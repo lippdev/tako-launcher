@@ -11,3 +11,5 @@ artifacts/
 *.db-wal
 *.db-shm
 .env
+.gstack/
+.DS_Store

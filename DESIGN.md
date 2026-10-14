@@ -1,0 +1,237 @@
+---
+version: alpha
+name: UltraLauncher Default Theme
+description: |
+  Tema padrão do UltraLauncher (MVP-013). Interface de sofá, 10 pés, controlada por joystick.
+  A arte do jogo em foco define a cor da tela inteira: o fundo assume o tom de destaque do jogo
+  e as superfícies são camadas brancas translúcidas sobre ele. Referência de canvas: 1920x1080,
+  escalada uniformemente (Viewbox) para outras resoluções.
+
+colors:
+  # Tom de destaque padrão; em uso real vem do jogo em foco (game.accent).
+  accent: "#C8102E"
+  accent-fallback: "#2B3A55"
+  # Derivados do accent (calculados em runtime, aqui os valores para o fallback vermelho).
+  accent-deep: "#7A0A1C"
+  canvas: "#0E1116"
+  on-accent: "#FFFFFF"
+  on-accent-muted: "#FFFFFFB8"
+  on-accent-subtle: "#FFFFFF80"
+  surface-1: "#FFFFFF1F"
+  surface-2: "#FFFFFF33"
+  surface-sidebar: "#FFFFFF2E"
+  surface-solid: "#FFFFFF"
+  on-surface-solid: "#11141A"
+  focus-ring: "#FFFFFF"
+  scrim: "#00000099"
+  success: "#3DDC84"
+  warning: "#FFB020"
+  error: "#FF5A5F"
+  store-steam: "#1B2838"
+  store-epic: "#2A2A2A"
+  store-gog: "#7A3FD1"
+  store-manual: "#3D5A80"
+
+typography:
+  display:
+    fontFamily: Inter
+    fontSize: 88px
+    fontWeight: 800
+    lineHeight: 0.95
+    letterSpacing: -0.03em
+  headline-lg:
+    fontFamily: Inter
+    fontSize: 56px
+    fontWeight: 800
+    lineHeight: 1.0
+    letterSpacing: -0.02em
+  headline-md:
+    fontFamily: Inter
+    fontSize: 34px
+    fontWeight: 700
+    lineHeight: 1.15
+    letterSpacing: -0.01em
+  title-md:
+    fontFamily: Inter
+    fontSize: 26px
+    fontWeight: 600
+    lineHeight: 1.2
+  body-lg:
+    fontFamily: Inter
+    fontSize: 26px
+    fontWeight: 400
+    lineHeight: 1.45
+  body-md:
+    fontFamily: Inter
+    fontSize: 22px
+    fontWeight: 400
+    lineHeight: 1.45
+  label-lg:
+    fontFamily: Inter
+    fontSize: 24px
+    fontWeight: 600
+    lineHeight: 1.2
+  label-md:
+    fontFamily: Inter
+    fontSize: 20px
+    fontWeight: 600
+    lineHeight: 1.2
+  label-sm:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: 500
+    lineHeight: 1.25
+  overline:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: 700
+    lineHeight: 1.2
+    letterSpacing: 0.16em
+  glyph:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: 800
+    lineHeight: 1
+
+rounded:
+  sm: 8px
+  md: 14px
+  lg: 22px
+  full: 999px
+
+spacing:
+  xxs: 4px
+  xs: 8px
+  sm: 16px
+  md: 24px
+  lg: 32px
+  xl: 48px
+  xxl: 64px
+  safe-x: 72px
+  safe-y: 48px
+
+motion:
+  focus: 160ms
+  page: 280ms
+  color: 600ms
+  easing: cubic-bezier(0.22, 1, 0.36, 1)
+  focus-scale: 1.08
+
+components:
+  sidebar:
+    backgroundColor: "{colors.surface-sidebar}"
+    width: 400px
+  sidebar-collapsed:
+    width: 120px
+  sidebar-item:
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.md}"
+    height: 64px
+    padding: 20px
+  sidebar-item-selected:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+  sidebar-item-focused:
+    backgroundColor: "{colors.surface-2}"
+  button-primary:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.full}"
+    height: 76px
+    padding: 44px
+  button-secondary:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.full}"
+    height: 76px
+  game-card:
+    rounded: "{rounded.md}"
+    width: 204px
+    height: 306px
+  game-card-label:
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-md}"
+  game-card-meta:
+    textColor: "{colors.on-accent-subtle}"
+    typography: "{typography.label-sm}"
+  search:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.on-accent-muted}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
+    height: 60px
+    width: 420px
+  hint-bar:
+    textColor: "{colors.on-accent-muted}"
+    typography: "{typography.label-sm}"
+    height: 72px
+  glyph-button:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+    typography: "{typography.glyph}"
+    rounded: "{rounded.full}"
+    size: 34px
+---
+
+# UltraLauncher — tema padrão
+
+## Overview
+
+Launcher de jogos para TV e handheld, usado do sofá com controle. A referência visual é uma biblioteca estilo "app de mídia": barra lateral com a organização da biblioteca, um destaque grande com o jogo atual e fileiras de capas. A tela inteira assume a cor do jogo em foco, como se a arte "vazasse" para a interface.
+
+Princípios:
+
+- **Controle primeiro.** Todo elemento interativo é alcançável pelo direcional/analógico, e sempre existe exatamente um elemento em foco, visível de longe.
+- **A arte é a protagonista.** O chrome é branco translúcido sobre o tom do jogo; nenhuma cor de marca compete com a capa.
+- **Legível a 3 metros.** Nenhum texto abaixo de 18px no canvas de 1080p.
+- **Implementável em WPF.** Só usar efeitos que o WPF reproduz sem custo alto (ver Do's and Don'ts).
+
+## Colors
+
+- **Accent (dinâmico):** cada jogo tem um `accent` extraído da arte (cor dominante saturada, pré-calculada na importação). O fundo é um gradiente de `accent` (topo-esquerda) para `accent-deep` (base). Ao trocar o foco, a cor anima em `motion.color`.
+- **accent-deep:** o accent escurecido ~45% em luminância. Garante contraste do texto branco na metade de baixo.
+- **Fallback (#2B3A55):** azul-ardósia para jogos sem arte ou com cor dominante pouco saturada.
+- **Superfícies:** brancos com alpha (`surface-1` 12%, `surface-2` 20%, `surface-sidebar` 18%). Funcionam sobre qualquer accent.
+- **Surface solid / on-surface-solid:** branco opaco com texto escuro, reservado à ação principal da tela (Jogar) e ao item ativo da barra lateral.
+- **Contraste:** se o accent tiver luminância relativa > 0.35, escurecer até atingir 4.5:1 com branco antes de usar como fundo.
+
+## Typography
+
+Inter (SIL OFL), empacotada com o app. Títulos de jogo usam `display` no destaque e `headline-lg` nos detalhes, peso 800, com tracking negativo, fazendo o papel do logo do jogo quando não há arte de logo. `overline` (caixa alta, tracking largo) marca contexto: "CONTINUAR JOGANDO", "INSTALADO".
+
+## Layout
+
+- **Canvas:** 1920x1080, escalado uniformemente. Área segura: `safe-x` 72px e `safe-y` 48px (overscan de TV).
+- **Barra lateral:** 400px quando em foco; recolhe para 120px (só ícones) quando o foco vai para o conteúdo, liberando espaço para o destaque.
+- **Conteúdo:** cabeçalho (título da página + busca), destaque (hero) ocupando ~55% da altura e fileiras horizontais de capas.
+- **Barra de dicas:** rodapé fixo com os glifos do controle e a ação de cada botão na tela atual.
+- **Grade da biblioteca:** capas 2:3 (204x306), 7 colunas quando a barra lateral está recolhida.
+
+## Elevation & Depth
+
+Profundidade vem de camadas de branco translúcido e de escala, não de sombra. A única sombra é a do elemento em foco (sombra preta 40%, blur 32px, deslocamento 16px), uma por vez. O hero usa gradientes de escurecimento (scrim) sobre a arte para destacar o texto.
+
+## Shapes
+
+Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da barra lateral em `md`. Nada de cantos vivos.
+
+## Components
+
+- **Foco:** anel branco de 4px afastado 6px do elemento, escala `motion.focus-scale` em capas, transição `motion.focus`. Itens de lista não escalam: ganham fundo `surface-2`.
+- **Game card:** capa 2:3, nome (`label-md`) e loja + tamanho (`label-sm`) abaixo. Em foco, a capa escala e o destaque da Home troca para o jogo.
+- **Botão primário (Jogar):** pílula branca com ícone de play. Um por tela.
+- **Barra de dicas:** glifos A/B/X/Y/LB/RB/Menu desenhados como círculos brancos com a letra; troca para teclas (Enter, Esc...) quando a última entrada foi teclado.
+- **Sair para o desktop:** sempre presente no fim da barra lateral (princípio "recovery-first" do PRD).
+
+## Do's and Don'ts
+
+- Do manter exatamente um elemento em foco e restaurar o foco anterior ao voltar (B).
+- Do lembrar a posição em cada fileira ao sair e voltar para ela.
+- Do usar transform (escala/translação), opacidade e animação de cor: são baratos no WPF.
+- Don't usar blur de fundo (`backdrop-filter`) ou vidro fosco: o WPF não tem equivalente nativo e o custo em GPU é alto.
+- Don't usar sombra em listas inteiras; só no item em foco.
+- Don't depender de hover ou de mouse para qualquer ação.
+- Don't usar arte de jogos reais em protótipos ou no repositório; usar capas geradas.

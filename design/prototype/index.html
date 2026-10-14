@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UltraLauncher — protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Tokens: espelham DESIGN.md. Canvas de referência 1920x1080, escalado como um Viewbox do WPF. */
+:root {
+  --accent: #C8102E;
+  --accent-deep: #7A0A1C;
+  --on-accent: #FFFFFF;
+  --on-accent-muted: rgba(255,255,255,.72);
+  --on-accent-subtle: rgba(255,255,255,.5);
+  --surface-1: rgba(255,255,255,.12);
+  --surface-2: rgba(255,255,255,.2);
+  --surface-sidebar: rgba(255,255,255,.18);
+  --surface-solid: #FFFFFF;
+  --on-surface-solid: #11141A;
+  --scrim: rgba(0,0,0,.6);
+  --success: #3DDC84;
+  --error: #FF5A5F;
+  --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-full: 999px;
+  --safe-x: 72px; --safe-y: 48px;
+  --t-focus: 160ms; --t-page: 280ms; --t-color: 600ms;
+  --ease: cubic-bezier(.22,1,.36,1);
+  --sidebar-w: 120px;
+}
+.reduced-motion { --t-focus: 0ms; --t-page: 0ms; --t-color: 0ms; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #000; overflow: hidden; }
+body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webkit-font-smoothing: antialiased; cursor: default; user-select: none; }
+
+#viewport { position: fixed; inset: 0; display: grid; place-items: center; }
+#stage { position: absolute; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; background: #0E1116; }
+
+/* ---------- Fundo: duas camadas que fazem crossfade (no WPF: duas camadas com animação de Opacity) ---------- */
+.backdrop { position: absolute; inset: 0; opacity: 0; transition: opacity var(--t-color) var(--ease); }
+.backdrop.visible { opacity: 1; }
+.backdrop .tint { position: absolute; inset: 0; }
+.backdrop .art { position: absolute; right: 0; top: 0; width: 1240px; height: 760px;
+  -webkit-mask-image: linear-gradient(to left, #000 45%, transparent 92%), linear-gradient(to top, transparent 0%, #000 40%);
+  -webkit-mask-composite: source-in; mask-composite: intersect; }
+.backdrop .art svg { width: 100%; height: 100%; display: block; }
+.backdrop .fade { position: absolute; inset: 0; }
+#stage.details-mode .backdrop .art { width: 1500px; height: 1080px; }
+
+/* ---------- Barra lateral ---------- */
+.sidebar { position: absolute; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); background: var(--surface-sidebar);
+  padding: var(--safe-y) 20px 96px; display: flex; flex-direction: column; gap: 6px; z-index: 5;
+  transition: width var(--t-page) var(--ease); overflow: hidden; }
+.sidebar.expanded { --sidebar-w: 400px; }
+.brand { display: flex; align-items: center; gap: 16px; height: 64px; padding: 0 20px; margin-bottom: 24px; white-space: nowrap; }
+.brand .mark { width: 40px; height: 40px; border-radius: 12px; background: var(--surface-solid); color: var(--on-surface-solid); display: grid; place-items: center; font-weight: 800; font-size: 20px; flex: none; }
+.brand .name { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.side-group { font-size: 18px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--on-accent-subtle);
+  padding: 22px 20px 8px; white-space: nowrap; transition: opacity var(--t-page); }
+.side-item { display: flex; align-items: center; gap: 18px; height: 64px; padding: 0 20px; border-radius: var(--r-md);
+  font-size: 24px; font-weight: 600; white-space: nowrap; position: relative; transition: background var(--t-focus), color var(--t-focus); }
+.side-item .ico { width: 34px; height: 34px; flex: none; display: grid; place-items: center; }
+.side-item .ico svg { width: 30px; height: 30px; }
+.side-item .count { margin-left: auto; font-size: 20px; color: var(--on-accent-subtle); font-weight: 600; }
+.side-item.selected { background: var(--surface-solid); color: var(--on-surface-solid); }
+.side-item.selected .count { color: rgba(17,20,26,.55); }
+.side-item:focus-visible, .side-item.focused { background: var(--surface-2); }
+.side-item.selected.focused { background: var(--surface-solid); }
+.sidebar:not(.expanded) .side-group, .sidebar:not(.expanded) .label, .sidebar:not(.expanded) .count, .sidebar:not(.expanded) .brand .name { opacity: 0; }
+.sidebar:not(.expanded) .side-group { height: 18px; padding: 0; margin: 10px 0; }
+.side-spacer { flex: 1; }
+.store-badge { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-size: 17px; font-weight: 800; color: #fff; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); }
+
+/* ---------- Área de conteúdo ---------- */
+.content { position: absolute; top: 0; bottom: 0; right: 0; left: var(--sidebar-w); transition: left var(--t-page) var(--ease); overflow: hidden; }
+.sidebar.expanded ~ .content { left: 400px; }
+.page { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity var(--t-page) var(--ease), transform var(--t-page) var(--ease); transform: translateY(16px); }
+.page.active { opacity: 1; pointer-events: auto; transform: none; }
+.scroller { position: absolute; left: 0; right: 0; top: 0; transition: transform var(--t-page) var(--ease); }
+/* Esmaece o conteúdo antes da barra de dicas (no WPF: OpacityMask com gradiente). */
+.page { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent calc(100% - 88px)); mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent calc(100% - 88px)); }
+
+.header { position: absolute; top: var(--safe-y); left: 64px; right: var(--safe-x); height: 60px; display: flex; align-items: center; justify-content: space-between; z-index: 3; }
+.header h1 { font-size: 26px; font-weight: 700; }
+.search { width: 420px; height: 60px; border-radius: var(--r-full); background: var(--surface-1); display: flex; align-items: center; gap: 14px; padding: 0 24px; color: var(--on-accent-muted); font-size: 20px; font-weight: 600; }
+.search svg { width: 26px; height: 26px; }
+
+/* ---------- Hero ---------- */
+.hero { position: relative; height: 548px; padding: 210px 0 0 64px; }
+.overline { font-size: 18px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--on-accent-muted); }
+.hero-title { font-size: 88px; font-weight: 800; line-height: .95; letter-spacing: -.03em; margin: 18px 0 18px; max-width: 900px; text-wrap: balance; text-shadow: 0 4px 24px rgba(0,0,0,.25); }
+.meta { font-size: 22px; color: var(--on-accent-muted); display: flex; gap: 14px; align-items: center; }
+.meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--on-accent-subtle); }
+.actions { display: flex; gap: 18px; margin-top: 34px; }
+
+.btn { height: 76px; border-radius: var(--r-full); display: inline-flex; align-items: center; justify-content: center; gap: 14px; font-size: 24px; font-weight: 600; padding: 0 44px; position: relative;
+  transition: transform var(--t-focus) var(--ease), box-shadow var(--t-focus) var(--ease), background var(--t-focus); }
+.btn svg { width: 26px; height: 26px; }
+.btn.primary { background: var(--surface-solid); color: var(--on-surface-solid); }
+.btn.secondary { background: var(--surface-2); color: var(--on-accent); }
+.btn.round { width: 76px; padding: 0; }
+.btn.danger { background: var(--error); color: #fff; }
+
+/* Anel de foco: 4px branco, afastado 6px. Sombra só no elemento em foco. */
+.focused.btn, .focused.chip, .focused.search, .focused.setting, .focused.tile-more { outline: 4px solid #fff; outline-offset: 6px; box-shadow: 0 16px 32px rgba(0,0,0,.4); transform: scale(1.04); }
+.focused.search { transform: none; }
+
+/* ---------- Fileiras e capas ---------- */
+.row { position: relative; padding-left: 64px; margin-bottom: 40px; }
+.row-title { font-size: 34px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 20px; display: flex; align-items: baseline; gap: 18px; }
+.row-title small { font-size: 20px; color: var(--on-accent-subtle); font-weight: 600; }
+.track-wrap { overflow: visible; }
+.track { display: flex; gap: 26px; transition: transform var(--t-page) var(--ease); }
+.card { width: 204px; flex: none; }
+.cover { width: 204px; height: 306px; border-radius: var(--r-md); overflow: hidden; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,.18);
+  transition: transform var(--t-focus) var(--ease), box-shadow var(--t-focus) var(--ease), outline-color var(--t-focus); outline: 4px solid transparent; outline-offset: 6px; }
+.cover svg { width: 100%; height: 100%; display: block; }
+.card .name { font-size: 20px; font-weight: 600; margin-top: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: transform var(--t-focus) var(--ease); }
+.card .sub { font-size: 18px; color: var(--on-accent-subtle); margin-top: 4px; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+.card .sub .store-badge { width: 22px; height: 22px; border-radius: 6px; font-size: 12px; box-shadow: none; }
+.card.focused .cover { transform: scale(1.08); outline-color: #fff; box-shadow: 0 16px 32px rgba(0,0,0,.4); }
+.card.focused .name { transform: translateY(12px); }
+.card.focused .sub { transform: translateY(12px); }
+.card .sub { transition: transform var(--t-focus) var(--ease); }
+.fav-pin { position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,.45); display: none; place-items: center; }
+.fav-pin svg { width: 22px; height: 22px; }
+.card.fav .fav-pin { display: grid; }
+.not-installed .cover::after { content: "NÃO INSTALADO"; position: absolute; left: 12px; top: 12px; font-size: 13px; font-weight: 800; letter-spacing: .12em; background: rgba(0,0,0,.6); padding: 6px 10px; border-radius: 6px; }
+.tile-more { width: 204px; height: 306px; border-radius: var(--r-md); background: var(--surface-1); display: grid; place-items: center; text-align: center; font-size: 24px; font-weight: 700; flex: none; transition: transform var(--t-focus) var(--ease); }
+.tile-more svg { width: 48px; height: 48px; display: block; margin: 0 auto 14px; }
+
+/* ---------- Biblioteca ---------- */
+.lib-head { padding: 140px 64px 0; display: flex; align-items: end; justify-content: space-between; }
+.lib-head h2 { font-size: 56px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.lib-head .count { font-size: 22px; color: var(--on-accent-muted); margin-top: 12px; }
+.chips { display: flex; gap: 14px; }
+.chip { height: 56px; padding: 0 26px; border-radius: var(--r-full); background: var(--surface-1); display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; transition: transform var(--t-focus) var(--ease); }
+.chip b { font-weight: 800; }
+.grid { display: grid; grid-template-columns: repeat(7, 204px); gap: 44px 36px; padding: 48px 64px 200px; }
+
+/* ---------- Detalhes ---------- */
+.details { padding: 210px 0 0 64px; max-width: 1100px; }
+.details .hero-title { font-size: 76px; }
+.stats { display: flex; gap: 48px; margin: 36px 0 34px; }
+.stat .k { font-size: 18px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--on-accent-subtle); }
+.stat .v { font-size: 30px; font-weight: 700; margin-top: 8px; }
+.desc { font-size: 24px; line-height: 1.5; color: var(--on-accent-muted); max-width: 900px; }
+.details .actions { margin-top: 44px; }
+
+/* ---------- Configurações ---------- */
+.settings { padding: 140px 64px 0; max-width: 1180px; }
+.settings h2 { font-size: 56px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 40px; }
+.setting { display: flex; align-items: center; justify-content: space-between; height: 92px; padding: 0 32px; border-radius: var(--r-lg); background: var(--surface-1); margin-bottom: 14px; transition: transform var(--t-focus) var(--ease); }
+.setting.focused { transform: scale(1.015); }
+.setting .t { font-size: 24px; font-weight: 600; }
+.setting .d { font-size: 18px; color: var(--on-accent-subtle); margin-top: 6px; }
+.setting .val { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 12px; }
+.toggle { width: 72px; height: 40px; border-radius: 20px; background: rgba(255,255,255,.25); position: relative; transition: background var(--t-focus); }
+.toggle::after { content: ""; position: absolute; top: 5px; left: 5px; width: 30px; height: 30px; border-radius: 50%; background: #fff; transition: transform var(--t-focus) var(--ease); }
+.toggle.on { background: var(--success); }
+.toggle.on::after { transform: translateX(32px); }
+
+/* ---------- Overlays: iniciando / jogando, recuperação, diálogo ---------- */
+.overlay { position: absolute; inset: 0; z-index: 20; display: none; }
+.overlay.active { display: block; animation: fade-in var(--t-page) var(--ease); }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+#launch { background: linear-gradient(160deg, var(--accent), var(--accent-deep)); }
+#launch .inner, #recovery .inner { position: absolute; left: 160px; top: 50%; transform: translateY(-50%); max-width: 1100px; }
+#launch .cover-mini { width: 190px; height: 285px; border-radius: var(--r-md); overflow: hidden; box-shadow: 0 16px 32px rgba(0,0,0,.4); margin-bottom: 40px; }
+#launch .cover-mini svg { width: 100%; height: 100%; display: block; }
+.progress { width: 560px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.2); margin-top: 36px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: #fff; border-radius: 4px; }
+.launching .progress i { animation: load 2.4s var(--ease) forwards; }
+@keyframes load { to { width: 100%; } }
+.status-line { font-size: 26px; color: var(--on-accent-muted); margin-top: 22px; }
+#recovery { background: #12151B; }
+#recovery .code { font-family: ui-monospace, Menlo, monospace; font-size: 18px; color: rgba(255,255,255,.45); margin-top: 22px; }
+.warn-ico { width: 88px; height: 88px; border-radius: 26px; background: rgba(255,90,95,.16); display: grid; place-items: center; margin-bottom: 36px; }
+.warn-ico svg { width: 48px; height: 48px; color: var(--error); }
+#dialog { background: var(--scrim); }
+#dialog .box { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 820px; border-radius: 28px; background: #1A1E26; padding: 56px; }
+#dialog h3 { font-size: 40px; font-weight: 800; letter-spacing: -.01em; }
+#dialog p { font-size: 24px; color: rgba(255,255,255,.7); margin-top: 16px; line-height: 1.45; }
+#dialog .actions { margin-top: 40px; }
+
+/* ---------- Barra de dicas e toast ---------- */
+.hints { position: absolute; left: 0; right: 0; bottom: 0; height: 88px; padding: 0 var(--safe-x); display: flex; align-items: center; justify-content: flex-end; gap: 36px; z-index: 30;
+  background: linear-gradient(to top, rgba(0,0,0,.35), transparent); font-size: 20px; font-weight: 600; color: var(--on-accent-muted); }
+.hint { display: flex; align-items: center; gap: 12px; }
+.glyph { min-width: 36px; height: 36px; padding: 0 8px; border-radius: 18px; background: #fff; color: #11141A; display: grid; place-items: center; font-size: 17px; font-weight: 800; }
+.glyph.key { border-radius: 8px; min-width: 40px; font-size: 15px; }
+.hints .clock { margin-right: auto; font-size: 22px; color: var(--on-accent); font-weight: 700; display: flex; gap: 22px; align-items: center; }
+.hints .pad-state { font-size: 18px; color: var(--on-accent-subtle); font-weight: 600; }
+.toast { position: absolute; left: 50%; bottom: 120px; transform: translate(-50%, 20px); background: #fff; color: #11141A; font-size: 22px; font-weight: 600; padding: 20px 32px; border-radius: var(--r-full); opacity: 0; z-index: 40; transition: opacity var(--t-focus), transform var(--t-page) var(--ease); box-shadow: 0 16px 32px rgba(0,0,0,.35); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Nota do protótipo (fora do canvas) */
+#proto-note { position: fixed; right: 12px; top: 10px; z-index: 100; font: 12px/1.4 system-ui; color: rgba(255,255,255,.55); text-align: right; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="proto-note">Protótipo UltraLauncher · setas/Enter/Esc ou controle · Q/E = LB/RB · F = X · / = Y · M = Menu</div>
+<div id="viewport">
+<div id="stage">
+  <div class="backdrop" id="bgA"><div class="tint"></div><div class="art"></div><div class="fade"></div></div>
+  <div class="backdrop" id="bgB"><div class="tint"></div><div class="art"></div><div class="fade"></div></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="mark">U</div><div class="name">UltraLauncher</div></div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="home"><span class="ico" data-icon="home"></span><span class="label">Início</span></div>
+    <div class="side-group">Biblioteca</div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="all"><span class="ico" data-icon="grid"></span><span class="label">Todos os jogos</span><span class="count" data-count="all"></span></div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="installed"><span class="ico" data-icon="check"></span><span class="label">Instalados</span><span class="count" data-count="installed"></span></div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="favorites"><span class="ico" data-icon="star"></span><span class="label">Favoritos</span><span class="count" data-count="favorites"></span></div>
+    <div class="side-group">Fontes</div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="steam"><span class="ico"><span class="store-badge" style="background:#1B2838">S</span></span><span class="label">Steam</span><span class="count" data-count="steam"></span></div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="epic"><span class="ico"><span class="store-badge" style="background:#2A2A2A">E</span></span><span class="label">Epic Games</span><span class="count" data-count="epic"></span></div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="gog"><span class="ico"><span class="store-badge" style="background:#7A3FD1">G</span></span><span class="label">GOG</span><span class="count" data-count="gog"></span></div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="manual"><span class="ico"><span class="store-badge" style="background:#3D5A80">M</span></span><span class="label">Adicionados</span><span class="count" data-count="manual"></span></div>
+    <div class="side-spacer"></div>
+    <div class="side-item" data-nav data-group="sidebar" data-route="settings"><span class="ico" data-icon="gear"></span><span class="label">Configurações</span></div>
+    <div class="side-item" data-nav data-group="sidebar" data-action="exit"><span class="ico" data-icon="power"></span><span class="label">Sair para o desktop</span></div>
+  </aside>
+
+  <main class="content" id="content">
+    <!-- Início -->
+    <section class="page" id="page-home">
+      <div class="header"><h1>Início</h1><div class="search" data-nav data-group="header" data-action="search"><span data-icon="search"></span>Buscar jogos</div></div>
+      <div class="scroller" id="home-scroller">
+        <div class="hero">
+          <div class="overline" id="home-overline"></div>
+          <div class="hero-title" id="home-title"></div>
+          <div class="meta" id="home-meta"></div>
+          <div class="actions">
+            <div class="btn primary" data-nav data-group="hero" data-action="play-hero"><span data-icon="play"></span>Jogar</div>
+            <div class="btn secondary round" data-nav data-group="hero" data-action="details-hero"><span data-icon="info"></span></div>
+          </div>
+        </div>
+        <div class="row" data-row="ready"><div class="row-title">Prontos para jogar <small id="ready-count"></small></div><div class="track-wrap"><div class="track" id="track-ready"></div></div></div>
+        <div class="row" data-row="recent"><div class="row-title">Adicionados recentemente</div><div class="track-wrap"><div class="track" id="track-recent"></div></div></div>
+      </div>
+    </section>
+
+    <!-- Biblioteca -->
+    <section class="page" id="page-library">
+      <div class="scroller" id="lib-scroller">
+        <div class="lib-head">
+          <div><h2 id="lib-title"></h2><div class="count" id="lib-count"></div></div>
+          <div class="chips"><div class="chip" data-nav data-group="lib-chips" data-action="sort">Ordenar: <b id="sort-label"></b></div></div>
+        </div>
+        <div class="grid" id="lib-grid"></div>
+      </div>
+    </section>
+
+    <!-- Detalhes -->
+    <section class="page" id="page-details">
+      <div class="details">
+        <div class="overline" id="det-overline"></div>
+        <div class="hero-title" id="det-title"></div>
+        <div class="stats" id="det-stats"></div>
+        <div class="desc" id="det-desc"></div>
+        <div class="actions" id="det-actions"></div>
+      </div>
+    </section>
+
+    <!-- Configurações -->
+    <section class="page" id="page-settings">
+      <div class="settings">
+        <h2>Configurações</h2>
+        <div class="setting" data-nav data-group="settings" data-setting="theme"><div><div class="t">Tema</div><div class="d">Temas Fullscreen do Playnite 10 importados aparecem aqui</div></div><div class="val" id="val-theme"></div></div>
+        <div class="setting" data-nav data-group="settings" data-setting="dynamic"><div><div class="t">Cor dinâmica</div><div class="d">A interface assume a cor da arte do jogo em foco</div></div><div class="toggle" id="val-dynamic"></div></div>
+        <div class="setting" data-nav data-group="settings" data-setting="motion"><div><div class="t">Reduzir animações</div><div class="d">Remove escalas e transições</div></div><div class="toggle" id="val-motion"></div></div>
+        <div class="setting" data-nav data-group="settings" data-setting="startup"><div><div class="t">Abrir em tela cheia ao iniciar o Windows</div><div class="d">Fullscreen convencional; integração com o Xbox mode depende da Microsoft (MVP-007)</div></div><div class="toggle" id="val-startup"></div></div>
+        <div class="setting" data-nav data-group="settings" data-setting="crash"><div><div class="t">Simular falha de tema</div><div class="d">Mostra a tela de recuperação (MVP-021 / MVP-036)</div></div><div class="val">Testar <span data-icon="chev"></span></div></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Iniciando / jogando -->
+  <div class="overlay" id="launch">
+    <div class="inner">
+      <div class="cover-mini" id="launch-cover"></div>
+      <div class="overline" id="launch-overline">Iniciando</div>
+      <div class="hero-title" id="launch-title"></div>
+      <div class="progress"><i></i></div>
+      <div class="status-line" id="launch-status"></div>
+      <div class="actions" id="launch-actions"></div>
+    </div>
+  </div>
+
+  <!-- Recuperação -->
+  <div class="overlay" id="recovery">
+    <div class="inner">
+      <div class="warn-ico"><span data-icon="alert"></span></div>
+      <div class="hero-title" style="font-size:64px">O tema não pôde ser carregado</div>
+      <div class="desc">O UltraLauncher voltou para um modo seguro. Seus jogos e configurações não foram alterados.</div>
+      <div class="actions">
+        <div class="btn primary" data-nav data-group="recovery" data-action="recover-default">Usar tema padrão</div>
+        <div class="btn secondary" data-nav data-group="recovery" data-action="recover-retry">Tentar de novo</div>
+        <div class="btn secondary" data-nav data-group="recovery" data-action="exit">Sair para o desktop</div>
+      </div>
+      <div class="code">ThemeXamlRejectedException · Views/Main.xaml (12,5) TypeNotAllowed: Tipo 'ObjectDataProvider' não é permitido em temas.</div>
+    </div>
+  </div>
+
+  <!-- Diálogo -->
+  <div class="overlay" id="dialog">
+    <div class="box">
+      <h3 id="dlg-title"></h3>
+      <p id="dlg-text"></p>
+      <div class="actions" id="dlg-actions"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <footer class="hints" id="hints"></footer>
+</div>
+</div>
+
+<script>
+'use strict';
+
+/* ================= Ícones (traço simples; no WPF viram Path) ================= */
+const ICONS = {
+  home: '<path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="m7.5 12.5 3 3 6-6.5"/>',
+  star: '<path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/>',
+  starFill: '<path fill="currentColor" d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/>',
+  gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.4 7.4 0 0 0 7 6.5l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 3l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.4 7.4 0 0 0 2.6-1.5l2.4 1 2-3.4z"/>',
+  power: '<path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+  play: '<path fill="currentColor" stroke="none" d="M7 4.8v14.4a1 1 0 0 0 1.5.9l11.3-7.2a1 1 0 0 0 0-1.7L8.5 3.9A1 1 0 0 0 7 4.8z"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".6" fill="currentColor"/>',
+  chev: '<path d="m9 5 7 7-7 7"/>',
+  more: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+  alert: '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+};
+const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+function hydrateIcons(root = document) { root.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); }); }
+
+/* ================= Biblioteca fictícia (Marco 0: "biblioteca fictícia") ================= */
+const STORES = { steam: { name: 'Steam', badge: 'S', color: '#1B2838' }, epic: { name: 'Epic Games', badge: 'E', color: '#2A2A2A' }, gog: { name: 'GOG', badge: 'G', color: '#7A3FD1' }, manual: { name: 'Adicionado', badge: 'M', color: '#3D5A80' } };
+const GAMES = [
+  { id: 'ashen', title: 'Ashen Frontier', store: 'steam', size: '98,4 GB', accent: '#C8102E', pal: ['#F2B134', '#C8102E', '#3A0610'], motif: 'sun', genre: 'Ação · Faroeste', played: 'Jogado ontem', hours: 42, installed: true, fav: true, added: 14, desc: 'Um pistoleiro em fuga atravessa um território em chamas. Mundo aberto, cavalgadas ao pôr do sol e escolhas que marcam a fronteira.' },
+  { id: 'tide', title: 'Tidebreaker', store: 'epic', size: '54,1 GB', accent: '#0E7C86', pal: ['#7FE0D8', '#0E7C86', '#062C33'], motif: 'waves', genre: 'Aventura naval', played: 'Há 3 dias', hours: 18, installed: true, added: 2, desc: 'Comande um navio pirata em mares procedurais, recrute tripulação e enfrente tempestades que mudam o mapa.' },
+  { id: 'moon', title: 'Moonlit Atelier', store: 'gog', size: '3,2 GB', accent: '#6A3FB5', pal: ['#F4D6FF', '#6A3FB5', '#1E1240'], motif: 'moon', genre: 'Aconchegante', played: 'Semana passada', hours: 9, installed: true, fav: true, added: 20, desc: 'Gerencie uma oficina mágica que só abre à noite. Crie poções, atenda clientes curiosos e decore cada canto.' },
+  { id: 'circuit', title: 'Circuit Saints', store: 'steam', size: '61,0 GB', accent: '#E4572E', pal: ['#FFD166', '#E4572E', '#2B0F0A'], motif: 'stripes', genre: 'Corrida', played: 'Há 2 semanas', hours: 27, installed: true, added: 9, desc: 'Corridas urbanas em alta velocidade com física arcade, garagem profunda e campeonatos noturnos.' },
+  { id: 'hollow', title: 'Hollow Lantern', store: 'epic', size: '41,7 GB', accent: '#2F6B3B', pal: ['#C9F27B', '#2F6B3B', '#0B1F10'], motif: 'rings', genre: 'Terror', played: 'Nunca jogado', hours: 0, installed: true, added: 1, desc: 'Uma lanterna, uma floresta e algo que não quer ser encontrado. Terror psicológico em primeira pessoa.' },
+  { id: 'pixel', title: 'Pixel Pilgrims', store: 'manual', size: '812 MB', accent: '#D99100', pal: ['#FFF1B8', '#D99100', '#3A2600'], motif: 'grid', genre: 'Plataforma', played: 'Há 1 mês', hours: 6, installed: true, added: 5, desc: 'Plataforma retrô com fases curtas e precisas. Adicionado manualmente a partir de um executável local.' },
+  { id: 'starfall', title: 'Starfall Atlas', store: 'steam', size: '120 GB', accent: '#2456C9', pal: ['#9EC5FF', '#2456C9', '#08143A'], motif: 'rings', genre: 'Ficção científica', played: 'Há 4 dias', hours: 63, installed: true, fav: true, added: 30, desc: 'Explore sistemas estelares, negocie entre facções e monte a nave dos seus sonhos módulo a módulo.' },
+  { id: 'kitsune', title: 'Kitsune Run', store: 'gog', size: '7,5 GB', accent: '#D62D6F', pal: ['#FFC2D9', '#D62D6F', '#3A0A1E'], motif: 'sun', genre: 'Ação', played: 'Nunca jogado', hours: 0, installed: false, added: 3, desc: 'Uma raposa de nove caudas corre por templos flutuantes em combates rápidos e estilosos.' },
+  { id: 'orchard', title: 'Iron Orchard', store: 'steam', size: '18,3 GB', accent: '#6B7A1F', pal: ['#E3F0A0', '#6B7A1F', '#1C2006'], motif: 'mountains', genre: 'Estratégia', played: 'Há 2 meses', hours: 120, installed: true, added: 40, desc: 'Construa uma colônia agrícola mecanizada e defenda as colheitas de estações cada vez mais hostis.' },
+  { id: 'glacier', title: 'Glacier Echo', store: 'epic', size: '2,1 GB', accent: '#3A8FB7', pal: ['#E6F7FF', '#3A8FB7', '#0B2433'], motif: 'mountains', genre: 'Quebra-cabeça', played: 'Há 6 dias', hours: 4, installed: true, added: 7, desc: 'Quebra-cabeças de som e reflexo em cavernas de gelo. Cada eco revela um caminho novo.' },
+  { id: 'heist', title: 'Velvet Heist', store: 'steam', size: '33,9 GB', accent: '#8E1B3A', pal: ['#FFB3C4', '#8E1B3A', '#22050D'], motif: 'grid', genre: 'Furtividade', played: 'Nunca jogado', hours: 0, installed: false, added: 11, desc: 'Planeje o assalto perfeito ao cassino mais vigiado da cidade, com equipe e rotas de fuga sob medida.' },
+  { id: 'choir', title: 'Sunken Choir', store: 'gog', size: '12,4 GB', accent: '#1F5F8B', pal: ['#BEE3FF', '#1F5F8B', '#061A28'], motif: 'waves', genre: 'Aventura', played: 'Há 3 semanas', hours: 11, installed: true, added: 16, desc: 'Mergulhe numa cidade submersa onde a música controla as marés e as portas antigas.' },
+  { id: 'rhyme', title: 'Rust & Rhyme', store: 'steam', size: '4,0 GB', accent: '#B5502D', pal: ['#FFD8C2', '#B5502D', '#2E1209'], motif: 'rings', genre: 'Ritmo', played: 'Há 2 dias', hours: 15, installed: true, added: 4, desc: 'Robôs enferrujados batalham no compasso da música. Cada acerto no tempo vira golpe.' },
+  { id: 'paper', title: 'Paper Kingdoms', store: 'epic', size: '9,2 GB', accent: '#4C6EF5', pal: ['#DDE4FF', '#4C6EF5', '#101A45'], motif: 'mountains', genre: 'RPG tático', played: 'Nunca jogado', hours: 0, installed: true, added: 6, desc: 'Reinos de papel dobrado disputam um mapa de origami em batalhas por turnos.' },
+  { id: 'market', title: 'Night Market', store: 'manual', size: '1,2 GB', accent: '#C2185B', pal: ['#FFD1E3', '#C2185B', '#2E0516'], motif: 'grid', genre: 'Simulação', played: 'Há 5 dias', hours: 8, installed: true, added: 8, desc: 'Monte sua barraca num mercado noturno e conquiste clientes com receitas de todo o mundo.' },
+  { id: 'drift', title: 'Dune Drift', store: 'steam', size: '22,6 GB', accent: '#C9781D', pal: ['#FFE2B0', '#C9781D', '#331C04'], motif: 'sun', genre: 'Corrida off-road', played: 'Há 1 semana', hours: 13, installed: true, added: 12, desc: 'Rallies no deserto com dunas que mudam a cada tempestade de areia.' },
+];
+const gameById = id => GAMES.find(g => g.id === id);
+
+/* ================= Capas geradas (sem arte real) ================= */
+function rng(seed) { let s = 0; for (const c of seed) s = (s * 31 + c.charCodeAt(0)) >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
+function motifSvg(g, w, h, uid) {
+  const [light, mid, dark] = g.pal; const r = rng(g.id); const p = [];
+  p.push(`<defs><linearGradient id="bg${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mid}"/><stop offset="1" stop-color="${dark}"/></linearGradient>
+    <radialGradient id="glow${uid}" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${light}" stop-opacity="0"/></radialGradient></defs>`);
+  p.push(`<rect width="${w}" height="${h}" fill="url(#bg${uid})"/>`);
+  const cx = w * .62, cy = h * .4, R = Math.min(w, h) * .3;
+  const mountains = (base, amp, color, op) => { let d = `M0 ${h}`; const n = 7; for (let i = 0; i <= n; i++) d += ` L${(w / n) * i} ${base - r() * amp}`; return `<path d="${d} L${w} ${h}Z" fill="${color}" opacity="${op}"/>`; };
+  switch (g.motif) {
+    case 'sun':
+      p.push(`<circle cx="${cx}" cy="${cy}" r="${R * 1.9}" fill="url(#glow${uid})" opacity=".55"/><circle cx="${cx}" cy="${cy}" r="${R}" fill="${light}"/>`);
+      for (let i = 0; i < 5; i++) p.push(`<rect x="0" y="${cy + R * (.15 + i * .18)}" width="${w}" height="${R * .06 * (i + 1)}" fill="${mid}" opacity=".9"/>`);
+      p.push(mountains(h * .78, h * .12, dark, .85), mountains(h * .88, h * .08, '#000', .45));
+      break;
+    case 'waves':
+      p.push(`<circle cx="${cx}" cy="${cy * .8}" r="${R * .8}" fill="${light}" opacity=".85"/>`);
+      for (let i = 0; i < 6; i++) { const y = h * (.55 + i * .08), a = h * .025; let d = `M0 ${y}`; for (let x = 0; x <= w; x += w / 8) d += ` Q${x + w / 16} ${y - a} ${x + w / 8} ${y}`; p.push(`<path d="${d} L${w} ${h} L0 ${h}Z" fill="${i % 2 ? dark : mid}" opacity="${.35 + i * .1}"/>`); }
+      break;
+    case 'moon':
+      for (let i = 0; i < 40; i++) p.push(`<circle cx="${r() * w}" cy="${r() * h * .7}" r="${r() * 1.6 + .4}" fill="${light}" opacity="${r() * .8 + .2}"/>`);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${light}"/><circle cx="${cx + R * .38}" cy="${cy - R * .2}" r="${R * .9}" fill="${mid}"/>`);
+      p.push(mountains(h * .82, h * .1, dark, .9));
+      break;
+    case 'stripes':
+      for (let i = -4; i < 10; i++) p.push(`<rect x="${i * w * .16}" y="${-h * .2}" width="${w * .07}" height="${h * 1.6}" fill="${i % 3 ? light : '#fff'}" opacity="${i % 2 ? .22 : .5}" transform="rotate(28 ${w / 2} ${h / 2})"/>`);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="${R * .7}" fill="none" stroke="${light}" stroke-width="${R * .12}"/>`);
+      break;
+    case 'rings':
+      p.push(`<circle cx="${cx}" cy="${cy}" r="${R * 2}" fill="url(#glow${uid})" opacity=".5"/>`);
+      for (let i = 1; i <= 6; i++) p.push(`<circle cx="${cx}" cy="${cy}" r="${R * i * .32}" fill="none" stroke="${light}" stroke-width="${2 + i * .6}" opacity="${1 - i * .13}"/>`);
+      p.push(`<circle cx="${cx}" cy="${cy}" r="${R * .16}" fill="${light}"/>`);
+      break;
+    case 'grid': {
+      p.push(`<circle cx="${w / 2}" cy="${h * .46}" r="${R * 1.05}" fill="${light}" opacity=".95"/>`);
+      const hz = h * .6; p.push(`<rect y="${hz}" width="${w}" height="${h - hz}" fill="${dark}"/>`);
+      for (let i = 0; i < 9; i++) { const y = hz + (h - hz) * Math.pow(i / 8, 1.8); p.push(`<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="${light}" stroke-width="1.5" opacity=".55"/>`); }
+      for (let i = -8; i <= 8; i++) p.push(`<line x1="${w / 2 + i * w * .04}" y1="${hz}" x2="${w / 2 + i * w * .3}" y2="${h}" stroke="${light}" stroke-width="1.5" opacity=".55"/>`);
+      break; }
+    case 'mountains':
+      p.push(`<circle cx="${cx}" cy="${cy * .75}" r="${R * .55}" fill="${light}" opacity=".9"/>`);
+      p.push(mountains(h * .55, h * .2, light, .35), mountains(h * .7, h * .18, mid, .8), mountains(h * .85, h * .12, dark, .95));
+      break;
+  }
+  return p.join('');
+}
+let uidSeq = 0;
+function coverSvg(g) {
+  const uid = ++uidSeq, w = 200, h = 300;
+  const words = g.title.toUpperCase().split(' '); const lines = []; let cur = '';
+  for (const wd of words) { if ((cur + ' ' + wd).trim().length > 11 && cur) { lines.push(cur); cur = wd; } else cur = (cur + ' ' + wd).trim(); }
+  lines.push(cur);
+  const fs = lines.some(l => l.length > 9) ? 24 : 30;
+  const text = lines.map((l, i) => `<text x="16" y="${h - 22 - (lines.length - 1 - i) * (fs + 2)}" font-family="Inter" font-weight="800" font-size="${fs}" letter-spacing="-1" fill="#fff">${l.replace('&', '&amp;')}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice">${motifSvg(g, w, h, uid)}<rect y="${h * .55}" width="${w}" height="${h * .45}" fill="url(#sh${uid})"/><defs><linearGradient id="sh${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity="0"/><stop offset="1" stop-opacity=".55"/></linearGradient></defs>${text}</svg>`;
+}
+const heroSvg = g => `<svg viewBox="0 0 1240 760" preserveAspectRatio="xMidYMid slice">${motifSvg(g, 1240, 760, ++uidSeq)}</svg>`;
+
+/* ================= Cor dinâmica ================= */
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgbToHex([r, g, b]) { return '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join(''); }
+function luminance([r, g, b]) { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); }
+function accentFor(g) {
+  let rgb = hexToRgb(state.dynamic ? g.accent : '#2B3A55');
+  // Garante contraste 4.5:1 com branco (DESIGN.md › Colors).
+  while (luminance(rgb) > .18) rgb = rgb.map(v => v * .92);
+  return { accent: rgbToHex(rgb), deep: rgbToHex(rgb.map(v => v * .55)) };
+}
+let bgFront = 'A', bgGameId = null, bgMode = '';
+function setBackdrop(g, mode = 'home') {
+  if (bgGameId === g.id && bgMode === mode + state.dynamic) return;
+  bgGameId = g.id; bgMode = mode + state.dynamic;
+  const { accent, deep } = accentFor(g);
+  const next = document.getElementById(bgFront === 'A' ? 'bgB' : 'bgA');
+  const prev = document.getElementById(bgFront === 'A' ? 'bgA' : 'bgB');
+  next.querySelector('.tint').style.background = `linear-gradient(160deg, ${accent} 0%, ${deep} 100%)`;
+  next.querySelector('.art').innerHTML = heroSvg(g);
+  next.querySelector('.fade').style.background = `linear-gradient(90deg, ${accent} 0%, ${accent}00 55%), linear-gradient(0deg, ${deep} 0%, ${deep}00 45%)`;
+  next.classList.add('visible'); prev.classList.remove('visible');
+  bgFront = bgFront === 'A' ? 'B' : 'A';
+  document.documentElement.style.setProperty('--accent', accent);
+  document.documentElement.style.setProperty('--accent-deep', deep);
+}
+
+/* ================= Estado e rotas ================= */
+const state = { route: 'home', filter: 'all', sort: 0, theme: 0, dynamic: true, motion: false, startup: true, gameId: null, heroGameId: 'ashen', input: 'keyboard', pad: null };
+const SORTS = ['Jogados recentemente', 'Nome', 'Tempo de jogo', 'Adicionados'];
+const THEMES = ['Padrão', 'Ardósia (sem cor dinâmica)', 'Aurora (Playnite 10, exemplo)'];
+const FILTERS = { all: 'Todos os jogos', installed: 'Instalados', favorites: 'Favoritos', steam: 'Steam', epic: 'Epic Games', gog: 'GOG', manual: 'Adicionados manualmente' };
+const history = [];
+
+function filtered() {
+  const f = state.filter;
+  let list = GAMES.filter(g => f === 'all' || (f === 'installed' && g.installed) || (f === 'favorites' && g.fav) || g.store === f);
+  const sorters = [(a, b) => rank(a) - rank(b), (a, b) => a.title.localeCompare(b.title), (a, b) => b.hours - a.hours, (a, b) => a.added - b.added];
+  return list.slice().sort(sorters[state.sort]);
+}
+const PLAYED_ORDER = ['Jogado ontem', 'Há 2 dias', 'Há 3 dias', 'Há 4 dias', 'Há 5 dias', 'Há 6 dias', 'Há 1 semana', 'Semana passada', 'Há 2 semanas', 'Há 3 semanas', 'Há 1 mês', 'Há 2 meses', 'Nunca jogado'];
+const rank = g => PLAYED_ORDER.indexOf(g.played);
+
+function cardHtml(g, group) {
+  const s = STORES[g.store];
+  return `<div class="card ${g.installed ? '' : 'not-installed'} ${g.fav ? 'fav' : ''}" data-nav data-group="${group}" data-game="${g.id}">
+    <div class="cover">${coverSvg(g)}<div class="fav-pin">${icon('starFill')}</div></div>
+    <div class="name">${g.title}</div>
+    <div class="sub"><span class="store-badge" style="background:${s.color}">${s.badge}</span>${s.name} · ${g.size}</div></div>`;
+}
+
+function renderCounts() {
+  const c = { all: GAMES.length, installed: GAMES.filter(g => g.installed).length, favorites: GAMES.filter(g => g.fav).length };
+  for (const k of Object.keys(STORES)) c[k] = GAMES.filter(g => g.store === k).length;
+  document.querySelectorAll('[data-count]').forEach(el => { el.textContent = c[el.dataset.count]; });
+}
+
+function renderHome() {
+  const ready = GAMES.filter(g => g.installed).sort((a, b) => rank(a) - rank(b));
+  document.getElementById('ready-count').textContent = `${ready.length} instalados`;
+  document.getElementById('track-ready').innerHTML = ready.slice(0, 10).map(g => cardHtml(g, 'row-ready')).join('') +
+    `<div class="tile-more" data-nav data-group="row-ready" data-action="see-all">${icon('more')}Ver todos</div>`;
+  const recent = GAMES.slice().sort((a, b) => a.added - b.added).slice(0, 10);
+  document.getElementById('track-recent').innerHTML = recent.map(g => cardHtml(g, 'row-recent')).join('');
+  updateHero(gameById(state.heroGameId));
+}
+function updateHero(g) {
+  state.heroGameId = g.id;
+  const first = g.id === GAMES.filter(x => x.installed).sort((a, b) => rank(a) - rank(b))[0].id;
+  document.getElementById('home-overline').textContent = first ? 'Continuar jogando' : `${g.genre} · ${STORES[g.store].name}`;
+  document.getElementById('home-title').textContent = g.title;
+  document.getElementById('home-meta').innerHTML = [g.hours ? `${g.hours} h jogadas` : 'Ainda não jogado', g.played !== 'Nunca jogado' ? g.played : null, g.size].filter(Boolean).join('<span class="dot"></span>');
+  setBackdrop(g);
+}
+function renderLibrary() {
+  document.getElementById('lib-title').textContent = FILTERS[state.filter];
+  const list = filtered();
+  document.getElementById('lib-count').textContent = `${list.length} ${list.length === 1 ? 'jogo' : 'jogos'}`;
+  document.getElementById('sort-label').textContent = SORTS[state.sort];
+  document.getElementById('lib-grid').innerHTML = list.map(g => cardHtml(g, 'grid')).join('');
+  if (list[0]) setBackdrop(list[0], 'library');
+}
+function renderDetails() {
+  const g = gameById(state.gameId); const s = STORES[g.store];
+  document.getElementById('det-overline').textContent = `${g.genre} · ${s.name}`;
+  document.getElementById('det-title').textContent = g.title;
+  document.getElementById('det-stats').innerHTML = [['Tempo de jogo', g.hours ? `${g.hours} h` : '—'], ['Última vez', g.played], ['Tamanho', g.size], ['Status', g.installed ? 'Instalado' : 'Não instalado']]
+    .map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  document.getElementById('det-desc').textContent = g.desc;
+  document.getElementById('det-actions').innerHTML =
+    (g.installed ? `<div class="btn primary" data-nav data-group="det" data-action="play">${icon('play')}Jogar</div>` : `<div class="btn primary" data-nav data-group="det" data-action="install">Instalar pela ${s.name}</div>`) +
+    `<div class="btn secondary" data-nav data-group="det" data-action="fav">${icon(g.fav ? 'starFill' : 'star')}${g.fav ? 'Favorito' : 'Favoritar'}</div>` +
+    `<div class="btn secondary" data-nav data-group="det" data-action="folder">${icon('folder')}Opções</div>`;
+  setBackdrop(g, 'details');
+}
+function renderSettings() {
+  document.getElementById('val-theme').innerHTML = `${THEMES[state.theme]} ${icon('chev')}`;
+  document.getElementById('val-theme').querySelector('svg').style.cssText = 'width:24px;height:24px';
+  for (const [k, id] of [['dynamic', 'val-dynamic'], ['motion', 'val-motion'], ['startup', 'val-startup']]) document.getElementById(id).classList.toggle('on', state[k]);
+}
+
+function go(route, opts = {}) {
+  if (!opts.replace && state.route !== route) history.push({ route: state.route, focusKey: focusKey(current), filter: state.filter, gameId: state.gameId });
+  state.route = route;
+  if (opts.filter) state.filter = opts.filter;
+  if (opts.gameId) state.gameId = opts.gameId;
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + route));
+  document.getElementById('stage').classList.toggle('details-mode', route === 'details');
+  if (route === 'home') renderHome();
+  if (route === 'library') { renderLibrary(); document.getElementById('lib-scroller').style.transform = ''; }
+  if (route === 'details') renderDetails();
+  if (route === 'settings') { renderSettings(); setBackdrop(gameById(state.heroGameId), 'settings'); }
+  syncSidebarSelection();
+  if (opts.focus !== false) {
+    const target = opts.focusKey ? findByKey(opts.focusKey) : firstIn(route);
+    setFocus(target || firstIn(route));
+  }
+}
+function back() {
+  if (topOverlay()) return closeOverlay();
+  const prev = history.pop();
+  if (!prev) { if (state.route !== 'home') go('home', { replace: true }); else if (inSidebar()) setFocus(firstIn('home')); return; }
+  go(prev.route, { replace: true, filter: prev.filter, gameId: prev.gameId, focusKey: prev.focusKey });
+}
+function firstIn(route) {
+  const page = document.getElementById('page-' + route);
+  return { home: page.querySelector('[data-action="play-hero"]'), library: page.querySelector('.card') || page.querySelector('[data-nav]'), details: page.querySelector('#det-actions [data-nav]'), settings: page.querySelector('[data-nav]') }[route];
+}
+function syncSidebarSelection() {
+  document.querySelectorAll('.side-item').forEach(el => {
+    const r = el.dataset.route;
+    el.classList.toggle('selected', r === state.route && (r !== 'library' || el.dataset.filter === state.filter) || (state.route === 'details' && false));
+  });
+}
+
+/* ================= Navegação espacial (no WPF: KeyboardNavigation + TraversalRequest direcional) ================= */
+let current = null;
+const groupMemory = {};
+function navigables() {
+  const ov = topOverlay();
+  const scope = ov ? [ov] : [document.getElementById('sidebar'), document.querySelector('.page.active')];
+  return scope.flatMap(s => [...s.querySelectorAll('[data-nav]')]);
+}
+function focusKey(el) { return el ? (el.dataset.game ? `game:${el.dataset.group}:${el.dataset.game}` : `act:${el.dataset.group}:${el.dataset.action || el.dataset.setting || el.dataset.filter || el.dataset.route}`) : null; }
+function findByKey(key) { return navigables().find(el => focusKey(el) === key); }
+const inSidebar = () => current && current.dataset.group === 'sidebar';
+
+function setFocus(el) {
+  if (!el) return;
+  if (current) current.classList.remove('focused');
+  current = el; el.classList.add('focused');
+  groupMemory[el.dataset.group] = el;
+  document.getElementById('sidebar').classList.toggle('expanded', inSidebar());
+  if (el.dataset.game && state.route === 'home') updateHero(gameById(el.dataset.game));
+  requestAnimationFrame(() => setTimeout(() => keepVisible(el), 0));
+  renderHints();
+}
+function rectOf(el) { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; }
+function move(dir) {
+  if (!current) return setFocus(firstIn(state.route));
+  const from = rectOf(current);
+  let best = null, bestScore = Infinity;
+  for (const el of navigables()) {
+    if (el === current) continue;
+    const c = rectOf(el);
+    let primary, ortho;
+    if (dir === 'left') { if (c.r > from.l + 2 && c.cx >= from.cx - 2) continue; primary = from.l - c.r; ortho = Math.abs(c.cy - from.cy); }
+    if (dir === 'right') { if (c.l < from.r - 2 && c.cx <= from.cx + 2) continue; primary = c.l - from.r; ortho = Math.abs(c.cy - from.cy); }
+    if (dir === 'up') { if (c.b > from.t + 2 && c.cy >= from.cy - 2) continue; primary = from.t - c.b; ortho = Math.abs(c.cx - from.cx); }
+    if (dir === 'down') { if (c.t < from.b - 2 && c.cy <= from.cy + 2) continue; primary = c.t - from.b; ortho = Math.abs(c.cx - from.cx); }
+    const score = Math.max(primary, 0) + ortho * 2.2;
+    if (score < bestScore) { bestScore = score; best = el; }
+  }
+  if (!best) return;
+  // Ao entrar num grupo diferente (fileira, sidebar), volta ao último item focado nele.
+  const g = best.dataset.group;
+  if (g === 'sidebar' && current.dataset.group !== 'sidebar') best = document.querySelector('.side-item.selected') || groupMemory[g] || best;
+  else if (g !== current.dataset.group && groupMemory[g] && groupMemory[g].isConnected && (dir === 'up' || dir === 'down' || current.dataset.group === 'sidebar')) best = groupMemory[g];
+  setFocus(best);
+}
+
+/* Mantém o item focado dentro da área segura: fileiras andam na horizontal, páginas na vertical. */
+function keepVisible(el) {
+  const stage = document.getElementById('stage').getBoundingClientRect(); const k = stage.width / 1920;
+  const track = el.closest('.track');
+  if (track) {
+    const wrap = track.parentElement.getBoundingClientRect(); const r = el.getBoundingClientRect();
+    const cur = new DOMMatrix(getComputedStyle(track).transform).m41;
+    const pad = 0, right = stage.right - 72 * k;
+    let shift = cur;
+    if (r.right > right) shift = cur - (r.right - right) / k - 40;
+    if (r.left < wrap.left + pad) shift = cur + (wrap.left - r.left) / k;
+    track.style.transform = `translateX(${Math.min(0, shift)}px)`;
+  }
+  const scroller = el.closest('.scroller');
+  if (scroller) {
+    const r = el.getBoundingClientRect(); const cur = new DOMMatrix(getComputedStyle(scroller).transform).m42;
+    const top = stage.top + 140 * k, bottom = stage.bottom - 120 * k;
+    let shift = cur;
+    if (el.closest('.hero') || el.closest('.lib-head')) shift = 0;
+    else if (r.bottom > bottom) shift = cur - (r.bottom - bottom) / k - 24;
+    else if (r.top < top) shift = cur + (top - r.top) / k;
+    scroller.style.transform = `translateY(${Math.min(0, shift)}px)`;
+  }
+}
+
+/* ================= Ações ================= */
+function activate(el = current) {
+  if (!el) return;
+  const a = el.dataset.action;
+  if (el.dataset.game) {
+    if (state.route === 'home' && el.closest('#track-ready')) return go('details', { gameId: el.dataset.game });
+    return go('details', { gameId: el.dataset.game });
+  }
+  if (el.dataset.route) return go(el.dataset.route, { filter: el.dataset.filter, focus: true, focusKey: undefined });
+  if (el.dataset.setting) return toggleSetting(el.dataset.setting);
+  switch (a) {
+    case 'play-hero': return launch(state.heroGameId);
+    case 'details-hero': return go('details', { gameId: state.heroGameId });
+    case 'see-all': return go('library', { filter: 'installed' });
+    case 'play': return launch(state.gameId);
+    case 'install': return toast(`Abrindo a ${STORES[gameById(state.gameId).store].name} para instalar (fora do MVP)`);
+    case 'fav': return toggleFav(state.gameId);
+    case 'folder': return toast('Opções do jogo: executável, argumentos e pasta (MVP-024)');
+    case 'sort': state.sort = (state.sort + 1) % SORTS.length; renderLibrary(); setFocus(document.querySelector('[data-action="sort"]')); return;
+    case 'search': return toast('Busca com teclado virtual chega no UX-001 (pós-MVP)');
+    case 'exit': return confirmExit();
+    case 'recover-default': state.theme = 0; closeOverlay(); return toast('Tema padrão restaurado');
+    case 'recover-retry': closeOverlay(); return toast('Tema recarregado com sucesso (simulado)');
+    case 'dlg-cancel': return closeOverlay();
+    case 'dlg-exit': closeOverlay(); return toast('Saindo para o desktop… (simulado)');
+    case 'end-session': return endSession();
+    case 'cancel-launch': return closeOverlay();
+  }
+}
+function toggleSetting(k) {
+  if (k === 'theme') { state.theme = (state.theme + 1) % THEMES.length; if (state.theme === 1) state.dynamic = false; if (state.theme !== 1) state.dynamic = true; }
+  if (k === 'dynamic') state.dynamic = !state.dynamic;
+  if (k === 'motion') { state.motion = !state.motion; document.documentElement.classList.toggle('reduced-motion', state.motion); }
+  if (k === 'startup') state.startup = !state.startup;
+  if (k === 'crash') return openOverlay('recovery');
+  renderSettings(); bgMode = ''; setBackdrop(gameById(state.heroGameId), 'settings');
+}
+function toggleFav(id) {
+  const g = gameById(id); g.fav = !g.fav; renderCounts();
+  toast(g.fav ? `${g.title} adicionado aos favoritos` : `${g.title} removido dos favoritos`);
+  if (state.route === 'details') { renderDetails(); setFocus(document.querySelector('[data-action="fav"]')); }
+  else if (current && current.dataset.game === id) current.classList.toggle('fav', g.fav);
+}
+
+/* ================= Overlays ================= */
+const overlayStack = [];
+function topOverlay() { return overlayStack[overlayStack.length - 1] || null; }
+function openOverlay(id) {
+  const el = document.getElementById(id);
+  overlayStack.push(el); el.dataset.returnKey = focusKey(current) || '';
+  el.classList.add('active');
+  const first = el.querySelector('[data-nav]'); if (first) setFocus(first); else renderHints();
+}
+function closeOverlay() {
+  const el = overlayStack.pop(); if (!el) return;
+  el.classList.remove('active', 'launching');
+  clearTimeout(launchTimer);
+  const target = findByKey(el.dataset.returnKey) || firstIn(state.route);
+  setFocus(target);
+}
+let launchTimer = null, sessionStart = 0;
+function launch(id) {
+  const g = gameById(id); const el = document.getElementById('launch');
+  document.getElementById('launch-cover').innerHTML = coverSvg(g);
+  document.getElementById('launch-title').textContent = g.title;
+  document.getElementById('launch-overline').textContent = 'Iniciando';
+  document.getElementById('launch-status').textContent = 'Preparando a sessão: monitores, áudio e controle';
+  document.getElementById('launch-actions').innerHTML = `<div class="btn secondary" data-nav data-group="launch" data-action="cancel-launch">Cancelar</div>`;
+  openOverlay('launch'); el.classList.remove('launching'); void el.offsetWidth; el.classList.add('launching');
+  launchTimer = setTimeout(() => {
+    sessionStart = Date.now();
+    document.getElementById('launch-overline').textContent = 'Jogando agora';
+    document.getElementById('launch-status').textContent = 'O launcher liberou memória e está em segundo plano. Ao fechar o jogo, você volta para cá.';
+    document.getElementById('launch-actions').innerHTML = `<div class="btn primary" data-nav data-group="launch" data-action="end-session">Simular fim do jogo</div>`;
+    setFocus(document.querySelector('[data-action="end-session"]'));
+  }, 2600);
+}
+function endSession() {
+  const g = gameById(state.route === 'details' ? state.gameId : state.heroGameId);
+  closeOverlay();
+  toast(`Bem-vindo de volta · sessão de ${g.title} encerrada`);
+}
+function confirmExit() {
+  document.getElementById('dlg-title').textContent = 'Sair para o desktop?';
+  document.getElementById('dlg-text').textContent = 'O UltraLauncher fecha a tela cheia e restaura monitores e áudio como estavam antes da sessão.';
+  document.getElementById('dlg-actions').innerHTML = `<div class="btn primary" data-nav data-group="dlg" data-action="dlg-exit">Sair</div><div class="btn secondary" data-nav data-group="dlg" data-action="dlg-cancel">Cancelar</div>`;
+  openOverlay('dialog');
+}
+
+/* ================= Toast, dicas e relógio ================= */
+let toastTimer = null;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
+const GLYPHS = { pad: { a: 'A', b: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', menu: '☰' }, keyboard: { a: 'Enter', b: 'Esc', x: 'F', y: '/', lb: 'Q', rb: 'E', menu: 'M' } };
+function renderHints() {
+  const g = GLYPHS[state.input === 'pad' ? 'pad' : 'keyboard']; const key = state.input !== 'pad';
+  const list = [];
+  const ov = topOverlay();
+  if (ov && ov.id === 'launch') list.push(['a', current && current.dataset.action === 'end-session' ? 'Encerrar' : 'Cancelar']);
+  else if (ov) list.push(['a', 'Selecionar'], ['b', 'Voltar']);
+  else {
+    list.push(['a', current && current.dataset.game ? 'Detalhes' : 'Selecionar']);
+    if (current && current.dataset.game) list.push(['x', 'Favoritar']);
+    if (state.route !== 'home' || history.length) list.push(['b', 'Voltar']);
+    list.push(['y', 'Buscar'], ['lb+rb', 'Seção'], ['menu', 'Configurações']);
+  }
+  const now = new Date();
+  const padTxt = state.pad ? `Controle: ${state.pad}` : 'Nenhum controle — usando teclado';
+  document.getElementById('hints').innerHTML = `<div class="clock">${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}<span class="pad-state">${padTxt}</span></div>` +
+    list.map(([b, label]) => `<div class="hint">${b.split('+').map(x => `<span class="glyph ${key ? 'key' : ''}">${g[x]}</span>`).join('')}${label}</div>`).join('');
+}
+setInterval(renderHints, 30000);
+
+/* ================= Entrada: teclado e Gamepad API ================= */
+const SECTIONS = [['home'], ['library', 'all'], ['library', 'installed'], ['library', 'favorites'], ['settings']];
+function cycleSection(step) {
+  if (topOverlay()) return;
+  let i = SECTIONS.findIndex(([r, f]) => r === state.route && (!f || f === state.filter)); if (i < 0) i = 0;
+  const [r, f] = SECTIONS[(i + step + SECTIONS.length) % SECTIONS.length];
+  history.length = 0; go(r, { filter: f, replace: true });
+}
+function command(cmd) {
+  switch (cmd) {
+    case 'up': case 'down': case 'left': case 'right': return move(cmd);
+    case 'a': return activate();
+    case 'b': return back();
+    case 'x': if (current && current.dataset.game && !topOverlay()) toggleFav(current.dataset.game); return;
+    case 'y': if (!topOverlay()) toast('Busca com teclado virtual chega no UX-001 (pós-MVP)'); return;
+    case 'lb': return cycleSection(-1);
+    case 'rb': return cycleSection(1);
+    case 'menu': if (!topOverlay()) go('settings'); return;
+  }
+}
+const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'a', ' ': 'a', Escape: 'b', Backspace: 'b', f: 'x', F: 'x', '/': 'y', q: 'lb', Q: 'lb', e: 'rb', E: 'rb', m: 'menu', M: 'menu' };
+addEventListener('keydown', e => {
+  const cmd = KEYMAP[e.key]; if (!cmd) return;
+  e.preventDefault();
+  if (state.input !== 'keyboard') { state.input = 'keyboard'; renderHints(); }
+  command(cmd);
+});
+addEventListener('mousedown', e => {
+  // Mouse não faz parte da experiência; clique apenas foca e ativa para facilitar a revisão do protótipo.
+  const el = e.target.closest('[data-nav]'); if (el && navigables().includes(el)) { setFocus(el); activate(el); }
+});
+
+// Mapeamento "standard" da Gamepad API: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 9 Menu, 12-15 direcional.
+const PAD_BUTTONS = { 0: 'a', 1: 'b', 2: 'x', 3: 'y', 4: 'lb', 5: 'rb', 9: 'menu', 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
+const held = {};
+function pollPads(ts) {
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  const pad = pads[0];
+  if (pad) {
+    const name = pad.id.replace(/\(.*?\)/g, '').trim().slice(0, 40) || 'conectado';
+    if (state.pad !== name) { state.pad = name; renderHints(); }
+    const pressed = {};
+    for (const [i, cmd] of Object.entries(PAD_BUTTONS)) if (pad.buttons[i] && pad.buttons[i].pressed) pressed[cmd] = true;
+    const [ax, ay] = pad.axes; const dz = .5;
+    if (ax < -dz) pressed.left = true; if (ax > dz) pressed.right = true;
+    if (ay < -dz) pressed.up = true; if (ay > dz) pressed.down = true;
+    for (const cmd of new Set([...Object.keys(pressed), ...Object.keys(held)])) {
+      if (pressed[cmd]) {
+        const h = held[cmd];
+        const repeatable = ['up', 'down', 'left', 'right'].includes(cmd);
+        if (!h) { held[cmd] = { next: ts + 380 }; fire(cmd); }
+        else if (repeatable && ts >= h.next) { h.next = ts + 110; fire(cmd); }
+      } else delete held[cmd];
+    }
+  }
+  requestAnimationFrame(pollPads);
+}
+function fire(cmd) { if (state.input !== 'pad') { state.input = 'pad'; renderHints(); } command(cmd); }
+addEventListener('gamepadconnected', e => toast(`Controle conectado: ${e.gamepad.id.replace(/\(.*?\)/g, '').trim().slice(0, 40)}`));
+addEventListener('gamepaddisconnected', () => { state.pad = null; renderHints(); toast('Controle desconectado — o teclado continua funcionando'); });
+
+/* ================= Escala do canvas (Viewbox) ================= */
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  const st = document.getElementById('stage');
+  st.style.transform = `scale(${s})`;
+  st.style.left = `${(innerWidth - 1920 * s) / 2}px`; st.style.top = `${(innerHeight - 1080 * s) / 2}px`;
+}
+addEventListener('resize', fit);
+
+if (matchMedia('(prefers-reduced-motion: reduce)').matches) { state.motion = true; document.documentElement.classList.add('reduced-motion'); }
+hydrateIcons();
+renderCounts();
+fit();
+go('home', { replace: true });
+requestAnimationFrame(pollPads);
+</script>
+</body>
+</html>
