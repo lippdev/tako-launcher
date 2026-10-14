@@ -200,7 +200,13 @@ Princípios:
 
 ## Typography
 
-Inter (SIL OFL), empacotada com o app. Títulos de jogo usam `display` no destaque e `headline-lg` nos detalhes, peso 800, com tracking negativo, fazendo o papel do logo do jogo quando não há arte de logo. `overline` (caixa alta, tracking largo) marca contexto: "CONTINUAR JOGANDO", "INSTALADO".
+Inter (SIL OFL), empacotada com o app. **Todo texto usa um token da escala acima**; nenhum tamanho avulso.
+
+- **Título de jogo:** `display` (88px) se couber em uma linha; senão `headline-lg` (56px), em até duas linhas. O bloco do destaque é ancorado embaixo, então o título cresce para cima e os botões nunca mudam de posição.
+- **Descrição:** no máximo 3 linhas (`body-lg`).
+- **Datas:** dd/mm/aaaa.
+
+ Títulos de jogo usam `display` no destaque e `headline-lg` nos detalhes, peso 800, com tracking negativo, fazendo o papel do logo do jogo quando não há arte de logo. `overline` (caixa alta, tracking largo) marca contexto: "CONTINUAR JOGANDO", "INSTALADO".
 
 ## Layout
 
@@ -221,7 +227,8 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
 ## Components
 
 - **Foco:** anel branco de 4px afastado 6px do elemento, escala `motion.focus-scale` em capas, transição `motion.focus`. Itens de lista não escalam: ganham fundo `surface-2`.
-- **Game card:** capa 2:3, nome (`label-md`) e loja + tamanho (`label-sm`) abaixo. Em foco, a capa escala e o destaque da Home troca para o jogo.
+- **Game card:** capa 2:3, nome (`label-md`, uma linha com reticências) e loja + tamanho (`label-sm`) abaixo. Em foco, só a capa escala; o texto não se move. O destaque da Home troca para o jogo.
+- **Fileiras:** o item em foco fica ancorado na primeira posição e a fileira rola por baixo dele, até o fim da lista.
 - **Botão primário (Jogar):** pílula branca com ícone de play. Um por tela.
 - **Barra de dicas:** glifos A/B/X/Y/LB/RB/Menu desenhados como círculos brancos com a letra; troca para teclas (Enter, Esc...) quando a última entrada foi teclado.
 - **Sair para o desktop:** sempre presente no fim da barra lateral (princípio "recovery-first" do PRD).
