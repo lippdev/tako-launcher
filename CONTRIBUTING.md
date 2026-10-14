@@ -35,6 +35,7 @@ Regras:
 - Um PR = uma história. Preferir menos de 400 linhas alteradas.
 - Para merge: CI verde, **1 aprovação** (2 para `runtime`, `ipc`, `themes` e qualquer tema de segurança — ver `.github/CODEOWNERS`), conversas resolvidas, DoD cumprida.
 - O autor não aprova o próprio PR.
+- **Mantenedores com permissão de push e merge em `main`:** @lippdev e @nextestudios.
 
 ## 4. Definition of Done
 
