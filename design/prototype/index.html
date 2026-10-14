@@ -247,7 +247,7 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
             <div class="btn secondary round" data-nav data-group="hero" data-action="details-hero"><span data-icon="info"></span></div>
           </div>
         </div>
-        <div class="row" data-row="ready"><div class="row-title">Prontos para jogar <small id="ready-count"></small></div><div class="track-wrap"><div class="track" id="track-ready"></div></div></div>
+        <div class="row" data-row="ready"><div class="row-title">Jogados recentemente <small id="ready-count"></small></div><div class="track-wrap"><div class="track" id="track-ready"></div></div></div>
         <div class="row" data-row="recent"><div class="row-title">Adicionados recentemente</div><div class="track-wrap"><div class="track" id="track-recent"></div></div></div>
       </div>
     </section>
@@ -740,7 +740,7 @@ function setBackdrop(g, mode = 'home') {
 }
 
 /* ================= Estado e rotas ================= */
-const state = { route: 'home', filter: 'all', sort: 0, theme: 0, dynamic: true, motion: false, startup: true, gameId: null, heroGameId: 'control', input: 'keyboard', pad: null };
+const state = { route: 'home', filter: 'all', sort: 0, theme: 0, dynamic: true, motion: false, startup: true, gameId: null, heroGameId: null, input: 'keyboard', pad: null };
 const SORTS = ['Jogados recentemente', 'Nome', 'Tempo de jogo', 'Adicionados'];
 const THEMES = ['Padrão', 'Ardósia (sem cor dinâmica)', 'Aurora (Playnite 10, exemplo)'];
 const FILTERS = { all: 'Todos os jogos', installed: 'Instalados', favorites: 'Favoritos', steam: 'Steam', epic: 'Epic Games', gog: 'GOG', xbox: 'Xbox', manual: 'Adicionados manualmente' };
@@ -752,7 +752,7 @@ function filtered() {
   const sorters = [(a, b) => rank(a) - rank(b), (a, b) => a.title.localeCompare(b.title), (a, b) => b.hours - a.hours, (a, b) => a.added - b.added];
   return list.slice().sort(sorters[state.sort]);
 }
-const PLAYED_ORDER = ['Jogado ontem', 'Há 2 dias', 'Há 3 dias', 'Há 4 dias', 'Há 5 dias', 'Há 6 dias', 'Há 1 semana', 'Semana passada', 'Há 2 semanas', 'Há 3 semanas', 'Há 1 mês', 'Há 2 meses', 'Nunca jogado'];
+const PLAYED_ORDER = ['Agora mesmo', 'Jogado ontem', 'Há 2 dias', 'Há 3 dias', 'Há 4 dias', 'Há 5 dias', 'Há 6 dias', 'Há 1 semana', 'Semana passada', 'Há 2 semanas', 'Há 3 semanas', 'Há 1 mês', 'Há 2 meses', 'Nunca jogado'];
 const rank = g => PLAYED_ORDER.indexOf(g.played);
 
 function cardHtml(g, group) {
@@ -770,18 +770,22 @@ function renderCounts() {
   document.querySelectorAll('[data-count]').forEach(el => { el.textContent = c[el.dataset.count]; });
 }
 
+const recentlyPlayed = () => GAMES.filter(g => g.played !== 'Nunca jogado').sort((a, b) => rank(a) - rank(b));
 function renderHome() {
-  const ready = GAMES.filter(g => g.installed).sort((a, b) => rank(a) - rank(b));
-  document.getElementById('ready-count').textContent = `${ready.length} instalados`;
+  // Início: sempre os últimos jogos jogados, do mais recente para o mais antigo.
+  const ready = recentlyPlayed();
+  document.getElementById('ready-count').textContent = `${ready.length} jogos`;
   document.getElementById('track-ready').innerHTML = ready.slice(0, 10).map(g => cardHtml(g, 'row-ready')).join('') +
     `<div class="tile-more" data-nav data-group="row-ready" data-action="see-all">${icon('more')}Ver todos</div>`;
   const recent = GAMES.slice().sort((a, b) => a.added - b.added).slice(0, 10);
+  document.querySelectorAll('#page-home .track').forEach(t => { t.style.transform = ''; });
+  document.getElementById('home-scroller').style.transform = '';
   document.getElementById('track-recent').innerHTML = recent.map(g => cardHtml(g, 'row-recent')).join('');
   updateHero(gameById(state.heroGameId));
 }
 function updateHero(g) {
   state.heroGameId = g.id;
-  const first = g.id === GAMES.filter(x => x.installed).sort((a, b) => rank(a) - rank(b))[0].id;
+  const first = g.id === recentlyPlayed()[0].id;
   document.getElementById('home-overline').textContent = first ? 'Continuar jogando' : `${g.genre} · ${STORES[g.store].name}`;
   const title = document.getElementById('home-title');
   title.textContent = g.title;
@@ -934,7 +938,7 @@ function activate(el = current) {
   switch (a) {
     case 'play-hero': return launch(state.heroGameId);
     case 'details-hero': return go('details', { gameId: state.heroGameId });
-    case 'see-all': return go('library', { filter: 'installed' });
+    case 'see-all': state.sort = 0; return go('library', { filter: 'all' });
     case 'play': return launch(state.gameId);
     case 'notify': return toast(`Você será avisado quando ${gameById(state.gameId).title} for lançado`);
     case 'install': return toast(`Abrindo a ${STORES[gameById(state.gameId).store].name} para instalar (fora do MVP)`);
@@ -982,8 +986,9 @@ function closeOverlay() {
   const target = findByKey(el.dataset.returnKey) || firstIn(state.route);
   setFocus(target);
 }
-let launchTimer = null, sessionStart = 0;
+let launchTimer = null, sessionStart = 0, launchedId = null;
 function launch(id) {
+  launchedId = id;
   const g = gameById(id); const el = document.getElementById('launch');
   const lc = document.getElementById('launch-cover'); lc.innerHTML = coverHtml(g); lc.setAttribute('style', coverStyle(g));
   const lt = document.getElementById('launch-title'); lt.textContent = g.title;
@@ -1000,8 +1005,12 @@ function launch(id) {
   }, 2600);
 }
 function endSession() {
-  const g = gameById(state.route === 'details' ? state.gameId : state.heroGameId);
+  const g = gameById(launchedId);
+  // O jogo que acabou de ser jogado vai para o topo de "Jogados recentemente".
+  for (const other of GAMES) if (other.played === 'Agora mesmo') other.played = 'Jogado ontem';
+  g.played = 'Agora mesmo'; g.hours += 1;
   closeOverlay();
+  if (state.route === 'home') { state.heroGameId = g.id; renderHome(); setFocus(firstIn('home')); }
   toast(`Bem-vindo de volta · sessão de ${g.title} encerrada`);
 }
 function confirmExit() {
@@ -1112,6 +1121,7 @@ if (matchMedia('(prefers-reduced-motion: reduce)').matches) { state.motion = tru
 hydrateIcons();
 renderCounts();
 fit();
+state.heroGameId = recentlyPlayed()[0].id;
 go('home', { replace: true });
 requestAnimationFrame(pollPads);
 </script>

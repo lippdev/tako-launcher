@@ -213,6 +213,7 @@ Inter (SIL OFL), empacotada com o app. **Todo texto usa um token da escala acima
 - **Canvas:** 1920x1080, escalado uniformemente. Área segura: `safe-x` 72px e `safe-y` 48px (overscan de TV).
 - **Barra lateral:** 400px quando em foco; recolhe para 120px (só ícones) quando o foco vai para o conteúdo, liberando espaço para o destaque.
 - **Conteúdo:** cabeçalho (título da página + busca), destaque (hero) ocupando ~55% da altura e fileiras horizontais de capas.
+- **Início:** a primeira fileira é sempre **Jogados recentemente** (só jogos já jogados, do mais recente ao mais antigo), e o destaque abre no último jogado ("Continuar jogando"). Ao fim de uma sessão, o jogo volta para o primeiro lugar e a fileira volta ao início.
 - **Barra de dicas:** rodapé fixo com os glifos do controle e a ação de cada botão na tela atual.
 - **Status do sistema:** canto superior direito, acima da busca: entrada atual (ícone de controle com o nome, ou teclado) e a hora. Aparece em todas as telas.
 - **Grade da biblioteca:** capas 2:3 (204x306), 7 colunas quando a barra lateral está recolhida.
