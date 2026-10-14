@@ -83,8 +83,12 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .page { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity var(--t-page) var(--ease), transform var(--t-page) var(--ease); transform: translateY(16px); }
 .page.active { opacity: 1; pointer-events: auto; transform: none; }
 .scroller { position: absolute; left: 0; right: 0; top: 0; transition: transform var(--t-page) var(--ease); }
-/* Esmaece o conteúdo antes da barra de dicas (no WPF: OpacityMask com gradiente). */
-.page { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent calc(100% - 88px)); mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent calc(100% - 88px)); }
+/* Moldura fixa do conteúdo rolável: esmaece antes do cabeçalho e antes da barra de dicas
+   (no WPF: OpacityMask com gradiente num contêiner que não rola). O cabeçalho fica fora dela. */
+.clip { position: absolute; inset: 0; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 120px, #000 170px, #000 calc(100% - 120px), transparent calc(100% - 88px));
+  mask-image: linear-gradient(to bottom, transparent 0, transparent 120px, #000 170px, #000 calc(100% - 120px), transparent calc(100% - 88px)); }
+/* Na biblioteca o título rola junto; enquanto está no topo, ele fica abaixo da faixa esmaecida. */
 
 .header { position: absolute; top: 56px; left: 64px; right: var(--safe-x); height: 60px; display: flex; align-items: center; justify-content: space-between; z-index: 3; }
 .header h1 { font-size: var(--fs-title); font-weight: 700; }
@@ -237,7 +241,7 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
     <!-- Início -->
     <section class="page" id="page-home">
       <div class="header"><h1>Início</h1><div class="search" data-nav data-group="header" data-action="search"><span data-icon="search"></span>Buscar jogos</div></div>
-      <div class="scroller" id="home-scroller">
+      <div class="clip"><div class="scroller" id="home-scroller">
         <div class="hero">
           <div class="overline" id="home-overline"></div>
           <div class="hero-title" id="home-title"></div>
@@ -249,18 +253,18 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
         </div>
         <div class="row" data-row="ready"><div class="row-title">Jogados recentemente <small id="ready-count"></small></div><div class="track-wrap"><div class="track" id="track-ready"></div></div></div>
         <div class="row" data-row="recent"><div class="row-title">Adicionados recentemente</div><div class="track-wrap"><div class="track" id="track-recent"></div></div></div>
-      </div>
+      </div></div>
     </section>
 
     <!-- Biblioteca -->
     <section class="page" id="page-library">
-      <div class="scroller" id="lib-scroller">
+      <div class="clip"><div class="scroller" id="lib-scroller">
         <div class="lib-head">
           <div><h2 id="lib-title"></h2><div class="count" id="lib-count"></div></div>
           <div class="chips"><div class="chip" data-nav data-group="lib-chips" data-action="sort">Ordenar: <b id="sort-label"></b></div></div>
         </div>
         <div class="grid" id="lib-grid"></div>
-      </div>
+      </div></div>
     </section>
 
     <!-- Detalhes -->
@@ -913,12 +917,14 @@ function keepVisible(el) {
     // O item em foco fica sempre na primeira posição da fileira (como no PS5), até o fim da lista.
     const visible = track.parentElement.clientWidth - 72;
     const max = Math.max(0, track.scrollWidth - visible);
-    track.style.transform = `translateX(${-Math.min(el.offsetLeft, max)}px)`;
+    // Posição do item dentro da trilha, em pixels do canvas (a trilha e o item se movem juntos).
+    const offset = (el.getBoundingClientRect().left - track.getBoundingClientRect().left) / k;
+    track.style.transform = `translateX(${-Math.min(offset, max)}px)`;
   }
   const scroller = el.closest('.scroller');
   if (scroller) {
-    const r = el.getBoundingClientRect(); const cur = new DOMMatrix(getComputedStyle(scroller).transform).m42;
-    const top = stage.top + 140 * k, bottom = stage.bottom - 120 * k;
+    const r = (el.closest('.row') || el).getBoundingClientRect(); const cur = new DOMMatrix(getComputedStyle(scroller).transform).m42;
+    const top = stage.top + 180 * k, bottom = stage.bottom - 130 * k;
     let shift = cur;
     if (el.closest('.hero') || el.closest('.lib-head')) shift = 0;
     else if (r.bottom > bottom) shift = cur - (r.bottom - bottom) / k - 24;
