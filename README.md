@@ -17,6 +17,8 @@ src/
   Launcher.Themes/               descoberta/validação/aplicação de temas
   Launcher.PlayniteCompat.P10/   adaptador de temas Playnite 10
   ConsoleMode.Runtime/           contratos de sessão/monitores/áudio/IPC (net8.0 + net10.0)
+tools/
+  Launcher.ThemeCheck/           valida uma pasta de tema com o carregador XAML restrito (spike MVP-016)
 tests/                           xUnit
 ```
 
