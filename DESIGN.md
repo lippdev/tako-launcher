@@ -37,7 +37,7 @@ typography:
     fontFamily: Inter
     fontSize: 72px
     fontWeight: 800
-    lineHeight: 1.02
+    lineHeight: 1.1
     letterSpacing: -0.03em
   headline-lg:
     fontFamily: Inter
