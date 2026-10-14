@@ -234,6 +234,9 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
 - **Fileiras:** o item em foco fica ancorado na primeira posição e a fileira rola por baixo dele, até o fim da lista.
 - **Botão primário (Jogar):** pílula branca com ícone de play. Um por tela.
 - **Barra de dicas:** glifos A/B/X/Y/LB/RB/Menu desenhados como círculos brancos com a letra; troca para teclas (Enter, Esc...) quando a última entrada foi teclado.
+- **Menu rápido (sobreposição do jogo):** aberto pelo botão Guia (Xbox/PS/Steam; tecla G no teclado) durante o jogo, no padrão da Central de Controle do PS5 e do menu de acesso rápido da Steam. O jogo fica visível atrás, escurecido de baixo para cima. No topo, a ficha do jogo (capa, título, tempo de sessão, total e loja); no meio, uma fileira de ações (Voltar ao jogo, Início, Capturar tela, Desempenho, Áudio, Controle, Tela, Encerrar jogo); embaixo, um painel que muda com a ação em foco e recebe o foco ao descer. B volta um nível; Guia fecha. "Início" volta ao launcher sem fechar o jogo, e o status mostra o jogo em execução; Guia retorna a ele. Encerrar sempre pede confirmação.
+- **HUD de desempenho:** canto superior esquerdo do jogo (Desligado, Só FPS, Completo), números tabulares, fundo preto 60%.
+- **Restrição técnica do menu rápido:** sem injeção gráfica (proibida pelo PRD, §10), a sobreposição é uma janela topmost transparente; ela funciona sobre jogos em tela cheia sem bordas, mas não sobre tela cheia exclusiva. Nesse caso, o Guia deve trazer o launcher para frente (como alternar janela). Validar no Windows antes de prometer o comportamento.
 - **Sair para o desktop:** sempre presente no fim da barra lateral (princípio "recovery-first" do PRD).
 
 ## Do's and Don'ts
