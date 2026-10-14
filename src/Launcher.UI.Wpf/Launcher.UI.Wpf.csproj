@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Launcher.Core\Launcher.Core.csproj" />
+    <ProjectReference Include="..\Launcher.Themes\Launcher.Themes.csproj" />
+    <ProjectReference Include="..\Launcher.PlayniteCompat.P10\Launcher.PlayniteCompat.P10.csproj" />
+  </ItemGroup>
+</Project>

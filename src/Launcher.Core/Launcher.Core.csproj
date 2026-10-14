@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Console.Runtime\Console.Runtime.csproj" />
+  </ItemGroup>
+</Project>
