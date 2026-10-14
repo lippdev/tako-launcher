@@ -876,6 +876,8 @@ function setFocus(el) {
   groupMemory[el.dataset.group] = el;
   document.getElementById('sidebar').classList.toggle('expanded', inSidebar());
   if (el.dataset.game && state.route === 'home') updateHero(gameById(el.dataset.game));
+  // Na biblioteca, o fundo e a cor acompanham a capa em foco.
+  if (el.dataset.game && state.route === 'library' && !topOverlay()) setBackdrop(gameById(el.dataset.game), 'library');
   requestAnimationFrame(() => setTimeout(() => keepVisible(el), 0));
   renderHints();
 }
