@@ -290,7 +290,9 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 /* ---------- Barra de dicas e toast ---------- */
 .hints { position: absolute; left: 0; right: 0; bottom: 0; height: 88px; padding: 0 var(--safe-x); display: flex; align-items: center; justify-content: flex-end; gap: 36px; z-index: 30;
   background: linear-gradient(to top, rgba(0,0,0,.35), transparent); font-size: var(--fs-label-md); font-weight: 600; color: var(--on-accent-muted); }
-.hint { display: flex; align-items: center; gap: 12px; }
+.hint { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.hint:hover { color: #fff; }
+[data-nav] { cursor: pointer; }
 .glyph { min-width: 36px; height: 36px; padding: 0 8px; border-radius: 18px; background: #fff; color: #11141A; display: grid; place-items: center; font-size: var(--fs-label-sm); font-weight: 800; }
 .glyph.key { border-radius: 8px; min-width: 44px; font-size: var(--fs-label-sm); }
 /* Status do sistema: canto superior direito, acima da busca. */
@@ -985,7 +987,7 @@ function focusKey(el) { return el ? (el.dataset.game ? `game:${el.dataset.group}
 function findByKey(key) { return navigables().find(el => focusKey(el) === key); }
 const inSidebar = () => current && current.dataset.group === 'sidebar';
 
-function setFocus(el) {
+function setFocus(el, { scroll = true } = {}) {
   if (!el) return;
   if (current) current.classList.remove('focused');
   current = el; el.classList.add('focused');
@@ -994,7 +996,7 @@ function setFocus(el) {
   if (el.dataset.game && state.route === 'home') updateHero(gameById(el.dataset.game));
   // Na biblioteca, o fundo e a cor acompanham a capa em foco.
   if (el.dataset.game && state.route === 'library' && !topOverlay()) setBackdrop(gameById(el.dataset.game), 'library');
-  requestAnimationFrame(() => setTimeout(() => keepVisible(el), 0));
+  if (scroll) requestAnimationFrame(() => setTimeout(() => keepVisible(el), 0));
   renderHints();
 }
 function rectOf(el) { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; }
@@ -1262,14 +1264,33 @@ function quickOption(el) {
   const k = document.getElementById('qpop').dataset.for;
   if (opt === 'act' && value === 'quit') return endSession(); // o próprio painel já é a confirmação
   if (opt === 'act' && value === 'close-pop') return closePopover();
-  if (opt === 'perf') setPerf(value);
-  if (opt === 'output') { state.output = +value; toast(`Áudio saindo por: ${OUTPUTS[state.output]}`); }
-  if (opt === 'resolution') state.resolution = +value;
-  if (opt === 'hdr') state.hdr = !state.hdr;
   if (opt === 'remap') return toast('Remapeamento por jogo chega depois do MVP');
   if (opt === 'pad') return toast('Controle conectado e com bateria em 80%');
-  renderCards(); openPopover(k, document.querySelector(`.qicon[data-bar="${k}"]`));
-  setFocus(document.querySelector(`#qpop [data-opt="${opt}"][data-value="${value}"]`));
+  // Opções aplicam na hora e fecham o painel, com o foco voltando ao ícone.
+  if (opt === 'perf') { setPerf(value); toast(`HUD de desempenho: ${PERF_MODES.find(([v]) => v === value)[1]}`); }
+  if (opt === 'output') { state.output = +value; toast(`Áudio saindo por: ${OUTPUTS[state.output]}`); }
+  if (opt === 'resolution') { state.resolution = +value; toast(`Resolução: ${RESOLUTIONS[state.resolution]}`); }
+  if (opt === 'hdr') { state.hdr = !state.hdr; toast(state.hdr ? 'HDR ligado' : 'HDR desligado'); }
+  renderCards(); closePopover();
+}
+
+/* ← → com um painel aberto: o painel acompanha o ícone vizinho (ou fecha, se o vizinho não tiver painel).
+   Encerrar nunca abre deslizando, para evitar fechar o jogo sem querer. */
+const SLIDE_POPOVERS = ['perf', 'audio', 'controller', 'display'];
+function slidePopover(dir) {
+  const icons = [...document.querySelectorAll('.qicon')];
+  const i = icons.findIndex(ic => ic.dataset.bar === document.getElementById('qpop').dataset.for);
+  const next = icons[i + (dir === 'right' ? 1 : -1)];
+  if (!next) return;
+  closePopover();
+  if (SLIDE_POPOVERS.includes(next.dataset.bar)) openPopover(next.dataset.bar, next); else setFocus(next);
+}
+
+function setVolumeFromPointer(slider, clientX) {
+  const bar = slider.querySelector('.bar').getBoundingClientRect();
+  state.volume = Math.max(0, Math.min(100, Math.round(((clientX - bar.left) / bar.width) * 20) * 5));
+  renderCards(); openPopover('audio', document.querySelector('.qicon[data-bar="audio"]'));
+  setFocus(document.querySelector('#qpop [data-slider]'), { scroll: false });
 }
 
 function adjustSlider(el, dir) {
@@ -1346,6 +1367,7 @@ function renderHints() {
     const inPop = popoverOpen();
     list.push(['a', 'Selecionar']);
     if (current && current.dataset.slider) list.push(['left+right', 'Ajustar']);
+    else if (inPop) list.push(['left+right', 'Outro painel']);
     list.push(['b', inPop ? 'Fechar painel' : 'Voltar ao jogo'], ['guide', 'Fechar']);
   }
   else if (ov && ov.id === 'launch') list.push(['a', current && current.dataset.action === 'end-session' ? 'Encerrar' : 'Cancelar']);
@@ -1359,7 +1381,7 @@ function renderHints() {
   }
   renderStatus();
   document.getElementById('hints').innerHTML =
-    list.map(([b, label]) => `<div class="hint">${b.split('+').map(x => `<span class="glyph ${key ? 'key' : ''}">${g[x]}</span>`).join('')}${label}</div>`).join('');
+    list.map(([b, label]) => `<div class="hint" data-cmd="${b.split('+')[0]}">${b.split('+').map(x => `<span class="glyph ${key ? 'key' : ''}" data-cmd="${x}">${g[x]}</span>`).join('')}${label}</div>`).join('');
 }
 function renderStatus() {
   const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1392,7 +1414,7 @@ function command(cmd) {
   }
   if (ov && ov.id === 'quick' && popoverOpen()) {
     if (cmd === 'b') return closePopover();
-    if (cmd === 'left' || cmd === 'right') return; // dentro do painel, ← → só ajustam controles
+    if (cmd === 'left' || cmd === 'right') return slidePopover(cmd);
   }
   switch (cmd) {
     case 'up': case 'down': case 'left': case 'right': return move(cmd);
@@ -1412,10 +1434,45 @@ addEventListener('keydown', e => {
   if (state.input !== 'keyboard') { state.input = 'keyboard'; renderHints(); }
   command(cmd);
 });
-addEventListener('mousedown', e => {
-  // Mouse não faz parte da experiência; clique apenas foca e ativa para facilitar a revisão do protótipo.
-  const el = e.target.closest('[data-nav]'); if (el && navigables().includes(el)) { setFocus(el); activate(el); }
+/* Mouse: passar por cima foca, clicar ativa. Controle e teclado continuam sendo o caminho principal. */
+addEventListener('mousemove', e => {
+  if (Math.abs(e.movementX) + Math.abs(e.movementY) < 2) return;
+  const el = e.target.closest('[data-nav]');
+  if (el && el !== current && navigables().includes(el)) setFocus(el, { scroll: false });
 });
+let dragging = null;
+addEventListener('mousedown', e => {
+  const slider = e.target.closest('[data-slider]');
+  if (slider && popoverOpen()) { dragging = slider; setVolumeFromPointer(slider, e.clientX); e.preventDefault(); }
+});
+addEventListener('mousemove', e => { if (dragging && e.buttons) setVolumeFromPointer(document.querySelector('#qpop [data-slider]'), e.clientX); });
+addEventListener('mouseup', () => { dragging = null; });
+addEventListener('click', e => {
+  if (e.target.closest('[data-slider]')) return; // tratado no mousedown
+  const hint = e.target.closest('[data-cmd]');
+  if (hint) return command(hint.dataset.cmd);
+  const el = e.target.closest('[data-nav]');
+  const ov = topOverlay();
+  if (ov && ov.id === 'quick') {
+    if (popoverOpen()) {
+      if (e.target.closest('#qpop') && !el) return;          // clique no fundo do painel
+      if (el && el.dataset.bar) { closePopover(); setFocus(el); return activate(el); } // outro ícone
+      if (!el) return closePopover();                         // clique fora fecha o painel
+    } else if (!el) return closeOverlay();                    // clique fora volta ao jogo
+  }
+  if (ov && ov.id === 'dialog' && !e.target.closest('.box')) return closeOverlay();
+  if (el && navigables().includes(el)) { setFocus(el); activate(el); }
+});
+let wheelLock = 0;
+addEventListener('wheel', e => {
+  e.preventDefault();
+  const now = Date.now(); if (now < wheelLock) return;
+  const horizontal = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+  const d = horizontal ? (e.deltaX || e.deltaY) : e.deltaY;
+  if (Math.abs(d) < 4) return;
+  wheelLock = now + 140;
+  command(horizontal ? (d > 0 ? 'right' : 'left') : (d > 0 ? 'down' : 'up'));
+}, { passive: false });
 
 // Mapeamento "standard" da Gamepad API: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 9 Menu, 12-15 direcional.
 // 16 = Guia (Xbox/PS/Steam). Alguns sistemas capturam o Guia; View (8) funciona como alternativa no protótipo.

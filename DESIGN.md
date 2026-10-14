@@ -238,6 +238,7 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
   - **Cartões vivos** (fileira abaixo da barra): Jogo (arte, tempo de sessão, total), Capturas (última captura ou convite), Desempenho ao vivo (FPS grande, gráfico dos últimos segundos, modo do HUD; A alterna o HUD), Áudio (volume e saída) e Controle (bateria). O cartão do jogo é maior e recebe o foco ao abrir.
   - **Barra de ícones** (no topo, centralizada): Início, o jogo (capa com ponto verde), Capturar, Desempenho, Áudio, Controle, Tela, Encerrar. O ícone em foco vira círculo branco e mostra o nome abaixo.
   - **Painel do ícone** (melhoria sobre o PS5, que troca de tela): A abre um painel de 600px logo abaixo da barra, alinhado ao ícone, com linhas grandes (marcador redondo, chave liga/desliga, barra de volume). O ícone de origem fica marcado e os cartões saem de cena (nunca dois painéis sobrepostos). B fecha o painel; o painel de Encerrar já é a confirmação.
+  - **Painéis e opções:** com um painel aberto, ← → levam o painel ao ícone vizinho (Desempenho, Áudio, Controle, Tela); ícones sem painel só recebem o foco, e Encerrar nunca abre deslizando. Escolher uma opção aplica na hora, confirma com um aviso e fecha o painel, com o foco de volta no ícone. No volume, ← → ajustam.
   - **Navegação:** ← → ficam na fileira atual; ↑ de um cartão vai ao ícone correspondente e ↓ volta ao cartão. B ou Guia voltam ao jogo. "Início" volta ao launcher sem fechar o jogo (o status mostra o jogo em execução e o Guia retorna a ele).
 - **HUD de desempenho:** canto superior esquerdo do jogo (Desligado, Só FPS, Completo), números tabulares, fundo preto 60%.
 - **Restrição técnica do menu rápido:** sem injeção gráfica (proibida pelo PRD, §10), a sobreposição é uma janela topmost transparente; ela funciona sobre jogos em tela cheia sem bordas, mas não sobre tela cheia exclusiva. Nesse caso, o Guia deve trazer o launcher para frente (como alternar janela). Validar no Windows antes de prometer o comportamento.
@@ -251,5 +252,6 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
 - Don't usar blur de fundo (`backdrop-filter`) ou vidro fosco: o WPF não tem equivalente nativo e o custo em GPU é alto.
 - Don't usar sombra em listas inteiras; só no item em foco.
 - Don't depender de hover ou de mouse para qualquer ação.
+- Do aceitar mouse em tudo como alternativa: passar o mouse foca sem rolar a tela, clicar ativa, a roda navega, as dicas do rodapé são clicáveis, clicar fora fecha o painel (ou o menu) e a barra de volume aceita clique e arraste.
 - Don't versionar arte de jogos no repositório (é protegida por direitos autorais): o app baixa capas e heros das lojas para um cache local, e o protótipo as carrega direto dos CDNs.
 - Do ter fallback quando não há arte: gradiente do accent com o título do jogo.
