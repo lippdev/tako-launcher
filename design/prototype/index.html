@@ -213,41 +213,47 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 #stage.in-game .hints, #stage.in-game .status { display: none; }
 
 #quick { z-index: 21; }
-#quick .scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,10,14,.97) 0%, rgba(8,10,14,.92) 52%, rgba(8,10,14,.35) 78%, rgba(8,10,14,.15) 100%); }
-.quick-head { position: absolute; left: var(--safe-x); top: 300px; display: flex; gap: 28px; align-items: flex-end; }
-.quick-head .mini { width: 112px; height: 168px; border-radius: var(--r-md); overflow: hidden; position: relative; box-shadow: 0 16px 32px rgba(0,0,0,.4); flex: none; }
-.quick-head .mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.quick-head .t { font-size: var(--fs-headline-md); font-weight: 800; letter-spacing: -.01em; line-height: 1.15; }
-.quick-head .m { font-size: var(--fs-body-md); color: rgba(255,255,255,.7); margin-top: 8px; display: flex; gap: 14px; align-items: center; }
-.quick-head .m .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.4); }
-.quick-tiles { position: absolute; left: var(--safe-x); right: var(--safe-x); top: 520px; display: flex; gap: 20px; }
-.tile { width: 184px; height: 150px; border-radius: var(--r-lg); background: rgba(255,255,255,.08); display: flex; flex-direction: column; justify-content: space-between; padding: 22px;
-  font-size: var(--fs-label-md); font-weight: 600; transition: transform var(--t-focus) var(--ease), background var(--t-focus), color var(--t-focus); }
-.tile svg { width: 38px; height: 38px; }
-.tile.danger svg { color: var(--error); }
-.tile.focused { background: #fff; color: #11141A; outline: 4px solid #fff; outline-offset: 6px; transform: scale(1.04); box-shadow: 0 16px 32px rgba(0,0,0,.4); }
-.tile.focused.danger svg { color: #C62828; }
-.tile.current:not(.focused) { background: rgba(255,255,255,.16); }
-.quick-detail { position: absolute; left: var(--safe-x); right: var(--safe-x); top: 720px; min-height: 200px; }
-.quick-detail h4 { font-size: var(--fs-title); font-weight: 700; }
-.quick-detail p { font-size: var(--fs-body-md); color: rgba(255,255,255,.7); margin-top: 10px; max-width: 1100px; }
-.quick-detail .controls { display: flex; gap: 16px; margin-top: 26px; align-items: center; flex-wrap: wrap; }
-.opt { height: 60px; padding: 0 28px; border-radius: var(--r-full); background: rgba(255,255,255,.1); display: inline-flex; align-items: center; gap: 10px; font-size: var(--fs-label-md); font-weight: 600;
-  transition: transform var(--t-focus) var(--ease); }
-.opt.selected { background: rgba(255,255,255,.24); }
-.opt.selected::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
-.opt.focused { outline: 4px solid #fff; outline-offset: 6px; transform: scale(1.04); }
-.opt.danger { background: var(--error); color: #fff; }
-.slider { display: flex; align-items: center; gap: 22px; height: 60px; padding: 0 28px; border-radius: var(--r-full); background: rgba(255,255,255,.1); font-size: var(--fs-label-md); font-weight: 600; min-width: 620px; }
-.slider > svg { width: 28px; height: 28px; flex: none; }
-.slider .bar { flex: 1; height: 10px; border-radius: 5px; background: rgba(255,255,255,.2); position: relative; }
-.slider .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: #fff; }
-.slider .bar b { position: absolute; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
-.slider .v { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
-.slider.focused { outline: 4px solid #fff; outline-offset: 6px; }
-.pad-row { display: flex; align-items: center; gap: 16px; height: 60px; padding: 0 28px; border-radius: var(--r-full); background: rgba(255,255,255,.1); font-size: var(--fs-label-md); font-weight: 600; }
-.pad-row svg { width: 28px; height: 28px; }
+#quick .scrim { position: absolute; inset: 0; background: linear-gradient(to right, rgba(0,0,0,.15) 0%, rgba(0,0,0,.45) 60%, rgba(0,0,0,.6) 100%); }
+/* Painel lateral (Steam: acesso rápido à direita; PS5: cartões e linhas grandes). */
+.qpanel { position: absolute; top: 0; right: 0; bottom: 0; width: 760px; background: rgba(14,17,23,.97); box-shadow: -24px 0 64px rgba(0,0,0,.5);
+  display: grid; grid-template-columns: 1fr 112px; grid-template-rows: auto 1fr; animation: qin var(--t-page) var(--ease); }
+@keyframes qin { from { transform: translateX(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+.qhead { grid-column: 1 / 3; display: flex; gap: 22px; align-items: center; padding: 72px 40px 28px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.qhead .mini { width: 84px; height: 126px; border-radius: var(--r-sm); overflow: hidden; position: relative; flex: none; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+.qhead .mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.qhead .t { font-size: var(--fs-title); font-weight: 800; line-height: 1.2; margin-top: 6px; }
+.qhead .m { font-size: var(--fs-label-sm); color: rgba(255,255,255,.6); margin-top: 8px; }
+.qcontent { padding: 28px 24px 120px 40px; overflow: hidden; }
+.qcontent h4 { font-size: var(--fs-label-sm); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.5); margin: 8px 0 14px; }
+.qcontent h4:not(:first-child) { margin-top: 30px; }
+.qcontent p { font-size: var(--fs-label-sm); color: rgba(255,255,255,.55); margin: -4px 0 14px; line-height: 1.45; }
+.qrail { border-left: 1px solid rgba(255,255,255,.08); padding: 28px 16px; display: flex; flex-direction: column; gap: 12px; }
+.qtab { width: 80px; height: 80px; border-radius: var(--r-md); display: grid; place-items: center; color: rgba(255,255,255,.6); position: relative;
+  transition: background var(--t-focus), color var(--t-focus), transform var(--t-focus) var(--ease); }
+.qtab svg { width: 34px; height: 34px; }
+.qtab.current { background: rgba(255,255,255,.12); color: #fff; }
+.qtab.current::before { content: ""; position: absolute; left: -17px; top: 20px; bottom: 20px; width: 4px; border-radius: 2px; background: #fff; }
+.qtab.focused { background: #fff; color: #11141A; outline: 4px solid #fff; outline-offset: 4px; }
+.qrow { display: flex; align-items: center; gap: 18px; min-height: 76px; padding: 0 24px; border-radius: var(--r-md); background: rgba(255,255,255,.06); margin-bottom: 10px;
+  font-size: var(--fs-label-lg); font-weight: 600; transition: background var(--t-focus), color var(--t-focus); }
+.qrow > svg { width: 30px; height: 30px; flex: none; }
+.qrow .end { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: var(--fs-label-md); color: rgba(255,255,255,.6); }
+.qrow.primary { background: #fff; color: #11141A; }
+.qrow.danger > svg { color: var(--error); }
+.qrow.focused { background: #fff; color: #11141A; outline: 4px solid #fff; outline-offset: 4px; }
+.qrow.focused .end { color: rgba(17,20,26,.6); }
+.qrow.focused.danger > svg { color: #C62828; }
+.radio { width: 26px; height: 26px; border-radius: 50%; border: 3px solid currentColor; opacity: .5; flex: none; position: relative; }
+.radio.on { opacity: 1; }
+.radio.on::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: currentColor; }
+.qrow .toggle { flex: none; }
+.slider-row .bar { flex: 1; height: 10px; border-radius: 5px; background: rgba(255,255,255,.2); position: relative; }
+.slider-row .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: currentColor; }
+.slider-row .bar b { position: absolute; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: currentColor; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.slider-row.focused .bar { background: rgba(17,20,26,.18); }
+.slider-row .v { width: 64px; text-align: right; font-variant-numeric: tabular-nums; font-size: var(--fs-label-md); }
 .battery { display: inline-flex; align-items: center; gap: 8px; color: var(--success); }
+.battery svg { width: 26px; height: 26px; }
 .running-pill { display: flex; align-items: center; gap: 8px; padding: 4px 14px; border-radius: var(--r-full); background: var(--success); color: #0B2915; font-weight: 700; }
 .running-pill svg { width: 18px; height: 18px; }
 
@@ -367,9 +373,11 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
   <!-- Menu rápido: sobreposição aberta pelo botão Guia durante o jogo -->
   <div class="overlay" id="quick">
     <div class="scrim"></div>
-    <div class="quick-head" id="quick-head"></div>
-    <div class="quick-tiles" id="quick-tiles"></div>
-    <div class="quick-detail" id="quick-detail"></div>
+    <aside class="qpanel">
+      <div class="qhead" id="quick-head"></div>
+      <div class="qcontent" id="quick-detail"></div>
+      <nav class="qrail" id="quick-tiles"></nav>
+    </aside>
   </div>
 
   <!-- Recuperação -->
@@ -1117,14 +1125,11 @@ function endSession() {
   toast(`Bem-vindo de volta · sessão de ${g.title} encerrada`);
 }
 
-const QUICK_TILES = [
-  ['resume', 'play', 'Voltar ao jogo'], ['home', 'home', 'Início'], ['capture', 'camera', 'Capturar tela'], ['perf', 'gauge', 'Desempenho'],
-  ['audio', 'volume', 'Áudio'], ['controller', 'gamepad', 'Controle'], ['display', 'monitor', 'Tela'], ['quit', 'power', 'Encerrar jogo'],
-];
+const QUICK_TABS = [['game', 'play', 'Jogo'], ['perf', 'gauge', 'Desempenho'], ['audio', 'volume', 'Áudio'], ['controller', 'gamepad', 'Controle'], ['display', 'monitor', 'Tela']];
 const PERF_MODES = [['off', 'Desligado'], ['fps', 'Só FPS'], ['full', 'Completo']];
 const OUTPUTS = ['TV (HDMI)', 'Fone Bluetooth', 'Alto-falantes'];
 const RESOLUTIONS = ['3840 × 2160', '2560 × 1440', '1920 × 1080'];
-Object.assign(state, { perf: 'off', volume: 70, output: 0, resolution: 0, hdr: true });
+Object.assign(state, { perf: 'off', volume: 70, output: 0, resolution: 0, hdr: true, quickTab: 'game' });
 
 function openQuick() {
   const g = gameById(state.running);
@@ -1132,61 +1137,81 @@ function openQuick() {
   document.getElementById('quick-head').innerHTML =
     `<div class="mini" style="${coverStyle(g)}">${coverHtml(g)}</div>
      <div><div class="overline">Jogando agora</div><div class="t">${esc(g.title)}</div>
-     <div class="m">Sessão de ${mins} min<span class="dot"></span>${g.hours} h no total<span class="dot"></span>${STORES[g.store].name}</div></div>`;
-  document.getElementById('quick-tiles').innerHTML = QUICK_TILES.map(([k, ic, label]) =>
-    `<div class="tile ${k === 'quit' ? 'danger' : ''}" data-nav data-group="quick-tiles" data-tile="${k}">${icon(ic)}<span>${label}</span></div>`).join('');
+     <div class="m">Sessão de ${mins} min · ${g.hours} h no total · ${STORES[g.store].name}</div></div>`;
+  document.getElementById('quick-tiles').innerHTML = QUICK_TABS.map(([k, ic, label]) =>
+    `<div class="qtab" data-nav data-group="quick-tiles" data-tile="${k}" title="${label}">${icon(ic)}</div>`).join('');
+  state.quickTab = 'game';
   openOverlay('quick');
-  renderQuickDetail('resume');
+  renderQuickDetail('game');
+  setFocus(document.querySelector('#quick-detail [data-nav]'));
 }
 
+/* Conteúdo da aba: linhas verticais grandes (PS5) dentro do painel lateral (Steam). */
 function renderQuickDetail(k) {
-  document.querySelectorAll('.tile').forEach(t => t.classList.toggle('current', t.dataset.tile === k));
-  const opt = (group, value, label, selected, extra = '') => `<div class="opt ${selected ? 'selected' : ''} ${extra}" data-nav data-group="quick-detail" data-opt="${group}" data-value="${value}">${label}</div>`;
+  state.quickTab = k;
+  document.querySelectorAll('.qtab').forEach(t => t.classList.toggle('current', t.dataset.tile === k));
+  const row = (opt, value, label, { ic, end = '', cls = '' } = {}) =>
+    `<div class="qrow ${cls}" data-nav data-group="quick-detail" data-opt="${opt}" data-value="${value}">${ic ? icon(ic) : ''}<span>${label}</span>${end ? `<span class="end">${end}</span>` : ''}</div>`;
+  const radio = on => `<span class="radio ${on ? 'on' : ''}"></span>`;
+  const g = gameById(state.running);
   const pad = state.pad || 'Xbox Wireless Controller';
   const html = {
-    resume: `<h4>Continue de onde parou</h4><p>O jogo foi pausado pelo sistema enquanto o menu está aberto (quando o jogo permite).</p>`,
-    home: `<h4>Ir para o Início</h4><p>Abre o launcher sem fechar o jogo. Ele continua rodando em segundo plano; aperte Guia para voltar.</p>`,
-    capture: `<h4>Capturar tela</h4><p>Salva a imagem em Imagens › UltraLauncher › ${esc(gameById(state.running).title)}.</p>`,
-    perf: `<h4>Sobreposição de desempenho</h4><p>Mostra FPS, tempo de quadro, CPU e GPU no canto do jogo.</p><div class="controls">${PERF_MODES.map(([v, l]) => opt('perf', v, l, state.perf === v)).join('')}</div>`,
-    audio: `<h4>Áudio</h4><div class="controls"><div class="slider" data-nav data-group="quick-detail" data-slider="volume">${icon('volume')}<div class="bar"><i style="width:${state.volume}%"></i><b style="left:${state.volume}%"></b></div><span class="v">${state.volume}%</span></div></div>
-            <div class="controls">${OUTPUTS.map((l, i) => opt('output', i, l, state.output === i)).join('')}</div>`,
-    controller: `<h4>Controles conectados</h4><div class="controls"><div class="pad-row">${icon('gamepad')}${esc(pad)}<span class="battery">${icon('battery')}80%</span></div>${opt('remap', 1, 'Remapear botões')}</div>`,
-    display: `<h4>Tela</h4><p>O Console Runtime restaura a configuração original ao encerrar a sessão.</p><div class="controls">${RESOLUTIONS.map((l, i) => opt('resolution', i, l, state.resolution === i)).join('')}${opt('hdr', 1, state.hdr ? 'HDR ligado' : 'HDR desligado', state.hdr)}</div>`,
-    quit: `<h4>Encerrar ${esc(gameById(state.running).title)}?</h4><p>Progresso não salvo pode ser perdido. Monitores e áudio voltam ao estado anterior à sessão.</p><div class="controls">${opt('quit', 1, 'Encerrar jogo', false, 'danger')}</div>`,
+    game: `<h4>Jogo</h4>
+      ${row('act', 'resume', 'Voltar ao jogo', { ic: 'play', cls: 'primary' })}
+      ${row('act', 'home', 'Ir para o Início', { ic: 'home', end: 'o jogo continua aberto' })}
+      ${row('act', 'capture', 'Capturar tela', { ic: 'camera' })}
+      <h4>Sessão</h4>
+      ${row('act', 'quit', `Encerrar ${esc(g.title)}`, { ic: 'power', cls: 'danger' })}`,
+    perf: `<h4>Sobreposição de desempenho</h4><p>Aparece no canto superior esquerdo do jogo.</p>
+      ${PERF_MODES.map(([v, l]) => row('perf', v, l, { end: radio(state.perf === v) })).join('')}`,
+    audio: `<h4>Volume</h4>
+      <div class="qrow slider-row" data-nav data-group="quick-detail" data-slider="volume">${icon('volume')}<div class="bar"><i style="width:${state.volume}%"></i><b style="left:${state.volume}%"></b></div><span class="v">${state.volume}%</span></div>
+      <h4>Saída de áudio</h4>
+      ${OUTPUTS.map((l, i) => row('output', i, l, { end: radio(state.output === i) })).join('')}`,
+    controller: `<h4>Conectados</h4>
+      ${row('pad', 1, esc(pad), { ic: 'gamepad', end: `<span class="battery">${icon('battery')}80%</span>` })}
+      <h4>Ajustes</h4>
+      ${row('remap', 1, 'Remapear botões', { end: 'pós-MVP' })}`,
+    display: `<h4>Resolução</h4>
+      ${RESOLUTIONS.map((l, i) => row('resolution', i, l, { end: radio(state.resolution === i) })).join('')}
+      <h4>Imagem</h4>
+      ${row('hdr', 1, 'HDR', { end: `<span class="toggle ${state.hdr ? 'on' : ''}"></span>` })}
+      <p>O Console Runtime restaura a configuração original ao encerrar a sessão.</p>`,
   }[k];
   document.getElementById('quick-detail').innerHTML = html;
 }
 
+/* A na aba: entra no conteúdo. */
 function quickTile(k) {
-  switch (k) {
-    case 'resume': return closeOverlay();
-    case 'home': {
+  renderQuickDetail(k);
+  setFocus(document.querySelector('#quick-detail [data-nav]'));
+}
+
+function quickOption(el) {
+  const { opt, value } = el.dataset;
+  const refocus = sel => setFocus(document.querySelector(sel));
+  if (opt === 'act') {
+    if (value === 'resume') return closeOverlay();
+    if (value === 'home') {
       const g = gameById(state.running);
       while (topOverlay()) { overlayStack.pop().classList.remove('active'); }
       state.heroGameId = g.id; go('home', { replace: true });
       return toast(`${g.title} continua rodando · ${state.input === 'pad' ? 'Guia' : 'G'} volta ao jogo`);
     }
-    case 'capture': {
+    if (value === 'capture') {
       closeOverlay();
       const f = document.getElementById('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
       return toast('Captura salva em Imagens › UltraLauncher');
     }
-    default: {
-      // Ações com opções: o foco desce para o painel.
-      const first = document.querySelector('#quick-detail [data-nav]'); if (first) setFocus(first);
-    }
+    if (value === 'quit') return confirmQuit();
   }
-}
-
-function quickOption(el) {
-  const { opt, value } = el.dataset;
   if (opt === 'perf') { setPerf(value); renderQuickDetail('perf'); }
   if (opt === 'output') { state.output = +value; renderQuickDetail('audio'); toast(`Áudio saindo por: ${OUTPUTS[state.output]}`); }
   if (opt === 'resolution') { state.resolution = +value; renderQuickDetail('display'); }
   if (opt === 'hdr') { state.hdr = !state.hdr; renderQuickDetail('display'); }
   if (opt === 'remap') return toast('Remapeamento por jogo chega depois do MVP');
-  if (opt === 'quit') return confirmQuit();
-  setFocus(document.querySelector(`#quick-detail [data-opt="${opt}"][data-value="${opt === 'hdr' ? 1 : value}"]`));
+  if (opt === 'pad') return toast('Controle conectado e com bateria em 80%');
+  refocus(`#quick-detail [data-opt="${opt}"][data-value="${value}"]`);
 }
 
 function adjustSlider(el, dir) {
@@ -1233,16 +1258,18 @@ function confirmExit() {
 /* ================= Toast, dicas e relógio ================= */
 let toastTimer = null;
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
-const GLYPHS = { pad: { a: 'A', b: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', menu: '☰', guide: 'Guia', left: '◀', right: '▶' }, keyboard: { a: 'Enter', b: 'Esc', x: 'F', y: '/', lb: 'Q', rb: 'E', menu: 'M', guide: 'G', left: '←', right: '→' } };
+const GLYPHS = { pad: { a: 'A', b: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', menu: '☰', guide: 'Guia', left: '◀', right: '▶', up: '▲', down: '▼' }, keyboard: { a: 'Enter', b: 'Esc', x: 'F', y: '/', lb: 'Q', rb: 'E', menu: 'M', guide: 'G', left: '←', right: '→', up: '↑', down: '↓' } };
 function renderHints() {
   const g = GLYPHS[state.input === 'pad' ? 'pad' : 'keyboard']; const key = state.input !== 'pad';
   const list = [];
   const ov = topOverlay();
   document.getElementById('stage').classList.toggle('in-game', !!(ov && ov.id === 'game'));
   if (ov && ov.id === 'quick') {
+    const inContent = current && current.dataset.group === 'quick-detail';
     list.push(['a', 'Selecionar']);
     if (current && current.dataset.slider) list.push(['left+right', 'Ajustar']);
-    list.push(['b', current && current.dataset.group === 'quick-detail' ? 'Voltar' : 'Voltar ao jogo'], ['guide', 'Fechar menu']);
+    else if (!inContent) list.push(['up+down', 'Abas']);
+    list.push(['b', inContent ? 'Abas' : 'Voltar ao jogo'], ['guide', 'Fechar']);
   }
   else if (ov && ov.id === 'launch') list.push(['a', current && current.dataset.action === 'end-session' ? 'Encerrar' : 'Cancelar']);
   else if (ov) list.push(['a', 'Selecionar'], ['b', 'Voltar']);
@@ -1278,8 +1305,11 @@ function command(cmd) {
   if (cmd === 'guide') return guide();
   if (ov && ov.id === 'game') return; // Durante o jogo, só o Guia é do launcher; o resto vai para o jogo.
   if ((cmd === 'left' || cmd === 'right') && current && current.dataset.slider) return adjustSlider(current, cmd);
-  if (cmd === 'b' && ov && ov.id === 'quick' && current && current.dataset.group === 'quick-detail') {
-    return setFocus(document.querySelector('.tile.current'));
+  if (ov && ov.id === 'quick' && current) {
+    const inContent = current.dataset.group === 'quick-detail';
+    if (inContent && (cmd === 'b' || (cmd === 'right' && !current.dataset.slider))) return setFocus(document.querySelector('.qtab.current'));
+    if (!inContent && cmd === 'left') return quickTile(current.dataset.tile);
+    if (!inContent && cmd === 'right') return;
   }
   switch (cmd) {
     case 'up': case 'down': case 'left': case 'right': return move(cmd);
