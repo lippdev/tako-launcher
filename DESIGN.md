@@ -214,6 +214,7 @@ Inter (SIL OFL), empacotada com o app. **Todo texto usa um token da escala acima
 - **Barra lateral:** 400px quando em foco; recolhe para 120px (só ícones) quando o foco vai para o conteúdo, liberando espaço para o destaque.
 - **Conteúdo:** cabeçalho (título da página + busca), destaque (hero) ocupando ~55% da altura e fileiras horizontais de capas.
 - **Barra de dicas:** rodapé fixo com os glifos do controle e a ação de cada botão na tela atual.
+- **Status do sistema:** canto superior direito, acima da busca: entrada atual (ícone de controle com o nome, ou teclado) e a hora. Aparece em todas as telas.
 - **Grade da biblioteca:** capas 2:3 (204x306), 7 colunas quando a barra lateral está recolhida.
 
 ## Elevation & Depth
