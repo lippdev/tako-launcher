@@ -256,7 +256,9 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .qpop { position: absolute; bottom: 210px; width: 600px; max-height: 640px; border-radius: 26px; background: rgba(18,21,28,.98); box-shadow: 0 24px 64px rgba(0,0,0,.55);
   padding: 26px 26px 16px; display: none; animation: qup var(--t-focus) var(--ease); }
 #quick.pop-open .qpop { display: block; }
-#quick.pop-open .qcards { opacity: .25; }
+/* Um painel por vez: com o painel aberto, os cartões saem de cena. */
+.qcards { transition: opacity var(--t-focus) var(--ease); }
+#quick.pop-open .qcards { opacity: 0; visibility: hidden; }
 .qpop h4 { font-size: var(--fs-label-sm); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.5); margin: 4px 0 12px; }
 .qpop h4:not(:first-child) { margin-top: 22px; }
 .qpop p { font-size: var(--fs-label-sm); color: rgba(255,255,255,.55); margin: 6px 0 10px; line-height: 1.45; }
