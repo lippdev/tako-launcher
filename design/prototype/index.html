@@ -211,12 +211,15 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .flash.go { animation: flash 420ms ease-out; }
 @keyframes flash { 0% { opacity: .85; } 100% { opacity: 0; } }
 #stage.in-game .hints, #stage.in-game .status { display: none; }
+/* Com a Central de Controle no topo, hora e controle descem para a linha da barra de dicas. */
+#stage.quick-open .status { top: auto; bottom: 29px; left: var(--safe-x); right: auto; }
 
 #quick { z-index: 21; }
-#quick .scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(6,8,12,.96) 0%, rgba(6,8,12,.88) 30%, rgba(6,8,12,.35) 62%, rgba(6,8,12,0) 85%); }
+#quick .scrim { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(6,8,12,.96) 0%, rgba(6,8,12,.88) 30%, rgba(6,8,12,.35) 58%, rgba(6,8,12,0) 80%); }
 /* Central de Controle (padrão PS5): cartões vivos + barra de ícones + painel do ícone. */
-.qcards { position: absolute; left: var(--safe-x); right: 0; top: 500px; height: 300px; display: flex; gap: 24px; align-items: flex-end; animation: qup var(--t-page) var(--ease); }
+.qcards { position: absolute; left: var(--safe-x); right: 0; top: 180px; height: 300px; display: flex; gap: 24px; align-items: flex-start; animation: qdown var(--t-page) var(--ease); }
 @keyframes qup { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes qdown { from { transform: translateY(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
 .qcard { width: 300px; height: 270px; flex: none; border-radius: var(--r-lg); background: rgba(22,26,34,.92); position: relative; overflow: hidden; padding: 24px;
   display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 12px 32px rgba(0,0,0,.35);
   transition: transform var(--t-focus) var(--ease), height var(--t-focus) var(--ease); }
@@ -236,7 +239,7 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .qcard .meter { height: 10px; border-radius: 5px; background: rgba(255,255,255,.18); margin-top: 16px; overflow: hidden; }
 .qcard .meter i { display: block; height: 100%; background: #fff; border-radius: 5px; }
 .qcard.focused { outline: 4px solid #fff; outline-offset: 6px; transform: scale(1.03); }
-.qbar { position: absolute; left: 0; right: 0; bottom: 96px; height: 96px; display: flex; justify-content: center; align-items: center; gap: 26px; }
+.qbar { position: absolute; left: 0; right: 0; top: 40px; height: 96px; animation: qdown var(--t-page) var(--ease); display: flex; justify-content: center; align-items: center; gap: 26px; }
 .qbar .sep { width: 2px; height: 40px; background: rgba(255,255,255,.18); margin: 0 6px; }
 .qicon { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; color: rgba(255,255,255,.85); position: relative;
   transition: background var(--t-focus), color var(--t-focus), transform var(--t-focus) var(--ease); }
@@ -248,13 +251,13 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .qicon.focused { background: #fff; color: #11141A; transform: scale(1.08); }
 .qicon.open { background: rgba(255,255,255,.22); color: #fff; }
 .qicon.focused.danger svg { color: #C62828; }
-.qicon .label { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 8px 16px; border-radius: var(--r-full); background: #fff; color: #11141A;
+.qicon .label { position: absolute; top: 88px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 8px 16px; border-radius: var(--r-full); background: #fff; color: #11141A;
   font-size: var(--fs-label-md); font-weight: 700; opacity: 0; pointer-events: none; transition: opacity var(--t-focus); }
 .qicon.focused .label { opacity: 1; }
 #quick.pop-open .qicon.focused .label { opacity: 0; }
 /* Painel do ícone: abre acima da barra, ancorado no ícone (melhoria sobre o PS5, que troca de tela). */
-.qpop { position: absolute; bottom: 210px; width: 600px; max-height: 640px; border-radius: 26px; background: rgba(18,21,28,.98); box-shadow: 0 24px 64px rgba(0,0,0,.55);
-  padding: 26px 26px 16px; display: none; animation: qup var(--t-focus) var(--ease); }
+.qpop { position: absolute; top: 160px; width: 600px; max-height: 760px; border-radius: 26px; background: rgba(18,21,28,.98); box-shadow: 0 24px 64px rgba(0,0,0,.55);
+  padding: 26px 26px 16px; display: none; animation: qdown var(--t-focus) var(--ease); }
 #quick.pop-open .qpop { display: block; }
 /* Um painel por vez: com o painel aberto, os cartões saem de cena. */
 .qcards { transition: opacity var(--t-focus) var(--ease); }
@@ -1338,6 +1341,7 @@ function renderHints() {
   const list = [];
   const ov = topOverlay();
   document.getElementById('stage').classList.toggle('in-game', !!(ov && ov.id === 'game'));
+  document.getElementById('stage').classList.toggle('quick-open', !!overlayStack.find(o => o.id === 'quick'));
   if (ov && ov.id === 'quick') {
     const inPop = popoverOpen();
     list.push(['a', 'Selecionar']);
@@ -1382,8 +1386,8 @@ function command(cmd) {
     const g = current.dataset.group;
     if (cmd === 'left' || cmd === 'right') return move(cmd, { sameGroup: true });
     // Cada cartão tem um ícone correspondente na barra (e vice-versa).
-    if (cmd === 'down' && g === 'qcards') return setFocus(document.querySelector(`.qicon[data-bar="${current.dataset.card}"]`) || document.querySelector('.qicon'));
-    if (cmd === 'up' && g === 'qbar') return setFocus(document.querySelector(`.qcard[data-card="${current.dataset.bar}"]`) || groupMemory.qcards || document.querySelector('.qcard'));
+    if (cmd === 'up' && g === 'qcards') return setFocus(document.querySelector(`.qicon[data-bar="${current.dataset.card}"]`) || document.querySelector('.qicon'));
+    if (cmd === 'down' && g === 'qbar') return setFocus(document.querySelector(`.qcard[data-card="${current.dataset.bar}"]`) || groupMemory.qcards || document.querySelector('.qcard'));
     return;
   }
   if (ov && ov.id === 'quick' && popoverOpen()) {
