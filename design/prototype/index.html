@@ -203,12 +203,9 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .toast { position: absolute; left: 50%; bottom: 120px; transform: translate(-50%, 20px); background: #fff; color: #11141A; font-size: var(--fs-body-md); font-weight: 600; padding: 20px 32px; border-radius: var(--r-full); opacity: 0; z-index: 40; transition: opacity var(--t-focus), transform var(--t-page) var(--ease); box-shadow: 0 16px 32px rgba(0,0,0,.35); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* Nota do protótipo (fora do canvas) */
-#proto-note { position: fixed; right: 12px; top: 10px; z-index: 100; font: 12px/1.4 system-ui; color: rgba(255,255,255,.55); text-align: right; pointer-events: none; }
 </style>
 </head>
 <body>
-<div id="proto-note">Protótipo UltraLauncher · setas/Enter/Esc ou controle · Q/E = LB/RB · F = X · / = Y · M = Menu</div>
 <div id="viewport">
 <div id="stage">
   <div class="backdrop" id="bgA"><div class="tint"></div><div class="art"></div><div class="fade"></div></div>
