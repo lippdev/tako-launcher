@@ -1,4 +1,4 @@
-namespace Console.Runtime;
+namespace ConsoleMode.Runtime;
 
 /// <summary>Estados de sessão (PRD §4.4). Transições devem ser idempotentes.</summary>
 public enum SessionState

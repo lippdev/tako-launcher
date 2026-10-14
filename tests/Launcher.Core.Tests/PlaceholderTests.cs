@@ -1,3 +1,3 @@
-namespace Launcher.Themes.Tests;
+namespace Launcher.Core.Tests;
 
 public class PlaceholderTests { }

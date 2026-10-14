@@ -1,0 +1,525 @@
+using System.IO;
+using System.Text.RegularExpressions;
+using System.Xml;
+
+namespace Launcher.Themes.Xaml;
+
+/// <summary>
+/// Valida XAML de tema como XML puro, antes de qualquer interpretação pelo WPF (MVP-016).
+/// Não instancia tipos nem carrega assemblies: só compara nomes contra a <see cref="XamlSecurityPolicy"/>.
+/// </summary>
+public sealed partial class XamlValidator(XamlSecurityPolicy policy)
+{
+    private const string XmlNamespace = "http://www.w3.org/XML/1998/namespace";
+    private const string XmlnsNamespace = "http://www.w3.org/2000/xmlns/";
+    private const string AllowedPackPrefix = "pack://application:,,,/";
+    private static readonly char[] PathSeparators = ['/', '\\'];
+
+    private static readonly HashSet<string> XamlDirectiveAttributes = new(StringComparer.Ordinal) { "Key", "Name", "Shared", "Uid" };
+    private static readonly HashSet<string> XamlElements = new(StringComparer.Ordinal) { "Null", "Type", "Static", "Array", "Reference" };
+    private static readonly HashSet<string> PresentationExtensions = new(StringComparer.Ordinal)
+    {
+        "Binding", "StaticResource", "DynamicResource", "TemplateBinding", "RelativeSource",
+    };
+
+    /// <param name="xaml">Conteúdo do arquivo.</param>
+    /// <param name="themeRelativePath">Caminho do arquivo dentro do tema (ex.: <c>Views/Main.xaml</c>), usado para detectar path traversal.</param>
+    /// <param name="expectedRoot">Elemento raiz exigido no namespace de apresentação (ex.: <c>ResourceDictionary</c>), ou nulo.</param>
+    public XamlValidationResult Validate(string xaml, string themeRelativePath, string? expectedRoot = null)
+    {
+        ArgumentNullException.ThrowIfNull(xaml);
+        ArgumentNullException.ThrowIfNull(themeRelativePath);
+
+        var violations = new List<XamlViolation>();
+        if (xaml.Length > policy.MaxCharacters)
+        {
+            violations.Add(new(XamlViolationCode.LimitExceeded, $"Arquivo excede {policy.MaxCharacters} caracteres.", 0, 0));
+            return new(violations);
+        }
+
+        var settings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = policy.MaxCharacters,
+            IgnoreComments = true,
+            IgnoreWhitespace = true,
+        };
+
+        using var reader = XmlReader.Create(new StringReader(xaml), settings);
+        var walker = new Walker(policy, reader, themeRelativePath, expectedRoot, violations);
+        try
+        {
+            walker.Run();
+        }
+        catch (XmlException ex) when (ex.Message.Contains("DTD", StringComparison.OrdinalIgnoreCase))
+        {
+            violations.Add(new(XamlViolationCode.DtdProhibited, "DTD não é permitido em XAML de tema.", ex.LineNumber, ex.LinePosition));
+        }
+        catch (XmlException ex)
+        {
+            violations.Add(new(XamlViolationCode.MalformedXml, ex.Message, ex.LineNumber, ex.LinePosition));
+        }
+
+        return new(violations);
+    }
+
+    [GeneratedRegex(@"\{\s*(?:(?<prefix>[A-Za-z_][\w\-.]*):)?(?<name>[A-Za-z_][\w.]*)(?<args>[^{}]*)")]
+    private static partial Regex MarkupExtensionPattern();
+
+    [GeneratedRegex(@"^[A-Za-z]:[\\/]")]
+    private static partial Regex DriveLetterPath();
+
+    private sealed class Walker(
+        XamlSecurityPolicy policy,
+        XmlReader reader,
+        string themeRelativePath,
+        string? expectedRoot,
+        List<XamlViolation> violations)
+    {
+        private readonly IXmlLineInfo _lineInfo = (IXmlLineInfo)reader;
+        private readonly Stack<string> _elements = new();
+        private int _elementCount;
+
+        public void Run()
+        {
+            while (reader.Read())
+            {
+                switch (reader.NodeType)
+                {
+                    case XmlNodeType.Element:
+                        VisitElement();
+                        break;
+                    case XmlNodeType.EndElement:
+                        _elements.Pop();
+                        break;
+                    case XmlNodeType.Text:
+                    case XmlNodeType.CDATA:
+                        VisitText();
+                        break;
+                    case XmlNodeType.ProcessingInstruction:
+                        Add(XamlViolationCode.DirectiveNotAllowed, $"Instrução de processamento '{reader.Name}' não é permitida.");
+                        break;
+                }
+            }
+        }
+
+        private void VisitElement()
+        {
+            if (++_elementCount > policy.MaxElements)
+            {
+                Add(XamlViolationCode.LimitExceeded, $"Arquivo excede {policy.MaxElements} elementos.");
+                throw new XmlException("Limite de elementos excedido.");
+            }
+
+            if (reader.Depth >= policy.MaxDepth)
+            {
+                Add(XamlViolationCode.LimitExceeded, $"Aninhamento excede {policy.MaxDepth} níveis.");
+                throw new XmlException("Limite de profundidade excedido.");
+            }
+
+            string ns = reader.NamespaceURI;
+            string name = reader.LocalName;
+            int line = _lineInfo.LineNumber;
+            int column = _lineInfo.LinePosition;
+
+            if (_elementCount == 1 && expectedRoot is not null
+                && (ns != XamlSecurityPolicy.PresentationNamespace || name != expectedRoot))
+            {
+                Add(XamlViolationCode.UnexpectedRoot, $"Elemento raiz deve ser '{expectedRoot}', encontrado '{reader.Name}'.");
+            }
+
+            var attributes = ReadAttributes();
+            foreach (var attribute in attributes.Where(a => a.IsNamespaceDeclaration))
+            {
+                ValidateNamespaceDeclaration(attribute);
+            }
+
+            ValidateElementName(ns, name, reader.Name, line, column);
+            foreach (var attribute in attributes.Where(a => !a.IsNamespaceDeclaration))
+            {
+                ValidateAttribute(ns, name, attribute, attributes);
+            }
+
+            if (reader.IsEmptyElement)
+            {
+                return;
+            }
+
+            _elements.Push(name);
+        }
+
+        private List<Attribute> ReadAttributes()
+        {
+            var attributes = new List<Attribute>();
+            if (reader.MoveToFirstAttribute())
+            {
+                do
+                {
+                    attributes.Add(new(
+                        reader.NamespaceURI,
+                        reader.Prefix,
+                        reader.LocalName,
+                        reader.Name,
+                        reader.Value,
+                        reader.NamespaceURI == XmlnsNamespace,
+                        _lineInfo.LineNumber,
+                        _lineInfo.LinePosition));
+                }
+                while (reader.MoveToNextAttribute());
+
+                reader.MoveToElement();
+            }
+
+            return attributes;
+        }
+
+        private void ValidateNamespaceDeclaration(Attribute attribute)
+        {
+            string value = attribute.Value;
+            bool allowed = value is XamlSecurityPolicy.PresentationNamespace
+                or XamlSecurityPolicy.XamlNamespace
+                or XamlSecurityPolicy.MarkupCompatibilityNamespace
+                or XamlSecurityPolicy.DesignerNamespace
+                or XamlSecurityPolicy.PresentationOptionsNamespace
+                || policy.ClrNamespaces.ContainsKey(value);
+
+            if (!allowed)
+            {
+                Add(XamlViolationCode.NamespaceNotAllowed, $"Namespace '{value}' não é permitido.", attribute.Line, attribute.Column);
+            }
+        }
+
+        private void ValidateElementName(string ns, string name, string qualifiedName, int line, int column)
+        {
+            int dot = name.LastIndexOf('.');
+            if (dot > 0)
+            {
+                // Elemento de propriedade: <Owner.Property>.
+                if (!IsOwnerAllowed(ns, name[..dot]))
+                {
+                    Add(XamlViolationCode.TypeNotAllowed, $"Elemento de propriedade '{qualifiedName}' usa tipo não permitido.", line, column);
+                }
+
+                return;
+            }
+
+            switch (ns)
+            {
+                case XamlSecurityPolicy.PresentationNamespace when policy.PresentationTypes.Contains(name):
+                    return;
+                case XamlSecurityPolicy.PresentationNamespace:
+                    Add(XamlViolationCode.TypeNotAllowed, $"Tipo '{name}' não é permitido em temas.", line, column);
+                    return;
+                case XamlSecurityPolicy.XamlNamespace when XamlElements.Contains(StripExtension(name)):
+                    return;
+                case XamlSecurityPolicy.XamlNamespace:
+                    Add(XamlViolationCode.DirectiveNotAllowed, $"Diretiva '{qualifiedName}' não é permitida.", line, column);
+                    return;
+                case XamlSecurityPolicy.MarkupCompatibilityNamespace:
+                    Add(XamlViolationCode.MarkupCompatibilityNotAllowed, $"Elemento '{qualifiedName}' de markup compatibility não é permitido.", line, column);
+                    return;
+            }
+
+            if (policy.ClrNamespaces.TryGetValue(ns, out var types))
+            {
+                if (!types.Contains(name))
+                {
+                    Add(XamlViolationCode.TypeNotAllowed, $"Tipo '{qualifiedName}' não é permitido em temas.", line, column);
+                }
+
+                return;
+            }
+
+            Add(XamlViolationCode.NamespaceNotAllowed, $"Elemento '{qualifiedName}' está em namespace não permitido.", line, column);
+        }
+
+        private void ValidateAttribute(string elementNs, string elementName, Attribute attribute, List<Attribute> siblings)
+        {
+            switch (attribute.Namespace)
+            {
+                case XmlNamespace:
+                case XamlSecurityPolicy.DesignerNamespace:
+                case XamlSecurityPolicy.PresentationOptionsNamespace:
+                    return;
+                case XamlSecurityPolicy.XamlNamespace:
+                    if (!XamlDirectiveAttributes.Contains(attribute.LocalName))
+                    {
+                        Add(XamlViolationCode.DirectiveNotAllowed, $"Diretiva '{attribute.QualifiedName}' não é permitida.", attribute.Line, attribute.Column);
+                        return;
+                    }
+
+                    ValidateValue(attribute.LocalName, attribute.Value, attribute);
+                    return;
+                case XamlSecurityPolicy.MarkupCompatibilityNamespace:
+                    ValidateMarkupCompatibility(attribute);
+                    return;
+            }
+
+            string name = attribute.LocalName;
+            int dot = name.LastIndexOf('.');
+            if (dot > 0)
+            {
+                // Propriedade anexada: o dono é resolvido no namespace do prefixo (ou no namespace padrão).
+                string ownerNs = attribute.Namespace.Length > 0 ? attribute.Namespace : reader.LookupNamespace(string.Empty) ?? string.Empty;
+                if (!IsOwnerAllowed(ownerNs, name[..dot]))
+                {
+                    Add(XamlViolationCode.TypeNotAllowed, $"Propriedade anexada '{attribute.QualifiedName}' usa tipo não permitido.", attribute.Line, attribute.Column);
+                    return;
+                }
+            }
+            else if (attribute.Namespace.Length > 0)
+            {
+                Add(XamlViolationCode.NamespaceNotAllowed, $"Atributo '{attribute.QualifiedName}' está em namespace não permitido.", attribute.Line, attribute.Column);
+                return;
+            }
+
+            string property = name[(dot + 1)..];
+            if (elementNs == XamlSecurityPolicy.PresentationNamespace)
+            {
+                if (elementName == "ResourceDictionary" && property == "Source")
+                {
+                    Add(XamlViolationCode.NestedLoadNotAllowed, "ResourceDictionary.Source carregaria outro XAML sem validação; o motor de temas deve compor os dicionários.", attribute.Line, attribute.Column);
+                    return;
+                }
+
+                if (elementName == "Setter" && property == "Value")
+                {
+                    // Setter Property="Source" Value="..." passa pelo conversor de URI da propriedade-alvo.
+                    var target = siblings.FirstOrDefault(a => a.Namespace.Length == 0 && a.LocalName == "Property");
+                    if (target is not null && policy.UriProperties.Contains(LastSegment(target.Value)))
+                    {
+                        property = LastSegment(target.Value);
+                    }
+                }
+            }
+
+            if (elementNs == XamlSecurityPolicy.XamlNamespace)
+            {
+                ValidateXamlElementArgument(elementName, property, attribute);
+            }
+
+            ValidateValue(property, attribute.Value, attribute);
+        }
+
+        private void ValidateXamlElementArgument(string elementName, string property, Attribute attribute)
+        {
+            switch (StripExtension(elementName), property)
+            {
+                case ("Static", "Member"):
+                    ValidateStaticMember(attribute.Value.Trim(), attribute.Line, attribute.Column);
+                    break;
+                case ("Type", "TypeName"):
+                case ("Array", "Type"):
+                    ValidateTypeReference(attribute.Value.Trim(), attribute.Line, attribute.Column);
+                    break;
+            }
+        }
+
+        private void ValidateMarkupCompatibility(Attribute attribute)
+        {
+            if (attribute.LocalName != "Ignorable")
+            {
+                Add(XamlViolationCode.MarkupCompatibilityNotAllowed, $"Atributo '{attribute.QualifiedName}' não é permitido.", attribute.Line, attribute.Column);
+                return;
+            }
+
+            foreach (string prefix in attribute.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string? ns = reader.LookupNamespace(prefix);
+                if (ns is not (XamlSecurityPolicy.DesignerNamespace or XamlSecurityPolicy.PresentationOptionsNamespace))
+                {
+                    Add(XamlViolationCode.MarkupCompatibilityNotAllowed, $"Prefixo ignorável '{prefix}' não é permitido.", attribute.Line, attribute.Column);
+                }
+            }
+        }
+
+        private void VisitText()
+        {
+            // Ex.: <BitmapImage.UriSource>http://...</BitmapImage.UriSource>
+            if (_elements.TryPeek(out string? parent) && parent.Contains('.', StringComparison.Ordinal))
+            {
+                ValidateValue(LastSegment(parent), reader.Value, null);
+            }
+        }
+
+        private void ValidateValue(string property, string value, Attribute? attribute)
+        {
+            int line = attribute?.Line ?? _lineInfo.LineNumber;
+            int column = attribute?.Column ?? _lineInfo.LinePosition;
+            string trimmed = value.Trim();
+
+            if (trimmed.StartsWith('{') && !trimmed.StartsWith("{}", StringComparison.Ordinal))
+            {
+                ValidateMarkupExtensions(trimmed, line, column);
+                return;
+            }
+
+            if (IsAbsoluteLocation(trimmed))
+            {
+                if (!trimmed.StartsWith(AllowedPackPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    Add(XamlViolationCode.ExternalUri, $"URI ou caminho absoluto '{trimmed}' não é permitido; use caminhos relativos ao tema.", line, column);
+                }
+
+                return;
+            }
+
+            if (policy.UriProperties.Contains(property) && EscapesTheme(trimmed))
+            {
+                Add(XamlViolationCode.PathEscapesTheme, $"Caminho '{trimmed}' sai da pasta do tema.", line, column);
+            }
+        }
+
+        private void ValidateMarkupExtensions(string value, int line, int column)
+        {
+            foreach (Match match in MarkupExtensionPattern().Matches(value))
+            {
+                string prefix = match.Groups["prefix"].Value;
+                string name = StripExtension(match.Groups["name"].Value);
+                string argument = FirstArgument(match.Groups["args"].Value);
+                string? ns = reader.LookupNamespace(prefix);
+
+                switch (ns)
+                {
+                    case XamlSecurityPolicy.PresentationNamespace when PresentationExtensions.Contains(name):
+                        continue;
+                    case XamlSecurityPolicy.XamlNamespace when name is "Null" or "Reference":
+                        continue;
+                    case XamlSecurityPolicy.XamlNamespace when name == "Static":
+                        ValidateStaticMember(argument, line, column);
+                        continue;
+                    case XamlSecurityPolicy.XamlNamespace when name == "Type":
+                        ValidateTypeReference(argument, line, column);
+                        continue;
+                }
+
+                if (ns is not null && policy.ClrNamespaces.TryGetValue(ns, out var types)
+                    && (types.Contains(name) || types.Contains(name + "Extension")))
+                {
+                    continue;
+                }
+
+                string shown = prefix.Length > 0 ? $"{prefix}:{name}" : name;
+                Add(XamlViolationCode.MarkupExtensionNotAllowed, $"Extensão de marcação '{{{shown}}}' não é permitida.", line, column);
+            }
+        }
+
+        private void ValidateStaticMember(string member, int line, int column)
+        {
+            int dot = member.LastIndexOf('.');
+            if (dot <= 0)
+            {
+                Add(XamlViolationCode.StaticMemberNotAllowed, $"Membro estático '{member}' inválido.", line, column);
+                return;
+            }
+
+            var (ns, type) = ResolveTypeName(member[..dot]);
+            bool allowed = ns == XamlSecurityPolicy.PresentationNamespace
+                ? policy.StaticMemberOwners.Contains(type)
+                : ns is not null && policy.ClrNamespaces.TryGetValue(ns, out var types) && types.Contains(type);
+
+            if (!allowed)
+            {
+                Add(XamlViolationCode.StaticMemberNotAllowed, $"Membro estático '{member}' não é permitido.", line, column);
+            }
+        }
+
+        private void ValidateTypeReference(string typeName, int line, int column)
+        {
+            // Referenciar um tipo de apresentação só produz um objeto Type; o risco está em resolver
+            // tipos de outros assemblies, o que os namespaces permitidos já limitam.
+            var (ns, type) = ResolveTypeName(typeName);
+            bool allowed = ns == XamlSecurityPolicy.PresentationNamespace
+                || (ns is not null && policy.ClrNamespaces.TryGetValue(ns, out var types) && types.Contains(type));
+
+            if (!allowed)
+            {
+                Add(XamlViolationCode.TypeNotAllowed, $"Referência ao tipo '{typeName}' não é permitida.", line, column);
+            }
+        }
+
+        private (string? Namespace, string Type) ResolveTypeName(string qualified)
+        {
+            int colon = qualified.IndexOf(':', StringComparison.Ordinal);
+            return colon < 0
+                ? (reader.LookupNamespace(string.Empty), qualified)
+                : (reader.LookupNamespace(qualified[..colon]), qualified[(colon + 1)..]);
+        }
+
+        private bool IsOwnerAllowed(string ns, string owner)
+        {
+            if (ns == XamlSecurityPolicy.PresentationNamespace)
+            {
+                return policy.PresentationTypes.Contains(owner) || policy.PresentationOwnerTypes.Contains(owner);
+            }
+
+            return policy.ClrNamespaces.TryGetValue(ns, out var types) && types.Contains(owner);
+        }
+
+        private bool EscapesTheme(string value)
+        {
+            string path = value.Split('#')[0].Trim();
+            if (path.Length == 0)
+            {
+                return false;
+            }
+
+            if (path[0] is '/' or '\\')
+            {
+                return true;
+            }
+
+            var segments = new Stack<string>(themeRelativePath.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries).SkipLast(1));
+            foreach (string segment in path.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (segment == "..")
+                {
+                    if (!segments.TryPop(out _))
+                    {
+                        return true;
+                    }
+                }
+                else if (segment != ".")
+                {
+                    segments.Push(segment);
+                }
+            }
+
+            return false;
+        }
+
+        private void Add(XamlViolationCode code, string message) =>
+            Add(code, message, _lineInfo.LineNumber, _lineInfo.LinePosition);
+
+        private void Add(XamlViolationCode code, string message, int line, int column) =>
+            violations.Add(new(code, message, line, column));
+    }
+
+    private static bool IsAbsoluteLocation(string value) =>
+        value.Contains("://", StringComparison.Ordinal)
+        || value.StartsWith(@"\\", StringComparison.Ordinal)
+        || DriveLetterPath().IsMatch(value);
+
+    private static string FirstArgument(string args)
+    {
+        string first = args.Split(',')[0].Trim();
+        int equals = first.IndexOf('=', StringComparison.Ordinal);
+        return (equals >= 0 ? first[(equals + 1)..] : first).Trim();
+    }
+
+    private static string StripExtension(string name) =>
+        name.EndsWith("Extension", StringComparison.Ordinal) ? name[..^"Extension".Length] : name;
+
+    private static string LastSegment(string name) => name[(name.LastIndexOf('.') + 1)..];
+
+    private sealed record Attribute(
+        string Namespace,
+        string Prefix,
+        string LocalName,
+        string QualifiedName,
+        string Value,
+        bool IsNamespaceDeclaration,
+        int Line,
+        int Column);
+}
