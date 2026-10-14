@@ -45,7 +45,7 @@ Vale a DoD do [PRD §13](docs/PRD.md); o checklist está no template de PR.
 
 - `.editorconfig` + analyzers; **warnings são erros**. Rode `dotnet format` antes do commit.
 - `Nullable` habilitado; sem `!` sem comentário justificando.
-- Namespaces file-scoped; campos privados `_camelCase`; métodos assíncronos terminam em `Async` e aceitam `CancellationToken`.
+- Namespaces file-scoped; campos privados `_camelCase` (constantes e `static readonly` em PascalCase); métodos assíncronos terminam em `Async` e aceitam `CancellationToken`.
 - **MVVM** na UI: sem lógica de negócio em code-behind.
 - Injeção de dependência (`Microsoft.Extensions.DependencyInjection`); sem singletons estáticos.
 - Logs estruturados com `Microsoft.Extensions.Logging`. **Nunca** logar credenciais ou tokens.
