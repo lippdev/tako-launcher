@@ -29,7 +29,7 @@
   --ease: cubic-bezier(.22,1,.36,1);
   --sidebar-w: 120px;
   /* Escala tipográfica (DESIGN.md › typography). Nenhum tamanho fora desta lista. */
-  --fs-display: 88px; --fs-headline-lg: 56px; --fs-headline-md: 34px; --fs-title: 26px;
+  --fs-display: 72px; --fs-headline-lg: 56px; --fs-headline-md: 34px; --fs-title: 26px;
   --fs-body-lg: 26px; --fs-body-md: 22px; --fs-label-lg: 24px; --fs-label-md: 20px; --fs-label-sm: 18px;
 }
 .reduced-motion { --t-focus: 0ms; --t-page: 0ms; --t-color: 0ms; }
@@ -84,7 +84,7 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .page.active { opacity: 1; pointer-events: auto; transform: none; }
 .scroller { position: absolute; left: 0; right: 0; top: 0; transition: transform var(--t-page) var(--ease); }
 /* Esmaece o conteúdo antes da barra de dicas (no WPF: OpacityMask com gradiente). */
-.page { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent calc(100% - 88px)); mask-image: linear-gradient(to bottom, #000 calc(100% - 150px), transparent calc(100% - 88px)); }
+.page { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent calc(100% - 88px)); mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent calc(100% - 88px)); }
 
 .header { position: absolute; top: var(--safe-y); left: 64px; right: var(--safe-x); height: 60px; display: flex; align-items: center; justify-content: space-between; z-index: 3; }
 .header h1 { font-size: var(--fs-title); font-weight: 700; }
@@ -92,9 +92,10 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
 .search svg { width: 26px; height: 26px; }
 
 /* ---------- Hero ---------- */
-.hero { position: relative; height: 548px; padding: 0 0 40px 64px; display: flex; flex-direction: column; justify-content: flex-end; }
+.hero { position: relative; height: 500px; padding: 0 0 40px 64px; display: flex; flex-direction: column; justify-content: flex-end; }
 .overline { font-size: var(--fs-label-sm); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--on-accent-muted); }
-.hero-title { font-size: var(--fs-display); font-weight: 800; line-height: 1; letter-spacing: -.03em; margin: 16px 0 18px; max-width: 1000px; text-wrap: balance; text-shadow: 0 4px 24px rgba(0,0,0,.25); }
+.hero-title { font-size: var(--fs-display); font-weight: 800; line-height: 1.02; letter-spacing: -.03em; margin: 16px 0 18px; max-width: 1000px; text-wrap: balance;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 4px 24px rgba(0,0,0,.25); }
 .meta { font-size: var(--fs-body-md); color: var(--on-accent-muted); display: flex; gap: 14px; align-items: center; }
 .meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--on-accent-subtle); }
 .actions { display: flex; gap: 18px; margin-top: 34px; }
@@ -706,15 +707,6 @@ function formatDate(d) {
   return m ? `${m[1].padStart(2, '0')}/${String(MONTHS.indexOf(m[2]) + 1).padStart(2, '0')}/${m[3]}` : d;
 }
 
-/* Título de jogo: maior tamanho da escala que cabe em uma linha; senão, duas linhas no menor. */
-const TITLE_SIZES = ['--fs-display', '--fs-headline-lg'];
-function fitTitle(el) {
-  for (const t of TITLE_SIZES) {
-    el.style.fontSize = `var(${t})`;
-    if (el.scrollHeight <= parseFloat(getComputedStyle(el).fontSize) * 1.15) return;
-  }
-}
-
 /* ================= Cor dinâmica ================= */
 function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function rgbToHex([r, g, b]) { return '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join(''); }
@@ -786,7 +778,7 @@ function updateHero(g) {
   const first = g.id === GAMES.filter(x => x.installed).sort((a, b) => rank(a) - rank(b))[0].id;
   document.getElementById('home-overline').textContent = first ? 'Continuar jogando' : `${g.genre} · ${STORES[g.store].name}`;
   const title = document.getElementById('home-title');
-  title.textContent = g.title; fitTitle(title);
+  title.textContent = g.title;
   document.getElementById('home-meta').innerHTML = [g.hours ? `${g.hours} h jogadas` : 'Ainda não jogado', g.played !== 'Nunca jogado' ? g.played : null, g.size].filter(Boolean).join('<span class="dot"></span>');
   setBackdrop(g);
 }
@@ -802,7 +794,7 @@ function renderDetails() {
   const g = gameById(state.gameId); const s = STORES[g.store];
   document.getElementById('det-overline').textContent = `${g.genre} · ${s.name}`;
   const title = document.getElementById('det-title');
-  title.textContent = g.title; fitTitle(title);
+  title.textContent = g.title;
   const status = g.upcoming ? `Lança em ${g.upcoming}` : g.installed ? 'Instalado' : 'Não instalado';
   document.getElementById('det-stats').innerHTML = [['Tempo de jogo', g.hours ? `${g.hours} h` : '—'], ['Última vez', g.played], g.size && ['Tamanho', g.size], g.released && !g.upcoming && ['Lançamento', formatDate(g.released)], ['Status', status]]
     .filter(Boolean).map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
@@ -992,7 +984,7 @@ function launch(id) {
   document.getElementById('launch-overline').textContent = 'Iniciando';
   document.getElementById('launch-status').textContent = 'Preparando a sessão: monitores, áudio e controle';
   document.getElementById('launch-actions').innerHTML = `<div class="btn secondary" data-nav data-group="launch" data-action="cancel-launch">Cancelar</div>`;
-  openOverlay('launch'); fitTitle(lt); el.classList.remove('launching'); void el.offsetWidth; el.classList.add('launching');
+  openOverlay('launch'); el.classList.remove('launching'); void el.offsetWidth; el.classList.add('launching');
   launchTimer = setTimeout(() => {
     sessionStart = Date.now();
     document.getElementById('launch-overline').textContent = 'Jogando agora';

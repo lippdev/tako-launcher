@@ -35,9 +35,9 @@ colors:
 typography:
   display:
     fontFamily: Inter
-    fontSize: 88px
+    fontSize: 72px
     fontWeight: 800
-    lineHeight: 0.95
+    lineHeight: 1.02
     letterSpacing: -0.03em
   headline-lg:
     fontFamily: Inter
@@ -202,11 +202,11 @@ Princípios:
 
 Inter (SIL OFL), empacotada com o app. **Todo texto usa um token da escala acima**; nenhum tamanho avulso.
 
-- **Título de jogo:** `display` (88px) se couber em uma linha; senão `headline-lg` (56px), em até duas linhas. O bloco do destaque é ancorado embaixo, então o título cresce para cima e os botões nunca mudam de posição.
+- **Título de jogo:** sempre `display` (72px), em qualquer tela (destaque, detalhes, jogando), com no máximo duas linhas. O tamanho não varia com o comprimento do nome. O bloco do destaque é ancorado embaixo, então um título de duas linhas cresce para cima e os botões nunca mudam de posição.
 - **Descrição:** no máximo 3 linhas (`body-lg`).
 - **Datas:** dd/mm/aaaa.
 
- Títulos de jogo usam `display` no destaque e `headline-lg` nos detalhes, peso 800, com tracking negativo, fazendo o papel do logo do jogo quando não há arte de logo. `overline` (caixa alta, tracking largo) marca contexto: "CONTINUAR JOGANDO", "INSTALADO".
+ Títulos de jogo usam `display` em todas as telas, peso 800, com tracking negativo, fazendo o papel do logo do jogo quando não há arte de logo. `overline` (caixa alta, tracking largo) marca contexto: "CONTINUAR JOGANDO", "INSTALADO".
 
 ## Layout
 
