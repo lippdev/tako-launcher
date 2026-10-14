@@ -234,11 +234,11 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
 - **Fileiras:** o item em foco fica ancorado na primeira posição e a fileira rola por baixo dele, até o fim da lista.
 - **Botão primário (Jogar):** pílula branca com ícone de play. Um por tela.
 - **Barra de dicas:** glifos A/B/X/Y/LB/RB/Menu desenhados como círculos brancos com a letra; troca para teclas (Enter, Esc...) quando a última entrada foi teclado.
-- **Menu rápido (sobreposição do jogo):** aberto pelo botão Guia (Xbox/PS/Steam; tecla G no teclado) durante o jogo. É um **painel lateral à direita** (760px, fundo #0E1117 a 97%), no padrão do acesso rápido da Steam, com linhas grandes no estilo do PS5. O jogo continua visível à esquerda.
-  - **Topo:** ficha do jogo (capa, título, tempo de sessão, total, loja).
-  - **Abas:** coluna de ícones na borda direita: Jogo, Desempenho, Áudio, Controle, Tela. A aba atual tem fundo e um marcador branco à esquerda.
-  - **Conteúdo:** lista vertical de linhas de 76px (`label-lg`), agrupadas por títulos `overline`. Opções exclusivas usam marcador redondo; liga/desliga usa chave; volume usa barra deslizante (← → ajustam).
-  - **Navegação:** abre com o foco em "Voltar ao jogo". ↑↓ nas abas troca a aba; ← entra no conteúdo; → ou B voltam às abas; B nas abas ou Guia fecham. "Ir para o Início" volta ao launcher sem fechar o jogo (o status mostra o jogo em execução e o Guia retorna a ele). Encerrar sempre pede confirmação.
+- **Menu rápido (Central de Controle):** aberto pelo botão Guia (Xbox/PS/Steam; tecla G no teclado) durante o jogo, no padrão da Central de Controle do PS5. O jogo continua visível, escurecido de baixo para cima.
+  - **Cartões vivos** (fileira acima da barra): Jogo (arte, tempo de sessão, total), Capturas (última captura ou convite), Desempenho ao vivo (FPS grande, gráfico dos últimos segundos, modo do HUD; A alterna o HUD), Áudio (volume e saída) e Controle (bateria). O cartão do jogo é maior e recebe o foco ao abrir.
+  - **Barra de ícones** (embaixo, centralizada): Início, o jogo (capa com ponto verde), Capturar, Desempenho, Áudio, Controle, Tela, Encerrar. O ícone em foco vira círculo branco e mostra o nome acima.
+  - **Painel do ícone** (melhoria sobre o PS5, que troca de tela): A abre um painel de 600px acima da barra, alinhado ao ícone, com linhas grandes (marcador redondo, chave liga/desliga, barra de volume). O ícone de origem fica marcado e os cartões esmaecem. B fecha o painel; o painel de Encerrar já é a confirmação.
+  - **Navegação:** ← → ficam na fileira atual; ↓ de um cartão vai ao ícone correspondente e ↑ volta ao cartão. B ou Guia voltam ao jogo. "Início" volta ao launcher sem fechar o jogo (o status mostra o jogo em execução e o Guia retorna a ele).
 - **HUD de desempenho:** canto superior esquerdo do jogo (Desligado, Só FPS, Completo), números tabulares, fundo preto 60%.
 - **Restrição técnica do menu rápido:** sem injeção gráfica (proibida pelo PRD, §10), a sobreposição é uma janela topmost transparente; ela funciona sobre jogos em tela cheia sem bordas, mas não sobre tela cheia exclusiva. Nesse caso, o Guia deve trazer o launcher para frente (como alternar janela). Validar no Windows antes de prometer o comportamento.
 - **Sair para o desktop:** sempre presente no fim da barra lateral (princípio "recovery-first" do PRD).
