@@ -2,6 +2,6 @@
   <PropertyGroup>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Console.Runtime\Console.Runtime.csproj" />
+    <ProjectReference Include="..\ConsoleMode.Runtime\ConsoleMode.Runtime.csproj" />
   </ItemGroup>
 </Project>
