@@ -33,7 +33,8 @@ Regras:
 
 - Título segue Conventional Commits (validado no CI); descrição usa o template.
 - Um PR = uma história. Preferir menos de 400 linhas alteradas.
-- Para merge: CI verde, **1 aprovação** (2 para `runtime`, `ipc`, `themes` e qualquer tema de segurança — ver `.github/CODEOWNERS`), conversas resolvidas, DoD cumprida.
+- Para merge: CI verde, **1 aprovação** de um code owner (ver `.github/CODEOWNERS`), conversas resolvidas, DoD cumprida.
+- PRs que tocam `runtime`, `ipc`, `themes` ou segurança: o revisor confirma explicitamente o item "Segurança e permissões revisadas" do checklist. Com três ou mais mantenedores, passam a exigir **2 aprovações**.
 - O autor não aprova o próprio PR.
 
 ## 4. Definition of Done
@@ -52,7 +53,7 @@ Vale a DoD do [PRD §13](docs/PRD.md); o checklist está no template de PR.
 
 ## 6. Regras arquiteturais (PRD §4.3)
 
-1. Dependências fluem para dentro: `UI.Wpf`/`Host` → `Core`/`Themes` → `Console.Runtime` (contratos). `Core` **não** referencia WPF.
+1. Dependências fluem para dentro: `UI.Wpf`/`Host` → `Core`/`Themes` → `ConsoleMode.Runtime` (contratos). `Core` **não** referencia WPF.
 2. Temas e `PlayniteCompat` nunca acessam serviços privilegiados do runtime.
 3. A UI não restaura monitores/áudio; o runtime restaura e sobrevive à falha da UI.
 4. IPC: Named Pipes restritos ao usuário local + JSON-RPC **versionado**; mudança de contrato exige teste de contrato.
@@ -65,7 +66,7 @@ Vale a DoD do [PRD §13](docs/PRD.md); o checklist está no template de PR.
 
 - Unitários (xUnit) para Core/Themes; contrato para IPC; regressão para a máquina de estados.
 - Meta de 80% de cobertura em `Launcher.Core`.
-- Testes que exigem monitores, áudio, controle ou FSE reais não rodam no CI: marque com `[Trait("Category","Hardware")]` e use checklists em `docs/testing/`.
+- Testes que exigem monitores, áudio, controle ou FSE reais não rodam no CI: marque com `[Trait("Category","Hardware")]` (excluídos no CI via `--filter-not-trait "Category=Hardware"`) e use checklists em `docs/testing/`.
 
 ## 8. Releases
 

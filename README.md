@@ -16,7 +16,7 @@ src/
   Launcher.Core/                 biblioteca, catálogo, persistência (SQLite)
   Launcher.Themes/               descoberta/validação/aplicação de temas
   Launcher.PlayniteCompat.P10/   adaptador de temas Playnite 10
-  Console.Runtime/               contratos de sessão/monitores/áudio/IPC
+  ConsoleMode.Runtime/           contratos de sessão/monitores/áudio/IPC (net8.0 + net10.0)
 tests/                           xUnit
 ```
 
@@ -27,7 +27,9 @@ Requer Windows 11 e [.NET 10 SDK](https://dotnet.microsoft.com/download) (ver `g
 ```
 dotnet restore
 dotnet build
-dotnet test --filter "Category!=Hardware"
+dotnet test --filter-not-trait "Category=Hardware" --ignore-exit-code 8
 ```
 
-> O esqueleto foi gerado sem o SDK 10 instalado localmente e ainda não foi compilado; o primeiro build/CI pode exigir pequenos ajustes.
+Versões de pacotes ficam centralizadas em `Directory.Packages.props`, com lock files (`packages.lock.json`). Ao mudar uma versão, rode `dotnet restore --force-evaluate` e commite os lock files. Os testes usam xUnit v3 sobre Microsoft.Testing.Platform (ver `global.json`).
+
+Fora do Windows (macOS/Linux) é possível compilar com `-p:EnableWindowsTargeting=true`, mas os testes dos projetos `-windows` só rodam no Windows.

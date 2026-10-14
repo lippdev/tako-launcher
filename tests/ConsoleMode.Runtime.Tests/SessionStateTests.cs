@@ -1,7 +1,7 @@
-using Console.Runtime;
+using ConsoleMode.Runtime;
 using Xunit;
 
-namespace Launcher.Core.Tests;
+namespace ConsoleMode.Runtime.Tests;
 
 public class SessionStateTests
 {
