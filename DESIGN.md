@@ -234,4 +234,5 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
 - Don't usar blur de fundo (`backdrop-filter`) ou vidro fosco: o WPF não tem equivalente nativo e o custo em GPU é alto.
 - Don't usar sombra em listas inteiras; só no item em foco.
 - Don't depender de hover ou de mouse para qualquer ação.
-- Don't usar arte de jogos reais em protótipos ou no repositório; usar capas geradas.
+- Don't versionar arte de jogos no repositório (é protegida por direitos autorais): o app baixa capas e heros das lojas para um cache local, e o protótipo as carrega direto dos CDNs.
+- Do ter fallback quando não há arte: gradiente do accent com o título do jogo.
