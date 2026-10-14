@@ -30,6 +30,6 @@ dotnet build
 dotnet test --filter-not-trait "Category=Hardware" --ignore-exit-code 8
 ```
 
-Versões de pacotes ficam centralizadas em `Directory.Packages.props`. Os testes usam xUnit v3 sobre Microsoft.Testing.Platform (ver `global.json`).
+Versões de pacotes ficam centralizadas em `Directory.Packages.props`, com lock files (`packages.lock.json`). Ao mudar uma versão, rode `dotnet restore --force-evaluate` e commite os lock files. Os testes usam xUnit v3 sobre Microsoft.Testing.Platform (ver `global.json`).
 
 Fora do Windows (macOS/Linux) é possível compilar com `-p:EnableWindowsTargeting=true`, mas os testes dos projetos `-windows` só rodam no Windows.

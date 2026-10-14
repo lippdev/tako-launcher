@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - run: dotnet restore
+      - run: dotnet restore --locked-mode
       - run: dotnet format --verify-no-changes --no-restore
       - run: dotnet build --no-restore -c Release
       # --ignore-exit-code 8: projetos de teste ainda sem testes (remover quando todos tiverem).

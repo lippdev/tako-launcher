@@ -33,7 +33,8 @@ Regras:
 
 - Título segue Conventional Commits (validado no CI); descrição usa o template.
 - Um PR = uma história. Preferir menos de 400 linhas alteradas.
-- Para merge: CI verde, **1 aprovação** (2 para `runtime`, `ipc`, `themes` e qualquer tema de segurança — ver `.github/CODEOWNERS`), conversas resolvidas, DoD cumprida.
+- Para merge: CI verde, **1 aprovação** de um code owner (ver `.github/CODEOWNERS`), conversas resolvidas, DoD cumprida.
+- PRs que tocam `runtime`, `ipc`, `themes` ou segurança: o revisor confirma explicitamente o item "Segurança e permissões revisadas" do checklist. Com três ou mais mantenedores, passam a exigir **2 aprovações**.
 - O autor não aprova o próprio PR.
 
 ## 4. Definition of Done
