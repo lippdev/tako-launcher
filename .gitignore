@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+TestResults/
+artifacts/
+*.log
+*.db
+*.db-wal
+*.db-shm
+.env
