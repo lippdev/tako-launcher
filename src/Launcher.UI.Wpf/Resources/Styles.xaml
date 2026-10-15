@@ -373,10 +373,13 @@
     </Setter>
   </Style>
 
-  <!-- Central de Controle: janela aberta (ícone do programa, título e nome). -->
+  <!--
+    Central de Controle: janela aberta. Linhas de altura fixa (ícone 40, título em até 2 linhas de 25 com reticências,
+    nome do programa 24) que somam menos que o cartão: nada se sobrepõe nem é cortado em cima, com qualquer título.
+  -->
   <Style x:Key="WindowCard" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
-    <Setter Property="Width" Value="280" />
-    <Setter Property="Height" Value="132" />
+    <Setter Property="Width" Value="300" />
+    <Setter Property="Height" Value="164" />
     <Setter Property="Margin" Value="0,0,20,0" />
     <Setter Property="VerticalAlignment" Value="Top" />
     <Setter Property="Template">
@@ -384,18 +387,27 @@
         <ControlTemplate TargetType="Button">
           <Grid>
             <Border x:Name="Ring" Margin="-10" CornerRadius="28" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
-            <Border x:Name="Body" CornerRadius="20" Background="#EB161A22" Padding="20,18">
-              <DockPanel>
-                <Grid DockPanel.Dock="Top" Width="44" Height="44" HorizontalAlignment="Left">
-                  <Border CornerRadius="12" Background="#2EFFFFFF">
+            <Border x:Name="Body" CornerRadius="20" Background="#EB161A22" Padding="20,16">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="40" />
+                  <RowDefinition Height="10" />
+                  <RowDefinition Height="50" />
+                  <RowDefinition Height="*" />
+                  <RowDefinition Height="24" />
+                </Grid.RowDefinitions>
+                <Grid x:Name="IconBox" Width="40" Height="40" HorizontalAlignment="Left">
+                  <Border CornerRadius="10" Background="#2EFFFFFF">
                     <TextBlock Text="{Binding Initial}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
                   </Border>
                   <Image Source="{Binding Icon}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
                          Visibility="{Binding Icon, Converter={StaticResource NotNullToVisibility}}" />
                 </Grid>
-                <TextBlock DockPanel.Dock="Bottom" Text="{Binding ProcessName}" FontSize="{DynamicResource FsLabelSm}" FontWeight="SemiBold" Opacity="0.7" TextTrimming="CharacterEllipsis" />
-                <TextBlock Text="{Binding Title}" Margin="0,12,0,4" FontSize="{DynamicResource FsLabelMd}" FontWeight="Bold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom" />
-              </DockPanel>
+                <TextBlock x:Name="TitleText" Grid.Row="2" Text="{Binding Title}" VerticalAlignment="Top" FontSize="{DynamicResource FsLabelMd}" FontWeight="Bold"
+                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" LineHeight="25" LineStackingStrategy="BlockLineHeight" MaxHeight="50" />
+                <TextBlock x:Name="ProcessText" Grid.Row="4" Text="{Binding ProcessName}" VerticalAlignment="Bottom" FontSize="{DynamicResource FsLabelSm}" FontWeight="SemiBold" Opacity="0.7"
+                           TextTrimming="CharacterEllipsis" />
+              </Grid>
             </Border>
           </Grid>
           <ControlTemplate.Triggers>

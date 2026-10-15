@@ -158,6 +158,7 @@ public sealed partial class UiSmokeTests
         Pump(0.8);
         Snap(window, "06-configuracoes");
         XboxLibrarySetting(shell, window);
+        ControlCenterShortcutSettings(shell, window); // UX-005: atalhos da Central, captura e validação
         // Tema Fullscreen padrão do Playnite 10 renderizado sem o Playnite (H2).
         shell.ShowPlaynitePreview();
         Pump(2.5);
@@ -226,6 +227,7 @@ public sealed partial class UiSmokeTests
         Assert.Equal("bar:controller", Nav.GetKey(nav.Focused!));
 
         ControlCenterTools(window, shell, center, windows, pointer);
+        ControlCenterWindowsLayout(window, center, windows); // títulos longos, rolagem e resoluções
 
         // Encerrar pelo painel: volta à Início com o jogo no topo.
         string played = shell.RunningGame!.Id;
@@ -290,7 +292,7 @@ public sealed partial class UiSmokeTests
 
         // Jogo real (MVP-026/027): acompanha o processo iniciado até ele fechar, registra o tempo e devolve o foco.
         string ping = Path.Combine(Environment.SystemDirectory, "PING.EXE");
-        var real = shell.Library.AddManual(ManualGameRecord.Create("Ping", ping, DateTimeOffset.Now) with { Arguments = "-n 4 127.0.0.1" });
+        var real = shell.Library.AddManual(ManualGameRecord.Create("Ping", ping, DateTimeOffset.Now) with { Arguments = "-n 10 127.0.0.1" });
         Pump(0.5);
         shell.OpenDetails(shell.ItemFor(real));
         Pump(0.8);
@@ -302,6 +304,7 @@ public sealed partial class UiSmokeTests
         Assert.Equal(real.Id, shell.RunningGame!.Id);
         Assert.Equal("Voltar ao jogo", ((DetailsViewModel)shell.CurrentPage).PrimaryLabel);
         Snap(window, "21-jogo-real");
+        LiveControlCenter(shell, window); // Central ao vivo sobre o jogo (janela transparente) e com a arte
         for (int i = 0; i < 30 && shell.Session != ConsoleMode.Runtime.SessionState.Browsing; i++)
         {
             Pump(1);

@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -64,7 +63,6 @@ public partial class MainWindow : Window
     private long _wheelLockedUntil;
     private FrameworkElement? _draggingSlider;
     private Point? _lastMouse;
-    private bool _guideHeldInBackground;
 
     public MainWindow(ShellViewModel shell, ArtService art, SonyHidGamepad sony, PointerPadRelay pointerPad, ILogger<MainWindow> logger)
     {
@@ -85,6 +83,7 @@ public partial class MainWindow : Window
         _shell.PropertyChanged += OnShellPropertyChanged;
         _shell.Settings.PropertyChanged += (_, _) => Backdrop.Transition = _shell.Settings.ColorDuration;
         _shell.ReadControllers = ProbeControllers;
+        InitializeControlCenterShortcuts();
 
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewTextInput += OnPreviewTextInput;
@@ -143,7 +142,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Durante o jogo, só o Guia pertence ao launcher.
+        // Durante o jogo, só o atalho da Central pertence ao launcher.
         if (_shell.IsInGame)
         {
             return;
@@ -219,15 +218,35 @@ public partial class MainWindow : Window
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+        // Tela de captura do atalho de teclado (UX-005): toda tecla vai para ela.
+        if (_shell.TopOverlay is ShortcutCaptureViewModel { IsGamepad: false } capture)
+        {
+            e.Handled = true;
+            _shell.InputKind = InputKind.Keyboard;
+            capture.Key(key.ToString(), (KeyModifiers)Keyboard.Modifiers);
+            return;
+        }
+
+        // Atalho da Central (padrão Ctrl+Shift+T; durante um jogo real ele é global e chega por WM_HOTKEY).
+        if (IsControlCenterKey(key))
+        {
+            e.Handled = true;
+            Handle(AppCommand.Guide, InputKind.Keyboard);
+            return;
+        }
+
         if (key == Key.Tab)
         {
-            // Shift+Tab abre a Central de Controle (como a sobreposição da Steam); Tab sozinho não navega.
-            e.Handled = true;
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
-            {
-                Handle(AppCommand.Guide, InputKind.Keyboard);
-            }
+            e.Handled = true; // Tab não navega (o Shift+Tab fica para a Steam)
+            return;
+        }
 
+        // Tela de captura do controle aberta: o teclado só cancela (Esc). Com botões pressionados, o Esc pode ser o eco
+        // do B pela Steam (configuração de área de trabalho): aí ele também é ignorado; tocar B já cancela.
+        if (_shell.TopOverlay is ShortcutCaptureViewModel && (key != Key.Escape || _captureButtons != GamepadButtons.None))
+        {
+            e.Handled = true;
             return;
         }
 
@@ -331,9 +350,10 @@ public partial class MainWindow : Window
             _shell.Toast(name is null ? "Controle desconectado — o teclado continua funcionando" : $"Controle conectado: {name}");
         }
 
-        if (snapshot is { } background && !IsActive)
+        // Atalho da Central (combinação segurada), com o Tako na frente ou atrás; e a tela de captura do atalho.
+        if (HandleControlCenterChord(snapshot?.Buttons ?? GamepadButtons.None))
         {
-            SummonFromBackground(background);
+            return;
         }
 
         if (snapshot is not { } pad || !IsActive)
@@ -344,7 +364,7 @@ public partial class MainWindow : Window
         }
 
         var now = _clock.Elapsed;
-        foreach (var command in _gamepad.Update(pad, now))
+        foreach (var command in _gamepad.Update(pad, now, _chord.Suppressed(pad.Buttons)))
         {
             if (_echo.AcceptGamepad(command, now))
             {
@@ -372,30 +392,6 @@ public partial class MainWindow : Window
         }
 
         return probes;
-    }
-
-    /// <summary>
-    /// Guia/PS com o jogo real em primeiro plano: o Tako vem para a frente com a Central de Controle aberta. Só o Guia
-    /// (não o View, que é botão de jogo) e só na borda de descida.
-    /// </summary>
-    private void SummonFromBackground(GamepadSnapshot pad)
-    {
-        bool guide = pad.Buttons.HasFlag(GamepadButtons.Guide);
-        bool pressed = guide && !_guideHeldInBackground;
-        _guideHeldInBackground = guide;
-        if (!pressed || !_shell.CanOpenControlCenterFromBackground)
-        {
-            return;
-        }
-
-        if (WindowState == WindowState.Minimized)
-        {
-            WindowState = WindowState.Maximized;
-        }
-
-        _shell.SessionTools.Windows.Activate(new WindowInteropHelper(this).Handle);
-        _shell.InputKind = InputKind.Gamepad;
-        _shell.Guide();
     }
 
     // ---------------------------------------------------------------- Mouse
@@ -567,6 +563,12 @@ public partial class MainWindow : Window
                 break;
             case nameof(ShellViewModel.InputKind) or nameof(ShellViewModel.ControllerName):
                 InputIcon.Key = _shell.ControllerName is null ? "Icon.Keyboard" : "Icon.Gamepad";
+                break;
+            case nameof(ShellViewModel.IsLiveOverlay):
+                OnLiveOverlayChanged();
+                break;
+            case nameof(ShellViewModel.Session):
+                UpdateGlobalHotkey();
                 break;
         }
     }

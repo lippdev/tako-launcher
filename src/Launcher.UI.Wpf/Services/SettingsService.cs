@@ -60,6 +60,7 @@ public sealed partial class SettingsService : ObservableObject
             RestoreEnvironmentAfterGame = Read(saved, nameof(RestoreEnvironmentAfterGame), RestoreEnvironmentAfterGame);
             LoadGameScreen(saved);
             LoadStores(saved);
+            LoadShortcuts(saved);
             SteamToTrayAfterGame = Read(saved, nameof(SteamToTrayAfterGame), SteamToTrayAfterGame);
             GameAudioOutput = saved.TryGetValue(GameAudioIdKey, out string? audioId) && audioId.Length > 0
                 ? new AudioOutputChoice(audioId, saved.GetValueOrDefault(GameAudioNameKey, audioId))

@@ -46,6 +46,41 @@
     <Setter Property="Foreground" Value="{DynamicResource OnAccentMutedBrush}" />
   </Style>
 
+  <!--
+    Captura do atalho da Central (UX-005): "Segure os botões que quer usar" (controle) ou "Aperte as teclas" (teclado).
+    A barra enche enquanto a combinação fica igual; um motivo em vermelho quando ela é recusada.
+  -->
+  <DataTemplate DataType="{x:Type vm:ShortcutCaptureViewModel}">
+    <Grid>
+      <Rectangle Fill="{DynamicResource ScrimBrush}" />
+      <Border Width="900" CornerRadius="28" Background="#FF1A1E26" Padding="56,48" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel>
+          <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Foreground="{DynamicResource OnAccentMutedBrush}" />
+          <TextBlock Text="{Binding Prompt}" Margin="0,10,0,0" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <Border Margin="0,32,0,0" Height="96" CornerRadius="20" Background="{DynamicResource Surface2Brush}" Padding="28,0">
+            <TextBlock Text="{Binding Current}" VerticalAlignment="Center" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+          </Border>
+          <Border Height="8" Margin="0,16,0,0" CornerRadius="4" Background="#26FFFFFF">
+            <Border CornerRadius="4" Background="White" HorizontalAlignment="Left"
+                    Width="{Binding Progress, Converter={StaticResource FractionToWidth}, ConverterParameter=788}" />
+          </Border>
+          <TextBlock x:Name="ErrorText" Text="{Binding Error}" Margin="0,20,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
+          <TextBlock Text="{Binding Help}" Margin="0,20,0,0" FontSize="{DynamicResource FsLabelMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding CurrentShortcut}" Margin="0,12,0,0" FontSize="{DynamicResource FsLabelMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+          <!-- Para o mouse: com o controle, tocar B cancela; com o teclado, Esc. -->
+          <Button Style="{StaticResource PillButton}" Margin="0,32,0,0" HorizontalAlignment="Left" Command="{Binding CancelCommand}" nav:Nav.Group="overlay" nav:Nav.Key="capture:cancel">
+            <TextBlock Text="Cancelar" />
+          </Button>
+        </StackPanel>
+      </Border>
+    </Grid>
+    <DataTemplate.Triggers>
+      <DataTrigger Binding="{Binding HasError}" Value="True">
+        <Setter TargetName="ErrorText" Property="Visibility" Value="Visible" />
+      </DataTrigger>
+    </DataTemplate.Triggers>
+  </DataTemplate>
+
   <!-- Editar jogo adicionado (MVP-024): ↑ ↓ (ou Enter) passam pelos campos até os botões; Esc/B cancela. -->
   <DataTemplate DataType="{x:Type vm:EditGameViewModel}">
     <Grid>

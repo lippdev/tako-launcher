@@ -87,7 +87,7 @@ public sealed partial class LaunchOverlayViewModel(GameItemViewModel game, IComm
 
 /// <summary>
 /// Jogo em execução. Marco 0: a biblioteca é fictícia, então a "tela do jogo" é a arte em tela cheia; iniciar e
-/// acompanhar processos reais é o MVP-026. Só o Guia é do launcher; o resto da entrada é do jogo.
+/// acompanhar processos reais é o MVP-026. Só o atalho da Central é do launcher; o resto da entrada é do jogo.
 /// </summary>
 public sealed partial class GameSessionViewModel : ObservableObject, IOverlayViewModel
 {

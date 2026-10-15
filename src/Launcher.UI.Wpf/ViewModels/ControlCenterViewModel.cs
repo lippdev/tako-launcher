@@ -83,6 +83,12 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
 
     public bool HasWindows => Windows.Count > 0;
 
+    /// <summary>"JANELAS ABERTAS · 5": a contagem avisa que a fileira continua além da borda.</summary>
+    public string WindowsTitle => Windows.Count > 1 ? $"JANELAS ABERTAS · {Windows.Count}" : "JANELAS ABERTAS";
+
+    /// <summary>Lê a lista de janelas de novo (ex.: o teste de fumaça com janelas simuladas novas).</summary>
+    public void RefreshWindows() => _ = RefreshWindowsAsync();
+
     public bool IsRealGame => _session.IsRealGame;
 
     public bool IsPopoverOpen => Popover is not null;
@@ -148,6 +154,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             int index = Windows.IndexOf(window);
             Windows.Remove(window);
             OnPropertyChanged(nameof(HasWindows));
+            OnPropertyChanged(nameof(WindowsTitle));
             _shell.Toast($"Pedimos para {window.ProcessName} fechar");
             _shell.RequestFocus(Windows.Count > 0 ? Windows[Math.Clamp(index, 0, Windows.Count - 1)].NavKey : "card:game");
         }
@@ -498,6 +505,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
         }
 
         OnPropertyChanged(nameof(HasWindows));
+        OnPropertyChanged(nameof(WindowsTitle));
     }
 
     private void RebuildPopover(string focusKey)
@@ -675,7 +683,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
         {
             return
             [
-                new("ControlFS", "Explorador de arquivos feito para o controle. Abre por cima do jogo; o Guia traz a Central de volta.",
+                new("ControlFS", "Explorador de arquivos feito para o controle. Abre por cima do jogo; o atalho da Central a traz de volta.",
                 [
                     new PanelRowViewModel { Key = "files:open", Label = "Abrir o ControlFS", IconKey = "Icon.Folder", Command = new RelayCommand(() => _shell.OpenControlFs(this)) },
                 ]),

@@ -42,9 +42,23 @@ public class GamepadInterpreterTests
     public void Small_stick_movement_is_ignored() =>
         Assert.Empty(new GamepadInterpreter().Update(new GamepadSnapshot(GamepadButtons.None, 0.3, -0.3), TimeSpan.Zero));
 
+    [Theory]
+    [InlineData(GamepadButtons.View)]
+    [InlineData(GamepadButtons.Guide)]
+    public void View_and_guide_alone_are_not_commands(GamepadButtons button) =>
+        Assert.Empty(new GamepadInterpreter().Update(Pressed(button), TimeSpan.Zero)); // a Central abre pela combinação segurada
+
     [Fact]
-    public void View_button_works_as_guide() =>
-        Assert.Equal([AppCommand.Guide], new GamepadInterpreter().Update(Pressed(GamepadButtons.View), TimeSpan.Zero));
+    public void Ignored_button_stays_silent_until_released()
+    {
+        var pad = new GamepadInterpreter();
+
+        // View + Y: com o View pressionado, o Y não abre a busca; soltar o View antes do Y também não.
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.View | GamepadButtons.Y), TimeSpan.Zero, ignore: GamepadButtons.Y));
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.Y), TimeSpan.FromMilliseconds(100)));
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.None), TimeSpan.FromMilliseconds(200)));
+        Assert.Equal([AppCommand.Search], pad.Update(Pressed(GamepadButtons.Y), TimeSpan.FromMilliseconds(300)));
+    }
 
     [Fact]
     public void Direction_held_during_disconnect_does_not_keep_moving()

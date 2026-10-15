@@ -23,6 +23,15 @@ public sealed class SimulatedWindowSwitcher : IWindowSwitcher
         }
     }
 
+    /// <summary>Abre uma janela simulada (ex.: títulos longos no teste de fumaça); entra no fim da lista.</summary>
+    public void Add(OpenWindow window)
+    {
+        lock (_gate)
+        {
+            _windows.Add(window);
+        }
+    }
+
     public IconBitmap? LoadIcon(OpenWindow window, int size) => null;
 
     public bool Activate(nint handle)
