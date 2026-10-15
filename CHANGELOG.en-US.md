@@ -4,6 +4,21 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7]
+### What's new
+- Displays and audio go back to normal after a game: Tako records resolution, refresh rate, primary display, audio output, volume and mute before launching the game and, when it ends, restores only what the game changed. If Tako crashes during the game, it offers to restore on the next start. It can be turned off in Settings. (#22)
+- Playnite themes across the whole interface: in Settings → Themes, "Use this theme" replaces Tako's home screen with the theme's, with your library, Play, details and back working with a controller and keyboard. The Menu button always leads to Tako's Settings; any failure falls back to the default interface. (#24)
+- Tako protects itself: a lightweight supervisor reopens the interface if it hangs or closes unexpectedly, then tries safe mode and, as a last resort, leaves you on the desktop. Games are not closed. (#23)
+- Settings → System diagnostics builds a report (no personal data) with version, Windows, displays, controllers, Steam and Xbox mode, to attach when something goes wrong. (#21)
+
+### Fixes
+- Security: themes can no longer load images or videos from outside their own folder, the internet or the network, even when the path is built at runtime. (#25)
+
+### For developers
+- Named-pipe IPC with a versioned protocol between supervisor and interface ([ADR-0012](docs/adr/0012-supervisor-e-ipc.md)); our own display and audio contracts ([ADR-0013](docs/adr/0013-estado-de-monitores-e-audio.md)). (#22, #23)
+- `tools/Launcher.Bench` and a `benchmark` CI job with the baseline in `docs/marco-1/benchmark.md`. (#21)
+- Marco 1 plan and status in `docs/marco-1/plano.md`.
+
 ## [0.1.0-alpha.6]
 ### What's new
 - Games tracked for real: when you play, Tako notices when the game ends (through its process or, for Steam games, the game folder), records the real play time, comes back to the front and puts the focus back on the game, with "Welcome back". For added games, Options → Edit changes the name, arguments, working folder and how the end of the game is detected. (#18)
