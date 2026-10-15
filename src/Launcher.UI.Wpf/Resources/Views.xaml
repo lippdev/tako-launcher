@@ -540,7 +540,7 @@
     </DataTemplate.Triggers>
   </DataTemplate>
 
-  <!-- Jogo em execução (simulado no Marco 0) + HUD de desempenho. -->
+  <!-- Jogo em execução (simulado no Marco 0) ou arte do jogo real sob a Central de Controle. O contador de FPS é o do RTSS. -->
   <DataTemplate DataType="{x:Type vm:GameSessionViewModel}">
     <Grid Background="Black">
       <Rectangle Fill="{Binding Game.FallbackBrush}" />
@@ -553,28 +553,7 @@
           </RadialGradientBrush>
         </Rectangle.Fill>
       </Rectangle>
-      <Border x:Name="Hud" Margin="32,28,0,0" Padding="18,10" CornerRadius="8" Background="#99000000" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="Collapsed">
-        <StackPanel Orientation="Horizontal">
-          <TextBlock Foreground="{DynamicResource SuccessBrush}" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold">
-            <Run Text="{Binding Performance.Fps, Mode=OneWay}" /><Run Text=" FPS" />
-          </TextBlock>
-          <TextBlock x:Name="HudFull" Margin="18,0,0,0" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold" Visibility="Collapsed">
-            <Run Text="Quadro " Foreground="#8CFFFFFF" /><Run Text="{Binding Performance.FrameTimeMs, Mode=OneWay, StringFormat={}{0:0.0} ms}" />
-            <Run Text="   CPU " Foreground="#8CFFFFFF" /><Run Text="{Binding Performance.Cpu, Mode=OneWay, StringFormat={}{0}%}" />
-            <Run Text="   GPU " Foreground="#8CFFFFFF" /><Run Text="{Binding Performance.Gpu, Mode=OneWay, StringFormat={}{0}%}" /><Run Text="{Binding Performance.GpuTemperature, Mode=OneWay, StringFormat={} · {0}°C}" />
-          </TextBlock>
-        </StackPanel>
-      </Border>
     </Grid>
-    <DataTemplate.Triggers>
-      <DataTrigger Binding="{Binding Options.PerfMode}" Value="1">
-        <Setter TargetName="Hud" Property="Visibility" Value="Visible" />
-      </DataTrigger>
-      <DataTrigger Binding="{Binding Options.PerfMode}" Value="2">
-        <Setter TargetName="Hud" Property="Visibility" Value="Visible" />
-        <Setter TargetName="HudFull" Property="Visibility" Value="Visible" />
-      </DataTrigger>
-    </DataTemplate.Triggers>
   </DataTemplate>
 
   <!-- Central de Controle (topo): barra de ícones, cartões vivos e painel do ícone. -->
@@ -665,6 +644,34 @@
       </ItemsControl>
       </Canvas>
 
+      <!-- Janelas abertas (o Alt+Tab do controle): A alterna para a janela, X pede para ela fechar. -->
+      <StackPanel Margin="72,540,0,0" VerticalAlignment="Top" HorizontalAlignment="Left"
+                  Visibility="{Binding IsPopoverOpen, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+        <TextBlock Text="JANELAS ABERTAS" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold" Foreground="#80FFFFFF" />
+        <TextBlock Text="Nenhuma outra janela aberta" Margin="0,14,0,0" FontSize="{DynamicResource FsLabelMd}" Foreground="#8CFFFFFF"
+                   Visibility="{Binding HasWindows, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+      </StackPanel>
+      <Canvas Margin="0,570,0,0" Height="172" VerticalAlignment="Top" ClipToBounds="True"
+              Visibility="{Binding IsPopoverOpen, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+      <ItemsControl ItemsSource="{Binding Windows}" Canvas.Left="72" Canvas.Top="20" Focusable="False" nav:Nav.LockHorizontal="True" nav:Nav.ScrollHost="Horizontal">
+        <ItemsControl.RenderTransform>
+          <TranslateTransform />
+        </ItemsControl.RenderTransform>
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Button Style="{StaticResource WindowCard}"
+                    Command="{Binding DataContext.ActivateWindowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                    nav:Nav.Group="qwin" nav:Nav.Key="{Binding NavKey}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      </Canvas>
+
       <!-- Painel do ícone: um por vez; os cartões saem de cena enquanto ele está aberto. -->
       <Border x:Name="Popover" Width="600" Margin="0,160,0,0" Padding="26,26,26,16" CornerRadius="26" Background="{DynamicResource PanelStrongBrush}"
               HorizontalAlignment="Left" VerticalAlignment="Top" Effect="{StaticResource FocusShadow}"
@@ -681,7 +688,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <Button x:Name="Row" Style="{StaticResource PanelRow}" Command="{Binding Command}"
-                              nav:Nav.Group="qpop" nav:Nav.AdjustCommand="{Binding AdjustCommand}">
+                              nav:Nav.Group="qpop" nav:Nav.Key="{Binding Key}" nav:Nav.AdjustCommand="{Binding AdjustCommand}">
                         <DockPanel>
                           <c:Icon DockPanel.Dock="Left" Key="{Binding IconKey}" Width="30" Height="30" Margin="0,0,18,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                   Visibility="{Binding IconKey, Converter={StaticResource NotNullToVisibility}}" />

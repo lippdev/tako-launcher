@@ -97,6 +97,7 @@ public sealed partial class ShellViewModel
 
         _monitor ??= new GameProcessMonitor(_time);
         _monitor.Start(tracker, OnRealGameStatusChanged);
+        SessionTools.BeginSession(); // contador e limite de FPS escolhidos na Central de Controle
         LogRealSessionStarted(_logger, game.Id, plan.Strategy);
         Toast(tracker.Status == GameRunStatus.Running
             ? $"Jogando {game.Title} · o Tako espera você voltar"
@@ -146,6 +147,8 @@ public sealed partial class ShellViewModel
     {
         var game = RunningGame;
         _monitor?.Stop();
+        CloseRealGameOverlays();
+        SessionTools.EndSession();
         ClearRunningGame();
         Session = SessionState.Browsing;
         RestoreGameScreen(); // sem jogo, a tela de jogo não fica em foco
@@ -165,6 +168,8 @@ public sealed partial class ShellViewModel
         var game = RunningGame;
         var played = tracker.PlayTime;
         _monitor?.Stop();
+        CloseRealGameOverlays();
+        SessionTools.EndSession(); // ponteiro visível e limite de FPS do usuário de volta
         Session = SessionState.Returning;
         ClearRunningGame();
         if (game is not null && Library.Find(game.Id) is not null)

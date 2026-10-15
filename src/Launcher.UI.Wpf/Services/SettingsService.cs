@@ -101,12 +101,8 @@ public sealed partial class SettingsService : ObservableObject
 /// <summary>Opções da sessão de jogo ajustadas pela Central de Controle.</summary>
 public sealed partial class SessionOptions : ObservableObject
 {
-    public static readonly string[] PerfModes = ["Desligado", "Só FPS", "Completo"];
     public static readonly string[] Outputs = ["TV (HDMI)", "Fone Bluetooth", "Alto-falantes"];
     public static readonly string[] Resolutions = ["3840 × 2160", "2560 × 1440", "1920 × 1080"];
-
-    [ObservableProperty]
-    private int _perfMode;
 
     [ObservableProperty]
     private int _volume = 70;

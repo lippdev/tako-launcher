@@ -1,10 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Implementações Win32 dos contratos de ConsoleMode.Runtime (ADR-0011, ADR-0013): monitores (CCD) e áudio (Core Audio). -->
+    <!-- Implementações Win32 dos contratos de ConsoleMode.Runtime (ADR-0011, ADR-0013): monitores (CCD), áudio (Core Audio)
+         e ferramentas da Central de Controle (janelas, RTSS, ponteiro, ControlFS, desempenho). -->
     <TargetFramework>net10.0-windows</TargetFramework>
     <!-- LibraryImport, GeneratedComInterface e ponteiros para as estruturas do Windows. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ConsoleMode.Runtime\ConsoleMode.Runtime.csproj" />
   </ItemGroup>

@@ -99,7 +99,8 @@
       "consolemode.runtime.windows": {
         "type": "Project",
         "dependencies": {
-          "ConsoleMode.Runtime": "[1.0.0, )"
+          "ConsoleMode.Runtime": "[1.0.0, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.13, )"
         }
       },
       "launcher.core": {

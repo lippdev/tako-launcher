@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using ConsoleMode.Runtime.Audio;
 using ConsoleMode.Runtime.Display;
 using ConsoleMode.Runtime.Ipc;
+using ConsoleMode.Runtime.SessionTools;
 using ConsoleMode.Runtime.Simulation;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
@@ -48,6 +49,11 @@ public sealed partial class UiSmokeTests
         // simulados: o teste nunca muda a resolução nem o som da máquina (MVP-012).
         var display = new SimulatedDisplayConfiguration();
         var audio = new SimulatedAudioEndpoints();
+
+        // Central de Controle: janelas, RTSS (não instalado), ponteiro, ControlFS e desempenho simulados; o teste nunca
+        // ativa nem fecha janelas da máquina nem esconde o ponteiro.
+        var windows = new SimulatedWindowSwitcher();
+        var pointer = new SimulatedPointer();
         string environmentFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-environment-{Guid.NewGuid():N}.json");
         using var services = App.BuildServices(
             new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System),
@@ -55,6 +61,11 @@ public sealed partial class UiSmokeTests
                 .AddSingleton<IAudioEndpointService>(audio)
                 .AddSingleton<IDisplayControlService>(new SimulatedDisplayDesk())
                 .AddSingleton<IScreenCurtain>(new SimulatedScreenCurtain())
+                .AddSingleton<IWindowSwitcher>(windows)
+                .AddSingleton<IFpsOverlayService>(new SimulatedFpsOverlay())
+                .AddSingleton<IPointerService>(pointer)
+                .AddSingleton<IControlFsService>(new SimulatedControlFs())
+                .AddSingleton<IHardwareMonitor>(new SimulatedHardwareMonitor())
                 .AddSingleton(new PendingEnvironmentStore(environmentFile)));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
@@ -182,9 +193,10 @@ public sealed partial class UiSmokeTests
         Assert.Null(center.Popover);
         Assert.Equal("bar:controller", Nav.GetKey(nav.Focused!));
 
+        ControlCenterTools(window, shell, center, windows, pointer);
+
         // Encerrar pelo painel: volta à Início com o jogo no topo.
         string played = shell.RunningGame!.Id;
-        Press(window, AppCommand.Right);
         Press(window, AppCommand.Right);
         Assert.Equal("bar:quit", Nav.GetKey(nav.Focused!));
         Press(window, AppCommand.Accept);
@@ -646,6 +658,69 @@ public sealed partial class UiSmokeTests
         shell.Settings.GameScreenId = string.Empty;
         shell.Settings.GameScreenName = string.Empty;
         Pump(0.3);
+    }
+
+    /// <summary>
+    /// Ferramentas da Central de Controle vindas do Console Mode: janelas abertas (A alterna, X fecha), desempenho e
+    /// RTSS ausente (mostra como instalar), ponteiro e ControlFS ausente. Começa em "Controle" e termina em "ControlFS".
+    /// </summary>
+    private static void ControlCenterTools(MainWindow window, ShellViewModel shell, ControlCenterViewModel center, SimulatedWindowSwitcher windows, SimulatedPointer pointer)
+    {
+        var nav = window.Navigator;
+
+        // Janelas abertas: ↓ do cartão vai para a fileira de janelas; X pede para a janela focada fechar.
+        Pump(0.6); // a lista chega em segundo plano
+        Assert.Equal(3, center.Windows.Count);
+        Assert.True(nav.FocusDefault("card:game"));
+        Press(window, AppCommand.Down);
+        Assert.Equal("qwin", Nav.GetGroup(nav.Focused!));
+        var first = Assert.IsType<WindowCardViewModel>(nav.Focused!.DataContext);
+        Assert.Contains(shell.Hints, h => h.Label == "Fechar janela");
+        Snap(window, "11a-central-janelas");
+        Press(window, AppCommand.Favorite);
+        Assert.DoesNotContain(windows.List(), w => w.Handle == first.Window.Handle);
+        Assert.Equal(2, center.Windows.Count);
+        Assert.Equal("qwin", Nav.GetGroup(nav.Focused!)); // o foco fica na fileira, na janela vizinha
+        Pump(1.2);
+
+        // Desempenho sem RTSS: leitura do PC no cartão e, no painel, como instalar o RTSS (nada quebra).
+        Assert.StartsWith("CPU ", center.Cards.First(c => c.Key == "perf").Value, StringComparison.Ordinal);
+        Assert.True(nav.FocusDefault("bar:perf"));
+        Press(window, AppCommand.Accept);
+        Assert.Equal("perf", center.Popover!.Key);
+        Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Label == "Baixar o RTSS");
+        Pump(0.5);
+        Snap(window, "11b-painel-desempenho");
+        Press(window, AppCommand.Back);
+
+        // Ponteiro: A esconde e mostra; o analógico liga e desliga.
+        Assert.True(nav.FocusDefault("bar:pointer"));
+        Press(window, AppCommand.Accept);
+        Assert.Equal("pointer", center.Popover!.Key);
+        Assert.Equal("pointer:hide", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Accept);
+        Assert.True(pointer.IsCursorHidden);
+        Assert.Equal("pointer:hide", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Down);
+        Press(window, AppCommand.Accept);
+        Assert.True(pointer.IsControllerMouseOn);
+        Assert.True(pointer.IsControllerMousePaused); // a Central aberta pausa o ponteiro pelo controle
+        Pump(0.5);
+        Snap(window, "11c-painel-ponteiro");
+        Press(window, AppCommand.Accept);
+        Press(window, AppCommand.Up);
+        Press(window, AppCommand.Accept);
+        Assert.False(pointer.IsCursorHidden);
+        Assert.False(pointer.IsControllerMouseOn);
+
+        // ControlFS ausente: o painel explica e oferece o download.
+        Press(window, AppCommand.Right);
+        Assert.Equal("files", center.Popover!.Key);
+        Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Label == "Baixar o ControlFS");
+        Pump(0.5);
+        Snap(window, "11d-painel-controlfs");
+        Press(window, AppCommand.Back);
+        Assert.Equal("bar:files", Nav.GetKey(nav.Focused!));
     }
 
     /// <summary>
