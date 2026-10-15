@@ -1,9 +1,11 @@
 using System.IO;
 using System.Net.Http;
 using System.Windows;
+using Launcher.Core.Diagnostics;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Steam;
+using Launcher.Core.Persistence;
 using Launcher.Themes.Xaml;
 using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Services;
@@ -21,6 +23,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         _services = BuildServices();
+        LogUnhandledExceptions(_services);
 
         // O tema padrão passa pelo mesmo carregador restrito que temas da comunidade (MVP-013/016).
         var startupTheme = _services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
@@ -45,6 +48,12 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
         services.AddLogging(logging => logging.AddDebug().SetMinimumLevel(LogLevel.Information));
+        // Logs de diagnóstico em arquivo, sem dados sensíveis (MVP-033).
+        services.AddSingleton(_ => new FileLoggerProvider(AppPaths.LogsDirectory, TimeProvider.System));
+        services.AddSingleton<ILoggerProvider>(sp => sp.GetRequiredService<FileLoggerProvider>());
+        // Biblioteca e configurações no SQLite (MVP-005).
+        services.AddSingleton(_ => new TakoDatabase(AppPaths.DatabaseFile));
+        services.AddSingleton<SettingsStore>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton(_ =>
         {
@@ -72,7 +81,7 @@ public partial class App : Application
         return services.BuildServiceProvider();
     }
 
-    /// <summary>Biblioteca real: jogos instalados na Steam + adicionados pelo usuário (<c>%LOCALAPPDATA%\Tako\library.json</c>).</summary>
+    /// <summary>Biblioteca real: jogos instalados na Steam + adicionados pelo usuário (<c>tako.db</c>; importa o antigo <c>library.json</c>).</summary>
     private static LocalGameLibrary CreateLocalLibrary(IServiceProvider services)
     {
         string? steamRoot = SteamLocator.FindRoot();
@@ -96,10 +105,38 @@ public partial class App : Application
             }
         }
 
-        var library = new LocalGameLibrary(DiscoverSteam, new LibraryStore(AppPaths.LibraryFile), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
+        var database = services.GetRequiredService<TakoDatabase>();
+        var library = new LocalGameLibrary(DiscoverSteam, new SqliteLibraryStore(database, AppPaths.LibraryFile), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
         library.Load();
+        if (database.RecoveredFromCorruption)
+        {
+            LogDatabaseRecovered(logger, database.FilePath);
+        }
+
         return library;
     }
+
+    /// <summary>Exceções que derrubariam o processo ficam registradas no log antes (MVP-033).</summary>
+    private static void LogUnhandledExceptions(ServiceProvider services)
+    {
+        var logger = services.GetRequiredService<ILogger<App>>();
+        var fileLog = services.GetRequiredService<FileLoggerProvider>();
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            LogFatalException(logger, e.ExceptionObject as Exception);
+            fileLog.Flush(TimeSpan.FromSeconds(2));
+        };
+        TaskScheduler.UnobservedTaskException += (_, e) => LogUnobservedTaskException(logger, e.Exception);
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Banco corrompido renomeado para .corrompido; recomeçando vazio: {Path}")]
+    private static partial void LogDatabaseRecovered(ILogger logger, string path);
+
+    [LoggerMessage(Level = LogLevel.Critical, Message = "Exceção não tratada encerrando o Tako")]
+    private static partial void LogFatalException(ILogger logger, Exception? exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Exceção não observada em tarefa")]
+    private static partial void LogUnobservedTaskException(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Falha ao ler as bibliotecas da Steam em {SteamRoot}")]
     private static partial void LogSteamScanFailed(ILogger logger, Exception exception, string steamRoot);

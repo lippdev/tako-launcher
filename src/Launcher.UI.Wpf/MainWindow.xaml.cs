@@ -15,6 +15,7 @@ using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
 using Launcher.UI.Wpf.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace Launcher.UI.Wpf;
 
@@ -48,6 +49,7 @@ public partial class MainWindow : Window
     private const double MaxStageWidth = 3840; // 32:9
 
     private readonly ShellViewModel _shell;
+    private readonly ILogger<MainWindow> _logger;
     private readonly ArtService _art;
     private readonly FocusNavigator _navigator;
     private readonly GamepadInterpreter _gamepad = new();
@@ -59,10 +61,11 @@ public partial class MainWindow : Window
     private FrameworkElement? _draggingSlider;
     private Point? _lastMouse;
 
-    public MainWindow(ShellViewModel shell, ArtService art, SonyHidGamepad sony)
+    public MainWindow(ShellViewModel shell, ArtService art, SonyHidGamepad sony, ILogger<MainWindow> logger)
     {
         InitializeComponent();
         _shell = shell;
+        _logger = logger;
         _art = art;
         _sony = sony;
         SizeChanged += (_, _) => FitStage();
@@ -467,6 +470,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        LogUnhandledException(_logger, e.Exception); // MVP-033: toda exceção não tratada da UI fica no log
         if (e.Exception is not System.Windows.Markup.XamlParseException xaml)
         {
             return;
@@ -475,4 +479,7 @@ public partial class MainWindow : Window
         e.Handled = true;
         _shell.RecoverFromThemeFailure(xaml.Message);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Exceção não tratada na UI")]
+    private static partial void LogUnhandledException(ILogger logger, Exception exception);
 }
