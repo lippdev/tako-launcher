@@ -21,7 +21,7 @@ public sealed class ThemeFileExtension(string path) : MarkupExtension
 
     public override object? ProvideValue(IServiceProvider serviceProvider)
     {
-        string? full = ThemeFiles.Resolve(ThemeFiles.RootOf(serviceProvider), Path);
+        string? full = ThemeFiles.ResolveWithFallback(ThemeFiles.RootOf(serviceProvider), Path);
         if (full is null)
         {
             return null;
@@ -87,7 +87,7 @@ public sealed class ThemeFileBindingExtension : MarkupExtension
             }
 
             string relative = format is null ? data : string.Format(CultureInfo.InvariantCulture, format, data);
-            string? full = ThemeFiles.Resolve(root, relative);
+            string? full = ThemeFiles.ResolveWithFallback(root, relative);
             return full is null ? null : ThemeFiles.As(full, targetType ?? targetType2);
         }
 
@@ -103,6 +103,15 @@ internal static class ThemeFiles
         var baseUri = (serviceProvider.GetService(typeof(IUriContext)) as IUriContext)?.BaseUri;
         return baseUri is { IsFile: true } ? FindThemeRoot(System.IO.Path.GetDirectoryName(baseUri.LocalPath)) : null;
     }
+
+    /// <summary>
+    /// Pasta do Fullscreen padrão do Playnite (embutido no Tako). Como no Playnite, um arquivo que o tema não tem vem
+    /// do tema padrão, com a mesma proteção de caminho. Definida pelo <c>P10Theme.Load</c>.
+    /// </summary>
+    public static string? FallbackRoot { get; set; }
+
+    public static string? ResolveWithFallback(string? root, string relative) =>
+        Resolve(root, relative) ?? (FallbackRoot is { } fallback && !string.Equals(fallback, root, StringComparison.OrdinalIgnoreCase) ? Resolve(fallback, relative) : null);
 
     /// <summary>Caminho absoluto de um arquivo existente dentro do tema; nulo se sair da pasta ou não existir.</summary>
     public static string? Resolve(string? root, string relative)

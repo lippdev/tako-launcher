@@ -833,7 +833,15 @@ public sealed class UiSmokeTests
         Assert.Null(shell.PlayniteUi);
         foreach (var theme in playnite.Imported())
         {
-            playnite.Remove(theme);
+            try
+            {
+                playnite.Remove(theme);
+            }
+            catch (IOException ex)
+            {
+                // Imagens que o WPF ainda mantém abertas; o app mostra o mesmo aviso em Configurações › Temas.
+                report.Add($"{theme.Manifest.Manifest.DisplayName}: pasta mantida ({ex.Message})");
+            }
         }
 
         Pump(0.6);

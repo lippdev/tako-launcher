@@ -69,6 +69,11 @@ public static class P10Theme
         }
 
         var manifest = ThemeManifest.Read(root);
+        if (baseRoot is not null)
+        {
+            Markup.ThemeFiles.FallbackRoot = Path.TrimEndingDirectorySeparator(baseRoot);
+        }
+
         var resources = new ResourceDictionary();
         resources.MergedDictionaries.Add(CompatibilityResources());
         var loaded = new List<string>();
@@ -261,6 +266,8 @@ public static class P10Theme
         resources["FontTitilliumWeb"] = new FontFamily("Segoe UI");
         resources["FontTitilliumWebBold"] = new FontFamily("Segoe UI Semibold");
         resources["FontIcoFont"] = new FontFamily("Segoe MDL2 Assets");
+        resources["DesignWidth"] = 1920.0;
+        resources["DesignHeight"] = 1080.0;
         foreach (var (key, text) in Strings)
         {
             resources[key] = text;
