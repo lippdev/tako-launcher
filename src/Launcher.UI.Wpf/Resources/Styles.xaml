@@ -12,6 +12,7 @@
   <c:BoolToVisibilityConverter x:Key="BoolToVisibility" />
   <c:FractionToWidthConverter x:Key="FractionToWidth" />
   <c:UpperCaseConverter x:Key="Upper" />
+  <c:FractionToThumbMarginConverter x:Key="FractionToThumbMargin" />
   <CubicEase x:Key="EaseOut" EasingMode="EaseOut" />
 
   <DropShadowEffect x:Key="FocusShadow" BlurRadius="32" ShadowDepth="16" Direction="270" Opacity="0.4" Color="Black" />
@@ -496,6 +497,7 @@
     <Setter Property="LineHeight" Value="80" />
     <Setter Property="MaxHeight" Value="166" />
     <Setter Property="MaxWidth" Value="1000" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="Margin" Value="0,12,0,10" />
   </Style>
 </ResourceDictionary>

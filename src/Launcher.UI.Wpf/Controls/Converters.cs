@@ -58,3 +58,18 @@ public sealed class UpperCaseConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
+
+/// <summary>Posição do botão deslizante: margem esquerda centrada na fração (parâmetro = largura da barra).</summary>
+public sealed class FractionToThumbMarginConverter : IValueConverter
+{
+    private const double ThumbRadius = 13;
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        double total = parameter is string p ? double.Parse(p, CultureInfo.InvariantCulture) : 100;
+        double fraction = value is double f ? Math.Clamp(f, 0, 1) : 0;
+        return new Thickness((fraction * total) - ThumbRadius, 0, 0, 0);
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}

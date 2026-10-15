@@ -83,11 +83,20 @@ public sealed class BackdropView : Grid
         _front = 1 - _front;
     }
 
+    /// <summary>Máscara opaca até <paramref name="solid"/> e transparente a partir de <paramref name="clear"/>.</summary>
+    private static LinearGradientBrush Fade(Point start, Point end, double solid, double clear)
+    {
+        var brush = new LinearGradientBrush([new GradientStop(Colors.Black, solid), new GradientStop(Colors.Transparent, clear)], start, end);
+        brush.Freeze();
+        return brush;
+    }
+
     /// <summary>Uma camada: tinta (gradiente), arte e esmaecimento para o accent.</summary>
     private sealed class Layer
     {
         private readonly Rectangle _tint = new();
-        private readonly Rectangle _art = new() { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
+        private readonly Rectangle _art = new();
+        private readonly Border _artHost = new() { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
         private readonly Rectangle _fadeLeft = new();
         private readonly Rectangle _fadeBottom = new();
 
@@ -95,7 +104,11 @@ public sealed class BackdropView : Grid
         {
             Root = new Grid { Opacity = 0 };
             Root.Children.Add(_tint);
-            Root.Children.Add(_art);
+            // A arte some para a esquerda e para baixo (máscaras aninhadas), como no protótipo.
+            _artHost.Child = _art;
+            _artHost.OpacityMask = Fade(new Point(1, 0), new Point(0, 0), 0.45, 0.92);
+            _art.OpacityMask = Fade(new Point(0, 0), new Point(0, 1), 0.55, 1);
+            Root.Children.Add(_artHost);
             Root.Children.Add(_fadeLeft);
             Root.Children.Add(_fadeBottom);
         }
@@ -105,8 +118,8 @@ public sealed class BackdropView : Grid
         public void Show(BackdropState state, bool large)
         {
             _tint.Fill = new LinearGradientBrush(state.Accent, state.Deep, 70);
-            _art.Width = large ? 1500 : 1240;
-            _art.Height = large ? 1080 : 760;
+            _artHost.Width = large ? 1500 : 1240;
+            _artHost.Height = large ? 1080 : 760;
             _art.Fill = state.Hero is null ? null : new ImageBrush(state.Hero)
             {
                 Stretch = Stretch.UniformToFill,
