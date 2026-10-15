@@ -225,9 +225,21 @@ public static class P10Theme
         }
         catch (ThemeXamlRejectedException ex)
         {
-            reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : ex.InnerException?.Message ?? ex.Message;
+            reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : Innermost(ex);
             return false;
         }
+    }
+
+    /// <summary>Mensagem mais interna (ex.: a chave de um StaticResource que não existe), sem a pilha.</summary>
+    private static string Innermost(Exception error)
+    {
+        var messages = new List<string>();
+        for (var e = error.InnerException ?? error; e is not null; e = e.InnerException)
+        {
+            messages.Add(e.Message);
+        }
+
+        return string.Join(" → ", messages.Distinct());
     }
 
     /// <summary>Constants.xaml antes de Media.xaml (Media usa recursos de Constants).</summary>
@@ -285,5 +297,8 @@ public static class P10Theme
         ("LOCSettingsLabel", "Configurações"),
         ("LOCMoreAction", "Mais"),
         ("LOCCurrentlyPlaying", "Jogando agora"),
+        ("LOCGridViewLabel", "Grade"),
+        ("LOCListViewLabel", "Lista"),
+        ("LOCUpdaterWindowTitle", "Atualização"),
     ];
 }

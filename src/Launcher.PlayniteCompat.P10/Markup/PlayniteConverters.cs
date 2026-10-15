@@ -19,6 +19,8 @@ public static class PlayniteConverters
         ["True"] = true,
         ["False"] = false,
         ["NullToVisibilityConverter"] = new NullToVisibilityConverter(),
+        ["BooleanToVisibilityConverter"] = new System.Windows.Controls.BooleanToVisibilityConverter(),
+        ["InvertedBooleanToVisibilityConverter"] = new Controls.InverseBooleanToVisibilityConverter(),
         ["ImageStringToImageConverter"] = new ImageStringToImageConverter(),
         ["ListToStringConverter"] = new ListToStringConverter(),
         ["PlayTimeToStringConverter"] = new PlayTimeToStringConverter(),
