@@ -24,8 +24,28 @@ public class ButtonEx : Button
     }
 }
 
-/// <summary>Lista de itens do Playnite (menus e filtros).</summary>
+/// <summary>Lista de itens do Playnite (menus e filtros). <see cref="HorizontalLayout"/> troca o painel para horizontal.</summary>
 public class ItemsControlEx : ItemsControl
+{
+    public static readonly DependencyProperty HorizontalLayoutProperty =
+        DependencyProperty.Register(nameof(HorizontalLayout), typeof(bool), typeof(ItemsControlEx), new PropertyMetadata(false, OnHorizontalLayoutChanged));
+
+    public bool HorizontalLayout
+    {
+        get => (bool)GetValue(HorizontalLayoutProperty);
+        set => SetValue(HorizontalLayoutProperty, value);
+    }
+
+    private static void OnHorizontalLayoutChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var panel = new FrameworkElementFactory(typeof(StackPanel));
+        panel.SetValue(StackPanel.OrientationProperty, e.NewValue is true ? Orientation.Horizontal : Orientation.Vertical);
+        ((ItemsControlEx)d).ItemsPanel = new ItemsPanelTemplate(panel);
+    }
+}
+
+/// <summary>Lista suspensa do Playnite (a lista abre num Popup, que temas não podem usar; aqui só o controle).</summary>
+public class ComboBoxEx : ComboBox
 {
 }
 

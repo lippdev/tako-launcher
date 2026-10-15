@@ -36,7 +36,7 @@ public static class P10Theme
             [
                 "ButtonEx", "ItemsControlEx", "ListBoxEx", "ScrollViewerEx", "FadeImage", "GameListItem", "CheckBoxEx", "SliderEx",
                 "ToggleButtonEx", "FilterDbItemtSelection", "FilterEnumListSelection", "FilterStringListSelection", "FilterPresetSelector",
-                "Filters", "FiltersAdditional", "GameDetails", "GameStatus",
+                "Filters", "FiltersAdditional", "GameDetails", "GameStatus", "ComboBoxEx",
             ],
             presentationExtensions: ["ThemeFile", "Settings"],
             remappedNamespaces: [(PlayniteMarkupNamespace, AdapterMarkupNamespace, ["ThemeFile", "ThemeFileExtension"])]);
@@ -59,7 +59,6 @@ public static class P10Theme
         appResources?.MergedDictionaries.Add(resources);
         try
         {
-
             foreach (string folder in Folders)
             {
                 string directory = Path.Combine(root, folder);
