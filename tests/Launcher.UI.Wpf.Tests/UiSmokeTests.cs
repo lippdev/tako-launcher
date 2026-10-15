@@ -258,6 +258,116 @@ public sealed class UiSmokeTests
         // --- Resiliência e foco (frente D)
         ResilienceAndFocus(app, services, shell, window);
 
+        // --- Temas (frente C): Configurações › Temas, importar .pthm, prévia, diagnóstico, remover (MVP-014/015/020)
+        // e homologação de três temas reais (MVP-022), tudo pelo controle onde há tela.
+        var playnite = services.GetRequiredService<PlayniteThemeService>();
+        shell.OpenSettings();
+        Pump(0.5);
+        shell.OpenThemes();
+        Pump(0.8);
+        Assert.IsType<ThemesViewModel>(shell.CurrentPage);
+        Assert.Equal("themes:import", Nav.GetKey(nav.Focused!));
+        Snap(window, "30-temas");
+        Press(window, AppCommand.Down);
+        Press(window, AppCommand.Down);
+        Press(window, AppCommand.Down);
+        Assert.Equal("theme:Playnite_builtin_DefaultFullscreen", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Accept);
+        Assert.IsType<DialogViewModel>(shell.TopOverlay);
+        Pump(0.4);
+        Snap(window, "31-tema-opcoes");
+        Press(window, AppCommand.Back);
+
+        // Pacote recusado (tema do modo Desktop): diálogo com o motivo e nada instalado.
+        Assert.False(shell.ImportThemeFrom(ThemeFixtures.DesktopPackage()).Succeeded);
+        Pump(0.4);
+        Snap(window, "32-tema-recusado");
+        Press(window, AppCommand.Back);
+        Assert.DoesNotContain(playnite.Imported(), t => t.Id == "Tako_Teste_Desktop");
+
+        // Pacote válido: importa, A abre a prévia (ação padrão) e o diagnóstico mostra X de Y arquivos.
+        var copy = shell.ImportThemeFrom(ThemeFixtures.CopyOfDefault(playnite.BuiltIn().Directory));
+        Assert.True(copy.Succeeded, string.Join('\n', copy.Diagnostics));
+        Press(window, AppCommand.Accept);
+        Pump(2);
+        var copyPreview = Assert.IsType<PlaynitePreviewViewModel>(shell.TopOverlay);
+        Assert.Equal(31, copyPreview.Report.Loaded.Count);
+        Press(window, AppCommand.Back);
+        var copyItem = ((ThemesViewModel)shell.CurrentPage).Themes.Single(t => t.Theme?.Id == "Tako_Teste_CopiaDoPadrao");
+        shell.ShowThemeDiagnostics(copyItem);
+        Pump(0.4);
+        Assert.StartsWith("31 de 33", copyItem.LoadSummary, StringComparison.Ordinal);
+        Snap(window, "33-tema-diagnostico");
+        Press(window, AppCommand.Back);
+
+        // Homologação: .pthm das releases (hash fixo), importados e abertos na prévia; o relatório vai para o artefato.
+        var homologation = new List<string>();
+        foreach (var fixture in ThemeFixtures.Homologated)
+        {
+            string? package = ThemeFixtures.TryDownload(fixture, out string? problem);
+            if (package is null)
+            {
+                homologation.Add($"{fixture.Name}: não executado ({problem})");
+                continue;
+            }
+
+            var installed = shell.ImportThemeFrom(package);
+            Assert.True(installed.Succeeded, string.Join('\n', installed.Diagnostics));
+            Press(window, AppCommand.Accept);
+            Pump(3);
+            if (shell.TopOverlay is PlaynitePreviewViewModel themePreview)
+            {
+                var r = themePreview.Report;
+                homologation.Add($"{fixture.Name} [{fixture.License}] · ThemeApiVersion {r.ThemeApiVersion} · {r.Loaded.Count} de {r.Total} carregados · {r.Inherited.Count} herdados · {r.Ignored.Count} ignorados");
+                homologation.AddRange(r.Manifest.Diagnostics.Select(d => "    " + d));
+                homologation.AddRange(r.Loaded.Select(f => "    OK      " + f));
+                homologation.AddRange(r.Rejected.Select(x => $"    RECUSA  {x.File} — {x.Reason}"));
+                homologation.AddRange(r.Inherited.Select(f => "    HERDADO " + f));
+                homologation.AddRange(r.Ignored.Select(f => "    IGNORADO " + f));
+                Assert.NotEmpty(r.Loaded);
+                Snap(window, $"34-tema-{fixture.Slug}");
+            }
+            else
+            {
+                homologation.Add($"{fixture.Name}: prévia não abriu ({shell.TopOverlay?.GetType().Name ?? "nada"})");
+                Snap(window, $"34-tema-{fixture.Slug}-falha");
+            }
+
+            Press(window, AppCommand.Back);
+            while (shell.TopOverlay is not null)
+            {
+                shell.CloseOverlay(shell.TopOverlay);
+            }
+        }
+
+        File.WriteAllLines(Path.Combine(Screenshots, "theme-homologation.txt"), homologation);
+
+        // Modo seguro (frente D): temas importados não são carregados.
+        var page = (ThemesViewModel)shell.CurrentPage;
+        page.Refresh();
+        shell.IsSafeMode = true;
+        shell.ShowThemePreview(page.Themes.Single(t => t.Theme?.Id == "Tako_Teste_CopiaDoPadrao").Theme!);
+        Assert.Null(shell.TopOverlay);
+        shell.IsSafeMode = false;
+
+        // Usar um tema importado muda a prévia; remover e restaurar voltam ao padrão.
+        shell.ShowThemeOptions(page.Themes.Single(t => t.Theme?.Id == "Tako_Teste_CopiaDoPadrao"));
+        var options = Assert.IsType<DialogViewModel>(shell.TopOverlay);
+        options.Actions.Single(a => a.Label == "Usar este tema").Command.Execute(null);
+        Assert.Equal("Tako_Teste_CopiaDoPadrao", playnite.SelectedId);
+        Pump(0.4);
+        Snap(window, "35-temas-importados");
+        foreach (var item in page.Themes.Where(t => t.CanRemove).ToList())
+        {
+            shell.RemoveTheme(item);
+        }
+
+        shell.RestoreDefaultTheme();
+        Pump(0.5);
+        Assert.Null(playnite.SelectedId);
+        Assert.DoesNotContain(((ThemesViewModel)shell.CurrentPage).Themes, t => t.Kind == ThemeKind.Imported);
+        Assert.Equal("themes:import", Nav.GetKey(nav.Focused!));
+
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();
         window.Width = 840; // 21:9

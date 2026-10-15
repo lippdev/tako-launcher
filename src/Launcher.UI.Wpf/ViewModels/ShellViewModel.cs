@@ -512,10 +512,10 @@ public sealed partial class ShellViewModel : ObservableObject
         ShowRecovery(new ThemeLoadResult(PlayniteThemeService.SampleTheme, false, reason));
     }
 
-    /// <summary>Prévia do tema Fullscreen padrão do Playnite 10 com a biblioteca do launcher (H2, MVP-014/017/018).</summary>
+    /// <summary>Prévia do tema Playnite 10 em uso (padrão: Fullscreen do Playnite) com a biblioteca do launcher (H2, MVP-018/020).</summary>
     public void ShowPlaynitePreview()
     {
-        var report = _playniteThemes.Load(PlayniteThemeService.SampleTheme);
+        var report = LoadPreviewTheme();
         LogPlaynitePreview(_logger, report.Loaded.Count, report.Rejected.Count);
         PlaynitePreviewViewModel? preview = null;
         preview = new PlaynitePreviewViewModel(report, LibraryQuery.RecentlyPlayed(Library.Games).Select(ItemFor), new RelayCommand(() => CloseOverlay(preview!)));
