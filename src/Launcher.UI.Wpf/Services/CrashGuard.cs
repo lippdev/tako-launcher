@@ -24,6 +24,9 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
     /// <summary>O Tako está fechando por falha: o fechamento não conta como limpo.</summary>
     public bool IsFatal { get; private set; }
 
+    /// <summary>O que foi feito com o último erro (diagnóstico do teste de fumaça).</summary>
+    internal string LastOutcome { get; private set; } = "nenhum";
+
     /// <summary>
     /// Instala o tratador. Chamar depois de criar a janela: ele roda depois do tratador da janela (erros de tema), que
     /// tem prioridade.
@@ -40,6 +43,7 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
     {
         if (e.Handled)
         {
+            LastOutcome = "já tratado";
             return; // tratado antes (ex.: erro de tema → tela de recuperação do tema)
         }
 
@@ -55,12 +59,14 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
             try
             {
                 _shell.ShowErrorRecovery(e.Exception);
+                LastOutcome = $"recuperação ({_shell.Overlays.Count} sobreposições)";
                 return;
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 // A própria tela de recuperação falhou: não há UI confiável, fecha a tela cheia.
                 LogRecoveryFailed(logger, ex);
+                LastOutcome = "recuperação falhou: " + ex;
             }
         }
 
@@ -70,6 +76,7 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
     /// <summary>Fecha a janela de tela cheia e encerra o Tako; o Windows volta ao desktop.</summary>
     private void ReturnToDesktop()
     {
+        LastOutcome = "desktop";
         IsFatal = true;
         LogReturningToDesktop(logger);
         try

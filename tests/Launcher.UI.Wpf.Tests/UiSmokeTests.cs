@@ -347,7 +347,7 @@ public sealed class UiSmokeTests
         shell.Overlays.CollectionChanged += (_, e) => seen.Add($"overlays {e.Action} {string.Join(",", e.NewItems?.Cast<object>().Select(o => o.GetType().Name) ?? [])} -{string.Join(",", e.OldItems?.Cast<object>().Select(o => o.GetType().Name) ?? [])} trace={new StackTrace(1, false).ToString().Replace(Environment.NewLine, " | ", StringComparison.Ordinal)[..Math.Min(1500, new StackTrace(1, false).ToString().Length)]}");
         window.Dispatcher.BeginInvoke(() => throw new InvalidOperationException("Falha simulada pelo teste de fumaça"));
         Pump(0.8);
-        string diagnosis = $"eventos=[{string.Join("; ", seen)}] fatal={guard.IsFatal} carregada={window.IsLoaded} visível={window.IsVisible} topo={shell.TopOverlay?.GetType().Name ?? "nenhum"}";
+        string diagnosis = $"eventos=[{string.Join("; ", seen)}] guarda={guard.LastOutcome} fatal={guard.IsFatal} carregada={window.IsLoaded} visível={window.IsVisible} topo={shell.TopOverlay?.GetType().Name ?? "nenhum"}";
         Assert.False(guard.IsFatal, diagnosis);
         Assert.True(shell.TopOverlay is RecoveryViewModel, diagnosis);
         var error = Assert.IsType<RecoveryViewModel>(shell.TopOverlay);
