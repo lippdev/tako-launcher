@@ -104,7 +104,7 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
             Publishers = game.Publisher is null ? [] : [new P10NamedItem(game.Publisher)],
             LibraryPlugin = new P10LibraryPlugin(LibraryName(game.Store)),
             Source = new P10NamedItem(item.StoreName),
-            CriticScore = game.MetacriticScore,
+            CriticScore = game.MetacriticScore ?? game.CriticScore,
             CoverSource = () => item.Cover, // só carrega quando o tema mostra a capa
         };
     }

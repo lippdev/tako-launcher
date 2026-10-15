@@ -15,13 +15,24 @@ O Tako preenche as informações dos jogos sozinho, como os "agentes" do Plex fa
 | Provedor | Chave | Traz | Status |
 |---|---|---|---|
 | Steam Store (`SteamStoreProvider`) | não precisa | descrição em português, gêneros, lançamento, desenvolvedora, publicadora, nota do Metacritic; artes 2x (capa 600×900, fundo 3840×1240) | ativo |
-| IGDB (Twitch) | Client ID + secret | jogos fora da Steam, consoles, notas da crítica | planejado |
+| IGDB (`IgdbProvider`, [ADR-0021](adr/0021-metadados-igdb.md)) | Client ID + Client Secret da Twitch **do próprio usuário** | jogos de qualquer loja e de consoles: resumo (inglês), gêneros, temas, modos, lançamento, desenvolvedora, publicadora, nota da crítica, capa, arte de fundo, franquia; ids em outras lojas | ativo quando configurado |
+| ScreenScraper | conta do usuário | ROMs por hash, caixa 2D/3D, wheel, marquee, vídeo | planejado |
 | SteamGridDB | chave gratuita | capas, fundos e logos da comunidade para qualquer jogo | planejado |
 
 O Metacritic não tem API pública, e raspar o site viola os termos de uso. Por isso a nota vem pela Steam Store, que a publica com autorização.
 
+## IGDB com a sua chave da Twitch
+O Tako é open source, então não traz chave nenhuma: cada pessoa cria a sua, de graça, em Configurações › **Dados dos jogos (IGDB)**:
+1. Entrar em [dev.twitch.tv/console](https://dev.twitch.tv/console) (a conta precisa da verificação em duas etapas).
+2. "Registrar seu aplicativo": qualquer nome, URL de redirecionamento OAuth `http://localhost`, categoria "Application Integration", cliente Confidencial.
+3. Em "Gerenciar", copiar o **Client ID**; em "Novo segredo", copiar o **Client Secret**. Colar nos campos (botão "Colar" funciona com o controle), **Testar** e **Salvar**.
+
+A chave fica cifrada com DPAPI em `%LOCALAPPDATA%\Tako\igdb.dat` e nunca volta para a tela. Sem chave (ou desligada), a IGDB não é consultada e tudo segue só com a Steam. Detalhes, limites e a alternativa descartada (proxy) na [ADR-0021](adr/0021-metadados-igdb.md).
+
 ## Como funciona
-1. **Correspondência**: jogos da Steam usam o próprio appid. Jogos adicionados, do Xbox, da Epic e do GOG são buscados pelo título (os que também estão na Steam herdam o appid de lá) (nome do produto no executável ou nome do arquivo), e o `TitleMatcher` escolhe o resultado mais parecido (ignora acentos, ™/®, "Edition", "GOTY" e algarismos romanos). Abaixo de 70% de semelhança, nada é aplicado (o usuário pode corrigir).
-2. **Cache**: `%LOCALAPPDATA%\Tako\cache\metadata\<jogo>.json`. É aplicado na hora em que o jogo aparece e atualizado em segundo plano depois de 30 dias (7 dias quando não houve correspondência), um jogo a cada 1,5 s, por causa do limite da API.
-3. **Artes**: `steam-art://<appid>/cover|hero` resolve, nesta ordem, os arquivos 2x informados pela API, o caminho antigo da CDN e o cache local da Steam (`appcache/librarycache`). O resultado vai para `%LOCALAPPDATA%\Tako\cache\art`. A capa escolhida pelo usuário nunca é trocada.
-4. **Corrigir correspondência** (Detalhes › Opções): mostra os 5 primeiros resultados da busca. A escolha fica fixada e não é trocada nas atualizações automáticas.
+1. **Correspondência**: primeiro por id, sem ambiguidade — jogos da Steam pelo appid; com a IGDB ligada, jogos da Steam, do GOG (id do jogo), da Epic (CatalogItemId) e do Xbox (StoreId) pelos `external_games` da IGDB, e a IGDB informa o appid da Steam do mesmo jogo, que é consultada por ele. Sem id, a busca é pelo título (nome do produto no executável ou nome do arquivo), filtrada pela plataforma na IGDB (PC ou o console do emulador), e o `TitleMatcher` escolhe o resultado mais parecido (ignora acentos, ™/®, "Edition", "GOTY" e algarismos romanos). Abaixo de 70% de semelhança, nada é aplicado (o usuário pode corrigir).
+2. **Combinação** (`MetadataMerge`), campo a campo, pela ordem do tipo de jogo: jogos da Steam usam a Steam e completam com a IGDB (temas, modos, série, nota da crítica); jogos de outras lojas e adicionados usam a IGDB primeiro e completam com a Steam; jogos de emulador usarão o ScreenScraper, depois a IGDB. A descrição prefere português (a IGDB só tem inglês); a arte de jogos de PC vem da Steam quando há appid (maior), senão da IGDB.
+3. **Cache**: `%LOCALAPPDATA%\Tako\cache\metadata\<jogo>.json`, com a parte de cada fonte. É aplicado na hora em que o jogo aparece e atualizado em segundo plano depois de 30 dias (7 dias quando não houve correspondência), um jogo a cada 1,5 s, por causa do limite da Steam. Ligar a IGDB consulta só a IGDB para os jogos que ainda não passaram por ela. As respostas da IGDB ficam em `cache\igdb` (30 dias); a biblioteca inteira é resolvida em poucas consultas em lote, no máximo 4 por segundo, esperando e tentando de novo quando a IGDB pede (429).
+4. **Artes**: `steam-art://<appid>/cover|hero` resolve, nesta ordem, os arquivos 2x informados pela API, o caminho antigo da CDN e o cache local da Steam (`appcache/librarycache`). Artes da IGDB são https (`images.igdb.com`, capa `t_cover_big`, fundo `t_1080p` ou `t_screenshot_huge`). O resultado vai para `%LOCALAPPDATA%\Tako\cache\art`. A capa escolhida pelo usuário nunca é trocada.
+5. **Corrigir correspondência** (Detalhes › Opções): mostra até 4 resultados de cada fonte ligada, com a fonte, o ano e a plataforma ("Hades (2020) · IGDB"); ✓ marca o casado pelo id da loja. A escolha fica fixada (e traz os dados das outras fontes pelos ids) e não é trocada nas atualizações automáticas.
+6. **Aviso**: com a IGDB desligada, um jogo de fora da Steam sem descrição mostra nos detalhes uma linha discreta sugerindo ligá-la.

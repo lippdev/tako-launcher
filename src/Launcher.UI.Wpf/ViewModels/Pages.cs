@@ -291,6 +291,9 @@ public sealed partial class DetailsViewModel : PageViewModel
 
     public string FavoriteIconKey => Game.IsFavorite ? "Icon.StarFill" : "Icon.Star";
 
+    /// <summary>Aviso discreto quando o jogo está sem dados e a IGDB poderia trazê-los (ADR-0021).</summary>
+    public string? MetadataHint => Shell.MetadataHintFor(Game.Game);
+
     /// <summary>"Coleções" ou, com o jogo em alguma, "Coleções (2)" (UX-003).</summary>
     public string CollectionsLabel => Game.Game.Collections.Count is int n and > 0 ? $"Coleções ({n})" : "Coleções";
 
@@ -302,9 +305,11 @@ public sealed partial class DetailsViewModel : PageViewModel
             new StatViewModel("Tempo de jogo", Game.PlayTimeText),
             new StatViewModel("Última vez", Game.LastPlayedText),
             Game.MetacriticText is null ? null : new StatViewModel("Metacritic", Game.MetacriticText),
+            Game.MetacriticText is null && g.CriticScore is int critic ? new StatViewModel("Crítica", critic.ToString(System.Globalization.CultureInfo.InvariantCulture)) : null,
             g.SizeLabel is null ? null : new StatViewModel("Tamanho", g.SizeLabel),
             Game.ReleaseText is null ? null : new StatViewModel("Lançamento", Game.ReleaseText),
             g.Developer is null ? null : new StatViewModel("Desenvolvedora", g.Developer),
+            g.Franchise is null ? null : new StatViewModel("Série", g.Franchise),
             new StatViewModel("Status", Game.Status),
             g.AlsoInstalledIn.Count == 0 ? null : new StatViewModel("Também em", string.Join(", ", g.AlsoInstalledIn.Select(Core.Presentation.GameText.StoreName))),
         }.OfType<StatViewModel>());
@@ -312,6 +317,7 @@ public sealed partial class DetailsViewModel : PageViewModel
         OnPropertyChanged(nameof(FavoriteLabel));
         OnPropertyChanged(nameof(FavoriteIconKey));
         OnPropertyChanged(nameof(CollectionsLabel));
+        OnPropertyChanged(nameof(MetadataHint));
     }
 
     [RelayCommand]

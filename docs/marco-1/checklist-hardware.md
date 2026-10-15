@@ -411,6 +411,29 @@ Configurações › Teste de controle, aperte o botão que falhou, use "Copiar" 
 | DE11 | DualSense comum pelo Bluetooth | Repetir DE2 e DE3 com o DualSense (0CE6) | Igual ao Edge |
 | DE12 | Diagnóstico | Configurações › Diagnóstico do sistema com o Edge ligado | Seção "[Teste de controle]" com modelo, USB/Bluetooth, product id e relatórios crus; sem caminho do dispositivo nem endereço Bluetooth |
 
+## 21. Dados dos jogos pela IGDB ([ADR-0021](../adr/0021-metadados-igdb.md))
+
+Precisa de uma conta da Twitch com verificação em duas etapas e de jogos de várias lojas (Steam, Epic, GOG, Xbox e um
+adicionado à mão). Anexe `logs\tako-AAAAMMDD.log` (linhas "IGDB" e "Metadados"). Nada disso roda no CI: lá não há
+chamadas reais à Twitch nem à IGDB.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| IG1 | Sem chave | Instalação nova, sem configurar a IGDB | Configurações › Dados dos jogos (IGDB): "Desligada"; os dados vêm da Steam como antes; nenhuma linha "IGDB" no log |
+| IG2 | Passo a passo | Seguir os passos da tela: dev.twitch.tv, registrar app (`http://localhost`, Application Integration), Client ID, Novo segredo | Os textos batem com o site da Twitch; anotar o que mudou de nome |
+| IG3 | Colar com o controle | Copiar o Client ID no navegador, voltar ao Tako e usar "Colar" só com o controle | O campo é preenchido sem espaços; status "Client ID colado" |
+| IG4 | Testar com erros | Testar com o Client ID errado; depois com o segredo errado; depois sem internet | Mensagens diferentes e claras para cada caso; nada é salvo |
+| IG5 | Testar e salvar | Chave certa › Testar › Salvar | "Tudo certo"; ao salvar, "IGDB ligada · buscando dados…"; o resumo da linha vira "Ligada · sua chave da Twitch" |
+| IG6 | Segredo protegido | Abrir `%LOCALAPPDATA%\Tako\igdb.dat` no Bloco de Notas; reabrir a tela | O arquivo começa com `dpapi:` e não mostra a chave; o campo do segredo vem vazio com "já salvo" |
+| IG7 | Jogos fora da Steam | Jogos da Epic, GOG e Xbox que não existem na Steam | Ganham descrição (inglês), gêneros/temas em português, capa e fundo da IGDB, nota "Crítica" e "Série" nos detalhes |
+| IG8 | Casamento por id | Jogo do GOG e da Epic que também existem na Steam | Opções mostra "IGDB + Steam"; descrição em português da Steam; capa grande da Steam; sem busca pelo nome no log |
+| IG9 | Jogo da Steam | Jogo da Steam com a IGDB ligada | Dados da Steam mantidos; temas, modos e série completados pela IGDB |
+| IG10 | Corrigir correspondência | Jogo adicionado com nome ambíguo › Opções › Corrigir correspondência | Resultados da IGDB e da Steam, cada um com a fonte, ano e plataforma; escolher um da IGDB fixa e traz a capa |
+| IG11 | Biblioteca grande | 200+ jogos, ligar a IGDB pela primeira vez | Poucas consultas em lote no início; nenhum erro 429 persistente; o Tako não trava; os jogos ganham dados aos poucos |
+| IG12 | Aviso nos detalhes | IGDB desligada, jogo adicionado sem descrição | Linha discreta sugerindo ligar a IGDB; some ao ligar |
+| IG13 | Qualidade na TV | Capas da IGDB (`t_cover_big`) na grade em 4K | Anotar se ficam borradas (se sim, trocar para `t_cover_big_2x`) |
+| IG14 | Região Brasil e lojas | Jogo com nome/capa brasileira na IGDB; jogo da Epic e do Xbox | Nome e capa da localização Brasil; anotar se Epic (CatalogItemId) e Xbox (StoreId) casam por id ou só pelo nome |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.

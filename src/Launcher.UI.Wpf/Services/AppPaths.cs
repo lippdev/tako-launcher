@@ -39,6 +39,12 @@ public static class AppPaths
 
     public static string MetadataCache => Path.Combine(DataRoot, "cache", "metadata");
 
+    /// <summary>Respostas da IGDB, uma por consulta, para não repetir consultas (ADR-0021).</summary>
+    public static string IgdbCache => Path.Combine(DataRoot, "cache", "igdb");
+
+    /// <summary>IGDB ligada e a chave da Twitch do usuário (Client ID e Client Secret), cifradas com DPAPI (ADR-0021).</summary>
+    public static string IgdbSettingsFile => Path.Combine(DataRoot, "igdb.dat");
+
     /// <summary>Marcador de sessão em andamento (proteção contra loop de travamento, MVP-036).</summary>
     public static string SessionFile => Path.Combine(DataRoot, "session.json");
 

@@ -24,6 +24,7 @@ public static class XboxGames
             LaunchTarget = game.LaunchTarget,
             // O AUMID não devolve processo: o acompanhamento automático usa os processos dentro da pasta do pacote.
             InstallPath = game.Folder,
+            StoreProductId = game.StoreId,
         };
     }
 }

@@ -13,6 +13,7 @@ using Launcher.Core.Library;
 using Launcher.Core.Library.Epic;
 using Launcher.Core.Library.Gog;
 using Launcher.Core.Library.Metadata;
+using Launcher.Core.Library.Metadata.Igdb;
 using Launcher.Core.Library.Sources;
 using Launcher.Core.Library.Steam;
 using Launcher.Core.Library.Xbox;
@@ -126,7 +127,12 @@ public partial class App : Application
             return http;
         });
         services.AddSingleton<SteamArtResolver>();
+        // Metadados (ADR-0021): Steam Store sempre; IGDB só com a chave da Twitch do próprio usuário (cifrada com DPAPI).
+        services.AddSingleton(_ => new IgdbSettingsStore(AppPaths.IgdbSettingsFile, new DpapiSecretProtector()));
+        services.AddSingleton<IIgdbAuthenticator>(sp => new TwitchAppAuthenticator(sp.GetRequiredService<HttpClient>(), () => sp.GetRequiredService<IgdbSettingsStore>().Current, sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton(sp => new IgdbClient(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<IIgdbAuthenticator>(), sp.GetRequiredService<TimeProvider>(), new IgdbFileCache(AppPaths.IgdbCache, sp.GetRequiredService<TimeProvider>())));
         services.AddSingleton<IMetadataProvider, SteamStoreProvider>();
+        services.AddSingleton<IMetadataProvider, IgdbProvider>();
         services.AddSingleton<MetadataService>();
         services.AddSingleton<SupervisorLink>();
         services.AddSingleton<UpdateService>();

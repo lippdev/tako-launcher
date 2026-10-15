@@ -8,6 +8,15 @@ public static class GameText
 {
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
+    /// <summary>"Corrigir correspondência": "Hollow Knight (2017) · SNES · IGDB", com "✓" quando casou pelo id da loja.</summary>
+    public static string MatchLabel(Library.Metadata.MetadataMatch match)
+    {
+        ArgumentNullException.ThrowIfNull(match);
+        string title = match.Year is int year ? $"{match.Title} ({year.ToString(CultureInfo.InvariantCulture)})" : match.Title;
+        string platforms = match.Platforms is { Length: > 0 } p && p != "PC" ? $" · {p}" : string.Empty;
+        return $"{(match.IsExact ? "✓ " : string.Empty)}{title}{platforms} · {match.Source}";
+    }
+
     public static string StoreName(GameStore store) => store switch
     {
         GameStore.Steam => "Steam",

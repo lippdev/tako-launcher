@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 namespace Launcher.Core.Library.Metadata;
 
 /// <summary>
-/// Provedor de metadados pela API pública da loja Steam (sem chave): busca por título e detalhes em português —
+/// Provedor de metadados pela API pública da loja Steam (sem chave): busca por título e detalhes em português (quando o jogo tem) —
 /// descrição, gêneros, lançamento, desenvolvedora, publicadora e nota do Metacritic. A Steam limita ~200 consultas
 /// a cada 5 minutos; quem chama espaça as consultas e guarda o resultado em cache.
 /// </summary>
@@ -18,10 +18,17 @@ public sealed partial class SteamStoreProvider(HttpClient http) : IMetadataProvi
 
     public string Name => SourceName;
 
-    public async Task<IReadOnlyList<MetadataMatch>> SearchAsync(string title, CancellationToken cancellationToken)
+    public bool IsEnabled => true;
+
+    public async Task<IReadOnlyList<MetadataMatch>> SearchAsync(MetadataLookup lookup, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(title);
-        var url = new Uri($"https://store.steampowered.com/api/storesearch/?term={Uri.EscapeDataString(title)}&l=brazilian&cc=BR");
+        ArgumentNullException.ThrowIfNull(lookup);
+        if (lookup.Platform is { Length: > 0 } platform && !string.Equals(platform, "pc", StringComparison.OrdinalIgnoreCase))
+        {
+            return []; // a loja Steam só tem jogos de PC
+        }
+
+        var url = new Uri($"https://store.steampowered.com/api/storesearch/?term={Uri.EscapeDataString(lookup.Title)}&l=brazilian&cc=BR");
         using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
         if (document?.RootElement.TryGetProperty("items", out var items) != true)
         {
@@ -30,11 +37,23 @@ public sealed partial class SteamStoreProvider(HttpClient http) : IMetadataProvi
 
         return [.. items.EnumerateArray()
             .Where(i => i.TryGetProperty("type", out var type) && type.GetString() == "app")
-            .Select(i => new MetadataMatch(i.GetProperty("name").GetString() ?? string.Empty, i.GetProperty("id").GetInt32()))];
+            .Select(i => MetadataMatch.Steam(i.GetProperty("name").GetString() ?? string.Empty, i.GetProperty("id").GetInt32()))];
     }
 
-    public async Task<GameMetadata?> FetchAsync(int steamAppId, CancellationToken cancellationToken)
+    /// <summary>O appid já é o id da Steam: jogos da Steam (ou que outro provedor ligou a um appid) casam direto.</summary>
+    public Task<string?> FindExactAsync(MetadataLookup lookup, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(lookup);
+        return Task.FromResult(lookup.ExternalIds.GetValueOrDefault(ExternalGameIds.Steam));
+    }
+
+    public async Task<GameMetadata?> FetchAsync(string id, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out int steamAppId))
+        {
+            return null;
+        }
+
         var url = new Uri($"https://store.steampowered.com/api/appdetails?appids={steamAppId}&l=brazilian&cc=BR");
         using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
         return document is null ? null : Parse(document.RootElement, steamAppId, DateTimeOffset.UtcNow);
@@ -55,8 +74,11 @@ public sealed partial class SteamStoreProvider(HttpClient http) : IMetadataProvi
             Source = SourceName,
             FetchedAt = now,
             SteamAppId = steamAppId,
+            SourceIds = new Dictionary<string, string> { [SourceName] = steamAppId.ToString(CultureInfo.InvariantCulture) },
             Title = Text(data, "name"),
             Description = Text(data, "short_description") is { } d ? WebUtility.HtmlDecode(d).Trim() : null,
+            // Pedido em português; a loja só traduz a descrição de jogos com português entre os idiomas.
+            DescriptionLanguage = Text(data, "supported_languages")?.Contains("Português", StringComparison.OrdinalIgnoreCase) == true ? "pt-BR" : "en",
             Genres = data.TryGetProperty("genres", out var genres) ? [.. genres.EnumerateArray().Select(g => Text(g, "description")).OfType<string>().Take(3)] : [],
             ReleaseDate = data.TryGetProperty("release_date", out var release) ? ParseDate(Text(release, "date")) : null,
             Developer = First(data, "developers"),

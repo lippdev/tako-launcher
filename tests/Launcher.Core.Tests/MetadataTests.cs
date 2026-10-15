@@ -30,15 +30,15 @@ public class MetadataTests
     {
         MetadataMatch[] results =
         [
-            new("Hollow Knight", 367520),
-            new("Hollow Knight: Silksong", 1030300),
-            new("Hollow Knight Soundtrack", 1),
+            MetadataMatch.Steam("Hollow Knight", 367520),
+            MetadataMatch.Steam("Hollow Knight: Silksong", 1030300),
+            MetadataMatch.Steam("Hollow Knight Soundtrack", 1),
         ];
 
         Assert.Equal(1030300, TitleMatcher.Best("silksong hollow knight", results)?.SteamAppId);
         Assert.Equal(367520, TitleMatcher.Best("Hollow Knight", results)?.SteamAppId);
         Assert.Null(TitleMatcher.Best("Forza Horizon 5", results));
-        Assert.Null(TitleMatcher.Best("Minecraft Launcher", [new MetadataMatch("Minecraft Dungeons II", 1912410), new MetadataMatch("Minecraft Legends", 1928870)]));
+        Assert.Null(TitleMatcher.Best("Minecraft Launcher", [MetadataMatch.Steam("Minecraft Dungeons II", 1912410), MetadataMatch.Steam("Minecraft Legends", 1928870)]));
     }
 
     [Fact]
@@ -118,9 +118,9 @@ public class MetadataTests
             {"total":2,"items":[{"type":"app","name":"Hollow Knight: Silksong","id":1030300},{"type":"sub","name":"Pacote","id":5}]}
             """));
 
-        var results = await new SteamStoreProvider(http).SearchAsync("silksong", TestContext.Current.CancellationToken);
+        var results = await new SteamStoreProvider(http).SearchAsync(new MetadataLookup("silksong", new Dictionary<string, string>()), TestContext.Current.CancellationToken);
 
-        Assert.Equal([new MetadataMatch("Hollow Knight: Silksong", 1030300)], results);
+        Assert.Equal([MetadataMatch.Steam("Hollow Knight: Silksong", 1030300)], results);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class MetadataTests
     {
         using var http = new HttpClient(new StubHandler("{}", HttpStatusCode.TooManyRequests));
 
-        Assert.Null(await new SteamStoreProvider(http).FetchAsync(570, TestContext.Current.CancellationToken));
+        Assert.Null(await new SteamStoreProvider(http).FetchAsync("570", TestContext.Current.CancellationToken));
     }
 
     private sealed class StubHandler(string body, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
