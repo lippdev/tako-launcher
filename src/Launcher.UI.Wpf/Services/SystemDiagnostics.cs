@@ -17,7 +17,8 @@ public sealed record DiagnosticsContext(
     bool SafeMode,
     string? SafeModeDetail,
     FseAssessment XboxMode,
-    string? Theme);
+    string? Theme,
+    IReadOnlyList<string>? ControllerTest = null);
 
 /// <summary>
 /// Coleta os fatos do "Diagnóstico do sistema" (MVP-034): Windows, monitores, controles, Steam e Xbox mode. Só lê
@@ -56,6 +57,7 @@ public static partial class SystemDiagnostics
             Displays = ReadDisplays(),
             Controllers = ReadControllers(),
             ActiveController = context.ActiveController,
+            ControllerTest = context.ControllerTest ?? [],
             SteamFound = Safe(SteamLocator.FindRoot) is not null,
             SteamGames = context.Games.Count(g => g.Store == GameStore.Steam),
             ManualGames = context.Games.Count(g => g.Store == GameStore.Manual),
@@ -110,10 +112,33 @@ public static partial class SystemDiagnostics
 
         list.AddRange(SonyHidGamepad.ListConnected().Select(model => model switch
         {
+            SonyController.DualSenseEdge => "PlayStation 5 DualSense Edge (HID)",
             SonyController.DualSense => "PlayStation 5 DualSense (HID)",
             _ => "PlayStation 4 DualShock 4 (HID)",
         }));
         return list;
+    }
+
+    /// <summary>
+    /// Steam aberta agora? Com o suporte a PlayStation/Xbox ligado, ela transforma o controle em teclas fora dos jogos
+    /// e pode criar um controle XInput virtual: ajuda a entender relatos de controle. Nulo se não deu para ler.
+    /// </summary>
+    public static bool? IsSteamRunning()
+    {
+        try
+        {
+            var processes = System.Diagnostics.Process.GetProcessesByName("steam");
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+
+            return processes.Length > 0;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

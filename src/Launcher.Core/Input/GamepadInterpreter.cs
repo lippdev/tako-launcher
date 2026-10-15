@@ -64,7 +64,11 @@ public sealed class GamepadInterpreter
     ];
 
     private readonly Dictionary<AppCommand, TimeSpan> _held = [];
+    private HashSet<AppCommand> _pressed = [];
     private bool _suppressHeld;
+
+    /// <summary>Comandos mantidos pelo controle na última leitura (o filtro de eco do teclado consulta).</summary>
+    public IReadOnlySet<AppCommand> Pressed => _pressed;
 
     /// <summary>
     /// Controle desconectado, trocado ou janela sem foco (MVP-031): esquece o estado e ignora o que ainda estiver
@@ -74,6 +78,7 @@ public sealed class GamepadInterpreter
     public void Reset()
     {
         _held.Clear();
+        _pressed = [];
         _suppressHeld = true;
     }
 
@@ -108,6 +113,7 @@ public sealed class GamepadInterpreter
             pressed.Add(AppCommand.Right);
         }
 
+        _pressed = pressed;
         var fired = new List<AppCommand>();
         if (_suppressHeld)
         {

@@ -389,6 +389,28 @@ Configurações › **Tela de jogo** ligada (seção 9b) e **Ao abrir o Tako, ir
 | K15 | Fim de jogo sem congelar | Seção 9b (sem o modo console): fechar o jogo e mexer no controle enquanto as telas voltam | "Voltando para a mesa…" com a barra andando; o supervisor não acusa "sem heartbeat"; "Jogar" só funciona depois que a volta termina |
 | K16 | Atalho ocupado | Outro programa usando Ctrl+Alt+Shift+D antes de abrir o Tako | O Tako abre normalmente; o log registra que o atalho está indisponível |
 
+## 20. DualSense Edge e controles juntos (MVP-031)
+
+Relato da alpha.9: "o DualSense Edge não vai para cima". Causa provável: no Bluetooth, sem a Steam aberta, o controle
+manda o relatório simples e o Tako lia os botões no byte errado (↑ ficava "sempre pressionado"). Rode cada caso com a
+Steam **fechada** e depois **aberta** (com "Suporte a controles PlayStation" ligado). Se algo falhar, abra
+Configurações › Teste de controle, aperte o botão que falhou, use "Copiar" e cole na issue junto com o diagnóstico.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| DE1 | Edge pelo cabo (USB) | Conectar com o Tako aberto | Aviso "Controle conectado: Controle PS5 (DualSense Edge)"; teste de controle mostra "HID · DualSense Edge · USB · 054C:0DF2 · relatório 0x01 USB completo, 64 bytes" |
+| DE2 | Edge pelo Bluetooth, Steam fechada | Parear e conectar | Mesmo aviso; teste mostra "Bluetooth" e "relatório 0x01 simples, 78 bytes" (ou "0x31 Bluetooth completo") |
+| DE3 | ↑ em toque curto | Em DE1 e DE2, na tela inicial e nas Configurações | Cada toque anda **uma** casa para cima |
+| DE4 | ↑ segurado | Segurar ↑ numa lista longa (Biblioteca, Configurações) | Anda uma casa, espera um pouco e repete; para ao soltar |
+| DE5 | Direcional e analógico | ↓ ← → no direcional e no analógico esquerdo; analógico solto | Tudo anda uma casa por toque; analógico parado não anda sozinho |
+| DE6 | Botões | ✕ ○ □ △, L1/R1, Options, Create, PS | ✕ confirma, ○ volta, L1/R1 trocam de seção, Options abre o menu; no teste de controle cada um aparece na linha do HID |
+| DE7 | Fn e botões traseiros | No teste de controle, apertar Fn esquerdo/direito e os traseiros | Aparecem em "extras" (Fn esq., Fn dir., traseiro esq., traseiro dir.) sem mudar o direcional; não fazem nada na navegação |
+| DE8 | Steam aberta | Repetir DE3 a DE6 com a Steam aberta (fora de jogo) | ↑ continua andando **uma** casa (não duas); segurar não acelera; teste mostra "Steam em execução: sim" |
+| DE9 | XInput virtual junto (DS4Windows, DSX ou Steam) | Com um programa que cria um controle Xbox virtual a partir do Edge | Teste mostra o HID e o XInput; cada toque aciona uma vez; soltar um não "solta" o outro |
+| DE10 | Xbox e Edge ao mesmo tempo | Conectar os dois | Os dois navegam; o aviso mostra o Edge; nenhum comando em dobro |
+| DE11 | DualSense comum pelo Bluetooth | Repetir DE2 e DE3 com o DualSense (0CE6) | Igual ao Edge |
+| DE12 | Diagnóstico | Configurações › Diagnóstico do sistema com o Edge ligado | Seção "[Teste de controle]" com modelo, USB/Bluetooth, product id e relatórios crus; sem caminho do dispositivo nem endereço Bluetooth |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.

@@ -490,7 +490,24 @@ public sealed partial class UiSmokeTests
         Assert.DoesNotContain(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), diagnostics.Report, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith("Salvo em logs", diagnostics.Status, StringComparison.Ordinal);
         File.WriteAllText(Path.Combine(Screenshots, "diagnostico-sistema.txt"), diagnostics.Report);
+        Assert.Contains("[Teste de controle]", diagnostics.Report, StringComparison.Ordinal);
         Snap(window, "50-diagnostico");
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+
+        // --- Teste de controle (MVP-031/034): controles ao vivo e relatórios crus; ○/B precisa de dois toques para sair.
+        shell.OpenSettings();
+        Pump(0.8);
+        Assert.True(nav.FocusDefault("settings:controller-test"));
+        Press(window, AppCommand.Accept);
+        Pump(0.6);
+        var controllerTest = Assert.IsType<ControllerTestViewModel>(shell.TopOverlay);
+        Assert.Equal("Copiar", Nav.GetKey(nav.Focused!));
+        Assert.StartsWith("Steam em execução:", controllerTest.Text, StringComparison.Ordinal);
+        Snap(window, "51-teste-de-controle");
+        Press(window, AppCommand.Back);
+        Assert.Same(controllerTest, shell.TopOverlay);
+        Assert.Equal(ControllerTestViewModel.BackHint, controllerTest.Hint);
         Press(window, AppCommand.Back);
         Assert.Null(shell.TopOverlay);
 

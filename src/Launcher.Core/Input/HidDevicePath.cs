@@ -20,6 +20,18 @@ public static partial class HidDevicePath
             && ushort.TryParse(match.Groups["pid"].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out productId);
     }
 
+    /// <summary>
+    /// Caminho de um dispositivo HID pelo Bluetooth: serviço HID clássico (<c>{00001124-...}</c>), HID sobre BLE
+    /// (<c>{00001812-...}</c>) ou o vendor id com a fonte Bluetooth (<c>_vid&amp;0002054c</c>).
+    /// </summary>
+    public static bool IsBluetooth(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return path.Contains("{00001124-0000-1000-8000-00805f9b34fb}", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("{00001812-0000-1000-8000-00805f9b34fb}", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("_vid&0002", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Modelos PlayStation suportados entre os caminhos, sem repetição (um controle expõe várias coleções HID).</summary>
     public static IReadOnlyList<SonyController> SonyControllers(IEnumerable<string> paths)
     {

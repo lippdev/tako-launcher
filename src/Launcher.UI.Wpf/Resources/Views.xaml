@@ -619,6 +619,19 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Teste de controle (MVP-031/034): o que cada controle manda, ao vivo, com os relatórios HID crus. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ShowControllerTestCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:controller-test">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Abrir" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Teste de controle" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Mostra cada botão e analógico ao vivo e o que o controle envia; copie e mande na issue se algum botão falhar" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <Button Style="{StaticResource SettingRow}" Command="{Binding ReapplyThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:theme" nav:Nav.IsDefault="True">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
