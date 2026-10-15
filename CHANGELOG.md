@@ -4,6 +4,21 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7]
+### Novidades
+- Monitores e áudio voltam ao normal depois do jogo: o Tako registra resolução, taxa de atualização, monitor principal, saída de som, volume e mudo antes de abrir o jogo e, ao terminar, restaura só o que o jogo mudou. Se o Tako cair durante o jogo, ele oferece restaurar na próxima abertura. Dá para desligar em Configurações. (#22)
+- Temas do Playnite na interface inteira: em Configurações → Temas, "Usar este tema" troca a tela inicial do Tako pela do tema, com sua biblioteca, Jogar, detalhes e voltar funcionando por controle e teclado. O botão Menu sempre leva às Configurações do Tako; qualquer falha volta para a interface padrão. (#24)
+- O Tako se protege sozinho: um supervisor leve reabre a interface se ela travar ou fechar inesperadamente, depois tenta o modo seguro e, em último caso, deixa você no desktop. Os jogos não são fechados. (#23)
+- Configurações → Diagnóstico do sistema gera um relatório (sem dados pessoais) com versão, Windows, monitores, controles, Steam e Xbox mode, para anexar quando algo der errado. (#21)
+
+### Correções
+- Segurança: temas não conseguem mais carregar imagens ou vídeos de fora da própria pasta, da internet ou da rede, mesmo montando o caminho durante a execução. (#25)
+
+### Para desenvolvedores
+- IPC por named pipes com protocolo versionado entre supervisor e interface ([ADR-0012](docs/adr/0012-supervisor-e-ipc.md)); contratos próprios de monitores e áudio ([ADR-0013](docs/adr/0013-estado-de-monitores-e-audio.md)). (#22, #23)
+- `tools/Launcher.Bench` e job `benchmark` no CI com a linha de base em `docs/marco-1/benchmark.md`. (#21)
+- Plano e status do Marco 1 em `docs/marco-1/plano.md`.
+
 ## [0.1.0-alpha.6]
 ### Novidades
 - Jogos acompanhados de verdade: ao jogar, o Tako percebe quando o jogo termina (pelo processo ou, nos jogos da Steam, pela pasta do jogo), registra o tempo jogado real, volta para a frente e devolve o foco ao jogo, com "Bem-vindo de volta". Em jogos adicionados, Opções → Editar muda nome, argumentos, pasta de trabalho e como reconhecer o fim do jogo. (#18)
