@@ -1,0 +1,7 @@
+<!-- Tema de exemplo propositalmente inválido: x:Class e x:Code não são permitidos em temas (MVP-016). -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    x:Class="Exemplo.Tema">
+  <x:Code><![CDATA[ void Executar() { } ]]></x:Code>
+  <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFF00FF" />
+</ResourceDictionary>

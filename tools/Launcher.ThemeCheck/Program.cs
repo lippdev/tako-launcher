@@ -1,11 +1,13 @@
 using System.IO;
+using Launcher.PlayniteCompat.P10;
 using Launcher.Themes.Xaml;
 
 namespace Launcher.ThemeCheck;
 
 /// <summary>
 /// Ferramenta de spike (MVP-016): roda o validador XAML sobre uma pasta de tema extraída e resume as violações.
-/// Uso: Launcher.ThemeCheck &lt;pasta-do-tema&gt; [--load]
+/// Uso: Launcher.ThemeCheck &lt;pasta-do-tema&gt; [--load] [--p10]
+/// <c>--p10</c> usa a política do adaptador Playnite 10 (controles e extensões que ele implementa).
 /// </summary>
 internal static class Program
 {
@@ -14,13 +16,19 @@ internal static class Program
     {
         if (args.Length == 0 || !Directory.Exists(args[0]))
         {
-            Console.Error.WriteLine("Uso: Launcher.ThemeCheck <pasta-do-tema> [--load]");
+            Console.Error.WriteLine("Uso: Launcher.ThemeCheck <pasta-do-tema> [--load] [--p10]");
             return 2;
         }
 
         string root = Path.GetFullPath(args[0]);
         bool load = args.Contains("--load", StringComparer.OrdinalIgnoreCase);
-        var validator = new XamlValidator(XamlSecurityPolicy.CreateDefault());
+        var policy = XamlSecurityPolicy.CreateDefault();
+        if (args.Contains("--p10", StringComparer.OrdinalIgnoreCase))
+        {
+            policy = P10Theme.Policy(policy);
+        }
+
+        var validator = new XamlValidator(policy);
         var loader = new RestrictedXamlLoader(validator);
         var byCode = new Dictionary<XamlViolationCode, int>();
         int files = 0;

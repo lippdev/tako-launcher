@@ -10,6 +10,8 @@ namespace Launcher.Themes.Xaml;
 /// </summary>
 public sealed partial class XamlValidator(XamlSecurityPolicy policy)
 {
+    public XamlSecurityPolicy Policy => policy;
+
     private const string XmlNamespace = "http://www.w3.org/XML/1998/namespace";
     private const string XmlnsNamespace = "http://www.w3.org/2000/xmlns/";
     private const string AllowedPackPrefix = "pack://application:,,,/";
@@ -17,10 +19,6 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
 
     private static readonly HashSet<string> XamlDirectiveAttributes = new(StringComparer.Ordinal) { "Key", "Name", "Shared", "Uid" };
     private static readonly HashSet<string> XamlElements = new(StringComparer.Ordinal) { "Null", "Type", "Static", "Array", "Reference" };
-    private static readonly HashSet<string> PresentationExtensions = new(StringComparer.Ordinal)
-    {
-        "Binding", "StaticResource", "DynamicResource", "TemplateBinding", "RelativeSource",
-    };
 
     /// <param name="xaml">Conteúdo do arquivo.</param>
     /// <param name="themeRelativePath">Caminho do arquivo dentro do tema (ex.: <c>Views/Main.xaml</c>), usado para detectar path traversal.</param>
@@ -48,9 +46,11 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
 
         using var reader = XmlReader.Create(new StringReader(xaml), settings);
         var walker = new Walker(policy, reader, themeRelativePath, expectedRoot, violations);
+        IReadOnlyList<UnusedNamespaceDeclaration> unused = [];
         try
         {
             walker.Run();
+            unused = walker.FinishNamespaces();
         }
         catch (XmlException ex) when (ex.Message.Contains("DTD", StringComparison.OrdinalIgnoreCase))
         {
@@ -61,7 +61,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
             violations.Add(new(XamlViolationCode.MalformedXml, ex.Message, ex.LineNumber, ex.LinePosition));
         }
 
-        return new(violations);
+        return new(violations, unused);
     }
 
     [GeneratedRegex(@"\{\s*(?:(?<prefix>[A-Za-z_][\w\-.]*):)?(?<name>[A-Za-z_][\w.]*)(?<args>[^{}]*)")]
@@ -79,6 +79,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
     {
         private readonly IXmlLineInfo _lineInfo = (IXmlLineInfo)reader;
         private readonly Stack<string> _elements = new();
+        private readonly Dictionary<string, (Attribute Declaration, bool Used)> _disallowed = new(StringComparer.Ordinal);
         private int _elementCount;
 
         public void Run()
@@ -184,9 +185,62 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
                 or XamlSecurityPolicy.PresentationOptionsNamespace
                 || policy.ClrNamespaces.ContainsKey(value);
 
-            if (!allowed)
+            if (allowed)
+            {
+                return;
+            }
+
+            // Namespace padrão não permitido afetaria todo nome sem prefixo: rejeita já.
+            if (attribute.Prefix.Length == 0)
             {
                 Add(XamlViolationCode.NamespaceNotAllowed, $"Namespace '{value}' não é permitido.", attribute.Line, attribute.Column);
+                return;
+            }
+
+            // Só declarar não carrega nada; vira violação apenas se for usado (ver FinishNamespaces).
+            _disallowed[attribute.LocalName] = (attribute, false);
+        }
+
+        /// <summary>Declarações não permitidas: usadas viram violação; não usadas são devolvidas para remoção.</summary>
+        public List<UnusedNamespaceDeclaration> FinishNamespaces()
+        {
+            var unused = new List<UnusedNamespaceDeclaration>();
+            foreach (var (prefix, (declaration, used)) in _disallowed)
+            {
+                if (used)
+                {
+                    Add(XamlViolationCode.NamespaceNotAllowed, $"Namespace '{declaration.Value}' não é permitido.", declaration.Line, declaration.Column);
+                }
+                else
+                {
+                    unused.Add(new UnusedNamespaceDeclaration(prefix, declaration.Value));
+                }
+            }
+
+            return unused;
+        }
+
+        private void MarkUsed(string? ns)
+        {
+            foreach (var (prefix, entry) in _disallowed)
+            {
+                if (entry.Declaration.Value == ns)
+                {
+                    _disallowed[prefix] = (entry.Declaration, true);
+                }
+            }
+        }
+
+        /// <summary>Prefixos não permitidos citados em valores (ex.: Setter Property="i:Interaction.Behaviors").</summary>
+        private void CheckPrefixReferences(string value, int line, int column)
+        {
+            foreach (var (prefix, entry) in _disallowed)
+            {
+                if (Regex.IsMatch(value, $@"(?<![\w.]){Regex.Escape(prefix)}:"))
+                {
+                    _disallowed[prefix] = (entry.Declaration, true);
+                    Add(XamlViolationCode.NamespaceNotAllowed, $"Valor usa o prefixo '{prefix}' de namespace não permitido.", line, column);
+                }
             }
         }
 
@@ -231,6 +285,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
                 return;
             }
 
+            MarkUsed(ns);
             Add(XamlViolationCode.NamespaceNotAllowed, $"Elemento '{qualifiedName}' está em namespace não permitido.", line, column);
         }
 
@@ -264,12 +319,14 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
                 string ownerNs = attribute.Namespace.Length > 0 ? attribute.Namespace : reader.LookupNamespace(string.Empty) ?? string.Empty;
                 if (!IsOwnerAllowed(ownerNs, name[..dot]))
                 {
+                    MarkUsed(ownerNs);
                     Add(XamlViolationCode.TypeNotAllowed, $"Propriedade anexada '{attribute.QualifiedName}' usa tipo não permitido.", attribute.Line, attribute.Column);
                     return;
                 }
             }
             else if (attribute.Namespace.Length > 0)
             {
+                MarkUsed(attribute.Namespace);
                 Add(XamlViolationCode.NamespaceNotAllowed, $"Atributo '{attribute.QualifiedName}' está em namespace não permitido.", attribute.Line, attribute.Column);
                 return;
             }
@@ -348,6 +405,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
             int line = attribute?.Line ?? _lineInfo.LineNumber;
             int column = attribute?.Column ?? _lineInfo.LinePosition;
             string trimmed = value.Trim();
+            CheckPrefixReferences(trimmed, line, column);
 
             if (trimmed.StartsWith('{') && !trimmed.StartsWith("{}", StringComparison.Ordinal))
             {
@@ -382,7 +440,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
 
                 switch (ns)
                 {
-                    case XamlSecurityPolicy.PresentationNamespace when PresentationExtensions.Contains(name):
+                    case XamlSecurityPolicy.PresentationNamespace when policy.PresentationExtensions.Contains(name):
                         continue;
                     case XamlSecurityPolicy.XamlNamespace when name is "Null" or "Reference":
                         continue;
@@ -400,6 +458,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
                     continue;
                 }
 
+                MarkUsed(ns);
                 string shown = prefix.Length > 0 ? $"{prefix}:{name}" : name;
                 Add(XamlViolationCode.MarkupExtensionNotAllowed, $"Extensão de marcação '{{{shown}}}' não é permitida.", line, column);
             }

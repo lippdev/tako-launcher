@@ -11,6 +11,12 @@
           "ConsoleMode.Runtime": "[1.0.0, )"
         }
       },
+      "launcher.playnitecompat.p10": {
+        "type": "Project",
+        "dependencies": {
+          "Launcher.Themes": "[1.0.0, )"
+        }
+      },
       "launcher.themes": {
         "type": "Project",
         "dependencies": {

@@ -1,0 +1,40 @@
+<!-- Tema padrão (MVP-013): tokens do DESIGN.md. Carregado pelo carregador XAML restrito como qualquer tema. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+  <!-- Cores (WPF usa #AARRGGBB) -->
+  <Color x:Key="CanvasColor">#FF0E1116</Color>
+  <Color x:Key="AccentFallbackColor">#FF2B3A55</Color>
+  <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="OnAccentMutedBrush" Color="#B8FFFFFF" />
+  <SolidColorBrush x:Key="OnAccentSubtleBrush" Color="#80FFFFFF" />
+  <SolidColorBrush x:Key="Surface1Brush" Color="#1FFFFFFF" />
+  <SolidColorBrush x:Key="Surface2Brush" Color="#33FFFFFF" />
+  <SolidColorBrush x:Key="SurfaceSidebarBrush" Color="#2EFFFFFF" />
+  <SolidColorBrush x:Key="SurfaceSolidBrush" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="OnSurfaceSolidBrush" Color="#FF11141A" />
+  <SolidColorBrush x:Key="PanelBrush" Color="#F7161A22" />
+  <SolidColorBrush x:Key="PanelStrongBrush" Color="#FA12151C" />
+  <SolidColorBrush x:Key="ScrimBrush" Color="#99000000" />
+  <SolidColorBrush x:Key="SuccessBrush" Color="#FF3DDC84" />
+  <SolidColorBrush x:Key="WarningBrush" Color="#FFFFB020" />
+  <SolidColorBrush x:Key="ErrorBrush" Color="#FFFF5A5F" />
+
+  <!-- Tipografia: Inter (SIL OFL), empacotada com o app -->
+  <FontFamily x:Key="FontText">pack://application:,,,/Launcher.UI.Wpf;component/Assets/Fonts/#Inter</FontFamily>
+  <sys:Double x:Key="FsDisplay">72</sys:Double>
+  <sys:Double x:Key="FsHeadlineLg">56</sys:Double>
+  <sys:Double x:Key="FsHeadlineMd">34</sys:Double>
+  <sys:Double x:Key="FsTitle">26</sys:Double>
+  <sys:Double x:Key="FsBodyLg">26</sys:Double>
+  <sys:Double x:Key="FsBodyMd">22</sys:Double>
+  <sys:Double x:Key="FsLabelLg">24</sys:Double>
+  <sys:Double x:Key="FsLabelMd">20</sys:Double>
+  <sys:Double x:Key="FsLabelSm">18</sys:Double>
+
+  <!-- Formas -->
+  <CornerRadius x:Key="RoundedSm">8</CornerRadius>
+  <CornerRadius x:Key="RoundedMd">14</CornerRadius>
+  <CornerRadius x:Key="RoundedLg">22</CornerRadius>
+  <CornerRadius x:Key="RoundedFull">999</CornerRadius>
+</ResourceDictionary>

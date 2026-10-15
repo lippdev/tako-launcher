@@ -12,7 +12,7 @@ Launcher de jogos para Windows 11 com experiência de console: gamepad-first, te
 ```
 src/
   Launcher.Host/                 supervisão, modo FSE/Fullscreen, recuperação
-  Launcher.UI.Wpf/               telas Fullscreen (WPF, MVVM)
+  Launcher.UI.Wpf/               telas Fullscreen (WPF, MVVM), tema padrão, navegação por controle
   Launcher.Core/                 biblioteca, catálogo, persistência (SQLite)
   Launcher.Themes/               descoberta/validação/aplicação de temas
   Launcher.PlayniteCompat.P10/   adaptador de temas Playnite 10
@@ -28,6 +28,14 @@ tests/                           xUnit
 ## Build
 
 Requer Windows 11 e [.NET 10 SDK](https://dotnet.microsoft.com/download) (ver `global.json`).
+
+Rodar o launcher (Marco 0: biblioteca fictícia, sessão de jogo simulada):
+
+```
+dotnet run --project src/Launcher.UI.Wpf -c Release
+```
+
+Controle Xbox (XInput), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), G (Guia). As capas são baixadas para `%LOCALAPPDATA%\UltraLauncher\cache\art` (nenhuma arte de jogo vai para o repositório).
 
 ```
 dotnet restore
