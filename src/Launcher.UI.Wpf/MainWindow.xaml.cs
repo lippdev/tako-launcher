@@ -242,6 +242,7 @@ public partial class MainWindow : Window
 
         if (name != _shell.ControllerName)
         {
+            _gamepad.Reset(); // MVP-031: o que estava pressionado no controle anterior não continua valendo
             _shell.ControllerName = name;
             _shell.IsPlayStationPad = name?.StartsWith("Controle PS", StringComparison.Ordinal) == true;
             _shell.Toast(name is null ? "Controle desconectado — o teclado continua funcionando" : $"Controle conectado: {name}");
@@ -249,6 +250,8 @@ public partial class MainWindow : Window
 
         if (snapshot is not { } pad || !IsActive)
         {
+            // Sem controle ou sem foco: ao voltar, botões ainda pressionados só valem depois de soltos.
+            _gamepad.Reset();
             return;
         }
 
