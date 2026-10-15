@@ -35,7 +35,7 @@ internal static class Program
     {
         Console.Error.WriteLine(problem);
         Console.Error.WriteLine("""
-            Uso: Launcher.Bench.exe [--sizes 20,200,1000] [--warm 5] [--idle-seconds 10] [--load-seconds 10]
+            Uso: Launcher.Bench.exe [--sizes 20,200,1000,5000] [--warm 5] [--idle-seconds 10] [--load-seconds 10]
                                     [--out pasta] [--label "nome da máquina"] [--quick]
             --quick: rodada curta para conferir que tudo funciona (só 20 jogos, poucos segundos).
             """);

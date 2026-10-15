@@ -500,6 +500,9 @@ public sealed partial class UiSmokeTests
         Pump(1.5);
         Snap(window, "18-inicio-4k", scale: 2);
 
+        // Bibliotecas grandes (frente D, PERF-004): grades virtualizadas com 2000 itens.
+        LargeLibraryVirtualization();
+
         File.WriteAllLines(Path.Combine(Screenshots, "binding-errors.txt"), bindingErrors.Errors);
         window.Close();
         Assert.DoesNotContain(bindingErrors.Errors, e => !e.Contains("Error: 4 :", StringComparison.Ordinal));

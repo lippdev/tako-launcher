@@ -89,6 +89,7 @@ internal sealed record StartupPhases(double MainEntered, double ServicesBuilt, d
 /// <summary>
 /// Fluidez durante a navegação roteirizada. Intervalos entre quadros vêm do <c>CompositionTarget.Rendering</c>;
 /// <see cref="ExpectedFrameMs"/> é a mediana medida com a UI parada (a taxa de atualização efetiva da tela).
+/// <see cref="OpenLibraryMs"/>: do comando de abrir a grade da biblioteca até o primeiro quadro desenhado depois dele.
 /// </summary>
 internal sealed record FluidityResult(
     double Seconds,
@@ -99,7 +100,8 @@ internal sealed record FluidityResult(
     int DroppedFrames,
     Distribution DispatchMs,
     Distribution CommandToFrameMs,
-    int Commands);
+    int Commands,
+    Distribution OpenLibraryMs);
 
 /// <summary>Tako com um jogo (carga de CPU) em execução, comparado com a carga sozinha.</summary>
 internal sealed record GameOverheadResult(CpuSample TakoCpu, MemorySample TakoMemory, LoadResult? WithTako, LoadResult? Baseline)

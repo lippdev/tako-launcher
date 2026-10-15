@@ -103,6 +103,21 @@ public class Main : Control
         }
     }
 
+    /// <summary>
+    /// Rola a grade até o jogo (a grade é virtualizada: a capa dele pode ainda não existir). Falso se o jogo não está na
+    /// grade ou a capa já existe.
+    /// </summary>
+    public bool BringGameIntoView(string id)
+    {
+        if (_list is not { } list || list.Items.OfType<P10GameEntry>().FirstOrDefault(g => g.Id == id) is not { } game || list.ItemContainerGenerator.ContainerFromItem(game) is not null)
+        {
+            return false;
+        }
+
+        list.ScrollIntoView(game);
+        return true;
+    }
+
     /// <summary>Solta a seleção da grade do modelo (ensaio descartado: a lista não pode escrever no jogo selecionado).</summary>
     internal void DetachSelection()
     {

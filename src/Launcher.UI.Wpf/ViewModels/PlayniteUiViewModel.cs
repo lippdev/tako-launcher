@@ -105,7 +105,7 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
             LibraryPlugin = new P10LibraryPlugin(LibraryName(game.Store)),
             Source = new P10NamedItem(item.StoreName),
             CriticScore = game.MetacriticScore,
-            CoverImage = item.Cover,
+            CoverSource = () => item.Cover, // só carrega quando o tema mostra a capa
         };
     }
 
@@ -141,10 +141,6 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
             _entries[game.Id] = entry;
             item.PropertyChanged += OnItemChanged;
             entries.Add(entry);
-            if (item.Cover is null)
-            {
-                LoadCover(item);
-            }
         }
 
         Model.SetGames(entries);
@@ -217,11 +213,6 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
 
     private GameItemViewModel? Item(P10GameEntry game) => _items.GetValueOrDefault(game.Id);
 
-    private static async void LoadCover(GameItemViewModel item)
-    {
-        await item.LoadCoverAsync().ConfigureAwait(true);
-    }
-
     private void OnItemChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (sender is not GameItemViewModel item || !_entries.TryGetValue(item.Id, out var entry))
@@ -231,7 +222,7 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
 
         if (e.PropertyName is nameof(GameItemViewModel.Cover) or null or "")
         {
-            entry.CoverImage = item.Cover;
+            entry.NotifyCoverChanged();
         }
 
         if (e.PropertyName is nameof(GameItemViewModel.IsRunning) or null or "")

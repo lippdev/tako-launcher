@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Launcher.PlayniteCompat.P10;
 using Launcher.PlayniteCompat.P10.Controls;
@@ -16,7 +17,7 @@ namespace Launcher.UI.Wpf.Controls;
 /// ligados à navegação por controle/teclado e uma rede de segurança no layout: um erro do template do tema não derruba
 /// o launcher, volta à UI padrão com a tela de recuperação.
 /// </summary>
-public sealed class PlayniteMainHost : Decorator
+public sealed class PlayniteMainHost : Decorator, IVirtualNavHost
 {
     public static readonly DependencyProperty SessionProperty =
         DependencyProperty.Register(nameof(Session), typeof(PlayniteUiViewModel), typeof(PlayniteMainHost), new PropertyMetadata(null, (d, e) => ((PlayniteMainHost)d).Build(e.NewValue as PlayniteUiViewModel)));
@@ -95,6 +96,28 @@ public sealed class PlayniteMainHost : Decorator
         scope.Content = new Main { DataContext = session.Model };
         session.Model.PropertyChanged += OnModelChanged;
         Child = scope;
+    }
+
+    /// <summary>A grade do tema é virtualizada: o jogo a focar (ex.: o selecionado) pode estar fora da tela.</summary>
+    public bool RealizeKey(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        string prefix = Main.GamesGroup + ":";
+        return key.StartsWith(prefix, StringComparison.Ordinal) && FindMain(this) is { } main && main.BringGameIntoView(key[prefix.Length..]);
+    }
+
+    private static Main? FindMain(DependencyObject root)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if ((child as Main ?? FindMain(child)) is { } main)
+            {
+                return main;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Elemento do tema anunciado pelo adaptador → propriedades de navegação do Tako.</summary>

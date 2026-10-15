@@ -4,18 +4,22 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Launcher.Core.Library;
 using Launcher.Core.Presentation;
+using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
 
 namespace Launcher.UI.Wpf.ViewModels;
 
 /// <summary>Jogo como aparece nas capas, no destaque e nos detalhes.</summary>
-public sealed partial class GameItemViewModel : ObservableObject
+public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
 {
     private readonly ArtService _art;
     private readonly TimeProvider _time;
 
-    [ObservableProperty]
-    private ImageSource? _cover;
+    // Capa sob demanda (PERF-004): referência fraca. Quem segura a imagem é a capa na tela e o cache LRU do ArtService;
+    // fora da tela e fora do cache, o GC libera e a próxima leitura decodifica de novo.
+    private WeakReference<ImageSource>? _cover;
+    private bool _coverLoading;
+    private bool _coverMissing;
 
     [ObservableProperty]
     private bool _isRunning;
@@ -34,6 +38,8 @@ public sealed partial class GameItemViewModel : ObservableObject
     public Game Game { get; }
 
     public string Id => Game.Id;
+
+    string INavKeyed.NavKey => Id;
 
     public string Title => Game.Title;
 
@@ -103,9 +109,73 @@ public sealed partial class GameItemViewModel : ObservableObject
     /// <summary>Maior largura da arte de fundo no palco (telas ultrawide incluídas).</summary>
     private const int HeroDisplayWidth = 2000;
 
-    public async Task LoadCoverAsync()
+    /// <summary>
+    /// Capa decodificada no tamanho da tela. Só é carregada quando alguém lê (a capa entrou na tela): enquanto carrega,
+    /// fica nula (a UI mostra o gradiente com o título) e avisa por <see cref="ObservableObject.PropertyChanged"/>.
+    /// </summary>
+    public ImageSource? Cover
     {
-        Cover ??= await _art.GetAsync(Game.CoverUri, CoverDisplayWidth).ConfigureAwait(true);
+        get
+        {
+            if (_cover is not null && _cover.TryGetTarget(out var cover))
+            {
+                return cover;
+            }
+
+            if (_coverMissing || Game.CoverUri is null)
+            {
+                return null;
+            }
+
+            if (_art.TryGetCached(Game.CoverUri, CoverDisplayWidth, out var cached))
+            {
+                Remember(cached);
+                return cached;
+            }
+
+            _ = LoadCoverAsync();
+            return null;
+        }
+    }
+
+    private async Task LoadCoverAsync()
+    {
+        if (_coverLoading)
+        {
+            return;
+        }
+
+        _coverLoading = true;
+        var uri = Game.CoverUri;
+        bool notify;
+        try
+        {
+            // Nunca avisa no meio da leitura que pediu a capa (o binding ainda está lendo).
+            await Task.Yield();
+            var image = await _art.GetAsync(uri, CoverDisplayWidth).ConfigureAwait(true);
+            bool stale = uri != Game.CoverUri; // a capa mudou durante a carga: lê de novo
+            if (!stale)
+            {
+                Remember(image);
+            }
+
+            notify = stale || image is not null;
+        }
+        finally
+        {
+            _coverLoading = false;
+        }
+
+        if (notify)
+        {
+            OnPropertyChanged(nameof(Cover));
+        }
+    }
+
+    private void Remember(ImageSource? image)
+    {
+        _cover = image is null ? null : new WeakReference<ImageSource>(image);
+        _coverMissing = image is null;
     }
 
     public Task<ImageSource?> LoadHeroAsync() => _art.GetAsync(Game.HeroUri, HeroDisplayWidth);
@@ -116,10 +186,12 @@ public sealed partial class GameItemViewModel : ObservableObject
         OnPropertyChanged(string.Empty); // todas as propriedades: favorito, tempos, gêneros, descrição, nota...
     }
 
-    /// <summary>A capa mudou (metadados encontraram a arte, ou o usuário escolheu outra imagem).</summary>
-    public async Task ReloadArtAsync()
+    /// <summary>A capa mudou (metadados encontraram a arte, ou o usuário escolheu outra imagem): recarrega se estiver na tela.</summary>
+    public void ReloadArt()
     {
-        Cover = await _art.GetAsync(Game.CoverUri, CoverDisplayWidth).ConfigureAwait(true);
+        _cover = null;
+        _coverMissing = false;
+        OnPropertyChanged(nameof(Cover));
     }
 
     public static Color ToColor(Rgb rgb) => Color.FromRgb(rgb.R, rgb.G, rgb.B);

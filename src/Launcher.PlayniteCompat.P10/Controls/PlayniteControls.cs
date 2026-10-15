@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -415,9 +416,13 @@ public static class MediaElementBehaviors
 
 /// <summary>
 /// Grade de capas do <c>PART_ListGameItems</c> (o <c>FullscreenTilePanel</c> do Playnite): colunas de largura igual e
-/// altura proporcional à capa. Sem virtualização (a biblioteca do MVP cabe na memória).
+/// altura proporcional à capa. Virtualizada como a do Playnite (PERF-004): dentro do <c>ScrollViewer</c> da lista
+/// (<c>CanContentScroll</c>, o padrão do ListBox), rola por conta própria e só cria as capas das linhas visíveis, mais
+/// duas linhas de folga de cada lado para a navegação achar o vizinho. Os itens que saem da tela são descartados (sem
+/// reaproveitar: cada capa anuncia a própria chave de navegação uma vez). Fora de um <c>ScrollViewer</c> com rolagem
+/// lógica, ou com <c>VirtualizingPanel.IsVirtualizing="False"</c> no tema, cria tudo, como antes.
 /// </summary>
-public class P10TilePanel : Panel
+public class P10TilePanel : VirtualizingPanel, IScrollInfo
 {
     public static readonly DependencyProperty ColumnsProperty =
         DependencyProperty.Register(nameof(Columns), typeof(int), typeof(P10TilePanel), new FrameworkPropertyMetadata(7, FrameworkPropertyMetadataOptions.AffectsMeasure));
@@ -427,6 +432,16 @@ public class P10TilePanel : Panel
 
     /// <summary>Largura usada quando o painel é medido sem limite (ex.: rolagem horizontal).</summary>
     private const double FallbackWidth = 1600;
+
+    /// <summary>Passo de uma "linha" de rolagem, igual ao da rolagem física do <c>ScrollViewer</c>.</summary>
+    private const double LineStep = 16;
+
+    private const int BufferRows = 2;
+
+    private VirtualGrid _grid;
+    private Size _extent;
+    private Size _viewport;
+    private Vector _offset;
 
     public int Columns
     {
@@ -441,30 +456,229 @@ public class P10TilePanel : Panel
         set => SetValue(ItemAspectRatioProperty, value);
     }
 
+    public bool CanHorizontallyScroll { get; set; }
+
+    public bool CanVerticallyScroll { get; set; }
+
+    public double ExtentWidth => _extent.Width;
+
+    public double ExtentHeight => _extent.Height;
+
+    public double ViewportWidth => _viewport.Width;
+
+    public double ViewportHeight => _viewport.Height;
+
+    public double HorizontalOffset => _offset.X;
+
+    public double VerticalOffset => _offset.Y;
+
+    public ScrollViewer? ScrollOwner { get; set; }
+
+    private bool IsScrolling => ScrollOwner is not null;
+
+    private int ColumnCount => Math.Clamp(Columns, 1, 30);
+
+    public void LineUp() => SetVerticalOffset(_offset.Y - LineStep);
+
+    public void LineDown() => SetVerticalOffset(_offset.Y + LineStep);
+
+    public void LineLeft() => SetHorizontalOffset(_offset.X - LineStep);
+
+    public void LineRight() => SetHorizontalOffset(_offset.X + LineStep);
+
+    public void PageUp() => SetVerticalOffset(_offset.Y - _viewport.Height);
+
+    public void PageDown() => SetVerticalOffset(_offset.Y + _viewport.Height);
+
+    public void PageLeft() => SetHorizontalOffset(_offset.X - _viewport.Width);
+
+    public void PageRight() => SetHorizontalOffset(_offset.X + _viewport.Width);
+
+    public void MouseWheelUp() => SetVerticalOffset(_offset.Y - (SystemParameters.WheelScrollLines * LineStep));
+
+    public void MouseWheelDown() => SetVerticalOffset(_offset.Y + (SystemParameters.WheelScrollLines * LineStep));
+
+    public void MouseWheelLeft() => SetHorizontalOffset(_offset.X - (SystemParameters.WheelScrollLines * LineStep));
+
+    public void MouseWheelRight() => SetHorizontalOffset(_offset.X + (SystemParameters.WheelScrollLines * LineStep));
+
+    public void SetHorizontalOffset(double offset) => SetOffset(new Vector(Clamp(offset, _extent.Width, _viewport.Width), _offset.Y));
+
+    public void SetVerticalOffset(double offset) => SetOffset(new Vector(_offset.X, Clamp(offset, _extent.Height, _viewport.Height)));
+
+    /// <summary>Capa focada (BringIntoView): rola o mínimo para ela aparecer, como a rolagem física fazia.</summary>
+    public Rect MakeVisible(Visual visual, Rect rectangle)
+    {
+        if (rectangle.IsEmpty || visual is null || ReferenceEquals(visual, this) || !IsAncestorOf(visual))
+        {
+            return Rect.Empty;
+        }
+
+        var bounds = visual.TransformToAncestor(this).TransformBounds(rectangle);
+        var before = _offset;
+        double x = VirtualGrid.MinimalScroll(_offset.X, _viewport.Width, bounds.X + _offset.X, bounds.Width);
+        double y = VirtualGrid.MinimalScroll(_offset.Y, _viewport.Height, bounds.Y + _offset.Y, bounds.Height);
+        SetOffset(new Vector(Clamp(x, _extent.Width, _viewport.Width), Clamp(y, _extent.Height, _viewport.Height)));
+        bounds.Offset(before - _offset);
+        return bounds;
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
-        var item = ItemSize(availableSize.Width);
+        // Com rolagem horizontal liberada pelo tema, o painel antigo era medido sem limite de largura (largura padrão):
+        // mantém o mesmo tamanho de capa e a mesma barra horizontal.
+        var item = ItemSize(IsScrolling && CanHorizontallyScroll ? double.PositiveInfinity : availableSize.Width);
+        var owner = ItemsControl.GetItemsOwner(this);
+        _grid = new VirtualGrid(owner?.Items.Count ?? 0, ColumnCount, item.Width, item.Height);
+
+        // Largura de todas as colunas mesmo com menos itens (como o painel antigo).
+        var extent = new Size(item.Width * ColumnCount, _grid.Height);
+        bool virtualizing = IsScrolling && owner is not null && GetIsVirtualizing(owner) && !double.IsInfinity(availableSize.Height);
+        if (IsScrolling)
+        {
+            UpdateScrollInfo(extent, availableSize);
+        }
+
+        var range = virtualizing
+            ? _grid.Visible(_offset.X, _offset.Y, _offset.X + _viewport.Width, _offset.Y + _viewport.Height, BufferRows)
+            : _grid.Count == 0 ? ItemRange.Empty : new ItemRange(0, _grid.Count - 1);
+        Realize(range);
         foreach (UIElement child in InternalChildren)
         {
             child.Measure(item);
         }
 
-        int rows = (InternalChildren.Count + ColumnCount - 1) / ColumnCount;
-        return new Size(item.Width * ColumnCount, item.Height * rows);
+        return IsScrolling
+            ? new Size(Math.Min(extent.Width, availableSize.Width), Math.Min(extent.Height, availableSize.Height))
+            : extent;
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        var item = ItemSize(finalSize.Width);
+        if (IsScrolling)
+        {
+            UpdateScrollInfo(_extent, finalSize);
+        }
+
+        var generator = ItemContainerGenerator;
         for (int i = 0; i < InternalChildren.Count; i++)
         {
-            InternalChildren[i].Arrange(new Rect(new Point(i % ColumnCount * item.Width, i / ColumnCount * item.Height), item));
+            int index = generator.IndexFromGeneratorPosition(new GeneratorPosition(i, 0));
+            var (x, y) = _grid.PositionOf(index);
+            InternalChildren[i].Arrange(new Rect(new Point(x - _offset.X, y - _offset.Y), new Size(_grid.ItemWidth, _grid.ItemHeight)));
         }
 
         return finalSize;
     }
 
-    private int ColumnCount => Math.Clamp(Columns, 1, 30);
+    protected override void OnItemsChanged(object sender, ItemsChangedEventArgs args)
+    {
+        ArgumentNullException.ThrowIfNull(args);
+        switch (args.Action)
+        {
+            case NotifyCollectionChangedAction.Remove:
+            case NotifyCollectionChangedAction.Replace:
+            case NotifyCollectionChangedAction.Move:
+                RemoveInternalChildRange(args.Position.Index, args.ItemUICount);
+                break;
+        }
+
+        base.OnItemsChanged(sender, args);
+        InvalidateMeasure();
+    }
+
+    /// <summary><c>ListBox.ScrollIntoView</c> de um item ainda sem capa criada: rola até a linha dele.</summary>
+    protected override void BringIndexIntoView(int index)
+    {
+        if (index < 0 || index >= _grid.Count)
+        {
+            return;
+        }
+
+        var (_, y) = _grid.PositionOf(index);
+        SetVerticalOffset(VirtualGrid.MinimalScroll(_offset.Y, _viewport.Height, y, _grid.ItemHeight));
+    }
+
+    private static double Clamp(double offset, double extent, double viewport) => Math.Max(0, Math.Min(offset, extent - viewport));
+
+    private void SetOffset(Vector offset)
+    {
+        if (offset == _offset)
+        {
+            return;
+        }
+
+        _offset = offset;
+        ScrollOwner?.InvalidateScrollInfo();
+        InvalidateMeasure(); // novas linhas na tela
+    }
+
+    private void UpdateScrollInfo(Size extent, Size viewport)
+    {
+        viewport = new Size(double.IsInfinity(viewport.Width) ? extent.Width : viewport.Width, double.IsInfinity(viewport.Height) ? extent.Height : viewport.Height);
+        var offset = new Vector(Clamp(_offset.X, extent.Width, viewport.Width), Clamp(_offset.Y, extent.Height, viewport.Height));
+        if (extent == _extent && viewport == _viewport && offset == _offset)
+        {
+            return;
+        }
+
+        _extent = extent;
+        _viewport = viewport;
+        _offset = offset;
+        ScrollOwner?.InvalidateScrollInfo();
+    }
+
+    /// <summary>Cria as capas da faixa e descarta as de fora (a capa com foco sempre fica).</summary>
+    private void Realize(ItemRange range)
+    {
+        var children = InternalChildren; // garante o gerador ligado ao painel
+        var generator = ItemContainerGenerator;
+        for (int i = children.Count - 1; i >= 0; i--)
+        {
+            var position = new GeneratorPosition(i, 0);
+            if (range.Contains(generator.IndexFromGeneratorPosition(position)) || children[i].IsKeyboardFocusWithin)
+            {
+                continue;
+            }
+
+            generator.Remove(position, 1);
+            RemoveInternalChildRange(i, 1);
+        }
+
+        if (range.IsEmpty)
+        {
+            return;
+        }
+
+        var start = generator.GeneratorPositionFromIndex(range.First);
+        int childIndex = start.Offset == 0 ? start.Index : start.Index + 1;
+        using (generator.StartAt(start, GeneratorDirection.Forward, allowStartAtRealizedItem: true))
+        {
+            for (int index = range.First; index <= range.Last; index++, childIndex++)
+            {
+                if (generator.GenerateNext(out _) is not UIElement child)
+                {
+                    break;
+                }
+
+                if (childIndex < children.Count && ReferenceEquals(children[childIndex], child))
+                {
+                    continue;
+                }
+
+                if (childIndex >= children.Count)
+                {
+                    AddInternalChild(child);
+                }
+                else
+                {
+                    InsertInternalChild(childIndex, child);
+                }
+
+                generator.PrepareItemContainer(child);
+            }
+        }
+    }
 
     private Size ItemSize(double available)
     {

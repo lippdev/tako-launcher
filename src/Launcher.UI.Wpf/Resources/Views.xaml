@@ -31,6 +31,12 @@
     <StackPanel Orientation="Horizontal" />
   </ItemsPanelTemplate>
 
+  <!-- Fileira de capas virtualizada (PERF-004): mesmo layout do HorizontalPanel; só as capas perto da tela existem.
+       ItemWidth = capa (204) + margem do GameCard (26). -->
+  <ItemsPanelTemplate x:Key="GameRowPanel">
+    <c:VirtualTilePanel Orientation="Horizontal" ItemWidth="230" />
+  </ItemsPanelTemplate>
+
   <!-- ===================================================================== Início -->
   <DataTemplate DataType="{x:Type vm:HomeViewModel}">
     <Grid>
@@ -101,7 +107,8 @@
                 <StackPanel.RenderTransform>
                   <TranslateTransform />
                 </StackPanel.RenderTransform>
-                <ItemsControl ItemsSource="{Binding RecentlyPlayed}" Tag="row-recent" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource GameCardTemplate}" Focusable="False" />
+                <ItemsControl ItemsSource="{Binding RecentlyPlayed}" Tag="row-recent" ItemsPanel="{StaticResource GameRowPanel}" ItemTemplate="{StaticResource GameCardTemplate}" Focusable="False"
+                              VirtualizingPanel.VirtualizationMode="Recycling" />
                 <Button Style="{StaticResource MoreTile}" Command="{Binding SeeAllCommand}" nav:Nav.Group="row-recent" nav:Nav.Key="home:see-all" />
               </StackPanel>
             </Canvas>
@@ -115,7 +122,8 @@
                 <StackPanel.RenderTransform>
                   <TranslateTransform />
                 </StackPanel.RenderTransform>
-                <ItemsControl ItemsSource="{Binding RecentlyAdded}" Tag="row-added" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource GameCardTemplate}" Focusable="False" />
+                <ItemsControl ItemsSource="{Binding RecentlyAdded}" Tag="row-added" ItemsPanel="{StaticResource GameRowPanel}" ItemTemplate="{StaticResource GameCardTemplate}" Focusable="False"
+                              VirtualizingPanel.VirtualizationMode="Recycling" />
               </StackPanel>
             </Canvas>
           </StackPanel>
@@ -180,11 +188,12 @@
             <TextBlock Text="{Binding EmptyText}" Margin="0,14,0,0" TextWrapping="Wrap" FontSize="{DynamicResource FsBodyLg}" Foreground="{DynamicResource OnAccentMutedBrush}" />
           </StackPanel>
         </StackPanel>
-        <ItemsControl ItemsSource="{Binding Games}" Tag="grid" Margin="64,48,72,200" Focusable="False">
+        <ItemsControl ItemsSource="{Binding Games}" Tag="grid" Margin="64,48,72,200" Focusable="False" VirtualizingPanel.VirtualizationMode="Recycling">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <!-- Quebra pela largura disponível: mais colunas em telas mais largas. -->
-              <WrapPanel ItemWidth="240" ItemHeight="440" HorizontalAlignment="Left" />
+              <!-- Quebra pela largura disponível: mais colunas em telas mais largas. Virtualizada (PERF-004): só as
+                   linhas perto da tela existem, a altura é a da grade inteira. -->
+              <c:VirtualTilePanel ItemWidth="240" ItemHeight="440" HorizontalAlignment="Left" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>

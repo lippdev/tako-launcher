@@ -122,8 +122,11 @@ internal static class ChildRunner
         var frames = new List<double>();
         var commandToFrame = new List<double>();
         var dispatch = new List<double>();
+        var openLibrary = new List<double>();
         var last = TimeSpan.Zero;
         long pending = 0;
+        long pendingOpen = 0;
+        int openFrames = 0;
         void OnRendering(object? sender, EventArgs e)
         {
             var time = ((RenderingEventArgs)e).RenderingTime;
@@ -142,6 +145,13 @@ internal static class ChildRunner
             {
                 commandToFrame.Add(Stopwatch.GetElapsedTime(pending).TotalMilliseconds);
                 pending = 0;
+            }
+
+            // O Rendering vem antes do layout do quadro: a grade nova só está desenhada no quadro seguinte.
+            if (pendingOpen != 0 && ++openFrames == 2)
+            {
+                openLibrary.Add(Stopwatch.GetElapsedTime(pendingOpen).TotalMilliseconds);
+                pendingOpen = 0;
             }
         }
 
@@ -172,9 +182,17 @@ internal static class ChildRunner
                 }
             }
 
+            // Abrir a grade da biblioteca: do comando até o primeiro quadro com a grade (o travamento que o usuário vê).
+            void OpenLibrary()
+            {
+                pendingOpen = Stopwatch.GetTimestamp();
+                openFrames = 0;
+                shell.OpenLibrary(LibraryFilter.All);
+                Pump(1);
+            }
+
             var clock = Stopwatch.StartNew();
-            shell.OpenLibrary(LibraryFilter.All);
-            Pump(1);
+            OpenLibrary();
             Repeat(AppCommand.Right, 24);
             Repeat(AppCommand.Down, 12);
             Repeat(AppCommand.Up, 6);
@@ -189,8 +207,7 @@ internal static class ChildRunner
             Pump(0.8);
             Repeat(AppCommand.Down, 10);
             Repeat(AppCommand.Up, 10);
-            shell.OpenLibrary(LibraryFilter.All);
-            Pump(1);
+            OpenLibrary();
             Repeat(AppCommand.Down, 25, 0.1);
             Pump(0.5);
             double seconds = clock.Elapsed.TotalSeconds;
@@ -206,7 +223,8 @@ internal static class ChildRunner
                 dropped,
                 Distribution.Of(dispatch),
                 Distribution.Of(commandToFrame),
-                commands);
+                commands,
+                Distribution.Of(openLibrary));
         }
         finally
         {

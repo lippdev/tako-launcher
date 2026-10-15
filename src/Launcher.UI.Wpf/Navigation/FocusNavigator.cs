@@ -18,8 +18,8 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
     private const double SafeBottom = 1080 - 130;
     private const double RowRightMargin = 72;
 
-    private readonly Dictionary<string, WeakReference<FrameworkElement>> _groupMemory = [];
-    private WeakReference<FrameworkElement>? _lastOutsideSidebar;
+    private readonly Dictionary<string, FocusMemory> _groupMemory = [];
+    private FocusMemory? _lastOutsideSidebar;
 
     public event EventHandler<FrameworkElement?>? FocusChanged;
 
@@ -67,7 +67,7 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
         }
 
         // Sair da barra lateral para a direita volta exatamente para onde o usuário estava.
-        if (group == "sidebar" && direction == NavDirection.Right && _lastOutsideSidebar?.TryGetTarget(out var back) == true && all.Contains(back))
+        if (group == "sidebar" && direction == NavDirection.Right && _lastOutsideSidebar?.Target is { } back && all.Contains(back))
         {
             Focus(back);
             return true;
@@ -100,6 +100,11 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
     public bool FocusDefault(string? key)
     {
         var all = Navigables();
+        if (key is not null && !all.Any(e => MatchesKey(e, key)) && RealizeKey(key))
+        {
+            all = Navigables();
+        }
+
         var target = (key is null ? null : all.FirstOrDefault(e => MatchesKey(e, key)))
             ?? all.FirstOrDefault(Nav.GetIsDefault)
             // Sem padrão, o foco entra no conteúdo (primeiro item de cima para baixo), não na barra lateral.
@@ -121,10 +126,11 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
         Focused = element;
         if (Nav.GetGroup(element) is string group)
         {
-            _groupMemory[group] = new WeakReference<FrameworkElement>(element);
+            var remembered = new FocusMemory(element);
+            _groupMemory[group] = remembered;
             if (group != "sidebar")
             {
-                _lastOutsideSidebar = new WeakReference<FrameworkElement>(element);
+                _lastOutsideSidebar = remembered;
             }
         }
 
@@ -188,7 +194,27 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
     }
 
     private FrameworkElement? Remembered(string group) =>
-        _groupMemory.TryGetValue(group, out var weak) && weak.TryGetTarget(out var element) && element.IsVisible ? element : null;
+        _groupMemory.TryGetValue(group, out var remembered) && remembered.Target is { IsVisible: true } element ? element : null;
+
+    /// <summary>Item fora da tela numa lista virtualizada: pede às listas do escopo que criem o elemento dele.</summary>
+    private bool RealizeKey(string key)
+    {
+        bool realized = false;
+        foreach (var scope in scopes())
+        {
+            foreach (var host in FindAll(scope, e => e is IVirtualNavHost).Cast<IVirtualNavHost>().ToList())
+            {
+                realized |= host.RealizeKey(key);
+            }
+        }
+
+        if (realized)
+        {
+            stage.UpdateLayout();
+        }
+
+        return realized;
+    }
 
     private NavRect RectOf(FrameworkElement element)
     {
@@ -286,6 +312,18 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
         }
 
         transform.BeginAnimation(property, new DoubleAnimation(to, duration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+    }
+
+    /// <summary>
+    /// Último elemento focado de um grupo. Em listas virtualizadas o elemento pode ter sido reaproveitado para outro item;
+    /// a chave guardada evita voltar o foco para o item errado.
+    /// </summary>
+    private sealed class FocusMemory(FrameworkElement element)
+    {
+        private readonly WeakReference<FrameworkElement> _element = new(element);
+        private readonly string? _key = Nav.GetKey(element);
+
+        public FrameworkElement? Target => _element.TryGetTarget(out var element) && Nav.GetKey(element) == _key ? element : null;
     }
 
     private static IEnumerable<FrameworkElement> FindAll(DependencyObject root, Func<FrameworkElement, bool> predicate)

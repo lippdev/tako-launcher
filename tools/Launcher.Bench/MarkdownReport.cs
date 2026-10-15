@@ -37,7 +37,7 @@ internal static class MarkdownReport
         }
 
         text.Append("\n### Fluidez na navegação roteirizada\n\n");
-        text.Append("| Jogos | Quadro esperado (ms) | FPS médio | Tempo de quadro p50 / p95 / p99 / máx (ms) | Quadros lentos (>1,5×) | Quadros perdidos | Comando → próximo quadro p50 / p95 (ms) | Tratamento do comando p95 (ms) |\n|---:|---:|---:|---|---:|---:|---|---:|\n");
+        text.Append("| Jogos | Quadro esperado (ms) | FPS médio | Tempo de quadro p50 / p95 / p99 / máx (ms) | Quadros lentos (>1,5×) | Quadros perdidos | Comando → próximo quadro p50 / p95 (ms) | Tratamento do comando p95 (ms) | Abrir a biblioteca, máx (ms) |\n|---:|---:|---:|---|---:|---:|---|---:|---:|\n");
         foreach (var s in report.Sizes)
         {
             if (s.Full.Fluidity is not { } f)
@@ -45,7 +45,7 @@ internal static class MarkdownReport
                 continue;
             }
 
-            text.Append(c, $"| {s.Games} | {f.ExpectedFrameMs:0.0} | {f.AverageFps:0.0} | {f.FrameMs.P50:0.0} / {f.FrameMs.P95:0.0} / {f.FrameMs.P99:0.0} / {f.FrameMs.Max:0.0} | {f.SlowFrames} de {f.FrameMs.Count} | {f.DroppedFrames} | {f.CommandToFrameMs.P50:0.0} / {f.CommandToFrameMs.P95:0.0} | {f.DispatchMs.P95:0.0} |\n");
+            text.Append(c, $"| {s.Games} | {f.ExpectedFrameMs:0.0} | {f.AverageFps:0.0} | {f.FrameMs.P50:0.0} / {f.FrameMs.P95:0.0} / {f.FrameMs.P99:0.0} / {f.FrameMs.Max:0.0} | {f.SlowFrames} de {f.FrameMs.Count} | {f.DroppedFrames} | {f.CommandToFrameMs.P50:0.0} / {f.CommandToFrameMs.P95:0.0} | {f.DispatchMs.P95:0.0} | {f.OpenLibraryMs.Max:0} |\n");
         }
 
         text.Append("\n### Com um jogo em execução (carga de CPU em todos os núcleos)\n\n");
