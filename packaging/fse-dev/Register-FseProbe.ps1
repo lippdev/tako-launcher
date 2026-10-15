@@ -15,7 +15,7 @@
 param([switch]$Unregister)
 
 $ErrorActionPreference = 'Stop'
-$packageName = 'UltraLauncher.FseProbe'
+$packageName = 'Tako.FseProbe'
 $here = $PSScriptRoot
 $layout = Join-Path $here 'layout'
 $prebuilt = Join-Path $here 'probe'
@@ -53,4 +53,4 @@ New-Item -ItemType Directory -Path (Join-Path $layout 'Public') -Force | Out-Nul
 Add-AppxPackage -Register (Join-Path $layout 'AppxManifest.xml') -ForceUpdateFromAnyVersion
 Get-AppxPackage -Name $packageName | Select-Object PackageFamilyName, SignatureKind, IsDevelopmentMode | Format-List
 
-Write-Host 'Registrado. Agora: Configurações > Jogos > Xbox mode > Escolher app inicial > UltraLauncher FseProbe.'
+Write-Host 'Registrado. Agora: Configurações > Jogos > Xbox mode > Escolher app inicial > Tako FseProbe.'

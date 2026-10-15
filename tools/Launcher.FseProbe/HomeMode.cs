@@ -37,11 +37,11 @@ internal static partial class HomeMode
             FontSize = 28,
             Margin = new Thickness(64),
             TextWrapping = TextWrapping.Wrap,
-            Text = $"UltraLauncher FseProbe (modo home)\n\nEnter: iniciar {testTarget}\nEsc: sair\n\nLog: {LogPath}",
+            Text = $"Tako FseProbe (modo home)\n\nEnter: iniciar {testTarget}\nEsc: sair\n\nLog: {LogPath}",
         };
         var window = new Window
         {
-            Title = "UltraLauncher FseProbe",
+            Title = "Tako FseProbe",
             WindowStyle = WindowStyle.None,
             ResizeMode = ResizeMode.NoResize,
             WindowState = WindowState.Maximized,

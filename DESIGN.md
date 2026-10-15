@@ -1,8 +1,8 @@
 ---
 version: alpha
-name: UltraLauncher Default Theme
+name: Tako Default Theme
 description: |
-  Tema padrão do UltraLauncher (MVP-013). Interface de sofá, 10 pés, controlada por joystick.
+  Tema padrão do Tako (MVP-013). Interface de sofá, 10 pés, controlada por joystick.
   A arte do jogo em foco define a cor da tela inteira: o fundo assume o tom de destaque do jogo
   e as superfícies são camadas brancas translúcidas sobre ele. Referência de canvas: 1920x1080,
   escalada uniformemente (Viewbox) para outras resoluções.
@@ -176,7 +176,7 @@ components:
     size: 34px
 ---
 
-# UltraLauncher — tema padrão
+# Tako — tema padrão
 
 ## Overview
 

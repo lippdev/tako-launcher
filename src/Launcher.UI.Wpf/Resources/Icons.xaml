@@ -1,4 +1,4 @@
-<!-- Ícones (traço 24x24, desenhados para o UltraLauncher) e logos das lojas (Simple Icons, CC0; marcas dos respectivos donos). -->
+<!-- Ícones (traço 24x24, desenhados para o Tako) e logos das lojas (Simple Icons, CC0; marcas dos respectivos donos). -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:c="clr-namespace:Launcher.UI.Wpf.Controls">

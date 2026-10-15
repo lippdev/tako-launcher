@@ -7,7 +7,7 @@
 
 ## Pergunta
 
-O UltraLauncher consegue se registrar e iniciar como app principal ("home app") do Full Screen Experience do Windows 11 por um caminho oficialmente suportado? Em quais builds e dispositivos?
+O Tako consegue se registrar e iniciar como app principal ("home app") do Full Screen Experience do Windows 11 por um caminho oficialmente suportado? Em quais builds e dispositivos?
 
 ## Resumo
 
@@ -62,10 +62,10 @@ Da documentação de suporte da Microsoft (KB5070297):
 Objetivo: confirmar o mecanismo no hardware real, medir o ciclo de vida de um home app de terceiros e encontrar sinais de detecção. O experimento usa o caminho de desenvolvimento, que **não** é o de produção.
 
 Ferramentas:
-- `tools/Launcher.FseProbe`: sem argumentos, gera um relatório do ambiente; com `--home`, é a tela que o Windows abre como home app e grava o ciclo de vida em `Documentos\UltraLauncher-FseProbe\home.log`.
+- `tools/Launcher.FseProbe`: sem argumentos, gera um relatório do ambiente; com `--home`, é a tela que o Windows abre como home app e grava o ciclo de vida em `Documentos\Tako-FseProbe\home.log`.
 - `packaging/fse-dev/Register-FseProbe.ps1`: publica a probe e a registra como home app de desenvolvimento (sem MSIX nem certificado).
 
-Sem o SDK do .NET: baixe `UltraLauncher-FseKit-…-win-x64.zip` na página de releases. O kit traz a probe compilada e o `LEIA-ME.txt` com estes mesmos passos (`.\probe\Launcher.FseProbe.exe` no lugar de `dotnet run`).
+Sem o SDK do .NET: baixe `Tako-FseKit-…-win-x64.zip` na página de releases. O kit traz a probe compilada e o `LEIA-ME.txt` com estes mesmos passos (`.\probe\Launcher.FseProbe.exe` no lugar de `dotnet run`).
 
 ### Passo 1: relatório do ambiente (não muda nada no PC)
 
@@ -84,7 +84,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\packaging\fse-dev\Register-FseProbe.ps1
 ```
 
-Em Configurações > Jogos > Xbox mode, escolher "UltraLauncher FseProbe" como app inicial. Depois:
+Em Configurações > Jogos > Xbox mode, escolher "Tako FseProbe" como app inicial. Depois:
 
 1. Entrar no Xbox mode (Win+F11). A probe abre em tela cheia?
 2. Enter: abre o Bloco de Notas (o "jogo"). Fechar o Bloco de Notas: a probe volta ao primeiro plano?

@@ -1,4 +1,6 @@
-# UltraLauncher
+# Tako
+
+<img src="logo/Logo%20TAKO%20com%20fundo%20transparente.png" alt="Tako" width="220" />
 
 Launcher de jogos para Windows 11 com experiência de console: gamepad-first, temas Fullscreen do Playnite 10 e integração com o Windows Full Screen Experience (FSE). Status: **planejamento / Marco 0**.
 
@@ -35,7 +37,7 @@ Rodar o launcher (Marco 0: biblioteca fictícia, sessão de jogo simulada):
 dotnet run --project src/Launcher.UI.Wpf -c Release
 ```
 
-Controle Xbox (XInput), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), G (Guia). As capas são baixadas para `%LOCALAPPDATA%\UltraLauncher\cache\art` (nenhuma arte de jogo vai para o repositório).
+Controle Xbox (XInput), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), G (Guia). As capas são baixadas para `%LOCALAPPDATA%\Tako\cache\art` (nenhuma arte de jogo vai para o repositório).
 
 ```
 dotnet restore

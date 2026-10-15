@@ -4,7 +4,7 @@
         xmlns:c="clr-namespace:Launcher.UI.Wpf.Controls"
         xmlns:nav="clr-namespace:Launcher.UI.Wpf.Navigation"
         xmlns:vm="clr-namespace:Launcher.UI.Wpf.ViewModels"
-        Title="UltraLauncher" WindowStyle="None" ResizeMode="NoResize" WindowState="Maximized" Background="Black"
+        Title="Tako" Icon="pack://application:,,,/Tako;component/Assets/Brand/tako.ico" WindowStyle="None" ResizeMode="NoResize" WindowState="Maximized" Background="Black"
         FontFamily="{DynamicResource FontText}" Foreground="{DynamicResource OnAccentBrush}"
         UseLayoutRounding="True" TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="Grayscale">
   <Window.Resources>
@@ -29,10 +29,8 @@
       <Border x:Name="Sidebar" Width="120" HorizontalAlignment="Left" Background="{DynamicResource SurfaceSidebarBrush}" Panel.ZIndex="5" ClipToBounds="True">
         <DockPanel Margin="20,48,20,96" LastChildFill="False">
           <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Height="64" Margin="20,0,0,24">
-            <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource SurfaceSolidBrush}">
-              <TextBlock Text="U" Foreground="{DynamicResource OnSurfaceSolidBrush}" FontWeight="ExtraBold" FontSize="{DynamicResource FsLabelMd}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
-            <TextBlock x:Name="BrandName" Text="UltraLauncher" Margin="16,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FsTitle}" FontWeight="ExtraBold" Opacity="0" />
+            <Image Source="pack://application:,,,/Tako;component/Assets/Brand/tako-mark.png" Width="40" Height="40" RenderOptions.BitmapScalingMode="HighQuality" />
+            <TextBlock x:Name="BrandName" Text="Tako" Margin="16,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FsTitle}" FontWeight="ExtraBold" Opacity="0" />
           </StackPanel>
           <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding SidebarMain}" Focusable="False">
             <ItemsControl.ItemTemplate>

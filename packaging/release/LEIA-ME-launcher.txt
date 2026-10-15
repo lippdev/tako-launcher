@@ -1,7 +1,7 @@
-UltraLauncher (versão de teste do Marco 0)
+Tako (versão de teste do Marco 0)
 
 1. Extraia esta pasta inteira (não rode de dentro do zip).
-2. Rode Launcher.UI.Wpf.exe. Se o SmartScreen avisar: "Mais informações" > "Executar assim mesmo".
+2. Rode Tako.exe. Se o SmartScreen avisar: "Mais informações" > "Executar assim mesmo".
 3. Conecte um controle Xbox (ou compatível XInput) e teste:
    - setas/analógico navegam; A seleciona; B volta;
    - botão Guia (ou View) abre a Central de Controle;
@@ -9,5 +9,5 @@ UltraLauncher (versão de teste do Marco 0)
 4. Teclado: setas, Enter, Esc. Mouse: clique, roda e arraste no volume.
 
 Anote o que falhar (tela, botão, o que esperava e o que aconteceu) e mande no chat ou numa issue.
-O cache de imagens fica em %LOCALAPPDATA%\UltraLauncher.
+O cache de imagens fica em %LOCALAPPDATA%\Tako.
 Os dados são de exemplo; "Jogar" simula a sessão de jogo.

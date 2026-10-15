@@ -7,6 +7,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), versionamen
 - `DESIGN.md` (tokens do tema padrão) e protótipo navegável por controle em `design/prototype/index.html` (MVP-013, MVP-023, MVP-028).
 - Spike MVP-007: pesquisa do FSE / Xbox mode (`docs/spikes/MVP-007-fse.md`), ferramenta `Launcher.FseProbe` e pacote de desenvolvimento em `packaging/fse-dev/`.
 - Spike MVP-016: validador e carregador XAML restrito para temas (`Launcher.Themes.Xaml`), ferramenta `Launcher.ThemeCheck` e relatório em `docs/spikes/`.
+- Nome do produto: **Tako**. Executável `Tako.exe` com o ícone do polvo, marca na barra lateral e textos da interface; logos em `logo/`. O repositório e os namespaces continuam `ultralauncher`/`Launcher.*`.
 - Workflow de release: cada tag `v*` publica o launcher (self-contained, win-x64) e o kit do experimento FSE na página da release.
 - Estrutura inicial da solução, CI e regras de desenvolvimento.
 
