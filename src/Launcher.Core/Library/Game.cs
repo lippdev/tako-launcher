@@ -66,6 +66,9 @@ public sealed class Game
     /// <summary>Pasta do jogo no disco ("Abrir pasta").</summary>
     public string? InstallPath { get; init; }
 
+    /// <summary>Como reconhecer o fim do jogo (MVP-026); nulo = automático (<see cref="Session.GameTracking.Plan"/>).</summary>
+    public Session.GameTrackingStrategy? Tracking { get; init; }
+
     /// <summary>Jogo correspondente na Steam (da própria loja ou encontrado pelos metadados).</summary>
     public int? SteamAppId { get; set; }
 
