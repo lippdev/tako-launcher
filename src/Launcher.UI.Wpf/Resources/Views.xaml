@@ -332,6 +332,16 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Monitores e áudio (frente E2, MVP-012). -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleRestoreEnvironmentCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:environment">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.RestoreEnvironmentAfterGame}" />
+          <StackPanel>
+            <TextBlock Text="Restaurar monitores e áudio ao sair do jogo" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Volta resolução, taxa de atualização, monitor principal, saída de áudio e volume como estavam antes do jogo" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <Button Style="{StaticResource SettingRow}" Command="{Binding ReapplyThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:theme" nav:Nav.IsDefault="True">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">

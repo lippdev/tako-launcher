@@ -36,6 +36,9 @@ public static class AppPaths
     /// <summary>Marcador de sessão em andamento (proteção contra loop de travamento, MVP-036).</summary>
     public static string SessionFile => Path.Combine(DataRoot, "session.json");
 
+    /// <summary>Monitores e áudio registrados antes do jogo, até a restauração (MVP-012).</summary>
+    public static string EnvironmentSnapshotFile => Path.Combine(DataRoot, "session-environment.json");
+
     /// <summary>Temas importados de pacotes <c>.pthm</c>, um por pasta (<c>themes/&lt;Id&gt;</c>).</summary>
     public static string ThemesRoot => Path.Combine(DataRoot, "themes");
 }

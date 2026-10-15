@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Implementações Win32 dos contratos de ConsoleMode.Runtime (ADR-0011, ADR-0013): monitores (CCD) e áudio (Core Audio). -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- LibraryImport, GeneratedComInterface e ponteiros para as estruturas do Windows. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ConsoleMode.Runtime\ConsoleMode.Runtime.csproj" />
+  </ItemGroup>
+</Project>

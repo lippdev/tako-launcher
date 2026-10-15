@@ -335,6 +335,9 @@ public sealed partial class SettingsViewModel : PageViewModel
     private void ToggleStartup() => Settings.StartFullscreenOnLogin = !Settings.StartFullscreenOnLogin;
 
     [RelayCommand]
+    private void ToggleRestoreEnvironment() => Settings.RestoreEnvironmentAfterGame = !Settings.RestoreEnvironmentAfterGame;
+
+    [RelayCommand]
     private void PreviewPlayniteTheme() => Shell.ShowPlaynitePreview();
 
     [RelayCommand]

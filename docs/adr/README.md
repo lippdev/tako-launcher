@@ -3,3 +3,4 @@
 ADR-001 a ADR-010 estão propostas em [`../PRD.md` §14](../PRD.md). Ao aceitar uma, crie `NNNN-slug.md` a partir do template.
 Dependem de spike: ADR-003 (FSE) e ADR-004 (compat Playnite).
 - [ADR-0011](0011-runtime-contracts-naming-and-targets.md): nome e frameworks-alvo do runtime compartilhado (Proposta).
+- [ADR-0013](0013-estado-de-monitores-e-audio.md): estado de monitores e áudio da sessão, contratos próprios e implementação Windows (Proposta).
