@@ -4,6 +4,23 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 
+## [0.1.0-alpha.8]
+### What's new
+- Game screen, like Console Mode: in Settings pick the screen you play on (the TV, for example). When a game starts, Tako turns that screen on, turns off or blacks out the others, applies resolution, refresh rate and HDR if you want, and puts everything back when it closes. The first time on a new screen it asks "Can you see this screen?" and reverts on its own if nobody answers. Off by default. (#30)
+- Audio and TV: "Audio output while playing" switches sound to the TV during a game and back afterwards. Google TV and Android TV can be turned on over the network and switched to the PC's input when a game starts, with optional standby on exit. (#31)
+- Steam games tracked more precisely (by the game Steam itself reports as running), plus an option to send Steam to the tray when you leave the game. (#31)
+- A much richer in-game Control Center: open windows to switch to or close, volume and audio output, real CPU, GPU and RAM usage, FPS counter and FPS limit through RTSS, hide the mouse pointer or drive it with the stick, and open ControlFS. (#33, #31)
+- Library search, filters and sorting: on-screen keyboard for the controller, accent-insensitive search, filters (installed, favorites, recent, source, genre) and sorting by name, last played, playtime, score or date added. Also works in Playnite themes. (#32)
+- Large libraries without stutter: with 1000 games the library opens in about 0.1 s (was 1.8 s) and Tako uses 170 MB idle (was 507 MB); with 5000 games, 177 MB (was over 2 GB). Covers load only when they come on screen. (#29)
+
+### Changes
+- Tako is now free software under the AGPL-3.0, the same license as Console Mode, and uses its display, audio, Steam, TV and session menu code. (#27)
+- The portable build is less than half the size: 69 MB (was 141 MB). (#28)
+
+### For developers
+- [ADR-0014](docs/adr/0014-licenca-agpl.md) (license), [ADR-0015](docs/adr/0015-monitores-do-console-mode-e-tela-de-jogo.md) (game screen) and [ADR-0016](docs/adr/0016-audio-steam-e-tv-na-sessao.md) (audio, Steam and TV). The hardware checklist gained sections for the game screen, the Control Center and audio/Steam/TV.
+- 5000-game scenario and "open library" time in `tools/Launcher.Bench`. (#29)
+
 ## [0.1.0-alpha.7]
 ### What's new
 - Displays and audio go back to normal after a game: Tako records resolution, refresh rate, primary display, audio output, volume and mute before launching the game and, when it ends, restores only what the game changed. If Tako crashes during the game, it offers to restore on the next start. It can be turned off in Settings. (#22)
