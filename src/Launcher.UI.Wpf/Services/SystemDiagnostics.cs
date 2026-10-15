@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security;
 using Launcher.Core.Diagnostics;
@@ -28,6 +29,10 @@ public static partial class SystemDiagnostics
     private const string WindowsKey = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
     private const string CpuKey = @"HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0";
 
+    /// <summary>Versão do Tako (do assembly do app, não do processo que hospeda: testes e benchmark também dão a versão certa).</summary>
+    public static string TakoVersion { get; } =
+        typeof(SystemDiagnostics).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? UpdateService.CurrentVersion;
+
     public static SystemSnapshot Collect(DiagnosticsContext context, TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -37,7 +42,7 @@ public static partial class SystemDiagnostics
         return new SystemSnapshot
         {
             GeneratedAt = time.GetLocalNow(),
-            TakoVersion = UpdateService.CurrentVersion,
+            TakoVersion = TakoVersion,
             InstallKind = UpdateService.IsPublishedBuild ? UpdateService.InstallKind : "desenvolvimento (dotnet run / build local)",
             DataFolder = AppPaths.DataRoot,
             WindowsName = windows.Name,

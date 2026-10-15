@@ -62,6 +62,8 @@ jobs:
       - run: dotnet build tools/Launcher.Bench --no-restore -c Release
       - name: Run benchmark
         shell: pwsh
+        env:
+          TAKO_BENCH_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           & tools/Launcher.Bench/bin/Release/net10.0-windows/Launcher.Bench.exe --out "$env:RUNNER_TEMP/benchmark" --label "GitHub Actions windows-latest"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -1,10 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
 using System.Text.Json;
 using Launcher.Core.Diagnostics;
-using Launcher.UI.Wpf;
 using Launcher.UI.Wpf.Services;
 
 namespace Launcher.Bench;
@@ -78,14 +76,15 @@ internal static class Orchestrator
                 results.Add(MeasureSize(self, games, art, runs, warm, idle, load));
             }
 
-            string takoVersion = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "?";
+            string takoVersion = SystemDiagnostics.TakoVersion;
             var machine = SystemDiagnostics.Collect(new DiagnosticsContext([], null, false, null, new FseDetector().Assessment, "Padrão"), TimeProvider.System) with
             {
                 TakoVersion = takoVersion,
                 InstallKind = "benchmark (Launcher.Bench)",
                 DataFolder = null,
             };
-            string? commit = Environment.GetEnvironmentVariable("GITHUB_SHA") is { Length: >= 7 } sha ? sha[..7] : null;
+            // No CI de PR, GITHUB_SHA é o merge temporário; o job passa o commit da branch em TAKO_BENCH_COMMIT.
+            string? commit = (Environment.GetEnvironmentVariable("TAKO_BENCH_COMMIT") ?? Environment.GetEnvironmentVariable("GITHUB_SHA")) is { Length: >= 7 } sha ? sha[..7] : null;
             var report = new BenchmarkReport(label, DateTimeOffset.Now, takoVersion, commit, machine, warm, idle, load, results);
 
             File.WriteAllText(Path.Combine(output, "benchmark.json"), JsonSerializer.Serialize(report, Json.Options));
@@ -120,8 +119,9 @@ internal static class Orchestrator
             warmRuns.Add(RunChild(self, runs, $"warm-{games}-{i + 1}", ["--mode", "startup", "--games", Text(games), "--art", art]));
         }
 
-        Console.WriteLine($"[{games} jogos] carga sozinha (linha de base do jogo)...");
-        var baseline = RunLoad(self, runs, games, load);
+        // Linha de base: a melhor de duas rodadas da carga sozinha (a primeira costuma sair mais lenta com a máquina fria).
+        Console.WriteLine($"[{games} jogos] carga sozinha (linha de base do jogo, 2 rodadas)...");
+        var baseline = new[] { RunLoad(self, runs, $"{games}-1", load), RunLoad(self, runs, $"{games}-2", load) }.MaxBy(r => r.OpsPerSecond) ?? throw new BenchFailureException("Sem linha de base da carga");
 
         Console.WriteLine($"[{games} jogos] rodada completa: repouso {idle} s, navegação, jogo {load} s...");
         var full = RunChild(self, runs, $"full-{games}", ["--mode", "full", "--games", Text(games), "--art", art, "--idle-seconds", Text(idle), "--load-seconds", Text(load)]);
@@ -207,9 +207,9 @@ internal static class Orchestrator
         return (Distribution.Round(TimeSpan.FromTicks(ticks).TotalMilliseconds), report);
     }
 
-    private static LoadResult RunLoad(string self, string runs, int games, int seconds)
+    private static LoadResult RunLoad(string self, string runs, string name, int seconds)
     {
-        string result = Path.Combine(runs, $"load-baseline-{games}.json");
+        string result = Path.Combine(runs, $"load-baseline-{name}.json");
         File.Delete(result);
         var start = new ProcessStartInfo(self) { UseShellExecute = false };
         foreach (string argument in new[] { "load", "--seconds", Text(seconds), "--warmup", "2", "--result", result })
