@@ -38,6 +38,11 @@ public static class SchemaMigrator
                 value TEXT NOT NULL
             );
             """),
+        // Como reconhecer o fim do jogo (MVP-026): nome da estratégia ou nulo (automático). ADD COLUMN não aceita
+        // IF NOT EXISTS, mas roda na mesma transação que registra a versão, então não fica pela metade.
+        new(3, """
+            ALTER TABLE manual_games ADD COLUMN track_by TEXT;
+            """),
     ];
 
     public static int LatestVersion => Migrations[^1].Version;

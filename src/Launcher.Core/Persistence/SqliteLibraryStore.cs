@@ -1,5 +1,6 @@
 using System.Globalization;
 using Launcher.Core.Library;
+using Launcher.Core.Session;
 using Microsoft.Data.Sqlite;
 
 namespace Launcher.Core.Persistence;
@@ -61,8 +62,8 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
         {
             command.Transaction = transaction;
             command.CommandText = $"""
-                {verb} INTO manual_games (id, title, path, arguments, working_directory, cover_path, hero_path, added_at)
-                VALUES ($id, $title, $path, $arguments, $workingDirectory, $coverPath, $heroPath, $addedAt);
+                {verb} INTO manual_games (id, title, path, arguments, working_directory, cover_path, hero_path, added_at, track_by)
+                VALUES ($id, $title, $path, $arguments, $workingDirectory, $coverPath, $heroPath, $addedAt, $trackBy);
                 """;
             var id = command.Parameters.Add("$id", SqliteType.Text);
             var title = command.Parameters.Add("$title", SqliteType.Text);
@@ -72,6 +73,7 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
             var coverPath = command.Parameters.Add("$coverPath", SqliteType.Text);
             var heroPath = command.Parameters.Add("$heroPath", SqliteType.Text);
             var addedAt = command.Parameters.Add("$addedAt", SqliteType.Text);
+            var trackBy = command.Parameters.Add("$trackBy", SqliteType.Text);
             foreach (var record in manual)
             {
                 id.Value = record.Id;
@@ -82,6 +84,7 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
                 coverPath.Value = (object?)record.CoverPath ?? DBNull.Value;
                 heroPath.Value = (object?)record.HeroPath ?? DBNull.Value;
                 addedAt.Value = FormatDate(record.AddedAt);
+                trackBy.Value = record.TrackBy is { } strategy ? strategy.ToString() : DBNull.Value;
                 command.ExecuteNonQuery();
             }
         }
@@ -111,7 +114,7 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
     private static List<ManualGameRecord> ReadManual(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT id, title, path, arguments, working_directory, cover_path, hero_path, added_at FROM manual_games ORDER BY rowid;";
+        command.CommandText = "SELECT id, title, path, arguments, working_directory, cover_path, hero_path, added_at, track_by FROM manual_games ORDER BY rowid;";
         using var reader = command.ExecuteReader();
         var result = new List<ManualGameRecord>();
         while (reader.Read())
@@ -126,6 +129,8 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
                 CoverPath = reader.IsDBNull(5) ? null : reader.GetString(5),
                 HeroPath = reader.IsDBNull(6) ? null : reader.GetString(6),
                 AddedAt = ParseDate(reader.GetString(7)),
+                // Valor desconhecido (versão mais nova gravou outro nome) volta ao automático.
+                TrackBy = !reader.IsDBNull(8) && Enum.TryParse<GameTrackingStrategy>(reader.GetString(8), out var strategy) ? strategy : null,
             });
         }
 
