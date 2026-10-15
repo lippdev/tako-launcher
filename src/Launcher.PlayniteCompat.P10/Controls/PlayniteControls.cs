@@ -44,7 +44,7 @@ public class ItemsControlEx : ItemsControl
     }
 }
 
-/// <summary>Lista suspensa do Playnite (a lista abre num Popup, que temas não podem usar; aqui só o controle).</summary>
+/// <summary>Lista suspensa do Playnite. O Popup da lista só é aceito no template dela (ver <c>XamlSecurityPolicy.PopupHostTemplates</c>).</summary>
 public class ComboBoxEx : ComboBox
 {
 }

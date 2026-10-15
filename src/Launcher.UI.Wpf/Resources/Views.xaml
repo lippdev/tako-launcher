@@ -513,6 +513,8 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
           <RowDefinition Height="Auto" />
+          <!-- Espaço da barra de dicas do launcher, que fica por cima de tudo. -->
+          <RowDefinition Height="88" />
         </Grid.RowDefinitions>
         <Border Background="{DynamicResource TopBarBackgroundBrush}" Padding="72,40,72,28">
           <StackPanel>

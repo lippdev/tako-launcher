@@ -15,6 +15,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), versionamen
 - Versões de pacotes centralizadas em `Directory.Packages.props`; testes migrados para xUnit v3 4.x sobre Microsoft.Testing.Platform.
 - Lock files de pacotes (`packages.lock.json`); o CI restaura em `--locked-mode`.
 - Regra de aprovação: 1 aprovação de code owner enquanto houver dois mantenedores; `nextestudios` adicionado ao CODEOWNERS.
+- Temas: `Popup` aceito só como lista de lista suspensa (ComboBox/ComboBoxEx), sem abrir nem se mover sozinho; o adaptador P10 fornece os booleanos e conversores que o Playnite dá aos temas. Tema Fullscreen padrão do Playnite 10: 31 de 33 arquivos carregados (MVP-016, MVP-018).
 
 ### Corrigido
 - Build do CI falhava com CA1707 nos nomes de teste.

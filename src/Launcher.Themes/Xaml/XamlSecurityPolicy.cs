@@ -44,6 +44,13 @@ public sealed class XamlSecurityPolicy
     /// </summary>
     public FrozenDictionary<string, string> NamespaceRemaps { get; init; } = FrozenDictionary<string, string>.Empty;
 
+    /// <summary>
+    /// Tipos cujo <c>ControlTemplate</c> pode conter um <c>Popup</c> (a lista suspensa). Fora desses templates o
+    /// <c>Popup</c> continua proibido, e dentro deles só abre junto com <c>IsDropDownOpen</c>, abaixo ou acima do
+    /// controle (ver <see cref="XamlValidator"/>).
+    /// </summary>
+    public FrozenSet<string> PopupHostTemplates { get; init; } = Set("ComboBox");
+
     public int MaxCharacters { get; init; } = 2 * 1024 * 1024;
 
     public int MaxDepth { get; init; } = 128;
@@ -57,7 +64,8 @@ public sealed class XamlSecurityPolicy
     public XamlSecurityPolicy Extend(
         IEnumerable<string>? presentationTypes = null,
         IEnumerable<string>? presentationExtensions = null,
-        IEnumerable<(string Source, string Target, IEnumerable<string> Types)>? remappedNamespaces = null)
+        IEnumerable<(string Source, string Target, IEnumerable<string> Types)>? remappedNamespaces = null,
+        IEnumerable<string>? popupHostTemplates = null)
     {
         var namespaces = ClrNamespaces.ToDictionary(StringComparer.Ordinal);
         var remaps = NamespaceRemaps.ToDictionary(StringComparer.Ordinal);
@@ -76,6 +84,7 @@ public sealed class XamlSecurityPolicy
             UriProperties = UriProperties,
             PresentationExtensions = Set([.. PresentationExtensions, .. presentationExtensions ?? []]),
             NamespaceRemaps = remaps.ToFrozenDictionary(StringComparer.Ordinal),
+            PopupHostTemplates = Set([.. PopupHostTemplates, .. popupHostTemplates ?? []]),
             MaxCharacters = MaxCharacters,
             MaxDepth = MaxDepth,
             MaxElements = MaxElements,

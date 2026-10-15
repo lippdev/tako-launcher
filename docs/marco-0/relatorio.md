@@ -29,9 +29,10 @@ O tema Fullscreen padrão do Playnite 10 (MIT, incluído em `Themes/Playnite-Def
 | Validador padrão, sem adaptação | 18 de 35 |
 | + declarações de namespace não usadas toleradas (e removidas antes do parser) | 22 de 35 |
 | + política do adaptador P10 (validação) | 32 de 35 |
-| **Carregados e aplicados pelo WPF** (composição na ordem do Playnite) | **27 de 33** |
+| + `Popup` restrito ao template da lista suspensa (validação) | 33 de 35 |
+| **Carregados e aplicados pelo WPF** (composição na ordem do Playnite, com os conversores que o Playnite fornece) | **31 de 33** |
 
-Recusas restantes: `Popup` e `HtmlTextView` (bloqueados por segurança), `{Api}` (API do Playnite, Marco 1) e 3 views que dependem do estilo de ComboBox recusado. Achado de robustez: o WPF adia a validação de estilos/templates até o uso; o carregador agora os materializa na carga, e um erro tardio vira tela de recuperação em vez de derrubar o launcher (MVP-021).
+Recusas restantes: `Views/GameDetails.xaml` (usa `HtmlTextView`, bloqueado por segurança) e `Views/Main.xaml` (usa `{Api}`, a API do Playnite, que fica para o Marco 1). O `Popup` passou a ser aceito só como lista de uma lista suspensa (ComboBox), aberto por `IsDropDownOpen` e sem posição livre; o adaptador também fornece os booleanos e conversores que o Playnite registra para os temas. Achado de robustez: o WPF adia a validação de estilos/templates até o uso; o carregador agora os materializa na carga, e um erro tardio vira tela de recuperação em vez de derrubar o launcher (MVP-021).
 
 **H3 — Runtime compartilhado com o Console Mode.** *Limitação registrada: bloqueada por decisão de licença.*
 Reutilizar código do Console Mode exige resolver `LEGAL-001` (repositório MIT × Console Mode AGPL-3.0-only), decisão que cabe aos mantenedores e não pode ser tomada no código. O lado do launcher está pronto para a integração: o contrato `ConsoleMode.Runtime` compila para .NET 8 e .NET 10 (ADR-0011) e a sessão de jogo já percorre os estados de `SessionState` (`LaunchingGame → Playing → Returning → Restoring → Browsing`). Pelo gate do Marco 0, a hipótese segue para o Marco 1 condicionada a `LEGAL-001`.
@@ -53,7 +54,7 @@ Reutilizar código do Console Mode exige resolver `LEGAL-001` (repositório MIT 
 | FSE não permitir launcher de terceiros | **Confirmado** sem parceria; mitigado pela prévia Fullscreen |
 | XAML não confiável executar código | Mitigado: validação antes do parser, lista de permissões, 53 testes |
 | Licença AGPL × MIT | **Aberto e bloqueante** para H3 (decisão dos mantenedores) |
-| Temas Playnite com controles/views próprios | Mitigado: adaptador P10 cobre 27 de 33 arquivos do tema padrão; restante mapeado |
+| Temas Playnite com controles/views próprios | Mitigado: adaptador P10 cobre 31 de 33 arquivos do tema padrão; os 2 restantes dependem de HtmlTextView (segurança) e da API do Playnite (Marco 1) |
 | Overlay sobre jogo em tela cheia exclusiva | Aberto: sem injeção (PRD §10), a Central de Controle precisa de janela topmost; validar em hardware |
 | Navegação por controle em hardware real | CI cobre teclado/comandos; falta teste com controle físico e TV |
 
