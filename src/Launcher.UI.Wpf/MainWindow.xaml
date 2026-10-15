@@ -33,9 +33,9 @@
       <Border x:Name="Sidebar" Width="120" HorizontalAlignment="Left" Background="{DynamicResource SurfaceSidebarBrush}" Panel.ZIndex="5" ClipToBounds="True">
         <DockPanel Margin="20,36,20,96" LastChildFill="False">
           <!-- Marca: polvo com a barra recolhida; logo horizontal (polvo + TAKO) com a barra aberta. -->
-          <Grid DockPanel.Dock="Top" Height="64" Margin="0,0,0,12">
+          <Grid DockPanel.Dock="Top" Height="80" Margin="0,0,0,8">
             <Image x:Name="BrandMark" Source="pack://application:,,,/Tako;component/Assets/Brand/tako-mark.png" Width="52" Height="52" HorizontalAlignment="Left" Margin="14,0,0,0" />
-            <Image x:Name="BrandLogo" Source="pack://application:,,,/Tako;component/Assets/Brand/tako-logo.png" Height="64" HorizontalAlignment="Left" Margin="6,0,0,0" Opacity="0" />
+            <Image x:Name="BrandLogo" Source="pack://application:,,,/Tako;component/Assets/Brand/tako-logo.png" Height="80" HorizontalAlignment="Left" Margin="6,0,0,0" Opacity="0" />
           </Grid>
           <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding SidebarMain}" Focusable="False">
             <ItemsControl.ItemTemplate>

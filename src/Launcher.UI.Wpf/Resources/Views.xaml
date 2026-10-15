@@ -419,8 +419,13 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <ItemsControl ItemsSource="{Binding Cards}" Margin="72,180,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Focusable="False" nav:Nav.LockHorizontal="True"
-                    Visibility="{Binding IsPopoverOpen, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+      <!-- Trilho de cartões: rola com o foco (mais cartões que a largura da tela) sem recortar o anel de foco. -->
+      <Canvas Margin="0,160,0,0" Height="340" VerticalAlignment="Top" ClipToBounds="True"
+              Visibility="{Binding IsPopoverOpen, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+      <ItemsControl ItemsSource="{Binding Cards}" Canvas.Left="72" Canvas.Top="20" Focusable="False" nav:Nav.LockHorizontal="True" nav:Nav.ScrollHost="Horizontal">
+        <ItemsControl.RenderTransform>
+          <TranslateTransform />
+        </ItemsControl.RenderTransform>
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
             <StackPanel Orientation="Horizontal" />
@@ -434,6 +439,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </Canvas>
 
       <!-- Painel do ícone: um por vez; os cartões saem de cena enquanto ele está aberto. -->
       <Border x:Name="Popover" Width="600" Margin="0,160,0,0" Padding="26,26,26,16" CornerRadius="26" Background="{DynamicResource PanelStrongBrush}"
