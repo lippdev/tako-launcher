@@ -96,13 +96,15 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
         return true;
     }
 
-    /// <summary>Foca o elemento com a chave pedida; senão o marcado como padrão; senão o primeiro do escopo.</summary>
+    /// <summary>Foca o elemento com a chave pedida; senão o marcado como padrão; senão o primeiro do conteúdo.</summary>
     public bool FocusDefault(string? key)
     {
         var all = Navigables();
         var target = (key is null ? null : all.FirstOrDefault(e => MatchesKey(e, key)))
             ?? all.FirstOrDefault(Nav.GetIsDefault)
-            ?? all.OrderBy(e => RectOf(e).Top).ThenBy(e => RectOf(e).Left).FirstOrDefault();
+            // Sem padrão, o foco entra no conteúdo (primeiro item de cima para baixo), não na barra lateral.
+            ?? all.Where(e => Nav.GetGroup(e) != "sidebar").OrderBy(e => RectOf(e).Top).ThenBy(e => RectOf(e).Left).FirstOrDefault()
+            ?? all.FirstOrDefault();
         if (target is null)
         {
             Focused = null;
