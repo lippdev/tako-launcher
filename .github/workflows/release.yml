@@ -1,0 +1,49 @@
+name: Release
+# Pré-releases de teste (ex.: v0.1.0-alpha.1) e releases. Compila no Windows e publica os zips na página da release.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Testes
+        run: |
+          dotnet restore --locked-mode
+          dotnet build --no-restore -c Release
+          dotnet test --no-build -c Release --filter-not-trait "Category=Hardware" --ignore-exit-code 8
+      - name: Publicar
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = $tag.TrimStart('v')
+          $out = Join-Path $env:RUNNER_TEMP 'out'
+          # Self-contained: roda sem instalar o .NET.
+          dotnet publish src/Launcher.UI.Wpf -c Release -r win-x64 --self-contained -p:Version=$version -o "$out/UltraLauncher"
+          Copy-Item packaging/release/LEIA-ME-launcher.txt "$out/UltraLauncher/LEIA-ME.txt"
+          Compress-Archive "$out/UltraLauncher/*" "$out/UltraLauncher-$version-win-x64.zip"
+
+          $kit = "$out/FseKit"
+          dotnet publish tools/Launcher.FseProbe -c Release -r win-x64 --self-contained -p:Version=$version -o "$kit/probe"
+          Copy-Item packaging/fse-dev/AppxManifest.xml, packaging/fse-dev/CustomCapability.SCCD, packaging/fse-dev/Register-FseProbe.ps1 $kit
+          Copy-Item packaging/fse-dev/Assets $kit -Recurse
+          Copy-Item packaging/release/LEIA-ME-fse.txt "$kit/LEIA-ME.txt"
+          Compress-Archive "$kit/*" "$out/UltraLauncher-FseKit-$version-win-x64.zip"
+          "OUT=$out" >> $env:GITHUB_ENV
+          "VERSION=$version" >> $env:GITHUB_ENV
+      - name: Criar release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $flags = @()
+          if ($tag -match '-') { $flags += '--prerelease' }
+          gh release create $tag "$env:OUT/UltraLauncher-$env:VERSION-win-x64.zip" "$env:OUT/UltraLauncher-FseKit-$env:VERSION-win-x64.zip" `
+            --title "UltraLauncher $env:VERSION" --notes-file packaging/release/NOTES.md --verify-tag @flags

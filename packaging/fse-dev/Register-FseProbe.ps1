@@ -3,8 +3,9 @@
   Registra (ou remove) a FseProbe como gaming home app de desenvolvimento do Xbox mode. Spike MVP-007.
 
 .DESCRIPTION
-  Publica tools/Launcher.FseProbe em packaging/fse-dev/layout e registra o layout com
-  Add-AppxPackage -Register (sem MSIX, sem certificado). Exige Modo de Desenvolvedor ligado,
+  Monta packaging/fse-dev/layout e o registra com Add-AppxPackage -Register (sem MSIX, sem certificado).
+  No kit da release, a probe já vem compilada na pasta probe\ ao lado do script; no repositório,
+  o script publica tools/Launcher.FseProbe (exige o SDK do .NET). Exige Modo de Desenvolvedor ligado,
   porque o SCCD usa o catálogo de desenvolvimento (FFFF).
 
 .EXAMPLE
@@ -16,8 +17,8 @@ param([switch]$Unregister)
 $ErrorActionPreference = 'Stop'
 $packageName = 'UltraLauncher.FseProbe'
 $here = $PSScriptRoot
-$repo = Resolve-Path (Join-Path $here '..\..')
 $layout = Join-Path $here 'layout'
+$prebuilt = Join-Path $here 'probe'
 
 if ($Unregister) {
     Get-AppxPackage -Name $packageName | Remove-AppxPackage
@@ -34,9 +35,15 @@ if (Test-Path $layout) {
     Remove-Item $layout -Recurse -Force
 }
 
-dotnet publish (Join-Path $repo 'tools\Launcher.FseProbe') -c Release -o $layout
-if ($LASTEXITCODE -ne 0) {
-    throw 'dotnet publish falhou.'
+if (Test-Path (Join-Path $prebuilt 'Launcher.FseProbe.exe')) {
+    Copy-Item $prebuilt $layout -Recurse
+}
+else {
+    $repo = Resolve-Path (Join-Path $here '..\..')
+    dotnet publish (Join-Path $repo 'tools\Launcher.FseProbe') -c Release -o $layout
+    if ($LASTEXITCODE -ne 0) {
+        throw 'dotnet publish falhou.'
+    }
 }
 
 Copy-Item (Join-Path $here 'AppxManifest.xml'), (Join-Path $here 'CustomCapability.SCCD') $layout
