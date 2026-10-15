@@ -419,7 +419,7 @@ chamadas reais à Twitch nem à IGDB.
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
-| IG1 | Sem chave | Instalação nova, sem configurar a IGDB | Configurações › Dados dos jogos (IGDB): "Desligada"; os dados vêm da Steam como antes; nenhuma linha "IGDB" no log |
+| IG1 | Sem chave | Instalação nova, sem configurar a IGDB | Configurações › Biblioteca e lojas › Dados dos jogos (IGDB): "Desligada"; os dados vêm da Steam como antes; nenhuma linha "IGDB" no log |
 | IG2 | Passo a passo | Seguir os passos da tela: dev.twitch.tv, registrar app (`http://localhost`, Application Integration), Client ID, Novo segredo | Os textos batem com o site da Twitch; anotar o que mudou de nome |
 | IG3 | Colar com o controle | Copiar o Client ID no navegador, voltar ao Tako e usar "Colar" só com o controle | O campo é preenchido sem espaços; status "Client ID colado" |
 | IG4 | Testar com erros | Testar com o Client ID errado; depois com o segredo errado; depois sem internet | Mensagens diferentes e claras para cada caso; nada é salvo |

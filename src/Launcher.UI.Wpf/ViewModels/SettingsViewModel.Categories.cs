@@ -58,8 +58,13 @@ public sealed partial class SettingsViewModel
             description: () => "Junte jogos do seu jeito; cada coleção vira uma fileira na Início e um filtro na biblioteca",
             value: () => CollectionsSummary),
         Row("metadata", SettingKind.Action, "Atualizar informações dos jogos", Shell.RefreshMetadata,
-            description: () => "Descrição, gêneros, lançamento, nota e artes, buscados na loja da Steam",
+            description: () => "Descrição, gêneros, lançamento, notas e artes (loja da Steam e, se ligada, IGDB)",
             value: () => "Atualizar"),
+
+        // Fontes de dados dos jogos (ADR-0021): cada uma abre o próprio painel. O ScreenScraper entra aqui, no mesmo padrão.
+        Row("igdb", SettingKind.Action, "Dados dos jogos (IGDB)", () => Shell.OpenIgdbSettingsCommand.Execute(null),
+            description: () => "Informações e artes de jogos de qualquer loja e de consoles, com a sua chave gratuita da Twitch",
+            value: () => Shell.IgdbSummary),
     ];
 
     /// <summary>"Criar", "1 coleção", "3 coleções".</summary>

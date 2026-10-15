@@ -213,7 +213,7 @@ public sealed partial class ShellViewModel
             : $"Nada encontrado para \"{item.Title}\" em {_metadata.ProviderName}.";
         if (results.Count == 0 && MetadataHintFor(item.Game) is not null)
         {
-            empty += " Com a IGDB ligada (Configurações › Dados dos jogos), a busca inclui jogos de outras lojas e de consoles.";
+            empty += " Com a IGDB ligada (Configurações › Biblioteca e lojas › Dados dos jogos), a busca inclui jogos de outras lojas e de consoles.";
         }
 
         dialog = new DialogViewModel("Qual destes é o seu jogo?", results.Count == 0 ? empty : $"Resultados para \"{item.Title}\":", actions);

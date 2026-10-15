@@ -47,11 +47,11 @@ public sealed partial class UiSmokeTests
             Assert.True(nav.FocusDefault(category.NavKey));
             Pump(0.3);
             Assert.Same(category, settings.SelectedCategory);
-            Snap(window, $"80-configuracoes-{i + 1}-{category.Id}");
+            Snap(window, $"cfg80-configuracoes-{i + 1}-{category.Id}");
             Press(window, AppCommand.Right);
             Assert.Equal(category.Rows.First(r => !r.IsHeader).Key, Nav.GetKey(nav.Focused!)); // → entra pela primeira linha
             WalkRows(window, category.Rows.Count(r => r.IsShown && !r.IsHeader), $"Configurações › {category.Title}");
-            Snap(window, $"81-configuracoes-{i + 1}-{category.Id}-fim");
+            Snap(window, $"cfg81-configuracoes-{i + 1}-{category.Id}-fim");
             Press(window, AppCommand.Back);
             Assert.Equal(category.NavKey, Nav.GetKey(nav.Focused!)); // B no conteúdo volta à categoria
             AssertHintBarFits(window, $"Configurações › {category.Title}");
@@ -78,7 +78,7 @@ public sealed partial class UiSmokeTests
         Assert.All(system.Rows.Where(r => r.Key is "settings:theme" or "settings:playnite" or "settings:crash"), r => Assert.True(r.IsShown));
         Press(window, AppCommand.Down);
         AssertInsideBand(window, "Opções de desenvolvedor");
-        Snap(window, "82-configuracoes-desenvolvedor");
+        Snap(window, "cfg82-configuracoes-desenvolvedor");
         Assert.True(nav.FocusDefault("settings:developer"));
         Press(window, AppCommand.Accept);
         Assert.False(shell.Settings.DeveloperOptions);
@@ -91,7 +91,7 @@ public sealed partial class UiSmokeTests
         Assert.Equal(["console:gamescreen", "console:tv", "console:audio", "console:steam", "console:fps", "console:fpslimit"], console.Cards.Select(c => c.Key));
         Assert.All(console.Cards, c => Assert.NotNull(c.State));
         Assert.Equal(FeatureState.Off, console.CardFor("gamescreen").State);
-        Snap(window, "83-modo-console");
+        Snap(window, "cfg83-modo-console");
         Press(window, AppCommand.Down);
         Assert.Equal("console:gamescreen", Nav.GetKey(nav.Focused!)); // ↓ do assistente vai ao primeiro cartão
         foreach (var card in console.Cards)
@@ -101,7 +101,7 @@ public sealed partial class UiSmokeTests
             AssertInsideBand(window, $"Modo Console › {card.Title}");
         }
 
-        Snap(window, "84-modo-console-cartoes");
+        Snap(window, "cfg84-modo-console-cartoes");
         AssertHintBarFits(window, "Modo Console");
 
         // Assistente: tela (a TV é sugerida) → testar a imagem (confirma na "TV") → pular a TV → áudio → pronto.
@@ -111,21 +111,22 @@ public sealed partial class UiSmokeTests
         var wizard = Assert.IsType<SetupWizardViewModel>(shell.TopOverlay);
         Assert.Equal("Passo 1 de 5", wizard.StepText);
         Assert.Equal("TV da sala", Nav.GetKey(nav.Focused!));
-        Snap(window, "85-assistente-tela");
+        Snap(window, "cfg85-assistente-tela");
         Press(window, AppCommand.Accept);
         Pump(0.4);
         Assert.Equal("Passo 2 de 5", wizard.StepText);
         Assert.True(shell.Settings.GameScreenEnabled);
         Assert.Equal("SIM\\TV", shell.Settings.GameScreenId);
-        Snap(window, "86-assistente-imagem");
+        Snap(window, "cfg86-assistente-imagem");
         Press(window, AppCommand.Accept); // Testar agora
-        Until(() => shell.TopOverlay is ScreenConfirmViewModel);
-        Snap(window, "87-assistente-confirmar");
+        Until(() => shell.TopOverlay is ScreenConfirmViewModel || wizard.Title != "Vamos testar a imagem");
+        Assert.True(shell.TopOverlay is ScreenConfirmViewModel, $"Sem a pergunta na tela de jogo: {wizard.Title} · {wizard.Text}");
+        Snap(window, "cfg87-assistente-confirmar");
         Press(window, AppCommand.Accept); // Sim, manter
         Until(() => wizard.StepText == "Passo 3 de 5");
         Assert.False(shell.GameScreen.IsActive); // o teste devolve as telas
         Assert.False(string.IsNullOrEmpty(shell.Settings.GameScreenConfirmedSetup));
-        Snap(window, "88-assistente-tv");
+        Snap(window, "cfg88-assistente-tv");
         Press(window, AppCommand.Back); // B volta um passo
         Assert.Equal("Passo 2 de 5", wizard.StepText);
         wizard.Actions.Single(a => a.Label == "Pular").Command.Execute(null);
@@ -133,18 +134,18 @@ public sealed partial class UiSmokeTests
         wizard.Actions.Single(a => a.Label == "Pular").Command.Execute(null);
         Pump(0.4);
         Assert.Equal("Passo 4 de 5", wizard.StepText);
-        Snap(window, "89-assistente-audio");
+        Snap(window, "cfg89-assistente-audio");
         Press(window, AppCommand.Accept); // a saída sugerida (ou "Não alterar o som")
         Pump(0.4);
         Assert.Equal("Passo 5 de 5", wizard.StepText);
-        Snap(window, "90-assistente-pronto");
+        Snap(window, "cfg90-assistente-pronto");
         Press(window, AppCommand.Accept); // Concluir
         Pump(0.5);
         Assert.Null(shell.TopOverlay);
         (window.Left, window.Top, window.Width, window.Height) = placement; // o teste da imagem moveu o Tako para a "TV"
         Pump(0.8);
         Assert.Equal(FeatureState.On, console.CardFor("gamescreen").State);
-        Snap(window, "91-modo-console-configurado");
+        Snap(window, "cfg91-modo-console-configurado");
 
         // Detalhe da Tela de jogo: todas as linhas aparecem com a tela ligada; B volta ao cartão.
         Assert.True(nav.FocusDefault("console:gamescreen"));
@@ -153,7 +154,7 @@ public sealed partial class UiSmokeTests
         var detail = Assert.IsType<SettingsDetailViewModel>(shell.CurrentPage);
         Assert.All(detail.Rows, r => Assert.True(r.IsShown, r.Key));
         WalkRows(window, detail.Rows.Count, "Modo Console › Tela de jogo");
-        Snap(window, "92-modo-console-tela-de-jogo");
+        Snap(window, "cfg92-modo-console-tela-de-jogo");
         Press(window, AppCommand.Back);
         Assert.Equal("console:gamescreen", Nav.GetKey(nav.Focused!));
 
@@ -169,14 +170,14 @@ public sealed partial class UiSmokeTests
             Pump(0.5);
             AssertInsideBand(window, $"Configurações {name}");
             AssertHintBarFits(window, $"Configurações {name}");
-            Snap(window, $"93-configuracoes-{name}");
+            Snap(window, $"cfg93-configuracoes-{name}");
             shell.OpenConsoleMode();
             Pump(1);
             Assert.True(nav.FocusDefault("console:fpslimit"));
             Pump(0.5);
             AssertInsideBand(window, $"Modo Console {name}");
             AssertHintBarFits(window, $"Modo Console {name}");
-            Snap(window, $"94-modo-console-{name}");
+            Snap(window, $"cfg94-modo-console-{name}");
         }
 
         window.Width = 640; // 16:9
@@ -185,7 +186,7 @@ public sealed partial class UiSmokeTests
         Pump(1);
         Assert.True(nav.FocusDefault("settings:store:xbox"));
         Pump(0.5);
-        Snap(window, "95-configuracoes-4k", scale: 2);
+        Snap(window, "cfg95-configuracoes-4k", scale: 2);
         shell.InputKind = InputKind.Gamepad;
         (window.Left, window.Top, window.Width, window.Height) = placement;
         Pump(0.8);
