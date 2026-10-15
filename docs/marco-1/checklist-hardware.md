@@ -434,6 +434,31 @@ chamadas reais à Twitch nem à IGDB.
 | IG13 | Qualidade na TV | Capas da IGDB (`t_cover_big`) na grade em 4K | Anotar se ficam borradas (se sim, trocar para `t_cover_big_2x`) |
 | IG14 | Região Brasil e lojas | Jogo com nome/capa brasileira na IGDB; jogo da Epic e do Xbox | Nome e capa da localização Brasil; anotar se Epic (CatalogItemId) e Xbox (StoreId) casam por id ou só pelo nome |
 
+## 22. Dados de ROMs pelo ScreenScraper ([ADR-0022](../adr/0022-metadados-screenscraper.md))
+
+Precisa de uma conta em screenscraper.fr (e-mail confirmado), de uma **versão de release com as credenciais do
+software** (segredos `SCREENSCRAPER_DEVID`/`SCREENSCRAPER_DEVPASSWORD` criados) e de algumas ROMs suas: um cartucho
+solto (`.sfc`/`.gba`), um `.zip` com um cartucho, um conjunto do MAME (`.zip`), uma ISO grande (PS2) e um `.chd`.
+Anexe `logs\tako-AAAAMMDD.log` (linhas "ScreenScraper" e "Metadados"). Nada disso roda no CI: lá não há chamadas reais
+ao ScreenScraper.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| SS1 | Versão sem acesso | Build local (ou release sem os segredos) › Configurações › Dados de ROMs | Linha "Indisponível nesta versão"; a tela avisa "Esta versão do Tako ainda não tem acesso ao ScreenScraper"; dá para salvar a conta; nenhuma linha "ScreenScraper" no log; o log do `Publish-Tako.ps1` avisa que saiu sem acesso |
+| SS2 | Passo a passo | Seguir os passos: criar conta, confirmar e-mail, usuário e senha | Os textos batem com o site; anotar o que mudou de nome |
+| SS3 | Testar com erros | Senha errada; depois sem internet | Mensagens diferentes e claras; nada é salvo |
+| SS4 | Testar e salvar | Conta certa › Testar › Salvar | "Tudo certo: conta …, nível …, N de M consultas restam hoje"; ao salvar, "ScreenScraper ligado"; linha "Ligado · sua conta" |
+| SS5 | Conta protegida | Abrir `%LOCALAPPDATA%\Tako\screenscraper.dat` no Bloco de Notas; reabrir a tela | Começa com `dpapi:` e não mostra usuário nem senha; o campo da senha vem vazio com "já salva" |
+| SS6 | Adicionar ROM | Adicionar jogo › escolher um `.sfc` | Pergunta "De qual sistema…" com SNES primeiro; título sem "(USA)"; detalhes com "Sistema: SNES" e botão "Abrir no emulador (em breve)", que só explica |
+| SS7 | Casamento pelo hash | ROM de cartucho reconhecida | Nome brasileiro quando houver, sinopse em português (senão inglês), caixa como capa, fanart/captura no fundo, "Jogadores", nota "Crítica"; Opções mostra "ScreenScraper + IGDB" |
+| SS8 | .zip e arcade | `.zip` com um cartucho (sistema SNES) e um `.zip` do MAME (sistema Arcade) | Os dois casam pelo hash; anotar se algum só casou pelo nome |
+| SS9 | ISO grande e .chd | ISO de PS2 (> 64 MB) e um `.chd` de PS1 | A tela não trava durante o hash; anotar se a ISO casa só com CRC e se o `.chd` casa pelo nome; reabrir o Tako não lê a ISO de novo (`cache\rom-hashes.json`) |
+| SS10 | Mídia sem credenciais | Procurar a senha em `cache\metadata\*.json` e `cache\screenscraper\*.json` | A senha e o `devpassword` não aparecem em nenhum arquivo; as capas aparecem (baixadas de `ssmedia://`) |
+| SS11 | Corrigir correspondência | ROM com nome ambíguo › Opções › Corrigir correspondência | Resultados do ScreenScraper (✓ no casado pelo hash) e da IGDB, com ano e sistema; escolher um fixa |
+| SS12 | Cota | Conta perto do limite diário (ou muitas ROMs desconhecidas) | Ao acabar, a linha (ao abrir as Configurações) diz "Pausado · cota do dia"; as ROMs não ficam marcadas como "sem dados" e voltam a ser consultadas depois da meia-noite de Paris |
+| SS13 | Jogos de PC | Biblioteca com jogos da Steam/Epic e o ScreenScraper ligado | Nenhuma consulta ao ScreenScraper para jogos de PC no log |
+| SS14 | Capas na TV | Caixas deitadas (SNES, Mega Drive) na grade em 4K | Anotar se o recorte 2:3 fica aceitável |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.

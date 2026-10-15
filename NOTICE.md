@@ -103,3 +103,7 @@ O Tako não distribui dados nem imagens de jogos: eles são baixados em tempo de
 - **IGDB** (<https://www.igdb.com>, Twitch Interactive): dados e imagens fornecidos pela IGDB.com, usada só quando o
   usuário informa a própria chave da Twitch (ADR-0021), conforme os termos de uso da API da Twitch/IGDB. A IGDB não
   endossa o Tako. A atribuição aparece em Configurações › Dados dos jogos (IGDB).
+- **ScreenScraper** (<https://www.screenscraper.fr>): dados e mídias de jogos de console fornecidos por ScreenScraper.fr,
+  banco de dados comunitário, usado só para ROMs quando o usuário informa a própria conta e a versão do Tako traz as
+  credenciais do software (ADR-0022). Obrigado aos colaboradores do ScreenScraper. Os créditos aparecem em
+  Configurações › Dados de ROMs (ScreenScraper).

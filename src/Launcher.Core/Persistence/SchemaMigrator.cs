@@ -69,6 +69,10 @@ public static class SchemaMigrator
                 extra_arguments TEXT
             );
             """),
+        // Sistema da ROM adicionada pelo "Adicionar jogo" (ADR-0022): nulo = jogo de PC.
+        new(5, """
+            ALTER TABLE manual_games ADD COLUMN platform TEXT;
+            """),
     ];
 
     public static int LatestVersion => Migrations[^1].Version;

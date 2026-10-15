@@ -43,7 +43,7 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
     {
         ArgumentNullException.ThrowIfNull(game);
         cached = Normalize(cached);
-        return force || cached is null || IsStale(cached) || Enabled.Any(p => !cached.Consulted.Contains(p.Name));
+        return force || cached is null || IsStale(cached) || For(MetadataPriority.KindOf(game)).Any(p => !IsPaused(p) && !cached.Consulted.Contains(p.Name));
     }
 
     /// <summary>Lote antes da rodada: provedores que sabem resolver muitos jogos de uma vez (IGDB).</summary>
@@ -74,7 +74,7 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         bool pinned = cached?.IsPinned == true;
         bool refreshAll = force || cached is null || IsStale(cached);
         var kind = MetadataPriority.KindOf(game);
-        var enabled = MetadataPriority.Sort(Enabled, p => p.Name, MetadataPriority.Order(kind));
+        var enabled = For(kind);
         var keep = refreshAll ? [] : cached!.Parts.Where(p => enabled.Any(e => e.Name == p.Source)).ToList();
         var consulted = refreshAll ? [] : cached!.Consulted.Where(name => enabled.Any(e => e.Name == name)).ToList();
         var ids = new Dictionary<string, string>(ExternalGameIds.For(game), StringComparer.Ordinal);
@@ -94,13 +94,15 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         var parts = new List<GameMetadata>(keep);
         int before = consulted.Count;
         bool queried = false;
-        foreach (var provider in enabled.Where(p => !consulted.Contains(p.Name)))
+        foreach (var provider in enabled.Where(p => !consulted.Contains(p.Name) && !IsPaused(p)))
         {
             queried = true;
             var outcome = await ConsultAsync(provider, game, ids, titleSearch: !pinned, cancellationToken).ConfigureAwait(false);
-            if (outcome.Transient)
+            if (outcome.Transient || IsPaused(provider))
             {
-                continue; // limite da API ou fora do ar: fica para a próxima rodada
+                // Limite da API, fora do ar ou provedor pausado durante a consulta (cota do dia do ScreenScraper): fica
+                // para a próxima rodada, sem marcar como "sem correspondência".
+                continue;
             }
 
             consulted.Add(provider.Name);
@@ -128,7 +130,7 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         ArgumentNullException.ThrowIfNull(game);
         var lookup = MetadataLookup.For(game);
         var results = new List<MetadataMatch>();
-        foreach (var provider in MetadataPriority.Sort(Enabled, p => p.Name, MetadataPriority.Order(MetadataPriority.KindOf(game))))
+        foreach (var provider in For(MetadataPriority.KindOf(game)).Where(p => !IsPaused(p)))
         {
             results.AddRange(await SearchProviderAsync(provider, lookup, cancellationToken).ConfigureAwait(false));
         }
@@ -152,10 +154,10 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         Learn(ids, metadata);
         var parts = new List<GameMetadata> { metadata };
         var consulted = new List<string> { chosen.Name };
-        foreach (var provider in MetadataPriority.Sort(Enabled, p => p.Name, MetadataPriority.Order(kind)).Where(p => p != chosen))
+        foreach (var provider in For(kind).Where(p => p != chosen && !IsPaused(p)))
         {
             var outcome = await ConsultAsync(provider, game, ids, titleSearch: false, cancellationToken).ConfigureAwait(false);
-            if (!outcome.Transient)
+            if (!outcome.Transient && !IsPaused(provider))
             {
                 consulted.Add(provider.Name);
             }
@@ -171,6 +173,16 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         var pinnedIds = new Dictionary<string, string>(combined.SourceIds, StringComparer.Ordinal) { [chosen.Name] = match.Id };
         return combined with { IsPinned = true, SourceIds = pinnedIds };
     }
+
+    /// <summary>
+    /// Fontes ligadas que atendem o tipo de jogo, na ordem dele. O ScreenScraper só atende ROMs (ADR-0022): consultá-lo
+    /// para jogos de PC gastaria a cota diária do usuário sem ganho.
+    /// </summary>
+    private IReadOnlyList<IMetadataProvider> For(MetadataKind kind) =>
+        MetadataPriority.Sort(Enabled.Where(p => MetadataPriority.Applies(p.Name, kind)), p => p.Name, MetadataPriority.Order(kind));
+
+    /// <summary>Pausado (ex.: cota do dia): não é consultado agora, mas os dados que já trouxe continuam na combinação.</summary>
+    private static bool IsPaused(IMetadataProvider provider) => provider is IPausableMetadataProvider { IsPaused: true };
 
     private bool IsStale(GameMetadata cached) => time.GetUtcNow() - cached.FetchedAt >= (cached.IsEmpty ? NoMatchRetry : MaxAge);
 

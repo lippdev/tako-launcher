@@ -64,6 +64,15 @@ public sealed record GameMetadata
     /// <summary>Arte de fundo (paisagem).</summary>
     public Uri? BackgroundUrl { get; init; }
 
+    /// <summary>Número de jogadores como a fonte informa ("1-2"), quando informa (ScreenScraper).</summary>
+    public string? Players { get; init; }
+
+    /// <summary>
+    /// Outras mídias por tipo (<see cref="GameMedia"/>: caixa 3D, logo, marquee, captura, fanart, vídeo), quando a fonte
+    /// tem. Só endereços: nada é baixado até alguém pedir (o cache de artes guarda o que for exibido).
+    /// </summary>
+    public IReadOnlyDictionary<string, Uri> Media { get; init; } = new Dictionary<string, Uri>();
+
     public bool IsEmpty => SourceIds.Count == 0 && SteamAppId is null;
 
     /// <summary>Id deste jogo na fonte indicada, se conhecido.</summary>
@@ -102,6 +111,12 @@ public sealed record GameMetadata
         game.Publisher = Publisher ?? game.Publisher;
         game.MetacriticScore = MetacriticScore ?? game.MetacriticScore;
         game.CriticScore = CriticScore ?? game.CriticScore;
+        game.Players = Players ?? game.Players;
+        if (Media.Count > 0)
+        {
+            game.Media = Media;
+        }
+
         if (SteamAppId is int appId)
         {
             game.SteamAppId = appId;
@@ -121,7 +136,29 @@ public sealed record GameMetadata
         new($"{Steam.SteamGames.ArtScheme}://{appId.ToString(CultureInfo.InvariantCulture)}/{kind}");
 
     // Arte que veio de um provedor (não do usuário nem do disco) pode ser trocada por outra de provedor.
-    private static bool IsProviderArt(Uri uri) => uri.Scheme == Steam.SteamGames.ArtScheme || uri.Scheme == Uri.UriSchemeHttps;
+    private static bool IsProviderArt(Uri uri) =>
+        uri.Scheme == Steam.SteamGames.ArtScheme || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == ScreenScraper.ScreenScraperMedia.Scheme;
+}
+
+/// <summary>Tipos de mídia além da capa e do fundo (<see cref="GameMetadata.Media"/>), como o ScreenScraper fornece.</summary>
+public static class GameMedia
+{
+    /// <summary>Caixa 2D (vira a capa, <see cref="GameMetadata.CoverUrl"/>).</summary>
+    public const string Box2D = "box2d";
+
+    public const string Box3D = "box3d";
+
+    /// <summary>Logo do jogo sem fundo ("wheel").</summary>
+    public const string Logo = "logo";
+
+    public const string Marquee = "marquee";
+
+    public const string Screenshot = "screenshot";
+
+    public const string Fanart = "fanart";
+
+    /// <summary>Vídeo de apresentação: só o endereço; baixado sob demanda.</summary>
+    public const string Video = "video";
 }
 
 /// <summary>Resultado de busca de um provedor; <see cref="Source"/> diz de onde veio ("Corrigir correspondência" mostra).</summary>
@@ -148,10 +185,13 @@ public sealed record MetadataMatch(string Source, string Id, string Title)
 /// </summary>
 public sealed record MetadataLookup(string Title, IReadOnlyDictionary<string, string> ExternalIds, string? Platform = null)
 {
+    /// <summary>Arquivo da ROM, para casar pelo hash (ScreenScraper); nulo para jogos de PC.</summary>
+    public string? RomPath { get; init; }
+
     public static MetadataLookup For(Game game)
     {
         ArgumentNullException.ThrowIfNull(game);
-        return new MetadataLookup(game.Title, ExternalGameIds.For(game), game.Platform);
+        return new MetadataLookup(game.Title, ExternalGameIds.For(game), game.Platform) { RomPath = game.RomPath };
     }
 }
 
@@ -171,6 +211,15 @@ public interface IMetadataProvider
     Task<string?> FindExactAsync(MetadataLookup lookup, CancellationToken cancellationToken);
 
     Task<GameMetadata?> FetchAsync(string id, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Provedor que pode ficar pausado por um tempo sem estar desligado (ex.: cota do dia do ScreenScraper esgotada): o
+/// agente não o consulta enquanto isso, mas mantém os dados que ele já trouxe e não marca os jogos como sem correspondência.
+/// </summary>
+public interface IPausableMetadataProvider : IMetadataProvider
+{
+    bool IsPaused { get; }
 }
 
 /// <summary>Provedor que consegue adiantar muitos jogos de uma vez (consulta em lote) antes da atualização jogo a jogo.</summary>

@@ -4,17 +4,26 @@ using System.Text.Json;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Metadata.Igdb;
+using Launcher.Core.Library.Metadata.ScreenScraper;
 using Microsoft.Extensions.Logging;
 
 namespace Launcher.UI.Wpf.Services;
 
 /// <summary>
 /// Agente de metadados (como no Plex): para cada jogo, junta os dados das fontes ligadas — Steam Store sempre, IGDB
-/// com a chave do usuário (ADR-0021) — pela prioridade do tipo de jogo (<see cref="MetadataAgent"/>) e guarda em
+/// com a chave do usuário (ADR-0021), ScreenScraper para ROMs com a conta do usuário (ADR-0022) — pela prioridade do tipo de jogo (<see cref="MetadataAgent"/>) e guarda em
 /// <c>%LOCALAPPDATA%\Tako\cache\metadata</c>. O cache é aplicado na hora; a atualização roda em segundo plano, um jogo
 /// por vez, respeitando o limite das APIs. "Corrigir correspondência" fixa a escolha do usuário.
 /// </summary>
-public sealed partial class MetadataService(IEnumerable<IMetadataProvider> providers, IgdbSettingsStore igdb, HttpClient http, TimeProvider time, ILogger<MetadataService> logger)
+public sealed partial class MetadataService(
+    IEnumerable<IMetadataProvider> providers,
+    IgdbSettingsStore igdb,
+    ScreenScraperSettingsStore screenScraper,
+    ScreenScraperClient screenScraperClient,
+    ScreenScraperSoftware screenScraperSoftware,
+    HttpClient http,
+    TimeProvider time,
+    ILogger<MetadataService> logger)
 {
     /// <summary>Espaço entre jogos, pelo limite da loja Steam (~200 consultas a cada 5 minutos).</summary>
     private static readonly TimeSpan Spacing = TimeSpan.FromSeconds(1.5);
@@ -47,6 +56,28 @@ public sealed partial class MetadataService(IEnumerable<IMetadataProvider> provi
 
     /// <summary>O teste de fumaça troca por um simulado: o CI nunca fala com a Twitch.</summary>
     internal Func<IgdbSettings, CancellationToken, Task> IgdbTester { get; set; } = (settings, token) => IgdbClient.TestAsync(http, settings, time, token);
+
+    /// <summary>ScreenScraper ligado ou não e a conta do usuário (Configurações › Dados de ROMs).</summary>
+    public ScreenScraperSettings ScreenScraperSettings => screenScraper.Current;
+
+    /// <summary>Esta versão do Tako tem as credenciais do software do ScreenScraper (só o build de release).</summary>
+    public bool HasScreenScraperAccess => screenScraperSoftware.IsAvailable;
+
+    /// <summary>Por que o ScreenScraper está pausado agora (cota do dia, servidor fechado); nulo = não está.</summary>
+    public ScreenScraperFailure? ScreenScraperPause => screenScraperClient.PauseReason;
+
+    /// <summary>Última conta vista numa resposta (nível e cota do dia).</summary>
+    public ScreenScraperAccount? ScreenScraperAccount => screenScraperClient.Account;
+
+    public void SaveScreenScraper(ScreenScraperSettings settings) => screenScraper.Save(settings);
+
+    /// <summary>Botão "Testar": nível da conta e cota do dia, com a conta informada (ainda não salva).</summary>
+    /// <exception cref="ScreenScraperException">Com o motivo, para a mensagem (<see cref="ScreenScraperErrors"/>).</exception>
+    public Task<ScreenScraperAccount> TestScreenScraperAsync(ScreenScraperSettings settings, CancellationToken cancellationToken) => ScreenScraperTester(settings, cancellationToken);
+
+    /// <summary>O teste de fumaça troca por um simulado: o CI nunca fala com o ScreenScraper.</summary>
+    internal Func<ScreenScraperSettings, CancellationToken, Task<ScreenScraperAccount>> ScreenScraperTester { get; set; } =
+        (settings, token) => ScreenScraperClient.TestAsync(http, screenScraperSoftware, settings, time, token);
 
     /// <summary>Aplica o que já está em cache (chamado pela biblioteca ao montar cada jogo).</summary>
     public void ApplyCached(Game game)

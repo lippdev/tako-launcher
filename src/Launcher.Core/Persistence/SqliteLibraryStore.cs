@@ -62,8 +62,8 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
         {
             command.Transaction = transaction;
             command.CommandText = $"""
-                {verb} INTO manual_games (id, title, path, arguments, working_directory, cover_path, hero_path, added_at, track_by)
-                VALUES ($id, $title, $path, $arguments, $workingDirectory, $coverPath, $heroPath, $addedAt, $trackBy);
+                {verb} INTO manual_games (id, title, path, arguments, working_directory, cover_path, hero_path, added_at, track_by, platform)
+                VALUES ($id, $title, $path, $arguments, $workingDirectory, $coverPath, $heroPath, $addedAt, $trackBy, $platform);
                 """;
             var id = command.Parameters.Add("$id", SqliteType.Text);
             var title = command.Parameters.Add("$title", SqliteType.Text);
@@ -74,6 +74,7 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
             var heroPath = command.Parameters.Add("$heroPath", SqliteType.Text);
             var addedAt = command.Parameters.Add("$addedAt", SqliteType.Text);
             var trackBy = command.Parameters.Add("$trackBy", SqliteType.Text);
+            var platform = command.Parameters.Add("$platform", SqliteType.Text);
             foreach (var record in manual)
             {
                 id.Value = record.Id;
@@ -85,6 +86,7 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
                 heroPath.Value = (object?)record.HeroPath ?? DBNull.Value;
                 addedAt.Value = FormatDate(record.AddedAt);
                 trackBy.Value = record.TrackBy is { } strategy ? strategy.ToString() : DBNull.Value;
+                platform.Value = (object?)record.Platform ?? DBNull.Value;
                 command.ExecuteNonQuery();
             }
         }
@@ -114,7 +116,7 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
     private static List<ManualGameRecord> ReadManual(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT id, title, path, arguments, working_directory, cover_path, hero_path, added_at, track_by FROM manual_games ORDER BY rowid;";
+        command.CommandText = "SELECT id, title, path, arguments, working_directory, cover_path, hero_path, added_at, track_by, platform FROM manual_games ORDER BY rowid;";
         using var reader = command.ExecuteReader();
         var result = new List<ManualGameRecord>();
         while (reader.Read())
@@ -131,6 +133,7 @@ public sealed class SqliteLibraryStore(TakoDatabase database, string? legacyJson
                 AddedAt = ParseDate(reader.GetString(7)),
                 // Valor desconhecido (versão mais nova gravou outro nome) volta ao automático.
                 TrackBy = !reader.IsDBNull(8) && Enum.TryParse<GameTrackingStrategy>(reader.GetString(8), out var strategy) ? strategy : null,
+                Platform = reader.IsDBNull(9) ? null : reader.GetString(9),
             });
         }
 

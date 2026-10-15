@@ -1,5 +1,5 @@
 <!--
-  Configurações › Dados dos jogos (IGDB), ADR-0021. Separado de Views.xaml para que a reorganização das Configurações
+  Configurações › Dados dos jogos (IGDB), ADR-0021, e Dados de ROMs (ScreenScraper), ADR-0022. Separado de Views.xaml para que a reorganização das Configurações
   mova só a linha que abre esta sobreposição. Usa FieldBox/FieldLabel de SessionViews.xaml e PillButton de Styles.xaml.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -83,6 +83,94 @@
 
           <!-- Atribuição exigida pelos termos da IGDB. -->
           <TextBlock Text="Dados e imagens fornecidos pela IGDB.com (Twitch). A IGDB não endossa o Tako." Margin="0,20,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+    <DataTemplate.Triggers>
+      <DataTrigger Binding="{Binding HasStatus}" Value="True">
+        <Setter TargetName="StatusText" Property="Visibility" Value="Visible" />
+      </DataTrigger>
+      <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+        <Setter TargetName="StatusText" Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+      </DataTrigger>
+    </DataTemplate.Triggers>
+  </DataTemplate>
+
+  <!-- Configurações › Dados de ROMs (ScreenScraper), ADR-0022: mesmo padrão da IGDB. ↑ ↓ ← → passam pelos botões e campos; Esc/B cancela. -->
+  <DataTemplate DataType="{x:Type vm:ScreenScraperSettingsViewModel}">
+    <Grid>
+      <Rectangle Fill="{DynamicResource ScrimBrush}" />
+      <Border Width="1180" CornerRadius="28" Background="#FF1A1E26" Padding="56,40" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel>
+          <TextBlock Text="Dados de ROMs (ScreenScraper)" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" />
+          <TextBlock Text="O ScreenScraper reconhece ROMs pelo arquivo e traz nome, descrição, caixa, logo, capturas e vídeo de jogos de console. Ele é gratuito, mas pede uma conta sua; o Tako guarda a conta cifrada neste PC." Margin="0,10,0,0" FontSize="{DynamicResource FsLabelMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" />
+
+          <Button Style="{StaticResource PillButton}" Margin="0,24,0,0" HorizontalAlignment="Stretch" Command="{Binding ToggleEnabledCommand}"
+                  nav:Nav.Group="overlay" nav:Nav.Key="ss:enabled" nav:Nav.IsDefault="True">
+            <TextBlock Text="{Binding EnabledLabel}" />
+          </Button>
+
+          <ItemsControl ItemsSource="{Binding Steps}" Margin="0,22,0,0" Focusable="False">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" Margin="0,0,0,8" FontSize="{DynamicResource FsLabelSm}" TextWrapping="Wrap" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Style="{StaticResource PillButton}" Margin="0,6,0,0" HorizontalAlignment="Left" Command="{Binding OpenSiteCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:site">
+            <TextBlock Text="Criar conta em screenscraper.fr" />
+          </Button>
+
+          <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Style="{StaticResource FieldLabel}" Text="Usuário do ScreenScraper" />
+              <TextBox Style="{StaticResource FieldBox}" Text="{Binding User, UpdateSourceTrigger=PropertyChanged}"
+                       nav:Nav.Group="overlay" nav:Nav.Key="ss:user" />
+            </StackPanel>
+            <Button Grid.Column="1" Style="{StaticResource PillButton}" Margin="18,0,0,0" VerticalAlignment="Bottom" Command="{Binding PasteUserCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:paste-user">
+              <TextBlock Text="Colar" />
+            </Button>
+          </Grid>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Style="{StaticResource FieldLabel}" Text="{Binding PasswordLabel}" />
+              <TextBox Style="{StaticResource FieldBox}" Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+                       nav:Nav.Group="overlay" nav:Nav.Key="ss:password" />
+            </StackPanel>
+            <Button Grid.Column="1" Style="{StaticResource PillButton}" Margin="18,0,0,0" VerticalAlignment="Bottom" Command="{Binding PastePasswordCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:paste-password">
+              <TextBlock Text="Colar" />
+            </Button>
+          </Grid>
+
+          <TextBlock x:Name="StatusText" Text="{Binding Status}" Margin="0,22,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
+
+          <Grid Margin="0,28,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button Style="{StaticResource PillButton}" Margin="0,0,18,0" Command="{Binding TestCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:test">
+              <TextBlock Text="{Binding TestLabel}" />
+            </Button>
+            <Button Grid.Column="1" Style="{StaticResource PillButton}" Tag="primary" Margin="0,0,18,0" Command="{Binding SaveCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:save">
+              <TextBlock Text="Salvar" />
+            </Button>
+            <Button Grid.Column="2" Style="{StaticResource PillButton}" Command="{Binding CancelCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:cancel">
+              <TextBlock Text="Cancelar" />
+            </Button>
+          </Grid>
+
+          <!-- Créditos exigidos pelo ScreenScraper. -->
+          <TextBlock Text="Dados e mídias fornecidos por ScreenScraper.fr, um banco de dados comunitário. Obrigado a todos os colaboradores." Margin="0,20,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
     </Grid>

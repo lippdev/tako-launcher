@@ -76,12 +76,7 @@ public sealed partial class ShellViewModel
     [RelayCommand]
     public void AddGame()
     {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Adicionar jogo",
-            Filter = "Jogos e atalhos|*.exe;*.lnk;*.url;*.bat;*.cmd|Todos os arquivos|*.*",
-            CheckFileExists = true,
-        };
+        var dialog = AddGameDialog();
         if (dialog.ShowDialog(System.Windows.Application.Current?.MainWindow) != true)
         {
             return;
@@ -92,6 +87,12 @@ public sealed partial class ShellViewModel
         {
             Toast($"{existing.Title} já está na biblioteca");
             OpenDetails(ItemFor(existing));
+            return;
+        }
+
+        if (Core.Library.Metadata.ScreenScraper.ScreenScraperSystems.LooksLikeRom(path))
+        {
+            AddRom(path); // ADR-0022: pergunta o sistema; a ROM não abre ainda (épico EMU)
             return;
         }
 

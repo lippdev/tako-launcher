@@ -75,7 +75,7 @@ public static class MetadataPriority
 {
     public const string Igdb = "IGDB";
 
-    /// <summary>Provedor de ROMs previsto (mídia de emulação por hash); ainda não implementado.</summary>
+    /// <summary>Provedor de ROMs (ADR-0022): casa pelo hash da ROM e traz a mídia de emulação.</summary>
     public const string ScreenScraper = "ScreenScraper";
 
     public static MetadataKind KindOf(Game game)
@@ -85,6 +85,12 @@ public static class MetadataPriority
             : game.Store == GameStore.Steam ? MetadataKind.Steam
             : MetadataKind.Pc;
     }
+
+    /// <summary>
+    /// A fonte atende o tipo de jogo? O ScreenScraper só atende ROMs (jogos de PC gastariam a cota diária do usuário sem
+    /// ganho, ADR-0022); as outras atendem todos (a Steam devolve nada para consoles sozinha).
+    /// </summary>
+    public static bool Applies(string provider, MetadataKind kind) => provider != ScreenScraper || kind == MetadataKind.Emulated;
 
     /// <summary>Ordem geral das fontes para o tipo de jogo.</summary>
     public static IReadOnlyList<string> Order(MetadataKind kind) => kind switch
@@ -161,6 +167,17 @@ public static class MetadataMerge
         int? steamAppId = found.Select(p => p.SteamAppId).FirstOrDefault(v => v is not null)
             ?? (ids.TryGetValue(SteamStoreProvider.SourceName, out string? steam) && int.TryParse(steam, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed) ? parsed : null);
         var order = MetadataPriority.Sort(found, p => p.Source, MetadataPriority.Order(kind));
+
+        // Outras mídias (caixa 3D, logo, vídeo...): cada tipo da primeira fonte que o tiver, na ordem da arte.
+        var media = new Dictionary<string, Uri>(StringComparer.Ordinal);
+        foreach (var part in By(MetadataField.Art))
+        {
+            foreach (var (kindKey, uri) in part.Media)
+            {
+                media.TryAdd(kindKey, uri);
+            }
+        }
+
         return new GameMetadata
         {
             Source = found.Count == 0 ? string.Join(" + ", consulted ?? []) : string.Join(" + ", order.Select(p => p.Source)),
@@ -183,6 +200,8 @@ public static class MetadataMerge
             CriticScore = FirstValue(MetadataField.Score, p => p.CriticScore),
             CoverUrl = art?.CoverUrl ?? (art?.SteamAppId is int coverId ? GameMetadata.SteamArt(coverId, "cover") : null),
             BackgroundUrl = art?.BackgroundUrl ?? (art?.SteamAppId is int heroId ? GameMetadata.SteamArt(heroId, "hero") : null),
+            Players = order.Select(p => p.Players).FirstOrDefault(p => p is not null),
+            Media = media,
         };
     }
 }
