@@ -7,6 +7,8 @@
     <AssemblyName>Tako</AssemblyName>
     <RootNamespace>Launcher.UI.Wpf</RootNamespace>
     <Product>Tako</Product>
+    <!-- Versão local; a release usa a da tag (build\Publish-Tako.ps1 -Version). -->
+    <Version>0.1.0</Version>
     <ApplicationIcon>Assets\Brand\tako.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- LibraryImport (XInput) gera código unsafe. -->

@@ -19,7 +19,7 @@ Regras:
 2. `feature/*` → `develop`: **squash merge**. `release/*` e `hotfix/*` → `main`: **merge commit** (`--no-ff`), depois tag e merge de volta em `develop`.
 3. Branches de feature vivem poucos dias; histórias grandes são quebradas. Faça rebase em `develop` antes do PR.
 4. Apague a branch após o merge.
-5. Tags: `vMAJOR.MINOR.PATCH` (SemVer; pré-lançamentos `-alpha.N`, `-beta.N`, `-rc.N`). Builds `-alpha.N` para teste podem ser marcadas direto em `develop`; `beta`, `rc` e versões finais saem de `release/*` → `main`. Toda tag `v*` dispara `.github/workflows/release.yml`, que publica os zips na página da release.
+5. Tags: `vMAJOR.MINOR.PATCH` (SemVer; pré-lançamentos `-alpha.N`, `-beta.N`, `-rc.N`). Builds `-alpha.N` para teste podem ser marcadas direto em `develop`; `beta`, `rc` e versões finais saem de `release/*` → `main`. Releases seguem o processo do Console Mode (seção 8).
 
 ## 2. Commits — Conventional Commits
 
@@ -71,7 +71,16 @@ Vale a DoD do [PRD §13](docs/PRD.md); o checklist está no template de PR.
 
 ## 8. Releases
 
-SemVer, `0.x` durante o MVP. Changelog em `CHANGELOG.md`. Fluxo: `develop` → `release/X.Y.Z` → PR para `main` → tag → merge de volta em `develop`.
+SemVer, `0.x` durante o MVP. Fluxo: `develop` → `release/X.Y.Z` → PR para `main` → tag → merge de volta em `develop`. O processo e os arquivos são os mesmos do Console Mode:
+
+1. Adicione a seção `## [X.Y.Z]` (ou `## [X.Y.Z-alpha.N]`) **nos dois changelogs**: `CHANGELOG.md` (português) e `CHANGELOG.en-US.md` (inglês). Um `(#NN)` no fim do item vira link para a PR. O workflow falha se faltar alguma seção.
+2. Publique de um destes jeitos (versão com hífen = pré-release):
+   - push de uma tag `vX.Y.Z` / `vX.Y.Z-alpha.N`; ou
+   - Actions › Release › Run workflow na `main`, com a versão e "publish" marcado (a tag é criada ali). Sem "publish", só gera os arquivos como artefato.
+3. A release sai com o nome `Tako X.Y.Z`, notas em inglês tiradas do `CHANGELOG.en-US.md` mais o link para o changelog em português, e os arquivos `Tako-Setup-x64.exe` (instalador Inno Setup, por usuário) e `Tako-Portable-x64.exe` (um único .exe; dados em `Tako_Data` ao lado). O kit do spike FSE (`Tako-FseKit-x64.zip`) acompanha enquanto o MVP-007 estiver aberto.
+4. Assinatura (SignPath) e envio ao winget ficam prontos no workflow e ligam quando as variáveis/segredos existirem (`SIGNPATH_*`, `WINGET_TOKEN`).
+
+Para gerar localmente: `.\build\Publish-Tako.ps1 -Runtime x64 -Target All -Version X.Y.Z`.
 
 ## 9. Issues
 

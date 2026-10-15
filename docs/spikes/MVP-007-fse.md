@@ -65,7 +65,7 @@ Ferramentas:
 - `tools/Launcher.FseProbe`: sem argumentos, gera um relatório do ambiente; com `--home`, é a tela que o Windows abre como home app e grava o ciclo de vida em `Documentos\Tako-FseProbe\home.log`.
 - `packaging/fse-dev/Register-FseProbe.ps1`: publica a probe e a registra como home app de desenvolvimento (sem MSIX nem certificado).
 
-Sem o SDK do .NET: baixe `Tako-FseKit-…-win-x64.zip` na página de releases. O kit traz a probe compilada e o `LEIA-ME.txt` com estes mesmos passos (`.\probe\Launcher.FseProbe.exe` no lugar de `dotnet run`).
+Sem o SDK do .NET: baixe `Tako-FseKit-x64.zip` na página de releases (ou gere com `build\Publish-Tako.ps1 -Target FseKit`). O kit traz a probe compilada e o `LEIA-ME.txt` com estes mesmos passos (`.\probe\Launcher.FseProbe.exe` no lugar de `dotnet run`).
 
 ### Passo 1: relatório do ambiente (não muda nada no PC)
 

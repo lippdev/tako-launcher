@@ -14,3 +14,5 @@ artifacts/
 .gstack/
 .DS_Store
 packaging/fse-dev/layout/
+dist/
+Tako_Data/

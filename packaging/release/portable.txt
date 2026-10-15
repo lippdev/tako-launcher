@@ -1,2 +1,0 @@
-Este arquivo ativa o modo portable do Tako: os dados ficam na pasta Data\ ao lado do Tako.exe.
-Apague-o para usar %LOCALAPPDATA%\Tako (como a versão instalada).

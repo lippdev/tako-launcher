@@ -3,19 +3,22 @@ using System.IO;
 namespace Launcher.UI.Wpf.Services;
 
 /// <summary>
-/// Onde o Tako guarda dados do usuário (biblioteca, cache de artes e metadados). Instalado: <c>%LOCALAPPDATA%\Tako</c>.
-/// Portable: com <c>portable.txt</c> ao lado do executável, tudo fica em <c>Data\</c> na própria pasta, para levar num
-/// pendrive ou HD externo sem deixar nada no PC.
+/// Onde o Tako guarda dados do usuário (biblioteca, cache de artes e metadados), no mesmo modelo do Console Mode:
+/// instalado (o instalador grava <c>Tako.installed</c> ao lado do executável) usa <c>%LOCALAPPDATA%\Tako</c>; sem o
+/// marcador (portable, um único .exe) usa a pasta <c>Tako_Data</c> ao lado do arquivo.
 /// </summary>
 public static class AppPaths
 {
-    public const string PortableMarker = "portable.txt";
+    public const string InstalledMarker = "Tako.installed";
 
-    public static bool IsPortable { get; } = File.Exists(Path.Combine(AppContext.BaseDirectory, PortableMarker));
+    /// <summary>Pasta do executável real (no .exe único, <see cref="AppContext.BaseDirectory"/> é a pasta de extração).</summary>
+    public static string ExecutableDirectory { get; } = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
 
-    public static string DataRoot { get; } = IsPortable
-        ? Path.Combine(AppContext.BaseDirectory, "Data")
-        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako");
+    public static bool IsInstalled { get; } = File.Exists(Path.Combine(ExecutableDirectory, InstalledMarker));
+
+    public static string DataRoot { get; } = IsInstalled
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako")
+        : Path.Combine(ExecutableDirectory, "Tako_Data");
 
     public static string LibraryFile => Path.Combine(DataRoot, "library.json");
 
