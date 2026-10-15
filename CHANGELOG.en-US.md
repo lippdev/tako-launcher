@@ -4,6 +4,26 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 
+## [0.1.0-alpha.10]
+### What's new
+- More stores in the library: **Epic Games**, **GOG** and **Xbox / PC Game Pass** games show up on their own and launch through the store's own client. Each store can be turned on or off in Settings › Library and stores; a game in two stores shows once per store, marked "Also in". (#39, #40)
+- **Console Mode menu** in the sidebar, with cards for Game screen, TV, Game audio, Steam in the tray, FPS counter and FPS limit, each showing whether it is on, off or needs attention. The "Set up to play on the TV" wizard walks you through it. (#45)
+- **Console mode on launch:** with the option on, Tako opens straight on the TV and only gives the displays back to the desk when you quit or choose "Back to PC". Emergency shortcut: Ctrl+Alt+Shift+D. Returning to the desk no longer freezes the screen. (#42)
+- **LG (webOS) and Samsung (Tizen) TVs**, besides Google TV and Android TV: turn on, switch to the PC's input and standby. (#38)
+- **Collections and per-game settings:** create collections, which show on the home screen and in filters. Each game can have its own game screen, resolution, HDR, audio output, FPS limit and counter. The ☰ button on a cover opens quick actions. (#41)
+- **Game data from IGDB and ScreenScraper**, with your own key (Twitch) or account, stored encrypted on this PC. Steam is still queried for every game. ScreenScraper identifies emulator ROMs by file, and "Add game" already accepts ROMs with a system picker. Launching ROMs in an emulator comes later. (#46, #47)
+- **Control Center with the game live behind it**, like Steam's, when the game runs windowed or borderless. The shortcut is now holding **Select + △** (Create + △ on PlayStation, View + Y on Xbox) or **Ctrl+Shift+T**; both can be changed in Settings › Controls. (#44)
+- Settings › System › **Controller test** shows live what the controller sends and copies it so you can send it when something goes wrong. (#43)
+
+### Fixes
+- **DualSense and DualSense Edge over Bluetooth with Steam closed:** D-pad up got stuck and the buttons did not respond. Tako also merges Steam's virtual controller and the PlayStation controller without one cancelling the other, and ignores the arrow-key echo Steam sends. (#43)
+- **Settings:** organized in categories, nothing hidden behind the hint bar, no technical text and developer options tucked away. The hint bar shortens instead of being cut off, and passwords and keys are masked. (#45)
+- **Open windows in the Control Center:** titles are no longer cut and the focused card is always fully visible. (#44)
+
+### For developers
+- ADR-0019 (library sources), ADR-0020 (settings layout), ADR-0021 (IGDB) and ADR-0022 (ScreenScraper). The hardware checklist now goes to section 24.
+- ScreenScraper's software credential comes from the `SCREENSCRAPER_DEVID` and `SCREENSCRAPER_DEVPASSWORD` CI secrets; without them ScreenScraper shows as unavailable.
+
 ## [0.1.0-alpha.9]
 ### What's new
 - Tako's own FPS counter, no RTSS: Tako measures FPS, frame time and 1% low through Intel's PresentMon, like CapFrameX, without touching the game. No more conflicts with MSI Afterburner or anti-cheat. The counter shows in Tako's own window over the game, in the FPS only, Compact and Detailed styles. (#36)
