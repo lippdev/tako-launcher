@@ -59,6 +59,12 @@
       "consolemode.runtime": {
         "type": "Project"
       },
+      "consolemode.runtime.windows": {
+        "type": "Project",
+        "dependencies": {
+          "ConsoleMode.Runtime": "[1.0.0, )"
+        }
+      },
       "launcher.core": {
         "type": "Project",
         "dependencies": {
@@ -83,6 +89,7 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.Mvvm": "[8.4.2, )",
+          "ConsoleMode.Runtime.Windows": "[1.0.0, )",
           "Launcher.Core": "[1.0.0, )",
           "Launcher.PlayniteCompat.P10": "[1.0.0, )",
           "Launcher.Themes": "[1.0.0, )",

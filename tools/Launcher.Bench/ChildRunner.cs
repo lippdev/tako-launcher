@@ -4,6 +4,9 @@ using System.Text.Json;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ConsoleMode.Runtime;
+using ConsoleMode.Runtime.Audio;
+using ConsoleMode.Runtime.Display;
+using ConsoleMode.Runtime.Simulation;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.UI.Wpf;
@@ -35,7 +38,10 @@ internal static class ChildRunner
         var app = new App();
         app.InitializeComponent();
         var library = new InMemoryGameLibrary(SyntheticLibrary.Create(games, art, DateTimeOffset.Now), TimeProvider.System);
-        using var services = App.BuildServices(library);
+        // Monitores e áudio simulados (como no teste de fumaça): o benchmark nunca muda a resolução nem o som da máquina.
+        using var services = App.BuildServices(library, s => s
+            .AddSingleton<IDisplayConfigurationService>(new SimulatedDisplayConfiguration())
+            .AddSingleton<IAudioEndpointService>(new SimulatedAudioEndpoints()));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         if (!theme.Succeeded)
         {
