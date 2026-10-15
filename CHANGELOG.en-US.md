@@ -6,7 +6,16 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [0.1.0-alpha.6]
 ### What's new
+- Games tracked for real: when you play, Tako notices when the game ends (through its process or, for Steam games, the game folder), records the real play time, comes back to the front and puts the focus back on the game, with "Welcome back". For added games, Options → Edit changes the name, arguments, working folder and how the end of the game is detected. (#18)
+- Playnite themes: import `.pthm` packages (with a safety check before any file is written) and manage everything in Settings → Themes: preview, compatibility report, use, remove and restore the default. Partial themes inherit the default theme. Three real themes were validated (PS5ish, Toggle and Revisited). (#19)
+- Safe mode: if Tako closes badly twice in a row, it opens with the built-in theme only and no updates, with an option to go back to normal. An unexpected error shows the "Something went wrong" screen with a one-step way back to the desktop. (#17)
+- "Open full screen when Windows starts" now works on the installed and portable builds. Settings shows whether the PC has Xbox mode. (#17)
+- Your settings and library live in a database (SQLite) and survive restarts; the old file is imported by itself. Diagnostic logs, with no personal data, in Settings → Open logs folder. (#16)
 - Automatic updates: when it opens, Tako looks for a new version and downloads it in the background, checking the file against the SHA-256 published on GitHub. When it's done, it asks whether to restart now or install on exit; during a game, the notice waits for the game to end. Works on the installed build (runs the installer silently) and the portable one (swaps the .exe). In Settings: check now, turn automatic updates off and get test versions. (#15)
+
+### Fixes
+- B on the "Starting" screen now really cancels (before, the game opened anyway). (#17)
+- A controller that disconnects, gets swapped or loses window focus no longer leaves the focus "moving by itself". (#17)
 
 ### Updating from 0.1.0-alpha.5
 - This is the last manual update: download the installer or the portable build from the release. From here on, Tako updates itself.

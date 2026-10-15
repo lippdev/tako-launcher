@@ -6,7 +6,16 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [0.1.0-alpha.6]
 ### Novidades
+- Jogos acompanhados de verdade: ao jogar, o Tako percebe quando o jogo termina (pelo processo ou, nos jogos da Steam, pela pasta do jogo), registra o tempo jogado real, volta para a frente e devolve o foco ao jogo, com "Bem-vindo de volta". Em jogos adicionados, Opções → Editar muda nome, argumentos, pasta de trabalho e como reconhecer o fim do jogo. (#18)
+- Temas do Playnite: importe pacotes `.pthm` (com checagem de segurança antes de gravar qualquer arquivo) e gerencie tudo em Configurações → Temas: prévia, diagnóstico de compatibilidade, usar, remover e restaurar o padrão. Temas parciais herdam o tema padrão. Três temas reais foram homologados (PS5ish, Toggle e Revisited). (#19)
+- Modo seguro: se o Tako fechar errado duas vezes seguidas, ele abre só com o tema embutido e sem atualizações, com a opção de voltar ao normal. Um erro inesperado mostra a tela "Algo deu errado" com saída para o desktop em um passo. (#17)
+- "Abrir em tela cheia ao iniciar o Windows" agora funciona nas versões instalada e portátil. Configurações mostra se o PC tem o Xbox mode. (#17)
+- Suas configurações e a biblioteca ficam num banco de dados (SQLite) e sobrevivem a reinícios; o arquivo antigo é importado sozinho. Logs de diagnóstico, sem dados pessoais, em Configurações → Abrir pasta de logs. (#16)
 - Atualização automática: ao abrir, o Tako procura uma versão nova e a baixa em segundo plano, conferindo o arquivo com o SHA-256 publicado no GitHub. Quando termina, pergunta se reinicia agora ou instala ao sair; durante um jogo, o aviso espera o jogo acabar. Funciona na versão instalada (roda o instalador em silêncio) e na portátil (troca o .exe). Em Configurações: verificar agora, desligar a atualização automática e receber versões de teste. (#15)
+
+### Correções
+- B na tela "Iniciando" agora cancela de verdade (antes o jogo abria mesmo assim). (#17)
+- Controle desconectado, trocado ou com a janela fora de foco não deixa mais o foco "andando sozinho". (#17)
 
 ### Atualizando da 0.1.0-alpha.5
 - Esta é a última atualização manual: baixe o instalador ou o portátil da release. A partir daqui o Tako se atualiza sozinho.
