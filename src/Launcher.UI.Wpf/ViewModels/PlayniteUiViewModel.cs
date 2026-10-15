@@ -21,6 +21,7 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
     private readonly Dictionary<string, GameItemViewModel> _items = new(StringComparer.Ordinal);
     private readonly Dictionary<string, P10GameEntry> _entries = new(StringComparer.Ordinal);
     private string _signature = string.Empty;
+    private P10SubFilterKind? _lastSubFilter;
     private bool _disposed;
 
     public PlayniteUiViewModel(ShellViewModel shell, P10ThemeReport report, InstalledTheme theme)
@@ -56,6 +57,26 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
 
     /// <summary>Detalhes do jogo abertos dentro do tema (B fecha).</summary>
     public bool IsDetailsOpen => Model.GameDetailsVisible;
+
+    /// <summary>Painel de filtros ou lista de fonte/gênero aberto dentro do tema (B volta um nível).</summary>
+    public bool IsFilterOpen => Model.FilterPanelVisible || Model.SubFilterVisible;
+
+    /// <summary>
+    /// Onde o foco vai quando os painéis do tema mudam: botão principal dos detalhes, o filtro padrão do painel (ou o
+    /// botão da lista de onde se voltou), ou a capa selecionada.
+    /// </summary>
+    public string? PanelFocusKey => (IsDetailsOpen, Model.SubFilterVisible, Model.FilterPanelVisible) switch
+    {
+        (true, _, _) => $"{GameDetails.DetailsGroup}:play",
+        (_, true, _) => null,
+        (_, _, true) => _lastSubFilter switch
+        {
+            P10SubFilterKind.Sources => $"{Filters.FiltersGroup}:sources",
+            P10SubFilterKind.Genres => $"{Filters.FiltersGroup}:genres",
+            _ => null,
+        },
+        _ => SelectedFocusKey,
+    };
 
     /// <summary>Chave de navegação do jogo selecionado (ou nulo).</summary>
     public string? SelectedFocusKey => Model.SelectedGame is { } game ? $"{Main.GamesGroup}:{game.Id}" : null;
@@ -158,7 +179,8 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
 
     public void OpenMainMenu() => _shell.OpenSettings();
 
-    public void OpenSearch() => _shell.Toast("Busca com teclado virtual chega no UX-001 (pós-MVP)");
+    /// <summary>Busca do tema (<c>PART_ButtonSearch</c> ou Y): o teclado virtual do Tako escreve no texto buscado do tema.</summary>
+    public void OpenSearch() => _shell.OpenSearch();
 
     public void OpenNotifications() => _shell.Toast("Nenhuma notificação");
 
@@ -235,9 +257,26 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
 
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(P10MainModel.GameDetailsVisible))
+        switch (e.PropertyName)
         {
-            _shell.OnPlayniteDetailsChanged();
+            case nameof(P10MainModel.SubFilter):
+                _lastSubFilter = Model.SubFilter?.Kind ?? _lastSubFilter;
+                _shell.OnPlayniteDetailsChanged();
+                break;
+            case nameof(P10MainModel.FilterPanelVisible):
+                if (!Model.FilterPanelVisible && !Model.SubFilterVisible)
+                {
+                    _lastSubFilter = null; // painel fechado: na próxima abertura o foco vai ao primeiro filtro
+                }
+
+                _shell.OnPlayniteDetailsChanged();
+                break;
+            case nameof(P10MainModel.GameDetailsVisible):
+                _shell.OnPlayniteDetailsChanged();
+                break;
+            case nameof(P10MainModel.IsSearchActive):
+                _shell.OnPlayniteSearchChanged();
+                break;
         }
     }
 

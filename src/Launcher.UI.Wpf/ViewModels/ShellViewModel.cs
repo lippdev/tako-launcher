@@ -175,6 +175,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public void OpenLibrary(LibraryFilter filter)
     {
         var item = SidebarItems.FirstOrDefault(s => s.Filter == filter);
+        _libraryCriteria = _libraryCriteria with { Search = string.Empty }; // nova rota: filtros e ordem ficam, a busca não
         Navigate(new LibraryViewModel(this, filter, LibraryTitle(filter), item?.Key ?? "library:all"), replace: CurrentPage is LibraryViewModel);
     }
 
@@ -199,7 +200,7 @@ public sealed partial class ShellViewModel : ObservableObject
             return;
         }
 
-        if (TryBackInPlayniteUi())
+        if (TryBackInPlayniteUi() || TryClearLibrarySearch())
         {
             return;
         }
@@ -645,6 +646,18 @@ public sealed partial class ShellViewModel : ObservableObject
                 break;
             case LaunchOverlayViewModel:
                 list.Add(("a", "Cancelar", AppCommand.Accept));
+                break;
+            case SearchViewModel when key:
+                // Teclado físico: digita direto; Enter conclui.
+                list.Add(("a", "Pronto", AppCommand.Menu));
+                list.Add(("b", "Fechar", AppCommand.Back));
+                break;
+            case SearchViewModel:
+                list.Add(("a", "Digitar", AppCommand.Accept));
+                list.Add(("x", "Apagar", AppCommand.Favorite));
+                list.Add(("y", "Espaço", AppCommand.Search));
+                list.Add(("menu", "Pronto", AppCommand.Menu));
+                list.Add(("b", "Fechar", AppCommand.Back));
                 break;
             case not null:
                 list.Add(("a", "Selecionar", AppCommand.Accept));

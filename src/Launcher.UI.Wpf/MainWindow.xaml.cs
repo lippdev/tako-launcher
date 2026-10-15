@@ -84,6 +84,7 @@ public partial class MainWindow : Window
         _shell.Settings.PropertyChanged += (_, _) => Backdrop.Transition = _shell.Settings.ColorDuration;
 
         PreviewKeyDown += OnPreviewKeyDown;
+        PreviewTextInput += OnPreviewTextInput;
         PreviewMouseMove += OnPreviewMouseMove;
         PreviewMouseWheel += OnPreviewMouseWheel;
         PreviewMouseLeftButtonDown += OnPreviewMouseDown;
@@ -147,8 +148,19 @@ public partial class MainWindow : Window
 
         var focused = _navigator.Focused;
         bool noOverlay = _shell.TopOverlay is null;
+        var search = _shell.TopOverlay as SearchViewModel;
         switch (command)
         {
+            // Teclado virtual da busca (UX-001): X apaga, Y põe espaço, ☰ conclui.
+            case AppCommand.Favorite when search is not null:
+                search.Backspace();
+                break;
+            case AppCommand.Search when search is not null:
+                search.Space();
+                break;
+            case AppCommand.Menu when search is not null:
+                search.Finish();
+                break;
             case AppCommand.Left or AppCommand.Right:
                 var direction = command == AppCommand.Left ? NavDirection.Left : NavDirection.Right;
                 if (focused is not null && Nav.GetAdjustCommand(focused) is { } adjust)
@@ -184,7 +196,7 @@ public partial class MainWindow : Window
                 _shell.ToggleFavorite(game);
                 break;
             case AppCommand.Search when noOverlay:
-                _shell.Toast("Busca com teclado virtual chega no UX-001 (pós-MVP)");
+                _shell.OpenSearch();
                 break;
             case AppCommand.PreviousSection:
                 _shell.CycleSection(-1);
@@ -213,6 +225,21 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Busca aberta: o teclado físico digita (o texto chega em OnPreviewTextInput); setas navegam nas teclas da tela.
+        if (_shell.TopOverlay is SearchViewModel search)
+        {
+            if (HandleSearchKey(search, key))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (key is not (Key.Up or Key.Down or Key.Left or Key.Right or Key.Escape))
+            {
+                return; // letras e símbolos (inclusive F, Q, E, M e /) viram texto, não atalho
+            }
+        }
+
         // Campo de texto (ex.: editar jogo): letras, espaço, ← → e Backspace são do campo; ↑ ↓ e Esc navegam e Enter vai ao próximo.
         if (e.OriginalSource is TextBox)
         {
@@ -233,6 +260,38 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             Handle(command, InputKind.Keyboard);
+        }
+    }
+
+    /// <summary>
+    /// Teclas do teclado físico com a busca aberta. Backspace apaga e Enter conclui; espaço digita (não "aperta" a tecla
+    /// em foco). Letras e símbolos seguem para <see cref="OnPreviewTextInput"/>; setas e Esc navegam normalmente.
+    /// </summary>
+    private bool HandleSearchKey(SearchViewModel search, Key key)
+    {
+        _shell.InputKind = InputKind.Keyboard;
+        switch (key)
+        {
+            case Key.Back:
+                search.Backspace();
+                return true;
+            case Key.Enter:
+                search.Finish();
+                return true;
+            case Key.Space:
+                search.Space();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        if (_shell.TopOverlay is SearchViewModel search && !string.IsNullOrEmpty(e.Text))
+        {
+            search.Type(e.Text);
+            e.Handled = true;
         }
     }
 

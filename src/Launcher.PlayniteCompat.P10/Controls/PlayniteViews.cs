@@ -12,8 +12,9 @@ namespace Launcher.PlayniteCompat.P10.Controls;
 /// Tela principal de um tema Fullscreen do Playnite (<c>Views/Main.xaml</c>, MVP-019). O tema só desenha; este controle
 /// liga os elementos nomeados (<c>PART_</c>) ao <see cref="P10MainModel"/> (DataContext), como o
 /// <c>Playnite.FullscreenApp.Controls.Views.Main</c>: grade de jogos e seleção, botões do menu principal e das ações,
-/// filtros rápidos, relógio, detalhes do jogo. Elementos sem equivalente no Tako (bateria, progresso, atualização do
-/// Playnite, painel completo de filtros, status do jogo) ficam ocultos.
+/// filtros rápidos, busca (<c>PART_ElemSearchActive</c>), painel de filtros (<c>PART_ElemFilters</c>) e lista de fonte ou
+/// gênero (<c>PART_ContentFilterItems</c>), relógio, detalhes do jogo. Elementos sem equivalente no Tako (bateria,
+/// progresso, atualização do Playnite, filtros adicionais, status do jogo) ficam ocultos.
 /// </summary>
 [TemplatePart(Name = "PART_ListGameItems", Type = typeof(ListBox))]
 [TemplatePart(Name = "PART_ButtonPlay", Type = typeof(ButtonBase))]
@@ -29,6 +30,8 @@ namespace Launcher.PlayniteCompat.P10.Controls;
 [TemplatePart(Name = "PART_ImageBackground", Type = typeof(Image))]
 [TemplatePart(Name = "PART_ElemGameDetails", Type = typeof(FrameworkElement))]
 [TemplatePart(Name = "PART_ElemGameStatus", Type = typeof(FrameworkElement))]
+[TemplatePart(Name = "PART_ElemFilters", Type = typeof(FrameworkElement))]
+[TemplatePart(Name = "PART_ContentFilterItems", Type = typeof(ContentControl))]
 public class Main : Control
 {
     public const string GamesGroup = "p10-games";
@@ -73,8 +76,15 @@ public class Main : Control
         BindVisibility("PART_ElemSearchActive", nameof(P10MainModel.IsSearchActive));
         BindVisibility("PART_ElemExtraFilterActive", nameof(P10MainModel.IsExtraFilterActive));
         BindVisibility("PART_ElemFilters", nameof(P10MainModel.FilterPanelVisible));
-        BindVisibility("PART_ElemFiltersAdditional", nameof(P10MainModel.FilterPanelVisible));
-        BindVisibility("PART_ContentFilterItems", nameof(P10MainModel.FilterPanelVisible));
+        BindVisibility("PART_ElemFiltersAdditional", nameof(P10MainModel.FilterAdditionalPanelVisible));
+        BindVisibility("PART_ContentFilterItems", nameof(P10MainModel.SubFilterVisible));
+        if (Part<ContentControl>("PART_ContentFilterItems") is { } subFilterHost)
+        {
+            // Lista de fonte/gênero: o controle do tema (FilterDbItemtSelection) com a lista aberta como DataContext.
+            var selection = new FilterDbItemtSelection();
+            selection.SetBinding(DataContextProperty, new Binding($"{nameof(DataContext)}.{nameof(P10MainModel.SubFilter)}") { Source = this });
+            subFilterHost.Content = selection;
+        }
         BindVisibility("PART_ElemGameStatus", nameof(P10MainModel.GameStatusVisible));
         BindVisibility("PART_ElemBatteryStatus", nameof(P10MainModel.ShowBattery));
         BindVisibility("PART_TextBatteryPercentage", nameof(P10MainModel.ShowBattery));

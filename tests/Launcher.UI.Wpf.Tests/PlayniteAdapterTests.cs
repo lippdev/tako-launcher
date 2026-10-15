@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Markup;
+using Launcher.Core.Library;
 using Launcher.PlayniteCompat.P10.Controls;
 using Launcher.PlayniteCompat.P10.Data;
 using Launcher.PlayniteCompat.P10.Markup;
@@ -13,6 +14,8 @@ namespace Launcher.UI.Wpf.Tests;
 public class PlayniteAdapterTests
 {
     private static readonly string[] InstalledIds = ["a", "c"];
+    private static readonly string[] ByName = ["c", "a", "b"];
+    private static readonly string[] SteamInstalled = ["c", "a"];
 
     [Fact]
     public void Theme_file_paths_never_leave_the_theme_folder()
@@ -118,8 +121,8 @@ public class PlayniteAdapterTests
         model.SelectedGame = model.Games[2];
         Assert.Equal("c", host.LastSelection?.Id);
 
-        // Filtro rápido (PART_ButtonFilter / FilterPresetSelector): mantém o selecionado quando ele continua na lista.
-        model.ToggleFiltersCommand.Execute(null);
+        // Filtro rápido (FilterPresetSelector): mantém o selecionado quando ele continua na lista.
+        model.NextFilterPresetCommand.Execute(null);
         Assert.Equal("Instalados", model.ActiveFilterPreset!.Name);
         Assert.True(model.ActiveFilterPreset.IsActive);
         Assert.False(model.FilterPresets[0].IsActive);
@@ -141,6 +144,85 @@ public class PlayniteAdapterTests
         Assert.True(host.MenuOpened);
     }
 
+    [Fact]
+    public void Main_model_searches_filters_and_sorts_with_the_library_rules()
+    {
+        var host = new FakeHost();
+        var model = new P10MainModel(host, []);
+        model.SetGames(
+        [
+            new P10GameEntry("a", "Pokémon Edição") { IsInstalled = true, Source = new("Steam"), Genres = [new("RPG")], CriticScore = 80 },
+            new P10GameEntry("b", "Zelda") { Source = new("Adicionado"), Genres = [new("Aventura")], CriticScore = 95, Favorite = true },
+            new P10GameEntry("c", "Ágata") { IsInstalled = true, Source = new("Steam"), LastActivity = DateTime.Now },
+        ]);
+        List<string> Ids() => [.. model.Games.Select(g => g.Id)];
+
+        // Ordem de nome do Playnite, sem diferenciar acentos.
+        Assert.Equal(ByName, Ids());
+
+        // Busca (PART_ButtonSearch → teclado do launcher → PART_ElemSearchActive): sem acento e sem maiúsculas.
+        model.OpenSearchCommand.Execute(null);
+        Assert.True(host.SearchOpened);
+        model.SearchText = "POKEMON edicao";
+        Assert.Equal(["a"], Ids());
+        Assert.True(model.IsSearchActive);
+        Assert.False(model.IsExtraFilterActive);
+        Assert.Equal("POKEMON edicao", model.AppSettings.Fullscreen.FilterSettings.Name);
+        Assert.True(model.HandleBack()); // B limpa a busca
+        Assert.False(model.IsSearchActive);
+        Assert.Equal(ByName, Ids());
+
+        // Painel de filtros (PART_ButtonFilter → PART_ElemFilters): Instalados e Não instalados se excluem.
+        model.ToggleFiltersCommand.Execute(null);
+        Assert.True(model.FilterPanelVisible);
+        model.FilterPanel.Installed.Command.Execute(null);
+        Assert.True(model.FilterPanel.Installed.IsChecked);
+        Assert.Equal(SteamInstalled, Ids());
+        Assert.True(model.IsExtraFilterActive);
+        model.FilterPanel.Uninstalled.Command.Execute(null);
+        Assert.False(model.FilterPanel.Installed.IsChecked);
+        Assert.Equal(["b"], Ids());
+        Assert.True(model.FilterPanel.Clear.IsVisible);
+        model.FilterPanel.Clear.Command.Execute(null);
+        Assert.Equal(3, model.Games.Count);
+        Assert.False(model.FilterPanel.Clear.IsVisible);
+        Assert.True(model.FilterPanel.Genres.IsVisible); // há gêneros nos metadados
+
+        // Lista de fontes (FilterDbItemtSelection em PART_ContentFilterItems): o painel sai, B volta para ele.
+        model.FilterPanel.Sources.Command.Execute(null);
+        Assert.False(model.FilterPanelVisible);
+        Assert.True(model.SubFilterVisible);
+        Assert.Equal("Fonte", model.SubFilter!.Title);
+        var steam = model.SubFilter.Options.Single(o => o.Key == "Steam");
+        Assert.Equal("Steam (2)", steam.Name);
+        steam.Command.Execute(null);
+        Assert.True(steam.IsChecked);
+        Assert.Equal(SteamInstalled, Ids());
+        Assert.Equal("Fonte (1)", model.FilterPanel.Sources.Name);
+        model.SubFilter.ClearCommand.Execute(null);
+        Assert.False(steam.IsChecked);
+        steam.Command.Execute(null);
+        Assert.True(model.HandleBack());
+        Assert.True(model.FilterPanelVisible);
+        Assert.False(model.SubFilterVisible);
+
+        // Ordenar: a próxima opção depois de Nome é Tempo de jogo.
+        model.FilterPanel.Sort.Command.Execute(null);
+        Assert.Equal(LibrarySort.PlayTime, model.Criteria.Sort);
+        Assert.Equal("Ordenar: Tempo de jogo", model.FilterPanel.Sort.Name);
+
+        // B fecha o painel; os filtros continuam valendo e B não os apaga.
+        Assert.True(model.HandleBack());
+        Assert.False(model.FilterPanelVisible);
+        Assert.Equal(2, model.Games.Count);
+        Assert.False(model.HandleBack());
+
+        // PART_ButtonFilter abre e fecha o painel.
+        model.ToggleFiltersCommand.Execute(null);
+        model.ToggleFiltersCommand.Execute(null);
+        Assert.False(model.FilterPanelVisible);
+    }
+
     private sealed class FakeHost : IP10Host
     {
         public P10GameEntry? Activated { get; private set; }
@@ -159,9 +241,9 @@ public class PlayniteAdapterTests
 
         public void OpenMainMenu() => MenuOpened = true;
 
-        public void OpenSearch()
-        {
-        }
+        public bool SearchOpened { get; private set; }
+
+        public void OpenSearch() => SearchOpened = true;
 
         public void OpenNotifications()
         {
