@@ -2,9 +2,9 @@ namespace Launcher.Core.Library;
 
 /// <summary>
 /// Biblioteca real: jogos encontrados nas lojas instaladas (<paramref name="discover"/>, hoje a Steam) mais os adicionados
-/// pelo usuário, com favoritos e "jogado por último" guardados em <see cref="LibraryStore"/>.
+/// pelo usuário, com favoritos e "jogado por último" guardados em <see cref="ILibraryStore"/>.
 /// </summary>
-public sealed class LocalGameLibrary(Func<IReadOnlyList<Game>> discover, LibraryStore store, TimeProvider time, Action<Game>? enrich = null) : IGameLibrary
+public sealed class LocalGameLibrary(Func<IReadOnlyList<Game>> discover, ILibraryStore store, TimeProvider time, Action<Game>? enrich = null) : IGameLibrary
 {
     private List<Game> _games = [];
 

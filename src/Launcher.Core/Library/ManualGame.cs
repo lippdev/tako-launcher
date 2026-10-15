@@ -1,6 +1,6 @@
 namespace Launcher.Core.Library;
 
-/// <summary>Jogo adicionado pelo usuário (executável, atalho ou URI). Persistido em <see cref="LibraryStore"/>.</summary>
+/// <summary>Jogo adicionado pelo usuário (executável, atalho ou URI). Persistido em <see cref="ILibraryStore"/>.</summary>
 public sealed record ManualGameRecord
 {
     public required string Id { get; init; }

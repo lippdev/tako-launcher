@@ -3,10 +3,10 @@ using System.Text.Json;
 namespace Launcher.Core.Library;
 
 /// <summary>
-/// Biblioteca do usuário em JSON (<c>%LOCALAPPDATA%\Tako\library.json</c>): jogos adicionados e estado por jogo.
-/// Gravação atômica (arquivo temporário + troca). SQLite com migrações continua planejado (MVP-005).
+/// Formato antigo da biblioteca do usuário (<c>library.json</c>): jogos adicionados e estado por jogo. Desde o MVP-005
+/// o app usa <see cref="Persistence.SqliteLibraryStore"/>, que importa este arquivo na primeira abertura.
 /// </summary>
-public sealed class LibraryStore(string path)
+public sealed class LibraryStore(string path) : ILibraryStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
