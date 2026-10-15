@@ -14,6 +14,8 @@ Objetivo: provar H1, H2, H3 ou registrar limitações. **Fechamento:** [`docs/ma
 ## Marco 1 — MVP Alpha
 Épicos do PRD §5 na ordem: A (fundação) → D (biblioteca) → B (FSE/fallback) → C (temas) → E (controle) → F (qualidade/distribuição).
 
+**Status (0.1.0-alpha.6):** plano, frentes e o que falta em [`docs/marco-1/plano.md`](marco-1/plano.md). Bloqueios restantes: LEGAL-001 (runtime: MVP-002/003/006/012), SCCD da Microsoft e hardware (MVP-007/009), máquinas de referência (MVP-035).
+
 ## Pendências antes de codar o runtime
 - `LEGAL-001`: licença (repo MIT vs. AGPL do Console Mode) e reuso de código. Opções e recomendação em [`legal/LEGAL-001.md`](legal/LEGAL-001.md).
 - Migração do runtime compartilhado de .NET 8 para .NET 10 (PRD §3).
