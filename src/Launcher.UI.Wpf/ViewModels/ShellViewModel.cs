@@ -137,7 +137,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public SettingsService Settings { get; }
 
-    /// <summary>Ferramentas da Central de Controle (janelas, RTSS, ponteiro, ControlFS, desempenho).</summary>
+    /// <summary>Ferramentas da Central de Controle (janelas, contador e limite de FPS, ponteiro, ControlFS, desempenho).</summary>
     public SessionToolsService SessionTools { get; }
 
     public SessionOptions SessionOptions { get; } = new();
@@ -618,7 +618,11 @@ public sealed partial class ShellViewModel : ObservableObject
         UpdateHints();
     }
 
-    partial void OnInputKindChanged(InputKind value) => UpdateHints();
+    partial void OnInputKindChanged(InputKind value)
+    {
+        UpdateHints();
+        (CurrentPage as SettingsViewModel)?.OnInputKindChanged(); // "Mostrar FPS" só com teclado e mouse
+    }
 
     partial void OnIsPlayStationPadChanged(bool value) => UpdateHints();
 

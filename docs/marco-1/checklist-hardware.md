@@ -187,11 +187,11 @@ Com um jogo real aberto pelo Tako (ex.: um jogo da Steam em tela cheia sem borda
 | G2 | Janelas abertas | A fileira lista as janelas do Alt+Tab com ícones; A alterna para uma (o jogo segue aberto); X fecha (um programa com algo não salvo pergunta antes) |
 | G3 | Encerrar jogo (jogo real) | O jogo recebe o pedido de fechar e volta à frente; ao fechar, "Bem-vindo de volta" |
 | G4 | Desempenho | Cartão e painel mostram CPU, GPU (com temperatura, se o driver informar) e RAM próximos do Gerenciador de Tarefas |
-| G5 | RTSS não instalado | Painel de Desempenho mostra "Baixar o RTSS" para o contador; o limite de FPS continua disponível (§13); nada trava |
-| G6 | RTSS instalado: contador | Só FPS / Compacto / Detalhado aparecem no jogo; posição, tamanho e fundo mudam na hora; o OSD do Afterburner some enquanto o contador do Tako está ligado e volta em "O do RTSS" |
-| G7 | Limite de FPS | Agora pelo driver de vídeo: ver §13 |
+| G5 | Contador de FPS desligado | Painel de Desempenho mostra as opções de FPS esmaecidas com "Ative o contador de FPS nas Configurações do Tako, com teclado e mouse."; nada trava |
+| G6 | Contador de FPS ligado | Ver §14 (contador próprio, sem RTSS) |
+| G7 | Limite de FPS | Pelo driver de vídeo: ver §13 |
 | G8 | Ponteiro | Esconder some com o ponteiro em todos os apps e ele volta ao fim da sessão; mover com o analógico funciona com Xbox e com DualSense; A, A duplo e segurar A clicam, clicam com o direito e arrastam |
-| G9 | Queda com o ponteiro escondido ou limite aplicado | Finalizar `Tako.exe` e abrir de novo: ponteiro visível e limite do usuário de volta |
+| G9 | Queda com o ponteiro escondido ou o contador de FPS medindo | Finalizar `Tako.exe` e abrir de novo: ponteiro visível; `PresentMon.exe` fechado e `logman query -ets` sem a sessão `Tako_FPS` |
 | G10 | ControlFS | Instalado: abre por cima do jogo; não instalado: "Baixar o ControlFS" abre a página |
 
 ## 12. Áudio, Steam e TV durante o jogo (MVP-002, [ADR-0016](../adr/0016-audio-steam-e-tv-na-sessao.md))
@@ -237,6 +237,33 @@ Uma máquina de cada fabricante: **NVIDIA** (GeForce com driver recente), **AMD*
 | L10 | Notebook híbrido | Intel + NVIDIA; jogo com "Alto desempenho" em Configurações › Tela › Gráficos | O limite vai para a NVIDIA; com "Economia de energia", para a Intel. **Anotar** o que acontece sem preferência |
 | L11 | Jogo da Steam | Jogo da Steam (exe só conhecido quando o processo aparece) | O limite é aplicado quando o jogo aparece; **anotar** se precisou reabrir o jogo |
 | L12 | Duas placas Intel | Arc + integrada | O limite vale no jogo e volta nas duas ao fechar |
+
+## 14. Contador de FPS sem RTSS ([ADR-0017](../adr/0017-contador-de-fps-com-presentmon.md))
+
+Contador próprio: o PresentMon da Intel (junto com o Tako) lê os eventos de apresentação do Windows e o Tako desenha
+uma janela transparente por cima do jogo. Nada é injetado no jogo. Ligar exige que a conta esteja no grupo
+"Usuários de log de desempenho" (uma vez, com UAC). Usar a versão publicada (instalador ou portátil): rodando pelo
+código-fonte, o PresentMon não vem junto.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| F1 | Com controle nas Configurações | Usar só o controle e ir em Configurações › Mostrar FPS | Linha esmaecida com "Use teclado e mouse para ativar"; A só mostra o aviso, nenhum UAC abre |
+| F2 | Ligar com teclado e mouse | Clicar em Mostrar FPS | Explica "Para medir o FPS sem tocar no jogo, o Windows precisa liberar o Tako uma única vez." e, em Continuar, abre o UAC |
+| F3 | Usuário padrão | Conta sem administrador; no UAC digitar a senha de outro administrador | A conta **que pediu** entra no grupo (conferir com `net localgroup "Usuários de log de desempenho"` ou o nome do grupo no idioma do Windows); a conta do administrador não |
+| F4 | Sair e entrar | Depois de F2/F3, abrir um jogo sem sair do Windows | Configurações mostra "Saia e entre no Windows de novo para o contador funcionar."; depois de sair e entrar, o contador funciona |
+| F5 | UAC com controle | Windows 11 em portátil (ROG Ally / Xbox Ally, Legion Go) só com controle | Anotar se o UAC aceita o controle; com o controle o Tako não deixa abrir o UAC (F1) |
+| F6 | Instalador com a caixa marcada | Instalar com "Ativar contador de FPS (o Windows vai pedir permissão)" marcado | No fim, um UAC; Mostrar FPS já ligado ao abrir o Tako; depois de sair e entrar, funciona. Com a caixa desmarcada (padrão), nenhum UAC |
+| F7 | Atualização silenciosa | Atualizar pelo Tako uma instalação feita com a caixa marcada | Nenhum UAC durante a atualização |
+| F8 | Estilos | Na Central: Só FPS, Compacto, Detalhado, Desligado; posição, tamanho e fundo escuro | Muda na hora sobre o jogo; Detalhado mostra tempo de quadro, 1% low e API (DXGI, D3D9…) |
+| F9 | Telas 2K e 4K | Monitor 1440p e 2160p com escala 125%, 150% e 200%; jogo no segundo monitor | Contador no canto certo do monitor do jogo, texto nítido e no mesmo tamanho físico |
+| F10 | Janela do contador | Durante o jogo, clicar onde está o contador; Alt+Tab | O clique vai para o jogo; o contador não aparece no Alt+Tab nem rouba o foco |
+| F11 | Tela cheia exclusiva | Jogo em tela cheia exclusiva (não "sem bordas") | O contador não aparece sobre o jogo (limite do Windows); a Central mostra "FPS do jogo" com números |
+| F12 | Precisão | Comparar com CapFrameX ou FrameView no mesmo jogo | FPS e 1% low parecidos (±2 FPS em cena parada) |
+| F13 | Convivência | Afterburner + RTSS abertos com OSD, e CapFrameX capturando | Os três seguem funcionando; o Tako não muda nada no RTSS/Afterburner; `logman query -ets` mostra a sessão `Tako_FPS` ao lado das deles |
+| F14 | Fim da sessão | Fechar o jogo | `PresentMon.exe` fecha junto e a sessão `Tako_FPS` some |
+| F15 | Queda do Tako | Finalizar `Tako.exe` (Gerenciador de Tarefas) com o contador ligado | `PresentMon.exe` fecha junto (Job Object); ao abrir o Tako de novo, a sessão `Tako_FPS` some |
+| F16 | Anti-cheat | Um jogo com Easy Anti-Cheat e um com BattlEye, contador ligado | O jogo abre e roda sem aviso nem expulsão (o PresentMon não entra no processo do jogo); anotar jogo e versão |
+| F17 | Remover permissão | Configurações › Remover permissão do contador de FPS (teclado e mouse) | UAC; a conta sai do grupo; o contador fica desligado |
 
 ## Resultados
 

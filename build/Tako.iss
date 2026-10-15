@@ -63,9 +63,18 @@ es.DesktopShortcut=Acceso directo de Tako en el escritorio
 ptbr.LaunchApp=Abrir o Tako
 en.LaunchApp=Open Tako
 es.LaunchApp=Abrir Tako
+ptbr.FpsCounter=Ativar contador de FPS (o Windows vai pedir permissão)
+en.FpsCounter=Turn on the FPS counter (Windows will ask for permission)
+es.FpsCounter=Activar el contador de FPS (Windows pedirá permiso)
+ptbr.FpsCounterStatus=Liberando o contador de FPS no Windows...
+en.FpsCounterStatus=Allowing the FPS counter in Windows...
+es.FpsCounterStatus=Habilitando el contador de FPS en Windows...
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; Flags: unchecked
+; Contador de FPS (ADR-0017): põe o usuário que instalou no grupo "Usuários de log de desempenho" (S-1-5-32-559) por um
+; UAC no fim. O resto da instalação continua por usuário, sem administrador.
+Name: "fpscounter"; Description: "{cm:FpsCounter}"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -77,6 +86,9 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
+; Roda como o usuário que instalou (instalador sem elevação): o Tako lê o SID dele, pede o UAC só para o passo elevado
+; e liga "Mostrar FPS". Atualizações silenciosas não repetem o pedido.
+Filename: "{app}\{#AppExe}"; Parameters: "--setup-fps-counter"; StatusMsg: "{cm:FpsCounterStatus}"; Flags: waituntilterminated; Tasks: fpscounter; Check: not WizardSilent
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
 ; Silent installs (in-app updates): bring the app back afterwards, unless the update runs as the app exits (/NOLAUNCH=1).
 Filename: "{app}\{#AppExe}"; Flags: nowait; Check: RelaunchAfterSilentUpdate

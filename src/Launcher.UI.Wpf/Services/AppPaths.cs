@@ -48,8 +48,14 @@ public static class AppPaths
     /// <summary>Marcador de ponteiro escondido pela Central de Controle; existe só enquanto ele está escondido.</summary>
     public static string CursorHiddenMarker => Path.Combine(DataRoot, "cursor-hidden");
 
-    /// <summary>Limite de FPS do RTSS que o usuário tinha antes da sessão, até ser devolvido.</summary>
-    public static string RtssLimitBackupFile => Path.Combine(DataRoot, "rtss-fps-limit.txt");
+    /// <summary>
+    /// PresentMon da Intel distribuído com o Tako (ADR-0017): na pasta de instalação ou, no .exe portátil, na pasta de
+    /// extração (<see cref="AppContext.BaseDirectory"/>). Ausente nas compilações locais.
+    /// </summary>
+    public static string PresentMonExe => Path.Combine(AppContext.BaseDirectory, ConsoleMode.Runtime.SessionTools.PresentMonArguments.Folder, ConsoleMode.Runtime.SessionTools.PresentMonArguments.ExeName);
+
+    /// <summary>Existe enquanto o PresentMon mede o jogo; sobra dele na abertura = a sessão ETW ficou aberta numa queda.</summary>
+    public static string FpsCaptureMarker => Path.Combine(DataRoot, "fps-capture-running");
 
     /// <summary>Limites de FPS que o Tako mudou no driver de vídeo e o valor de antes, até serem devolvidos (ADR-0018).</summary>
     public static string DriverFpsLimitBackupFile => Path.Combine(DataRoot, "driver-fps-limit.json");

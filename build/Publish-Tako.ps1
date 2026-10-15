@@ -3,6 +3,8 @@
 #   dist\Tako-Portable-<arch>.exe  um único .exe portátil (dados em Tako_Data ao lado do exe)
 #   dist\Tako-Setup-<arch>.exe     instalador por usuário (Inno Setup; dados em %LOCALAPPDATA%\Tako)
 #   dist\Tako-FseKit-<arch>.zip    kit do experimento do Xbox mode (MVP-007), com -Target All ou FseKit
+# O PresentMon da Intel (MIT), usado pelo contador de FPS (ADR-0017), é baixado da release oficial e conferido pelo
+# SHA-256 abaixo; não fica no repositório. Só existe x64: no ARM64 o contador aparece como indisponível.
 
 param(
     [ValidateSet("x64", "ARM64")]
@@ -38,6 +40,41 @@ Write-Host "Versão: $Version"
 
 New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 
+# PresentMon 2.6.0 (GameTechDev/PresentMon, MIT). Para trocar de versão: nova URL, novo SHA-256 (o "digest" da release
+# no GitHub) e PresentMonArguments.Version em ConsoleMode.Runtime.
+$presentMonVersion = "2.6.0"
+$presentMonUrl = "https://github.com/GameTechDev/PresentMon/releases/download/v$presentMonVersion/PresentMon-$presentMonVersion-x64.exe"
+$presentMonSha256 = "b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af"
+
+function Get-PresentMon {
+    if ($arch -ne "x64") {
+        Write-Warning "PresentMon só tem build x64; o contador de FPS fica indisponível em $arch."
+        return $null
+    }
+    $dir = Join-Path $root "artifacts\presentmon\$presentMonVersion"
+    $file = Join-Path $dir "PresentMon.exe"
+    if (Test-Path -LiteralPath $file) {
+        if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -eq $presentMonSha256) { return $file }
+        Remove-Item -LiteralPath $file -Force
+    }
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $download = "$file.download"
+    Write-Host "Baixando PresentMon $presentMonVersion..."
+    Invoke-WebRequest -Uri $presentMonUrl -OutFile $download -UseBasicParsing
+    $hash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash
+    if ($hash -ne $presentMonSha256) {
+        Remove-Item -LiteralPath $download -Force
+        throw "SHA-256 do PresentMon não confere (esperado $presentMonSha256, veio $hash). Nada foi publicado."
+    }
+    Move-Item -LiteralPath $download -Destination $file -Force
+    return $file
+}
+
+$presentMon = $null
+if ($Target -in "All", "Portable", "Installer") {
+    $presentMon = Get-PresentMon
+}
+
 function Invoke-Publish([string]$ProjectPath, [string]$OutDir, [bool]$SingleFile, [string]$Exe) {
     if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
     $pubArgs = @(
@@ -53,6 +90,9 @@ function Invoke-Publish([string]$ProjectPath, [string]$OutDir, [bool]$SingleFile
         "-p:FileVersion=$numericVersion",
         "-o", $OutDir
     )
+    if ($presentMon -and $ProjectPath -eq $project) {
+        $pubArgs += "-p:PresentMonExe=$presentMon"
+    }
     # Temas e fontes vão dentro do .exe e são extraídos na primeira execução.
     # A compressão reduz o portátil (~141 MB) pela metade, como no Console Mode.
     if ($SingleFile) {
@@ -63,6 +103,9 @@ function Invoke-Publish([string]$ProjectPath, [string]$OutDir, [bool]$SingleFile
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish falhou ($OutDir)" }
     if (-not (Test-Path -LiteralPath (Join-Path $OutDir $Exe))) {
         throw "Publish não gerou $Exe em $OutDir"
+    }
+    if ($presentMon -and $ProjectPath -eq $project -and -not $SingleFile -and -not (Test-Path -LiteralPath (Join-Path $OutDir "PresentMon\PresentMon.exe"))) {
+        throw "Publish não incluiu o PresentMon em $OutDir"
     }
 }
 

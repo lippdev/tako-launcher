@@ -356,7 +356,7 @@ Todas as histórias abaixo têm prioridade **P0** e devem ser consideradas candi
 - [ ] **PERF-002:** suspender ou encerrar a UI principal durante o jogo.
 - [ ] **PERF-003:** minimizar polling e trabalho de background.
 - [ ] **PERF-004:** implementar cache de imagens e lazy loading.
-- [ ] **PERF-005:** disponibilizar contador de FPS via integração RTSS existente.
+- [ ] **PERF-005:** disponibilizar contador de FPS próprio, sem injeção, pelo PresentMon (ADR-0017; substitui a integração com o RTSS).
 - [ ] **PERF-006:** registrar FPS médio e 1% lows em benchmarks.
 - [ ] **PERF-007:** estudar métricas de frametime e latência de apresentação.
 - [ ] **PERF-008:** permitir limitar FPS nos cenários compatíveis.

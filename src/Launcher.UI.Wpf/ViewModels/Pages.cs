@@ -314,6 +314,7 @@ public sealed partial class SettingsViewModel : PageViewModel
     {
         Settings = settings;
         Themes = themes;
+        shell.SessionTools.RefreshPermission(); // o usuário pode ter saído e entrado no Windows desde a última vez
     }
 
     public SettingsService Settings { get; }

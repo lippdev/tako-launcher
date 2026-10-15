@@ -33,10 +33,17 @@
     <Resource Include="Assets\Brand\*" />
     <None Include="Assets\Fonts\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Assets\Fonts\OFL-SourceSans3.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Avisos de licença de terceiros (PresentMon, CapFrameX) ao lado do Tako.exe. -->
+    <None Include="..\..\NOTICE.md" Link="NOTICE.md" CopyToOutputDirectory="PreserveNewest" />
     <!-- Temas são dados não confiáveis: ficam soltos na pasta de saída e passam pelo carregador XAML restrito (MVP-016). -->
     <Page Remove="Themes\**\*.xaml" />
     <Content Include="Themes\**\*" CopyToOutputDirectory="PreserveNewest" />
     <!-- Cópia embutida do tema padrão: fallback quando o arquivo solto falha (MVP-021). -->
     <Resource Include="Themes\Default\Tokens.xaml" />
+  </ItemGroup>
+  <!-- PresentMon da Intel (MIT) para o contador de FPS (ADR-0017): build\Publish-Tako.ps1 baixa a release oficial, confere
+       o SHA-256 e passa -p:PresentMonExe=<arquivo>. Sem ele (compilação local) o contador aparece como indisponível. -->
+  <ItemGroup Condition="'$(PresentMonExe)' != '' And Exists('$(PresentMonExe)')">
+    <None Include="$(PresentMonExe)" Link="PresentMon\PresentMon.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

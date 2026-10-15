@@ -132,6 +132,9 @@ public sealed partial class PanelRowViewModel : ObservableObject
 
     public bool IsBattery { get; init; }
 
+    /// <summary>Opção que não dá para usar agora (ex.: contador de FPS desligado): esmaecida, mas focável para explicar.</summary>
+    public bool IsDimmed { get; init; }
+
     public required ICommand Command { get; init; }
 
     public ICommand? AdjustCommand { get; init; }

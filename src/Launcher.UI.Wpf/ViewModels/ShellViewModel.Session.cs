@@ -99,7 +99,8 @@ public sealed partial class ShellViewModel
 
         _monitor ??= new GameProcessMonitor(_time);
         _monitor.Start(tracker, OnRealGameStatusChanged, _devices.SteamRunningAppId);
-        SessionTools.BeginSession(GameExecutables.FromLaunchTarget(game.LaunchTarget)); // contador e limite de FPS escolhidos na Central de Controle
+        // Contador de FPS (filtra os processos do jogo, que mudam: launcher → jogo) e limite escolhido na Central.
+        SessionTools.BeginSession(GameExecutables.FromLaunchTarget(game.LaunchTarget), () => _monitor?.Tracker?.GameProcessIds.ToArray() ?? []);
         BeginSessionDevices(game, tvReady); // TV (se ainda não ligou) e saída de áudio (MVP-002) em segundo plano
         LogRealSessionStarted(_logger, game.Id, plan.Strategy);
         Toast(tracker.Status == GameRunStatus.Running

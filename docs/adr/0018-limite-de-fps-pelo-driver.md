@@ -42,4 +42,4 @@ Os três fabricantes expõem um limitador no driver, com biblioteca instalada ju
   - Layout das estruturas do IGCL (`ApplicationNameLength` sem o zero final) e se o limite global da Intel vale sem reiniciar o jogo.
   - Em notebooks híbridos sem preferência no Windows, o driver pode rodar o jogo na integrada; aí o limite vai para a placa errada.
 - AMD global: se o Tako cair, outro jogo aberto antes da próxima abertura do Tako fica com o limite. A abertura seguinte devolve o valor.
-- A interface `IFpsOverlayService` ainda tem `SetFpsLimit`/`CanLimitFps` do RTSS, sem uso pela Central; a F1 remove o RTSS. O backup antigo do RTSS (`rtss-fps-limit.txt`) continua sendo devolvido enquanto o RTSS existir no código.
+- A F1 ([ADR-0017](0017-contador-de-fps-com-presentmon.md)) removeu o RTSS do Tako, junto com `IFpsOverlayService` (`SetFpsLimit`/`CanLimitFps`) e o backup `rtss-fps-limit.txt`.
