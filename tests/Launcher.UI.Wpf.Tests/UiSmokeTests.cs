@@ -66,6 +66,7 @@ public sealed partial class UiSmokeTests
                 .AddSingleton<IScreenCurtain>(new SimulatedScreenCurtain())
                 .AddSingleton<IWindowSwitcher>(windows)
                 .AddSingleton<IFpsOverlayService>(new SimulatedFpsOverlay())
+                .AddSingleton<IFrameRateLimiter>(new NullFrameRateLimiter())
                 .AddSingleton<IPointerService>(pointer)
                 .AddSingleton<IControlFsService>(new SimulatedControlFs())
                 .AddSingleton<IHardwareMonitor>(new SimulatedHardwareMonitor())
@@ -803,6 +804,8 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Accept);
         Assert.Equal("perf", center.Popover!.Key);
         Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Label == "Baixar o RTSS");
+        // Limite de FPS pelo driver (ADR-0018) aparece mesmo sem RTSS; sem driver, não deixa escolher valor.
+        Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Key == "fps:limit" && r.AdjustCommand is null);
         Pump(0.5);
         Snap(window, "11b-painel-desempenho");
         Press(window, AppCommand.Back);

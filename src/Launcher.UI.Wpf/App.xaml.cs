@@ -136,6 +136,8 @@ public partial class App : Application
         // Central de Controle durante o jogo: janelas abertas, RTSS, ponteiro, ControlFS e desempenho (MVP-002/030).
         services.AddSingleton<IWindowSwitcher, WindowsWindowSwitcher>();
         services.AddSingleton<IFpsOverlayService>(sp => new WindowsRtss(AppPaths.RtssLimitBackupFile, sp.GetRequiredService<ILogger<WindowsRtss>>()));
+        // Limite de FPS pelo driver de vídeo (NVAPI, ADLX ou IGCL), sem RTSS nem injeção (ADR-0018).
+        services.AddSingleton<IFrameRateLimiter>(sp => WindowsFrameRateLimiter.Create(AppPaths.DriverFpsLimitBackupFile, sp.GetRequiredService<ILogger<SessionToolsService>>()));
         services.AddSingleton<PointerPadRelay>();
         services.AddSingleton<IPointerService>(sp => new WindowsPointer(AppPaths.CursorHiddenMarker, sp.GetRequiredService<PointerPadRelay>().Read, sp.GetRequiredService<ILogger<WindowsPointer>>()));
         services.AddSingleton<IControlFsService, WindowsControlFs>();

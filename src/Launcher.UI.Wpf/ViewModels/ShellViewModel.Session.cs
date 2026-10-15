@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using ConsoleMode.Runtime;
+using ConsoleMode.Runtime.SessionTools;
 using Launcher.Core.Library;
 using Launcher.Core.Presentation;
 using Launcher.Core.Session;
@@ -98,7 +99,7 @@ public sealed partial class ShellViewModel
 
         _monitor ??= new GameProcessMonitor(_time);
         _monitor.Start(tracker, OnRealGameStatusChanged, _devices.SteamRunningAppId);
-        SessionTools.BeginSession(); // contador e limite de FPS escolhidos na Central de Controle
+        SessionTools.BeginSession(GameExecutables.FromLaunchTarget(game.LaunchTarget)); // contador e limite de FPS escolhidos na Central de Controle
         BeginSessionDevices(game, tvReady); // TV (se ainda não ligou) e saída de áudio (MVP-002) em segundo plano
         LogRealSessionStarted(_logger, game.Id, plan.Strategy);
         Toast(tracker.Status == GameRunStatus.Running
@@ -134,6 +135,7 @@ public sealed partial class ShellViewModel
         {
             case GameRunStatus.Running:
                 Session = SessionState.Playing;
+                SessionTools.GameExecutableFound(GameExecutables.Pick(tracker.GameExecutablePaths)); // perfil do driver (ADR-0018)
                 break;
             case GameRunStatus.Exited:
                 EndRealSession(tracker);
