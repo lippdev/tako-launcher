@@ -46,6 +46,10 @@ public sealed partial class SettingsService : ObservableObject
     [ObservableProperty]
     private TvControlConfig _tvControl = TvControlConfig.Default;
 
+    /// <summary>Configurações › Sistema › Opções de desenvolvedor (ADR-0020): ferramentas de tema; desligado por padrão.</summary>
+    [ObservableProperty]
+    private bool _developerOptions;
+
     public SettingsService(SettingsStore store, ILogger<SettingsService> logger)
     {
         _store = store;
@@ -66,6 +70,7 @@ public sealed partial class SettingsService : ObservableObject
                 ? new AudioOutputChoice(audioId, saved.GetValueOrDefault(GameAudioNameKey, audioId))
                 : null;
             TvControl = TvControlConfigJson.Parse(saved.GetValueOrDefault(nameof(TvControl)));
+            DeveloperOptions = Read(saved, nameof(DeveloperOptions), DeveloperOptions);
         }
         catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
         {
@@ -101,6 +106,8 @@ public sealed partial class SettingsService : ObservableObject
     }
 
     partial void OnTvControlChanged(TvControlConfig value) => Save(nameof(TvControl), TvControlConfigJson.Serialize(value));
+
+    partial void OnDeveloperOptionsChanged(bool value) => Save(nameof(DeveloperOptions), value);
 
     private void Save(string key, bool value) => Save(key, value ? "true" : "false");
 

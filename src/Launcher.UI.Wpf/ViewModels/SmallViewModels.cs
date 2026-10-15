@@ -39,8 +39,16 @@ public sealed partial class SidebarItemViewModel(string key, string label, strin
     public ICommand Command { get; } = command;
 }
 
-/// <summary>Dica da barra inferior: glifos dos botões e a ação. Clicável.</summary>
-public sealed record HintViewModel(IReadOnlyList<string> Glyphs, string Label, bool IsKey, AppCommand Command);
+/// <summary>
+/// Dica da barra inferior: glifos dos botões e a ação. Clicável. Sem espaço na barra, ela mostra <see cref="ShortLabel"/>
+/// e as de menor <see cref="Priority"/> somem primeiro (ADR-0020).
+/// </summary>
+public sealed record HintViewModel(IReadOnlyList<string> Glyphs, string Label, bool IsKey, AppCommand Command)
+{
+    public string ShortLabel { get; init; } = Label;
+
+    public int Priority { get; init; }
+}
 
 /// <summary>Estado do fundo (cor do jogo em foco e arte).</summary>
 public sealed record BackdropState(string GameId, Color Accent, Color Deep, ImageSource? Hero, System.Windows.Point HeroAlignment);

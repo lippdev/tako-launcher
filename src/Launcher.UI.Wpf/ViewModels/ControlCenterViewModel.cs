@@ -259,7 +259,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             case "controller":
                 return
                 [
-                    new("Conectados", null, [new PanelRowViewModel { Label = _shell.ControllerName ?? "Nenhum controle conectado", IconKey = "Icon.Gamepad", IsBattery = _shell.ControllerName is not null, EndText = _shell.ControllerName is null ? "use o teclado" : "XInput", Command = new RelayCommand(() => _shell.Toast("Bateria e remapeamento chegam com o GameInput (MVP-031)")) }]),
+                    new("Conectados", null, [new PanelRowViewModel { Label = _shell.ControllerName ?? "Nenhum controle conectado", IconKey = "Icon.Gamepad", IsBattery = _shell.ControllerName is not null, EndText = _shell.ControllerName is null ? "use o teclado" : "XInput", Command = new RelayCommand(() => _shell.Toast("Bateria e remapeamento de botões chegam numa versão futura")) }]),
                     new("Ajustes", null, [new PanelRowViewModel { Label = "Remapear botões", EndText = "pós-MVP", Command = new RelayCommand(() => _shell.Toast("Remapeamento por jogo chega depois do MVP")) }]),
                 ];
             case "display":
@@ -320,7 +320,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
         var pad = Cards[4];
         pad.Caption = _shell.ControllerName ?? "Nenhum controle conectado";
         pad.Value = _shell.ControllerName is null ? "Teclado" : "Conectado";
-        pad.Pill = _shell.ControllerName is null ? "Conecte um controle Xbox" : "Bateria via GameInput (MVP-031)";
+        pad.Pill = _shell.ControllerName is null ? "Conecte um controle Xbox" : "Bateria em breve";
     }
 
     private void UpdatePerfCard()
@@ -381,13 +381,13 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
     };
 
     /// <summary>Próxima opção: <paramref name="direction"/> 0 (A) avança e volta ao começo; ← → param nas pontas.</summary>
-    private static T Next<T>(IReadOnlyList<T> options, T current, int direction)
+    internal static T Next<T>(IReadOnlyList<T> options, T current, int direction)
     {
         int i = Math.Max(0, options.ToList().IndexOf(current));
         return direction == 0 ? options[(i + 1) % options.Count] : options[Math.Clamp(i + Math.Sign(direction), 0, options.Count - 1)];
     }
 
-    private static string StyleLabel(string style) => style switch
+    internal static string StyleLabel(string style) => style switch
     {
         FpsOverlay.Off => "Desligado",
         FpsOverlay.Compact => "Compacto",
@@ -395,7 +395,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
         _ => "Só FPS",
     };
 
-    private static string PositionLabel(string position) => position switch
+    internal static string PositionLabel(string position) => position switch
     {
         FpsOverlay.TopRight => "Superior direita",
         FpsOverlay.BottomLeft => "Inferior esquerda",
@@ -403,7 +403,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
         _ => "Superior esquerda",
     };
 
-    private static string SizeLabel(string size) => size switch
+    internal static string SizeLabel(string size) => size switch
     {
         FpsOverlay.Medium => "Médio",
         FpsOverlay.Large => "Grande",
@@ -557,7 +557,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             {
                 FpsCounterState.NotBundled => "O contador de FPS não veio nesta versão do Tako.",
                 FpsCounterState.NeedsSignOut => "Saia e entre no Windows de novo para o contador funcionar.",
-                _ => "Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.",
+                _ => "Ative o contador em Modo Console › Contador de FPS, com teclado e mouse.",
             };
             PanelRowViewModel Dimmed(string key, string label, string value) => new()
             {

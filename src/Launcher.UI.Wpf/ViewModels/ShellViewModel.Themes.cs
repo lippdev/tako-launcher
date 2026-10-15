@@ -15,6 +15,9 @@ public sealed partial class ShellViewModel
     private const int MaxDiagnosticLines = 8;
     private readonly Dictionary<string, string> _themeLoadSummaries = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Tema em uso na tela inicial: o do Tako ou o tema Playnite escolhido (Configurações › Aparência).</summary>
+    public string CurrentThemeName => _playniteThemes.SelectedForUi()?.Manifest.Manifest.DisplayName ?? "Tako (padrão)";
+
     [RelayCommand]
     public void OpenThemes() => Navigate(new ThemesViewModel(this, _playniteThemes, _themeLoadSummaries), replace: CurrentPage is ThemesViewModel);
 
@@ -124,7 +127,7 @@ public sealed partial class ShellViewModel
         DialogViewModel? dialog = null;
         dialog = new DialogViewModel(
             $"Diagnóstico: {item.Name}",
-            $"{item.LoadSummary} pelo carregador XAML restrito (ThemeApiVersion {theme.Manifest.Manifest.ThemeApiVersionText ?? "?"}; suportado {ThemeManifestValidator.SupportedRange})." + DiagnosticLines(lines),
+            $"{item.LoadSummary} (API de tema {theme.Manifest.Manifest.ThemeApiVersionText ?? "?"}; o Tako aceita {ThemeManifestValidator.SupportedRange})." + DiagnosticLines(lines),
             [new OverlayAction("Fechar", ActionStyle.Primary, new RelayCommand(() => CloseOverlay(dialog!)), IsDefault: true)]);
         PushOverlay(dialog);
     }
@@ -156,7 +159,7 @@ public sealed partial class ShellViewModel
     private void ReloadTakoTheme()
     {
         var result = _themes.Apply(ThemeService.DefaultTheme);
-        Toast(result.Succeeded ? "Tema do Tako recarregado pelo carregador XAML restrito" : $"Falha ao recarregar: {result.Error}");
+        Toast(result.Succeeded ? "Tema do Tako recarregado" : $"Não foi possível recarregar o tema: {result.Error}");
     }
 
     /// <summary>"Usar este tema": tema Playnite na tela inicial (MVP-018/019) ou de volta à interface do Tako.</summary>
@@ -165,7 +168,7 @@ public sealed partial class ShellViewModel
         ArgumentNullException.ThrowIfNull(item);
         if (item.Theme is { } theme && IsBlockedBySafeMode(theme))
         {
-            Toast("Modo seguro: temas importados não são aplicados. Volte ao normal em Configurações");
+            Toast("Modo seguro: temas importados não são aplicados. Volte ao normal em Configurações › Sistema");
             return;
         }
 
@@ -246,7 +249,7 @@ public sealed partial class ShellViewModel
     {
         if (IsBlockedBySafeMode(theme))
         {
-            Toast("Modo seguro: temas importados não são carregados. Volte ao normal em Configurações");
+            Toast("Modo seguro: temas importados não são carregados. Volte ao normal em Configurações › Sistema");
             return null;
         }
 
@@ -284,6 +287,8 @@ public sealed partial class ShellViewModel
         {
             page.Refresh();
         }
+
+        OnPropertyChanged(nameof(CurrentThemeName));
     }
 
     private static string DiagnosticLines(IEnumerable<string> lines)

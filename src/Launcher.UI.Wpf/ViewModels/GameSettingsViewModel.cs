@@ -61,9 +61,9 @@ public sealed partial class GameSettingsViewModel : ObservableObject, IOverlayVi
         _reset = Row("reset", "Usar tudo do Tako", () => Change(_ => GameSettingsOverride.None));
         Sections =
         [
-            new("Tela", "A tela é a escolhida em Configurações › Tela de jogo.", [_screen, _mode, _hdr]),
+            new("Tela", "A tela é a escolhida em Modo Console › Tela de jogo.", [_screen, _mode, _hdr]),
             new("Som", null, [_audio]),
-            new("Desempenho", "Mostrar FPS precisa da permissão do Windows (Configurações › Mostrar FPS).", [_fps, _showFps]),
+            new("Desempenho", "Mostrar FPS precisa da permissão do Windows (Modo Console › Contador de FPS).", [_fps, _showFps]),
             new("Abrir o jogo", "Valem quando o Tako abre o executável. Jogos da Steam usam as opções de inicialização da Steam.", [_arguments]),
             new("Padrão", null, [_reset]),
         ];
@@ -111,7 +111,7 @@ public sealed partial class GameSettingsViewModel : ObservableObject, IOverlayVi
 
         if (modes.Count == 0 && Current.ScreenMode is null)
         {
-            _context.Toast(Global.GameScreenId.Length == 0 ? "Escolha a tela de jogo em Configurações primeiro" : "Ligue a tela de jogo para ver as resoluções dela");
+            _context.Toast(Global.GameScreenId.Length == 0 ? "Escolha a tela de jogo em Modo Console primeiro" : "Ligue a tela de jogo para ver as resoluções dela");
         }
 
         int index = options.IndexOf(Current.ScreenMode);

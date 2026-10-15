@@ -18,19 +18,18 @@ public sealed partial class UiSmokeTests
         var settings = Assert.IsType<SettingsViewModel>(shell.CurrentPage);
         // A biblioteca fictícia não lê as lojas: lê agora, com o Windows simulado sem app Xbox.
         shell.LibrarySources.Discover();
-        settings.RescanCommand.Execute(null);
-        Assert.True(settings.XboxStoreEnabled);
-        Assert.StartsWith("App Xbox não encontrado", settings.XboxStoreStatus, StringComparison.Ordinal);
+        shell.RescanLibrary();
+        Assert.True(shell.Settings.IsStoreEnabled(GameStore.Xbox));
+        Assert.StartsWith("App Xbox não encontrado", settings.StoreStatus(GameStore.Xbox), StringComparison.Ordinal);
         Assert.True(nav.FocusDefault("settings:store:xbox"));
         Pump(0.4);
         Snap(window, "70-configuracoes-xbox");
 
         Press(window, AppCommand.Accept);
-        Assert.False(settings.XboxStoreEnabled);
         Assert.False(shell.Settings.IsStoreEnabled(GameStore.Xbox));
-        Assert.StartsWith("Desligada", settings.XboxStoreStatus, StringComparison.Ordinal);
+        Assert.StartsWith("Desligada", settings.StoreStatus(GameStore.Xbox), StringComparison.Ordinal);
         Press(window, AppCommand.Accept);
-        Assert.True(settings.XboxStoreEnabled);
+        Assert.True(shell.Settings.IsStoreEnabled(GameStore.Xbox));
     }
 
     /// <summary>Windows simulado sem app Xbox nem jogos: o teste nunca lê o registro da máquina.</summary>

@@ -338,7 +338,6 @@ public sealed partial class ShellViewModel
         }
 
         CurrentPage.Refresh();
-        (CurrentPage as SettingsViewModel)?.OnCollectionsChanged();
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Não foi possível {Action} as configurações do jogo {GameId}")]

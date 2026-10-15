@@ -16,3 +16,13 @@ public interface IVirtualNavHost
     /// <summary>Cria (no próximo layout) o elemento do item com a chave pedida (<c>grupo:chave</c> ou só a chave).</summary>
     bool RealizeKey(string key);
 }
+
+/// <summary>
+/// Página com partes escondidas (ex.: categorias das Configurações): pedir a chave de um elemento escondido mostra a
+/// parte dele. Ligada à navegação pelo <see cref="Controls.RevealHost"/>.
+/// </summary>
+public interface IKeyRevealer
+{
+    /// <summary>Mostra a parte com a chave pedida; verdadeiro se algo mudou e a tela precisa de um novo layout.</summary>
+    bool RevealKey(string key);
+}

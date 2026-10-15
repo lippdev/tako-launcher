@@ -44,7 +44,7 @@ public sealed partial class ShellViewModel
     /// <summary>Xbox mode / Full Screen Experience neste PC (MVP-008), lido uma vez do registro.</summary>
     public FseAssessment FseStatus => _fse.Value.Assessment;
 
-    public string FseDescription => $"{FseStatus.Reason} · o Tako abre em tela cheia convencional";
+    public string FseDescription => $"{FseStatus.Reason}. O Tako funciona igual, na tela cheia dele";
 
     // ---------------------------------------------------------------- Modo seguro
 

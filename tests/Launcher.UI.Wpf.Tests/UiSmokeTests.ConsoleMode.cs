@@ -26,18 +26,21 @@ public sealed partial class UiSmokeTests
         Assert.True(shell.StartEmergencyHotkey());
         Assert.True(hotkey.IsStarted);
 
-        // Configurações: a opção aparece com a tela de jogo ligada e começa desligada.
-        shell.OpenSettings();
+        // Modo Console › Tela de jogo (ADR-0020): a opção aparece com a tela de jogo ligada e começa desligada.
+        shell.OpenConsoleMode();
         Pump(0.8);
+        ((ConsoleModeViewModel)shell.CurrentPage).OpenGameScreen();
+        Pump(0.6);
+        var detail = Assert.IsType<SettingsDetailViewModel>(shell.CurrentPage);
         Assert.False(shell.Settings.ConsoleModeOnLaunch);
-        Assert.True(nav.FocusDefault("settings:gamescreen"));
+        Assert.True(nav.FocusDefault("console:gamescreen:on"));
         Press(window, AppCommand.Accept);
         Pump(0.4);
         Assert.True(shell.Settings.GameScreenEnabled);
-        Assert.True(nav.FocusDefault("settings:gamescreen-onlaunch"));
+        Assert.True(nav.FocusDefault("console:gamescreen:onlaunch"));
         Press(window, AppCommand.Accept);
         Assert.True(shell.Settings.ConsoleModeOnLaunch);
-        Assert.Contains(shell.EmergencyKeys, ((SettingsViewModel)shell.CurrentPage).ConsoleModeOnLaunchDescription, StringComparison.Ordinal);
+        Assert.Contains(shell.EmergencyKeys, detail.Rows.Single(r => r.Key == "console:gamescreen:onlaunch").Description, StringComparison.Ordinal);
         Pump(0.4);
         Snap(window, "45-configuracoes-modo-console");
 

@@ -38,6 +38,16 @@
     </Setter>
   </Style>
 
+  <!--
+    Escurecimento das páginas de configurações (ADR-0020): a arte do jogo continua atrás, mas nenhum texto fica direto
+    sobre ela. Da esquerda (mais escuro, onde ficam as categorias) para a direita.
+  -->
+  <LinearGradientBrush x:Key="SettingsScrim" StartPoint="0,0" EndPoint="1,0">
+    <GradientStop Offset="0" Color="#E00B0D12" />
+    <GradientStop Offset="0.55" Color="#C70B0D12" />
+    <GradientStop Offset="1" Color="#B30B0D12" />
+  </LinearGradientBrush>
+
   <!-- Base de todos os botões navegáveis: sem visual de foco do Windows, sem Tab. -->
   <Style x:Key="NavButtonBase" TargetType="Button">
     <Setter Property="OverridesDefaultStyle" Value="True" />
@@ -516,11 +526,16 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBlock Text="{Binding Label}" Margin="4,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" />
+            <TextBlock x:Name="Label" Text="{Binding Label}" Margin="4,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" />
           </StackPanel>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter Property="Foreground" Value="White" />
+            </Trigger>
+            <!-- Sem espaço (HintBarPanel): texto curto e dicas mais próximas, em vez de cortar (ADR-0020). -->
+            <Trigger Property="c:HintBarPanel.IsCompact" Value="True">
+              <Setter TargetName="Label" Property="Text" Value="{Binding ShortLabel}" />
+              <Setter Property="Margin" Value="22,0,0,0" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
