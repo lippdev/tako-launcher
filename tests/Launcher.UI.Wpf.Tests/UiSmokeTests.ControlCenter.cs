@@ -40,9 +40,15 @@ public sealed partial class UiSmokeTests
             windows.Add(new OpenWindow(200 + i, longWindows[i][0], longWindows[i][1], null));
         }
 
-        center.RefreshWindows();
-        Pump(0.8);
-        Assert.Equal(2 + longWindows.Length, center.Windows.Count);
+        int expected = windows.List().Count;
+        Assert.Same(center, window.DataContext is ShellViewModel s ? s.TopOverlay : null);
+        for (int i = 0; i < 20 && center.Windows.Count != expected; i++)
+        {
+            center.RefreshWindows(); // a lista chega em segundo plano
+            Pump(0.5);
+        }
+
+        Assert.True(expected == center.Windows.Count, $"janelas: {center.Windows.Count} na Central, {expected} abertas ({string.Join(", ", center.Windows.Select(w => w.Window.Handle))})");
         Assert.Equal($"JANELAS ABERTAS · {center.Windows.Count}", center.WindowsTitle);
 
         Assert.True(nav.FocusDefault(center.Windows[0].NavKey));
