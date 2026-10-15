@@ -65,6 +65,22 @@ public sealed partial class SonyHidGamepad : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Controles PlayStation conectados, só pelos caminhos HID (sem abrir o dispositivo, para não disputar a leitura).
+    /// Usado pelo diagnóstico do sistema (MVP-034).
+    /// </summary>
+    public static IReadOnlyList<SonyController> ListConnected()
+    {
+        try
+        {
+            return HidDevicePath.SonyControllers(HidDevicePaths());
+        }
+        catch (Win32Exception)
+        {
+            return [];
+        }
+    }
+
     public void Dispose()
     {
         SafeFileHandle? handle;

@@ -419,6 +419,24 @@ public sealed class UiSmokeTests
         Assert.Equal(UiLaunchMode.Normal, link.Status?.Mode);
         supervisorServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
+        // --- Diagnóstico (frente G): Configurações › Diagnóstico do sistema gera o relatório do checklist (MVP-034).
+        shell.OpenSettings();
+        Pump(0.8);
+        Assert.True(nav.FocusDefault("settings:diagnostics"));
+        Press(window, AppCommand.Accept);
+        Pump(0.6);
+        var diagnostics = Assert.IsType<DiagnosticsViewModel>(shell.TopOverlay);
+        Assert.Equal("Copiar", Nav.GetKey(nav.Focused!));
+        Assert.Contains("[Monitores]", diagnostics.Report, StringComparison.Ordinal);
+        Assert.Contains("[Xbox mode / FSE]", diagnostics.Report, StringComparison.Ordinal);
+        Assert.Contains($"Total:                 {shell.Library.Games.Count}", diagnostics.Report, StringComparison.Ordinal);
+        Assert.DoesNotContain(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), diagnostics.Report, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("Salvo em logs", diagnostics.Status, StringComparison.Ordinal);
+        File.WriteAllText(Path.Combine(Screenshots, "diagnostico-sistema.txt"), diagnostics.Report);
+        Snap(window, "50-diagnostico");
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();
         window.Width = 840; // 21:9

@@ -1,0 +1,38 @@
+<!--
+  Configurações › Diagnóstico do sistema (frente G, MVP-034): relatório para anexar ao checklist de hardware.
+  O texto encolhe para caber no palco (Viewbox), então não há rolagem: o controle só navega entre as ações.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="clr-namespace:Launcher.UI.Wpf.Controls"
+                    xmlns:vm="clr-namespace:Launcher.UI.Wpf.ViewModels">
+
+  <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}">
+    <Grid Background="#FF12151B">
+      <Grid Margin="120,96,120,72">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal">
+          <Border Width="72" Height="72" CornerRadius="22" Background="#1FFFFFFF" Margin="0,0,28,0" VerticalAlignment="Center">
+            <c:Icon Key="Icon.Monitor" Width="40" Height="40" Foreground="{DynamicResource OnAccentBrush}" />
+          </Border>
+          <TextBlock Text="Diagnóstico do sistema" Style="{StaticResource PageTitle}" FontWeight="Normal" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" Margin="0,18,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap">
+          <Run Text="Anexe este relatório ao rodar o checklist de hardware. Sem nome de usuário, nome do computador ou lista de jogos." />
+          <Run Text="{Binding Status, Mode=OneWay}" Foreground="#FFFFFFFF" />
+        </TextBlock>
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding Actions}" Margin="0,32,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
+        <Border Grid.Row="3" Margin="0,14,0,0" CornerRadius="18" Background="#0DFFFFFF" Padding="32,24">
+          <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <TextBlock Text="{Binding Report}" FontFamily="Consolas" FontSize="22" Foreground="#E6FFFFFF" />
+          </Viewbox>
+        </Border>
+      </Grid>
+    </Grid>
+  </DataTemplate>
+</ResourceDictionary>
