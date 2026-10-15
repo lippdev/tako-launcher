@@ -31,6 +31,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     private readonly ArtService _art;
     private readonly ThemeService _themes;
+    private readonly PlayniteThemeService _playniteThemes;
     private readonly TimeProvider _time;
     private readonly ILogger<ShellViewModel> _logger;
     private readonly Dictionary<string, GameItemViewModel> _items = [];
@@ -79,6 +80,7 @@ public sealed partial class ShellViewModel : ObservableObject
         ArtService art,
         SettingsService settings,
         ThemeService themes,
+        PlayniteThemeService playniteThemes,
         PerformanceSimulator performance,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
@@ -87,6 +89,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _art = art;
         Settings = settings;
         _themes = themes;
+        _playniteThemes = playniteThemes;
         Performance = performance;
         _time = time;
         _logger = logger;
@@ -478,6 +481,16 @@ public sealed partial class ShellViewModel : ObservableObject
         PushOverlay(recovery);
     }
 
+    /// <summary>Prévia do tema Fullscreen padrão do Playnite 10 com a biblioteca do launcher (H2, MVP-014/017/018).</summary>
+    public void ShowPlaynitePreview()
+    {
+        var report = _playniteThemes.Load(PlayniteThemeService.SampleTheme);
+        LogPlaynitePreview(_logger, report.Loaded.Count, report.Rejected.Count);
+        PlaynitePreviewViewModel? preview = null;
+        preview = new PlaynitePreviewViewModel(report, LibraryQuery.RecentlyPlayed(Library.Games).Select(ItemFor), new RelayCommand(() => CloseOverlay(preview!)));
+        PushOverlay(preview);
+    }
+
     private void OnOverlaysChanged()
     {
         OnPropertyChanged(nameof(TopOverlay));
@@ -682,6 +695,9 @@ public sealed partial class ShellViewModel : ObservableObject
             string label => label,
             null => "Todos os jogos",
         };
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Tema Playnite: {Loaded} arquivos carregados, {Rejected} recusados")]
+    private static partial void LogPlaynitePreview(ILogger logger, int loaded, int rejected);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Sessão de {GameId} encerrada")]
     private static partial void LogSessionEnded(ILogger logger, string gameId);

@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Launcher.Themes\Launcher.Themes.csproj" />
+    <ProjectReference Include="..\..\src\Launcher.PlayniteCompat.P10\Launcher.PlayniteCompat.P10.csproj" />
   </ItemGroup>
 </Project>

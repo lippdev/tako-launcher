@@ -95,6 +95,22 @@ public sealed class UiSmokeTests
         shell.OpenSettings();
         Pump(0.8);
         Snap(window, "06-configuracoes");
+        // Tema Fullscreen padrão do Playnite 10 renderizado sem o Playnite (H2).
+        shell.ShowPlaynitePreview();
+        Pump(2.5);
+        var preview = Assert.IsType<PlaynitePreviewViewModel>(shell.TopOverlay);
+        File.WriteAllLines(Path.Combine(Screenshots, "playnite-theme-report.txt"),
+            [preview.Summary, .. preview.Report.Loaded.Select(f => "OK    " + f), .. preview.RejectedLines.Select(r => "RECUSA " + r)]);
+        Assert.True(preview.Report.Loaded.Count >= 20, preview.Summary);
+        Assert.Contains("ListGameItemStyle", preview.Resources.MergedDictionaries.SelectMany(d => d.Keys.OfType<string>()));
+        Assert.Equal("p10-games", Nav.GetGroup(nav.Focused!));
+        Press(window, AppCommand.Right);
+        Assert.Equal("p10-games:1", Nav.GetKey(nav.Focused!));
+        Pump(0.5);
+        Snap(window, "14-tema-playnite");
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+
         ((SettingsViewModel)shell.CurrentPage).SimulateThemeFailureCommand.Execute(null);
         Pump(0.8);
         Assert.IsType<RecoveryViewModel>(shell.TopOverlay);

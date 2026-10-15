@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Markup;
 
@@ -40,6 +41,8 @@ public sealed class ThemeXamlRejectedException : Exception
 /// </summary>
 public sealed class RestrictedXamlLoader(XamlValidator validator)
 {
+    public XamlValidator Validator => validator;
+
     public ResourceDictionary LoadResourceDictionary(string themeRoot, string themeRelativePath)
     {
         ArgumentNullException.ThrowIfNull(themeRoot);
@@ -66,7 +69,7 @@ public sealed class RestrictedXamlLoader(XamlValidator validator)
         }
 
         var context = new ParserContext { BaseUri = new Uri(fullPath, UriKind.Absolute) };
-        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(xaml));
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(Prepare(xaml, result)));
         try
         {
             return (ResourceDictionary)XamlReader.Load(stream, context);
@@ -75,5 +78,24 @@ public sealed class RestrictedXamlLoader(XamlValidator validator)
         {
             throw new ThemeXamlRejectedException($"XAML '{themeRelativePath}' inválido: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// Ajustes depois da validação, sobre o mesmo texto validado: remove declarações de namespaces não permitidos
+    /// que nada usa e aplica os remapeamentos da política (ex.: assembly do Playnite → adaptador P10).
+    /// </summary>
+    private string Prepare(string xaml, XamlValidationResult result)
+    {
+        foreach (var unused in result.UnusedDisallowedNamespaces)
+        {
+            xaml = Regex.Replace(xaml, $@"\s+xmlns:{Regex.Escape(unused.Prefix)}\s*=\s*([""']){Regex.Escape(unused.Namespace)}\1", string.Empty);
+        }
+
+        foreach (var (source, target) in validator.Policy.NamespaceRemaps)
+        {
+            xaml = Regex.Replace(xaml, $@"(xmlns:[\w.-]+\s*=\s*[""']){Regex.Escape(source)}([""'])", m => m.Groups[1].Value + target + m.Groups[2].Value);
+        }
+
+        return xaml;
     }
 }

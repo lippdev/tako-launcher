@@ -44,6 +44,7 @@ public partial class App : Application
         services.AddSingleton<XamlValidator>();
         services.AddSingleton<RestrictedXamlLoader>();
         services.AddSingleton<ThemeService>();
+        services.AddSingleton<PlayniteThemeService>();
         services.AddSingleton<ArtService>();
         services.AddSingleton<SettingsService>();
         services.AddSingleton<PerformanceSimulator>();

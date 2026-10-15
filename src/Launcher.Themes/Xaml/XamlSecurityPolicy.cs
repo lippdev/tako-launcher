@@ -35,11 +35,52 @@ public sealed class XamlSecurityPolicy
     /// <summary>Propriedades cujo valor é carregado como arquivo ou URI pelo WPF.</summary>
     public required FrozenSet<string> UriProperties { get; init; }
 
+    /// <summary>Extensões de marcação permitidas no namespace de apresentação (sem o sufixo "Extension").</summary>
+    public FrozenSet<string> PresentationExtensions { get; init; } = Set("Binding", "StaticResource", "DynamicResource", "TemplateBinding", "RelativeSource");
+
+    /// <summary>
+    /// <c>clr-namespace</c> de origem → de destino. O carregador reescreve a declaração depois da validação
+    /// (ex.: <c>assembly=Playnite.FullscreenApp</c> → adaptador P10).
+    /// </summary>
+    public FrozenDictionary<string, string> NamespaceRemaps { get; init; } = FrozenDictionary<string, string>.Empty;
+
     public int MaxCharacters { get; init; } = 2 * 1024 * 1024;
 
     public int MaxDepth { get; init; } = 128;
 
     public int MaxElements { get; init; } = 50_000;
+
+    /// <summary>
+    /// Política ampliada por um adaptador (ex.: P10): tipos e extensões que o adaptador implementa e mapeamentos de
+    /// <c>clr-namespace</c> reescritos para o assembly do adaptador.
+    /// </summary>
+    public XamlSecurityPolicy Extend(
+        IEnumerable<string>? presentationTypes = null,
+        IEnumerable<string>? presentationExtensions = null,
+        IEnumerable<(string Source, string Target, IEnumerable<string> Types)>? remappedNamespaces = null)
+    {
+        var namespaces = ClrNamespaces.ToDictionary(StringComparer.Ordinal);
+        var remaps = NamespaceRemaps.ToDictionary(StringComparer.Ordinal);
+        foreach (var (source, target, types) in remappedNamespaces ?? [])
+        {
+            namespaces[source] = Set([.. types]);
+            remaps[source] = target;
+        }
+
+        return new XamlSecurityPolicy
+        {
+            PresentationTypes = Set([.. PresentationTypes, .. presentationTypes ?? []]),
+            PresentationOwnerTypes = PresentationOwnerTypes,
+            StaticMemberOwners = StaticMemberOwners,
+            ClrNamespaces = namespaces.ToFrozenDictionary(StringComparer.Ordinal),
+            UriProperties = UriProperties,
+            PresentationExtensions = Set([.. PresentationExtensions, .. presentationExtensions ?? []]),
+            NamespaceRemaps = remaps.ToFrozenDictionary(StringComparer.Ordinal),
+            MaxCharacters = MaxCharacters,
+            MaxDepth = MaxDepth,
+            MaxElements = MaxElements,
+        };
+    }
 
     public static XamlSecurityPolicy CreateDefault() => new()
     {

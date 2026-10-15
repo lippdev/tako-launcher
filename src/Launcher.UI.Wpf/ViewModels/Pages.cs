@@ -283,6 +283,9 @@ public sealed partial class SettingsViewModel : PageViewModel
     private void ToggleStartup() => Settings.StartFullscreenOnLogin = !Settings.StartFullscreenOnLogin;
 
     [RelayCommand]
+    private void PreviewPlayniteTheme() => Shell.ShowPlaynitePreview();
+
+    [RelayCommand]
     private void SimulateThemeFailure()
     {
         Shell.ShowRecovery(Themes.Apply(ThemeService.InvalidSampleTheme));

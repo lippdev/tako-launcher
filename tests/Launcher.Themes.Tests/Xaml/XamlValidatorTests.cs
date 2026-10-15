@@ -122,12 +122,37 @@ public class XamlValidatorTests
         AssertRejected(Validate(Dictionary(body)), XamlViolationCode.TypeNotAllowed);
 
     [Theory]
-    [InlineData("""xmlns:io="clr-namespace:System.IO;assembly=System.Runtime" """)]
-    [InlineData("""xmlns:local="clr-namespace:Evil" """)]
-    [InlineData("""xmlns:evil="clr-namespace:Evil;assembly=Evil" """)]
-    [InlineData("""xmlns:b="http://schemas.microsoft.com/xaml/behaviors" """)]
-    public void Rejects_namespaces_outside_allowlist(string ns) =>
-        AssertRejected(Validate(Dictionary("", ns)), XamlViolationCode.NamespaceNotAllowed);
+    [InlineData("""xmlns:p="clr-namespace:System.IO;assembly=System.Runtime" """, """<p:FileInfo x:Key="f" />""")]
+    [InlineData("""xmlns:p="clr-namespace:Evil" """, """<Style x:Key="s" p:Evil.Value="1" />""")]
+    [InlineData("""xmlns:p="clr-namespace:Evil;assembly=Evil" """, """<TextBlock x:Key="t" Tag="{p:Payload}" />""")]
+    [InlineData("""xmlns:p="http://schemas.microsoft.com/xaml/behaviors" """, """<Style x:Key="s" TargetType="Button"><Setter Property="p:Interaction.Behaviors" Value="x" /></Style>""")]
+    public void Rejects_used_namespaces_outside_allowlist(string ns, string body) =>
+        AssertRejected(Validate(Dictionary(body, ns)), XamlViolationCode.NamespaceNotAllowed);
+
+    [Fact]
+    public void Tolerates_unused_disallowed_declaration_and_reports_it_for_removal()
+    {
+        // Comum em temas Playnite: Constants.xaml declara Interactivity sem usar.
+        var result = Validate(Dictionary("""<Style x:Key="s" />""", """xmlns:i="clr-namespace:System.Windows.Interactivity;assembly=System.Windows.Interactivity" """));
+
+        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Violations));
+        var unused = Assert.Single(result.UnusedDisallowedNamespaces);
+        Assert.Equal("i", unused.Prefix);
+    }
+
+    [Fact]
+    public void Default_namespace_outside_allowlist_is_always_rejected() =>
+        AssertRejected(Validate("""<ResourceDictionary xmlns="clr-namespace:Evil;assembly=Evil" />"""), XamlViolationCode.NamespaceNotAllowed);
+
+    [Fact]
+    public void Extended_policy_allows_adapter_types_and_extensions()
+    {
+        var policy = XamlSecurityPolicy.CreateDefault().Extend(presentationTypes: ["ButtonEx"], presentationExtensions: ["ThemeFile"]);
+        var result = new XamlValidator(policy).Validate(Dictionary("""<ButtonEx x:Key="b" Tag="{ThemeFile 'Images/x.png'}" />"""), "Views/Main.xaml", "ResourceDictionary");
+
+        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Violations));
+        AssertRejected(Validate(Dictionary("""<ButtonEx x:Key="b" />""")), XamlViolationCode.TypeNotAllowed);
+    }
 
     [Fact]
     public void Rejects_dtd_entity_expansion()

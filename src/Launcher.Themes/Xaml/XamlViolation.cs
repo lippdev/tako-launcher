@@ -23,11 +23,24 @@ public sealed record XamlViolation(XamlViolationCode Code, string Message, int L
     public override string ToString() => $"({Line},{Column}) {Code}: {Message}";
 }
 
+/// <summary>Declaração de namespace não permitido que nenhum elemento, atributo ou valor usa.</summary>
+public sealed record UnusedNamespaceDeclaration(string Prefix, string Namespace);
+
 public sealed class XamlValidationResult
 {
-    internal XamlValidationResult(IReadOnlyList<XamlViolation> violations) => Violations = violations;
+    internal XamlValidationResult(IReadOnlyList<XamlViolation> violations, IReadOnlyList<UnusedNamespaceDeclaration>? unused = null)
+    {
+        Violations = violations;
+        UnusedDisallowedNamespaces = unused ?? [];
+    }
 
     public IReadOnlyList<XamlViolation> Violations { get; }
+
+    /// <summary>
+    /// Namespaces não permitidos apenas declarados (comum em temas Playnite, ex.: Interactivity). Não são violação;
+    /// o carregador remove a declaração antes do parser para nunca resolver o assembly.
+    /// </summary>
+    public IReadOnlyList<UnusedNamespaceDeclaration> UnusedDisallowedNamespaces { get; }
 
     public bool IsValid => Violations.Count == 0;
 }

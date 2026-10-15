@@ -7,7 +7,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:c="clr-namespace:Launcher.UI.Wpf.Controls"
                     xmlns:nav="clr-namespace:Launcher.UI.Wpf.Navigation"
-                    xmlns:vm="clr-namespace:Launcher.UI.Wpf.ViewModels">
+                    xmlns:vm="clr-namespace:Launcher.UI.Wpf.ViewModels"
+                    xmlns:p10="clr-namespace:Launcher.PlayniteCompat.P10.Controls;assembly=Launcher.PlayniteCompat.P10">
 
   <!-- Esmaece o conteúdo rolável antes do cabeçalho (topo) e da barra de dicas (base). -->
   <!-- Absolute: a máscara segue a viewport (1080 de altura), não o conteúdo rolável, que é mais alto. -->
@@ -234,6 +235,18 @@
           <StackPanel>
             <TextBlock Text="Abrir em tela cheia ao iniciar o Windows" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
             <TextBlock Text="Fullscreen convencional; integração com o Xbox mode depende da Microsoft (MVP-007)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding PreviewPlayniteThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:playnite">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Abrir" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Prévia de tema Playnite 10" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Renderiza o tema Fullscreen padrão do Playnite com a sua biblioteca, sem o Playnite instalado (H2)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -490,6 +503,53 @@
         </ItemsControl>
       </Border>
     </Grid>
+  </DataTemplate>
+
+  <!-- Prévia de tema Playnite 10: tudo dentro do ThemeScope usa os recursos do tema (estilos, cores, templates). -->
+  <DataTemplate DataType="{x:Type vm:PlaynitePreviewViewModel}">
+    <c:ThemeScope ThemeResources="{Binding Resources}">
+      <Grid Background="{DynamicResource MainBackgourndBrush}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Border Background="{DynamicResource TopBarBackgroundBrush}" Padding="72,40,72,28">
+          <StackPanel>
+            <TextBlock Text="Tema Playnite 10 (prévia)" Style="{DynamicResource TextBlockBaseStyle}" FontSize="40" />
+            <TextBlock Text="{Binding Summary}" Style="{DynamicResource TextBlockBaseStyle}" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource TextBrushDark}" Margin="0,8,0,0" />
+          </StackPanel>
+        </Border>
+        <c:NavigableListBox Grid.Row="1" ItemsSource="{Binding Games}" ItemGroup="p10-games" Margin="64,40,64,0"
+                            Background="Transparent" BorderThickness="0" ItemContainerStyle="{DynamicResource ListGameItemStyle}"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled" Focusable="False">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <p10:GameListItem Width="200" Height="300" Style="{DynamicResource ListGameItemTemplate}" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </c:NavigableListBox>
+        <Border Grid.Row="2" Background="{DynamicResource BottomBarBackgroundBrush}" Padding="72,18">
+          <DockPanel>
+            <p10:ButtonEx DockPanel.Dock="Right" Style="{DynamicResource ButtonBottomMenu}" Command="{Binding Close}" nav:Nav.Group="p10-bar" Padding="18,8">
+              <TextBlock Text="Voltar ao UltraLauncher" Style="{DynamicResource TextBlockBaseStyle}" />
+            </p10:ButtonEx>
+            <ItemsControl ItemsSource="{Binding RejectedLines}" Focusable="False">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding StringFormat=Não suportado: {0}}" Style="{DynamicResource TextBlockBaseStyle}" FontSize="14" Foreground="{DynamicResource TextBrushDark}" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DockPanel>
+        </Border>
+      </Grid>
+    </c:ThemeScope>
   </DataTemplate>
 
   <!-- Diálogo -->
