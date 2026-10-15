@@ -8,6 +8,7 @@ using ConsoleMode.Runtime;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Sources;
+using Launcher.Core.Persistence;
 using Launcher.Core.Presentation;
 using Launcher.Core.Session.GameScreen;
 using Launcher.Core.Session.Devices;
@@ -95,6 +96,8 @@ public sealed partial class ShellViewModel : ObservableObject
         GameScreenSession gameScreen,
         GameSessionDevices devices,
         LibrarySources librarySources,
+        CollectionLibrary collections,
+        GameSettingsStore gameSettings,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
@@ -109,6 +112,8 @@ public sealed partial class ShellViewModel : ObservableObject
         _environment = environment;
         GameScreen = gameScreen;
         _devices = devices;
+        Collections = collections;
+        _gameSettings = gameSettings;
         _time = time;
         _logger = logger;
         SyncItems();
@@ -125,6 +130,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _launchTimer.Tick += (_, _) => { _launchTimer.Stop(); StartSession(); };
         library.Changed += (_, _) => RefreshAll();
         settings.StoreToggled += (_, store) => OnStoreToggled(store);
+        collections.Changed += (_, _) => OnCollectionsChanged();
         metadata.GameUpdated += (_, id) => OnMetadataUpdated(id);
         if (_currentPage is HomeViewModel { Hero: { } hero })
         {
@@ -471,7 +477,7 @@ public sealed partial class ShellViewModel : ObservableObject
         RunningGame = game;
         game.IsRunning = true;
         Session = SessionState.Playing;
-        SessionTools.BeginSession();
+        SessionTools.BeginSession(choices: ToolChoices(ResolveSessionSettings(game.Id)));
         PushOverlay(session);
         CurrentPage.Refresh();
         Toast($"Jogando {game.Title} · {GuideName} abre o menu rápido");
@@ -701,7 +707,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
                 list.Add(("y", "Buscar", AppCommand.Search));
                 list.Add(("lb+rb", "Seção", AppCommand.NextSection));
-                list.Add(("menu", "Configurações", AppCommand.Menu));
+                list.Add(("menu", onGame ? "Ações" : "Configurações", AppCommand.Menu)); // UX-005: ☰ numa capa abre o menu rápido
                 break;
         }
 

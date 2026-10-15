@@ -58,7 +58,8 @@ public sealed partial class SearchViewModel : ObservableObject, IOverlayViewMode
 
     public bool HasText => Text.Length > 0;
 
-    public string ResultText => HasText ? LibraryText.GameCount(ResultCount) : "Digite com o teclado ou escolha as letras com o controle";
+    public string ResultText => _describe?.Invoke(Text)
+        ?? (HasText ? LibraryText.GameCount(ResultCount) : "Digite com o teclado ou escolha as letras com o controle");
 
     /// <summary>Teclado físico: texto digitado (letras, números, espaço).</summary>
     public void Type(string typed) => Text = VirtualKeyboard.Type(Text, typed);

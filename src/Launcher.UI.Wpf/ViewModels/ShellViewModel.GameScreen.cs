@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Interop;
 using ConsoleMode.Runtime.Display;
 using ConsoleMode.Runtime.Windows;
+using Launcher.Core.Session;
 using Launcher.Core.Session.GameScreen;
 
 namespace Launcher.UI.Wpf.ViewModels;
@@ -18,15 +19,24 @@ public sealed partial class ShellViewModel
 
     public GameScreenSession GameScreen { get; }
 
-    /// <summary>Foca a tela de jogo (se ligada). Falso: o usuário não confirmou e as telas já voltaram; não abra o jogo.</summary>
-    private async Task<bool> FocusGameScreenAsync()
+    /// <summary>
+    /// Foca a tela de jogo (se ligada para este jogo, UX-007). Falso: o usuário não confirmou e as telas já voltaram;
+    /// não abra o jogo.
+    /// </summary>
+    private async Task<bool> FocusGameScreenAsync(EffectiveSessionSettings effective)
     {
-        if (Settings.GameScreen is not { } settings)
+        if (effective.GameScreenProblem is { } problem)
+        {
+            Toast($"Tela de jogo: {problem} · o jogo abre na tela atual");
+        }
+
+        if (effective.GameScreen is not { } settings)
         {
             return true;
         }
 
-        string confirmed = Settings.GameScreenConfirmedSetup;
+        // Cada resolução já confirmada vale (um jogo pode pedir outra); o formato esperado é a combinação ou vazio.
+        string confirmed = GameScreenConfirmations.Matching(Settings.GameScreenConfirmedSetup, settings.SetupKey);
         var result = await Task.Run(() => GameScreen.Begin(settings, confirmed)).ConfigureAwait(true);
         switch (result.Outcome)
         {
@@ -50,7 +60,7 @@ public sealed partial class ShellViewModel
 
         if (await ConfirmGameScreenAsync(result.Target?.Name ?? Settings.GameScreenName).ConfigureAwait(true))
         {
-            Settings.GameScreenConfirmedSetup = settings.SetupKey;
+            Settings.GameScreenConfirmedSetup = GameScreenConfirmations.Remember(Settings.GameScreenConfirmedSetup, settings.SetupKey);
             return true;
         }
 

@@ -46,9 +46,10 @@ public sealed partial class ShellViewModel
     private async Task StartRealSessionAsync(GameItemViewModel item)
     {
         var game = item.Game;
+        var effective = ResolveSessionSettings(game.Id); // Configurações do Tako + deste jogo (UX-007)
         CaptureEnvironmentBeforeGame(game.Id); // antes da tela de jogo: o registro é o estado de antes de tudo
-        bool tvReady = await WakeTvForGameScreenAsync(game).ConfigureAwait(true); // a TV liga antes de virar a tela de jogo
-        if (!await FocusGameScreenAsync().ConfigureAwait(true))
+        bool tvReady = await WakeTvForGameScreenAsync(game, effective).ConfigureAwait(true); // a TV liga antes de virar a tela de jogo
+        if (!await FocusGameScreenAsync(effective).ConfigureAwait(true))
         {
             Session = SessionState.Browsing; // tela de jogo não confirmada: as telas já voltaram
             _environment.Discard();
@@ -61,7 +62,7 @@ public sealed partial class ShellViewModel
             process = Process.Start(new ProcessStartInfo(game.LaunchTarget!)
             {
                 UseShellExecute = true,
-                Arguments = game.LaunchArguments ?? string.Empty,
+                Arguments = effective.Arguments(game.LaunchArguments),
                 WorkingDirectory = game.WorkingDirectory ?? string.Empty,
             });
         }
@@ -103,8 +104,8 @@ public sealed partial class ShellViewModel
         _monitor ??= new GameProcessMonitor(_time);
         _monitor.Start(tracker, OnRealGameStatusChanged, _devices.SteamRunningAppId);
         // Contador de FPS (filtra os processos do jogo, que mudam: launcher → jogo) e limite escolhido na Central.
-        SessionTools.BeginSession(GameExecutables.FromLaunchTarget(game.LaunchTarget), () => _monitor?.Tracker?.GameProcessIds.ToArray() ?? []);
-        BeginSessionDevices(game, tvReady); // TV (se ainda não ligou) e saída de áudio (MVP-002) em segundo plano
+        SessionTools.BeginSession(GameExecutables.FromLaunchTarget(game.LaunchTarget), () => _monitor?.Tracker?.GameProcessIds.ToArray() ?? [], ToolChoices(effective));
+        BeginSessionDevices(game, tvReady, effective); // TV (se ainda não ligou) e saída de áudio (MVP-002) em segundo plano
         LogRealSessionStarted(_logger, game.Id, plan.Strategy);
         Toast(tracker.Status == GameRunStatus.Running
             ? $"Jogando {game.Title} · o Tako espera você voltar"

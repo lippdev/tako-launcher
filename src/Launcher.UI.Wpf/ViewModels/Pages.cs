@@ -59,6 +59,9 @@ public sealed partial class HomeViewModel : PageViewModel
 
     public ObservableCollection<GameItemViewModel> RecentlyAdded { get; } = [];
 
+    /// <summary>Uma fileira por coleção do usuário com jogos (UX-003), em ordem de nome.</summary>
+    public ObservableCollection<CollectionRowViewModel> Collections { get; } = [];
+
     public string RecentCountText => $"{RecentlyPlayed.Count} jogos";
 
     public string HeroOverline => Hero is not null && RecentlyPlayed.Count > 0 && RecentlyPlayed[0] == Hero ? "Continuar jogando" : Hero?.Overline ?? string.Empty;
@@ -85,13 +88,37 @@ public sealed partial class HomeViewModel : PageViewModel
         OnPropertyChanged(nameof(IsEmpty));
         Replace(RecentlyPlayed, LibraryQuery.RecentlyPlayed(Shell.Library.Games).Select(Shell.ItemFor));
         Replace(RecentlyAdded, LibraryQuery.RecentlyAdded(Shell.Library.Games, 10).Select(Shell.ItemFor));
+        RefreshCollections();
         OnPropertyChanged(nameof(RecentCountText));
         // Mantém o jogo em foco no destaque; na primeira montagem, abre no último jogado.
-        bool keep = !_resetHero && Hero is not null && (RecentlyPlayed.Contains(Hero) || RecentlyAdded.Contains(Hero));
+        bool keep = !_resetHero && Hero is not null && (RecentlyPlayed.Contains(Hero) || RecentlyAdded.Contains(Hero) || Collections.Any(c => c.Games.Contains(Hero)));
         Hero = keep ? Hero : RecentlyPlayed.FirstOrDefault() ?? RecentlyAdded.FirstOrDefault();
         _resetHero = false;
         OnPropertyChanged(nameof(HeroOverline));
         OnPropertyChanged(nameof(PlayLabel));
+    }
+
+    /// <summary>Fileiras das coleções: as mesmas fileiras continuam (o foco não se perde); só muda o que mudou.</summary>
+    private void RefreshCollections()
+    {
+        var wanted = Shell.Collections.Collections
+            .Select(c => (Collection: c, Games: LibraryQuery.Apply(Shell.Library.Games.Where(g => c.Contains(g.Id)), LibraryFilter.All, LibrarySort.RecentlyPlayed)))
+            .Where(c => c.Games.Count > 0)
+            .ToList();
+        if (!Collections.Select(r => r.Id).SequenceEqual(wanted.Select(w => w.Collection.Id)))
+        {
+            Collections.Clear();
+            foreach (var (collection, _) in wanted)
+            {
+                Collections.Add(new CollectionRowViewModel(Shell, collection.Id));
+            }
+        }
+
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            Collections[i].Name = wanted[i].Collection.Name;
+            Collections[i].SetGames(wanted[i].Games.Select(Shell.ItemFor));
+        }
     }
 
     [RelayCommand]
@@ -264,6 +291,9 @@ public sealed partial class DetailsViewModel : PageViewModel
 
     public string FavoriteIconKey => Game.IsFavorite ? "Icon.StarFill" : "Icon.Star";
 
+    /// <summary>"Coleções" ou, com o jogo em alguma, "Coleções (2)" (UX-003).</summary>
+    public string CollectionsLabel => Game.Game.Collections.Count is int n and > 0 ? $"Coleções ({n})" : "Coleções";
+
     public override void Refresh()
     {
         var g = Game.Game;
@@ -281,6 +311,7 @@ public sealed partial class DetailsViewModel : PageViewModel
         OnPropertyChanged(nameof(PrimaryLabel));
         OnPropertyChanged(nameof(FavoriteLabel));
         OnPropertyChanged(nameof(FavoriteIconKey));
+        OnPropertyChanged(nameof(CollectionsLabel));
     }
 
     [RelayCommand]
@@ -310,6 +341,12 @@ public sealed partial class DetailsViewModel : PageViewModel
 
     [RelayCommand]
     private void Options() => Shell.ShowGameOptions(Game);
+
+    [RelayCommand]
+    private void ChooseCollections() => Shell.ChooseCollections(Game);
+
+    [RelayCommand]
+    private void GameSettings() => Shell.OpenGameSettings(Game);
 }
 
 public sealed partial class SettingsViewModel : PageViewModel

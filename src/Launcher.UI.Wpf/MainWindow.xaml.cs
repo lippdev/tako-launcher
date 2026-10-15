@@ -57,6 +57,7 @@ public partial class MainWindow : Window
     private readonly SonyHidGamepad _sony;
     private readonly PointerPadRelay _pointerPad;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private FrameworkElement? _restoringFocus;
     private readonly DispatcherTimer _gamepadTimer = new(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly Stack<FrameworkElement?> _focusBeforeOverlay = new();
     private long _wheelLockedUntil;
@@ -203,6 +204,9 @@ public partial class MainWindow : Window
                 break;
             case AppCommand.NextSection:
                 _shell.CycleSection(1);
+                break;
+            case AppCommand.Menu when noOverlay && !_shell.IsPlayniteUiVisible && focused?.DataContext is GameItemViewModel quick:
+                _shell.ShowQuickActions(quick); // UX-005: ☰ numa capa abre o menu rápido do jogo
                 break;
             case AppCommand.Menu when noOverlay:
                 _shell.OpenSettings();
@@ -486,13 +490,17 @@ public partial class MainWindow : Window
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
-                _focusBeforeOverlay.Push(_navigator.Focused);
+                // Um diálogo que abre outro (ex.: menu rápido → coleções): o foco a devolver é o de antes do primeiro.
+                _focusBeforeOverlay.Push(_restoringFocus ?? _navigator.Focused);
+                _restoringFocus = null;
                 AfterLayout(() => _navigator.FocusDefault(null));
                 break;
             case NotifyCollectionChangedAction.Remove:
                 var previous = _focusBeforeOverlay.Count > 0 ? _focusBeforeOverlay.Pop() : null;
+                _restoringFocus = previous;
                 AfterLayout(() =>
                 {
+                    _restoringFocus = null;
                     if (previous is not null && previous.IsVisible && _navigator.Navigables().Contains(previous))
                     {
                         _navigator.Focus(previous);

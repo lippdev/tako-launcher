@@ -86,6 +86,9 @@ public sealed class Game
 
     public TimeSpan PlayTime { get; set; }
 
+    /// <summary>Ids das coleções do usuário que têm este jogo (UX-003; ver <see cref="CollectionLibrary.ApplyTo"/>).</summary>
+    public IReadOnlySet<string> Collections { get; set; } = new HashSet<string>();
+
     public bool IsUpcoming => UpcomingRelease is not null;
 
     public bool CanPlay => IsInstalled && !IsUpcoming;

@@ -60,6 +60,8 @@ public sealed partial class SessionToolsService : IDisposable
     private HardwareSample? _overlaySample;
     private bool _overlaySampling;
     private bool _inSession;
+    private int _savedLimit;
+    private SessionToolChoices? _choices;
 
     public SessionToolsService(
         IWindowSwitcher windows,
@@ -96,7 +98,7 @@ public sealed partial class SessionToolsService : IDisposable
                 Size = FpsOverlay.NormalizeSize(saved.GetValueOrDefault(SizeKey)),
                 Card = !bool.TryParse(saved.GetValueOrDefault(CardKey), out bool card) || card,
             };
-            FpsLimit = int.TryParse(saved.GetValueOrDefault(LimitKey), NumberStyles.Integer, CultureInfo.InvariantCulture, out int limit) ? FpsLimits.Normalize(limit) : 0;
+            _savedLimit = int.TryParse(saved.GetValueOrDefault(LimitKey), NumberStyles.Integer, CultureInfo.InvariantCulture, out int limit) ? FpsLimits.Normalize(limit) : 0;
         }
         catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
         {
@@ -148,11 +150,23 @@ public sealed partial class SessionToolsService : IDisposable
 
     public FpsOverlayLayout Layout { get; private set; } = new();
 
-    /// <summary>Limite de FPS da sessão (0 = sem limite, o do usuário fica valendo; <see cref="FpsLimits.MatchDisplay"/> = tela − 3).</summary>
-    public int FpsLimit { get; private set; }
+    /// <summary>
+    /// Limite de FPS em vigor (0 = sem limite, o do usuário fica valendo; <see cref="FpsLimits.MatchDisplay"/> = tela − 3):
+    /// na sessão, o que as configurações do jogo decidiram (UX-007); fora dela, o salvo.
+    /// </summary>
+    public int FpsLimit => _inSession && _choices is { } choices ? choices.FpsLimit : _savedLimit;
+
+    /// <summary>Limite do Tako (Central de Controle), o padrão dos jogos sem limite próprio.</summary>
+    public int SavedFpsLimit => _savedLimit;
+
+    /// <summary>O limite da sessão veio das configurações do jogo: mudar na Central vale só para esta sessão.</summary>
+    public bool FpsLimitFromGame => _inSession && _choices is { FpsLimitFromGame: true };
 
     /// <summary>Números do jogo agora (nulo sem contador ou sem quadros recentes).</summary>
-    public FrameStats? CurrentFrames => _inSession && CounterState == FpsCounterState.Ready ? Fps.Current : null;
+    public FrameStats? CurrentFrames => _inSession && CounterReady ? Fps.Current : null;
+
+    /// <summary>O contador mede nesta sessão: "Mostrar FPS" (do jogo ou global), com a permissão do Windows pronta.</summary>
+    private bool CounterReady => Fps.IsAvailable && PermissionState == PerfLogStatus.Ready && (_choices?.ShowFps ?? FpsCounterEnabled);
 
     /// <summary>Lê de novo se o usuário está no grupo (depois do UAC, ao abrir Configurações e a cada sessão).</summary>
     public PerfLogStatus RefreshPermission() => PermissionState = Permission.Check();
@@ -161,6 +175,10 @@ public sealed partial class SessionToolsService : IDisposable
     {
         FpsCounterEnabled = enabled;
         Save(EnabledKey, enabled ? "true" : "false");
+        if (_choices is { ShowFpsFromGame: false } choices)
+        {
+            _choices = choices with { ShowFps = enabled };
+        }
         if (!enabled)
         {
             StopCounter();
@@ -175,13 +193,14 @@ public sealed partial class SessionToolsService : IDisposable
     /// Início da sessão de jogo: contador e limite escolhidos voltam a valer. <paramref name="gameExePath"/> é o exe do
     /// jogo quando já se sabe (atalho direto para .exe); senão chega por <see cref="GameExecutableFound"/>.
     /// <paramref name="gameProcesses"/> lista os processos do jogo real agora, para o contador (nulo na sessão simulada,
-    /// que não tem o que medir).
+    /// que não tem o que medir). <paramref name="choices"/> é o que vale para este jogo (UX-007); nulo usa o salvo.
     /// </summary>
-    public void BeginSession(string? gameExePath = null, Func<IReadOnlyCollection<int>>? gameProcesses = null)
+    public void BeginSession(string? gameExePath = null, Func<IReadOnlyCollection<int>>? gameProcesses = null, SessionToolChoices? choices = null)
     {
         _inSession = true;
         _gameExe = gameExePath;
         _gameProcesses = gameProcesses;
+        _choices = choices;
         if (FpsLimit != 0)
         {
             ApplyLimitNow();
@@ -212,6 +231,7 @@ public sealed partial class SessionToolsService : IDisposable
         _inSession = false;
         _gameProcesses = null;
         _gameExe = null;
+        _choices = null;
         Cursor.Reset();
         StopCounter();
         RestoreLimit();
@@ -248,10 +268,24 @@ public sealed partial class SessionToolsService : IDisposable
         RefreshOverlay();
     }
 
+    /// <summary>
+    /// Limite escolhido na Central. Com o limite vindo das configurações do jogo, vale só para esta sessão; senão é
+    /// salvo como o limite do Tako.
+    /// </summary>
     public void SetFpsLimit(int fps)
     {
-        FpsLimit = FpsLimits.Normalize(fps);
-        Save(LimitKey, FpsLimit.ToString(CultureInfo.InvariantCulture));
+        int limit = FpsLimits.Normalize(fps);
+        if (!FpsLimitFromGame)
+        {
+            _savedLimit = limit;
+            Save(LimitKey, limit.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (_choices is { } choices)
+        {
+            _choices = choices with { FpsLimit = limit };
+        }
+
         if (_inSession)
         {
             ApplyLimitNow();
@@ -305,7 +339,7 @@ public sealed partial class SessionToolsService : IDisposable
 
     private void StartCounter()
     {
-        if (!_inSession || _gameProcesses is not { } processes || CounterState != FpsCounterState.Ready)
+        if (!_inSession || _gameProcesses is not { } processes || !CounterReady)
         {
             return;
         }
@@ -328,7 +362,7 @@ public sealed partial class SessionToolsService : IDisposable
     /// <summary>Mostra, atualiza ou fecha a janela do contador conforme o estilo; um tique por segundo.</summary>
     private void RefreshOverlay()
     {
-        if (!_inSession || FpsStyle == FpsOverlay.Off || CounterState != FpsCounterState.Ready || Fps.Status is FpsCounterStatus.Idle or FpsCounterStatus.Unavailable)
+        if (!_inSession || FpsStyle == FpsOverlay.Off || !CounterReady || Fps.Status is FpsCounterStatus.Idle or FpsCounterStatus.Unavailable)
         {
             CloseOverlay();
             return;
@@ -514,6 +548,13 @@ public sealed partial class SessionToolsService : IDisposable
     [LoggerMessage(Level = LogLevel.Warning, Message = "Não foi possível abrir {Url}")]
     private static partial void LogOpenPageFailed(ILogger logger, Exception exception, string url);
 }
+
+/// <summary>
+/// Limite e contador de FPS de uma sessão, já resolvidos com as configurações do jogo (UX-007,
+/// <see cref="Launcher.Core.Session.GameSettingsResolver"/>). Os "FromGame" dizem se o valor é do jogo: mudar o global
+/// no meio da sessão não passa por cima da escolha do jogo.
+/// </summary>
+public sealed record SessionToolChoices(int FpsLimit, bool FpsLimitFromGame, bool ShowFps, bool ShowFpsFromGame);
 
 /// <summary>
 /// Último estado de um controle PlayStation (lido por HID na UI) para o ponteiro pelo controle, que roda em outra

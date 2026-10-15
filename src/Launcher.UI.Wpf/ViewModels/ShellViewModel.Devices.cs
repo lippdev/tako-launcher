@@ -4,6 +4,7 @@ using ConsoleMode.Runtime.Audio;
 using ConsoleMode.Runtime.Steam;
 using ConsoleMode.Runtime.Tv;
 using Launcher.Core.Library;
+using Launcher.Core.Session;
 using Launcher.Core.Session.Devices;
 
 namespace Launcher.UI.Wpf.ViewModels;
@@ -25,11 +26,13 @@ public sealed partial class ShellViewModel
         _ => "Desligado",
     };
 
-    private SessionDeviceOptions DeviceOptions() =>
-        new(Settings.GameAudioOutput, Settings.SteamToTrayAfterGame, Settings.TvControl);
+    /// <summary>Saída de áudio do jogo vem do efetivo (UX-007: o jogo pode ter a própria); Steam e TV são do Tako.</summary>
+    private SessionDeviceOptions DeviceOptions(EffectiveSessionSettings effective) =>
+        new(effective.GameAudio, Settings.SteamToTrayAfterGame, Settings.TvControl);
 
     /// <summary>Jogo aberto e acompanhado: TV (se ainda não foi ligada) e saída de áudio em segundo plano.</summary>
-    private void BeginSessionDevices(Game game, bool tvReady) => _ = _devices.BeginSession(game.Id, DeviceOptions(), tvReady);
+    private void BeginSessionDevices(Game game, bool tvReady, EffectiveSessionSettings effective) =>
+        _ = _devices.BeginSession(game.Id, DeviceOptions(effective), tvReady);
 
     /// <summary>
     /// Com a "Tela de jogo" (ADR-0015) e a TV ligadas, a TV precisa estar ligada na entrada do PC antes de a tela de
@@ -37,9 +40,9 @@ public sealed partial class ShellViewModel
     /// não há segunda espera. Sem a tela de jogo, a TV liga em segundo plano junto com o jogo. Devolve se a TV já foi
     /// tratada aqui.
     /// </summary>
-    private async Task<bool> WakeTvForGameScreenAsync(Game game)
+    private async Task<bool> WakeTvForGameScreenAsync(Game game, EffectiveSessionSettings effective)
     {
-        if (Settings.GameScreen is null || !Settings.TvControl.IsActive)
+        if (effective.GameScreen is null || !Settings.TvControl.IsActive)
         {
             return false;
         }

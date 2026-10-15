@@ -43,6 +43,32 @@ public static class SchemaMigrator
         new(3, """
             ALTER TABLE manual_games ADD COLUMN track_by TEXT;
             """),
+        // Coleções (UX-003) e configurações por jogo (UX-007). Coluna nula = "usar o padrão do Tako". Os ids de jogo
+        // não têm chave estrangeira: jogos de loja somem e voltam com a mesma identidade a cada varredura.
+        new(4, """
+            CREATE TABLE IF NOT EXISTS collections (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS collection_games (
+                collection_id TEXT NOT NULL,
+                game_id TEXT NOT NULL,
+                added_at TEXT NOT NULL,
+                PRIMARY KEY (collection_id, game_id)
+            );
+            CREATE TABLE IF NOT EXISTS game_settings (
+                game_id TEXT PRIMARY KEY,
+                use_game_screen INTEGER,
+                screen_mode TEXT,
+                hdr INTEGER,
+                audio_device_id TEXT,
+                audio_device_name TEXT,
+                fps_limit INTEGER,
+                show_fps INTEGER,
+                extra_arguments TEXT
+            );
+            """),
     ];
 
     public static int LatestVersion => Migrations[^1].Version;

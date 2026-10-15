@@ -21,6 +21,7 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
     private readonly List<(LibrarySort Sort, PanelRowViewModel Row)> _sorts = [];
     private readonly List<(string Value, PanelRowViewModel Row)> _sources = [];
     private readonly List<(string Value, PanelRowViewModel Row)> _genres = [];
+    private readonly List<(string Id, PanelRowViewModel Row)> _collections = [];
 
     [ObservableProperty]
     private string _countText = string.Empty;
@@ -28,7 +29,8 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
     /// <param name="games">Jogos da página (a rota da barra lateral), de onde saem as fontes e os gêneros.</param>
     /// <param name="get">Critério atual.</param>
     /// <param name="set">Aplica o critério e devolve quantos jogos aparecem.</param>
-    public LibraryFiltersViewModel(IReadOnlyList<Game> games, Func<LibraryCriteria> get, Func<LibraryCriteria, int> set)
+    /// <param name="collections">Coleções do usuário (UX-003); as que têm jogos nesta página viram filtro.</param>
+    public LibraryFiltersViewModel(IReadOnlyList<Game> games, Func<LibraryCriteria> get, Func<LibraryCriteria, int> set, IReadOnlyList<CollectionInfo>? collections = null)
     {
         ArgumentNullException.ThrowIfNull(games);
         _get = get;
@@ -53,11 +55,25 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
             _genres.Add((genre.Name, Row(genre.Name, () => Change(c => c.ToggleGenre(genre.Name)), toggle: true, end: genre.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))));
         }
 
+        foreach (var collection in collections ?? [])
+        {
+            int count = games.Count(g => collection.Contains(g.Id));
+            if (count > 0 || _get().Collections.Contains(collection.Id))
+            {
+                _collections.Add((collection.Id, Row(collection.Name, () => Change(c => c.ToggleCollection(collection.Id)), toggle: true, end: count.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+            }
+        }
+
         var sections = new List<PanelSection>
         {
             new("Mostrar", null, [_install, _favorites, _played]),
             new("Ordenar por", null, [.. _sorts.Select(s => s.Row)]),
         };
+        if (_collections.Count > 0)
+        {
+            sections.Add(new PanelSection("Coleção", null, [.. _collections.Select(c => c.Row)]));
+        }
+
         if (_sources.Count > 1)
         {
             sections.Add(new PanelSection("Fonte", null, [.. _sources.Select(s => s.Row)]));
@@ -96,6 +112,11 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
         foreach (var (value, row) in _genres)
         {
             row.IsOn = criteria.Genres.Contains(value);
+        }
+
+        foreach (var (id, row) in _collections)
+        {
+            row.IsOn = criteria.Collections.Contains(id);
         }
 
         _clear.EndText = criteria.ActiveFilterCount switch

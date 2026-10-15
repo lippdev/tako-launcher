@@ -96,7 +96,8 @@ public sealed partial class ShellViewModel
             {
                 LibraryCriteria = criteria;
                 return library.Games.Count;
-            }));
+            },
+            Collections.Collections));
     }
 
     /// <summary>A busca do tema Playnite começou ou foi limpa: a dica "Limpar busca" aparece ou some.</summary>

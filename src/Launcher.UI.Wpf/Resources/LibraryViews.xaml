@@ -58,13 +58,13 @@
 
       <Border Width="760" HorizontalAlignment="Right" Background="{DynamicResource PanelStrongBrush}">
         <StackPanel Margin="40,0,20,40" VerticalAlignment="Center">
-          <TextBlock Text="Buscar" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" Margin="0,0,0,24" />
+          <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" Margin="0,0,0,24" />
 
           <!-- Campo: o texto buscado com o cursor no fim. -->
           <Border Height="72" Margin="0,0,10,0" CornerRadius="36" Background="{DynamicResource Surface2Brush}" Padding="26,0">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
               <c:Icon Key="Icon.Search" Width="28" Height="28" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,16,0" />
-              <TextBlock x:Name="Placeholder" Text="Nome do jogo" FontSize="{DynamicResource FsBodyLg}" Foreground="{DynamicResource OnAccentSubtleBrush}" VerticalAlignment="Center" />
+              <TextBlock x:Name="Placeholder" Text="{Binding Placeholder}" FontSize="{DynamicResource FsBodyLg}" Foreground="{DynamicResource OnAccentSubtleBrush}" VerticalAlignment="Center" />
               <TextBlock x:Name="Query" Text="{Binding Text}" FontSize="{DynamicResource FsBodyLg}" FontWeight="SemiBold" VerticalAlignment="Center" MaxWidth="560" TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
               <Rectangle Width="3" Height="32" Margin="4,0,0,0" Fill="{DynamicResource OnAccentBrush}" VerticalAlignment="Center">
                 <Rectangle.Triggers>

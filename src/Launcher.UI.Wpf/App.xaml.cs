@@ -113,6 +113,9 @@ public partial class App : Application
         // Biblioteca e configurações no SQLite (MVP-005).
         services.AddSingleton(_ => new TakoDatabase(AppPaths.DatabaseFile));
         services.AddSingleton<SettingsStore>();
+        services.AddSingleton<GameSettingsStore>();
+        services.AddSingleton<CollectionStore>();
+        services.AddSingleton(LoadCollections);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton(_ =>
         {

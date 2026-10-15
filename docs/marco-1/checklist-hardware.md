@@ -149,14 +149,14 @@ Configurações › **Tela de jogo** (padrão: desligada). Use um PC com monitor
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
-| G1 | Escolher a tela | Ligar a opção; ativar "Tela onde você joga" várias vezes | Sugere a tela que não é a principal; passa por todas as conectadas, inclusive a TV desligada da área de trabalho |
-| G2 | TV desligada da área de trabalho | TV conectada mas fora da área de trabalho (Win+P "Somente tela do PC"); abrir um jogo | A TV liga, vira principal, o monitor desconecta, o Tako vai para a TV; ao fechar o jogo tudo volta como estava (TV fora da área de trabalho) |
-| G3 | Confirmação | Primeira vez com G2 | "Você consegue ver esta tela?" na TV, com contagem de 15 s; A/Enter/clique em "Sim, manter" abre o jogo; na próxima vez não pergunta |
-| G4 | Sem resposta | Como G3, mas sem responder (ou B/Esc, ou "Voltar ao normal") | As telas voltam sozinhas; aviso "Tela de jogo não confirmada"; o jogo não abre |
-| G5 | Cobrir de preto | "Outras telas" › Cobrir de preto | O monitor fica preto (ligado), sem roubar o foco do jogo; some ao fechar o jogo |
-| G6 | Resolução e taxa | Escolher um modo (ex.: 3840 × 2160 · 120 Hz) | Aplicado na TV durante o jogo; volta ao fechar; trocar o modo pede confirmação de novo |
-| G7 | Modo recusado | Escolher um modo que a TV não aceita | O jogo abre no modo atual da TV; o log registra a recusa |
-| G8 | HDR | "Ligar HDR" numa TV com HDR desligado | HDR liga durante o jogo e desliga ao sair; numa tela sem HDR, nada acontece e o log diz "HDR não disponível" |
+| CJ1 | Escolher a tela | Ligar a opção; ativar "Tela onde você joga" várias vezes | Sugere a tela que não é a principal; passa por todas as conectadas, inclusive a TV desligada da área de trabalho |
+| CJ2 | TV desligada da área de trabalho | TV conectada mas fora da área de trabalho (Win+P "Somente tela do PC"); abrir um jogo | A TV liga, vira principal, o monitor desconecta, o Tako vai para a TV; ao fechar o jogo tudo volta como estava (TV fora da área de trabalho) |
+| CJ3 | Confirmação | Primeira vez com G2 | "Você consegue ver esta tela?" na TV, com contagem de 15 s; A/Enter/clique em "Sim, manter" abre o jogo; na próxima vez não pergunta |
+| CJ4 | Sem resposta | Como G3, mas sem responder (ou B/Esc, ou "Voltar ao normal") | As telas voltam sozinhas; aviso "Tela de jogo não confirmada"; o jogo não abre |
+| CJ5 | Cobrir de preto | "Outras telas" › Cobrir de preto | O monitor fica preto (ligado), sem roubar o foco do jogo; some ao fechar o jogo |
+| CJ6 | Resolução e taxa | Escolher um modo (ex.: 3840 × 2160 · 120 Hz) | Aplicado na TV durante o jogo; volta ao fechar; trocar o modo pede confirmação de novo |
+| CJ7 | Modo recusado | Escolher um modo que a TV não aceita | O jogo abre no modo atual da TV; o log registra a recusa |
+| CJ8 | HDR | "Ligar HDR" numa TV com HDR desligado | HDR liga durante o jogo e desliga ao sair; numa tela sem HDR, nada acontece e o log diz "HDR não disponível" |
 | G9 | TV que não acorda | TV desligada da tomada/sem sinal | Depois de ~8 s o Tako desiste, as telas ficam como estavam e o jogo abre na tela atual |
 | G10 | Tela desconectada | Escolher a TV e desconectar o cabo | Aviso "a tela de jogo escolhida não está conectada · o jogo abre na tela atual" |
 | G11 | Jogo que não abre / sem acompanhamento | Atalho inválido; URI sem pasta | As telas voltam logo |
@@ -183,14 +183,14 @@ Com um jogo real aberto pelo Tako (ex.: um jogo da Steam em tela cheia sem borda
 
 | # | Caso | Esperado |
 |---|---|---|
-| G1 | Guia (Xbox) ou PS durante o jogo | O Tako vem para a frente com a Central aberta sobre a arte do jogo; B, Guia ou "Voltar ao jogo" devolvem o jogo. Anotar se a Barra de Jogo do Xbox também abre |
-| G2 | Janelas abertas | A fileira lista as janelas do Alt+Tab com ícones; A alterna para uma (o jogo segue aberto); X fecha (um programa com algo não salvo pergunta antes) |
-| G3 | Encerrar jogo (jogo real) | O jogo recebe o pedido de fechar e volta à frente; ao fechar, "Bem-vindo de volta" |
-| G4 | Desempenho | Cartão e painel mostram CPU, GPU (com temperatura, se o driver informar) e RAM próximos do Gerenciador de Tarefas |
-| G5 | Contador de FPS desligado | Painel de Desempenho mostra as opções de FPS esmaecidas com "Ative o contador de FPS nas Configurações do Tako, com teclado e mouse."; nada trava |
-| G6 | Contador de FPS ligado | Ver §14 (contador próprio, sem RTSS) |
-| G7 | Limite de FPS | Pelo driver de vídeo: ver §13 |
-| G8 | Ponteiro | Esconder some com o ponteiro em todos os apps e ele volta ao fim da sessão; mover com o analógico funciona com Xbox e com DualSense; A, A duplo e segurar A clicam, clicam com o direito e arrastam |
+| CJ1 | Guia (Xbox) ou PS durante o jogo | O Tako vem para a frente com a Central aberta sobre a arte do jogo; B, Guia ou "Voltar ao jogo" devolvem o jogo. Anotar se a Barra de Jogo do Xbox também abre |
+| CJ2 | Janelas abertas | A fileira lista as janelas do Alt+Tab com ícones; A alterna para uma (o jogo segue aberto); X fecha (um programa com algo não salvo pergunta antes) |
+| CJ3 | Encerrar jogo (jogo real) | O jogo recebe o pedido de fechar e volta à frente; ao fechar, "Bem-vindo de volta" |
+| CJ4 | Desempenho | Cartão e painel mostram CPU, GPU (com temperatura, se o driver informar) e RAM próximos do Gerenciador de Tarefas |
+| CJ5 | Contador de FPS desligado | Painel de Desempenho mostra as opções de FPS esmaecidas com "Ative o contador de FPS nas Configurações do Tako, com teclado e mouse."; nada trava |
+| CJ6 | Contador de FPS ligado | Ver §14 (contador próprio, sem RTSS) |
+| CJ7 | Limite de FPS | Pelo driver de vídeo: ver §13 |
+| CJ8 | Ponteiro | Esconder some com o ponteiro em todos os apps e ele volta ao fim da sessão; mover com o analógico funciona com Xbox e com DualSense; A, A duplo e segurar A clicam, clicam com o direito e arrastam |
 | G9 | Queda com o ponteiro escondido ou o contador de FPS medindo | Finalizar `Tako.exe` e abrir de novo: ponteiro visível; `PresentMon.exe` fechado e `logman query -ets` sem a sessão `Tako_FPS` |
 | G10 | ControlFS | Instalado: abre por cima do jogo; não instalado: "Baixar o ControlFS" abre a página |
 
@@ -346,6 +346,23 @@ próprio launcher; o GOG abre pelo GOG Galaxy quando instalado, senão pelo exec
 | LJ2 | Capas e dados | Jogos da Epic/GOG recém-encontrados | Capa, descrição e gêneros chegam pelo agente de metadados; "Opções › Corrigir correspondência" troca a escolha |
 | LJ3 | Desligar lojas | Configurações › Epic Games (A) e depois de novo | Os jogos da Epic somem e voltam; favoritos e tempo de jogo continuam |
 | LJ4 | Só controle | Fazer LJ3 só com o controle | Linhas das lojas alcançáveis e alternáveis com A |
+
+## 18. Configurações deste jogo (UX-007)
+
+Detalhes do jogo › Configurações deste jogo (ou ☰ numa capa). Cada opção começa em "Padrão: ..." (o valor das
+Configurações do Tako) e só vale para aquele jogo. Precisa de tela de jogo escolhida (seção 9b), duas saídas de áudio e
+GPU com limite pelo driver (seção 13).
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| CJ1 | Tela de jogo só neste jogo | Tela de jogo desligada nas Configurações; no jogo A, "Usar a Tela de jogo: Sim"; abrir A e depois B | A abre na TV (com a pergunta "Você consegue ver esta tela?" na primeira vez); B abre na tela atual |
+| CJ2 | Não usar neste jogo | Tela de jogo ligada; no jogo A, "Não" | A abre na tela atual, sem mexer nos monitores |
+| CJ3 | Resolução e HDR por jogo | No jogo A, 1920 × 1080 · 60 Hz e HDR desligado; abrir A, fechar, abrir B (padrão 4K/HDR) | A abre em 1080p sem HDR; B em 4K com HDR. Ao fechar cada um, as telas voltam como estavam. A pergunta de confirmação aparece só na primeira vez de cada resolução |
+| CJ4 | Saída de áudio | Padrão = TV; no jogo A, "Fone"; no jogo B, "Não alterar" | A toca no fone; B não troca a saída; ao fechar, o som volta para a saída de antes |
+| CJ5 | Limite de FPS | Padrão sem limite; no jogo A, 60 FPS | A fica em 60 FPS (painel do driver mostra o perfil do jogo); B sem limite. Mudar o limite na Central durante A vale só para a sessão (o padrão do Tako não muda) |
+| CJ6 | Mostrar FPS | Contador desligado nas Configurações (com a permissão já dada); no jogo A, "Mostrar FPS: Sim" | O contador aparece só em A |
+| CJ7 | Argumentos extras | Jogo adicionado (.exe) com "-windowed" (ou outro argumento conhecido do jogo) | O jogo abre com o argumento (Gerenciador de Tarefas › coluna Linha de comando) |
+| CJ8 | Voltar ao padrão | "Usar tudo do Tako" e abrir o jogo de novo | Comporta-se como os outros jogos |
 
 ## Resultados
 
