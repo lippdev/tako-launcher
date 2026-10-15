@@ -35,7 +35,7 @@
             </StackPanel>
             <StackPanel>
               <TextBlock Text="Restaurar tema padrão" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-              <TextBlock Text="Recarrega o tema do Tako e volta a prévia para o tema Fullscreen padrão do Playnite" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="Volta à interface e ao tema do Tako; a prévia volta ao Fullscreen padrão do Playnite" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
           </DockPanel>
         </Button>

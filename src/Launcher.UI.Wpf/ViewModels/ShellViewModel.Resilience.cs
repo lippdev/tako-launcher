@@ -56,6 +56,7 @@ public sealed partial class ShellViewModel
         _deferredUpdates = updates;
         SafeModeReason = decision.Reason;
         IsSafeMode = true;
+        ClosePlayniteUi(); // tema Playnite na interface só fora do modo seguro
         UpdateStatus = $"Versão {UpdateService.CurrentVersion} · modo seguro: atualizações automáticas pausadas nesta abertura";
 
         RecoveryViewModel? notice = null;
@@ -96,6 +97,7 @@ public sealed partial class ShellViewModel
             StartAutoUpdate(updates);
         }
 
+        ApplyPlayniteUi();
         if (theme.Succeeded)
         {
             Toast("Modo normal: tema e atualizações automáticas de volta");

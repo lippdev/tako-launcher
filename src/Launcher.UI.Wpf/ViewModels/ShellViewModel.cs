@@ -158,7 +158,11 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public GameItemViewModel ItemFor(Game game) => _items[game.Id];
 
-    partial void OnCurrentPageChanged(PageViewModel value) => OnPropertyChanged(nameof(IsBackdropLarge));
+    partial void OnCurrentPageChanged(PageViewModel value)
+    {
+        OnPropertyChanged(nameof(IsBackdropLarge));
+        OnPageChangedForPlaynite();
+    }
 
     // ---------------------------------------------------------------- Navegação entre páginas
 
@@ -188,6 +192,11 @@ public sealed partial class ShellViewModel : ObservableObject
                 CloseOverlay(overlay);
             }
 
+            return;
+        }
+
+        if (TryBackInPlayniteUi())
+        {
             return;
         }
 
@@ -505,9 +514,15 @@ public sealed partial class ShellViewModel : ObservableObject
         PushOverlay(recovery);
     }
 
-    /// <summary>Erro de tema em uso: fecha a prévia e mostra a recuperação.</summary>
+    /// <summary>Erro de tema em uso: fecha a prévia (ou sai do tema Playnite da interface) e mostra a recuperação.</summary>
     public void RecoverFromThemeFailure(string reason)
     {
+        if (PlayniteUi is not null && !Overlays.OfType<PlaynitePreviewViewModel>().Any())
+        {
+            FailPlayniteUi(reason);
+            return;
+        }
+
         foreach (var preview in Overlays.OfType<PlaynitePreviewViewModel>().ToList())
         {
             CloseOverlay(preview);
@@ -613,6 +628,9 @@ public sealed partial class ShellViewModel : ObservableObject
             case not null:
                 list.Add(("a", "Selecionar", AppCommand.Accept));
                 list.Add(("b", "Voltar", AppCommand.Back));
+                break;
+            case null when IsPlayniteUiVisible:
+                AddPlayniteHints(list);
                 break;
             default:
                 bool onGame = _focusedContext is GameItemViewModel;

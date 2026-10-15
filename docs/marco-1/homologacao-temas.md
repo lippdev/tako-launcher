@@ -1,7 +1,7 @@
 # MVP-022: homologação de temas Fullscreen reais do Playnite
 
 - Data: 2026-10-15
-- Escopo: MVP-014 (importar `.pthm`), MVP-015 (`theme.yaml`), MVP-017 (herança do tema padrão) e MVP-022 (homologação)
+- Escopo: MVP-014 (importar `.pthm`), MVP-015 (`theme.yaml`), MVP-017 (herança do tema padrão), MVP-018/019 (adaptadores de dados e controles `PART_`, interface inteira) e MVP-022 (homologação)
 - Medição: teste de fumaça da UI no CI Windows. Cada tema é importado pelo fluxo real (`ShellViewModel.ImportThemeFrom` → `ThemePackage.Install`) e aberto na prévia (`P10Theme.Load` sobre o Fullscreen padrão). O relatório completo fica em `theme-homologation.txt` e as capturas `34-tema-*.png` ficam no artefato `ui-screenshots`.
 
 ## Temas escolhidos
@@ -28,14 +28,27 @@ Ficaram de fora:
 
 ## Resultado (CI Windows, carregador XAML restrito + adaptador P10)
 
+"Antes" é a medição da frente C (PR #19), só com a prévia. "Depois" inclui os adaptadores de dados e os controles `PART_` (MVP-018/019, PR #24). Os temas passam a ser aplicados à **interface inteira**: a tela inicial do Tako vira o `Views/Main.xaml` do tema.
+
 | | PS5ish 5.0.3 | Toggle 1.10.1 | Revisited 2.1.0 (parcial) | Playnite padrão (referência) |
 |---|---|---|---|---|
 | Importação `.pthm` (validação e extração) | ✅ 66 arquivos | ✅ 619 arquivos | ✅ 10 arquivos | — (embutido) |
 | `theme.yaml` | ✅ 2.3.0 | ✅ 2.9.0 | ✅ 2.9.0 | ✅ 2.0.0 |
-| Arquivos do tema carregados | **22 de 26** | **27 de 33** | **3 de 6** | 31 de 33 |
-| Herdados do padrão | 9 | 4 | 28 | — |
+| Arquivos do tema carregados: antes → **depois** | 22 de 26 → **25 de 26** | 27 de 33 → **33 de 33** | 3 de 6 → **4 de 6** | 31 de 33 → **33 de 33** |
+| Herdados do padrão: antes → depois | 9 → 8 | 4 → 0 | 28 → 29 (inclui 2 recusados) | — |
 | Ignorados (fora do padrão) | 0 | 0 | 1 (`Views/ActionSelection.xaml`) | — |
-| Grade de jogos na prévia | ✅ visual do tema | ✅ visual do tema (foco laranja, barra azul) | ✅ estilo do tema + resto do padrão | ✅ |
+| `Views/Main.xaml` | ⚠️ herdado do padrão (vídeos de `\ExtraMetadata`, bloqueado) | ✅ do tema | ✅ do tema | ✅ |
+| `Views/GameDetails.xaml` | ✅ do tema | ✅ do tema | ⚠️ herdado (`\ExtraMetadata`) | ✅ |
+| Interface inteira (tela inicial, capas, detalhes, Jogar, voltar) | ✅ | ✅ | ✅ | ✅ |
+
+Arquivos por tema, depois:
+
+- **PS5ish**: `Constants.xaml` (liberado `SplineThicknessKeyFrame`), `DefaultControls/Button.xaml` (`{SettingsBinding}`, `{PluginSettings}`) e `Views/GameDetails.xaml` (`HtmlTextView` seguro, `{PluginSettings}`, `DesignWidth`) passaram a carregar. Só o `Views/Main.xaml` continua recusado: monta vídeos e a foto de perfil a partir de `\ExtraMetadata`, fora da pasta do tema. A interface usa o `Main.xaml` padrão com o restante do visual do PS5ish.
+- **Toggle**: todos os 33 carregam: `{ThemeFileBinding}`, `{PluginSettings}`/`{PluginStatus}`, `{Api}`, `pbeh:FocusBahaviors` e `pin:GameControllerInputBinding` por nome, e a imagem `custom_cover_background.png` que falta no pacote vem do tema padrão, como no Playnite.
+- **Revisited**: `Views/Main.xaml` passou a carregar (`{Api Notifications.Count}`). `GameDetails.xaml` e `GameStatus.xaml` continuam recusados por `\ExtraMetadata`.
+- **Playnite padrão**: `Views/Main.xaml` (`{Api}`) e `Views/GameDetails.xaml` (`HtmlTextView` seguro) passaram a carregar.
+
+O teste de homologação do CI agora verifica que o `Main.xaml` carrega (`P10ThemeReport.HasMainView`) e se ele veio do próprio tema (Toggle, Revisited) ou do padrão (PS5ish). O bloco "Tema Playnite na interface (frente F)" do teste de fumaça aplica os três temas à interface inteira e abre os detalhes pelo controle (capturas `60-` a `66-` e relatório `theme-whole-ui.txt` no artefato `ui-screenshots`).
 
 ### Matriz de recursos
 
@@ -43,32 +56,31 @@ Ficaram de fora:
 
 | Recurso do tema | PS5ish | Toggle | Revisited | Situação no Tako |
 |---|---|---|---|---|
-| Cores, pincéis e fontes (`Constants.xaml`) | ⚠️ recusado por `SplineThicknessKeyFrame`; usa o do padrão | ✅ | ✅ | Suportado. `SplineThicknessKeyFrame` fora da lista de permissões (candidato a liberar: animação inofensiva) |
-| Mídia (`Media.xaml`, imagens via `ThemeFile`) | ⚠️ herdado | ⚠️ `BitmapImage` falha na carga; usa o do padrão | ⚠️ herdado | `ThemeFile` suportado; imagem que falha recusa o arquivo inteiro |
-| Controles padrão (Button, CheckBox, ComboBox, Slider, TextBox…) | ⚠️ 6 de 7 (Button usa `{SettingsBinding}`; usa o do padrão) | ✅ 9 de 9 | ✅ Button do tema + resto herdado | Suportado |
-| Estilos derivados (`ListGameItemStyle`/`Template`, menus) | ✅ | ⚠️ `{PluginSettings}`; usa o do padrão | ✅ `ListGameItemStyle` do tema | Suportado. `{PluginSettings}` (extensões do Playnite) não |
-| Controles próprios (filtros, `FilterPresetSelector`) | ✅ | ⚠️ `{ThemeFileBinding}` | ⚠️ herdado | `ThemeFileBinding` ainda não implementado no adaptador |
-| Views de menu, filtros, mensagens, notificações, configurações | ✅ | ✅ | ⚠️ herdado | Suportado (renderização completa das views: MVP-018/019) |
-| `Views/Main.xaml` | ❌ vídeo de fundo fora da pasta do tema (`\ExtraMetadata\...`) | ❌ `{PluginSettings}` | ❌ `{Api}` | Não suportado: API do Playnite, extensões e arquivos fora do tema |
-| `Views/GameDetails.xaml` | ❌ `{PluginSettings}`, `HtmlTextView` | ❌ `FocusBahaviors` (Playnite.Behaviors) | ❌ `{PluginSettings}`, `{Api}` | Não suportado: `HtmlTextView` (segurança), behaviors e API |
-| `Views/GameStatus.xaml` | ✅ | ✅ | ❌ `{Api}`, caminho fora do tema | Parcial |
-| Extensões de terceiros (SuccessStory, ExtraMetadataLoader, ThemeOptions…) | ❌ | ❌ | ❌ | Não suportado: não há plugins do Playnite no Tako |
+| Cores, pincéis e fontes (`Constants.xaml`) | ✅ | ✅ | ✅ | Suportado (`SplineThicknessKeyFrame` liberado) |
+| Mídia (`Media.xaml`, imagens via `ThemeFile`) | ⚠️ herdado | ✅ | ⚠️ herdado | `{ThemeFile}` procura no tema e depois no padrão, sempre dentro das pastas dos temas |
+| Controles padrão (Button, CheckBox, ComboBox, Slider, TextBox…) | ✅ 7 de 7 | ✅ 9 de 9 | ✅ Button do tema + resto herdado | Suportado |
+| Estilos derivados (`ListGameItemStyle`/`Template`, menus) | ✅ | ✅ | ✅ `ListGameItemStyle` do tema | Suportado |
+| Controles próprios (filtros, `FilterPresetSelector`) | ✅ | ✅ | ⚠️ herdado | Filtros rápidos funcionam (Todos, Instalados, Favoritos, Jogados recentemente); o painel completo de filtros fica oculto |
+| Tela principal (`Views/Main.xaml`) e `PART_` | ⚠️ herdada | ✅ | ✅ | **Suportado**: grade de jogos e seleção, Jogar/Instalar, Detalhes, Opções, Buscar (aviso do UX-001), Filtrar, menu principal (→ Configurações do Tako), relógio, fundo do jogo |
+| Detalhes (`Views/GameDetails.xaml`) | ✅ | ✅ | ⚠️ herdado | Suportado: capa, fundo, dados do jogo, ação principal e opções; a descrição é texto puro (`HtmlTextView` seguro) |
+| `Views/GameStatus.xaml` | ✅ (oculto) | ✅ (oculto) | ❌ `\ExtraMetadata` | O status do jogo usa a tela de sessão do Tako |
+| Dados do Playnite (`{Api}`, `{Settings}`, `{SettingsBinding}`) | ✅ | ✅ | ✅ | Subconjunto só-leitura; configurações com os valores do Tako |
+| Extensões de terceiros (SuccessStory, ExtraMetadataLoader, ThemeOptions…) | ⚠️ | ⚠️ | ⚠️ | O arquivo carrega, e a extensão aparece como "não instalada" (`{PluginSettings}`/`{PluginStatus}`). O Toggle mostra o próprio aviso de que falta o ThemeOptions |
 | Arquivos fora da pasta do tema (`\ExtraMetadata`, vídeos, perfil) | ❌ | — | ❌ | Bloqueado por segurança (`PathEscapesTheme`) |
-| Bindings para dados do Playnite (`Platforms`, `Library`, `ElementName` de PART_) | ⚠️ ficam vazios | ⚠️ ficam vazios | ⚠️ ficam vazios | Dados e PART_ ainda não fornecidos (MVP-018/019). Os erros de binding de temas de terceiros vão para o relatório, não para a verificação do launcher |
+| Behaviors e atalhos de controle do Playnite | — | ⚠️ | — | `FocusBahaviors` funciona; `GameControllerInputBinding` fica inerte (a entrada é do Tako) |
+| Bindings a `Window.DataContext` do Playnite | ⚠️ | ⚠️ | — | Ficam vazios (no Tako a janela é a do launcher); vão para o relatório de erros de binding |
 
-### O que bloqueia mais arquivos (por frequência)
+### O que ainda fica de fora
 
-1. `{PluginSettings}`/`{PluginStatus}`: configurações de extensões do Playnite. O adaptador poderia expor um objeto vazio, para os valores ficarem nulos em vez de recusar o arquivo (MVP-018).
-2. `{Api …}`: API do Playnite (notificações, caminhos). Fica no escopo do MVP-018.
-3. Caminhos `\ExtraMetadata\...`: vídeos e logos que o ExtraMetadataLoader grava fora do tema. Continuam bloqueados.
-4. `{SettingsBinding}` e `{ThemeFileBinding}`: extensões do Playnite que ainda não existem no adaptador. São candidatas diretas, porque não executam código.
-5. `SplineThicknessKeyFrame` e `Playnite.Behaviors`: tipo e behavior fora da lista. Cada um só entra individualmente e com justificativa (spike MVP-016, questão 3).
+1. Caminhos `\ExtraMetadata\...` (vídeos, logos e fundos que o ExtraMetadataLoader grava fora do tema): continuam bloqueados. Por isso o `Main.xaml` do PS5ish e o `GameDetails.xaml`/`GameStatus.xaml` do Revisited usam os do padrão.
+2. Extensões do Playnite: não há plugins no Tako, e o tema as vê como não instaladas.
+3. Painel completo de filtros, busca com teclado virtual, bateria e progresso: fora do subset do MVP-019.
 
-Nenhum item da política de segurança foi afrouxado nesta homologação.
+Nenhuma liberação foi genérica: cada tipo ou extensão entra por nome e é implementado no adaptador. As justificativas estão em [`docs/spikes/MVP-016-xaml-restrito.md`](../spikes/MVP-016-xaml-restrito.md#liberações-para-a-interface-inteira-mvp-018019).
 
 ## Como reproduzir
 
-- **No app**: Configurações › Temas › "Importar tema do Playnite (.pthm)", escolha um dos pacotes acima e depois "Diagnóstico" no tema.
+- **No app**: Configurações › Temas › "Importar tema do Playnite (.pthm)", escolha um dos pacotes acima e depois "Diagnóstico" no tema. "Usar este tema" aplica o tema à tela inicial; Menu (☰ / M) volta às Configurações do Tako.
 - **Pela linha de comando (Windows)**: extraia o `.pthm` e rode
   `dotnet run --project tools/Launcher.ThemeCheck -- <pasta> --p10 --load --base src/Launcher.UI.Wpf/Themes/Playnite-Default`.
-- **No CI**: o artefato `ui-screenshots` traz `theme-homologation.txt`, com OK/RECUSA/HERDADO/IGNORADO por arquivo e os erros de binding, e as capturas `30-` a `35-`.
+- **No CI**: o artefato `ui-screenshots` traz `theme-homologation.txt`, com OK/RECUSA/HERDADO/IGNORADO por arquivo e os erros de binding, e as capturas `30-` a `35-`; a interface inteira está em `theme-whole-ui.txt` e nas capturas `60-` a `66-`.

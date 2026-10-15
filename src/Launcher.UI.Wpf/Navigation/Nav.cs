@@ -45,6 +45,21 @@ public static class Nav
     public static readonly DependencyProperty IsGroupEntryProperty =
         DependencyProperty.RegisterAttached("IsGroupEntry", typeof(bool), typeof(Nav), new PropertyMetadata(false));
 
+    /// <summary>A/Enter num elemento que não é botão (ex.: capa de um tema Playnite abre os detalhes).</summary>
+    public static readonly DependencyProperty ActivateCommandProperty =
+        DependencyProperty.RegisterAttached("ActivateCommand", typeof(ICommand), typeof(Nav), new PropertyMetadata(null));
+
+    public static readonly DependencyProperty ActivateParameterProperty =
+        DependencyProperty.RegisterAttached("ActivateParameter", typeof(object), typeof(Nav), new PropertyMetadata(null));
+
+    public static ICommand? GetActivateCommand(DependencyObject d) => (ICommand?)d.GetValue(ActivateCommandProperty);
+
+    public static void SetActivateCommand(DependencyObject d, ICommand? value) => d.SetValue(ActivateCommandProperty, value);
+
+    public static object? GetActivateParameter(DependencyObject d) => d.GetValue(ActivateParameterProperty);
+
+    public static void SetActivateParameter(DependencyObject d, object? value) => d.SetValue(ActivateParameterProperty, value);
+
     public static bool GetIsGroupEntry(DependencyObject d) => (bool)d.GetValue(IsGroupEntryProperty);
 
     public static void SetIsGroupEntry(DependencyObject d, bool value) => d.SetValue(IsGroupEntryProperty, value);

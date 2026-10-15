@@ -157,6 +157,10 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
         {
             command.Execute(button.CommandParameter);
         }
+        else if (Focused is not null && Nav.GetActivateCommand(Focused) is { } activate && activate.CanExecute(Nav.GetActivateParameter(Focused)))
+        {
+            activate.Execute(Nav.GetActivateParameter(Focused));
+        }
     }
 
     public static bool MatchesKey(FrameworkElement element, string key)

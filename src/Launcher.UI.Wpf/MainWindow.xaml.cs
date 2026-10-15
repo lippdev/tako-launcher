@@ -371,6 +371,12 @@ public partial class MainWindow : Window
             return [container];
         }
 
+        // Tema Playnite na tela inicial: só os elementos do tema (Menu/☰ continua levando às Configurações).
+        if (_shell.IsPlayniteUiVisible)
+        {
+            return [PlayniteHost];
+        }
+
         return [Sidebar, PageHost];
     }
 

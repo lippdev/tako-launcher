@@ -1,7 +1,10 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using Launcher.Core.Themes;
+using Launcher.PlayniteCompat.P10.Controls;
+using Launcher.PlayniteCompat.P10.Data;
 using Launcher.PlayniteCompat.P10.Markup;
 using Launcher.Themes.Xaml;
 
@@ -25,6 +28,12 @@ public sealed record P10ThemeReport(
 
     /// <summary>XAML do tema que o Playnite também ignora (não existe no tema padrão, ex.: App.xaml de projeto Blend).</summary>
     public IReadOnlyList<string> Ignored { get; init; } = [];
+
+    /// <summary>A tela principal (<c>Views/Main.xaml</c>) veio do próprio tema.</summary>
+    public bool MainFromTheme => Loaded.Contains(P10Theme.MainView, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Há uma tela principal para aplicar à interface inteira: do tema ou herdada do tema padrão (MVP-018/019).</summary>
+    public bool HasMainView => MainFromTheme || Inherited.Contains(P10Theme.MainView, StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>
@@ -34,27 +43,14 @@ public sealed record P10ThemeReport(
 /// </summary>
 public static class P10Theme
 {
-    private const string PlayniteMarkupNamespace = "clr-namespace:Playnite.FullscreenApp.Markup;assembly=Playnite.FullscreenApp";
-    private const string AdapterMarkupNamespace = "clr-namespace:Launcher.PlayniteCompat.P10.Markup;assembly=Launcher.PlayniteCompat.P10";
+    /// <summary>Arquivo da tela principal do tema.</summary>
+    public const string MainView = "Views/Main.xaml";
 
     /// <summary>Ordem de composição usada pelo Playnite: constantes, mídia, controles padrão, estilos derivados, controles e views.</summary>
     private static readonly string[] Folders = [string.Empty, "DefaultControls", "DerivedStyles", "CustomControls", "Views"];
 
-    /// <summary>Política do carregador para temas P10.</summary>
-    public static XamlSecurityPolicy Policy(XamlSecurityPolicy basePolicy)
-    {
-        ArgumentNullException.ThrowIfNull(basePolicy);
-        return basePolicy.Extend(
-            presentationTypes:
-            [
-                "ButtonEx", "ItemsControlEx", "ListBoxEx", "ScrollViewerEx", "FadeImage", "GameListItem", "CheckBoxEx", "SliderEx",
-                "ToggleButtonEx", "FilterDbItemtSelection", "FilterEnumListSelection", "FilterStringListSelection", "FilterPresetSelector",
-                "Filters", "FiltersAdditional", "GameDetails", "GameStatus", "ComboBoxEx",
-            ],
-            presentationExtensions: ["ThemeFile", "Settings"],
-            remappedNamespaces: [(PlayniteMarkupNamespace, AdapterMarkupNamespace, ["ThemeFile", "ThemeFileExtension"])],
-            popupHostTemplates: ["ComboBoxEx"]);
-    }
+    /// <summary>Política do carregador para temas P10 (ver <see cref="P10Policy"/>).</summary>
+    public static XamlSecurityPolicy Policy(XamlSecurityPolicy basePolicy) => P10Policy.Create(basePolicy);
 
     /// <summary>
     /// Carrega o tema. Deve rodar na thread de UI (STA). Com <paramref name="baseThemeDirectory"/> (o Fullscreen padrão),
@@ -73,6 +69,11 @@ public static class P10Theme
         }
 
         var manifest = ThemeManifest.Read(root);
+        if (baseRoot is not null)
+        {
+            Markup.ThemeFiles.FallbackRoot = Path.TrimEndingDirectorySeparator(baseRoot);
+        }
+
         var resources = new ResourceDictionary();
         resources.MergedDictionaries.Add(CompatibilityResources());
         var loaded = new List<string>();
@@ -133,6 +134,73 @@ public static class P10Theme
         };
     }
 
+    /// <summary>
+    /// Ensaio da tela principal antes de aplicá-la à interface inteira (MVP-021): monta <see cref="Main"/> e
+    /// <see cref="GameDetails"/> fora da tela, com o modelo real, e faz medida e arranjo. Erros que o WPF só mostra ao
+    /// instanciar o template (propriedade inexistente, conversão inválida, binding TwoWay em valor só-leitura) aparecem
+    /// aqui, e o launcher fica na UI padrão. Retorna o motivo da falha, ou nulo. Roda na thread de UI.
+    /// </summary>
+    public static string? Probe(P10ThemeReport report, P10MainModel model, P10Api api, Size size)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        if (!report.HasMainView)
+        {
+            return $"{MainView} do tema e do tema padrão foram recusados pelo carregador XAML restrito.";
+        }
+
+        var main = new Main { DataContext = model };
+        var details = new GameDetails { DataContext = model.Games.FirstOrDefault(), Model = model };
+        var root = new Grid();
+        root.Children.Add(main);
+        root.Children.Add(details);
+        root.Resources.MergedDictionaries.Add(report.Resources);
+        P10Context.SetApi(root, api);
+        string? problem;
+        try
+        {
+            root.Measure(size);
+            root.Arrange(new Rect(size));
+            root.UpdateLayout();
+            problem = main.Template is null ? $"O tema não define o template de Main ({MainView})." : null;
+        }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+        {
+            problem = Describe(ex);
+        }
+
+        // Desmontar também é ensaio: a lista do tema é recriada ao filtrar ou quando a biblioteca muda. E o ensaio não
+        // pode continuar ligado ao modelo (a lista dele escreveria a seleção).
+        try
+        {
+            main.DetachSelection();
+            main.DataContext = null;
+            details.DataContext = null;
+            details.Model = null;
+            root.Children.Clear();
+        }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+        {
+            problem ??= Describe(ex);
+        }
+
+        return problem;
+    }
+
+    /// <summary>Erro de tema para a tela de recuperação e o log: tipo, mensagem e onde aconteceu.</summary>
+    public static string Describe(Exception error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        var root = error;
+        while (root.InnerException is { } inner)
+        {
+            root = inner;
+        }
+
+        string where = root.StackTrace?.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? string.Empty;
+        string text = ReferenceEquals(root, error) ? $"{error.GetType().Name}: {error.Message}" : $"{error.GetType().Name}: {error.Message} ({root.GetType().Name}: {root.Message})";
+        return where.Length > 0 ? $"{text} [{where}]" : text;
+    }
+
     /// <summary>XAML das pastas do tema, na ordem de composição do Playnite.</summary>
     private static List<string> ThemeFiles(string root)
     {
@@ -162,9 +230,21 @@ public static class P10Theme
         }
         catch (ThemeXamlRejectedException ex)
         {
-            reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : ex.InnerException?.Message ?? ex.Message;
+            reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : Innermost(ex);
             return false;
         }
+    }
+
+    /// <summary>Mensagem mais interna (ex.: a chave de um StaticResource que não existe), sem a pilha.</summary>
+    private static string Innermost(Exception error)
+    {
+        var messages = new List<string>();
+        for (var e = error.InnerException ?? error; e is not null; e = e.InnerException)
+        {
+            messages.Add(e.Message);
+        }
+
+        return string.Join(" → ", messages.Distinct());
     }
 
     /// <summary>Constants.xaml antes de Media.xaml (Media usa recursos de Constants).</summary>
@@ -175,13 +255,57 @@ public static class P10Theme
         _ => 2,
     };
 
-    /// <summary>Recursos que o próprio Playnite fornece aos temas (fontes, booleanos e conversores); aqui com equivalentes do launcher.</summary>
+    /// <summary>
+    /// Recursos que o próprio Playnite fornece aos temas (fontes, booleanos, conversores e textos <c>LOC*</c>); aqui com
+    /// equivalentes do launcher, em português. O tema pode redefinir qualquer um.
+    /// </summary>
     private static ResourceDictionary CompatibilityResources()
     {
         var resources = PlayniteConverters.Resources();
         resources["FontTitilliumWebLight"] = new FontFamily("Segoe UI Light");
         resources["FontTitilliumWeb"] = new FontFamily("Segoe UI");
+        resources["FontTitilliumWebBold"] = new FontFamily("Segoe UI Semibold");
         resources["FontIcoFont"] = new FontFamily("Segoe MDL2 Assets");
+        resources["DesignWidth"] = 1920.0;
+        resources["DesignHeight"] = 1080.0;
+        foreach (var (key, text) in Strings)
+        {
+            resources[key] = text;
+        }
+
         return resources;
     }
+
+    /// <summary>Textos da interface do Playnite usados pelas telas principais dos temas homologados.</summary>
+    private static readonly (string Key, string Text)[] Strings =
+    [
+        ("LOCPlayGame", "Jogar"),
+        ("LOCInstallGame", "Instalar"),
+        ("LOCGameDetails", "Detalhes"),
+        ("LOCGameOptions", "Opções"),
+        ("LOCSearchLabel", "Buscar"),
+        ("LOCFilter", "Filtrar"),
+        ("LOCNoGamesFound", "Nenhum jogo encontrado"),
+        ("LOCGameListSearchResults", "Resultados da busca"),
+        ("LOCGameListExtraFiltered", "Filtro adicional ativo"),
+        ("LOCGameListFiltered", "Lista filtrada"),
+        ("LOCTimePlayed", "Tempo jogado"),
+        ("LOCGameLastActivityTitle", "Última vez"),
+        ("LOCGameReleaseDateTitle", "Lançamento"),
+        ("LOCGamePlatformTitle", "Plataforma"),
+        ("LOCGameProviderTitle", "Biblioteca"),
+        ("LOCGameDescriptionTitle", "Descrição"),
+        ("LOCGenreLabel", "Gênero"),
+        ("LOCPublisherLabel", "Distribuidora"),
+        ("LOCCompletionStatus", "Status"),
+        ("LOCAllGames", "Todos os jogos"),
+        ("LOCQuickFilterRecentlyPlayed", "Jogados recentemente"),
+        ("LOCNotifications", "Notificações"),
+        ("LOCSettingsLabel", "Configurações"),
+        ("LOCMoreAction", "Mais"),
+        ("LOCCurrentlyPlaying", "Jogando agora"),
+        ("LOCGridViewLabel", "Grade"),
+        ("LOCListViewLabel", "Lista"),
+        ("LOCUpdaterWindowTitle", "Atualização"),
+    ];
 }

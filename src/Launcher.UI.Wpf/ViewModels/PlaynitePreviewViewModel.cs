@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
 using Launcher.PlayniteCompat.P10;
-using Launcher.PlayniteCompat.P10.Controls;
+using Launcher.PlayniteCompat.P10.Data;
 
 namespace Launcher.UI.Wpf.ViewModels;
 
@@ -15,7 +15,7 @@ public sealed class PlaynitePreviewViewModel : IOverlayViewModel
         Close = close;
         foreach (var game in games)
         {
-            Games.Add(new P10GameEntry(game.Title, game.Game.IsInstalled, game.Cover));
+            Games.Add(PlayniteUiViewModel.ToEntry(game));
         }
 
         string inherited = report.Inherited.Count > 0 ? $" ({report.Inherited.Count} herdados do tema padrão)" : string.Empty;

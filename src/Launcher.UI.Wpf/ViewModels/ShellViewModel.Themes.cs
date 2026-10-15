@@ -77,12 +77,18 @@ public sealed partial class ShellViewModel
         string text;
         if (item.Theme is not { } theme)
         {
-            text = "O visual do Tako. Temas do Playnite são aplicados numa prévia até o adaptador cobrir as telas do launcher (MVP-018/019).";
-            actions.Add(new OverlayAction("Recarregar tema", ActionStyle.Primary, new RelayCommand(() => { Close(); ReloadTakoTheme(); }), IsDefault: true));
+            text = "A interface e o visual do Tako.";
+            if (!item.IsSelected)
+            {
+                actions.Add(new OverlayAction("Usar este tema", ActionStyle.Primary, new RelayCommand(() => { Close(); SelectTheme(item); }), IsDefault: true));
+            }
+
+            actions.Add(new OverlayAction("Recarregar tema", item.IsSelected ? ActionStyle.Primary : ActionStyle.Secondary, new RelayCommand(() => { Close(); ReloadTakoTheme(); }), IsDefault: item.IsSelected));
         }
         else
         {
-            text = $"{theme.Directory}\n{item.Detail}" + (IsBlockedBySafeMode(theme) ? "\nModo seguro ativo: prévia e diagnóstico ficam indisponíveis até voltar ao normal." : string.Empty);
+            text = $"{theme.Directory}\n{item.Detail}\n\"Usar este tema\" aplica o tema à tela inicial do Tako; Menu (☰ / M) sempre abre as Configurações do Tako."
+                + (IsBlockedBySafeMode(theme) ? "\nModo seguro ativo: prévia e diagnóstico ficam indisponíveis até voltar ao normal." : string.Empty);
             if (theme.Manifest.IsCompatible)
             {
                 actions.Add(new OverlayAction("Abrir prévia", ActionStyle.Primary, new RelayCommand(() => { Close(); ShowThemePreview(theme); }), IsDefault: true));
@@ -136,12 +142,13 @@ public sealed partial class ShellViewModel
         PushOverlay(preview);
     }
 
-    /// <summary>Volta o Tako ao tema padrão e a prévia ao tema Fullscreen padrão do Playnite.</summary>
+    /// <summary>Volta à interface e ao tema padrão do Tako; a prévia volta ao tema Fullscreen padrão do Playnite.</summary>
     [RelayCommand]
     public void RestoreDefaultTheme()
     {
         var result = _themes.Apply(ThemeService.DefaultTheme);
         TryChangeSelection(null);
+        ClosePlayniteUi();
         RefreshThemesPage();
         Toast(result.Succeeded ? "Tema padrão restaurado" : "Tema padrão embutido em uso");
     }
@@ -152,12 +159,34 @@ public sealed partial class ShellViewModel
         Toast(result.Succeeded ? "Tema do Tako recarregado pelo carregador XAML restrito" : $"Falha ao recarregar: {result.Error}");
     }
 
-    private void SelectTheme(ThemeItemViewModel item)
+    /// <summary>"Usar este tema": tema Playnite na tela inicial (MVP-018/019) ou de volta à interface do Tako.</summary>
+    public void SelectTheme(ThemeItemViewModel item)
     {
-        if (TryChangeSelection(item.Kind == ThemeKind.Imported ? item.Theme : null))
+        ArgumentNullException.ThrowIfNull(item);
+        if (item.Theme is { } theme && IsBlockedBySafeMode(theme))
         {
-            RefreshThemesPage();
-            Toast($"{item.Name} será usado na prévia de tema Playnite 10");
+            Toast("Modo seguro: temas importados não são aplicados. Volte ao normal em Configurações");
+            return;
+        }
+
+        if (!TryChangeSelection(item.Theme))
+        {
+            return;
+        }
+
+        ApplyPlayniteUi();
+        RefreshThemesPage();
+        if (item.Theme is null)
+        {
+            Toast("Interface do Tako em uso");
+        }
+        else if (PlayniteUi is not null)
+        {
+            Toast($"{item.Name} aplicado à tela inicial · ☰ abre as Configurações do Tako");
+        }
+        else if (IsSafeMode)
+        {
+            Toast($"{item.Name} será aplicado ao sair do modo seguro");
         }
     }
 
@@ -166,7 +195,7 @@ public sealed partial class ShellViewModel
         DialogViewModel? dialog = null;
         dialog = new DialogViewModel(
             $"Remover {item.Name}?",
-            "Apaga a pasta do tema importado. Se ele estiver em uso, a prévia volta ao tema padrão.",
+            "Apaga a pasta do tema importado. Se ele estiver em uso, o Tako volta à interface padrão.",
             [
                 new OverlayAction("Remover", ActionStyle.Danger, new RelayCommand(() =>
                 {
@@ -189,6 +218,11 @@ public sealed partial class ShellViewModel
         {
             _playniteThemes.Remove(item.Theme);
             _themeLoadSummaries.Remove(item.Theme.Directory);
+            if (PlayniteUi is not null && _playniteThemes.SelectedForUi() is null)
+            {
+                ClosePlayniteUi();
+            }
+
             Toast($"{item.Name} removido");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)

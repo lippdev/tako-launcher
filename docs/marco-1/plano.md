@@ -20,8 +20,8 @@ Antes das frentes, no mesmo ciclo: biblioteca real da Steam + jogos adicionados 
 | MVP-001 estrutura · MVP-013 tema padrão · MVP-016 XAML restrito · MVP-023 biblioteca · MVP-025 detalhes · MVP-028 navegação | ✅ |
 | MVP-004 · MVP-005 · MVP-010 · MVP-011 · MVP-014 · MVP-015 · MVP-020 · MVP-021 · MVP-024 · MVP-026 · MVP-027 · MVP-029 · MVP-031 · MVP-032 · MVP-033 · MVP-036 | ✅ (validação final em hardware pelo [checklist](checklist-hardware.md)) |
 | MVP-008 detectar FSE | ✅ classificação sem falso positivo; "suportado" só confirmado em hardware |
-| MVP-017 · MVP-018 · MVP-019 temas Playnite | 🟡 herança e adaptadores de estilos/templates prontos; telas `Main`/`GameDetails` dependem da API do Playnite (`{Api}`, `{PluginSettings}`, `{SettingsBinding}`) |
-| MVP-022 homologação | ✅ 3 temas reais medidos; aplicar tema Playnite à interface inteira segue para MVP-018/019 |
+| MVP-017 · MVP-018 · MVP-019 temas Playnite | ✅ tema Playnite aplicado à tela inicial (`Main.xaml`, `PART_`, `{Api}` só-leitura, `{PluginSettings}`, `{SettingsBinding}`, `{ThemeFileBinding}`, `HtmlTextView` seguro), com fallback (MVP-021) ([matriz](homologacao-temas.md)); validação em hardware pendente |
+| MVP-022 homologação | ✅ 3 temas reais medidos e aplicados à interface inteira (Main.xaml do tema no Toggle e no Revisited; do padrão no PS5ish) |
 | MVP-034 testes e checklists | 🟡 CI completo; checklist e Configurações › Diagnóstico do sistema prontos; execução no Windows real pendente |
 | MVP-012 restaurar monitores/áudio | 🟡 contratos e implementação próprios, sem código do Console Mode ([ADR-0013](../adr/0013-estado-de-monitores-e-audio.md)); validação em hardware pelo [checklist](checklist-hardware.md) §9 |
 | MVP-002 · MVP-003 · MVP-006 runtime compartilhado, IPC, supervisor | ⛔ dependem da decisão [LEGAL-001](../legal/LEGAL-001.md) (reuso do Console Mode); MVP-002 já tem os contratos próprios de monitores e áudio (ADR-0013) |
@@ -31,4 +31,4 @@ Antes das frentes, no mesmo ciclo: biblioteca real da Steam + jogos adicionados 
 ## Próximos passos
 1. Rodar o [checklist de hardware](checklist-hardware.md) no Windows 11 com a `0.1.0-alpha.6` (a primeira que se atualiza sozinha).
 2. Decidir o LEGAL-001 para destravar o runtime (MVP-002/003/006/012).
-3. Cobertura de temas: implementar `{PluginSettings}`, `{SettingsBinding}`, `{ThemeFileBinding}` e liberar `SplineThicknessKeyFrame` (sugestões da homologação), depois aplicar o tema Playnite à interface inteira (MVP-018/019).
+3. Temas: validar o texto de `sys:String` contra caminhos compostos (questão aberta 8 do [spike](../spikes/MVP-016-xaml-restrito.md)) e avaliar o painel completo de filtros e a busca do tema.

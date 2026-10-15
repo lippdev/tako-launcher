@@ -58,14 +58,16 @@ public sealed class XamlSecurityPolicy
     public int MaxElements { get; init; } = 50_000;
 
     /// <summary>
-    /// Política ampliada por um adaptador (ex.: P10): tipos e extensões que o adaptador implementa e mapeamentos de
-    /// <c>clr-namespace</c> reescritos para o assembly do adaptador.
+    /// Política ampliada por um adaptador (ex.: P10): tipos e extensões que o adaptador implementa, donos de
+    /// propriedades anexadas (sem poder instanciar o tipo) e mapeamentos de <c>clr-namespace</c> reescritos para o
+    /// assembly do adaptador.
     /// </summary>
     public XamlSecurityPolicy Extend(
         IEnumerable<string>? presentationTypes = null,
         IEnumerable<string>? presentationExtensions = null,
         IEnumerable<(string Source, string Target, IEnumerable<string> Types)>? remappedNamespaces = null,
-        IEnumerable<string>? popupHostTemplates = null)
+        IEnumerable<string>? popupHostTemplates = null,
+        IEnumerable<string>? presentationOwnerTypes = null)
     {
         var namespaces = ClrNamespaces.ToDictionary(StringComparer.Ordinal);
         var remaps = NamespaceRemaps.ToDictionary(StringComparer.Ordinal);
@@ -78,7 +80,7 @@ public sealed class XamlSecurityPolicy
         return new XamlSecurityPolicy
         {
             PresentationTypes = Set([.. PresentationTypes, .. presentationTypes ?? []]),
-            PresentationOwnerTypes = PresentationOwnerTypes,
+            PresentationOwnerTypes = Set([.. PresentationOwnerTypes, .. presentationOwnerTypes ?? []]),
             StaticMemberOwners = StaticMemberOwners,
             ClrNamespaces = namespaces.ToFrozenDictionary(StringComparer.Ordinal),
             UriProperties = UriProperties,
@@ -133,7 +135,7 @@ public sealed class XamlSecurityPolicy
             "SplineDoubleKeyFrame", "DiscreteDoubleKeyFrame", "ColorAnimationUsingKeyFrames",
             "LinearColorKeyFrame", "EasingColorKeyFrame", "SplineColorKeyFrame", "DiscreteColorKeyFrame",
             "ThicknessAnimationUsingKeyFrames", "LinearThicknessKeyFrame", "EasingThicknessKeyFrame",
-            "DiscreteThicknessKeyFrame", "ObjectAnimationUsingKeyFrames", "DiscreteObjectKeyFrame",
+            "DiscreteThicknessKeyFrame", "SplineThicknessKeyFrame", "ObjectAnimationUsingKeyFrames", "DiscreteObjectKeyFrame",
             "BooleanAnimationUsingKeyFrames", "DiscreteBooleanKeyFrame", "StringAnimationUsingKeyFrames",
             "DiscreteStringKeyFrame", "KeySpline", "CubicEase", "QuadraticEase", "QuarticEase", "QuinticEase",
             "SineEase", "ExponentialEase", "BackEase", "BounceEase", "CircleEase", "ElasticEase", "PowerEase"),
