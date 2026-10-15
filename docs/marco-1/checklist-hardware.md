@@ -293,6 +293,37 @@ manifesto e, se ele usar recurso de idioma que o Windows não resolver, do nome 
 | X11 | Jogo desinstalado | Desinstalar X1 pelo app Xbox e procurar de novo | O jogo some (pasta que sobrar sem pacote registrado não aparece) |
 | X12 | Outro usuário do Windows | Entrar com outra conta do Windows no mesmo PC | Só aparecem os jogos registrados para essa conta |
 
+## 16. TVs LG (webOS) e Samsung (Tizen) (MVP-002, [ADR-0016](../adr/0016-audio-steam-e-tv-na-sessao.md))
+
+Configurações › **Ligar a TV e trocar a entrada** com **Tipo: LG (webOS)** ou **Tipo: Samsung (Tizen)**. Precisa de
+uma LG e de uma Samsung reais (Samsung 2016 em diante; anotar modelo e ano). Na LG: "LG Connect Apps" ligado e, para
+ligar a TV desligada, "Ligar via Wi-Fi" + MAC. Na Samsung: "Acesso de dispositivos IP remotos" ligado. HDMI-CEC fica
+fora (exige adaptador).
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| L1 | Detectar | IP da LG, **Detectar pelo IP** (TV ligada) | "Encontrada: LG (webOS)"; o campo de comando avançado some |
+| L2 | Pareamento | **Testar** pela primeira vez | A TV mostra o aviso do "LG Remote App"; com "Aceitar", troca para a HDMI escolhida; log "a TV aceitou este PC" |
+| L3 | Testar de novo | **Testar** outra vez | Sem aviso; troca a entrada |
+| L4 | Entrada inexistente | Escolher uma HDMI que a TV não tem | Mensagem com as entradas da TV (nomes da própria TV) |
+| L5 | Recusar | Apagar `tv-pairing.dat`, **Testar** e escolher "Recusar" na TV | "A TV LG recusou o Tako…" |
+| L6 | Recurso desligado | Desligar "LG Connect Apps", **Testar** | "…recusou a conexão. Nas Configurações da TV, ligue LG Connect Apps…" |
+| L7 | Início do jogo com a TV em espera | TV desligada pelo controle remoto, MAC preenchido; abrir um jogo | Wake-on-LAN liga a TV e ela vai para a entrada do PC; anotar o tempo no log |
+| L8 | Espera ao sair | "Colocar a TV em espera ao sair do jogo" ligado | Ao fechar o jogo a TV desliga |
+| L9 | Porta antiga | LG de 2016–2017 (só `ws://3000`), se houver | Funciona igual (o Tako tenta 3001 e depois 3000) |
+| SG1 | Detectar | IP da Samsung, **Detectar pelo IP** | "Encontrada: Samsung (Tizen)" |
+| SG2 | Pareamento | **Testar** pela primeira vez | A TV pergunta se permite o "Tako"; com "Permitir", vai para a HDMI escolhida |
+| SG3 | Testar de novo | **Testar** outra vez | Sem pergunta; troca a entrada (token salvo) |
+| SG4 | Recusar | Na TV, Gerenciador de conexão de dispositivo › Lista de dispositivos: negar o Tako; **Testar** | "A TV Samsung recusou o Tako…" |
+| SG5 | Recurso desligado | Desligar "Acesso de dispositivos IP remotos", **Testar** | Mensagem pedindo para ligar o recurso |
+| SG6 | Em espera com rede | TV desligada pelo controle remoto (modelo 2018+), sem MAC; abrir um jogo | A tecla Power liga a TV e a tecla HDMI troca a entrada |
+| SG7 | Espera profunda | Mesma coisa com MAC preenchido | Wake-on-LAN liga a TV; a tecla Power **não** é mandada de novo (a TV não desliga) |
+| SG8 | Espera ao sair | Opção ligada; fechar o jogo; repetir com a TV já desligada antes de fechar | Desliga só se estava ligada (nunca religa a TV) |
+| SG9 | Tecla HDMI | Anotar se `KEY_HDMI1..4` troca a entrada no modelo testado | Se não trocar, anotar o modelo (algumas Samsung só aceitam `KEY_SOURCE`/`KEY_HDMI`) |
+| TV1 | Chaves cifradas | Copiar `Tako_Data` para outro usuário/PC e **Testar** nas duas TVs | As duas TVs pedem permissão de novo; `tv-pairing.dat` começa com `dpapi:` |
+| TV2 | Certificado | Conferir no log que a conexão LG usou `wss://IP:3001` e a Samsung `wss://IP:8002` | Funciona com o IP; com um nome (ex.: `tv.lan`) as Configurações pedem o IP |
+| TV3 | Detectar sem TV | IP sem TV, **Detectar pelo IP** | "Nenhuma TV conhecida respondeu…" em poucos segundos |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.

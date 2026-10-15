@@ -25,9 +25,12 @@ public sealed class SimulatedSteamClient : ISteamClient
 }
 
 /// <summary>TV em memória: registra os pedidos e pode simular uma TV que não responde.</summary>
-public sealed class SimulatedTvControl : ITvControl
+public sealed class SimulatedTvControl : ITvControl, ITvDetector
 {
     public IList<string> Calls { get; } = [];
+
+    /// <summary>O que "Detectar" encontra (nulo: nenhuma TV respondeu).</summary>
+    public TvKind? DetectedKind { get; set; }
 
     /// <summary>Próximas chamadas falham com esta mensagem.</summary>
     public string? FailWith { get; set; }
@@ -35,6 +38,12 @@ public sealed class SimulatedTvControl : ITvControl
     public Task TurnOnAsync(TvControlConfig config, TimeSpan approvalTimeout, CancellationToken cancellationToken) => Record($"ligar:{config?.Host}");
 
     public Task StandbyAsync(TvControlConfig config, CancellationToken cancellationToken) => Record($"espera:{config?.Host}");
+
+    public Task<TvKind?> DetectAsync(string host, CancellationToken cancellationToken)
+    {
+        Calls.Add($"detectar:{host}");
+        return Task.FromResult(DetectedKind);
+    }
 
     private Task Record(string call)
     {

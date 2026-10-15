@@ -20,8 +20,8 @@ public sealed partial class ShellViewModel
     /// <summary>Resumo da TV na linha das Configurações.</summary>
     public string TvSummary => Settings.TvControl switch
     {
-        { IsActive: true, StandbyAfterGame: true } tv => $"Ligada · {tv.Host} · espera ao sair",
-        { IsActive: true } tv => $"Ligada · {tv.Host}",
+        { IsActive: true, StandbyAfterGame: true } tv => $"Ligada · {tv.Host} · {TvKinds.Label(tv.Kind)} · espera ao sair",
+        { IsActive: true } tv => $"Ligada · {tv.Host} · {TvKinds.Label(tv.Kind)}",
         _ => "Desligado",
     };
 
@@ -119,7 +119,7 @@ public sealed partial class ShellViewModel
     [RelayCommand]
     private void ToggleSteamTray() => Settings.SteamToTrayAfterGame = !Settings.SteamToTrayAfterGame;
 
-    /// <summary>Configurações › TV: endereço, entrada, espera ao sair e o botão Testar (que pareia na primeira vez).</summary>
+    /// <summary>Configurações › TV: tipo (Android, LG, Samsung ou Detectar), endereço, entrada, espera ao sair e Testar (que pareia na primeira vez).</summary>
     [RelayCommand]
     private void OpenTvSettings()
     {
@@ -127,6 +127,7 @@ public sealed partial class ShellViewModel
         editor = new TvSettingsViewModel(
             Settings.TvControl,
             config => _devices.TestTvAsync(config, CancellationToken.None),
+            host => _devices.DetectTvAsync(host, CancellationToken.None),
             saved =>
             {
                 CloseOverlay(editor!);

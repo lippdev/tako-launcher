@@ -206,9 +206,22 @@ public partial class App : Application
         return library;
     }
 
-    /// <summary>Google TV / Android TV pela rede (ADB); a chave deste PC fica cifrada com DPAPI na pasta de dados.</summary>
-    private static AndroidTvControl CreateTvControl(ILogger logger) =>
-        new(new AdbKeyStore(AppPaths.AdbKeyFile, new DpapiSecretProtector()), $"Tako@{Environment.MachineName}", e => GameSessionDevices.LogTvEvent(logger, e));
+    /// <summary>
+    /// TV pela rede: Google TV / Android TV (ADB), LG (webOS) e Samsung (Tizen), escolhida pelo tipo nas Configurações.
+    /// A chave ADB e as chaves de pareamento da LG e da Samsung ficam cifradas com DPAPI na pasta de dados.
+    /// </summary>
+    private static TvControlRouter CreateTvControl(ILogger logger)
+    {
+        void Log(TvEvent e) => GameSessionDevices.LogTvEvent(logger, e);
+        var protector = new DpapiSecretProtector();
+        var pairing = new TvPairingStore(AppPaths.TvPairingFile, protector);
+        var transport = new NetworkTvTransport();
+        return new TvControlRouter(
+            new AndroidTvControl(new AdbKeyStore(AppPaths.AdbKeyFile, protector), $"Tako@{Environment.MachineName}", Log),
+            new WebOsTvControl(pairing, transport, Log),
+            new SamsungTvControl(pairing, transport, "Tako", Log),
+            new TvDetector(transport));
+    }
 
     /// <summary>Exceções que derrubariam o processo ficam registradas no log antes (MVP-033).</summary>
     private static void LogUnhandledExceptions(ServiceProvider services)

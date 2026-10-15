@@ -35,6 +35,29 @@ public sealed partial class UiSmokeTests
         Assert.True(editor.StatusIsError); // sem IP
         editor.Host = "192.168.0.50";
         editor.MacAddress = "AA:BB:CC:DD:EE:FF";
+
+        // Tipo de TV: "Detectar pelo IP" acha uma LG; o comando avançado (só Android) some e o texto de ajuda muda.
+        Assert.Equal(TvKind.Android, editor.Kind);
+        tv.DetectedKind = TvKind.LgWebOs;
+        editor.DetectCommand.Execute(null);
+        Pump(0.5);
+        Assert.Equal(TvKind.LgWebOs, editor.Kind);
+        Assert.False(editor.StatusIsError);
+        Assert.False(editor.IsAndroid);
+        Assert.Contains("LG Connect Apps", editor.Help, StringComparison.Ordinal);
+        Assert.Equal(["detectar:192.168.0.50"], tv.Calls);
+        Snap(window, "60b-configuracoes-tv-lg");
+        editor.Host = "tv.lan";
+        editor.SaveCommand.Execute(null);
+        Assert.True(editor.StatusIsError); // LG e Samsung pedem o IP
+        editor.Host = "192.168.0.50";
+        editor.CycleKindCommand.Execute(null);
+        Assert.Equal(TvKind.Samsung, editor.Kind);
+        editor.CycleKindCommand.Execute(null);
+        Assert.Equal(TvKind.Android, editor.Kind);
+        Assert.True(editor.IsAndroid);
+        tv.Calls.Clear();
+
         editor.ToggleStandbyCommand.Execute(null);
         editor.TestCommand.Execute(null);
         Pump(0.5);
@@ -43,7 +66,7 @@ public sealed partial class UiSmokeTests
         Snap(window, "60-configuracoes-tv");
         editor.SaveCommand.Execute(null);
         Assert.Null(shell.TopOverlay);
-        Assert.True(shell.Settings.TvControl is { IsActive: true, StandbyAfterGame: true, HdmiInput: 1 });
+        Assert.True(shell.Settings.TvControl is { IsActive: true, StandbyAfterGame: true, HdmiInput: 1, Kind: TvKind.Android });
         Assert.StartsWith("Ligada · 192.168.0.50", shell.TvSummary, StringComparison.Ordinal);
 
         // Saída de áudio durante o jogo: lista as saídas ativas; escolher fecha e salva.

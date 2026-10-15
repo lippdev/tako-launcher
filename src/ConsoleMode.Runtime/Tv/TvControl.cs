@@ -14,9 +14,12 @@ public enum TvEvent
 
     /// <summary>Chave ADB nova criada (primeira vez, ou a anterior era de outro usuário/PC).</summary>
     KeyCreated,
+
+    /// <summary>LG ou Samsung aceitou este PC e a chave/token novo foi guardado (cifrado).</summary>
+    PairingSaved,
 }
 
-/// <summary>Um jeito de falar com a TV (hoje só ADB pela rede, para Google TV / Android TV).</summary>
+/// <summary>Um jeito de falar com a TV (ADB no Android, WebSocket na LG e na Samsung).</summary>
 public interface ITvControl
 {
     /// <summary>Liga a TV e troca para a entrada do PC.</summary>
@@ -91,22 +94,31 @@ public sealed class AndroidTvControl(AdbKeyStore keys, string keyName, Action<Tv
     }
 }
 
+/// <summary>
+/// Textos de "não respondeu" de cada tipo de TV. <see cref="Refused"/>: a TV está na rede, mas recusou a conexão na
+/// porta do controle (o recurso de rede está desligado na TV).
+/// </summary>
+public sealed record TvNetworkMessages(string Unreachable, string Refused);
+
 /// <summary>Conexão com uma TV na rede, acordando-a com Wake-on-LAN quando está em espera profunda.</summary>
 public static class TvNetwork
 {
     /// <param name="connect">Uma tentativa de conexão; lança erro de rede quando ninguém responde.</param>
     /// <param name="wakeOnLan">Enviar o pacote mágico (se houver MAC) quando a primeira tentativa falhar.</param>
     /// <param name="wakeWait">Quanto continuar tentando depois do Wake-on-LAN.</param>
+    /// <param name="messages">Textos do tipo de TV; nulo = os do Android (ADB).</param>
     public static async Task<T> ConnectAsync<T>(
         TvControlConfig config,
         bool wakeOnLan,
         TimeSpan wakeWait,
         Action? wakeOnLanSent,
         Func<CancellationToken, Task<T>> connect,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TvNetworkMessages? messages = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(connect);
+        messages ??= AndroidMessages(config.Host);
         try
         {
             return await connect(cancellationToken).ConfigureAwait(false);
@@ -119,7 +131,7 @@ public static class TvNetwork
         }
         catch (Exception ex) when (IsUnreachable(ex))
         {
-            throw Unreachable(config, ex);
+            throw Unreachable(messages, ex);
         }
 
         var deadline = DateTime.UtcNow + wakeWait;
@@ -136,7 +148,7 @@ public static class TvNetwork
             }
             catch (Exception ex) when (IsUnreachable(ex))
             {
-                throw Unreachable(config, ex);
+                throw Unreachable(messages, ex);
             }
         }
     }
@@ -144,6 +156,24 @@ public static class TvNetwork
     /// <summary>Ninguém escutando, sem rota, tempo de conexão esgotado ou TV que desligou no meio do handshake.</summary>
     public static bool IsUnreachable(Exception ex) => ex is SocketException or IOException;
 
-    private static TvControlException Unreachable(TvControlConfig config, Exception inner) =>
-        new($"A TV em {config.Host} não respondeu. Confira o IP, se a TV está na mesma rede e se a depuração está ativada.", inner);
+    /// <summary>A TV respondeu "porta fechada": está ligada na rede, mas o recurso de controle está desligado.</summary>
+    public static bool IsRefused(Exception? ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is TvConnectionException { Refused: true } or SocketException { SocketErrorCode: SocketError.ConnectionRefused })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static TvNetworkMessages AndroidMessages(string host) => new(
+        $"A TV em {host} não respondeu. Confira o IP, se a TV está na mesma rede e se a depuração está ativada.",
+        $"A TV em {host} não respondeu. Confira o IP, se a TV está na mesma rede e se a depuração está ativada.");
+
+    private static TvControlException Unreachable(TvNetworkMessages messages, Exception inner) =>
+        new(IsRefused(inner) ? messages.Refused : messages.Unreachable, inner);
 }
