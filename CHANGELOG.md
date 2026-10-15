@@ -4,6 +4,19 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9]
+### Novidades
+- Contador de FPS próprio, sem RTSS: o Tako mede o FPS, o tempo de quadro e o 1% low pelo PresentMon da Intel, como o CapFrameX, sem entrar no jogo. Acabam os conflitos com o MSI Afterburner e com anti-cheat. O contador aparece numa janela própria por cima do jogo, nos estilos Só FPS, Compacto e Detalhado. (#36)
+- Para medir, o Windows precisa liberar o Tako uma única vez. "Mostrar FPS" é ligado nas Configurações, com teclado e mouse, porque a confirmação do Windows não aceita controle. Depois disso é preciso sair e entrar no Windows uma vez. No instalador há a opção "Ativar contador de FPS", desmarcada por padrão, para resolver tudo na instalação. Na Central de Controle, enquanto o contador não estiver ativo, as opções de FPS ficam esmaecidas com o aviso. (#36)
+- Limite de FPS pelo driver de vídeo (NVIDIA, AMD e Intel), também sem RTSS. O valor que você tinha volta no fim do jogo e também depois de uma queda do Tako. Opções: sem limite, 30, 40, 45, 60, 90, 120, 144 e "Tela − 3" para VRR. (#35)
+
+### Mudanças
+- O Tako não usa nem altera mais o RTSS. Se você usa RTSS ou Afterburner, eles continuam como estão. Um limite aplicado pelo RTSS em versões anteriores do Tako não é desfeito sozinho. (#36)
+- Em tela cheia exclusiva o contador não aparece por cima do jogo, mas a Central de Controle mostra o FPS. (#36)
+
+### Para desenvolvedores
+- [ADR-0017](docs/adr/0017-contador-de-fps-com-presentmon.md) (contador de FPS e permissão) e [ADR-0018](docs/adr/0018-limite-de-fps-pelo-driver.md) (limite pelos drivers). O checklist de hardware ganhou as seções 13 e 14.
+
 ## [0.1.0-alpha.8]
 ### Novidades
 - Tela de jogo, como no Console Mode: em Configurações escolha a tela onde você joga (a TV, por exemplo). Ao abrir um jogo, o Tako liga essa tela, desliga ou cobre de preto as outras, aplica resolução, taxa e HDR se você quiser e devolve tudo ao fechar. Na primeira vez numa tela nova ele pergunta "Você consegue ver esta tela?" e volta sozinho se ninguém responder. Desligada por padrão. (#30)
