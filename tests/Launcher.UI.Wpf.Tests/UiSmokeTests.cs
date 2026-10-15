@@ -340,9 +340,15 @@ public sealed class UiSmokeTests
         AssertFocused(window, "depois do diálogo");
 
         // MVP-011: exceção não tratada na UI vira tela de recuperação com caminho para o desktop.
-        services.GetRequiredService<CrashGuard>().Install(app, window, shell);
+        var guard = services.GetRequiredService<CrashGuard>();
+        guard.Install(app, window, shell);
+        var seen = new List<string>();
+        window.Dispatcher.UnhandledException += (_, e) => seen.Add($"{e.Exception.GetType().Name} handled={e.Handled}");
         window.Dispatcher.BeginInvoke(() => throw new InvalidOperationException("Falha simulada pelo teste de fumaça"));
         Pump(0.8);
+        string diagnosis = $"eventos=[{string.Join("; ", seen)}] fatal={guard.IsFatal} carregada={window.IsLoaded} visível={window.IsVisible} topo={shell.TopOverlay?.GetType().Name ?? "nenhum"}";
+        Assert.False(guard.IsFatal, diagnosis);
+        Assert.True(shell.TopOverlay is RecoveryViewModel, diagnosis);
         var error = Assert.IsType<RecoveryViewModel>(shell.TopOverlay);
         Assert.True(error.IsError);
         Assert.Contains(error.Actions, a => a.Label == "Sair para o desktop");
