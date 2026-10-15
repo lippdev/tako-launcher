@@ -21,13 +21,13 @@ public sealed partial class ArtService : IDisposable
     private const int LargeImageWidth = 1000;
 
     /// <summary>
-    /// Capas decodificadas guardadas além das que estão na tela (PERF-004): ~180 capas em 1080p, ~45 em 4K. As que estão
-    /// na tela ficam vivas pela própria imagem; o cache só evita decodificar de novo ao rolar de volta.
+    /// Capas decodificadas guardadas (PERF-004): ~90 capas em 1080p, ~23 em 4K. As que estão na tela ficam vivas pela
+    /// própria imagem; o cache só evita decodificar de novo ao rolar de volta um pouco.
     /// </summary>
-    private const long SmallCacheBytes = 64L * 1024 * 1024;
+    private const long SmallCacheBytes = 32L * 1024 * 1024;
 
-    /// <summary>Artes de fundo: ~5 em 1080p, 1 em 4K (cada uma ocupa 8 a 33 MB decodificada).</summary>
-    private const long LargeCacheBytes = 48L * 1024 * 1024;
+    /// <summary>Artes de fundo: ~4 em 1080p, 1 em 4K (cada uma ocupa 8 a 33 MB decodificada).</summary>
+    private const long LargeCacheBytes = 32L * 1024 * 1024;
 
     /// <summary>Custo nominal de "sem arte" no cache (não ocupa imagem, mas não pode ficar para sempre).</summary>
     private const long MissingCost = 1024;
