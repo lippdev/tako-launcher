@@ -10,6 +10,14 @@ Launcher de jogos para Windows 11 com experiência de console: gamepad-first, te
 - Como contribuir (Git Flow, commits, PRs, DoD, arquitetura): [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Decisões de arquitetura: [`docs/adr/`](docs/adr/)
 
+## Baixar
+
+Na [página de releases](https://github.com/lippdev/ultralauncher/releases), no mesmo formato do Console Mode:
+- **Instalador:** `Tako-Setup-x64.exe` — instala para o seu usuário (sem administrador), com atalho no Menu Iniciar; dados em `%LOCALAPPDATA%\Tako`.
+- **Portátil:** `Tako-Portable-x64.exe` — um único executável; guarda os dados na pasta `Tako_Data` ao lado do arquivo.
+
+Nenhum dos dois exige o .NET instalado. Para gerar localmente: `.\build\Publish-Tako.ps1 -Version 0.1.0` (o instalador precisa do Inno Setup 6).
+
 ## Estrutura
 
 ```
@@ -25,6 +33,7 @@ tools/
   Launcher.FseProbe/             coleta sinais do Xbox mode / FSE e testa o ciclo de vida de home app (spike MVP-007)
 packaging/
   fse-dev/                       pacote de desenvolvimento da FseProbe como gaming home app (só Modo de Desenvolvedor)
+build/                           Publish-Tako.ps1 (portátil + instalador) e Tako.iss (Inno Setup)
 tests/                           xUnit
 ```
 
@@ -32,13 +41,13 @@ tests/                           xUnit
 
 Requer Windows 11 e [.NET 10 SDK](https://dotnet.microsoft.com/download) (ver `global.json`).
 
-Rodar o launcher (Marco 0: biblioteca fictícia, sessão de jogo simulada):
+Rodar o launcher (biblioteca real: jogos da Steam + adicionados):
 
 ```
 dotnet run --project src/Launcher.UI.Wpf -c Release
 ```
 
-Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualShock 4, por USB ou Bluetooth, lido direto por HID), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), Shift+Tab (Central de Controle, como na Steam; no controle, Guia ou PS). As capas são baixadas para `%LOCALAPPDATA%\Tako\cache\art` (nenhuma arte de jogo vai para o repositório).
+Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualShock 4, por USB ou Bluetooth, lido direto por HID), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), Shift+Tab (Central de Controle, como na Steam; no controle, Guia ou PS). Dados do usuário e caches ficam em `%LOCALAPPDATA%\Tako` na versão instalada, ou em `Tako_Data` ao lado do executável na portátil (e ao rodar pelo `dotnet run`); nenhuma arte de jogo vai para o repositório.
 
 ```
 dotnet restore

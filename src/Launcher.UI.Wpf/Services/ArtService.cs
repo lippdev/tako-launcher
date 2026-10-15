@@ -31,7 +31,7 @@ public sealed partial class ArtService
         _logger = logger;
         _http = http;
         _steam = steam;
-        _cacheDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako", "cache", "art");
+        _cacheDirectory = AppPaths.ArtCache;
     }
 
     /// <summary>

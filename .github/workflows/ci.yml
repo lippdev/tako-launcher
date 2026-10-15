@@ -24,6 +24,30 @@ jobs:
           name: ui-screenshots
           path: tests/Launcher.UI.Wpf.Tests/bin/Release/**/screenshots/
           if-no-files-found: ignore
+  # Instalador e portable em toda PR (mesmo script da release): a release não quebra só na hora da tag.
+  package:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install Inno Setup (if missing)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Build portable + installer
+        shell: pwsh
+        run: .\build\Publish-Tako.ps1 -Runtime x64 -Target All -Version "0.0.0-ci.${{ github.run_number }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tako-ci-${{ github.run_number }}
+          path: |
+            dist/Tako-Setup-x64.exe
+            dist/Tako-Portable-x64.exe
+          if-no-files-found: error
+          retention-days: 7
   pr-title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

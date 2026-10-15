@@ -92,8 +92,7 @@ public partial class App : Application
             }
         }
 
-        string file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako", "library.json");
-        var library = new LocalGameLibrary(DiscoverSteam, new LibraryStore(file), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
+        var library = new LocalGameLibrary(DiscoverSteam, new LibraryStore(AppPaths.LibraryFile), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
         library.Load();
         return library;
     }
