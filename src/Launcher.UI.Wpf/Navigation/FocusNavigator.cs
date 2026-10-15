@@ -104,7 +104,7 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
             ?? all.FirstOrDefault(Nav.GetIsDefault)
             // Sem padrão, o foco entra no conteúdo (primeiro item de cima para baixo), não na barra lateral.
             ?? all.Where(e => Nav.GetGroup(e) != "sidebar").OrderBy(e => RectOf(e).Top).ThenBy(e => RectOf(e).Left).FirstOrDefault()
-            ?? all.FirstOrDefault();
+            ?? (all.Count > 0 ? all[0] : null);
         if (target is null)
         {
             Focused = null;
