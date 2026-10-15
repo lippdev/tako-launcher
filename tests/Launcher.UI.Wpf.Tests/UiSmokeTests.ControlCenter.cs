@@ -44,7 +44,9 @@ public sealed partial class UiSmokeTests
         Assert.Same(center, window.DataContext is ShellViewModel s ? s.TopOverlay : null);
         for (int i = 0; i < 20 && center.Windows.Count != expected; i++)
         {
-            center.RefreshWindows(); // a lista chega em segundo plano
+            // Pelo Dispatcher, como no app: a lista chega em segundo plano e volta à thread da UI pelo contexto de
+            // sincronização dele (chamado direto do teste, a continuação iria para outra thread).
+            window.Dispatcher.BeginInvoke(center.RefreshWindows);
             Pump(0.5);
         }
 
