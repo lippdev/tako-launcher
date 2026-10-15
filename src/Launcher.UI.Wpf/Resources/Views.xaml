@@ -439,6 +439,40 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Áudio, Steam e TV durante o jogo (MVP-002 parte 2): ShellViewModel.Devices.cs; tela da TV em DeviceViews.xaml. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ChooseGameAudioCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:gameaudio">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Settings.GameAudioOutput.Name, FallbackValue='Não alterar', TargetNullValue='Não alterar'}" MaxWidth="360" TextTrimming="CharacterEllipsis" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Saída de áudio durante o jogo" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Ex.: a TV. Troca ao abrir o jogo e volta para a saída de antes ao fechar" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ToggleSteamTrayCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:steamtray">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.SteamToTrayAfterGame}" />
+          <StackPanel>
+            <TextBlock Text="Mandar a Steam para a bandeja ao sair do jogo" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Fecha só a janela da Steam (ela continua aberta na bandeja), e só se nenhum outro jogo estiver rodando" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.OpenTvSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:tv">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding DataContext.TvSummary, RelativeSource={RelativeSource AncestorType=Window}}" MaxWidth="420" TextTrimming="CharacterEllipsis" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Ligar a TV e trocar a entrada" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Google TV / Android TV pela rede: liga e muda para a entrada do PC ao abrir um jogo" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <!-- Diagnóstico do sistema (frente G, MVP-034): relatório para o checklist de hardware. -->
       <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ShowSystemDiagnosticsCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:diagnostics">
         <DockPanel>

@@ -18,14 +18,17 @@ public sealed class GameProcessMonitor(TimeProvider time) : IDisposable
 
     public bool IsTracking => Tracker is { IsFinished: false };
 
-    /// <summary>Começa a acompanhar; <paramref name="changed"/> roda a cada mudança de status, até o jogo terminar.</summary>
-    public void Start(GameRunTracker tracker, Action<GameRunTracker> changed)
+    /// <summary>
+    /// Começa a acompanhar; <paramref name="changed"/> roda a cada mudança de status, até o jogo terminar.
+    /// <paramref name="steamRunningAppId"/> lê o <c>RunningAppID</c> da Steam a cada leitura (só para jogos da Steam).
+    /// </summary>
+    public void Start(GameRunTracker tracker, Action<GameRunTracker> changed, Func<int?>? steamRunningAppId = null)
     {
         ArgumentNullException.ThrowIfNull(tracker);
         Stop();
         Tracker = tracker;
         _cancel = new CancellationTokenSource();
-        _ = PollAsync(tracker, changed, _cancel.Token);
+        _ = PollAsync(tracker, changed, tracker.Plan.SteamAppId is null ? null : steamRunningAppId, _cancel.Token);
     }
 
     public void Stop()
@@ -41,7 +44,7 @@ public sealed class GameProcessMonitor(TimeProvider time) : IDisposable
 
     public void Dispose() => Stop();
 
-    private async Task PollAsync(GameRunTracker tracker, Action<GameRunTracker> changed, CancellationToken cancel)
+    private async Task PollAsync(GameRunTracker tracker, Action<GameRunTracker> changed, Func<int?>? steamRunningAppId, CancellationToken cancel)
     {
         using var timer = new PeriodicTimer(PollInterval, time);
         try
@@ -49,14 +52,14 @@ public sealed class GameProcessMonitor(TimeProvider time) : IDisposable
             // ConfigureAwait(true): o tracker e o aviso ficam na thread da UI; só a leitura dos processos vai para o pool.
             while (await timer.WaitForNextTickAsync(cancel).ConfigureAwait(true))
             {
-                var processes = await Task.Run(_snapshot.Take, cancel).ConfigureAwait(true);
+                var (processes, steamAppId) = await Task.Run(() => (_snapshot.Take(), steamRunningAppId?.Invoke()), cancel).ConfigureAwait(true);
                 if (cancel.IsCancellationRequested)
                 {
                     return;
                 }
 
                 var before = tracker.Status;
-                if (tracker.Update(processes, time.GetUtcNow()) != before)
+                if (tracker.Update(processes, time.GetUtcNow(), steamAppId) != before)
                 {
                     changed(tracker);
                 }

@@ -1,5 +1,7 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ConsoleMode.Runtime.Audio;
+using ConsoleMode.Runtime.Tv;
 using Launcher.Core.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -12,6 +14,9 @@ namespace Launcher.UI.Wpf.Services;
 /// </summary>
 public sealed partial class SettingsService : ObservableObject
 {
+    private const string GameAudioIdKey = "GameAudioDeviceId";
+    private const string GameAudioNameKey = "GameAudioDeviceName";
+
     private readonly SettingsStore _store;
     private readonly ILogger<SettingsService> _logger;
     private readonly bool _loading;
@@ -29,6 +34,18 @@ public sealed partial class SettingsService : ObservableObject
     [ObservableProperty]
     private bool _restoreEnvironmentAfterGame = true;
 
+    /// <summary>Saída de áudio durante o jogo (MVP-002); nula = não alterar.</summary>
+    [ObservableProperty]
+    private AudioOutputChoice? _gameAudioOutput;
+
+    /// <summary>Mandar a Steam para a bandeja quando um jogo da Steam termina (MVP-002).</summary>
+    [ObservableProperty]
+    private bool _steamToTrayAfterGame;
+
+    /// <summary>Ligar a TV e trocar a entrada (MVP-002); desligado por padrão.</summary>
+    [ObservableProperty]
+    private TvControlConfig _tvControl = TvControlConfig.Default;
+
     public SettingsService(SettingsStore store, ILogger<SettingsService> logger)
     {
         _store = store;
@@ -42,6 +59,11 @@ public sealed partial class SettingsService : ObservableObject
             StartFullscreenOnLogin = Read(saved, nameof(StartFullscreenOnLogin), StartFullscreenOnLogin);
             RestoreEnvironmentAfterGame = Read(saved, nameof(RestoreEnvironmentAfterGame), RestoreEnvironmentAfterGame);
             LoadGameScreen(saved);
+            SteamToTrayAfterGame = Read(saved, nameof(SteamToTrayAfterGame), SteamToTrayAfterGame);
+            GameAudioOutput = saved.TryGetValue(GameAudioIdKey, out string? audioId) && audioId.Length > 0
+                ? new AudioOutputChoice(audioId, saved.GetValueOrDefault(GameAudioNameKey, audioId))
+                : null;
+            TvControl = TvControlConfigJson.Parse(saved.GetValueOrDefault(nameof(TvControl)));
         }
         catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
         {
@@ -67,6 +89,16 @@ public sealed partial class SettingsService : ObservableObject
     partial void OnStartFullscreenOnLoginChanged(bool value) => Save(nameof(StartFullscreenOnLogin), value);
 
     partial void OnRestoreEnvironmentAfterGameChanged(bool value) => Save(nameof(RestoreEnvironmentAfterGame), value);
+
+    partial void OnSteamToTrayAfterGameChanged(bool value) => Save(nameof(SteamToTrayAfterGame), value);
+
+    partial void OnGameAudioOutputChanged(AudioOutputChoice? value)
+    {
+        Save(GameAudioIdKey, value?.DeviceId ?? string.Empty);
+        Save(GameAudioNameKey, value?.Name ?? string.Empty);
+    }
+
+    partial void OnTvControlChanged(TvControlConfig value) => Save(nameof(TvControl), TvControlConfigJson.Serialize(value));
 
     private void Save(string key, bool value) => Save(key, value ? "true" : "false");
 

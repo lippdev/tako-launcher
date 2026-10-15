@@ -50,6 +50,8 @@ public static class AppPaths
 
     /// <summary>Limite de FPS do RTSS que o usuário tinha antes da sessão, até ser devolvido.</summary>
     public static string RtssLimitBackupFile => Path.Combine(DataRoot, "rtss-fps-limit.txt");
+    /// <summary>Chave ADB deste PC para controlar a TV, cifrada com DPAPI (MVP-002).</summary>
+    public static string AdbKeyFile => Path.Combine(DataRoot, "adbkey.pem");
 
     /// <summary>Temas importados de pacotes <c>.pthm</c>, um por pasta (<c>themes/&lt;Id&gt;</c>).</summary>
     public static string ThemesRoot => Path.Combine(DataRoot, "themes");

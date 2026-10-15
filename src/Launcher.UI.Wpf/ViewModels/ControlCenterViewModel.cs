@@ -247,36 +247,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             case "perf":
                 return BuildPerfSections();
             case "audio":
-                PanelRowViewModel? slider = null;
-                slider = new PanelRowViewModel
-                {
-                    Label = "Volume",
-                    IconKey = "Icon.Volume",
-                    IsSlider = true,
-                    Fraction = _options.Volume / 100d,
-                    EndText = $"{_options.Volume}%",
-                    Command = new RelayCommand(() => { }),
-                    AdjustCommand = new RelayCommand<object?>(delta =>
-                    {
-                        int step = delta is int d ? d : 0;
-                        _options.Volume = Math.Clamp(_options.Volume + (step * 5), 0, 100);
-                        slider!.Fraction = _options.Volume / 100d; // Atribuído antes de qualquer ajuste.
-                        slider.EndText = $"{_options.Volume}%";
-                        UpdateCards();
-                    }),
-                    SetFractionCommand = new RelayCommand<double>(fraction =>
-                    {
-                        _options.Volume = (int)Math.Round(Math.Clamp(fraction, 0, 1) * 20) * 5;
-                        slider!.Fraction = _options.Volume / 100d;
-                        slider.EndText = $"{_options.Volume}%";
-                        UpdateCards();
-                    }),
-                };
-                return
-                [
-                    new("Volume", null, [slider]),
-                    new("Saída de áudio", null, SessionOptions.Outputs.Select((label, i) => Radio(label, _options.Output == i, () => _options.Output = i, $"Áudio saindo por: {label}")).ToList()),
-                ];
+                return BuildAudioSections();
             case "controller":
                 return
                 [
@@ -326,10 +297,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
 
         UpdatePerfCard();
 
-        var audio = Cards[3];
-        audio.Caption = $"Volume · {SessionOptions.Outputs[_options.Output]}";
-        audio.Value = $"{_options.Volume}%";
-        audio.Meter = _options.Volume / 100d;
+        UpdateAudioCard();
 
         var pad = Cards[4];
         pad.Caption = _shell.ControllerName ?? "Nenhum controle conectado";

@@ -11,6 +11,7 @@
         <ResourceDictionary Source="Resources/Views.xaml" />
         <ResourceDictionary Source="Resources/SessionViews.xaml" />
         <ResourceDictionary Source="Resources/LibraryViews.xaml" />
+        <ResourceDictionary Source="Resources/DeviceViews.xaml" />
         <ResourceDictionary Source="Resources/ThemeViews.xaml" />
         <ResourceDictionary Source="Resources/DiagnosticsViews.xaml" />
         <ResourceDictionary Source="Resources/GameScreenViews.xaml" />
