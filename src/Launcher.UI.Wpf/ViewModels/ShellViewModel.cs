@@ -63,6 +63,10 @@ public sealed partial class ShellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(InputStatus))]
     private string? _controllerName;
 
+    /// <summary>Controle PlayStation conectado: dicas com ✕ ○ □ △ e PS.</summary>
+    [ObservableProperty]
+    private bool _isPlayStationPad;
+
     [ObservableProperty]
     private string? _toastMessage;
 
@@ -368,7 +372,7 @@ public sealed partial class ShellViewModel : ObservableObject
         OnOverlaysChanged();
     }
 
-    /// <summary>Botão Guia (ou View / tecla G).</summary>
+    /// <summary>Botão Guia / PS (ou View / Shift+Tab, como na Steam).</summary>
     public void Guide()
     {
         switch (TopOverlay)
@@ -387,7 +391,12 @@ public sealed partial class ShellViewModel : ObservableObject
         }
     }
 
-    public string GuideName => InputKind == InputKind.Gamepad ? "Guia" : "G";
+    public string GuideName => (InputKind, IsPlayStationPad) switch
+    {
+        (InputKind.Gamepad, true) => "PS",
+        (InputKind.Gamepad, false) => "Guia",
+        _ => "Shift+Tab",
+    };
 
     private GameSessionViewModel? _backgroundSession;
 
@@ -558,6 +567,8 @@ public sealed partial class ShellViewModel : ObservableObject
 
     partial void OnInputKindChanged(InputKind value) => UpdateHints();
 
+    partial void OnIsPlayStationPadChanged(bool value) => UpdateHints();
+
     private void UpdateHints()
     {
         bool key = InputKind != InputKind.Gamepad;
@@ -614,9 +625,22 @@ public sealed partial class ShellViewModel : ObservableObject
         Hints.Clear();
         foreach (var (buttons, label, command) in list)
         {
-            Hints.Add(new HintViewModel(buttons.Split('+').Select(b => Glyph(b, key)).ToList(), label, key, command));
+            Hints.Add(new HintViewModel(buttons.Split('+').Select(b => Glyph(b, key, IsPlayStationPad)).ToList(), label, key, command));
         }
     }
+
+    private static string Glyph(string button, bool keyboard, bool playStation) => (button, keyboard, playStation) switch
+    {
+        ("a", false, true) => "✕",
+        ("b", false, true) => "○",
+        ("x", false, true) => "□",
+        ("y", false, true) => "△",
+        ("lb", false, true) => "L1",
+        ("rb", false, true) => "R1",
+        ("menu", false, true) => "Options",
+        ("guide", false, true) => "PS",
+        _ => Glyph(button, keyboard),
+    };
 
     private static string Glyph(string button, bool keyboard) => (button, keyboard) switch
     {
@@ -627,7 +651,7 @@ public sealed partial class ShellViewModel : ObservableObject
         ("lb", true) => "Q",
         ("rb", true) => "E",
         ("menu", true) => "M",
-        ("guide", true) => "G",
+        ("guide", true) => "Shift+Tab",
         ("left", true) => "←",
         ("right", true) => "→",
         ("a", false) => "A",

@@ -37,7 +37,7 @@ Rodar o launcher (Marco 0: biblioteca fictícia, sessão de jogo simulada):
 dotnet run --project src/Launcher.UI.Wpf -c Release
 ```
 
-Controle Xbox (XInput), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), G (Guia). As capas são baixadas para `%LOCALAPPDATA%\Tako\cache\art` (nenhuma arte de jogo vai para o repositório).
+Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualShock 4, por USB ou Bluetooth, lido direto por HID), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), Shift+Tab (Central de Controle, como na Steam; no controle, Guia ou PS). As capas são baixadas para `%LOCALAPPDATA%\Tako\cache\art` (nenhuma arte de jogo vai para o repositório).
 
 ```
 dotnet restore

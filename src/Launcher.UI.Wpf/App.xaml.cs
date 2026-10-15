@@ -1,6 +1,7 @@
 using System.Windows;
 using Launcher.Core.Library;
 using Launcher.Themes.Xaml;
+using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Services;
 using Launcher.UI.Wpf.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +47,7 @@ public partial class App : Application
         services.AddSingleton<ThemeService>();
         services.AddSingleton<PlayniteThemeService>();
         services.AddSingleton<ArtService>();
+        services.AddSingleton<SonyHidGamepad>();
         services.AddSingleton<SettingsService>();
         services.AddSingleton<PerformanceSimulator>();
         services.AddSingleton<ShellViewModel>();
