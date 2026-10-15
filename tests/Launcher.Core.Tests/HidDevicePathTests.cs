@@ -15,6 +15,16 @@ public sealed class HidDevicePathTests
         Assert.Equal((vendor, product), (v, p));
     }
 
+    [Theory]
+    [InlineData(@"\\?\HID#{00001124-0000-1000-8000-00805F9B34FB}_VID&0002054C_PID&0DF2#9&1F2E&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}", true)]
+    [InlineData(@"\\?\HID#{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&02054c_PID&0df2#a&1&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}", true)]
+    [InlineData(@"\\?\hid#vid_054c&pid_0df2&mi_03#7&2a1b3c&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}", false)]
+    public void Detects_bluetooth_paths(string path, bool bluetooth) => Assert.Equal(bluetooth, HidDevicePath.IsBluetooth(path));
+
+    [Fact]
+    public void Edge_is_listed_as_its_own_model() =>
+        Assert.Equal([SonyController.DualSenseEdge], HidDevicePath.SonyControllers([@"\\?\hid#vid_054c&pid_0df2&mi_03#7&aaa&0&0000#{g}"]));
+
     [Fact]
     public void Path_without_ids_is_ignored() => Assert.False(HidDevicePath.TryParseIds(@"\\?\hid#keyboard#1", out _, out _));
 

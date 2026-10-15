@@ -70,6 +70,12 @@ public sealed record SystemSnapshot
     /// <summary>Controle em uso pela navegação do Tako, se houver.</summary>
     public string? ActiveController { get; init; }
 
+    /// <summary>
+    /// Teste de controle (<see cref="Input.ControllerTest.Lines"/>): fonte, modelo, USB/Bluetooth, product id, estado e
+    /// os últimos relatórios HID crus. Vazio quando não foi lido.
+    /// </summary>
+    public IReadOnlyList<string> ControllerTest { get; init; } = [];
+
     public bool SteamFound { get; init; }
 
     public int SteamGames { get; init; }
@@ -163,6 +169,17 @@ public static class SystemReport
 
         Line("  Em uso no Tako", snapshot.ActiveController ?? "teclado");
         text.Append('\n');
+
+        if (snapshot.ControllerTest.Count > 0)
+        {
+            text.Append("[Teste de controle]\n");
+            foreach (string line in snapshot.ControllerTest)
+            {
+                text.Append(c, $"  {line}\n");
+            }
+
+            text.Append('\n');
+        }
 
         text.Append("[Biblioteca]\n");
         Line("Steam", snapshot.SteamFound ? $"encontrada, {snapshot.SteamGames} jogos" : "não encontrada");

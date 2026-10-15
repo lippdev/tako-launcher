@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private readonly ArtService _art;
     private readonly FocusNavigator _navigator;
     private readonly GamepadInterpreter _gamepad = new();
+    private readonly InputEchoFilter _echo = new();
     private readonly SonyHidGamepad _sony;
     private readonly PointerPadRelay _pointerPad;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -83,6 +84,7 @@ public partial class MainWindow : Window
         _shell.Overlays.CollectionChanged += OnOverlaysChanged;
         _shell.PropertyChanged += OnShellPropertyChanged;
         _shell.Settings.PropertyChanged += (_, _) => Backdrop.Transition = _shell.Settings.ColorDuration;
+        _shell.ReadControllers = ProbeControllers;
 
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewTextInput += OnPreviewTextInput;
@@ -229,6 +231,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Steam aberta: o mesmo toque do controle também chega como tecla (configuração de área de trabalho da Steam).
+        if (KeyMap.TryGetValue(key, out var echo) && !_echo.AcceptKeyboard(echo, _clock.Elapsed, _gamepad.Pressed))
+        {
+            e.Handled = true;
+            return;
+        }
+
         // Busca aberta: o teclado físico digita (o texto chega em OnPreviewTextInput); setas navegam nas teclas da tela.
         if (_shell.TopOverlay is SearchViewModel search)
         {
@@ -301,14 +310,17 @@ public partial class MainWindow : Window
 
     private void PollGamepad()
     {
-        // Xbox/XInput primeiro; sem ele, controles PlayStation por HID.
-        GamepadSnapshot? snapshot = XInputGamepad.ReadFirst()?.Snapshot;
-        string? name = snapshot is null ? null : "Controle Xbox";
-        if (snapshot is null && _sony.Read() is { } sony)
+        // Todas as fontes juntas (XInput e PlayStation por HID): um XInput em repouso (ex.: o virtual da Steam ou do
+        // DS4Windows) não esconde mais o controle PlayStation, e o mesmo controle visto pelas duas fontes dispara uma vez.
+        var sony = _sony.Read();
+        var xinput = XInputGamepad.ReadAll();
+        GamepadSnapshot? snapshot = GamepadFusion.Merge(xinput.Select(r => (GamepadSnapshot?)r.Snapshot).Append(sony));
+        string? name = sony is not null && _sony.Model is { } model ? SonyHidReport.DisplayName(model)
+            : xinput.Count > 0 ? "Controle Xbox"
+            : null;
+        if (sony is { } ps)
         {
-            snapshot = sony;
-            name = _sony.Model == SonyController.DualSense ? "Controle PS5 (DualSense)" : "Controle PS4 (DualShock 4)";
-            _pointerPad.Update(sony.LeftX, sony.LeftY, sony.Buttons.HasFlag(GamepadButtons.A)); // ponteiro pelo controle
+            _pointerPad.Update(ps.LeftX, ps.LeftY, ps.Buttons.HasFlag(GamepadButtons.A)); // ponteiro pelo controle
         }
 
         if (name != _shell.ControllerName)
@@ -331,10 +343,35 @@ public partial class MainWindow : Window
             return;
         }
 
-        foreach (var command in _gamepad.Update(pad, _clock.Elapsed))
+        var now = _clock.Elapsed;
+        foreach (var command in _gamepad.Update(pad, now))
         {
-            Handle(command, InputKind.Gamepad);
+            if (_echo.AcceptGamepad(command, now))
+            {
+                Handle(command, InputKind.Gamepad);
+            }
         }
+    }
+
+    /// <summary>Controles lidos agora, para o teste de controle e o diagnóstico (Configurações › Diagnóstico do sistema).</summary>
+    private List<ControllerProbe> ProbeControllers()
+    {
+        var probes = new List<ControllerProbe>();
+        if (_sony.Probe() is { } sony)
+        {
+            probes.Add(sony);
+        }
+
+        try
+        {
+            probes.AddRange(XInputGamepad.Probes());
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            // Windows sem XInput: o teste mostra só o HID.
+        }
+
+        return probes;
     }
 
     /// <summary>
