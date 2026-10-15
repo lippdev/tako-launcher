@@ -10,6 +10,10 @@ Launcher de jogos para Windows 11 com experiência de console: gamepad-first, te
 - Como contribuir (Git Flow, commits, PRs, DoD, arquitetura): [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Decisões de arquitetura: [`docs/adr/`](docs/adr/)
 
+## Baixar
+
+Na [página de releases](https://github.com/lippdev/ultralauncher/releases): **instalador** (`Tako-…-Setup-x64.exe`, sem precisar de administrador) ou **portable** (`Tako-…-Portable-x64.zip`, roda de qualquer pasta e guarda os dados em `Data\` ao lado do `Tako.exe`). Nenhum dos dois exige o .NET instalado.
+
 ## Estrutura
 
 ```
@@ -25,6 +29,8 @@ tools/
   Launcher.FseProbe/             coleta sinais do Xbox mode / FSE e testa o ciclo de vida de home app (spike MVP-007)
 packaging/
   fse-dev/                       pacote de desenvolvimento da FseProbe como gaming home app (só Modo de Desenvolvedor)
+  installer/                     instalador (Inno Setup) usado pelo workflow de release
+  release/                       notas, LEIA-ME e marcador portable.txt das releases
 tests/                           xUnit
 ```
 
@@ -32,13 +38,13 @@ tests/                           xUnit
 
 Requer Windows 11 e [.NET 10 SDK](https://dotnet.microsoft.com/download) (ver `global.json`).
 
-Rodar o launcher (Marco 0: biblioteca fictícia, sessão de jogo simulada):
+Rodar o launcher (biblioteca real: jogos da Steam + adicionados):
 
 ```
 dotnet run --project src/Launcher.UI.Wpf -c Release
 ```
 
-Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualShock 4, por USB ou Bluetooth, lido direto por HID), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), Shift+Tab (Central de Controle, como na Steam; no controle, Guia ou PS). As capas são baixadas para `%LOCALAPPDATA%\Tako\cache\art` (nenhuma arte de jogo vai para o repositório).
+Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualShock 4, por USB ou Bluetooth, lido direto por HID), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), Shift+Tab (Central de Controle, como na Steam; no controle, Guia ou PS). Dados do usuário e caches ficam em `%LOCALAPPDATA%\Tako` (ou em `Data\` no modo portable); nenhuma arte de jogo vai para o repositório.
 
 ```
 dotnet restore

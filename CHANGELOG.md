@@ -12,6 +12,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), versionamen
 - Nome do produto: **Tako**. Executável `Tako.exe` com o ícone do polvo, marca na barra lateral e textos da interface; logos em `logo/`. O repositório e os namespaces continuam `ultralauncher`/`Launcher.*`.
 - Controles PlayStation (DualSense, DualSense Edge, DualShock 4; USB e Bluetooth) lidos direto por HID, com dicas ✕ ○ □ △ e botão PS abrindo a Central de Controle.
 - Interface responsiva: o palco acompanha a proporção da tela (21:9, 16:10…), DPI por monitor e artes decodificadas na resolução física (capas e fundos 2x da Steam), nítidas em 2K/4K.
+- Releases com instalador (`Tako-…-Setup-x64.exe`, Inno Setup, por usuário sem administrador, com desinstalador) e versão portable (`Tako-…-Portable-x64.zip`, dados em `Data\` ao lado do executável via `portable.txt`).
 - Workflow de release: cada tag `v*` publica o launcher (self-contained, win-x64) e o kit do experimento FSE na página da release.
 - Estrutura inicial da solução, CI e regras de desenvolvimento.
 

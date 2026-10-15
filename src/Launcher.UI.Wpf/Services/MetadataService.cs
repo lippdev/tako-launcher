@@ -19,7 +19,7 @@ public sealed partial class MetadataService(IMetadataProvider provider, TimeProv
     private static readonly TimeSpan Spacing = TimeSpan.FromSeconds(1.5);
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
-    private readonly string _directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako", "cache", "metadata");
+    private readonly string _directory = AppPaths.MetadataCache;
     private bool _running;
     private bool _pending;
 

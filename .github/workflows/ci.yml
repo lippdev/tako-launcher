@@ -24,6 +24,25 @@ jobs:
           name: ui-screenshots
           path: tests/Launcher.UI.Wpf.Tests/bin/Release/**/screenshots/
           if-no-files-found: ignore
+  # Instalador e portable em toda PR: a release não quebra só na hora da tag.
+  package:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Pacotes
+        shell: pwsh
+        run: ./packaging/build-packages.ps1 -Version '0.0.0-ci.${{ github.run_number }}' -OutDir "$env:RUNNER_TEMP/out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pacotes
+          path: |
+            ${{ runner.temp }}/out/Tako-*-Setup-x64.exe
+            ${{ runner.temp }}/out/Tako-*-Portable-x64.zip
+          retention-days: 7
   pr-title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

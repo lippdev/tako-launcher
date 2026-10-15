@@ -1,13 +1,13 @@
-Tako (versão de teste do Marco 0)
+Tako — como testar
 
-1. Extraia esta pasta inteira (não rode de dentro do zip).
-2. Rode Tako.exe. Se o SmartScreen avisar: "Mais informações" > "Executar assim mesmo".
-3. Conecte um controle Xbox ou PlayStation (DualSense/DualShock 4, USB ou Bluetooth) e teste:
+1. Rode Tako.exe. Se o SmartScreen avisar: "Mais informações" > "Executar assim mesmo".
+2. Jogos da Steam aparecem sozinhos (a Steam não precisa estar aberta). Capas, descrição, gêneros e nota do
+   Metacritic chegam em segundo plano na primeira vez.
+3. Para outros jogos: "Adicionar jogo" e escolha o executável ou atalho. Se os dados vierem do jogo errado,
+   Detalhes > Opções > Corrigir correspondência.
+4. Controle Xbox ou PlayStation (DualSense/DualShock 4, USB ou Bluetooth):
    - direcional/analógico navegam; A ou ✕ seleciona; B ou ○ volta;
-   - botão Guia/PS (ou View/Create) abre a Central de Controle;
-   - Configurações > "Prévia de tema Playnite 10".
-4. Teclado: setas, Enter, Esc; Shift+Tab abre a Central de Controle. Mouse: clique, roda e arraste no volume.
+   - Guia/PS (ou View/Create) abre a Central de Controle.
+5. Teclado: setas, Enter, Esc; Shift+Tab abre a Central de Controle. Mouse: clique, roda e arraste no volume.
 
 Anote o que falhar (tela, botão, o que esperava e o que aconteceu) e mande no chat ou numa issue.
-O cache de imagens fica em %LOCALAPPDATA%\Tako.
-Os dados são de exemplo; "Jogar" simula a sessão de jogo.
