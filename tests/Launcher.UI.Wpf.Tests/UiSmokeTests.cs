@@ -182,22 +182,24 @@ public sealed class UiSmokeTests
         Assert.Null(shell.TopOverlay);
 
         // Outras proporções: o palco acompanha a largura da janela (sem faixas pretas) e a grade ganha colunas.
+        // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();
-        window.Width = 1680; // 21:9
+        window.Width = 840; // 21:9
+        window.Height = 360;
         Pump(1.5);
         Assert.Equal(2520, window.StageElement.ActualWidth, 0);
         Snap(window, "15-inicio-21x9");
         shell.OpenLibrary(LibraryFilter.All);
         Pump(1.5);
         Snap(window, "16-biblioteca-21x9");
-        window.Width = 1152; // 16:10
+        window.Width = 576; // 16:10
         shell.GoHome();
         Pump(1.5);
         Assert.Equal(1728, window.StageElement.ActualWidth, 0);
         Snap(window, "17-inicio-16x10");
 
         // 4K: texto e vetores renderizados em 3840x2160.
-        window.Width = 1280;
+        window.Width = 640; // 16:9
         Pump(1.5);
         Snap(window, "18-inicio-4k", scale: 2);
 
