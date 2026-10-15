@@ -344,6 +344,7 @@ public sealed class UiSmokeTests
         guard.Install(app, window, shell);
         var seen = new List<string>();
         window.Dispatcher.UnhandledException += (_, e) => seen.Add($"{e.Exception.GetType().Name} handled={e.Handled}");
+        shell.Overlays.CollectionChanged += (_, e) => seen.Add($"overlays {e.Action} {string.Join(",", e.NewItems?.Cast<object>().Select(o => o.GetType().Name) ?? [])} -{string.Join(",", e.OldItems?.Cast<object>().Select(o => o.GetType().Name) ?? [])} trace={new StackTrace(1, false).ToString().Replace(Environment.NewLine, " | ", StringComparison.Ordinal)[..Math.Min(1500, new StackTrace(1, false).ToString().Length)]}");
         window.Dispatcher.BeginInvoke(() => throw new InvalidOperationException("Falha simulada pelo teste de fumaça"));
         Pump(0.8);
         string diagnosis = $"eventos=[{string.Join("; ", seen)}] fatal={guard.IsFatal} carregada={window.IsLoaded} visível={window.IsVisible} topo={shell.TopOverlay?.GetType().Name ?? "nenhum"}";
