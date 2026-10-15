@@ -1,5 +1,5 @@
 <!--
-  Configurações › Temas (MVP-014/015/020): importar .pthm, restaurar o padrão e a lista de temas instalados.
+  Configurações › Aparência › Tema (MVP-014/015/020): importar .pthm, restaurar o padrão e a lista de temas instalados.
   Mesmo layout e navegação da página de Configurações (linhas SettingRow num único grupo vertical).
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -9,6 +9,9 @@
                     xmlns:vm="clr-namespace:Launcher.UI.Wpf.ViewModels">
 
   <DataTemplate DataType="{x:Type vm:ThemesViewModel}">
+    <Grid>
+    <!-- Escurecimento como nas Configurações (ADR-0020): os textos não ficam direto sobre a arte do jogo. -->
+    <Rectangle Fill="{StaticResource SettingsScrim}" />
     <Canvas x:Name="Viewport" ClipToBounds="True" OpacityMask="{StaticResource ContentFadeMask}">
       <StackPanel Canvas.Left="64" Canvas.Top="140" Width="1180" Margin="0,0,0,200" nav:Nav.ScrollHost="Vertical">
         <StackPanel.RenderTransform>
@@ -23,7 +26,7 @@
             </StackPanel>
             <StackPanel>
               <TextBlock Text="Importar tema do Playnite (.pthm)" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-              <TextBlock Text="Temas Fullscreen; o pacote é verificado antes de instalar e nada dele é executado" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="Temas Fullscreen; o pacote é verificado antes de instalar e nada dele é executado" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentMutedBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
           </DockPanel>
         </Button>
@@ -35,7 +38,7 @@
             </StackPanel>
             <StackPanel>
               <TextBlock Text="Restaurar tema padrão" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-              <TextBlock Text="Volta à interface e ao tema do Tako; a prévia volta ao Fullscreen padrão do Playnite" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="Volta à interface e ao tema do Tako; a prévia volta ao Fullscreen padrão do Playnite" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentMutedBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
           </DockPanel>
         </Button>
@@ -52,7 +55,7 @@
                   </StackPanel>
                   <StackPanel>
                     <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Detail}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Detail}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentMutedBrush}" TextTrimming="CharacterEllipsis" />
                   </StackPanel>
                 </DockPanel>
               </Button>
@@ -62,5 +65,6 @@
         <TextBlock Text="{Binding FolderText}" Margin="0,18,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" />
       </StackPanel>
     </Canvas>
+    </Grid>
   </DataTemplate>
 </ResourceDictionary>

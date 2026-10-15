@@ -53,20 +53,36 @@ public sealed partial class ShellViewModel
     private void ToggleAutoUpdate()
     {
         UpdatePreferences.AutoUpdate = !UpdatePreferences.AutoUpdate;
-        UpdatePreferences.Save();
-        OnPropertyChanged(nameof(UpdatePreferences));
+        SaveUpdatePreferences();
     }
 
     [RelayCommand]
     private void TogglePrereleaseUpdates()
     {
         UpdatePreferences.Prereleases = !UpdatePreferences.Prereleases;
-        UpdatePreferences.Save();
-        OnPropertyChanged(nameof(UpdatePreferences));
+        SaveUpdatePreferences();
         if (UpdatePreferences.Prereleases)
         {
             Toast("Versões de teste (alpha/beta) podem ter falhas; desligar não volta para a versão anterior");
         }
+    }
+
+    /// <summary>
+    /// Grava <c>updates.json</c>. Antes, uma falha de disco (pasta só de leitura, antivírus) derrubava o Tako ao tocar
+    /// na opção; agora a escolha vale nesta abertura e o aviso explica.
+    /// </summary>
+    private void SaveUpdatePreferences()
+    {
+        try
+        {
+            UpdatePreferences.Save();
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Toast($"A escolha vale até fechar o Tako: não foi possível salvá-la ({ex.Message})");
+        }
+
+        OnPropertyChanged(nameof(UpdatePreferences));
     }
 
     private async Task CheckForUpdatesAsync(bool manual, TimeSpan startupDelay)
@@ -108,7 +124,7 @@ public sealed partial class ShellViewModel
             if (!update.CanInstall)
             {
                 UpdateStatus = $"Tako {update.Version} disponível (baixe pela página da release)";
-                Toast($"Tako {update.Version} disponível · abra a página da release em Configurações");
+                Toast($"Tako {update.Version} disponível · veja em Configurações › Geral");
                 return;
             }
 

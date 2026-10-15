@@ -51,14 +51,19 @@
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel>
               <TextBlock Style="{StaticResource FieldLabel}" Text="{Binding SecretLabel}" />
-              <TextBox Style="{StaticResource FieldBox}" Text="{Binding ClientSecret, UpdateSourceTrigger=PropertyChanged}"
+              <TextBox Style="{StaticResource SecretBox}" Tag="{Binding IsSecretVisible}" Text="{Binding ClientSecret, UpdateSourceTrigger=PropertyChanged}"
                        nav:Nav.Group="overlay" nav:Nav.Key="igdb:secret" />
             </StackPanel>
             <Button Grid.Column="1" Style="{StaticResource PillButton}" Margin="18,0,0,0" VerticalAlignment="Bottom" Command="{Binding PasteSecretCommand}" nav:Nav.Group="overlay" nav:Nav.Key="igdb:paste-secret">
               <TextBlock Text="Colar" />
+            </Button>
+            <!-- Segredo mascarado: "Mostrar" alterna entre ● e o texto. -->
+            <Button Grid.Column="2" Style="{StaticResource PillButton}" Margin="18,0,0,0" VerticalAlignment="Bottom" Command="{Binding ToggleSecretVisibleCommand}" nav:Nav.Group="overlay" nav:Nav.Key="igdb:show-secret">
+              <TextBlock Text="{Binding SecretToggleLabel}" />
             </Button>
           </Grid>
 
@@ -139,14 +144,19 @@
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel>
               <TextBlock Style="{StaticResource FieldLabel}" Text="{Binding PasswordLabel}" />
-              <TextBox Style="{StaticResource FieldBox}" Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+              <TextBox Style="{StaticResource SecretBox}" Tag="{Binding IsSecretVisible}" Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
                        nav:Nav.Group="overlay" nav:Nav.Key="ss:password" />
             </StackPanel>
             <Button Grid.Column="1" Style="{StaticResource PillButton}" Margin="18,0,0,0" VerticalAlignment="Bottom" Command="{Binding PastePasswordCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:paste-password">
               <TextBlock Text="Colar" />
+            </Button>
+            <!-- Segredo mascarado: "Mostrar" alterna entre ● e o texto. -->
+            <Button Grid.Column="2" Style="{StaticResource PillButton}" Margin="18,0,0,0" VerticalAlignment="Bottom" Command="{Binding ToggleSecretVisibleCommand}" nav:Nav.Group="overlay" nav:Nav.Key="ss:show-password">
+              <TextBlock Text="{Binding SecretToggleLabel}" />
             </Button>
           </Grid>
 

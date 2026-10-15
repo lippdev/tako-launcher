@@ -66,7 +66,7 @@ public sealed partial class ThemeItemViewModel : ObservableObject
         {
             if (Theme is null)
             {
-                return "Cores, tipografia e formas do Tako, carregadas pelo carregador XAML restrito";
+                return "Cores, letras e formas do Tako";
             }
 
             var m = Theme.Manifest.Manifest;
@@ -82,7 +82,7 @@ public sealed partial class ThemeItemViewModel : ObservableObject
                 parts.Add($"versão {m.Version}");
             }
 
-            parts.Add($"ThemeApiVersion {m.ThemeApiVersionText ?? "?"}");
+            parts.Add($"API de tema {m.ThemeApiVersionText ?? "?"}");
             if (Theme.Manifest.Errors.FirstOrDefault() is { } error)
             {
                 parts.Add(error.Message);
@@ -123,7 +123,7 @@ public sealed partial class ThemesViewModel : PageViewModel
 
     public ObservableCollection<ThemeItemViewModel> Themes { get; } = [];
 
-    public string FolderText => $"Temas importados ficam em {_playnite.UserThemesRoot}. Temas Fullscreen do Playnite com ThemeApiVersion {ThemeManifestValidator.SupportedRange}.";
+    public string FolderText => $"Temas importados ficam em {_playnite.UserThemesRoot}. Funcionam temas Fullscreen do Playnite 10 (API de tema {ThemeManifestValidator.SupportedRange}).";
 
     public override void Refresh()
     {

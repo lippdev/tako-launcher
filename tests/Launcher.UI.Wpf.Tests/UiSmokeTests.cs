@@ -51,6 +51,7 @@ public sealed partial class UiSmokeTests
         // simulados: o teste nunca muda a resolução nem o som da máquina (MVP-012).
         var display = new SimulatedDisplayConfiguration();
         var audio = new SimulatedAudioEndpoints();
+        var desk = new SimulatedDisplayDesk();
 
         // Central de Controle: janelas, contador de FPS (sem permissão no começo), ponteiro, ControlFS e desempenho
         // simulados; o teste nunca ativa nem fecha janelas da máquina, não pede UAC nem esconde o ponteiro.
@@ -70,7 +71,7 @@ public sealed partial class UiSmokeTests
             new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System),
             s => s.AddSingleton<IDisplayConfigurationService>(display)
                 .AddSingleton<IAudioEndpointService>(audio)
-                .AddSingleton<IDisplayControlService>(new SimulatedDisplayDesk())
+                .AddSingleton<IDisplayControlService>(desk)
                 .AddSingleton<IScreenCurtain>(new SimulatedScreenCurtain())
                 .AddSingleton<IWindowSwitcher>(windows)
                 .AddSingleton<IFpsCounter>(new SimulatedFpsCounter(available: true))
@@ -157,6 +158,10 @@ public sealed partial class UiSmokeTests
         shell.OpenSettings();
         Pump(0.8);
         Snap(window, "06-configuracoes");
+        // Configurações em categorias e menu Modo Console (ADR-0020): cada categoria, cada cartão e o assistente.
+        SettingsAndConsoleTour(shell, window, desk);
+        shell.OpenSettings();
+        Pump(0.6);
         XboxLibrarySetting(shell, window);
         ControlCenterShortcutSettings(shell, window); // UX-005: atalhos da Central, captura e validação
         // Tema Fullscreen padrão do Playnite 10 renderizado sem o Playnite (H2).
@@ -180,7 +185,7 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Back);
         Assert.Null(shell.TopOverlay);
 
-        ((SettingsViewModel)shell.CurrentPage).SimulateThemeFailureCommand.Execute(null);
+        ((SettingsViewModel)shell.CurrentPage).SimulateThemeFailure(); // Opções de desenvolvedor › Testar a tela de recuperação
         Pump(0.8);
         Assert.IsType<RecoveryViewModel>(shell.TopOverlay);
         Snap(window, "07-recuperacao");
@@ -701,13 +706,16 @@ public sealed partial class UiSmokeTests
         Pump(0.8);
         AssertFocused(window, "Favoritos");
 
-        // Configurações: as linhas novas (modo seguro e Xbox mode) ficam logo antes de "Tema".
+        // Configurações: modo seguro e Xbox mode ficam em Sistema; B no conteúdo volta às categorias e B de novo sai.
         shell.OpenSettings();
         Pump(0.8);
         AssertFocused(window, "Configurações");
-        Assert.NotNull(nav.Navigables().FirstOrDefault(e => Nav.GetKey(e) == "settings:safemode"));
-        Assert.NotNull(nav.Navigables().FirstOrDefault(e => Nav.GetKey(e) == "settings:fse"));
+        Assert.True(nav.FocusDefault("settings:safemode"));
+        Assert.True(nav.FocusDefault("settings:fse"));
         Assert.NotEmpty(shell.FseStatus.Reason);
+        Press(window, AppCommand.Back);
+        Assert.IsType<SettingsViewModel>(shell.CurrentPage);
+        Assert.Equal("settings-cat:sistema", Nav.GetKey(nav.Focused!));
         Press(window, AppCommand.Back);
         Assert.IsNotType<SettingsViewModel>(shell.CurrentPage);
         AssertFocused(window, "depois de sair das Configurações");
@@ -804,15 +812,20 @@ public sealed partial class UiSmokeTests
     private static void GameScreenSettingsAndConfirmation(ShellViewModel shell, MainWindow window)
     {
         var nav = window.Navigator;
-        shell.OpenSettings();
+        shell.OpenConsoleMode();
         Pump(0.8);
+        var consolePage = Assert.IsType<ConsoleModeViewModel>(shell.CurrentPage);
+        Assert.True(nav.FocusDefault("console:gamescreen"));
+        Press(window, AppCommand.Accept); // detalhe da Tela de jogo
+        Pump(0.6);
+        Assert.IsType<SettingsDetailViewModel>(shell.CurrentPage);
         Assert.False(shell.Settings.GameScreenEnabled);
-        Assert.True(nav.FocusDefault("settings:gamescreen"));
+        Assert.Equal("console:gamescreen:on", Nav.GetKey(nav.Focused!));
         Press(window, AppCommand.Accept);
         Pump(0.4);
         Assert.True(shell.Settings.GameScreenEnabled);
         Assert.Equal("SIM\\TV", shell.Settings.GameScreenId);
-        Assert.Equal("TV da sala", ((SettingsViewModel)shell.CurrentPage).GameScreenLabel);
+        Assert.Equal("TV da sala", consolePage.GameScreenLabel);
         Snap(window, "43-configuracoes-tela-de-jogo");
 
         var confirm = new ScreenConfirmViewModel("TV da sala", ShellViewModel.ScreenConfirmSeconds);
@@ -861,13 +874,13 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Accept);
         Assert.Equal("perf", center.Popover!.Key);
         var counter = center.Popover.Sections.First(x => x.Title == "Contador de FPS");
-        Assert.Equal("Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.", counter.Description);
+        Assert.Equal("Ative o contador em Modo Console › Contador de FPS, com teclado e mouse.", counter.Description);
         Assert.All(counter.Rows, r => Assert.True(r.IsDimmed));
         // Limite de FPS pelo driver (ADR-0018) aparece com o contador desligado; sem driver, não deixa escolher valor.
         Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Key == "fps:limit" && r.AdjustCommand is null);
         Assert.True(nav.FocusDefault("fps:style")); // esmaecida, mas focável para explicar
         Press(window, AppCommand.Accept);
-        Assert.Equal("Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.", shell.ToastMessage);
+        Assert.Equal("Ative o contador em Modo Console › Contador de FPS, com teclado e mouse.", shell.ToastMessage);
         Pump(0.5);
         Snap(window, "11b-painel-desempenho");
         Press(window, AppCommand.Back);

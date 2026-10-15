@@ -18,14 +18,14 @@ public sealed partial class UiSmokeTests
         shell.OpenSettings();
         Pump(0.8);
         var settings = Assert.IsType<SettingsViewModel>(shell.CurrentPage);
-        Assert.True(settings.SteamStoreEnabled);
-        Assert.True(settings.EpicStoreEnabled);
-        Assert.True(settings.GogStoreEnabled);
-        Assert.False(string.IsNullOrWhiteSpace(settings.EpicStoreStatus));
+        Assert.True(shell.Settings.IsStoreEnabled(GameStore.Steam));
+        Assert.True(shell.Settings.IsStoreEnabled(GameStore.Epic));
+        Assert.True(shell.Settings.IsStoreEnabled(GameStore.Gog));
+        Assert.False(string.IsNullOrWhiteSpace(settings.StoreStatus(GameStore.Epic)));
 
         Assert.True(nav.FocusDefault("settings:store:epic"));
+        Assert.Equal("biblioteca", settings.SelectedCategory.Id); // a linha estava em outra categoria: ela abre sozinha
         Press(window, AppCommand.Accept);
-        Assert.False(settings.EpicStoreEnabled);
         Assert.False(shell.Settings.IsStoreEnabled(GameStore.Epic));
         Assert.StartsWith("Epic Games desligada", shell.ToastMessage, StringComparison.Ordinal);
         Assert.Equal("settings:store:epic", Nav.GetKey(nav.Focused!));
@@ -33,7 +33,7 @@ public sealed partial class UiSmokeTests
         Snap(window, "75-configuracoes-lojas");
 
         Press(window, AppCommand.Accept);
-        Assert.True(settings.EpicStoreEnabled);
+        Assert.True(shell.Settings.IsStoreEnabled(GameStore.Epic));
         Assert.StartsWith("Epic Games ligada", shell.ToastMessage, StringComparison.Ordinal);
 
         Assert.True(nav.FocusDefault("settings:store:gog"));

@@ -154,10 +154,11 @@
             <GradientStop Offset="1" Color="#00000000" />
           </LinearGradientBrush>
         </Border.Background>
-        <ItemsControl ItemsSource="{Binding Hints}" HorizontalAlignment="Right" VerticalAlignment="Center" Focusable="False">
+        <!-- Abrevia e esconde as dicas menos importantes quando não cabem (ADR-0020): nunca corta uma dica no meio. -->
+        <ItemsControl x:Name="HintBar" ItemsSource="{Binding Hints}" VerticalAlignment="Center" Focusable="False">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" />
+              <c:HintBarPanel />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>

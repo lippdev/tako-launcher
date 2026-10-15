@@ -166,6 +166,46 @@ components:
     textColor: "{colors.on-accent-muted}"
     typography: "{typography.label-sm}"
     height: 72px
+  settings-category:
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.md}"
+    height: 68px
+    width: 340px
+  settings-category-focused:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+  settings-category-selected:
+    backgroundColor: "{colors.surface-2}"
+  setting-row:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.lg}"
+    height: 92px
+    padding: 28px
+  setting-value:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
+  feature-card:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.title-md}"
+    rounded: "{rounded.lg}"
+    width: 420px
+    height: 208px
+  state-badge-on:
+    backgroundColor: "{colors.success}"
+    typography: "{typography.label-sm}"
+    rounded: "{rounded.full}"
+  state-badge-setup:
+    backgroundColor: "{colors.warning}"
+  state-badge-problem:
+    backgroundColor: "{colors.error}"
+  state-badge-off:
+    backgroundColor: "{colors.surface-2}"
   glyph-button:
     backgroundColor: "{colors.surface-solid}"
     textColor: "{colors.on-surface-solid}"
@@ -212,7 +252,8 @@ Títulos (`display`, `headline-*`) em Source Sans 3 leve, humanista da linha Fru
 - **Barra lateral:** 400px quando em foco; recolhe para 120px (só ícones) quando o foco vai para o conteúdo, liberando espaço para o destaque.
 - **Conteúdo:** cabeçalho (título da página + busca), destaque (hero) ocupando ~55% da altura e fileiras horizontais de capas.
 - **Início:** a primeira fileira é sempre **Jogados recentemente** (só jogos já jogados, do mais recente ao mais antigo), e o destaque abre no último jogado ("Continuar jogando"). Ao fim de uma sessão, o jogo volta para o primeiro lugar e a fileira volta ao início.
-- **Barra de dicas:** rodapé fixo com os glifos do controle e a ação de cada botão na tela atual.
+- **Barra de dicas:** rodapé fixo com os glifos do controle e a ação de cada botão na tela atual. Sem largura (4:3, 16:10, escala alta, teclado), primeiro abrevia ("Configurações" → "Ajustes", menos espaço entre as dicas) e depois esconde as menos importantes (seção, busca); A e B ficam sempre. Nunca corta uma dica no meio.
+- **Listas que rolam com o foco:** o item focado fica inteiro entre o cabeçalho e a barra de dicas, com folga (o anel de foco não encosta na moldura). Listas que não começam no topo da tela rolam numa moldura com recorte que termina acima da barra de dicas.
 - **Cabeçalho fixo:** título da página, busca e status não rolam. O conteúdo rola numa moldura que esmaece antes do cabeçalho e antes da barra de dicas, então nada passa por trás desses textos.
 - **Status do sistema:** canto superior direito, acima da busca: entrada atual (ícone de controle com o nome, ou teclado) e a hora. Aparece em todas as telas.
 - **Grade da biblioteca:** capas 2:3 (204x306), 7 colunas quando a barra lateral está recolhida. O fundo e o accent acompanham a capa em foco, como na Início.
@@ -243,13 +284,19 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
   - **Painel do ícone** (melhoria sobre o PS5, que troca de tela): A abre um painel de 600px logo abaixo da barra, alinhado ao ícone, com linhas grandes (marcador redondo, chave liga/desliga, barra de volume). O ícone de origem fica marcado e os cartões saem de cena (nunca dois painéis sobrepostos). B fecha o painel; o painel de Encerrar já é a confirmação.
   - **Painéis e opções:** com um painel aberto, ← → levam o painel ao ícone vizinho (Desempenho, Áudio, Controle, Tela, Ponteiro, ControlFS); ícones sem painel só recebem o foco, e Encerrar nunca abre deslizando. Escolher uma opção aplica na hora, confirma com um aviso e fecha o painel, com o foco de volta no ícone. No volume, ← → ajustam. Linhas de valor (estilo e posição do contador de FPS, limite de FPS) e chaves (ponteiro) mudam sem fechar o painel: A avança, ← → ajustam.
   - **Navegação:** ← → ficam na fileira atual; ↑ de um cartão vai ao ícone correspondente e ↓ volta ao cartão. B ou o atalho da Central voltam ao jogo. "Início" volta ao launcher sem fechar o jogo (o status mostra o jogo em execução e o atalho retorna a ele).
-- **Contador de FPS:** próprio, sem RTSS e sem injeção (ADR-0017): o PresentMon mede pelo Windows e o Tako desenha uma janela transparente que não recebe clique nem foco, no canto escolhido do monitor do jogo. Estilos Desligado, Só FPS (padrão), Compacto e Detalhado (tempo de quadro, 1% low, API, CPU/GPU/memória); posição, tamanho e fundo escuro. Ligado em Configurações › Mostrar FPS, só com teclado e mouse (o UAC da permissão não aceita controle; com controle a linha esmaece e diz "Use teclado e mouse para ativar"). Sem o contador pronto, as opções de FPS na Central ficam esmaecidas com o caminho para ligar. Em tela cheia exclusiva o contador não aparece sobre o jogo; o FPS continua na Central.
+- **Contador de FPS:** próprio, sem RTSS e sem injeção (ADR-0017): o PresentMon mede pelo Windows e o Tako desenha uma janela transparente que não recebe clique nem foco, no canto escolhido do monitor do jogo. Estilos Desligado, Só FPS (padrão), Compacto e Detalhado (tempo de quadro, 1% low, API, CPU/GPU/memória); posição, tamanho e fundo escuro. Ligado em Modo Console › Contador de FPS › Mostrar FPS, só com teclado e mouse (o UAC da permissão não aceita controle; com controle a linha esmaece e diz "Use teclado e mouse para ativar"). Sem o contador pronto, as opções de FPS na Central ficam esmaecidas com o caminho para ligar. Em tela cheia exclusiva o contador não aparece sobre o jogo; o FPS continua na Central.
 - **Limite de FPS:** pelo driver de vídeo (NVIDIA, AMD ou Intel, ADR-0018), independente do contador. O valor do usuário volta ao sair do jogo.
 - **Ponteiro:** esconder o ponteiro e movê-lo com o analógico (esquerdo move, direito rola, A clica, A duas vezes = botão direito, segurar A = arrastar), pausado enquanto a Central está aberta; tudo volta ao normal no fim da sessão.
 - **Restrição técnica do menu rápido:** sem injeção gráfica (proibida pelo PRD, §10), a sobreposição é a janela do Tako transparente e topmost (composição do DWM, sem `AllowsTransparency`); ela funciona sobre jogos em janela e em tela cheia sem bordas, mas não sobre tela cheia exclusiva, onde a Central abre com a arte do jogo. Validar no Windows (checklist §11) antes de prometer o comportamento.
 - **Ações rápidas do jogo (UX-005):** ☰ (Options no PS, M no teclado) com o foco numa capa abre um diálogo com Jogar, Favoritar, Adicionar à coleção, Configurações deste jogo e Detalhes; a dica do rodapé troca de "Configurações" para "Ações". Fora de uma capa, ☰ continua abrindo as Configurações. Um diálogo que abre outro devolve o foco à capa de origem ao fechar a cadeia.
 - **Coleções (UX-003):** cada coleção com jogos vira uma fileira na Início (entre "Jogados recentemente" e "Adicionados recentemente"), com "Ver todos" que abre a biblioteca filtrada, e uma seção "Coleção" no painel de filtros. Pôr e tirar jogos: diálogo com as coleções (✓ = o jogo está nela), que continua aberto para marcar várias. Nomes pelo teclado virtual da busca, com título e dica próprios e a regra do nome na linha de baixo; B cancela.
 - **Painel lateral de opções:** o mesmo dos filtros (à direita, na altura da tela, linhas com o valor no fim, a página visível atrás; 760px quando os valores são longos). Em "Configurações deste jogo" (UX-007) cada linha começa em "Padrão: <valor do Tako>" em opacidade reduzida; o que o jogo muda aparece em negrito. A troca o valor e salva na hora; "Usar tudo do Tako" volta tudo ao padrão.
+- **Configurações (UX-006/009, ADR-0020):** como num console. Título da página no topo; à esquerda, a coluna de categorias (`settings-category`, 340px: ícone e nome; a escolhida fica com `surface-2`, a focada branca com texto escuro); à direita, o nome e uma frase da categoria e as linhas dela. Focar uma categoria já mostra o conteúdo; → ou A entram na primeira linha; LB/RB (Q/E) trocam de categoria e a dica do rodapé diz "Categoria"; B no conteúdo volta à categoria e B na coluna sai. Categorias: Geral, Biblioteca e lojas, Aparência, Controles, Sistema e Sobre. "Opções de desenvolvedor" (em Sistema, desligadas) escondem as ferramentas de tema.
+  - **Linha (`setting-row`):** título (`label-lg`) e descrição em até duas linhas (`label-sm`, `on-accent-muted`); à direita, a chave liga/desliga, ou o valor numa pílula (`setting-value`) com seta (abre algo) ou com ⇄ (A troca o valor), ou só a pílula (informação). Grupos dentro da categoria com título `overline`. Linha que precisa de teclado e mouse fica a 45% de opacidade e explica ao ser ativada.
+  - **Legibilidade:** a página escurece a arte do jogo da esquerda (88%) para a direita (70%); nenhum texto fica direto sobre a arte.
+- **Modo Console (ADR-0020):** item próprio na barra lateral (acima de Configurações), com tudo que veio do Console Mode. Título, uma frase e o botão primário "Configurar para jogar na TV"; abaixo, um **cartão de recurso** (`feature-card`, 420×208: ícone, selo de estado no canto, nome em `title-md` e uma linha de resumo) para Tela de jogo, TV, Áudio do jogo, Steam na bandeja, Contador de FPS e Limite de FPS. Selos: Ligado (`success`), Falta configurar (`warning`), Com problema (`error`), Desligado (`surface-2`). A abre o detalhe: o cartão vira cabeçalho (ícone, nome, selo e resumo) e as linhas do recurso seguem o componente de linha; B volta ao cartão.
+  - **Assistente:** diálogo largo (1000px) com o nome do assistente em `overline`, a barra de passos (Tela, Imagem, TV, Áudio, Pronto: o atual em branco, os feitos em verde), "Passo N de 5", título, texto e as escolhas do passo como pílulas (a sugerida é a primária e recebe o foco). B volta um passo; cada passo salva na hora e pode ser pulado.
+- **Campo de segredo:** senhas e chaves (Client Secret da IGDB, senha do ScreenScraper) aparecem como ● ; o botão "Mostrar"/"Ocultar" ao lado alterna o texto. Colar e digitar funcionam como nos outros campos.
 - **Sair para o desktop:** sempre presente no fim da barra lateral (princípio "recovery-first" do PRD).
 
 ## Do's and Don'ts

@@ -30,6 +30,16 @@ public abstract partial class PageViewModel(ShellViewModel shell) : ObservableOb
     {
     }
 
+    /// <summary>A página entrou na tela (nova ou de volta pelo histórico).</summary>
+    public virtual void OnShown()
+    {
+    }
+
+    /// <summary>A página saiu da tela (pode voltar pelo histórico).</summary>
+    public virtual void OnHidden()
+    {
+    }
+
     /// <summary>Busca com teclado virtual (UX-001): na Início, abre Todos os jogos com o teclado.</summary>
     [RelayCommand]
     private void Search() => Shell.OpenSearch();
@@ -214,7 +224,7 @@ public sealed partial class LibraryViewModel : PageViewModel
         (true, true) => "Tente outra busca ou limpe os filtros.",
         (true, false) => "Confira o nome ou tente só uma parte dele. Acentos e maiúsculas não importam.",
         (false, true) => "Nenhum jogo combina com os filtros escolhidos.",
-        _ => "Adicione um jogo ou procure jogos da Steam de novo em Configurações.",
+        _ => "Adicione um jogo ou procure os jogos instalados em Configurações › Biblioteca e lojas.",
     };
 
     /// <summary>A biblioteca abre na primeira capa; sem resultados, na busca.</summary>
@@ -360,87 +370,4 @@ public sealed partial class DetailsViewModel : PageViewModel
 
     [RelayCommand]
     private void GameSettings() => Shell.OpenGameSettings(Game);
-}
-
-public sealed partial class SettingsViewModel : PageViewModel
-{
-    public SettingsViewModel(ShellViewModel shell, SettingsService settings, ThemeService themes)
-        : base(shell)
-    {
-        Settings = settings;
-        Themes = themes;
-        shell.SessionTools.RefreshPermission(); // o usuário pode ter saído e entrado no Windows desde a última vez
-    }
-
-    public SettingsService Settings { get; }
-
-    public ThemeService Themes { get; }
-
-    public override string Title => "Configurações";
-
-    public override string RouteKey => "settings";
-
-    public string ThemeLabel => Themes.CurrentTheme == ThemeService.DefaultTheme ? "Padrão" : Themes.CurrentTheme;
-
-    [RelayCommand]
-    private void ReapplyTheme()
-    {
-        var result = Themes.Apply(ThemeService.DefaultTheme);
-        OnPropertyChanged(nameof(ThemeLabel));
-        Shell.Toast(result.Succeeded ? "Tema padrão recarregado pelo carregador XAML restrito" : $"Falha ao recarregar: {result.Error}");
-    }
-
-    [RelayCommand]
-    private void ToggleDynamicColor()
-    {
-        Settings.DynamicColor = !Settings.DynamicColor;
-        Shell.RefreshBackdrop();
-    }
-
-    [RelayCommand]
-    private void ToggleReducedMotion() => Settings.ReducedMotion = !Settings.ReducedMotion;
-
-    [RelayCommand]
-    private void AddGame() => Shell.AddGame();
-
-    [RelayCommand]
-    private void Rescan()
-    {
-        Shell.RescanLibrary();
-        OnPropertyChanged(string.Empty); // avisos das lojas (Configurações › Lojas)
-    }
-
-    [RelayCommand]
-    private void RefreshMetadata() => Shell.RefreshMetadata();
-
-    /// <summary>Abre no Explorer a pasta dos logs de diagnóstico (MVP-033).</summary>
-    [RelayCommand]
-    private void OpenLogs()
-    {
-        try
-        {
-            System.IO.Directory.CreateDirectory(AppPaths.LogsDirectory);
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppPaths.LogsDirectory) { UseShellExecute = true })?.Dispose();
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.IO.IOException or UnauthorizedAccessException)
-        {
-            Shell.Toast($"Não foi possível abrir a pasta de logs: {ex.Message}");
-        }
-    }
-
-    [RelayCommand]
-    private void ToggleStartup() => Settings.StartFullscreenOnLogin = !Settings.StartFullscreenOnLogin;
-
-    [RelayCommand]
-    private void ToggleRestoreEnvironment() => Settings.RestoreEnvironmentAfterGame = !Settings.RestoreEnvironmentAfterGame;
-
-    [RelayCommand]
-    private void PreviewPlayniteTheme() => Shell.ShowPlaynitePreview();
-
-    [RelayCommand]
-    private void SimulateThemeFailure()
-    {
-        Shell.ShowRecovery(Themes.Apply(ThemeService.InvalidSampleTheme));
-        OnPropertyChanged(nameof(ThemeLabel));
-    }
 }

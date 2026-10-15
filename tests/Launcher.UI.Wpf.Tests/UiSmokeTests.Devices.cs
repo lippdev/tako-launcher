@@ -18,13 +18,16 @@ public sealed partial class UiSmokeTests
     private static void GameAudioSteamAndTv(ShellViewModel shell, MainWindow window, Game game, SimulatedAudioEndpoints audio, SimulatedTvControl tv)
     {
         var nav = window.Navigator;
-        shell.OpenSettings();
+        // ADR-0020: TV, áudio e Steam ficam no menu Modo Console, um cartão por recurso.
+        shell.OpenConsoleMode();
         Pump(0.8);
+        var console = Assert.IsType<ConsoleModeViewModel>(shell.CurrentPage);
 
         // TV: desligada por padrão; endereço, espera ao sair, Testar e Salvar.
         Assert.False(shell.Settings.TvControl.IsActive);
         Assert.Equal("Desligado", shell.TvSummary);
-        Assert.True(nav.FocusDefault("settings:tv"));
+        Assert.Equal(Launcher.Core.Presentation.FeatureState.Off, console.CardFor("tv").State);
+        Assert.True(nav.FocusDefault("console:tv"));
         Press(window, AppCommand.Accept);
         Pump(0.5);
         var editor = Assert.IsType<TvSettingsViewModel>(shell.TopOverlay);
@@ -68,9 +71,12 @@ public sealed partial class UiSmokeTests
         Assert.Null(shell.TopOverlay);
         Assert.True(shell.Settings.TvControl is { IsActive: true, StandbyAfterGame: true, HdmiInput: 1, Kind: TvKind.Android });
         Assert.StartsWith("Ligada · 192.168.0.50", shell.TvSummary, StringComparison.Ordinal);
+        Pump(0.3);
+        Assert.Equal(Launcher.Core.Presentation.FeatureState.On, console.CardFor("tv").State);
+        Assert.Equal("console:tv", Nav.GetKey(nav.Focused!)); // o foco volta ao cartão
 
         // Saída de áudio durante o jogo: lista as saídas ativas; escolher fecha e salva.
-        Assert.True(nav.FocusDefault("settings:gameaudio"));
+        Assert.True(nav.FocusDefault("console:audio"));
         Press(window, AppCommand.Accept);
         Pump(0.5);
         var choose = Assert.IsType<DialogViewModel>(shell.TopOverlay);
@@ -80,11 +86,20 @@ public sealed partial class UiSmokeTests
         Assert.Null(shell.TopOverlay);
         Assert.Equal("sim-headset", shell.Settings.GameAudioOutput?.DeviceId);
 
-        Assert.True(nav.FocusDefault("settings:steamtray"));
+        Pump(0.3);
+        Assert.Equal(Launcher.Core.Presentation.FeatureState.On, console.CardFor("audio").State);
+        Assert.True(nav.FocusDefault("console:steam"));
+        Press(window, AppCommand.Accept); // abre o detalhe do recurso
+        Pump(0.5);
+        Assert.IsType<SettingsDetailViewModel>(shell.CurrentPage);
+        Assert.Equal("console:steam:on", Nav.GetKey(nav.Focused!));
         Press(window, AppCommand.Accept);
         Assert.True(shell.Settings.SteamToTrayAfterGame);
+        Press(window, AppCommand.Back);
         Pump(0.4);
-        Snap(window, "62-configuracoes-audio-steam-tv");
+        Assert.IsType<ConsoleModeViewModel>(shell.CurrentPage);
+        Assert.Equal("console:steam", Nav.GetKey(nav.Focused!));
+        Snap(window, "62-modo-console-audio-steam-tv");
 
         // Jogo real: TV ligada e som no fone durante o jogo; ao fechar, a saída volta e a TV vai para espera.
         tv.Calls.Clear();

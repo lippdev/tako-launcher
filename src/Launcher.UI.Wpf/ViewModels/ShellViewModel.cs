@@ -146,6 +146,9 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public event EventHandler<FocusRequestEventArgs>? FocusRequested;
 
+    /// <summary>Algo que as Configurações e o Modo Console mostram mudou fora das preferências observáveis (ADR-0020).</summary>
+    public event EventHandler? SettingsChanged;
+
     /// <summary>Comando vindo de uma dica clicada; a view o trata como se viesse do teclado/controle.</summary>
     public event EventHandler<AppCommand>? CommandRequested;
 
@@ -191,6 +194,18 @@ public sealed partial class ShellViewModel : ObservableObject
         OnPageChangedForPlaynite();
     }
 
+    partial void OnCurrentPageChanged(PageViewModel? oldValue, PageViewModel newValue)
+    {
+        if (oldValue != newValue)
+        {
+            oldValue?.OnHidden();
+            newValue.OnShown();
+        }
+    }
+
+    /// <summary>Avisa as páginas de configurações que um estado fora das preferências mudou (lojas, permissões, sessão).</summary>
+    public void NotifySettingsChanged() => SettingsChanged?.Invoke(this, EventArgs.Empty);
+
     // ---------------------------------------------------------------- Navegação entre páginas
 
     public void GoHome() => Navigate(new HomeViewModel(this), replace: true, clearHistory: true);
@@ -227,7 +242,7 @@ public sealed partial class ShellViewModel : ObservableObject
             return;
         }
 
-        if (TryBackInPlayniteUi() || TryClearLibrarySearch())
+        if (TryBackInPlayniteUi() || TryClearLibrarySearch() || TryBackToSettingsCategories())
         {
             return;
         }
@@ -246,7 +261,10 @@ public sealed partial class ShellViewModel : ObservableObject
         }
     }
 
-    /// <summary>LB/RB: Início → Todos → Instalados → Favoritos → Configurações.</summary>
+    /// <summary>
+    /// LB/RB: Início → Todos → Instalados → Favoritos → Modo Console → Configurações. Nas Configurações, trocam de
+    /// categoria (ADR-0020).
+    /// </summary>
     public void CycleSection(int step)
     {
         if (TopOverlay is not null)
@@ -254,7 +272,15 @@ public sealed partial class ShellViewModel : ObservableObject
             return;
         }
 
-        string[] order = ["home", "library:all", "library:installed", "library:favorites", "settings"];
+        if (CurrentPage is SettingsViewModel settings)
+        {
+            bool inContent = _focusedGroup == "settings";
+            var category = settings.CycleCategory(step);
+            RequestFocus(inContent ? settings.FirstRowKey ?? category.NavKey : category.NavKey);
+            return;
+        }
+
+        string[] order = ["home", "library:all", "library:installed", "library:favorites", ConsoleModeViewModel.Route, "settings"];
         int i = Array.IndexOf(order, CurrentPage.RouteKey);
         string next = order[((i < 0 ? 0 : i) + step + order.Length) % order.Length];
         _history.Clear();
@@ -292,7 +318,20 @@ public sealed partial class ShellViewModel : ObservableObject
         RequestFocus(page.DefaultFocusKey);
     }
 
-    private string? FocusKeyOfCurrent() => _focusedContext is GameItemViewModel g && _focusedGroup is not null ? $"{_focusedGroup}:{g.Id}" : null;
+    /// <summary>Chave do elemento focado para voltar a ele pelo histórico (capas, linhas e cartões).</summary>
+    private string? FocusKeyOfCurrent() => _focusedContext is Navigation.INavKeyed keyed && _focusedGroup is not null ? $"{_focusedGroup}:{keyed.NavKey}" : null;
+
+    /// <summary>B no conteúdo das Configurações volta para a coluna de categorias, como num console.</summary>
+    private bool TryBackToSettingsCategories()
+    {
+        if (TopOverlay is not null || CurrentPage is not SettingsViewModel settings || _focusedGroup != "settings")
+        {
+            return false;
+        }
+
+        RequestFocus(settings.SelectedCategory.NavKey);
+        return true;
+    }
 
     // ---------------------------------------------------------------- Biblioteca
 
@@ -530,7 +569,7 @@ public sealed partial class ShellViewModel : ObservableObject
             "Sair para o desktop?",
             IsConsoleModeActive
                 ? "O Tako volta as telas, o áudio e a TV para a mesa e fecha a tela cheia."
-                : "O Tako fecha a tela cheia. Monitores e áudio são restaurados pelo Console Runtime (Marco 1).",
+                : "O Tako fecha a tela cheia e volta para a área de trabalho do Windows.",
             [
                 new OverlayAction("Sair", ActionStyle.Primary, UiCommand(async () =>
                 {
@@ -646,6 +685,10 @@ public sealed partial class ShellViewModel : ObservableObject
         _focusedGroup = group;
         _focusedIsAdjustable = isAdjustable;
         IsSidebarExpanded = group == "sidebar" && TopOverlay is null;
+        if (context is SettingsCategoryViewModel category && CurrentPage is SettingsViewModel settings && TopOverlay is null)
+        {
+            settings.Select(category); // focar a categoria mostra o conteúdo dela
+        }
         if (context is GameItemViewModel game && TopOverlay is null)
         {
             CurrentPage.OnGameFocused(game);
@@ -660,8 +703,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     partial void OnInputKindChanged(InputKind value)
     {
-        UpdateHints();
-        (CurrentPage as SettingsViewModel)?.OnInputKindChanged(); // "Mostrar FPS" só com teclado e mouse
+        UpdateHints(); // as linhas que pedem teclado e mouse (ADR-0017) releem pela mudança da Shell
     }
 
     partial void OnIsPlayStationPadChanged(bool value) => OnShortcutsChanged();
@@ -729,12 +771,18 @@ public sealed partial class ShellViewModel : ObservableObject
 
                 if (CurrentPage is not HomeViewModel || _history.Count > 0)
                 {
-                    list.Add(("b", "Voltar", AppCommand.Back));
+                    list.Add(("b", CurrentPage is SettingsViewModel && _focusedGroup == "settings" ? "Categorias" : "Voltar", AppCommand.Back));
                 }
 
                 if (_backgroundSession is not null)
                 {
                     list.Add(("guide", "Voltar ao jogo", AppCommand.Guide));
+                }
+
+                if (CurrentPage is SettingsViewModel)
+                {
+                    list.Add(("lb+rb", SettingsViewModel.CategoryHint, AppCommand.NextSection)); // ADR-0020: LB/RB trocam de categoria
+                    break;
                 }
 
                 list.Add(("y", "Buscar", AppCommand.Search));
@@ -747,9 +795,40 @@ public sealed partial class ShellViewModel : ObservableObject
         foreach (var (buttons, label, command) in list)
         {
             var glyphs = buttons == "guide" ? GuideGlyphs(key) : buttons.Split('+').Select(b => Glyph(b, key, IsPlayStationPad)).ToList();
-            Hints.Add(new HintViewModel(glyphs, label, key, command));
+            Hints.Add(new HintViewModel(glyphs, label, key, command)
+            {
+                ShortLabel = ShortHint(label),
+                Priority = HintPriority(command),
+            });
         }
     }
+
+    /// <summary>Texto da dica quando a barra não tem espaço (telas 4:3 e 16:10, escala alta).</summary>
+    private static string ShortHint(string label) => label switch
+    {
+        "Configurações" or "Configurações do Tako" => "Ajustes",
+        "Voltar ao jogo" => "Jogo",
+        "Selecionar" => "OK",
+        "Favoritar" => "Favorito",
+        "Fechar janela" => "Fechar",
+        "Outro painel" => "Painel",
+        "Limpar busca" => "Limpar",
+        "Categoria" => "Categ.",
+        _ => label,
+    };
+
+    /// <summary>Sem espaço, somem primeiro as dicas de atalhos que continuam funcionando (seção, busca).</summary>
+    private static int HintPriority(AppCommand command) => command switch
+    {
+        AppCommand.Accept => 9,
+        AppCommand.Back => 8,
+        AppCommand.Guide => 7,
+        AppCommand.Right or AppCommand.Left => 6,
+        AppCommand.Menu => 5,
+        AppCommand.Favorite => 4,
+        AppCommand.Search => 3,
+        _ => 2,
+    };
 
     private static string Glyph(string button, bool keyboard, bool playStation) => (button, keyboard, playStation) switch
     {
@@ -818,6 +897,8 @@ public sealed partial class ShellViewModel : ObservableObject
             Library("library:gog", "GOG", "Store.Gog", LibraryFilter.ForStore(GameStore.Gog), badge: StoreBrush(GameStore.Gog)),
             Library("library:xbox", "Xbox", "Store.Xbox", LibraryFilter.ForStore(GameStore.Xbox), badge: StoreBrush(GameStore.Xbox)),
             Library("library:manual", "Adicionados", "Store.Manual", LibraryFilter.ForStore(GameStore.Manual), badge: StoreBrush(GameStore.Manual)),
+            // ADR-0020: o que veio do Console Mode tem menu próprio, fora das Configurações.
+            new(ConsoleModeViewModel.Route, "Modo Console", "Icon.Tv", new RelayCommand(OpenConsoleMode)) { IsBottom = true },
             new("settings", "Configurações", "Icon.Gear", new RelayCommand(OpenSettings)) { IsBottom = true },
             // Modo console (tela de jogo desde a abertura): aparece só enquanto ele está ativo.
             new("desk", "Voltar ao PC", "Icon.Monitor", new RelayCommand(ConfirmReturnToDesk)) { IsHidden = true },

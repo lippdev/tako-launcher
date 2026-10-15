@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -24,6 +25,12 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
     /// <summary>Deslocamento pedido por último a cada fileira "Reveal" (a animação pode estar no meio do caminho).</summary>
     private static readonly DependencyProperty RevealOffsetProperty =
         DependencyProperty.RegisterAttached("RevealOffset", typeof(double), typeof(FocusNavigator), new PropertyMetadata(0d));
+
+    /// <summary>Folga entre o item focado e a borda de uma moldura com recorte (o anel de foco fica 10 para fora).</summary>
+    private const double FrameMargin = 16;
+
+    /// <summary>Destino de cada rolagem: no meio de uma animação o valor lido é o intermediário, não o destino.</summary>
+    private readonly ConditionalWeakTable<TranslateTransform, StrongBox<double>> _targets = [];
 
     private readonly Dictionary<string, FocusMemory> _groupMemory = [];
     private FocusMemory? _lastOutsideSidebar;
@@ -273,34 +280,58 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
             else
             {
                 // Âncora vertical: o filho direto do host que contém o elemento (a fileira inteira, com título).
+                // Tudo em coordenadas do palco com a lista sem rolagem; a faixa visível desconta o cabeçalho, a barra
+                // de dicas e a moldura da lista (ADR-0020: antes, uma lista que não começava no topo da tela deixava o
+                // item focado atrás da barra de dicas).
                 var row = (FrameworkElement)child;
-                bool isFirst = VisualTreeHelper.GetChildrenCount(host) > 0 && VisualTreeHelper.GetChild(host, 0) == row;
-                double top = row.TransformToAncestor(host).Transform(default).Y;
-                double y = translate.Y;
-                double target = y;
-                if (isFirst)
-                {
-                    target = 0;
-                }
-                else if (top + row.ActualHeight + y > SafeBottom)
-                {
-                    target = SafeBottom - (top + row.ActualHeight);
-                }
-                else if (top + y < SafeTop)
-                {
-                    target = SafeTop - top;
-                }
-
-                // Elementos de uma grade (fileiras dentro do mesmo filho): ancora no próprio elemento.
-                double own = element.TransformToAncestor(host).Transform(default).Y;
-                if (!isFirst && (own + element.ActualHeight + target > SafeBottom || own + target < SafeTop))
-                {
-                    target = own + element.ActualHeight + y > SafeBottom ? SafeBottom - (own + element.ActualHeight) - 24 : SafeTop - own + 40;
-                }
-
-                Animate(translate, TranslateTransform.YProperty, Math.Min(0, target));
+                double y = TargetOf(translate);
+                double origin = host.TransformToAncestor(stage).Transform(default).Y - translate.Y;
+                var (bandTop, bandBottom) = Band(host);
+                bool isFirst = (VisualTreeHelper.GetChildrenCount(host) > 0 && VisualTreeHelper.GetChild(host, 0) == row)
+                    || FindAll(host, IsNavigable).FirstOrDefault() == element;
+                double target = ScrollMath.Vertical(
+                    y,
+                    StageRect(row, host, origin),
+                    StageRect(element, host, origin),
+                    isFirst,
+                    bandTop,
+                    bandBottom);
+                Animate(translate, TranslateTransform.YProperty, target);
             }
         }
+    }
+
+    /// <summary>Deslocamento vertical para onde a lista está indo (ou está, sem animação).</summary>
+    private double TargetOf(TranslateTransform transform) =>
+        _targets.TryGetValue(transform, out var target) ? target.Value : transform.Y;
+
+    /// <summary>
+    /// Faixa vertical visível para a lista, no palco: entre o cabeçalho e a barra de dicas e dentro da moldura com
+    /// recorte mais próxima (ex.: a coluna de conteúdo das Configurações).
+    /// </summary>
+    private (double Top, double Bottom) Band(FrameworkElement host)
+    {
+        double top = SafeTop;
+        double bottom = SafeBottom;
+        for (var d = VisualTreeHelper.GetParent(host); d is not null && d != stage; d = VisualTreeHelper.GetParent(d))
+        {
+            if (d is FrameworkElement { ClipToBounds: true } frame && stage.IsAncestorOf(frame))
+            {
+                var bounds = frame.TransformToAncestor(stage).TransformBounds(new Rect(0, 0, frame.ActualWidth, frame.ActualHeight));
+                top = Math.Max(top, bounds.Top + FrameMargin);
+                bottom = Math.Min(bottom, bounds.Bottom - FrameMargin);
+                break;
+            }
+        }
+
+        return (top, Math.Max(top, bottom));
+    }
+
+    /// <summary>Retângulo de um elemento da lista no palco, como se a lista não estivesse rolada.</summary>
+    private static NavRect StageRect(FrameworkElement element, FrameworkElement host, double origin)
+    {
+        double top = origin + element.TransformToAncestor(host).Transform(default).Y;
+        return new NavRect(0, top, element.ActualWidth, element.ActualHeight);
     }
 
     /// <summary>Transformações declaradas em templates vêm congeladas; a primeira rolagem troca por uma cópia animável.</summary>
@@ -319,6 +350,11 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
 
     private void Animate(TranslateTransform transform, DependencyProperty property, double to)
     {
+        if (property == TranslateTransform.YProperty)
+        {
+            _targets.AddOrUpdate(transform, new StrongBox<double>(to));
+        }
+
         var duration = scrollDuration();
         if (duration == TimeSpan.Zero)
         {

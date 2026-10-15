@@ -19,7 +19,7 @@ public sealed class PlaynitePreviewViewModel : IOverlayViewModel
         }
 
         string inherited = report.Inherited.Count > 0 ? $" ({report.Inherited.Count} herdados do tema padrão)" : string.Empty;
-        Summary = $"{report.Name} {report.Version} · ThemeApiVersion {report.ThemeApiVersion} · {report.Loaded.Count} de {report.Total} arquivos carregados pelo carregador XAML restrito{inherited}";
+        Summary = $"{report.Name} {report.Version} · API de tema {report.ThemeApiVersion} · {report.Loaded.Count} de {report.Total} arquivos carregados{inherited}";
         RejectedLines = report.Rejected.Select(r => $"{r.File} — {r.Reason}").ToList();
     }
 

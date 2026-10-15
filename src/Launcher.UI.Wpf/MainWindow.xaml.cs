@@ -129,6 +129,9 @@ public partial class MainWindow : Window
 
     internal FrameworkElement StageElement => Stage;
 
+    /// <summary>Barra de dicas (teste de fumaça: nenhuma dica cortada em nenhuma proporção).</summary>
+    internal ItemsControl HintBarElement => HintBar;
+
     internal void Dispatch(AppCommand command) => Handle(command, InputKind.Gamepad);
 
     // ---------------------------------------------------------------- Comandos
