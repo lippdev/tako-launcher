@@ -4,7 +4,7 @@ Casos que o CI não cobre: precisam de monitores, áudio, controles, Steam e Win
 
 Como registrar: copie a tabela de resultados no fim deste arquivo para a PR ou issue, uma linha por máquina, e anexe o log do dia `logs\tako-AAAAMMDD.log` (pasta de dados, ver abaixo) quando algo falhar.
 
-**Em toda execução, anexe o diagnóstico do sistema** (MVP-034): Configurações › **Diagnóstico do sistema** › **Gerar**. O relatório traz versão e tipo de instalação do Tako, Windows/build, processador e memória, cada monitor (resolução, proporção, escala, Hz e placa de vídeo), controles detectados (XInput e PlayStation por HID), Steam e número de jogos, estado do Xbox mode com os sinais lidos e modo seguro. Não tem nome de usuário, nome do computador nem lista de jogos (a pasta do perfil aparece como `%USERPROFILE%`). **Copiar** põe o texto na área de transferência; o arquivo fica em `logs\diagnostico-AAAAMMDD-HHMMSS.txt`. Gere de novo depois de trocar monitor ou controle (casos M7/M8, C1–C8) para registrar o estado que o Tako viu.
+**Em toda execução, anexe o diagnóstico do sistema** (MVP-034): Configurações › Sistema › **Diagnóstico do sistema** › **Gerar**. O relatório traz versão e tipo de instalação do Tako, Windows/build, processador e memória, cada monitor (resolução, proporção, escala, Hz e placa de vídeo), controles detectados (XInput e PlayStation por HID), Steam e número de jogos, estado do Xbox mode com os sinais lidos e modo seguro. Não tem nome de usuário, nome do computador nem lista de jogos (a pasta do perfil aparece como `%USERPROFILE%`). **Copiar** põe o texto na área de transferência; o arquivo fica em `logs\diagnostico-AAAAMMDD-HHMMSS.txt`. Gere de novo depois de trocar monitor ou controle (casos M7/M8, C1–C8) para registrar o estado que o Tako viu.
 
 - Pasta de dados: instalado → `%LOCALAPPDATA%\Tako`; portátil → `Tako_Data` ao lado do `.exe`.
 - Marcador de sessão: `session.json` na pasta de dados (`Running: true` enquanto o Tako está aberto).
@@ -84,8 +84,8 @@ Teste cada um por USB e, quando houver, por Bluetooth.
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
 | R1 | Uma saída suja | Abrir o Tako e finalizar `Tako.exe` no Gerenciador de Tarefas; abrir de novo | Abre normal (uma falha só não é loop) |
-| R2 | Duas saídas sujas seguidas | Repetir R1 duas vezes; abrir a terceira | Aviso **Modo seguro**; tema padrão embutido; Configurações › Modo seguro = "Ativo" |
-| R3 | Voltar ao normal | No aviso ou em Configurações › Modo seguro | Sem reiniciar: tema do disco e atualizações automáticas voltam |
+| R2 | Duas saídas sujas seguidas | Repetir R1 duas vezes; abrir a terceira | Aviso **Modo seguro**; tema padrão embutido; Configurações › Sistema › Modo seguro = "Ativo" |
+| R3 | Voltar ao normal | No aviso ou em Configurações › Sistema › Modo seguro | Sem reiniciar: tema do disco e atualizações automáticas voltam |
 | R4 | Fechar limpo no modo seguro | Sair para o desktop e abrir de novo | Abre normal |
 | R5 | `--safe-mode` | `Tako.exe --safe-mode` | Modo seguro com o motivo "Pedido na linha de comando" |
 | R6 | Tema do disco apagado | Apagar `Themes\Default\Tokens.xaml` da pasta do Tako | Abre com o tema embutido e tela de recuperação do tema |
@@ -105,7 +105,7 @@ Teste cada um por USB e, quando houver, por Bluetooth.
 
 ## 8. Xbox mode / FSE (MVP-008)
 
-Linha em Configurações › **Xbox mode (tela cheia do Windows)**.
+Linha em Configurações › Sistema › **Tela cheia do Windows (Xbox mode)**.
 
 | # | Máquina | Esperado |
 |---|---|---|
@@ -119,7 +119,7 @@ Em todos os casos o Tako abre em tela cheia convencional; registrar-se como app 
 
 ## 9. Restaurar monitores e áudio (MVP-012)
 
-Opção em Configurações › **Restaurar monitores e áudio ao sair do jogo** (padrão: ligada). Decisões e riscos na [ADR-0013](../adr/0013-estado-de-monitores-e-audio.md); o CI só testa com monitores e áudio simulados.
+Opção em Configurações › Sistema › **Restaurar telas e som ao sair do jogo** (padrão: ligada). Decisões e riscos na [ADR-0013](../adr/0013-estado-de-monitores-e-audio.md); o CI só testa com monitores e áudio simulados.
 
 Jogo de teste: adicione `C:\Windows\notepad.exe` como jogo, com fim do jogo por "Processo iniciado". Com o Bloco de Notas aberto pelo Tako, faça a mudança pelas Configurações do Windows (ou pelo ícone de som da barra de tarefas) e feche o Bloco de Notas. Repita os casos principais (E1, E2, E9) com um jogo real que troque a resolução em tela cheia exclusiva.
 
@@ -146,7 +146,7 @@ Jogo de teste: adicione `C:\Windows\notepad.exe` como jogo, com fim do jogo por 
 
 ## 9b. Tela de jogo (MVP-002, [ADR-0015](../adr/0015-monitores-do-console-mode-e-tela-de-jogo.md))
 
-Configurações › **Tela de jogo** (padrão: desligada). Use um PC com monitor + TV (ou dois monitores) e o mesmo jogo de teste da seção 9. Anexe `logs\tako-AAAAMMDD.log` (linhas "Tela de jogo").
+Modo Console › **Tela de jogo** (padrão: desligada). Use um PC com monitor + TV (ou dois monitores) e o mesmo jogo de teste da seção 9. Anexe `logs\tako-AAAAMMDD.log` (linhas "Tela de jogo").
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
@@ -197,7 +197,7 @@ Com um jogo real aberto pelo Tako (ex.: um jogo da Steam em tela cheia sem borda
 
 ## 12. Áudio, Steam e TV durante o jogo (MVP-002, [ADR-0016](../adr/0016-audio-steam-e-tv-na-sessao.md))
 
-Configurações › **Saída de áudio durante o jogo**, **Mandar a Steam para a bandeja ao sair do jogo** e **Ligar a TV e trocar a entrada** (TV: Google TV / Android TV com "Depuração USB" ou "Depuração pela rede" ativada nas Opções do desenvolvedor).
+Modo Console › **Áudio do jogo**, **Steam na bandeja** e **TV** (TV: Google TV / Android TV com "Depuração USB" ou "Depuração pela rede" ativada nas Opções do desenvolvedor).
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
@@ -211,7 +211,7 @@ Configurações › **Saída de áudio durante o jogo**, **Mandar a Steam para a
 | S3 | Steam sem pasta | Jogo da Steam sem pasta de instalação conhecida | Acompanhado só pela Steam; tempo de jogo registrado |
 | S4 | Bandeja | Opção ligada; fechar um jogo da Steam com a janela da Steam aberta | A janela da Steam fecha e ela continua na bandeja; o jogo nunca recebe o pedido |
 | S5 | Outro jogo | Como S4, com outro jogo da Steam ainda aberto | A Steam fica aberta; log "GameRunning" |
-| T1 | Pareamento | Configurações › TV: IP, **Testar** | A TV pergunta "Permitir depuração"; com "Sempre permitir", a TV liga e muda para a entrada do PC |
+| T1 | Pareamento | Modo Console › TV: IP, **Testar** | A TV pergunta "Permitir depuração"; com "Sempre permitir", a TV liga e muda para a entrada do PC |
 | T2 | Testar de novo | **Testar** outra vez | Sem pergunta na TV; liga e troca a entrada |
 | T3 | Início do jogo | TV em espera, controle da TV ligado; abrir um jogo | A TV liga na entrada do PC; o jogo abre normalmente mesmo se a TV demorar |
 | T4 | Espera profunda | TV que desliga a rede em espera; MAC preenchido | Wake-on-LAN acorda a TV; log "Wake-on-LAN enviado" |
@@ -248,7 +248,7 @@ código-fonte, o PresentMon não vem junto.
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
-| F1 | Com controle nas Configurações | Usar só o controle e ir em Configurações › Mostrar FPS | Linha esmaecida com "Use teclado e mouse para ativar"; A só mostra o aviso, nenhum UAC abre |
+| F1 | Com controle nas Configurações | Usar só o controle e ir em Modo Console › Contador de FPS › Mostrar FPS | Linha esmaecida com "Use teclado e mouse para ativar"; A só mostra o aviso, nenhum UAC abre |
 | F2 | Ligar com teclado e mouse | Clicar em Mostrar FPS | Explica "Para medir o FPS sem tocar no jogo, o Windows precisa liberar o Tako uma única vez." e, em Continuar, abre o UAC |
 | F3 | Usuário padrão | Conta sem administrador; no UAC digitar a senha de outro administrador | A conta **que pediu** entra no grupo (conferir com `net localgroup "Usuários de log de desempenho"` ou o nome do grupo no idioma do Windows); a conta do administrador não |
 | F4 | Sair e entrar | Depois de F2/F3, abrir um jogo sem sair do Windows | Configurações mostra "Saia e entre no Windows de novo para o contador funcionar."; depois de sair e entrar, o contador funciona |
@@ -264,7 +264,7 @@ código-fonte, o PresentMon não vem junto.
 | F14 | Fim da sessão | Fechar o jogo | `PresentMon.exe` fecha junto e a sessão `Tako_FPS` some |
 | F15 | Queda do Tako | Finalizar `Tako.exe` (Gerenciador de Tarefas) com o contador ligado | `PresentMon.exe` fecha junto (Job Object); ao abrir o Tako de novo, a sessão `Tako_FPS` some |
 | F16 | Anti-cheat | Um jogo com Easy Anti-Cheat e um com BattlEye, contador ligado | O jogo abre e roda sem aviso nem expulsão (o PresentMon não entra no processo do jogo); anotar jogo e versão |
-| F17 | Remover permissão | Configurações › Remover permissão do contador de FPS (teclado e mouse) | UAC; a conta sai do grupo; o contador fica desligado |
+| F17 | Remover permissão | Modo Console › Contador de FPS › Remover a permissão do Windows (teclado e mouse) | UAC; a conta sai do grupo; o contador fica desligado |
 
 ## 15. Jogos do Xbox / PC Game Pass (STORE-004)
 
@@ -281,14 +281,14 @@ manifesto e, se ele usar recurso de idioma que o Windows não resolver, do nome 
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
-| X1 | Jogo do Game Pass em `C:\XboxGames` | Instalar um jogo do PC Game Pass pelo app Xbox; Configurações › Procurar jogos instalados | Aparece em Biblioteca › Xbox com o nome certo; a linha da loja diz "N jogos instalados" |
+| X1 | Jogo do Game Pass em `C:\XboxGames` | Instalar um jogo do PC Game Pass pelo app Xbox; Configurações › Biblioteca e lojas › Procurar jogos instalados | Aparece em Biblioteca › Xbox com o nome certo; a linha da loja diz "N jogos instalados" |
 | X2 | Outra unidade | Escolher `D:` como pasta de jogos no app Xbox e instalar um jogo lá | Aparece também (lido pelo `.GamingRoot` de `D:\`) |
 | X3 | Jogo antigo em WindowsApps | Um jogo UWP com Xbox Live (ex.: Microsoft Solitaire Collection) | Aparece; apps comuns da Store (ex.: Calculadora, Fotos) não aparecem |
 | X4 | Arte e dados | Abrir os detalhes de X1 depois de alguns segundos | Capa e fundo da Steam quando o nome casar; sem correspondência, o logo do pacote; Opções › Corrigir correspondência funciona |
 | X5 | Abrir | Jogar em X1 | O jogo abre pelo Windows (sem erro de acesso); a tela mostra "aguardando o jogo iniciar" e depois "Jogando" |
 | X6 | Sessão | Jogar alguns minutos, abrir a Central de Controle (Guia) | Central sobre o jogo; contador de FPS acompanha o processo do jogo |
 | X7 | Fim | Fechar o jogo pelo menu do próprio jogo | Em até ~5 s o Tako volta; "Jogados recentemente" e tempo de jogo atualizados |
-| X8 | Desligar a fonte | Configurações › Lojas › Xbox (PC Game Pass) › desligar | Os jogos do Xbox somem da biblioteca; ligar de novo traz de volta |
+| X8 | Desligar a fonte | Configurações › Biblioteca e lojas › Xbox (PC Game Pass) › desligar | Os jogos do Xbox somem da biblioteca; ligar de novo traz de volta |
 | X9 | Sem app Xbox | Numa máquina sem o app Xbox (ou após desinstalá-lo) | A linha "Xbox (PC Game Pass)" avisa "App Xbox não encontrado…"; nada trava |
 | X10 | Sem Serviços de Jogos | Parar/remover os Serviços de Jogos (ou máquina recém-formatada só com o app Xbox) | Aviso "Serviços de Jogos não encontrados: abra o app Xbox para instalá-los" |
 | X11 | Jogo desinstalado | Desinstalar X1 pelo app Xbox e procurar de novo | O jogo some (pasta que sobrar sem pacote registrado não aparece) |
@@ -296,7 +296,7 @@ manifesto e, se ele usar recurso de idioma que o Windows não resolver, do nome 
 
 ## 16. TVs LG (webOS) e Samsung (Tizen) (MVP-002, [ADR-0016](../adr/0016-audio-steam-e-tv-na-sessao.md))
 
-Configurações › **Ligar a TV e trocar a entrada** com **Tipo: LG (webOS)** ou **Tipo: Samsung (Tizen)**. Precisa de
+Modo Console › **TV** com **Tipo: LG (webOS)** ou **Tipo: Samsung (Tizen)**. Precisa de
 uma LG e de uma Samsung reais (Samsung 2016 em diante; anotar modelo e ano). Na LG: "LG Connect Apps" ligado e, para
 ligar a TV desligada, "Ligar via Wi-Fi" + MAC. Na Samsung: "Acesso de dispositivos IP remotos" ligado. HDMI-CEC fica
 fora (exige adaptador).
@@ -337,15 +337,15 @@ próprio launcher; o GOG abre pelo GOG Galaxy quando instalado, senão pelo exec
 | EG3 | Jogo com anti-cheat ou launcher próprio | Ex.: jogo que abre um launcher antes | Sessão acompanhada pela pasta do jogo; anotar se o fim foi reconhecido |
 | EG4 | Jogo movido | Mover um jogo pela Epic (Gerenciar › Mover) e "Procurar jogos instalados" | O jogo continua lá, com a pasta nova (Opções › Abrir pasta) |
 | EG5 | Desinstalar | Desinstalar um jogo pela Epic e "Procurar jogos instalados" | O jogo some da biblioteca |
-| EG6 | Epic ausente | PC sem a Epic (ou desinstalada, manifests apagados) | Configurações › Epic Games: "Epic Games Launcher não encontrado neste PC"; nada trava |
+| EG6 | Epic ausente | PC sem a Epic (ou desinstalada, manifests apagados) | Configurações › Biblioteca e lojas › Epic Games: "Epic Games Launcher não encontrado neste PC"; nada trava |
 | EG7 | Epic removida com manifests | Desinstalar só o launcher, deixando os jogos | Jogos aparecem; Configurações avisam; Jogar mostra "Epic Games Launcher não encontrado: instale-o para abrir …" |
 | GG1 | Jogos do GOG Galaxy | Galaxy com 2+ jogos instalados, Galaxy fechado | Aparecem em "GOG" com selo e cor do GOG; DLCs não aparecem |
 | GG2 | Abrir pelo Galaxy | Jogar um jogo do GOG | Abre pelo Galaxy ("pelo GOG Galaxy"); nuvem sincroniza; o fim da sessão é reconhecido |
-| GG3 | Instalador offline sem Galaxy | Instalar um jogo pelo instalador offline do GOG num PC sem Galaxy | O jogo aparece; abre direto pelo executável com os argumentos do jogo; Configurações › GOG: "Sem GOG Galaxy: os jogos abrem direto pelo executável" |
+| GG3 | Instalador offline sem Galaxy | Instalar um jogo pelo instalador offline do GOG num PC sem Galaxy | O jogo aparece; abre direto pelo executável com os argumentos do jogo; Configurações › Biblioteca e lojas › GOG: "Sem GOG Galaxy: os jogos abrem direto pelo executável" |
 | GG4 | Desinstalar | Desinstalar um jogo do GOG e "Procurar jogos instalados" | O jogo some |
 | LJ1 | Mesmo jogo em duas lojas | Um jogo instalado na Steam e na Epic (ou GOG) | Dois itens, cada um com a sua loja; detalhes mostram "Também em"; cada um abre pela própria loja |
 | LJ2 | Capas e dados | Jogos da Epic/GOG recém-encontrados | Capa, descrição e gêneros chegam pelo agente de metadados; "Opções › Corrigir correspondência" troca a escolha |
-| LJ3 | Desligar lojas | Configurações › Epic Games (A) e depois de novo | Os jogos da Epic somem e voltam; favoritos e tempo de jogo continuam |
+| LJ3 | Desligar lojas | Configurações › Biblioteca e lojas › Epic Games (A) e depois de novo | Os jogos da Epic somem e voltam; favoritos e tempo de jogo continuam |
 | LJ4 | Só controle | Fazer LJ3 só com o controle | Linhas das lojas alcançáveis e alternáveis com A |
 
 ## 18. Configurações deste jogo (UX-007)
@@ -367,7 +367,7 @@ GPU com limite pelo driver (seção 13).
 
 ## 19. Modo console ao abrir (MVP-002/012/036, [ADR-0015](../adr/0015-monitores-do-console-mode-e-tela-de-jogo.md))
 
-Configurações › **Tela de jogo** ligada (seção 9b) e **Ao abrir o Tako, ir para a tela de jogo** (padrão: desligada). Mesmo PC da seção 9b (monitor + TV), de preferência com a TV da seção 12 configurada. Anexe `logs\tako-AAAAMMDD.log` (linhas "Modo console") e, nos casos de queda, `logs\supervisor\tako-AAAAMMDD.log`.
+Modo Console › **Tela de jogo** ligada (seção 9b) e **Ao abrir o Tako, ir para a tela de jogo** (padrão: desligada). Mesmo PC da seção 9b (monitor + TV), de preferência com a TV da seção 12 configurada. Anexe `logs\tako-AAAAMMDD.log` (linhas "Modo console") e, nos casos de queda, `logs\supervisor\tako-AAAAMMDD.log`.
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
@@ -394,7 +394,7 @@ Configurações › **Tela de jogo** ligada (seção 9b) e **Ao abrir o Tako, ir
 Relato da alpha.9: "o DualSense Edge não vai para cima". Causa provável: no Bluetooth, sem a Steam aberta, o controle
 manda o relatório simples e o Tako lia os botões no byte errado (↑ ficava "sempre pressionado"). Rode cada caso com a
 Steam **fechada** e depois **aberta** (com "Suporte a controles PlayStation" ligado). Se algo falhar, abra
-Configurações › Teste de controle, aperte o botão que falhou, use "Copiar" e cole na issue junto com o diagnóstico.
+Configurações › Sistema › Teste de controle, aperte o botão que falhou, use "Copiar" e cole na issue junto com o diagnóstico.
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
@@ -409,7 +409,7 @@ Configurações › Teste de controle, aperte o botão que falhou, use "Copiar" 
 | DE9 | XInput virtual junto (DS4Windows, DSX ou Steam) | Com um programa que cria um controle Xbox virtual a partir do Edge | Teste mostra o HID e o XInput; cada toque aciona uma vez; soltar um não "solta" o outro |
 | DE10 | Xbox e Edge ao mesmo tempo | Conectar os dois | Os dois navegam; o aviso mostra o Edge; nenhum comando em dobro |
 | DE11 | DualSense comum pelo Bluetooth | Repetir DE2 e DE3 com o DualSense (0CE6) | Igual ao Edge |
-| DE12 | Diagnóstico | Configurações › Diagnóstico do sistema com o Edge ligado | Seção "[Teste de controle]" com modelo, USB/Bluetooth, product id e relatórios crus; sem caminho do dispositivo nem endereço Bluetooth |
+| DE12 | Diagnóstico | Configurações › Sistema › Diagnóstico do sistema com o Edge ligado | Seção "[Teste de controle]" com modelo, USB/Bluetooth, product id e relatórios crus; sem caminho do dispositivo nem endereço Bluetooth |
 
 ## 21. Dados dos jogos pela IGDB ([ADR-0021](../adr/0021-metadados-igdb.md))
 
@@ -444,7 +444,7 @@ ao ScreenScraper.
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
-| SS1 | Versão sem acesso | Build local (ou release sem os segredos) › Configurações › Dados de ROMs | Linha "Indisponível nesta versão"; a tela avisa "Esta versão do Tako ainda não tem acesso ao ScreenScraper"; dá para salvar a conta; nenhuma linha "ScreenScraper" no log; o log do `Publish-Tako.ps1` avisa que saiu sem acesso |
+| SS1 | Versão sem acesso | Build local (ou release sem os segredos) › Configurações › Biblioteca e lojas › Dados de ROMs | Linha "Indisponível nesta versão"; a tela avisa "Esta versão do Tako ainda não tem acesso ao ScreenScraper"; dá para salvar a conta; nenhuma linha "ScreenScraper" no log; o log do `Publish-Tako.ps1` avisa que saiu sem acesso |
 | SS2 | Passo a passo | Seguir os passos: criar conta, confirmar e-mail, usuário e senha | Os textos batem com o site; anotar o que mudou de nome |
 | SS3 | Testar com erros | Senha errada; depois sem internet | Mensagens diferentes e claras; nada é salvo |
 | SS4 | Testar e salvar | Conta certa › Testar › Salvar | "Tudo certo: conta …, nível …, N de M consultas restam hoje"; ao salvar, "ScreenScraper ligado"; linha "Ligado · sua conta" |
@@ -475,11 +475,32 @@ Com um jogo real aberto pelo Tako. Teste num jogo em **janela sem bordas** (ex.:
 | JA1 | Janelas com títulos longos | Abrir 8+ janelas (navegador com abas de título longo, Explorer em pasta funda, WhatsApp, Discord) e abrir a Central | Cada cartão mostra ícone, título em até 2 linhas com "…" e o nome do programa embaixo; nada cortado em cima nem sobreposto ao ícone. O título da fileira mostra a contagem |
 | JA2 | Rolagem da fileira | → até a última janela e ← de volta | O cartão focado fica sempre inteiro na tela, com folga nas bordas; as bordas da fileira esmaecem quando há mais cartões fora da tela |
 | AT1 | Atalho no DualSense / DualShock 4 | Segurar Create + △ (Share + △ no DS4) no jogo | Abre a Central; as dicas mostram "Create △" |
-| AT2 | Trocar o atalho do controle | Configurações › "Abrir a Central de Controle no controle" › segurar View + X por 1 s | Salvo; no jogo, View + X abre e View + Y não. Tentar LB + RB: recusado com "já servem para navegar no Tako". Tocar B cancela |
-| AT3 | Trocar o atalho do teclado | Configurações › "… no teclado" › Ctrl+Alt+F10 | Salvo; Ctrl+Alt+F10 abre a Central **com o jogo na frente**. Shift+Tab é recusado (Steam); Ctrl+Shift+O é aceito com aviso (AMD) |
+| AT2 | Trocar o atalho do controle | Configurações › Controles › "Abrir a Central de Controle no controle" › segurar View + X por 1 s | Salvo; no jogo, View + X abre e View + Y não. Tentar LB + RB: recusado com "já servem para navegar no Tako". Tocar B cancela |
+| AT3 | Trocar o atalho do teclado | Configurações › Controles › "… no teclado" › Ctrl+Alt+F10 | Salvo; Ctrl+Alt+F10 abre a Central **com o jogo na frente**. Shift+Tab é recusado (Steam); Ctrl+Shift+O é aceito com aviso (AMD) |
 | AT4 | Atalho já usado por outro programa | Escolher um atalho que outro programa registrou (ex.: o do Discord ou do OBS) e abrir um jogo | Aviso "já é usado por outro programa · troque o atalho nas Configurações"; o atalho continua valendo com o Tako na frente |
 | AT5 | Restaurar padrão | "Restaurar atalhos padrão" | Volta a View + Y e Ctrl+Shift+T |
 | AT6 | Steam e Barra de Jogo | Com a Steam aberta, segurar View + Y no jogo | Só a Central abre (a sobreposição da Steam e a Barra de Jogo não) |
+
+## 24. Configurações em categorias e menu Modo Console (UX-006/009, [ADR-0020](../adr/0020-organizacao-das-configuracoes.md))
+
+Testar com controle **e** com teclado, numa tela 4:3 ou 16:10 (ex.: 1600×1200), numa 16:9 e, se houver, numa 21:9, com
+escala do Windows em 100% e em 150–200%. Um jogo com arte clara em foco ajuda a ver a legibilidade.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| CF1 | Categorias | ☰ (ou M) › Configurações; ↓ pela coluna da esquerda | Cada categoria mostra o conteúdo na hora; nenhum texto com "MVP", "H2", "Marco" ou "carregador XAML" |
+| CF2 | Entrar e voltar | → numa categoria, ↓ até a última linha, B, B | → entra na primeira linha; a linha focada fica inteira e acima da barra de dicas o tempo todo (também com o direcional segurado); 1º B volta à categoria, 2º B sai das Configurações |
+| CF3 | LB/RB | LB/RB (Q/E) com o foco na coluna e no conteúdo | Troca de categoria e dá a volta; no conteúdo, o foco vai para a primeira linha da nova categoria |
+| CF4 | Barra de dicas | Em cada tela/escala da lista acima, com controle e com teclado | Nenhuma dica cortada; sem espaço, os textos encurtam ("Ajustes", "OK") e somem primeiro "Seção"/"Buscar" |
+| CF5 | Legibilidade | Configurações e Modo Console com um jogo de arte clara em foco | Valores (pílulas) e descrições legíveis a 3 metros |
+| CF6 | Preferências mantidas | Atualizar de uma alpha anterior com opções mudadas (lojas, cor dinâmica, tela de jogo, TV, FPS) | Tudo continua como estava depois de atualizar |
+| CF7 | Persistência | Mudar uma opção de cada categoria e do Modo Console; fechar e abrir o Tako | Todas voltam como foram deixadas |
+| CF8 | Opções de desenvolvedor | Sistema › Opções de desenvolvedor | Desligadas por padrão; ligadas mostram recarregar tema, prévia do Playnite e teste de recuperação |
+| MC1 | Modo Console | Barra lateral › Modo Console | Seis cartões com selo (Ligado, Desligado, Falta configurar, Com problema) coerente com o PC; A abre o detalhe, B volta ao mesmo cartão |
+| MC2 | Assistente na TV | "Configurar para jogar na TV" com a TV ligada no HDMI | A TV é sugerida; "Testar agora" mostra o Tako na TV e pergunta "Você consegue ver esta tela?"; as telas voltam sozinhas; TV e áudio (a saída HDMI da TV sugerida) configurados; o primeiro jogo abre na TV sem perguntar de novo |
+| MC3 | Assistente sem confirmar | Repetir MC2 sem responder (ou com B) | Em 15 s as telas voltam; o passo diz que não foi confirmado e oferece tentar de novo ou pular |
+| MC4 | Tela desconectada | Desligar a TV escolhida e abrir o Modo Console | Cartão Tela de jogo "Com problema" dizendo que a tela não está conectada |
+| MC5 | Contador de FPS | Modo Console › Contador de FPS com o controle e depois com teclado e mouse | Com o controle "Mostrar FPS" e "Remover a permissão" ficam esmaecidas e explicam; com teclado e mouse pedem o UAC (seção 14) |
 
 ## Resultados
 
