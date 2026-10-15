@@ -130,6 +130,24 @@ public class GameListItem : Control
 {
     private const string CoverPart = "PART_ImageCover";
 
+    public GameListItem()
+    {
+        Loaded += (_, _) => PinStyle();
+    }
+
+    /// <summary>
+    /// O estilo vem do tema por <c>DynamicResource</c>. Ao sair da árvore (lista filtrada ou recarregada) a referência
+    /// deixaria de achar o recurso, o template sumiria no meio da remoção e o WPF falharia ao percorrer os filhos dele
+    /// (NullReferenceException em TreeWalkHelper). Fixa o estilo já resolvido como valor local.
+    /// </summary>
+    private void PinStyle()
+    {
+        if (ReadLocalValue(StyleProperty) is not System.Windows.Style && Style is { } style)
+        {
+            Style = style;
+        }
+    }
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();

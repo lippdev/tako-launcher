@@ -93,6 +93,15 @@ public class Main : Control
         }
     }
 
+    /// <summary>Solta a seleção da grade do modelo (ensaio descartado: a lista não pode escrever no jogo selecionado).</summary>
+    internal void DetachSelection()
+    {
+        if (_list is not null)
+        {
+            BindingOperations.ClearBinding(_list, Selector.SelectedItemProperty);
+        }
+    }
+
     private void WireGameList(ListBox? list)
     {
         if (_list is not null)

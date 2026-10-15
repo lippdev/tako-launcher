@@ -150,26 +150,35 @@ public static class P10Theme
         root.Children.Add(details);
         root.Resources.MergedDictionaries.Add(report.Resources);
         P10Context.SetApi(root, api);
+        string? problem;
         try
         {
             root.Measure(size);
             root.Arrange(new Rect(size));
             root.UpdateLayout();
-            return main.Template is null ? $"O tema não define o template de Main ({MainView})." : null;
+            problem = main.Template is null ? $"O tema não define o template de Main ({MainView})." : null;
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
         {
-            return Describe(ex);
+            problem = Describe(ex);
         }
-        finally
+
+        // Desmontar também é ensaio: a lista do tema é recriada ao filtrar ou quando a biblioteca muda. E o ensaio não
+        // pode continuar ligado ao modelo (a lista dele escreveria a seleção).
+        try
         {
-            // O ensaio não pode continuar ligado ao modelo (a lista dele escreveria a seleção).
+            main.DetachSelection();
             main.DataContext = null;
             details.DataContext = null;
             details.Model = null;
             root.Children.Clear();
-            root.Resources.MergedDictionaries.Clear();
         }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
+        {
+            problem ??= Describe(ex);
+        }
+
+        return problem;
     }
 
     /// <summary>Erro de tema para a tela de recuperação e o log: tipo, mensagem e onde aconteceu.</summary>
