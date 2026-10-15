@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Launcher.Core.Library;
+using Launcher.Core.Library.Sources;
 
 namespace Launcher.UI.Wpf.ViewModels;
 
@@ -38,8 +39,10 @@ public sealed partial class SettingsViewModel
     [RelayCommand]
     private void ToggleXboxStore() => ToggleStore(GameStore.Xbox);
 
-    private string StoreStatus(GameStore store) =>
-        Shell.LibrarySources.Reports.GetValueOrDefault(store)?.Summary ?? "Ainda não verificada; use \"Procurar jogos instalados\"";
+    // Desligada vale na hora, mesmo antes da próxima leitura das lojas.
+    private string StoreStatus(GameStore store) => !Settings.IsStoreEnabled(store)
+        ? new LibrarySourceReport(store, Enabled: false, 0, ClientInstalled: false, Notice: null, Failed: false).Summary
+        : Shell.LibrarySources.Reports.GetValueOrDefault(store) is { Enabled: true } report ? report.Summary : "Ainda não verificada; use \"Procurar jogos instalados\"";
 
     private void ToggleStore(GameStore store)
     {
