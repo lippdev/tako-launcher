@@ -54,7 +54,11 @@ function Invoke-Publish([string]$ProjectPath, [string]$OutDir, [bool]$SingleFile
         "-o", $OutDir
     )
     # Temas e fontes vão dentro do .exe e são extraídos na primeira execução.
-    if ($SingleFile) { $pubArgs += "-p:IncludeAllContentForSelfExtract=true" }
+    # A compressão reduz o portátil (~141 MB) pela metade, como no Console Mode.
+    if ($SingleFile) {
+        $pubArgs += "-p:IncludeAllContentForSelfExtract=true"
+        $pubArgs += "-p:EnableCompressionInSingleFile=true"
+    }
     & dotnet @pubArgs
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish falhou ($OutDir)" }
     if (-not (Test-Path -LiteralPath (Join-Path $OutDir $Exe))) {
