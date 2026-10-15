@@ -47,7 +47,12 @@ public sealed partial class GameItemViewModel : ObservableObject
 
     public string Genres => GameText.Genres(Game);
 
-    public string Overline => $"{Genres} · {StoreName}";
+    public string Overline => Game.Genres.Count == 0 ? StoreName : $"{Genres} · {StoreName}";
+
+    /// <summary>"Metacritic 90", quando a fonte de dados informa a nota.</summary>
+    public string? MetacriticText => Game.MetacriticScore is int score ? score.ToString(CultureInfo.InvariantCulture) : null;
+
+    public string? Developer => Game.Developer;
 
     /// <summary>Selo sobre a capa: "NÃO INSTALADO" ou "LANÇA EM 29/10".</summary>
     public string? Badge => Game.UpcomingRelease is DateOnly up ? $"LANÇA EM {GameText.ShortDate(up)}" : Game.IsInstalled ? null : "NÃO INSTALADO";
@@ -105,13 +110,16 @@ public sealed partial class GameItemViewModel : ObservableObject
 
     public Task<ImageSource?> LoadHeroAsync() => _art.GetAsync(Game.HeroUri, HeroDisplayWidth);
 
-    /// <summary>Recalcula textos derivados do estado do usuário (favorito, tempo jogado).</summary>
+    /// <summary>Recalcula textos derivados do estado do usuário (favorito, tempo jogado) e dos metadados.</summary>
     public void Refresh()
     {
-        OnPropertyChanged(nameof(IsFavorite));
-        OnPropertyChanged(nameof(LastPlayedText));
-        OnPropertyChanged(nameof(PlayTimeText));
-        OnPropertyChanged(nameof(Meta));
+        OnPropertyChanged(string.Empty); // todas as propriedades: favorito, tempos, gêneros, descrição, nota...
+    }
+
+    /// <summary>A capa mudou (metadados encontraram a arte, ou o usuário escolheu outra imagem).</summary>
+    public async Task ReloadArtAsync()
+    {
+        Cover = await _art.GetAsync(Game.CoverUri, CoverDisplayWidth).ConfigureAwait(true);
     }
 
     public static Color ToColor(Rgb rgb) => Color.FromRgb(rgb.R, rgb.G, rgb.B);
@@ -126,6 +134,8 @@ public sealed partial class GameItemViewModel : ObservableObject
         var parts = value.Replace("%", string.Empty, StringComparison.Ordinal).Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return new Point(double.Parse(parts[0], CultureInfo.InvariantCulture) / 100, double.Parse(parts[1], CultureInfo.InvariantCulture) / 100);
     }
+
+    public static Brush BrushFor(GameStore store) => StoreBrushes[store];
 
     private static readonly Dictionary<GameStore, Brush> StoreBrushes = new()
     {

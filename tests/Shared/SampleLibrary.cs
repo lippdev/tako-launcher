@@ -2,11 +2,13 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Launcher.Core.Library;
+using Launcher.Core.Library;
+
+namespace Launcher.Tests;
 
 /// <summary>
-/// Biblioteca fictícia do Marco 0. Os dados ficam em <c>SampleLibrary.json</c> (recurso embutido) e trazem só URLs
-/// das artes; nenhuma imagem de jogo é versionada.
+/// Biblioteca fictícia usada só nos testes (o app usa a biblioteca real). Os dados ficam em <c>SampleLibrary.json</c>
+/// (recurso embutido) e trazem só URLs das artes; nenhuma imagem de jogo é versionada.
 /// </summary>
 public static class SampleLibrary
 {
@@ -19,7 +21,7 @@ public static class SampleLibrary
     public static IReadOnlyList<Game> Load(TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(time);
-        using var stream = typeof(SampleLibrary).Assembly.GetManifestResourceStream("Launcher.Core.Library.SampleLibrary.json")
+        using var stream = typeof(SampleLibrary).Assembly.GetManifestResourceStream("Launcher.Tests.SampleLibrary.json")
             ?? throw new InvalidOperationException("SampleLibrary.json não foi embutido no assembly.");
         var document = JsonSerializer.Deserialize<SampleDocument>(stream, Options)
             ?? throw new InvalidOperationException("SampleLibrary.json vazio.");

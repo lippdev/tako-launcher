@@ -2,7 +2,4 @@
   <ItemGroup>
     <ProjectReference Include="..\ConsoleMode.Runtime\ConsoleMode.Runtime.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Library\SampleLibrary.json" LogicalName="Launcher.Core.Library.SampleLibrary.json" />
-  </ItemGroup>
 </Project>

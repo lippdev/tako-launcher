@@ -30,6 +30,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(2.6);
 
     private readonly ArtService _art;
+    private readonly MetadataService _metadata;
     private readonly ThemeService _themes;
     private readonly PlayniteThemeService _playniteThemes;
     private readonly TimeProvider _time;
@@ -82,6 +83,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public ShellViewModel(
         IGameLibrary library,
         ArtService art,
+        MetadataService metadata,
         SettingsService settings,
         ThemeService themes,
         PlayniteThemeService playniteThemes,
@@ -91,18 +93,14 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         Library = library;
         _art = art;
+        _metadata = metadata;
         Settings = settings;
         _themes = themes;
         _playniteThemes = playniteThemes;
         Performance = performance;
         _time = time;
         _logger = logger;
-        foreach (var game in library.Games)
-        {
-            var item = new GameItemViewModel(game, art, time);
-            _items[game.Id] = item;
-            _ = item.LoadCoverAsync();
-        }
+        SyncItems();
 
         SidebarItems = BuildSidebar();
         SidebarMain = SidebarItems.Where(s => !s.IsBottom && s.Key != "exit").ToList();
@@ -115,6 +113,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _toastTimer.Tick += (_, _) => { IsToastVisible = false; _toastTimer.Stop(); };
         _launchTimer.Tick += (_, _) => { _launchTimer.Stop(); StartSession(); };
         library.Changed += (_, _) => RefreshAll();
+        metadata.GameUpdated += (_, id) => OnMetadataUpdated(id);
         if (_currentPage is HomeViewModel { Hero: { } hero })
         {
             SetBackdrop(hero);
@@ -263,6 +262,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     private void RefreshAll()
     {
+        SyncItems();
         foreach (var item in _items.Values)
         {
             item.Refresh();
@@ -418,6 +418,17 @@ public sealed partial class ShellViewModel : ObservableObject
         }
 
         var game = launch.Game;
+        if (game.Game.LaunchTarget is not null)
+        {
+            // Jogo real: a tela "Iniciando" dá o retorno e o jogo abre por cima do launcher. Acompanhar o processo é o MVP-026.
+            Overlays.Remove(launch);
+            Session = SessionState.Browsing;
+            OnOverlaysChanged();
+            LaunchReal(game);
+            CurrentPage.Refresh();
+            return;
+        }
+
         var session = new GameSessionViewModel(game, SessionOptions, Performance);
         Overlays.Remove(launch);
         RunningGame = game;
@@ -538,9 +549,9 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void RefreshBackdrop()
     {
-        if (_backdropGameId is not null)
+        if (_backdropGameId is not null && _items.TryGetValue(_backdropGameId, out var item))
         {
-            SetBackdrop(_items[_backdropGameId]);
+            SetBackdrop(item);
         }
     }
 
@@ -686,7 +697,7 @@ public sealed partial class ShellViewModel : ObservableObject
         SidebarItemViewModel Library(string key, string label, string icon, LibraryFilter filter, string? section = null, Brush? badge = null) =>
             new(key, label, icon, new RelayCommand(() => OpenLibrary(filter))) { Filter = filter, SectionTitle = section, BadgeBrush = badge };
 
-        Brush StoreBrush(GameStore store) => _items.Values.First(i => i.Game.Store == store).StoreBrush;
+        Brush StoreBrush(GameStore store) => GameItemViewModel.BrushFor(store);
 
         var items = new ObservableCollection<SidebarItemViewModel>
         {
@@ -720,6 +731,8 @@ public sealed partial class ShellViewModel : ObservableObject
         foreach (var item in SidebarItems.Where(s => s.Filter is not null))
         {
             item.Count = Library.Games.Count(item.Filter!.Value.Matches);
+            // Lojas sem jogos somem da barra (Steam e Adicionados ficam sempre, como atalho).
+            item.IsHidden = item.Count == 0 && item.Filter.Value.Kind == LibraryFilterKind.Store && item.Filter.Value.Store is not (GameStore.Steam or GameStore.Manual);
         }
     }
 

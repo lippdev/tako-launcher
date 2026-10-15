@@ -15,6 +15,10 @@ public sealed partial class SidebarItemViewModel(string key, string label, strin
     [ObservableProperty]
     private int? _count;
 
+    /// <summary>Some da barra (ex.: loja sem jogos instalados).</summary>
+    [ObservableProperty]
+    private bool _isHidden;
+
     public string Key { get; } = key;
 
     public string Label { get; } = label;

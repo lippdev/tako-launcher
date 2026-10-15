@@ -1,4 +1,5 @@
 using Launcher.Core.Library;
+using Launcher.Tests;
 using Xunit;
 
 namespace Launcher.Core.Tests;

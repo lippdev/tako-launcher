@@ -9,4 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Launcher.UI.Wpf\Launcher.UI.Wpf.csproj" />
   </ItemGroup>
+  <!-- Biblioteca fictícia só para testes (o app usa a biblioteca real). -->
+  <ItemGroup>
+    <Compile Include="..\Shared\SampleLibrary.cs" Link="Shared\SampleLibrary.cs" />
+    <EmbeddedResource Include="..\Shared\SampleLibrary.json" LogicalName="Launcher.Tests.SampleLibrary.json" Link="Shared\SampleLibrary.json" />
+  </ItemGroup>
 </Project>

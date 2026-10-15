@@ -43,7 +43,27 @@
         </StackPanel>
       </Button>
 
-      <Canvas x:Name="Viewport" ClipToBounds="True" OpacityMask="{StaticResource ContentFadeMask}">
+      <!-- Biblioteca vazia: como começar. -->
+      <StackPanel Margin="64,0,72,0" VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="1100"
+                  Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Text="Nenhum jogo ainda" Style="{StaticResource PageTitle}" />
+        <TextBlock Margin="0,18,0,0" TextWrapping="Wrap" FontSize="{DynamicResource FsBodyLg}" Foreground="{DynamicResource OnAccentMutedBrush}"
+                   Text="O Tako encontra sozinho os jogos instalados pela Steam. Para outros jogos, adicione o executável ou atalho; capa, descrição e nota vêm automaticamente." />
+        <StackPanel Orientation="Horizontal" Margin="0,40,0,0">
+          <Button Style="{StaticResource PillButton}" Tag="primary" Command="{Binding AddGameCommand}" nav:Nav.Group="empty" nav:Nav.Key="home:add" nav:Nav.IsDefault="True">
+            <StackPanel Orientation="Horizontal">
+              <c:Icon Key="Icon.More" Width="26" Height="26" Foreground="{DynamicResource OnSurfaceSolidBrush}" Margin="0,0,14,0" />
+              <TextBlock Text="Adicionar jogo" />
+            </StackPanel>
+          </Button>
+          <Button Style="{StaticResource PillButton}" Margin="18,0,0,0" Command="{Binding RescanCommand}" nav:Nav.Group="empty" nav:Nav.Key="home:rescan">
+            <TextBlock Text="Procurar de novo" />
+          </Button>
+        </StackPanel>
+      </StackPanel>
+
+      <Canvas x:Name="Viewport" ClipToBounds="True" OpacityMask="{StaticResource ContentFadeMask}"
+              Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
         <StackPanel nav:Nav.ScrollHost="Vertical" Width="{Binding ActualWidth, ElementName=Viewport}">
           <StackPanel.RenderTransform>
             <TranslateTransform />
@@ -112,6 +132,12 @@
           <TranslateTransform />
         </StackPanel.RenderTransform>
         <DockPanel Margin="64,140,72,0">
+          <Button DockPanel.Dock="Right" Style="{StaticResource ChipButton}" VerticalAlignment="Bottom" Margin="18,0,0,0" Command="{Binding AddGameCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:add">
+            <StackPanel Orientation="Horizontal">
+              <c:Icon Key="Icon.More" Width="24" Height="24" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,10,0" />
+              <TextBlock Text="Adicionar jogo" />
+            </StackPanel>
+          </Button>
           <Button DockPanel.Dock="Right" Style="{StaticResource ChipButton}" VerticalAlignment="Bottom" Command="{Binding CycleSortCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:sort">
             <TextBlock>
               <Run Text="Ordenar:" /> <Run Text="{Binding SortLabel, Mode=OneWay}" FontWeight="ExtraBold" />
@@ -198,8 +224,49 @@
   </DataTemplate>
 
   <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
-    <StackPanel Margin="64,140,0,0" Width="1180" HorizontalAlignment="Left">
+    <!-- Rola com o foco: há mais linhas do que cabem na altura. -->
+    <Canvas x:Name="Viewport" ClipToBounds="True" OpacityMask="{StaticResource ContentFadeMask}">
+    <StackPanel Canvas.Left="64" Canvas.Top="140" Width="1180" Margin="0,0,0,200" nav:Nav.ScrollHost="Vertical">
+      <StackPanel.RenderTransform>
+        <TranslateTransform />
+      </StackPanel.RenderTransform>
       <TextBlock Text="Configurações" Margin="0,0,0,40" Style="{StaticResource PageTitle}" />
+      <Button Style="{StaticResource SettingRow}" Command="{Binding AddGameCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:add">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Escolher" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Adicionar jogo" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Executável ou atalho de qualquer jogo; capa e informações são buscadas automaticamente" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding RescanCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:rescan">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Procurar" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Procurar jogos instalados" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Lê de novo as bibliotecas da Steam (todas as pastas configuradas na Steam)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding RefreshMetadataCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:metadata">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Atualizar" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Atualizar dados dos jogos" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Descrição, gêneros, lançamento, desenvolvedora, nota do Metacritic e artes (fonte: Steam Store)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <Button Style="{StaticResource SettingRow}" Command="{Binding ReapplyThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:theme" nav:Nav.IsDefault="True">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -264,13 +331,14 @@
         </DockPanel>
       </Button>
     </StackPanel>
+    </Canvas>
   </DataTemplate>
 
   <!-- ===================================================================== Sobreposições -->
 
   <!-- Botão de ação de diálogo/recuperação (estilo por ActionStyle). -->
   <DataTemplate x:Key="OverlayActionTemplate" DataType="{x:Type vm:OverlayAction}">
-    <Button x:Name="Action" Style="{StaticResource PillButton}" Margin="0,0,18,0" Command="{Binding Command}"
+    <Button x:Name="Action" Style="{StaticResource PillButton}" Margin="0,0,18,18" Command="{Binding Command}"
             nav:Nav.Group="overlay" nav:Nav.Key="{Binding Label}" nav:Nav.IsDefault="{Binding IsDefault}">
       <TextBlock Text="{Binding Label}" />
     </Button>
@@ -575,7 +643,14 @@
         <StackPanel>
           <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Text}" Margin="0,16,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
-          <ItemsControl ItemsSource="{Binding Actions}" Margin="0,40,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
+          <!-- Várias ações (ex.: opções do jogo) quebram em linhas. -->
+          <ItemsControl ItemsSource="{Binding Actions}" Margin="0,40,0,-18" Focusable="False" ItemTemplate="{StaticResource OverlayActionTemplate}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
         </StackPanel>
       </Border>
     </Grid>

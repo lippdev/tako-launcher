@@ -49,6 +49,8 @@ public sealed partial class HomeViewModel : PageViewModel
 
     public override string Title => "Início";
 
+    public override string? DefaultFocusKey => IsEmpty ? "home:add" : null;
+
     public override string RouteKey => "home";
 
     public ObservableCollection<GameItemViewModel> RecentlyPlayed { get; } = [];
@@ -63,14 +65,24 @@ public sealed partial class HomeViewModel : PageViewModel
 
     public override void OnGameFocused(GameItemViewModel game) => Hero = game;
 
+    /// <summary>Sem jogos: a Início mostra como começar (Steam não encontrada ou nada instalado).</summary>
+    public bool IsEmpty => Shell.Library.Games.Count == 0;
+
+    [RelayCommand]
+    private void AddGame() => Shell.AddGame();
+
+    [RelayCommand]
+    private void Rescan() => Shell.RescanLibrary();
+
     public override void Refresh()
     {
+        OnPropertyChanged(nameof(IsEmpty));
         Replace(RecentlyPlayed, LibraryQuery.RecentlyPlayed(Shell.Library.Games).Select(Shell.ItemFor));
         Replace(RecentlyAdded, LibraryQuery.RecentlyAdded(Shell.Library.Games, 10).Select(Shell.ItemFor));
         OnPropertyChanged(nameof(RecentCountText));
         // Mantém o jogo em foco no destaque; na primeira montagem, abre no último jogado.
         bool keep = !_resetHero && Hero is not null && (RecentlyPlayed.Contains(Hero) || RecentlyAdded.Contains(Hero));
-        Hero = keep ? Hero : RecentlyPlayed.FirstOrDefault();
+        Hero = keep ? Hero : RecentlyPlayed.FirstOrDefault() ?? RecentlyAdded.FirstOrDefault();
         _resetHero = false;
         OnPropertyChanged(nameof(HeroOverline));
         OnPropertyChanged(nameof(PlayLabel));
@@ -166,6 +178,9 @@ public sealed partial class LibraryViewModel : PageViewModel
     private void OpenGame(GameItemViewModel game) => Shell.OpenDetails(game);
 
     [RelayCommand]
+    private void AddGame() => Shell.AddGame();
+
+    [RelayCommand]
     private void CycleSort()
     {
         _sortIndex = (_sortIndex + 1) % Sorts.Length;
@@ -193,7 +208,14 @@ public sealed partial class DetailsViewModel : PageViewModel
 
     public ObservableCollection<StatViewModel> Stats { get; } = [];
 
-    public string PrimaryLabel => Game.IsRunning ? "Voltar ao jogo" : Game.Game.IsUpcoming ? "Avisar no lançamento" : Game.Game.IsInstalled ? "Jogar" : $"Instalar pela {Game.StoreName}";
+    public string PrimaryLabel => (Game.IsRunning, Game.Game) switch
+    {
+        (true, _) => "Voltar ao jogo",
+        (_, { IsUpcoming: true }) => "Avisar no lançamento",
+        (_, { IsInstalled: true }) => "Jogar",
+        (_, { Store: GameStore.Manual }) => "Arquivo não encontrado",
+        _ => $"Instalar pela {Game.StoreName}",
+    };
 
     public bool PrimaryHasPlayIcon => Game.Game.CanPlay;
 
@@ -208,8 +230,10 @@ public sealed partial class DetailsViewModel : PageViewModel
         {
             new StatViewModel("Tempo de jogo", Game.PlayTimeText),
             new StatViewModel("Última vez", Game.LastPlayedText),
+            Game.MetacriticText is null ? null : new StatViewModel("Metacritic", Game.MetacriticText),
             g.SizeLabel is null ? null : new StatViewModel("Tamanho", g.SizeLabel),
             Game.ReleaseText is null ? null : new StatViewModel("Lançamento", Game.ReleaseText),
+            g.Developer is null ? null : new StatViewModel("Desenvolvedora", g.Developer),
             new StatViewModel("Status", Game.Status),
         }.OfType<StatViewModel>());
         OnPropertyChanged(nameof(PrimaryLabel));
@@ -229,6 +253,10 @@ public sealed partial class DetailsViewModel : PageViewModel
         {
             Shell.Toast($"Você será avisado quando {g.Title} for lançado");
         }
+        else if (g.Store == GameStore.Manual)
+        {
+            Shell.Toast($"Arquivo não encontrado: {g.LaunchTarget}. Use Opções para remover ou corrigir");
+        }
         else
         {
             Shell.Toast($"Abrindo a {Game.StoreName} para instalar (integração com lojas é pós-MVP)");
@@ -239,7 +267,7 @@ public sealed partial class DetailsViewModel : PageViewModel
     private void ToggleFavorite() => Shell.ToggleFavorite(Game);
 
     [RelayCommand]
-    private void Options() => Shell.Toast("Opções do jogo: executável, argumentos e pasta (MVP-024)");
+    private void Options() => Shell.ShowGameOptions(Game);
 }
 
 public sealed partial class SettingsViewModel : PageViewModel
@@ -278,6 +306,15 @@ public sealed partial class SettingsViewModel : PageViewModel
 
     [RelayCommand]
     private void ToggleReducedMotion() => Settings.ReducedMotion = !Settings.ReducedMotion;
+
+    [RelayCommand]
+    private void AddGame() => Shell.AddGame();
+
+    [RelayCommand]
+    private void Rescan() => Shell.RescanLibrary();
+
+    [RelayCommand]
+    private void RefreshMetadata() => Shell.RefreshMetadata();
 
     [RelayCommand]
     private void ToggleStartup() => Settings.StartFullscreenOnLogin = !Settings.StartFullscreenOnLogin;
