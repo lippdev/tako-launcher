@@ -48,6 +48,33 @@ jobs:
             dist/Tako-Portable-x64.exe
           if-no-files-found: error
           retention-days: 7
+  # Benchmark (MVP-035, frente G): números vão para o artefato "benchmark" e o resumo do job. Runners variam, então
+  # nenhum número reprova; só reprova se o Tako travar, quebrar ou não chegar à tela interativa.
+  benchmark:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore tools/Launcher.Bench --locked-mode
+      - run: dotnet build tools/Launcher.Bench --no-restore -c Release
+      - name: Run benchmark
+        shell: pwsh
+        run: |
+          & tools/Launcher.Bench/bin/Release/net10.0-windows/Launcher.Bench.exe --out "$env:RUNNER_TEMP/benchmark" --label "GitHub Actions windows-latest"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content "$env:RUNNER_TEMP/benchmark/benchmark.md" | Add-Content $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark
+          path: |
+            ${{ runner.temp }}/benchmark/benchmark.json
+            ${{ runner.temp }}/benchmark/benchmark.md
+            ${{ runner.temp }}/benchmark/runs/
+          if-no-files-found: ignore
   pr-title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
