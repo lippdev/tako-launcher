@@ -9,8 +9,10 @@ namespace Launcher.UI.Wpf.Tests;
 /// <summary>
 /// Tema Fullscreen real usado na homologação (MVP-022): release fixa, verificada por SHA-256. <paramref name="MainLoads"/>:
 /// o <c>Views/Main.xaml</c> do próprio tema passa pelo carregador restrito (senão a interface usa o do tema padrão).
+/// <paramref name="Loaded"/> de <paramref name="Total"/>: arquivos do tema carregados, como na matriz de
+/// <c>docs/marco-1/homologacao-temas.md</c> (a frente H não pode mudar esses números).
 /// </summary>
-internal sealed record HomologatedTheme(string Name, string Slug, string License, Uri Package, string Sha256, bool MainLoads);
+internal sealed record HomologatedTheme(string Name, string Slug, string License, Uri Package, string Sha256, bool MainLoads, int Loaded, int Total);
 
 /// <summary>
 /// Pacotes de tema para o teste de fumaça (frente C). Os temas de terceiros não são versionados: o teste baixa o
@@ -24,15 +26,15 @@ internal static class ThemeFixtures
         new("PS5ish 5.0.3", "ps5ish", "MIT, davidkgriggs",
             new Uri("https://github.com/davidkgriggs/PS5ish/releases/download/v5.0.3/PS5ish_676e10ec-adfe-48d8-a1bd-4d5771b5a2ca_5_0_3.pthm"),
             "b9f07cfa2b23540755bae0897ecb4ea4afd7a9f4e6769b989fb638c72db4b632",
-            MainLoads: false), // vídeos e foto de perfil em \ExtraMetadata (fora da pasta do tema): bloqueado por segurança
+            MainLoads: false, Loaded: 25, Total: 26), // vídeos e foto de perfil em \ExtraMetadata (fora da pasta do tema): bloqueado por segurança
         new("Toggle 1.10.1", "toggle", "MIT, Jonathan Sellier",
             new Uri("https://github.com/jonosellier/toggle-theme-playnite/releases/download/v1.10.1/Toggle_28b7d2c0-105b-4632-8dca-d11348bd61d2_1_10_1.pthm"),
             "06147d8e5ef7bdfcc254f558123fcb1b49d9e33e9fe0248f6e7445e6df320888",
-            MainLoads: true),
+            MainLoads: true, Loaded: 33, Total: 33),
         new("Revisited 2.1.0 (parcial)", "revisited", "MIT, ld892012",
             new Uri("https://github.com/ld892012/PlayniteRevisitedSkin/releases/download/2.1.0/Revisited_2_1_0.pthm"),
             "623abde6b121f535b697abdc39f9f14ca682248ff1f7c64b1a477d1b8ef4c838",
-            MainLoads: true),
+            MainLoads: true, Loaded: 4, Total: 6),
     ];
 
     private static readonly string Work = Path.Combine(Path.GetTempPath(), "tako-theme-fixtures");

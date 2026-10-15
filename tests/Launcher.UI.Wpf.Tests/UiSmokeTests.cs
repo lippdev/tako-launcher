@@ -27,7 +27,7 @@ namespace Launcher.UI.Wpf.Tests;
 /// Teste de fumaça da UI real (Windows): monta o app, passa por todas as telas com comandos de controle,
 /// salva capturas em <c>screenshots/</c> (publicadas pelo CI) e falha com erros de binding do WPF.
 /// </summary>
-public sealed class UiSmokeTests
+public sealed partial class UiSmokeTests
 {
     private static readonly string Screenshots = Path.Combine(AppContext.BaseDirectory, "screenshots");
 
@@ -355,6 +355,8 @@ public sealed class UiSmokeTests
                 // MVP-018: a tela principal carrega (do tema, ou do padrão quando o tema usa algo bloqueado por segurança).
                 Assert.True(r.HasMainView, $"{fixture.Name}: Views/Main.xaml ausente");
                 Assert.True(fixture.MainLoads == r.MainFromTheme, $"{fixture.Name}: Main.xaml do tema esperado={fixture.MainLoads}; {string.Join(" | ", r.Rejected.Where(x => x.File == "Views/Main.xaml").Select(x => x.Reason))}");
+                // Frente H: as regras novas (validação estática e guarda de mídia) não mudam o que os temas homologados carregam.
+                Assert.True(fixture.Loaded == r.Loaded.Count && fixture.Total == r.Total, $"{fixture.Name}: esperado {fixture.Loaded} de {fixture.Total}, carregou {r.Loaded.Count} de {r.Total}; {string.Join(" | ", r.Rejected.Select(x => $"{x.File}: {x.Reason}"))}");
                 Snap(window, $"34-tema-{fixture.Slug}");
             }
             else
@@ -447,6 +449,9 @@ public sealed class UiSmokeTests
         Snap(window, "50-diagnostico");
         Press(window, AppCommand.Back);
         Assert.Null(shell.TopOverlay);
+
+        // --- Segurança de temas (frente H): caminhos montados por dados não carregam (MVP-016, questão aberta 8).
+        ThemeSecurity(services, bindingErrors);
 
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();

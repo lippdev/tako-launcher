@@ -6,6 +6,7 @@ using Launcher.Core.Themes;
 using Launcher.PlayniteCompat.P10.Controls;
 using Launcher.PlayniteCompat.P10.Data;
 using Launcher.PlayniteCompat.P10.Markup;
+using Launcher.Themes.Security;
 using Launcher.Themes.Xaml;
 
 namespace Launcher.PlayniteCompat.P10;
@@ -69,8 +70,26 @@ public static class P10Theme
         }
 
         var manifest = ThemeManifest.Read(root);
+
+        // Frente H (questão aberta 8): antes de qualquer XAML do tema, a guarda de mídia entra no binding desta thread e
+        // as pastas do tema e do tema padrão passam a ser as únicas de onde um caminho montado por dados pode carregar.
+        // Sem a guarda (WPF diferente do esperado), nada do tema é carregado: falha fechada.
+        if (!ThemeMediaGuard.EnsureInstalled(out string? guardProblem))
+        {
+            return new P10ThemeReport(
+                manifest.Manifest.Name ?? Path.GetFileName(root),
+                manifest.Manifest.Version,
+                manifest.Manifest.ThemeApiVersionText,
+                new ResourceDictionary(),
+                [],
+                [.. ThemeFiles(root).Select(f => (f, guardProblem))],
+                manifest);
+        }
+
+        ThemeSourcePolicy.Shared.AllowTheme(root);
         if (baseRoot is not null)
         {
+            ThemeSourcePolicy.Shared.AllowTheme(baseRoot, isBase: true);
             Markup.ThemeFiles.FallbackRoot = Path.TrimEndingDirectorySeparator(baseRoot);
         }
 

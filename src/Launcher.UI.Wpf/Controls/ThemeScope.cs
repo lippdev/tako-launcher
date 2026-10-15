@@ -1,10 +1,14 @@
 using System.Windows;
 using System.Windows.Controls;
+using Launcher.Themes.Security;
 using Launcher.UI.Wpf.Navigation;
 
 namespace Launcher.UI.Wpf.Controls;
 
-/// <summary>Aplica um dicionário de tema só ao conteúdo (prévia isolada, sem afetar o resto do launcher).</summary>
+/// <summary>
+/// Aplica um dicionário de tema só ao conteúdo (prévia isolada e interface inteira, sem afetar o resto do launcher).
+/// Imagens e mídia que o tema montar por binding passam pela <see cref="ThemeMediaGuard"/>.
+/// </summary>
 public sealed class ThemeScope : ContentControl
 {
     public static readonly DependencyProperty ThemeResourcesProperty =
@@ -25,7 +29,9 @@ public sealed class ThemeScope : ContentControl
     {
         var scope = (ThemeScope)d;
         scope.Resources.MergedDictionaries.Clear();
-        if (e.NewValue is ResourceDictionary resources)
+
+        // Frente H: o tema só entra na árvore com a guarda de mídia ativa nesta thread (caminhos montados por dados).
+        if (e.NewValue is ResourceDictionary resources && ThemeMediaGuard.EnsureInstalled(out _))
         {
             scope.Resources.MergedDictionaries.Add(resources);
         }

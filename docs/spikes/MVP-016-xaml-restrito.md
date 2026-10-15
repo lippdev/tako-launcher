@@ -1,6 +1,6 @@
 # Spike MVP-016: carregador XAML restrito
 
-- Status: implementado e homologado com temas reais (MVP-022); liberações da interface inteira (MVP-018/019) descritas abaixo
+- Status: implementado e homologado com temas reais (MVP-022); liberações da interface inteira (MVP-018/019) descritas abaixo; questão aberta 8 (caminhos montados por dados) fechada na frente H
 - Data: 2026-10-14
 - Branch: `spike/MVP-016-xaml-loader`
 - Riscos do PRD: "XAML não confiável executar comportamentos indevidos" (crítico), CA-04, CA-10
@@ -37,6 +37,8 @@ Tudo o que não está na lista é rejeitado, com código, mensagem e linha/colun
 | Esconder conteúdo | `mc:AlternateContent`, `mc:ProcessContent`, prefixos ignoráveis arbitrários | só `mc:Ignorable` com `d:` ou `PresentationOptions:` |
 | Carregar XAML sem validação | `<ResourceDictionary Source="Outro.xaml"/>` | rejeitado (ver descobertas) |
 | Handlers de evento | `Click="OnClick"` | rejeitado pelo parser WPF (sem `x:Class`) e convertido em `ThemeXamlRejectedException` |
+| Pedaços de caminho em literais | `<sys:String>\\servidor\x</sys:String>`, `StringFormat='\\\\srv\\{0}'`, `ConverterParameter`, `FallbackValue`, `TargetNullValue` | regras de URI no texto de elementos e em qualquer posição de formatos e literais de binding (questão 8) |
+| Caminho montado em tempo de execução | `MultiBinding`/`StringFormat`/`sys:String` → `Image.Source`, `ImageBrush.ImageSource`, `MediaElement.Source` | guarda de mídia no conversor padrão do binding (`ThemeMediaGuard` + `ThemeSourcePolicy`, questão 8) |
 
 ## Resultados
 
@@ -87,9 +89,52 @@ Para o `Views/Main.xaml` e o `Views/GameDetails.xaml` dos temas carregarem, o ad
 
 **Rede de segurança na execução (MVP-021):** antes de trocar a tela inicial, `P10Theme.Probe` monta `Main` e `GameDetails` fora da tela com o modelo real e faz medida e arranjo; erros que o WPF só mostra ao instanciar o template ficam ali, e o Tako continua na UI padrão. Em uso, o host (`PlayniteMainHost`) captura erros de layout do tema, e um `XamlParseException` tardio passa pela janela; nos dois casos o tema sai da tela e aparece a recuperação ("Usar a interface do Tako" limpa a escolha). O tema nunca é reaplicado sozinho (sem loop) e não é aplicado no modo seguro, que liga depois de duas aberturas sem fechamento limpo.
 
-### Questão aberta 8: caminhos montados por dados
+### Questão 8 (fechada na frente H): caminhos montados por dados
 
-O validador confere valores literais. Um tema ainda pode **compor** um texto em tempo de execução (por exemplo `MultiBinding` com `StringFormat`, ou um recurso `sys:String`, cujo texto não é validado) e ligá-lo a `Image.Source`/`MediaElement.Source`. O WPF resolve o caminho relativo ao arquivo XAML do tema, e um texto como `..\..\x` ou um caminho UNC escaparia da pasta (leitura de mídia local ou acesso SMB). Não é novo nesta etapa: o PS5ish já faz isso no `Main.xaml` e continua recusado só porque o pedaço literal `\ExtraMetadata\` é bloqueado. Recomendações: validar o texto de `sys:String` com as mesmas regras de URI e, como segunda camada, o processo de UI isolado e com privilégios mínimos (PRD §4.3).
+**Problema.** O validador confere valores literais. Um tema podia **compor** um texto em tempo de execução (`MultiBinding` com `StringFormat`, recursos `sys:String`, `Tag`/`Text` de outros elementos, conversores) e ligá-lo a `Image.Source`, `ImageBrush.ImageSource`, `MediaElement.Source` ou `BitmapImage.UriSource`. Assim alcançava arquivos fora da pasta do tema, URLs externas e caminhos UNC (`\\servidor\share`), que no Windows abrem uma conexão SMB e **vazam o hash NTLM** do usuário. O PS5ish já monta caminhos assim (`ExtraMetadataPath` + `MultiBinding`), e só era recusado porque o pedaço literal `\ExtraMetadata\` é bloqueado.
+
+**Por que não coerção na propriedade.** O texto vira imagem no **conversor padrão do binding**, e o `ImageSourceConverter` já abre o arquivo ou inicia o download *durante a conversão* (`BitmapFrame.CreateFromUriOrStream`). Um `CoerceValueCallback` em `Image.Source` (ou um estilo implícito, ou um attached behavior) só vê o `BitmapFrame` pronto: a conexão SMB já teria acontecido. Subclasses do adaptador também não resolvem: `ImageBrush` e `BitmapImage` são `sealed`, e um `Setter` com `TargetType="Image"` continuaria indo para a propriedade original. A coerção só funcionaria para `MediaElement.Source` (o `Uri` é aberto depois), que mesmo assim não aceita `OverrideMetadata` no próprio tipo.
+
+**Decisão: guarda no conversor padrão do binding** (`src/Launcher.Themes/Security/ThemeMediaGuard.cs`). Toda conversão de `string`/`Uri`/`object` → `ImageSource`/`Uri`/`FontFamily`/`Cursor` feita por `Binding`, `MultiBinding`, `PriorityBinding` (inclusive o fallback dinâmico quando um conversor devolve outro tipo) sai da tabela de conversores padrão do `DataBindEngine` do WPF, uma por thread de UI. A guarda troca essas entradas por um conversor que:
+
+1. decide pela `ThemeSourcePolicy` (`src/Launcher.Core/Themes/ThemeSourcePolicy.cs`) **antes** do conversor original, resolvendo o caminho relativo a partir do `BaseUri` do elemento de destino, como o WPF faria;
+2. entrega ao conversor original a **URI já resolvida e permitida** (o que carrega é exatamente o que foi conferido);
+3. bloqueado: devolve nulo (imagem/mídia vazia, sem erro para o usuário) e dispara `ThemeMediaGuard.Blocked`, que o `PlayniteThemeService` registra no log uma vez por origem, só com esquema e host ou o nome do arquivo (e o `LogRedactor` por cima).
+
+| Origem | Decisão |
+|---|---|
+| Arquivo dentro da pasta do tema (do XAML do elemento) ou do Fullscreen padrão (arquivos herdados) | ✅ permitido, depois de `GetFullPath` e sem link simbólico/junção entre a pasta e o arquivo |
+| Cache de artes do Tako (`AppPaths.ArtCache`) | ✅ permitido |
+| `pack://application:,,,/` e caminhos relativos sem XAML de origem (resolvidos no pacote do app) | ✅ permitido (só alcança recursos embutidos) |
+| `ImageSource` já carregado (view models do Tako, `{ThemeFile}`, `{ThemeFileBinding}`) | ✅ passa direto, sem conversão |
+| UNC, `\\?\UNC`, `\\.\`, `//servidor`, `file://servidor/...` | ❌ `Network`, decidido só pelo texto, sem tocar o disco |
+| `http`, `https`, `ftp`, `pack://siteoforigin`, outros esquemas | ❌ `External` |
+| Arquivo local fora dessas pastas (`..\..\..\Windows\win.ini`, `C:\...`) | ❌ `OutsideTheme` |
+| Link simbólico ou junção dentro do tema | ❌ `Link` |
+| `FontFamily` com local (`/`, `\`, `:`, `#`) montado por binding; `Cursor` que não seja do sistema | ❌ (nomes de família e cursores do sistema passam) |
+
+A guarda vale para a thread de UI inteira, não só para a árvore do tema: os templates do tema são instanciados em vários lugares (prévia, `ThemeScope` da interface inteira, ensaio do `P10Theme.Probe`) e `Freezable`s como `ImageBrush` nem herdam propriedades da árvore. A UI do próprio Tako nunca converte texto em imagem (recebe `ImageSource` do cache de artes), então nada muda para ela.
+
+**Instalação e falha fechada.** `P10Theme.Load` instala a guarda antes de ler qualquer XAML do tema e registra as pastas do tema e do tema padrão na política; o `ThemeScope` só aplica recursos de tema com a guarda ativa. O acesso à tabela é por reflexão a membros internos do WPF (`DataBindEngine.CurrentDataBindEngine`, `_valueConverterTable`, `GetDefaultValueConverter`); a instalação confere que a troca pegou. Se um WPF futuro mudar esses membros, `EnsureInstalled` falha, **nenhum arquivo do tema é carregado** (o relatório mostra o motivo) e o Tako fica na própria UI; os testes acusam no CI.
+
+**Conversores do adaptador.** O `ImageStringToImageConverter` aceitava qualquer caminho absoluto existente, inclusive UNC (o `File.Exists` já abria a conexão). Agora usa a mesma política, decidida antes de qualquer acesso ao disco. `{ThemeFile}`/`{ThemeFileBinding}` passaram a recusar caminhos que atravessam link simbólico ou junção.
+
+**Validação estática (complemento).** Pega o óbvio já na carga, com o código de violação de sempre:
+
+- texto de elementos (`<sys:String>`, conteúdo de `TextBlock`…): URI ou caminho absoluto recusado como nos atributos (`ExternalUri`); em recursos primitivos (`sys:String` etc.), em qualquer posição do texto;
+- `StringFormat`, `ContentStringFormat`, `ConverterParameter`, `FallbackValue`, `TargetNullValue` e qualquer literal dentro de uma extensão de marcação (depois de tirar os escapes `\`): `://`, `\\`, `//servidor`, letra de unidade e `file:` em qualquer posição viram `ExternalUri`; segmentos `..` viram `PathEscapesTheme`.
+
+`PathEscapesTheme` **não** se aplica ao texto de `sys:String`: o `Constants.xaml` do PS5ish guarda `ExtraMetadataPath = ..\..\..\..` e seria recusado, mudando a homologação. O valor sozinho é inofensivo; o caminho que ele montar é barrado pela guarda.
+
+**Testes.** `XamlValidatorTests` (literais em `sys:String`, formatos e extensões, e os formatos comuns dos temas que continuam aceitos), `ThemeSourcePolicyTests` (política, sem WPF), `ThemeMediaGuardTests` (WPF: tema que passa na validação e monta `\\exemplo\share\x.png`, `http://exemplo/x.png`, `..\..\..\Windows\win.ini` e um arquivo fora do tema por `MultiBinding`, `sys:String` e `StringFormat`, ligados a `Image`, `ImageBrush` e `MediaElement`; nada carrega, e o mesmo caminho montado dentro do tema carrega) e o bloco "Segurança de temas (frente H)" do teste de fumaça, que faz o mesmo com uma cópia do Fullscreen padrão dentro de um `ThemeScope` (relatório `theme-security.txt`) e confere que PS5ish, Toggle, Revisited e o padrão continuam carregando o mesmo número de arquivos.
+
+**Limitações que ficam.**
+
+- Depende de membros internos do WPF (ver falha fechada acima). É a única forma que encontramos de decidir **antes** da conversão; a alternativa seria reescrever todos os bindings do tema no carregador.
+- Conversões que não passam pelo binding (`FallbackValue`/`TargetNullValue` e `Value` de `DataTrigger`) usam o conversor do tipo direto; o texto delas é sempre literal ou recurso, e por isso fica com a validação estática.
+- Quando o WPF não sabe de qual XAML veio o elemento, vale qualquer pasta de tema registrada (um tema poderia exibir imagens de outro tema instalado), nunca fora delas.
+- Texto de elemento com `://` passa a ser recusado (mesmo falso positivo conservador da questão 5).
+- Continua não sendo sandbox: o processo de UI isolado e com privilégios mínimos (PRD §4.3) segue recomendado como segunda camada.
 
 ## Recomendação
 

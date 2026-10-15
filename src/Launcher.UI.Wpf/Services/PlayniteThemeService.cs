@@ -1,7 +1,11 @@
+using System.Collections.Concurrent;
 using System.IO;
+using Launcher.Core.Diagnostics;
 using Launcher.Core.Themes;
 using Launcher.PlayniteCompat.P10;
+using Launcher.Themes.Security;
 using Launcher.Themes.Xaml;
+using Microsoft.Extensions.Logging;
 
 namespace Launcher.UI.Wpf.Services;
 
@@ -11,18 +15,35 @@ namespace Launcher.UI.Wpf.Services;
 /// inicial do Tako passa a ser a do tema (MVP-018/019); sem escolha, fica a UI do Tako. A prévia usa o escolhido, ou o
 /// Fullscreen padrão do Playnite quando não há.
 /// </summary>
-public sealed class PlayniteThemeService(XamlSecurityPolicy basePolicy, string? userThemesRoot = null)
+public sealed partial class PlayniteThemeService
 {
     public const string SampleTheme = "Playnite-Default";
     private const string SelectionFile = ".selected";
+    private const int MaxLoggedOrigins = 256;
 
-    private readonly RestrictedXamlLoader _loader = new(new XamlValidator(P10Theme.Policy(basePolicy)));
+    private static readonly ConcurrentDictionary<string, bool> LoggedOrigins = new(StringComparer.Ordinal);
+    private static ILogger? _blockedLog;
+
+    private readonly RestrictedXamlLoader _loader;
+
+    public PlayniteThemeService(XamlSecurityPolicy basePolicy, string? userThemesRoot = null, ILogger<PlayniteThemeService>? logger = null)
+    {
+        _loader = new(new XamlValidator(P10Theme.Policy(basePolicy)));
+        UserThemesRoot = userThemesRoot ?? AppPaths.ThemesRoot;
+
+        // Frente H: além das pastas dos temas (registradas ao carregar), um tema pode exibir as artes do cache do Tako.
+        ThemeSourcePolicy.Shared.AllowDirectory(AppPaths.ArtCache);
+        if (logger is not null && Interlocked.CompareExchange(ref _blockedLog, logger, null) is null)
+        {
+            ThemeMediaGuard.Blocked += OnMediaBlocked;
+        }
+    }
 
     /// <summary>Temas embutidos (pasta <c>Themes</c> ao lado do executável).</summary>
     public string ThemesRoot { get; } = Path.Combine(AppContext.BaseDirectory, "Themes");
 
     /// <summary>Temas importados de pacotes <c>.pthm</c> (<c>%LOCALAPPDATA%\Tako\themes</c> ou <c>Tako_Data\themes</c>).</summary>
-    public string UserThemesRoot { get; } = userThemesRoot ?? AppPaths.ThemesRoot;
+    public string UserThemesRoot { get; }
 
     public P10ThemeReport Load(string themeFolder) => LoadDirectory(Path.Combine(ThemesRoot, themeFolder));
 
@@ -116,4 +137,19 @@ public sealed class PlayniteThemeService(XamlSecurityPolicy basePolicy, string? 
         Directory.CreateDirectory(UserThemesRoot);
         File.WriteAllText(path, theme.Id);
     }
+
+    /// <summary>
+    /// Origem bloqueada pela guarda de mídia: vai para o log uma vez por origem, só com esquema/host ou nome do arquivo
+    /// (o <see cref="Launcher.Core.Diagnostics.LogRedactor"/> do arquivo de log ainda passa por cima). O usuário não vê nada.
+    /// </summary>
+    private static void OnMediaBlocked(object? sender, ThemeMediaBlockedEventArgs e)
+    {
+        if (_blockedLog is { } logger && LoggedOrigins.Count < MaxLoggedOrigins && LoggedOrigins.TryAdd(e.Origin, true))
+        {
+            LogMediaBlocked(logger, e.Reason, e.TargetType.Name, LogRedactor.Default.Redact(e.Origin));
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tema: origem de mídia bloqueada ({Reason}, {Target}): {Origin}")]
+    private static partial void LogMediaBlocked(ILogger logger, ThemeSourceBlock reason, string target, string origin);
 }
