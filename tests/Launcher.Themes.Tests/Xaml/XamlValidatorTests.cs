@@ -297,6 +297,59 @@ public class XamlValidatorTests
         Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Violations));
     }
 
+    // Questão aberta 8 (frente H): pedaços de caminho que um binding levaria a Image.Source/MediaElement.Source.
+    [Theory]
+    [InlineData("""<sys:String x:Key="p">\\exemplo\share\x.png</sys:String>""")]
+    [InlineData("""<sys:String x:Key="p">http://exemplo/x.png</sys:String>""")]
+    [InlineData("""<sys:String x:Key="p">C:\Windows\win.ini</sys:String>""")]
+    [InlineData("""<sys:String x:Key="p">file:///C:/Windows/win.ini</sys:String>""")]
+    [InlineData("""<sys:String x:Key="p">pack://siteoforigin:,,,/x.png</sys:String>""")]
+    [InlineData("""<sys:String x:Key="p">{}{0}\\exemplo\share</sys:String>""")]
+    [InlineData("""<x:Array x:Key="a" Type="sys:String"><sys:String>//exemplo/share/x.png</sys:String></x:Array>""")]
+    [InlineData("""<TextBlock x:Key="t">\\exemplo\share\x.png</TextBlock>""")]
+    public void Rejects_absolute_locations_in_string_resources(string body) =>
+        AssertRejected(Validate(Dictionary(body, """ xmlns:sys="clr-namespace:System;assembly=mscorlib" """)), XamlViolationCode.ExternalUri);
+
+    [Theory]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Name, StringFormat='\\\\exemplo\\share\\{0}'}" />""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Name, StringFormat='{}{0}://exemplo/x.png'}" />""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Name, StringFormat=http://exemplo/{0}.png}" />""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Name, ConverterParameter='C:\\Windows\\win.ini'}" />""")]
+    [InlineData("""<Image x:Key="i" Source="{Binding Cover, FallbackValue='\\\\exemplo\\share\\x.png'}" />""")]
+    [InlineData("""<Image x:Key="i" Source="{Binding Cover, TargetNullValue='//exemplo/share/x.png'}" />""")]
+    [InlineData("""<Image x:Key="i" Source="{Binding Source='file:\\\\exemplo\\x.png'}" />""")]
+    [InlineData("""<TextBlock x:Key="t"><TextBlock.Text><MultiBinding StringFormat="{}\\exemplo\share\{0}"><Binding Path="Name" /></MultiBinding></TextBlock.Text></TextBlock>""")]
+    [InlineData("""<TextBlock x:Key="t"><TextBlock.Text><MultiBinding StringFormat="{}{0}C:\Windows\{1}"><Binding Path="Name" /></MultiBinding></TextBlock.Text></TextBlock>""")]
+    [InlineData("""<TextBlock x:Key="t"><TextBlock.Text><Binding Path="Name" ConverterParameter="https://exemplo/x" /></TextBlock.Text></TextBlock>""")]
+    [InlineData("""<ContentControl x:Key="c" ContentStringFormat="{}{0}\\exemplo\x" />""")]
+    public void Rejects_locations_inside_formats_and_binding_literals(string body) =>
+        AssertRejected(Validate(Dictionary(body)), XamlViolationCode.ExternalUri);
+
+    [Theory]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Name, StringFormat='{}{0}..\\..\\..\\Windows\\win.ini'}" />""")]
+    [InlineData("""<TextBlock x:Key="t"><TextBlock.Text><MultiBinding StringFormat="{}{0}/../../{1}"><Binding Path="Name" /></MultiBinding></TextBlock.Text></TextBlock>""")]
+    [InlineData("""<Image x:Key="i" Source="{Binding Cover, FallbackValue='../../../x.png'}" />""")]
+    public void Rejects_traversal_inside_formats_and_binding_literals(string body) =>
+        AssertRejected(Validate(Dictionary(body)), XamlViolationCode.PathEscapesTheme);
+
+    [Theory]
+    [InlineData("""<sys:String x:Key="p">Jogar</sys:String>""")]
+    [InlineData("""<sys:String x:Key="p">..\..\..\..</sys:String>""")] // PS5ish (Constants.xaml): o binding é que é barrado em tempo de execução
+    [InlineData("""<sys:String x:Key="p">pack://application:,,,/Images/x.png</sys:String>""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Name, StringFormat={}{0}%}" />""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding LastPlayed, StringFormat='HH:mm'}" />""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Time, StringFormat='{}{0:hh\\:mm}'}" />""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Progress, StringFormat='({0}%)'}" />""")]
+    [InlineData("""<TextBlock x:Key="t"><TextBlock.Text><MultiBinding StringFormat="{}{0}{1}{2}"><Binding Path="A" /><Binding Path="B" /><Binding Path="C" /></MultiBinding></TextBlock.Text></TextBlock>""")]
+    [InlineData("""<ContentControl x:Key="c" ContentStringFormat="{}{0}:" />""")]
+    [InlineData("""<TextBlock x:Key="t" Text="{Binding Name, StringFormat='{}{0} // {1}'}" />""")]
+    public void Accepts_ordinary_strings_and_formats(string body)
+    {
+        var result = Validate(Dictionary(body, """ xmlns:sys="clr-namespace:System;assembly=mscorlib" """));
+
+        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Violations));
+    }
+
     [Fact]
     public void Rejects_nested_dictionary_loading()
     {

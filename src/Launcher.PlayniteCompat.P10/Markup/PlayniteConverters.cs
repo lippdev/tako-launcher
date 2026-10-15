@@ -3,8 +3,11 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Launcher.Core.Presentation;
+using Launcher.Core.Themes;
+using Launcher.Themes.Security;
 
 namespace Launcher.PlayniteCompat.P10.Markup;
 
@@ -38,8 +41,10 @@ public sealed class NullToVisibilityConverter : IValueConverter
 }
 
 /// <summary>
-/// Ícone de menu (caminho de arquivo local ou recurso do app) → imagem. Endereços de rede são ignorados:
-/// a arte remota passa pelo cache do launcher, não por um tema.
+/// Ícone de menu (recurso do app ou arquivo local) → imagem. O tema pode ligar qualquer texto a este conversor, então
+/// arquivos passam pela mesma política da guarda de mídia (frente H): só a pasta de um tema carregado ou o cache de
+/// artes. Endereços de rede e UNC são recusados antes de qualquer acesso ao disco; a arte remota passa pelo cache do
+/// launcher, não por um tema.
 /// </summary>
 public sealed class ImageStringToImageConverter : IValueConverter
 {
@@ -50,9 +55,23 @@ public sealed class ImageStringToImageConverter : IValueConverter
             return null;
         }
 
-        Uri? uri = text.StartsWith("pack://application:,,,/", StringComparison.OrdinalIgnoreCase)
-            ? new Uri(text)
-            : Path.IsPathFullyQualified(text) && File.Exists(text) ? new Uri(text) : null;
+        Uri? uri = null;
+        if (text.StartsWith("pack://application:,,,/", StringComparison.OrdinalIgnoreCase))
+        {
+            uri = new Uri(text);
+        }
+        else if (text.Length > 1 && text[0] is '\\' or '/' && text[1] is '\\' or '/' || Path.IsPathFullyQualified(text))
+        {
+            var decision = ThemeSourcePolicy.Shared.EvaluateLocalFile(text, baseUri: null);
+            if (!decision.IsAllowed)
+            {
+                ThemeMediaGuard.Report(decision.Block, typeof(ImageSource), text);
+                return null;
+            }
+
+            uri = File.Exists(decision.Uri!.LocalPath) ? decision.Uri : null; // arquivo permitido sempre traz a URI
+        }
+
         if (uri is null)
         {
             return null;

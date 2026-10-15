@@ -21,6 +21,16 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
     private static readonly HashSet<string> XamlElements = new(StringComparer.Ordinal) { "Null", "Type", "Static", "Array", "Reference" };
 
     /// <summary>
+    /// Propriedades cujo texto pode compor ou substituir um caminho em tempo de execução (questão aberta 8): o formato do
+    /// binding, o parâmetro do conversor e os valores de reserva. Valem as regras de caminho em qualquer posição do texto.
+    /// </summary>
+    private static readonly HashSet<string> FormatProperties = new(StringComparer.Ordinal)
+    {
+        "StringFormat", "ContentStringFormat", "HeaderStringFormat", "ItemStringFormat", "ColumnHeaderStringFormat",
+        "ConverterParameter", "FallbackValue", "TargetNullValue",
+    };
+
+    /// <summary>
     /// Atributos aceitos no <c>Popup</c> da lista suspensa. Ficam de fora posição livre (offsets, PlacementTarget,
     /// PlacementRectangle), StaysOpen e qualquer outra forma de abrir ou mover a janela do Popup.
     /// </summary>
@@ -86,6 +96,18 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
     [GeneratedRegex(@"^[A-Za-z]:[\\/]")]
     private static partial Regex DriveLetterPath();
 
+    // Caminho ou URI em qualquer posição do texto: "C:\", "//servidor", "file:\" (o "://" e o "\\" são conferidos à parte).
+    [GeneratedRegex(@"(?<![A-Za-z])[A-Za-z]:[\\/]|(?<![:/])//[\w.\-]|\bfile:[\\/]", RegexOptions.IgnoreCase)]
+    private static partial Regex EmbeddedLocation();
+
+    // Segmento ".." de caminho em qualquer posição do texto.
+    [GeneratedRegex(@"(?:^|[\\/'""=\s{}])\.\.[\\/]|[\\/]\.\.(?=$|[\\/'""\s,}])")]
+    private static partial Regex EmbeddedTraversal();
+
+    // Escape de extensão de marcação: "\x" vira "x".
+    [GeneratedRegex(@"\\(.)")]
+    private static partial Regex MarkupEscape();
+
     [GeneratedRegex(@"^\{\s*TemplateBinding\s+(?:Property\s*=\s*)?(?:ComboBox\.)?IsDropDownOpen\s*\}$")]
     private static partial Regex DropDownOpenBinding();
 
@@ -109,6 +131,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
     {
         private readonly IXmlLineInfo _lineInfo = (IXmlLineInfo)reader;
         private readonly Stack<string> _elements = new();
+        private readonly Stack<string> _elementNamespaces = new();
         private readonly Stack<ElementKind> _kinds = new();
         private readonly HashSet<string> _popupNames = new(StringComparer.Ordinal);
         private readonly List<(string Target, string? Property, int Line, int Column)> _targeted = [];
@@ -128,6 +151,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
                         break;
                     case XmlNodeType.EndElement:
                         _elements.Pop();
+                        _elementNamespaces.Pop();
                         Leave(_kinds.Pop());
                         break;
                     case XmlNodeType.Text:
@@ -208,6 +232,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
             }
 
             _elements.Push(name);
+            _elementNamespaces.Push(ns);
             _kinds.Push(kind);
             Enter(kind);
         }
@@ -559,12 +584,33 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
 
         private void VisitText()
         {
+            if (!_elements.TryPeek(out string? parent))
+            {
+                return;
+            }
+
             // Ex.: <BitmapImage.UriSource>http://...</BitmapImage.UriSource>
-            if (_elements.TryPeek(out string? parent) && parent.Contains('.', StringComparison.Ordinal))
+            if (parent.Contains('.', StringComparison.Ordinal))
             {
                 ValidateValue(LastSegment(parent), reader.Value, null);
+                return;
+            }
+
+            // Texto de elemento (<sys:String x:Key="Caminho">\\servidor\x</sys:String>, conteúdo de TextBlock): o WPF não
+            // o trata como URI na carga, mas um binding pode levá-lo a Image.Source ou MediaElement.Source (questão
+            // aberta 8). URIs e caminhos absolutos são recusados como nos atributos; em recursos primitivos, em qualquer
+            // posição do texto. Um "..\" relativo não é recusado aqui (o PS5ish guarda "..\..\..\.." num sys:String):
+            // a guarda de mídia em tempo de execução bloqueia o caminho que sair do tema.
+            string text = reader.Value.Trim();
+            if (!CheckAbsoluteLocation(text, _lineInfo.LineNumber, _lineInfo.LinePosition) && IsSystemPrimitive(_elementNamespaces.Peek(), parent))
+            {
+                CheckEmbeddedLocation(text, traversal: false, _lineInfo.LineNumber, _lineInfo.LinePosition);
             }
         }
+
+        private bool IsSystemPrimitive(string ns, string name) =>
+            ns.StartsWith("clr-namespace:System;", StringComparison.Ordinal)
+            && policy.ClrNamespaces.TryGetValue(ns, out var types) && types.Contains(name);
 
         private void ValidateValue(string property, string value, Attribute? attribute)
         {
@@ -576,22 +622,59 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
             if (trimmed.StartsWith('{') && !trimmed.StartsWith("{}", StringComparison.Ordinal))
             {
                 ValidateMarkupExtensions(trimmed, line, column);
+
+                // Valores literais dentro da extensão (StringFormat, ConverterParameter, FallbackValue, Source...).
+                CheckEmbeddedLocation(MarkupEscape().Replace(trimmed, "$1"), traversal: true, line, column);
                 return;
             }
 
-            if (IsAbsoluteLocation(trimmed))
+            if (CheckAbsoluteLocation(trimmed, line, column))
             {
-                if (!trimmed.StartsWith(AllowedPackPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    Add(XamlViolationCode.ExternalUri, $"URI ou caminho absoluto '{trimmed}' não é permitido; use caminhos relativos ao tema.", line, column);
-                }
-
                 return;
+            }
+
+            if (FormatProperties.Contains(property))
+            {
+                CheckEmbeddedLocation(trimmed, traversal: true, line, column);
             }
 
             if (policy.UriProperties.Contains(property) && EscapesTheme(trimmed))
             {
                 Add(XamlViolationCode.PathEscapesTheme, $"Caminho '{trimmed}' sai da pasta do tema.", line, column);
+            }
+        }
+
+        /// <summary>URI ou caminho absoluto no início do valor (exceto <c>pack://application</c>). Devolve se era absoluto.</summary>
+        private bool CheckAbsoluteLocation(string value, int line, int column)
+        {
+            if (!IsAbsoluteLocation(value))
+            {
+                return false;
+            }
+
+            if (!value.StartsWith(AllowedPackPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                Add(XamlViolationCode.ExternalUri, $"URI ou caminho absoluto '{value}' não é permitido; use caminhos relativos ao tema.", line, column);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// URI, caminho de rede, letra de unidade ou <c>file:</c> em qualquer posição do texto (e, com
+        /// <paramref name="traversal"/>, segmentos <c>..</c>): pedaços de um caminho que o tema montaria em tempo de
+        /// execução com <c>StringFormat</c> ou <c>MultiBinding</c>.
+        /// </summary>
+        private void CheckEmbeddedLocation(string value, bool traversal, int line, int column)
+        {
+            string text = value.Replace(AllowedPackPrefix, string.Empty, StringComparison.OrdinalIgnoreCase);
+            if (text.Contains("://", StringComparison.Ordinal) || text.Contains(@"\\", StringComparison.Ordinal) || EmbeddedLocation().IsMatch(text))
+            {
+                Add(XamlViolationCode.ExternalUri, $"Valor '{value}' contém URI ou caminho absoluto; temas só usam caminhos relativos ao tema.", line, column);
+            }
+            else if (traversal && EmbeddedTraversal().IsMatch(text))
+            {
+                Add(XamlViolationCode.PathEscapesTheme, $"Valor '{value}' contém '..' e pode montar um caminho fora da pasta do tema.", line, column);
             }
         }
 

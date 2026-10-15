@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Launcher.Core.Themes;
 using Launcher.PlayniteCompat.P10.Data;
 
 namespace Launcher.PlayniteCompat.P10.Markup;
@@ -113,7 +114,7 @@ internal static class ThemeFiles
     public static string? ResolveWithFallback(string? root, string relative) =>
         Resolve(root, relative) ?? (FallbackRoot is { } fallback && !string.Equals(fallback, root, StringComparison.OrdinalIgnoreCase) ? Resolve(fallback, relative) : null);
 
-    /// <summary>Caminho absoluto de um arquivo existente dentro do tema; nulo se sair da pasta ou não existir.</summary>
+    /// <summary>Caminho absoluto de um arquivo existente dentro do tema; nulo se sair da pasta (inclusive por link) ou não existir.</summary>
     public static string? Resolve(string? root, string relative)
     {
         if (root is null || string.IsNullOrWhiteSpace(relative) || relative.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0 || relative.Contains(':', StringComparison.Ordinal))
@@ -131,7 +132,8 @@ internal static class ThemeFiles
             return null;
         }
 
-        return full.StartsWith(root + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && File.Exists(full) ? full : null;
+        // Dentro da pasta, existente e sem link simbólico/junção no caminho (um link poderia apontar para fora do tema).
+        return ThemeSourcePolicy.IsUnder(full, root) && !ThemeSourcePolicy.CrossesLink(root, full) && File.Exists(full) ? full : null;
     }
 
     /// <summary>O arquivo no formato da propriedade de destino: Uri, imagem ou o caminho.</summary>

@@ -48,6 +48,8 @@ Arquivos por tema, depois:
 - **Revisited**: `Views/Main.xaml` passou a carregar (`{Api Notifications.Count}`). `GameDetails.xaml` e `GameStatus.xaml` continuam recusados por `\ExtraMetadata`.
 - **Playnite padrão**: `Views/Main.xaml` (`{Api}`) e `Views/GameDetails.xaml` (`HtmlTextView` seguro) passaram a carregar.
 
+**Frente H (caminhos montados por dados):** a validação estática ganhou regras para `sys:String`, formatos e literais de binding, e uma guarda de mídia passou a barrar em tempo de execução as origens fora do tema. Os números acima não mudam: o teste de homologação confere, para cada tema, o mesmo número de arquivos carregados (`ThemeFixtures.Homologated`). Os temas que montam caminhos (PS5ish e Revisited, para `\ExtraMetadata`) já usavam o `Main.xaml`/`GameDetails.xaml` do padrão por causa do literal bloqueado.
+
 O teste de homologação do CI agora verifica que o `Main.xaml` carrega (`P10ThemeReport.HasMainView`) e se ele veio do próprio tema (Toggle, Revisited) ou do padrão (PS5ish). O bloco "Tema Playnite na interface (frente F)" do teste de fumaça aplica os três temas à interface inteira e abre os detalhes pelo controle (capturas `60-` a `66-` e relatório `theme-whole-ui.txt` no artefato `ui-screenshots`).
 
 ### Matriz de recursos
@@ -67,6 +69,7 @@ O teste de homologação do CI agora verifica que o `Main.xaml` carrega (`P10The
 | Dados do Playnite (`{Api}`, `{Settings}`, `{SettingsBinding}`) | ✅ | ✅ | ✅ | Subconjunto só-leitura; configurações com os valores do Tako |
 | Extensões de terceiros (SuccessStory, ExtraMetadataLoader, ThemeOptions…) | ⚠️ | ⚠️ | ⚠️ | O arquivo carrega, e a extensão aparece como "não instalada" (`{PluginSettings}`/`{PluginStatus}`). O Toggle mostra o próprio aviso de que falta o ThemeOptions |
 | Arquivos fora da pasta do tema (`\ExtraMetadata`, vídeos, perfil) | ❌ | — | ❌ | Bloqueado por segurança (`PathEscapesTheme`) |
+| Caminhos montados por dados (`MultiBinding`/`StringFormat`/`sys:String` → imagem ou mídia) | ⚠️ | — | ⚠️ | Só carregam da pasta do tema, do tema padrão, do cache de artes ou de `pack://application`; UNC, URLs e arquivos de fora são bloqueados em tempo de execução, sem aviso na tela e com registro no log (frente H, [questão 8](../spikes/MVP-016-xaml-restrito.md#questão-8-fechada-na-frente-h-caminhos-montados-por-dados)) |
 | Behaviors e atalhos de controle do Playnite | — | ⚠️ | — | `FocusBahaviors` funciona; `GameControllerInputBinding` fica inerte (a entrada é do Tako) |
 | Bindings a `Window.DataContext` do Playnite | ⚠️ | ⚠️ | — | Ficam vazios (no Tako a janela é a do launcher); vão para o relatório de erros de binding |
 
