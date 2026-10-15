@@ -62,7 +62,13 @@
           <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding SidebarFooter}" Focusable="False">
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="{x:Type vm:SidebarItemViewModel}">
-                <Button Style="{StaticResource SidebarItem}" Command="{Binding Command}" nav:Nav.Group="sidebar" nav:Nav.Key="{Binding Key}" nav:Nav.IsGroupEntry="{Binding IsSelected}" />
+                <Button x:Name="Item" Style="{StaticResource SidebarItem}" Command="{Binding Command}" nav:Nav.Group="sidebar" nav:Nav.Key="{Binding Key}" nav:Nav.IsGroupEntry="{Binding IsSelected}" />
+                <DataTemplate.Triggers>
+                  <!-- "Voltar ao PC" só aparece no modo console. -->
+                  <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                    <Setter TargetName="Item" Property="Visibility" Value="Collapsed" />
+                  </DataTrigger>
+                </DataTemplate.Triggers>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>

@@ -1,6 +1,9 @@
 using System.IO;
 using ConsoleMode.Runtime.Ipc;
+using ConsoleMode.Runtime.Windows;
 using Launcher.Core.Diagnostics;
+using Launcher.Core.Session.GameScreen;
+using Launcher.Core.Session.Restore;
 using Launcher.Core.Supervision;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +30,26 @@ public static class SupervisorHost
 
         // Main sem contexto de sincronização: esperar aqui não trava nada.
         int exitCode = supervisor.RunAsync(SupervisorArguments.Has(args, SupervisorArguments.SafeMode), SupervisorArguments.Passthrough(args)).GetAwaiter().GetResult();
+        RecoverConsoleMode(loggers);
         fileLog.Flush(TimeSpan.FromSeconds(2));
         return exitCode;
+    }
+
+    /// <summary>
+    /// A UI não volta mais (o supervisor desistiu, ou ela foi encerrada à força) e deixou o modo console ativo: as telas
+    /// voltam para a mesa aqui, para ninguém ficar no desktop com as telas desligadas (MVP-036). Numa saída normal o
+    /// marcador já não existe e nada é lido do Windows.
+    /// </summary>
+    private static void RecoverConsoleMode(ILoggerFactory loggers)
+    {
+        var store = new PendingEnvironmentStore(AppPaths.ConsoleModeEnvironmentFile);
+        var markers = new ConsoleModeMarkerStore(AppPaths.ConsoleModeMarkerFile);
+        if (!markers.Exists() && !store.Exists())
+        {
+            return;
+        }
+
+        var environment = new SessionEnvironmentGuard(new WindowsDisplayConfiguration(), new WindowsAudioEndpoints(), store, TimeProvider.System, loggers.CreateLogger<SessionEnvironmentGuard>());
+        new ConsoleModeRecovery(new WindowsDisplayControl(), environment, store, markers, loggers.CreateLogger<ConsoleModeRecovery>()).Recover();
     }
 }

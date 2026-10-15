@@ -48,6 +48,7 @@ public sealed partial class ShellViewModel
                 return true;
         }
 
+        _screenFocusedForGame = true; // a volta é deste jogo (no modo console a tela de jogo é do modo console)
         if (result.TargetBounds is { } bounds)
         {
             MoveLauncherTo(bounds);
@@ -64,7 +65,7 @@ public sealed partial class ShellViewModel
             return true;
         }
 
-        RestoreGameScreen();
+        await RestoreGameScreenAsync().ConfigureAwait(true);
         Toast("Tela de jogo não confirmada · suas telas voltaram ao normal");
         return false;
     }
@@ -82,15 +83,30 @@ public sealed partial class ShellViewModel
         return seen;
     }
 
-    /// <summary>Desfaz a tela de jogo, se estiver em foco. Devolve o complemento do aviso de "bem-vindo".</summary>
-    private string RestoreGameScreen()
+    /// <summary>
+    /// A tela de jogo focada por este jogo, se houver, deixa de ser dele (thread da UI). Devolve se é preciso desfazê-la
+    /// com <see cref="EndGameScreen"/>.
+    /// </summary>
+    private bool TakeGameScreen()
     {
-        if (!GameScreen.IsActive)
+        bool focused = _screenFocusedForGame;
+        _screenFocusedForGame = false;
+        return focused;
+    }
+
+    /// <summary>Desfaz a tela de jogo (lento: fora da thread da UI). Devolve o complemento do aviso de "bem-vindo".</summary>
+    private string EndGameScreen() =>
+        !GameScreen.IsActive || GameScreen.End() ? string.Empty : " · as telas não voltaram exatamente como antes (veja os logs)";
+
+    /// <summary>Desfaz a tela de jogo deste jogo fora da thread da UI, com "Voltando para a mesa…" na tela.</summary>
+    private async Task<string> RestoreGameScreenAsync()
+    {
+        if (!TakeGameScreen())
         {
             return string.Empty;
         }
 
-        return GameScreen.End() ? string.Empty : " · as telas não voltaram exatamente como antes (veja os logs)";
+        return await RunOffUiAsync(ReturningToDesk, ReturningDetail, EndGameScreen).ConfigureAwait(true);
     }
 
     /// <summary>O Tako vai para a tela de jogo (com a cortina preta, ele poderia ficar coberto na tela antiga).</summary>

@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ConsoleMode.Runtime;
+using ConsoleMode.Runtime.Display;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Sources;
@@ -40,6 +41,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly PlayniteThemeService _playniteThemes;
     private readonly SessionEnvironmentGuard _environment;
     private readonly GameSessionDevices _devices;
+    private readonly IEmergencyHotkey _emergencyHotkey;
     private readonly TimeProvider _time;
     private readonly ILogger<ShellViewModel> _logger;
     private readonly Dictionary<string, GameItemViewModel> _items = [];
@@ -98,6 +100,8 @@ public sealed partial class ShellViewModel : ObservableObject
         LibrarySources librarySources,
         CollectionLibrary collections,
         GameSettingsStore gameSettings,
+        ConsoleModeSession consoleMode,
+        IEmergencyHotkey emergencyHotkey,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
@@ -114,12 +118,14 @@ public sealed partial class ShellViewModel : ObservableObject
         _devices = devices;
         Collections = collections;
         _gameSettings = gameSettings;
+        ConsoleSession = consoleMode;
+        _emergencyHotkey = emergencyHotkey;
         _time = time;
         _logger = logger;
         SyncItems();
 
         SidebarItems = BuildSidebar();
-        SidebarMain = SidebarItems.Where(s => !s.IsBottom && s.Key != "exit").ToList();
+        SidebarMain = SidebarItems.Where(s => !s.IsBottom && s.Key is not ("exit" or "desk")).ToList();
         SidebarFooter = SidebarItems.Except(SidebarMain).ToList();
         _currentPage = new HomeViewModel(this);
         SyncSidebar();
@@ -314,6 +320,12 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void Launch(GameItemViewModel game)
     {
+        if (IsReturningToDesk)
+        {
+            Toast("Aguarde: o Tako está voltando as telas para a mesa");
+            return;
+        }
+
         if (RunningGame is not null)
         {
             if (RunningGame == game)
@@ -513,9 +525,21 @@ public sealed partial class ShellViewModel : ObservableObject
         DialogViewModel? dialog = null;
         dialog = new DialogViewModel(
             "Sair para o desktop?",
-            "O Tako fecha a tela cheia. Monitores e áudio são restaurados pelo Console Runtime (Marco 1).",
+            IsConsoleModeActive
+                ? "O Tako volta as telas, o áudio e a TV para a mesa e fecha a tela cheia."
+                : "O Tako fecha a tela cheia. Monitores e áudio são restaurados pelo Console Runtime (Marco 1).",
             [
-                new OverlayAction("Sair", ActionStyle.Primary, new RelayCommand(() => System.Windows.Application.Current.Shutdown()), IsDefault: true),
+                new OverlayAction("Sair", ActionStyle.Primary, new AsyncRelayCommand(async () =>
+                {
+                    if (IsConsoleModeActive)
+                    {
+                        // A volta para a mesa roda fora da thread da UI, com o andamento na tela, antes de fechar.
+                        CloseOverlay(dialog!);
+                        await ReturnToDeskAsync().ConfigureAwait(true);
+                    }
+
+                    System.Windows.Application.Current.Shutdown();
+                }), IsDefault: true),
                 new OverlayAction("Cancelar", ActionStyle.Secondary, new RelayCommand(() => CloseOverlay(dialog!))),
             ]);
         PushOverlay(dialog);
@@ -668,6 +692,8 @@ public sealed partial class ShellViewModel : ObservableObject
             case LaunchOverlayViewModel:
                 list.Add(("a", "Cancelar", AppCommand.Accept));
                 break;
+            case ProgressOverlayViewModel:
+                break; // some sozinho ao terminar
             case SearchViewModel when key:
                 // Teclado físico: digita direto; Enter conclui.
                 list.Add(("a", "Pronto", AppCommand.Menu));
@@ -789,6 +815,8 @@ public sealed partial class ShellViewModel : ObservableObject
             Library("library:xbox", "Xbox", "Store.Xbox", LibraryFilter.ForStore(GameStore.Xbox), badge: StoreBrush(GameStore.Xbox)),
             Library("library:manual", "Adicionados", "Store.Manual", LibraryFilter.ForStore(GameStore.Manual), badge: StoreBrush(GameStore.Manual)),
             new("settings", "Configurações", "Icon.Gear", new RelayCommand(OpenSettings)) { IsBottom = true },
+            // Modo console (tela de jogo desde a abertura): aparece só enquanto ele está ativo.
+            new("desk", "Voltar ao PC", "Icon.Monitor", new RelayCommand(ConfirmReturnToDesk)) { IsHidden = true },
             new("exit", "Sair para o desktop", "Icon.Power", new RelayCommand(ConfirmExit)),
         };
         return items;

@@ -77,8 +77,9 @@ public partial class App : Application
         // O Tako caiu durante um jogo com o ponteiro escondido, o PresentMon medindo ou um limite de FPS aplicado: desfaz.
         _services.GetRequiredService<SessionToolsService>().RecoverAfterCrash();
 
-        // O Tako caiu durante um jogo e monitores ou áudio ficaram diferentes: oferece restaurar (MVP-012).
-        shell.OfferEnvironmentRestore();
+        // Telas na abertura (MVP-012/036): atalho de emergência, volta para a mesa se o Tako caiu no modo console,
+        // oferta de restaurar monitores e áudio de um jogo e, por fim, o modo console ao abrir (nunca no modo seguro).
+        shell.StartScreensOnLaunch(startup.SafeMode);
 
         // Descrição, gêneros, notas e artes dos jogos chegam em segundo plano (cache primeiro).
         shell.StartMetadataUpdates();
@@ -169,6 +170,10 @@ public partial class App : Application
         services.AddSingleton<ISteamClient, WindowsSteamClient>();
         services.AddSingleton<ITvControl>(sp => CreateTvControl(sp.GetRequiredService<ILogger<GameSessionDevices>>()));
         services.AddSingleton<GameSessionDevices>();
+        // Modo console ao abrir (MVP-002/036): arquivos próprios, separados dos do jogo, e o atalho de emergência.
+        services.AddSingleton(_ => new ConsoleModeFiles(AppPaths.ConsoleModeMarkerFile, AppPaths.ConsoleModeEnvironmentFile));
+        services.AddSingleton(CreateConsoleMode);
+        services.AddSingleton<IEmergencyHotkey, WindowsEmergencyHotkey>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
         testServices?.Invoke(services);
@@ -209,6 +214,22 @@ public partial class App : Application
         }
 
         return library;
+    }
+
+    /// <summary>
+    /// Modo console: registro de monitores e áudio de antes (para a recuperação) e dispositivos próprios, para o áudio e
+    /// a TV dele não se misturarem com os de cada jogo.
+    /// </summary>
+    private static ConsoleModeSession CreateConsoleMode(IServiceProvider services)
+    {
+        var files = services.GetRequiredService<ConsoleModeFiles>();
+        var time = services.GetRequiredService<TimeProvider>();
+        var store = new PendingEnvironmentStore(files.Environment);
+        var environment = new SessionEnvironmentGuard(services.GetRequiredService<IDisplayConfigurationService>(), services.GetRequiredService<IAudioEndpointService>(), store, time, services.GetRequiredService<ILogger<SessionEnvironmentGuard>>());
+        var markers = new ConsoleModeMarkerStore(files.Marker);
+        var recovery = new ConsoleModeRecovery(services.GetRequiredService<IDisplayControlService>(), environment, store, markers, services.GetRequiredService<ILogger<ConsoleModeRecovery>>());
+        var devices = new GameSessionDevices(services.GetRequiredService<IAudioEndpointService>(), services.GetRequiredService<ISteamClient>(), services.GetRequiredService<ITvControl>(), time, services.GetRequiredService<ILogger<GameSessionDevices>>());
+        return new ConsoleModeSession(services.GetRequiredService<GameScreenSession>(), devices, environment, markers, recovery, time, services.GetRequiredService<ILogger<ConsoleModeSession>>());
     }
 
     /// <summary>
@@ -260,6 +281,9 @@ public partial class App : Application
         {
             _services.GetService<SessionJournal>()?.EndClean();
         }
+
+        // Ainda no modo console (Alt+F4, fim da sessão do Windows, recuperação de erro): as telas voltam para a mesa.
+        _services?.GetService<ShellViewModel>()?.LeaveConsoleModeOnExit();
 
         // Atualização baixada e não aplicada: instala agora, sem reabrir.
         _services?.GetService<ShellViewModel>()?.ApplyPendingUpdateOnExit();

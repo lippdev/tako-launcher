@@ -59,6 +59,10 @@ public sealed partial class UiSmokeTests
         var steam = new SimulatedSteamClient();
         var tv = new SimulatedTvControl();
         string environmentFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-environment-{Guid.NewGuid():N}.json");
+        var hotkey = new SimulatedEmergencyHotkey();
+        var consoleFiles = new ConsoleModeFiles(
+            Path.Combine(Path.GetTempPath(), $"tako-smoke-console-{Guid.NewGuid():N}.json"),
+            Path.Combine(Path.GetTempPath(), $"tako-smoke-console-environment-{Guid.NewGuid():N}.json"));
         using var services = App.BuildServices(
             new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System),
             s => s.AddSingleton<IDisplayConfigurationService>(display)
@@ -75,7 +79,9 @@ public sealed partial class UiSmokeTests
                 .AddSingleton<ConsoleMode.Runtime.Steam.ISteamClient>(steam)
                 .AddSingleton<ConsoleMode.Runtime.Tv.ITvControl>(tv)
                 .AddSingleton<Launcher.Core.Library.Xbox.IXboxSystem>(new EmptyXboxSystem())
-                .AddSingleton(new PendingEnvironmentStore(environmentFile)));
+                .AddSingleton(new PendingEnvironmentStore(environmentFile))
+                .AddSingleton<IEmergencyHotkey>(hotkey)
+                .AddSingleton(consoleFiles));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
 
@@ -442,6 +448,7 @@ public sealed partial class UiSmokeTests
         // --- Monitores e áudio (frente E2)
         MonitorsAndAudio(services, shell, window, real, display, audio);
         GameScreenSettingsAndConfirmation(shell, window);
+        ConsoleModeOnLaunch(shell, window, hotkey, consoleFiles);
 
         // --- Áudio, Steam e TV durante o jogo (MVP-002 parte 2)
         GameAudioSteamAndTv(shell, window, real, audio, tv);
@@ -917,6 +924,7 @@ public sealed partial class UiSmokeTests
         Assert.Equal("overlay", Nav.GetGroup(nav.Focused!));
         Snap(window, "42-oferta-restaurar-monitores-audio");
         Press(window, AppCommand.Accept);
+        WaitForNoOverlay(shell); // a restauração roda fora da thread da UI, com "Restaurando monitores e áudio…" na tela
         Assert.Null(shell.TopOverlay);
         Assert.Equal(appliedBefore + 1, display.AppliedCount);
         Assert.True(display.Current.IsEquivalentTo(SimulatedDisplayConfiguration.Default));
