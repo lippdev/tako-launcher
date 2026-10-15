@@ -304,9 +304,12 @@ public sealed class UiSmokeTests
         Press(window, AppCommand.Back);
 
         // Homologação: .pthm das releases (hash fixo), importados e abertos na prévia; o relatório vai para o artefato.
+        // Bindings para dados que o adaptador ainda não fornece (MVP-018) são esperados em temas de terceiros: vão para o
+        // relatório da homologação, não para a verificação de erros de binding do launcher.
         var homologation = new List<string>();
         foreach (var fixture in ThemeFixtures.Homologated)
         {
+            int bindingErrorsBefore = bindingErrors.Errors.Count;
             string? package = ThemeFixtures.TryDownload(fixture, out string? problem);
             if (package is null)
             {
@@ -343,6 +346,11 @@ public sealed class UiSmokeTests
             {
                 shell.CloseOverlay(shell.TopOverlay);
             }
+
+            var themeBindingErrors = bindingErrors.Errors.Skip(bindingErrorsBefore).ToList();
+            bindingErrors.Errors.RemoveRange(bindingErrorsBefore, themeBindingErrors.Count);
+            homologation.Add($"    Erros de binding do tema (dados do Playnite ainda não fornecidos): {themeBindingErrors.Count}");
+            homologation.AddRange(themeBindingErrors.Select(e => e.Split(';')[0]).Distinct(StringComparer.Ordinal).Take(15).Select(e => "      " + e));
         }
 
         File.WriteAllLines(Path.Combine(Screenshots, "theme-homologation.txt"), homologation);
