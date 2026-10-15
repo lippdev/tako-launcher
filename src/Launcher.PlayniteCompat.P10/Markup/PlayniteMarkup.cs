@@ -57,12 +57,15 @@ public sealed class ThemeFileBindingExtension : MarkupExtension
 
     public object? FallbackValue { get; set; }
 
+    public string? StringFormat { get; set; }
+
     public override object? ProvideValue(IServiceProvider serviceProvider)
     {
         var target = (serviceProvider.GetService(typeof(IProvideValueTarget)) as IProvideValueTarget)?.TargetProperty as DependencyProperty;
         var binding = new Binding(Path ?? string.Empty)
         {
             Mode = BindingMode.OneWay,
+            StringFormat = StringFormat,
             Converter = new ThemeFileConverter(ThemeFiles.RootOf(serviceProvider), PathFormat, target?.PropertyType),
         };
         if (FallbackValue is not null)
@@ -261,6 +264,9 @@ public sealed class SettingsExtension : MarkupExtension
 
     public object? FallbackValue { get; set; }
 
+    /// <summary>Aceito por compatibilidade; como no WPF, não se aplica ao valor de reserva.</summary>
+    public string? StringFormat { get; set; }
+
     public override object? ProvideValue(IServiceProvider serviceProvider) =>
         StaticValue.Provide(serviceProvider, P10SettingsValues.Get(Path) ?? FallbackValue);
 }
@@ -287,12 +293,15 @@ public sealed class SettingsBindingExtension : MarkupExtension
 
     public object? FallbackValue { get; set; }
 
+    public string? StringFormat { get; set; }
+
     public override object? ProvideValue(IServiceProvider serviceProvider)
     {
         var binding = new Binding(nameof(SettingValue.Value))
         {
             Source = new SettingValue(P10SettingsValues.Get(Path) ?? FallbackValue),
             Mode = Mode,
+            StringFormat = StringFormat,
         };
         return StaticValue.Bind(binding, serviceProvider);
     }
@@ -316,6 +325,9 @@ public sealed class PluginSettingsExtension : MarkupExtension
     public string? Path { get; set; }
 
     public object? FallbackValue { get; set; }
+
+    /// <summary>Aceito por compatibilidade; como no WPF, não se aplica ao valor de reserva.</summary>
+    public string? StringFormat { get; set; }
 
     public override object? ProvideValue(IServiceProvider serviceProvider) => StaticValue.Provide(serviceProvider, FallbackValue);
 }
@@ -351,6 +363,8 @@ public sealed class ApiExtension : MarkupExtension
 
     public object? FallbackValue { get; set; }
 
+    public string? StringFormat { get; set; }
+
     public override object? ProvideValue(IServiceProvider serviceProvider)
     {
         string path = string.IsNullOrWhiteSpace(Path) ? "(0)" : $"(0).{Path.Trim()}";
@@ -359,6 +373,7 @@ public sealed class ApiExtension : MarkupExtension
             Path = new PropertyPath(path, P10Context.ApiProperty),
             RelativeSource = RelativeSource.Self,
             Mode = BindingMode.OneWay,
+            StringFormat = StringFormat,
         };
         if (FallbackValue is not null)
         {
