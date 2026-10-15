@@ -481,6 +481,17 @@ public sealed partial class ShellViewModel : ObservableObject
         PushOverlay(recovery);
     }
 
+    /// <summary>Erro de tema em uso: fecha a prévia e mostra a recuperação.</summary>
+    public void RecoverFromThemeFailure(string reason)
+    {
+        foreach (var preview in Overlays.OfType<PlaynitePreviewViewModel>().ToList())
+        {
+            CloseOverlay(preview);
+        }
+
+        ShowRecovery(new ThemeLoadResult(PlayniteThemeService.SampleTheme, false, reason));
+    }
+
     /// <summary>Prévia do tema Fullscreen padrão do Playnite 10 com a biblioteca do launcher (H2, MVP-014/017/018).</summary>
     public void ShowPlaynitePreview()
     {

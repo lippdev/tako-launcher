@@ -72,11 +72,46 @@ public sealed class RestrictedXamlLoader(XamlValidator validator)
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(Prepare(xaml, result)));
         try
         {
-            return (ResourceDictionary)XamlReader.Load(stream, context);
+            var dictionary = (ResourceDictionary)XamlReader.Load(stream, context);
+            Realize(dictionary);
+            return dictionary;
         }
-        catch (XamlParseException ex)
+        catch (Exception ex) when (ex is XamlParseException or InvalidOperationException or NotSupportedException)
         {
             throw new ThemeXamlRejectedException($"XAML '{themeRelativePath}' inválido: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// O WPF adia a criação de recursos e templates até o primeiro uso; um erro ali (ex.: propriedade que só existe no
+    /// Playnite) derrubaria a UI depois. Materializa tudo agora, para o erro recusar o arquivo na carga (MVP-021).
+    /// </summary>
+    private static void Realize(ResourceDictionary dictionary)
+    {
+        foreach (object key in dictionary.Keys.Cast<object>().ToList())
+        {
+            switch (dictionary[key])
+            {
+                case Style style:
+                    style.Seal();
+                    foreach (var setter in style.Setters.OfType<Setter>())
+                    {
+                        if (setter.Value is FrameworkTemplate template)
+                        {
+                            _ = template.LoadContent();
+                        }
+                    }
+
+                    break;
+                case FrameworkTemplate template:
+                    _ = template.LoadContent();
+                    break;
+            }
+        }
+
+        foreach (var merged in dictionary.MergedDictionaries)
+        {
+            Realize(merged);
         }
     }
 

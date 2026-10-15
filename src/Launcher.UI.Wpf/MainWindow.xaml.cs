@@ -79,6 +79,7 @@ public partial class MainWindow : Window
             }
         };
         _gamepadTimer.Tick += (_, _) => PollGamepad();
+        Dispatcher.UnhandledException += OnDispatcherUnhandledException;
         Loaded += (_, _) =>
         {
             Backdrop.Transition = _shell.Settings.ColorDuration;
@@ -420,4 +421,19 @@ public partial class MainWindow : Window
     }
 
     private void AfterLayout(Action action) => Dispatcher.BeginInvoke(action, DispatcherPriority.Loaded);
+
+    /// <summary>
+    /// Rede de segurança (MVP-021): um erro de XAML de tema que escape da validação e da carga não derruba o launcher;
+    /// a prévia é fechada e a tela de recuperação explica o motivo.
+    /// </summary>
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        if (e.Exception is not System.Windows.Markup.XamlParseException xaml)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _shell.RecoverFromThemeFailure(xaml.Message);
+    }
 }

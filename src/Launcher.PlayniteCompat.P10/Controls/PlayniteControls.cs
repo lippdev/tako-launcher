@@ -10,9 +10,17 @@ namespace Launcher.PlayniteCompat.P10.Controls;
 // Equivalentes dos controles do Playnite.FullscreenApp usados pelos temas Fullscreen (MVP-018/019).
 // O tema define estilos e templates; o comportamento específico do Playnite entra conforme a homologação (MVP-022).
 
-/// <summary>Botão do Playnite (Fullscreen). Sem comportamento extra no Marco 0.</summary>
+/// <summary>Botão do Playnite (Fullscreen). <see cref="InputHint"/> é o glifo do botão do controle ao lado do texto.</summary>
 public class ButtonEx : Button
 {
+    public static readonly DependencyProperty InputHintProperty =
+        DependencyProperty.Register(nameof(InputHint), typeof(DataTemplate), typeof(ButtonEx), new PropertyMetadata(null));
+
+    public DataTemplate? InputHint
+    {
+        get => (DataTemplate?)GetValue(InputHintProperty);
+        set => SetValue(InputHintProperty, value);
+    }
 }
 
 /// <summary>Lista de itens do Playnite (menus e filtros).</summary>
