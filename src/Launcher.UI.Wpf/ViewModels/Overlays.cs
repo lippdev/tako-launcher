@@ -36,9 +36,19 @@ public sealed class DialogViewModel(string title, string text, IReadOnlyList<Ove
     public IReadOnlyList<OverlayAction> Actions { get; } = actions;
 }
 
-/// <summary>Tela de recuperação (MVP-021/036): tema rejeitado, o app segue no tema padrão.</summary>
+/// <summary>
+/// Tela de recuperação (MVP-011/021/036): tema rejeitado (o app segue no tema padrão), erro inesperado ou aviso de modo
+/// seguro. Sempre tem uma ação que leva ao desktop.
+/// </summary>
 public sealed class RecoveryViewModel(string detail, IReadOnlyList<OverlayAction> actions) : IOverlayViewModel
 {
+    public string Title { get; init; } = "O tema não pôde ser carregado";
+
+    public string Message { get; init; } = "O Tako voltou para o tema padrão. Seus jogos e configurações não foram alterados.";
+
+    /// <summary>Erro inesperado (não de tema): evita empilhar uma tela de recuperação sobre outra.</summary>
+    public bool IsError { get; init; }
+
     public string Detail { get; } = detail;
 
     public IReadOnlyList<OverlayAction> Actions { get; } = actions;
@@ -50,6 +60,13 @@ public sealed partial class LaunchOverlayViewModel(GameItemViewModel game, IComm
     public GameItemViewModel Game { get; } = game;
 
     public ICommand Cancel { get; } = cancel;
+
+    /// <summary>B cancela de verdade (para o temporizador e volta a sessão a "navegando"), como o botão Cancelar.</summary>
+    public bool HandleBack()
+    {
+        Cancel.Execute(null);
+        return true;
+    }
 
     public string Status { get; } = "Preparando a sessão: monitores, áudio e controle";
 }

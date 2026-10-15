@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
+using Launcher.Core.Resilience;
 using Launcher.Tests;
 using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
@@ -254,6 +255,9 @@ public sealed class UiSmokeTests
         Assert.Equal("Jogar", ((DetailsViewModel)shell.CurrentPage).PrimaryLabel);
         Snap(window, "22-retorno-do-jogo");
 
+        // --- Resiliência e foco (frente D)
+        ResilienceAndFocus(app, services, shell, window);
+
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();
         window.Width = 840; // 21:9
@@ -278,6 +282,147 @@ public sealed class UiSmokeTests
         File.WriteAllLines(Path.Combine(Screenshots, "binding-errors.txt"), bindingErrors.Errors);
         window.Close();
         Assert.DoesNotContain(bindingErrors.Errors, e => !e.Contains("Error: 4 :", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// MVP-029/031/011/036: toda tela essencial abre com um elemento focado e B sempre leva a algum lugar; erro
+    /// inesperado mostra a recuperação; o modo seguro avisa e volta ao normal sem reiniciar.
+    /// </summary>
+    private static void ResilienceAndFocus(App app, ServiceProvider services, ShellViewModel shell, MainWindow window)
+    {
+        var nav = window.Navigator;
+
+        // Início é a raiz: B não tira o foco de lugar nenhum.
+        shell.GoHome();
+        Pump(1);
+        AssertFocused(window, "Início");
+        Press(window, AppCommand.Back);
+        Assert.IsType<HomeViewModel>(shell.CurrentPage);
+        AssertFocused(window, "Início depois de B");
+
+        // Biblioteca → Detalhes → B → Biblioteca → B → Início.
+        shell.OpenLibrary(LibraryFilter.All);
+        Pump(1);
+        AssertFocused(window, "Biblioteca");
+        Press(window, AppCommand.Accept);
+        Pump(0.8);
+        Assert.IsType<DetailsViewModel>(shell.CurrentPage);
+        AssertFocused(window, "Detalhes");
+        Press(window, AppCommand.Back);
+        Assert.IsType<LibraryViewModel>(shell.CurrentPage);
+        AssertFocused(window, "Biblioteca depois de B");
+        Press(window, AppCommand.Back);
+        Assert.IsType<HomeViewModel>(shell.CurrentPage);
+        AssertFocused(window, "Início depois de sair da biblioteca");
+
+        // Favoritos (pode estar vazia: o cabeçalho ainda tem o que focar).
+        shell.OpenLibrary(LibraryFilter.Favorites);
+        Pump(0.8);
+        AssertFocused(window, "Favoritos");
+
+        // Configurações: as linhas novas (modo seguro e Xbox mode) ficam logo antes de "Tema".
+        shell.OpenSettings();
+        Pump(0.8);
+        AssertFocused(window, "Configurações");
+        Assert.NotNull(nav.Navigables().FirstOrDefault(e => Nav.GetKey(e) == "settings:safemode"));
+        Assert.NotNull(nav.Navigables().FirstOrDefault(e => Nav.GetKey(e) == "settings:fse"));
+        Assert.NotEmpty(shell.FseStatus.Reason);
+        Press(window, AppCommand.Back);
+        Assert.IsNotType<SettingsViewModel>(shell.CurrentPage);
+        AssertFocused(window, "depois de sair das Configurações");
+
+        // Diálogo: foco nas ações; B fecha e devolve o foco à página.
+        shell.ConfirmExit();
+        Pump(0.5);
+        AssertFocused(window, "Diálogo de saída");
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+        AssertFocused(window, "depois do diálogo");
+
+        // MVP-011: exceção não tratada na UI vira tela de recuperação com caminho para o desktop.
+        var guard = services.GetRequiredService<CrashGuard>();
+        guard.Install(app, window, shell);
+        var seen = new List<string>();
+        window.Dispatcher.UnhandledException += (_, e) => seen.Add($"{e.Exception.GetType().Name} handled={e.Handled}");
+        window.Dispatcher.BeginInvoke(() => throw new InvalidOperationException("Falha simulada pelo teste de fumaça"));
+        Pump(0.8);
+        string diagnosis = $"eventos=[{string.Join("; ", seen)}] guarda={guard.LastOutcome} fatal={guard.IsFatal} carregada={window.IsLoaded} visível={window.IsVisible} topo={shell.TopOverlay?.GetType().Name ?? "nenhum"}";
+        Assert.False(guard.IsFatal, diagnosis);
+        Assert.Equal(1, guard.Recoveries);
+        Assert.True(shell.TopOverlay is RecoveryViewModel, diagnosis);
+        var error = Assert.IsType<RecoveryViewModel>(shell.TopOverlay);
+        Assert.True(error.IsError);
+        Assert.Contains(error.Actions, a => a.Label == "Sair para o desktop");
+        Assert.False(services.GetRequiredService<CrashGuard>().IsFatal);
+        AssertFocused(window, "Recuperação de erro");
+        Snap(window, "23-recuperacao-erro");
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+        AssertFocused(window, "depois da recuperação");
+
+        // MVP-036: modo seguro com aviso; "Voltar ao normal" aplica o tema do disco sem reiniciar.
+        string journalFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-{Guid.NewGuid():N}.json");
+        var journal = new SessionJournal(journalFile, TimeProvider.System);
+        var decision = CrashLoopPolicy.Decide(new SessionMarker(true, 1, null), safeModeRequested: false, DateTimeOffset.Now);
+        Assert.True(decision.SafeMode);
+        shell.EnterSafeMode(decision, journal, services.GetRequiredService<UpdateService>());
+        Pump(0.6);
+        var notice = Assert.IsType<RecoveryViewModel>(shell.TopOverlay);
+        Assert.Equal("Modo seguro", notice.Title);
+        Assert.Equal("Continuar no modo seguro", Nav.GetKey(nav.Focused!));
+        Snap(window, "24-modo-seguro");
+        Press(window, AppCommand.Accept);
+        Assert.Null(shell.TopOverlay);
+        Assert.True(shell.IsSafeMode);
+        shell.OpenSettings();
+        Pump(0.8);
+        Assert.True(nav.FocusDefault("settings:safemode"));
+        Assert.Equal("settings:safemode", Nav.GetKey(nav.Focused!));
+        Pump(0.6);
+        Snap(window, "25-configuracoes-resiliencia");
+        Press(window, AppCommand.Accept);
+        Assert.False(shell.IsSafeMode);
+        Assert.Equal(ThemeService.DefaultTheme, services.GetRequiredService<ThemeService>().CurrentTheme);
+        File.Delete(journalFile);
+
+        // B durante "Iniciando" cancela de verdade (antes só escondia a tela e o jogo abria mesmo assim).
+        // Jogo simulado da biblioteca fictícia (sem executável): o destaque da Início pode ser um jogo real.
+        var simulated = shell.ItemFor(shell.Library.Games.First(g => g.LaunchTarget is null && g.CanPlay));
+        shell.GoHome();
+        Pump(0.8);
+        shell.Launch(simulated);
+        Pump(0.3);
+        Assert.IsType<LaunchOverlayViewModel>(shell.TopOverlay);
+        AssertFocused(window, "Iniciando");
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+        Pump(3);
+        Assert.False(shell.IsInGame);
+        AssertFocused(window, "depois de cancelar o início");
+
+        // Central de Controle: foco no cartão do jogo; B volta ao jogo.
+        shell.Launch(simulated);
+        Pump(3.2);
+        Assert.True(shell.IsInGame);
+        Press(window, AppCommand.Guide);
+        Pump(0.6);
+        Assert.IsType<ControlCenterViewModel>(shell.TopOverlay);
+        AssertFocused(window, "Central de Controle");
+        Press(window, AppCommand.Back);
+        Assert.IsType<GameSessionViewModel>(shell.TopOverlay);
+        shell.EndSession();
+        Pump(0.8);
+        Assert.Null(shell.TopOverlay);
+        AssertFocused(window, "Início depois do jogo");
+    }
+
+    /// <summary>Há um elemento focado, visível e alcançável pela navegação no escopo atual.</summary>
+    private static void AssertFocused(MainWindow window, string screen)
+    {
+        var focused = window.Navigator.Focused;
+        Assert.True(focused is not null, $"{screen}: nenhum elemento focado");
+        Assert.True(focused.IsVisible, $"{screen}: o foco está num elemento invisível ({Nav.GetKey(focused)})");
+        Assert.True(window.Navigator.Navigables().Contains(focused), $"{screen}: o foco está fora do escopo navegável ({Nav.GetKey(focused)})");
     }
 
     private static void Press(MainWindow window, AppCommand command)

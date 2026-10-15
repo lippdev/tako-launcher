@@ -51,7 +51,15 @@ public sealed partial class SonyHidGamepad : IDisposable
         if (Environment.TickCount64 >= _nextScan)
         {
             _nextScan = Environment.TickCount64 + RescanMilliseconds;
-            TryConnect();
+            try
+            {
+                TryConnect();
+            }
+            catch (Win32Exception)
+            {
+                // Falha ao enumerar dispositivos HID (driver ocupado, sessão remota): tenta de novo no próximo ciclo,
+                // sem derrubar a leitura do teclado e do XInput (MVP-031).
+            }
         }
 
         return null;

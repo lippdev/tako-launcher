@@ -6,6 +6,7 @@ using Launcher.Core.Library;
 using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Steam;
 using Launcher.Core.Persistence;
+using Launcher.Core.Resilience;
 using Launcher.Themes.Xaml;
 using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Services;
@@ -17,6 +18,9 @@ namespace Launcher.UI.Wpf;
 
 public partial class App : Application
 {
+    /// <summary>Força o modo seguro nesta abertura (atalho para suporte: <c>Tako.exe --safe-mode</c>).</summary>
+    public const string SafeModeArgument = "--safe-mode";
+
     private ServiceProvider? _services;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -25,11 +29,29 @@ public partial class App : Application
         _services = BuildServices();
         LogUnhandledExceptions(_services);
 
-        // O tema padrão passa pelo mesmo carregador restrito que temas da comunidade (MVP-013/016).
-        var startupTheme = _services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
+        // Proteção contra loop de travamento (MVP-036): duas aberturas seguidas sem fechar limpo abrem em modo seguro.
+        var journal = _services.GetRequiredService<SessionJournal>();
+        var startup = journal.Begin(safeModeRequested: e.Args.Contains(SafeModeArgument, StringComparer.OrdinalIgnoreCase));
+
+        // O tema padrão passa pelo mesmo carregador restrito que temas da comunidade (MVP-013/016); no modo seguro, só a
+        // cópia embutida no executável.
+        var themes = _services.GetRequiredService<ThemeService>();
+        ThemeLoadResult startupTheme;
+        if (startup.SafeMode)
+        {
+            themes.ApplyEmbeddedDefault();
+            startupTheme = ThemeLoadResult.Ok(ThemeService.DefaultTheme);
+        }
+        else
+        {
+            startupTheme = themes.Apply(ThemeService.DefaultTheme);
+        }
+
         var shell = _services.GetRequiredService<ShellViewModel>();
         var window = _services.GetRequiredService<MainWindow>();
         MainWindow = window;
+        _services.GetRequiredService<CrashGuard>().Install(this, window, shell);
+        shell.ConfigureStartupEntry(StartupRegistration.IsSupported ? new StartupRegistration() : null, Environment.ProcessPath);
         window.Show();
         if (!startupTheme.Succeeded)
         {
@@ -39,8 +61,17 @@ public partial class App : Application
         // Descrição, gêneros, notas e artes dos jogos chegam em segundo plano (cache primeiro).
         shell.StartMetadataUpdates();
 
-        // Procura e baixa atualizações em segundo plano (GitHub Releases, como no Console Mode).
-        shell.StartAutoUpdate(_services.GetRequiredService<UpdateService>());
+        // Procura e baixa atualizações em segundo plano (GitHub Releases, como no Console Mode); no modo seguro, só
+        // depois de "Voltar ao normal".
+        var updates = _services.GetRequiredService<UpdateService>();
+        if (startup.SafeMode)
+        {
+            shell.EnterSafeMode(startup, journal, updates);
+        }
+        else
+        {
+            shell.StartAutoUpdate(updates);
+        }
     }
 
     /// <summary>Composição de dependências. O teste de fumaça da UI passa uma biblioteca fictícia em <paramref name="library"/>.</summary>
@@ -66,6 +97,8 @@ public partial class App : Application
         services.AddSingleton<IMetadataProvider, SteamStoreProvider>();
         services.AddSingleton<MetadataService>();
         services.AddSingleton<UpdateService>();
+        services.AddSingleton(sp => new SessionJournal(AppPaths.SessionFile, sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<CrashGuard>();
         services.AddSingleton<IGameLibrary>(sp => library ?? CreateLocalLibrary(sp));
         services.AddSingleton(XamlSecurityPolicy.CreateDefault());
         services.AddSingleton<XamlValidator>();
@@ -143,6 +176,12 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // Fechamento limpo apaga a "sessão em andamento"; saída por falha (CrashGuard) conta para o modo seguro.
+        if (_services?.GetService<CrashGuard>() is { IsFatal: false })
+        {
+            _services.GetService<SessionJournal>()?.EndClean();
+        }
+
         // Atualização baixada e não aplicada: instala agora, sem reabrir.
         _services?.GetService<ShellViewModel>()?.ApplyPendingUpdateOnExit();
         _services?.Dispose();

@@ -310,6 +310,28 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Resiliência (frente D): modo seguro (MVP-036) e estado do Xbox mode / FSE (MVP-008). -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ExitSafeModeCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:safemode">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding DataContext.SafeModeLabel, RelativeSource={RelativeSource AncestorType=Window}}" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Modo seguro" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding DataContext.SafeModeDescription, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ShowFseStatusCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:fse">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" Text="{Binding DataContext.FseStatus.Label, RelativeSource={RelativeSource AncestorType=Window}}" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+          <StackPanel>
+            <TextBlock Text="Xbox mode (tela cheia do Windows)" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding DataContext.FseDescription, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <Button Style="{StaticResource SettingRow}" Command="{Binding ReapplyThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:theme" nav:Nav.IsDefault="True">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -706,8 +728,8 @@
         <Border Width="88" Height="88" CornerRadius="26" Background="#29FF5A5F" HorizontalAlignment="Left" Margin="0,0,0,36">
           <c:Icon Key="Icon.Alert" Width="48" Height="48" Foreground="{DynamicResource ErrorBrush}" />
         </Border>
-        <TextBlock Text="O tema não pôde ser carregado" Style="{StaticResource PageTitle}" FontWeight="Normal" />
-        <TextBlock Text="O Tako voltou para o tema padrão. Seus jogos e configurações não foram alterados." Margin="0,18,0,0"
+        <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitle}" FontWeight="Normal" />
+        <TextBlock Text="{Binding Message}" Margin="0,18,0,0"
                    FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
         <ItemsControl ItemsSource="{Binding Actions}" Margin="0,44,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
         <TextBlock Text="{Binding Detail}" Margin="0,30,0,0" FontFamily="Consolas" FontSize="{DynamicResource FsLabelSm}" Foreground="#73FFFFFF" TextWrapping="Wrap" />

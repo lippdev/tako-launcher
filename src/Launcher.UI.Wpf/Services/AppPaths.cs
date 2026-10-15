@@ -32,4 +32,7 @@ public static class AppPaths
     public static string ArtCache => Path.Combine(DataRoot, "cache", "art");
 
     public static string MetadataCache => Path.Combine(DataRoot, "cache", "metadata");
+
+    /// <summary>Marcador de sessão em andamento (proteção contra loop de travamento, MVP-036).</summary>
+    public static string SessionFile => Path.Combine(DataRoot, "session.json");
 }
