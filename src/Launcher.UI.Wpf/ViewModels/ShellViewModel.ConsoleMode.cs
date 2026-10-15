@@ -49,6 +49,7 @@ public sealed partial class ShellViewModel
     /// </summary>
     public async void StartScreensOnLaunch(bool safeMode)
     {
+        EnsureUiContext();
         StartEmergencyHotkey();
         await RecoverConsoleModeAsync().ConfigureAwait(true);
         if (OfferEnvironmentRestore())
@@ -119,6 +120,8 @@ public sealed partial class ShellViewModel
         {
             return false;
         }
+
+        EnsureUiContext();
 
         string name = Settings.GameScreenName.Length > 0 ? Settings.GameScreenName : "tela de jogo";
         var progress = new ProgressOverlayViewModel("Indo para a tela de jogo…", Settings.TvControl.IsActive ? "Ligando a TV e trocando a entrada" : $"Usando {name}");
@@ -262,6 +265,7 @@ public sealed partial class ShellViewModel
     /// </summary>
     private async Task<T> RunOffUiAsync<T>(string title, string detail, Func<T> work)
     {
+        EnsureUiContext();
         var progress = new ProgressOverlayViewModel(title, detail);
         Interlocked.Increment(ref _offUiWork);
         PushOverlay(progress);
@@ -276,6 +280,18 @@ public sealed partial class ShellViewModel
         {
             Interlocked.Decrement(ref _offUiWork);
             CloseIfOpen(progress);
+        }
+    }
+
+    /// <summary>
+    /// Os awaits daqui voltam para a thread da UI pelo contexto de sincronização. Chamado fora de um ciclo do Dispatcher
+    /// (ex.: um comando executado direto), a thread da UI ainda não tem o contexto: instala o do Dispatcher dela.
+    /// </summary>
+    private void EnsureUiContext()
+    {
+        if (SynchronizationContext.Current is null && _uiDispatcher.CheckAccess())
+        {
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(_uiDispatcher));
         }
     }
 
