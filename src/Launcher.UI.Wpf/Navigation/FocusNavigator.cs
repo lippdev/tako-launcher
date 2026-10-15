@@ -186,10 +186,12 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
     {
         for (DependencyObject? d = VisualTreeHelper.GetParent(element), child = element; d is not null; child = d, d = VisualTreeHelper.GetParent(d))
         {
-            if (d is not FrameworkElement host || Nav.GetScrollHost(host) is not string mode || host.RenderTransform is not TranslateTransform translate)
+            if (d is not FrameworkElement host || Nav.GetScrollHost(host) is not string mode)
             {
                 continue;
             }
+
+            var translate = MutableTranslate(host);
 
             if (VisualTreeHelper.GetParent(host) is not FrameworkElement viewport)
             {
@@ -234,6 +236,20 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
                 Animate(translate, TranslateTransform.YProperty, Math.Min(0, target));
             }
         }
+    }
+
+    /// <summary>Transformações declaradas em templates vêm congeladas; a primeira rolagem troca por uma cópia animável.</summary>
+    private static TranslateTransform MutableTranslate(FrameworkElement host)
+    {
+        if (host.RenderTransform is TranslateTransform { IsFrozen: false } current)
+        {
+            return current;
+        }
+
+        var existing = host.RenderTransform as TranslateTransform;
+        var mutable = new TranslateTransform(existing?.X ?? 0, existing?.Y ?? 0);
+        host.RenderTransform = mutable;
+        return mutable;
     }
 
     private void Animate(TranslateTransform transform, DependencyProperty property, double to)
