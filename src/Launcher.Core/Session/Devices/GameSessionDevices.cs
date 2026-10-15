@@ -155,6 +155,23 @@ public sealed partial class GameSessionDevices(
         }
     }
 
+    /// <summary>
+    /// Configurações › Detectar: o tipo da TV no IP (Android, LG ou Samsung) pelas portas que respondem; nulo se nenhuma
+    /// respondeu ou se o controle de TV não sabe detectar.
+    /// </summary>
+    public async Task<TvKind?> DetectTvAsync(string host, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        if (tv is not ITvDetector detector || string.IsNullOrWhiteSpace(host))
+        {
+            return null;
+        }
+
+        var kind = await detector.DetectAsync(host.Trim(), cancellationToken).ConfigureAwait(false);
+        LogTvDetected(logger, kind);
+        return kind;
+    }
+
     /// <summary>Linha de log para um evento da TV (usado pela composição ao criar o controle da TV).</summary>
     public static void LogTvEvent(ILogger logger, TvEvent tvEvent)
     {
@@ -169,6 +186,9 @@ public sealed partial class GameSessionDevices(
                 break;
             case TvEvent.KeyCreated:
                 LogTvKeyCreated(logger);
+                break;
+            case TvEvent.PairingSaved:
+                LogTvPairingSaved(logger);
                 break;
         }
     }
@@ -356,4 +376,10 @@ public sealed partial class GameSessionDevices(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "TV: chave ADB nova criada (a TV vai pedir permissão)")]
     private static partial void LogTvKeyCreated(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "TV: a TV aceitou este PC; chave de pareamento guardada (cifrada)")]
+    private static partial void LogTvPairingSaved(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "TV: detecção pelas portas encontrou {Kind} (vazio = nenhuma)")]
+    private static partial void LogTvDetected(ILogger logger, TvKind? kind);
 }

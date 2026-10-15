@@ -15,7 +15,10 @@ public sealed record TvControlConfig
     /// <summary>Ligar a TV e trocar a entrada ao abrir um jogo.</summary>
     public bool Enabled { get; init; }
 
-    /// <summary>IP ou nome da TV na rede, com ":porta" opcional (padrão 5555).</summary>
+    /// <summary>Como falar com a TV (padrão: Google TV / Android TV por ADB, o único tipo antes de LG e Samsung).</summary>
+    public TvKind Kind { get; init; } = TvKind.Android;
+
+    /// <summary>IP da TV na rede. No Android aceita nome e ":porta" opcional (padrão 5555); LG e Samsung usam o IP.</summary>
     public string Host { get; init; } = string.Empty;
 
     /// <summary>Endereço MAC para o Wake-on-LAN quando a TV está em espera profunda; vazio = não enviar.</summary>
@@ -24,7 +27,7 @@ public sealed record TvControlConfig
     /// <summary>Entrada HDMI onde o PC está ligado (1 a 4).</summary>
     public int HdmiInput { get; init; } = 1;
 
-    /// <summary>Comando de shell do Android que troca para a entrada do PC, para TVs que ignoram a tecla HDMI.</summary>
+    /// <summary>Só Android: comando de shell que troca para a entrada do PC, para TVs que ignoram a tecla HDMI.</summary>
     public string InputCommand { get; init; } = string.Empty;
 
     /// <summary>Colocar a TV em espera quando o jogo termina. Desligado por padrão.</summary>
@@ -44,7 +47,11 @@ public sealed record TvControlConfig
 /// <summary>Formato JSON da configuração (guardada como texto nas configurações do Tako).</summary>
 public static class TvControlConfigJson
 {
-    private static readonly JsonSerializerOptions Options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     public static string Serialize(TvControlConfig config) => JsonSerializer.Serialize(config, Options);
 
@@ -65,6 +72,7 @@ public static class TvControlConfigJson
                 MacAddress = config.MacAddress ?? string.Empty,
                 InputCommand = config.InputCommand ?? string.Empty,
                 HdmiInput = Math.Clamp(config.HdmiInput, 1, 4),
+                Kind = Enum.IsDefined(config.Kind) ? config.Kind : TvKind.Android,
             };
         }
         catch (JsonException)

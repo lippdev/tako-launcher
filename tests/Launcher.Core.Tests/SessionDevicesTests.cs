@@ -223,6 +223,17 @@ public class SessionDevicesTests
         Assert.Equal("A TV não autorizou este PC.", error.Message);
     }
 
+    [Fact]
+    public async Task Tv_detection_goes_to_the_detector_and_ignores_empty_addresses()
+    {
+        var (devices, _, _, tv) = Create();
+        tv.DetectedKind = TvKind.Samsung;
+
+        Assert.Null(await devices.DetectTvAsync("  ", TestContext.Current.CancellationToken));
+        Assert.Equal(TvKind.Samsung, await devices.DetectTvAsync(" 192.168.0.70 ", TestContext.Current.CancellationToken));
+        Assert.Equal(["detectar:192.168.0.70"], tv.Calls);
+    }
+
     private static async Task WaitForAsync(Func<bool> condition)
     {
         for (int i = 0; i < 100 && !condition(); i++)

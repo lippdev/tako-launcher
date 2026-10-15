@@ -14,12 +14,26 @@
       <Border Width="1180" CornerRadius="28" Background="#FF1A1E26" Padding="56,44" HorizontalAlignment="Center" VerticalAlignment="Center">
         <StackPanel>
           <TextBlock Text="Ligar a TV e trocar a entrada" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" />
-          <TextBlock Text="Pela rede, sem instalar nada. Na TV: Configurações › Sistema › Opções do desenvolvedor › ative &quot;Depuração USB&quot; (ou &quot;Depuração pela rede&quot;). Na primeira vez, aceite &quot;Permitir depuração&quot; na TV." Margin="0,10,0,0" FontSize="{DynamicResource FsLabelMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Help}" Margin="0,10,0,0" FontSize="{DynamicResource FsLabelMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" />
 
           <Button Style="{StaticResource PillButton}" Margin="0,28,0,0" HorizontalAlignment="Stretch" Command="{Binding ToggleEnabledCommand}"
                   nav:Nav.Group="overlay" nav:Nav.Key="tv:enabled" nav:Nav.IsDefault="True">
             <TextBlock Text="{Binding EnabledLabel}" />
           </Button>
+
+          <Grid Margin="0,20,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="36" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button Style="{StaticResource PillButton}" HorizontalAlignment="Stretch" Command="{Binding CycleKindCommand}" nav:Nav.Group="overlay" nav:Nav.Key="tv:kind">
+              <TextBlock Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis" />
+            </Button>
+            <Button Grid.Column="2" Style="{StaticResource PillButton}" HorizontalAlignment="Stretch" Command="{Binding DetectCommand}" nav:Nav.Group="overlay" nav:Nav.Key="tv:detect">
+              <TextBlock Text="{Binding DetectLabel}" />
+            </Button>
+          </Grid>
 
           <Grid>
             <Grid.ColumnDefinitions>
@@ -28,7 +42,7 @@
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <StackPanel>
-              <TextBlock Style="{StaticResource FieldLabel}" Text="IP da TV (Configurações › Rede, na TV)" />
+              <TextBlock Style="{StaticResource FieldLabel}" Text="{Binding HostLabel}" />
               <TextBox Style="{StaticResource FieldBox}" Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"
                        nav:Nav.Group="overlay" nav:Nav.Key="tv:host" />
             </StackPanel>
@@ -53,9 +67,11 @@
             </Button>
           </Grid>
 
-          <TextBlock Style="{StaticResource FieldLabel}" Text="Comando da entrada (avançado; só se a TV ignorar a tecla HDMI)" />
-          <TextBox Style="{StaticResource FieldBox}" Text="{Binding InputCommand, UpdateSourceTrigger=PropertyChanged}"
-                   nav:Nav.Group="overlay" nav:Nav.Key="tv:command" />
+          <StackPanel x:Name="AndroidCommand">
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Comando da entrada (avançado; só se a TV ignorar a tecla HDMI)" />
+            <TextBox Style="{StaticResource FieldBox}" Text="{Binding InputCommand, UpdateSourceTrigger=PropertyChanged}"
+                     nav:Nav.Group="overlay" nav:Nav.Key="tv:command" />
+          </StackPanel>
 
           <TextBlock x:Name="StatusText" Text="{Binding Status}" Margin="0,24,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
 
@@ -84,6 +100,9 @@
       </DataTrigger>
       <DataTrigger Binding="{Binding StatusIsError}" Value="True">
         <Setter TargetName="StatusText" Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+      </DataTrigger>
+      <DataTrigger Binding="{Binding IsAndroid}" Value="False">
+        <Setter TargetName="AndroidCommand" Property="Visibility" Value="Collapsed" />
       </DataTrigger>
     </DataTemplate.Triggers>
   </DataTemplate>

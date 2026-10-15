@@ -488,7 +488,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Ligar a TV e trocar a entrada" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Google TV / Android TV pela rede: liga e muda para a entrada do PC ao abrir um jogo" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="Google TV, LG ou Samsung pela rede: liga e muda para a entrada do PC ao abrir um jogo" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
