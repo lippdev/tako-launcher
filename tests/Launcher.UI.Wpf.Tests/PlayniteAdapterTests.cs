@@ -56,10 +56,10 @@ public class PlayniteAdapterTests
         var bindingProperty = typeof(DataTrigger).GetProperty(nameof(DataTrigger.Binding))!;
 
         var status = Assert.IsType<Binding>(new PluginStatusExtension { Plugin = "MoData", Status = "Installed" }.ProvideValue(new Target(trigger, bindingProperty)));
-        Assert.False((bool)status.Source);
+        Assert.False((bool)Assert.IsType<SettingsBindingExtension.SettingValue>(status.Source).Value!);
 
         var settings = Assert.IsType<Binding>(new PluginSettingsExtension { Plugin = "SuccessStory", Path = "HasData" }.ProvideValue(new Target(trigger, bindingProperty)));
-        Assert.Null(settings.Source);
+        Assert.Null(Assert.IsType<SettingsBindingExtension.SettingValue>(settings.Source).Value);
 
         // Num DependencyProperty o FallbackValue (texto do XAML) é convertido para o tipo da propriedade.
         var element = new FrameworkElement();

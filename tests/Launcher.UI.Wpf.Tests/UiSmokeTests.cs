@@ -323,6 +323,8 @@ public sealed class UiSmokeTests
         // Bindings para dados que o adaptador ainda não fornece (MVP-018) são esperados em temas de terceiros: vão para o
         // relatório da homologação, não para a verificação de erros de binding do launcher.
         var homologation = new List<string>();
+        var themeExceptions = new List<string>();
+        window.Dispatcher.UnhandledException += (_, e) => themeExceptions.Add(e.Exception.ToString());
         foreach (var fixture in ThemeFixtures.Homologated)
         {
             int bindingErrorsBefore = bindingErrors.Errors.Count;
@@ -358,6 +360,7 @@ public sealed class UiSmokeTests
             else
             {
                 homologation.Add($"{fixture.Name}: prévia não abriu ({shell.TopOverlay?.GetType().Name ?? "nada"})");
+                homologation.AddRange(themeExceptions.SelectMany(x => x.Split('\n').Take(25)).Select(l => "      " + l.TrimEnd()));
                 Snap(window, $"34-tema-{fixture.Slug}-falha");
             }
 
@@ -684,6 +687,7 @@ public sealed class UiSmokeTests
         var playnite = services.GetRequiredService<PlayniteThemeService>();
         int bindingErrorsBefore = bindingErrors.Errors.Count;
         var report = new List<string>();
+        window.Dispatcher.UnhandledException += (_, e) => report.Add("  Exceção: " + string.Join(" | ", e.Exception.ToString().Split('\n').Take(25).Select(l => l.Trim())));
 
         shell.OpenThemes();
         Pump(0.6);

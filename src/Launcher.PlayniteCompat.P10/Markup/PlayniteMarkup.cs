@@ -187,7 +187,8 @@ internal static class StaticValue
         var target = serviceProvider.GetService(typeof(IProvideValueTarget)) as IProvideValueTarget;
         if (target?.TargetProperty is not DependencyProperty property)
         {
-            return new Binding { Source = value, Mode = BindingMode.OneWay };
+            // Fonte nunca nula: um Source nulo explícito em gatilhos de estilo derruba o WPF.
+            return new Binding(nameof(SettingsBindingExtension.SettingValue.Value)) { Source = new SettingsBindingExtension.SettingValue(value), Mode = BindingMode.OneWay };
         }
 
         if (property.PropertyType == typeof(Visibility) && value is bool visible)

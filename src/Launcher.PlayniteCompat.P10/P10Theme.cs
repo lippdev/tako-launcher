@@ -159,7 +159,7 @@ public static class P10Theme
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
         {
-            return ex.InnerException is { } inner ? $"{ex.Message} ({inner.Message})" : ex.Message;
+            return Describe(ex);
         }
         finally
         {
@@ -170,6 +170,21 @@ public static class P10Theme
             root.Children.Clear();
             root.Resources.MergedDictionaries.Clear();
         }
+    }
+
+    /// <summary>Erro de tema para a tela de recuperação e o log: tipo, mensagem e onde aconteceu.</summary>
+    public static string Describe(Exception error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        var root = error;
+        while (root.InnerException is { } inner)
+        {
+            root = inner;
+        }
+
+        string where = root.StackTrace?.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? string.Empty;
+        string text = ReferenceEquals(root, error) ? $"{error.GetType().Name}: {error.Message}" : $"{error.GetType().Name}: {error.Message} ({root.GetType().Name}: {root.Message})";
+        return where.Length > 0 ? $"{text} [{where}]" : text;
     }
 
     /// <summary>XAML das pastas do tema, na ordem de composição do Playnite.</summary>

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Launcher.PlayniteCompat.P10;
 using Launcher.PlayniteCompat.P10.Controls;
 using Launcher.PlayniteCompat.P10.Data;
 using Launcher.UI.Wpf.Navigation;
@@ -158,7 +159,7 @@ public sealed class PlayniteMainHost : Decorator
             Child = null;
             if (session is not null && DataContext is ShellViewModel shell && ReferenceEquals(shell.PlayniteUi, session))
             {
-                shell.FailPlayniteUi(error.InnerException is { } inner ? $"{error.Message} ({inner.Message})" : error.Message);
+                shell.FailPlayniteUi(P10Theme.Describe(error));
             }
         }, DispatcherPriority.Send);
     }
