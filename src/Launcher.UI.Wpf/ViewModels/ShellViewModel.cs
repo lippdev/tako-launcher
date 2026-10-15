@@ -38,6 +38,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly PlayniteThemeService _playniteThemes;
     private readonly SessionEnvironmentGuard _environment;
     private readonly GameSessionDevices _devices;
+    private readonly XboxLibraryService _xbox;
     private readonly TimeProvider _time;
     private readonly ILogger<ShellViewModel> _logger;
     private readonly Dictionary<string, GameItemViewModel> _items = [];
@@ -93,6 +94,7 @@ public sealed partial class ShellViewModel : ObservableObject
         SessionEnvironmentGuard environment,
         GameScreenSession gameScreen,
         GameSessionDevices devices,
+        XboxLibraryService xbox,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
@@ -106,6 +108,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _environment = environment;
         GameScreen = gameScreen;
         _devices = devices;
+        _xbox = xbox;
         _time = time;
         _logger = logger;
         SyncItems();

@@ -42,6 +42,10 @@ public sealed partial class SettingsService : ObservableObject
     [ObservableProperty]
     private bool _steamToTrayAfterGame;
 
+    /// <summary>Mostrar na biblioteca os jogos do app Xbox / Microsoft Store (STORE-004).</summary>
+    [ObservableProperty]
+    private bool _xboxLibraryEnabled = true;
+
     /// <summary>Ligar a TV e trocar a entrada (MVP-002); desligado por padrão.</summary>
     [ObservableProperty]
     private TvControlConfig _tvControl = TvControlConfig.Default;
@@ -60,6 +64,7 @@ public sealed partial class SettingsService : ObservableObject
             RestoreEnvironmentAfterGame = Read(saved, nameof(RestoreEnvironmentAfterGame), RestoreEnvironmentAfterGame);
             LoadGameScreen(saved);
             SteamToTrayAfterGame = Read(saved, nameof(SteamToTrayAfterGame), SteamToTrayAfterGame);
+            XboxLibraryEnabled = Read(saved, nameof(XboxLibraryEnabled), XboxLibraryEnabled);
             GameAudioOutput = saved.TryGetValue(GameAudioIdKey, out string? audioId) && audioId.Length > 0
                 ? new AudioOutputChoice(audioId, saved.GetValueOrDefault(GameAudioNameKey, audioId))
                 : null;
@@ -91,6 +96,8 @@ public sealed partial class SettingsService : ObservableObject
     partial void OnRestoreEnvironmentAfterGameChanged(bool value) => Save(nameof(RestoreEnvironmentAfterGame), value);
 
     partial void OnSteamToTrayAfterGameChanged(bool value) => Save(nameof(SteamToTrayAfterGame), value);
+
+    partial void OnXboxLibraryEnabledChanged(bool value) => Save(nameof(XboxLibraryEnabled), value);
 
     partial void OnGameAudioOutputChanged(AudioOutputChoice? value)
     {

@@ -12,6 +12,7 @@ using Launcher.Core.Diagnostics;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Steam;
+using Launcher.Core.Library.Xbox;
 using Launcher.Core.Persistence;
 using Launcher.Core.Resilience;
 using Launcher.Core.Session.GameScreen;
@@ -133,6 +134,9 @@ public partial class App : Application
         services.AddSingleton<ArtService>();
         services.AddSingleton<SonyHidGamepad>();
         services.AddSingleton<SettingsService>();
+        // Jogos do app Xbox / Microsoft Store (STORE-004): fonte isolada, ligada nas Configurações.
+        services.AddSingleton<IXboxSystem, WindowsXboxSystem>();
+        services.AddSingleton<XboxLibraryService>();
         // Central de Controle durante o jogo: janelas abertas, contador de FPS (PresentMon, ADR-0017), limite de FPS,
         // ponteiro, ControlFS e desempenho (MVP-002/030).
         services.AddSingleton<IWindowSwitcher, WindowsWindowSwitcher>();
@@ -164,7 +168,7 @@ public partial class App : Application
         return services.BuildServiceProvider();
     }
 
-    /// <summary>Biblioteca real: jogos instalados na Steam + adicionados pelo usuário (<c>tako.db</c>; importa o antigo <c>library.json</c>).</summary>
+    /// <summary>Biblioteca real: jogos instalados na Steam e no app Xbox + adicionados pelo usuário (<c>tako.db</c>; importa o antigo <c>library.json</c>).</summary>
     private static LocalGameLibrary CreateLocalLibrary(IServiceProvider services)
     {
         string? steamRoot = SteamLocator.FindRoot();
@@ -188,8 +192,11 @@ public partial class App : Application
             }
         }
 
+        var xbox = services.GetRequiredService<XboxLibraryService>();
+        IReadOnlyList<Game> Discover() => [.. DiscoverSteam(), .. xbox.Discover()];
+
         var database = services.GetRequiredService<TakoDatabase>();
-        var library = new LocalGameLibrary(DiscoverSteam, new SqliteLibraryStore(database, AppPaths.LibraryFile), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
+        var library = new LocalGameLibrary(Discover, new SqliteLibraryStore(database, AppPaths.LibraryFile), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
         library.Load();
         if (database.RecoveredFromCorruption)
         {

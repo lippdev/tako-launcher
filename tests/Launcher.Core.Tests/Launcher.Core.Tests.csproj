@@ -5,6 +5,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Launcher.Core\Launcher.Core.csproj" />
   </ItemGroup>
+  <!-- Manifestos de exemplo (fictícios) da fonte Xbox. -->
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
   <!-- Biblioteca fictícia só para testes (o app usa a biblioteca real). -->
   <ItemGroup>
     <Compile Include="..\Shared\SampleLibrary.cs" Link="Shared\SampleLibrary.cs" />

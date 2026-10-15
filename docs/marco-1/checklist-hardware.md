@@ -265,6 +265,34 @@ código-fonte, o PresentMon não vem junto.
 | F16 | Anti-cheat | Um jogo com Easy Anti-Cheat e um com BattlEye, contador ligado | O jogo abre e roda sem aviso nem expulsão (o PresentMon não entra no processo do jogo); anotar jogo e versão |
 | F17 | Remover permissão | Configurações › Remover permissão do contador de FPS (teclado e mouse) | UAC; a conta sai do grupo; o contador fica desligado |
 
+## 15. Jogos do Xbox / PC Game Pass (STORE-004)
+
+O Tako lê os jogos instalados pelo app Xbox sem contornar o pacote: as pastas de jogos de cada unidade (arquivo
+oculto `.GamingRoot`, normalmente `X:\XboxGames\<jogo>\Content\MicrosoftGame.config`) e os pacotes MSIX/AppX
+registrados para o usuário que são jogos (`MicrosoftGame.config`, `xboxservices.config` ou registrados pelos Serviços
+de Jogos). Abre sempre pelo AUMID (`shell:AppsFolder\<família>!<app>`), nunca pelo `.exe`. O fim do jogo é visto
+pelos processos dentro da pasta do pacote. Precisa de conta com PC Game Pass (ou um jogo comprado na Microsoft Store)
+e do app Xbox com os Serviços de Jogos.
+
+Limitações conhecidas: jogos que rodam um launcher fora da pasta (EA app, Ubisoft Connect) só contam como jogando
+quando o `.exe` do jogo abre; jogos UWP antigos sem Xbox Live (sem `xboxservices.config`) não aparecem; nomes vêm do
+manifesto e, se ele usar recurso de idioma que o Windows não resolver, do nome da pasta.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| X1 | Jogo do Game Pass em `C:\XboxGames` | Instalar um jogo do PC Game Pass pelo app Xbox; Configurações › Procurar jogos instalados | Aparece em Biblioteca › Xbox com o nome certo; o aviso diz "N jogos do Xbox encontrados" |
+| X2 | Outra unidade | Escolher `D:` como pasta de jogos no app Xbox e instalar um jogo lá | Aparece também (lido pelo `.GamingRoot` de `D:\`) |
+| X3 | Jogo antigo em WindowsApps | Um jogo UWP com Xbox Live (ex.: Microsoft Solitaire Collection) | Aparece; apps comuns da Store (ex.: Calculadora, Fotos) não aparecem |
+| X4 | Arte e dados | Abrir os detalhes de X1 depois de alguns segundos | Capa e fundo da Steam quando o nome casar; sem correspondência, o logo do pacote; Opções › Corrigir correspondência funciona |
+| X5 | Abrir | Jogar em X1 | O jogo abre pelo Windows (sem erro de acesso); a tela mostra "aguardando o jogo iniciar" e depois "Jogando" |
+| X6 | Sessão | Jogar alguns minutos, abrir a Central de Controle (Guia) | Central sobre o jogo; contador de FPS acompanha o processo do jogo |
+| X7 | Fim | Fechar o jogo pelo menu do próprio jogo | Em até ~5 s o Tako volta; "Jogados recentemente" e tempo de jogo atualizados |
+| X8 | Desligar a fonte | Configurações › Jogos do Xbox (PC Game Pass) › desligar | Os jogos do Xbox somem da biblioteca; ligar de novo traz de volta |
+| X9 | Sem app Xbox | Numa máquina sem o app Xbox (ou após desinstalá-lo) | A linha "Jogos do Xbox" avisa "App Xbox não encontrado…"; nada trava |
+| X10 | Sem Serviços de Jogos | Parar/remover os Serviços de Jogos (ou máquina recém-formatada só com o app Xbox) | Aviso "Serviços de Jogos não encontrados: abra o app Xbox para instalá-los" |
+| X11 | Jogo desinstalado | Desinstalar X1 pelo app Xbox e procurar de novo | O jogo some (pasta que sobrar sem pacote registrado não aparece) |
+| X12 | Outro usuário do Windows | Entrar com outra conta do Windows no mesmo PC | Só aparecem os jogos registrados para essa conta |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.
