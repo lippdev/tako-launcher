@@ -6,7 +6,7 @@ Fonte de verdade de como trabalhamos. Contexto de produto: [`docs/PRD.md`](docs/
 
 | Branch | Origem | Destino (merge) | Finalidade |
 |---|---|---|---|
-| `main` | — | — | Somente código de release. Cada commit é uma versão com tag `vX.Y.Z`. Protegida. |
+| `main` | — | — | Somente código de release. Cada commit é uma versão com tag `vX.Y.Z`. Protegida (`scripts/setup-branch-protection.sh`, roda um admin). |
 | `develop` | `main` | — | Integração do próximo release. Protegida. |
 | `feature/<id>-<slug>` | `develop` | `develop` | Uma história do backlog. Ex.: `feature/MVP-005-sqlite-persistence`. |
 | `release/X.Y.Z` | `develop` | `main` **e** `develop` | Estabilização: só correções, versão, changelog. |
@@ -79,4 +79,4 @@ Cada item do PRD (ex.: `MVP-005`) vira uma issue com o ID no título. Labels: `e
 
 ## 10. Licença
 
-O repositório é MIT, mas o PRD §4.2 prevê reuso do Console Mode (**AGPL-3.0-only**). **Não copie código do Console Mode** até a revisão de licença (`LEGAL-001`) ser concluída.
+O repositório é MIT, mas o PRD §4.2 prevê reuso do Console Mode (**AGPL-3.0-only**). **Não copie código do Console Mode** até a revisão de licença ([`LEGAL-001`](docs/legal/LEGAL-001.md)) ser concluída.
