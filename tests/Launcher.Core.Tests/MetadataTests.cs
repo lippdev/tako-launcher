@@ -14,8 +14,16 @@ public class MetadataTests
     [InlineData("God of War III", "God of War 3", 1.0)]
     [InlineData("Pokémon", "Pokemon", 1.0)]
     [InlineData("The Witcher 3: Wild Hunt GOTY", "The Witcher® 3: Wild Hunt", 1.0)]
+    [InlineData("eldenring", "ELDEN RING", 0.95)]
     public void Equivalent_titles_match_exactly(string local, string candidate, double expected) =>
         Assert.Equal(expected, TitleMatcher.Score(local, candidate), 2);
+
+    [Fact]
+    public void Search_terms_add_a_clean_title_when_it_differs()
+    {
+        Assert.Equal(["The Witcher 3 Wild Hunt GOTY", "witcher 3 wild hunt"], TitleMatcher.SearchTerms("The Witcher 3 Wild Hunt GOTY"));
+        Assert.Equal(["hades 2"], TitleMatcher.SearchTerms("hades 2"));
+    }
 
     [Fact]
     public void Picks_the_closest_result_and_rejects_weak_ones()
@@ -30,6 +38,7 @@ public class MetadataTests
         Assert.Equal(1030300, TitleMatcher.Best("silksong hollow knight", results)?.SteamAppId);
         Assert.Equal(367520, TitleMatcher.Best("Hollow Knight", results)?.SteamAppId);
         Assert.Null(TitleMatcher.Best("Forza Horizon 5", results));
+        Assert.Null(TitleMatcher.Best("Minecraft Launcher", [new MetadataMatch("Minecraft Dungeons II", 1912410), new MetadataMatch("Minecraft Legends", 1928870)]));
     }
 
     [Fact]

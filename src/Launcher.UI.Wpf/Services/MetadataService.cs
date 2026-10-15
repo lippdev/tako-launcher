@@ -68,7 +68,20 @@ public sealed partial class MetadataService(IMetadataProvider provider, TimeProv
         }
     }
 
-    public Task<IReadOnlyList<MetadataMatch>> SearchAsync(string title) => provider.SearchAsync(title, CancellationToken.None);
+    /// <summary>Busca pelo título; sem resultados, tenta o título limpo (a loja não acha "… GOTY", por exemplo).</summary>
+    public async Task<IReadOnlyList<MetadataMatch>> SearchAsync(string title)
+    {
+        foreach (string term in TitleMatcher.SearchTerms(title))
+        {
+            var results = await provider.SearchAsync(term, CancellationToken.None).ConfigureAwait(true);
+            if (results.Count > 0)
+            {
+                return results;
+            }
+        }
+
+        return [];
+    }
 
     /// <summary>Correspondência escolhida pelo usuário: busca os dados desse jogo e fixa a escolha.</summary>
     public async Task<bool> PinAsync(Game game, int steamAppId)
@@ -99,7 +112,7 @@ public sealed partial class MetadataService(IMetadataProvider provider, TimeProv
         appId ??= cached is { IsPinned: true } ? cached.SteamAppId : null;
         if (appId is null)
         {
-            var match = TitleMatcher.Best(game.Title, await provider.SearchAsync(game.Title, CancellationToken.None).ConfigureAwait(true));
+            var match = TitleMatcher.Best(game.Title, await SearchAsync(game.Title).ConfigureAwait(true));
             if (match is null)
             {
                 Write(game.Id, new GameMetadata { Source = provider.Name, FetchedAt = now }); // sem correspondência: tenta de novo em 7 dias

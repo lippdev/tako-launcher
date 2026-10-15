@@ -7,7 +7,7 @@ namespace Launcher.Core.Library.Metadata;
 public static class TitleMatcher
 {
     /// <summary>Abaixo disso a correspondência não é aplicada automaticamente (o usuário pode corrigir).</summary>
-    public const double Threshold = 0.6;
+    public const double Threshold = 0.7;
 
     private static readonly HashSet<string> Noise = new(StringComparer.Ordinal)
     {
@@ -52,10 +52,24 @@ public static class TitleMatcher
             return 1;
         }
 
+        // Nomes de executável costumam vir colados ("eldenring", "HollowKnight").
+        if (string.Concat(a) == string.Concat(b))
+        {
+            return 0.95;
+        }
+
         int common = a.Intersect(b).Count();
         double dice = 2.0 * common / (a.Count + b.Count);
-        bool prefix = b.Take(a.Count).SequenceEqual(a) || a.Take(b.Count).SequenceEqual(b);
+        // Prefixo ("Hollow Knight" → "Hollow Knight: Silksong") só conta com 2+ palavras: "Minecraft" sozinho não é "Minecraft Dungeons".
+        bool prefix = Math.Min(a.Count, b.Count) >= 2 && (b.Take(a.Count).SequenceEqual(a) || a.Take(b.Count).SequenceEqual(b));
         return Math.Min(0.99, prefix ? Math.Max(dice, 0.8) : dice);
+    }
+
+    /// <summary>Termos de busca: o título como está e, se diferente, a versão limpa (sem "GOTY", ™, edição...).</summary>
+    public static IReadOnlyList<string> SearchTerms(string title)
+    {
+        string clean = string.Join(' ', Tokens(title));
+        return clean.Length == 0 || string.Equals(clean, title.Trim(), StringComparison.OrdinalIgnoreCase) ? [title] : [title, clean];
     }
 
     public static MetadataMatch? Best(string title, IEnumerable<MetadataMatch> candidates)
