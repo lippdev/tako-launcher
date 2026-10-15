@@ -201,15 +201,16 @@ internal static class StaticValue
         {
             try
             {
-                return TypeDescriptor.GetConverter(property.PropertyType).ConvertFromInvariantString(text) ?? DependencyProperty.UnsetValue;
+                return TypeDescriptor.GetConverter(property.PropertyType).ConvertFromInvariantString(text) ?? property.DefaultMetadata.DefaultValue;
             }
             catch (Exception ex) when (ex is NotSupportedException or FormatException or ArgumentException)
             {
-                return DependencyProperty.UnsetValue;
+                return property.DefaultMetadata.DefaultValue;
             }
         }
 
-        return value is null || !property.PropertyType.IsInstanceOfType(value) ? DependencyProperty.UnsetValue : value;
+        // Em templates o WPF não aceita UnsetValue: sem valor compatível, fica o padrão da propriedade.
+        return value is not null && property.PropertyType.IsInstanceOfType(value) ? value : property.DefaultMetadata.DefaultValue;
     }
 }
 

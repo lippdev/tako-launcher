@@ -151,6 +151,7 @@ public class GameListItem : Control
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        PinStyle(); // antes do Loaded: a lista pode recriar os itens já na primeira medida
         if (GetTemplateChild(CoverPart) is Image cover)
         {
             cover.SetBinding(Image.SourceProperty, new Binding("CoverImage"));
