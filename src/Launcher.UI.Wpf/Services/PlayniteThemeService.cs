@@ -7,9 +7,9 @@ namespace Launcher.UI.Wpf.Services;
 
 /// <summary>
 /// Temas Fullscreen do Playnite 10 (H2): carregador restrito com a política do adaptador P10, os temas embutidos e os
-/// importados pelo usuário (MVP-014/020). No Marco 1 um tema P10 é aplicado numa prévia isolada; trocar o visual
-/// inteiro do launcher por um tema P10 é o MVP-018/019. "Usar tema" escolhe qual tema a prévia (e, depois, o modo
-/// Fullscreen) usa.
+/// importados pelo usuário (MVP-014/020). "Usar este tema" grava a escolha: com um tema Playnite escolhido, a tela
+/// inicial do Tako passa a ser a do tema (MVP-018/019); sem escolha, fica a UI do Tako. A prévia usa o escolhido, ou o
+/// Fullscreen padrão do Playnite quando não há.
 /// </summary>
 public sealed class PlayniteThemeService(XamlSecurityPolicy basePolicy, string? userThemesRoot = null)
 {
@@ -76,16 +76,34 @@ public sealed class PlayniteThemeService(XamlSecurityPolicy basePolicy, string? 
         }
     }
 
-    public InstalledTheme Selected() =>
-        SelectedId is { } id && Imported().FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase) && t.Manifest.IsCompatible) is { } theme
-            ? theme
-            : BuiltIn();
+    /// <summary>Tema da prévia: o escolhido, ou o Fullscreen padrão do Playnite.</summary>
+    public InstalledTheme Selected() => SelectedForUi() ?? BuiltIn();
 
-    /// <summary>Escolhe o tema usado pela prévia; nulo volta ao padrão.</summary>
+    /// <summary>
+    /// Tema Playnite aplicado à interface; nulo = UI do Tako (sem escolha, ou o tema escolhido sumiu ou ficou
+    /// incompatível).
+    /// </summary>
+    public InstalledTheme? SelectedForUi()
+    {
+        if (SelectedId is not { } id)
+        {
+            return null;
+        }
+
+        var builtIn = BuiltIn();
+        if (string.Equals(id, builtIn.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            return builtIn;
+        }
+
+        return Imported().FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase) && t.Manifest.IsCompatible);
+    }
+
+    /// <summary>Escolhe o tema Playnite da interface (e da prévia); nulo volta à UI do Tako.</summary>
     public void Select(InstalledTheme? theme)
     {
         string path = Path.Combine(UserThemesRoot, SelectionFile);
-        if (theme is null || string.Equals(theme.Id, BuiltIn().Id, StringComparison.OrdinalIgnoreCase))
+        if (theme is null)
         {
             if (File.Exists(path))
             {

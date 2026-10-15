@@ -13,6 +13,7 @@ using Launcher.Core.Library;
 using Launcher.Core.Resilience;
 using Launcher.Core.Session.Restore;
 using Launcher.Core.Supervision;
+using Launcher.PlayniteCompat.P10.Controls;
 using Launcher.Tests;
 using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
@@ -121,8 +122,9 @@ public sealed class UiSmokeTests
         Assert.Contains("Constants.xaml", preview.Report.Loaded);
         Assert.Contains("DerivedStyles/ListGameItemStyle.xaml", preview.Report.Loaded);
         Assert.Contains("DefaultControls/ComboBox.xaml", preview.Report.Loaded);
-        // Só ficam de fora o que depende de HtmlTextView (segurança) e de {Api} (API do Playnite, Marco 1).
-        Assert.Equal(["Views/GameDetails.xaml", "Views/Main.xaml"], preview.Report.Rejected.Select(r => r.File).Order(StringComparer.Ordinal));
+        // Com os adaptadores de dados (MVP-018), Main.xaml ({Api}) e GameDetails.xaml (HtmlTextView seguro) também carregam.
+        Assert.Empty(preview.Report.Rejected);
+        Assert.True(preview.Report.MainFromTheme);
         Assert.Contains("ListGameItemStyle", preview.Resources.MergedDictionaries.SelectMany(d => d.Keys.OfType<string>()));
         Assert.Equal("p10-games", Nav.GetGroup(nav.Focused!));
         Press(window, AppCommand.Right);
@@ -308,12 +310,12 @@ public sealed class UiSmokeTests
         Press(window, AppCommand.Accept);
         Pump(2);
         var copyPreview = Assert.IsType<PlaynitePreviewViewModel>(shell.TopOverlay);
-        Assert.Equal(31, copyPreview.Report.Loaded.Count);
+        Assert.Equal(33, copyPreview.Report.Loaded.Count);
         Press(window, AppCommand.Back);
         var copyItem = ((ThemesViewModel)shell.CurrentPage).Themes.Single(t => t.Theme?.Id == "Tako_Teste_CopiaDoPadrao");
         shell.ShowThemeDiagnostics(copyItem);
         Pump(0.4);
-        Assert.StartsWith("31 de 33", copyItem.LoadSummary, StringComparison.Ordinal);
+        Assert.StartsWith("33 de 33", copyItem.LoadSummary, StringComparison.Ordinal);
         Snap(window, "33-tema-diagnostico");
         Press(window, AppCommand.Back);
 
@@ -346,7 +348,11 @@ public sealed class UiSmokeTests
                 homologation.AddRange(r.Rejected.Select(x => $"    RECUSA  {x.File} — {x.Reason}"));
                 homologation.AddRange(r.Inherited.Select(f => "    HERDADO " + f));
                 homologation.AddRange(r.Ignored.Select(f => "    IGNORADO " + f));
+                homologation.Add($"    Main.xaml: {(r.MainFromTheme ? "do tema" : r.HasMainView ? "herdado do tema padrão" : "AUSENTE")}");
                 Assert.NotEmpty(r.Loaded);
+                // MVP-018: a tela principal carrega (do tema, ou do padrão quando o tema usa algo bloqueado por segurança).
+                Assert.True(r.HasMainView, $"{fixture.Name}: Views/Main.xaml ausente");
+                Assert.True(fixture.MainLoads == r.MainFromTheme, $"{fixture.Name}: Main.xaml do tema esperado={fixture.MainLoads}; {string.Join(" | ", r.Rejected.Where(x => x.File == "Views/Main.xaml").Select(x => x.Reason))}");
                 Snap(window, $"34-tema-{fixture.Slug}");
             }
             else
@@ -418,6 +424,8 @@ public sealed class UiSmokeTests
         Assert.Equal(Environment.ProcessId, link.SupervisorProcessId);
         Assert.Equal(UiLaunchMode.Normal, link.Status?.Mode);
         supervisorServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        // --- Tema Playnite na interface (frente F): "Usar este tema" aplica o Main.xaml do tema à tela inicial (MVP-018/019/021).
+        PlayniteThemeOnTheWholeUi(services, shell, window, bindingErrors);
 
         // --- Diagnóstico (frente G): Configurações › Diagnóstico do sistema gera o relatório do checklist (MVP-034).
         shell.OpenSettings();
@@ -662,6 +670,175 @@ public sealed class UiSmokeTests
         shell.OfferEnvironmentRestore();
         Assert.Null(shell.TopOverlay);
         guard.Discard();
+    }
+
+    /// <summary>
+    /// Frente F: o tema Playnite escolhido vira a tela inicial (lista real, seleção, detalhes, Jogar e voltar), Menu leva
+    /// às Configurações do Tako, falha volta à UI padrão com a recuperação e o modo seguro não aplica o tema. Os três temas
+    /// homologados também são aplicados; erros de binding de temas de terceiros vão para o relatório, não para a
+    /// verificação do launcher.
+    /// </summary>
+    private static void PlayniteThemeOnTheWholeUi(ServiceProvider services, ShellViewModel shell, MainWindow window, BindingErrorListener bindingErrors)
+    {
+        var nav = window.Navigator;
+        var playnite = services.GetRequiredService<PlayniteThemeService>();
+        int bindingErrorsBefore = bindingErrors.Errors.Count;
+        var report = new List<string>();
+
+        shell.OpenThemes();
+        Pump(0.6);
+        var builtIn = ((ThemesViewModel)shell.CurrentPage).Themes.Single(t => t.Kind == ThemeKind.BuiltIn);
+        shell.SelectTheme(builtIn);
+        var ui = Assert.IsType<PlayniteUiViewModel>(shell.PlayniteUi);
+        Assert.True(ui.Report.MainFromTheme);
+        Assert.Equal("Em uso", ((ThemesViewModel)shell.CurrentPage).Themes.Single(t => t.Kind == ThemeKind.BuiltIn).Badge);
+        Assert.False(shell.IsPlayniteUiVisible); // ainda em Configurações › Temas
+
+        // Tela inicial = Main.xaml do tema, com a biblioteca real e o foco numa capa.
+        shell.GoHome();
+        Pump(2.5);
+        Assert.True(shell.IsPlayniteUiVisible);
+        Assert.Equal(shell.Library.Games.Count, ui.Model.Games.Count);
+        Assert.Equal(Main.GamesGroup, Nav.GetGroup(nav.Focused!));
+        AssertFocused(window, "Tela inicial do tema Playnite");
+        Assert.Contains(nav.Navigables(), e => Nav.GetGroup(e) == Main.ActionsGroup && Nav.GetKey(e) == "details");
+        Assert.Contains(nav.Navigables(), e => Nav.GetGroup(e) == Main.TopGroup && Nav.GetKey(e) == "menu");
+        Assert.Contains(nav.Navigables(), e => Nav.GetGroup(e) == FilterPresetSelector.PresetsGroup);
+        Snap(window, "50-tema-playnite-inicio");
+
+        // → seleciona a próxima capa (PART_ListGameItems); A abre os detalhes do tema (PART_ElemGameDetails); B fecha.
+        string first = Nav.GetKey(nav.Focused!)!;
+        Press(window, AppCommand.Right);
+        string second = Nav.GetKey(nav.Focused!)!;
+        Assert.NotEqual(first, second);
+        Assert.Equal(second, ui.Model.SelectedGame!.Id);
+        Press(window, AppCommand.Accept);
+        Pump(1.2);
+        Assert.True(ui.IsDetailsOpen);
+        Assert.Equal(GameDetails.DetailsGroup, Nav.GetGroup(nav.Focused!));
+        Assert.Equal("play", Nav.GetKey(nav.Focused!));
+        Snap(window, "51-tema-playnite-detalhes");
+        Press(window, AppCommand.Back);
+        Pump(0.8);
+        Assert.False(ui.IsDetailsOpen);
+        Assert.Equal(second, Nav.GetKey(nav.Focused!));
+
+        // Filtro rápido (PART_ButtonFilter / FilterPresetSelector).
+        ui.Model.ToggleFiltersCommand.Execute(null);
+        Pump(0.8);
+        Assert.Equal("Instalados", ui.Model.ActiveFilterPreset!.Name);
+        Assert.All(ui.Model.Games, g => Assert.True(g.IsInstalled));
+        Snap(window, "52-tema-playnite-filtro");
+        ui.Model.ApplyFilterPresetCommand.Execute(ui.Model.FilterPresets[0]);
+        Pump(0.8);
+
+        // Saída garantida: Menu abre as Configurações do Tako; B volta para o tema.
+        Press(window, AppCommand.Menu);
+        Pump(0.8);
+        Assert.IsType<SettingsViewModel>(shell.CurrentPage);
+        Assert.False(shell.IsPlayniteUiVisible);
+        AssertFocused(window, "Configurações a partir do tema");
+        Press(window, AppCommand.Back);
+        Pump(1.2);
+        Assert.True(shell.IsPlayniteUiVisible);
+        AssertFocused(window, "Tema depois das Configurações");
+
+        // Jogar pelo tema passa pela sessão do Tako (Iniciando); B cancela.
+        var simulated = shell.Library.Games.First(g => g.LaunchTarget is null && g.CanPlay);
+        ui.Model.SelectedGame = ui.Model.Games.Single(g => g.Id == simulated.Id);
+        Assert.Equal("Jogar", ui.Model.SelectedGameActionLabel);
+        ui.Model.ActivateSelectedCommand.Execute(null);
+        Pump(0.4);
+        Assert.IsType<LaunchOverlayViewModel>(shell.TopOverlay);
+        Snap(window, "53-tema-playnite-jogar");
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+        Pump(3);
+        Assert.False(shell.IsInGame);
+
+        // MVP-021: falha do tema em uso → UI padrão e recuperação; "Usar a interface do Tako" limpa a escolha (sem loop).
+        shell.RecoverFromThemeFailure("Falha simulada pelo teste de fumaça");
+        Pump(0.6);
+        Assert.Null(shell.PlayniteUi);
+        var recovery = Assert.IsType<RecoveryViewModel>(shell.TopOverlay);
+        Assert.Equal("O tema não pôde ser aplicado", recovery.Title);
+        AssertFocused(window, "Recuperação do tema Playnite");
+        Snap(window, "54-tema-playnite-recuperacao");
+        Press(window, AppCommand.Accept);
+        Pump(0.6);
+        Assert.Null(shell.TopOverlay);
+        Assert.Null(playnite.SelectedId);
+        Assert.False(shell.IsPlayniteUiVisible);
+        AssertFocused(window, "Início do Tako depois da falha do tema");
+
+        // Modo seguro: o tema escolhido não é aplicado; ao sair, volta.
+        playnite.Select(builtIn.Theme);
+        shell.IsSafeMode = true;
+        shell.ApplyPlayniteUi();
+        Assert.Null(shell.PlayniteUi);
+        shell.IsSafeMode = false;
+        shell.ApplyPlayniteUi();
+        Assert.NotNull(shell.PlayniteUi);
+        Pump(1);
+
+        // Temas homologados aplicados à interface inteira (mesmos pacotes fixados da frente C).
+        foreach (var fixture in ThemeFixtures.Homologated)
+        {
+            string? package = ThemeFixtures.TryDownload(fixture, out string? problem);
+            if (package is null)
+            {
+                report.Add($"{fixture.Name}: não executado ({problem})");
+                continue;
+            }
+
+            var installed = playnite.Import(package);
+            Assert.True(installed.Succeeded, string.Join('\n', installed.Diagnostics));
+            var theme = playnite.Imported().Single(t => string.Equals(t.Directory, installed.Directory, StringComparison.OrdinalIgnoreCase));
+            playnite.Select(theme);
+            shell.ApplyPlayniteUi();
+            Pump(2.5);
+            if (shell.PlayniteUi is not { } applied)
+            {
+                string detail = (shell.TopOverlay as RecoveryViewModel)?.Detail ?? "sem detalhe";
+                report.Add($"{fixture.Name}: interface NÃO aplicada ({detail})");
+                File.WriteAllLines(Path.Combine(Screenshots, "theme-whole-ui.txt"), report);
+                Snap(window, $"55-tema-{fixture.Slug}-interface-falha");
+                Assert.Fail($"{fixture.Name}: tema não aplicado à interface: {detail}");
+                return;
+            }
+
+            Assert.True(shell.IsPlayniteUiVisible);
+            Assert.True(fixture.MainLoads == applied.Report.MainFromTheme, $"{fixture.Name}: Main.xaml do tema esperado={fixture.MainLoads}");
+            AssertFocused(window, $"Tela inicial do tema {fixture.Name}");
+            report.Add($"{fixture.Name}: interface aplicada · Main.xaml {(applied.Report.MainFromTheme ? "do tema" : "herdado do tema padrão")} · {applied.Report.Loaded.Count} de {applied.Report.Total} arquivos do tema · {applied.Model.Games.Count} jogos");
+            report.AddRange(applied.Report.Rejected.Select(x => $"    RECUSA  {x.File} — {x.Reason}"));
+            Snap(window, $"55-tema-{fixture.Slug}-interface");
+            Press(window, AppCommand.Accept);
+            Pump(1.2);
+            Assert.True(applied.IsDetailsOpen, $"{fixture.Name}: A não abriu os detalhes");
+            AssertFocused(window, $"Detalhes do tema {fixture.Name}");
+            Snap(window, $"56-tema-{fixture.Slug}-detalhes");
+            Press(window, AppCommand.Back);
+            Pump(0.6);
+            Assert.False(applied.IsDetailsOpen);
+        }
+
+        // Volta à interface do Tako e remove os temas importados aqui.
+        playnite.Select(null);
+        shell.ApplyPlayniteUi();
+        Assert.Null(shell.PlayniteUi);
+        foreach (var theme in playnite.Imported())
+        {
+            playnite.Remove(theme);
+        }
+
+        Pump(0.6);
+        AssertFocused(window, "Início do Tako depois dos temas");
+        var themeBindingErrors = bindingErrors.Errors.Skip(bindingErrorsBefore).ToList();
+        bindingErrors.Errors.RemoveRange(bindingErrorsBefore, themeBindingErrors.Count);
+        report.Add($"Erros de binding dos temas na interface (dados do Playnite sem equivalente no Tako): {themeBindingErrors.Count}");
+        report.AddRange(themeBindingErrors.Select(e => e.Split(';')[0]).Distinct(StringComparer.Ordinal).Take(40).Select(e => "  " + e));
+        File.WriteAllLines(Path.Combine(Screenshots, "theme-whole-ui.txt"), report);
     }
 
     /// <summary>Há um elemento focado, visível e alcançável pela navegação no escopo atual.</summary>

@@ -81,6 +81,9 @@ public partial class App : Application
         {
             shell.StartAutoUpdate(updates);
         }
+
+        // Tema Playnite escolhido na tela inicial (MVP-018/019): só depois da decisão do modo seguro, que o bloqueia.
+        shell.ApplyPlayniteUi();
     }
 
     /// <summary>

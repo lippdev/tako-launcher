@@ -229,6 +229,31 @@ public class XamlValidatorTests
     }
 
     [Fact]
+    public void Accepts_spline_thickness_key_frame()
+    {
+        // Animação de margem (PS5ish, Constants.xaml): só interpola valores; liberada na homologação (MVP-018).
+        var result = Validate(Dictionary("""
+            <Storyboard x:Key="s"><ThicknessAnimationUsingKeyFrames Storyboard.TargetProperty="Margin">
+              <SplineThicknessKeyFrame KeyTime="0:0:0.2" Value="0,10,0,0" KeySpline="0.2,0,0.2,1" />
+            </ThicknessAnimationUsingKeyFrames></Storyboard>
+            """));
+
+        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Violations));
+    }
+
+    [Fact]
+    public void Extended_owner_types_allow_attached_properties_but_not_elements()
+    {
+        var policy = XamlSecurityPolicy.CreateDefault().Extend(presentationOwnerTypes: ["MediaElementBehaviors"]);
+        var validator = new XamlValidator(policy);
+
+        var attached = validator.Validate(Dictionary("""<MediaElement x:Key="m" MediaElementBehaviors.Repeat="True" />"""), "Views/Main.xaml", "ResourceDictionary");
+        Assert.True(attached.IsValid, string.Join(Environment.NewLine, attached.Violations));
+        AssertRejected(validator.Validate(Dictionary("""<MediaElementBehaviors x:Key="m" />"""), "Views/Main.xaml", "ResourceDictionary"), XamlViolationCode.TypeNotAllowed);
+        AssertRejected(Validate(Dictionary("""<MediaElement x:Key="m" MediaElementBehaviors.Repeat="True" />""")), XamlViolationCode.TypeNotAllowed);
+    }
+
+    [Fact]
     public void Rejects_dtd_entity_expansion()
     {
         const string xaml = """

@@ -52,11 +52,10 @@ public sealed partial class ThemeItemViewModel : ObservableObject
 
     public bool IsCompatible => Theme?.Manifest.IsCompatible ?? true;
 
-    public string Badge => (Kind, IsSelected, IsCompatible) switch
+    public string Badge => (IsSelected, IsCompatible) switch
     {
-        (ThemeKind.Tako, _, _) => "Interface do Tako",
-        (_, _, false) => "Incompatível",
-        (_, true, _) => "Em uso na prévia",
+        (_, false) => "Incompatível",
+        (true, _) => "Em uso",
         _ => "Opções",
     };
 
@@ -128,9 +127,10 @@ public sealed partial class ThemesViewModel : PageViewModel
 
     public override void Refresh()
     {
-        string? selected = _playnite.Selected().Directory;
+        // Em uso: o tema Playnite aplicado à interface, ou o do Tako quando não há um.
+        string? selected = _playnite.SelectedForUi()?.Directory;
         Themes.Clear();
-        Themes.Add(new ThemeItemViewModel(ThemeKind.Tako, "Tako (padrão)", null));
+        Themes.Add(new ThemeItemViewModel(ThemeKind.Tako, "Tako (padrão)", null) { IsSelected = selected is null });
         foreach (var (kind, theme) in _playnite.Imported().Select(t => (ThemeKind.Imported, t)).Prepend((ThemeKind.BuiltIn, _playnite.BuiltIn())))
         {
             Themes.Add(new ThemeItemViewModel(kind, theme.Manifest.Manifest.DisplayName, theme)

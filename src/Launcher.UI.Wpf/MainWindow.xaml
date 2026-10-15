@@ -91,6 +91,10 @@
         </Border.Style>
       </Border>
 
+      <!-- Tema Playnite na tela inicial (MVP-018/019): cobre a página e a barra lateral; sobreposições ficam por cima. -->
+      <c:PlayniteMainHost x:Name="PlayniteHost" Session="{Binding PlayniteUi}" Panel.ZIndex="10"
+                          Visibility="{Binding IsPlayniteUiVisible, Converter={StaticResource BoolToVisibility}}" />
+
       <!-- Sobreposições empilhadas: a última fica por cima. -->
       <ItemsControl x:Name="OverlayHost" ItemsSource="{Binding Overlays}" Panel.ZIndex="20" Focusable="False">
         <ItemsControl.ItemsPanel>
@@ -118,6 +122,10 @@
                 <Setter Property="Margin" Value="72,0,0,29" />
               </DataTrigger>
               <DataTrigger Binding="{Binding IsInGame}" Value="True">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
+              <!-- O tema Playnite tem relógio próprio. -->
+              <DataTrigger Binding="{Binding IsPlayniteUiVisible}" Value="True">
                 <Setter Property="Visibility" Value="Collapsed" />
               </DataTrigger>
             </Style.Triggers>
