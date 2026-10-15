@@ -57,7 +57,9 @@ Duas causas técnicas do "cortado":
    - A barra de dicas usa o `HintBarPanel`: sem espaço, abrevia (texto curto e dicas mais próximas) e depois esconde
      as menos importantes (seção, busca), nunca a de A/B (`HintFit.Plan`, testada).
    - As páginas escurecem a arte do jogo (`SettingsScrim`) e os valores ficam numa pílula `surface-2`.
-4. **Compatibilidade**: as chaves salvas no `tako.db` (e o `updates.json`) não mudam. As chaves de foco (`Nav.Key`)
+4. **Fontes de dados dos jogos** (IGDB, ADR-0021; ScreenScraper, ADR-0022) ficam em Biblioteca e lojas, cada uma abrindo o
+   próprio painel; os campos de segredo desses painéis ficam mascarados (●) com "Mostrar"/"Ocultar".
+5. **Compatibilidade**: as chaves salvas no `tako.db` (e o `updates.json`) não mudam. As chaves de foco (`Nav.Key`)
    das Configurações continuam `settings:...`; as do Modo Console são `console:...`. Pedir o foco de uma linha de
    outra categoria (voltar pelo histórico, testes) troca para a categoria dela (`IKeyRevealer` + `RevealHost`).
 

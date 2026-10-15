@@ -296,6 +296,7 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
   - **Legibilidade:** a página escurece a arte do jogo da esquerda (88%) para a direita (70%); nenhum texto fica direto sobre a arte.
 - **Modo Console (ADR-0020):** item próprio na barra lateral (acima de Configurações), com tudo que veio do Console Mode. Título, uma frase e o botão primário "Configurar para jogar na TV"; abaixo, um **cartão de recurso** (`feature-card`, 420×208: ícone, selo de estado no canto, nome em `title-md` e uma linha de resumo) para Tela de jogo, TV, Áudio do jogo, Steam na bandeja, Contador de FPS e Limite de FPS. Selos: Ligado (`success`), Falta configurar (`warning`), Com problema (`error`), Desligado (`surface-2`). A abre o detalhe: o cartão vira cabeçalho (ícone, nome, selo e resumo) e as linhas do recurso seguem o componente de linha; B volta ao cartão.
   - **Assistente:** diálogo largo (1000px) com o nome do assistente em `overline`, a barra de passos (Tela, Imagem, TV, Áudio, Pronto: o atual em branco, os feitos em verde), "Passo N de 5", título, texto e as escolhas do passo como pílulas (a sugerida é a primária e recebe o foco). B volta um passo; cada passo salva na hora e pode ser pulado.
+- **Campo de segredo:** senhas e chaves (Client Secret da IGDB, senha do ScreenScraper) aparecem como ● ; o botão "Mostrar"/"Ocultar" ao lado alterna o texto. Colar e digitar funcionam como nos outros campos.
 - **Sair para o desktop:** sempre presente no fim da barra lateral (princípio "recovery-first" do PRD).
 
 ## Do's and Don'ts

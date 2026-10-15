@@ -83,6 +83,24 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Accept);
         Assert.False(shell.Settings.DeveloperOptions);
 
+        // Segredos (IGDB e ScreenScraper) aparecem como ● até pedir "Mostrar"; as duas linhas ficam em Biblioteca e lojas.
+        Assert.True(nav.FocusDefault("settings:screenscraper"));
+        Assert.Equal("biblioteca", settings.SelectedCategory.Id);
+        Assert.True(nav.FocusDefault("settings:igdb"));
+        Press(window, AppCommand.Accept);
+        Pump(0.5);
+        var igdb = Assert.IsType<IgdbSettingsViewModel>(shell.TopOverlay);
+        Assert.False(igdb.IsSecretVisible);
+        igdb.ClientSecret = "segredo-de-teste";
+        Pump(0.3);
+        Snap(window, "cfg82b-segredo-mascarado");
+        igdb.ToggleSecretVisibleCommand.Execute(null);
+        Assert.True(igdb.IsSecretVisible);
+        Assert.Equal("Ocultar", igdb.SecretToggleLabel);
+        igdb.CancelCommand.Execute(null);
+        Pump(0.3);
+        Assert.Null(shell.TopOverlay);
+
         // --- Modo Console: assistente no topo e um cartão por recurso, com o estado.
         shell.OpenConsoleMode();
         Pump(0.8);

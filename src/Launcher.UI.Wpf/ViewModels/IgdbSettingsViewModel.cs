@@ -20,6 +20,11 @@ public sealed partial class IgdbSettingsViewModel : ObservableObject, IOverlayVi
     private readonly Func<string?> _readClipboard;
     private readonly Action _cancel;
 
+    /// <summary>O segredo aparece como ● até o usuário pedir para ver (ninguém no sofá lê a senha na TV).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SecretToggleLabel))]
+    private bool _isSecretVisible;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EnabledLabel))]
     private bool _enabled;
@@ -70,6 +75,11 @@ public sealed partial class IgdbSettingsViewModel : ObservableObject, IOverlayVi
     ];
 
     public bool HasStatus => Status is not null;
+
+    public string SecretToggleLabel => IsSecretVisible ? "Ocultar" : "Mostrar";
+
+    [RelayCommand]
+    private void ToggleSecretVisible() => IsSecretVisible = !IsSecretVisible;
 
     [RelayCommand]
     private void ToggleEnabled() => Enabled = !Enabled;

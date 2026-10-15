@@ -12,6 +12,7 @@
   <c:BoolToVisibilityConverter x:Key="BoolToVisibility" />
   <c:FractionToWidthConverter x:Key="FractionToWidth" />
   <c:UpperCaseConverter x:Key="Upper" />
+  <c:SecretMaskConverter x:Key="SecretMask" />
   <c:FractionToThumbMarginConverter x:Key="FractionToThumbMargin" />
   <CubicEase x:Key="EaseOut" EasingMode="EaseOut" />
 

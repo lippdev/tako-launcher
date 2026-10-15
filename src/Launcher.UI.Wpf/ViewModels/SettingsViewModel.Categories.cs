@@ -61,10 +61,13 @@ public sealed partial class SettingsViewModel
             description: () => "Descrição, gêneros, lançamento, notas e artes (loja da Steam e, se ligada, IGDB)",
             value: () => "Atualizar"),
 
-        // Fontes de dados dos jogos (ADR-0021): cada uma abre o próprio painel. O ScreenScraper entra aqui, no mesmo padrão.
+        // Fontes de dados dos jogos (ADR-0021/0022): cada uma abre o próprio painel.
         Row("igdb", SettingKind.Action, "Dados dos jogos (IGDB)", () => Shell.OpenIgdbSettingsCommand.Execute(null),
             description: () => "Informações e artes de jogos de qualquer loja e de consoles, com a sua chave gratuita da Twitch",
             value: () => Shell.IgdbSummary),
+        Row("screenscraper", SettingKind.Action, "Dados de ROMs (ScreenScraper)", () => Shell.OpenScreenScraperSettingsCommand.Execute(null),
+            description: () => "Caixas, logos, vídeos e informações de jogos de console, reconhecidos pelo arquivo, com a sua conta gratuita",
+            value: () => Shell.ScreenScraperSummary),
     ];
 
     /// <summary>"Criar", "1 coleção", "3 coleções".</summary>

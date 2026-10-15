@@ -73,3 +73,12 @@ public sealed class FractionToThumbMarginConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
+
+/// <summary>Campo de segredo mascarado: um ● por caractere (Client Secret da IGDB, senha do ScreenScraper).</summary>
+public sealed class SecretMaskConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is string text ? new string('●', text.Length) : string.Empty;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}
