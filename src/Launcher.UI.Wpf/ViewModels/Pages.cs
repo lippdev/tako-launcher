@@ -208,7 +208,14 @@ public sealed partial class DetailsViewModel : PageViewModel
 
     public ObservableCollection<StatViewModel> Stats { get; } = [];
 
-    public string PrimaryLabel => Game.IsRunning ? "Voltar ao jogo" : Game.Game.IsUpcoming ? "Avisar no lançamento" : Game.Game.IsInstalled ? "Jogar" : $"Instalar pela {Game.StoreName}";
+    public string PrimaryLabel => (Game.IsRunning, Game.Game) switch
+    {
+        (true, _) => "Voltar ao jogo",
+        (_, { IsUpcoming: true }) => "Avisar no lançamento",
+        (_, { IsInstalled: true }) => "Jogar",
+        (_, { Store: GameStore.Manual }) => "Arquivo não encontrado",
+        _ => $"Instalar pela {Game.StoreName}",
+    };
 
     public bool PrimaryHasPlayIcon => Game.Game.CanPlay;
 
