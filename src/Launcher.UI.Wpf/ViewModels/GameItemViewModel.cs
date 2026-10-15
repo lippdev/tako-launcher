@@ -213,7 +213,7 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
     {
         [GameStore.Steam] = Frozen("#171A21"),
         [GameStore.Epic] = Frozen("#2A2A2A"),
-        [GameStore.Gog] = Frozen("#86328A"),
+        [GameStore.Gog] = Frozen("#7A3FD1"), // store-gog (DESIGN.md)
         [GameStore.Xbox] = Frozen("#107C10"),
         [GameStore.Manual] = Frozen("#3D5A80"),
     };

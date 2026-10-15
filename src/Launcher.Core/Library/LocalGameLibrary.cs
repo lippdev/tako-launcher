@@ -1,7 +1,8 @@
 namespace Launcher.Core.Library;
 
 /// <summary>
-/// Biblioteca real: jogos encontrados nas lojas instaladas (<paramref name="discover"/>, hoje a Steam) mais os adicionados
+/// Biblioteca real: jogos encontrados nas lojas instaladas (<paramref name="discover"/>, normalmente
+/// <see cref="Sources.LibrarySources.Discover"/>: Steam, Epic, GOG...) mais os adicionados
 /// pelo usuário, com favoritos e "jogado por último" guardados em <see cref="ILibraryStore"/>.
 /// </summary>
 public sealed class LocalGameLibrary(Func<IReadOnlyList<Game>> discover, ILibraryStore store, TimeProvider time, Action<Game>? enrich = null) : IGameLibrary
@@ -110,8 +111,14 @@ public sealed class LocalGameLibrary(Func<IReadOnlyList<Game>> discover, ILibrar
                 }
             }
 
-            enrich?.Invoke(game); // metadados em cache (descrição, gêneros, arte de jogos manuais)
             games.Add(game);
+        }
+
+        // Mesmo jogo em duas lojas: itens separados, ligados (STORE-010, ADR-0019).
+        Sources.StoreDuplicates.Link(games);
+        foreach (var game in games)
+        {
+            enrich?.Invoke(game); // metadados em cache (descrição, gêneros, arte de jogos manuais)
         }
 
         _games = games;

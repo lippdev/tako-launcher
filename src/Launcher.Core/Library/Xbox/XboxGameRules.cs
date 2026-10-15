@@ -124,6 +124,15 @@ public static class XboxGameRules
         return gamingServicesInstalled ? XboxAvailability.Ready : XboxAvailability.NoGamingServices;
     }
 
+    /// <summary>Aviso quando falta algo para os jogos do Xbox funcionarem; nulo quando está tudo pronto.</summary>
+    public static string? Notice(XboxAvailability availability) => availability switch
+    {
+        XboxAvailability.NoXboxApp => "App Xbox não encontrado: instale-o pela Microsoft Store para jogar o PC Game Pass",
+        XboxAvailability.NoGamingServices => "Serviços de Jogos não encontrados: abra o app Xbox para instalá-los",
+        XboxAvailability.Unknown => "Não foi possível ler os apps instalados deste usuário",
+        _ => null,
+    };
+
     /// <summary>Linha de ajuda nas Configurações.</summary>
     public static string Describe(bool enabled, XboxAvailability availability, int games)
     {
@@ -138,12 +147,6 @@ public static class XboxGameRules
             1 => "1 jogo encontrado",
             _ => $"{games} jogos encontrados",
         };
-        return availability switch
-        {
-            XboxAvailability.NoXboxApp => $"App Xbox não encontrado: instale-o pela Microsoft Store para jogar o PC Game Pass ({found})",
-            XboxAvailability.NoGamingServices => $"Serviços de Jogos não encontrados: abra o app Xbox para instalá-los ({found})",
-            XboxAvailability.Unknown => $"Não foi possível ler os apps instalados deste usuário ({found})",
-            _ => $"PC Game Pass e Microsoft Store · {found}",
-        };
+        return Notice(availability) is { } notice ? $"{notice} ({found})" : $"PC Game Pass e Microsoft Store · {found}";
     }
 }

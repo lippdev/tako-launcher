@@ -5,7 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Launcher.Core\Launcher.Core.csproj" />
   </ItemGroup>
-  <!-- Manifestos de exemplo (fictícios) da fonte Xbox. -->
+  <!-- Arquivos de exemplo (fictícios) das lojas: Xbox, Epic e GOG (ADR-0019). -->
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

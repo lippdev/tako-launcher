@@ -1,0 +1,12 @@
+{
+  "bIsIncompleteInstall": false,
+  "LaunchExecutable": "Corrida.exe",
+  "AppName": "Corrida Noturna",
+  "CatalogItemId": "c0ffee",
+  "CatalogNamespace": "corrida",
+  "AppCategories": ["public", "games", "applications"],
+  "DisplayName": "Corrida Noturna™",
+  "InstallLocation": "C:\\Program Files\\Epic Games\\CorridaNoturna",
+  "InstallSize": 734003200,
+  "MainGameAppName": "Corrida Noturna"
+}

@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using ConsoleMode.Runtime;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
+using Launcher.Core.Library.Sources;
 using Launcher.Core.Presentation;
 using Launcher.Core.Session.GameScreen;
 using Launcher.Core.Session.Devices;
@@ -38,7 +39,6 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly PlayniteThemeService _playniteThemes;
     private readonly SessionEnvironmentGuard _environment;
     private readonly GameSessionDevices _devices;
-    private readonly XboxLibraryService _xbox;
     private readonly TimeProvider _time;
     private readonly ILogger<ShellViewModel> _logger;
     private readonly Dictionary<string, GameItemViewModel> _items = [];
@@ -94,11 +94,12 @@ public sealed partial class ShellViewModel : ObservableObject
         SessionEnvironmentGuard environment,
         GameScreenSession gameScreen,
         GameSessionDevices devices,
-        XboxLibraryService xbox,
+        LibrarySources librarySources,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
         Library = library;
+        LibrarySources = librarySources;
         _art = art;
         _metadata = metadata;
         Settings = settings;
@@ -108,7 +109,6 @@ public sealed partial class ShellViewModel : ObservableObject
         _environment = environment;
         GameScreen = gameScreen;
         _devices = devices;
-        _xbox = xbox;
         _time = time;
         _logger = logger;
         SyncItems();
@@ -124,6 +124,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _toastTimer.Tick += (_, _) => { IsToastVisible = false; _toastTimer.Stop(); };
         _launchTimer.Tick += (_, _) => { _launchTimer.Stop(); StartSession(); };
         library.Changed += (_, _) => RefreshAll();
+        settings.StoreToggled += (_, store) => OnStoreToggled(store);
         metadata.GameUpdated += (_, id) => OnMetadataUpdated(id);
         if (_currentPage is HomeViewModel { Hero: { } hero })
         {
@@ -137,6 +138,9 @@ public sealed partial class ShellViewModel : ObservableObject
     public event EventHandler<AppCommand>? CommandRequested;
 
     public IGameLibrary Library { get; }
+
+    /// <summary>Lojas lidas pela biblioteca e o resultado da última leitura (Configurações › Lojas, ADR-0019).</summary>
+    public LibrarySources LibrarySources { get; }
 
     public SettingsService Settings { get; }
 

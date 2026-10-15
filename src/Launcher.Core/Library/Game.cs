@@ -75,6 +75,9 @@ public sealed class Game
     /// <summary>Jogo correspondente na Steam (da própria loja ou encontrado pelos metadados).</summary>
     public int? SteamAppId { get; set; }
 
+    /// <summary>Outras lojas em que o mesmo jogo está instalado (STORE-010); cada cópia segue um item próprio.</summary>
+    public IReadOnlyList<GameStore> AlsoInstalledIn { get; set; } = [];
+
     public DateTimeOffset AddedAt { get; init; }
 
     public bool IsFavorite { get; set; }
