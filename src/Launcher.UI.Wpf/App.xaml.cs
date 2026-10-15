@@ -35,6 +35,9 @@ public partial class App : Application
 
         // Descrição, gêneros, notas e artes dos jogos chegam em segundo plano (cache primeiro).
         shell.StartMetadataUpdates();
+
+        // Procura e baixa atualizações em segundo plano (GitHub Releases, como no Console Mode).
+        shell.StartAutoUpdate(_services.GetRequiredService<UpdateService>());
     }
 
     /// <summary>Composição de dependências. O teste de fumaça da UI passa uma biblioteca fictícia em <paramref name="library"/>.</summary>
@@ -53,6 +56,7 @@ public partial class App : Application
         services.AddSingleton<SteamArtResolver>();
         services.AddSingleton<IMetadataProvider, SteamStoreProvider>();
         services.AddSingleton<MetadataService>();
+        services.AddSingleton<UpdateService>();
         services.AddSingleton<IGameLibrary>(sp => library ?? CreateLocalLibrary(sp));
         services.AddSingleton(XamlSecurityPolicy.CreateDefault());
         services.AddSingleton<XamlValidator>();
@@ -102,6 +106,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // Atualização baixada e não aplicada: instala agora, sem reabrir.
+        _services?.GetService<ShellViewModel>()?.ApplyPendingUpdateOnExit();
         _services?.Dispose();
         base.OnExit(e);
     }

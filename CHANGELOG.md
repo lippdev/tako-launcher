@@ -4,6 +4,13 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6]
+### Novidades
+- Atualização automática: ao abrir, o Tako procura uma versão nova e a baixa em segundo plano, conferindo o arquivo com o SHA-256 publicado no GitHub. Quando termina, pergunta se reinicia agora ou instala ao sair; durante um jogo, o aviso espera o jogo acabar. Funciona na versão instalada (roda o instalador em silêncio) e na portátil (troca o .exe). Em Configurações: verificar agora, desligar a atualização automática e receber versões de teste. (#15)
+
+### Atualizando da 0.1.0-alpha.5
+- Esta é a última atualização manual: baixe o instalador ou o portátil da release. A partir daqui o Tako se atualiza sozinho.
+
 ## [0.1.0-alpha.5]
 ### Novidades
 - Sua biblioteca de verdade: os jogos instalados pela Steam aparecem sozinhos (todas as pastas de biblioteca, com tempo jogado e última vez, sem precisar da Steam aberta), e qualquer outro jogo entra por "Adicionar jogo" (executável, atalho ou link). Jogar abre o jogo de verdade. Favoritos e histórico ficam salvos. (#13)
