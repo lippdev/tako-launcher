@@ -193,7 +193,7 @@
   <DataTemplate x:Key="SettingText">
     <StackPanel>
       <TextBlock Text="{Binding [0]}" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding [1]}" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+      <TextBlock Text="{Binding [1]}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
     </StackPanel>
   </DataTemplate>
 
@@ -208,7 +208,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Tema" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Recarrega o tema padrão pelo carregador XAML restrito. Temas do Playnite 10 chegam no Marco 1." Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Recarrega o tema padrão pelo carregador XAML restrito. Temas do Playnite 10 chegam no Marco 1." Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -217,7 +217,7 @@
           <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.DynamicColor}" />
           <StackPanel>
             <TextBlock Text="Cor dinâmica" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="A interface assume a cor da arte do jogo em foco" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="A interface assume a cor da arte do jogo em foco" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -226,7 +226,7 @@
           <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.ReducedMotion}" />
           <StackPanel>
             <TextBlock Text="Reduzir animações" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Remove transições de cor e de rolagem" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Remove transições de cor e de rolagem" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -235,7 +235,7 @@
           <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.StartFullscreenOnLogin}" />
           <StackPanel>
             <TextBlock Text="Abrir em tela cheia ao iniciar o Windows" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Fullscreen convencional; integração com o Xbox mode depende da Microsoft (MVP-007)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Fullscreen convencional; integração com o Xbox mode depende da Microsoft (MVP-007)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -247,7 +247,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Prévia de tema Playnite 10" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Renderiza o tema Fullscreen padrão do Playnite com a sua biblioteca, sem o Playnite instalado (H2)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Renderiza o tema Fullscreen padrão do Playnite com a sua biblioteca, sem o Playnite instalado (H2)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -259,7 +259,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Carregar tema inválido" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Aplica Themes/Exemplo-Invalido e mostra a tela de recuperação (MVP-021)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Aplica Themes/Exemplo-Invalido e mostra a tela de recuperação (MVP-021)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -573,7 +573,7 @@
       </Button>
       <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center">
         <StackPanel>
-          <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="ExtraBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Text}" Margin="0,16,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
           <ItemsControl ItemsSource="{Binding Actions}" Margin="0,40,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
         </StackPanel>
@@ -588,7 +588,7 @@
         <Border Width="88" Height="88" CornerRadius="26" Background="#29FF5A5F" HorizontalAlignment="Left" Margin="0,0,0,36">
           <c:Icon Key="Icon.Alert" Width="48" Height="48" Foreground="{DynamicResource ErrorBrush}" />
         </Border>
-        <TextBlock Text="O tema não pôde ser carregado" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" />
+        <TextBlock Text="O tema não pôde ser carregado" Style="{StaticResource PageTitle}" FontWeight="Normal" />
         <TextBlock Text="O Tako voltou para o tema padrão. Seus jogos e configurações não foram alterados." Margin="0,18,0,0"
                    FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
         <ItemsControl ItemsSource="{Binding Actions}" Margin="0,44,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
