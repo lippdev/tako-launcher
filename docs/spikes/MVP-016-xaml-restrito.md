@@ -54,6 +54,16 @@ Tudo o que não está na lista é rejeitado, com código, mensagem e linha/colun
 6. **A lista de permissões é inicial.** Tipos como `Popup`, `ContextMenu`, `KeyBinding`, `Hyperlink`, `SoundPlayerAction` e `CollectionViewSource` estão fora até a homologação (MVP-022) mostrar necessidade.
 7. Recursos referenciados entre arquivos (`StaticResource` de outro arquivo) falham ao carregar um arquivo isolado. É esperado: a ordem de composição é responsabilidade do MVP-017.
 
+## Resultado com tema real (tema Fullscreen padrão do Playnite 10)
+
+Medido no Windows CI com `src/Launcher.UI.Wpf/Themes/Playnite-Default` (MIT):
+
+- Sem adaptação: 18 de 35 arquivos passam no validador. As recusas confirmaram as questões 2 e 3 acima, com um achado: os controles do Playnite (`ButtonEx`, `ItemsControlEx`, `GameListItem`…) e as extensões `{ThemeFile}`/`{Settings}` **não têm prefixo**. O Playnite os registra no namespace do WPF via `XmlnsDefinition`, e o adaptador P10 faz o mesmo, sem reescrever o XAML.
+- `Constants.xaml` só era recusado por **declarar** Interactivity sem usar. O validador agora tolera declarações não usadas (qualquer uso, inclusive em valores como `Setter Property="i:…"`, continua sendo violação) e o carregador as remove antes do parser.
+- Com o adaptador P10: 32 de 35 passam na validação e **27 de 33 são carregados e aplicados pelo WPF**. O tema é renderizado na prévia do launcher sem o Playnite instalado.
+- O WPF adia erros de estilos e templates até o uso (ex.: `TemplateBinding InputHint`, propriedade que só existe no Playnite). O carregador agora sela estilos e carrega o conteúdo dos templates na carga, para o erro recusar o arquivo; e um erro tardio vira tela de recuperação.
+- Questão 1 resolvida: o adaptador compõe os dicionários por código, na ordem do Playnite, e cada arquivo enxerga os recursos dos anteriores (`StaticResource` entre arquivos).
+
 ## Recomendação
 
 Seguir com a abordagem de validação prévia com lista de permissões, que responde à pergunta do spike para o subconjunto WPF. A decisão final depende de medir os temas reais: se a maioria das rejeições cair nas questões 2 e 3, o caminho é o adaptador P10 com remapeamento; se houver dependência ampla de tipos perigosos, o escopo de compatibilidade (H2) precisa ser revisto.
