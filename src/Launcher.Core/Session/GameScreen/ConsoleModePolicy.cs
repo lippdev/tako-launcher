@@ -82,7 +82,7 @@ public static class ConsoleModePolicy
         string? note = effective.GameScreen switch
         {
             null => "Modo console: este jogo abre na tela de jogo · para jogar na mesa, use \"Voltar ao PC\"",
-            { } own when consoleScreen is not null && (own.Mode != consoleScreen.Mode || own.EnableHdr != consoleScreen.EnableHdr) =>
+            { } screen when consoleScreen is not null && (screen.Mode != consoleScreen.Mode || screen.EnableHdr != consoleScreen.EnableHdr) =>
                 "Modo console: a resolução e o HDR deste jogo não valem · a tela de jogo fica como o modo console deixou",
             _ => null,
         };
