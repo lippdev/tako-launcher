@@ -2,14 +2,14 @@
 
 Detalhes e gates em [PRD §12](PRD.md). Backlog completo: [PRD §5–8](PRD.md).
 
-## Marco 0 — Proof of Concept (comece aqui)
-Objetivo: provar H1, H2, H3 ou registrar limitações.
+## Marco 0 — Proof of Concept
+Objetivo: provar H1, H2, H3 ou registrar limitações. **Fechamento:** [`docs/marco-0/relatorio.md`](marco-0/relatorio.md).
 
-1. **MVP-001** estrutura da solução em CI (esqueleto já criado)
-2. **MVP-007 (spike)** FSE oficial — maior risco do projeto; fazer cedo
-3. **MVP-016 (spike)** carregador XAML restrito — segundo maior risco (segurança)
-4. **MVP-013 / MVP-023 / MVP-028** tema padrão + biblioteca fictícia + navegação por controle
-5. Relatório de riscos define o escopo do Marco 1
+1. ✅ **MVP-001** estrutura da solução em CI
+2. ✅ **MVP-007 (spike)** FSE oficial — distribuível só com SCCD assinado pela Microsoft; experimento em hardware pendente
+3. ✅ **MVP-016 (spike)** carregador XAML restrito — em uso pelo tema padrão; medir temas reais pendente
+4. ✅ **MVP-013 / MVP-023 / MVP-028** tema padrão + biblioteca fictícia + navegação por controle (launcher WPF)
+5. ✅ Relatório de riscos e escopo do Marco 1
 
 ## Marco 1 — MVP Alpha
 Épicos do PRD §5 na ordem: A (fundação) → D (biblioteca) → B (FSE/fallback) → C (temas) → E (controle) → F (qualidade/distribuição).

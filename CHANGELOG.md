@@ -3,6 +3,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), versionamen
 
 ## [Não lançado]
 ### Adicionado
+- Launcher WPF do Marco 0 a partir do protótipo: Início, Biblioteca, Detalhes, Configurações, sessão de jogo simulada, Central de Controle, diálogos e tela de recuperação; navegação por controle (XInput), teclado e mouse; tema padrão carregado pelo carregador XAML restrito; teste de fumaça da UI com capturas no CI. Relatório do Marco 0 em `docs/marco-0/relatorio.md`.
 - `DESIGN.md` (tokens do tema padrão) e protótipo navegável por controle em `design/prototype/index.html` (MVP-013, MVP-023, MVP-028).
 - Spike MVP-007: pesquisa do FSE / Xbox mode (`docs/spikes/MVP-007-fse.md`), ferramenta `Launcher.FseProbe` e pacote de desenvolvimento em `packaging/fse-dev/`.
 - Spike MVP-016: validador e carregador XAML restrito para temas (`Launcher.Themes.Xaml`), ferramenta `Launcher.ThemeCheck` e relatório em `docs/spikes/`.
