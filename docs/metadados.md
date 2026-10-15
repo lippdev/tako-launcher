@@ -5,7 +5,7 @@ O Tako preenche as informações dos jogos sozinho, como os "agentes" do Plex fa
 ## De onde vêm os jogos
 - **Steam**: o Tako localiza a Steam pelo registro, lê `steamapps/libraryfolders.vdf` (todas as pastas de biblioteca) e os `appmanifest_*.acf`. O tempo jogado e a última vez vêm de `userdata/<conta>/config/localconfig.vdf`. Não precisa da Steam aberta nem de login.
 - **Adicionados**: qualquer executável, atalho (`.lnk`/`.url`) ou script, pelo botão "Adicionar jogo" (Início vazia, Biblioteca ou Configurações).
-- O estado do usuário (favoritos, última vez aberto pelo Tako, jogos adicionados) fica em `%LOCALAPPDATA%\Tako\library.json`.
+- O estado do usuário (favoritos, última vez aberto pelo Tako, jogos adicionados) fica no banco SQLite `%LOCALAPPDATA%\Tako\tako.db` (MVP-005), junto com as configurações; um `library.json` antigo é importado na primeira abertura e renomeado para `library.json.importado`. Logs de diagnóstico ficam em `logs\tako-AAAAMMDD.log` (7 dias, MVP-033).
 
 ## Provedores (`IMetadataProvider`)
 | Provedor | Chave | Traz | Status |

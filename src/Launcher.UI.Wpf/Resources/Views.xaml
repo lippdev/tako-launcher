@@ -267,6 +267,18 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding OpenLogsCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:logs">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Abrir" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Abrir pasta de logs" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Registros de diagnóstico dos últimos 7 dias, sem dados pessoais; anexe ao relatar um problema" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <!-- Atualizações (GitHub Releases): estado, verificar agora e preferências. -->
       <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.CheckUpdatesNowCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:updates">
         <DockPanel>

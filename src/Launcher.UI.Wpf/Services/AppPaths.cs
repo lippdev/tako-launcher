@@ -20,7 +20,14 @@ public static class AppPaths
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako")
         : Path.Combine(ExecutableDirectory, "Tako_Data");
 
+    /// <summary>Banco SQLite com a biblioteca e as configurações (MVP-005).</summary>
+    public static string DatabaseFile => Path.Combine(DataRoot, "tako.db");
+
+    /// <summary>Biblioteca no formato antigo; importada para o <see cref="DatabaseFile"/> na primeira abertura.</summary>
     public static string LibraryFile => Path.Combine(DataRoot, "library.json");
+
+    /// <summary>Logs de diagnóstico <c>tako-AAAAMMDD.log</c> (MVP-033).</summary>
+    public static string LogsDirectory => Path.Combine(DataRoot, "logs");
 
     public static string ArtCache => Path.Combine(DataRoot, "cache", "art");
 

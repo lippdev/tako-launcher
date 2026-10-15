@@ -316,6 +316,21 @@ public sealed partial class SettingsViewModel : PageViewModel
     [RelayCommand]
     private void RefreshMetadata() => Shell.RefreshMetadata();
 
+    /// <summary>Abre no Explorer a pasta dos logs de diagnóstico (MVP-033).</summary>
+    [RelayCommand]
+    private void OpenLogs()
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(AppPaths.LogsDirectory);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppPaths.LogsDirectory) { UseShellExecute = true })?.Dispose();
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.IO.IOException or UnauthorizedAccessException)
+        {
+            Shell.Toast($"Não foi possível abrir a pasta de logs: {ex.Message}");
+        }
+    }
+
     [RelayCommand]
     private void ToggleStartup() => Settings.StartFullscreenOnLogin = !Settings.StartFullscreenOnLogin;
 
