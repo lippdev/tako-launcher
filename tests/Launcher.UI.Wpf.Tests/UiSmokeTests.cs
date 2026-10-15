@@ -64,6 +64,7 @@ public sealed class UiSmokeTests
         Press(window, AppCommand.Left);
         Press(window, AppCommand.Left);
         Assert.Equal("sidebar", Nav.GetGroup(nav.Focused!));
+        Assert.Equal("home", Nav.GetKey(nav.Focused!)); // entra no item selecionado, não no mais próximo
         Assert.True(shell.IsSidebarExpanded);
         Pump(0.6);
         Snap(window, "03-barra-lateral");

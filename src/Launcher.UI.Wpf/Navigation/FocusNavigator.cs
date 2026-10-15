@@ -74,7 +74,12 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
         var target = next.Value.Item;
         string targetGroup = next.Value.Group;
         bool sidebarTransition = targetGroup == "sidebar" || group == "sidebar";
-        if (targetGroup != group && (!horizontal || sidebarTransition) && Remembered(targetGroup) is { } remembered && all.Contains(remembered))
+        var entry = targetGroup != group ? all.FirstOrDefault(e => Nav.GetGroup(e) == targetGroup && Nav.GetIsGroupEntry(e)) : null;
+        if (entry is not null)
+        {
+            target = entry;
+        }
+        else if (targetGroup != group && (!horizontal || sidebarTransition) && Remembered(targetGroup) is { } remembered && all.Contains(remembered))
         {
             target = remembered;
         }

@@ -5,7 +5,8 @@
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:c="clr-namespace:Launcher.UI.Wpf.Controls">
+                    xmlns:c="clr-namespace:Launcher.UI.Wpf.Controls"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
   <c:NotNullToVisibilityConverter x:Key="NotNullToVisibility" />
   <c:BoolToVisibilityConverter x:Key="BoolToVisibility" />
@@ -204,15 +205,16 @@
         <ControlTemplate TargetType="Button">
           <Border x:Name="Body" CornerRadius="14" Background="Transparent" Padding="20,0">
             <DockPanel LastChildFill="True">
-              <Grid Width="34" Height="34" DockPanel.Dock="Left" Margin="0,0,18,0">
+              <Grid Width="34" Height="34" DockPanel.Dock="Left">
                 <c:Icon x:Name="Glyph" Key="{Binding IconKey}" Foreground="{TemplateBinding Foreground}"
                         Visibility="{Binding BadgeBrush, Converter={StaticResource NotNullToVisibility}, ConverterParameter=invert}" />
                 <Border CornerRadius="9" Background="{Binding BadgeBrush}" Visibility="{Binding BadgeBrush, Converter={StaticResource NotNullToVisibility}}">
                   <c:Icon Key="{Binding IconKey}" Width="20" Height="20" Foreground="White" />
                 </Border>
               </Grid>
-              <TextBlock x:Name="Count" DockPanel.Dock="Right" Text="{Binding Count}" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Opacity="0.55" />
-              <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock x:Name="Count" DockPanel.Dock="Right" Text="{Binding Count}" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Opacity="0.55"
+                         Visibility="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}" />
+              <TextBlock Text="{Binding Label}" Margin="18,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
             </DockPanel>
           </Border>
           <ControlTemplate.Triggers>
@@ -264,7 +266,10 @@
             <Ellipse x:Name="Knob" Width="30" Height="30" Fill="White" HorizontalAlignment="Left" Margin="5,0" />
           </Border>
           <ControlTemplate.Triggers>
-            <Trigger Property="Tag" Value="True">
+            <Trigger Property="Tag">
+              <Trigger.Value>
+                <sys:Boolean>True</sys:Boolean>
+              </Trigger.Value>
               <Setter TargetName="Track" Property="Background" Value="{DynamicResource SuccessBrush}" />
               <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
             </Trigger>
@@ -344,6 +349,9 @@
             </Border>
           </Grid>
           <ControlTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsTextValue}" Value="True">
+              <Setter TargetName="Value" Property="FontSize" Value="{DynamicResource FsTitle}" />
+            </DataTrigger>
             <DataTrigger Binding="{Binding IsWide}" Value="True">
               <Setter Property="Width" Value="440" />
               <Setter Property="Height" Value="300" />

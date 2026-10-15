@@ -149,4 +149,7 @@ public sealed partial class CardViewModel(string key) : ObservableObject
     public string Key { get; } = key;
 
     public bool IsWide => Key == "game";
+
+    /// <summary>Valor em texto (título) em vez de número grande.</summary>
+    public bool IsTextValue => Key is "game" or "capture";
 }

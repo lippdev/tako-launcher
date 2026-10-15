@@ -10,7 +10,8 @@
                     xmlns:vm="clr-namespace:Launcher.UI.Wpf.ViewModels">
 
   <!-- Esmaece o conteúdo rolável antes do cabeçalho (topo) e da barra de dicas (base). -->
-  <LinearGradientBrush x:Key="ContentFadeMask" StartPoint="0,0" EndPoint="0,1">
+  <!-- Absolute: a máscara segue a viewport (1080 de altura), não o conteúdo rolável, que é mais alto. -->
+  <LinearGradientBrush x:Key="ContentFadeMask" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,1080">
     <GradientStop Offset="0" Color="Transparent" />
     <GradientStop Offset="0.111" Color="Transparent" />
     <GradientStop Offset="0.157" Color="Black" />

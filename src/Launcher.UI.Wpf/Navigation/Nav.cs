@@ -41,6 +41,14 @@ public static class Nav
     public static readonly DependencyProperty LinkProperty =
         DependencyProperty.RegisterAttached("Link", typeof(string), typeof(Nav), new PropertyMetadata(null));
 
+    /// <summary>Ponto de entrada do grupo: ao entrar no grupo vindo de fora, o foco vai para cá (ex.: item selecionado da barra lateral).</summary>
+    public static readonly DependencyProperty IsGroupEntryProperty =
+        DependencyProperty.RegisterAttached("IsGroupEntry", typeof(bool), typeof(Nav), new PropertyMetadata(false));
+
+    public static bool GetIsGroupEntry(DependencyObject d) => (bool)d.GetValue(IsGroupEntryProperty);
+
+    public static void SetIsGroupEntry(DependencyObject d, bool value) => d.SetValue(IsGroupEntryProperty, value);
+
     public static string? GetGroup(DependencyObject d) => (string?)d.GetValue(GroupProperty);
 
     public static void SetGroup(DependencyObject d, string? value) => d.SetValue(GroupProperty, value);

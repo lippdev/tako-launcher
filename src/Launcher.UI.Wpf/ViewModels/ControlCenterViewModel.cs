@@ -276,9 +276,9 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
     private void UpdatePerfCard()
     {
         var perf = Cards[2];
-        perf.Caption = "Desempenho ao vivo (simulado)";
+        perf.Caption = "Desempenho ao vivo";
         perf.Value = $"{_performance.Fps} FPS";
-        perf.Pill = $"HUD: {SessionOptions.PerfModes[_options.PerfMode]}";
+        perf.Pill = $"HUD: {SessionOptions.PerfModes[_options.PerfMode]} · simulado";
         var points = new PointCollection();
         int i = 0, n = Math.Max(1, _performance.History.Count - 1);
         foreach (int fps in _performance.History)

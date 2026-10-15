@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     private readonly Stack<FrameworkElement?> _focusBeforeOverlay = new();
     private long _wheelLockedUntil;
     private FrameworkElement? _draggingSlider;
+    private Point? _lastMouse;
 
     public MainWindow(ShellViewModel shell)
     {
@@ -207,6 +208,15 @@ public partial class MainWindow : Window
         if (_draggingSlider is not null && e.LeftButton == MouseButtonState.Pressed)
         {
             SetSliderFromPointer(_draggingSlider, e);
+            return;
+        }
+
+        // O WPF gera "mouse move" quando o layout muda sob o cursor parado: só foca com movimento real.
+        var position = e.GetPosition(this);
+        bool moved = _lastMouse is { } last && Math.Abs(last.X - position.X) + Math.Abs(last.Y - position.Y) > 2;
+        _lastMouse = position;
+        if (!moved)
+        {
             return;
         }
 
