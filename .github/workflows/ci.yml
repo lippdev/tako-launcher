@@ -17,6 +17,13 @@ jobs:
       - run: dotnet build --no-restore -c Release
       # --ignore-exit-code 8: projetos de teste ainda sem testes (remover quando todos tiverem).
       - run: dotnet test --no-build -c Release --filter-not-trait "Category=Hardware" --ignore-exit-code 8
+      # Capturas do teste de fumaça da UI (cada tela renderizada pelo WPF real).
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots
+          path: tests/Launcher.UI.Wpf.Tests/bin/Release/**/screenshots/
+          if-no-files-found: ignore
   pr-title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

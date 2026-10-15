@@ -1,0 +1,493 @@
+<!--
+  Estilos do tema padrão (DESIGN.md › Components). Cores, tipografia e formas vêm dos tokens do tema
+  (Themes/Default/Tokens.xaml) via DynamicResource; aqui ficam forma, foco e animação.
+  Foco: anel branco de 4px afastado 6px, sombra só no elemento focado, escala sutil.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="clr-namespace:Launcher.UI.Wpf.Controls">
+
+  <c:NotNullToVisibilityConverter x:Key="NotNullToVisibility" />
+  <c:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+  <c:FractionToWidthConverter x:Key="FractionToWidth" />
+  <c:UpperCaseConverter x:Key="Upper" />
+  <CubicEase x:Key="EaseOut" EasingMode="EaseOut" />
+
+  <DropShadowEffect x:Key="FocusShadow" BlurRadius="32" ShadowDepth="16" Direction="270" Opacity="0.4" Color="Black" />
+
+  <!-- Ícone 24x24: traço + preenchimento na cor do Foreground. -->
+  <Style TargetType="c:Icon">
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="IsTabStop" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="c:Icon">
+          <Viewbox Stretch="Uniform">
+            <Canvas Width="24" Height="24">
+              <Path Data="{Binding Data.Stroke, RelativeSource={RelativeSource TemplatedParent}}" Stroke="{TemplateBinding Foreground}"
+                    StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+              <Path Data="{Binding Data.Fill, RelativeSource={RelativeSource TemplatedParent}}" Fill="{TemplateBinding Foreground}" />
+            </Canvas>
+          </Viewbox>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Base de todos os botões navegáveis: sem visual de foco do Windows, sem Tab. -->
+  <Style x:Key="NavButtonBase" TargetType="Button">
+    <Setter Property="OverridesDefaultStyle" Value="True" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Focusable" Value="True" />
+    <Setter Property="IsTabStop" Value="False" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+  </Style>
+
+  <!-- Pílula (Jogar, Favoritar...). Tag = "primary" | "secondary" | "danger". -->
+  <Style x:Key="PillButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Height" Value="76" />
+    <Setter Property="Padding" Value="44,0" />
+    <Setter Property="FontSize" Value="{DynamicResource FsLabelLg}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Background" Value="{DynamicResource Surface2Brush}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid x:Name="Root" RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+              <ScaleTransform />
+            </Grid.RenderTransform>
+            <Border x:Name="Ring" Margin="-10" CornerRadius="48" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+            <Border x:Name="Body" CornerRadius="38" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="Tag" Value="primary">
+              <Setter Property="Background" Value="{DynamicResource SurfaceSolidBrush}" />
+              <Setter Property="Foreground" Value="{DynamicResource OnSurfaceSolidBrush}" />
+            </Trigger>
+            <Trigger Property="Tag" Value="danger">
+              <Setter Property="Background" Value="{DynamicResource ErrorBrush}" />
+              <Setter Property="Foreground" Value="White" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+              <Setter TargetName="Body" Property="Effect" Value="{StaticResource FocusShadow}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.04" Duration="0:0:0.16" EasingFunction="{StaticResource EaseOut}" />
+                    <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.04" Duration="0:0:0.16" EasingFunction="{StaticResource EaseOut}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.16" />
+                    <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.16" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="RoundButton" TargetType="Button" BasedOn="{StaticResource PillButton}">
+    <Setter Property="Width" Value="76" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <!-- Capa de jogo 2:3 (204x306). Só a capa escala no foco; o texto não se move. -->
+  <Style x:Key="GameCard" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Width" Value="204" />
+    <Setter Property="Margin" Value="0,0,26,0" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <StackPanel>
+            <Grid x:Name="CoverHost" Width="204" Height="306" RenderTransformOrigin="0.5,0.5">
+              <Grid.RenderTransform>
+                <ScaleTransform />
+              </Grid.RenderTransform>
+              <Border x:Name="Ring" Margin="-10" CornerRadius="22" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+              <Border x:Name="Cover" CornerRadius="14" Background="{Binding FallbackBrush}">
+                <Border.Clip>
+                  <RectangleGeometry Rect="0,0,204,306" RadiusX="14" RadiusY="14" />
+                </Border.Clip>
+                <Grid>
+                  <TextBlock Text="{Binding Title}" Margin="16" VerticalAlignment="Bottom" TextWrapping="Wrap" FontSize="{DynamicResource FsTitle}" FontWeight="ExtraBold" />
+                  <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                  <Border Background="#99000000" CornerRadius="6" Padding="10,6" Margin="12" HorizontalAlignment="Left" VerticalAlignment="Top"
+                          Visibility="{Binding Badge, Converter={StaticResource NotNullToVisibility}}">
+                    <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FsLabelSm}" FontWeight="ExtraBold" />
+                  </Border>
+                  <Border Width="40" Height="40" CornerRadius="20" Background="#73000000" Margin="12" HorizontalAlignment="Right" VerticalAlignment="Top"
+                          Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibility}}">
+                    <c:Icon Key="Icon.StarFill" Width="22" Height="22" Foreground="White" />
+                  </Border>
+                </Grid>
+              </Border>
+            </Grid>
+            <TextBlock Text="{Binding Title}" Margin="0,26,0,0" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+              <Border Width="24" Height="24" CornerRadius="6" Background="{Binding StoreBrush}" Margin="0,0,8,0">
+                <c:Icon Key="{Binding StoreIconKey}" Width="14" Height="14" Foreground="White" />
+              </Border>
+              <TextBlock Text="{Binding SubLabel}" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" MaxWidth="172" />
+            </StackPanel>
+          </StackPanel>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+              <Setter TargetName="Cover" Property="Effect" Value="{StaticResource FocusShadow}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="CoverHost" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.08" Duration="0:0:0.16" EasingFunction="{StaticResource EaseOut}" />
+                    <DoubleAnimation Storyboard.TargetName="CoverHost" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.08" Duration="0:0:0.16" EasingFunction="{StaticResource EaseOut}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="CoverHost" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.16" />
+                    <DoubleAnimation Storyboard.TargetName="CoverHost" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.16" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- "Ver todos" no fim da fileira. -->
+  <Style x:Key="MoreTile" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid Width="204" Height="306">
+            <Border x:Name="Ring" Margin="-10" CornerRadius="22" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+            <Border CornerRadius="14" Background="{DynamicResource Surface1Brush}">
+              <StackPanel VerticalAlignment="Center">
+                <c:Icon Key="Icon.More" Width="48" Height="48" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,0,14" />
+                <TextBlock Text="Ver todos" HorizontalAlignment="Center" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+              </StackPanel>
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Item da barra lateral: ícone ou selo da loja, rótulo e contagem. Selecionado = fundo branco. -->
+  <Style x:Key="SidebarItem" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Height" Value="64" />
+    <Setter Property="Margin" Value="0,0,0,6" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Body" CornerRadius="14" Background="Transparent" Padding="20,0">
+            <DockPanel LastChildFill="True">
+              <Grid Width="34" Height="34" DockPanel.Dock="Left" Margin="0,0,18,0">
+                <c:Icon x:Name="Glyph" Key="{Binding IconKey}" Foreground="{TemplateBinding Foreground}"
+                        Visibility="{Binding BadgeBrush, Converter={StaticResource NotNullToVisibility}, ConverterParameter=invert}" />
+                <Border CornerRadius="9" Background="{Binding BadgeBrush}" Visibility="{Binding BadgeBrush, Converter={StaticResource NotNullToVisibility}}">
+                  <c:Icon Key="{Binding IconKey}" Width="20" Height="20" Foreground="White" />
+                </Border>
+              </Grid>
+              <TextBlock x:Name="Count" DockPanel.Dock="Right" Text="{Binding Count}" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Opacity="0.55" />
+              <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Body" Property="Background" Value="{DynamicResource Surface2Brush}" />
+            </Trigger>
+            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+              <Setter TargetName="Body" Property="Background" Value="{DynamicResource SurfaceSolidBrush}" />
+              <Setter Property="Foreground" Value="{DynamicResource OnSurfaceSolidBrush}" />
+            </DataTrigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Pílula translúcida (busca, ordenação). -->
+  <Style x:Key="ChipButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Height" Value="56" />
+    <Setter Property="Padding" Value="26,0" />
+    <Setter Property="FontSize" Value="{DynamicResource FsLabelMd}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Border x:Name="Ring" Margin="-10" CornerRadius="38" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+            <Border CornerRadius="28" Background="{DynamicResource Surface1Brush}" Padding="{TemplateBinding Padding}">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Chave liga/desliga (visual). Tag = estado (bool). -->
+  <Style x:Key="ToggleVisual" TargetType="ContentControl">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ContentControl">
+          <Border x:Name="Track" Width="72" Height="40" CornerRadius="20" Background="#40FFFFFF">
+            <Ellipse x:Name="Knob" Width="30" Height="30" Fill="White" HorizontalAlignment="Left" Margin="5,0" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="Tag" Value="True">
+              <Setter TargetName="Track" Property="Background" Value="{DynamicResource SuccessBrush}" />
+              <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Linha de configuração (92px, superfície translúcida). -->
+  <Style x:Key="SettingRow" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Height" Value="92" />
+    <Setter Property="Margin" Value="0,0,0,14" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Border x:Name="Ring" Margin="-10" CornerRadius="30" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+            <Border CornerRadius="22" Background="{DynamicResource Surface1Brush}" Padding="32,0">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Central de Controle: cartão vivo. -->
+  <Style x:Key="ControlCard" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Width" Value="300" />
+    <Setter Property="Height" Value="270" />
+    <Setter Property="Margin" Value="0,0,24,0" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Border x:Name="Ring" Margin="-10" CornerRadius="30" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+            <Border x:Name="Body" CornerRadius="22" Background="#EB161A22">
+              <Border.Clip>
+                <RectangleGeometry Rect="0,0,300,270" RadiusX="22" RadiusY="22" />
+              </Border.Clip>
+              <Grid>
+                <Image Source="{Binding Background}" Stretch="UniformToFill" />
+                <Border Visibility="{Binding Background, Converter={StaticResource NotNullToVisibility}}">
+                  <Border.Background>
+                    <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                      <GradientStop Offset="0" Color="#D9000000" />
+                      <GradientStop Offset="0.6" Color="#33000000" />
+                      <GradientStop Offset="1" Color="#0D000000" />
+                    </LinearGradientBrush>
+                  </Border.Background>
+                </Border>
+                <Border Width="48" Height="48" CornerRadius="12" Background="White" Margin="20" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Visibility="{Binding TagIconKey, Converter={StaticResource NotNullToVisibility}}">
+                  <c:Icon Key="{Binding TagIconKey}" Width="28" Height="28" Foreground="#FF11141A" />
+                </Border>
+                <Polyline Points="{Binding Sparkline}" Stroke="{DynamicResource SuccessBrush}" StrokeThickness="3" StrokeLineJoin="Round" Margin="0,22,0,0" VerticalAlignment="Top" />
+                <StackPanel Margin="24" VerticalAlignment="Bottom">
+                  <TextBlock Text="{Binding Caption}" FontSize="{DynamicResource FsLabelSm}" FontWeight="SemiBold" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                  <TextBlock x:Name="Value" Text="{Binding Value}" Margin="0,6,0,0" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" TextTrimming="CharacterEllipsis" />
+                  <Border Height="10" CornerRadius="5" Background="#2EFFFFFF" Margin="0,16,0,0" Visibility="{Binding Meter, Converter={StaticResource NotNullToVisibility}}">
+                    <Border HorizontalAlignment="Left" CornerRadius="5" Background="White" Width="{Binding Meter, Converter={StaticResource FractionToWidth}, ConverterParameter=252}" />
+                  </Border>
+                  <Border BorderBrush="#B3FFFFFF" BorderThickness="2" CornerRadius="6" Padding="12,3" Margin="0,12,0,0" HorizontalAlignment="Left"
+                          Visibility="{Binding Pill, Converter={StaticResource NotNullToVisibility}}">
+                    <TextBlock Text="{Binding Pill}" FontSize="{DynamicResource FsLabelSm}" FontWeight="SemiBold" />
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsWide}" Value="True">
+              <Setter Property="Width" Value="440" />
+              <Setter Property="Height" Value="300" />
+              <Setter TargetName="Value" Property="FontSize" Value="{DynamicResource FsTitle}" />
+              <Setter TargetName="Body" Property="Clip">
+                <Setter.Value>
+                  <RectangleGeometry Rect="0,0,440,300" RadiusX="22" RadiusY="22" />
+                </Setter.Value>
+              </Setter>
+            </DataTrigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+              <Setter TargetName="Body" Property="Effect" Value="{StaticResource FocusShadow}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Central de Controle: ícone da barra (círculo branco no foco, nome abaixo). -->
+  <Style x:Key="ControlBarIcon" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Width" Value="72" />
+    <Setter Property="Height" Value="72" />
+    <Setter Property="Margin" Value="13,0" />
+    <Setter Property="Foreground" Value="#D9FFFFFF" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Ellipse x:Name="Disc" Fill="Transparent" />
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Border x:Name="Label" Background="White" CornerRadius="20" Padding="16,8" Margin="0,88,0,-60" HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Visibility="Collapsed" IsHitTestVisible="False">
+              <TextBlock Text="{Binding Label}" Foreground="#FF11141A" FontSize="{DynamicResource FsLabelMd}" FontWeight="Bold" />
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="Tag" Value="open">
+              <Setter TargetName="Disc" Property="Fill" Value="#38FFFFFF" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Disc" Property="Fill" Value="White" />
+              <Setter Property="Foreground" Value="#FF11141A" />
+              <Setter TargetName="Label" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Linha de painel (72px). Tag = "danger" para Encerrar. -->
+  <Style x:Key="PanelRow" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="MinHeight" Value="72" />
+    <Setter Property="Margin" Value="0,0,0,10" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="FontSize" Value="{DynamicResource FsLabelLg}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Border x:Name="Ring" Margin="-8" CornerRadius="20" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+            <Border x:Name="Body" CornerRadius="14" Background="#0FFFFFFF" Padding="22,0">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="Tag" Value="danger">
+              <Setter TargetName="Body" Property="Background" Value="{DynamicResource ErrorBrush}" />
+              <Setter Property="Foreground" Value="White" />
+            </Trigger>
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="IsKeyboardFocused" Value="True" />
+                <Condition Property="Tag" Value="{x:Null}" />
+              </MultiTrigger.Conditions>
+              <Setter TargetName="Body" Property="Background" Value="White" />
+              <Setter Property="Foreground" Value="#FF11141A" />
+            </MultiTrigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Dica da barra inferior: clicável, não navegável. -->
+  <Style x:Key="HintButton" TargetType="Button">
+    <Setter Property="OverridesDefaultStyle" Value="True" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Margin" Value="36,0,0,0" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentMutedBrush}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <StackPanel Orientation="Horizontal" Background="Transparent">
+            <ItemsControl ItemsSource="{Binding Glyphs}" VerticalAlignment="Center">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border MinWidth="40" Height="36" CornerRadius="8" Background="White" Padding="8,0" Margin="0,0,8,0">
+                    <TextBlock Text="{Binding}" Foreground="#FF11141A" FontSize="{DynamicResource FsLabelSm}" FontWeight="ExtraBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding Label}" Margin="4,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" />
+          </StackPanel>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter Property="Foreground" Value="White" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Título de seção (overline): caixa alta, peso 700. -->
+  <Style x:Key="Overline" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource FsLabelSm}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentMutedBrush}" />
+  </Style>
+
+  <!-- Título de jogo: sempre display (72px), até duas linhas. -->
+  <Style x:Key="GameTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource FsDisplay}" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+    <Setter Property="LineHeight" Value="80" />
+    <Setter Property="MaxHeight" Value="166" />
+    <Setter Property="MaxWidth" Value="1000" />
+    <Setter Property="Margin" Value="0,12,0,10" />
+  </Style>
+</ResourceDictionary>
