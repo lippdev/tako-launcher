@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Launcher.Core.Presentation;
 using Microsoft.Extensions.Logging;
 
 namespace Launcher.UI.Wpf.Services;
@@ -14,13 +15,30 @@ namespace Launcher.UI.Wpf.Services;
 /// endereços http(s), arquivos locais (capas escolhidas pelo usuário) e <c>steam-art://</c> (vários candidatos,
 /// do melhor ao pior). Sem arte ou sem rede, a UI usa o fallback (gradiente + título).
 /// </summary>
-public sealed partial class ArtService
+public sealed partial class ArtService : IDisposable
 {
     private const string SteamArtScheme = "steam-art";
     private const int LargeImageWidth = 1000;
-    private const int MaxLargeImages = 8;
-    private readonly Dictionary<(Uri, int), Task<ImageSource?>> _memory = [];
-    private readonly Queue<(Uri, int)> _large = new();
+
+    /// <summary>
+    /// Capas decodificadas guardadas além das que estão na tela (PERF-004): ~180 capas em 1080p, ~45 em 4K. As que estão
+    /// na tela ficam vivas pela própria imagem; o cache só evita decodificar de novo ao rolar de volta.
+    /// </summary>
+    private const long SmallCacheBytes = 64L * 1024 * 1024;
+
+    /// <summary>Artes de fundo: ~5 em 1080p, 1 em 4K (cada uma ocupa 8 a 33 MB decodificada).</summary>
+    private const long LargeCacheBytes = 48L * 1024 * 1024;
+
+    /// <summary>Custo nominal de "sem arte" no cache (não ocupa imagem, mas não pode ficar para sempre).</summary>
+    private const long MissingCost = 1024;
+
+    private readonly object _gate = new();
+    private readonly Dictionary<(Uri, int), Task<ImageSource?>> _pending = [];
+    private readonly SizedLruCache<(Uri, int), ImageSource?> _small = new(SmallCacheBytes);
+    private readonly SizedLruCache<(Uri, int), ImageSource?> _large = new(LargeCacheBytes);
+
+    /// <summary>Decodificações em paralelo: rolar rápido não ocupa todos os núcleos (nem atrasa a thread da UI).</summary>
+    private readonly SemaphoreSlim _decoders = new(Math.Clamp(Environment.ProcessorCount / 2, 1, 4));
     private readonly ILogger<ArtService> _logger;
     private readonly HttpClient _http;
     private readonly SteamArtResolver _steam;
@@ -42,7 +60,8 @@ public sealed partial class ArtService
 
     /// <summary>
     /// Imagem para exibir com <paramref name="displayWidth"/> unidades do palco, decodificada na densidade da tela
-    /// (nunca acima da resolução original), ou nulo se não houver arte ou rede.
+    /// (nunca acima da resolução original) fora da thread da UI, ou nulo se não houver arte ou rede. Pedidos iguais em
+    /// andamento são compartilhados; as prontas ficam num cache LRU limitado em bytes.
     /// </summary>
     public Task<ImageSource?> GetAsync(Uri? uri, int displayWidth)
     {
@@ -51,27 +70,60 @@ public sealed partial class ArtService
             return Task.FromResult<ImageSource?>(null);
         }
 
-        int decodeWidth = (int)Math.Ceiling(displayWidth * Math.Max(1, RenderScale));
-
-        lock (_memory)
+        var key = (uri, DecodeWidth(displayWidth));
+        lock (_gate)
         {
-            if (!_memory.TryGetValue((uri, decodeWidth), out var task))
+            if (CacheFor(key).TryGet(key, out var cached))
             {
-                task = LoadAsync(uri, decodeWidth);
-                _memory[(uri, decodeWidth)] = task;
-                if (decodeWidth >= LargeImageWidth)
+                return Task.FromResult(cached);
+            }
+
+            if (!_pending.TryGetValue(key, out var task))
+            {
+                task = LoadAndCacheAsync(key);
+                if (!task.IsCompleted)
                 {
-                    // Artes de fundo em 4K ocupam ~19 MB cada: guarda só as mais recentes.
-                    _large.Enqueue((uri, decodeWidth));
-                    if (_large.Count > MaxLargeImages)
-                    {
-                        _memory.Remove(_large.Dequeue());
-                    }
+                    _pending[key] = task;
                 }
             }
 
             return task;
         }
+    }
+
+    /// <summary>A imagem já decodificada, sem esperar (nulo também quando já se sabe que não há arte).</summary>
+    public bool TryGetCached(Uri? uri, int displayWidth, out ImageSource? image)
+    {
+        image = null;
+        if (uri is null)
+        {
+            return true;
+        }
+
+        var key = (uri, DecodeWidth(displayWidth));
+        lock (_gate)
+        {
+            return CacheFor(key).TryGet(key, out image);
+        }
+    }
+
+    public void Dispose() => _decoders.Dispose();
+
+    private int DecodeWidth(int displayWidth) => (int)Math.Ceiling(displayWidth * Math.Max(1, RenderScale));
+
+    private SizedLruCache<(Uri, int), ImageSource?> CacheFor((Uri Uri, int Width) key) => key.Width >= LargeImageWidth ? _large : _small;
+
+    private async Task<ImageSource?> LoadAndCacheAsync((Uri Uri, int Width) key)
+    {
+        var image = await LoadAsync(key.Uri, key.Width).ConfigureAwait(false);
+        lock (_gate)
+        {
+            _pending.Remove(key);
+            long cost = image is BitmapSource bitmap ? (long)bitmap.PixelWidth * bitmap.PixelHeight * 4 : MissingCost;
+            CacheFor(key).Add(key, image, cost);
+        }
+
+        return image;
     }
 
     private async Task<ImageSource?> LoadAsync(Uri uri, int decodeWidth)
@@ -83,24 +135,36 @@ public sealed partial class ArtService
                 return null;
             }
 
-            return await Task.Run(() =>
+            await _decoders.WaitAsync().ConfigureAwait(false);
+            try
             {
-                int sourceWidth = BitmapDecoder.Create(new Uri(path), BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0].PixelWidth;
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                image.UriSource = new Uri(path);
-                image.DecodePixelWidth = Math.Min(decodeWidth, sourceWidth);
-                image.EndInit();
-                image.Freeze();
-                return (ImageSource)image;
-            }).ConfigureAwait(false);
+                // Arquivo local resolve na hora: sem o Task.Run a decodificação rodaria na thread de quem pediu (a UI).
+                return await Task.Run<ImageSource?>(() => Decode(path, decodeWidth)).ConfigureAwait(false);
+            }
+            finally
+            {
+                _decoders.Release();
+            }
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or NotSupportedException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or NotSupportedException or UnauthorizedAccessException or FileFormatException)
         {
             LogArtFailed(_logger, uri, ex.Message);
             return null;
         }
+    }
+
+    /// <summary>Decodifica já no tamanho de exibição e congela (pode ir para a thread da UI).</summary>
+    private static BitmapImage Decode(string path, int decodeWidth)
+    {
+        int sourceWidth = BitmapDecoder.Create(new Uri(path), BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0].PixelWidth;
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.UriSource = new Uri(path);
+        image.DecodePixelWidth = Math.Min(decodeWidth, sourceWidth);
+        image.EndInit();
+        image.Freeze();
+        return image;
     }
 
     /// <summary>Arquivo local da imagem: o próprio arquivo, o cache, ou o primeiro candidato que baixar.</summary>

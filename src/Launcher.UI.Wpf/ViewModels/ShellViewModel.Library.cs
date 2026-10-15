@@ -37,7 +37,7 @@ public sealed partial class ShellViewModel
                     RunningGame = item;
                 }
 
-                _ = item.LoadCoverAsync();
+                // A capa carrega quando aparece na tela (PERF-004), não para a biblioteca inteira de uma vez.
             }
         }
 
@@ -59,7 +59,7 @@ public sealed partial class ShellViewModel
         item.Refresh();
         if (game.CoverUri != previousCover)
         {
-            _ = item.ReloadArtAsync();
+            item.ReloadArt();
             if (_backdropGameId == id)
             {
                 SetBackdrop(item);

@@ -103,9 +103,15 @@ public sealed class P10GameEntry(string id, string name) : P10Observable
 
     public int? UserScore { get; init; }
 
+    /// <summary>
+    /// Capa sob demanda: o launcher fornece a capa por <see cref="CoverSource"/> e a lê só quando o tema mostra o item
+    /// (grade virtualizada); <see cref="NotifyCoverChanged"/> avisa quando ela fica pronta. Um valor atribuído vence.
+    /// </summary>
+    public Func<ImageSource?>? CoverSource { get; init; }
+
     public ImageSource? CoverImage
     {
-        get => _coverImage;
+        get => _coverImage ?? CoverSource?.Invoke();
         set
         {
             if (SetField(ref _coverImage, value))
@@ -114,6 +120,14 @@ public sealed class P10GameEntry(string id, string name) : P10Observable
                 OnPropertyChanged(nameof(CoverImageObjectCached));
             }
         }
+    }
+
+    /// <summary>A capa de <see cref="CoverSource"/> ficou pronta ou mudou.</summary>
+    public void NotifyCoverChanged()
+    {
+        OnPropertyChanged(nameof(CoverImage));
+        OnPropertyChanged(nameof(CoverImageObject));
+        OnPropertyChanged(nameof(CoverImageObjectCached));
     }
 
     public ImageSource? CoverImageObject => CoverImage;
