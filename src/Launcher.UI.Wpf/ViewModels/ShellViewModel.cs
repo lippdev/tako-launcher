@@ -87,7 +87,7 @@ public sealed partial class ShellViewModel : ObservableObject
         SettingsService settings,
         ThemeService themes,
         PlayniteThemeService playniteThemes,
-        PerformanceSimulator performance,
+        SessionToolsService sessionTools,
         SessionEnvironmentGuard environment,
         GameScreenSession gameScreen,
         TimeProvider time,
@@ -99,7 +99,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Settings = settings;
         _themes = themes;
         _playniteThemes = playniteThemes;
-        Performance = performance;
+        SessionTools = sessionTools;
         _environment = environment;
         GameScreen = gameScreen;
         _time = time;
@@ -133,7 +133,8 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public SettingsService Settings { get; }
 
-    public PerformanceSimulator Performance { get; }
+    /// <summary>Ferramentas da Central de Controle (janelas, RTSS, ponteiro, ControlFS, desempenho).</summary>
+    public SessionToolsService SessionTools { get; }
 
     public SessionOptions SessionOptions { get; } = new();
 
@@ -342,7 +343,7 @@ public sealed partial class ShellViewModel : ObservableObject
         var game = RunningGame;
         foreach (var overlay in Overlays.OfType<ControlCenterViewModel>().ToList())
         {
-            CloseOverlay(overlay);
+            CloseControlCenterKeepingGameBehind(overlay); // jogo real: fica atrás da Início até o Guia
         }
 
         // A sessão continua na pilha, mas o launcher fica em primeiro plano até o Guia.
@@ -367,9 +368,14 @@ public sealed partial class ShellViewModel : ObservableObject
         var game = RunningGame;
         var session = Overlays.OfType<GameSessionViewModel>().FirstOrDefault() ?? _backgroundSession;
         Session = SessionState.Returning;
+        foreach (var disposable in Overlays.OfType<IDisposable>().ToList())
+        {
+            disposable.Dispose();
+        }
+
         Overlays.Clear();
         _backgroundSession = null;
-        Performance.Stop();
+        SessionTools.EndSession();
         if (game is not null)
         {
             game.IsRunning = false;
@@ -396,7 +402,7 @@ public sealed partial class ShellViewModel : ObservableObject
         switch (TopOverlay)
         {
             case GameSessionViewModel session:
-                PushOverlay(new ControlCenterViewModel(this, session));
+                PushOverlay(new ControlCenterViewModel(this, session, SessionTools));
                 break;
             case ControlCenterViewModel center:
                 CloseOverlay(center);
@@ -405,6 +411,9 @@ public sealed partial class ShellViewModel : ObservableObject
                 PushOverlay(_backgroundSession);
                 _backgroundSession = null;
                 Session = SessionState.Playing;
+                break;
+            case null when IsTrackingRealGame && Session == SessionState.Playing:
+                OpenControlCenterOverRealGame();
                 break;
         }
     }
@@ -445,12 +454,12 @@ public sealed partial class ShellViewModel : ObservableObject
             return;
         }
 
-        var session = new GameSessionViewModel(game, SessionOptions, Performance);
+        var session = new GameSessionViewModel(game, SessionOptions);
         Overlays.Remove(launch);
         RunningGame = game;
         game.IsRunning = true;
         Session = SessionState.Playing;
-        Performance.Start();
+        SessionTools.BeginSession();
         PushOverlay(session);
         CurrentPage.Refresh();
         Toast($"Jogando {game.Title} · {GuideName} abre o menu rápido");
@@ -473,6 +482,11 @@ public sealed partial class ShellViewModel : ObservableObject
         }
 
         Overlays.Remove(overlay);
+        if (overlay is ControlCenterViewModel)
+        {
+            OnControlCenterClosed();
+        }
+
         OnOverlaysChanged();
     }
 
@@ -616,6 +630,10 @@ public sealed partial class ShellViewModel : ObservableObject
                 if (_focusedIsAdjustable)
                 {
                     list.Add(("left+right", "Ajustar", AppCommand.Right));
+                }
+                else if (_focusedContext is WindowCardViewModel)
+                {
+                    list.Add(("x", "Fechar janela", AppCommand.Favorite));
                 }
                 else if (center.IsPopoverOpen)
                 {

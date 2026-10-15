@@ -45,6 +45,12 @@ public static class AppPaths
     /// <summary>Monitores e áudio registrados antes do jogo, até a restauração (MVP-012).</summary>
     public static string EnvironmentSnapshotFile => Path.Combine(DataRoot, "session-environment.json");
 
+    /// <summary>Marcador de ponteiro escondido pela Central de Controle; existe só enquanto ele está escondido.</summary>
+    public static string CursorHiddenMarker => Path.Combine(DataRoot, "cursor-hidden");
+
+    /// <summary>Limite de FPS do RTSS que o usuário tinha antes da sessão, até ser devolvido.</summary>
+    public static string RtssLimitBackupFile => Path.Combine(DataRoot, "rtss-fps-limit.txt");
+
     /// <summary>Temas importados de pacotes <c>.pthm</c>, um por pasta (<c>themes/&lt;Id&gt;</c>).</summary>
     public static string ThemesRoot => Path.Combine(DataRoot, "themes");
 }

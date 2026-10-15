@@ -3,7 +3,9 @@ using System.Net.Http;
 using System.Windows;
 using ConsoleMode.Runtime.Audio;
 using ConsoleMode.Runtime.Display;
+using ConsoleMode.Runtime.SessionTools;
 using ConsoleMode.Runtime.Windows;
+using ConsoleMode.Runtime.Windows.SessionTools;
 using Launcher.Core.Diagnostics;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Metadata;
@@ -65,6 +67,9 @@ public partial class App : Application
             shell.ShowRecovery(startupTheme);
         }
 
+        // O Tako caiu durante um jogo com o ponteiro escondido ou um limite de FPS aplicado: desfaz.
+        _services.GetRequiredService<SessionToolsService>().RecoverAfterCrash();
+
         // O Tako caiu durante um jogo e monitores ou áudio ficaram diferentes: oferece restaurar (MVP-012).
         shell.OfferEnvironmentRestore();
 
@@ -125,7 +130,14 @@ public partial class App : Application
         services.AddSingleton<ArtService>();
         services.AddSingleton<SonyHidGamepad>();
         services.AddSingleton<SettingsService>();
-        services.AddSingleton<PerformanceSimulator>();
+        // Central de Controle durante o jogo: janelas abertas, RTSS, ponteiro, ControlFS e desempenho (MVP-002/030).
+        services.AddSingleton<IWindowSwitcher, WindowsWindowSwitcher>();
+        services.AddSingleton<IFpsOverlayService>(sp => new WindowsRtss(AppPaths.RtssLimitBackupFile, sp.GetRequiredService<ILogger<WindowsRtss>>()));
+        services.AddSingleton<PointerPadRelay>();
+        services.AddSingleton<IPointerService>(sp => new WindowsPointer(AppPaths.CursorHiddenMarker, sp.GetRequiredService<PointerPadRelay>().Read, sp.GetRequiredService<ILogger<WindowsPointer>>()));
+        services.AddSingleton<IControlFsService, WindowsControlFs>();
+        services.AddSingleton<IHardwareMonitor, WindowsHardwareMonitor>();
+        services.AddSingleton<SessionToolsService>();
         // Monitores e áudio da sessão (MVP-012): registrados antes do jogo e restaurados depois.
         services.AddSingleton<IDisplayConfigurationService, WindowsDisplayConfiguration>();
         services.AddSingleton<IAudioEndpointService, WindowsAudioEndpoints>();

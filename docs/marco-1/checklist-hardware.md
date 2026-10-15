@@ -177,6 +177,23 @@ Configurações › **Tela de jogo** (padrão: desligada). Use um PC com monitor
 | S8 | `Tako.exe --no-supervisor` | Só a UI, sem supervisor |
 | S9 | E14 com o supervisor (finalizar só a UI durante o jogo) | A UI reabre sozinha e faz a pergunta "Restaurar monitores e áudio?" |
 
+## 11. Central de Controle sobre o jogo (MVP-030)
+
+Com um jogo real aberto pelo Tako (ex.: um jogo da Steam em tela cheia sem bordas e outro em tela cheia exclusiva).
+
+| # | Caso | Esperado |
+|---|---|---|
+| G1 | Guia (Xbox) ou PS durante o jogo | O Tako vem para a frente com a Central aberta sobre a arte do jogo; B, Guia ou "Voltar ao jogo" devolvem o jogo. Anotar se a Barra de Jogo do Xbox também abre |
+| G2 | Janelas abertas | A fileira lista as janelas do Alt+Tab com ícones; A alterna para uma (o jogo segue aberto); X fecha (um programa com algo não salvo pergunta antes) |
+| G3 | Encerrar jogo (jogo real) | O jogo recebe o pedido de fechar e volta à frente; ao fechar, "Bem-vindo de volta" |
+| G4 | Desempenho | Cartão e painel mostram CPU, GPU (com temperatura, se o driver informar) e RAM próximos do Gerenciador de Tarefas |
+| G5 | RTSS não instalado | Painel de Desempenho mostra "Baixar o RTSS"; nada trava |
+| G6 | RTSS instalado: contador | Só FPS / Compacto / Detalhado aparecem no jogo; posição, tamanho e fundo mudam na hora; o OSD do Afterburner some enquanto o contador do Tako está ligado e volta em "O do RTSS" |
+| G7 | RTSS instalado: limite | Limite de 60 FPS vale no jogo; ao fechar o jogo, o limite que estava no RTSS volta (conferir no RTSS) |
+| G8 | Ponteiro | Esconder some com o ponteiro em todos os apps e ele volta ao fim da sessão; mover com o analógico funciona com Xbox e com DualSense; A, A duplo e segurar A clicam, clicam com o direito e arrastam |
+| G9 | Queda com o ponteiro escondido ou limite aplicado | Finalizar `Tako.exe` e abrir de novo: ponteiro visível e limite do usuário de volta |
+| G10 | ControlFS | Instalado: abre por cima do jogo; não instalado: "Baixar o ControlFS" abre a página |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.

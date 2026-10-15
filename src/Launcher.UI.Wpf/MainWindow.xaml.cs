@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -54,20 +55,23 @@ public partial class MainWindow : Window
     private readonly FocusNavigator _navigator;
     private readonly GamepadInterpreter _gamepad = new();
     private readonly SonyHidGamepad _sony;
+    private readonly PointerPadRelay _pointerPad;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly DispatcherTimer _gamepadTimer = new(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly Stack<FrameworkElement?> _focusBeforeOverlay = new();
     private long _wheelLockedUntil;
     private FrameworkElement? _draggingSlider;
     private Point? _lastMouse;
+    private bool _guideHeldInBackground;
 
-    public MainWindow(ShellViewModel shell, ArtService art, SonyHidGamepad sony, ILogger<MainWindow> logger)
+    public MainWindow(ShellViewModel shell, ArtService art, SonyHidGamepad sony, PointerPadRelay pointerPad, ILogger<MainWindow> logger)
     {
         InitializeComponent();
         _shell = shell;
         _logger = logger;
         _art = art;
         _sony = sony;
+        _pointerPad = pointerPad;
         SizeChanged += (_, _) => FitStage();
         DpiChanged += (_, _) => FitStage();
         DataContext = shell;
@@ -173,6 +177,9 @@ public partial class MainWindow : Window
             case AppCommand.Back:
                 _shell.Back();
                 break;
+            case AppCommand.Favorite when _shell.TopOverlay is ControlCenterViewModel center && focused?.DataContext is WindowCardViewModel window:
+                center.CloseWindow(window);
+                break;
             case AppCommand.Favorite when noOverlay && focused?.DataContext is GameItemViewModel game:
                 _shell.ToggleFavorite(game);
                 break;
@@ -238,6 +245,7 @@ public partial class MainWindow : Window
         {
             snapshot = sony;
             name = _sony.Model == SonyController.DualSense ? "Controle PS5 (DualSense)" : "Controle PS4 (DualShock 4)";
+            _pointerPad.Update(sony.LeftX, sony.LeftY, sony.Buttons.HasFlag(GamepadButtons.A)); // ponteiro pelo controle
         }
 
         if (name != _shell.ControllerName)
@@ -246,6 +254,11 @@ public partial class MainWindow : Window
             _shell.ControllerName = name;
             _shell.IsPlayStationPad = name?.StartsWith("Controle PS", StringComparison.Ordinal) == true;
             _shell.Toast(name is null ? "Controle desconectado — o teclado continua funcionando" : $"Controle conectado: {name}");
+        }
+
+        if (snapshot is { } background && !IsActive)
+        {
+            SummonFromBackground(background);
         }
 
         if (snapshot is not { } pad || !IsActive)
@@ -259,6 +272,30 @@ public partial class MainWindow : Window
         {
             Handle(command, InputKind.Gamepad);
         }
+    }
+
+    /// <summary>
+    /// Guia/PS com o jogo real em primeiro plano: o Tako vem para a frente com a Central de Controle aberta. Só o Guia
+    /// (não o View, que é botão de jogo) e só na borda de descida.
+    /// </summary>
+    private void SummonFromBackground(GamepadSnapshot pad)
+    {
+        bool guide = pad.Buttons.HasFlag(GamepadButtons.Guide);
+        bool pressed = guide && !_guideHeldInBackground;
+        _guideHeldInBackground = guide;
+        if (!pressed || !_shell.CanOpenControlCenterFromBackground)
+        {
+            return;
+        }
+
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Maximized;
+        }
+
+        _shell.SessionTools.Windows.Activate(new WindowInteropHelper(this).Handle);
+        _shell.InputKind = InputKind.Gamepad;
+        _shell.Guide();
     }
 
     // ---------------------------------------------------------------- Mouse

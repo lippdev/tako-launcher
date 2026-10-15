@@ -373,6 +373,42 @@
     </Setter>
   </Style>
 
+  <!-- Central de Controle: janela aberta (ícone do programa, título e nome). -->
+  <Style x:Key="WindowCard" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Setter Property="Width" Value="280" />
+    <Setter Property="Height" Value="132" />
+    <Setter Property="Margin" Value="0,0,20,0" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Border x:Name="Ring" Margin="-10" CornerRadius="28" BorderBrush="White" BorderThickness="4" Visibility="Collapsed" />
+            <Border x:Name="Body" CornerRadius="20" Background="#EB161A22" Padding="20,18">
+              <DockPanel>
+                <Grid DockPanel.Dock="Top" Width="44" Height="44" HorizontalAlignment="Left">
+                  <Border CornerRadius="12" Background="#2EFFFFFF">
+                    <TextBlock Text="{Binding Initial}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+                  </Border>
+                  <Image Source="{Binding Icon}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
+                         Visibility="{Binding Icon, Converter={StaticResource NotNullToVisibility}}" />
+                </Grid>
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding ProcessName}" FontSize="{DynamicResource FsLabelSm}" FontWeight="SemiBold" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Title}" Margin="0,12,0,4" FontSize="{DynamicResource FsLabelMd}" FontWeight="Bold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom" />
+              </DockPanel>
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+              <Setter TargetName="Body" Property="Effect" Value="{StaticResource FocusShadow}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!-- Central de Controle: ícone da barra (círculo branco no foco, nome abaixo). -->
   <Style x:Key="ControlBarIcon" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
     <Setter Property="Width" Value="72" />

@@ -3,6 +3,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ConsoleMode.Runtime.SessionTools;
 using Launcher.Core.Navigation;
 using Launcher.UI.Wpf.Services;
 
@@ -80,11 +81,10 @@ public sealed partial class GameSessionViewModel : ObservableObject, IOverlayVie
     [ObservableProperty]
     private ImageSource? _frame;
 
-    public GameSessionViewModel(GameItemViewModel game, SessionOptions options, PerformanceSimulator performance)
+    public GameSessionViewModel(GameItemViewModel game, SessionOptions options)
     {
         Game = game;
         Options = options;
-        Performance = performance;
         Started = DateTimeOffset.UtcNow;
     }
 
@@ -92,9 +92,13 @@ public sealed partial class GameSessionViewModel : ObservableObject, IOverlayVie
 
     public SessionOptions Options { get; }
 
-    public PerformanceSimulator Performance { get; }
-
     public DateTimeOffset Started { get; }
+
+    /// <summary>
+    /// Jogo real (MVP-026) sob a Central de Controle: o Tako veio para a frente com a arte do jogo no fundo e sai de
+    /// cena quando a Central fecha.
+    /// </summary>
+    public bool IsRealGame { get; init; }
 
     public bool HandleBack() => true; // B pertence ao jogo.
 }
@@ -112,6 +116,9 @@ public sealed partial class PanelRowViewModel : ObservableObject
     private double _fraction;
 
     public required string Label { get; init; }
+
+    /// <summary>Chave de foco (<c>Nav.Key</c>) para voltar à mesma linha depois de reconstruir o painel.</summary>
+    public string? Key { get; init; }
 
     public string? IconKey { get; init; }
 
@@ -169,4 +176,22 @@ public sealed partial class CardViewModel(string key) : ObservableObject
 
     /// <summary>Valor em texto (título) em vez de número grande.</summary>
     public bool IsTextValue => Key is "game" or "capture";
+}
+
+/// <summary>Janela aberta no alternador da Central de Controle: A alterna para ela, X pede para fechar.</summary>
+public sealed partial class WindowCardViewModel(OpenWindow window) : ObservableObject
+{
+    [ObservableProperty]
+    private ImageSource? _icon;
+
+    public OpenWindow Window { get; } = window;
+
+    public string NavKey => $"win:{Window.Handle}";
+
+    public string Title => Window.Title;
+
+    /// <summary>Nome do programa; vazio quando o Windows não deixa ler (ex.: janela de administrador).</summary>
+    public string ProcessName => string.IsNullOrEmpty(Window.ProcessName) ? "Janela" : Window.ProcessName;
+
+    public string Initial => ProcessName[..1].ToUpperInvariant();
 }
