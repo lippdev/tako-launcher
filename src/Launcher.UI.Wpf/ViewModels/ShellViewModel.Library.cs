@@ -181,33 +181,41 @@ public sealed partial class ShellViewModel
         PushOverlay(dialog);
     }
 
-    private string SourceText(Game game) => game.SteamAppId is int id ? $"{_metadata.ProviderName} (appid {id})" : "nenhuma correspondência ainda";
+    private string SourceText(Game game) => _metadata.Describe(game);
 
     private static string GameTextStore(Game game) => GameTextStore(game.Store);
 
     private static string GameTextStore(GameStore store) => Core.Presentation.GameText.StoreName(store);
 
-    /// <summary>Como no Plex: mostra os resultados da busca pelo título e fixa o escolhido.</summary>
+    /// <summary>
+    /// Como no Plex: mostra os resultados de todas as fontes ligadas (Steam, IGDB...), cada um com a fonte, e fixa o
+    /// escolhido. Os casados por id (mesmo jogo na loja) vêm marcados.
+    /// </summary>
     private async Task FixMatchAsync(GameItemViewModel item)
     {
         Toast($"Buscando \"{item.Title}\" em {_metadata.ProviderName}…");
-        var results = await _metadata.SearchAsync(item.Title).ConfigureAwait(true);
+        var all = await _metadata.SearchAsync(item.Game).ConfigureAwait(true);
+        // Até 4 por fonte, para nenhuma esconder as outras.
+        var results = all.GroupBy(m => m.Source).SelectMany(g => g.Take(4)).ToList();
         DialogViewModel? dialog = null;
-        var actions = results.Take(5)
-            .Select((match, i) => new OverlayAction(match.Title, i == 0 ? ActionStyle.Primary : ActionStyle.Secondary, new RelayCommand(async () =>
+        var actions = results
+            .Select((match, i) => new OverlayAction(Core.Presentation.GameText.MatchLabel(match), i == 0 ? ActionStyle.Primary : ActionStyle.Secondary, new RelayCommand(async () =>
             {
                 CloseOverlay(dialog!);
-                bool ok = await _metadata.PinAsync(item.Game, match.SteamAppId).ConfigureAwait(true);
-                Toast(ok ? $"{item.Title} agora usa os dados de {match.Title}" : "Não foi possível buscar os dados agora; tente de novo");
+                bool ok = await _metadata.PinAsync(item.Game, match).ConfigureAwait(true);
+                Toast(ok ? $"{item.Title} agora usa os dados de {match.Title} ({match.Source})" : "Não foi possível buscar os dados agora; tente de novo");
             }), IsDefault: i == 0))
             .Append(new OverlayAction("Cancelar", ActionStyle.Secondary, new RelayCommand(() => CloseOverlay(dialog!)), IsDefault: results.Count == 0))
             .ToList();
-        dialog = new DialogViewModel(
-            "Qual destes é o seu jogo?",
-            results.Count == 0
-                ? item.Game.Store == GameStore.Manual ? $"Nada encontrado para \"{item.Title}\". Renomeie o atalho ou escolha uma capa manualmente." : $"Nada encontrado para \"{item.Title}\" na {_metadata.ProviderName}."
-                : $"Resultados para \"{item.Title}\":",
-            actions);
+        string empty = item.Game.Store == GameStore.Manual
+            ? $"Nada encontrado para \"{item.Title}\" em {_metadata.ProviderName}. Renomeie o atalho ou escolha uma capa manualmente."
+            : $"Nada encontrado para \"{item.Title}\" em {_metadata.ProviderName}.";
+        if (results.Count == 0 && MetadataHintFor(item.Game) is not null)
+        {
+            empty += " Com a IGDB ligada (Configurações › Dados dos jogos), a busca inclui jogos de outras lojas e de consoles.";
+        }
+
+        dialog = new DialogViewModel("Qual destes é o seu jogo?", results.Count == 0 ? empty : $"Resultados para \"{item.Title}\":", actions);
         PushOverlay(dialog);
     }
 

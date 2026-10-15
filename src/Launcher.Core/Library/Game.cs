@@ -38,6 +38,14 @@ public sealed class Game
 
     public IReadOnlyList<string> Genres { get; set; } = [];
 
+    public IReadOnlyList<string> Themes { get; set; } = [];
+
+    /// <summary>Modos de jogo (um jogador, cooperativo...).</summary>
+    public IReadOnlyList<string> GameModes { get; set; } = [];
+
+    /// <summary>Franquia ou série.</summary>
+    public string? Franchise { get; set; }
+
     public string Description { get; set; } = string.Empty;
 
     public string? Developer { get; set; }
@@ -46,6 +54,9 @@ public sealed class Game
 
     /// <summary>Nota do Metacritic (0–100), quando a fonte informa.</summary>
     public int? MetacriticScore { get; set; }
+
+    /// <summary>Nota da crítica agregada (0–100) de outra fonte (IGDB), mostrada quando não há a do Metacritic.</summary>
+    public int? CriticScore { get; set; }
 
     /// <summary>Aviso exibido nos detalhes (ex.: port não oficial).</summary>
     public string? Note { get; init; }
@@ -71,6 +82,15 @@ public sealed class Game
 
     /// <summary>Como reconhecer o fim do jogo (MVP-026); nulo = automático (<see cref="Session.GameTracking.Plan"/>).</summary>
     public Session.GameTrackingStrategy? Tracking { get; init; }
+
+    /// <summary>
+    /// Id do produto na própria loja, quando ele difere do <see cref="Id"/> (Epic: CatalogItemId; Xbox: StoreId da
+    /// Microsoft Store): serve para casar os metadados sem depender do nome.
+    /// </summary>
+    public string? StoreProductId { get; init; }
+
+    /// <summary>Plataforma de origem para jogos de emulador ("snes", "ps2"...; ver <see cref="Metadata.Igdb.IgdbPlatforms"/>); nula = PC.</summary>
+    public string? Platform { get; init; }
 
     /// <summary>Jogo correspondente na Steam (da própria loja ou encontrado pelos metadados).</summary>
     public int? SteamAppId { get; set; }

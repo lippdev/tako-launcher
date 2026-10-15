@@ -266,6 +266,10 @@
           <TextBlock Text="{Binding Game.Note}" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" />
         </StackPanel>
       </Border>
+      <!-- ADR-0021: jogo sem dados e IGDB desligada; some quando a IGDB é ligada ou o jogo ganha descrição. -->
+      <TextBlock Text="{Binding MetadataHint}" Margin="0,18,0,0" MaxWidth="900" HorizontalAlignment="Left" TextWrapping="Wrap"
+                 FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}"
+                 Visibility="{Binding MetadataHint, Converter={StaticResource NotNullToVisibility}}" />
       <StackPanel Orientation="Horizontal" Margin="0,44,0,0">
         <Button Style="{StaticResource PillButton}" Tag="primary" Command="{Binding PrimaryCommand}" nav:Nav.Group="details" nav:Nav.Key="details:primary" nav:Nav.IsDefault="True">
           <StackPanel Orientation="Horizontal">
@@ -393,7 +397,20 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Atualizar dados dos jogos" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Descrição, gêneros, lançamento, desenvolvedora, nota do Metacritic e artes (fonte: Steam Store)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="Descrição, gêneros, lançamento, desenvolvedora, notas e artes (Steam Store e, se ligada, IGDB)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <!-- Dados dos jogos (IGDB, ADR-0021): bloco isolado; abre a sobreposição de MetadataViews.xaml. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.OpenIgdbSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:igdb">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding DataContext.IgdbSummary, RelativeSource={RelativeSource AncestorType=Window}}" MaxWidth="420" TextTrimming="CharacterEllipsis" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Dados dos jogos (IGDB)" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Informações e artes de jogos de qualquer loja e de consoles, com a sua chave gratuita da Twitch" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>

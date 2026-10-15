@@ -89,6 +89,7 @@ public sealed class EpicLibrarySource(IRegistryReader registry, string programDa
             AddedAt = addedAt,
             LaunchTarget = EpicManifests.LaunchUri(install),
             InstallPath = install.InstallLocation,
+            StoreProductId = install.CatalogItemId,
         };
     }
 

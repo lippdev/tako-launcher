@@ -93,3 +93,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Serviços de dados de jogos
+
+O Tako não distribui dados nem imagens de jogos: eles são baixados em tempo de execução para o cache local do usuário.
+
+- **Steam Store** (Valve): descrição, gêneros, lançamento, empresas, nota do Metacritic e artes, pela API pública da
+  loja.
+- **IGDB** (<https://www.igdb.com>, Twitch Interactive): dados e imagens fornecidos pela IGDB.com, usada só quando o
+  usuário informa a própria chave da Twitch (ADR-0021), conforme os termos de uso da API da Twitch/IGDB. A IGDB não
+  endossa o Tako. A atribuição aparece em Configurações › Dados dos jogos (IGDB).

@@ -21,6 +21,7 @@ using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
 using Launcher.UI.Wpf.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace Launcher.UI.Wpf.Tests;
@@ -60,6 +61,7 @@ public sealed partial class UiSmokeTests
         var tv = new SimulatedTvControl();
         string environmentFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-environment-{Guid.NewGuid():N}.json");
         var hotkey = new SimulatedEmergencyHotkey();
+        string igdbFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-igdb-{Guid.NewGuid():N}.dat");
         var consoleFiles = new ConsoleModeFiles(
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-{Guid.NewGuid():N}.json"),
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-environment-{Guid.NewGuid():N}.json"));
@@ -81,7 +83,10 @@ public sealed partial class UiSmokeTests
                 .AddSingleton<Launcher.Core.Library.Xbox.IXboxSystem>(new EmptyXboxSystem())
                 .AddSingleton(new PendingEnvironmentStore(environmentFile))
                 .AddSingleton<IEmergencyHotkey>(hotkey)
-                .AddSingleton(consoleFiles));
+                .AddSingleton(consoleFiles)
+                // IGDB (ADR-0021): chave num arquivo temporário e nenhum provedor de metadados, para o CI não ir à rede.
+                .AddSingleton(new Launcher.Core.Library.Metadata.Igdb.IgdbSettingsStore(igdbFile, new ConsoleMode.Runtime.Windows.DpapiSecretProtector()))
+                .RemoveAll<Launcher.Core.Library.Metadata.IMetadataProvider>());
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
 
@@ -513,6 +518,9 @@ public sealed partial class UiSmokeTests
 
         // --- Lojas (ADR-0019): Steam, Epic Games e GOG ligadas/desligadas nas Configurações.
         StoreSettings(shell, window);
+
+        // --- Dados dos jogos (IGDB, ADR-0021): chave da Twitch do usuário, Testar simulado, aviso nos detalhes.
+        IgdbDataSettings(shell, window, services.GetRequiredService<MetadataService>());
 
         // --- Segurança de temas (frente H): caminhos montados por dados não carregam (MVP-016, questão aberta 8).
         ThemeSecurity(services, bindingErrors);
