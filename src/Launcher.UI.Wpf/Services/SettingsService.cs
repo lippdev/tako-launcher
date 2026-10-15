@@ -41,6 +41,7 @@ public sealed partial class SettingsService : ObservableObject
             ReducedMotion = Read(saved, nameof(ReducedMotion), ReducedMotion);
             StartFullscreenOnLogin = Read(saved, nameof(StartFullscreenOnLogin), StartFullscreenOnLogin);
             RestoreEnvironmentAfterGame = Read(saved, nameof(RestoreEnvironmentAfterGame), RestoreEnvironmentAfterGame);
+            LoadGameScreen(saved);
         }
         catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
         {
@@ -67,7 +68,9 @@ public sealed partial class SettingsService : ObservableObject
 
     partial void OnRestoreEnvironmentAfterGameChanged(bool value) => Save(nameof(RestoreEnvironmentAfterGame), value);
 
-    private void Save(string key, bool value)
+    private void Save(string key, bool value) => Save(key, value ? "true" : "false");
+
+    private void Save(string key, string value)
     {
         if (_loading)
         {
@@ -76,7 +79,7 @@ public sealed partial class SettingsService : ObservableObject
 
         try
         {
-            _store.Set(key, value ? "true" : "false");
+            _store.Set(key, value);
         }
         catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
         {

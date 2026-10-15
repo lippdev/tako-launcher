@@ -53,6 +53,8 @@ public sealed partial class UiSmokeTests
             new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System),
             s => s.AddSingleton<IDisplayConfigurationService>(display)
                 .AddSingleton<IAudioEndpointService>(audio)
+                .AddSingleton<IDisplayControlService>(new SimulatedDisplayDesk())
+                .AddSingleton<IScreenCurtain>(new SimulatedScreenCurtain())
                 .AddSingleton(new PendingEnvironmentStore(environmentFile)));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
@@ -408,6 +410,7 @@ public sealed partial class UiSmokeTests
 
         // --- Monitores e áudio (frente E2)
         MonitorsAndAudio(services, shell, window, real, display, audio);
+        GameScreenSettingsAndConfirmation(shell, window);
 
         // --- Supervisor (frente E1): a UI aberta com --supervisor-pipe manda heartbeats pela thread da UI (MVP-003/006).
         string supervisorPipe = NamedPipeIpc.NewPipeName("tk-smoke");
@@ -609,6 +612,40 @@ public sealed partial class UiSmokeTests
         Pump(0.8);
         Assert.Null(shell.TopOverlay);
         AssertFocused(window, "Início depois do jogo");
+    }
+
+    /// <summary>
+    /// Tela de jogo (MVP-002) com a mesa simulada: desligada por padrão, ligar sugere a TV, as linhas extras aparecem e a
+    /// confirmação "Você consegue ver esta tela?" responde "não" com B/Esc. Termina desligada para não afetar o resto.
+    /// </summary>
+    private static void GameScreenSettingsAndConfirmation(ShellViewModel shell, MainWindow window)
+    {
+        var nav = window.Navigator;
+        shell.OpenSettings();
+        Pump(0.8);
+        Assert.False(shell.Settings.GameScreenEnabled);
+        Assert.True(nav.FocusDefault("settings:gamescreen"));
+        Press(window, AppCommand.Accept);
+        Pump(0.4);
+        Assert.True(shell.Settings.GameScreenEnabled);
+        Assert.Equal("SIM\\TV", shell.Settings.GameScreenId);
+        Assert.Equal("TV da sala", ((SettingsViewModel)shell.CurrentPage).GameScreenLabel);
+        Snap(window, "43-configuracoes-tela-de-jogo");
+
+        var confirm = new ScreenConfirmViewModel("TV da sala", ShellViewModel.ScreenConfirmSeconds);
+        shell.PushOverlay(confirm);
+        Pump(0.5);
+        Assert.Equal("overlay", Nav.GetGroup(nav.Focused!));
+        Snap(window, "44-confirmar-tela-de-jogo");
+        Press(window, AppCommand.Back);
+        Assert.True(confirm.Result.IsCompleted);
+        Assert.False(confirm.Result.Result);
+        shell.CloseOverlay(confirm);
+
+        shell.Settings.GameScreenEnabled = false;
+        shell.Settings.GameScreenId = string.Empty;
+        shell.Settings.GameScreenName = string.Empty;
+        Pump(0.3);
     }
 
     /// <summary>

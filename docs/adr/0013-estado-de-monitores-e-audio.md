@@ -1,7 +1,9 @@
 # ADR-0013: Estado de monitores e áudio da sessão
 
-- Status: Proposta
+- Status: Proposta (monitores complementados pela [ADR-0015](0015-monitores-do-console-mode-e-tela-de-jogo.md))
 - Data: 2026-10-15
+
+> **Atualização (ADR-0015):** com o Tako sob AGPL-3.0-only ([ADR-0014](0014-licenca-agpl.md)), a implementação de monitores passou a vir do Console Mode: identidade de monitores, ligar/desconectar pela CCD, principal, resolução, HDR e cortina preta foram portados para `ConsoleMode.Runtime`/`ConsoleMode.Runtime.Windows`, e a restauração sem a configuração exata agora religa e desconecta monitores como o Console Mode. Os contratos, o snapshot e as regras desta ADR continuam valendo. A restrição de "escrito do zero, sem consultar o Console Mode" abaixo é histórica.
 
 ## Contexto
 

@@ -1,0 +1,23 @@
+<!--
+  Tela de jogo (MVP-002): confirmação "Você consegue ver esta tela?" na primeira vez com uma tela ou modo novo.
+  Sem resposta, as telas voltam ao normal sozinhas (contagem regressiva).
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:Launcher.UI.Wpf.ViewModels">
+
+  <DataTemplate DataType="{x:Type vm:ScreenConfirmViewModel}">
+    <Grid>
+      <Rectangle Fill="{DynamicResource ScrimBrush}" />
+      <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel>
+          <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Text}" Margin="0,16,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
+          <ProgressBar Margin="0,28,0,0" Height="6" Minimum="0" Maximum="{Binding Seconds}" Value="{Binding SecondsLeft, Mode=OneWay}" Foreground="#E6FFFFFF" Background="#26FFFFFF" BorderThickness="0" />
+          <TextBlock Text="{Binding CountdownText}" Margin="0,10,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="#99FFFFFF" />
+          <ItemsControl ItemsSource="{Binding Actions}" Margin="0,36,0,-18" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </DataTemplate>
+</ResourceDictionary>

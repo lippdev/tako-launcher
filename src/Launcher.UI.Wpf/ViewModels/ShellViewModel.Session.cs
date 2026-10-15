@@ -42,10 +42,17 @@ public sealed partial class ShellViewModel
     public bool IsTrackingRealGame => _monitor?.IsTracking == true;
 
     /// <summary>Abre o jogo de verdade (URI da loja ou executável/atalho) e começa a acompanhar até ele fechar.</summary>
-    private void StartRealSession(GameItemViewModel item)
+    private async Task StartRealSessionAsync(GameItemViewModel item)
     {
         var game = item.Game;
-        CaptureEnvironmentBeforeGame(game.Id);
+        CaptureEnvironmentBeforeGame(game.Id); // antes da tela de jogo: o registro é o estado de antes de tudo
+        if (!await FocusGameScreenAsync().ConfigureAwait(true))
+        {
+            Session = SessionState.Browsing; // tela de jogo não confirmada: as telas já voltaram
+            _environment.Discard();
+            return;
+        }
+
         Process? process;
         try
         {
@@ -59,6 +66,7 @@ public sealed partial class ShellViewModel
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException)
         {
             Session = SessionState.Browsing; // falha ao abrir: nada mudou
+            RestoreGameScreen();
             _environment.Discard();
             LogLaunchFailed(_logger, ex, game.Id);
             Toast($"Não foi possível abrir {game.Title}: {ex.Message}");
@@ -73,6 +81,7 @@ public sealed partial class ShellViewModel
         {
             // Sem como acompanhar (ex.: URI sem pasta conhecida): o jogo só é aberto, como antes do MVP-026.
             Session = SessionState.Browsing;
+            RestoreGameScreen(); // sem saber quando o jogo fecha, a tela de jogo não teria quando voltar
             _environment.Discard(); // sem saber quando o jogo fecha, não há momento seguro para restaurar
             Toast(game.Store == GameStore.Steam ? $"Abrindo {game.Title} pela Steam" : $"Abrindo {game.Title}");
             return;
@@ -139,6 +148,7 @@ public sealed partial class ShellViewModel
         _monitor?.Stop();
         ClearRunningGame();
         Session = SessionState.Browsing;
+        RestoreGameScreen(); // sem jogo, a tela de jogo não fica em foco
         _environment.Discard(); // o jogo pode abrir depois: restaurar agora atrapalharia
         if (game is not null)
         {
@@ -164,7 +174,8 @@ public sealed partial class ShellViewModel
         }
 
         Session = SessionState.Restoring;
-        string restored = RestoreEnvironmentAfterGame(); // monitores e áudio antes de trazer a janela (MVP-012)
+        string screens = RestoreGameScreen(); // tela de jogo primeiro: a restauração do MVP-012 confere o resultado
+        string restored = RestoreEnvironmentAfterGame() + screens; // monitores e áudio antes de trazer a janela (MVP-012)
         BringLauncherToFront();
         Session = SessionState.Browsing;
         if (game is not null)

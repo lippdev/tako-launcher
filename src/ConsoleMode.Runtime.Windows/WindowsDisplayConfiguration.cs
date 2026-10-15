@@ -1,5 +1,6 @@
+// Leitura e restauração exata: própria do Tako (ADR-0013). Restauração sem a configuração exata adaptada de
+// lippdev/consolemode: src/ConsoleMode/Services/MonitorService.cs (RestoreBackup)
 using System.Buffers.Binary;
-using System.Globalization;
 using System.Runtime.InteropServices;
 using ConsoleMode.Runtime.Display;
 using static ConsoleMode.Runtime.Windows.DisplayNative;
@@ -11,15 +12,17 @@ namespace ConsoleMode.Runtime.Windows;
 /// (caminhos e modos do <c>QueryDisplayConfig</c>) em <see cref="DisplayTopology.PlatformData"/>; a restauração devolve
 /// essa configuração ao <c>SetDisplayConfig</c> (topologia, principal, resolução, taxa, rotação e posição de uma vez).
 /// Se isso falhar (ex.: depois de reiniciar o PC, quando os identificadores dos adaptadores mudam), restaura monitor a
-/// monitor pelo GDI os monitores alterados que ainda estão ativos.
+/// monitor: religa e desconecta pela CCD como o Console Mode e aplica modo, posição e principal pelo GDI.
 /// </summary>
 public sealed unsafe class WindowsDisplayConfiguration : IDisplayConfigurationService
 {
     private const string PlatformPrefix = "ccd1:";
 
+    private readonly WindowsDisplayControl _control = new();
+
     public DisplayTopology Capture()
     {
-        var (paths, modes) = Query();
+        var (paths, modes) = Ccd.Query(QdcOnlyActivePaths);
         var monitors = new List<MonitorState>();
         foreach (var path in paths)
         {
@@ -34,8 +37,8 @@ public sealed unsafe class WindowsDisplayConfiguration : IDisplayConfigurationSe
                 continue;
             }
 
-            var target = TargetName(path.TargetInfo.AdapterId, path.TargetInfo.Id);
-            string id = target.DevicePath ?? string.Create(CultureInfo.InvariantCulture, $"{DescribeLuid(path.TargetInfo.AdapterId)}:{path.TargetInfo.Id}");
+            var target = Ccd.TargetName(path.TargetInfo.AdapterId, path.TargetInfo.Id);
+            string id = Ccd.MonitorId(path.TargetInfo.AdapterId, path.TargetInfo.Id, target.DevicePath);
             if (monitors.Any(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase)))
             {
                 continue;
@@ -44,7 +47,7 @@ public sealed unsafe class WindowsDisplayConfiguration : IDisplayConfigurationSe
             var source = mode.SourceMode;
             monitors.Add(new MonitorState(
                 id,
-                target.FriendlyName ?? SourceGdiName(path.SourceInfo.AdapterId, path.SourceInfo.Id) ?? id,
+                target.FriendlyName ?? Ccd.SourceGdiName(path.SourceInfo.AdapterId, path.SourceInfo.Id) ?? id,
                 IsPrimary: source.X == 0 && source.Y == 0,
                 source.X,
                 source.Y,
@@ -64,12 +67,7 @@ public sealed unsafe class WindowsDisplayConfiguration : IDisplayConfigurationSe
         int ccdError = ErrorSuccess;
         if (Decode(target.PlatformData) is (var paths, var modes))
         {
-            fixed (PathInfo* p = paths)
-            fixed (ModeInfo* m = modes)
-            {
-                ccdError = SetDisplayConfig((uint)paths.Length, p, (uint)modes.Length, m, SdcApply | SdcUseSuppliedDisplayConfig | SdcSaveToDatabase | SdcAllowChanges);
-            }
-
+            ccdError = Ccd.Set(paths, modes);
             if (ccdError == ErrorSuccess)
             {
                 return;
@@ -78,12 +76,39 @@ public sealed unsafe class WindowsDisplayConfiguration : IDisplayConfigurationSe
 
         try
         {
-            ApplyPerMonitor(target, changedMonitorIds);
+            var relinked = MatchActiveMonitors(target);
+            ApplyPerMonitor(target, [.. changedMonitorIds.Union(relinked, StringComparer.OrdinalIgnoreCase)]);
         }
         catch (RuntimeEnvironmentException ex) when (ccdError != ErrorSuccess)
         {
             throw new RuntimeEnvironmentException($"SetDisplayConfig falhou ({ccdError}); restauração monitor a monitor: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// Sem a configuração exata: religa os monitores que estavam ativos e desconecta os que não estavam, como o
+    /// <c>RestoreBackup</c> do Console Mode (primeiro religa, depois desconecta, depois posições e modos).
+    /// </summary>
+    /// <returns>Monitores religados, para entrarem no passo de modo e posição.</returns>
+    private List<string> MatchActiveMonitors(DisplayTopology target)
+    {
+        var connected = _control.ListDisplays();
+        var wantOn = target.Monitors
+            .Where(m => connected.Any(c => !c.IsActive && string.Equals(c.Id, m.Id, StringComparison.OrdinalIgnoreCase)))
+            .Select(m => m.Id)
+            .ToList();
+        if (wantOn.Count > 0)
+        {
+            _control.Enable(wantOn);
+        }
+
+        var wantOff = connected.Where(c => c.IsActive && target.Find(c.Id) is null).Select(c => c.Id).ToList();
+        if (wantOff.Count > 0 && target.Monitors.Count > 0)
+        {
+            _control.Disable(wantOff);
+        }
+
+        return wantOn;
     }
 
     /// <summary>Caminho GDI: resolução, taxa, rotação, posição e principal dos monitores alterados que estão ativos.</summary>
@@ -148,86 +173,18 @@ public sealed unsafe class WindowsDisplayConfiguration : IDisplayConfigurationSe
 
     private static Dictionary<string, string> CurrentGdiNames()
     {
-        var (paths, _) = Query();
+        var (paths, _) = Ccd.Query(QdcOnlyActivePaths);
         var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in paths.Where(p => (p.Flags & PathActive) != 0))
         {
-            var target = TargetName(path.TargetInfo.AdapterId, path.TargetInfo.Id);
-            if (target.DevicePath is { } id && SourceGdiName(path.SourceInfo.AdapterId, path.SourceInfo.Id) is { } gdi)
+            var target = Ccd.TargetName(path.TargetInfo.AdapterId, path.TargetInfo.Id);
+            if (target.DevicePath is { } id && Ccd.SourceGdiName(path.SourceInfo.AdapterId, path.SourceInfo.Id) is { } gdi)
             {
                 names.TryAdd(id, gdi);
             }
         }
 
         return names;
-    }
-
-    private static (PathInfo[] Paths, ModeInfo[] Modes) Query()
-    {
-        // A configuração pode mudar entre a consulta do tamanho e a leitura: tenta de novo algumas vezes.
-        for (int attempt = 0; attempt < 5; attempt++)
-        {
-            uint pathCount;
-            uint modeCount;
-            int sizes = GetDisplayConfigBufferSizes(QdcOnlyActivePaths, &pathCount, &modeCount);
-            if (sizes != ErrorSuccess)
-            {
-                throw new RuntimeEnvironmentException($"GetDisplayConfigBufferSizes falhou ({sizes})");
-            }
-
-            var paths = new PathInfo[pathCount];
-            var modes = new ModeInfo[modeCount];
-            int result;
-            fixed (PathInfo* p = paths)
-            fixed (ModeInfo* m = modes)
-            {
-                result = QueryDisplayConfig(QdcOnlyActivePaths, &pathCount, p, &modeCount, m, 0);
-            }
-
-            if (result == ErrorSuccess)
-            {
-                return (paths[..(int)pathCount], modes[..(int)modeCount]);
-            }
-
-            if (result != ErrorInsufficientBuffer)
-            {
-                throw new RuntimeEnvironmentException($"QueryDisplayConfig falhou ({result})");
-            }
-        }
-
-        throw new RuntimeEnvironmentException("QueryDisplayConfig: a configuração de monitores não parou de mudar");
-    }
-
-    private static (string? FriendlyName, string? DevicePath) TargetName(Luid adapter, uint targetId)
-    {
-        TargetDeviceName request = default;
-        request.Header.Type = DeviceInfoGetTargetName;
-        request.Header.Size = (uint)sizeof(TargetDeviceName);
-        request.Header.AdapterId = adapter;
-        request.Header.Id = targetId;
-        if (DisplayConfigGetDeviceInfo(&request.Header) != ErrorSuccess)
-        {
-            return (null, null);
-        }
-
-        return (NullIfEmpty(new string(request.MonitorFriendlyDeviceName, 0, 64)), NullIfEmpty(new string(request.MonitorDevicePath, 0, 128)));
-    }
-
-    private static string? SourceGdiName(Luid adapter, uint sourceId)
-    {
-        SourceDeviceName request = default;
-        request.Header.Type = DeviceInfoGetSourceName;
-        request.Header.Size = (uint)sizeof(SourceDeviceName);
-        request.Header.AdapterId = adapter;
-        request.Header.Id = sourceId;
-        return DisplayConfigGetDeviceInfo(&request.Header) == ErrorSuccess ? NullIfEmpty(new string(request.ViewGdiDeviceName, 0, 32)) : null;
-    }
-
-    private static string? NullIfEmpty(string text)
-    {
-        int end = text.IndexOf('\0', StringComparison.Ordinal);
-        string value = end >= 0 ? text[..end] : text;
-        return value.Length == 0 ? null : value;
     }
 
     private static DisplayRotation FromCcdRotation(uint rotation) => rotation switch
@@ -286,5 +243,4 @@ public sealed unsafe class WindowsDisplayConfiguration : IDisplayConfigurationSe
         return (paths, modes);
     }
 
-    private static string DescribeLuid(Luid luid) => string.Create(CultureInfo.InvariantCulture, $"{luid.HighPart:X8}{luid.LowPart:X8}");
 }

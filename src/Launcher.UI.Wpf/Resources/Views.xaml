@@ -342,6 +342,61 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Tela de jogo (MVP-002, como o Console Mode): desligada por padrão. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleGameScreenCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:gamescreen">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.GameScreenEnabled}" />
+          <StackPanel>
+            <TextBlock Text="Tela de jogo" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Ao abrir um jogo, usa só a tela escolhida (ex.: a TV) e desliga as outras; tudo volta ao sair do jogo" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding CycleGameScreenCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:gamescreen-display" Visibility="{Binding Settings.GameScreenEnabled, Converter={StaticResource BoolToVisibility}}">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding GameScreenLabel}" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Tela onde você joga" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Na primeira vez com uma tela nova, o Tako pergunta se você está vendo a imagem" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding CycleGameScreenHideCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:gamescreen-hide" Visibility="{Binding Settings.GameScreenEnabled, Converter={StaticResource BoolToVisibility}}">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding GameScreenHideLabel}" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Outras telas" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Desconectar tira as telas da área de trabalho; cobrir de preto só apaga a imagem" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding CycleGameScreenModeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:gamescreen-mode" Visibility="{Binding Settings.GameScreenEnabled, Converter={StaticResource BoolToVisibility}}">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding GameScreenModeLabel}" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Resolução e taxa" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Aplicadas na tela de jogo durante o jogo" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleGameScreenHdrCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:gamescreen-hdr" Visibility="{Binding Settings.GameScreenEnabled, Converter={StaticResource BoolToVisibility}}">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.GameScreenHdr}" />
+          <StackPanel>
+            <TextBlock Text="Ligar HDR" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Liga o HDR na tela de jogo (se ela tiver) e desliga ao sair" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <!-- Diagnóstico do sistema (frente G, MVP-034): relatório para o checklist de hardware. -->
       <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ShowSystemDiagnosticsCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:diagnostics">
         <DockPanel>
