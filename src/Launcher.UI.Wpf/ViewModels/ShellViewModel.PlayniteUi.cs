@@ -129,13 +129,16 @@ public sealed partial class ShellViewModel
         }
     }
 
-    /// <summary>Detalhes do jogo abriram ou fecharam dentro do tema: foco no botão principal ou de volta na capa.</summary>
+    /// <summary>
+    /// Detalhes ou painel de filtros abriram ou fecharam dentro do tema: foco no botão principal, no painel ou de volta
+    /// na capa.
+    /// </summary>
     internal void OnPlayniteDetailsChanged()
     {
         UpdateHints();
         if (IsPlayniteUiVisible && TopOverlay is null && PlayniteUi is { } ui)
         {
-            FocusPlayniteLater(ui.IsDetailsOpen ? "p10-details:play" : ui.SelectedFocusKey);
+            FocusPlayniteLater(ui.PanelFocusKey);
         }
     }
 
@@ -178,10 +181,19 @@ public sealed partial class ShellViewModel
     private void AddPlayniteHints(List<(string Buttons, string Label, AppCommand Command)> list)
     {
         bool details = PlayniteUi?.IsDetailsOpen == true;
-        list.Add(("a", details ? "Selecionar" : "Detalhes", AppCommand.Accept));
-        if (details)
+        bool filters = PlayniteUi?.IsFilterOpen == true;
+        list.Add(("a", details || filters ? "Selecionar" : "Detalhes", AppCommand.Accept));
+        if (details || filters)
         {
             list.Add(("b", "Voltar", AppCommand.Back));
+        }
+        else
+        {
+            list.Add(("y", "Buscar", AppCommand.Search));
+            if (PlayniteUi?.Model.IsSearchActive == true)
+            {
+                list.Add(("b", "Limpar busca", AppCommand.Back));
+            }
         }
 
         if (_backgroundSession is not null)

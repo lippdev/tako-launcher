@@ -4,6 +4,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using Launcher.Core.Presentation;
+using Launcher.PlayniteCompat.P10.Data;
 
 namespace Launcher.PlayniteCompat.P10.Controls;
 
@@ -83,32 +84,165 @@ public class ToggleButtonEx : ToggleButton
 {
 }
 
-// Controles compostos de filtro do Playnite: existem para os estilos do tema carregarem. O painel de filtros completo
-// fica fora do subset (MVP-019); os filtros rápidos (FilterPresetSelector) funcionam.
+// Controles de filtro do Playnite (UX-002, MVP-019). Como no Playnite, o tema desenha o painel e o adaptador preenche o
+// PART_ItemsHost com caixas e botões que usam os estilos do próprio tema (FilterPanelCheckBoxEx,
+// FilterPanelNagivationButton, FilterPanelButtonEx, FilterPanelText e FilterItemtSelectionStyle).
 
-/// <summary>Seleção de itens de filtro (gêneros, plataformas...).</summary>
-public class FilterDbItemtSelection : Control
+/// <summary>
+/// Painel de filtros (<c>PART_ElemFilters</c>): Instalados, Não instalados, Favoritos, Jogados recentemente, listas de
+/// Fonte e Gênero, Ordenar e Limpar filtros. DataContext = <see cref="P10MainModel"/>. Enquanto visível, só ele navega.
+/// </summary>
+[TemplatePart(Name = "PART_ItemsHost", Type = typeof(ItemsControl))]
+public class Filters : Control
 {
+    public const string FiltersGroup = "p10-filters";
+
+    public Filters()
+    {
+        Focusable = false;
+        DataContextChanged += (_, _) => Build();
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        Build();
+        P10Navigation.Announce(this, f => new P10NavigableEventArgs(P10Navigation.NavigableEvent, f) { IsModalScope = true });
+    }
+
+    private void Build()
+    {
+        if (GetTemplateChild("PART_ItemsHost") is not ItemsControl host || DataContext is not P10MainModel model)
+        {
+            return;
+        }
+
+        var panel = model.FilterPanel;
+        host.ItemsSource = null;
+        host.Items.Clear();
+        host.Items.Add(FilterElements.Header("Filtros"));
+        foreach (var option in panel.Checks)
+        {
+            host.Items.Add(FilterElements.Check(option, "FilterPanelCheckBoxEx", FiltersGroup, isDefault: option == panel.Checks[0]));
+        }
+
+        foreach (var option in panel.Lists)
+        {
+            host.Items.Add(FilterElements.Button(option, "FilterPanelNagivationButton", FiltersGroup));
+        }
+
+        host.Items.Add(FilterElements.Header("Ordenação"));
+        host.Items.Add(FilterElements.Button(panel.Sort, "FilterPanelButtonEx", FiltersGroup));
+        host.Items.Add(FilterElements.Button(panel.Clear, "FilterPanelButtonEx", FiltersGroup));
+    }
 }
 
-/// <summary>Seleção de valores enumerados de filtro.</summary>
+/// <summary>
+/// Lista de um filtro (fonte ou gênero) em <c>PART_ContentFilterItems</c>: uma caixa por valor, Voltar
+/// (<c>PART_ButtonBack</c>) e Limpar (<c>PART_ButtonClear</c>). DataContext = <see cref="P10SubFilter"/>.
+/// </summary>
+[TemplatePart(Name = "PART_ItemsHost", Type = typeof(ItemsControl))]
+[TemplatePart(Name = "PART_ButtonBack", Type = typeof(ButtonBase))]
+[TemplatePart(Name = "PART_ButtonClear", Type = typeof(ButtonBase))]
+public class FilterDbItemtSelection : Control
+{
+    public const string SubFilterGroup = "p10-subfilter";
+
+    public FilterDbItemtSelection()
+    {
+        Focusable = false;
+        DataContextChanged += (_, _) => Build();
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        Build();
+        P10Navigation.Announce(this, f => new P10NavigableEventArgs(P10Navigation.NavigableEvent, f) { IsModalScope = true });
+    }
+
+    private void Build()
+    {
+        if (GetTemplateChild("PART_ItemsHost") is not ItemsControl host)
+        {
+            return;
+        }
+
+        host.ItemsSource = null;
+        host.Items.Clear();
+        if (DataContext is not P10SubFilter filter)
+        {
+            return;
+        }
+
+        if (GetTemplateChild("PART_ButtonBack") is ButtonBase back)
+        {
+            back.Command = filter.BackCommand;
+            P10Navigation.Announce(back, b => new P10NavigableEventArgs(P10Navigation.NavigableEvent, b) { Group = SubFilterGroup, Key = "back", IsDefault = filter.Options.Count == 0 });
+        }
+
+        if (GetTemplateChild("PART_ButtonClear") is ButtonBase clear)
+        {
+            clear.Command = filter.ClearCommand;
+            P10Navigation.Announce(clear, b => new P10NavigableEventArgs(P10Navigation.NavigableEvent, b) { Group = SubFilterGroup, Key = "clear" });
+        }
+
+        foreach (var option in filter.Options)
+        {
+            host.Items.Add(FilterElements.Check(option, "FilterItemtSelectionStyle", SubFilterGroup, isDefault: option == filter.Options[0]));
+        }
+    }
+}
+
+/// <summary>Seleção de valores enumerados de filtro (existe para o estilo do tema carregar; as listas usam <see cref="FilterDbItemtSelection"/>).</summary>
 public class FilterEnumListSelection : Control
 {
 }
 
-/// <summary>Seleção de textos de filtro.</summary>
+/// <summary>Seleção de textos de filtro (existe para o estilo do tema carregar).</summary>
 public class FilterStringListSelection : Control
 {
 }
 
-/// <summary>Painel de filtros.</summary>
-public class Filters : Control
+/// <summary>Painel de filtros adicionais (oculto: fonte e gênero ficam no painel principal).</summary>
+public class FiltersAdditional : Control
 {
 }
 
-/// <summary>Painel de filtros adicionais.</summary>
-public class FiltersAdditional : Control
+/// <summary>Elementos dos painéis de filtro, com os estilos do tema por nome (sem o estilo, o controle fica com o padrão).</summary>
+internal static class FilterElements
 {
+    private static readonly BooleanToVisibilityConverter Visible = new();
+
+    public static TextBlock Header(string text)
+    {
+        var header = new TextBlock { Text = text };
+        header.SetResourceReference(FrameworkElement.StyleProperty, "FilterPanelText");
+        return header;
+    }
+
+    public static CheckBoxEx Check(P10FilterOption option, string styleKey, string group, bool isDefault)
+    {
+        var check = new CheckBoxEx { DataContext = option, Command = option.Command };
+        check.SetResourceReference(FrameworkElement.StyleProperty, styleKey);
+        check.SetBinding(ContentControl.ContentProperty, new Binding(nameof(P10FilterOption.Name)));
+        check.SetBinding(ToggleButton.IsCheckedProperty, new Binding(nameof(P10FilterOption.IsChecked)) { Mode = BindingMode.OneWay });
+        check.SetBinding(UIElement.VisibilityProperty, new Binding(nameof(P10FilterOption.IsVisible)) { Converter = Visible });
+        P10Navigation.Announce(check, c => new P10NavigableEventArgs(P10Navigation.NavigableEvent, c) { Group = group, Key = option.Key, IsDefault = isDefault });
+        return check;
+    }
+
+    /// <summary>Botão do painel; <c>Tag</c> = verdadeiro quando há algo escolhido (o tema destaca o texto).</summary>
+    public static ButtonEx Button(P10FilterOption option, string styleKey, string group)
+    {
+        var button = new ButtonEx { DataContext = option, Command = option.Command };
+        button.SetResourceReference(FrameworkElement.StyleProperty, styleKey);
+        button.SetBinding(ContentControl.ContentProperty, new Binding(nameof(P10FilterOption.Name)));
+        button.SetBinding(FrameworkElement.TagProperty, new Binding(nameof(P10FilterOption.IsChecked)) { Mode = BindingMode.OneWay });
+        button.SetBinding(UIElement.VisibilityProperty, new Binding(nameof(P10FilterOption.IsVisible)) { Converter = Visible });
+        P10Navigation.Announce(button, b => new P10NavigableEventArgs(P10Navigation.NavigableEvent, b) { Group = group, Key = option.Key });
+        return button;
+    }
 }
 
 /// <summary>Status do jogo em execução. No Tako a sessão de jogo tem tela própria; a do tema fica oculta.</summary>

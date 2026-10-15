@@ -10,6 +10,7 @@ using ConsoleMode.Runtime.Ipc;
 using ConsoleMode.Runtime.Simulation;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
+using Launcher.Core.Presentation;
 using Launcher.Core.Resilience;
 using Launcher.Core.Session.Restore;
 using Launcher.Core.Supervision;
@@ -108,6 +109,9 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Back);
         Assert.IsType<LibraryViewModel>(shell.CurrentPage);
         Assert.Equal(focusedGame, Nav.GetKey(nav.Focused!));
+
+        // --- Busca, filtros e ordenação da biblioteca (frente E: UX-001/002/004).
+        LibrarySearchAndFilters(shell, window);
 
         // Configurações e recuperação de tema inválido (MVP-016/021).
         shell.OpenSettings();
@@ -480,6 +484,106 @@ public sealed partial class UiSmokeTests
     }
 
     /// <summary>
+    /// Frente E: Y abre o teclado virtual sobre a biblioteca e a grade acompanha cada tecla (sem acento, sem
+    /// maiúsculas); o painel de filtros aplica instalação, gênero e ordenação na hora; sem resultados, o cabeçalho
+    /// explica e "Limpar" volta à lista inteira.
+    /// </summary>
+    private static void LibrarySearchAndFilters(ShellViewModel shell, MainWindow window)
+    {
+        var nav = window.Navigator;
+        shell.OpenLibrary(LibraryFilter.All);
+        Pump(1);
+        var library = Assert.IsType<LibraryViewModel>(shell.CurrentPage);
+
+        // Controle: Y abre o teclado com o foco no Q; ↓ → → → → chega ao G e A digita.
+        Press(window, AppCommand.Search);
+        Pump(0.8);
+        var search = Assert.IsType<SearchViewModel>(shell.TopOverlay);
+        Assert.Equal("keyboard", Nav.GetGroup(nav.Focused!));
+        Assert.Equal("key:Q", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Down);
+        for (int i = 0; i < 4; i++)
+        {
+            Press(window, AppCommand.Right);
+        }
+
+        Assert.Equal("key:G", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Accept);
+        search.Type("OD"); // teclado físico: o texto chega pela janela
+        Pump(0.6);
+        Assert.Equal("gOD", search.Text);
+        Assert.NotEmpty(library.Games);
+        Assert.All(library.Games, g => Assert.Contains("god", SearchText.Normalize(g.Title), StringComparison.Ordinal));
+        Assert.Equal(library.Games.Count, search.ResultCount);
+        Snap(window, "70-busca-teclado");
+        Press(window, AppCommand.Favorite); // X apaga
+        Assert.Equal("gO", search.Text);
+        Press(window, AppCommand.Search); // Y põe espaço
+        Assert.Equal("gO ", search.Text);
+        search.Backspace();
+        search.Type("d");
+        Press(window, AppCommand.Menu); // ☰ conclui
+        Pump(0.8);
+        Assert.Null(shell.TopOverlay);
+        Assert.Equal("grid", Nav.GetGroup(nav.Focused!));
+        Assert.True(library.HasSearch);
+        Assert.StartsWith($"{library.Games.Count} de ", library.CountText, StringComparison.Ordinal);
+        Snap(window, "71-busca-resultado");
+
+        // B com busca ativa limpa a busca antes de sair da página.
+        Press(window, AppCommand.Back);
+        Pump(0.6);
+        Assert.IsType<LibraryViewModel>(shell.CurrentPage);
+        Assert.False(library.HasSearch);
+        AssertFocused(window, "Biblioteca depois de limpar a busca");
+
+        // Painel de filtros: Instalação → Instalados; gênero RPG; ordenar por nota. B fecha e a grade fica filtrada.
+        shell.OpenLibraryFilters();
+        Pump(0.8);
+        var filters = Assert.IsType<LibraryFiltersViewModel>(shell.TopOverlay);
+        Assert.Equal("filters", Nav.GetGroup(nav.Focused!));
+        Assert.Equal("filter:Instalação", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Accept);
+        Pump(0.4);
+        Assert.Equal(InstallFilter.Installed, shell.LibraryCriteria.Install);
+        Assert.All(library.Games, g => Assert.True(g.Game.IsInstalled));
+        var rows = filters.Sections.SelectMany(s => s.Rows).ToList();
+        var rpg = rows.Single(r => r.Label == "RPG");
+        rpg.Command.Execute(null);
+        Assert.True(rpg.IsOn);
+        Assert.NotEmpty(library.Games);
+        Assert.All(library.Games, g => Assert.Contains("RPG", g.Game.Genres));
+        rows.Single(r => r.Label == "Nota").Command.Execute(null);
+        Assert.Equal(LibrarySort.Rating, shell.LibraryCriteria.Sort);
+        Assert.Equal(LibraryText.GameCount(library.Games.Count), filters.CountText);
+        Press(window, AppCommand.Down);
+        Pump(0.6);
+        Snap(window, "72-filtros");
+        Press(window, AppCommand.Back);
+        Pump(0.6);
+        Assert.Null(shell.TopOverlay);
+        Assert.Equal("Filtros (2)", library.FiltersLabel);
+        Assert.Equal("Nota", library.SortLabel);
+        AssertFocused(window, "Biblioteca filtrada");
+        Snap(window, "73-biblioteca-filtrada");
+
+        // Sem resultados: o cabeçalho explica, o foco fica na busca e "Limpar" volta à lista inteira.
+        shell.LibraryCriteria = shell.LibraryCriteria with { Search = "zzzz" };
+        shell.RequestFocus(library.DefaultFocusKey);
+        Pump(0.6);
+        Assert.True(library.IsEmptyResult);
+        Assert.Equal("Nenhum jogo encontrado", library.EmptyTitle);
+        Assert.Equal("lib:search", Nav.GetKey(nav.Focused!));
+        Snap(window, "74-busca-vazia");
+        library.ClearCriteriaCommand.Execute(null);
+        Pump(0.6);
+        Assert.False(library.HasCriteria);
+        Assert.Equal(shell.Library.Games.Count, library.Games.Count);
+        AssertFocused(window, "Biblioteca depois de limpar busca e filtros");
+        shell.LibraryCriteria = LibraryCriteria.None; // o resto do teste usa a ordem padrão
+    }
+
+    /// <summary>
     /// MVP-029/031/011/036: toda tela essencial abre com um elemento focado e B sempre leva a algum lugar; erro
     /// inesperado mostra a recuperação; o modo seguro avisa e volta ao normal sem reiniciar.
     /// </summary>
@@ -732,14 +836,17 @@ public sealed partial class UiSmokeTests
         Assert.False(ui.IsDetailsOpen);
         Assert.Equal(second, Nav.GetKey(nav.Focused!));
 
-        // Filtro rápido (PART_ButtonFilter / FilterPresetSelector).
-        ui.Model.ToggleFiltersCommand.Execute(null);
+        // Filtro rápido (FilterPresetSelector).
+        ui.Model.NextFilterPresetCommand.Execute(null);
         Pump(0.8);
         Assert.Equal("Instalados", ui.Model.ActiveFilterPreset!.Name);
         Assert.All(ui.Model.Games, g => Assert.True(g.IsInstalled));
         Snap(window, "62-tema-playnite-filtro");
         ui.Model.ApplyFilterPresetCommand.Execute(ui.Model.FilterPresets[0]);
         Pump(0.8);
+
+        // Painel de filtros do tema (PART_ButtonFilter → PART_ElemFilters) e lista de fonte (PART_ContentFilterItems).
+        ThemeFiltersAndSearch(shell, window, ui, "tema-playnite");
 
         // Saída garantida: Menu abre as Configurações do Tako; B volta para o tema.
         Press(window, AppCommand.Menu);
@@ -830,6 +937,12 @@ public sealed partial class UiSmokeTests
             Press(window, AppCommand.Back);
             Pump(0.6);
             Assert.False(applied.IsDetailsOpen);
+
+            // Filtros e busca no visual do tema (frente E).
+            ThemeFiltersAndSearch(shell, window, applied, $"tema-{fixture.Slug}");
+            applied.Model.SearchText = "god";
+            report.Add($"    Filtros e busca: painel com {applied.Model.FilterPanel.Checks.Count} filtros, busca \"god\" → {applied.Model.Games.Count} jogos");
+            applied.Model.SearchText = string.Empty;
         }
 
         // Volta à interface do Tako e remove os temas importados aqui.
@@ -859,6 +972,62 @@ public sealed partial class UiSmokeTests
     }
 
     /// <summary>Há um elemento focado, visível e alcançável pela navegação no escopo atual.</summary>
+    /// <summary>
+    /// Frente E: PART_ButtonFilter abre o painel de filtros do tema com o foco no primeiro filtro; A marca Instalados;
+    /// a lista de fonte entra no lugar do painel e B volta um nível por vez. Y abre o teclado do Tako e o tema mostra a
+    /// busca ativa (PART_ElemSearchActive); ☰ conclui com o foco na grade; B limpa a busca.
+    /// </summary>
+    private static void ThemeFiltersAndSearch(ShellViewModel shell, MainWindow window, PlayniteUiViewModel ui, string slug)
+    {
+        var nav = window.Navigator;
+        ui.Model.ToggleFiltersCommand.Execute(null);
+        Pump(1);
+        Assert.True(ui.IsFilterOpen);
+        Assert.Equal(Filters.FiltersGroup, Nav.GetGroup(nav.Focused!));
+        Assert.Equal("installed", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Accept);
+        Pump(0.6);
+        Assert.Equal(InstallFilter.Installed, ui.Model.Criteria.Install);
+        Assert.All(ui.Model.Games, g => Assert.True(g.IsInstalled));
+        Snap(window, $"67-{slug}-filtros");
+
+        ui.Model.FilterPanel.Sources.Command.Execute(null);
+        Pump(1);
+        Assert.True(ui.Model.SubFilterVisible);
+        Assert.Equal(FilterDbItemtSelection.SubFilterGroup, Nav.GetGroup(nav.Focused!));
+        Snap(window, $"68-{slug}-filtro-fonte");
+        Press(window, AppCommand.Back);
+        Pump(0.8);
+        Assert.True(ui.Model.FilterPanelVisible);
+        Assert.Equal("sources", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Back);
+        Pump(0.8);
+        Assert.False(ui.IsFilterOpen);
+        Assert.Equal(Main.GamesGroup, Nav.GetGroup(nav.Focused!));
+        ui.Model.ClearFiltersCommand.Execute(null);
+        Pump(0.4);
+
+        Press(window, AppCommand.Search);
+        Pump(0.8);
+        var search = Assert.IsType<SearchViewModel>(shell.TopOverlay);
+        Assert.Equal("keyboard", Nav.GetGroup(nav.Focused!));
+        search.Type("God");
+        Pump(0.6);
+        Assert.Equal("God", ui.Model.SearchText);
+        Assert.True(ui.Model.IsSearchActive);
+        Assert.Equal("God", ui.Model.AppSettings.Fullscreen.FilterSettings.Name);
+        Assert.All(ui.Model.Games, g => Assert.Contains("god", SearchText.Normalize(g.Name), StringComparison.Ordinal));
+        Press(window, AppCommand.Menu);
+        Pump(0.8);
+        Assert.Null(shell.TopOverlay);
+        Assert.Equal(Main.GamesGroup, Nav.GetGroup(nav.Focused!));
+        Snap(window, $"69-{slug}-busca");
+        Press(window, AppCommand.Back); // B limpa a busca
+        Pump(0.6);
+        Assert.False(ui.Model.IsSearchActive);
+        Assert.Equal(shell.Library.Games.Count, ui.Model.Games.Count);
+    }
+
     private static void AssertFocused(MainWindow window, string screen)
     {
         var focused = window.Navigator.Focused;

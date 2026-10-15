@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Launcher.Core.Library;
+using Launcher.Core.Presentation;
 using Launcher.UI.Wpf.Services;
 
 namespace Launcher.UI.Wpf.ViewModels;
@@ -29,8 +30,9 @@ public abstract partial class PageViewModel(ShellViewModel shell) : ObservableOb
     {
     }
 
+    /// <summary>Busca com teclado virtual (UX-001): na Início, abre Todos os jogos com o teclado.</summary>
     [RelayCommand]
-    private void Search() => Shell.Toast("Busca com teclado virtual chega no UX-001 (pós-MVP)");
+    private void Search() => Shell.OpenSearch();
 }
 
 public sealed partial class HomeViewModel : PageViewModel
@@ -129,18 +131,12 @@ public sealed partial class HomeViewModel : PageViewModel
     }
 }
 
+/// <summary>
+/// Grade da biblioteca de uma rota da barra lateral, com busca, filtros e ordenação (<see cref="ShellViewModel.LibraryCriteria"/>).
+/// O cabeçalho mostra o que está valendo: o texto buscado, quantos filtros e a ordem.
+/// </summary>
 public sealed partial class LibraryViewModel : PageViewModel
 {
-    private static readonly (LibrarySort Sort, string Label)[] Sorts =
-    [
-        (LibrarySort.RecentlyPlayed, "Jogados recentemente"),
-        (LibrarySort.Name, "Nome"),
-        (LibrarySort.PlayTime, "Tempo de jogo"),
-        (LibrarySort.RecentlyAdded, "Adicionados"),
-    ];
-
-    private int _sortIndex;
-
     public LibraryViewModel(ShellViewModel shell, LibraryFilter filter, string title, string routeKey)
         : base(shell)
     {
@@ -158,20 +154,51 @@ public sealed partial class LibraryViewModel : PageViewModel
 
     public ObservableCollection<GameItemViewModel> Games { get; } = [];
 
-    public string CountText => Games.Count == 1 ? "1 jogo" : $"{Games.Count} jogos";
+    public LibraryCriteria Criteria => Shell.LibraryCriteria;
 
-    public string SortLabel => Sorts[_sortIndex].Label;
+    /// <summary>"19 jogos" ou, com busca/filtro, "3 de 19 jogos".</summary>
+    public string CountText => Shell.Library.Games.Count(Filter.Matches) is int total && HasCriteria && total > 0
+        ? $"{Games.Count} de {LibraryText.GameCount(total)}"
+        : LibraryText.GameCount(Games.Count);
 
-    /// <summary>A biblioteca abre na primeira capa, não no botão de ordenar.</summary>
-    public override string? DefaultFocusKey => Games.Count > 0 ? $"grid:{Games[0].Id}" : null;
+    public string SortLabel => LibraryText.SortLabel(Criteria.Sort);
+
+    public bool HasSearch => Criteria.HasSearch;
+
+    public bool HasFilters => Criteria.HasFilters;
+
+    public bool HasCriteria => HasSearch || HasFilters;
+
+    /// <summary>Texto do botão de busca: o que foi buscado, ou "Buscar".</summary>
+    public string SearchLabel => HasSearch ? $"“{Criteria.Search}”" : "Buscar";
+
+    public string FiltersLabel => LibraryText.FiltersLabel(Criteria.ActiveFilterCount);
+
+    public bool IsEmptyResult => Games.Count == 0;
+
+    public string EmptyTitle => HasCriteria ? "Nenhum jogo encontrado" : "Nenhum jogo aqui ainda";
+
+    public string EmptyText => (HasSearch, HasFilters) switch
+    {
+        (true, true) => "Tente outra busca ou limpe os filtros.",
+        (true, false) => "Confira o nome ou tente só uma parte dele. Acentos e maiúsculas não importam.",
+        (false, true) => "Nenhum jogo combina com os filtros escolhidos.",
+        _ => "Adicione um jogo ou procure jogos da Steam de novo em Configurações.",
+    };
+
+    /// <summary>A biblioteca abre na primeira capa; sem resultados, na busca.</summary>
+    public override string? DefaultFocusKey => Games.Count > 0 ? $"grid:{Games[0].Id}" : "lib:search";
 
     public override void OnGameFocused(GameItemViewModel game) => Shell.SetBackdrop(game);
 
     public override void Refresh()
     {
-        HomeViewModel.Replace(Games, LibraryQuery.Apply(Shell.Library.Games, Filter, Sorts[_sortIndex].Sort).Select(Shell.ItemFor));
-        OnPropertyChanged(nameof(CountText));
-        OnPropertyChanged(nameof(SortLabel));
+        HomeViewModel.Replace(Games, LibraryQuery.Apply(Shell.Library.Games, Filter, Criteria).Select(Shell.ItemFor));
+        foreach (string name in (string[])[nameof(Criteria), nameof(CountText), nameof(SortLabel), nameof(HasSearch), nameof(HasFilters), nameof(HasCriteria),
+            nameof(SearchLabel), nameof(FiltersLabel), nameof(IsEmptyResult), nameof(EmptyTitle), nameof(EmptyText)])
+        {
+            OnPropertyChanged(name);
+        }
     }
 
     [RelayCommand]
@@ -183,9 +210,19 @@ public sealed partial class LibraryViewModel : PageViewModel
     [RelayCommand]
     private void CycleSort()
     {
-        _sortIndex = (_sortIndex + 1) % Sorts.Length;
-        Refresh();
+        Shell.LibraryCriteria = Criteria with { Sort = LibraryText.NextSort(Criteria.Sort) };
         Shell.RequestFocus("lib:sort");
+    }
+
+    [RelayCommand]
+    private void OpenFilters() => Shell.OpenLibraryFilters();
+
+    /// <summary>Limpa a busca e os filtros (a ordem continua).</summary>
+    [RelayCommand]
+    private void ClearCriteria()
+    {
+        Shell.LibraryCriteria = Criteria.ClearFilters() with { Search = string.Empty };
+        Shell.RequestFocus(DefaultFocusKey);
     }
 }
 

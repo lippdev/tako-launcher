@@ -131,23 +131,55 @@
         <StackPanel.RenderTransform>
           <TranslateTransform />
         </StackPanel.RenderTransform>
-        <DockPanel Margin="64,140,72,0">
-          <Button DockPanel.Dock="Right" Style="{StaticResource ChipButton}" VerticalAlignment="Bottom" Margin="18,0,0,0" Command="{Binding AddGameCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:add">
-            <StackPanel Orientation="Horizontal">
-              <c:Icon Key="Icon.More" Width="24" Height="24" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,10,0" />
-              <TextBlock Text="Adicionar jogo" />
+        <!-- Cabeçalho: título e contagem; abaixo, busca, filtros e ordem (frente E: UX-001/002/004). -->
+        <StackPanel Margin="64,140,72,0">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Style="{StaticResource ChipButton}" VerticalAlignment="Bottom" Margin="18,0,0,0" Command="{Binding AddGameCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:add">
+              <StackPanel Orientation="Horizontal">
+                <c:Icon Key="Icon.More" Width="24" Height="24" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,10,0" />
+                <TextBlock Text="Adicionar jogo" />
+              </StackPanel>
+            </Button>
+            <StackPanel>
+              <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitle}" />
+              <TextBlock Text="{Binding CountText}" Margin="0,12,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentMutedBrush}" />
             </StackPanel>
-          </Button>
-          <Button DockPanel.Dock="Right" Style="{StaticResource ChipButton}" VerticalAlignment="Bottom" Command="{Binding CycleSortCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:sort">
-            <TextBlock>
-              <Run Text="Ordenar:" /> <Run Text="{Binding SortLabel, Mode=OneWay}" FontWeight="ExtraBold" />
-            </TextBlock>
-          </Button>
-          <StackPanel>
-            <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="{Binding CountText}" Margin="0,12,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentMutedBrush}" />
+          </DockPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,28,0,0">
+            <Button Style="{StaticResource ChipButton}" MinWidth="300" Command="{Binding SearchCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:search">
+              <StackPanel Orientation="Horizontal">
+                <c:Icon Key="Icon.Search" Width="24" Height="24" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,12,0" />
+                <TextBlock x:Name="SearchText" Text="{Binding SearchLabel}" MaxWidth="520" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource OnAccentMutedBrush}" />
+              </StackPanel>
+            </Button>
+            <Button Style="{StaticResource ChipButton}" Margin="18,0,0,0" Command="{Binding OpenFiltersCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:filters">
+              <StackPanel Orientation="Horizontal">
+                <c:Icon Key="Icon.Filter" Width="24" Height="24" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,12,0" />
+                <TextBlock x:Name="FiltersText" Text="{Binding FiltersLabel}" />
+              </StackPanel>
+            </Button>
+            <Button Style="{StaticResource ChipButton}" Margin="18,0,0,0" Command="{Binding CycleSortCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:sort">
+              <StackPanel Orientation="Horizontal">
+                <c:Icon Key="Icon.Sort" Width="24" Height="24" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,12,0" />
+                <TextBlock>
+                  <Run Text="Ordenar:" /> <Run Text="{Binding SortLabel, Mode=OneWay}" FontWeight="ExtraBold" />
+                </TextBlock>
+              </StackPanel>
+            </Button>
+            <Button Style="{StaticResource ChipButton}" Margin="18,0,0,0" Command="{Binding ClearCriteriaCommand}" nav:Nav.Group="lib-head" nav:Nav.Key="lib:clear"
+                    Visibility="{Binding HasCriteria, Converter={StaticResource BoolToVisibility}}">
+              <StackPanel Orientation="Horizontal">
+                <c:Icon Key="Icon.Close" Width="24" Height="24" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,12,0" />
+                <TextBlock Text="Limpar" />
+              </StackPanel>
+            </Button>
           </StackPanel>
-        </DockPanel>
+          <!-- Sem resultados: diz por quê e como sair (o foco fica na busca). -->
+          <StackPanel Margin="0,72,0,0" MaxWidth="1100" HorizontalAlignment="Left" Visibility="{Binding IsEmptyResult, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding EmptyTitle}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding EmptyText}" Margin="0,14,0,0" TextWrapping="Wrap" FontSize="{DynamicResource FsBodyLg}" Foreground="{DynamicResource OnAccentMutedBrush}" />
+          </StackPanel>
+        </StackPanel>
         <ItemsControl ItemsSource="{Binding Games}" Tag="grid" Margin="64,48,72,200" Focusable="False">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -165,6 +197,16 @@
         </ItemsControl>
       </StackPanel>
     </Canvas>
+    <DataTemplate.Triggers>
+      <!-- Busca ou filtro ligado: o texto do botão fica em destaque. -->
+      <DataTrigger Binding="{Binding HasSearch}" Value="True">
+        <Setter TargetName="SearchText" Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+        <Setter TargetName="SearchText" Property="FontWeight" Value="ExtraBold" />
+      </DataTrigger>
+      <DataTrigger Binding="{Binding HasFilters}" Value="True">
+        <Setter TargetName="FiltersText" Property="FontWeight" Value="ExtraBold" />
+      </DataTrigger>
+    </DataTemplate.Triggers>
   </DataTemplate>
 
   <!-- ===================================================================== Detalhes -->

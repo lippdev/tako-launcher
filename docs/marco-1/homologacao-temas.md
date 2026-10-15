@@ -62,8 +62,8 @@ O teste de homologação do CI agora verifica que o `Main.xaml` carrega (`P10The
 | Mídia (`Media.xaml`, imagens via `ThemeFile`) | ⚠️ herdado | ✅ | ⚠️ herdado | `{ThemeFile}` procura no tema e depois no padrão, sempre dentro das pastas dos temas |
 | Controles padrão (Button, CheckBox, ComboBox, Slider, TextBox…) | ✅ 7 de 7 | ✅ 9 de 9 | ✅ Button do tema + resto herdado | Suportado |
 | Estilos derivados (`ListGameItemStyle`/`Template`, menus) | ✅ | ✅ | ✅ `ListGameItemStyle` do tema | Suportado |
-| Controles próprios (filtros, `FilterPresetSelector`) | ✅ | ✅ | ⚠️ herdado | Filtros rápidos funcionam (Todos, Instalados, Favoritos, Jogados recentemente); o painel completo de filtros fica oculto |
-| Tela principal (`Views/Main.xaml`) e `PART_` | ⚠️ herdada | ✅ | ✅ | **Suportado**: grade de jogos e seleção, Jogar/Instalar, Detalhes, Opções, Buscar (aviso do UX-001), Filtrar, menu principal (→ Configurações do Tako), relógio, fundo do jogo |
+| Controles próprios (filtros, `FilterPresetSelector`) | ✅ | ✅ | ⚠️ herdado | Filtros rápidos (Todos, Instalados, Favoritos, Jogados recentemente) e **painel de filtros** (frente E): `Filters` com Instalados, Não instalados, Favoritos, Jogados recentemente, Fonte, Gênero, Ordenar e Limpar, desenhado com os estilos do tema (`FilterPanelCheckBoxEx`, `FilterPanelNagivationButton`, `FilterPanelButtonEx`, `FilterPanelText`); Fonte e Gênero abrem o `FilterDbItemtSelection` do tema em `PART_ContentFilterItems`. `FiltersAdditional` fica oculto |
+| Tela principal (`Views/Main.xaml`) e `PART_` | ⚠️ herdada | ✅ | ✅ | **Suportado**: grade de jogos e seleção, Jogar/Instalar, Detalhes, Opções, Buscar (teclado virtual do Tako; o tema mostra `PART_ElemSearchActive` com `AppSettings.Fullscreen.FilterSettings.Name`), Filtrar (abre o painel; `PART_ElemExtraFilterActive` com filtro ligado), menu principal (→ Configurações do Tako), relógio, fundo do jogo |
 | Detalhes (`Views/GameDetails.xaml`) | ✅ | ✅ | ⚠️ herdado | Suportado: capa, fundo, dados do jogo, ação principal e opções; a descrição é texto puro (`HtmlTextView` seguro) |
 | `Views/GameStatus.xaml` | ✅ (oculto) | ✅ (oculto) | ❌ `\ExtraMetadata` | O status do jogo usa a tela de sessão do Tako |
 | Dados do Playnite (`{Api}`, `{Settings}`, `{SettingsBinding}`) | ✅ | ✅ | ✅ | Subconjunto só-leitura; configurações com os valores do Tako |
@@ -77,7 +77,9 @@ O teste de homologação do CI agora verifica que o `Main.xaml` carrega (`P10The
 
 1. Caminhos `\ExtraMetadata\...` (vídeos, logos e fundos que o ExtraMetadataLoader grava fora do tema): continuam bloqueados. Por isso o `Main.xaml` do PS5ish e o `GameDetails.xaml`/`GameStatus.xaml` do Revisited usam os do padrão.
 2. Extensões do Playnite: não há plugins no Tako, e o tema as vê como não instaladas.
-3. Painel completo de filtros, busca com teclado virtual, bateria e progresso: fora do subset do MVP-019.
+3. Bateria, progresso e filtros adicionais do Playnite (`FiltersAdditional`, listas de plataforma, categoria, série etc.): fora do subset. A busca e o painel de filtros passaram a funcionar na frente E (UX-001/002/004), com as mesmas regras da biblioteca do Tako (`LibraryCriteria`): sem acento, sem diferenciar maiúsculas, ordenação por nome, último jogado, tempo de jogo, nota e data de adição. O `Views/TextInput.xaml` dos temas não é usado: a busca abre o teclado virtual do Tako por cima do tema.
+
+**Frente E (filtros e busca):** o teste de fumaça abre o painel de filtros, marca Instalados, abre a lista de fontes, volta com B e busca "God" em cada tema homologado e no padrão (capturas `67-` a `69-` por tema no artefato `ui-screenshots`; resultado em `theme-whole-ui.txt`). Os números de arquivos carregados da tabela acima não mudam: nenhuma liberação nova no carregador XAML.
 
 Nenhuma liberação foi genérica: cada tipo ou extensão entra por nome e é implementado no adaptador. As justificativas estão em [`docs/spikes/MVP-016-xaml-restrito.md`](../spikes/MVP-016-xaml-restrito.md#liberações-para-a-interface-inteira-mvp-018019).
 
