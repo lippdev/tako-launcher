@@ -39,7 +39,8 @@ public static class P10Theme
                 "Filters", "FiltersAdditional", "GameDetails", "GameStatus", "ComboBoxEx",
             ],
             presentationExtensions: ["ThemeFile", "Settings"],
-            remappedNamespaces: [(PlayniteMarkupNamespace, AdapterMarkupNamespace, ["ThemeFile", "ThemeFileExtension"])]);
+            remappedNamespaces: [(PlayniteMarkupNamespace, AdapterMarkupNamespace, ["ThemeFile", "ThemeFileExtension"])],
+            popupHostTemplates: ["ComboBoxEx"]);
     }
 
     /// <summary>Carrega o tema. Deve rodar na thread de UI (STA).</summary>

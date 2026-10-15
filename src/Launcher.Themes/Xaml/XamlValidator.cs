@@ -20,6 +20,21 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
     private static readonly HashSet<string> XamlDirectiveAttributes = new(StringComparer.Ordinal) { "Key", "Name", "Shared", "Uid" };
     private static readonly HashSet<string> XamlElements = new(StringComparer.Ordinal) { "Null", "Type", "Static", "Array", "Reference" };
 
+    /// <summary>
+    /// Atributos aceitos no <c>Popup</c> da lista suspensa. Ficam de fora posição livre (offsets, PlacementTarget,
+    /// PlacementRectangle), StaysOpen e qualquer outra forma de abrir ou mover a janela do Popup.
+    /// </summary>
+    private static readonly HashSet<string> PopupAttributes = new(StringComparer.Ordinal)
+    {
+        "IsOpen", "Placement", "Focusable", "AllowsTransparency", "PopupAnimation", "SnapsToDevicePixels",
+    };
+
+    /// <summary>Propriedades do <c>Popup</c> que gatilhos podem alterar por <c>Setter TargetName</c>.</summary>
+    private static readonly HashSet<string> PopupSetterProperties = new(StringComparer.Ordinal)
+    {
+        "Focusable", "AllowsTransparency", "PopupAnimation", "SnapsToDevicePixels",
+    };
+
     /// <param name="xaml">Conteúdo do arquivo.</param>
     /// <param name="themeRelativePath">Caminho do arquivo dentro do tema (ex.: <c>Views/Main.xaml</c>), usado para detectar path traversal.</param>
     /// <param name="expectedRoot">Elemento raiz exigido no namespace de apresentação (ex.: <c>ResourceDictionary</c>), ou nulo.</param>
@@ -50,6 +65,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
         try
         {
             walker.Run();
+            walker.FinishPopupTargets();
             unused = walker.FinishNamespaces();
         }
         catch (XmlException ex) when (ex.Message.Contains("DTD", StringComparison.OrdinalIgnoreCase))
@@ -70,6 +86,20 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
     [GeneratedRegex(@"^[A-Za-z]:[\\/]")]
     private static partial Regex DriveLetterPath();
 
+    [GeneratedRegex(@"^\{\s*TemplateBinding\s+(?:Property\s*=\s*)?(?:ComboBox\.)?IsDropDownOpen\s*\}$")]
+    private static partial Regex DropDownOpenBinding();
+
+    [GeneratedRegex(@"^\{\s*(?:[\w\-.]+:)?Type(?:Extension)?\s+(?:TypeName\s*=\s*)?(?<type>[\w:.]+)\s*\}$")]
+    private static partial Regex TypeExtensionValue();
+
+    private enum ElementKind
+    {
+        Plain,
+        Template,
+        PopupHost,
+        Popup,
+    }
+
     private sealed class Walker(
         XamlSecurityPolicy policy,
         XmlReader reader,
@@ -79,6 +109,11 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
     {
         private readonly IXmlLineInfo _lineInfo = (IXmlLineInfo)reader;
         private readonly Stack<string> _elements = new();
+        private readonly Stack<ElementKind> _kinds = new();
+        private readonly HashSet<string> _popupNames = new(StringComparer.Ordinal);
+        private readonly List<(string Target, string? Property, int Line, int Column)> _targeted = [];
+        private readonly Stack<bool> _templates = new();
+        private int _popupDepth;
         private readonly Dictionary<string, (Attribute Declaration, bool Used)> _disallowed = new(StringComparer.Ordinal);
         private int _elementCount;
 
@@ -93,6 +128,7 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
                         break;
                     case XmlNodeType.EndElement:
                         _elements.Pop();
+                        Leave(_kinds.Pop());
                         break;
                     case XmlNodeType.Text:
                     case XmlNodeType.CDATA:
@@ -136,7 +172,31 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
                 ValidateNamespaceDeclaration(attribute);
             }
 
-            ValidateElementName(ns, name, reader.Name, line, column);
+            var kind = ElementKind.Plain;
+            bool presentation = ns == XamlSecurityPolicy.PresentationNamespace;
+            if (presentation && name == "Popup")
+            {
+                ValidatePopup(attributes, line, column);
+                kind = ElementKind.Popup;
+            }
+            else
+            {
+                ValidateElementName(ns, name, reader.Name, line, column);
+                if (presentation && name is "ControlTemplate" or "DataTemplate" or "HierarchicalDataTemplate" or "ItemsPanelTemplate")
+                {
+                    kind = name == "ControlTemplate" && policy.PopupHostTemplates.Contains(TargetTypeOf(attributes) ?? string.Empty)
+                        ? ElementKind.PopupHost
+                        : ElementKind.Template;
+                }
+            }
+
+            if (TargetTypeOf(attributes) == "Popup")
+            {
+                // Estilo ou template implícito para Popup alcançaria os Popups permitidos sem as restrições abaixo.
+                Add(XamlViolationCode.TypeNotAllowed, "Estilos e templates com TargetType Popup não são permitidos.", line, column);
+            }
+
+            RecordTargetName(presentation ? name : null, attributes);
             foreach (var attribute in attributes.Where(a => !a.IsNamespaceDeclaration))
             {
                 ValidateAttribute(ns, name, attribute, attributes);
@@ -148,6 +208,112 @@ public sealed partial class XamlValidator(XamlSecurityPolicy policy)
             }
 
             _elements.Push(name);
+            _kinds.Push(kind);
+            Enter(kind);
+        }
+
+        private void Enter(ElementKind kind)
+        {
+            switch (kind)
+            {
+                case ElementKind.Template or ElementKind.PopupHost:
+                    _templates.Push(kind == ElementKind.PopupHost);
+                    break;
+                case ElementKind.Popup:
+                    _popupDepth++;
+                    break;
+            }
+        }
+
+        private void Leave(ElementKind kind)
+        {
+            switch (kind)
+            {
+                case ElementKind.Template or ElementKind.PopupHost:
+                    _templates.Pop();
+                    break;
+                case ElementKind.Popup:
+                    _popupDepth--;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Popup só como lista de uma lista suspensa: dentro do template de um tipo de <see cref="XamlSecurityPolicy.PopupHostTemplates"/>,
+        /// sem Popup aninhado, aberto apenas por <c>IsDropDownOpen</c> e posicionado abaixo ou acima do controle.
+        /// </summary>
+        private void ValidatePopup(List<Attribute> attributes, int line, int column)
+        {
+            // O template mais interno precisa ser o da lista suspensa (não vale um template aninhado dentro dele).
+            if (!_templates.TryPeek(out bool inHost) || !inHost || _popupDepth > 0)
+            {
+                Add(XamlViolationCode.TypeNotAllowed, "Tipo 'Popup' só é permitido dentro do template de uma lista suspensa (ComboBox).", line, column);
+            }
+
+            foreach (var attribute in attributes.Where(a => !a.IsNamespaceDeclaration))
+            {
+                string value = attribute.Value.Trim();
+                if (attribute.LocalName == "Name" && attribute.Namespace is "" or XamlSecurityPolicy.XamlNamespace)
+                {
+                    _popupNames.Add(value);
+                    continue;
+                }
+
+                bool allowed = attribute.Namespace.Length == 0 && attribute.LocalName switch
+                {
+                    "IsOpen" => DropDownOpenBinding().IsMatch(value) || value == "False",
+                    "Placement" => value is "Bottom" or "Top",
+                    _ => PopupAttributes.Contains(attribute.LocalName),
+                };
+
+                if (!allowed)
+                {
+                    Add(XamlViolationCode.TypeNotAllowed, $"Atributo '{attribute.QualifiedName}=\"{value}\"' não é permitido no Popup da lista suspensa.", attribute.Line, attribute.Column);
+                }
+            }
+        }
+
+        /// <summary>Guarda alvos de Setter/Storyboard por nome; os que apontam para um Popup são conferidos no fim.</summary>
+        private void RecordTargetName(string? presentationElement, List<Attribute> attributes)
+        {
+            foreach (var attribute in attributes.Where(a => a.Namespace.Length == 0))
+            {
+                if (presentationElement == "Setter" && attribute.LocalName == "TargetName")
+                {
+                    string? property = attributes.FirstOrDefault(a => a.Namespace.Length == 0 && a.LocalName == "Property")?.Value;
+                    _targeted.Add((attribute.Value.Trim(), property is null ? null : LastSegment(property.Trim()), attribute.Line, attribute.Column));
+                }
+                else if (attribute.LocalName is "Storyboard.TargetName" or "Storyboard.Target")
+                {
+                    // Animação de um Popup poderia movê-lo ou abri-lo; o nome é procurado também em {Binding ElementName=...}.
+                    _targeted.Add((attribute.Value.Trim(), null, attribute.Line, attribute.Column));
+                }
+            }
+        }
+
+        public void FinishPopupTargets()
+        {
+            foreach (var (target, property, line, column) in _targeted)
+            {
+                string? popup = _popupNames.FirstOrDefault(n => target == n || Regex.IsMatch(target, $@"ElementName\s*=\s*{Regex.Escape(n)}\b"));
+                if (popup is not null && (property is null || !PopupSetterProperties.Contains(property)))
+                {
+                    Add(XamlViolationCode.TypeNotAllowed, $"Gatilhos e animações não podem alterar '{property ?? "propriedades"}' do Popup '{popup}'.", line, column);
+                }
+            }
+        }
+
+        private static string? TargetTypeOf(List<Attribute> attributes)
+        {
+            string? value = attributes.FirstOrDefault(a => a.Namespace.Length == 0 && a.LocalName == "TargetType")?.Value.Trim();
+            if (value is null)
+            {
+                return null;
+            }
+
+            var match = TypeExtensionValue().Match(value);
+            string type = match.Success ? match.Groups["type"].Value : value;
+            return type[(type.IndexOf(':', StringComparison.Ordinal) + 1)..];
         }
 
         private List<Attribute> ReadAttributes()

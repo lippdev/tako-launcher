@@ -121,6 +121,80 @@ public class XamlValidatorTests
     public void Rejects_types_outside_allowlist(string body) =>
         AssertRejected(Validate(Dictionary(body)), XamlViolationCode.TypeNotAllowed);
 
+    private static string ComboBoxTemplate(string popup, string triggers = "", string targetType = "ComboBox") => Dictionary($$"""
+        <Style x:Key="c" TargetType="ComboBox">
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate TargetType="{{targetType}}">
+                <Grid>
+                  {{popup}}
+                </Grid>
+                <ControlTemplate.Triggers>{{triggers}}</ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
+        </Style>
+        """);
+
+    private const string DropDownPopup = """
+        <Popup x:Name="Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" Focusable="False" AllowsTransparency="True">
+          <Border><ScrollViewer><StackPanel IsItemsHost="True" /></ScrollViewer></Border>
+        </Popup>
+        """;
+
+    [Theory]
+    [InlineData("ComboBox")]
+    [InlineData("{x:Type ComboBox}")]
+    public void Accepts_drop_down_popup_in_combo_box_template(string targetType)
+    {
+        var result = Validate(ComboBoxTemplate(DropDownPopup, """<Trigger Property="IsEnabled" Value="False"><Setter TargetName="Popup" Property="PopupAnimation" Value="None" /></Trigger>""", targetType));
+
+        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Violations));
+    }
+
+    [Fact]
+    public void Extended_policy_adds_popup_host_templates()
+    {
+        string xaml = ComboBoxTemplate(DropDownPopup, targetType: "ComboBoxEx");
+        AssertRejected(Validate(xaml), XamlViolationCode.TypeNotAllowed);
+
+        var policy = XamlSecurityPolicy.CreateDefault().Extend(presentationTypes: ["ComboBoxEx"], popupHostTemplates: ["ComboBoxEx"]);
+        var result = new XamlValidator(policy).Validate(xaml, "Views/Main.xaml", "ResourceDictionary");
+        Assert.True(result.IsValid, string.Join(Environment.NewLine, result.Violations));
+    }
+
+    [Theory]
+    // Fora do template de lista suspensa.
+    [InlineData("""<ControlTemplate x:Key="t" TargetType="Button"><Popup IsOpen="True" /></ControlTemplate>""")]
+    [InlineData("""<DataTemplate x:Key="t"><Popup /></DataTemplate>""")]
+    [InlineData("""<Style x:Key="s" TargetType="Popup" />""")]
+    [InlineData("""<Style x:Key="s" TargetType="{x:Type Popup}" />""")]
+    public void Rejects_popup_outside_combo_box_template(string body) =>
+        AssertRejected(Validate(Dictionary(body)), XamlViolationCode.TypeNotAllowed);
+
+    [Theory]
+    [InlineData("""<Popup IsOpen="True" />""")]
+    [InlineData("""<Popup IsOpen="{Binding IsMouseOver, RelativeSource={RelativeSource TemplatedParent}}" />""")]
+    [InlineData("""<Popup Placement="Absolute" />""")]
+    [InlineData("""<Popup Placement="Mouse" />""")]
+    [InlineData("""<Popup HorizontalOffset="-5000" />""")]
+    [InlineData("""<Popup VerticalOffset="100" />""")]
+    [InlineData("""<Popup StaysOpen="True" />""")]
+    [InlineData("""<Popup Width="100000" />""")]
+    [InlineData("""<Popup><Popup.PlacementTarget><Border /></Popup.PlacementTarget></Popup>""")]
+    [InlineData("""<Popup><Popup IsOpen="{TemplateBinding IsDropDownOpen}" /></Popup>""")]
+    [InlineData("""<ToggleButton><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Popup /></ControlTemplate></ToggleButton.Template></ToggleButton>""")]
+    public void Rejects_popup_that_could_open_or_move_on_its_own(string popup) =>
+        AssertRejected(Validate(ComboBoxTemplate(popup)), XamlViolationCode.TypeNotAllowed);
+
+    [Theory]
+    [InlineData("""<Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Popup" Property="IsOpen" Value="True" /></Trigger>""")]
+    [InlineData("""<Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Popup" Property="HorizontalOffset" Value="-5000" /></Trigger>""")]
+    [InlineData("""<Trigger Property="IsMouseOver" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="Popup" Storyboard.TargetProperty="VerticalOffset" To="500" /></Storyboard></BeginStoryboard></Trigger.EnterActions></Trigger>""")]
+    [InlineData("""<Trigger Property="IsMouseOver" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.Target="{Binding ElementName=Popup}" Storyboard.TargetProperty="VerticalOffset" To="500" /></Storyboard></BeginStoryboard></Trigger.EnterActions></Trigger>""")]
+    public void Rejects_triggers_that_change_popup_position_or_visibility(string triggers) =>
+        AssertRejected(Validate(ComboBoxTemplate(DropDownPopup, triggers)), XamlViolationCode.TypeNotAllowed);
+
     [Theory]
     [InlineData("""xmlns:p="clr-namespace:System.IO;assembly=System.Runtime" """, """<p:FileInfo x:Key="f" />""")]
     [InlineData("""xmlns:p="clr-namespace:Evil" """, """<Style x:Key="s" p:Evil.Value="1" />""")]
