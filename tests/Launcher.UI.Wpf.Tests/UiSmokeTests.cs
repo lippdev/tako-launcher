@@ -196,6 +196,64 @@ public sealed class UiSmokeTests
         Press(window, AppCommand.Back);
         Assert.Null(shell.TopOverlay);
 
+        // --- Sessão (frente B)
+        // Editar jogo adicionado (MVP-024): campos de texto, ↓ entre campos, botão de estratégia, validação da pasta.
+        shell.EditGame(shell.ItemFor(manual));
+        Pump(0.6);
+        var editor = Assert.IsType<EditGameViewModel>(shell.TopOverlay);
+        Assert.Equal("edit:name", Nav.GetKey(nav.Focused!));
+        editor.Name = "Meu Jogo Indie Editado";
+        editor.Arguments = "-windowed";
+        Press(window, AppCommand.Down);
+        Press(window, AppCommand.Down);
+        Press(window, AppCommand.Down);
+        Assert.Equal("edit:tracking", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Accept);
+        Assert.Equal("Fim do jogo: Processo iniciado", editor.TrackingLabel);
+        Press(window, AppCommand.Down);
+        Assert.Equal("edit:save", Nav.GetKey(nav.Focused!));
+        Press(window, AppCommand.Accept); // a pasta C:\Jogos\MeuJogo não existe no CI
+        Assert.True(editor.HasError);
+        Pump(0.4);
+        Snap(window, "20-editar-jogo");
+        editor.WorkingDirectory = string.Empty; // vazio = pasta do executável
+        Press(window, AppCommand.Accept);
+        Assert.Null(shell.TopOverlay);
+        var edited = shell.Library.FindManual(manual.Id)!;
+        Assert.Equal("Meu Jogo Indie Editado", edited.Title);
+        Assert.Equal("-windowed", edited.Arguments);
+        Assert.Equal(Launcher.Core.Session.GameTrackingStrategy.Process, edited.TrackBy);
+        Assert.Equal("Meu Jogo Indie Editado", Assert.IsType<DetailsViewModel>(shell.CurrentPage).Game.Title);
+
+        // Jogo real (MVP-026/027): acompanha o processo iniciado até ele fechar, registra o tempo e devolve o foco.
+        string ping = Path.Combine(Environment.SystemDirectory, "PING.EXE");
+        var real = shell.Library.AddManual(ManualGameRecord.Create("Ping", ping, DateTimeOffset.Now) with { Arguments = "-n 4 127.0.0.1" });
+        Pump(0.5);
+        shell.OpenDetails(shell.ItemFor(real));
+        Pump(0.8);
+        Press(window, AppCommand.Accept); // Jogar
+        Assert.IsType<LaunchOverlayViewModel>(shell.TopOverlay);
+        Pump(3);
+        Assert.Equal(ConsoleMode.Runtime.SessionState.Playing, shell.Session);
+        Assert.True(shell.IsTrackingRealGame);
+        Assert.Equal(real.Id, shell.RunningGame!.Id);
+        Assert.Equal("Voltar ao jogo", ((DetailsViewModel)shell.CurrentPage).PrimaryLabel);
+        Snap(window, "21-jogo-real");
+        for (int i = 0; i < 30 && shell.Session != ConsoleMode.Runtime.SessionState.Browsing; i++)
+        {
+            Pump(1);
+        }
+
+        Assert.Equal(ConsoleMode.Runtime.SessionState.Browsing, shell.Session);
+        Assert.Null(shell.RunningGame);
+        Assert.False(shell.IsTrackingRealGame);
+        Assert.StartsWith("Bem-vindo de volta", shell.ToastMessage, StringComparison.Ordinal);
+        Assert.NotNull(shell.Library.Find(real.Id)!.LastPlayedAt);
+        Pump(0.5);
+        Assert.Equal("details:primary", Nav.GetKey(nav.Focused!));
+        Assert.Equal("Jogar", ((DetailsViewModel)shell.CurrentPage).PrimaryLabel);
+        Snap(window, "22-retorno-do-jogo");
+
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();
         window.Width = 840; // 21:9
