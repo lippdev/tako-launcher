@@ -6,6 +6,8 @@
     <!-- Nome do produto: o executável é Tako.exe; namespaces continuam Launcher.UI.Wpf. -->
     <AssemblyName>Tako</AssemblyName>
     <RootNamespace>Launcher.UI.Wpf</RootNamespace>
+    <!-- Main próprio: o mesmo Tako.exe roda como supervisor (sem WPF) ou como UI (ADR-0012). -->
+    <StartupObject>Launcher.UI.Wpf.Program</StartupObject>
     <Product>Tako</Product>
     <!-- Versão local; a release usa a da tag (build\Publish-Tako.ps1 -Version). -->
     <Version>0.1.0</Version>
