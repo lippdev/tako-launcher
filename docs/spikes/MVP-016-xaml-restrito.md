@@ -51,7 +51,7 @@ Tudo o que não está na lista é rejeitado, com código, mensagem e linha/colun
 3. **Behaviors (`http://schemas.microsoft.com/xaml/behaviors`) estão bloqueados.** Se temas homologados dependerem deles, cada behavior precisa entrar na lista individualmente, nunca o namespace inteiro.
 4. **Bindings `TwoWay` com `RelativeSource FindAncestor`** podem alterar propriedades da janela (ex.: `Topmost`). Não executa código, mas é um argumento a favor do processo de UI isolado e com privilégios mínimos.
 5. **Falso positivo conhecido:** qualquer atributo cujo valor seja uma URI absoluta (ex.: `Text="https://..."`) é rejeitado. É conservador de propósito, porque propriedades de controles de terceiros podem carregar URIs com nomes arbitrários.
-6. **A lista de permissões é inicial.** Tipos como `Popup`, `ContextMenu`, `KeyBinding`, `Hyperlink`, `SoundPlayerAction` e `CollectionViewSource` estão fora até a homologação (MVP-022) mostrar necessidade.
+6. **A lista de permissões é inicial.** `Popup` entrou só como lista de lista suspensa: dentro do `ControlTemplate` mais interno de um tipo em `PopupHostTemplates` (`ComboBox`; `ComboBoxEx` nos temas P10), com `IsOpen="{TemplateBinding IsDropDownOpen}"`, `Placement` `Bottom`/`Top` e sem offsets, `PlacementTarget`, `StaysOpen`, estilos implícitos de Popup nem gatilhos/animações que o movam ou abram. Tipos como `ContextMenu`, `KeyBinding`, `Hyperlink`, `SoundPlayerAction` e `CollectionViewSource` estão fora até a homologação (MVP-022) mostrar necessidade.
 7. Recursos referenciados entre arquivos (`StaticResource` de outro arquivo) falham ao carregar um arquivo isolado. É esperado: a ordem de composição é responsabilidade do MVP-017.
 
 ## Resultado com tema real (tema Fullscreen padrão do Playnite 10)
@@ -60,7 +60,7 @@ Medido no Windows CI com `src/Launcher.UI.Wpf/Themes/Playnite-Default` (MIT):
 
 - Sem adaptação: 18 de 35 arquivos passam no validador. As recusas confirmaram as questões 2 e 3 acima, com um achado: os controles do Playnite (`ButtonEx`, `ItemsControlEx`, `GameListItem`…) e as extensões `{ThemeFile}`/`{Settings}` **não têm prefixo**. O Playnite os registra no namespace do WPF via `XmlnsDefinition`, e o adaptador P10 faz o mesmo, sem reescrever o XAML.
 - `Constants.xaml` só era recusado por **declarar** Interactivity sem usar. O validador agora tolera declarações não usadas (qualquer uso, inclusive em valores como `Setter Property="i:…"`, continua sendo violação) e o carregador as remove antes do parser.
-- Com o adaptador P10: 32 de 35 passam na validação e **27 de 33 são carregados e aplicados pelo WPF**. O tema é renderizado na prévia do launcher sem o Playnite instalado.
+- Com o adaptador P10: 32 de 35 passam na validação e 27 de 33 eram carregados pelo WPF. Com o `Popup` restrito à lista suspensa e os booleanos/conversores que o Playnite fornece aos temas: 33 de 35 na validação e **31 de 33 carregados e aplicados pelo WPF**. O tema é renderizado na prévia do launcher sem o Playnite instalado.
 - O WPF adia erros de estilos e templates até o uso (ex.: `TemplateBinding InputHint`, propriedade que só existe no Playnite). O carregador agora sela estilos e carrega o conteúdo dos templates na carga, para o erro recusar o arquivo; e um erro tardio vira tela de recuperação.
 - Questão 1 resolvida: o adaptador compõe os dicionários por código, na ordem do Playnite, e cada arquivo enxerga os recursos dos anteriores (`StaticResource` entre arquivos).
 
