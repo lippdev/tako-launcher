@@ -873,13 +873,13 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Accept);
         Assert.Equal("perf", center.Popover!.Key);
         var counter = center.Popover.Sections.First(x => x.Title == "Contador de FPS");
-        Assert.Equal("Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.", counter.Description);
+        Assert.Equal("Ative o contador em Modo Console › Contador de FPS, com teclado e mouse.", counter.Description);
         Assert.All(counter.Rows, r => Assert.True(r.IsDimmed));
         // Limite de FPS pelo driver (ADR-0018) aparece com o contador desligado; sem driver, não deixa escolher valor.
         Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Key == "fps:limit" && r.AdjustCommand is null);
         Assert.True(nav.FocusDefault("fps:style")); // esmaecida, mas focável para explicar
         Press(window, AppCommand.Accept);
-        Assert.Equal("Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.", shell.ToastMessage);
+        Assert.Equal("Ative o contador em Modo Console › Contador de FPS, com teclado e mouse.", shell.ToastMessage);
         Pump(0.5);
         Snap(window, "11b-painel-desempenho");
         Press(window, AppCommand.Back);
