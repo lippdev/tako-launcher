@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using Launcher.PlayniteCompat.P10.Markup;
 using Launcher.Themes.Xaml;
 
 namespace Launcher.PlayniteCompat.P10;
@@ -106,13 +107,15 @@ public static class P10Theme
         _ => 2,
     };
 
-    /// <summary>Recursos que o próprio Playnite fornece aos temas (fontes); aqui com equivalentes do sistema.</summary>
-    private static ResourceDictionary CompatibilityResources() => new()
+    /// <summary>Recursos que o próprio Playnite fornece aos temas (fontes, booleanos e conversores); aqui com equivalentes do launcher.</summary>
+    private static ResourceDictionary CompatibilityResources()
     {
-        ["FontTitilliumWebLight"] = new FontFamily("Segoe UI Light"),
-        ["FontTitilliumWeb"] = new FontFamily("Segoe UI"),
-        ["FontIcoFont"] = new FontFamily("Segoe MDL2 Assets"),
-    };
+        var resources = PlayniteConverters.Resources();
+        resources["FontTitilliumWebLight"] = new FontFamily("Segoe UI Light");
+        resources["FontTitilliumWeb"] = new FontFamily("Segoe UI");
+        resources["FontIcoFont"] = new FontFamily("Segoe MDL2 Assets");
+        return resources;
+    }
 
     /// <summary>theme.yaml do Playnite é "Chave: valor" em linhas; não precisa de parser YAML completo.</summary>
     private static Dictionary<string, string> ReadManifest(string path)

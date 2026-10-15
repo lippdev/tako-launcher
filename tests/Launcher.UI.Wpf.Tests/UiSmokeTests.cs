@@ -103,6 +103,9 @@ public sealed class UiSmokeTests
             [preview.Summary, .. preview.Report.Loaded.Select(f => "OK    " + f), .. preview.RejectedLines.Select(r => "RECUSA " + r)]);
         Assert.Contains("Constants.xaml", preview.Report.Loaded);
         Assert.Contains("DerivedStyles/ListGameItemStyle.xaml", preview.Report.Loaded);
+        Assert.Contains("DefaultControls/ComboBox.xaml", preview.Report.Loaded);
+        // Só ficam de fora o que depende de HtmlTextView (segurança) e de {Api} (API do Playnite, Marco 1).
+        Assert.Equal(["Views/GameDetails.xaml", "Views/Main.xaml"], preview.Report.Rejected.Select(r => r.File).Order(StringComparer.Ordinal));
         Assert.Contains("ListGameItemStyle", preview.Resources.MergedDictionaries.SelectMany(d => d.Keys.OfType<string>()));
         Assert.Equal("p10-games", Nav.GetGroup(nav.Focused!));
         Press(window, AppCommand.Right);
