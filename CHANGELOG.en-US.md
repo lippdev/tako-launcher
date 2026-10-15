@@ -4,6 +4,19 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9]
+### What's new
+- Tako's own FPS counter, no RTSS: Tako measures FPS, frame time and 1% low through Intel's PresentMon, like CapFrameX, without touching the game. No more conflicts with MSI Afterburner or anti-cheat. The counter shows in Tako's own window over the game, in the FPS only, Compact and Detailed styles. (#36)
+- To measure, Windows has to allow Tako once. "Show FPS" is turned on in Settings with a keyboard and mouse, because the Windows prompt doesn't take a controller. After that, sign out and back in to Windows once. The installer has an "Enable FPS counter" option, unchecked by default, to handle it during setup. In the Control Center, the FPS options are dimmed with a notice until the counter is active. (#36)
+- FPS limit through the graphics driver (NVIDIA, AMD and Intel), also without RTSS. Your previous value comes back when the game ends and after a Tako crash. Options: no limit, 30, 40, 45, 60, 90, 120, 144 and "Display − 3" for VRR. (#35)
+
+### Changes
+- Tako no longer uses or changes RTSS. If you use RTSS or Afterburner, they stay as they are. A limit set through RTSS by earlier Tako versions is not undone automatically. (#36)
+- In exclusive fullscreen the counter doesn't show over the game, but the Control Center shows the FPS. (#36)
+
+### For developers
+- [ADR-0017](docs/adr/0017-contador-de-fps-com-presentmon.md) (FPS counter and permission) and [ADR-0018](docs/adr/0018-limite-de-fps-pelo-driver.md) (driver limits). The hardware checklist gained sections 13 and 14.
+
 ## [0.1.0-alpha.8]
 ### What's new
 - Game screen, like Console Mode: in Settings pick the screen you play on (the TV, for example). When a game starts, Tako turns that screen on, turns off or blacks out the others, applies resolution, refresh rate and HDR if you want, and puts everything back when it closes. The first time on a new screen it asks "Can you see this screen?" and reverts on its own if nobody answers. Off by default. (#30)
