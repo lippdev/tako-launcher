@@ -119,12 +119,17 @@ internal static class Orchestrator
             warmRuns.Add(RunChild(self, runs, $"warm-{games}-{i + 1}", ["--mode", "startup", "--games", Text(games), "--art", art]));
         }
 
-        // Linha de base: a melhor de duas rodadas da carga sozinha (a primeira costuma sair mais lenta com a máquina fria).
-        Console.WriteLine($"[{games} jogos] carga sozinha (linha de base do jogo, 2 rodadas)...");
-        var baseline = new[] { RunLoad(self, runs, $"{games}-1", load), RunLoad(self, runs, $"{games}-2", load) }.MaxBy(r => r.OpsPerSecond) ?? throw new BenchFailureException("Sem linha de base da carga");
+        // Linha de base: a melhor de duas rodadas da carga sozinha, uma antes e outra depois da rodada completa. No runner,
+        // a máquina ainda está "fria" no começo do job (rodadas até 25% mais lentas), e a de depois corrige isso.
+        Console.WriteLine($"[{games} jogos] carga sozinha (linha de base do jogo, rodada 1/2)...");
+        var before = RunLoad(self, runs, $"{games}-antes", load);
 
         Console.WriteLine($"[{games} jogos] rodada completa: repouso {idle} s, navegação, jogo {load} s...");
         var full = RunChild(self, runs, $"full-{games}", ["--mode", "full", "--games", Text(games), "--art", art, "--idle-seconds", Text(idle), "--load-seconds", Text(load)]);
+
+        Console.WriteLine($"[{games} jogos] carga sozinha (linha de base do jogo, rodada 2/2)...");
+        var after = RunLoad(self, runs, $"{games}-depois", load);
+        var baseline = after.OpsPerSecond > before.OpsPerSecond ? after : before;
         var game = (full.Report.Game ?? throw new BenchFailureException("A rodada completa não mediu o jogo em execução")) with { Baseline = baseline };
 
         var phases = warmRuns.Select(r => r.Report.Startup).ToList();
