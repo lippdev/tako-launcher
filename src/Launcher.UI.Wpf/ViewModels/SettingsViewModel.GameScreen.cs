@@ -83,6 +83,19 @@ public sealed partial class SettingsViewModel
     [RelayCommand]
     private void ToggleGameScreenHdr() => Settings.GameScreenHdr = !Settings.GameScreenHdr;
 
+    /// <summary>Modo console: só volta para a mesa ao sair do Tako ou em "Voltar ao PC"; o atalho de emergência fica à vista.</summary>
+    public string ConsoleModeOnLaunchDescription =>
+        $"Como o Console Mode: a mesa só volta ao sair do Tako ou em \"Voltar ao PC\" · emergência: {Shell.EmergencyKeys}";
+
+    [RelayCommand]
+    private void ToggleConsoleModeOnLaunch()
+    {
+        Settings.ConsoleModeOnLaunch = !Settings.ConsoleModeOnLaunch;
+        Shell.Toast(Settings.ConsoleModeOnLaunch
+            ? $"Na próxima abertura, o Tako vai direto para {GameScreenLabel} · {Shell.EmergencyKeys} volta as telas para a mesa"
+            : "O Tako abre na mesa; a tela de jogo vale só durante os jogos");
+    }
+
     private void ChooseGameScreen(ConnectedDisplay display)
     {
         if (!string.Equals(Settings.GameScreenId, display.Id, StringComparison.OrdinalIgnoreCase))

@@ -31,6 +31,10 @@ public sealed partial class SettingsService
     [ObservableProperty]
     private string _gameScreenConfirmedSetup = string.Empty;
 
+    /// <summary>"Ao abrir o Tako, ir para a tela de jogo" (modo console); desligado por padrão.</summary>
+    [ObservableProperty]
+    private bool _consoleModeOnLaunch;
+
     /// <summary>Preferências prontas para a sessão; nulo se a opção estiver desligada ou sem tela escolhida.</summary>
     public GameScreenSettings? GameScreen => GameScreenEnabled && GameScreenId.Length > 0
         ? new GameScreenSettings(GameScreenId, GameScreenHideOthers, DisplayMode.TryParse(GameScreenMode), GameScreenHdr)
@@ -50,6 +54,8 @@ public sealed partial class SettingsService
 
     partial void OnGameScreenConfirmedSetupChanged(string value) => Save(nameof(GameScreenConfirmedSetup), value);
 
+    partial void OnConsoleModeOnLaunchChanged(bool value) => Save(nameof(ConsoleModeOnLaunch), value);
+
     private void LoadGameScreen(IReadOnlyDictionary<string, string> saved)
     {
         GameScreenEnabled = Read(saved, nameof(GameScreenEnabled), GameScreenEnabled);
@@ -59,5 +65,6 @@ public sealed partial class SettingsService
         GameScreenMode = DisplayMode.TryParse(saved.GetValueOrDefault(nameof(GameScreenMode)))?.Key ?? string.Empty;
         GameScreenHdr = Read(saved, nameof(GameScreenHdr), GameScreenHdr);
         GameScreenConfirmedSetup = saved.GetValueOrDefault(nameof(GameScreenConfirmedSetup)) ?? string.Empty;
+        ConsoleModeOnLaunch = Read(saved, nameof(ConsoleModeOnLaunch), ConsoleModeOnLaunch);
     }
 }

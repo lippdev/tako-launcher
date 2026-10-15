@@ -257,11 +257,21 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
                 ];
             case "display":
                 var hdr = new PanelRowViewModel { Label = "HDR", IsToggle = true, IsOn = _options.Hdr, Command = new RelayCommand(() => { _options.Hdr = !_options.Hdr; Choose(_options.Hdr ? "HDR ligado" : "HDR desligado"); }) };
-                return
+                List<PanelSection> display =
                 [
                     new("Resolução", null, SessionOptions.Resolutions.Select((label, i) => Radio(label, _options.Resolution == i, () => _options.Resolution = i, $"Resolução: {label}")).ToList()),
                     new("Imagem", "O Console Runtime restaura a configuração original ao encerrar a sessão.", [hdr]),
                 ];
+                if (_shell.IsConsoleModeActive)
+                {
+                    // Modo console: a mesa só volta aqui, no menu ou ao sair do Tako (com confirmação).
+                    display.Add(new("Modo console", $"As telas, o áudio e a TV voltam a como estavam antes. Emergência: {_shell.EmergencyKeys}.",
+                    [
+                        new PanelRowViewModel { Label = "Voltar ao PC", Key = "display:desk", IconKey = "Icon.Monitor", Command = new RelayCommand(_shell.ConfirmReturnToDesk) },
+                    ]));
+                }
+
+                return display;
             case "pointer":
                 return BuildPointerSections();
             case "files":

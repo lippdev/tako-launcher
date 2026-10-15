@@ -17,6 +17,7 @@ Como registrar: copie a tabela de resultados no fim deste arquivo para a PR ou i
 | Erro inesperado | A tela **Algo deu errado** tem **Sair para o desktop** num passo só. Mais de 3 erros em 10 s fecham a tela cheia sozinhos. |
 | Tela congelada | **Ctrl+Shift+Esc** (Gerenciador de Tarefas, aparece por cima: a janela do Tako não é "sempre visível") › finalizar `Tako.exe`. **Win** abre o menu Iniciar. |
 | Travou ao abrir duas vezes seguidas | A terceira abertura entra em **modo seguro** sozinha. Para forçar: `Tako.exe --safe-mode`. |
+| Tela de jogo em foco e sem imagem (TV desligada, monitor desconectado) | **Ctrl+Alt+Shift+D** em qualquer momento, inclusive com o jogo na frente ou o Tako ocupado: as telas voltam para a mesa (seção 19). |
 
 ## 1. Monitores e resolução
 
@@ -160,7 +161,7 @@ Configurações › **Tela de jogo** (padrão: desligada). Use um PC com monitor
 | G9 | TV que não acorda | TV desligada da tomada/sem sinal | Depois de ~8 s o Tako desiste, as telas ficam como estavam e o jogo abre na tela atual |
 | G10 | Tela desconectada | Escolher a TV e desconectar o cabo | Aviso "a tela de jogo escolhida não está conectada · o jogo abre na tela atual" |
 | G11 | Jogo que não abre / sem acompanhamento | Atalho inválido; URI sem pasta | As telas voltam logo |
-| G12 | Queda com a tela de jogo em foco | Finalizar `Tako.exe` durante o jogo e abrir de novo | Com "Restaurar monitores e áudio" ligado, aparece a oferta de restauração (seção 9, E14) e as telas voltam |
+| G12 | Queda com a tela de jogo em foco | Finalizar `Tako.exe` durante o jogo e abrir de novo | Com "Restaurar monitores e áudio" ligado, aparece a oferta de restauração (seção 9, E14) e as telas voltam (com "Restaurando monitores e áudio…", sem congelar) |
 | G13 | Restauração sem a configuração exata | Como G12, mas reiniciar o Windows antes | A restauração religa os monitores que estavam ligados e desconecta a TV; o log registra o caminho usado |
 
 ## 10. Supervisor (MVP-006, [ADR-0012](../adr/0012-supervisor-e-ipc.md))
@@ -363,6 +364,30 @@ GPU com limite pelo driver (seção 13).
 | CJ6 | Mostrar FPS | Contador desligado nas Configurações (com a permissão já dada); no jogo A, "Mostrar FPS: Sim" | O contador aparece só em A |
 | CJ7 | Argumentos extras | Jogo adicionado (.exe) com "-windowed" (ou outro argumento conhecido do jogo) | O jogo abre com o argumento (Gerenciador de Tarefas › coluna Linha de comando) |
 | CJ8 | Voltar ao padrão | "Usar tudo do Tako" e abrir o jogo de novo | Comporta-se como os outros jogos |
+
+## 19. Modo console ao abrir (MVP-002/012/036, [ADR-0015](../adr/0015-monitores-do-console-mode-e-tela-de-jogo.md))
+
+Configurações › **Tela de jogo** ligada (seção 9b) e **Ao abrir o Tako, ir para a tela de jogo** (padrão: desligada). Mesmo PC da seção 9b (monitor + TV), de preferência com a TV da seção 12 configurada. Anexe `logs\tako-AAAAMMDD.log` (linhas "Modo console") e, nos casos de queda, `logs\supervisor\tako-AAAAMMDD.log`.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| K1 | Abrir no modo console | Ligar a opção e abrir o Tako (atalho) | "Indo para a tela de jogo…" na tela; a TV liga e troca para a entrada do PC (com a TV configurada), vira a principal, as outras telas desligam/escurecem, o som vai para a saída do jogo e o Tako abre na TV |
+| K2 | Iniciar com o Windows | Opção ligada + "Abrir ao iniciar o Windows"; reiniciar o PC | Como K1, sem tocar em nada |
+| K3 | Primeira vez | K1 com uma tela ou modo nunca confirmado | "Você consegue ver esta tela?" com 15 s; "Sim, manter" fica; sem resposta, B/Esc ou "Voltar ao normal", as telas voltam e o Tako fica na mesa; na próxima abertura pergunta de novo só se a tela/modo mudou |
+| K4 | Jogos no modo console | Abrir e fechar dois jogos seguidos | Nenhuma piscada de tela entre os jogos: o jogo não foca nem restaura a tela de jogo, não troca o áudio e não põe a TV em espera; "Mandar a Steam para a bandeja" continua valendo no fim de cada jogo |
+| K17 | Configurações deste jogo no modo console (seção 18) | Um jogo com "Usar a Tela de jogo" desligado; outro com resolução/HDR próprios; outro com saída de áudio própria | Os dois primeiros abrem na tela de jogo do modo console, sem piscar, com o aviso ("use Voltar ao PC" / "a resolução e o HDR deste jogo não valem"); o terceiro troca o som no início e volta para a saída do modo console ao fechar; FPS e argumentos do jogo valem |
+| K5 | Voltar ao PC pelo menu | Barra lateral › **Voltar ao PC** › confirmar | "Voltando para a mesa…" com a barra andando (a tela não congela); telas, HDR, áudio e TV voltam a como estavam antes do modo console; o item some do menu |
+| K6 | Voltar ao PC pela Central | Durante um jogo: Guia › Tela › **Voltar ao PC** | Confirmação dizendo que o jogo continua aberto; as telas voltam com o jogo aberto; ao fechar o jogo depois, nada volta para a TV |
+| K7 | Sair do Tako | Barra lateral › Sair para o desktop | O aviso diz que as telas voltam para a mesa; "Voltando para a mesa…" e depois o Tako fecha com tudo como antes |
+| K8 | Alt+F4 | Alt+F4 no modo console | As telas voltam para a mesa antes de o Tako fechar |
+| K9 | Atalho de emergência | No modo console (e numa sessão da seção 9b), com o jogo na frente, apertar **Ctrl+Alt+Shift+D** | As telas voltam para a mesa sem depender da janela do Tako; a TV não vai para a espera; aviso com o atalho; o log registra "Atalho de emergência" |
+| K10 | Queda no modo console | Finalizar só a UI (seção 10, S3) no modo console | A UI reabre, volta para a mesa sozinha ("O Tako fechou no modo console…") e, com a opção ligada, vai de novo para a tela de jogo |
+| K11 | Queda sem supervisor | `Tako.exe --no-supervisor`, finalizar no modo console e abrir de novo | Na abertura, as telas voltam para a mesa sem pergunta; nenhuma oferta "Restaurar monitores e áudio?" sobre o jogo que estava aberto |
+| K12 | Supervisor desiste | Finalizar a UI 5 vezes em 5 min no modo console (S3) | Na desistência o supervisor volta as telas para a mesa antes de sair (log do supervisor "Recuperação do modo console"); ninguém fica no desktop com as telas desligadas |
+| K13 | Modo seguro | `Tako.exe --safe-mode` com a opção ligada | Abre na mesa com o aviso "Modo seguro: o Tako abriu na mesa" |
+| K14 | Sem a TV | Opção ligada com a TV desconectada/desligada da tomada | Aviso "a tela de jogo escolhida não está conectada · o Tako abriu na mesa" ou, depois de ~8 s, "as telas voltaram como estavam" |
+| K15 | Fim de jogo sem congelar | Seção 9b (sem o modo console): fechar o jogo e mexer no controle enquanto as telas voltam | "Voltando para a mesa…" com a barra andando; o supervisor não acusa "sem heartbeat"; "Jogar" só funciona depois que a volta termina |
+| K16 | Atalho ocupado | Outro programa usando Ctrl+Alt+Shift+D antes de abrir o Tako | O Tako abre normalmente; o log registra que o atalho está indisponível |
 
 ## Resultados
 

@@ -28,13 +28,13 @@ public sealed partial class ShellViewModel
 
     /// <summary>
     /// Na abertura: se a sessão anterior terminou no meio de um jogo e monitores ou áudio continuam diferentes,
-    /// pergunta se deve restaurar. Nada muda sem a confirmação.
+    /// pergunta se deve restaurar. Nada muda sem a confirmação. Devolve se a pergunta foi feita.
     /// </summary>
-    public void OfferEnvironmentRestore()
+    public bool OfferEnvironmentRestore()
     {
         if (_environment.PendingFromPreviousRun() is not { } pending)
         {
-            return;
+            return false;
         }
 
         DialogViewModel? dialog = null;
@@ -42,10 +42,11 @@ public sealed partial class ShellViewModel
             "Restaurar monitores e áudio?",
             $"O Tako fechou durante um jogo ({pending.CapturedAt.ToLocalTime():dd/MM HH:mm}) e monitores ou áudio continuam diferentes de antes.",
             [
-                new OverlayAction("Restaurar monitores e áudio como estavam antes do jogo", ActionStyle.Primary, new RelayCommand(() =>
+                new OverlayAction("Restaurar monitores e áudio como estavam antes do jogo", ActionStyle.Primary, UiCommand(async () =>
                 {
                     CloseOverlay(dialog!);
-                    var report = _environment.RestoreFrom(pending);
+                    // Fora da thread da UI: o Windows pode levar alguns segundos para trocar o modo das telas.
+                    var report = await RunOffUiAsync("Restaurando monitores e áudio…", "Voltando ao que era antes do jogo", () => _environment.RestoreFrom(pending)).ConfigureAwait(true);
                     Toast(report.Succeeded ? "Monitores e áudio restaurados" : "Não deu para restaurar tudo · detalhes nos logs");
                 }), IsDefault: true),
                 new OverlayAction("Manter como está", ActionStyle.Secondary, new RelayCommand(() =>
@@ -55,5 +56,6 @@ public sealed partial class ShellViewModel
                 })),
             ]);
         PushOverlay(dialog);
+        return true;
     }
 }

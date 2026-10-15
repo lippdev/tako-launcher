@@ -540,6 +540,16 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Modo console ao abrir: a tela de jogo vale desde a abertura até sair do Tako ou "Voltar ao PC". -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleConsoleModeOnLaunchCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:gamescreen-onlaunch" Visibility="{Binding Settings.GameScreenEnabled, Converter={StaticResource BoolToVisibility}}">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.ConsoleModeOnLaunch}" />
+          <StackPanel>
+            <TextBlock Text="Ao abrir o Tako, ir para a tela de jogo" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding ConsoleModeOnLaunchDescription}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <!-- Áudio, Steam e TV durante o jogo (MVP-002 parte 2): ShellViewModel.Devices.cs; tela da TV em DeviceViews.xaml. -->
       <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ChooseGameAudioCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:gameaudio">
         <DockPanel>

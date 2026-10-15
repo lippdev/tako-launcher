@@ -31,8 +31,11 @@ public sealed partial class ShellViewModel
         new(effective.GameAudio, Settings.SteamToTrayAfterGame, Settings.TvControl);
 
     /// <summary>Jogo aberto e acompanhado: TV (se ainda não foi ligada) e saída de áudio em segundo plano.</summary>
-    private void BeginSessionDevices(Game game, bool tvReady, EffectiveSessionSettings effective) =>
-        _ = _devices.BeginSession(game.Id, DeviceOptions(effective), tvReady);
+    private void BeginSessionDevices(Game game, SessionDeviceOptions options, bool tvReady) => _ = _devices.BeginSession(game.Id, options, tvReady);
+
+    /// <summary>Áudio, Steam e TV das Configurações do Tako (o modo console usa estes, não os de um jogo).</summary>
+    private SessionDeviceOptions DeviceOptions() =>
+        new(Settings.GameAudioOutput, Settings.SteamToTrayAfterGame, Settings.TvControl);
 
     /// <summary>
     /// Com a "Tela de jogo" (ADR-0015) e a TV ligadas, a TV precisa estar ligada na entrada do PC antes de a tela de
@@ -54,12 +57,12 @@ public sealed partial class ShellViewModel
 
     /// <summary>
     /// Antes de restaurar monitores e áudio: devolve a saída de áudio, Steam para a bandeja e TV em espera. O texto
-    /// volta para o aviso de "bem-vindo".
+    /// volta para o aviso de "bem-vindo". Roda fora da thread da UI (a devolução do áudio pode esperar a troca em
+    /// andamento terminar).
     /// </summary>
-    private string EndSessionDevices(GameItemViewModel? item, bool gameEnded)
+    private string EndSessionDevices(string? gameId, bool steamGame, int? steamAppId, bool gameEnded)
     {
-        var game = item?.Game;
-        var report = _devices.EndSession(game?.Id ?? "-", game?.Store == GameStore.Steam, game?.SteamAppId, gameEnded);
+        var report = _devices.EndSession(gameId ?? "-", steamGame, steamAppId, gameEnded);
         return report.SteamSentToTray ? " · Steam na bandeja" : string.Empty;
     }
 

@@ -55,6 +55,19 @@ public sealed class RecoveryViewModel(string detail, IReadOnlyList<OverlayAction
     public IReadOnlyList<OverlayAction> Actions { get; } = actions;
 }
 
+/// <summary>
+/// Trabalho lento fora da thread da UI ("Voltando para a mesa…", "Indo para a tela de jogo…"): a tela continua
+/// respondendo e mostra o andamento. Sem ações: some sozinho ao terminar; B não interrompe (as telas ficariam pela metade).
+/// </summary>
+public sealed class ProgressOverlayViewModel(string title, string detail) : IOverlayViewModel
+{
+    public string Title { get; } = title;
+
+    public string Detail { get; } = detail;
+
+    public bool HandleBack() => true;
+}
+
 /// <summary>"Iniciando" com a capa e a barra de progresso.</summary>
 public sealed partial class LaunchOverlayViewModel(GameItemViewModel game, ICommand cancel) : ObservableObject, IOverlayViewModel
 {

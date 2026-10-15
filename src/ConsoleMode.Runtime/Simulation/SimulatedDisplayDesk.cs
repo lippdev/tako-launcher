@@ -255,3 +255,24 @@ public sealed class SimulatedScreenCurtain : IScreenCurtain
 
     public void Close() => Covered = [];
 }
+
+/// <summary>Atalho de emergência em memória: <see cref="PressAsync"/> faz o papel do teclado.</summary>
+public sealed class SimulatedEmergencyHotkey : IEmergencyHotkey
+{
+    private Action? _pressed;
+
+    public string Keys => "Ctrl+Alt+Shift+D";
+
+    public bool IsStarted => _pressed is not null;
+
+    public bool Start(Action pressed)
+    {
+        _pressed = pressed;
+        return true;
+    }
+
+    /// <summary>Aperta o atalho numa thread que não é a do chamador, como o Windows faria.</summary>
+    public Task PressAsync() => Task.Run(() => _pressed?.Invoke());
+
+    public void Dispose() => _pressed = null;
+}

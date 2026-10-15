@@ -70,6 +70,18 @@ public sealed partial class GameScreenSession
         }
     }
 
+    /// <summary>Tela em que a sessão ligou o HDR (para desligar numa recuperação depois de uma queda); nula se não ligou.</summary>
+    public string? HdrDisplayId
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _active?.HdrTurnedOnFor;
+            }
+        }
+    }
+
     /// <summary>Telas conectadas para escolher em Configurações; falha da plataforma devolve lista vazia.</summary>
     public IReadOnlyList<ConnectedDisplay> ListDisplays()
     {
