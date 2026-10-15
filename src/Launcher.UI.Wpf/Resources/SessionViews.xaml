@@ -65,21 +65,26 @@
           <TextBox Style="{StaticResource FieldBox}" Text="{Binding WorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
                    nav:Nav.Group="overlay" nav:Nav.Key="edit:folder" />
 
-          <Button Style="{StaticResource PillButton}" Margin="0,36,0,0" HorizontalAlignment="Left" Command="{Binding CycleTrackingCommand}"
+          <!-- Botões na largura dos campos: ↑ ↓ seguem em linha reta (a navegação penaliza desvio lateral). -->
+          <Button Style="{StaticResource PillButton}" Margin="0,36,0,0" HorizontalAlignment="Stretch" Command="{Binding CycleTrackingCommand}"
                   nav:Nav.Group="overlay" nav:Nav.Key="edit:tracking">
             <TextBlock Text="{Binding TrackingLabel}" />
           </Button>
 
           <TextBlock x:Name="ErrorText" Text="{Binding Error}" Margin="0,24,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
 
-          <StackPanel Orientation="Horizontal" Margin="0,36,0,0">
+          <Grid Margin="0,36,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="2*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <Button Style="{StaticResource PillButton}" Tag="primary" Margin="0,0,18,0" Command="{Binding SaveCommand}" nav:Nav.Group="overlay" nav:Nav.Key="edit:save">
               <TextBlock Text="Salvar" />
             </Button>
-            <Button Style="{StaticResource PillButton}" Command="{Binding CancelCommand}" nav:Nav.Group="overlay" nav:Nav.Key="edit:cancel">
+            <Button Grid.Column="1" Style="{StaticResource PillButton}" Command="{Binding CancelCommand}" nav:Nav.Group="overlay" nav:Nav.Key="edit:cancel">
               <TextBlock Text="Cancelar" />
             </Button>
-          </StackPanel>
+          </Grid>
         </StackPanel>
       </Border>
     </Grid>
