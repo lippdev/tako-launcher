@@ -97,6 +97,10 @@ Mesmo runner (GitHub Actions windows-latest, 1024×768), PR #29: "antes" = commi
 | 1000, **depois** | **885** | **165** | **406** | **77** | **78** | **25,5** |
 | 5000, antes | 3642 | 2038 | 2651 | 6115 | 6094 | 134,4 |
 | 5000, **depois** | **990** | **175** | **433** | **102** | **78** | **26,1** |
+| 1000, depois do rebase (`9188214`) | 1366 | 170 | 386 | 167 | 109 | 31,1 |
+| 5000, depois do rebase (`9188214`) | 1440 | 177 | 407 | 213 | 156 | 29,7 |
+
+As duas últimas linhas são a medição final, depois do rebase sobre a busca e os filtros (#32), num runner mais lento (EPYC 7763). Nesse runner, abrir a biblioteca com 20 jogos já leva 153 ms e o maior quadro chega a 297 ms. O que sobra no runner é custo da própria página (cabeçalho com busca e filtros, renderização por software), não do tamanho da biblioteca.
 
 - Memória e tempos passam a quase não depender do tamanho da biblioteca: 20 jogos ficam em 164 MB em repouso e 276 MB após navegar.
 - A meta do PRD (até 300 MB em repouso) vale com folga em 1000 e 5000 jogos. Após a navegação roteirizada o conjunto de trabalho fica em ~400 MB no runner: são as capas e fundos ainda na tela ou no cache e memória de imagens já descartadas que o GC ainda não devolveu (a heap .NET fica abaixo de 20 MB).
