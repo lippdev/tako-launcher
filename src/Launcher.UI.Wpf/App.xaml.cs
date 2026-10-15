@@ -70,7 +70,7 @@ public partial class App : Application
             shell.ShowRecovery(startupTheme);
         }
 
-        // O Tako caiu durante um jogo com o ponteiro escondido ou um limite de FPS aplicado: desfaz.
+        // O Tako caiu durante um jogo com o ponteiro escondido, o PresentMon medindo ou um limite de FPS aplicado: desfaz.
         _services.GetRequiredService<SessionToolsService>().RecoverAfterCrash();
 
         // O Tako caiu durante um jogo e monitores ou áudio ficaram diferentes: oferece restaurar (MVP-012).
@@ -133,9 +133,11 @@ public partial class App : Application
         services.AddSingleton<ArtService>();
         services.AddSingleton<SonyHidGamepad>();
         services.AddSingleton<SettingsService>();
-        // Central de Controle durante o jogo: janelas abertas, RTSS, ponteiro, ControlFS e desempenho (MVP-002/030).
+        // Central de Controle durante o jogo: janelas abertas, contador de FPS (PresentMon, ADR-0017), limite de FPS,
+        // ponteiro, ControlFS e desempenho (MVP-002/030).
         services.AddSingleton<IWindowSwitcher, WindowsWindowSwitcher>();
-        services.AddSingleton<IFpsOverlayService>(sp => new WindowsRtss(AppPaths.RtssLimitBackupFile, sp.GetRequiredService<ILogger<WindowsRtss>>()));
+        services.AddSingleton<IFpsCounter>(sp => new PresentMonFpsCounter(AppPaths.PresentMonExe, AppPaths.FpsCaptureMarker, sp.GetRequiredService<ILogger<PresentMonFpsCounter>>()));
+        services.AddSingleton<IPerfLogAccess>(sp => new WindowsPerfLogAccess(Environment.ProcessPath ?? "Tako.exe", sp.GetRequiredService<ILogger<WindowsPerfLogAccess>>()));
         // Limite de FPS pelo driver de vídeo (NVAPI, ADLX ou IGCL), sem RTSS nem injeção (ADR-0018).
         services.AddSingleton<IFrameRateLimiter>(sp => WindowsFrameRateLimiter.Create(AppPaths.DriverFpsLimitBackupFile, sp.GetRequiredService<ILogger<SessionToolsService>>()));
         services.AddSingleton<PointerPadRelay>();

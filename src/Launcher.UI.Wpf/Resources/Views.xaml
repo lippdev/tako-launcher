@@ -482,6 +482,28 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Contador de FPS sem injeção (ADR-0017): ligar pede o UAC, que não aceita o controle; com ele a linha esmaece. -->
+      <Button x:Name="FpsCounterRow" Style="{StaticResource SettingRow}" Command="{Binding ToggleFpsCounterCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:fps">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding FpsCounterOn}" />
+          <StackPanel>
+            <TextBlock Text="Mostrar FPS" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding FpsCounterDetail}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button x:Name="FpsRevokeRow" Style="{StaticResource SettingRow}" Command="{Binding RevokeFpsPermissionCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:fps-revoke" Visibility="{Binding CanRevokeFpsPermission, Converter={StaticResource BoolToVisibility}}">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Remover" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Remover permissão do contador de FPS" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Tira sua conta do grupo &quot;Usuários de log de desempenho&quot; do Windows (pede confirmação)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <!-- Diagnóstico do sistema (frente G, MVP-034): relatório para o checklist de hardware. -->
       <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ShowSystemDiagnosticsCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:diagnostics">
         <DockPanel>
@@ -573,6 +595,13 @@
       </Button>
     </StackPanel>
     </Canvas>
+    <DataTemplate.Triggers>
+      <!-- Com o controle, "Mostrar FPS" e "Remover permissão" esmaecem: o UAC não aceita o controle. -->
+      <DataTrigger Binding="{Binding FpsCounterDimmed}" Value="True">
+        <Setter TargetName="FpsCounterRow" Property="Opacity" Value="0.45" />
+        <Setter TargetName="FpsRevokeRow" Property="Opacity" Value="0.45" />
+      </DataTrigger>
+    </DataTemplate.Triggers>
   </DataTemplate>
 
   <!-- ===================================================================== Sobreposições -->
@@ -625,7 +654,7 @@
     </DataTemplate.Triggers>
   </DataTemplate>
 
-  <!-- Jogo em execução (simulado no Marco 0) ou arte do jogo real sob a Central de Controle. O contador de FPS é o do RTSS. -->
+  <!-- Jogo em execução (simulado no Marco 0) ou arte do jogo real sob a Central de Controle. O contador de FPS é uma janela à parte (FpsOverlayWindow). -->
   <DataTemplate DataType="{x:Type vm:GameSessionViewModel}">
     <Grid Background="Black">
       <Rectangle Fill="{Binding Game.FallbackBrush}" />
@@ -815,6 +844,9 @@
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsDanger}" Value="True">
                           <Setter TargetName="Row" Property="Tag" Value="danger" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsDimmed}" Value="True">
+                          <Setter TargetName="Row" Property="Opacity" Value="0.45" />
                         </DataTrigger>
                       </DataTemplate.Triggers>
                     </DataTemplate>

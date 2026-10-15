@@ -8,4 +8,5 @@ Dependem de spike: ADR-003 (FSE) e ADR-004 (compat Playnite).
 - [ADR-0014](0014-licenca-agpl.md): licença AGPL-3.0-only e reuso do Console Mode (Aceita).
 - [ADR-0015](0015-monitores-do-console-mode-e-tela-de-jogo.md): monitores vindos do Console Mode e "Tela de jogo" (Proposta).
 - [ADR-0016](0016-audio-steam-e-tv-na-sessao.md): saída de áudio, Steam (`RunningAppID` e bandeja) e TV (ADB pela rede) durante a sessão de jogo (Proposta).
+- [ADR-0017](0017-contador-de-fps-com-presentmon.md): contador de FPS próprio pelo PresentMon, sem RTSS e sem injeção; permissão pelo grupo "Usuários de log de desempenho" (Proposta).
 - [ADR-0018](0018-limite-de-fps-pelo-driver.md): limite de FPS pelo driver de vídeo (NVAPI, ADLX, IGCL), sem RTSS nem elevação (Proposta).

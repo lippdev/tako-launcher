@@ -43,43 +43,81 @@ public sealed class SimulatedWindowSwitcher : IWindowSwitcher
     }
 }
 
-/// <summary>RTSS simulado: instalado ou não, guarda o último estilo e limite pedidos.</summary>
-public sealed class SimulatedFpsOverlay(bool installed = false) : IFpsOverlayService
+/// <summary>Contador de FPS simulado: "mede" um FPS fixo enquanto há processos do jogo.</summary>
+public sealed class SimulatedFpsCounter(bool available = false, double fps = 60) : IFpsCounter
 {
-    public bool IsInstalled { get; } = installed;
+    private Func<IReadOnlyCollection<int>>? _game;
 
-    public bool CanLimitFps => IsInstalled;
+    public bool IsAvailable { get; } = available;
 
-    public string? Style { get; private set; }
+    public FpsCounterStatus Status { get; private set; } = FpsCounterStatus.Idle;
 
-    public int Limit { get; private set; }
+    public FrameStats? Current => Status == FpsCounterStatus.Running && _game?.Invoke() is { Count: > 0 } pids
+        ? new FrameStats(fps, 1000 / fps, fps * 0.9, "DXGI", pids.First())
+        : null;
 
-    public bool ApplyOverlay(string style, FpsOverlayLayout layout)
+    public int Starts { get; private set; }
+
+    public bool StartCapture(Func<IReadOnlyCollection<int>> gameProcesses)
     {
-        if (!IsInstalled)
+        if (!IsAvailable)
         {
+            Status = FpsCounterStatus.Unavailable;
             return false;
         }
 
-        Style = style;
+        _game = gameProcesses;
+        Status = FpsCounterStatus.Running;
+        Starts++;
         return true;
     }
 
-    public bool SetFpsLimit(int fps)
+    public void StopCapture()
     {
-        if (!IsInstalled)
+        _game = null;
+        Status = IsAvailable ? FpsCounterStatus.Idle : FpsCounterStatus.Unavailable;
+    }
+
+    public void RecoverAfterCrash()
+    {
+    }
+}
+
+/// <summary>Permissão do contador simulada: o "UAC" responde o que o teste mandar.</summary>
+public sealed class SimulatedPerfLogAccess(PerfLogStatus permission = PerfLogStatus.NotGranted) : IPerfLogAccess
+{
+    public PerfLogStatus Permission { get; set; } = permission;
+
+    /// <summary>Resposta do próximo UAC.</summary>
+    public PerfLogChange NextAnswer { get; set; } = PerfLogChange.Done;
+
+    /// <summary>Depois de conceder, o token só tem o grupo no próximo login.</summary>
+    public PerfLogStatus AfterGrant { get; set; } = PerfLogStatus.NeedsSignOut;
+
+    public int Prompts { get; private set; }
+
+    public PerfLogStatus Check() => Permission;
+
+    public Task<PerfLogChange> GrantAsync()
+    {
+        Prompts++;
+        if (NextAnswer == PerfLogChange.Done)
         {
-            return false;
+            Permission = AfterGrant;
         }
 
-        Limit = fps;
-        return true;
+        return Task.FromResult(NextAnswer);
     }
 
-    public void Restore()
+    public Task<PerfLogChange> RevokeAsync()
     {
-        Style = null;
-        Limit = 0;
+        Prompts++;
+        if (NextAnswer == PerfLogChange.Done)
+        {
+            Permission = PerfLogStatus.NotGranted;
+        }
+
+        return Task.FromResult(NextAnswer);
     }
 }
 

@@ -1,0 +1,64 @@
+# Avisos de terceiros
+
+O Tako é distribuído sob a AGPL-3.0-only (ver `LICENSE`). Ele inclui ou adapta os componentes abaixo, cada um sob a
+sua própria licença.
+
+## Intel PresentMon 2.6.0
+
+O contador de FPS (ADR-0017) usa o `PresentMon.exe` oficial da Intel, distribuído sem alterações na pasta
+`PresentMon` ao lado do `Tako.exe`. Fonte: <https://github.com/GameTechDev/PresentMon> (release v2.6.0,
+`PresentMon-2.6.0-x64.exe`, SHA-256 `b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af`).
+
+```
+Copyright (C) 2017-2024 Intel Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+## CapFrameX
+
+Partes do código do contador de FPS foram adaptadas do CapFrameX (<https://github.com/CXWorld/CapFrameX>): os
+argumentos do PresentMon em tempo real e a leitura do stdout (`CapFrameX.PresentMonInterface`) e o cálculo de FPS
+médio, percentil e "1% low" (`CapFrameX.Statistics.NetStandard`). Os arquivos adaptados indicam a origem no topo:
+`src/ConsoleMode.Runtime/SessionTools/PresentMon.cs`, `src/ConsoleMode.Runtime/SessionTools/FrameStats.cs` e
+`src/ConsoleMode.Runtime.Windows/SessionTools/PresentMonFpsCounter.cs`.
+
+```
+MIT License
+
+Copyright (c) 2018-2026 DevTechProfile
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

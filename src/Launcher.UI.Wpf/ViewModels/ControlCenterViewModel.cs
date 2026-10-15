@@ -14,8 +14,8 @@ namespace Launcher.UI.Wpf.ViewModels;
 
 /// <summary>
 /// Central de Controle (menu rápido do jogo): cartões vivos, janelas abertas, barra de ícones no topo e painel por
-/// ícone. Comportamento descrito no DESIGN.md › Components › Menu rápido. Janelas, contador de FPS (RTSS), limite de FPS (driver de vídeo, ADR-0018),
-/// ponteiro, ControlFS e desempenho vêm do "menu de sessão" do Console Mode (<see cref="SessionToolsService"/>).
+/// ícone. Comportamento descrito no DESIGN.md › Components › Menu rápido. Janelas, contador de FPS (PresentMon, ADR-0017),
+/// limite de FPS (driver de vídeo, ADR-0018), ponteiro, ControlFS e desempenho vêm do "menu de sessão" do Console Mode (<see cref="SessionToolsService"/>).
 /// </summary>
 public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayViewModel, IDisposable
 {
@@ -34,6 +34,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
     private readonly Queue<double> _cpuHistory = new();
     private readonly List<(PanelRowViewModel Row, Func<HardwareSample, string> Text)> _liveRows = [];
     private HardwareSample? _sample;
+    private PanelRowViewModel? _fpsRow;
     private bool _sampling;
     private bool _disposed;
 
@@ -319,7 +320,8 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
         }
 
         perf.Value = $"CPU {Percent(sample.CpuUsage)}";
-        perf.Pill = $"GPU {Percent(sample.GpuUsage)} · RAM {Percent(sample.RamUsage)}";
+        string fps = _tools.CurrentFrames is { } frames ? $"{FpsOverlay.FpsText(frames)} FPS · " : string.Empty;
+        perf.Pill = $"{fps}GPU {Percent(sample.GpuUsage)} · RAM {Percent(sample.RamUsage)}";
         var points = new PointCollection();
         int i = 0, n = Math.Max(1, _cpuHistory.Count - 1);
         foreach (double cpu in _cpuHistory)
@@ -370,29 +372,40 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
 
     private static string StyleLabel(string style) => style switch
     {
-        RtssOverlay.Off => "Desligado",
-        RtssOverlay.FpsOnly => "Só FPS",
-        RtssOverlay.Compact => "Compacto",
-        RtssOverlay.Detailed => "Detalhado",
-        RtssOverlay.Custom => "Personalizado",
-        _ => "O do RTSS",
+        FpsOverlay.Off => "Desligado",
+        FpsOverlay.Compact => "Compacto",
+        FpsOverlay.Detailed => "Detalhado",
+        _ => "Só FPS",
     };
 
     private static string PositionLabel(string position) => position switch
     {
-        RtssOverlay.TopLeft => "Superior esquerda",
-        RtssOverlay.TopRight => "Superior direita",
-        RtssOverlay.BottomLeft => "Inferior esquerda",
-        RtssOverlay.BottomRight => "Inferior direita",
-        _ => "A do RTSS",
+        FpsOverlay.TopRight => "Superior direita",
+        FpsOverlay.BottomLeft => "Inferior esquerda",
+        FpsOverlay.BottomRight => "Inferior direita",
+        _ => "Superior esquerda",
     };
 
     private static string SizeLabel(string size) => size switch
     {
-        RtssOverlay.Medium => "Médio",
-        RtssOverlay.Large => "Grande",
+        FpsOverlay.Medium => "Médio",
+        FpsOverlay.Large => "Grande",
         _ => "Pequeno",
     };
+
+    private string FpsNowText() => _tools.Fps.Status switch
+    {
+        FpsCounterStatus.Denied => "o Windows recusou · saia e entre de novo",
+        FpsCounterStatus.Failed => "não foi possível medir",
+        _ => FramesText(_tools.CurrentFrames),
+    };
+
+    /// <summary>"60 FPS · 1% low 48" para a linha viva do painel; funciona até em tela cheia exclusiva.</summary>
+    private static string FramesText(FrameStats? frames) => frames is null
+        ? "medindo…"
+        : frames.OnePercentLow is { } low
+            ? string.Create(CultureInfo.InvariantCulture, $"{frames.Fps:0} FPS · 1% low {low:0}")
+            : string.Create(CultureInfo.InvariantCulture, $"{frames.Fps:0} FPS");
 
     /// <summary>Uma leitura por segundo fora da thread da UI; atualiza o cartão e as linhas "Agora" do painel.</summary>
     private async Task SampleAsync()
@@ -422,6 +435,11 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             }
 
             UpdatePerfCard();
+            if (_fpsRow is not null)
+            {
+                _fpsRow.EndText = FpsNowText();
+            }
+
             foreach (var (row, text) in _liveRows)
             {
                 row.EndText = text(sample);
@@ -486,6 +504,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
     private IReadOnlyList<PanelSection> BuildPerfSections()
     {
         _liveRows.Clear();
+        _fpsRow = null;
         PanelRowViewModel Live(string label, Func<HardwareSample, string> text)
         {
             var row = new PanelRowViewModel { Label = label, EndText = _sample is { } s ? text(s) : "--", Command = new RelayCommand(() => { }) };
@@ -493,49 +512,69 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             return row;
         }
 
-        var now = new PanelSection("Agora", null, [Live("Uso do PC", s => $"CPU {Percent(s.CpuUsage)} · GPU {GpuText(s)} · RAM {Percent(s.RamUsage)}")]);
-        var limit = BuildLimitSection();
-
-        if (!_tools.Fps.IsInstalled)
+        var nowRows = new List<PanelRowViewModel>();
+        var state = _tools.CounterState;
+        if (state == FpsCounterState.Ready)
         {
-            return
-            [
-                new("Contador de FPS",
-                    "Usa o RivaTuner Statistics Server (RTSS), gratuito. Instale o RTSS, abra-o uma vez e volte aqui: as opções aparecem sozinhas.",
-                    [
-                        new PanelRowViewModel
-                        {
-                            Key = "fps:install",
-                            Label = "Baixar o RTSS",
-                            EndText = "abre o navegador",
-                            Command = new RelayCommand(() => OpenPage(RtssLocator.DownloadUrl, "Página do RTSS aberta no navegador")),
-                        },
-                    ]),
-                limit,
-                now,
-            ];
+            _fpsRow = new PanelRowViewModel { Key = "fps:now", Label = "FPS do jogo", EndText = FpsNowText(), Command = new RelayCommand(() => { }) };
+            nowRows.Add(_fpsRow);
         }
 
+        nowRows.Add(Live("Uso do PC", s => $"CPU {Percent(s.CpuUsage)} · GPU {GpuText(s)} · RAM {Percent(s.RamUsage)}"));
+        var now = new PanelSection("Agora", null, nowRows);
+        return [BuildCounterSection(state), BuildLimitSection(), now];
+    }
+
+    /// <summary>
+    /// Contador de FPS. Ligar pede o UAC, que não aceita o controle: por isso ele é ligado nas Configurações, com
+    /// teclado e mouse. Aqui, sem o contador pronto, as opções aparecem esmaecidas com o caminho para ligar.
+    /// </summary>
+    private PanelSection BuildCounterSection(FpsCounterState state)
+    {
         string style = _tools.FpsStyle;
         var layout = _tools.Layout;
+        if (state != FpsCounterState.Ready)
+        {
+            string why = state switch
+            {
+                FpsCounterState.NotBundled => "O contador de FPS não veio nesta versão do Tako.",
+                FpsCounterState.NeedsSignOut => "Saia e entre no Windows de novo para o contador funcionar.",
+                _ => "Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.",
+            };
+            PanelRowViewModel Dimmed(string key, string label, string value) => new()
+            {
+                Key = key,
+                Label = label,
+                EndText = value,
+                IsDimmed = true,
+                Command = new RelayCommand(() => _shell.Toast(why)),
+            };
+            return new PanelSection("Contador de FPS", why,
+            [
+                Dimmed("fps:style", "Estilo", StyleLabel(style)),
+                Dimmed("fps:position", "Posição", PositionLabel(layout.Position)),
+                Dimmed("fps:size", "Tamanho", SizeLabel(layout.Size)),
+            ]);
+        }
+
         var counter = new List<PanelRowViewModel>
         {
             CycleRow("fps:style", "Estilo", StyleLabel(style), d =>
             {
-                _tools.SetFpsStyle(Next(RtssOverlay.Styles.Where(s => s != RtssOverlay.Custom).ToList(), _tools.FpsStyle, d));
+                _tools.SetFpsStyle(Next(FpsOverlay.Styles, _tools.FpsStyle, d));
                 RebuildPopover("fps:style");
             }),
         };
-        if (RtssOverlay.Text(style).Length > 0)
+        if (style != FpsOverlay.Off)
         {
             counter.Add(CycleRow("fps:position", "Posição", PositionLabel(layout.Position), d =>
             {
-                _tools.SetLayout(_tools.Layout with { Position = Next(RtssOverlay.Positions, _tools.Layout.Position, d) });
+                _tools.SetLayout(_tools.Layout with { Position = Next(FpsOverlay.Positions, _tools.Layout.Position, d) });
                 RebuildPopover("fps:position");
             }));
             counter.Add(CycleRow("fps:size", "Tamanho", SizeLabel(layout.Size), d =>
             {
-                _tools.SetLayout(_tools.Layout with { Size = Next(RtssOverlay.Sizes, _tools.Layout.Size, d) });
+                _tools.SetLayout(_tools.Layout with { Size = Next(FpsOverlay.Sizes, _tools.Layout.Size, d) });
                 RebuildPopover("fps:size");
             }));
             counter.Add(new PanelRowViewModel
@@ -552,15 +591,13 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             });
         }
 
-        return
-        [
-            new("Contador de FPS", "Desenhado pelo RTSS sobre o jogo; \"O do RTSS\" mantém o que você já usa.", counter),
-            limit,
-            now,
-        ];
+        return new PanelSection(
+            "Contador de FPS",
+            "Medido pelo Windows, sem tocar no jogo. Em tela cheia exclusiva o contador não aparece sobre o jogo; o FPS continua aqui.",
+            counter);
     }
 
-    /// <summary>Limite de FPS pelo driver de vídeo (ADR-0018): independe do RTSS.</summary>
+    /// <summary>Limite de FPS pelo driver de vídeo (ADR-0018): independe do contador.</summary>
     private PanelSection BuildLimitSection()
     {
         var caps = _tools.LimitCapabilities;

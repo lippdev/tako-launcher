@@ -51,9 +51,10 @@ public sealed partial class UiSmokeTests
         var display = new SimulatedDisplayConfiguration();
         var audio = new SimulatedAudioEndpoints();
 
-        // Central de Controle: janelas, RTSS (não instalado), ponteiro, ControlFS e desempenho simulados; o teste nunca
-        // ativa nem fecha janelas da máquina nem esconde o ponteiro.
+        // Central de Controle: janelas, contador de FPS (sem permissão no começo), ponteiro, ControlFS e desempenho
+        // simulados; o teste nunca ativa nem fecha janelas da máquina, não pede UAC nem esconde o ponteiro.
         var windows = new SimulatedWindowSwitcher();
+        var fpsAccess = new SimulatedPerfLogAccess();
         var pointer = new SimulatedPointer();
         var steam = new SimulatedSteamClient();
         var tv = new SimulatedTvControl();
@@ -65,7 +66,8 @@ public sealed partial class UiSmokeTests
                 .AddSingleton<IDisplayControlService>(new SimulatedDisplayDesk())
                 .AddSingleton<IScreenCurtain>(new SimulatedScreenCurtain())
                 .AddSingleton<IWindowSwitcher>(windows)
-                .AddSingleton<IFpsOverlayService>(new SimulatedFpsOverlay())
+                .AddSingleton<IFpsCounter>(new SimulatedFpsCounter(available: true))
+                .AddSingleton<IPerfLogAccess>(fpsAccess)
                 .AddSingleton<IFrameRateLimiter>(new NullFrameRateLimiter())
                 .AddSingleton<IPointerService>(pointer)
                 .AddSingleton<IControlFsService>(new SimulatedControlFs())
@@ -293,6 +295,9 @@ public sealed partial class UiSmokeTests
         Assert.Equal("details:primary", Nav.GetKey(nav.Focused!));
         Assert.Equal("Jogar", ((DetailsViewModel)shell.CurrentPage).PrimaryLabel);
         Snap(window, "22-retorno-do-jogo");
+
+        // --- Contador de FPS sem RTSS (ADR-0017): só com teclado e mouse, UAC simulado, janela do overlay.
+        FpsCounterSettings(shell, window, fpsAccess);
 
         // --- Resiliência e foco (frente D)
         ResilienceAndFocus(app, services, shell, window);
@@ -776,8 +781,8 @@ public sealed partial class UiSmokeTests
     }
 
     /// <summary>
-    /// Ferramentas da Central de Controle vindas do Console Mode: janelas abertas (A alterna, X fecha), desempenho e
-    /// RTSS ausente (mostra como instalar), ponteiro e ControlFS ausente. Começa em "Controle" e termina em "ControlFS".
+    /// Ferramentas da Central de Controle vindas do Console Mode: janelas abertas (A alterna, X fecha), desempenho com
+    /// o contador de FPS desligado (opções esmaecidas), ponteiro e ControlFS ausente. Começa em "Controle" e termina em "ControlFS".
     /// </summary>
     private static void ControlCenterTools(MainWindow window, ShellViewModel shell, ControlCenterViewModel center, SimulatedWindowSwitcher windows, SimulatedPointer pointer)
     {
@@ -798,14 +803,20 @@ public sealed partial class UiSmokeTests
         Assert.Equal("qwin", Nav.GetGroup(nav.Focused!)); // o foco fica na fileira, na janela vizinha
         Pump(1.2);
 
-        // Desempenho sem RTSS: leitura do PC no cartão e, no painel, como instalar o RTSS (nada quebra).
+        // Desempenho com o contador ainda desligado: leitura do PC no cartão; no painel, as opções de FPS esmaecidas
+        // com o caminho para ligar (Configurações, teclado e mouse).
         Assert.StartsWith("CPU ", center.Cards.First(c => c.Key == "perf").Value, StringComparison.Ordinal);
         Assert.True(nav.FocusDefault("bar:perf"));
         Press(window, AppCommand.Accept);
         Assert.Equal("perf", center.Popover!.Key);
-        Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Label == "Baixar o RTSS");
-        // Limite de FPS pelo driver (ADR-0018) aparece mesmo sem RTSS; sem driver, não deixa escolher valor.
+        var counter = center.Popover.Sections.First(x => x.Title == "Contador de FPS");
+        Assert.Equal("Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.", counter.Description);
+        Assert.All(counter.Rows, r => Assert.True(r.IsDimmed));
+        // Limite de FPS pelo driver (ADR-0018) aparece com o contador desligado; sem driver, não deixa escolher valor.
         Assert.Contains(center.Popover.Sections.SelectMany(x => x.Rows), r => r.Key == "fps:limit" && r.AdjustCommand is null);
+        Assert.True(nav.FocusDefault("fps:style")); // esmaecida, mas focável para explicar
+        Press(window, AppCommand.Accept);
+        Assert.Equal("Ative o contador de FPS nas Configurações do Tako, com teclado e mouse.", shell.ToastMessage);
         Pump(0.5);
         Snap(window, "11b-painel-desempenho");
         Press(window, AppCommand.Back);

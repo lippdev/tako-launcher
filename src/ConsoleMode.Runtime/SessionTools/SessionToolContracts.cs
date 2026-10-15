@@ -21,25 +21,51 @@ public interface IWindowSwitcher
     bool RequestClose(nint handle);
 }
 
-/// <summary>
-/// Contador e limite de FPS pelo RivaTuner Statistics Server (RTSS), quando instalado. Sem RTSS, tudo devolve falso e
-/// nada muda no sistema. O limite original do usuário é guardado na primeira mudança e volta em <see cref="Restore"/>.
-/// </summary>
-public interface IFpsOverlayService
+/// <summary>Estado do contador de FPS durante a sessão.</summary>
+public enum FpsCounterStatus
 {
-    bool IsInstalled { get; }
+    /// <summary>Parado (fora de jogo ou contador desligado).</summary>
+    Idle,
 
-    /// <summary>O limite de FPS pode ser mudado (biblioteca de perfis do RTSS encontrada).</summary>
-    bool CanLimitFps { get; }
+    /// <summary>PresentMon aberto, esperando o primeiro quadro do jogo.</summary>
+    Starting,
 
-    /// <summary>Mostra (ou tira) o contador do Tako no estilo pedido; inicia o RTSS se preciso.</summary>
-    bool ApplyOverlay(string style, FpsOverlayLayout layout);
+    Running,
 
-    /// <summary>Limite global de FPS (0 = sem limite).</summary>
-    bool SetFpsLimit(int fps);
+    /// <summary>O PresentMon não veio com esta compilação do Tako (ex.: rodando pelo código-fonte).</summary>
+    Unavailable,
 
-    /// <summary>Fim da sessão: tira o contador do Tako e devolve o limite que o usuário tinha.</summary>
-    void Restore();
+    /// <summary>O Windows recusou a medição: falta a permissão (ou o login depois dela).</summary>
+    Denied,
+
+    Failed,
+}
+
+/// <summary>
+/// Contador de FPS sem injeção (ADR-0017): o PresentMon lê os eventos de apresentação do Windows (ETW) e o Tako filtra
+/// os quadros dos processos do jogo. Nada é carregado dentro do jogo. Nunca lança.
+/// </summary>
+public interface IFpsCounter
+{
+    /// <summary>O PresentMon está ao lado do Tako.exe.</summary>
+    bool IsAvailable { get; }
+
+    FpsCounterStatus Status { get; }
+
+    /// <summary>
+    /// Começa a medir. <paramref name="gameProcesses"/> é consultado a cada segundo: o jogo pode trocar de processo.
+    /// Já medindo, só troca a fonte dos processos.
+    /// </summary>
+    bool StartCapture(Func<IReadOnlyCollection<int>> gameProcesses);
+
+    /// <summary>Números de agora; nulo sem quadros recentes do jogo.</summary>
+    FrameStats? Current { get; }
+
+    /// <summary>Fecha o PresentMon e a sessão ETW do Tako. Seguro chamar parado.</summary>
+    void StopCapture();
+
+    /// <summary>Na abertura: fecha uma sessão ETW do Tako que uma execução que caiu deixou aberta.</summary>
+    void RecoverAfterCrash();
 }
 
 /// <summary>Ponteiro do mouse durante a sessão: esconder e mover com o analógico.</summary>
