@@ -10,6 +10,7 @@
         <ResourceDictionary Source="Resources/Styles.xaml" />
         <ResourceDictionary Source="Resources/Views.xaml" />
         <ResourceDictionary Source="Resources/SessionViews.xaml" />
+        <ResourceDictionary Source="Resources/ThemeViews.xaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

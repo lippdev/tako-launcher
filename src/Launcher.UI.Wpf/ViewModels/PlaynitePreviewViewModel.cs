@@ -18,8 +18,8 @@ public sealed class PlaynitePreviewViewModel : IOverlayViewModel
             Games.Add(new P10GameEntry(game.Title, game.Game.IsInstalled, game.Cover));
         }
 
-        int total = report.Loaded.Count + report.Rejected.Count;
-        Summary = $"{report.Name} {report.Version} · ThemeApiVersion {report.ThemeApiVersion} · {report.Loaded.Count} de {total} arquivos carregados pelo carregador XAML restrito";
+        string inherited = report.Inherited.Count > 0 ? $" ({report.Inherited.Count} herdados do tema padrão)" : string.Empty;
+        Summary = $"{report.Name} {report.Version} · ThemeApiVersion {report.ThemeApiVersion} · {report.Loaded.Count} de {report.Total} arquivos carregados pelo carregador XAML restrito{inherited}";
         RejectedLines = report.Rejected.Select(r => $"{r.File} — {r.Reason}").ToList();
     }
 

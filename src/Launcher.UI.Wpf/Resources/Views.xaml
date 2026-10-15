@@ -371,6 +371,19 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Temas (frente C, MVP-020): página própria em Resources/ThemeViews.xaml. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.OpenThemesCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:themes">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Gerenciar" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Temas" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Importar temas do Playnite (.pthm), prévia, diagnóstico, remover e restaurar o padrão" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <Button Style="{StaticResource SettingRow}" Command="{Binding PreviewPlayniteThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:playnite">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -379,7 +392,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Prévia de tema Playnite 10" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Renderiza o tema Fullscreen padrão do Playnite com a sua biblioteca, sem o Playnite instalado (H2)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="Renderiza o tema Playnite em uso (padrão: Fullscreen do Playnite) com a sua biblioteca, sem o Playnite instalado (H2)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>

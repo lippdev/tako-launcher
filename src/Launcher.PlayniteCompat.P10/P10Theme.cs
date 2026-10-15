@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using Launcher.Core.Themes;
 using Launcher.PlayniteCompat.P10.Markup;
 using Launcher.Themes.Xaml;
 
@@ -13,7 +14,18 @@ public sealed record P10ThemeReport(
     string? ThemeApiVersion,
     ResourceDictionary Resources,
     IReadOnlyList<string> Loaded,
-    IReadOnlyList<(string File, string Reason)> Rejected);
+    IReadOnlyList<(string File, string Reason)> Rejected,
+    ThemeManifestResult Manifest)
+{
+    /// <summary>Arquivos XAML do próprio tema que o adaptador tentou carregar.</summary>
+    public int Total => Loaded.Count + Rejected.Count;
+
+    /// <summary>Arquivos que vieram do tema base (Fullscreen padrão) porque o tema não os tem ou foram recusados.</summary>
+    public IReadOnlyList<string> Inherited { get; init; } = [];
+
+    /// <summary>XAML do tema que o Playnite também ignora (não existe no tema padrão, ex.: App.xaml de projeto Blend).</summary>
+    public IReadOnlyList<string> Ignored { get; init; } = [];
+}
 
 /// <summary>
 /// Adaptador de temas Fullscreen do Playnite 10 (H2, MVP-014/015/017/018). Amplia a política do carregador restrito
@@ -44,16 +56,30 @@ public static class P10Theme
             popupHostTemplates: ["ComboBoxEx"]);
     }
 
-    /// <summary>Carrega o tema. Deve rodar na thread de UI (STA).</summary>
-    public static P10ThemeReport Load(string themeDirectory, RestrictedXamlLoader loader)
+    /// <summary>
+    /// Carrega o tema. Deve rodar na thread de UI (STA). Com <paramref name="baseThemeDirectory"/> (o Fullscreen padrão),
+    /// segue a regra do Playnite (<c>Themes.ApplyTheme</c>): só valem os arquivos que existem no tema base, e cada um
+    /// entra na ordem base → tema. Assim temas parciais herdam o que não alteram (MVP-017), e um arquivo recusado do
+    /// tema cai para a versão do tema base.
+    /// </summary>
+    public static P10ThemeReport Load(string themeDirectory, RestrictedXamlLoader loader, string? baseThemeDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(loader);
         string root = Path.GetFullPath(themeDirectory);
-        var manifest = ReadManifest(Path.Combine(root, "theme.yaml"));
+        string? baseRoot = baseThemeDirectory is null ? null : Path.GetFullPath(baseThemeDirectory);
+        if (baseRoot is not null && (string.Equals(baseRoot.TrimEnd(Path.DirectorySeparatorChar), root.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) || !Directory.Exists(baseRoot)))
+        {
+            baseRoot = null;
+        }
+
+        var manifest = ThemeManifest.Read(root);
         var resources = new ResourceDictionary();
         resources.MergedDictionaries.Add(CompatibilityResources());
         var loaded = new List<string>();
         var rejected = new List<(string, string)>();
+        var inherited = new List<string>();
+        var files = ThemeFiles(baseRoot ?? root);
+        List<string> ignored = baseRoot is null ? [] : ThemeFiles(root).Except(files, StringComparer.OrdinalIgnoreCase).ToList();
 
         // Como no Playnite, cada arquivo enxerga os recursos dos anteriores (StaticResource entre arquivos).
         // O dicionário em composição fica visível no app só durante a carga.
@@ -61,26 +87,29 @@ public static class P10Theme
         appResources?.MergedDictionaries.Add(resources);
         try
         {
-            foreach (string folder in Folders)
+            foreach (string relative in files)
             {
-                string directory = Path.Combine(root, folder);
-                if (!Directory.Exists(directory))
+                bool baseLoaded = baseRoot is not null && TryLoad(loader, baseRoot, relative, resources, out _);
+                if (!File.Exists(Path.Combine(root, relative)))
                 {
+                    if (baseLoaded)
+                    {
+                        inherited.Add(relative);
+                    }
+
                     continue;
                 }
 
-                foreach (string file in Directory.EnumerateFiles(directory, "*.xaml").Order(StringComparer.OrdinalIgnoreCase).OrderBy(Priority))
+                if (TryLoad(loader, root, relative, resources, out string? reason))
                 {
-                    string relative = Path.GetRelativePath(root, file).Replace('\\', '/');
-                    try
+                    loaded.Add(relative);
+                }
+                else
+                {
+                    rejected.Add((relative, reason!));
+                    if (baseLoaded)
                     {
-                        resources.MergedDictionaries.Add(loader.LoadResourceDictionary(root, relative));
-                        loaded.Add(relative);
-                    }
-                    catch (ThemeXamlRejectedException ex)
-                    {
-                        string reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : ex.InnerException?.Message ?? ex.Message;
-                        rejected.Add((relative, reason));
+                        inherited.Add(relative);
                     }
                 }
             }
@@ -91,12 +120,51 @@ public static class P10Theme
         }
 
         return new P10ThemeReport(
-            manifest.GetValueOrDefault("Name") ?? Path.GetFileName(root),
-            manifest.GetValueOrDefault("Version"),
-            manifest.GetValueOrDefault("ThemeApiVersion"),
+            manifest.Manifest.Name ?? Path.GetFileName(root),
+            manifest.Manifest.Version,
+            manifest.Manifest.ThemeApiVersionText,
             resources,
             loaded,
-            rejected);
+            rejected,
+            manifest)
+        {
+            Inherited = inherited,
+            Ignored = ignored,
+        };
+    }
+
+    /// <summary>XAML das pastas do tema, na ordem de composição do Playnite.</summary>
+    private static List<string> ThemeFiles(string root)
+    {
+        var files = new List<string>();
+        foreach (string folder in Folders)
+        {
+            string directory = Path.Combine(root, folder);
+            if (Directory.Exists(directory))
+            {
+                files.AddRange(Directory.EnumerateFiles(directory, "*.xaml")
+                    .Order(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(Priority)
+                    .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')));
+            }
+        }
+
+        return files;
+    }
+
+    private static bool TryLoad(RestrictedXamlLoader loader, string root, string relative, ResourceDictionary target, out string? reason)
+    {
+        try
+        {
+            target.MergedDictionaries.Add(loader.LoadResourceDictionary(root, relative));
+            reason = null;
+            return true;
+        }
+        catch (ThemeXamlRejectedException ex)
+        {
+            reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : ex.InnerException?.Message ?? ex.Message;
+            return false;
+        }
     }
 
     /// <summary>Constants.xaml antes de Media.xaml (Media usa recursos de Constants).</summary>
@@ -115,26 +183,5 @@ public static class P10Theme
         resources["FontTitilliumWeb"] = new FontFamily("Segoe UI");
         resources["FontIcoFont"] = new FontFamily("Segoe MDL2 Assets");
         return resources;
-    }
-
-    /// <summary>theme.yaml do Playnite é "Chave: valor" em linhas; não precisa de parser YAML completo.</summary>
-    private static Dictionary<string, string> ReadManifest(string path)
-    {
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(path))
-        {
-            return values;
-        }
-
-        foreach (string line in File.ReadLines(path))
-        {
-            int colon = line.IndexOf(':', StringComparison.Ordinal);
-            if (colon > 0 && !line.TrimStart().StartsWith('#'))
-            {
-                values[line[..colon].Trim().TrimStart('﻿')] = line[(colon + 1)..].Trim();
-            }
-        }
-
-        return values;
     }
 }
