@@ -88,4 +88,8 @@ Cada item do PRD (ex.: `MVP-005`) vira uma issue com o ID no título. Labels: `e
 
 ## 10. Licença
 
-O repositório é MIT, mas o PRD §4.2 prevê reuso do Console Mode (**AGPL-3.0-only**). **Não copie código do Console Mode** até a revisão de licença ([`LEGAL-001`](docs/legal/LEGAL-001.md)) ser concluída.
+O Tako é **AGPL-3.0-only** ([`LICENSE`](LICENSE)), a mesma licença do Console Mode ([ADR-0014](docs/adr/0014-licenca-agpl.md), [`LEGAL-001`](docs/legal/LEGAL-001.md)). Ao contribuir, você licencia sua contribuição nos mesmos termos.
+
+- **Código do Console Mode** pode ser reaproveitado. Mantenha um comentário no topo do arquivo com a origem (`// Adaptado de lippdev/consolemode: src/ConsoleMode/...`).
+- **Código de terceiros** só entra com licença compatível com a AGPL-3.0 (MIT, BSD, Apache-2.0, OFL para fontes). Registre a origem e a licença num `NOTICE.md` ao lado.
+- **Temas e extensões** de terceiros carregados em tempo de execução não fazem parte do Tako e mantêm a própria licença.
