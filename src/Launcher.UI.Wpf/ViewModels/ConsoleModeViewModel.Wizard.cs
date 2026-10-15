@@ -211,6 +211,12 @@ public sealed class TvSetupWizard(ConsoleModeViewModel page, ShellViewModel shel
                 _shell.RequestFocus(null);
             }
         }
+        catch (Exception ex) when (ex is ConsoleMode.Runtime.RuntimeEnvironmentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // Nunca em silêncio: o passo diz o que houve e oferece tentar de novo ou pular.
+            ShowTest($"Não foi possível testar a tela ({ex.Message})");
+            _shell.RequestFocus(null);
+        }
         finally
         {
             _busy = false;

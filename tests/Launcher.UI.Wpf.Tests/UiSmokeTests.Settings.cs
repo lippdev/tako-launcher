@@ -118,9 +118,15 @@ public sealed partial class UiSmokeTests
         Assert.True(shell.Settings.GameScreenEnabled);
         Assert.Equal("SIM\\TV", shell.Settings.GameScreenId);
         Snap(window, "cfg86-assistente-imagem");
+        string before = Nav.GetKey(nav.Focused!) ?? "-";
         Press(window, AppCommand.Accept); // Testar agora
-        Until(() => shell.TopOverlay is ScreenConfirmViewModel || wizard.Title != "Vamos testar a imagem");
-        Assert.True(shell.TopOverlay is ScreenConfirmViewModel, $"Sem a pergunta na tela de jogo: {wizard.Title} · {wizard.Text}");
+        for (double waited = 0; waited < 20 && shell.TopOverlay is not ScreenConfirmViewModel && wizard.Title == "Vamos testar a imagem"; waited += 0.1)
+        {
+            Pump(0.1);
+        }
+
+        Assert.True(shell.TopOverlay is ScreenConfirmViewModel,
+            $"Sem a pergunta na tela de jogo: foco antes={before} topo={shell.TopOverlay?.GetType().Name} ativa={shell.GameScreen.IsActive} {wizard.StepText} · {wizard.Title} · {wizard.Text}");
         Snap(window, "cfg87-assistente-confirmar");
         Press(window, AppCommand.Accept); // Sim, manter
         Until(() => wizard.StepText == "Passo 3 de 5");
