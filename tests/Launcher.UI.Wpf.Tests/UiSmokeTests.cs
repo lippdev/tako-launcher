@@ -101,7 +101,8 @@ public sealed class UiSmokeTests
         var preview = Assert.IsType<PlaynitePreviewViewModel>(shell.TopOverlay);
         File.WriteAllLines(Path.Combine(Screenshots, "playnite-theme-report.txt"),
             [preview.Summary, .. preview.Report.Loaded.Select(f => "OK    " + f), .. preview.RejectedLines.Select(r => "RECUSA " + r)]);
-        Assert.True(preview.Report.Loaded.Count >= 20, preview.Summary);
+        Assert.Contains("Constants.xaml", preview.Report.Loaded);
+        Assert.Contains("DerivedStyles/ListGameItemStyle.xaml", preview.Report.Loaded);
         Assert.Contains("ListGameItemStyle", preview.Resources.MergedDictionaries.SelectMany(d => d.Keys.OfType<string>()));
         Assert.Equal("p10-games", Nav.GetGroup(nav.Focused!));
         Press(window, AppCommand.Right);

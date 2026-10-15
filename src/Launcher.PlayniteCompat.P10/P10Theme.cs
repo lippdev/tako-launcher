@@ -32,7 +32,12 @@ public static class P10Theme
     {
         ArgumentNullException.ThrowIfNull(basePolicy);
         return basePolicy.Extend(
-            presentationTypes: ["ButtonEx", "ItemsControlEx", "ListBoxEx", "ScrollViewerEx", "FadeImage", "GameListItem"],
+            presentationTypes:
+            [
+                "ButtonEx", "ItemsControlEx", "ListBoxEx", "ScrollViewerEx", "FadeImage", "GameListItem", "CheckBoxEx", "SliderEx",
+                "ToggleButtonEx", "FilterDbItemtSelection", "FilterEnumListSelection", "FilterStringListSelection", "FilterPresetSelector",
+                "Filters", "FiltersAdditional", "GameDetails", "GameStatus",
+            ],
             presentationExtensions: ["ThemeFile", "Settings"],
             remappedNamespaces: [(PlayniteMarkupNamespace, AdapterMarkupNamespace, ["ThemeFile", "ThemeFileExtension"])]);
     }
@@ -48,28 +53,40 @@ public static class P10Theme
         var loaded = new List<string>();
         var rejected = new List<(string, string)>();
 
-        foreach (string folder in Folders)
+        // Como no Playnite, cada arquivo enxerga os recursos dos anteriores (StaticResource entre arquivos).
+        // O dicionário em composição fica visível no app só durante a carga.
+        var appResources = Application.Current?.Resources;
+        appResources?.MergedDictionaries.Add(resources);
+        try
         {
-            string directory = Path.Combine(root, folder);
-            if (!Directory.Exists(directory))
-            {
-                continue;
-            }
 
-            foreach (string file in Directory.EnumerateFiles(directory, "*.xaml").Order(StringComparer.OrdinalIgnoreCase).OrderBy(Priority))
+            foreach (string folder in Folders)
             {
-                string relative = Path.GetRelativePath(root, file).Replace('\\', '/');
-                try
+                string directory = Path.Combine(root, folder);
+                if (!Directory.Exists(directory))
                 {
-                    resources.MergedDictionaries.Add(loader.LoadResourceDictionary(root, relative));
-                    loaded.Add(relative);
+                    continue;
                 }
-                catch (ThemeXamlRejectedException ex)
+
+                foreach (string file in Directory.EnumerateFiles(directory, "*.xaml").Order(StringComparer.OrdinalIgnoreCase).OrderBy(Priority))
                 {
-                    string reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : ex.InnerException?.Message ?? ex.Message;
-                    rejected.Add((relative, reason));
+                    string relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+                    try
+                    {
+                        resources.MergedDictionaries.Add(loader.LoadResourceDictionary(root, relative));
+                        loaded.Add(relative);
+                    }
+                    catch (ThemeXamlRejectedException ex)
+                    {
+                        string reason = ex.Violations.Count > 0 ? ex.Violations[0].ToString() : ex.InnerException?.Message ?? ex.Message;
+                        rejected.Add((relative, reason));
+                    }
                 }
             }
+        }
+        finally
+        {
+            appResources?.MergedDictionaries.Remove(resources);
         }
 
         return new P10ThemeReport(
