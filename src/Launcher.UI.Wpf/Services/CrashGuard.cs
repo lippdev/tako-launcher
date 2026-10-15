@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Markup;
 using System.Windows.Threading;
 using Launcher.Core.Resilience;
 using Launcher.UI.Wpf.ViewModels;
@@ -27,6 +28,9 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
     /// <summary>O que foi feito com o último erro (diagnóstico do teste de fumaça).</summary>
     internal string LastOutcome { get; private set; } = "nenhum";
 
+    /// <summary>Erros tratados com a tela de recuperação nesta sessão.</summary>
+    internal int Recoveries { get; private set; }
+
     /// <summary>
     /// Instala o tratador. Chamar depois de criar a janela: ele roda depois do tratador da janela (erros de tema), que
     /// tem prioridade.
@@ -41,14 +45,15 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        if (e.Handled)
+        // Erro de XAML de tema é da janela (fecha a prévia e mostra a recuperação do tema). Não dá para confiar em
+        // e.Handled: outro assinante do dispatcher pode marcá-lo sem mostrar nada ao usuário.
+        if (e.Exception is XamlParseException)
         {
-            LastOutcome = "já tratado";
-            return; // tratado antes (ex.: erro de tema → tela de recuperação do tema)
+            LastOutcome = "tema";
+            return;
         }
 
-        e.Handled = true;
-        LogUnhandled(logger, e.Exception);
+        e.Handled = true; // o registro no log de diagnóstico é feito pela janela (MVP-033)
         if (IsFatal)
         {
             return;
@@ -59,6 +64,7 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
             try
             {
                 _shell.ShowErrorRecovery(e.Exception);
+                Recoveries++;
                 LastOutcome = $"recuperação ({_shell.Overlays.Count} sobreposições)";
                 return;
             }
@@ -91,9 +97,6 @@ public sealed partial class CrashGuard(ILogger<CrashGuard> logger)
 
         Application.Current?.Shutdown(1);
     }
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "Exceção não tratada na UI")]
-    private static partial void LogUnhandled(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A tela de recuperação falhou")]
     private static partial void LogRecoveryFailed(ILogger logger, Exception exception);
