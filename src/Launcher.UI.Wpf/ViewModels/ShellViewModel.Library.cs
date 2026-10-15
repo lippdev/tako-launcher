@@ -129,6 +129,7 @@ public sealed partial class ShellViewModel
         if (game.Store == GameStore.Manual)
         {
             actions.Add(new OverlayAction("Corrigir correspondência", ActionStyle.Primary, new RelayCommand(() => { Close(); _ = FixMatchAsync(item); }), IsDefault: true));
+            actions.Add(new OverlayAction("Editar", ActionStyle.Secondary, new RelayCommand(() => { Close(); EditGame(item); })));
             actions.Add(new OverlayAction("Trocar capa", ActionStyle.Secondary, new RelayCommand(() => { Close(); ChangeCover(item); })));
         }
 
@@ -195,6 +196,31 @@ public sealed partial class ShellViewModel
         {
             Navigate(new DetailsViewModel(this, ItemFor(updated)), replace: true);
         }
+    }
+
+    /// <summary>Editar jogo adicionado (MVP-024): nome, argumentos, pasta de trabalho e como reconhecer o fim do jogo.</summary>
+    public void EditGame(GameItemViewModel item)
+    {
+        if (Library.FindManual(item.Id) is not { } record)
+        {
+            return;
+        }
+
+        EditGameViewModel? editor = null;
+        editor = new EditGameViewModel(
+            record,
+            saved =>
+            {
+                CloseOverlay(editor!);
+                Library.UpdateManual(saved);
+                Toast($"{saved.Title} atualizado");
+                if (Library.Find(saved.Id) is { } updated && CurrentPage is DetailsViewModel)
+                {
+                    Navigate(new DetailsViewModel(this, ItemFor(updated)), replace: true);
+                }
+            },
+            () => CloseOverlay(editor!));
+        PushOverlay(editor);
     }
 
     private void ConfirmRemove(GameItemViewModel item)
