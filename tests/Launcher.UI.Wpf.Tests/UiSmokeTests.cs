@@ -134,6 +134,9 @@ public sealed partial class UiSmokeTests
         // --- Busca, filtros e ordenação da biblioteca (frente E: UX-001/002/004).
         LibrarySearchAndFilters(shell, window);
 
+        // --- Coleções, menu rápido e configurações por jogo (UX-003/005/007).
+        CollectionsAndGameSettings(shell, window);
+
         // Configurações e recuperação de tema inválido (MVP-016/021).
         shell.OpenSettings();
         Pump(0.8);

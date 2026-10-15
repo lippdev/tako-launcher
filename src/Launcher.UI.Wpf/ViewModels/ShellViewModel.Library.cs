@@ -45,6 +45,8 @@ public sealed partial class ShellViewModel
         {
             _items.Remove(stale);
         }
+
+        Collections.ApplyTo(Library.Games); // jogos recriados pela varredura voltam com as coleções (UX-003)
     }
 
     private void OnMetadataUpdated(string id)

@@ -114,6 +114,30 @@
             </Canvas>
           </StackPanel>
 
+          <!-- Coleções do usuário (UX-003): uma fileira por coleção com jogos; "Ver todos" abre a biblioteca filtrada. -->
+          <ItemsControl ItemsSource="{Binding Collections}" Focusable="False">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type vm:CollectionRowViewModel}">
+                <StackPanel Margin="0,0,0,40">
+                  <StackPanel Orientation="Horizontal" Margin="64,0,0,20">
+                    <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Text="{Binding CountText}" Margin="18,0,0,4" VerticalAlignment="Bottom" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+                  </StackPanel>
+                  <Canvas Height="456" ClipToBounds="True" Margin="0,-36,0,0">
+                    <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="36" nav:Nav.ScrollHost="Horizontal">
+                      <StackPanel.RenderTransform>
+                        <TranslateTransform />
+                      </StackPanel.RenderTransform>
+                      <ItemsControl ItemsSource="{Binding Games}" Tag="{Binding NavGroup}" ItemsPanel="{StaticResource GameRowPanel}" ItemTemplate="{StaticResource GameCardTemplate}" Focusable="False"
+                                    VirtualizingPanel.VirtualizationMode="Recycling" />
+                      <Button Style="{StaticResource MoreTile}" Command="{Binding SeeAllCommand}" nav:Nav.Group="{Binding NavGroup}" nav:Nav.Key="{Binding SeeAllKey}" />
+                    </StackPanel>
+                  </Canvas>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
           <!-- Adicionados recentemente -->
           <StackPanel Margin="0,0,0,160">
             <TextBlock Text="Adicionados recentemente" Margin="64,0,0,20" Style="{StaticResource SectionTitle}" />
@@ -262,6 +286,19 @@
             <TextBlock Text="Opções" />
           </StackPanel>
         </Button>
+        <!-- Coleções e configurações deste jogo (UX-003/007). -->
+        <Button Style="{StaticResource PillButton}" Margin="18,0,0,0" Command="{Binding ChooseCollectionsCommand}" nav:Nav.Group="details" nav:Nav.Key="details:collections">
+          <StackPanel Orientation="Horizontal">
+            <c:Icon Key="Icon.Grid" Width="26" Height="26" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,14,0" />
+            <TextBlock Text="{Binding CollectionsLabel}" />
+          </StackPanel>
+        </Button>
+        <Button Style="{StaticResource PillButton}" Margin="18,0,0,0" Command="{Binding GameSettingsCommand}" nav:Nav.Group="details" nav:Nav.Key="details:settings">
+          <StackPanel Orientation="Horizontal">
+            <c:Icon Key="Icon.Gear" Width="26" Height="26" Foreground="{DynamicResource OnAccentBrush}" Margin="0,0,14,0" />
+            <TextBlock Text="Configurações deste jogo" />
+          </StackPanel>
+        </Button>
       </StackPanel>
     </StackPanel>
   </DataTemplate>
@@ -357,6 +394,19 @@
           <StackPanel>
             <TextBlock Text="Atualizar dados dos jogos" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
             <TextBlock Text="Descrição, gêneros, lançamento, desenvolvedora, nota do Metacritic e artes (fonte: Steam Store)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <!-- Coleções (UX-003): criar, renomear e excluir. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ManageCollectionsCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:collections">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CollectionsSummary}" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Coleções" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Junte jogos do seu jeito; aparecem na Início e nos filtros da biblioteca" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
