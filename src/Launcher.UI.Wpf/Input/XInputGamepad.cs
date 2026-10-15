@@ -6,7 +6,7 @@ namespace Launcher.UI.Wpf.Input;
 /// <summary>
 /// Leitura de controles XInput (Xbox e compatíveis). O botão Guia só aparece em <c>XInputGetStateEx</c>
 /// (ordinal 100, não documentado); sem ele, usamos <c>XInputGetState</c> e o botão View faz o papel do Guia.
-/// Controles PlayStation precisam de Steam Input/DS4Windows até a camada GameInput (MVP-031).
+/// Controles PlayStation são lidos por HID em <see cref="SonyHidGamepad"/>.
 /// </summary>
 internal static partial class XInputGamepad
 {

@@ -11,9 +11,13 @@
     <Duration x:Key="PageDuration">0:0:0.28</Duration>
   </Window.Resources>
 
-  <!-- Canvas de referência 1920x1080, escalado uniformemente para qualquer resolução (DESIGN.md › Layout). -->
+  <!--
+    Palco de 1080 unidades de altura escalado para a tela (DESIGN.md › Layout). A largura acompanha a proporção da janela
+    (16:9 = 1920, 21:9 ≈ 2520, 16:10 = 1728), então o layout ocupa a tela toda em qualquer formato. O WPF desenha texto e
+    vetores na resolução física; as imagens são decodificadas na mesma densidade (ArtService.RenderScale).
+  -->
   <Viewbox Stretch="Uniform">
-    <Grid x:Name="Stage" Width="1920" Height="1080" ClipToBounds="True">
+    <Grid x:Name="Stage" Width="1920" Height="1080" ClipToBounds="True" RenderOptions.BitmapScalingMode="HighQuality">
       <Grid.Background>
         <SolidColorBrush Color="{DynamicResource CanvasColor}" />
       </Grid.Background>
@@ -27,16 +31,17 @@
 
       <!-- Barra lateral: recolhida (ícones) e expandida quando recebe o foco. -->
       <Border x:Name="Sidebar" Width="120" HorizontalAlignment="Left" Background="{DynamicResource SurfaceSidebarBrush}" Panel.ZIndex="5" ClipToBounds="True">
-        <DockPanel Margin="20,48,20,96" LastChildFill="False">
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Height="64" Margin="20,0,0,24">
-            <Image Source="pack://application:,,,/Tako;component/Assets/Brand/tako-mark.png" Width="40" Height="40" RenderOptions.BitmapScalingMode="HighQuality" />
-            <TextBlock x:Name="BrandName" Text="Tako" Margin="16,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FsTitle}" FontWeight="ExtraBold" Opacity="0" />
-          </StackPanel>
+        <DockPanel Margin="20,36,20,96" LastChildFill="False">
+          <!-- Marca: polvo com a barra recolhida; logo horizontal (polvo + TAKO) com a barra aberta. -->
+          <Grid DockPanel.Dock="Top" Height="80" Margin="0,0,0,8">
+            <Image x:Name="BrandMark" Source="pack://application:,,,/Tako;component/Assets/Brand/tako-mark.png" Width="52" Height="52" HorizontalAlignment="Left" Margin="14,0,0,0" />
+            <Image x:Name="BrandLogo" Source="pack://application:,,,/Tako;component/Assets/Brand/tako-logo.png" Height="80" HorizontalAlignment="Left" Margin="6,0,0,0" Opacity="0" />
+          </Grid>
           <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding SidebarMain}" Focusable="False">
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="{x:Type vm:SidebarItemViewModel}">
                 <StackPanel>
-                  <TextBlock x:Name="Section" Text="{Binding SectionTitle, Converter={StaticResource Upper}}" Margin="20,22,0,8" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold"
+                  <TextBlock x:Name="Section" Text="{Binding SectionTitle, Converter={StaticResource Upper}}" Margin="20,16,0,6" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold"
                              Foreground="{DynamicResource OnAccentSubtleBrush}" Visibility="{Binding SectionTitle, Converter={StaticResource NotNullToVisibility}}" />
                   <Button Style="{StaticResource SidebarItem}" Command="{Binding Command}" nav:Nav.Group="sidebar" nav:Nav.Key="{Binding Key}" nav:Nav.IsGroupEntry="{Binding IsSelected}" />
                 </StackPanel>

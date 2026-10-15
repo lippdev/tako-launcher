@@ -34,7 +34,7 @@
   <!-- ===================================================================== Início -->
   <DataTemplate DataType="{x:Type vm:HomeViewModel}">
     <Grid>
-      <TextBlock Text="{Binding Title}" Margin="64,64,0,0" FontSize="{DynamicResource FsTitle}" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top" />
+      <TextBlock Text="{Binding Title}" Margin="64,60,0,0" Style="{StaticResource SectionTitle}" FontSize="{DynamicResource FsTitle}" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Top" />
       <Button Style="{StaticResource ChipButton}" Width="420" Height="60" Margin="0,56,72,0" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="2"
               Command="{Binding SearchCommand}" nav:Nav.Group="header" nav:Nav.Key="home:search">
         <StackPanel Orientation="Horizontal">
@@ -51,7 +51,7 @@
 
           <!-- Destaque: ancorado embaixo; o título cresce para cima e os botões não se movem. -->
           <Grid Height="500">
-            <StackPanel Margin="64,0,0,40" VerticalAlignment="Bottom">
+            <StackPanel Margin="64,0,72,40" VerticalAlignment="Bottom">
               <TextBlock Style="{StaticResource Overline}" Text="{Binding HeroOverline, Converter={StaticResource Upper}}" />
               <TextBlock Style="{StaticResource GameTitle}" Text="{Binding Hero.Title}" />
               <TextBlock Text="{Binding Hero.Meta}" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentMutedBrush}" />
@@ -73,11 +73,11 @@
           <!-- Jogados recentemente -->
           <StackPanel Margin="0,0,0,40">
             <StackPanel Orientation="Horizontal" Margin="64,0,0,20">
-              <TextBlock Text="Jogados recentemente" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="Bold" />
+              <TextBlock Text="Jogados recentemente" Style="{StaticResource SectionTitle}" />
               <TextBlock Text="{Binding RecentCountText}" Margin="18,0,0,4" VerticalAlignment="Bottom" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Foreground="{DynamicResource OnAccentSubtleBrush}" />
             </StackPanel>
-            <Canvas Height="400" ClipToBounds="True" Margin="0,-20,0,0">
-              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="20" nav:Nav.ScrollHost="Horizontal">
+            <Canvas Height="456" ClipToBounds="True" Margin="0,-36,0,0">
+              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="36" nav:Nav.ScrollHost="Horizontal">
                 <StackPanel.RenderTransform>
                   <TranslateTransform />
                 </StackPanel.RenderTransform>
@@ -89,9 +89,9 @@
 
           <!-- Adicionados recentemente -->
           <StackPanel Margin="0,0,0,160">
-            <TextBlock Text="Adicionados recentemente" Margin="64,0,0,20" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="Bold" />
-            <Canvas Height="400" ClipToBounds="True" Margin="0,-20,0,0">
-              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="20" nav:Nav.ScrollHost="Horizontal">
+            <TextBlock Text="Adicionados recentemente" Margin="64,0,0,20" Style="{StaticResource SectionTitle}" />
+            <Canvas Height="456" ClipToBounds="True" Margin="0,-36,0,0">
+              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="36" nav:Nav.ScrollHost="Horizontal">
                 <StackPanel.RenderTransform>
                   <TranslateTransform />
                 </StackPanel.RenderTransform>
@@ -118,14 +118,15 @@
             </TextBlock>
           </Button>
           <StackPanel>
-            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" />
+            <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitle}" />
             <TextBlock Text="{Binding CountText}" Margin="0,12,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentMutedBrush}" />
           </StackPanel>
         </DockPanel>
-        <ItemsControl ItemsSource="{Binding Games}" Tag="grid" Margin="64,48,0,200" Focusable="False">
+        <ItemsControl ItemsSource="{Binding Games}" Tag="grid" Margin="64,48,72,200" Focusable="False">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <WrapPanel ItemWidth="240" ItemHeight="420" Width="1680" HorizontalAlignment="Left" />
+              <!-- Quebra pela largura disponível: mais colunas em telas mais largas. -->
+              <WrapPanel ItemWidth="240" ItemHeight="440" HorizontalAlignment="Left" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
@@ -142,7 +143,7 @@
 
   <!-- ===================================================================== Detalhes -->
   <DataTemplate DataType="{x:Type vm:DetailsViewModel}">
-    <StackPanel Margin="64,0,0,150" VerticalAlignment="Bottom" HorizontalAlignment="Left" MaxWidth="1100">
+    <StackPanel Margin="64,0,72,150" VerticalAlignment="Bottom" HorizontalAlignment="Left">
       <TextBlock Style="{StaticResource Overline}" Text="{Binding Game.Overline, Converter={StaticResource Upper}}" />
       <TextBlock Style="{StaticResource GameTitle}" Text="{Binding Game.Title}" />
       <ItemsControl ItemsSource="{Binding Stats}" Margin="0,26,0,30" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}">
@@ -192,13 +193,13 @@
   <DataTemplate x:Key="SettingText">
     <StackPanel>
       <TextBlock Text="{Binding [0]}" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding [1]}" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+      <TextBlock Text="{Binding [1]}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
     </StackPanel>
   </DataTemplate>
 
   <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
     <StackPanel Margin="64,140,0,0" Width="1180" HorizontalAlignment="Left">
-      <TextBlock Text="Configurações" Margin="0,0,0,40" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" />
+      <TextBlock Text="Configurações" Margin="0,0,0,40" Style="{StaticResource PageTitle}" />
       <Button Style="{StaticResource SettingRow}" Command="{Binding ReapplyThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:theme" nav:Nav.IsDefault="True">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -207,7 +208,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Tema" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Recarrega o tema padrão pelo carregador XAML restrito. Temas do Playnite 10 chegam no Marco 1." Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Recarrega o tema padrão pelo carregador XAML restrito. Temas do Playnite 10 chegam no Marco 1." Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -216,7 +217,7 @@
           <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.DynamicColor}" />
           <StackPanel>
             <TextBlock Text="Cor dinâmica" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="A interface assume a cor da arte do jogo em foco" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="A interface assume a cor da arte do jogo em foco" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -225,7 +226,7 @@
           <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.ReducedMotion}" />
           <StackPanel>
             <TextBlock Text="Reduzir animações" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Remove transições de cor e de rolagem" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Remove transições de cor e de rolagem" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -234,7 +235,7 @@
           <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.StartFullscreenOnLogin}" />
           <StackPanel>
             <TextBlock Text="Abrir em tela cheia ao iniciar o Windows" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Fullscreen convencional; integração com o Xbox mode depende da Microsoft (MVP-007)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Fullscreen convencional; integração com o Xbox mode depende da Microsoft (MVP-007)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -246,7 +247,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Prévia de tema Playnite 10" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Renderiza o tema Fullscreen padrão do Playnite com a sua biblioteca, sem o Playnite instalado (H2)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Renderiza o tema Fullscreen padrão do Playnite com a sua biblioteca, sem o Playnite instalado (H2)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -258,7 +259,7 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Carregar tema inválido" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Aplica Themes/Exemplo-Invalido e mostra a tela de recuperação (MVP-021)" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" />
+            <TextBlock Text="Aplica Themes/Exemplo-Invalido e mostra a tela de recuperação (MVP-021)" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
@@ -286,7 +287,7 @@
   <!-- Iniciando -->
   <DataTemplate DataType="{x:Type vm:LaunchOverlayViewModel}">
     <Grid Background="{Binding Game.FallbackBrush}">
-      <StackPanel Margin="160,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="1100">
+      <StackPanel Margin="160,0,160,0" VerticalAlignment="Center" HorizontalAlignment="Left">
         <Border Width="190" Height="285" CornerRadius="14" HorizontalAlignment="Left" Margin="0,0,0,40" Background="{Binding Game.FallbackBrush}" Effect="{StaticResource FocusShadow}">
           <Border.Clip>
             <RectangleGeometry Rect="0,0,190,285" RadiusX="14" RadiusY="14" />
@@ -418,8 +419,13 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <ItemsControl ItemsSource="{Binding Cards}" Margin="72,180,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Focusable="False" nav:Nav.LockHorizontal="True"
-                    Visibility="{Binding IsPopoverOpen, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+      <!-- Trilho de cartões: rola com o foco (mais cartões que a largura da tela) sem recortar o anel de foco. -->
+      <Canvas Margin="0,160,0,0" Height="340" VerticalAlignment="Top" ClipToBounds="True"
+              Visibility="{Binding IsPopoverOpen, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}">
+      <ItemsControl ItemsSource="{Binding Cards}" Canvas.Left="72" Canvas.Top="20" Focusable="False" nav:Nav.LockHorizontal="True" nav:Nav.ScrollHost="Horizontal">
+        <ItemsControl.RenderTransform>
+          <TranslateTransform />
+        </ItemsControl.RenderTransform>
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
             <StackPanel Orientation="Horizontal" />
@@ -433,6 +439,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </Canvas>
 
       <!-- Painel do ícone: um por vez; os cartões saem de cena enquanto ele está aberto. -->
       <Border x:Name="Popover" Width="600" Margin="0,160,0,0" Padding="26,26,26,16" CornerRadius="26" Background="{DynamicResource PanelStrongBrush}"
@@ -566,7 +573,7 @@
       </Button>
       <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center">
         <StackPanel>
-          <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="ExtraBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Text}" Margin="0,16,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
           <ItemsControl ItemsSource="{Binding Actions}" Margin="0,40,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
         </StackPanel>
@@ -581,7 +588,7 @@
         <Border Width="88" Height="88" CornerRadius="26" Background="#29FF5A5F" HorizontalAlignment="Left" Margin="0,0,0,36">
           <c:Icon Key="Icon.Alert" Width="48" Height="48" Foreground="{DynamicResource ErrorBrush}" />
         </Border>
-        <TextBlock Text="O tema não pôde ser carregado" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" />
+        <TextBlock Text="O tema não pôde ser carregado" Style="{StaticResource PageTitle}" FontWeight="Normal" />
         <TextBlock Text="O Tako voltou para o tema padrão. Seus jogos e configurações não foram alterados." Margin="0,18,0,0"
                    FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
         <ItemsControl ItemsSource="{Binding Actions}" Margin="0,44,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />

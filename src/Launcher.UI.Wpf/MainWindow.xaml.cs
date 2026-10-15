@@ -13,6 +13,7 @@ using Launcher.Core.Navigation;
 using Launcher.UI.Wpf.Controls;
 using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Navigation;
+using Launcher.UI.Wpf.Services;
 using Launcher.UI.Wpf.ViewModels;
 
 namespace Launcher.UI.Wpf;
@@ -39,13 +40,18 @@ public partial class MainWindow : Window
         [Key.Q] = AppCommand.PreviousSection,
         [Key.E] = AppCommand.NextSection,
         [Key.M] = AppCommand.Menu,
-        [Key.G] = AppCommand.Guide,
-        [Key.Home] = AppCommand.Guide,
     };
 
+    /// <summary>Altura do palco em unidades de layout; a largura varia com a proporção da tela.</summary>
+    private const double StageHeight = 1080;
+    private const double MinStageWidth = 1440; // 4:3
+    private const double MaxStageWidth = 3840; // 32:9
+
     private readonly ShellViewModel _shell;
+    private readonly ArtService _art;
     private readonly FocusNavigator _navigator;
     private readonly GamepadInterpreter _gamepad = new();
+    private readonly SonyHidGamepad _sony;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly DispatcherTimer _gamepadTimer = new(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly Stack<FrameworkElement?> _focusBeforeOverlay = new();
@@ -53,10 +59,14 @@ public partial class MainWindow : Window
     private FrameworkElement? _draggingSlider;
     private Point? _lastMouse;
 
-    public MainWindow(ShellViewModel shell)
+    public MainWindow(ShellViewModel shell, ArtService art, SonyHidGamepad sony)
     {
         InitializeComponent();
         _shell = shell;
+        _art = art;
+        _sony = sony;
+        SizeChanged += (_, _) => FitStage();
+        DpiChanged += (_, _) => FitStage();
         DataContext = shell;
         _navigator = new FocusNavigator(Stage, Scopes, () => shell.Settings.PageDuration);
         _navigator.FocusChanged += OnNavigatorFocusChanged;
@@ -79,6 +89,7 @@ public partial class MainWindow : Window
             }
         };
         _gamepadTimer.Tick += (_, _) => PollGamepad();
+        Closed += (_, _) => _gamepadTimer.Stop();
         Dispatcher.UnhandledException += OnDispatcherUnhandledException;
         Loaded += (_, _) =>
         {
@@ -89,6 +100,19 @@ public partial class MainWindow : Window
     }
 
     private BackdropView Backdrop => Stage.Children.OfType<BackdropView>().First();
+
+    /// <summary>Largura do palco na proporção da janela e densidade real (pixels físicos por unidade) para as imagens.</summary>
+    private void FitStage()
+    {
+        if (ActualWidth <= 0 || ActualHeight <= 0)
+        {
+            return;
+        }
+
+        Stage.Width = Math.Clamp(StageHeight * ActualWidth / ActualHeight, MinStageWidth, MaxStageWidth);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        _art.RenderScale = Math.Min(ActualHeight * dpi.DpiScaleY / StageHeight, ActualWidth * dpi.DpiScaleX / Stage.Width);
+    }
 
     /// <summary>Exposto para o teste de fumaça (navegação real sobre a árvore visual).</summary>
     internal FocusNavigator Navigator => _navigator;
@@ -169,7 +193,13 @@ public partial class MainWindow : Window
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (key == Key.Tab)
         {
+            // Shift+Tab abre a Central de Controle (como a sobreposição da Steam); Tab sozinho não navega.
             e.Handled = true;
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                Handle(AppCommand.Guide, InputKind.Keyboard);
+            }
+
             return;
         }
 
@@ -182,20 +212,28 @@ public partial class MainWindow : Window
 
     private void PollGamepad()
     {
-        var reading = XInputGamepad.ReadFirst();
-        string? name = reading is null ? null : "Controle Xbox (XInput)";
+        // Xbox/XInput primeiro; sem ele, controles PlayStation por HID.
+        GamepadSnapshot? snapshot = XInputGamepad.ReadFirst()?.Snapshot;
+        string? name = snapshot is null ? null : "Controle Xbox";
+        if (snapshot is null && _sony.Read() is { } sony)
+        {
+            snapshot = sony;
+            name = _sony.Model == SonyController.DualSense ? "Controle PS5 (DualSense)" : "Controle PS4 (DualShock 4)";
+        }
+
         if (name != _shell.ControllerName)
         {
             _shell.ControllerName = name;
+            _shell.IsPlayStationPad = name?.StartsWith("Controle PS", StringComparison.Ordinal) == true;
             _shell.Toast(name is null ? "Controle desconectado — o teclado continua funcionando" : $"Controle conectado: {name}");
         }
 
-        if (reading is not { } pad || !IsActive)
+        if (snapshot is not { } pad || !IsActive)
         {
             return;
         }
 
-        foreach (var command in _gamepad.Update(pad.Snapshot, _clock.Elapsed))
+        foreach (var command in _gamepad.Update(pad, _clock.Elapsed))
         {
             Handle(command, InputKind.Gamepad);
         }
@@ -355,7 +393,8 @@ public partial class MainWindow : Window
             case nameof(ShellViewModel.IsSidebarExpanded):
                 var to = new Thickness(_shell.IsSidebarExpanded ? 400 : 120, 0, 0, 0);
                 ContentArea.BeginAnimation(MarginProperty, new ThicknessAnimation(to, _shell.Settings.PageDuration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
-                BrandName.BeginAnimation(OpacityProperty, new DoubleAnimation(_shell.IsSidebarExpanded ? 1 : 0, _shell.Settings.PageDuration));
+                BrandLogo.BeginAnimation(OpacityProperty, new DoubleAnimation(_shell.IsSidebarExpanded ? 1 : 0, _shell.Settings.PageDuration));
+                BrandMark.BeginAnimation(OpacityProperty, new DoubleAnimation(_shell.IsSidebarExpanded ? 0 : 1, _shell.Settings.PageDuration));
                 break;
             case nameof(ShellViewModel.InputKind) or nameof(ShellViewModel.ControllerName):
                 InputIcon.Key = _shell.ControllerName is null ? "Icon.Keyboard" : "Icon.Gamepad";
@@ -381,7 +420,7 @@ public partial class MainWindow : Window
         }
 
         double center = icon.TransformToAncestor(Stage).Transform(new Point(icon.ActualWidth / 2, 0)).X;
-        panel.Margin = new Thickness(Math.Clamp(center - 300, 72, 1920 - 72 - 600), 160, 0, 0);
+        panel.Margin = new Thickness(Math.Clamp(center - 300, 72, Math.Max(72, Stage.ActualWidth - 72 - 600)), 160, 0, 0);
     }
 
     private static IEnumerable<FrameworkElement> AllNavigables(DependencyObject root)
