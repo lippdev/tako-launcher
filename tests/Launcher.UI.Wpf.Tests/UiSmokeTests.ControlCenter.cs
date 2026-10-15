@@ -51,15 +51,21 @@ public sealed partial class UiSmokeTests
         Assert.True(expected == center.Windows.Count, $"janelas: {center.Windows.Count} na Central, {expected} abertas ({string.Join(", ", center.Windows.Select(w => w.Window.Handle))})");
         Assert.Equal($"JANELAS ABERTAS · {center.Windows.Count}", center.WindowsTitle);
 
+        Pump(0.5);
         Assert.True(nav.FocusDefault(center.Windows[0].NavKey));
+        var trail = new List<string>();
         for (int i = 1; i < center.Windows.Count; i++)
         {
             Press(window, AppCommand.Right);
             Pump(0.35);
+            trail.Add(Nav.GetKey(nav.Focused!) ?? "?");
             AssertWindowCardLayout(window, "→ na fileira de janelas");
         }
 
-        Assert.Equal(center.Windows[^1].NavKey, Nav.GetKey(nav.Focused!)); // chegou ao último, inteiro na tela
+        // Chegou ao último, inteiro na tela. Na falha: o caminho e os cartões navegáveis da fileira (chave e posição).
+        var row = nav.Navigables().Where(e => Nav.GetGroup(e) == "qwin")
+            .Select(e => $"{Nav.GetKey(e)}@{e.TransformToAncestor(window.StageElement).Transform(default):0}").ToList();
+        Assert.True(center.Windows[^1].NavKey == Nav.GetKey(nav.Focused!), $"caminho: {string.Join(" ", trail)} · fileira: {string.Join(" ", row)}");
         Snap(window, "11e-central-janelas-titulos-longos");
         Snap(window, "11f-central-janelas-1440p", scale: 4.0 / 3);
         Snap(window, "11g-central-janelas-4k", scale: 2);
