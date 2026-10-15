@@ -45,4 +45,49 @@ public class GamepadInterpreterTests
     [Fact]
     public void View_button_works_as_guide() =>
         Assert.Equal([AppCommand.Guide], new GamepadInterpreter().Update(Pressed(GamepadButtons.View), TimeSpan.Zero));
+
+    [Fact]
+    public void Direction_held_during_disconnect_does_not_keep_moving()
+    {
+        var pad = new GamepadInterpreter();
+        var t = TimeSpan.Zero;
+        Assert.Single(pad.Update(Pressed(GamepadButtons.DPadRight), t));
+        Assert.Single(pad.Update(Pressed(GamepadButtons.DPadRight), t + GamepadInterpreter.RepeatDelay));
+
+        // Controle caiu no meio da repetição; volta com o direcional ainda pressionado.
+        pad.Reset();
+        var later = t + TimeSpan.FromSeconds(5);
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.DPadRight), later));
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.DPadRight), later + GamepadInterpreter.RepeatDelay));
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.DPadRight), later + TimeSpan.FromSeconds(10)));
+
+        // Soltou e apertou de novo: volta a funcionar sem reiniciar nada.
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.None), later + TimeSpan.FromSeconds(11)));
+        Assert.Equal([AppCommand.Right], pad.Update(Pressed(GamepadButtons.DPadRight), later + TimeSpan.FromSeconds(12)));
+    }
+
+    [Fact]
+    public void Button_held_while_launcher_was_in_background_does_not_fire()
+    {
+        var pad = new GamepadInterpreter();
+        pad.Reset();
+
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.A), TimeSpan.Zero));
+        // Um botão novo funciona na hora; só o que já estava pressionado fica ignorado.
+        Assert.Equal([AppCommand.Back], pad.Update(Pressed(GamepadButtons.A | GamepadButtons.B), TimeSpan.FromMilliseconds(16)));
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.None), TimeSpan.FromMilliseconds(32)));
+        Assert.Equal([AppCommand.Accept], pad.Update(Pressed(GamepadButtons.A), TimeSpan.FromMilliseconds(48)));
+    }
+
+    [Fact]
+    public void Reconnected_controller_with_nothing_pressed_works_immediately()
+    {
+        var pad = new GamepadInterpreter();
+        Assert.Single(pad.Update(Pressed(GamepadButtons.DPadDown), TimeSpan.Zero));
+
+        pad.Reset();
+
+        Assert.Empty(pad.Update(Pressed(GamepadButtons.None), TimeSpan.FromSeconds(1)));
+        Assert.Equal([AppCommand.Down], pad.Update(Pressed(GamepadButtons.DPadDown), TimeSpan.FromSeconds(1.016)));
+    }
 }

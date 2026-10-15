@@ -64,6 +64,18 @@ public sealed class GamepadInterpreter
     ];
 
     private readonly Dictionary<AppCommand, TimeSpan> _held = [];
+    private bool _suppressHeld;
+
+    /// <summary>
+    /// Controle desconectado, trocado ou janela sem foco (MVP-031): esquece o estado e ignora o que ainda estiver
+    /// pressionado até ser solto. Assim uma direção mantida antes da queda não volta "andando sozinha", e um A que
+    /// fechou o jogo não aciona nada ao voltar para o launcher.
+    /// </summary>
+    public void Reset()
+    {
+        _held.Clear();
+        _suppressHeld = true;
+    }
 
     public IReadOnlyList<AppCommand> Update(GamepadSnapshot snapshot, TimeSpan now)
     {
@@ -97,6 +109,18 @@ public sealed class GamepadInterpreter
         }
 
         var fired = new List<AppCommand>();
+        if (_suppressHeld)
+        {
+            // Primeira leitura depois do Reset: o que já está pressionado só volta a valer depois de solto.
+            _suppressHeld = false;
+            foreach (var command in pressed)
+            {
+                _held[command] = TimeSpan.MaxValue;
+            }
+
+            return fired;
+        }
+
         foreach (var command in pressed)
         {
             if (!_held.TryGetValue(command, out var next))
