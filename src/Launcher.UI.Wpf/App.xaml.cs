@@ -1,12 +1,16 @@
 using System.IO;
 using System.Net.Http;
 using System.Windows;
+using ConsoleMode.Runtime.Audio;
+using ConsoleMode.Runtime.Display;
+using ConsoleMode.Runtime.Windows;
 using Launcher.Core.Diagnostics;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Steam;
 using Launcher.Core.Persistence;
 using Launcher.Core.Resilience;
+using Launcher.Core.Session.Restore;
 using Launcher.Themes.Xaml;
 using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Services;
@@ -58,6 +62,9 @@ public partial class App : Application
             shell.ShowRecovery(startupTheme);
         }
 
+        // O Tako caiu durante um jogo e monitores ou áudio ficaram diferentes: oferece restaurar (MVP-012).
+        shell.OfferEnvironmentRestore();
+
         // Descrição, gêneros, notas e artes dos jogos chegam em segundo plano (cache primeiro).
         shell.StartMetadataUpdates();
 
@@ -74,8 +81,11 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Composição de dependências. O teste de fumaça da UI passa uma biblioteca fictícia em <paramref name="library"/>.</summary>
-    internal static ServiceProvider BuildServices(IGameLibrary? library = null)
+    /// <summary>
+    /// Composição de dependências. O teste de fumaça da UI passa uma biblioteca fictícia em <paramref name="library"/> e
+    /// troca serviços que mexem no Windows (ex.: monitores e áudio) por simulados em <paramref name="testServices"/>.
+    /// </summary>
+    internal static ServiceProvider BuildServices(IGameLibrary? library = null, Action<IServiceCollection>? testServices = null)
     {
         var services = new ServiceCollection();
         services.AddLogging(logging => logging.AddDebug().SetMinimumLevel(LogLevel.Information));
@@ -109,8 +119,14 @@ public partial class App : Application
         services.AddSingleton<SonyHidGamepad>();
         services.AddSingleton<SettingsService>();
         services.AddSingleton<PerformanceSimulator>();
+        // Monitores e áudio da sessão (MVP-012): registrados antes do jogo e restaurados depois.
+        services.AddSingleton<IDisplayConfigurationService, WindowsDisplayConfiguration>();
+        services.AddSingleton<IAudioEndpointService, WindowsAudioEndpoints>();
+        services.AddSingleton(_ => new PendingEnvironmentStore(AppPaths.EnvironmentSnapshotFile));
+        services.AddSingleton<SessionEnvironmentGuard>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
+        testServices?.Invoke(services);
         return services.BuildServiceProvider();
     }
 

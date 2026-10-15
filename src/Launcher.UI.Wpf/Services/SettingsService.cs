@@ -25,6 +25,10 @@ public sealed partial class SettingsService : ObservableObject
     [ObservableProperty]
     private bool _startFullscreenOnLogin = true;
 
+    /// <summary>Restaurar monitores e áudio ao sair do jogo (MVP-012).</summary>
+    [ObservableProperty]
+    private bool _restoreEnvironmentAfterGame = true;
+
     public SettingsService(SettingsStore store, ILogger<SettingsService> logger)
     {
         _store = store;
@@ -36,6 +40,7 @@ public sealed partial class SettingsService : ObservableObject
             DynamicColor = Read(saved, nameof(DynamicColor), DynamicColor);
             ReducedMotion = Read(saved, nameof(ReducedMotion), ReducedMotion);
             StartFullscreenOnLogin = Read(saved, nameof(StartFullscreenOnLogin), StartFullscreenOnLogin);
+            RestoreEnvironmentAfterGame = Read(saved, nameof(RestoreEnvironmentAfterGame), RestoreEnvironmentAfterGame);
         }
         catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
         {
@@ -59,6 +64,8 @@ public sealed partial class SettingsService : ObservableObject
     partial void OnReducedMotionChanged(bool value) => Save(nameof(ReducedMotion), value);
 
     partial void OnStartFullscreenOnLoginChanged(bool value) => Save(nameof(StartFullscreenOnLogin), value);
+
+    partial void OnRestoreEnvironmentAfterGameChanged(bool value) => Save(nameof(RestoreEnvironmentAfterGame), value);
 
     private void Save(string key, bool value)
     {

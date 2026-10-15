@@ -96,6 +96,12 @@
       "consolemode.runtime": {
         "type": "Project"
       },
+      "consolemode.runtime.windows": {
+        "type": "Project",
+        "dependencies": {
+          "ConsoleMode.Runtime": "[1.0.0, )"
+        }
+      },
       "launcher.core": {
         "type": "Project",
         "dependencies": {

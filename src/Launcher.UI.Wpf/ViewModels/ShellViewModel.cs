@@ -8,6 +8,7 @@ using ConsoleMode.Runtime;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.Core.Presentation;
+using Launcher.Core.Session.Restore;
 using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Services;
 using Microsoft.Extensions.Logging;
@@ -33,6 +34,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly MetadataService _metadata;
     private readonly ThemeService _themes;
     private readonly PlayniteThemeService _playniteThemes;
+    private readonly SessionEnvironmentGuard _environment;
     private readonly TimeProvider _time;
     private readonly ILogger<ShellViewModel> _logger;
     private readonly Dictionary<string, GameItemViewModel> _items = [];
@@ -85,6 +87,7 @@ public sealed partial class ShellViewModel : ObservableObject
         ThemeService themes,
         PlayniteThemeService playniteThemes,
         PerformanceSimulator performance,
+        SessionEnvironmentGuard environment,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
@@ -95,6 +98,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _themes = themes;
         _playniteThemes = playniteThemes;
         Performance = performance;
+        _environment = environment;
         _time = time;
         _logger = logger;
         SyncItems();

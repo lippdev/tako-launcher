@@ -4,9 +4,13 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using ConsoleMode.Runtime.Audio;
+using ConsoleMode.Runtime.Display;
+using ConsoleMode.Runtime.Simulation;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.Core.Resilience;
+using Launcher.Core.Session.Restore;
 using Launcher.Tests;
 using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
@@ -37,8 +41,16 @@ public sealed class UiSmokeTests
 
         var app = new App();
         app.InitializeComponent();
-        // Biblioteca fictícia: o CI não tem Steam e o teste não depende da rede para os dados.
-        using var services = App.BuildServices(new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System));
+        // Biblioteca fictícia: o CI não tem Steam e o teste não depende da rede para os dados. Monitores e áudio
+        // simulados: o teste nunca muda a resolução nem o som da máquina (MVP-012).
+        var display = new SimulatedDisplayConfiguration();
+        var audio = new SimulatedAudioEndpoints();
+        string environmentFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-environment-{Guid.NewGuid():N}.json");
+        using var services = App.BuildServices(
+            new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System),
+            s => s.AddSingleton<IDisplayConfigurationService>(display)
+                .AddSingleton<IAudioEndpointService>(audio)
+                .AddSingleton(new PendingEnvironmentStore(environmentFile)));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
 
@@ -381,6 +393,9 @@ public sealed class UiSmokeTests
         Assert.DoesNotContain(((ThemesViewModel)shell.CurrentPage).Themes, t => t.Kind == ThemeKind.Imported);
         Assert.Equal("themes:import", Nav.GetKey(nav.Focused!));
 
+        // --- Monitores e áudio (frente E2)
+        MonitorsAndAudio(services, shell, window, real, display, audio);
+
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();
         window.Width = 840; // 21:9
@@ -537,6 +552,75 @@ public sealed class UiSmokeTests
         Pump(0.8);
         Assert.Null(shell.TopOverlay);
         AssertFocused(window, "Início depois do jogo");
+    }
+
+    /// <summary>
+    /// MVP-012 com monitores e áudio simulados: opção nas Configurações, restauração só do que o jogo real mudou e
+    /// oferta de restauração depois de uma queda do Tako durante o jogo.
+    /// </summary>
+    private static void MonitorsAndAudio(ServiceProvider services, ShellViewModel shell, MainWindow window, Game game, SimulatedDisplayConfiguration display, SimulatedAudioEndpoints audio)
+    {
+        var nav = window.Navigator;
+
+        // Configurações: a linha nova fica antes de "Tema"; A liga e desliga (padrão: ligada).
+        shell.OpenSettings();
+        Pump(0.8);
+        Assert.True(shell.Settings.RestoreEnvironmentAfterGame);
+        Assert.True(nav.FocusDefault("settings:environment"));
+        Press(window, AppCommand.Accept);
+        Assert.False(shell.Settings.RestoreEnvironmentAfterGame);
+        Press(window, AppCommand.Accept);
+        Assert.True(shell.Settings.RestoreEnvironmentAfterGame);
+        Pump(0.4);
+        Snap(window, "40-configuracoes-monitores-audio");
+
+        // Jogo real: o "jogo" troca a resolução, a saída padrão e silencia os alto-falantes; ao fechar, tudo volta.
+        shell.OpenDetails(shell.ItemFor(game));
+        Pump(0.8);
+        Press(window, AppCommand.Accept); // Jogar
+        Pump(3);
+        Assert.Equal(ConsoleMode.Runtime.SessionState.Playing, shell.Session);
+        Assert.NotNull(services.GetRequiredService<SessionEnvironmentGuard>().Active);
+        display.Current = new DisplayTopology([SimulatedDisplayConfiguration.Default.Monitors[0] with { Width = 1280, Height = 720, RefreshRate = RefreshRate.FromHz(120) }]);
+        audio.SetDefaultDevice("sim-headset", AudioRole.Console);
+        audio.SetMute("sim-speakers", true);
+        for (int i = 0; i < 30 && shell.Session != ConsoleMode.Runtime.SessionState.Browsing; i++)
+        {
+            Pump(1);
+        }
+
+        Assert.Equal(ConsoleMode.Runtime.SessionState.Browsing, shell.Session);
+        Assert.True(display.Current.IsEquivalentTo(SimulatedDisplayConfiguration.Default));
+        Assert.Equal("sim-speakers", audio.Current.DefaultFor(AudioRole.Console));
+        Assert.False(audio.Current.LevelOf("sim-speakers")!.Muted);
+        Assert.EndsWith("monitores e áudio restaurados", shell.ToastMessage, StringComparison.Ordinal);
+        Pump(0.4);
+        Snap(window, "41-retorno-monitores-audio");
+
+        // Opção desligada: nada é registrado nem restaurado.
+        var guard = services.GetRequiredService<SessionEnvironmentGuard>();
+        Assert.Null(guard.BeginSession(game.Id, enabled: false));
+
+        // Queda durante o jogo: o estado de antes fica em disco e a próxima abertura oferece restaurar.
+        guard.BeginSession(game.Id, enabled: true);
+        display.Current = new DisplayTopology([SimulatedDisplayConfiguration.Default.Monitors[0] with { Width = 1024, Height = 768 }]);
+        int appliedBefore = display.AppliedCount;
+        shell.OfferEnvironmentRestore();
+        Pump(0.5);
+        var offer = Assert.IsType<DialogViewModel>(shell.TopOverlay);
+        Assert.Equal("Restaurar monitores e áudio como estavam antes do jogo", offer.Actions[0].Label);
+        Assert.Equal("overlay", Nav.GetGroup(nav.Focused!));
+        Snap(window, "42-oferta-restaurar-monitores-audio");
+        Press(window, AppCommand.Accept);
+        Assert.Null(shell.TopOverlay);
+        Assert.Equal(appliedBefore + 1, display.AppliedCount);
+        Assert.True(display.Current.IsEquivalentTo(SimulatedDisplayConfiguration.Default));
+
+        // Sem diferença: nada é oferecido.
+        guard.BeginSession(game.Id, enabled: true);
+        shell.OfferEnvironmentRestore();
+        Assert.Null(shell.TopOverlay);
+        guard.Discard();
     }
 
     /// <summary>Há um elemento focado, visível e alcançável pela navegação no escopo atual.</summary>

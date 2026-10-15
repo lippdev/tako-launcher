@@ -45,6 +45,7 @@ public sealed partial class ShellViewModel
     private void StartRealSession(GameItemViewModel item)
     {
         var game = item.Game;
+        CaptureEnvironmentBeforeGame(game.Id);
         Process? process;
         try
         {
@@ -58,6 +59,7 @@ public sealed partial class ShellViewModel
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException)
         {
             Session = SessionState.Browsing; // falha ao abrir: nada mudou
+            _environment.Discard();
             LogLaunchFailed(_logger, ex, game.Id);
             Toast($"Não foi possível abrir {game.Title}: {ex.Message}");
             return;
@@ -71,6 +73,7 @@ public sealed partial class ShellViewModel
         {
             // Sem como acompanhar (ex.: URI sem pasta conhecida): o jogo só é aberto, como antes do MVP-026.
             Session = SessionState.Browsing;
+            _environment.Discard(); // sem saber quando o jogo fecha, não há momento seguro para restaurar
             Toast(game.Store == GameStore.Steam ? $"Abrindo {game.Title} pela Steam" : $"Abrindo {game.Title}");
             return;
         }
@@ -136,6 +139,7 @@ public sealed partial class ShellViewModel
         _monitor?.Stop();
         ClearRunningGame();
         Session = SessionState.Browsing;
+        _environment.Discard(); // o jogo pode abrir depois: restaurar agora atrapalharia
         if (game is not null)
         {
             Toast($"{game.Title} não iniciou em {(int)GameRunTracker.DefaultStartTimeout.TotalMinutes} min · tempo de jogo não registrado");
@@ -160,12 +164,13 @@ public sealed partial class ShellViewModel
         }
 
         Session = SessionState.Restoring;
+        string restored = RestoreEnvironmentAfterGame(); // monitores e áudio antes de trazer a janela (MVP-012)
         BringLauncherToFront();
         Session = SessionState.Browsing;
         if (game is not null)
         {
             RestoreFocusAfterGame(game.Id);
-            Toast($"Bem-vindo de volta · {GameText.SessionPlayed(played)}");
+            Toast($"Bem-vindo de volta · {GameText.SessionPlayed(played)}{restored}");
         }
 
         OnOverlaysChanged();

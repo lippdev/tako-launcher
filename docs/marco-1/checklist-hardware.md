@@ -36,7 +36,7 @@ Como registrar: copie a tabela de resultados no fim deste arquivo para a PR ou i
 |---|---|---|
 | A1 | Fone Bluetooth conectado com o Tako aberto | Nenhum travamento; o áudio do Windows segue a saída padrão |
 | A2 | Saída HDMI (TV) desconectada | Nenhum travamento |
-| A3 | Central de Controle › Áudio | Painel abre e ajusta o volume (Marco 0: simulado; restauração real é do Console Runtime) |
+| A3 | Central de Controle › Áudio | Painel abre e ajusta o volume (Marco 0: simulado; a restauração real após o jogo está na seção 9) |
 
 ## 3. Controles (MVP-031)
 
@@ -113,6 +113,33 @@ Linha em Configurações › **Xbox mode (tela cheia do Windows)**.
 | F5 | Comparar com Configurações › Jogos › Xbox mode do Windows | Se o Windows mostra o Xbox mode e o Tako diz "Indisponível", é falso negativo: anotar build, `DeviceForm` e a saída do `Launcher.FseProbe` |
 
 Em todos os casos o Tako abre em tela cheia convencional; registrar-se como app inicial do Xbox mode depende de autorização da Microsoft (ver `docs/spikes/MVP-007-fse.md`).
+
+## 9. Restaurar monitores e áudio (MVP-012)
+
+Opção em Configurações › **Restaurar monitores e áudio ao sair do jogo** (padrão: ligada). Decisões e riscos na [ADR-0013](../adr/0013-estado-de-monitores-e-audio.md); o CI só testa com monitores e áudio simulados.
+
+Jogo de teste: adicione `C:\Windows\notepad.exe` como jogo, com fim do jogo por "Processo iniciado". Com o Bloco de Notas aberto pelo Tako, faça a mudança pelas Configurações do Windows (ou pelo ícone de som da barra de tarefas) e feche o Bloco de Notas. Repita os casos principais (E1, E2, E9) com um jogo real que troque a resolução em tela cheia exclusiva.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| E1 | Resolução | Durante o jogo, mudar a resolução do monitor principal | Ao voltar, resolução de antes; aviso "Bem-vindo de volta · … · monitores e áudio restaurados" |
+| E2 | Taxa de atualização | 144 → 60 Hz (ou 60 → 59,94 Hz) | Taxa de antes, inclusive fracionária |
+| E3 | Monitor principal | Dois monitores; trocar o principal durante o jogo | Principal e posições de antes |
+| E4 | Rotação | Girar o monitor secundário para retrato | Volta para paisagem |
+| E5 | Monitor desligado pelo jogo | Win+P › "Somente tela do PC" (ou "Somente segunda tela") durante o jogo | Os dois monitores voltam, com o mesmo arranjo |
+| E6 | Monitor desconectado durante o jogo | Puxar o cabo do secundário e fechar o jogo | Nada trava; o log registra a falha/o que não pôde voltar; o principal fica como estava |
+| E7 | Nada mudou | Jogar e fechar sem mexer em nada | Nenhuma piscada de tela; log "já estavam como antes" |
+| E8 | HDR | HDR ligado antes; jogo desliga (ou ao contrário) | Anotar o resultado (HDR não faz parte do estado restaurado nesta versão) |
+| E9 | Saída padrão | Fone/TV como padrão; durante o jogo trocar para alto-falantes | Saída de antes nos três papéis (sons do sistema, multimídia, comunicação) |
+| E10 | Volume e mudo | Volume em 30%; durante o jogo pôr 100% e mudo | 30% e com som, sem pico de volume |
+| E11 | Fone desconectado durante o jogo | Fone Bluetooth padrão antes; desligar o fone durante o jogo | Nada trava; log "não está conectado"; volume dos outros dispositivos restaurado |
+| E12 | `IPolicyConfig` indisponível | (Se uma atualização do Windows quebrar a troca de saída) | Volume/mudo continuam sendo restaurados; o log diz "trocar o dispositivo padrão não está disponível" |
+| E13 | Opção desligada | Desligar a opção e repetir E1/E9 | Nada é restaurado |
+| E14 | Queda durante o jogo | Mudar a resolução durante o jogo, finalizar `Tako.exe` no Gerenciador de Tarefas, fechar o jogo e abrir o Tako | Pergunta "Restaurar monitores e áudio?" com **Restaurar monitores e áudio como estavam antes do jogo**; ao aceitar, tudo volta; "Manter como está" não muda nada e não pergunta de novo |
+| E15 | Queda sem diferença | Como E14, mas sem mudar nada | Nenhuma pergunta |
+| E16 | Reinício do PC no meio | Como E14, mas reiniciar o Windows antes de abrir o Tako | A pergunta aparece; se a restauração exata falhar (identificadores dos adaptadores mudam), resolução/taxa/posição voltam monitor a monitor; o log registra o caminho usado |
+| E17 | Log | Depois de E1–E11 | `logs\tako-AAAAMMDD.log` tem "registrados antes de", cada passo restaurado/mantido e "verificada" ou "incompleta" |
+| E18 | Arquivo pendente | Durante o jogo | `session-environment.json` existe na pasta de dados; some depois de voltar |
 
 ## Resultados
 
