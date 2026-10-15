@@ -28,6 +28,9 @@ public sealed class Game
 
     public Uri? HeroUri { get; set; }
 
+    /// <summary>A capa é só um plano B da própria loja (ex.: logo do pacote Xbox): os metadados podem trocá-la.</summary>
+    public bool HasFallbackArt { get; init; }
+
     /// <summary>Ponto de enquadramento da arte de fundo, como "50% 40%" (x y).</summary>
     public string? HeroAlignment { get; init; }
 

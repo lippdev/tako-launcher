@@ -103,8 +103,21 @@ public sealed partial class ShellViewModel
     public void RescanLibrary()
     {
         Library.Refresh();
-        int steam = Library.Games.Count(g => g.Store == GameStore.Steam);
-        Toast(steam == 0 ? "Nenhum jogo da Steam encontrado neste PC" : $"{steam} jogos da Steam encontrados");
+        Toast(Core.Presentation.LibraryText.ScanSummary(
+            Library.Games.Count(g => g.Store == GameStore.Steam),
+            Settings.XboxLibraryEnabled ? Library.Games.Count(g => g.Store == GameStore.Xbox) : null));
+        OnPropertyChanged(nameof(XboxLibraryDescription));
+    }
+
+    /// <summary>Estado da fonte Xbox nas Configurações (STORE-004), com aviso se faltar o app Xbox ou os Serviços de Jogos.</summary>
+    public string XboxLibraryDescription => _xbox.Description;
+
+    /// <summary>Liga/desliga os jogos do app Xbox / Microsoft Store e procura de novo.</summary>
+    [RelayCommand]
+    public void ToggleXboxLibrary()
+    {
+        Settings.XboxLibraryEnabled = !Settings.XboxLibraryEnabled;
+        RescanLibrary();
     }
 
     [RelayCommand]
@@ -126,9 +139,14 @@ public sealed partial class ShellViewModel
             actions.Add(new OverlayAction("Abrir na Steam", ActionStyle.Primary, new RelayCommand(() => { Close(); OpenUri($"steam://nav/games/details/{appId}"); }), IsDefault: true));
         }
 
-        if (game.Store == GameStore.Manual)
+        // Xbox e adicionados: dados e artes vêm do agente pelo nome, então o usuário pode corrigir a correspondência.
+        if (game.Store is GameStore.Xbox or GameStore.Manual)
         {
             actions.Add(new OverlayAction("Corrigir correspondência", ActionStyle.Primary, new RelayCommand(() => { Close(); _ = FixMatchAsync(item); }), IsDefault: true));
+        }
+
+        if (game.Store == GameStore.Manual)
+        {
             actions.Add(new OverlayAction("Editar", ActionStyle.Secondary, new RelayCommand(() => { Close(); EditGame(item); })));
             actions.Add(new OverlayAction("Trocar capa", ActionStyle.Secondary, new RelayCommand(() => { Close(); ChangeCover(item); })));
         }

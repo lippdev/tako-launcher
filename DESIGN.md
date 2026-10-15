@@ -30,6 +30,7 @@ colors:
   store-steam: "#1B2838"
   store-epic: "#2A2A2A"
   store-gog: "#7A3FD1"
+  store-xbox: "#107C10"
   store-manual: "#3D5A80"
 
 typography:

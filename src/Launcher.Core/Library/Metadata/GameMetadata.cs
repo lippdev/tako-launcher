@@ -48,7 +48,7 @@ public sealed record GameMetadata
         {
             game.SteamAppId = appId;
             string id = appId.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (game.CoverUri is null || game.CoverUri.Scheme == Steam.SteamGames.ArtScheme)
+            if (game.CoverUri is null || game.HasFallbackArt || game.CoverUri.Scheme == Steam.SteamGames.ArtScheme)
             {
                 game.CoverUri = new Uri($"{Steam.SteamGames.ArtScheme}://{id}/cover");
                 game.HeroUri = new Uri($"{Steam.SteamGames.ArtScheme}://{id}/hero");

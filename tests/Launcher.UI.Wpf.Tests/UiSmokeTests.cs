@@ -74,6 +74,7 @@ public sealed partial class UiSmokeTests
                 .AddSingleton<IHardwareMonitor>(new SimulatedHardwareMonitor())
                 .AddSingleton<ConsoleMode.Runtime.Steam.ISteamClient>(steam)
                 .AddSingleton<ConsoleMode.Runtime.Tv.ITvControl>(tv)
+                .AddSingleton<Launcher.Core.Library.Xbox.IXboxSystem>(new EmptyXboxSystem())
                 .AddSingleton(new PendingEnvironmentStore(environmentFile)));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
@@ -137,6 +138,7 @@ public sealed partial class UiSmokeTests
         shell.OpenSettings();
         Pump(0.8);
         Snap(window, "06-configuracoes");
+        XboxLibrarySetting(shell, window);
         // Tema Fullscreen padrão do Playnite 10 renderizado sem o Playnite (H2).
         shell.ShowPlaynitePreview();
         Pump(2.5);
