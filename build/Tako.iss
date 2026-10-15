@@ -46,8 +46,8 @@ WizardStyle=modern
 ShowLanguageDialog=yes
 LanguageDetectionMethod=uilanguage
 UsePreviousLanguage=yes
-; Close the app through Restart Manager if it is still up.
-CloseApplications=yes
+; Close the app through Restart Manager if it is still up. "force": the windowless supervisor (ADR-0012) cannot be closed gracefully.
+CloseApplications=force
 RestartApplications=no
 
 [Languages]

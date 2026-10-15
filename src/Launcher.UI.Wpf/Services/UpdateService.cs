@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
+using Launcher.Core.Supervision;
 using Launcher.Core.Updates;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +14,7 @@ namespace Launcher.UI.Wpf.Services;
 /// do tipo de instalação (instalador ou .exe portátil), confere o SHA-256 publicado pelo GitHub e aplica — o instalado roda
 /// o setup em modo silencioso; o portátil troca o .exe por um script depois que o Tako fecha.
 /// </summary>
-public sealed partial class UpdateService(ILogger<UpdateService> logger) : IDisposable
+public sealed partial class UpdateService(ILogger<UpdateService> logger, SupervisorLink supervisor) : IDisposable
 {
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
@@ -28,7 +29,7 @@ public sealed partial class UpdateService(ILogger<UpdateService> logger) : IDisp
     /// Só versões publicadas se atualizam: instalada (marcador do instalador) ou portátil (.exe único). Rodando pelo
     /// <c>dotnet run</c>/Visual Studio, o executável não pode ser trocado.
     /// </summary>
-    public static bool IsPublishedBuild => AppPaths.IsInstalled || string.IsNullOrEmpty(typeof(UpdateService).Assembly.Location);
+    public static bool IsPublishedBuild => AppPaths.IsPublishedBuild;
 
     public static string InstallKind => AppPaths.IsInstalled ? "instalada" : "portátil";
 
@@ -94,34 +95,32 @@ public sealed partial class UpdateService(ILogger<UpdateService> logger) : IDisp
 
     /// <summary>
     /// Entrega para a atualização. Quem chama encerra o Tako em seguida (o setup / script espera o processo terminar).
-    /// <paramref name="relaunch"/> falso = atualiza ao sair, sem reabrir.
+    /// <paramref name="relaunch"/> falso = atualiza ao sair, sem reabrir. Com supervisor (ADR-0012), avisa que a saída é
+    /// de propósito (depois de iniciar o setup/script): ele sai junto em vez de reabrir a UI, liberando o <c>Tako.exe</c>.
     /// </summary>
     public void Apply(string file, bool relaunch)
     {
         LogApplying(logger, file, relaunch);
         if (AppPaths.IsInstalled)
         {
-            // Inno Setup: fecha o Tako pelo Restart Manager e o reabre ao terminar (menos com /NOLAUNCH=1).
+            // Inno Setup: fecha o Tako pelo Restart Manager e o reabre ao terminar (menos com /NOLAUNCH=1). O supervisor
+            // não tem janela; ele sai sozinho quando a UI sai, e /FORCECLOSEAPPLICATIONS cobre o caso de ainda estar aberto.
             Process.Start(new ProcessStartInfo
             {
                 FileName = file,
-                Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS" + (relaunch ? string.Empty : " /NOLAUNCH=1"),
+                Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS" + (relaunch ? string.Empty : " /NOLAUNCH=1"),
                 UseShellExecute = true,
             })?.Dispose();
+            supervisor.AnnounceClosing(UiCloseReason.Update);
             return;
         }
 
-        // Portátil: um .exe em uso não pode ser sobrescrito; um script espera o Tako fechar, troca o arquivo e (se pedido) o reabre.
+        // Portátil: um .exe em uso não pode ser sobrescrito; um script espera a UI e o supervisor fecharem, troca o arquivo
+        // e (se pedido) reabre o Tako.
         string exe = Environment.ProcessPath ?? throw new InvalidOperationException("Caminho do executável desconhecido.");
         string script = Path.Combine(Path.GetDirectoryName(file)!, "swap.cmd");
-        int pid = Environment.ProcessId;
-        File.WriteAllText(
-            script,
-            "@echo off\r\n"
-            // ping como espera: timeout.exe falha sem console interativo.
-            + $":wait\r\ntasklist /fi \"PID eq {pid}\" | find \"{pid}\" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)\r\n"
-            + $"move /y \"{file}\" \"{exe}\" >nul\r\n"
-            + (relaunch ? $"start \"\" \"{exe}\"\r\n" : string.Empty));
+        int[] waitFor = supervisor.SupervisorProcessId is { } supervisorPid ? [Environment.ProcessId, supervisorPid] : [Environment.ProcessId];
+        File.WriteAllText(script, PortableSwapScript.Build(file, exe, waitFor, relaunch));
         Process.Start(new ProcessStartInfo
         {
             FileName = "cmd.exe",
@@ -130,6 +129,7 @@ public sealed partial class UpdateService(ILogger<UpdateService> logger) : IDisp
             UseShellExecute = false,
             WorkingDirectory = Path.GetDirectoryName(file)!,
         })?.Dispose();
+        supervisor.AnnounceClosing(UiCloseReason.Update);
     }
 
     private async Task DownloadFileAsync(Uri url, string file, IProgress<double>? progress, CancellationToken cancellationToken)

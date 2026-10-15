@@ -6,11 +6,13 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ConsoleMode.Runtime.Audio;
 using ConsoleMode.Runtime.Display;
+using ConsoleMode.Runtime.Ipc;
 using ConsoleMode.Runtime.Simulation;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.Core.Resilience;
 using Launcher.Core.Session.Restore;
+using Launcher.Core.Supervision;
 using Launcher.Tests;
 using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
@@ -395,6 +397,27 @@ public sealed class UiSmokeTests
 
         // --- Monitores e áudio (frente E2)
         MonitorsAndAudio(services, shell, window, real, display, audio);
+
+        // --- Supervisor (frente E1): a UI aberta com --supervisor-pipe manda heartbeats pela thread da UI (MVP-003/006).
+        string supervisorPipe = NamedPipeIpc.NewPipeName("tk-smoke");
+        int heartbeats = 0;
+        var supervisorServer = new IpcServer(new NamedPipeServerTransport(supervisorPipe), new IpcConnectionOptions
+        {
+            PeerName = SupervisorMessages.SupervisorPeer,
+            Handler = new IpcHandlerMap()
+                .OnEvent(SupervisorMessages.Heartbeat, _ => Interlocked.Increment(ref heartbeats))
+                .OnRequest(SupervisorMessages.Status, _ => new SupervisorStatus(Environment.ProcessId, 0, UiLaunchMode.Normal)),
+        });
+        supervisorServer.Start();
+        var link = services.GetRequiredService<SupervisorLink>();
+        Assert.False(link.IsSupervised);
+        link.Start([SupervisorArguments.Ui, SupervisorArguments.Pipe, supervisorPipe], app, TimeSpan.FromMilliseconds(200));
+        Pump(2);
+        Assert.True(link.IsSupervised);
+        Assert.True(Volatile.Read(ref heartbeats) > 0, "nenhum heartbeat chegou ao supervisor");
+        Assert.Equal(Environment.ProcessId, link.SupervisorProcessId);
+        Assert.Equal(UiLaunchMode.Normal, link.Status?.Mode);
+        supervisorServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();

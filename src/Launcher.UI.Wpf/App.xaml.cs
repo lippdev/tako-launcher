@@ -32,6 +32,8 @@ public partial class App : Application
         base.OnStartup(e);
         _services = BuildServices();
         LogUnhandledExceptions(_services);
+        // Aberta pelo supervisor (--ui --supervisor-pipe): heartbeats pelo IPC (MVP-003/006, ADR-0012).
+        _services.GetRequiredService<SupervisorLink>().Start(e.Args, this);
 
         // Proteção contra loop de travamento (MVP-036): duas aberturas seguidas sem fechar limpo abrem em modo seguro.
         var journal = _services.GetRequiredService<SessionJournal>();
@@ -106,6 +108,7 @@ public partial class App : Application
         services.AddSingleton<SteamArtResolver>();
         services.AddSingleton<IMetadataProvider, SteamStoreProvider>();
         services.AddSingleton<MetadataService>();
+        services.AddSingleton<SupervisorLink>();
         services.AddSingleton<UpdateService>();
         services.AddSingleton(sp => new SessionJournal(AppPaths.SessionFile, sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<CrashGuard>();

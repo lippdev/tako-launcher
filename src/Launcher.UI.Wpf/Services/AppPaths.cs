@@ -16,6 +16,12 @@ public static class AppPaths
 
     public static bool IsInstalled { get; } = File.Exists(Path.Combine(ExecutableDirectory, InstalledMarker));
 
+    /// <summary>
+    /// Versão publicada: instalada (marcador) ou portátil (.exe único, sem <see cref="System.Reflection.Assembly.Location"/>).
+    /// Rodando pelo <c>dotnet run</c>/Visual Studio, não: o executável não se atualiza e a UI abre sem supervisor.
+    /// </summary>
+    public static bool IsPublishedBuild => IsInstalled || string.IsNullOrEmpty(typeof(AppPaths).Assembly.Location);
+
     public static string DataRoot { get; } = IsInstalled
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako")
         : Path.Combine(ExecutableDirectory, "Tako_Data");

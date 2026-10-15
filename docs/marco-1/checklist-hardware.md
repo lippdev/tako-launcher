@@ -141,6 +141,20 @@ Jogo de teste: adicione `C:\Windows\notepad.exe` como jogo, com fim do jogo por 
 | E17 | Log | Depois de E1–E11 | `logs\tako-AAAAMMDD.log` tem "registrados antes de", cada passo restaurado/mantido e "verificada" ou "incompleta" |
 | E18 | Arquivo pendente | Durante o jogo | `session-environment.json` existe na pasta de dados; some depois de voltar |
 
+## 10. Supervisor (MVP-006, [ADR-0012](../adr/0012-supervisor-e-ipc.md))
+
+| # | Caso | Esperado |
+|---|---|---|
+| S1 | Abrir o Tako (instalado e portátil) | Dois processos `Tako.exe` no Gerenciador de Tarefas (supervisor sem janela + UI); `logs/supervisor/` com "UI iniciada" |
+| S2 | Fechar o Tako normalmente / "Sair para o desktop" | Os dois processos saem |
+| S3 | Encerrar só a UI (Detalhes › Finalizar tarefa no PID da UI) | A UI reabre em ~1 s; na 4ª vez em 5 min abre em modo seguro; na 5ª o supervisor desiste e fica o desktop |
+| S4 | Travar a UI (ex.: pausar o processo da UI com o Process Explorer > 20 s) | O supervisor encerra e reabre a UI; o log registra "sem heartbeat" |
+| S5 | Atualização portátil e instalada (U1–U3) com o supervisor | Nenhum `Tako.exe` reaberto no meio da troca; depois de atualizar, abre de novo pelo supervisor |
+| S6 | "Abrir ao iniciar o Windows" ligado, reiniciar o PC | Abre pelo supervisor (dois processos) |
+| S7 | Sair do Windows (logoff) com o Tako aberto | O supervisor não tenta reabrir a UI |
+| S8 | `Tako.exe --no-supervisor` | Só a UI, sem supervisor |
+| S9 | E14 com o supervisor (finalizar só a UI durante o jogo) | A UI reabre sozinha e faz a pergunta "Restaurar monitores e áudio?" |
+
 ## Resultados
 
 | Data | Máquina (CPU/GPU) | Windows (build) | Monitor(es) | Controles | Versão do Tako | Falhas (IDs) | Observações |
