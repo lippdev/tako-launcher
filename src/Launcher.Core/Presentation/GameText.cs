@@ -41,6 +41,20 @@ public static class GameText
     public static string PlayTime(TimeSpan playTime) =>
         playTime < TimeSpan.FromHours(1) ? (playTime == TimeSpan.Zero ? "—" : $"{Math.Max(1, (int)playTime.TotalMinutes)} min") : $"{(int)playTime.TotalHours} h";
 
+    /// <summary>Duração de uma sessão no aviso de retorno: "menos de 1 min jogado", "25 min jogados", "1 h 05 min jogados".</summary>
+    public static string SessionPlayed(TimeSpan played)
+    {
+        int minutes = (int)played.TotalMinutes;
+        return minutes switch
+        {
+            < 1 => "menos de 1 min jogado",
+            1 => "1 min jogado",
+            < 60 => $"{minutes} min jogados",
+            _ when minutes % 60 == 0 => $"{minutes / 60} h jogadas",
+            _ => $"{minutes / 60} h {(minutes % 60).ToString("00", PtBr)} min jogados",
+        };
+    }
+
     public static string Date(DateOnly date) => date.ToString("dd/MM/yyyy", PtBr);
 
     public static string ShortDate(DateOnly date) => date.ToString("dd/MM", PtBr);
