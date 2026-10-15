@@ -281,6 +281,7 @@ public sealed class UiSmokeTests
         // Pacote recusado (tema do modo Desktop): diálogo com o motivo e nada instalado.
         Assert.False(shell.ImportThemeFrom(ThemeFixtures.DesktopPackage()).Succeeded);
         Pump(0.4);
+        Assert.Equal("overlay", Nav.GetGroup(nav.Focused!));
         Snap(window, "32-tema-recusado");
         Press(window, AppCommand.Back);
         Assert.DoesNotContain(playnite.Imported(), t => t.Id == "Tako_Teste_Desktop");
@@ -288,6 +289,8 @@ public sealed class UiSmokeTests
         // Pacote válido: importa, A abre a prévia (ação padrão) e o diagnóstico mostra X de Y arquivos.
         var copy = shell.ImportThemeFrom(ThemeFixtures.CopyOfDefault(playnite.BuiltIn().Directory));
         Assert.True(copy.Succeeded, string.Join('\n', copy.Diagnostics));
+        Pump(0.4); // o foco vai para a ação padrão do diálogo (A na página abriria o seletor de arquivo, que é modal)
+        Assert.Equal("overlay", Nav.GetGroup(nav.Focused!));
         Press(window, AppCommand.Accept);
         Pump(2);
         var copyPreview = Assert.IsType<PlaynitePreviewViewModel>(shell.TopOverlay);
@@ -313,6 +316,8 @@ public sealed class UiSmokeTests
 
             var installed = shell.ImportThemeFrom(package);
             Assert.True(installed.Succeeded, string.Join('\n', installed.Diagnostics));
+            Pump(0.4);
+            Assert.Equal("overlay", Nav.GetGroup(nav.Focused!));
             Press(window, AppCommand.Accept);
             Pump(3);
             if (shell.TopOverlay is PlaynitePreviewViewModel themePreview)
