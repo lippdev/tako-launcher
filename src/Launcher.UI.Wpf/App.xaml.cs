@@ -10,6 +10,7 @@ using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Steam;
 using Launcher.Core.Persistence;
 using Launcher.Core.Resilience;
+using Launcher.Core.Session.GameScreen;
 using Launcher.Core.Session.Restore;
 using Launcher.Themes.Xaml;
 using Launcher.UI.Wpf.Input;
@@ -130,6 +131,10 @@ public partial class App : Application
         services.AddSingleton<IAudioEndpointService, WindowsAudioEndpoints>();
         services.AddSingleton(_ => new PendingEnvironmentStore(AppPaths.EnvironmentSnapshotFile));
         services.AddSingleton<SessionEnvironmentGuard>();
+        // Tela de jogo (MVP-002): monitores pela pilha portada do Console Mode.
+        services.AddSingleton<IDisplayControlService, WindowsDisplayControl>();
+        services.AddSingleton<IScreenCurtain, WindowsScreenCurtain>();
+        services.AddSingleton(sp => new GameScreenSession(sp.GetRequiredService<IDisplayControlService>(), sp.GetRequiredService<IDisplayConfigurationService>(), sp.GetRequiredService<IScreenCurtain>(), sp.GetRequiredService<ILogger<GameScreenSession>>()));
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
         testServices?.Invoke(services);

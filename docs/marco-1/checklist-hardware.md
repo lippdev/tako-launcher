@@ -143,6 +143,26 @@ Jogo de teste: adicione `C:\Windows\notepad.exe` como jogo, com fim do jogo por 
 | E17 | Log | Depois de E1–E11 | `logs\tako-AAAAMMDD.log` tem "registrados antes de", cada passo restaurado/mantido e "verificada" ou "incompleta" |
 | E18 | Arquivo pendente | Durante o jogo | `session-environment.json` existe na pasta de dados; some depois de voltar |
 
+## 9b. Tela de jogo (MVP-002, [ADR-0015](../adr/0015-monitores-do-console-mode-e-tela-de-jogo.md))
+
+Configurações › **Tela de jogo** (padrão: desligada). Use um PC com monitor + TV (ou dois monitores) e o mesmo jogo de teste da seção 9. Anexe `logs\tako-AAAAMMDD.log` (linhas "Tela de jogo").
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| G1 | Escolher a tela | Ligar a opção; ativar "Tela onde você joga" várias vezes | Sugere a tela que não é a principal; passa por todas as conectadas, inclusive a TV desligada da área de trabalho |
+| G2 | TV desligada da área de trabalho | TV conectada mas fora da área de trabalho (Win+P "Somente tela do PC"); abrir um jogo | A TV liga, vira principal, o monitor desconecta, o Tako vai para a TV; ao fechar o jogo tudo volta como estava (TV fora da área de trabalho) |
+| G3 | Confirmação | Primeira vez com G2 | "Você consegue ver esta tela?" na TV, com contagem de 15 s; A/Enter/clique em "Sim, manter" abre o jogo; na próxima vez não pergunta |
+| G4 | Sem resposta | Como G3, mas sem responder (ou B/Esc, ou "Voltar ao normal") | As telas voltam sozinhas; aviso "Tela de jogo não confirmada"; o jogo não abre |
+| G5 | Cobrir de preto | "Outras telas" › Cobrir de preto | O monitor fica preto (ligado), sem roubar o foco do jogo; some ao fechar o jogo |
+| G6 | Resolução e taxa | Escolher um modo (ex.: 3840 × 2160 · 120 Hz) | Aplicado na TV durante o jogo; volta ao fechar; trocar o modo pede confirmação de novo |
+| G7 | Modo recusado | Escolher um modo que a TV não aceita | O jogo abre no modo atual da TV; o log registra a recusa |
+| G8 | HDR | "Ligar HDR" numa TV com HDR desligado | HDR liga durante o jogo e desliga ao sair; numa tela sem HDR, nada acontece e o log diz "HDR não disponível" |
+| G9 | TV que não acorda | TV desligada da tomada/sem sinal | Depois de ~8 s o Tako desiste, as telas ficam como estavam e o jogo abre na tela atual |
+| G10 | Tela desconectada | Escolher a TV e desconectar o cabo | Aviso "a tela de jogo escolhida não está conectada · o jogo abre na tela atual" |
+| G11 | Jogo que não abre / sem acompanhamento | Atalho inválido; URI sem pasta | As telas voltam logo |
+| G12 | Queda com a tela de jogo em foco | Finalizar `Tako.exe` durante o jogo e abrir de novo | Com "Restaurar monitores e áudio" ligado, aparece a oferta de restauração (seção 9, E14) e as telas voltam |
+| G13 | Restauração sem a configuração exata | Como G12, mas reiniciar o Windows antes | A restauração religa os monitores que estavam ligados e desconecta a TV; o log registra o caminho usado |
+
 ## 10. Supervisor (MVP-006, [ADR-0012](../adr/0012-supervisor-e-ipc.md))
 
 | # | Caso | Esperado |

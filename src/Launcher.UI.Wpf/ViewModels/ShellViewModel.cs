@@ -8,6 +8,7 @@ using ConsoleMode.Runtime;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.Core.Presentation;
+using Launcher.Core.Session.GameScreen;
 using Launcher.Core.Session.Restore;
 using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Services;
@@ -88,6 +89,7 @@ public sealed partial class ShellViewModel : ObservableObject
         PlayniteThemeService playniteThemes,
         PerformanceSimulator performance,
         SessionEnvironmentGuard environment,
+        GameScreenSession gameScreen,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
@@ -99,6 +101,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _playniteThemes = playniteThemes;
         Performance = performance;
         _environment = environment;
+        GameScreen = gameScreen;
         _time = time;
         _logger = logger;
         SyncItems();
@@ -438,7 +441,7 @@ public sealed partial class ShellViewModel : ObservableObject
             // Jogo real: a tela "Iniciando" dá o retorno e o jogo abre por cima do launcher (ShellViewModel.Session.cs).
             Overlays.Remove(launch);
             OnOverlaysChanged();
-            StartRealSession(game);
+            await StartRealSessionAsync(game).ConfigureAwait(true);
             return;
         }
 

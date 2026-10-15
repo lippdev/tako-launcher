@@ -12,7 +12,10 @@ internal static unsafe partial class DisplayNative
     public const int ErrorSuccess = 0;
     public const int ErrorInsufficientBuffer = 122;
 
+    public const uint QdcAllPaths = 0x00000001;
     public const uint QdcOnlyActivePaths = 0x00000002;
+
+    public const uint SdcTopologyExtend = 0x00000004;
 
     public const uint SdcUseSuppliedDisplayConfig = 0x00000020;
     public const uint SdcApply = 0x00000080;
@@ -25,6 +28,8 @@ internal static unsafe partial class DisplayNative
 
     public const uint DeviceInfoGetSourceName = 1;
     public const uint DeviceInfoGetTargetName = 2;
+    public const uint DeviceInfoGetAdvancedColorInfo = 9;
+    public const uint DeviceInfoSetAdvancedColorState = 10;
 
     // DISPLAYCONFIG_ROTATION
     public const uint RotationIdentity = 1;
@@ -36,6 +41,7 @@ internal static unsafe partial class DisplayNative
     public const int EnumCurrentSettings = -1;
     public const uint DmPosition = 0x00000020;
     public const uint DmDisplayOrientation = 0x00000080;
+    public const uint DmBitsPerPel = 0x00040000;
     public const uint DmPelsWidth = 0x00080000;
     public const uint DmPelsHeight = 0x00100000;
     public const uint DmDisplayFrequency = 0x00400000;
@@ -56,6 +62,9 @@ internal static unsafe partial class DisplayNative
 
     [LibraryImport("user32.dll")]
     public static partial int DisplayConfigGetDeviceInfo(DeviceInfoHeader* requestPacket);
+
+    [LibraryImport("user32.dll")]
+    public static partial int DisplayConfigSetDeviceInfo(DeviceInfoHeader* setPacket);
 
     [LibraryImport("user32.dll", EntryPoint = "EnumDisplaySettingsExW", StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -173,6 +182,24 @@ internal static unsafe partial class DisplayNative
         public fixed char MonitorDevicePath[128];
     }
 
+    /// <summary>DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO (32 bytes): bit 0 = HDR suportado, bit 1 = HDR ligado.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GetAdvancedColorInfo
+    {
+        public DeviceInfoHeader Header;
+        public uint Value;
+        public uint ColorEncoding;
+        public uint BitsPerColorChannel;
+    }
+
+    /// <summary>DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE (24 bytes).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SetAdvancedColorState
+    {
+        public DeviceInfoHeader Header;
+        public uint EnableAdvancedColor;
+    }
+
     /// <summary>DEVMODEW (220 bytes), só com os campos de monitor usados aqui.</summary>
     [StructLayout(LayoutKind.Explicit, Size = 220)]
     public struct DevMode
@@ -191,6 +218,9 @@ internal static unsafe partial class DisplayNative
 
         [FieldOffset(84)]
         public uint DisplayOrientation;
+
+        [FieldOffset(168)]
+        public uint BitsPerPel;
 
         [FieldOffset(172)]
         public uint PelsWidth;
