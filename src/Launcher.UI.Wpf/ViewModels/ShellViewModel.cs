@@ -529,7 +529,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 ? "O Tako volta as telas, o áudio e a TV para a mesa e fecha a tela cheia."
                 : "O Tako fecha a tela cheia. Monitores e áudio são restaurados pelo Console Runtime (Marco 1).",
             [
-                new OverlayAction("Sair", ActionStyle.Primary, new AsyncRelayCommand(async () =>
+                new OverlayAction("Sair", ActionStyle.Primary, UiCommand(async () =>
                 {
                     if (IsConsoleModeActive)
                     {

@@ -72,6 +72,7 @@ public sealed partial class ShellViewModel
     /// </summary>
     public async Task RecoverConsoleModeAsync()
     {
+        EnsureUiContext();
         if (!ConsoleSession.HasPendingRecovery)
         {
             return;
@@ -95,6 +96,7 @@ public sealed partial class ShellViewModel
     /// <summary>"Ao abrir o Tako, ir para a tela de jogo": decide e entra (nunca no modo seguro).</summary>
     public async Task StartConsoleModeAsync(bool safeMode)
     {
+        EnsureUiContext();
         switch (ConsoleModePolicy.AtStartup(Settings.ConsoleModeOnLaunch, Settings.GameScreen, safeMode))
         {
             case ConsoleModeStart.Off:
@@ -190,7 +192,7 @@ public sealed partial class ShellViewModel
             "Voltar ao PC?",
             $"{game}As telas, o áudio e a TV voltam a como estavam antes do modo console. O Tako continua aberto.",
             [
-                new OverlayAction("Voltar ao PC", ActionStyle.Primary, new AsyncRelayCommand(async () =>
+                new OverlayAction("Voltar ao PC", ActionStyle.Primary, UiCommand(async () =>
                 {
                     CloseOverlay(dialog!);
                     await ReturnToDeskAsync().ConfigureAwait(true);
@@ -203,6 +205,7 @@ public sealed partial class ShellViewModel
     /// <summary>Sai do modo console fora da thread da UI, com "Voltando para a mesa…" na tela.</summary>
     public async Task ReturnToDeskAsync()
     {
+        EnsureUiContext();
         var report = await RunOffUiAsync(ReturningToDesk, ReturningDetail, () => ConsoleSession.Exit(standbyTv: true)).ConfigureAwait(true);
         AfterConsoleModeLeft(report, "Você está de volta à mesa");
     }
@@ -284,8 +287,22 @@ public sealed partial class ShellViewModel
     }
 
     /// <summary>
+    /// Comando que roda trabalho assíncrono e sempre continua na thread da UI. O contexto é instalado antes de começar
+    /// (fora de um método assíncrono, onde ele seria desfeito ao voltar); falhas vão para o Dispatcher, como as de
+    /// qualquer comando (e daí para o CrashGuard).
+    /// </summary>
+    private RelayCommand UiCommand(Func<Task> action) => new(() =>
+    {
+        EnsureUiContext();
+        RunCommand(action);
+    });
+
+    private static async void RunCommand(Func<Task> action) => await action().ConfigureAwait(true);
+
+    /// <summary>
     /// Os awaits daqui voltam para a thread da UI pelo contexto de sincronização. Chamado fora de um ciclo do Dispatcher
-    /// (ex.: um comando executado direto), a thread da UI ainda não tem o contexto: instala o do Dispatcher dela.
+    /// (ex.: um comando executado direto), a thread da UI ainda não tem o contexto: instala o do Dispatcher dela. Dentro
+    /// de um método assíncrono, vale para os awaits dele (o .NET desfaz a troca ao voltar para quem chamou).
     /// </summary>
     private void EnsureUiContext()
     {

@@ -42,7 +42,7 @@ public sealed partial class ShellViewModel
             "Restaurar monitores e áudio?",
             $"O Tako fechou durante um jogo ({pending.CapturedAt.ToLocalTime():dd/MM HH:mm}) e monitores ou áudio continuam diferentes de antes.",
             [
-                new OverlayAction("Restaurar monitores e áudio como estavam antes do jogo", ActionStyle.Primary, new AsyncRelayCommand(async () =>
+                new OverlayAction("Restaurar monitores e áudio como estavam antes do jogo", ActionStyle.Primary, UiCommand(async () =>
                 {
                     CloseOverlay(dialog!);
                     // Fora da thread da UI: o Windows pode levar alguns segundos para trocar o modo das telas.
