@@ -6,8 +6,9 @@ namespace Launcher.UI.Wpf.Input;
 
 /// <summary>
 /// Leitura de controles XInput (Xbox e compatíveis, inclusive os virtuais da Steam e do DS4Windows). O botão Guia só
-/// aparece em <c>XInputGetStateEx</c> (ordinal 100, não documentado); sem ele, usamos <c>XInputGetState</c> e o botão
-/// View faz o papel do Guia. Controles PlayStation são lidos por HID em <see cref="SonyHidGamepad"/>.
+/// aparece em <c>XInputGetStateEx</c> (ordinal 100, não documentado); sem ele, usamos <c>XInputGetState</c> e o Guia não
+/// é lido (o atalho padrão da Central, View + Y, não depende dele). Controles PlayStation são lidos por HID em
+/// <see cref="SonyHidGamepad"/>.
 /// </summary>
 internal static partial class XInputGamepad
 {

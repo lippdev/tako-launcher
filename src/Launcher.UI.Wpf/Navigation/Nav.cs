@@ -25,7 +25,7 @@ public static class Nav
     public static readonly DependencyProperty AdjustCommandProperty =
         DependencyProperty.RegisterAttached("AdjustCommand", typeof(ICommand), typeof(Nav), new PropertyMetadata(null));
 
-    /// <summary>Container cujo conteúdo rola para manter o foco visível: "Horizontal" ou "Vertical".</summary>
+    /// <summary>Container cujo conteúdo rola para manter o foco visível: "Horizontal" (item na primeira posição), "Reveal" (só o necessário, Central de Controle) ou "Vertical".</summary>
     public static readonly DependencyProperty ScrollHostProperty =
         DependencyProperty.RegisterAttached("ScrollHost", typeof(string), typeof(Nav), new PropertyMetadata(null));
 

@@ -58,9 +58,8 @@ public sealed class GamepadInterpreter
         (GamepadButtons.LeftShoulder, AppCommand.PreviousSection),
         (GamepadButtons.RightShoulder, AppCommand.NextSection),
         (GamepadButtons.Start, AppCommand.Menu),
-        (GamepadButtons.Guide, AppCommand.Guide),
-        // View funciona como Guia quando o sistema captura o botão Xbox.
-        (GamepadButtons.View, AppCommand.Guide),
+
+        // Guia/PS e View não são comandos sozinhos: a Central abre pela combinação segurada (ButtonChordDetector, UX-005).
     ];
 
     private readonly Dictionary<AppCommand, TimeSpan> _held = [];
@@ -82,7 +81,13 @@ public sealed class GamepadInterpreter
         _suppressHeld = true;
     }
 
-    public IReadOnlyList<AppCommand> Update(GamepadSnapshot snapshot, TimeSpan now)
+    /// <param name="snapshot">Leitura do controle.</param>
+    /// <param name="now">Relógio monotônico.</param>
+    /// <param name="ignore">
+    /// Botões que não viram comando agora (o Y de View + Y enquanto o View está pressionado). Ficam "segurados": só valem
+    /// de novo depois de soltos, então soltar o View antes do Y não dispara a busca.
+    /// </param>
+    public IReadOnlyList<AppCommand> Update(GamepadSnapshot snapshot, TimeSpan now, GamepadButtons ignore = GamepadButtons.None)
     {
         var pressed = new HashSet<AppCommand>();
         foreach (var (button, command) in ButtonMap)
@@ -90,6 +95,10 @@ public sealed class GamepadInterpreter
             if (snapshot.Buttons.HasFlag(button))
             {
                 pressed.Add(command);
+                if (ignore.HasFlag(button) && !_held.ContainsKey(command))
+                {
+                    _held[command] = TimeSpan.MaxValue;
+                }
             }
         }
 

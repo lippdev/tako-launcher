@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using CommunityToolkit.Mvvm.ComponentModel;
 using ConsoleMode.Runtime;
 using ConsoleMode.Runtime.SessionTools;
 using Microsoft.Extensions.Logging;
@@ -7,21 +8,43 @@ using Microsoft.Extensions.Logging;
 namespace Launcher.UI.Wpf.ViewModels;
 
 /// <summary>
-/// Central de Controle sobre o jogo real (MVP-026/030): o Guia traz o Tako para a frente com a Central aberta sobre a
-/// arte do jogo; fechá-la devolve o jogo. Daqui saem também as ações que deixam o Tako para trás (alternar janela,
-/// abrir o ControlFS) e o "Encerrar jogo" de um jogo real, que pede para ele fechar como o X da janela.
+/// Central de Controle sobre o jogo real (MVP-026/030). Com o jogo em janela ou em tela cheia sem bordas, o atalho abre
+/// a Central "ao vivo", como a sobreposição da Steam: a janela do Tako fica transparente e sempre no topo, cobrindo o
+/// monitor do jogo, e o jogo continua visível e rodando atrás (<see cref="IsLiveOverlay"/>; a janela é tratada pela
+/// MainWindow). Em tela cheia exclusiva uma janela por cima minimiza o jogo: aí o Tako vem para a frente com a Central
+/// sobre a arte do jogo. Fechar devolve o foco ao jogo. Daqui saem também as ações que deixam o Tako para trás
+/// (alternar janela, abrir o ControlFS) e o "Encerrar jogo" de um jogo real, que pede para ele fechar como o X da janela.
 /// </summary>
 public sealed partial class ShellViewModel
 {
     /// <summary>Fechar a Central sem devolver o foco ao jogo (outra janela ou a Início vão para a frente).</summary>
     private bool _keepGameBehind;
 
-    /// <summary>O Guia, com o Tako em segundo plano, pode abrir a Central: há um jogo real aberto e nada por cima.</summary>
+    /// <summary>A Central está aberta sobre o jogo ao vivo (janela transparente por cima do jogo).</summary>
+    [ObservableProperty]
+    private bool _isLiveOverlay;
+
+    /// <summary>O atalho, com o Tako em segundo plano, pode abrir a Central: há um jogo real aberto e nada por cima.</summary>
     public bool CanOpenControlCenterFromBackground =>
         TopOverlay is null && _backgroundSession is null && IsTrackingRealGame && Session == SessionState.Playing;
 
-    /// <summary>Central de Controle sobre um jogo real: a arte do jogo fica no fundo enquanto ela está aberta.</summary>
-    private async void OpenControlCenterOverRealGame()
+    /// <summary>
+    /// Atalho com o jogo na frente. <paramref name="live"/>: o jogo não está em tela cheia exclusiva, então a Central abre
+    /// por cima dele sem a arte de fundo. Falso se não há o que abrir.
+    /// </summary>
+    public bool OpenControlCenterFromBackground(bool live)
+    {
+        if (!CanOpenControlCenterFromBackground || RunningGame is null)
+        {
+            return false;
+        }
+
+        OpenControlCenterOverRealGame(live);
+        return true;
+    }
+
+    /// <summary>Central de Controle sobre um jogo real: ao vivo, ou com a arte do jogo no fundo.</summary>
+    private async void OpenControlCenterOverRealGame(bool live = false)
     {
         if (RunningGame is not { } game)
         {
@@ -29,14 +52,33 @@ public sealed partial class ShellViewModel
         }
 
         var session = new GameSessionViewModel(game, SessionOptions) { IsRealGame = true };
-        PushOverlay(session);
+        if (live)
+        {
+            IsLiveOverlay = true; // a MainWindow já está transparente por cima do jogo
+        }
+        else
+        {
+            PushOverlay(session);
+        }
+
         PushOverlay(new ControlCenterViewModel(this, session, SessionTools));
-        session.Frame = await game.LoadHeroAsync().ConfigureAwait(true);
+        session.Frame = await game.LoadHeroAsync().ConfigureAwait(true); // ao vivo, só para o cartão de captura
     }
 
     /// <summary>Depois de fechar a Central: o fundo do jogo real sai junto e, se for o caso, o jogo volta à frente.</summary>
     private void OnControlCenterClosed()
     {
+        if (IsLiveOverlay)
+        {
+            IsLiveOverlay = false; // a janela some de cima do jogo antes de ele voltar ao primeiro plano
+            if (!_keepGameBehind)
+            {
+                TryResumeRealGame();
+            }
+
+            return;
+        }
+
         if (TopOverlay is not GameSessionViewModel { IsRealGame: true } real)
         {
             return;
@@ -60,7 +102,7 @@ public sealed partial class ShellViewModel
         }
     }
 
-    /// <summary>Abre o ControlFS por cima do jogo; o Guia traz a Central de volta.</summary>
+    /// <summary>Abre o ControlFS por cima do jogo; o atalho da Central a traz de volta.</summary>
     public void OpenControlFs(ControlCenterViewModel center)
     {
         CloseControlCenterKeepingGameBehind(center);

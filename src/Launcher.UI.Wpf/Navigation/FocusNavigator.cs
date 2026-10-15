@@ -18,6 +18,13 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
     private const double SafeBottom = 1080 - 130;
     private const double RowRightMargin = 72;
 
+    /// <summary>Folga do item focado nas fileiras "Reveal": anel de foco (10) e um respiro.</summary>
+    private const double RevealPadding = 16;
+
+    /// <summary>Deslocamento pedido por último a cada fileira "Reveal" (a animação pode estar no meio do caminho).</summary>
+    private static readonly DependencyProperty RevealOffsetProperty =
+        DependencyProperty.RegisterAttached("RevealOffset", typeof(double), typeof(FocusNavigator), new PropertyMetadata(0d));
+
     private readonly Dictionary<string, FocusMemory> _groupMemory = [];
     private FocusMemory? _lastOutsideSidebar;
 
@@ -247,7 +254,16 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
                 continue;
             }
 
-            if (mode == "Horizontal")
+            if (mode == "Reveal")
+            {
+                // Central de Controle: anda só o necessário para o item caber inteiro, com folga nas bordas.
+                double x = element.TransformToAncestor(host).Transform(default).X;
+                double visible = viewport.ActualWidth - System.Windows.Controls.Canvas.GetLeft(host) - RowRightMargin;
+                double offset = RowReveal.Offset(x, element.ActualWidth, host.ActualWidth, visible, RevealPadding, (double)host.GetValue(RevealOffsetProperty));
+                host.SetValue(RevealOffsetProperty, offset);
+                Animate(translate, TranslateTransform.XProperty, -offset);
+            }
+            else if (mode == "Horizontal")
             {
                 double x = element.TransformToAncestor(host).Transform(default).X;
                 double visible = viewport.ActualWidth - System.Windows.Controls.Canvas.GetLeft(host) - RowRightMargin;

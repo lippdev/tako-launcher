@@ -47,7 +47,22 @@ Rodar o launcher (biblioteca real: jogos da Steam + adicionados):
 dotnet run --project src/Launcher.UI.Wpf -c Release
 ```
 
-Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualShock 4, por USB ou Bluetooth, lido direto por HID), teclado ou mouse. Teclado: setas, Enter, Esc, F (favoritar), Q/E (seções), M (configurações), Shift+Tab (Central de Controle, como na Steam; no controle, Guia ou PS). Dados do usuário e caches ficam em `%LOCALAPPDATA%\Tako` na versão instalada, ou em `Tako_Data` ao lado do executável na portátil (e ao rodar pelo `dotnet run`); nenhuma arte de jogo vai para o repositório.
+Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualShock 4, por USB ou Bluetooth, lido direto por HID), teclado ou mouse.
+
+### Controles
+
+| Ação | Controle Xbox | PlayStation | Teclado |
+|---|---|---|---|
+| Navegar | Direcional ou analógico esquerdo | Direcional ou analógico esquerdo | Setas |
+| Selecionar / voltar | A / B | ✕ / ○ | Enter / Esc |
+| Favoritar · buscar | X · Y | □ · △ | F · / |
+| Trocar de seção | LB / RB | L1 / R1 | Q / E |
+| Configurações (ou ações da capa em foco) | Menu (☰) | Options | M |
+| **Central de Controle** (abrir e fechar, durante o jogo) | **segurar View + Y** por meio segundo | **segurar Create + △** (Share + △ no DualShock 4) | **Ctrl+Shift+T** |
+
+O atalho da Central muda em Configurações › "Abrir a Central de Controle no controle" e "… no teclado" (há "Restaurar atalhos padrão"). O Guia/PS e o Shift+Tab não abrem mais a Central: o Guia abre a Barra de Jogo do Xbox e a Steam, e o Shift+Tab é a sobreposição da Steam. Com um jogo em janela ou em tela cheia sem bordas, a Central abre por cima do jogo, que continua rodando atrás; em tela cheia exclusiva, o Tako vem para a frente com a arte do jogo (detalhes no [DESIGN.md](DESIGN.md), Menu rápido).
+
+Dados do usuário e caches ficam em `%LOCALAPPDATA%\Tako` na versão instalada, ou em `Tako_Data` ao lado do executável na portátil (e ao rodar pelo `dotnet run`); nenhuma arte de jogo vai para o repositório.
 
 ```
 dotnet restore

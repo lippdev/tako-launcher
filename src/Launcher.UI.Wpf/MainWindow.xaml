@@ -101,6 +101,13 @@
       <c:PlayniteMainHost x:Name="PlayniteHost" Session="{Binding PlayniteUi}" Panel.ZIndex="10"
                           Visibility="{Binding IsPlayniteUiVisible, Converter={StaticResource BoolToVisibility}}" />
 
+      <!--
+        Central de Controle ao vivo sobre o jogo (como a sobreposição da Steam): a janela fica transparente e só esta
+        camada do Tako escurece um pouco; o jogo continua visível e rodando atrás (MainWindow.ControlCenter.cs).
+      -->
+      <Rectangle x:Name="LiveScrim" Fill="#4D05070C" Panel.ZIndex="15" IsHitTestVisible="False"
+                 Visibility="{Binding IsLiveOverlay, Converter={StaticResource BoolToVisibility}}" />
+
       <!-- Sobreposições empilhadas: a última fica por cima. -->
       <ItemsControl x:Name="OverlayHost" ItemsSource="{Binding Overlays}" Panel.ZIndex="20" Focusable="False">
         <ItemsControl.ItemsPanel>

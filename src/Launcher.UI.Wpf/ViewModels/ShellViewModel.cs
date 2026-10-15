@@ -397,7 +397,7 @@ public sealed partial class ShellViewModel : ObservableObject
         GoHome();
         if (game is not null)
         {
-            Toast($"{game.Title} continua rodando · {GuideName} volta ao jogo");
+            Toast($"{game.Title} continua rodando · {GuideName} para voltar ao jogo");
         }
 
         OnOverlaysChanged();
@@ -436,7 +436,7 @@ public sealed partial class ShellViewModel : ObservableObject
         OnOverlaysChanged();
     }
 
-    /// <summary>Botão Guia / PS (ou View / Shift+Tab, como na Steam).</summary>
+    /// <summary>Abre ou fecha a Central de Controle: combinação segurada no controle (padrão View + Y) ou atalho de teclado (UX-005).</summary>
     public void Guide()
     {
         switch (TopOverlay)
@@ -457,13 +457,6 @@ public sealed partial class ShellViewModel : ObservableObject
                 break;
         }
     }
-
-    public string GuideName => (InputKind, IsPlayStationPad) switch
-    {
-        (InputKind.Gamepad, true) => "PS",
-        (InputKind.Gamepad, false) => "Guia",
-        _ => "Shift+Tab",
-    };
 
     private GameSessionViewModel? _backgroundSession;
 
@@ -502,7 +495,7 @@ public sealed partial class ShellViewModel : ObservableObject
         SessionTools.BeginSession(choices: ToolChoices(ResolveSessionSettings(game.Id)));
         PushOverlay(session);
         CurrentPage.Refresh();
-        Toast($"Jogando {game.Title} · {GuideName} abre o menu rápido");
+        Toast($"Jogando {game.Title} · {GuideName} para abrir a Central");
         session.Frame = await game.LoadHeroAsync().ConfigureAwait(true);
     }
 
@@ -671,7 +664,7 @@ public sealed partial class ShellViewModel : ObservableObject
         (CurrentPage as SettingsViewModel)?.OnInputKindChanged(); // "Mostrar FPS" só com teclado e mouse
     }
 
-    partial void OnIsPlayStationPadChanged(bool value) => UpdateHints();
+    partial void OnIsPlayStationPadChanged(bool value) => OnShortcutsChanged();
 
     private void UpdateHints()
     {
@@ -680,6 +673,9 @@ public sealed partial class ShellViewModel : ObservableObject
         switch (TopOverlay)
         {
             case GameSessionViewModel:
+                break;
+            case ShortcutCaptureViewModel capture:
+                list.Add(("b", capture.IsGamepad ? "Toque para cancelar" : "Cancelar", AppCommand.Back));
                 break;
             case ControlCenterViewModel center:
                 list.Add(("a", "Selecionar", AppCommand.Accept));
@@ -750,7 +746,8 @@ public sealed partial class ShellViewModel : ObservableObject
         Hints.Clear();
         foreach (var (buttons, label, command) in list)
         {
-            Hints.Add(new HintViewModel(buttons.Split('+').Select(b => Glyph(b, key, IsPlayStationPad)).ToList(), label, key, command));
+            var glyphs = buttons == "guide" ? GuideGlyphs(key) : buttons.Split('+').Select(b => Glyph(b, key, IsPlayStationPad)).ToList();
+            Hints.Add(new HintViewModel(glyphs, label, key, command));
         }
     }
 
@@ -763,7 +760,6 @@ public sealed partial class ShellViewModel : ObservableObject
         ("lb", false, true) => "L1",
         ("rb", false, true) => "R1",
         ("menu", false, true) => "Options",
-        ("guide", false, true) => "PS",
         _ => Glyph(button, keyboard),
     };
 
@@ -776,7 +772,6 @@ public sealed partial class ShellViewModel : ObservableObject
         ("lb", true) => "Q",
         ("rb", true) => "E",
         ("menu", true) => "M",
-        ("guide", true) => "Shift+Tab",
         ("left", true) => "←",
         ("right", true) => "→",
         ("a", false) => "A",
@@ -786,7 +781,6 @@ public sealed partial class ShellViewModel : ObservableObject
         ("lb", false) => "LB",
         ("rb", false) => "RB",
         ("menu", false) => "☰",
-        ("guide", false) => "Guia",
         ("left", false) => "◀",
         ("right", false) => "▶",
         _ => button.ToUpperInvariant(),
