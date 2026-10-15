@@ -19,7 +19,7 @@ Regras:
 2. `feature/*` → `develop`: **squash merge**. `release/*` e `hotfix/*` → `main`: **merge commit** (`--no-ff`), depois tag e merge de volta em `develop`.
 3. Branches de feature vivem poucos dias; histórias grandes são quebradas. Faça rebase em `develop` antes do PR.
 4. Apague a branch após o merge.
-5. Tags: `vMAJOR.MINOR.PATCH` (SemVer; pré-lançamentos `-alpha.N`, `-beta.N`, `-rc.N`).
+5. Tags: `vMAJOR.MINOR.PATCH` (SemVer; pré-lançamentos `-alpha.N`, `-beta.N`, `-rc.N`). Builds `-alpha.N` para teste podem ser marcadas direto em `develop`; `beta`, `rc` e versões finais saem de `release/*` → `main`. Toda tag `v*` dispara `.github/workflows/release.yml`, que publica os zips na página da release.
 
 ## 2. Commits — Conventional Commits
 
