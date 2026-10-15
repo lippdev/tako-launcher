@@ -539,7 +539,7 @@
         <Border Grid.Row="2" Background="{DynamicResource BottomBarBackgroundBrush}" Padding="72,18">
           <DockPanel>
             <p10:ButtonEx DockPanel.Dock="Right" Style="{DynamicResource ButtonBottomMenu}" Command="{Binding Close}" nav:Nav.Group="p10-bar" Padding="18,8">
-              <TextBlock Text="Voltar ao UltraLauncher" Style="{DynamicResource TextBlockBaseStyle}" />
+              <TextBlock Text="Voltar ao Tako" Style="{DynamicResource TextBlockBaseStyle}" />
             </p10:ButtonEx>
             <ItemsControl ItemsSource="{Binding RejectedLines}" Focusable="False">
               <ItemsControl.ItemTemplate>
@@ -582,7 +582,7 @@
           <c:Icon Key="Icon.Alert" Width="48" Height="48" Foreground="{DynamicResource ErrorBrush}" />
         </Border>
         <TextBlock Text="O tema não pôde ser carregado" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" />
-        <TextBlock Text="O UltraLauncher voltou para o tema padrão. Seus jogos e configurações não foram alterados." Margin="0,18,0,0"
+        <TextBlock Text="O Tako voltou para o tema padrão. Seus jogos e configurações não foram alterados." Margin="0,18,0,0"
                    FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
         <ItemsControl ItemsSource="{Binding Actions}" Margin="0,44,0,0" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}" ItemTemplate="{StaticResource OverlayActionTemplate}" />
         <TextBlock Text="{Binding Detail}" Margin="0,30,0,0" FontFamily="Consolas" FontSize="{DynamicResource FsLabelSm}" Foreground="#73FFFFFF" TextWrapping="Wrap" />

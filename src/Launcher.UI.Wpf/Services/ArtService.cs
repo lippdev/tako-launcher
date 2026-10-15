@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Launcher.UI.Wpf.Services;
 
 /// <summary>
-/// Baixa capas e artes para um cache local (%LOCALAPPDATA%\UltraLauncher\cache\art) e entrega imagens prontas.
+/// Baixa capas e artes para um cache local (%LOCALAPPDATA%\Tako\cache\art) e entrega imagens prontas.
 /// Arte de jogo nunca vai para o repositório; sem rede, a UI usa o fallback (gradiente + título).
 /// </summary>
 public sealed partial class ArtService : IDisposable
@@ -22,9 +22,9 @@ public sealed partial class ArtService : IDisposable
     public ArtService(ILogger<ArtService> logger)
     {
         _logger = logger;
-        _cacheDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UltraLauncher", "cache", "art");
+        _cacheDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako", "cache", "art");
         // Wikipedia e outros CDNs exigem User-Agent identificável.
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("UltraLauncher/0.1 (+https://github.com/lippdev/ultralauncher)");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("Tako/0.1 (+https://github.com/lippdev/ultralauncher)");
     }
 
     /// <summary>Imagem decodificada na largura pedida, ou nulo se não houver arte ou rede.</summary>

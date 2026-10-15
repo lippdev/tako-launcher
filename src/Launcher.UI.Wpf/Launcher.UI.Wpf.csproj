@@ -3,6 +3,11 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- Nome do produto: o executável é Tako.exe; namespaces continuam Launcher.UI.Wpf. -->
+    <AssemblyName>Tako</AssemblyName>
+    <RootNamespace>Launcher.UI.Wpf</RootNamespace>
+    <Product>Tako</Product>
+    <ApplicationIcon>Assets\Brand\tako.ico</ApplicationIcon>
     <!-- LibraryImport (XInput) gera código unsafe. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -19,6 +24,7 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\Fonts\*.ttf" />
+    <Resource Include="Assets\Brand\*" />
     <None Include="Assets\Fonts\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
     <!-- Temas são dados não confiáveis: ficam soltos na pasta de saída e passam pelo carregador XAML restrito (MVP-016). -->
     <Page Remove="Themes\**\*.xaml" />

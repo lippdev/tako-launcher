@@ -445,7 +445,7 @@ public sealed partial class ShellViewModel : ObservableObject
         DialogViewModel? dialog = null;
         dialog = new DialogViewModel(
             "Sair para o desktop?",
-            "O UltraLauncher fecha a tela cheia. Monitores e áudio são restaurados pelo Console Runtime (Marco 1).",
+            "O Tako fecha a tela cheia. Monitores e áudio são restaurados pelo Console Runtime (Marco 1).",
             [
                 new OverlayAction("Sair", ActionStyle.Primary, new RelayCommand(() => System.Windows.Application.Current.Shutdown()), IsDefault: true),
                 new OverlayAction("Cancelar", ActionStyle.Secondary, new RelayCommand(() => CloseOverlay(dialog!))),

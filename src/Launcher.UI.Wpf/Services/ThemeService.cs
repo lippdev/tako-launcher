@@ -50,7 +50,7 @@ public sealed partial class ThemeService(RestrictedXamlLoader loader, ILogger<Th
     /// <summary>Tema padrão embutido no executável: funciona mesmo se a pasta Themes for apagada ou corrompida.</summary>
     public void ApplyEmbeddedDefault()
     {
-        var uri = new Uri($"pack://application:,,,/Launcher.UI.Wpf;component/Themes/{DefaultTheme}/{TokensFile}");
+        var uri = new Uri($"pack://application:,,,/Tako;component/Themes/{DefaultTheme}/{TokensFile}");
         var info = Application.GetResourceStream(uri) ?? throw new InvalidOperationException("Tema padrão embutido ausente.");
         using var reader = new StreamReader(info.Stream);
         Swap(loader.Parse(reader.ReadToEnd(), uri.AbsoluteUri, TokensFile));

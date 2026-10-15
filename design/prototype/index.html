@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UltraLauncher — protótipo</title>
+<title>Tako — protótipo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -312,7 +312,7 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
   <div class="backdrop" id="bgB"><div class="tint"></div><div class="art"></div><div class="fade"></div></div>
 
   <aside class="sidebar" id="sidebar">
-    <div class="brand"><div class="mark">U</div><div class="name">UltraLauncher</div></div>
+    <div class="brand"><div class="mark">T</div><div class="name">Tako</div></div>
     <div class="side-item" data-nav data-group="sidebar" data-route="home"><span class="ico" data-icon="home"></span><span class="label">Início</span></div>
     <div class="side-group">Biblioteca</div>
     <div class="side-item" data-nav data-group="sidebar" data-route="library" data-filter="all"><span class="ico" data-icon="grid"></span><span class="label">Todos os jogos</span><span class="count" data-count="all"></span></div>
@@ -415,7 +415,7 @@ body { font-family: Inter, system-ui, sans-serif; color: var(--on-accent); -webk
     <div class="inner">
       <div class="warn-ico"><span data-icon="alert"></span></div>
       <div class="hero-title" style="font-size:var(--fs-headline-lg)">O tema não pôde ser carregado</div>
-      <div class="desc">O UltraLauncher voltou para um modo seguro. Seus jogos e configurações não foram alterados.</div>
+      <div class="desc">O Tako voltou para um modo seguro. Seus jogos e configurações não foram alterados.</div>
       <div class="actions">
         <div class="btn primary" data-nav data-group="recovery" data-action="recover-default">Usar tema padrão</div>
         <div class="btn secondary" data-nav data-group="recovery" data-action="recover-retry">Tentar de novo</div>
@@ -1256,7 +1256,7 @@ function capture() {
   closeOverlay();
   const f = document.getElementById('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
   state.captures += 1;
-  toast('Captura salva em Imagens › UltraLauncher');
+  toast('Captura salva em Imagens › Tako');
 }
 
 function quickOption(el) {
@@ -1348,7 +1348,7 @@ function guide() {
 
 function confirmExit() {
   document.getElementById('dlg-title').textContent = 'Sair para o desktop?';
-  document.getElementById('dlg-text').textContent = 'O UltraLauncher fecha a tela cheia e restaura monitores e áudio como estavam antes da sessão.';
+  document.getElementById('dlg-text').textContent = 'O Tako fecha a tela cheia e restaura monitores e áudio como estavam antes da sessão.';
   document.getElementById('dlg-actions').innerHTML = `<div class="btn primary" data-nav data-group="dlg" data-action="dlg-exit">Sair</div><div class="btn secondary" data-nav data-group="dlg" data-action="dlg-cancel">Cancelar</div>`;
   openOverlay('dialog');
 }

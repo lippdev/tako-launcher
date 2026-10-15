@@ -19,7 +19,7 @@ internal static class EnvironmentReport
         var report = new StringBuilder();
         void Line(string text) => report.AppendLine(text);
 
-        Line($"UltraLauncher FseProbe — {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        Line($"Tako FseProbe — {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
         Line(string.Empty);
 
         using (var nt = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))

@@ -13,7 +13,7 @@ internal static partial class Program
     private const int AttachParentProcess = -1;
 
     public static string LogDirectory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "UltraLauncher-FseProbe");
+        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Tako-FseProbe");
 
     [STAThread]
     private static int Main(string[] args)

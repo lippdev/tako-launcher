@@ -145,7 +145,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
     {
         _options.Captures++;
         _shell.CloseOverlay(this);
-        _shell.Toast("Captura salva em Imagens › UltraLauncher");
+        _shell.Toast("Captura salva em Imagens › Tako");
     }
 
     private void OpenPopover(string key)
