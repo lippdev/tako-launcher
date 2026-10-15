@@ -70,7 +70,7 @@ public sealed class ThemeFileBindingExtension : MarkupExtension
             binding.FallbackValue = FallbackValue;
         }
 
-        return binding.ProvideValue(serviceProvider);
+        return StaticValue.Bind(binding, serviceProvider);
     }
 
     private sealed class ThemeFileConverter(string? root, string? format, Type? targetType) : IValueConverter
@@ -172,6 +172,16 @@ internal static class ThemeFiles
 /// </summary>
 internal static class StaticValue
 {
+    /// <summary>
+    /// Binding pronto para o destino: expressão numa propriedade de dependência; o próprio binding nos demais destinos
+    /// (<c>Setter.Value</c>, <c>DataTrigger.Binding</c>), onde o WPF o aplica depois.
+    /// </summary>
+    public static object Bind(BindingBase binding, IServiceProvider serviceProvider)
+    {
+        var target = serviceProvider.GetService(typeof(IProvideValueTarget)) as IProvideValueTarget;
+        return target is { TargetObject: DependencyObject, TargetProperty: DependencyProperty } ? binding.ProvideValue(serviceProvider) : binding;
+    }
+
     public static object? Provide(IServiceProvider serviceProvider, object? value)
     {
         var target = serviceProvider.GetService(typeof(IProvideValueTarget)) as IProvideValueTarget;
@@ -282,7 +292,7 @@ public sealed class SettingsBindingExtension : MarkupExtension
             Source = new SettingValue(P10SettingsValues.Get(Path) ?? FallbackValue),
             Mode = Mode,
         };
-        return binding.ProvideValue(serviceProvider);
+        return StaticValue.Bind(binding, serviceProvider);
     }
 
     /// <summary>Valor isolado por uso da extensão.</summary>
@@ -353,6 +363,6 @@ public sealed class ApiExtension : MarkupExtension
             binding.FallbackValue = FallbackValue;
         }
 
-        return binding.ProvideValue(serviceProvider);
+        return StaticValue.Bind(binding, serviceProvider);
     }
 }

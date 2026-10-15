@@ -81,8 +81,9 @@ public class Main : Control
 
         if (Part<FrameworkElement>("PART_ElemGameDetails") is { } details)
         {
-            details.SetBinding(VisibilityProperty, new Binding(nameof(P10MainModel.GameDetailsVisible)) { Converter = Visible });
-            details.SetBinding(DataContextProperty, new Binding(nameof(P10MainModel.SelectedGame)));
+            // O DataContext dos detalhes é o jogo; a visibilidade vem do modelo do Main (fonte explícita).
+            details.SetBinding(VisibilityProperty, new Binding($"{nameof(DataContext)}.{nameof(P10MainModel.GameDetailsVisible)}") { Source = this, Converter = Visible, FallbackValue = Visibility.Collapsed });
+            details.SetBinding(DataContextProperty, new Binding($"{nameof(DataContext)}.{nameof(P10MainModel.SelectedGame)}") { Source = this });
             if (details is GameDetails view)
             {
                 view.SetBinding(GameDetails.ModelProperty, new Binding(nameof(DataContext)) { Source = this });
