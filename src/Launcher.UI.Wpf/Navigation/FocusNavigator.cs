@@ -19,6 +19,7 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
     private const double RowRightMargin = 72;
 
     private readonly Dictionary<string, WeakReference<FrameworkElement>> _groupMemory = [];
+    private WeakReference<FrameworkElement>? _lastOutsideSidebar;
 
     public event EventHandler<FrameworkElement?>? FocusChanged;
 
@@ -63,6 +64,13 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
                 Focus(linked);
                 return true;
             }
+        }
+
+        // Sair da barra lateral para a direita volta exatamente para onde o usuário estava.
+        if (group == "sidebar" && direction == NavDirection.Right && _lastOutsideSidebar?.TryGetTarget(out var back) == true && all.Contains(back))
+        {
+            Focus(back);
+            return true;
         }
 
         var next = SpatialNavigator.FindNext(RectOf(Focused), candidates.Select(e => new NavCandidate<FrameworkElement>(e, RectOf(e), Nav.GetGroup(e) ?? string.Empty)), direction);
@@ -112,6 +120,10 @@ public sealed class FocusNavigator(FrameworkElement stage, Func<IReadOnlyList<Fr
         if (Nav.GetGroup(element) is string group)
         {
             _groupMemory[group] = new WeakReference<FrameworkElement>(element);
+            if (group != "sidebar")
+            {
+                _lastOutsideSidebar = new WeakReference<FrameworkElement>(element);
+            }
         }
 
         if (!element.IsKeyboardFocused)
