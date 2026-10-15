@@ -150,9 +150,10 @@ public sealed partial class ShellViewModel
     {
         OnPropertyChanged(nameof(IsPlayniteUiVisible));
         UpdateHints();
-        if (IsPlayniteUiVisible && TopOverlay is null)
+        if (TopOverlay is null)
         {
-            FocusPlayniteLater(PlayniteUi?.SelectedFocusKey);
+            // Com o tema: capa selecionada. Sem ele (tema fechado na tela inicial): o foco volta à página do Tako.
+            FocusPlayniteLater(IsPlayniteUiVisible ? PlayniteUi?.SelectedFocusKey : CurrentPage.DefaultFocusKey);
         }
     }
 
