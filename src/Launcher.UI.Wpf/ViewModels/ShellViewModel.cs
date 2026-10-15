@@ -528,6 +528,7 @@ public sealed partial class ShellViewModel : ObservableObject
         OnPropertyChanged(nameof(IsInGame));
         OnPropertyChanged(nameof(IsQuickMenuOpen));
         UpdateHints();
+        OnOverlaysChangedForUpdates();
     }
 
     // ---------------------------------------------------------------- Fundo dinâmico

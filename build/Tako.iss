@@ -77,8 +77,14 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
-; Silent installs (future in-app updates): bring the app back afterwards.
-Filename: "{app}\{#AppExe}"; Flags: nowait; Check: WizardSilent
+; Silent installs (in-app updates): bring the app back afterwards, unless the update runs as the app exits (/NOLAUNCH=1).
+Filename: "{app}\{#AppExe}"; Flags: nowait; Check: RelaunchAfterSilentUpdate
+
+[Code]
+function RelaunchAfterSilentUpdate: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:NOLAUNCH|0}') = '0');
+end;
 
 [UninstallDelete]
 Type: files; Name: "{app}\Tako.installed"

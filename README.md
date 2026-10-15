@@ -16,7 +16,7 @@ Na [página de releases](https://github.com/lippdev/ultralauncher/releases), no 
 - **Instalador:** `Tako-Setup-x64.exe` — instala para o seu usuário (sem administrador), com atalho no Menu Iniciar; dados em `%LOCALAPPDATA%\Tako`.
 - **Portátil:** `Tako-Portable-x64.exe` — um único executável; guarda os dados na pasta `Tako_Data` ao lado do arquivo.
 
-Nenhum dos dois exige o .NET instalado. Para gerar localmente: `.\build\Publish-Tako.ps1 -Version 0.1.0` (o instalador precisa do Inno Setup 6).
+Nenhum dos dois exige o .NET instalado. Depois de instalado, o Tako se atualiza sozinho: ao abrir, baixa a versão nova em segundo plano (conferida pelo SHA-256 do GitHub) e instala ao reiniciar ou ao sair. Para gerar localmente: `.\build\Publish-Tako.ps1 -Version 0.1.0` (o instalador precisa do Inno Setup 6).
 
 ## Estrutura
 
