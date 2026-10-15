@@ -241,7 +241,7 @@ public sealed partial class ShellViewModel : ObservableObject
             SetBackdrop(library.Games[0]);
         }
 
-        RequestFocus(null);
+        RequestFocus(page.DefaultFocusKey);
     }
 
     private string? FocusKeyOfCurrent() => _focusedContext is GameItemViewModel g && _focusedGroup is not null ? $"{_focusedGroup}:{g.Id}" : null;

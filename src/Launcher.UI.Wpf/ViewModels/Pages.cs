@@ -16,6 +16,9 @@ public abstract partial class PageViewModel(ShellViewModel shell) : ObservableOb
     /// <summary>Rota da barra lateral que fica marcada ("home", "library:all", "settings").</summary>
     public abstract string RouteKey { get; }
 
+    /// <summary>Elemento que recebe o foco ao abrir a página (<c>Nav.Key</c>); nulo usa o marcado como padrão.</summary>
+    public virtual string? DefaultFocusKey => null;
+
     /// <summary>Chamado quando uma capa desta página recebe o foco.</summary>
     public virtual void OnGameFocused(GameItemViewModel game)
     {
@@ -146,6 +149,9 @@ public sealed partial class LibraryViewModel : PageViewModel
     public string CountText => Games.Count == 1 ? "1 jogo" : $"{Games.Count} jogos";
 
     public string SortLabel => Sorts[_sortIndex].Label;
+
+    /// <summary>A biblioteca abre na primeira capa, não no botão de ordenar.</summary>
+    public override string? DefaultFocusKey => Games.Count > 0 ? $"grid:{Games[0].Id}" : null;
 
     public override void OnGameFocused(GameItemViewModel game) => Shell.SetBackdrop(game);
 
