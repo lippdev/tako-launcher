@@ -4,6 +4,8 @@ Casos que o CI não cobre: precisam de monitores, áudio, controles, Steam e Win
 
 Como registrar: copie a tabela de resultados no fim deste arquivo para a PR ou issue, uma linha por máquina, e anexe o log do dia `logs\tako-AAAAMMDD.log` (pasta de dados, ver abaixo) quando algo falhar.
 
+**Em toda execução, anexe o diagnóstico do sistema** (MVP-034): Configurações › **Diagnóstico do sistema** › **Gerar**. O relatório traz versão e tipo de instalação do Tako, Windows/build, processador e memória, cada monitor (resolução, proporção, escala, Hz e placa de vídeo), controles detectados (XInput e PlayStation por HID), Steam e número de jogos, estado do Xbox mode com os sinais lidos e modo seguro. Não tem nome de usuário, nome do computador nem lista de jogos (a pasta do perfil aparece como `%USERPROFILE%`). **Copiar** põe o texto na área de transferência; o arquivo fica em `logs\diagnostico-AAAAMMDD-HHMMSS.txt`. Gere de novo depois de trocar monitor ou controle (casos M7/M8, C1–C8) para registrar o estado que o Tako viu.
+
 - Pasta de dados: instalado → `%LOCALAPPDATA%\Tako`; portátil → `Tako_Data` ao lado do `.exe`.
 - Marcador de sessão: `session.json` na pasta de dados (`Running: true` enquanto o Tako está aberto).
 
@@ -110,7 +112,7 @@ Linha em Configurações › **Xbox mode (tela cheia do Windows)**.
 | F2 | Windows 11 24H2+ sem o app Xbox | **Indisponível** |
 | F3 | Desktop/notebook 24H2+ com app Xbox | **Indeterminado** (rollout gradual da Microsoft; nunca "Suportado" sem sinal positivo) |
 | F4 | Portátil de jogos (ROG Ally, Legion Go…) 24H2+ com app Xbox | **Suportado** |
-| F5 | Comparar com Configurações › Jogos › Xbox mode do Windows | Se o Windows mostra o Xbox mode e o Tako diz "Indisponível", é falso negativo: anotar build, `DeviceForm` e a saída do `Launcher.FseProbe` |
+| F5 | Comparar com Configurações › Jogos › Xbox mode do Windows | Se o Windows mostra o Xbox mode e o Tako diz "Indisponível", é falso negativo: anexar o diagnóstico do sistema (linha "Sinais": build, app Xbox, `DeviceForm`) e a saída do `Launcher.FseProbe` |
 
 Em todos os casos o Tako abre em tela cheia convencional; registrar-se como app inicial do Xbox mode depende de autorização da Microsoft (ver `docs/spikes/MVP-007-fse.md`).
 
@@ -157,6 +159,10 @@ Jogo de teste: adicione `C:\Windows\notepad.exe` como jogo, com fim do jogo por 
 
 ## Resultados
 
-| Data | Máquina (CPU/GPU) | Windows (build) | Monitor(es) | Controles | Versão do Tako | Falhas (IDs) | Observações |
-|---|---|---|---|---|---|---|---|
-| | | | | | | | |
+Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.
+
+| Data | Máquina (CPU/GPU) | Windows (build) | Monitor(es) | Controles | Versão do Tako | Falhas (IDs) | Diagnóstico anexado | Observações |
+|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | |
+
+Para medir desempenho na mesma máquina, rode também o [benchmark](benchmark.md) e preencha a linha dela em "Máquinas de referência".
