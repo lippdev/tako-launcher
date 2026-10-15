@@ -44,7 +44,7 @@ internal static class Orchestrator
     public static int Run(Options options)
     {
         bool quick = options.Has("quick");
-        var sizes = options.Ints("sizes", quick ? [20] : [20, 200, 1000]);
+        var sizes = options.Ints("sizes", quick ? [20] : [20, 200, 1000, 5000]);
         int warm = options.Int("warm", quick ? 2 : 5);
         int idle = options.Int("idle-seconds", quick ? 3 : 10);
         int load = options.Int("load-seconds", quick ? 4 : 10);
