@@ -13,3 +13,4 @@ artifacts/
 .env
 .gstack/
 .DS_Store
+packaging/fse-dev/layout/

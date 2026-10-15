@@ -19,6 +19,9 @@ src/
   ConsoleMode.Runtime/           contratos de sessão/monitores/áudio/IPC (net8.0 + net10.0)
 tools/
   Launcher.ThemeCheck/           valida uma pasta de tema com o carregador XAML restrito (spike MVP-016)
+  Launcher.FseProbe/             coleta sinais do Xbox mode / FSE e testa o ciclo de vida de home app (spike MVP-007)
+packaging/
+  fse-dev/                       pacote de desenvolvimento da FseProbe como gaming home app (só Modo de Desenvolvedor)
 tests/                           xUnit
 ```
 
