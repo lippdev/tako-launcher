@@ -6,8 +6,10 @@ namespace Launcher.ThemeCheck;
 
 /// <summary>
 /// Ferramenta de spike (MVP-016): roda o validador XAML sobre uma pasta de tema extraída e resume as violações.
-/// Uso: Launcher.ThemeCheck &lt;pasta-do-tema&gt; [--load] [--p10]
-/// <c>--p10</c> usa a política do adaptador Playnite 10 (controles e extensões que ele implementa).
+/// Uso: Launcher.ThemeCheck &lt;pasta-do-tema&gt; [--load] [--p10] [--base &lt;pasta-do-tema-padrão&gt;]
+/// <c>--p10</c> usa a política do adaptador Playnite 10 (controles e extensões que ele implementa). Com <c>--p10 --load</c>
+/// o tema é composto como na prévia do launcher (<see cref="P10Theme.Load"/>), e <c>--base</c> aponta o Fullscreen
+/// padrão do qual um tema parcial herda os arquivos que não tem (homologação, MVP-022).
 /// </summary>
 internal static class Program
 {
@@ -16,7 +18,7 @@ internal static class Program
     {
         if (args.Length == 0 || !Directory.Exists(args[0]))
         {
-            Console.Error.WriteLine("Uso: Launcher.ThemeCheck <pasta-do-tema> [--load] [--p10]");
+            Console.Error.WriteLine("Uso: Launcher.ThemeCheck <pasta-do-tema> [--load] [--p10] [--base <pasta-do-tema-padrão>]");
             return 2;
         }
 
@@ -30,6 +32,11 @@ internal static class Program
 
         var validator = new XamlValidator(policy);
         var loader = new RestrictedXamlLoader(validator);
+        if (load && args.Contains("--p10", StringComparer.OrdinalIgnoreCase))
+        {
+            int baseIndex = Array.FindIndex(args, a => string.Equals(a, "--base", StringComparison.OrdinalIgnoreCase));
+            return Compose(root, loader, baseIndex >= 0 && baseIndex + 1 < args.Length ? args[baseIndex + 1] : null);
+        }
         var byCode = new Dictionary<XamlViolationCode, int>();
         int files = 0;
         int accepted = 0;
@@ -68,6 +75,42 @@ internal static class Program
         }
 
         return accepted == files ? 0 : 1;
+    }
+
+    /// <summary>Composição completa como na prévia: cada arquivo enxerga os anteriores (precisa de um Application).</summary>
+    private static int Compose(string root, RestrictedXamlLoader loader, string? baseRoot)
+    {
+        _ = new System.Windows.Application();
+        var report = P10Theme.Load(root, loader, baseRoot);
+        Console.WriteLine($"{report.Name} {report.Version} · ThemeApiVersion {report.ThemeApiVersion}");
+        foreach (var diagnostic in report.Manifest.Diagnostics)
+        {
+            Console.WriteLine($"  {diagnostic}");
+        }
+
+        foreach (string file in report.Loaded)
+        {
+            Console.WriteLine($"OK      {file}");
+        }
+
+        foreach (var (file, reason) in report.Rejected)
+        {
+            Console.WriteLine($"RECUSA  {file} — {reason}");
+        }
+
+        foreach (string file in report.Inherited)
+        {
+            Console.WriteLine($"HERDADO {file}");
+        }
+
+        foreach (string file in report.Ignored)
+        {
+            Console.WriteLine($"IGNORADO {file}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Carregados: {report.Loaded.Count} de {report.Total}; herdados do padrão: {report.Inherited.Count}; ignorados (fora do padrão): {report.Ignored.Count}");
+        return report.Rejected.Count == 0 ? 0 : 1;
     }
 
     private static bool TryLoad(RestrictedXamlLoader loader, string root, string relative)
