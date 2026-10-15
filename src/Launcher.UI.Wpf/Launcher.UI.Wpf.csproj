@@ -43,6 +43,25 @@
   </ItemGroup>
   <!-- PresentMon da Intel (MIT) para o contador de FPS (ADR-0017): build\Publish-Tako.ps1 baixa a release oficial, confere
        o SHA-256 e passa -p:PresentMonExe=<arquivo>. Sem ele (compilação local) o contador aparece como indisponível. -->
+  <!-- ScreenScraper (ADR-0022): credenciais do software (devid/devpassword/softname) NUNCA ficam no repositório. Só o
+       build de release as grava, como AssemblyMetadata do Tako.exe: build\Publish-Tako.ps1 passa -p:TakoScreenScraper=true
+       quando os segredos do CI estão nas variáveis de ambiente SCREENSCRAPER_DEVID e SCREENSCRAPER_DEVPASSWORD
+       (e, opcional, SCREENSCRAPER_SOFTNAME); o MSBuild lê os valores do ambiente, sem passá-los na linha de comando.
+       Sem eles, o ScreenScraper aparece como indisponível nesta versão. -->
+  <ItemGroup Condition="'$(TakoScreenScraper)' == 'true' And '$(SCREENSCRAPER_DEVID)' != '' And '$(SCREENSCRAPER_DEVPASSWORD)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ScreenScraperDevId</_Parameter1>
+      <_Parameter2>$(SCREENSCRAPER_DEVID)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ScreenScraperDevPassword</_Parameter1>
+      <_Parameter2>$(SCREENSCRAPER_DEVPASSWORD)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition="'$(SCREENSCRAPER_SOFTNAME)' != ''">
+      <_Parameter1>ScreenScraperSoftName</_Parameter1>
+      <_Parameter2>$(SCREENSCRAPER_SOFTNAME)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
   <ItemGroup Condition="'$(PresentMonExe)' != '' And Exists('$(PresentMonExe)')">
     <None Include="$(PresentMonExe)" Link="PresentMon\PresentMon.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

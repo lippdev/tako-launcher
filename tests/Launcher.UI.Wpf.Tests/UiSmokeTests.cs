@@ -62,6 +62,7 @@ public sealed partial class UiSmokeTests
         string environmentFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-environment-{Guid.NewGuid():N}.json");
         var hotkey = new SimulatedEmergencyHotkey();
         string igdbFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-igdb-{Guid.NewGuid():N}.dat");
+        string screenScraperFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-screenscraper-{Guid.NewGuid():N}.dat");
         var consoleFiles = new ConsoleModeFiles(
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-{Guid.NewGuid():N}.json"),
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-environment-{Guid.NewGuid():N}.json"));
@@ -86,6 +87,10 @@ public sealed partial class UiSmokeTests
                 .AddSingleton(consoleFiles)
                 // IGDB (ADR-0021): chave num arquivo temporário e nenhum provedor de metadados, para o CI não ir à rede.
                 .AddSingleton(new Launcher.Core.Library.Metadata.Igdb.IgdbSettingsStore(igdbFile, new ConsoleMode.Runtime.Windows.DpapiSecretProtector()))
+                // ScreenScraper (ADR-0022): conta num arquivo temporário e credenciais do software falsas (o "Testar" é
+                // simulado e não há provedores), para a tela seguir o caminho de uma versão de release sem ir à rede.
+                .AddSingleton(new Launcher.Core.Library.Metadata.ScreenScraper.ScreenScraperSettingsStore(screenScraperFile, new ConsoleMode.Runtime.Windows.DpapiSecretProtector()))
+                .AddSingleton(new Launcher.Core.Library.Metadata.ScreenScraper.ScreenScraperSoftware("teste", "teste", "Tako"))
                 .RemoveAll<Launcher.Core.Library.Metadata.IMetadataProvider>());
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
@@ -521,6 +526,9 @@ public sealed partial class UiSmokeTests
 
         // --- Dados dos jogos (IGDB, ADR-0021): chave da Twitch do usuário, Testar simulado, aviso nos detalhes.
         IgdbDataSettings(shell, window, services.GetRequiredService<MetadataService>());
+
+        // --- Dados de ROMs (ScreenScraper, ADR-0022): conta do usuário, Testar simulado, ROM no "Adicionar jogo".
+        ScreenScraperDataSettings(shell, window, services.GetRequiredService<MetadataService>());
 
         // --- Segurança de temas (frente H): caminhos montados por dados não carregam (MVP-016, questão aberta 8).
         ThemeSecurity(services, bindingErrors);

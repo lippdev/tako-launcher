@@ -45,6 +45,15 @@ public static class AppPaths
     /// <summary>IGDB ligada e a chave da Twitch do usuário (Client ID e Client Secret), cifradas com DPAPI (ADR-0021).</summary>
     public static string IgdbSettingsFile => Path.Combine(DataRoot, "igdb.dat");
 
+    /// <summary>Respostas do ScreenScraper, uma por consulta, sem credenciais (ADR-0022).</summary>
+    public static string ScreenScraperCache => Path.Combine(DataRoot, "cache", "screenscraper");
+
+    /// <summary>Hashes das ROMs por caminho + tamanho + data, para não ler de novo ISOs grandes (ADR-0022).</summary>
+    public static string RomHashesFile => Path.Combine(DataRoot, "cache", "rom-hashes.json");
+
+    /// <summary>ScreenScraper ligado e a conta do usuário (usuário e senha), cifrados com DPAPI (ADR-0022).</summary>
+    public static string ScreenScraperSettingsFile => Path.Combine(DataRoot, "screenscraper.dat");
+
     /// <summary>Marcador de sessão em andamento (proteção contra loop de travamento, MVP-036).</summary>
     public static string SessionFile => Path.Combine(DataRoot, "session.json");
 

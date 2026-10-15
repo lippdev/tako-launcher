@@ -25,6 +25,23 @@ public sealed record ManualGameRecord
 
     public DateTimeOffset AddedAt { get; init; }
 
+    /// <summary>
+    /// Sistema da ROM ("snes", "ps2"; ver <see cref="Metadata.ScreenScraper.ScreenScraperSystems"/>): o arquivo é uma ROM,
+    /// não um executável. Nulo = jogo de PC. A ROM ainda não abre pelo Tako (épico EMU), só ganha os dados (ADR-0022).
+    /// </summary>
+    public string? Platform { get; init; }
+
+    /// <summary>ROM adicionada pelo "Adicionar jogo": título pelo nome do arquivo, sem as marcações de região/versão.</summary>
+    public static ManualGameRecord CreateRom(string path, string platform, DateTimeOffset now) => new()
+    {
+        Id = $"manual:{Guid.NewGuid():N}",
+        Title = Metadata.ScreenScraper.RomTitle.FromFileName(path),
+        Path = path,
+        WorkingDirectory = System.IO.Path.GetDirectoryName(path),
+        AddedAt = now,
+        Platform = platform,
+    };
+
     public static ManualGameRecord Create(string title, string path, DateTimeOffset now) => new()
     {
         Id = $"manual:{Guid.NewGuid():N}",
@@ -54,6 +71,8 @@ public sealed record ManualGameRecord
             WorkingDirectory = WorkingDirectory,
             InstallPath = isUri ? null : System.IO.Path.GetDirectoryName(Path),
             Tracking = TrackBy,
+            Platform = Platform,
+            RomPath = Platform is null || isUri ? null : Path,
         };
     }
 }

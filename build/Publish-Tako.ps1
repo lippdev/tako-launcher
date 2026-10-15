@@ -75,6 +75,16 @@ if ($Target -in "All", "Portable", "Installer") {
     $presentMon = Get-PresentMon
 }
 
+# Credenciais do software no ScreenScraper (ADR-0022): só existem como segredos do CI (SCREENSCRAPER_DEVID,
+# SCREENSCRAPER_DEVPASSWORD e, opcional, SCREENSCRAPER_SOFTNAME). Sem elas, o Tako sai sem acesso ao ScreenScraper e
+# mostra isso nas Configurações; nada quebra.
+$screenScraper = -not [string]::IsNullOrWhiteSpace($env:SCREENSCRAPER_DEVID) -and -not [string]::IsNullOrWhiteSpace($env:SCREENSCRAPER_DEVPASSWORD)
+if ($screenScraper) {
+    Write-Host "ScreenScraper: credenciais do software incluídas nesta versão."
+} else {
+    Write-Warning "ScreenScraper: SCREENSCRAPER_DEVID/SCREENSCRAPER_DEVPASSWORD ausentes; esta versão sai sem acesso ao ScreenScraper."
+}
+
 function Invoke-Publish([string]$ProjectPath, [string]$OutDir, [bool]$SingleFile, [string]$Exe) {
     if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
     $pubArgs = @(
@@ -92,6 +102,11 @@ function Invoke-Publish([string]$ProjectPath, [string]$OutDir, [bool]$SingleFile
     )
     if ($presentMon -and $ProjectPath -eq $project) {
         $pubArgs += "-p:PresentMonExe=$presentMon"
+    }
+    # ScreenScraper (ADR-0022): os valores ficam no ambiente (segredos do CI) e o .csproj os lê de lá; aqui só se liga a
+    # gravação, para nunca aparecerem na linha de comando nem no log.
+    if ($screenScraper -and $ProjectPath -eq $project) {
+        $pubArgs += "-p:TakoScreenScraper=true"
     }
     # Temas e fontes vão dentro do .exe e são extraídos na primeira execução.
     # A compressão reduz o portátil (~141 MB) pela metade, como no Console Mode.

@@ -80,6 +80,8 @@ public static class GameText
     public static string Status(Game game)
     {
         ArgumentNullException.ThrowIfNull(game);
-        return game.UpcomingRelease is DateOnly up ? $"Lança em {Date(up)}" : game.IsInstalled ? "Instalado" : "Não instalado";
+        return game.UpcomingRelease is DateOnly up ? $"Lança em {Date(up)}"
+            : game.IsRom ? (game.IsInstalled ? "ROM no disco" : "ROM não encontrada")
+            : game.IsInstalled ? "Instalado" : "Não instalado";
     }
 }

@@ -89,8 +89,23 @@ public sealed class Game
     /// </summary>
     public string? StoreProductId { get; init; }
 
-    /// <summary>Plataforma de origem para jogos de emulador ("snes", "ps2"...; ver <see cref="Metadata.Igdb.IgdbPlatforms"/>); nula = PC.</summary>
+    /// <summary>
+    /// Plataforma de origem para jogos de emulador ("snes", "ps2"...; ver <see cref="Metadata.ScreenScraper.ScreenScraperSystems"/>
+    /// e <see cref="Metadata.Igdb.IgdbPlatforms"/>); nula = PC.
+    /// </summary>
     public string? Platform { get; init; }
+
+    /// <summary>Arquivo da ROM (jogo de emulador), usado para casar os metadados pelo hash (ADR-0022).</summary>
+    public string? RomPath { get; init; }
+
+    /// <summary>Jogo de emulador: ainda não abre pelo Tako (o épico EMU traz os emuladores); só tem os dados.</summary>
+    public bool IsRom => RomPath is not null;
+
+    /// <summary>Número de jogadores ("1-2"), quando a fonte informa.</summary>
+    public string? Players { get; set; }
+
+    /// <summary>Outras mídias por tipo (<see cref="Metadata.GameMedia"/>): caixa 3D, logo, marquee, captura, fanart, vídeo.</summary>
+    public IReadOnlyDictionary<string, Uri> Media { get; set; } = new Dictionary<string, Uri>();
 
     /// <summary>Jogo correspondente na Steam (da própria loja ou encontrado pelos metadados).</summary>
     public int? SteamAppId { get; set; }
@@ -111,5 +126,5 @@ public sealed class Game
 
     public bool IsUpcoming => UpcomingRelease is not null;
 
-    public bool CanPlay => IsInstalled && !IsUpcoming;
+    public bool CanPlay => IsInstalled && !IsUpcoming && !IsRom;
 }

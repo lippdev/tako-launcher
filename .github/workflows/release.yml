@@ -105,8 +105,16 @@ jobs:
         run: |
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
 
+      # ScreenScraper (ADR-0022): credenciais do software, pedidas pelos mantenedores ao ScreenScraper. Crie em
+      # Settings > Secrets and variables > Actions os segredos SCREENSCRAPER_DEVID e SCREENSCRAPER_DEVPASSWORD (e, se o
+      # ScreenScraper registrar outro nome de software, SCREENSCRAPER_SOFTNAME; o padrão é "Tako"). Sem eles, a release
+      # sai sem acesso ao ScreenScraper e o Tako mostra isso nas Configurações. Só este passo os recebe (nunca o CI de PR).
       - name: Build portable + installer
         shell: pwsh
+        env:
+          SCREENSCRAPER_DEVID: ${{ secrets.SCREENSCRAPER_DEVID }}
+          SCREENSCRAPER_DEVPASSWORD: ${{ secrets.SCREENSCRAPER_DEVPASSWORD }}
+          SCREENSCRAPER_SOFTNAME: ${{ secrets.SCREENSCRAPER_SOFTNAME }}
         run: .\build\Publish-Tako.ps1 -Runtime x64 -Target All -Version "${{ steps.version.outputs.version }}"
 
       # Assinatura de código (como no Console Mode). Desligada até existirem as variáveis do SignPath no repositório:

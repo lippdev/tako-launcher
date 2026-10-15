@@ -14,6 +14,7 @@ using Launcher.Core.Library.Epic;
 using Launcher.Core.Library.Gog;
 using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Metadata.Igdb;
+using Launcher.Core.Library.Metadata.ScreenScraper;
 using Launcher.Core.Library.Sources;
 using Launcher.Core.Library.Steam;
 using Launcher.Core.Library.Xbox;
@@ -131,8 +132,15 @@ public partial class App : Application
         services.AddSingleton(_ => new IgdbSettingsStore(AppPaths.IgdbSettingsFile, new DpapiSecretProtector()));
         services.AddSingleton<IIgdbAuthenticator>(sp => new TwitchAppAuthenticator(sp.GetRequiredService<HttpClient>(), () => sp.GetRequiredService<IgdbSettingsStore>().Current, sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton(sp => new IgdbClient(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<IIgdbAuthenticator>(), sp.GetRequiredService<TimeProvider>(), new IgdbFileCache(AppPaths.IgdbCache, sp.GetRequiredService<TimeProvider>())));
+        // ScreenScraper (ADR-0022): conta do próprio usuário (DPAPI) + credenciais do software, que só o build de release
+        // traz (segredos do CI gravados em AssemblyMetadata). Sem elas, fica indisponível com aviso claro.
+        services.AddSingleton(_ => ScreenScraperSoftware.FromAssembly(typeof(App).Assembly));
+        services.AddSingleton(_ => new ScreenScraperSettingsStore(AppPaths.ScreenScraperSettingsFile, new DpapiSecretProtector()));
+        services.AddSingleton(sp => new ScreenScraperClient(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ScreenScraperSoftware>(), () => sp.GetRequiredService<ScreenScraperSettingsStore>().Current, sp.GetRequiredService<TimeProvider>(), new IgdbFileCache(AppPaths.ScreenScraperCache, sp.GetRequiredService<TimeProvider>())));
+        services.AddSingleton(_ => new RomHashCache(AppPaths.RomHashesFile));
         services.AddSingleton<IMetadataProvider, SteamStoreProvider>();
         services.AddSingleton<IMetadataProvider, IgdbProvider>();
+        services.AddSingleton<IMetadataProvider, ScreenScraperProvider>();
         services.AddSingleton<MetadataService>();
         services.AddSingleton<SupervisorLink>();
         services.AddSingleton<UpdateService>();

@@ -59,13 +59,16 @@ public sealed class PersistenceTests : IDisposable
         store.Load();
         store.Manual.Add(new ManualGameRecord { Id = "manual:a", Title = "Jogo A", Path = "C:/a.exe", Arguments = "-x", AddedAt = added, TrackBy = GameTrackingStrategy.InstallFolder });
         store.Manual.Add(new ManualGameRecord { Id = "manual:b", Title = "Jogo B", Path = "steam://run/1", AddedAt = added });
+        store.Manual.Add(new ManualGameRecord { Id = "manual:rom", Title = "Lanterna", Path = "D:/roms/lanterna.sfc", AddedAt = added, Platform = "snes" });
         store.State["steam:570"] = new GameStateRecord { IsFavorite = true, LastPlayedAt = added, PlayMinutes = 42.5 };
         store.Save();
 
         var reopened = new SqliteLibraryStore(new TakoDatabase(DbPath));
         reopened.Load();
 
-        Assert.Equal(["manual:a", "manual:b"], reopened.Manual.Select(m => m.Id));
+        Assert.Equal(["manual:a", "manual:b", "manual:rom"], reopened.Manual.Select(m => m.Id));
+        Assert.Null(reopened.Manual[0].Platform);
+        Assert.Equal("snes", reopened.Manual[2].Platform); // ADR-0022: sistema da ROM
         Assert.Equal("-x", reopened.Manual[0].Arguments);
         Assert.Null(reopened.Manual[1].Arguments);
         Assert.Equal(GameTrackingStrategy.InstallFolder, reopened.Manual[0].TrackBy);
@@ -78,7 +81,7 @@ public sealed class PersistenceTests : IDisposable
         reopened.Save();
         var third = new SqliteLibraryStore(new TakoDatabase(DbPath));
         third.Load();
-        Assert.Equal(["manual:b"], third.Manual.Select(m => m.Id));
+        Assert.Equal(["manual:b", "manual:rom"], third.Manual.Select(m => m.Id));
         Assert.Empty(third.State);
     }
 

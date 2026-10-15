@@ -204,7 +204,11 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void OpenDetails(GameItemViewModel game) => Navigate(new DetailsViewModel(this, game), replace: false);
 
-    public void OpenSettings() => Navigate(new SettingsViewModel(this, Settings, _themes), replace: CurrentPage is SettingsViewModel);
+    public void OpenSettings()
+    {
+        OnPropertyChanged(nameof(ScreenScraperSummary)); // a pausa por cota muda sem aviso (ADR-0022)
+        Navigate(new SettingsViewModel(this, Settings, _themes), replace: CurrentPage is SettingsViewModel);
+    }
 
     [RelayCommand]
     private void Hint(AppCommand command) => CommandRequested?.Invoke(this, command);
@@ -320,6 +324,12 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void Launch(GameItemViewModel game)
     {
+        if (game.Game.IsRom && RunningGame != game)
+        {
+            Toast(RomLaunchNotice); // ADR-0022: ROMs só têm os dados; abrir pelo emulador é o épico EMU
+            return;
+        }
+
         if (IsReturningToDesk)
         {
             Toast("Aguarde: o Tako está voltando as telas para a mesa");

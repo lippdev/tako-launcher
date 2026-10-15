@@ -414,6 +414,19 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Dados de ROMs (ScreenScraper, ADR-0022): bloco isolado; abre a sobreposição de MetadataViews.xaml. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.OpenScreenScraperSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:screenscraper">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding DataContext.ScreenScraperSummary, RelativeSource={RelativeSource AncestorType=Window}}" MaxWidth="420" TextTrimming="CharacterEllipsis" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Dados de ROMs (ScreenScraper)" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Caixas, logos, vídeos e informações de jogos de console, reconhecidos pelo arquivo, com a sua conta gratuita" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <!-- Coleções (UX-003): criar, renomear e excluir. -->
       <Button Style="{StaticResource SettingRow}" Command="{Binding ManageCollectionsCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:collections">
         <DockPanel>

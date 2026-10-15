@@ -1,0 +1,53 @@
+{
+  "header": { "APIversion": "2.0", "dateTime": "2026-10-15 14:00:00", "commandRequested": "jeuInfos.php (escrito à mão para os testes)", "success": "true", "error": "" },
+  "response": {
+    "serveurs": { "cpu1": "10", "threadsmin": "5", "nbscrapeurs": "100", "apiacces": "1000" },
+    "ssuser": {
+      "id": "jogador", "numid": "1", "niveau": "1", "contribution": "0", "maxthreads": "2", "maxdownloadspeed": "256",
+      "requeststoday": "120", "requestskotoday": "3", "maxrequestspermin": "256", "maxrequestsperday": "20000",
+      "maxrequestskoperday": "2000", "favregion": "br"
+    },
+    "jeu": {
+      "id": "900077",
+      "romid": "5",
+      "notgame": "false",
+      "noms": [
+        { "region": "wor", "text": "Distant Lantern" },
+        { "region": "br", "text": "Lanterna Distante" },
+        { "region": "jp", "text": "Tooi Rantan" }
+      ],
+      "systeme": { "id": "4", "text": "Super Nintendo" },
+      "editeur": { "id": "1", "text": "Estúdio Farol" },
+      "developpeur": { "id": "2", "text": "Maré Baixa Games" },
+      "joueurs": { "text": "1-2" },
+      "note": { "text": "16" },
+      "synopsis": [
+        { "langue": "en", "text": "A lighthouse keeper explores a drowned archipelago. (Fictional game written for the tests.)" },
+        { "langue": "pt", "text": "Um faroleiro explora um arquipélago submerso. (Jogo fictício, escrito à mão para os testes.)" },
+        { "langue": "fr", "text": "Un gardien de phare explore un archipel englouti." }
+      ],
+      "dates": [
+        { "region": "jp", "text": "1994-03-18" },
+        { "region": "us", "text": "1994-08" }
+      ],
+      "genres": [
+        { "id": "7", "nomcourt": "platform", "principale": "1", "parentid": "0", "noms": [{ "langue": "en", "text": "Platform" }, { "langue": "fr", "text": "Plateforme" }] },
+        { "id": "13", "nomcourt": "puzzle", "principale": "1", "parentid": "0", "noms": [{ "langue": "en", "text": "Puzzle" }, { "langue": "pt", "text": "Quebra-cabeça" }] }
+      ],
+      "medias": [
+        { "type": "box-2D", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=box-2D(jp)", "region": "jp", "format": "png" },
+        { "type": "box-2D", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=box-2D(us)", "region": "us", "format": "png" },
+        { "type": "box-3D", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=box-3D(us)", "region": "us", "format": "png" },
+        { "type": "wheel", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=wheel(wor)", "region": "wor", "format": "png" },
+        { "type": "wheel-hd", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=wheel-hd(wor)", "region": "wor", "format": "png" },
+        { "type": "screenmarquee", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=screenmarquee(wor)", "region": "wor", "format": "png" },
+        { "type": "ss", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=ss(wor)", "region": "wor", "format": "png" },
+        { "type": "fanart", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=fanart", "format": "jpg" },
+        { "type": "video", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaVideoJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=video", "format": "mp4" },
+        { "type": "video-normalized", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaVideoJeu.php?devid=DEVFALSO&devpassword=SEGREDOFALSO&softname=Tako&ssid=jogador&sspassword=senhafalsa&systemeid=4&jeuid=900077&media=video-normalized", "format": "mp4" },
+        { "type": "manuel", "parent": "jeu", "url": "https://neoclone.screenscraper.fr/api2/mediaManuelJeu.php?systemeid=4&jeuid=900077&media=manuel(us)", "region": "us", "format": "pdf" },
+        { "type": "box-2D", "parent": "jeu", "url": "https://exemplo.invalid/fora-do-screenscraper.png", "region": "br", "format": "png" }
+      ]
+    }
+  }
+}

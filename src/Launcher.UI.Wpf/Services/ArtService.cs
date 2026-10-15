@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Launcher.Core.Library.Metadata.ScreenScraper;
 using Launcher.Core.Presentation;
 using Microsoft.Extensions.Logging;
 
@@ -12,8 +13,8 @@ namespace Launcher.UI.Wpf.Services;
 
 /// <summary>
 /// Baixa capas e artes para um cache local (%LOCALAPPDATA%\Tako\cache\art) e entrega imagens prontas. Aceita
-/// endereços http(s), arquivos locais (capas escolhidas pelo usuário) e <c>steam-art://</c> (vários candidatos,
-/// do melhor ao pior). Sem arte ou sem rede, a UI usa o fallback (gradiente + título).
+/// endereços http(s), arquivos locais (capas escolhidas pelo usuário), <c>steam-art://</c> (vários candidatos,
+/// do melhor ao pior) e <c>ssmedia://</c> (mídia do ScreenScraper, baixada com as credenciais só na hora, ADR-0022). Sem arte ou sem rede, a UI usa o fallback (gradiente + título).
 /// </summary>
 public sealed partial class ArtService : IDisposable
 {
@@ -42,13 +43,15 @@ public sealed partial class ArtService : IDisposable
     private readonly ILogger<ArtService> _logger;
     private readonly HttpClient _http;
     private readonly SteamArtResolver _steam;
+    private readonly ScreenScraperClient _screenScraper;
     private readonly string _cacheDirectory;
 
-    public ArtService(ILogger<ArtService> logger, HttpClient http, SteamArtResolver steam)
+    public ArtService(ILogger<ArtService> logger, HttpClient http, SteamArtResolver steam, ScreenScraperClient screenScraper)
     {
         _logger = logger;
         _http = http;
         _steam = steam;
+        _screenScraper = screenScraper;
         _cacheDirectory = AppPaths.ArtCache;
     }
 
@@ -175,6 +178,11 @@ public sealed partial class ArtService : IDisposable
             return File.Exists(uri.LocalPath) ? uri.LocalPath : null;
         }
 
+        if (uri.Scheme == ScreenScraperMedia.Scheme)
+        {
+            return await EnsureScreenScraperCachedAsync(uri).ConfigureAwait(false);
+        }
+
         if (uri.Scheme != SteamArtScheme)
         {
             return await EnsureCachedAsync(uri, uri).ConfigureAwait(false);
@@ -207,10 +215,31 @@ public sealed partial class ArtService : IDisposable
         return null;
     }
 
+    /// <summary>Mídia do ScreenScraper: o cache vale para o endereço sem credenciais; baixa pela fila da conta do usuário.</summary>
+    private async Task<string?> EnsureScreenScraperCachedAsync(Uri uri)
+    {
+        string path = CachePath(uri);
+        if (File.Exists(path))
+        {
+            return path;
+        }
+
+        if (await _screenScraper.DownloadMediaAsync(uri, CancellationToken.None).ConfigureAwait(false) is not { } bytes)
+        {
+            return null;
+        }
+
+        Directory.CreateDirectory(_cacheDirectory);
+        string temp = path + ".tmp";
+        await File.WriteAllBytesAsync(temp, bytes).ConfigureAwait(false);
+        File.Move(temp, path, overwrite: true);
+        return path;
+    }
+
     private string CachePath(Uri key)
     {
         string name = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key.AbsoluteUri)))[..32];
-        string extension = key.Scheme == SteamArtScheme ? ".img" : Path.GetExtension(key.AbsolutePath);
+        string extension = key.Scheme == SteamArtScheme || key.Scheme == ScreenScraperMedia.Scheme ? ".img" : Path.GetExtension(key.AbsolutePath);
         return Path.Combine(_cacheDirectory, name + extension);
     }
 
