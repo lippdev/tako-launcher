@@ -72,7 +72,9 @@ public class ThemeManifestTests
     [Theory]
     [InlineData("2.0.0", false)]
     [InlineData("2.0", false)]
-    [InlineData("2.9.1", true)]
+    [InlineData("2.10.0", false)]
+    [InlineData("2.10.1", true)]
+    [InlineData("2.11", true)]
     public void Accepts_2x_and_warns_about_newer_minor_versions(string api, bool warns)
     {
         var result = Check(Manifest(api: api));

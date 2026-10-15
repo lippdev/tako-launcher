@@ -3,10 +3,10 @@ namespace Launcher.Core.Themes;
 /// <summary>
 /// Compatibilidade de um <c>theme.yaml</c> com o adaptador Playnite 10 do Tako (MVP-015).
 /// <para>
-/// Faixa suportada de <c>ThemeApiVersion</c>: <b>2.x</b> (maior 2, qualquer menor), a API dos temas Fullscreen do
-/// Playnite 10 para a qual o adaptador P10 foi escrito. Como no Playnite, a versão maior quebra compatibilidade:
-/// 1.x (Playnite 8 e anteriores) e 3.x ou maior são recusados. Uma versão menor acima de
-/// <see cref="TestedApiVersion"/> só gera aviso: pode usar recursos que o adaptador ainda não implementa.
+/// Faixa suportada de <c>ThemeApiVersion</c>: <b>2.x</b>, a API de temas Fullscreen do Playnite 9 e 10 (2.0.0 no
+/// Playnite 9.0; 2.10.0 no Playnite 10.62, a referência do adaptador). A regra segue a do Playnite
+/// (<c>ThemeManifest.IsCompatible</c>: maior igual): 1.x e 3.x ou maior são recusados. Acima de
+/// <see cref="TargetApiVersion"/> o tema é aceito com aviso, porque pode usar recursos que o adaptador ainda não conhece.
 /// </para>
 /// </summary>
 public static class ThemeManifestValidator
@@ -14,8 +14,8 @@ public static class ThemeManifestValidator
     /// <summary>Versão maior da API de temas Fullscreen aceita.</summary>
     public const int SupportedApiMajor = 2;
 
-    /// <summary>Maior versão homologada (a do tema Fullscreen padrão do Playnite 10 incluído no Tako).</summary>
-    public static readonly Version TestedApiVersion = new(2, 0, 0);
+    /// <summary>API Fullscreen do Playnite 10.62 (<c>Themes.FullscreenApiVersion</c>), a referência do adaptador.</summary>
+    public static readonly Version TargetApiVersion = new(2, 10, 0);
 
     public static string SupportedRange => $"{SupportedApiMajor}.x";
 
@@ -87,11 +87,11 @@ public static class ThemeManifestValidator
             return;
         }
 
-        if (new Version(api.Major, api.Minor) > new Version(TestedApiVersion.Major, TestedApiVersion.Minor))
+        if (new Version(api.Major, api.Minor, Math.Max(api.Build, 0)) > TargetApiVersion)
         {
             diagnostics.Add(ThemeDiagnostic.Warning(
                 "manifest.newer-api",
-                $"ThemeApiVersion {manifest.ThemeApiVersionText} é mais nova que a homologada ({TestedApiVersion.ToString(3)}); partes do tema podem não carregar."));
+                $"ThemeApiVersion {manifest.ThemeApiVersionText} é mais nova que a do Playnite 10 suportado ({TargetApiVersion.ToString(3)}); partes do tema podem não carregar."));
         }
     }
 }
