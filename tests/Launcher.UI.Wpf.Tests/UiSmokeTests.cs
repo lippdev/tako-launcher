@@ -708,7 +708,7 @@ public sealed class UiSmokeTests
         Assert.Contains(nav.Navigables(), e => Nav.GetGroup(e) == Main.ActionsGroup && Nav.GetKey(e) == "details");
         Assert.Contains(nav.Navigables(), e => Nav.GetGroup(e) == Main.TopGroup && Nav.GetKey(e) == "menu");
         Assert.Contains(nav.Navigables(), e => Nav.GetGroup(e) == FilterPresetSelector.PresetsGroup);
-        Snap(window, "50-tema-playnite-inicio");
+        Snap(window, "60-tema-playnite-inicio");
 
         // → seleciona a próxima capa (PART_ListGameItems); A abre os detalhes do tema (PART_ElemGameDetails); B fecha.
         string first = Nav.GetKey(nav.Focused!)!;
@@ -721,7 +721,7 @@ public sealed class UiSmokeTests
         Assert.True(ui.IsDetailsOpen);
         Assert.Equal(GameDetails.DetailsGroup, Nav.GetGroup(nav.Focused!));
         Assert.Equal("play", Nav.GetKey(nav.Focused!));
-        Snap(window, "51-tema-playnite-detalhes");
+        Snap(window, "61-tema-playnite-detalhes");
         Press(window, AppCommand.Back);
         Pump(0.8);
         Assert.False(ui.IsDetailsOpen);
@@ -732,7 +732,7 @@ public sealed class UiSmokeTests
         Pump(0.8);
         Assert.Equal("Instalados", ui.Model.ActiveFilterPreset!.Name);
         Assert.All(ui.Model.Games, g => Assert.True(g.IsInstalled));
-        Snap(window, "52-tema-playnite-filtro");
+        Snap(window, "62-tema-playnite-filtro");
         ui.Model.ApplyFilterPresetCommand.Execute(ui.Model.FilterPresets[0]);
         Pump(0.8);
 
@@ -754,7 +754,7 @@ public sealed class UiSmokeTests
         ui.Model.ActivateSelectedCommand.Execute(null);
         Pump(0.4);
         Assert.IsType<LaunchOverlayViewModel>(shell.TopOverlay);
-        Snap(window, "53-tema-playnite-jogar");
+        Snap(window, "63-tema-playnite-jogar");
         Press(window, AppCommand.Back);
         Assert.Null(shell.TopOverlay);
         Pump(3);
@@ -767,7 +767,7 @@ public sealed class UiSmokeTests
         var recovery = Assert.IsType<RecoveryViewModel>(shell.TopOverlay);
         Assert.Equal("O tema não pôde ser aplicado", recovery.Title);
         AssertFocused(window, "Recuperação do tema Playnite");
-        Snap(window, "54-tema-playnite-recuperacao");
+        Snap(window, "64-tema-playnite-recuperacao");
         Press(window, AppCommand.Accept);
         Pump(0.6);
         Assert.Null(shell.TopOverlay);
@@ -806,7 +806,7 @@ public sealed class UiSmokeTests
                 string detail = (shell.TopOverlay as RecoveryViewModel)?.Detail ?? "sem detalhe";
                 report.Add($"{fixture.Name}: interface NÃO aplicada ({detail})");
                 File.WriteAllLines(Path.Combine(Screenshots, "theme-whole-ui.txt"), report);
-                Snap(window, $"55-tema-{fixture.Slug}-interface-falha");
+                Snap(window, $"65-tema-{fixture.Slug}-interface-falha");
                 Assert.Fail($"{fixture.Name}: tema não aplicado à interface: {detail}");
                 return;
             }
@@ -816,12 +816,12 @@ public sealed class UiSmokeTests
             AssertFocused(window, $"Tela inicial do tema {fixture.Name}");
             report.Add($"{fixture.Name}: interface aplicada · Main.xaml {(applied.Report.MainFromTheme ? "do tema" : "herdado do tema padrão")} · {applied.Report.Loaded.Count} de {applied.Report.Total} arquivos do tema · {applied.Model.Games.Count} jogos");
             report.AddRange(applied.Report.Rejected.Select(x => $"    RECUSA  {x.File} — {x.Reason}"));
-            Snap(window, $"55-tema-{fixture.Slug}-interface");
+            Snap(window, $"65-tema-{fixture.Slug}-interface");
             Press(window, AppCommand.Accept);
             Pump(1.2);
             Assert.True(applied.IsDetailsOpen, $"{fixture.Name}: A não abriu os detalhes");
             AssertFocused(window, $"Detalhes do tema {fixture.Name}");
-            Snap(window, $"56-tema-{fixture.Slug}-detalhes");
+            Snap(window, $"66-tema-{fixture.Slug}-detalhes");
             Press(window, AppCommand.Back);
             Pump(0.6);
             Assert.False(applied.IsDetailsOpen);
