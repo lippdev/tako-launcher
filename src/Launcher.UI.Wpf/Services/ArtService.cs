@@ -10,25 +10,28 @@ using Microsoft.Extensions.Logging;
 namespace Launcher.UI.Wpf.Services;
 
 /// <summary>
-/// Baixa capas e artes para um cache local (%LOCALAPPDATA%\Tako\cache\art) e entrega imagens prontas.
-/// Arte de jogo nunca vai para o repositório; sem rede, a UI usa o fallback (gradiente + título).
+/// Baixa capas e artes para um cache local (%LOCALAPPDATA%\Tako\cache\art) e entrega imagens prontas. Aceita
+/// endereços http(s), arquivos locais (capas escolhidas pelo usuário) e <c>steam-art://</c> (vários candidatos,
+/// do melhor ao pior). Sem arte ou sem rede, a UI usa o fallback (gradiente + título).
 /// </summary>
-public sealed partial class ArtService : IDisposable
+public sealed partial class ArtService
 {
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private const string SteamArtScheme = "steam-art";
     private const int LargeImageWidth = 1000;
     private const int MaxLargeImages = 8;
     private readonly Dictionary<(Uri, int), Task<ImageSource?>> _memory = [];
     private readonly Queue<(Uri, int)> _large = new();
     private readonly ILogger<ArtService> _logger;
+    private readonly HttpClient _http;
+    private readonly SteamArtResolver _steam;
     private readonly string _cacheDirectory;
 
-    public ArtService(ILogger<ArtService> logger)
+    public ArtService(ILogger<ArtService> logger, HttpClient http, SteamArtResolver steam)
     {
         _logger = logger;
+        _http = http;
+        _steam = steam;
         _cacheDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tako", "cache", "art");
-        // Wikipedia e outros CDNs exigem User-Agent identificável.
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("Tako/0.1 (+https://github.com/lippdev/ultralauncher)");
     }
 
     /// <summary>
@@ -71,13 +74,15 @@ public sealed partial class ArtService : IDisposable
         }
     }
 
-    public void Dispose() => _http.Dispose();
-
     private async Task<ImageSource?> LoadAsync(Uri uri, int decodeWidth)
     {
         try
         {
-            string path = await EnsureCachedAsync(uri).ConfigureAwait(false);
+            if (await LocateAsync(uri).ConfigureAwait(false) is not string path)
+            {
+                return null;
+            }
+
             return await Task.Run(() =>
             {
                 int sourceWidth = BitmapDecoder.Create(new Uri(path), BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0].PixelWidth;
@@ -98,17 +103,63 @@ public sealed partial class ArtService : IDisposable
         }
     }
 
-    private async Task<string> EnsureCachedAsync(Uri uri)
+    /// <summary>Arquivo local da imagem: o próprio arquivo, o cache, ou o primeiro candidato que baixar.</summary>
+    private async Task<string?> LocateAsync(Uri uri)
     {
-        string name = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)))[..32];
-        string path = Path.Combine(_cacheDirectory, name + Path.GetExtension(uri.AbsolutePath));
+        if (uri.IsFile)
+        {
+            return File.Exists(uri.LocalPath) ? uri.LocalPath : null;
+        }
+
+        if (uri.Scheme != SteamArtScheme)
+        {
+            return await EnsureCachedAsync(uri, uri).ConfigureAwait(false);
+        }
+
+        // Artes da Steam: o cache vale para o endereço lógico, então a próxima abertura não consulta a rede.
+        string cached = CachePath(uri);
+        if (File.Exists(cached))
+        {
+            return cached;
+        }
+
+        foreach (var candidate in await _steam.ResolveAsync(uri).ConfigureAwait(false))
+        {
+            if (candidate.IsFile)
+            {
+                return candidate.LocalPath; // cache da própria Steam
+            }
+
+            try
+            {
+                return await EnsureCachedAsync(uri, candidate).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                // 404: próximo candidato.
+            }
+        }
+
+        return null;
+    }
+
+    private string CachePath(Uri key)
+    {
+        string name = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key.AbsoluteUri)))[..32];
+        string extension = key.Scheme == SteamArtScheme ? ".img" : Path.GetExtension(key.AbsolutePath);
+        return Path.Combine(_cacheDirectory, name + extension);
+    }
+
+    private async Task<string> EnsureCachedAsync(Uri key, Uri source)
+    {
+        string path = CachePath(key);
         if (File.Exists(path))
         {
             return path;
         }
 
         Directory.CreateDirectory(_cacheDirectory);
-        byte[] bytes = await _http.GetByteArrayAsync(uri).ConfigureAwait(false);
+        byte[] bytes = await _http.GetByteArrayAsync(source).ConfigureAwait(false);
         string temp = path + ".tmp";
         await File.WriteAllBytesAsync(temp, bytes).ConfigureAwait(false);
         File.Move(temp, path, overwrite: true);

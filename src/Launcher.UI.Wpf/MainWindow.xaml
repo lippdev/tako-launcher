@@ -46,6 +46,10 @@
                   <Button Style="{StaticResource SidebarItem}" Command="{Binding Command}" nav:Nav.Group="sidebar" nav:Nav.Key="{Binding Key}" nav:Nav.IsGroupEntry="{Binding IsSelected}" />
                 </StackPanel>
                 <DataTemplate.Triggers>
+                  <!-- Loja sem jogos: some da barra (o título da seção fica no primeiro item, que é sempre visível). -->
+                  <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                  </DataTrigger>
                   <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
                     <Setter TargetName="Section" Property="Opacity" Value="0" />
                     <Setter TargetName="Section" Property="Height" Value="0" />

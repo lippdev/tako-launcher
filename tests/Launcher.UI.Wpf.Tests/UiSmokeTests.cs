@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Launcher.Core.Input;
 using Launcher.Core.Library;
+using Launcher.Tests;
 using Launcher.UI.Wpf.Navigation;
 using Launcher.UI.Wpf.Services;
 using Launcher.UI.Wpf.ViewModels;
@@ -35,7 +36,8 @@ public sealed class UiSmokeTests
 
         var app = new App();
         app.InitializeComponent();
-        using var services = App.BuildServices();
+        // Biblioteca fictícia: o CI não tem Steam e o teste não depende da rede para os dados.
+        using var services = App.BuildServices(new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
 
@@ -182,6 +184,18 @@ public sealed class UiSmokeTests
         Assert.Null(shell.TopOverlay);
 
         // Outras proporções: o palco acompanha a largura da janela (sem faixas pretas) e a grade ganha colunas.
+        // Jogo adicionado pelo usuário: aparece na biblioteca e tem opções próprias (corrigir dados, capa, remover).
+        var manual = shell.Library.AddManual(ManualGameRecord.Create("Meu Jogo Indie", @"C:\Jogos\MeuJogo\jogo.exe", DateTimeOffset.Now));
+        Pump(0.5);
+        shell.OpenDetails(shell.ItemFor(manual));
+        Pump(0.8);
+        shell.ShowGameOptions(shell.ItemFor(manual));
+        Pump(0.6);
+        Snap(window, "19-opcoes-jogo-manual");
+        Assert.IsType<DialogViewModel>(shell.TopOverlay);
+        Press(window, AppCommand.Back);
+        Assert.Null(shell.TopOverlay);
+
         // Janelas pequenas: a tela virtual do CI limita o tamanho máximo da janela.
         shell.GoHome();
         window.Width = 840; // 21:9
