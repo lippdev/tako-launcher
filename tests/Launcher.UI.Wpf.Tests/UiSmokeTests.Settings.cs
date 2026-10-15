@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using ConsoleMode.Runtime.Simulation;
 using Launcher.Core.Input;
 using Launcher.Core.Presentation;
 using Launcher.UI.Wpf.Input;
@@ -23,7 +24,7 @@ public sealed partial class UiSmokeTests
     /// Console, percorre os cartões e o assistente "Configurar para jogar na TV" do começo ao fim. Repete as capturas em
     /// 4:3, 16:10, 21:9 e 4K, com a barra de dicas inteira em todas.
     /// </summary>
-    private static void SettingsAndConsoleTour(ShellViewModel shell, MainWindow window)
+    private static void SettingsAndConsoleTour(ShellViewModel shell, MainWindow window, SimulatedDisplayDesk desk)
     {
         var nav = window.Navigator;
         var placement = (window.Left, window.Top, window.Width, window.Height);
@@ -167,6 +168,11 @@ public sealed partial class UiSmokeTests
         Pump(0.5);
         Assert.Null(shell.TopOverlay);
         (window.Left, window.Top, window.Width, window.Height) = placement; // o teste da imagem moveu o Tako para a "TV"
+
+        // No teste, a mesa simulada e a configuração de monitores simulada são independentes: a mesa volta à mão.
+        desk.Enable(["SIM\\DESK"]);
+        desk.SetPrimary("SIM\\DESK");
+        desk.Disable(["SIM\\TV"]);
         Pump(0.8);
         Assert.Equal(FeatureState.On, console.CardFor("gamescreen").State);
         Snap(window, "cfg91-modo-console-configurado");

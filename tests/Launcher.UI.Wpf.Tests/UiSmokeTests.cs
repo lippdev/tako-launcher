@@ -51,6 +51,7 @@ public sealed partial class UiSmokeTests
         // simulados: o teste nunca muda a resolução nem o som da máquina (MVP-012).
         var display = new SimulatedDisplayConfiguration();
         var audio = new SimulatedAudioEndpoints();
+        var desk = new SimulatedDisplayDesk();
 
         // Central de Controle: janelas, contador de FPS (sem permissão no começo), ponteiro, ControlFS e desempenho
         // simulados; o teste nunca ativa nem fecha janelas da máquina, não pede UAC nem esconde o ponteiro.
@@ -70,7 +71,7 @@ public sealed partial class UiSmokeTests
             new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System),
             s => s.AddSingleton<IDisplayConfigurationService>(display)
                 .AddSingleton<IAudioEndpointService>(audio)
-                .AddSingleton<IDisplayControlService>(new SimulatedDisplayDesk())
+                .AddSingleton<IDisplayControlService>(desk)
                 .AddSingleton<IScreenCurtain>(new SimulatedScreenCurtain())
                 .AddSingleton<IWindowSwitcher>(windows)
                 .AddSingleton<IFpsCounter>(new SimulatedFpsCounter(available: true))
@@ -158,7 +159,7 @@ public sealed partial class UiSmokeTests
         Pump(0.8);
         Snap(window, "06-configuracoes");
         // Configurações em categorias e menu Modo Console (ADR-0020): cada categoria, cada cartão e o assistente.
-        SettingsAndConsoleTour(shell, window);
+        SettingsAndConsoleTour(shell, window, desk);
         shell.OpenSettings();
         Pump(0.6);
         XboxLibrarySetting(shell, window);
