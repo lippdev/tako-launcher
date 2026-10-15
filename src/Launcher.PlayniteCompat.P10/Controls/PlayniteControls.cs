@@ -525,7 +525,9 @@ public class P10TilePanel : VirtualizingPanel, IScrollInfo
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var item = ItemSize(availableSize.Width);
+        // Com rolagem horizontal liberada pelo tema, o painel antigo era medido sem limite de largura (largura padrão):
+        // mantém o mesmo tamanho de capa e a mesma barra horizontal.
+        var item = ItemSize(IsScrolling && CanHorizontallyScroll ? double.PositiveInfinity : availableSize.Width);
         var owner = ItemsControl.GetItemsOwner(this);
         _grid = new VirtualGrid(owner?.Items.Count ?? 0, ColumnCount, item.Width, item.Height);
 
