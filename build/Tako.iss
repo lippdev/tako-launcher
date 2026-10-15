@@ -24,6 +24,7 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=lippdev
+AppCopyright=Copyright (C) 2026 Filipe Moreira (lippdev) e colaboradores. AGPL-3.0-only.
 AppPublisherURL=https://github.com/lippdev/ultralauncher
 AppSupportURL=https://github.com/lippdev/ultralauncher/issues
 AppUpdatesURL=https://github.com/lippdev/ultralauncher/releases

@@ -1,6 +1,6 @@
 # LEGAL-001 — Licença do UltraLauncher e reuso do Console Mode
 
-**Status:** aguardando decisão dos mantenedores (@lippdev e @nextestudios)
+**Status:** Decidido em 2026-10-15: **opção B** (o Tako passa a ser AGPL-3.0-only). Registro em [ADR-0014](../adr/0014-licenca-agpl.md).
 **Bloqueia:** H3 (runtime compartilhado), MVP-002 e MVP-012
 
 > Este documento organiza as opções para a decisão. Não é parecer jurídico.
@@ -25,7 +25,7 @@ Os dois autores declaram, num commit assinado por ambos (ou num comentário de P
 - **Contra:** antes de extrair, é preciso conferir a autoria de cada arquivo. Commits de bots não geram direitos autorais próprios, mas código de terceiros (PRs externas, trechos copiados de outros projetos) não pode ser relicenciado assim.
 - **Para executar:** criar `src/ConsoleMode.Runtime/NOTICE.md` com a declaração e a lista de arquivos de origem; registrar o ADR; liberar o MVP-002.
 
-### B. Mudar o UltraLauncher para AGPL-3.0-only
+### B. Mudar o UltraLauncher para AGPL-3.0-only (escolhida)
 - **A favor:** o reuso fica livre, sem conferir autoria.
 - **Contra:** todo o launcher passa a ser AGPL, inclusive para quem distribui versões modificadas. Isso pode afastar contribuições e integrações. Temas e plugins de terceiros carregados em tempo de execução precisariam de análise própria.
 - **Para executar:** trocar `LICENSE`, atualizar o README e o CONTRIBUTING §10 e conferir a compatibilidade das dependências (Inter OFL, tema Playnite MIT: ambos compatíveis).
