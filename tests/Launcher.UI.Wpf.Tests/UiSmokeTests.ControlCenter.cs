@@ -200,6 +200,8 @@ public sealed partial class UiSmokeTests
         Assert.Equal("Ctrl+Alt+F10", shell.KeyLabel);
 
         // Esc cancela sem mudar nada.
+        Pump(0.4);
+        Assert.True(nav.FocusDefault("settings:shortcut-key"));
         Press(window, AppCommand.Accept);
         Assert.IsType<ShortcutCaptureViewModel>(shell.TopOverlay).Key("Escape", KeyModifiers.None);
         Assert.Null(shell.TopOverlay);
