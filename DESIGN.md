@@ -4,8 +4,8 @@ name: Tako Default Theme
 description: |
   Tema padrão do Tako (MVP-013). Interface de sofá, 10 pés, controlada por joystick.
   A arte do jogo em foco define a cor da tela inteira: o fundo assume o tom de destaque do jogo
-  e as superfícies são camadas brancas translúcidas sobre ele. Referência de canvas: 1920x1080,
-  escalada uniformemente (Viewbox) para outras resoluções.
+  e as superfícies são camadas brancas translúcidas sobre ele. Palco de 1080 unidades de altura, com
+  largura na proporção da tela (16:9 = 1920, 21:9 = 2520, 16:10 = 1728), renderizado na resolução física.
 
 colors:
   # Tom de destaque padrão; em uso real vem do jogo em foco (game.accent).
@@ -34,23 +34,20 @@ colors:
 
 typography:
   display:
-    fontFamily: Inter
-    fontSize: 72px
-    fontWeight: 800
+    fontFamily: Source Sans 3
+    fontSize: 84px
+    fontWeight: 300
     lineHeight: 1.1
-    letterSpacing: -0.03em
   headline-lg:
-    fontFamily: Inter
-    fontSize: 56px
-    fontWeight: 800
+    fontFamily: Source Sans 3
+    fontSize: 64px
+    fontWeight: 300
     lineHeight: 1.0
-    letterSpacing: -0.02em
   headline-md:
-    fontFamily: Inter
-    fontSize: 34px
-    fontWeight: 700
+    fontFamily: Source Sans 3
+    fontSize: 38px
+    fontWeight: 400
     lineHeight: 1.15
-    letterSpacing: -0.01em
   title-md:
     fontFamily: Inter
     fontSize: 26px
@@ -200,9 +197,9 @@ Princípios:
 
 ## Typography
 
-Inter (SIL OFL), empacotada com o app. **Todo texto usa um token da escala acima**; nenhum tamanho avulso.
+Títulos (`display`, `headline-*`) em Source Sans 3 leve, humanista da linha Frutiger como a SST do PS5; o restante em Inter. Ambas SIL OFL, empacotadas com o app. **Todo texto usa um token da escala acima**; nenhum tamanho avulso.
 
-- **Título de jogo:** sempre `display` (72px), em qualquer tela (destaque, detalhes, jogando), com no máximo duas linhas. O tamanho não varia com o comprimento do nome. O bloco do destaque é ancorado embaixo, então um título de duas linhas cresce para cima e os botões nunca mudam de posição.
+- **Título de jogo:** sempre `display` (84px, peso 300), em qualquer tela (destaque, detalhes, jogando), ocupando a largura disponível, com no máximo duas linhas. O tamanho não varia com o comprimento do nome. O bloco do destaque é ancorado embaixo, então um título de duas linhas cresce para cima e os botões nunca mudam de posição.
 - **Descrição:** no máximo 3 linhas (`body-lg`).
 - **Datas:** dd/mm/aaaa.
 
@@ -210,7 +207,7 @@ Inter (SIL OFL), empacotada com o app. **Todo texto usa um token da escala acima
 
 ## Layout
 
-- **Canvas:** 1920x1080, escalado uniformemente. Área segura: `safe-x` 72px e `safe-y` 48px (overscan de TV).
+- **Palco:** 1080 de altura; a largura segue a proporção da tela (mínimo 4:3, máximo 32:9), então não há faixas pretas. Texto e vetores saem na resolução física (DPI por monitor) e as imagens são decodificadas na mesma densidade (capas 600x900 e fundos 3840 de largura em 4K). Área segura: `safe-x` 72px e `safe-y` 48px (overscan de TV).
 - **Barra lateral:** 400px quando em foco; recolhe para 120px (só ícones) quando o foco vai para o conteúdo, liberando espaço para o destaque.
 - **Conteúdo:** cabeçalho (título da página + busca), destaque (hero) ocupando ~55% da altura e fileiras horizontais de capas.
 - **Início:** a primeira fileira é sempre **Jogados recentemente** (só jogos já jogados, do mais recente ao mais antigo), e o destaque abre no último jogado ("Continuar jogando"). Ao fim de uma sessão, o jogo volta para o primeiro lugar e a fileira volta ao início.

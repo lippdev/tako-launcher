@@ -8,6 +8,7 @@
     <RootNamespace>Launcher.UI.Wpf</RootNamespace>
     <Product>Tako</Product>
     <ApplicationIcon>Assets\Brand\tako.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- LibraryImport (XInput) gera código unsafe. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -26,6 +27,7 @@
     <Resource Include="Assets\Fonts\*.ttf" />
     <Resource Include="Assets\Brand\*" />
     <None Include="Assets\Fonts\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\Fonts\OFL-SourceSans3.txt" CopyToOutputDirectory="PreserveNewest" />
     <!-- Temas são dados não confiáveis: ficam soltos na pasta de saída e passam pelo carregador XAML restrito (MVP-016). -->
     <Page Remove="Themes\**\*.xaml" />
     <Content Include="Themes\**\*" CopyToOutputDirectory="PreserveNewest" />

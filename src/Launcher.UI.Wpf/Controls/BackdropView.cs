@@ -68,19 +68,29 @@ public sealed class BackdropView : Grid
         _shownLarge = IsLarge;
         if (sameGame)
         {
-            _layers[_front].Show(state, IsLarge);
+            _layers[_front].Show(state, IsLarge, ActualWidth);
             return;
         }
 
         var back = _layers[1 - _front];
         var front = _layers[_front];
-        back.Show(state, IsLarge);
+        back.Show(state, IsLarge, ActualWidth);
         Panel.SetZIndex(back.Root, 1);
         Panel.SetZIndex(front.Root, 0);
         var duration = new Duration(Transition);
         back.Root.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration));
         front.Root.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0, duration) { BeginTime = Transition });
         _front = 1 - _front;
+    }
+
+    /// <summary>A arte ocupa a mesma fração da largura em qualquer proporção de tela.</summary>
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        foreach (var layer in _layers)
+        {
+            layer.Resize(sizeInfo.NewSize.Width);
+        }
     }
 
     /// <summary>Máscara opaca até <paramref name="solid"/> e transparente a partir de <paramref name="clear"/>.</summary>
@@ -115,11 +125,20 @@ public sealed class BackdropView : Grid
 
         public Grid Root { get; }
 
-        public void Show(BackdropState state, bool large)
+        private bool _large;
+
+        public void Resize(double stageWidth)
+        {
+            // Referência 16:9: 1240 (normal) ou 1500 (grande) de 1920.
+            _artHost.Width = Math.Max(1, stageWidth) * (_large ? 1500 : 1240) / 1920;
+            _artHost.Height = _large ? 1080 : 760;
+        }
+
+        public void Show(BackdropState state, bool large, double stageWidth)
         {
             _tint.Fill = new LinearGradientBrush(state.Accent, state.Deep, 70);
-            _artHost.Width = large ? 1500 : 1240;
-            _artHost.Height = large ? 1080 : 760;
+            _large = large;
+            Resize(stageWidth > 0 ? stageWidth : 1920);
             _art.Fill = state.Hero is null ? null : new ImageBrush(state.Hero)
             {
                 Stretch = Stretch.UniformToFill,

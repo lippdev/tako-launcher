@@ -181,6 +181,26 @@ public sealed class UiSmokeTests
         Press(window, AppCommand.Back);
         Assert.Null(shell.TopOverlay);
 
+        // Outras proporções: o palco acompanha a largura da janela (sem faixas pretas) e a grade ganha colunas.
+        shell.GoHome();
+        window.Width = 1680; // 21:9
+        Pump(1.5);
+        Assert.Equal(2520, window.StageElement.ActualWidth, 0);
+        Snap(window, "15-inicio-21x9");
+        shell.OpenLibrary(LibraryFilter.All);
+        Pump(1.5);
+        Snap(window, "16-biblioteca-21x9");
+        window.Width = 1152; // 16:10
+        shell.GoHome();
+        Pump(1.5);
+        Assert.Equal(1728, window.StageElement.ActualWidth, 0);
+        Snap(window, "17-inicio-16x10");
+
+        // 4K: texto e vetores renderizados em 3840x2160.
+        window.Width = 1280;
+        Pump(1.5);
+        Snap(window, "18-inicio-4k", scale: 2);
+
         File.WriteAllLines(Path.Combine(Screenshots, "binding-errors.txt"), bindingErrors.Errors);
         window.Close();
         Assert.DoesNotContain(bindingErrors.Errors, e => !e.Contains("Error: 4 :", StringComparison.Ordinal));
@@ -205,18 +225,19 @@ public sealed class UiSmokeTests
         Dispatcher.PushFrame(frame);
     }
 
-    /// <summary>Renderiza o palco 1920x1080 (independente do tamanho da janela) para PNG.</summary>
-    private static void Snap(MainWindow window, string name)
+    /// <summary>Renderiza o palco (1080 de altura, largura conforme a proporção) para PNG; <paramref name="scale"/> 2 = 4K.</summary>
+    private static void Snap(MainWindow window, string name, double scale = 1)
     {
         var stage = window.StageElement;
         stage.UpdateLayout();
+        double width = stage.ActualWidth;
         var visual = new DrawingVisual();
         using (var context = visual.RenderOpen())
         {
-            context.DrawRectangle(new VisualBrush(stage) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top }, null, new Rect(0, 0, 1920, 1080));
+            context.DrawRectangle(new VisualBrush(stage) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top }, null, new Rect(0, 0, width, 1080));
         }
 
-        var bitmap = new RenderTargetBitmap(1920, 1080, 96, 96, PixelFormats.Pbgra32);
+        var bitmap = new RenderTargetBitmap((int)Math.Round(width * scale), (int)Math.Round(1080 * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
         bitmap.Render(visual);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));

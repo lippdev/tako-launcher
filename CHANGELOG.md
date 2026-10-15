@@ -8,10 +8,13 @@ Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), versionamen
 - Spike MVP-007: pesquisa do FSE / Xbox mode (`docs/spikes/MVP-007-fse.md`), ferramenta `Launcher.FseProbe` e pacote de desenvolvimento em `packaging/fse-dev/`.
 - Spike MVP-016: validador e carregador XAML restrito para temas (`Launcher.Themes.Xaml`), ferramenta `Launcher.ThemeCheck` e relatório em `docs/spikes/`.
 - Nome do produto: **Tako**. Executável `Tako.exe` com o ícone do polvo, marca na barra lateral e textos da interface; logos em `logo/`. O repositório e os namespaces continuam `ultralauncher`/`Launcher.*`.
+- Controles PlayStation (DualSense, DualSense Edge, DualShock 4; USB e Bluetooth) lidos direto por HID, com dicas ✕ ○ □ △ e botão PS abrindo a Central de Controle.
+- Interface responsiva: o palco acompanha a proporção da tela (21:9, 16:10…), DPI por monitor e artes decodificadas na resolução física (capas e fundos 2x da Steam), nítidas em 2K/4K.
 - Workflow de release: cada tag `v*` publica o launcher (self-contained, win-x64) e o kit do experimento FSE na página da release.
 - Estrutura inicial da solução, CI e regras de desenvolvimento.
 
 ### Alterado
+- Central de Controle no teclado: Shift+Tab (como na Steam) no lugar de G. Títulos em Source Sans 3 leve (estilo PS5) ocupando a largura da tela; barra lateral com o logo horizontal do Tako e itens que cabem na altura.
 - `Console.Runtime` renomeado para `ConsoleMode.Runtime` (evita conflito com `System.Console`) e compilado para `net8.0` e `net10.0` (ADR-0011).
 - `Launcher.Themes` passa a usar `net10.0-windows` com WPF.
 - Versões de pacotes centralizadas em `Directory.Packages.props`; testes migrados para xUnit v3 4.x sobre Microsoft.Testing.Platform.

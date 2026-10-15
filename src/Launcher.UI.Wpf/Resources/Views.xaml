@@ -34,7 +34,7 @@
   <!-- ===================================================================== Início -->
   <DataTemplate DataType="{x:Type vm:HomeViewModel}">
     <Grid>
-      <TextBlock Text="{Binding Title}" Margin="64,64,0,0" FontSize="{DynamicResource FsTitle}" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top" />
+      <TextBlock Text="{Binding Title}" Margin="64,60,0,0" Style="{StaticResource SectionTitle}" FontSize="{DynamicResource FsTitle}" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Top" />
       <Button Style="{StaticResource ChipButton}" Width="420" Height="60" Margin="0,56,72,0" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="2"
               Command="{Binding SearchCommand}" nav:Nav.Group="header" nav:Nav.Key="home:search">
         <StackPanel Orientation="Horizontal">
@@ -51,7 +51,7 @@
 
           <!-- Destaque: ancorado embaixo; o título cresce para cima e os botões não se movem. -->
           <Grid Height="500">
-            <StackPanel Margin="64,0,0,40" VerticalAlignment="Bottom">
+            <StackPanel Margin="64,0,72,40" VerticalAlignment="Bottom">
               <TextBlock Style="{StaticResource Overline}" Text="{Binding HeroOverline, Converter={StaticResource Upper}}" />
               <TextBlock Style="{StaticResource GameTitle}" Text="{Binding Hero.Title}" />
               <TextBlock Text="{Binding Hero.Meta}" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentMutedBrush}" />
@@ -73,11 +73,11 @@
           <!-- Jogados recentemente -->
           <StackPanel Margin="0,0,0,40">
             <StackPanel Orientation="Horizontal" Margin="64,0,0,20">
-              <TextBlock Text="Jogados recentemente" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="Bold" />
+              <TextBlock Text="Jogados recentemente" Style="{StaticResource SectionTitle}" />
               <TextBlock Text="{Binding RecentCountText}" Margin="18,0,0,4" VerticalAlignment="Bottom" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Foreground="{DynamicResource OnAccentSubtleBrush}" />
             </StackPanel>
-            <Canvas Height="400" ClipToBounds="True" Margin="0,-20,0,0">
-              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="20" nav:Nav.ScrollHost="Horizontal">
+            <Canvas Height="456" ClipToBounds="True" Margin="0,-36,0,0">
+              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="36" nav:Nav.ScrollHost="Horizontal">
                 <StackPanel.RenderTransform>
                   <TranslateTransform />
                 </StackPanel.RenderTransform>
@@ -89,9 +89,9 @@
 
           <!-- Adicionados recentemente -->
           <StackPanel Margin="0,0,0,160">
-            <TextBlock Text="Adicionados recentemente" Margin="64,0,0,20" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="Bold" />
-            <Canvas Height="400" ClipToBounds="True" Margin="0,-20,0,0">
-              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="20" nav:Nav.ScrollHost="Horizontal">
+            <TextBlock Text="Adicionados recentemente" Margin="64,0,0,20" Style="{StaticResource SectionTitle}" />
+            <Canvas Height="456" ClipToBounds="True" Margin="0,-36,0,0">
+              <StackPanel Orientation="Horizontal" Canvas.Left="64" Canvas.Top="36" nav:Nav.ScrollHost="Horizontal">
                 <StackPanel.RenderTransform>
                   <TranslateTransform />
                 </StackPanel.RenderTransform>
@@ -118,14 +118,15 @@
             </TextBlock>
           </Button>
           <StackPanel>
-            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" />
+            <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitle}" />
             <TextBlock Text="{Binding CountText}" Margin="0,12,0,0" FontSize="{DynamicResource FsBodyMd}" Foreground="{DynamicResource OnAccentMutedBrush}" />
           </StackPanel>
         </DockPanel>
-        <ItemsControl ItemsSource="{Binding Games}" Tag="grid" Margin="64,48,0,200" Focusable="False">
+        <ItemsControl ItemsSource="{Binding Games}" Tag="grid" Margin="64,48,72,200" Focusable="False">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <WrapPanel ItemWidth="240" ItemHeight="420" Width="1680" HorizontalAlignment="Left" />
+              <!-- Quebra pela largura disponível: mais colunas em telas mais largas. -->
+              <WrapPanel ItemWidth="240" ItemHeight="440" HorizontalAlignment="Left" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
@@ -142,7 +143,7 @@
 
   <!-- ===================================================================== Detalhes -->
   <DataTemplate DataType="{x:Type vm:DetailsViewModel}">
-    <StackPanel Margin="64,0,0,150" VerticalAlignment="Bottom" HorizontalAlignment="Left" MaxWidth="1100">
+    <StackPanel Margin="64,0,72,150" VerticalAlignment="Bottom" HorizontalAlignment="Left">
       <TextBlock Style="{StaticResource Overline}" Text="{Binding Game.Overline, Converter={StaticResource Upper}}" />
       <TextBlock Style="{StaticResource GameTitle}" Text="{Binding Game.Title}" />
       <ItemsControl ItemsSource="{Binding Stats}" Margin="0,26,0,30" Focusable="False" ItemsPanel="{StaticResource HorizontalPanel}">
@@ -198,7 +199,7 @@
 
   <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
     <StackPanel Margin="64,140,0,0" Width="1180" HorizontalAlignment="Left">
-      <TextBlock Text="Configurações" Margin="0,0,0,40" FontSize="{DynamicResource FsHeadlineLg}" FontWeight="ExtraBold" />
+      <TextBlock Text="Configurações" Margin="0,0,0,40" Style="{StaticResource PageTitle}" />
       <Button Style="{StaticResource SettingRow}" Command="{Binding ReapplyThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:theme" nav:Nav.IsDefault="True">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -286,7 +287,7 @@
   <!-- Iniciando -->
   <DataTemplate DataType="{x:Type vm:LaunchOverlayViewModel}">
     <Grid Background="{Binding Game.FallbackBrush}">
-      <StackPanel Margin="160,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="1100">
+      <StackPanel Margin="160,0,160,0" VerticalAlignment="Center" HorizontalAlignment="Left">
         <Border Width="190" Height="285" CornerRadius="14" HorizontalAlignment="Left" Margin="0,0,0,40" Background="{Binding Game.FallbackBrush}" Effect="{StaticResource FocusShadow}">
           <Border.Clip>
             <RectangleGeometry Rect="0,0,190,285" RadiusX="14" RadiusY="14" />

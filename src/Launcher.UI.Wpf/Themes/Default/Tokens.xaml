@@ -20,11 +20,12 @@
   <SolidColorBrush x:Key="WarningBrush" Color="#FFFFB020" />
   <SolidColorBrush x:Key="ErrorBrush" Color="#FFFF5A5F" />
 
-  <!-- Tipografia: Inter (SIL OFL), empacotada com o app -->
+  <!-- Tipografia (SIL OFL, empacotadas com o app): Inter no texto; Source Sans 3 (humanista da linha Frutiger, como a SST do PS5) nos títulos -->
   <FontFamily x:Key="FontText">pack://application:,,,/Tako;component/Assets/Fonts/#Inter</FontFamily>
-  <sys:Double x:Key="FsDisplay">72</sys:Double>
-  <sys:Double x:Key="FsHeadlineLg">56</sys:Double>
-  <sys:Double x:Key="FsHeadlineMd">34</sys:Double>
+  <FontFamily x:Key="FontDisplay">pack://application:,,,/Tako;component/Assets/Fonts/#Source Sans 3</FontFamily>
+  <sys:Double x:Key="FsDisplay">84</sys:Double>
+  <sys:Double x:Key="FsHeadlineLg">64</sys:Double>
+  <sys:Double x:Key="FsHeadlineMd">38</sys:Double>
   <sys:Double x:Key="FsTitle">26</sys:Double>
   <sys:Double x:Key="FsBodyLg">26</sys:Double>
   <sys:Double x:Key="FsBodyMd">22</sys:Double>

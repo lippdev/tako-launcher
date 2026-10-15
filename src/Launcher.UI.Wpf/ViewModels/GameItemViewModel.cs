@@ -92,12 +92,18 @@ public sealed partial class GameItemViewModel : ObservableObject
     /// <summary>Enquadramento da arte de fundo (x, y em 0..1).</summary>
     public Point HeroAlignment { get; }
 
+    /// <summary>Largura da capa no palco, já com a escala de foco (204 × 1,08, arredondado para cima).</summary>
+    private const int CoverDisplayWidth = 240;
+
+    /// <summary>Maior largura da arte de fundo no palco (telas ultrawide incluídas).</summary>
+    private const int HeroDisplayWidth = 2000;
+
     public async Task LoadCoverAsync()
     {
-        Cover ??= await _art.GetAsync(Game.CoverUri, 408).ConfigureAwait(true);
+        Cover ??= await _art.GetAsync(Game.CoverUri, CoverDisplayWidth).ConfigureAwait(true);
     }
 
-    public Task<ImageSource?> LoadHeroAsync() => _art.GetAsync(Game.HeroUri, 1920);
+    public Task<ImageSource?> LoadHeroAsync() => _art.GetAsync(Game.HeroUri, HeroDisplayWidth);
 
     /// <summary>Recalcula textos derivados do estado do usuário (favorito, tempo jogado).</summary>
     public void Refresh()
