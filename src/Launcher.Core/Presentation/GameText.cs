@@ -17,6 +17,9 @@ public static class GameText
         _ => "Adicionado",
     };
 
+    /// <summary>"da Steam", "da Epic Games", "do GOG", "do Xbox" (para frases como "jogos da Steam").</summary>
+    public static string StoreOf(GameStore store) => (store is GameStore.Gog or GameStore.Xbox ? "do " : "da ") + StoreName(store);
+
     /// <summary>"Agora mesmo", "Jogado ontem", "Há 3 dias", "Há 2 semanas"...</summary>
     public static string LastPlayed(DateTimeOffset? lastPlayed, DateTimeOffset now)
     {

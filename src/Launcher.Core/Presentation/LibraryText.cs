@@ -44,23 +44,26 @@ public static class LibraryText
     public static string FiltersLabel(int active) => active == 0 ? "Filtros" : $"Filtros ({active})";
 
     /// <summary>
-    /// Resultado de "Procurar jogos instalados": "12 jogos da Steam e 3 do Xbox encontrados". <paramref name="xbox"/>
-    /// nulo = fonte Xbox desligada.
+    /// Resultado de "Procurar jogos instalados" pelas lojas ligadas (ADR-0019): "12 jogos da Steam e 3 do Xbox
+    /// encontrados", "12 jogos da Steam, 2 da Epic Games e 3 do Xbox encontrados". Lojas sem jogos não aparecem.
     /// </summary>
-    public static string ScanSummary(int steam, int? xbox)
+    public static string ScanSummary(IEnumerable<(GameStore Store, int Count)> enabled)
     {
-        int fromXbox = xbox ?? 0;
-        if (steam + fromXbox == 0)
+        ArgumentNullException.ThrowIfNull(enabled);
+        var stores = enabled.ToList();
+        var found = stores.Where(s => s.Count > 0).ToList();
+        if (found.Count == 0)
         {
-            return xbox is null ? "Nenhum jogo da Steam encontrado neste PC" : "Nenhum jogo da Steam ou do Xbox encontrado neste PC";
+            return stores.Count switch
+            {
+                0 => "Todas as lojas estão desligadas nas Configurações",
+                1 => $"Nenhum jogo {GameText.StoreOf(stores[0].Store)} encontrado neste PC",
+                _ => $"Nenhum jogo {string.Join(", ", stores.SkipLast(1).Select(s => GameText.StoreOf(s.Store)))} ou {GameText.StoreOf(stores[^1].Store)} encontrado neste PC",
+            };
         }
 
-        string found = steam + fromXbox == 1 ? "encontrado" : "encontrados";
-        return (steam, fromXbox) switch
-        {
-            (_, 0) => $"{GameCount(steam)} da Steam {found}",
-            (0, _) => $"{GameCount(fromXbox)} do Xbox {found}",
-            _ => $"{GameCount(steam)} da Steam e {fromXbox} do Xbox {found}",
-        };
+        var parts = found.Select((s, i) => $"{(i == 0 ? GameCount(s.Count) : s.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))} {GameText.StoreOf(s.Store)}").ToList();
+        string list = parts.Count == 1 ? parts[0] : $"{string.Join(", ", parts.SkipLast(1))} e {parts[^1]}";
+        return $"{list} {(found.Sum(s => s.Count) == 1 ? "encontrado" : "encontrados")}";
     }
 }

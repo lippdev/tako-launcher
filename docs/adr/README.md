@@ -10,3 +10,4 @@ Dependem de spike: ADR-003 (FSE) e ADR-004 (compat Playnite).
 - [ADR-0016](0016-audio-steam-e-tv-na-sessao.md): saída de áudio, Steam (`RunningAppID` e bandeja) e TV (ADB pela rede) durante a sessão de jogo (Proposta).
 - [ADR-0017](0017-contador-de-fps-com-presentmon.md): contador de FPS próprio pelo PresentMon, sem RTSS e sem injeção; permissão pelo grupo "Usuários de log de desempenho" (Proposta).
 - [ADR-0018](0018-limite-de-fps-pelo-driver.md): limite de FPS pelo driver de vídeo (NVAPI, ADLX, IGCL), sem RTSS nem elevação (Proposta).
+- [ADR-0019](0019-fontes-de-biblioteca.md): fontes de biblioteca (Steam, Epic Games, GOG, Xbox e as próximas lojas) por uma interface comum; jogo em duas lojas fica em itens separados e ligados (Proposta).

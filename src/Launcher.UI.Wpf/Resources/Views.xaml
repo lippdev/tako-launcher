@@ -302,17 +302,49 @@
           </StackPanel>
           <StackPanel>
             <TextBlock Text="Procurar jogos instalados" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="Lê de novo as bibliotecas da Steam (todas as pastas configuradas na Steam) e os jogos do app Xbox" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="Lê de novo as lojas ligadas abaixo (Steam, Epic Games, GOG e Xbox), sem precisar abri-las" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>
-      <!-- Jogos do app Xbox / Microsoft Store (STORE-004): ShellViewModel.Library.cs. -->
-      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ToggleXboxLibraryCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:xbox">
+      <!-- Lojas (ADR-0019): cada uma pode ser desligada; o texto diz o que a última leitura achou e se falta o cliente. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleSteamStoreCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:store:steam">
         <DockPanel>
-          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding Settings.XboxLibraryEnabled}" />
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding SteamStoreEnabled}" />
+          <c:Icon DockPanel.Dock="Left" Key="Store.Steam" Width="28" Height="28" Margin="0,0,20,0" VerticalAlignment="Center" Foreground="{DynamicResource OnAccentBrush}" />
           <StackPanel>
-            <TextBlock Text="Jogos do Xbox (PC Game Pass)" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding DataContext.XboxLibraryDescription, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="Steam" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding SteamStoreStatus}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleEpicStoreCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:store:epic">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding EpicStoreEnabled}" />
+          <c:Icon DockPanel.Dock="Left" Key="Store.Epic" Width="28" Height="28" Margin="0,0,20,0" VerticalAlignment="Center" Foreground="{DynamicResource OnAccentBrush}" />
+          <StackPanel>
+            <TextBlock Text="Epic Games" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding EpicStoreStatus}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleGogStoreCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:store:gog">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding GogStoreEnabled}" />
+          <c:Icon DockPanel.Dock="Left" Key="Store.Gog" Width="28" Height="28" Margin="0,0,20,0" VerticalAlignment="Center" Foreground="{DynamicResource OnAccentBrush}" />
+          <StackPanel>
+            <TextBlock Text="GOG" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding GogStoreStatus}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
+      <!-- Xbox / Microsoft Store (STORE-004): avisa quando faltam o app Xbox ou os Serviços de Jogos. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding ToggleXboxStoreCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:store:xbox">
+        <DockPanel>
+          <ContentControl DockPanel.Dock="Right" Style="{StaticResource ToggleVisual}" Tag="{Binding XboxStoreEnabled}" />
+          <c:Icon DockPanel.Dock="Left" Key="Store.Xbox" Width="28" Height="28" Margin="0,0,20,0" VerticalAlignment="Center" Foreground="{DynamicResource OnAccentBrush}" />
+          <StackPanel>
+            <TextBlock Text="Xbox (PC Game Pass)" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding XboxStoreStatus}" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </DockPanel>
       </Button>

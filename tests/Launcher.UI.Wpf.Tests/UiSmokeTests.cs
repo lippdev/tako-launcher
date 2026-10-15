@@ -484,6 +484,9 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Back);
         Assert.Null(shell.TopOverlay);
 
+        // --- Lojas (ADR-0019): Steam, Epic Games e GOG ligadas/desligadas nas Configurações.
+        StoreSettings(shell, window);
+
         // --- Segurança de temas (frente H): caminhos montados por dados não carregam (MVP-016, questão aberta 8).
         ThemeSecurity(services, bindingErrors);
 

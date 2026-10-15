@@ -71,7 +71,10 @@ public sealed partial class ShellViewModel
             RestoreGameScreen();
             _environment.Discard();
             LogLaunchFailed(_logger, ex, game.Id);
-            Toast($"Não foi possível abrir {game.Title}: {ex.Message}");
+            // Cliente da loja ausente (STORE-012): o protocolo não está registrado no Windows.
+            Toast(game.Store == GameStore.Epic && LibrarySources.Reports.GetValueOrDefault(GameStore.Epic) is { ClientInstalled: false }
+                ? $"Epic Games Launcher não encontrado: instale-o para abrir {game.Title}"
+                : $"Não foi possível abrir {game.Title}: {ex.Message}");
             return;
         }
 
@@ -85,7 +88,7 @@ public sealed partial class ShellViewModel
             Session = SessionState.Browsing;
             RestoreGameScreen(); // sem saber quando o jogo fecha, a tela de jogo não teria quando voltar
             _environment.Discard(); // sem saber quando o jogo fecha, não há momento seguro para restaurar
-            Toast(game.Store == GameStore.Steam ? $"Abrindo {game.Title} pela Steam" : $"Abrindo {game.Title}");
+            Toast($"Abrindo {game.Title}{LaunchVia(game)}");
             return;
         }
 
@@ -105,9 +108,18 @@ public sealed partial class ShellViewModel
         LogRealSessionStarted(_logger, game.Id, plan.Strategy);
         Toast(tracker.Status == GameRunStatus.Running
             ? $"Jogando {game.Title} · o Tako espera você voltar"
-            : $"Abrindo {game.Title}{(game.Store == GameStore.Steam ? " pela Steam" : string.Empty)} · aguardando o jogo iniciar");
+            : $"Abrindo {game.Title}{LaunchVia(game)} · aguardando o jogo iniciar");
         CurrentPage.Refresh();
     }
+
+    /// <summary>" pela Steam", " pela Epic Games", " pelo GOG Galaxy" ou nada (executável direto).</summary>
+    private static string LaunchVia(Game game) => game.Store switch
+    {
+        GameStore.Steam => " pela Steam",
+        GameStore.Epic => " pela Epic Games",
+        GameStore.Gog when game.LaunchTarget?.EndsWith("GalaxyClient.exe", StringComparison.OrdinalIgnoreCase) == true => " pelo GOG Galaxy",
+        _ => string.Empty,
+    };
 
     private static int? RootProcessId(Process? process)
     {

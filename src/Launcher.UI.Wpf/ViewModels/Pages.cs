@@ -74,7 +74,11 @@ public sealed partial class HomeViewModel : PageViewModel
     private void AddGame() => Shell.AddGame();
 
     [RelayCommand]
-    private void Rescan() => Shell.RescanLibrary();
+    private void Rescan()
+    {
+        Shell.RescanLibrary();
+        OnPropertyChanged(string.Empty); // avisos das lojas (Configurações › Lojas)
+    }
 
     public override void Refresh()
     {
@@ -272,6 +276,7 @@ public sealed partial class DetailsViewModel : PageViewModel
             Game.ReleaseText is null ? null : new StatViewModel("Lançamento", Game.ReleaseText),
             g.Developer is null ? null : new StatViewModel("Desenvolvedora", g.Developer),
             new StatViewModel("Status", Game.Status),
+            g.AlsoInstalledIn.Count == 0 ? null : new StatViewModel("Também em", string.Join(", ", g.AlsoInstalledIn.Select(Core.Presentation.GameText.StoreName))),
         }.OfType<StatViewModel>());
         OnPropertyChanged(nameof(PrimaryLabel));
         OnPropertyChanged(nameof(FavoriteLabel));
@@ -349,7 +354,11 @@ public sealed partial class SettingsViewModel : PageViewModel
     private void AddGame() => Shell.AddGame();
 
     [RelayCommand]
-    private void Rescan() => Shell.RescanLibrary();
+    private void Rescan()
+    {
+        Shell.RescanLibrary();
+        OnPropertyChanged(string.Empty); // avisos das lojas (Configurações › Lojas)
+    }
 
     [RelayCommand]
     private void RefreshMetadata() => Shell.RefreshMetadata();

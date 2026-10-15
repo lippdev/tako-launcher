@@ -280,15 +280,15 @@ manifesto e, se ele usar recurso de idioma que o Windows não resolver, do nome 
 
 | # | Caso | Como testar | Esperado |
 |---|---|---|---|
-| X1 | Jogo do Game Pass em `C:\XboxGames` | Instalar um jogo do PC Game Pass pelo app Xbox; Configurações › Procurar jogos instalados | Aparece em Biblioteca › Xbox com o nome certo; o aviso diz "N jogos do Xbox encontrados" |
+| X1 | Jogo do Game Pass em `C:\XboxGames` | Instalar um jogo do PC Game Pass pelo app Xbox; Configurações › Procurar jogos instalados | Aparece em Biblioteca › Xbox com o nome certo; a linha da loja diz "N jogos instalados" |
 | X2 | Outra unidade | Escolher `D:` como pasta de jogos no app Xbox e instalar um jogo lá | Aparece também (lido pelo `.GamingRoot` de `D:\`) |
 | X3 | Jogo antigo em WindowsApps | Um jogo UWP com Xbox Live (ex.: Microsoft Solitaire Collection) | Aparece; apps comuns da Store (ex.: Calculadora, Fotos) não aparecem |
 | X4 | Arte e dados | Abrir os detalhes de X1 depois de alguns segundos | Capa e fundo da Steam quando o nome casar; sem correspondência, o logo do pacote; Opções › Corrigir correspondência funciona |
 | X5 | Abrir | Jogar em X1 | O jogo abre pelo Windows (sem erro de acesso); a tela mostra "aguardando o jogo iniciar" e depois "Jogando" |
 | X6 | Sessão | Jogar alguns minutos, abrir a Central de Controle (Guia) | Central sobre o jogo; contador de FPS acompanha o processo do jogo |
 | X7 | Fim | Fechar o jogo pelo menu do próprio jogo | Em até ~5 s o Tako volta; "Jogados recentemente" e tempo de jogo atualizados |
-| X8 | Desligar a fonte | Configurações › Jogos do Xbox (PC Game Pass) › desligar | Os jogos do Xbox somem da biblioteca; ligar de novo traz de volta |
-| X9 | Sem app Xbox | Numa máquina sem o app Xbox (ou após desinstalá-lo) | A linha "Jogos do Xbox" avisa "App Xbox não encontrado…"; nada trava |
+| X8 | Desligar a fonte | Configurações › Lojas › Xbox (PC Game Pass) › desligar | Os jogos do Xbox somem da biblioteca; ligar de novo traz de volta |
+| X9 | Sem app Xbox | Numa máquina sem o app Xbox (ou após desinstalá-lo) | A linha "Xbox (PC Game Pass)" avisa "App Xbox não encontrado…"; nada trava |
 | X10 | Sem Serviços de Jogos | Parar/remover os Serviços de Jogos (ou máquina recém-formatada só com o app Xbox) | Aviso "Serviços de Jogos não encontrados: abra o app Xbox para instalá-los" |
 | X11 | Jogo desinstalado | Desinstalar X1 pelo app Xbox e procurar de novo | O jogo some (pasta que sobrar sem pacote registrado não aparece) |
 | X12 | Outro usuário do Windows | Entrar com outra conta do Windows no mesmo PC | Só aparecem os jogos registrados para essa conta |
@@ -323,6 +323,29 @@ fora (exige adaptador).
 | TV1 | Chaves cifradas | Copiar `Tako_Data` para outro usuário/PC e **Testar** nas duas TVs | As duas TVs pedem permissão de novo; `tv-pairing.dat` começa com `dpapi:` |
 | TV2 | Certificado | Conferir no log que a conexão LG usou `wss://IP:3001` e a Samsung `wss://IP:8002` | Funciona com o IP; com um nome (ex.: `tv.lan`) as Configurações pedem o IP |
 | TV3 | Detectar sem TV | IP sem TV, **Detectar pelo IP** | "Nenhuma TV conhecida respondeu…" em poucos segundos |
+
+## 17. Epic Games e GOG ([ADR-0019](../adr/0019-fontes-de-biblioteca.md))
+
+Precisa de contas reais com jogos **instalados**. Os jogos são lidos sem as lojas abertas; a Epic sempre abre pelo
+próprio launcher; o GOG abre pelo GOG Galaxy quando instalado, senão pelo executável do jogo.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| EG1 | Jogos da Epic | Epic instalada com 2+ jogos (um em outro disco), Epic **fechada**; abrir o Tako | Todos aparecem em "Epic Games" com selo e cor da Epic; DLCs e o Unreal Engine não aparecem |
+| EG2 | Abrir pela Epic | Jogar um jogo da Epic com a Epic fechada | A Epic abre (login/DRM) e o jogo inicia; "Abrindo … pela Epic Games"; o Tako reconhece o jogo rodando e o fim ao fechar |
+| EG3 | Jogo com anti-cheat ou launcher próprio | Ex.: jogo que abre um launcher antes | Sessão acompanhada pela pasta do jogo; anotar se o fim foi reconhecido |
+| EG4 | Jogo movido | Mover um jogo pela Epic (Gerenciar › Mover) e "Procurar jogos instalados" | O jogo continua lá, com a pasta nova (Opções › Abrir pasta) |
+| EG5 | Desinstalar | Desinstalar um jogo pela Epic e "Procurar jogos instalados" | O jogo some da biblioteca |
+| EG6 | Epic ausente | PC sem a Epic (ou desinstalada, manifests apagados) | Configurações › Epic Games: "Epic Games Launcher não encontrado neste PC"; nada trava |
+| EG7 | Epic removida com manifests | Desinstalar só o launcher, deixando os jogos | Jogos aparecem; Configurações avisam; Jogar mostra "Epic Games Launcher não encontrado: instale-o para abrir …" |
+| GG1 | Jogos do GOG Galaxy | Galaxy com 2+ jogos instalados, Galaxy fechado | Aparecem em "GOG" com selo e cor do GOG; DLCs não aparecem |
+| GG2 | Abrir pelo Galaxy | Jogar um jogo do GOG | Abre pelo Galaxy ("pelo GOG Galaxy"); nuvem sincroniza; o fim da sessão é reconhecido |
+| GG3 | Instalador offline sem Galaxy | Instalar um jogo pelo instalador offline do GOG num PC sem Galaxy | O jogo aparece; abre direto pelo executável com os argumentos do jogo; Configurações › GOG: "Sem GOG Galaxy: os jogos abrem direto pelo executável" |
+| GG4 | Desinstalar | Desinstalar um jogo do GOG e "Procurar jogos instalados" | O jogo some |
+| LJ1 | Mesmo jogo em duas lojas | Um jogo instalado na Steam e na Epic (ou GOG) | Dois itens, cada um com a sua loja; detalhes mostram "Também em"; cada um abre pela própria loja |
+| LJ2 | Capas e dados | Jogos da Epic/GOG recém-encontrados | Capa, descrição e gêneros chegam pelo agente de metadados; "Opções › Corrigir correspondência" troca a escolha |
+| LJ3 | Desligar lojas | Configurações › Epic Games (A) e depois de novo | Os jogos da Epic somem e voltam; favoritos e tempo de jogo continuam |
+| LJ4 | Só controle | Fazer LJ3 só com o controle | Linhas das lojas alcançáveis e alternáveis com A |
 
 ## Resultados
 

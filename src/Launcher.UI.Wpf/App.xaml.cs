@@ -10,7 +10,10 @@ using ConsoleMode.Runtime.Windows;
 using ConsoleMode.Runtime.Windows.SessionTools;
 using Launcher.Core.Diagnostics;
 using Launcher.Core.Library;
+using Launcher.Core.Library.Epic;
+using Launcher.Core.Library.Gog;
 using Launcher.Core.Library.Metadata;
+using Launcher.Core.Library.Sources;
 using Launcher.Core.Library.Steam;
 using Launcher.Core.Library.Xbox;
 using Launcher.Core.Persistence;
@@ -125,6 +128,8 @@ public partial class App : Application
         services.AddSingleton<UpdateService>();
         services.AddSingleton(sp => new SessionJournal(AppPaths.SessionFile, sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<CrashGuard>();
+        services.AddSingleton<IRegistryReader, WindowsRegistryReader>();
+        services.AddSingleton(CreateLibrarySources);
         services.AddSingleton<IGameLibrary>(sp => library ?? CreateLocalLibrary(sp));
         services.AddSingleton(XamlSecurityPolicy.CreateDefault());
         services.AddSingleton<XamlValidator>();
@@ -134,9 +139,8 @@ public partial class App : Application
         services.AddSingleton<ArtService>();
         services.AddSingleton<SonyHidGamepad>();
         services.AddSingleton<SettingsService>();
-        // Jogos do app Xbox / Microsoft Store (STORE-004): fonte isolada, ligada nas Configurações.
+        // Jogos do app Xbox / Microsoft Store (STORE-004): acesso ao Windows da fonte Xbox (ADR-0019).
         services.AddSingleton<IXboxSystem, WindowsXboxSystem>();
-        services.AddSingleton<XboxLibraryService>();
         // Central de Controle durante o jogo: janelas abertas, contador de FPS (PresentMon, ADR-0017), limite de FPS,
         // ponteiro, ControlFS e desempenho (MVP-002/030).
         services.AddSingleton<IWindowSwitcher, WindowsWindowSwitcher>();
@@ -168,35 +172,33 @@ public partial class App : Application
         return services.BuildServiceProvider();
     }
 
-    /// <summary>Biblioteca real: jogos instalados na Steam e no app Xbox + adicionados pelo usuário (<c>tako.db</c>; importa o antigo <c>library.json</c>).</summary>
-    private static LocalGameLibrary CreateLocalLibrary(IServiceProvider services)
+    /// <summary>
+    /// Lojas da biblioteca (ADR-0019): Steam, Epic, GOG e Xbox, lidas do disco e do registro sem os clientes abertos; as
+    /// desligadas nas Configurações ficam de fora.
+    /// </summary>
+    private static LibrarySources CreateLibrarySources(IServiceProvider services)
     {
         string? steamRoot = SteamLocator.FindRoot();
         services.GetRequiredService<SteamArtResolver>().SteamRoot = steamRoot;
+        var registry = services.GetRequiredService<IRegistryReader>();
         var logger = services.GetRequiredService<ILogger<App>>();
-        IReadOnlyList<Game> DiscoverSteam()
-        {
-            if (steamRoot is null)
-            {
-                return [];
-            }
+        return new LibrarySources(
+            [
+                new SteamLibrarySource(steamRoot),
+                new EpicLibrarySource(registry, Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)),
+                new GogLibrarySource(registry),
+                new XboxLibrarySource(services.GetRequiredService<IXboxSystem>()),
+            ],
+            services.GetRequiredService<SettingsService>().IsStoreEnabled,
+            (store, ex) => LogStoreScanFailed(logger, ex, store));
+    }
 
-            try
-            {
-                return [.. SteamLibraryScanner.Scan(steamRoot).Select(SteamGames.ToGame)];
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                LogSteamScanFailed(logger, ex, steamRoot);
-                return [];
-            }
-        }
-
-        var xbox = services.GetRequiredService<XboxLibraryService>();
-        IReadOnlyList<Game> Discover() => [.. DiscoverSteam(), .. xbox.Discover()];
-
+    /// <summary>Biblioteca real: jogos instalados nas lojas + adicionados pelo usuário (<c>tako.db</c>; importa o antigo <c>library.json</c>).</summary>
+    private static LocalGameLibrary CreateLocalLibrary(IServiceProvider services)
+    {
+        var logger = services.GetRequiredService<ILogger<App>>();
         var database = services.GetRequiredService<TakoDatabase>();
-        var library = new LocalGameLibrary(Discover, new SqliteLibraryStore(database, AppPaths.LibraryFile), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
+        var library = new LocalGameLibrary(services.GetRequiredService<LibrarySources>().Discover, new SqliteLibraryStore(database, AppPaths.LibraryFile), services.GetRequiredService<TimeProvider>(), services.GetRequiredService<MetadataService>().ApplyCached);
         library.Load();
         if (database.RecoveredFromCorruption)
         {
@@ -245,8 +247,8 @@ public partial class App : Application
     [LoggerMessage(Level = LogLevel.Error, Message = "Exceção não observada em tarefa")]
     private static partial void LogUnobservedTaskException(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Falha ao ler as bibliotecas da Steam em {SteamRoot}")]
-    private static partial void LogSteamScanFailed(ILogger logger, Exception exception, string steamRoot);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Falha ao ler os jogos instalados da loja {Store}")]
+    private static partial void LogStoreScanFailed(ILogger logger, Exception exception, GameStore store);
 
     protected override void OnExit(ExitEventArgs e)
     {

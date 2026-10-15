@@ -331,8 +331,24 @@ public sealed class XboxLibraryTests : IDisposable
     [InlineData(12, 0, "12 jogos da Steam encontrados")]
     [InlineData(0, 1, "1 jogo do Xbox encontrado")]
     [InlineData(12, 3, "12 jogos da Steam e 3 do Xbox encontrados")]
-    public void Scan_summary_mentions_each_store(int steam, int? xbox, string expected) =>
-        Assert.Equal(expected, LibraryText.ScanSummary(steam, xbox));
+    public void Scan_summary_mentions_each_store(int steam, int? xbox, string expected)
+    {
+        List<(GameStore, int)> enabled = [(GameStore.Steam, steam)];
+        if (xbox is int count)
+        {
+            enabled.Add((GameStore.Xbox, count));
+        }
+
+        Assert.Equal(expected, LibraryText.ScanSummary(enabled));
+    }
+
+    [Fact]
+    public void Scan_summary_lists_every_enabled_store()
+    {
+        Assert.Equal("12 jogos da Steam, 2 da Epic Games e 1 do GOG encontrados", LibraryText.ScanSummary([(GameStore.Steam, 12), (GameStore.Epic, 2), (GameStore.Xbox, 0), (GameStore.Gog, 1)]));
+        Assert.Equal("Nenhum jogo da Steam, da Epic Games ou do GOG encontrado neste PC", LibraryText.ScanSummary([(GameStore.Steam, 0), (GameStore.Epic, 0), (GameStore.Gog, 0)]));
+        Assert.Equal("Todas as lojas estão desligadas nas Configurações", LibraryText.ScanSummary([]));
+    }
 
     private static string ContosoFamily => PackageIdentity.FamilyName("Contoso.ContosoRacing", Contoso);
 

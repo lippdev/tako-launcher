@@ -103,21 +103,27 @@ public sealed partial class ShellViewModel
     public void RescanLibrary()
     {
         Library.Refresh();
-        Toast(Core.Presentation.LibraryText.ScanSummary(
-            Library.Games.Count(g => g.Store == GameStore.Steam),
-            Settings.XboxLibraryEnabled ? Library.Games.Count(g => g.Store == GameStore.Xbox) : null));
-        OnPropertyChanged(nameof(XboxLibraryDescription));
+        Toast(Core.Presentation.LibraryText.ScanSummary(LibrarySources.Stores
+            .Select(store => LibrarySources.Reports.GetValueOrDefault(store))
+            .Where(r => r is { Enabled: true })
+            .Select(r => (r!.Store, r.GameCount))));
     }
 
-    /// <summary>Estado da fonte Xbox nas Configurações (STORE-004), com aviso se faltar o app Xbox ou os Serviços de Jogos.</summary>
-    public string XboxLibraryDescription => _xbox.Description;
+    /// <summary>Configurações › Lojas: liga ou desliga uma loja e lê a biblioteca de novo (ADR-0019).</summary>
+    public void ToggleStore(GameStore store) => Settings.SetStoreEnabled(store, !Settings.IsStoreEnabled(store));
 
-    /// <summary>Liga/desliga os jogos do app Xbox / Microsoft Store e procura de novo.</summary>
-    [RelayCommand]
-    public void ToggleXboxLibrary()
+    private void OnStoreToggled(GameStore store)
     {
-        Settings.XboxLibraryEnabled = !Settings.XboxLibraryEnabled;
-        RescanLibrary();
+        Library.Refresh();
+        string name = GameTextStore(store);
+        if (!Settings.IsStoreEnabled(store))
+        {
+            Toast($"{name} desligada: os jogos dela saíram da biblioteca");
+            return;
+        }
+
+        var report = LibrarySources.Reports.GetValueOrDefault(store);
+        Toast(report is null ? $"{name} ligada" : $"{name} ligada · {report.Summary}");
     }
 
     [RelayCommand]
@@ -139,8 +145,8 @@ public sealed partial class ShellViewModel
             actions.Add(new OverlayAction("Abrir na Steam", ActionStyle.Primary, new RelayCommand(() => { Close(); OpenUri($"steam://nav/games/details/{appId}"); }), IsDefault: true));
         }
 
-        // Xbox e adicionados: dados e artes vêm do agente pelo nome, então o usuário pode corrigir a correspondência.
-        if (game.Store is GameStore.Xbox or GameStore.Manual)
+        // Jogos sem appid próprio da Steam (adicionados, Epic, GOG...) casam pelo nome; o usuário pode corrigir.
+        if (game.Store != GameStore.Steam)
         {
             actions.Add(new OverlayAction("Corrigir correspondência", ActionStyle.Primary, new RelayCommand(() => { Close(); _ = FixMatchAsync(item); }), IsDefault: true));
         }
@@ -165,13 +171,19 @@ public sealed partial class ShellViewModel
         string text = game.Store == GameStore.Manual
             ? $"{game.LaunchTarget}\nDados e artes: {SourceText(game)}"
             : $"{GameTextStore(game)} · dados e artes: {SourceText(game)}";
+        if (game.AlsoInstalledIn.Count > 0)
+        {
+            text += $"\nTambém instalado: {string.Join(", ", game.AlsoInstalledIn.Select(s => GameTextStore(s)))}";
+        }
         dialog = new DialogViewModel(game.Title, text, actions);
         PushOverlay(dialog);
     }
 
     private string SourceText(Game game) => game.SteamAppId is int id ? $"{_metadata.ProviderName} (appid {id})" : "nenhuma correspondência ainda";
 
-    private static string GameTextStore(Game game) => Core.Presentation.GameText.StoreName(game.Store);
+    private static string GameTextStore(Game game) => GameTextStore(game.Store);
+
+    private static string GameTextStore(GameStore store) => Core.Presentation.GameText.StoreName(store);
 
     /// <summary>Como no Plex: mostra os resultados da busca pelo título e fixa o escolhido.</summary>
     private async Task FixMatchAsync(GameItemViewModel item)
@@ -190,7 +202,9 @@ public sealed partial class ShellViewModel
             .ToList();
         dialog = new DialogViewModel(
             "Qual destes é o seu jogo?",
-            results.Count == 0 ? $"Nada encontrado para \"{item.Title}\". Renomeie o atalho ou escolha uma capa manualmente." : $"Resultados para \"{item.Title}\":",
+            results.Count == 0
+                ? item.Game.Store == GameStore.Manual ? $"Nada encontrado para \"{item.Title}\". Renomeie o atalho ou escolha uma capa manualmente." : $"Nada encontrado para \"{item.Title}\" na {_metadata.ProviderName}."
+                : $"Resultados para \"{item.Title}\":",
             actions);
         PushOverlay(dialog);
     }
