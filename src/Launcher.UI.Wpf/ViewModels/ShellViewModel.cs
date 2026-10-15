@@ -9,6 +9,7 @@ using Launcher.Core.Input;
 using Launcher.Core.Library;
 using Launcher.Core.Presentation;
 using Launcher.Core.Session.GameScreen;
+using Launcher.Core.Session.Devices;
 using Launcher.Core.Session.Restore;
 using Launcher.UI.Wpf.Input;
 using Launcher.UI.Wpf.Services;
@@ -36,6 +37,7 @@ public sealed partial class ShellViewModel : ObservableObject
     private readonly ThemeService _themes;
     private readonly PlayniteThemeService _playniteThemes;
     private readonly SessionEnvironmentGuard _environment;
+    private readonly GameSessionDevices _devices;
     private readonly TimeProvider _time;
     private readonly ILogger<ShellViewModel> _logger;
     private readonly Dictionary<string, GameItemViewModel> _items = [];
@@ -90,6 +92,7 @@ public sealed partial class ShellViewModel : ObservableObject
         SessionToolsService sessionTools,
         SessionEnvironmentGuard environment,
         GameScreenSession gameScreen,
+        GameSessionDevices devices,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
@@ -102,6 +105,7 @@ public sealed partial class ShellViewModel : ObservableObject
         SessionTools = sessionTools;
         _environment = environment;
         GameScreen = gameScreen;
+        _devices = devices;
         _time = time;
         _logger = logger;
         SyncItems();

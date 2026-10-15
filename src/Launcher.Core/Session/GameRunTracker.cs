@@ -60,6 +60,11 @@ public sealed class GameRunTracker
             throw new ArgumentException("A estratégia por processo precisa do processo iniciado.", nameof(rootProcessId));
         }
 
+        if (plan.Strategy == GameTrackingStrategy.SteamApp && plan.SteamAppId is null)
+        {
+            throw new ArgumentException("A estratégia pela Steam precisa do id do jogo na Steam.", nameof(plan));
+        }
+
         Plan = plan;
         _launchedAt = launchedAt;
         _startTimeout = startTimeout ?? DefaultStartTimeout;
@@ -91,8 +96,14 @@ public sealed class GameRunTracker
 
     public bool IsFinished => Status is GameRunStatus.Exited or GameRunStatus.TimedOut;
 
-    /// <summary>Aplica uma leitura da lista de processos feita em <paramref name="now"/> e devolve o novo status.</summary>
-    public GameRunStatus Update(IReadOnlyCollection<ProcessEntry> snapshot, DateTimeOffset now)
+    /// <summary>A Steam já confirmou este jogo rodando (<c>RunningAppID</c>): daí em diante ela decide o fim.</summary>
+    public bool SteamConfirmed { get; private set; }
+
+    /// <summary>
+    /// Aplica uma leitura da lista de processos feita em <paramref name="now"/> e devolve o novo status.
+    /// <paramref name="steamRunningAppId"/> é o <c>RunningAppID</c> lido junto (nulo: não lido ou ilegível).
+    /// </summary>
+    public GameRunStatus Update(IReadOnlyCollection<ProcessEntry> snapshot, DateTimeOffset now, int? steamRunningAppId = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         if (IsFinished)
@@ -100,8 +111,14 @@ public sealed class GameRunTracker
             return Status;
         }
 
-        _current = Plan.Strategy == GameTrackingStrategy.Process ? MatchTree(snapshot) : MatchFolder(snapshot);
-        if (_current.Count > 0)
+        _current = Plan.Strategy switch
+        {
+            GameTrackingStrategy.Process => MatchTree(snapshot),
+            GameTrackingStrategy.InstallFolder => MatchFolder(snapshot),
+            _ => [],
+        };
+
+        if (IsPresent(steamRunningAppId))
         {
             FirstSeenAt ??= now;
             LastSeenAt = now;
@@ -117,6 +134,23 @@ public sealed class GameRunTracker
         }
 
         return Status;
+    }
+
+    /// <summary>
+    /// O jogo está rodando nesta leitura. Com o sinal da Steam: o id dela confirma o início mesmo sem processo visto
+    /// (exe fora da pasta, acesso negado); depois de confirmado, a Steam decide o fim, e processos que ficam para trás na
+    /// pasta (relatório de falha, launcher) não seguram a sessão. Leitura da Steam ilegível volta aos processos.
+    /// </summary>
+    private bool IsPresent(int? steamRunningAppId)
+    {
+        if (Plan.SteamAppId is not { } appId || steamRunningAppId is not { } running)
+        {
+            return _current.Count > 0;
+        }
+
+        bool steamSaysRunning = running == appId;
+        SteamConfirmed |= steamSaysRunning;
+        return SteamConfirmed ? steamSaysRunning : steamSaysRunning || _current.Count > 0;
     }
 
     private List<int> MatchFolder(IReadOnlyCollection<ProcessEntry> snapshot) =>

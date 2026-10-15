@@ -4,6 +4,8 @@ using System.Windows;
 using ConsoleMode.Runtime.Audio;
 using ConsoleMode.Runtime.Display;
 using ConsoleMode.Runtime.SessionTools;
+using ConsoleMode.Runtime.Steam;
+using ConsoleMode.Runtime.Tv;
 using ConsoleMode.Runtime.Windows;
 using ConsoleMode.Runtime.Windows.SessionTools;
 using Launcher.Core.Diagnostics;
@@ -13,6 +15,7 @@ using Launcher.Core.Library.Steam;
 using Launcher.Core.Persistence;
 using Launcher.Core.Resilience;
 using Launcher.Core.Session.GameScreen;
+using Launcher.Core.Session.Devices;
 using Launcher.Core.Session.Restore;
 using Launcher.Themes.Xaml;
 using Launcher.UI.Wpf.Input;
@@ -147,6 +150,10 @@ public partial class App : Application
         services.AddSingleton<IDisplayControlService, WindowsDisplayControl>();
         services.AddSingleton<IScreenCurtain, WindowsScreenCurtain>();
         services.AddSingleton(sp => new GameScreenSession(sp.GetRequiredService<IDisplayControlService>(), sp.GetRequiredService<IDisplayConfigurationService>(), sp.GetRequiredService<IScreenCurtain>(), sp.GetRequiredService<ILogger<GameScreenSession>>()));
+        // Áudio, Steam e TV durante o jogo (MVP-002, ADR-0016).
+        services.AddSingleton<ISteamClient, WindowsSteamClient>();
+        services.AddSingleton<ITvControl>(sp => CreateTvControl(sp.GetRequiredService<ILogger<GameSessionDevices>>()));
+        services.AddSingleton<GameSessionDevices>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
         testServices?.Invoke(services);
@@ -187,6 +194,10 @@ public partial class App : Application
 
         return library;
     }
+
+    /// <summary>Google TV / Android TV pela rede (ADB); a chave deste PC fica cifrada com DPAPI na pasta de dados.</summary>
+    private static AndroidTvControl CreateTvControl(ILogger logger) =>
+        new(new AdbKeyStore(AppPaths.AdbKeyFile, new DpapiSecretProtector()), $"Tako@{Environment.MachineName}", e => GameSessionDevices.LogTvEvent(logger, e));
 
     /// <summary>Exceções que derrubariam o processo ficam registradas no log antes (MVP-033).</summary>
     private static void LogUnhandledExceptions(ServiceProvider services)

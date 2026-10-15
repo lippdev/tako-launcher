@@ -46,6 +46,7 @@ public sealed partial class ShellViewModel
     {
         var game = item.Game;
         CaptureEnvironmentBeforeGame(game.Id); // antes da tela de jogo: o registro é o estado de antes de tudo
+        bool tvReady = await WakeTvForGameScreenAsync(game).ConfigureAwait(true); // a TV liga antes de virar a tela de jogo
         if (!await FocusGameScreenAsync().ConfigureAwait(true))
         {
             Session = SessionState.Browsing; // tela de jogo não confirmada: as telas já voltaram
@@ -96,8 +97,9 @@ public sealed partial class ShellViewModel
         }
 
         _monitor ??= new GameProcessMonitor(_time);
-        _monitor.Start(tracker, OnRealGameStatusChanged);
+        _monitor.Start(tracker, OnRealGameStatusChanged, _devices.SteamRunningAppId);
         SessionTools.BeginSession(); // contador e limite de FPS escolhidos na Central de Controle
+        BeginSessionDevices(game, tvReady); // TV (se ainda não ligou) e saída de áudio (MVP-002) em segundo plano
         LogRealSessionStarted(_logger, game.Id, plan.Strategy);
         Toast(tracker.Status == GameRunStatus.Running
             ? $"Jogando {game.Title} · o Tako espera você voltar"
@@ -152,6 +154,7 @@ public sealed partial class ShellViewModel
         ClearRunningGame();
         Session = SessionState.Browsing;
         RestoreGameScreen(); // sem jogo, a tela de jogo não fica em foco
+        EndSessionDevices(game, gameEnded: false); // devolve a saída de áudio; TV e Steam ficam como estão
         _environment.Discard(); // o jogo pode abrir depois: restaurar agora atrapalharia
         if (game is not null)
         {
@@ -180,7 +183,8 @@ public sealed partial class ShellViewModel
 
         Session = SessionState.Restoring;
         string screens = RestoreGameScreen(); // tela de jogo primeiro: a restauração do MVP-012 confere o resultado
-        string restored = RestoreEnvironmentAfterGame() + screens; // monitores e áudio antes de trazer a janela (MVP-012)
+        string devices = EndSessionDevices(game, gameEnded: true); // saída de áudio, Steam e TV (MVP-002)
+        string restored = RestoreEnvironmentAfterGame() + screens + devices; // monitores e áudio antes de trazer a janela (MVP-012)
         BringLauncherToFront();
         Session = SessionState.Browsing;
         if (game is not null)

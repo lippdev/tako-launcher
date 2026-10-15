@@ -55,6 +55,8 @@ public sealed partial class UiSmokeTests
         // ativa nem fecha janelas da máquina nem esconde o ponteiro.
         var windows = new SimulatedWindowSwitcher();
         var pointer = new SimulatedPointer();
+        var steam = new SimulatedSteamClient();
+        var tv = new SimulatedTvControl();
         string environmentFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-environment-{Guid.NewGuid():N}.json");
         using var services = App.BuildServices(
             new InMemoryGameLibrary(SampleLibrary.Load(TimeProvider.System), TimeProvider.System),
@@ -67,6 +69,8 @@ public sealed partial class UiSmokeTests
                 .AddSingleton<IPointerService>(pointer)
                 .AddSingleton<IControlFsService>(new SimulatedControlFs())
                 .AddSingleton<IHardwareMonitor>(new SimulatedHardwareMonitor())
+                .AddSingleton<ConsoleMode.Runtime.Steam.ISteamClient>(steam)
+                .AddSingleton<ConsoleMode.Runtime.Tv.ITvControl>(tv)
                 .AddSingleton(new PendingEnvironmentStore(environmentFile)));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
@@ -185,9 +189,9 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Accept);
         var center = (ControlCenterViewModel)shell.TopOverlay!;
         Assert.Equal("audio", center.Popover!.Key);
-        int volume = shell.SessionOptions.Volume;
+        int volume = shell.AudioVolume.Current()!.VolumePercent; // volume real (simulado no teste), não um número da tela
         Press(window, AppCommand.Right);
-        Assert.Equal(volume + 5, shell.SessionOptions.Volume);
+        Assert.Equal(volume + 5, shell.AudioVolume.Current()!.VolumePercent);
         Pump(0.5);
         Snap(window, "11-painel-audio");
         Press(window, AppCommand.Down);
@@ -427,6 +431,9 @@ public sealed partial class UiSmokeTests
         // --- Monitores e áudio (frente E2)
         MonitorsAndAudio(services, shell, window, real, display, audio);
         GameScreenSettingsAndConfirmation(shell, window);
+
+        // --- Áudio, Steam e TV durante o jogo (MVP-002 parte 2)
+        GameAudioSteamAndTv(shell, window, real, audio, tv);
 
         // --- Supervisor (frente E1): a UI aberta com --supervisor-pipe manda heartbeats pela thread da UI (MVP-003/006).
         string supervisorPipe = NamedPipeIpc.NewPipeName("tk-smoke");

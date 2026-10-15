@@ -194,6 +194,31 @@ Com um jogo real aberto pelo Tako (ex.: um jogo da Steam em tela cheia sem borda
 | G9 | Queda com o ponteiro escondido ou limite aplicado | Finalizar `Tako.exe` e abrir de novo: ponteiro visível e limite do usuário de volta |
 | G10 | ControlFS | Instalado: abre por cima do jogo; não instalado: "Baixar o ControlFS" abre a página |
 
+## 12. Áudio, Steam e TV durante o jogo (MVP-002, [ADR-0016](../adr/0016-audio-steam-e-tv-na-sessao.md))
+
+Configurações › **Saída de áudio durante o jogo**, **Mandar a Steam para a bandeja ao sair do jogo** e **Ligar a TV e trocar a entrada** (TV: Google TV / Android TV com "Depuração USB" ou "Depuração pela rede" ativada nas Opções do desenvolvedor).
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| A1 | Saída do jogo | Escolher a TV (ou um fone) como saída do jogo; abrir e fechar um jogo | Durante o jogo o som sai pela escolhida nos três papéis; ao fechar, volta a de antes |
+| A2 | Troca durante o jogo | Como A1, mas trocar a saída pelo Windows durante o jogo | Ao fechar, a escolha feita durante o jogo fica (só os papéis ainda na saída do jogo voltam) |
+| A3 | Saída que aparece com a TV | TV desligada, saída do jogo = áudio HDMI da TV, TV configurada | A troca acontece assim que a TV liga (até 15 s); log "saída padrão trocada" |
+| A4 | Saída ausente | Saída do jogo desconectada | Nada muda; log "não aplicada (DeviceMissing)" |
+| A5 | Restaurar ligado e desligado | Repetir A1 com "Restaurar monitores e áudio" ligada e desligada | Mesma saída de antes nos dois casos |
+| S1 | Início pela Steam | Jogo da Steam cujo exe fica fora da pasta (ou com anti-cheat) | O Tako entra em "Jogando" quando a Steam informa o jogo |
+| S2 | Fim pela Steam | Fechar um jogo que deixa processo para trás (ex.: UnityCrashHandler) | O Tako volta em ~4 s depois da Steam zerar o `RunningAppID` |
+| S3 | Steam sem pasta | Jogo da Steam sem pasta de instalação conhecida | Acompanhado só pela Steam; tempo de jogo registrado |
+| S4 | Bandeja | Opção ligada; fechar um jogo da Steam com a janela da Steam aberta | A janela da Steam fecha e ela continua na bandeja; o jogo nunca recebe o pedido |
+| S5 | Outro jogo | Como S4, com outro jogo da Steam ainda aberto | A Steam fica aberta; log "GameRunning" |
+| T1 | Pareamento | Configurações › TV: IP, **Testar** | A TV pergunta "Permitir depuração"; com "Sempre permitir", a TV liga e muda para a entrada do PC |
+| T2 | Testar de novo | **Testar** outra vez | Sem pergunta na TV; liga e troca a entrada |
+| T3 | Início do jogo | TV em espera, controle da TV ligado; abrir um jogo | A TV liga na entrada do PC; o jogo abre normalmente mesmo se a TV demorar |
+| T4 | Espera profunda | TV que desliga a rede em espera; MAC preenchido | Wake-on-LAN acorda a TV; log "Wake-on-LAN enviado" |
+| T5 | Espera ao sair | "Colocar a TV em espera ao sair do jogo" ligado | Ao fechar o jogo a TV entra em espera |
+| T6 | TV fora da rede | IP errado | **Testar** mostra "A TV em … não respondeu"; abrir um jogo não trava |
+| T7 | Depuração sem fio | TV só com "Depuração sem fio" | **Testar** explica como ativar "Depuração USB"/"pela rede" |
+| T8 | Chave cifrada | Copiar a pasta `Tako_Data` para outro usuário/PC e testar | A TV pede permissão de novo (chave nova); `adbkey.pem` começa com `dpapi:` |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.
