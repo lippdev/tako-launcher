@@ -342,6 +342,19 @@
           </StackPanel>
         </DockPanel>
       </Button>
+      <!-- Diagnóstico do sistema (frente G, MVP-034): relatório para o checklist de hardware. -->
+      <Button Style="{StaticResource SettingRow}" Command="{Binding DataContext.ShowSystemDiagnosticsCommand, RelativeSource={RelativeSource AncestorType=Window}}" nav:Nav.Group="settings" nav:Nav.Key="settings:diagnostics">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Gerar" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
+            <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Diagnóstico do sistema" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
+            <TextBlock Text="Windows, monitores, controles, Steam e Xbox mode, sem dados pessoais; anexe ao rodar o checklist de hardware" Margin="0,6,32,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+      </Button>
       <Button Style="{StaticResource SettingRow}" Command="{Binding ReapplyThemeCommand}" nav:Nav.Group="settings" nav:Nav.Key="settings:theme" nav:Nav.IsDefault="True">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">

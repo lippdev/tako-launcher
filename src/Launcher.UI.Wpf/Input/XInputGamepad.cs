@@ -29,6 +29,21 @@ internal static partial class XInputGamepad
         return null;
     }
 
+    /// <summary>Posições (0–3) com controle XInput conectado agora, para o diagnóstico do sistema (MVP-034).</summary>
+    public static IReadOnlyList<int> ConnectedSlots()
+    {
+        var slots = new List<int>();
+        for (int i = 0; i < MaxControllers; i++)
+        {
+            if (TryRead(i, out _))
+            {
+                slots.Add(i);
+            }
+        }
+
+        return slots;
+    }
+
     private static bool TryRead(int index, out GamepadSnapshot snapshot)
     {
         snapshot = default;
