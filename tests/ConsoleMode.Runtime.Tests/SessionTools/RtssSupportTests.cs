@@ -3,43 +3,6 @@ using Xunit;
 
 namespace ConsoleMode.Runtime.Tests.SessionTools;
 
-public class FpsLimitsTests
-{
-    [Fact]
-    public void No_limit_comes_first_and_has_a_plain_label()
-    {
-        Assert.Equal(0, FpsLimits.Options[0]);
-        Assert.Equal("Sem limite", FpsLimits.Label(0));
-        Assert.Equal("60 FPS", FpsLimits.Label(60));
-    }
-
-    [Theory]
-    [InlineData(-5, 0)]
-    [InlineData(0, 0)]
-    [InlineData(60, 60)]
-    [InlineData(59, 60)]
-    [InlineData(100, 90)]
-    [InlineData(500, 165)]
-    public void Saved_values_snap_to_an_offered_limit(int saved, int expected) =>
-        Assert.Equal(expected, FpsLimits.Normalize(saved));
-
-    [Fact]
-    public void Left_and_right_stop_at_the_ends()
-    {
-        Assert.Equal(0, FpsLimits.Step(0, -1));
-        Assert.Equal(30, FpsLimits.Step(0, 1));
-        Assert.Equal(45, FpsLimits.Step(60, -1));
-        Assert.Equal(165, FpsLimits.Step(165, 1));
-    }
-
-    [Fact]
-    public void A_cycles_back_to_no_limit_after_the_last()
-    {
-        Assert.Equal(30, FpsLimits.Cycle(0));
-        Assert.Equal(0, FpsLimits.Cycle(165));
-    }
-}
-
 public class RtssLocatorTests
 {
     [Fact]

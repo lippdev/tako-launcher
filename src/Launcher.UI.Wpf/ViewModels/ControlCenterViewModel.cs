@@ -14,7 +14,7 @@ namespace Launcher.UI.Wpf.ViewModels;
 
 /// <summary>
 /// Central de Controle (menu rápido do jogo): cartões vivos, janelas abertas, barra de ícones no topo e painel por
-/// ícone. Comportamento descrito no DESIGN.md › Components › Menu rápido. Janelas, contador/limite de FPS (RTSS),
+/// ícone. Comportamento descrito no DESIGN.md › Components › Menu rápido. Janelas, contador de FPS (RTSS), limite de FPS (driver de vídeo, ADR-0018),
 /// ponteiro, ControlFS e desempenho vêm do "menu de sessão" do Console Mode (<see cref="SessionToolsService"/>).
 /// </summary>
 public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayViewModel, IDisposable
@@ -494,13 +494,14 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
         }
 
         var now = new PanelSection("Agora", null, [Live("Uso do PC", s => $"CPU {Percent(s.CpuUsage)} · GPU {GpuText(s)} · RAM {Percent(s.RamUsage)}")]);
+        var limit = BuildLimitSection();
 
         if (!_tools.Fps.IsInstalled)
         {
             return
             [
-                new("Contador e limite de FPS",
-                    "Usam o RivaTuner Statistics Server (RTSS), gratuito. Instale o RTSS, abra-o uma vez e volte aqui: as opções aparecem sozinhas.",
+                new("Contador de FPS",
+                    "Usa o RivaTuner Statistics Server (RTSS), gratuito. Instale o RTSS, abra-o uma vez e volte aqui: as opções aparecem sozinhas.",
                     [
                         new PanelRowViewModel
                         {
@@ -510,6 +511,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
                             Command = new RelayCommand(() => OpenPage(RtssLocator.DownloadUrl, "Página do RTSS aberta no navegador")),
                         },
                     ]),
+                limit,
                 now,
             ];
         }
@@ -550,20 +552,34 @@ public sealed partial class ControlCenterViewModel : ObservableObject, IOverlayV
             });
         }
 
-        var limit = _tools.Fps.CanLimitFps
-            ? CycleRow("fps:limit", "Limite", FpsLimits.Label(_tools.FpsLimit), d =>
-            {
-                _tools.SetFpsLimit(d == 0 ? FpsLimits.Cycle(_tools.FpsLimit) : FpsLimits.Step(_tools.FpsLimit, d));
-                RebuildPopover("fps:limit");
-            })
-            : new PanelRowViewModel { Key = "fps:limit", Label = "Limite", EndText = "indisponível", Command = new RelayCommand(() => _shell.Toast("Atualize o RTSS para mudar o limite pelo Tako")) };
-
         return
         [
             new("Contador de FPS", "Desenhado pelo RTSS sobre o jogo; \"O do RTSS\" mantém o que você já usa.", counter),
-            new("Limite de FPS", "O limite que você tinha no RTSS volta ao sair do jogo.", [limit]),
+            limit,
             now,
         ];
+    }
+
+    /// <summary>Limite de FPS pelo driver de vídeo (ADR-0018): independe do RTSS.</summary>
+    private PanelSection BuildLimitSection()
+    {
+        var caps = _tools.LimitCapabilities;
+        if (caps is not { IsAvailable: true })
+        {
+            string reason = caps?.Explanation ?? "Verificando o driver de vídeo…";
+            return new("Limite de FPS", "Feito pelo driver da placa de vídeo, sem programas extras.",
+            [
+                new PanelRowViewModel { Key = "fps:limit", Label = "Limite", EndText = caps is null ? "verificando" : "indisponível", Command = new RelayCommand(() => _shell.Toast(reason)) },
+            ]);
+        }
+
+        var row = CycleRow("fps:limit", "Limite", FpsLimits.Label(_tools.FpsLimit, _tools.DisplayRefreshHz), d =>
+        {
+            _tools.SetFpsLimit(d == 0 ? FpsLimits.Cycle(_tools.FpsLimit) : FpsLimits.Step(_tools.FpsLimit, d));
+            RebuildPopover("fps:limit");
+        });
+        string scope = caps.PerApplication ? "só neste jogo" : "em toda a placa enquanto você joga";
+        return new("Limite de FPS", $"Pelo driver {GpuVendors.Name(caps.Vendor)}, {scope}. O valor que você tinha volta ao sair do jogo.", [row]);
     }
 
     private IReadOnlyList<PanelSection> BuildPointerSections()

@@ -1,34 +1,5 @@
-// Adaptado de lippdev/consolemode: src/ConsoleMode/Services/RtssService.cs e Services/SessionMenuMath.cs
-using System.Globalization;
-
+// Adaptado de lippdev/consolemode: src/ConsoleMode/Services/RtssService.cs
 namespace ConsoleMode.Runtime.SessionTools;
-
-/// <summary>Limites de FPS oferecidos na Central de Controle. 0 = sem limite.</summary>
-public static class FpsLimits
-{
-    public static IReadOnlyList<int> Options { get; } = [0, 30, 40, 45, 60, 75, 90, 120, 144, 165];
-
-    /// <summary>Um valor salvo que não está na lista vira o mais próximo (negativo = sem limite).</summary>
-    public static int Normalize(int fps) =>
-        fps <= 0 ? 0 : Options.Where(o => o > 0).OrderBy(o => Math.Abs(o - fps)).ThenBy(o => o).First();
-
-    /// <summary>Próximo valor para ← → (<paramref name="direction"/> negativo volta), parando nas pontas.</summary>
-    public static int Step(int current, int direction)
-    {
-        int index = Options.ToList().IndexOf(Normalize(current));
-        int next = Math.Clamp(index + Math.Sign(direction), 0, Options.Count - 1);
-        return Options[next];
-    }
-
-    /// <summary>Próximo valor para A, voltando ao começo depois do último.</summary>
-    public static int Cycle(int current)
-    {
-        int index = Options.ToList().IndexOf(Normalize(current));
-        return Options[(index + 1) % Options.Count];
-    }
-
-    public static string Label(int fps) => fps <= 0 ? "Sem limite" : string.Create(CultureInfo.InvariantCulture, $"{fps} FPS");
-}
 
 /// <summary>
 /// Onde o RivaTuner Statistics Server está instalado. Puro: registro e pastas entram como parâmetros.

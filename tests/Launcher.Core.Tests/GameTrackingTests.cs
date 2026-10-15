@@ -87,6 +87,7 @@ public class GameTrackingTests
         Assert.Equal(GameRunStatus.Waiting, tracker.Update(steamOnly, Launched.AddSeconds(30)));
         Assert.Equal(GameRunStatus.Running, tracker.Update(playing, Launched.AddSeconds(40)));
         Assert.Equal([20], tracker.GameProcessIds);
+        Assert.Equal([Folder + @"\Hades.exe"], tracker.GameExecutablePaths); // perfil do limite de FPS no driver (ADR-0018)
         Assert.Equal(GameRunStatus.Running, tracker.Update(playing, Launched.AddMinutes(30)));
         Assert.Equal(GameRunStatus.Running, tracker.Update(steamOnly, Launched.AddMinutes(30).AddSeconds(2))); // ainda na tolerância
         Assert.Equal(GameRunStatus.Exited, tracker.Update(steamOnly, Launched.AddMinutes(30).AddSeconds(4)));

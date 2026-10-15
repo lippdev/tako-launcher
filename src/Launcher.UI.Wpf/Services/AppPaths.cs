@@ -50,6 +50,10 @@ public static class AppPaths
 
     /// <summary>Limite de FPS do RTSS que o usuário tinha antes da sessão, até ser devolvido.</summary>
     public static string RtssLimitBackupFile => Path.Combine(DataRoot, "rtss-fps-limit.txt");
+
+    /// <summary>Limites de FPS que o Tako mudou no driver de vídeo e o valor de antes, até serem devolvidos (ADR-0018).</summary>
+    public static string DriverFpsLimitBackupFile => Path.Combine(DataRoot, "driver-fps-limit.json");
+
     /// <summary>Chave ADB deste PC para controlar a TV, cifrada com DPAPI (MVP-002).</summary>
     public static string AdbKeyFile => Path.Combine(DataRoot, "adbkey.pem");
 

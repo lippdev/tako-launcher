@@ -38,6 +38,7 @@ public sealed class GameRunTracker
     private readonly TimeSpan _startTimeout;
     private readonly TimeSpan _exitGrace;
     private List<int> _current = [];
+    private List<string> _currentPaths = [];
 
     /// <param name="plan">Estratégia e pasta (para <see cref="GameTrackingStrategy.InstallFolder"/>).</param>
     /// <param name="launchedAt">Quando o launcher abriu o jogo.</param>
@@ -91,6 +92,9 @@ public sealed class GameRunTracker
     /// <summary>Processos do jogo na última leitura (para trazer a janela do jogo para frente).</summary>
     public IReadOnlyList<int> GameProcessIds => _current;
 
+    /// <summary>Executáveis dos processos do jogo na última leitura (sem repetidos), para o perfil do driver de vídeo.</summary>
+    public IReadOnlyList<string> GameExecutablePaths => _currentPaths;
+
     /// <summary>Tempo jogado: da primeira à última vez em que o jogo foi visto.</summary>
     public TimeSpan PlayTime => FirstSeenAt is { } first && LastSeenAt is { } last ? last - first : TimeSpan.Zero;
 
@@ -117,6 +121,7 @@ public sealed class GameRunTracker
             GameTrackingStrategy.InstallFolder => MatchFolder(snapshot),
             _ => [],
         };
+        _currentPaths = [.. snapshot.Where(p => p.ExecutablePath is not null && _current.Contains(p.Id)).Select(p => p.ExecutablePath!).Distinct(StringComparer.OrdinalIgnoreCase)];
 
         if (IsPresent(steamRunningAppId))
         {

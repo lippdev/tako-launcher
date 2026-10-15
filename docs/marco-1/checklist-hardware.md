@@ -187,9 +187,9 @@ Com um jogo real aberto pelo Tako (ex.: um jogo da Steam em tela cheia sem borda
 | G2 | Janelas abertas | A fileira lista as janelas do Alt+Tab com ícones; A alterna para uma (o jogo segue aberto); X fecha (um programa com algo não salvo pergunta antes) |
 | G3 | Encerrar jogo (jogo real) | O jogo recebe o pedido de fechar e volta à frente; ao fechar, "Bem-vindo de volta" |
 | G4 | Desempenho | Cartão e painel mostram CPU, GPU (com temperatura, se o driver informar) e RAM próximos do Gerenciador de Tarefas |
-| G5 | RTSS não instalado | Painel de Desempenho mostra "Baixar o RTSS"; nada trava |
+| G5 | RTSS não instalado | Painel de Desempenho mostra "Baixar o RTSS" para o contador; o limite de FPS continua disponível (§13); nada trava |
 | G6 | RTSS instalado: contador | Só FPS / Compacto / Detalhado aparecem no jogo; posição, tamanho e fundo mudam na hora; o OSD do Afterburner some enquanto o contador do Tako está ligado e volta em "O do RTSS" |
-| G7 | RTSS instalado: limite | Limite de 60 FPS vale no jogo; ao fechar o jogo, o limite que estava no RTSS volta (conferir no RTSS) |
+| G7 | Limite de FPS | Agora pelo driver de vídeo: ver §13 |
 | G8 | Ponteiro | Esconder some com o ponteiro em todos os apps e ele volta ao fim da sessão; mover com o analógico funciona com Xbox e com DualSense; A, A duplo e segurar A clicam, clicam com o direito e arrastam |
 | G9 | Queda com o ponteiro escondido ou limite aplicado | Finalizar `Tako.exe` e abrir de novo: ponteiro visível e limite do usuário de volta |
 | G10 | ControlFS | Instalado: abre por cima do jogo; não instalado: "Baixar o ControlFS" abre a página |
@@ -218,6 +218,25 @@ Configurações › **Saída de áudio durante o jogo**, **Mandar a Steam para a
 | T6 | TV fora da rede | IP errado | **Testar** mostra "A TV em … não respondeu"; abrir um jogo não trava |
 | T7 | Depuração sem fio | TV só com "Depuração sem fio" | **Testar** explica como ativar "Depuração USB"/"pela rede" |
 | T8 | Chave cifrada | Copiar a pasta `Tako_Data` para outro usuário/PC e testar | A TV pede permissão de novo (chave nova); `adbkey.pem` começa com `dpapi:` |
+
+## 13. Limite de FPS pelo driver de vídeo ([ADR-0018](../adr/0018-limite-de-fps-pelo-driver.md))
+
+Uma máquina de cada fabricante: **NVIDIA** (GeForce com driver recente), **AMD** (Radeon dedicada e, se possível, um portátil com APU, como ROG Ally/Legion Go) e **Intel** (Arc ou Iris Xe). Para conferir o FPS use o contador do Tako (F1) ou o do próprio driver (NVIDIA FrameView/overlay, AMD Adrenalin, Intel Arc Control). Anotar o modelo da placa e a versão do driver.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| L1 | Item na Central | Abrir um jogo; Central › Desempenho | "Limite de FPS" diz o fabricante e "só neste jogo" (NVIDIA, Intel por jogo) ou "em toda a placa" (AMD); com o driver sem a biblioteca, "indisponível" e o toque explica |
+| L2 | Aplicar | Escolher 60 FPS com o jogo aberto | O contador fica em ~60. **Anotar** se valeu na hora ou só depois de reabrir o jogo (NVIDIA e Intel por perfil) |
+| L3 | Valores | Passar por 30, 40, 45, 90, 120, 144 | Cada valor vale; acima da taxa da tela sem VRR o FPS fica preso na taxa da tela |
+| L4 | Tela − 3 (VRR) | Monitor/TV de 120 ou 144 Hz com G-Sync/FreeSync; escolher "Tela − 3" | Mostra "Tela − 3 (117 FPS)" (ou 141); o FPS fica 3 abaixo da taxa e o VRR continua ativo (OSD do monitor) |
+| L5 | Valor do usuário volta | Antes: pôr um limite próprio no painel do driver (ex.: 75 no Painel NVIDIA para o jogo; FRTC/Chill no Adrenalin; Intel Arc Control). Abrir o jogo pelo Tako, mudar para 60, fechar o jogo | O painel do driver mostra de novo o valor de antes. NVIDIA sem perfil antes: o perfil "Tako · jogo.exe" some |
+| L6 | Sem limite | Com 60 aplicado, escolher "Sem limite" | O valor do usuário volta na hora |
+| L7 | Restauração após queda | Aplicar 30 FPS; finalizar `Tako.exe` no Gerenciador de Tarefas; fechar o jogo; abrir o Tako de novo | O valor de antes volta (conferir no painel do driver); `Tako_Data\driver-fps-limit.json` some |
+| L8 | Afterburner aberto | MSI Afterburner + RTSS abertos com o OSD deles; aplicar e tirar o limite | Nada conflita: o OSD do Afterburner continua; o limite do RTSS (se houver) não é tocado pelo Tako |
+| L9 | Sem administrador | Tako aberto como usuário comum (padrão) | NVIDIA: **anotar** se o limite grava; se o log disser "exige administrador", o item mostra "Indisponível sem permissão de administrador" e nenhum UAC aparece |
+| L10 | Notebook híbrido | Intel + NVIDIA; jogo com "Alto desempenho" em Configurações › Tela › Gráficos | O limite vai para a NVIDIA; com "Economia de energia", para a Intel. **Anotar** o que acontece sem preferência |
+| L11 | Jogo da Steam | Jogo da Steam (exe só conhecido quando o processo aparece) | O limite é aplicado quando o jogo aparece; **anotar** se precisou reabrir o jogo |
+| L12 | Duas placas Intel | Arc + integrada | O limite vale no jogo e volta nas duas ao fechar |
 
 ## Resultados
 

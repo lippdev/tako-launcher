@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using ConsoleMode.Runtime;
+using ConsoleMode.Runtime.Display;
 using ConsoleMode.Runtime.SessionTools;
 using ConsoleMode.Runtime.Windows.SessionTools;
 using Launcher.Core.Persistence;
@@ -11,10 +13,10 @@ using Microsoft.Extensions.Logging;
 namespace Launcher.UI.Wpf.Services;
 
 /// <summary>
-/// Ferramentas da Central de Controle durante o jogo: janelas abertas, contador e limite de FPS (RTSS), ponteiro,
-/// ControlFS e desempenho do PC. Guarda as escolhas do contador e do limite no <c>tako.db</c>, aplica-as no início
-/// de cada sessão e desfaz tudo no fim (ponteiro visível, limite do usuário de volta). Chamadas ao RTSS rodam em fila
-/// fora da thread da UI: abri-lo leva até 1,5 s.
+/// Ferramentas da Central de Controle durante o jogo: janelas abertas, contador de FPS (RTSS), limite de FPS (driver de
+/// vídeo, ADR-0018), ponteiro, ControlFS e desempenho do PC. Guarda as escolhas do contador e do limite no <c>tako.db</c>,
+/// aplica-as no início de cada sessão e desfaz tudo no fim (ponteiro visível, limite do usuário de volta). Chamadas ao
+/// RTSS e ao driver rodam em fila fora da thread da UI: abrir o RTSS leva até 1,5 s e o driver, centenas de ms.
 /// </summary>
 public sealed partial class SessionToolsService : IDisposable
 {
@@ -27,8 +29,10 @@ public sealed partial class SessionToolsService : IDisposable
     private readonly SettingsStore _store;
     private readonly ILogger<SessionToolsService> _logger;
     private readonly object _queueGate = new();
+    private readonly IDisplayControlService _displays;
     private Task _rtssQueue = Task.CompletedTask;
     private bool _inSession;
+    private string? _gameExe;
 
     public SessionToolsService(
         IWindowSwitcher windows,
@@ -36,6 +40,8 @@ public sealed partial class SessionToolsService : IDisposable
         IPointerService cursor,
         IControlFsService controlFs,
         IHardwareMonitor hardware,
+        IFrameRateLimiter limiter,
+        IDisplayControlService displays,
         SettingsStore store,
         ILogger<SessionToolsService> logger)
     {
@@ -44,6 +50,8 @@ public sealed partial class SessionToolsService : IDisposable
         Cursor = cursor;
         ControlFs = controlFs;
         Hardware = hardware;
+        Limiter = limiter;
+        _displays = displays;
         _store = store;
         _logger = logger;
         try
@@ -74,18 +82,36 @@ public sealed partial class SessionToolsService : IDisposable
 
     public IHardwareMonitor Hardware { get; }
 
+    /// <summary>Limite de FPS pelo driver de vídeo (NVIDIA, AMD ou Intel), sem RTSS.</summary>
+    public IFrameRateLimiter Limiter { get; }
+
+    /// <summary>O que o driver da placa oferece; nulo enquanto a primeira sondagem (em segundo plano) não terminou.</summary>
+    public FrameRateLimitCapabilities? LimitCapabilities { get; private set; }
+
+    /// <summary>Taxa da tela principal na última leitura (para "Tela − 3"); nula se desconhecida.</summary>
+    public int? DisplayRefreshHz { get; private set; }
+
     /// <summary>Estilo do contador (<see cref="RtssOverlay.Styles"/>); "external" deixa o RTSS/Afterburner como estão.</summary>
     public string FpsStyle { get; private set; } = RtssOverlay.External;
 
     public FpsOverlayLayout Layout { get; private set; } = new();
 
-    /// <summary>Limite de FPS da sessão (0 = sem limite, o do usuário fica valendo).</summary>
+    /// <summary>Limite de FPS da sessão (0 = sem limite, o do usuário fica valendo; <see cref="FpsLimits.MatchDisplay"/> = tela − 3).</summary>
     public int FpsLimit { get; private set; }
 
-    /// <summary>Início da sessão de jogo: contador e limite escolhidos voltam a valer.</summary>
-    public void BeginSession()
+    /// <summary>
+    /// Início da sessão de jogo: contador e limite escolhidos voltam a valer. <paramref name="gameExePath"/> é o exe do
+    /// jogo quando já se sabe (atalho direto para .exe); senão chega por <see cref="GameExecutableFound"/>.
+    /// </summary>
+    public void BeginSession(string? gameExePath = null)
     {
         _inSession = true;
+        _gameExe = gameExePath;
+        if (FpsLimit != 0)
+        {
+            ApplyLimitNow();
+        }
+
         if (!Fps.IsInstalled)
         {
             return;
@@ -93,15 +119,24 @@ public sealed partial class SessionToolsService : IDisposable
 
         string style = FpsStyle;
         var layout = Layout;
-        int limit = FpsLimit;
         if (style != RtssOverlay.External)
         {
             Enqueue("mostrar o contador de FPS", () => Fps.ApplyOverlay(style, layout));
         }
+    }
 
-        if (limit > 0)
+    /// <summary>O processo do jogo apareceu: o perfil do driver passa a ser o dele (exe diferente do atalho, jogo da Steam).</summary>
+    public void GameExecutableFound(string? exePath)
+    {
+        if (!_inSession || string.IsNullOrWhiteSpace(exePath) || string.Equals(exePath, _gameExe, StringComparison.OrdinalIgnoreCase))
         {
-            Enqueue("aplicar o limite de FPS", () => Fps.SetFpsLimit(limit));
+            return;
+        }
+
+        _gameExe = exePath;
+        if (FpsLimit != 0)
+        {
+            ApplyLimitNow();
         }
     }
 
@@ -109,7 +144,9 @@ public sealed partial class SessionToolsService : IDisposable
     public void EndSession()
     {
         _inSession = false;
+        _gameExe = null;
         Cursor.Reset();
+        RestoreLimit();
         if (Fps.IsInstalled)
         {
             Enqueue("restaurar o RTSS", () =>
@@ -124,6 +161,13 @@ public sealed partial class SessionToolsService : IDisposable
     public void RecoverAfterCrash()
     {
         Cursor.RecoverAfterCrash();
+        RestoreLimit();
+        Enqueue("ler o limite de FPS do driver", () =>
+        {
+            LimitCapabilities = Limiter.Capabilities;
+            DisplayRefreshHz = ReadRefreshHz();
+            return true;
+        });
         if (Fps.IsInstalled)
         {
             Enqueue("restaurar o RTSS", () =>
@@ -155,10 +199,9 @@ public sealed partial class SessionToolsService : IDisposable
     {
         FpsLimit = FpsLimits.Normalize(fps);
         Save(LimitKey, FpsLimit.ToString(CultureInfo.InvariantCulture));
-        if (_inSession && Fps.CanLimitFps)
+        if (_inSession)
         {
-            int limit = FpsLimit;
-            Enqueue("aplicar o limite de FPS", () => Fps.SetFpsLimit(limit));
+            ApplyLimitNow();
         }
     }
 
@@ -195,17 +238,55 @@ public sealed partial class SessionToolsService : IDisposable
     {
         _inSession = false;
         Cursor.Reset();
+        Task pending;
+        lock (_queueGate)
+        {
+            pending = _rtssQueue;
+        }
+
+        // Fechando: termina a fila (as falhas dela já foram registradas) e devolve RTSS e driver antes de o processo sair.
+        pending.ContinueWith(_ => { }, TaskScheduler.Default).Wait(TimeSpan.FromSeconds(3));
+        Limiter.Restore();
         if (Fps.IsInstalled)
         {
-            Task pending;
-            lock (_queueGate)
-            {
-                pending = _rtssQueue;
-            }
-
-            // Fechando: termina a fila (as falhas dela já foram registradas) e devolve o RTSS antes de o processo sair.
-            pending.ContinueWith(_ => { }, TaskScheduler.Default).Wait(TimeSpan.FromSeconds(3));
             Fps.Restore();
+        }
+    }
+
+    /// <summary>Aplica o limite escolhido ao jogo atual (fora da thread da UI); "Tela − 3" lê a taxa da tela na hora.</summary>
+    private void ApplyLimitNow()
+    {
+        int option = FpsLimit;
+        string? exe = _gameExe;
+        Enqueue("aplicar o limite de FPS", () =>
+        {
+            int? refresh = option == FpsLimits.MatchDisplay ? ReadRefreshHz() : DisplayRefreshHz;
+            DisplayRefreshHz = refresh;
+            bool applied = FpsLimits.Resolve(option, refresh) is { } fps && Limiter.Apply(exe, fps);
+            LimitCapabilities = Limiter.Capabilities;
+            return applied;
+        });
+    }
+
+    private void RestoreLimit() => Enqueue("devolver o limite de FPS do driver", () =>
+    {
+        Limiter.Restore();
+        return true;
+    });
+
+    /// <summary>Taxa da tela principal (onde a tela de jogo põe o jogo); nula se não deu para ler.</summary>
+    private int? ReadRefreshHz()
+    {
+        try
+        {
+            var displays = _displays.ListDisplays();
+            var screen = displays.FirstOrDefault(d => d.IsActive && d.IsPrimary) ?? displays.FirstOrDefault(d => d.IsActive);
+            return screen?.CurrentMode?.RefreshHz;
+        }
+        catch (RuntimeEnvironmentException ex)
+        {
+            LogRtssFailed(_logger, ex, "ler a taxa da tela");
+            return null;
         }
     }
 
@@ -261,10 +342,10 @@ public sealed partial class SessionToolsService : IDisposable
     [LoggerMessage(Level = LogLevel.Warning, Message = "Preferências da Central de Controle não puderam ser lidas ou salvas")]
     private static partial void LogPreferencesFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "RTSS: não foi possível {Action}")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Central de Controle: não foi possível {Action}")]
     private static partial void LogRtssRefused(ILogger logger, string action);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "RTSS: falha ao {Action}")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Central de Controle: falha ao {Action}")]
     private static partial void LogRtssFailed(ILogger logger, Exception exception, string action);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Leitura de desempenho falhou")]
