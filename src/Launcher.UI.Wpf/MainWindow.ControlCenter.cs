@@ -192,7 +192,7 @@ public partial class MainWindow
         else
         {
             LogHotkeyUnavailable(_logger, shortcut.Display);
-            _shell.Toast($"{shortcut.Display} já é usado por outro programa · troque o atalho nas Configurações");
+            _shell.Toast($"{shortcut.Display} já é usado por outro programa · troque o atalho em Configurações › Controles");
         }
     }
 
