@@ -1,6 +1,6 @@
-# Marco 1 — plano e status (0.1.0-alpha.7)
+# Marco 1 — plano e status (0.1.0-alpha.8)
 
-Plano montado a partir do backlog do [PRD §5–8](../PRD.md) e executado por agentes em frentes paralelas (uma PR por frente), integradas no `develop`. Primeira rodada publicada na `v0.1.0-alpha.6`; segunda rodada (itens que estavam parciais ou bloqueados mas podiam ser feitos com código próprio) na `v0.1.0-alpha.7`.
+Plano montado a partir do backlog do [PRD §5–8](../PRD.md) e executado por agentes em frentes paralelas (uma PR por frente), integradas no `develop`. Primeira rodada publicada na `v0.1.0-alpha.6`; segunda rodada (itens que estavam parciais ou bloqueados mas podiam ser feitos com código próprio) na `v0.1.0-alpha.7`; terceira rodada (reuso do Console Mode depois do LEGAL-001, desempenho e busca) na `v0.1.0-alpha.8`.
 
 ## Frentes executadas
 
@@ -21,6 +21,20 @@ Plano montado a partir do backlog do [PRD §5–8](../PRD.md) e executado por ag
 | G · Benchmark e diagnóstico | MVP-035, MVP-034 | #21 | `tools/Launcher.Bench` + job no CI com linha de base; Configurações › Diagnóstico do sistema |
 | H · Segurança de temas | MVP-016, MVP-018 | #25 | Guarda que bloqueia imagens/mídia de fora do tema, URLs e UNC montados em tempo de execução (fecha a questão 8 do spike) |
 
+### Terceira rodada (0.1.0-alpha.8)
+
+LEGAL-001 decidido em 2026-10-15: o Tako passa a ser AGPL-3.0-only e reaproveita o Console Mode ([ADR-0014](../adr/0014-licenca-agpl.md)). Assinaturas da Microsoft ficam para depois.
+
+| Frente | Itens | PR | Entregue |
+|---|---|---|---|
+| Licença | LEGAL-001 | #27 | AGPL-3.0-only, CONTRIBUTING §10, ADR-0014 |
+| R1 · Monitores do Console Mode | MVP-002, MVP-012 | #30 | Pilha de monitores do Console Mode (CCD, EDID, identidade, HDR, cortina preta) atrás dos contratos do ADR-0013; Tela de jogo com confirmação e reversão ([ADR-0015](../adr/0015-monitores-do-console-mode-e-tela-de-jogo.md)) |
+| R2 · Áudio, Steam e TV | MVP-002, MVP-004 | #31 | Saída de áudio durante o jogo, volume, `RunningAppID` da Steam na sessão, Steam para a bandeja, Google/Android TV por ADB e Wake-on-LAN ([ADR-0016](../adr/0016-audio-steam-e-tv-na-sessao.md)) |
+| R3 · Central de Controle | MVP-002 | #33 | Janelas abertas, desempenho real, RTSS (contador e limite), ponteiro pelo controle, ControlFS |
+| R4 · Desempenho | MVP-035 | #29 | Grade virtualizada (Tako e temas Playnite), capas sob demanda com cache limitado; 1000 jogos: 507 → 170 MB parado, abrir a biblioteca 1852 → 77–167 ms |
+| R5 · Busca e filtros | MVP-017, MVP-018, MVP-019 | #32 | Busca sem acento com teclado na tela, filtros e ordenação no Core, ligados também ao painel de filtros dos temas Playnite |
+| Distribuição | MVP-032 | #28 | Portátil comprimido: 141 → 69 MB |
+
 Antes das frentes, no mesmo ciclo: biblioteca real da Steam + jogos adicionados + metadados (#13, MVP-023/024/025), instalador e portátil (#14, MVP-032) e atualização automática (#15).
 
 ## Status do backlog do Marco 1
@@ -35,16 +49,15 @@ Antes das frentes, no mesmo ciclo: biblioteca real da Steam + jogos adicionados 
 | MVP-034 testes e checklists | 🟡 CI completo; checklist e Configurações › Diagnóstico do sistema prontos; execução no Windows real pendente |
 | MVP-012 restaurar monitores/áudio | ✅ contratos e implementação próprios, sem código do Console Mode ([ADR-0013](../adr/0013-estado-de-monitores-e-audio.md)); validação em hardware pelo [checklist](checklist-hardware.md) §9 |
 | MVP-003 IPC · MVP-006 supervisor | ✅ implementação própria ([ADR-0012](../adr/0012-supervisor-e-ipc.md)); validação em hardware pelo [checklist](checklist-hardware.md) §10 |
-| MVP-002 extrair contratos do Console Runtime | 🟡 contratos próprios de sessão, monitores, áudio e IPC prontos; **reutilizar código** e integrar com o Console Mode depende da decisão [LEGAL-001](../legal/LEGAL-001.md) |
-| MVP-007 · MVP-009 FSE oficial | ⛔ dependem do SCCD assinado pela Microsoft e do experimento em hardware ([spike](../spikes/MVP-007-fse.md)) |
+| MVP-002 extrair contratos do Console Runtime | ✅ código de monitores, áudio, Steam, TV e menu de sessão do Console Mode portado para `ConsoleMode.Runtime(.Windows)` atrás dos contratos (#30, #31, #33); validação em hardware pelo [checklist](checklist-hardware.md) |
+| MVP-007 · MVP-009 FSE oficial | ⏸ adiado por decisão dos mantenedores; dependem do SCCD assinado pela Microsoft e do experimento em hardware ([spike](../spikes/MVP-007-fse.md)) |
 | MVP-035 benchmark | 🟡 [`tools/Launcher.Bench`](../../tools/Launcher.Bench) e job `benchmark` no CI com a [linha de base do runner](benchmark.md); números de referência dependem do hardware real |
 
 ## O que não dá para concluir só com código
 - **MVP-007 · MVP-009** (FSE oficial): o SCCD de produção é emitido pela Microsoft; o experimento precisa de hardware com Xbox mode.
-- **MVP-002** (reuso do Console Mode): decisão de licença LEGAL-001 dos mantenedores.
 - **Validação em hardware** de tudo marcado acima (checklist), números de referência do benchmark (MVP-035) e confirmação de "suportado" na detecção do FSE (MVP-008).
 
 ## Próximos passos
-1. Rodar o [checklist de hardware](checklist-hardware.md) no Windows 11 com a `0.1.0-alpha.7`, anexando o relatório de Configurações › Diagnóstico do sistema.
-2. Decidir o LEGAL-001.
-3. Desempenho com bibliotecas grandes (1000 jogos: virtualizar a grade e decodificar capas sob demanda, ver [benchmark](benchmark.md)); painel completo de filtros e busca nos temas Playnite.
+1. Rodar o [checklist de hardware](checklist-hardware.md) no Windows 11 com a `0.1.0-alpha.8`, incluindo as seções novas (tela de jogo, Central de Controle, áudio/Steam/TV), anexando o relatório de Configurações › Diagnóstico do sistema.
+2. Confirmar o limite de FPS pela `RTSSHooks64.dll` e o ADB numa TV real (pontos mais incertos da rodada).
+3. Pedir à Microsoft o SCCD de produção (MVP-007/009) quando o desenvolvimento estabilizar.
