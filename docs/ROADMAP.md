@@ -15,6 +15,6 @@ Objetivo: provar H1, H2, H3 ou registrar limitações. **Fechamento:** [`docs/ma
 Épicos do PRD §5 na ordem: A (fundação) → D (biblioteca) → B (FSE/fallback) → C (temas) → E (controle) → F (qualidade/distribuição).
 
 ## Pendências antes de codar o runtime
-- `LEGAL-001`: licença (repo MIT vs. AGPL do Console Mode) e reuso de código.
+- `LEGAL-001`: licença (repo MIT vs. AGPL do Console Mode) e reuso de código. Opções e recomendação em [`legal/LEGAL-001.md`](legal/LEGAL-001.md).
 - Migração do runtime compartilhado de .NET 8 para .NET 10 (PRD §3).
 - Definir máquinas de referência para benchmarks (MVP-035).
