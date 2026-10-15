@@ -49,4 +49,14 @@ public class PresentationTests
 
     [Fact]
     public void Dates_use_brazilian_format() => Assert.Equal("29/10/2026", GameText.Date(new DateOnly(2026, 10, 29)));
+
+    [Theory]
+    [InlineData(0.5, "menos de 1 min jogado")]
+    [InlineData(1.9, "1 min jogado")]
+    [InlineData(25, "25 min jogados")]
+    [InlineData(60, "1 h jogadas")]
+    [InlineData(65, "1 h 05 min jogados")]
+    [InlineData(150, "2 h 30 min jogados")]
+    public void Session_length_reads_naturally(double minutes, string expected) =>
+        Assert.Equal(expected, GameText.SessionPlayed(TimeSpan.FromMinutes(minutes)));
 }

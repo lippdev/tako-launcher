@@ -1,5 +1,6 @@
 using Launcher.Core.Library;
 using Launcher.Core.Persistence;
+using Launcher.Core.Session;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -56,7 +57,7 @@ public sealed class PersistenceTests : IDisposable
         var added = new DateTimeOffset(2026, 10, 15, 12, 0, 0, TimeSpan.FromHours(-3));
         var store = new SqliteLibraryStore(new TakoDatabase(DbPath));
         store.Load();
-        store.Manual.Add(new ManualGameRecord { Id = "manual:a", Title = "Jogo A", Path = "C:/a.exe", Arguments = "-x", AddedAt = added });
+        store.Manual.Add(new ManualGameRecord { Id = "manual:a", Title = "Jogo A", Path = "C:/a.exe", Arguments = "-x", AddedAt = added, TrackBy = GameTrackingStrategy.InstallFolder });
         store.Manual.Add(new ManualGameRecord { Id = "manual:b", Title = "Jogo B", Path = "steam://run/1", AddedAt = added });
         store.State["steam:570"] = new GameStateRecord { IsFavorite = true, LastPlayedAt = added, PlayMinutes = 42.5 };
         store.Save();
@@ -67,6 +68,8 @@ public sealed class PersistenceTests : IDisposable
         Assert.Equal(["manual:a", "manual:b"], reopened.Manual.Select(m => m.Id));
         Assert.Equal("-x", reopened.Manual[0].Arguments);
         Assert.Null(reopened.Manual[1].Arguments);
+        Assert.Equal(GameTrackingStrategy.InstallFolder, reopened.Manual[0].TrackBy);
+        Assert.Null(reopened.Manual[1].TrackBy);
         Assert.Equal(added, reopened.Manual[0].AddedAt);
         Assert.Equal(new GameStateRecord { IsFavorite = true, LastPlayedAt = added, PlayMinutes = 42.5 }, reopened.State["steam:570"]);
 

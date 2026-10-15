@@ -206,6 +206,22 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Campo de texto (ex.: editar jogo): letras, espaço, ← → e Backspace são do campo; ↑ ↓ e Esc navegam e Enter vai ao próximo.
+        if (e.OriginalSource is TextBox)
+        {
+            if (key is not (Key.Up or Key.Down or Key.Enter or Key.Escape))
+            {
+                return;
+            }
+
+            if (key == Key.Enter)
+            {
+                e.Handled = true;
+                Handle(AppCommand.Down, InputKind.Keyboard);
+                return;
+            }
+        }
+
         if (KeyMap.TryGetValue(key, out var command))
         {
             e.Handled = true;

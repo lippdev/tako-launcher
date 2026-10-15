@@ -14,6 +14,9 @@ public sealed record ManualGameRecord
 
     public string? WorkingDirectory { get; init; }
 
+    /// <summary>Como reconhecer o fim do jogo; nulo = automático (processo iniciado).</summary>
+    public Session.GameTrackingStrategy? TrackBy { get; init; }
+
     /// <summary>Imagem local escolhida como capa (2:3).</summary>
     public string? CoverPath { get; init; }
 
@@ -50,6 +53,7 @@ public sealed record ManualGameRecord
             LaunchArguments = Arguments,
             WorkingDirectory = WorkingDirectory,
             InstallPath = isUri ? null : System.IO.Path.GetDirectoryName(Path),
+            Tracking = TrackBy,
         };
     }
 }

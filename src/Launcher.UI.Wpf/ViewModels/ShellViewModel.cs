@@ -77,9 +77,6 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty]
     private GameItemViewModel? _runningGame;
 
-    [ObservableProperty]
-    private SessionState _session = SessionState.Browsing;
-
     public ShellViewModel(
         IGameLibrary library,
         ArtService art,
@@ -303,6 +300,11 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void ResumeGame()
     {
+        if (TryResumeRealGame())
+        {
+            return;
+        }
+
         var session = Overlays.OfType<GameSessionViewModel>().FirstOrDefault();
         if (session is null)
         {
@@ -334,7 +336,7 @@ public sealed partial class ShellViewModel : ObservableObject
             _backgroundSession = session;
         }
 
-        Session = SessionState.Browsing;
+        // A sessão continua em Playing: o jogo segue aberto.
         GoHome();
         if (game is not null)
         {
@@ -420,12 +422,10 @@ public sealed partial class ShellViewModel : ObservableObject
         var game = launch.Game;
         if (game.Game.LaunchTarget is not null)
         {
-            // Jogo real: a tela "Iniciando" dá o retorno e o jogo abre por cima do launcher. Acompanhar o processo é o MVP-026.
+            // Jogo real: a tela "Iniciando" dá o retorno e o jogo abre por cima do launcher (ShellViewModel.Session.cs).
             Overlays.Remove(launch);
-            Session = SessionState.Browsing;
             OnOverlaysChanged();
-            LaunchReal(game);
-            CurrentPage.Refresh();
+            StartRealSession(game);
             return;
         }
 
