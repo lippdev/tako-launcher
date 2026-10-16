@@ -19,7 +19,7 @@ pub use collections::{
     CollectionError, CollectionInfo, CollectionLibrary, CollectionStore, NameProblem,
 };
 pub use criteria::{InstallFilter, LibraryCriteria, LibraryFacts};
-pub use game::{ArtKind, Game, GameStore, GameTrackingStrategy, media};
+pub use game::{ArtKind, Game, GameStore, GameTrackingStrategy, PlayStatus, media};
 pub use game_library::{GameLibrary, LibraryData, LibraryError, LibraryStore, MemoryLibraryStore};
 pub use manual::{GameStateRecord, ManualGameRecord};
 pub use query::{FacetValue, LibraryFilter, LibrarySort};

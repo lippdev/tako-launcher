@@ -2,9 +2,9 @@
 //! Imutável: cada mudança no painel gera um novo critério. Dentro de fontes, gêneros ou coleções vale qualquer um
 //! dos marcados; entre filtros diferentes, todos precisam valer.
 
-use super::Game;
 use super::query::LibrarySort;
 use super::search_text::{Query, normalize};
+use super::{Game, PlayStatus};
 use crate::i18n;
 use crate::presentation::game_text;
 use chrono::{DateTime, Utc};
@@ -37,6 +37,7 @@ pub struct LibraryFacts {
     pub added_at: Option<DateTime<Utc>>,
     /// Ids das coleções do usuário com o jogo (só os jogos do Tako têm).
     pub collections: BTreeSet<String>,
+    pub play_status: Option<PlayStatus>,
 }
 
 impl LibraryFacts {
@@ -53,6 +54,7 @@ impl LibraryFacts {
             score: game.metacritic_score,
             added_at: game.added_at,
             collections: game.collections.clone(),
+            play_status: game.play_status,
         }
     }
 }
@@ -70,6 +72,8 @@ pub struct LibraryCriteria {
     pub genres: BTreeSet<String>,
     /// Ids de coleções do usuário (UX-003): o jogo precisa estar em alguma das marcadas.
     pub collections: BTreeSet<String>,
+    /// Status marcados (LIB-001): o jogo precisa ter algum deles.
+    pub statuses: BTreeSet<PlayStatus>,
     pub sort: LibrarySort,
 }
 
@@ -108,6 +112,7 @@ impl LibraryCriteria {
             + self.sources.len()
             + self.genres.len()
             + self.collections.len()
+            + self.statuses.len()
     }
 
     pub fn has_filters(&self) -> bool {
@@ -143,6 +148,8 @@ impl LibraryCriteria {
             && (self.genres.is_empty() || game.genres.iter().any(|g| self.has_genre(g)))
             && (self.collections.is_empty()
                 || game.collections.iter().any(|c| self.has_collection(c)))
+            && (self.statuses.is_empty()
+                || game.play_status.is_some_and(|s| self.statuses.contains(&s)))
             && query.matches(&normalize(&game.title))
     }
 
@@ -176,6 +183,17 @@ impl LibraryCriteria {
     pub fn toggle_collection(&self, collection_id: &str) -> Self {
         Self {
             collections: toggle(&self.collections, collection_id),
+            ..self.clone()
+        }
+    }
+
+    pub fn toggle_status(&self, status: PlayStatus) -> Self {
+        let mut statuses = self.statuses.clone();
+        if !statuses.remove(&status) {
+            statuses.insert(status);
+        }
+        Self {
+            statuses,
             ..self.clone()
         }
     }
@@ -227,6 +245,25 @@ mod tests {
         assert!(!cleared.has_filters());
         assert_eq!(cleared.search, "god");
         assert_eq!(cleared.sort, LibrarySort::Rating);
+    }
+
+    #[test]
+    fn status_filter_keeps_games_with_any_marked_status() {
+        let facts = |s| LibraryFacts {
+            play_status: s,
+            ..Default::default()
+        };
+        let c = LibraryCriteria::default()
+            .toggle_status(PlayStatus::Playing)
+            .toggle_status(PlayStatus::Paused);
+        assert_eq!(c.active_filter_count(), 2);
+        assert!(c.matches(&facts(Some(PlayStatus::Paused))));
+        assert!(!c.matches(&facts(Some(PlayStatus::Beaten))));
+        assert!(!c.matches(&facts(None)));
+        let c = c
+            .toggle_status(PlayStatus::Playing)
+            .toggle_status(PlayStatus::Paused);
+        assert!(c.matches(&facts(None)));
     }
 
     #[test]
