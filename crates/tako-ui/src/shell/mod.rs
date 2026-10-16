@@ -1,6 +1,7 @@
 //! Estado da interface (o `ShellViewModel` do WPF): páginas com histórico, barra lateral, camadas, dicas e
 //! avisos. Puro Rust e testável sem janela: `render` produz as propriedades do tema, o `bridge` as aplica.
 
+pub mod add_game;
 pub mod art;
 pub mod control_center;
 pub mod ctx;

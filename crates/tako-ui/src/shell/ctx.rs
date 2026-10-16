@@ -187,7 +187,17 @@ pub struct Ctx {
     pub pad_stick: (f32, f32),
     /// Uma camada que mostra o controle ao vivo pede outro desenho no próximo ciclo (marca a cada desenho).
     pub live_pad: std::cell::Cell<bool>,
+    /// Configurações por jogo já lidas (e as do `--simulate`, que não tem banco).
+    pub game_overrides: HashMap<String, tako_core::session::settings::GameSettingsOverride>,
+    /// Ids fixados em "Fontes e IDs" por jogo (cópia de `game_source_ids`; vazio = "nenhum").
+    pub pinned_ids: HashMap<String, tako_core::metadata::agent::PinnedIds>,
+    /// Imagens fixadas por jogo (cópia de `game_art`); a biblioteca as reaplica a cada leitura.
+    pub art_pins: std::sync::Arc<std::sync::Mutex<HashMap<String, ArtPins>>>,
+    /// Fontes de metadados ligadas e a fila; `None` até `metadata::start_metadata` (e no `--simulate`).
+    pub metadata: Option<std::rc::Rc<crate::metadata::Metadata>>,
 }
+
+pub type ArtPins = std::collections::BTreeMap<tako_core::library::ArtKind, String>;
 
 impl Ctx {
     /// Sem banco nem lojas (`--simulate`).

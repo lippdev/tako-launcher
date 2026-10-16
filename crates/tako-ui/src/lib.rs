@@ -7,6 +7,7 @@ pub mod demo;
 pub mod effects;
 pub mod gamepad;
 pub mod images;
+pub mod metadata;
 pub mod model;
 pub mod playnite;
 pub mod screen_test;

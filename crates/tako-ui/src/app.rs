@@ -172,6 +172,10 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pressed_buttons: 0,
         pad_stick: (0.0, 0.0),
         live_pad: Default::default(),
+        game_overrides: Default::default(),
+        pinned_ids: Default::default(),
+        art_pins: Default::default(),
+        metadata: None,
     };
     ctx.sync_collections();
     ctx
