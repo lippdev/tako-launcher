@@ -2,6 +2,7 @@
 //! / = Y, Q/E = LB/RB, M = ☰. Em campos de texto, letras e números viram texto.
 
 use super::Cmd;
+use tako_core::input::shortcut::{KeyModifiers, KeyShortcut};
 
 pub const UP: char = '\u{F700}';
 pub const DOWN: char = '\u{F701}';
@@ -73,6 +74,13 @@ pub fn map(text: &str, ctrl: bool, alt: bool, typing: bool) -> KeyAction {
 
 /// Texto da tecla do Slint → nome do `Key` do WPF, como o atalho da Central guarda ("T", "D5", "F10", "Tab").
 /// `None` = tecla sem nome no atalho (Caps Lock, Menu, letras acentuadas...).
+/// A tecla é o atalho de teclado da Central guardado nas configurações (Ctrl+Shift+Tab por padrão): dentro do Tako
+/// ele abre a Central, como o botão Xbox/PS; durante o jogo quem atende é o atalho global do supervisor.
+pub fn is_control_center(setting: Option<&str>, text: &str, mods: KeyModifiers) -> bool {
+    let shortcut = KeyShortcut::parse(setting);
+    shortcut.modifiers == mods && wpf_key(text).is_some_and(|k| k == shortcut.key)
+}
+
 pub fn wpf_key(text: &str) -> Option<String> {
     let mut chars = text.chars();
     let (Some(c), None) = (chars.next(), chars.next()) else {
@@ -129,6 +137,23 @@ pub fn wpf_key(text: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_control_center_shortcut_opens_the_central_inside_tako() {
+        let cs = KeyModifiers::CTRL | KeyModifiers::SHIFT;
+        // Padrão Ctrl+Shift+Tab: o Slint manda Tab ou Backtab (Shift+Tab), conforme o SO.
+        assert!(is_control_center(None, "\t", cs));
+        assert!(is_control_center(None, "\u{19}", cs));
+        assert!(!is_control_center(None, "\u{19}", KeyModifiers::SHIFT));
+        assert!(!is_control_center(None, "t", cs));
+        let custom = KeyShortcut::new(KeyModifiers::ALT, "F10").serialize();
+        assert!(is_control_center(
+            Some(&custom),
+            "\u{F70D}",
+            KeyModifiers::ALT
+        ));
+        assert!(!is_control_center(Some(&custom), "\t", cs));
+    }
 
     #[test]
     fn slint_keys_become_wpf_key_names() {

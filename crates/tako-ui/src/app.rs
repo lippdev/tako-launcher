@@ -386,7 +386,15 @@ impl App {
                         app.redraw();
                         return Value::Bool(true);
                     }
-                    keys::map(&text, ctrl, alt, s.typing())
+                    let setting = s
+                        .ctx
+                        .settings
+                        .get(crate::shell::ctx::keys::CONTROL_CENTER_KEY);
+                    if !s.typing() && keys::is_control_center(setting, &text, mods) {
+                        KeyAction::Cmd(Cmd::Guide)
+                    } else {
+                        keys::map(&text, ctrl, alt, s.typing())
+                    }
                 };
                 match action {
                     KeyAction::Cmd(c) => app.on_cmd(c),
