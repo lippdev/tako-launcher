@@ -704,7 +704,10 @@ mod tests {
         let host: Rc<RefCell<dyn Host>> = Rc::new(RefCell::new(NoHost));
         shell.borrow_mut().ctx.effect(Effect::SaveDiagnostics);
         pump_effects(&shell, &host);
-        assert!(shell.borrow().has_layers(), "o relatório do sistema abre um diálogo");
+        assert!(
+            shell.borrow().has_layers(),
+            "o relatório do sistema abre um diálogo"
+        );
         assert!(shell.borrow().ctx.pending_layer.is_none());
     }
 }
