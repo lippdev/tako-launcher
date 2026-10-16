@@ -4,6 +4,18 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 ### What's new
+- Opening Tako again brings the window that is already open to the front. During a game, it opens the Control Center over the game.
+- The Control Center keyboard shortcut is picked by pressing the keys again, as before.
+- When adding an `.exe` on Windows, the game's name comes from the product name stored in the file instead of the file name.
+- Image picker: SteamGridDB gets filters (style, shape, animated) on the X button and loads more images when you reach the end of the list.
+- Sources and IDs: a typed ID is only used after you confirm it ("Use {game}?").
+
+### Fixes
+- Dialogs that open on their own (the "Can you see this screen?" question, the Playnite preview, the update-ready notice and the system report) only showed after a key press. They now show right away.
+- Windows: the release ships x64 (Intel/AMD) only.
+
+## [0.2.0-alpha.1]
+### What's new
 - **Tako is now written in Rust, with a Slint interface, and runs on Windows, Linux and macOS.** Installer and portable on Windows; deb, AppImage and tar.gz on Linux; dmg and zip on macOS. (PRD v0.2)
 - While you play, Tako's window closes and only a small process stays, with no window and nothing drawn. It follows the game, hides the cursor, moves the pointer with the controller and puts the display and audio back at the end. (ADR-0026)
 - **Smaller quick menu:** Home without closing the game, back to game, audio, screen, pointer and close game. Opens with Select + Y on the controller and, on Windows, with Ctrl+Shift+Tab.

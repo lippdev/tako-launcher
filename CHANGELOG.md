@@ -4,6 +4,18 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 ### Novidades
+- Abrir o Tako de novo traz a janela que já está aberta para a frente. Durante o jogo, abre a Central por cima do jogo.
+- O atalho de teclado da Central volta a ser escolhido apertando as teclas, como antes.
+- Ao adicionar um `.exe` no Windows, o nome do jogo vem do nome do produto gravado no arquivo, e não mais do nome do arquivo.
+- Seletor de imagens: o SteamGridDB ganha filtros (estilo, formato, animadas) no botão X e carrega mais imagens ao chegar no fim da lista.
+- Fontes e IDs: um ID digitado só é usado depois de confirmar ("Usar {jogo}?").
+
+### Correções
+- Diálogos que abrem sozinhos (a pergunta "Você consegue ver esta tela?", a prévia do Playnite, o aviso de atualização pronta e o relatório do sistema) só apareciam depois de apertar uma tecla. Agora aparecem na hora.
+- Windows: a release sai só para x64 (Intel/AMD).
+
+## [0.2.0-alpha.1]
+### Novidades
 - **O Tako agora é escrito em Rust, com interface em Slint, e roda no Windows, no Linux e no macOS.** Instalador e portátil no Windows; deb, AppImage e tar.gz no Linux; dmg e zip no macOS. (PRD v0.2)
 - Durante o jogo, a janela do Tako fecha e fica só um processo pequeno, sem janela e sem desenhar nada. Ele acompanha o jogo, esconde o cursor, move o ponteiro pelo controle e devolve tela e áudio no fim. (ADR-0026)
 - **Central rápida reduzida:** Início sem fechar o jogo, voltar ao jogo, áudio, tela, ponteiro e encerrar jogo. Abre com Select + Y no controle e, no Windows, com Ctrl+Shift+Tab.
