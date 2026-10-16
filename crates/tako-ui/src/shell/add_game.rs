@@ -20,7 +20,7 @@ pub fn add_game(ctx: &mut Ctx) {
 }
 
 /// Mostra a camada: o app só abre `pending_layer` depois de uma ação, e quem chama aqui é o app (fora dela).
-fn open_layer(ctx: &mut Ctx, layer: Box<dyn Layer>) {
+pub(super) fn open_layer(ctx: &mut Ctx, layer: Box<dyn Layer>) {
     ctx.pending_layer = Some(layer);
     ctx.dirty = true;
     if crate::tasks::shell().is_some() {
