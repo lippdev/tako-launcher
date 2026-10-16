@@ -33,6 +33,9 @@ pub struct TrackRequest {
     pub controller_mouse: bool,
     /// Telas e áudio foram registrados em disco e precisam voltar no fim.
     pub restore: bool,
+    /// Mostrar o jogo no Discord (EXT-004).
+    #[serde(default)]
+    pub discord: bool,
 }
 
 /// Resultado de abrir um jogo.
@@ -166,6 +169,7 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         hide_cursor: ctx.settings.bool(keys::HIDE_CURSOR, false),
         controller_mouse: ctx.settings.bool(keys::CONTROLLER_MOUSE, false),
         restore: recorded,
+        discord: crate::discord::available() && ctx.settings.bool(keys::DISCORD_PRESENCE, false),
     };
     Ok(Started::Tracking(req))
 }
@@ -215,6 +219,7 @@ pub struct Running {
     tracker: GameRunTracker,
     mouse: tako_core::input::controller_mouse::ControllerMouse,
     screen_height: u32,
+    presence: Option<crate::discord::Presence>,
 }
 
 impl Running {
@@ -232,12 +237,16 @@ impl Running {
             tracker,
             mouse: Default::default(),
             screen_height: 1080,
+            presence: None,
         })
     }
 
-    /// Cursor da sessão. Fica com quem acompanha o jogo: no X11 o cursor escondido volta quando a
-    /// conexão de quem escondeu fecha.
+    /// Cursor e presença no Discord da sessão. Ficam com quem acompanha o jogo: no X11 o cursor escondido (e no
+    /// Discord a atividade) some quando a conexão de quem pediu fecha.
     pub fn begin(&mut self, platform: &Platform) {
+        if self.req.discord {
+            self.presence = crate::discord::Presence::start(&self.req.title, self.req.launched_at);
+        }
         self.screen_height = platform
             .displays
             .list()
@@ -292,6 +301,7 @@ impl Running {
 
     /// Fim da sessão: solta o ponteiro e restaura telas, áudio e cursor.
     pub fn finish(&mut self, platform: &Platform, paths: &DataPaths) {
+        self.presence = None;
         let _ = self.mouse.reset(platform.pointer.as_ref());
         restore_now(platform, paths, self.req.restore);
     }

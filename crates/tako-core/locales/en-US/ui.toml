@@ -30,6 +30,7 @@ exit = "Exit to desktop"
 
 [status]
 keyboard = "Keyboard"
+battery_low = "Low battery: {pad} at {percent}%"
 
 [home]
 recent = "Recently played"
@@ -92,6 +93,7 @@ metadata_hint = "Turn on IGDB in Settings › Covers and metadata to fill in the
 add_to_collection = "Add to collection"
 
 [options]
+sessions = "Sessions"
 open_steam = "Open in Steam"
 change_art = "Change images"
 source_ids = "Sources and IDs"
@@ -159,6 +161,7 @@ pointer = "Pointer"
 end = "Close game"
 end_confirm = "Close the game"
 playing = "Playing now"
+pad_battery = "Controller at {percent}%"
 volume = "Volume"
 mute = "Mute"
 output = "AUDIO OUTPUT"

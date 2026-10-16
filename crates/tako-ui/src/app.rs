@@ -152,6 +152,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pad: Default::default(),
         pad_name: String::new(),
         pads_connected: 0,
+        pad_battery: None,
         input: InputKind::Keyboard,
         toast: None,
         effects: Vec::new(),
@@ -470,6 +471,7 @@ impl App {
         let started = Instant::now();
         let app = self.clone();
         let mut last_clock = String::new();
+        let mut next_battery = Duration::ZERO;
         let timer = slint::Timer::default();
         timer.start(
             slint::TimerMode::Repeated,
@@ -489,6 +491,24 @@ impl App {
                         }
                         s.ctx.pads_connected = p.count();
                         s.ctx.dirty = true;
+                        next_battery = now;
+                    }
+                    // Bateria a cada 30 s (e logo depois de um controle entrar ou sair), nunca por quadro.
+                    if now >= next_battery {
+                        next_battery = now + Duration::from_secs(30);
+                        let (level, low) = p.battery();
+                        let mut s = app.shell.borrow_mut();
+                        if s.ctx.pad_battery != level {
+                            s.ctx.pad_battery = level;
+                            s.ctx.dirty = true;
+                        }
+                        for (pad, pct) in low {
+                            let text = s.ctx.tf(
+                                "status.battery_low",
+                                &[("pad", &pad), ("percent", &pct.to_string())],
+                            );
+                            s.ctx.toast(text);
+                        }
                     }
                     pad_state = p.state();
                     {

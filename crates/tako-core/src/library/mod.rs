@@ -20,8 +20,10 @@ pub use collections::{
 };
 pub use criteria::{InstallFilter, LibraryCriteria, LibraryFacts};
 pub use game::{ArtKind, Game, GameStore, GameTrackingStrategy, PlayStatus, media};
-pub use game_library::{GameLibrary, LibraryData, LibraryError, LibraryStore, MemoryLibraryStore};
-pub use manual::{GameStateRecord, ManualGameRecord};
+pub use game_library::{
+    GameLibrary, LibraryData, LibraryError, LibraryStore, MAX_SESSIONS, MemoryLibraryStore,
+};
+pub use manual::{GameStateRecord, ManualGameRecord, PlaySession};
 pub use query::{FacetValue, LibraryFilter, LibrarySort};
 
 use chrono::{DateTime, Utc};

@@ -4,6 +4,7 @@ use super::{Game, GameStore, GameTrackingStrategy, PlayStatus};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::time::Duration;
 
 /// Jogo adicionado pelo usuário: executável, atalho, script, `.desktop`, AppImage, `.app` ou URI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -33,6 +34,16 @@ pub struct GameStateRecord {
     pub play_status: Option<PlayStatus>,
     pub last_played_at: Option<DateTime<Utc>>,
     pub play_minutes: f64,
+    /// Histórico (SESSION-002), da mais antiga para a mais recente; só as últimas `MAX_SESSIONS`.
+    #[serde(default)]
+    pub sessions: Vec<PlaySession>,
+}
+
+/// Uma vez que o jogo rodou pelo launcher.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PlaySession {
+    pub started_at: DateTime<Utc>,
+    pub duration: Duration,
 }
 
 impl ManualGameRecord {

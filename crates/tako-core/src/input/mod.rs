@@ -279,6 +279,18 @@ pub fn merge(
     })
 }
 
+/// Bateria (%) a partir da qual o controle sem fio ganha o aviso de bateria fraca.
+pub const LOW_BATTERY: i32 = 15;
+
+/// Aviso de bateria fraca: `true` só na primeira leitura baixa desde que o controle conectou (`warned`
+/// começa falso a cada conexão). `None` = com fio ou desconhecida.
+pub fn low_battery_warning(warned: &mut bool, percent: Option<i32>) -> bool {
+    let low = percent.is_some_and(|p| p <= LOW_BATTERY);
+    let fire = low && !*warned;
+    *warned |= low;
+    fire
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -395,6 +407,19 @@ mod tests {
             upd(&mut pad, pressed(B::DPAD_DOWN), ms(1016)),
             [AppCommand::Down]
         );
+    }
+
+    #[test]
+    fn low_battery_warns_once_per_connection() {
+        let mut warned = false;
+        let fired: Vec<_> = [Some(40), None, Some(15), Some(9), Some(20), Some(12)]
+            .into_iter()
+            .map(|p| low_battery_warning(&mut warned, p))
+            .collect();
+        assert_eq!(fired, [false, false, true, false, false, false]);
+        // Reconectou: avisa de novo.
+        let mut warned = false;
+        assert!(low_battery_warning(&mut warned, Some(10)));
     }
 
     // InputFusionTests

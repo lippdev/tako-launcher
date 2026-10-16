@@ -83,6 +83,15 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
     ),
     // Status do jogo (LIB-001): jogando, zerado, pausado, abandonado, quero jogar.
     (8, "ALTER TABLE game_state ADD COLUMN status TEXT;"),
+    // Histórico de sessões (SESSION-002); a biblioteca guarda só as últimas por jogo.
+    (
+        9,
+        "CREATE TABLE IF NOT EXISTS play_sessions (
+            game_id TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            seconds INTEGER NOT NULL
+        );",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).

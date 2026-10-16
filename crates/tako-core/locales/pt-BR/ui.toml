@@ -30,6 +30,7 @@ exit = "Sair para o desktop"
 
 [status]
 keyboard = "Teclado"
+battery_low = "Bateria fraca: {pad} com {percent}%"
 
 [home]
 recent = "Jogados recentemente"
@@ -92,6 +93,7 @@ metadata_hint = "Ligue a IGDB em Configurações › Capas e metadados para comp
 add_to_collection = "Adicionar à coleção"
 
 [options]
+sessions = "Sessões"
 open_steam = "Abrir na Steam"
 change_art = "Trocar imagens"
 source_ids = "Fontes e IDs"
@@ -159,6 +161,7 @@ pointer = "Ponteiro"
 end = "Encerrar jogo"
 end_confirm = "Encerrar o jogo"
 playing = "Jogando agora"
+pad_battery = "Controle com {percent}%"
 volume = "Volume"
 mute = "Sem som"
 output = "SAÍDA DE ÁUDIO"

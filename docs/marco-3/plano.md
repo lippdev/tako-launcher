@@ -13,6 +13,8 @@ A v0.2.0-alpha.1 fechou a paridade em código (Fase 2 do PRD). Daqui em diante o
 
 ## MUST
 
+Todos concluídos e publicados na v0.2.0-alpha.2: M-01 (#57), M-02 (#58), M-03 (#61), M-04 (#60), M-05 (#62).
+
 | Item | Por quê |
 |---|---|
 | **M-01** Abrir o Tako de novo traz a janela aberta para a frente (durante o jogo, abre a Central) | Paridade: no WPF o segundo Tako ativava o primeiro. Hoje ele só sai e parece que não abriu |
