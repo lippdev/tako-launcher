@@ -7,6 +7,9 @@ public enum GameStore
     Gog,
     Xbox,
     Manual,
+
+    /// <summary>ROMs das pastas configuradas em Configurações › Emulação (EMU-003, ADR-0024).</summary>
+    Emulation,
 }
 
 /// <summary>Jogo da biblioteca. Dados de catálogo são imutáveis; estado do usuário (favorito, tempo jogado) muda.</summary>
@@ -98,7 +101,7 @@ public sealed class Game
     /// <summary>Arquivo da ROM (jogo de emulador), usado para casar os metadados pelo hash (ADR-0022).</summary>
     public string? RomPath { get; init; }
 
-    /// <summary>Jogo de emulador: ainda não abre pelo Tako (o épico EMU traz os emuladores); só tem os dados.</summary>
+    /// <summary>Jogo de emulador: abre pelo emulador escolhido para o sistema (épico EMU, ADR-0024).</summary>
     public bool IsRom => RomPath is not null;
 
     /// <summary>Número de jogadores ("1-2"), quando a fonte informa.</summary>
@@ -126,5 +129,5 @@ public sealed class Game
 
     public bool IsUpcoming => UpcomingRelease is not null;
 
-    public bool CanPlay => IsInstalled && !IsUpcoming && !IsRom;
+    public bool CanPlay => IsInstalled && !IsUpcoming;
 }

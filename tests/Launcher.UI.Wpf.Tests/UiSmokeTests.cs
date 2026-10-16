@@ -64,6 +64,7 @@ public sealed partial class UiSmokeTests
         var hotkey = new SimulatedEmergencyHotkey();
         string igdbFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-igdb-{Guid.NewGuid():N}.dat");
         string screenScraperFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-screenscraper-{Guid.NewGuid():N}.dat");
+        string emulationFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-emulation-{Guid.NewGuid():N}.json");
         var consoleFiles = new ConsoleModeFiles(
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-{Guid.NewGuid():N}.json"),
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-environment-{Guid.NewGuid():N}.json"));
@@ -92,7 +93,9 @@ public sealed partial class UiSmokeTests
                 // simulado e não há provedores), para a tela seguir o caminho de uma versão de release sem ir à rede.
                 .AddSingleton(new Launcher.Core.Library.Metadata.ScreenScraper.ScreenScraperSettingsStore(screenScraperFile, new ConsoleMode.Runtime.Windows.DpapiSecretProtector()))
                 .AddSingleton(new Launcher.Core.Library.Metadata.ScreenScraper.ScreenScraperSoftware("teste", "teste", "Tako"))
-                .RemoveAll<Launcher.Core.Library.Metadata.IMetadataProvider>());
+                .RemoveAll<Launcher.Core.Library.Metadata.IMetadataProvider>()
+                // Emulação (ADR-0024): configuração num arquivo temporário; a detecção lê o disco e o registro do CI.
+                .AddSingleton(new Launcher.Core.Emulation.EmulationConfigStore(emulationFile)));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
 
@@ -537,6 +540,9 @@ public sealed partial class UiSmokeTests
 
         // --- Dados de ROMs (ScreenScraper, ADR-0022): conta do usuário, Testar simulado, ROM no "Adicionar jogo".
         ScreenScraperDataSettings(shell, window, services.GetRequiredService<MetadataService>());
+
+        // --- Emulação (épico EMU, ADR-0024): assistente, pastas de ROMs, emulador personalizado, abrir e sair do emulador.
+        EmulationJourney(shell, window, services.GetRequiredService<EmulationService>());
 
         // --- Segurança de temas (frente H): caminhos montados por dados não carregam (MVP-016, questão aberta 8).
         ThemeSecurity(services, bindingErrors);

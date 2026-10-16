@@ -9,6 +9,7 @@ using ConsoleMode.Runtime.Tv;
 using ConsoleMode.Runtime.Windows;
 using ConsoleMode.Runtime.Windows.SessionTools;
 using Launcher.Core.Diagnostics;
+using Launcher.Core.Emulation;
 using Launcher.Core.Library;
 using Launcher.Core.Library.Epic;
 using Launcher.Core.Library.Gog;
@@ -147,6 +148,11 @@ public partial class App : Application
         services.AddSingleton(sp => new SessionJournal(AppPaths.SessionFile, sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<CrashGuard>();
         services.AddSingleton<IRegistryReader, WindowsRegistryReader>();
+        // Emulação (épico EMU, ADR-0024): emuladores achados no disco e no registro, pastas de ROMs e escolhas em emulation.json.
+        services.AddSingleton<IEmulationFileSystem, PhysicalEmulationFileSystem>();
+        services.AddSingleton(_ => EmulationPaths.FromEnvironment());
+        services.AddSingleton(_ => new EmulationConfigStore(AppPaths.EmulationFile));
+        services.AddSingleton(sp => new EmulationService(sp.GetRequiredService<EmulationConfigStore>(), sp.GetRequiredService<IRegistryReader>(), sp.GetRequiredService<IEmulationFileSystem>(), sp.GetRequiredService<EmulationPaths>(), sp.GetRequiredService<ILogger<EmulationService>>(), AppPaths.RomScanCacheFile));
         services.AddSingleton(CreateLibrarySources);
         services.AddSingleton<IGameLibrary>(sp => library ?? CreateLocalLibrary(sp));
         services.AddSingleton(XamlSecurityPolicy.CreateDefault());
@@ -195,7 +201,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Lojas da biblioteca (ADR-0019): Steam, Epic, GOG e Xbox, lidas do disco e do registro sem os clientes abertos; as
+    /// Lojas da biblioteca (ADR-0019): Steam, Epic, GOG, Xbox e as pastas de ROMs (Emulação, ADR-0024), lidas do disco e do registro sem os clientes abertos; as
     /// desligadas nas Configurações ficam de fora.
     /// </summary>
     private static LibrarySources CreateLibrarySources(IServiceProvider services)
@@ -210,6 +216,7 @@ public partial class App : Application
                 new EpicLibrarySource(registry, Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)),
                 new GogLibrarySource(registry),
                 new XboxLibrarySource(services.GetRequiredService<IXboxSystem>()),
+                services.GetRequiredService<EmulationService>().Source,
             ],
             services.GetRequiredService<SettingsService>().IsStoreEnabled,
             (store, ex) => LogStoreScanFailed(logger, ex, store));

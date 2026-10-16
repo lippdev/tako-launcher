@@ -17,6 +17,7 @@ public enum InstallFilter
 /// <param name="Source">Fonte como aparece para o usuário ("Steam", "Adicionado").</param>
 /// <param name="Score">Nota de 0 a 100 (Metacritic), quando existe.</param>
 /// <param name="Collections">Ids das coleções do usuário com o jogo (só os jogos do Tako têm).</param>
+/// <param name="System">Sistema do jogo de emulador ("snes"; EMU-007); nulo = PC.</param>
 public readonly record struct LibraryFacts(
     string Title,
     bool IsInstalled,
@@ -27,7 +28,8 @@ public readonly record struct LibraryFacts(
     TimeSpan PlayTime,
     int? Score,
     DateTimeOffset AddedAt,
-    IReadOnlySet<string>? Collections = null)
+    IReadOnlySet<string>? Collections = null,
+    string? System = null)
 {
     public static LibraryFacts Of(Game game)
     {
@@ -42,7 +44,8 @@ public readonly record struct LibraryFacts(
             game.PlayTime,
             game.MetacriticScore,
             game.AddedAt,
-            game.Collections);
+            game.Collections,
+            game.Platform);
     }
 }
 
@@ -73,13 +76,16 @@ public sealed record LibraryCriteria
     /// <summary>Ids de coleções do usuário (UX-003): o jogo precisa estar em alguma das marcadas.</summary>
     public IReadOnlySet<string> Collections { get; init; } = NoValues;
 
+    /// <summary>Sistemas de emulador ("snes", "ps1"; EMU-007): o jogo precisa ser de algum dos marcados.</summary>
+    public IReadOnlySet<string> Systems { get; init; } = NoValues;
+
     public LibrarySort Sort { get; init; } = LibrarySort.RecentlyPlayed;
 
     public bool HasSearch => !string.IsNullOrWhiteSpace(Search);
 
     /// <summary>Quantos filtros do painel estão ligados (a busca e a ordenação não contam).</summary>
     public int ActiveFilterCount =>
-        (Install == InstallFilter.Any ? 0 : 1) + (FavoritesOnly ? 1 : 0) + (PlayedOnly ? 1 : 0) + Sources.Count + Genres.Count + Collections.Count;
+        (Install == InstallFilter.Any ? 0 : 1) + (FavoritesOnly ? 1 : 0) + (PlayedOnly ? 1 : 0) + Sources.Count + Genres.Count + Collections.Count + Systems.Count;
 
     public bool HasFilters => ActiveFilterCount > 0;
 
@@ -98,6 +104,7 @@ public sealed record LibraryCriteria
                 && (Sources.Count == 0 || Sources.Contains(game.Source))
                 && (Genres.Count == 0 || (game.Genres ?? []).Any(Genres.Contains))
                 && (Collections.Count == 0 || (game.Collections ?? NoValues).Any(Collections.Contains))
+                && (Systems.Count == 0 || (game.System is not null && Systems.Contains(game.System)))
                 && (query.IsEmpty || SearchText.Matches(SearchText.Normalize(game.Title), query)),
         };
     }
@@ -110,6 +117,8 @@ public sealed record LibraryCriteria
     public LibraryCriteria ToggleGenre(string genre) => this with { Genres = Toggle(Genres, genre) };
 
     public LibraryCriteria ToggleCollection(string collectionId) => this with { Collections = Toggle(Collections, collectionId) };
+
+    public LibraryCriteria ToggleSystem(string system) => this with { Systems = Toggle(Systems, system) };
 
     /// <summary>Tira coleções que não existem mais (ex.: excluída com o filtro ligado).</summary>
     public LibraryCriteria KeepCollections(IEnumerable<string> existingIds)
@@ -127,6 +136,7 @@ public sealed record LibraryCriteria
         Sources = NoValues,
         Genres = NoValues,
         Collections = NoValues,
+        Systems = NoValues,
     };
 
     private static HashSet<string> Toggle(IReadOnlySet<string> values, string value)

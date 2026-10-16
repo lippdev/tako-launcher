@@ -101,6 +101,7 @@ public sealed partial class ShellViewModel : ObservableObject
         CollectionLibrary collections,
         GameSettingsStore gameSettings,
         ConsoleModeSession consoleMode,
+        EmulationService emulation,
         IEmergencyHotkey emergencyHotkey,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
@@ -119,6 +120,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Collections = collections;
         _gameSettings = gameSettings;
         ConsoleSession = consoleMode;
+        Emulation = emulation;
         _emergencyHotkey = emergencyHotkey;
         _time = time;
         _logger = logger;
@@ -137,6 +139,7 @@ public sealed partial class ShellViewModel : ObservableObject
         library.Changed += (_, _) => RefreshAll();
         settings.StoreToggled += (_, store) => OnStoreToggled(store);
         collections.Changed += (_, _) => OnCollectionsChanged();
+        emulation.Changed += (_, _) => NotifySettingsChanged();
         metadata.GameUpdated += (_, id) => OnMetadataUpdated(id);
         if (_currentPage is HomeViewModel { Hero: { } hero })
         {
@@ -363,12 +366,6 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void Launch(GameItemViewModel game)
     {
-        if (game.Game.IsRom && RunningGame != game)
-        {
-            Toast(RomLaunchNotice); // ADR-0022: ROMs só têm os dados; abrir pelo emulador é o épico EMU
-            return;
-        }
-
         if (IsReturningToDesk)
         {
             Toast("Aguarde: o Tako está voltando as telas para a mesa");
@@ -387,6 +384,11 @@ public sealed partial class ShellViewModel : ObservableObject
             }
 
             return;
+        }
+
+        if (game.Game.IsRom && !ConfirmRomLaunch(game))
+        {
+            return; // sem emulador para o sistema, ou falta BIOS e o usuário vai decidir (ADR-0024)
         }
 
         Session = SessionState.LaunchingGame;
@@ -896,6 +898,7 @@ public sealed partial class ShellViewModel : ObservableObject
             Library("library:epic", "Epic Games", "Store.Epic", LibraryFilter.ForStore(GameStore.Epic), badge: StoreBrush(GameStore.Epic)),
             Library("library:gog", "GOG", "Store.Gog", LibraryFilter.ForStore(GameStore.Gog), badge: StoreBrush(GameStore.Gog)),
             Library("library:xbox", "Xbox", "Store.Xbox", LibraryFilter.ForStore(GameStore.Xbox), badge: StoreBrush(GameStore.Xbox)),
+            Library("library:emulation", "Emulação", "Icon.Gamepad", LibraryFilter.ForStore(GameStore.Emulation), badge: StoreBrush(GameStore.Emulation)),
             Library("library:manual", "Adicionados", "Store.Manual", LibraryFilter.ForStore(GameStore.Manual), badge: StoreBrush(GameStore.Manual)),
             // ADR-0020: o que veio do Console Mode tem menu próprio, fora das Configurações.
             new(ConsoleModeViewModel.Route, "Modo Console", "Icon.Tv", new RelayCommand(OpenConsoleMode)) { IsBottom = true },

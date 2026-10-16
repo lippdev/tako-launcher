@@ -1,0 +1,6 @@
+# Exemplo no formato dos .info do RetroArch (fictício).
+display_name = "Nintendo - SNES / SFC (Snes9x - Current)"
+corename = "Snes9x"
+supported_extensions = "smc|sfc|swc|fig|bs|st"
+database = "Nintendo - Super Nintendo Entertainment System|Nintendo - Super Nintendo Entertainment System Hacks"
+firmware_count = 0

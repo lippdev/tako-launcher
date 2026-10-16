@@ -87,6 +87,17 @@ public static class LibraryQuery
     public static IReadOnlyList<FacetValue> Genres<T>(IEnumerable<T> items, Func<T, LibraryFacts> facts) =>
         Facet(items.Select(i => facts(i).Genres));
 
+    /// <summary>Sistemas de emulador presentes (chaves "snes", "ps1"; EMU-007), na ordem da tabela de sistemas, com quantos jogos cada um tem.</summary>
+    public static IReadOnlyList<FacetValue> Systems<T>(IEnumerable<T> items, Func<T, LibraryFacts> facts)
+    {
+        var order = Metadata.ScreenScraper.ScreenScraperSystems.All.Select(s => s.Key).ToList();
+        return [.. items.Select(i => facts(i).System).OfType<string>()
+            .GroupBy(s => s, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new FacetValue(g.Key, g.Count()))
+            .OrderBy(f => order.IndexOf(f.Name) is int i and >= 0 ? i : int.MaxValue)
+            .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)];
+    }
+
     /// <summary>Fileira "Jogados recentemente" da Início: só jogos já jogados, do mais recente ao mais antigo.</summary>
     public static IReadOnlyList<Game> RecentlyPlayed(IEnumerable<Game> games) =>
         games.Where(g => g.LastPlayedAt is not null).OrderByDescending(g => g.LastPlayedAt).ToList();

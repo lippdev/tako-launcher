@@ -54,6 +54,12 @@ public static class AppPaths
     /// <summary>ScreenScraper ligado e a conta do usuário (usuário e senha), cifrados com DPAPI (ADR-0022).</summary>
     public static string ScreenScraperSettingsFile => Path.Combine(DataRoot, "screenscraper.dat");
 
+    /// <summary>Configurações › Emulação: pastas de ROMs, emuladores e escolhas por sistema e por jogo (ADR-0024).</summary>
+    public static string EmulationFile => Path.Combine(DataRoot, "emulation.json");
+
+    /// <summary>Lista de arquivos de cada pasta de ROMs, para a leitura incremental (ADR-0024).</summary>
+    public static string RomScanCacheFile => Path.Combine(DataRoot, "cache", "rom-scan.json");
+
     /// <summary>Marcador de sessão em andamento (proteção contra loop de travamento, MVP-036).</summary>
     public static string SessionFile => Path.Combine(DataRoot, "session.json");
 

@@ -25,6 +25,7 @@ public sealed partial class SettingsViewModel : RowsPageViewModel, IKeyRevealer
         [
             new("geral", "Geral", "Icon.Gear", "Como o Tako abre, idioma e atualizações.", GeneralRows()),
             new("biblioteca", "Biblioteca e lojas", "Icon.Grid", "De onde vêm os seus jogos e como organizá-los.", LibraryRows()),
+            new("emulacao", "Emulação", "Icon.Gamepad", "Emuladores, pastas de ROMs e como abrir e sair dos jogos de console.", EmulationRows()),
             new("aparencia", "Aparência", "Icon.Palette", "Tema, cores e animações.", AppearanceRows()),
             new("controles", "Controles", "Icon.Gamepad", "Controles, teclado e atalhos.", ControlsRows()),
             new("sistema", "Sistema", "Icon.Monitor", "Telas e som depois do jogo, diagnóstico e recuperação.", SystemRows()),

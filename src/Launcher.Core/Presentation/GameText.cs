@@ -23,6 +23,7 @@ public static class GameText
         GameStore.Epic => "Epic Games",
         GameStore.Gog => "GOG",
         GameStore.Xbox => "Xbox",
+        GameStore.Emulation => "Emulação",
         _ => "Adicionado",
     };
 

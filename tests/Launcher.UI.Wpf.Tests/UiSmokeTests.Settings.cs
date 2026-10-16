@@ -32,7 +32,7 @@ public sealed partial class UiSmokeTests
         Pump(0.8);
         var settings = Assert.IsType<SettingsViewModel>(shell.CurrentPage);
         Assert.Equal("settings-cat:geral", Nav.GetKey(nav.Focused!));
-        Assert.Equal(["geral", "biblioteca", "aparencia", "controles", "sistema", "sobre"], settings.Categories.Select(c => c.Id));
+        Assert.Equal(["geral", "biblioteca", "emulacao", "aparencia", "controles", "sistema", "sobre"], settings.Categories.Select(c => c.Id));
 
         // Nenhum texto de desenvolvedor visível: sem IDs internos do PRD/ADR nem nomes técnicos.
         foreach (var row in settings.Categories.SelectMany(c => c.Rows))

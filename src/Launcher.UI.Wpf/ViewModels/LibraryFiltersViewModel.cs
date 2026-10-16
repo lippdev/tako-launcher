@@ -6,8 +6,8 @@ using Launcher.Core.Presentation;
 namespace Launcher.UI.Wpf.ViewModels;
 
 /// <summary>
-/// Painel de filtros da biblioteca (UX-002/004): instalação, favoritos, jogados recentemente, fonte, gênero (quando os
-/// metadados trazem) e ordenação. Cada escolha vale na hora e a grade atrás do painel acompanha; B fecha. As linhas
+/// Painel de filtros da biblioteca (UX-002/004): instalação, favoritos, jogados recentemente, fonte, sistema (jogos de
+/// emulador, EMU-007), gênero (quando os metadados trazem) e ordenação. Cada escolha vale na hora e a grade atrás do painel acompanha; B fecha. As linhas
 /// são as mesmas dos painéis da Central de Controle (marcador, chave, valor no fim).
 /// </summary>
 public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlayViewModel
@@ -22,6 +22,7 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
     private readonly List<(string Value, PanelRowViewModel Row)> _sources = [];
     private readonly List<(string Value, PanelRowViewModel Row)> _genres = [];
     private readonly List<(string Id, PanelRowViewModel Row)> _collections = [];
+    private readonly List<(string Key, PanelRowViewModel Row)> _systems = [];
 
     [ObservableProperty]
     private string _countText = string.Empty;
@@ -55,6 +56,13 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
             _genres.Add((genre.Name, Row(genre.Name, () => Change(c => c.ToggleGenre(genre.Name)), toggle: true, end: genre.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))));
         }
 
+        // Sistemas de emulador (EMU-007): "SNES", "PlayStation"… quando a página tem jogos de mais de um.
+        foreach (var system in LibraryQuery.Systems(games, LibraryFacts.Of))
+        {
+            string name = Core.Library.Metadata.ScreenScraper.ScreenScraperSystems.ForKey(system.Name)?.Name ?? system.Name;
+            _systems.Add((system.Name, Row(name, () => Change(c => c.ToggleSystem(system.Name)), toggle: true, end: system.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+        }
+
         foreach (var collection in collections ?? [])
         {
             int count = games.Count(g => collection.Contains(g.Id));
@@ -77,6 +85,11 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
         if (_sources.Count > 1)
         {
             sections.Add(new PanelSection("Fonte", null, [.. _sources.Select(s => s.Row)]));
+        }
+
+        if (_systems.Count > 1 || (_systems.Count == 1 && _get().Systems.Count > 0))
+        {
+            sections.Add(new PanelSection("Sistema", null, [.. _systems.Select(s => s.Row)]));
         }
 
         if (_genres.Count > 0)
@@ -117,6 +130,11 @@ public sealed partial class LibraryFiltersViewModel : ObservableObject, IOverlay
         foreach (var (id, row) in _collections)
         {
             row.IsOn = criteria.Collections.Contains(id);
+        }
+
+        foreach (var (key, row) in _systems)
+        {
+            row.IsOn = criteria.Systems.Contains(key);
         }
 
         _clear.EndText = criteria.ActiveFilterCount switch

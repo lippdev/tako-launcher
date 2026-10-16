@@ -127,7 +127,7 @@ public sealed class ScreenScraperTests : IDisposable
         Assert.Equal(path, game.RomPath);
         Assert.True(game.IsRom);
         Assert.True(game.IsInstalled);
-        Assert.False(game.CanPlay); // abrir pelo emulador é o épico EMU
+        Assert.True(game.CanPlay); // abre pelo emulador do sistema (ADR-0024)
         Assert.Equal(MetadataKind.Emulated, MetadataPriority.KindOf(game));
         Assert.Equal(path, MetadataLookup.For(game).RomPath);
         Assert.Equal("ROM no disco", Presentation.GameText.Status(game));

@@ -160,6 +160,8 @@ public sealed partial class ShellViewModel
             actions.Add(new OverlayAction("Trocar capa", ActionStyle.Secondary, new RelayCommand(() => { Close(); ChangeCover(item); })));
         }
 
+        actions.AddRange(GameEmulationActions(item, Close)); // ROM: emulador, argumentos e .cfg deste jogo (ADR-0024)
+
         if (game.InstallPath is { } folder && Directory.Exists(folder))
         {
             actions.Add(new OverlayAction("Abrir pasta", ActionStyle.Secondary, new RelayCommand(() => { Close(); OpenUri(folder); })));

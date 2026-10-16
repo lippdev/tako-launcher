@@ -290,7 +290,6 @@ public sealed partial class DetailsViewModel : PageViewModel
     {
         (true, _) => "Voltar ao jogo",
         (_, { IsUpcoming: true }) => "Avisar no lançamento",
-        (_, { IsRom: true }) => "Abrir no emulador (em breve)",
         (_, { IsInstalled: true }) => "Jogar",
         (_, { Store: GameStore.Manual }) => "Arquivo não encontrado",
         _ => $"Instalar pela {Game.StoreName}",
@@ -322,6 +321,7 @@ public sealed partial class DetailsViewModel : PageViewModel
             g.Developer is null ? null : new StatViewModel("Desenvolvedora", g.Developer),
             g.Franchise is null ? null : new StatViewModel("Série", g.Franchise),
             Core.Library.Metadata.ScreenScraper.ScreenScraperSystems.ForKey(g.Platform) is { } system ? new StatViewModel("Sistema", system.Name) : null,
+            g.IsRom ? new StatViewModel("Emulador", Shell.Emulation.Describe(g)) : null,
             g.Players is null ? null : new StatViewModel("Jogadores", g.Players),
             new StatViewModel("Status", Game.Status),
             g.AlsoInstalledIn.Count == 0 ? null : new StatViewModel("Também em", string.Join(", ", g.AlsoInstalledIn.Select(Core.Presentation.GameText.StoreName))),
@@ -344,10 +344,6 @@ public sealed partial class DetailsViewModel : PageViewModel
         else if (g.IsUpcoming)
         {
             Shell.Toast($"Você será avisado quando {g.Title} for lançado");
-        }
-        else if (g.IsRom)
-        {
-            Shell.Toast(ShellViewModel.RomLaunchNotice);
         }
         else if (g.Store == GameStore.Manual)
         {

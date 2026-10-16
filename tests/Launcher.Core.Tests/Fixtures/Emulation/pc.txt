@@ -1,0 +1,52 @@
+# PC fictício para os testes de emulação (ADR-0024). Uma linha por arquivo; "=> arquivo" diz de onde vem o conteúdo.
+# Nenhum arquivo é real: só nomes, para testar detecção, leitura das pastas de ROMs e montagem da linha de comando.
+
+# RetroArch na pasta padrão, com 4 cores (um sem sistema conhecido) e a pasta system sem a BIOS do PS1.
+C:\Program Files\RetroArch\retroarch.exe
+C:\Program Files\RetroArch\retroarch.cfg => retroarch.cfg
+C:\Program Files\RetroArch\cores\snes9x_libretro.dll
+C:\Program Files\RetroArch\cores\swanstation_libretro.dll
+C:\Program Files\RetroArch\cores\fbneo_libretro.dll
+C:\Program Files\RetroArch\cores\coreestranho_libretro.dll
+C:\Program Files\RetroArch\info\snes9x_libretro.info => snes9x_libretro.info
+C:\Program Files\RetroArch\info\swanstation_libretro.info => swanstation_libretro.info
+C:\Program Files\RetroArch\system\leiame.txt
+
+# PCSX2 pelo Scoop, com a BIOS na pasta de documentos.
+C:\Users\Jogador\scoop\apps\pcsx2\current\pcsx2-qt.exe
+C:\Users\Jogador\Documents\PCSX2\bios\console-ps2.bin
+
+# DuckStation pelo winget, sem BIOS.
+C:\Users\Jogador\AppData\Local\Microsoft\WinGet\Packages\Stenzek.DuckStation_Microsoft.Winget.Source_8wekyb3d8bbwe\duckstation-qt-x64-ReleaseLTCG.exe
+
+# Dolphin numa pasta qualquer, achado pelo registro (Aplicativos instalados).
+D:\Emus\Dolphin-x64\Dolphin.exe
+
+# Emulador personalizado.
+D:\Emus\MeuEmulador\meu.exe
+
+# ROMs: pasta raiz com subpastas por sistema (nomes do ES-DE).
+E:\ROMs\snes\Lanterna Distante (USA).sfc
+E:\ROMs\snes\Corrida Pixel (Brazil).zip
+E:\ROMs\snes\media\Lanterna Distante (USA).png
+E:\ROMs\psx\Vale Sombrio (USA).cue => vale.cue
+E:\ROMs\psx\Vale Sombrio (USA) (Track 1).bin
+E:\ROMs\psx\Vale Sombrio (USA) (Track 2).bin
+E:\ROMs\psx\Saga Estelar\Saga Estelar (USA).m3u => saga.m3u
+E:\ROMs\psx\Saga Estelar\Saga Estelar (USA) (Disc 1).chd
+E:\ROMs\psx\Saga Estelar\Saga Estelar (USA) (Disc 2).chd
+E:\ROMs\psx\Torre Antiga (Europe) (Disc 2).chd
+E:\ROMs\psx\Torre Antiga (Europe) (Disc 1).chd
+E:\ROMs\psx\leiame.txt
+E:\ROMs\arcade\lutaneon.zip
+E:\ROMs\gc\Ilha Flutuante (USA).rvz
+E:\ROMs\ps2\Rua Veloz (USA).iso
+E:\ROMs\desconhecido\algo.bin
+E:\ROMs\dreamcast\Mar Profundo (USA)\Mar Profundo (USA).gdi => mar.gdi
+E:\ROMs\dreamcast\Mar Profundo (USA)\track01.bin
+E:\ROMs\dreamcast\Mar Profundo (USA)\track02.raw
+E:\ROMs\dreamcast\Mar Profundo (USA)\track03.bin
+
+# Pasta de um sistema só, escolhida à mão.
+F:\Portateis\Aventura de Bolso (USA).gba
+F:\Portateis\Aventura de Bolso (USA).sav

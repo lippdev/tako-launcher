@@ -62,15 +62,19 @@ public sealed partial class ShellViewModel
             return;
         }
 
+        // ROM: o emulador do sistema com a linha de comando montada (ADR-0024); o resto, o próprio jogo.
+        if (GameStartInfo(game, effective) is not { } start)
+        {
+            Session = SessionState.Browsing; // nenhum emulador serve mais (ex.: desinstalado): nada mudou
+            await RestoreGameScreenAsync().ConfigureAwait(true);
+            _environment.Discard();
+            return;
+        }
+
         Process? process;
         try
         {
-            process = Process.Start(new ProcessStartInfo(game.LaunchTarget!)
-            {
-                UseShellExecute = true,
-                Arguments = effective.Arguments(game.LaunchArguments),
-                WorkingDirectory = game.WorkingDirectory ?? string.Empty,
-            });
+            process = Process.Start(start);
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException)
         {
@@ -87,7 +91,7 @@ public sealed partial class ShellViewModel
 
         var launchedAt = _time.GetUtcNow();
         int? root = RootProcessId(process);
-        var plan = GameTracking.Plan(game, root is not null);
+        var plan = TrackingFor(game, root);
         Library.RecordLaunch(game.Id);
         if (plan.Strategy == GameTrackingStrategy.None)
         {
@@ -110,10 +114,10 @@ public sealed partial class ShellViewModel
         _monitor ??= new GameProcessMonitor(_time);
         _monitor.Start(tracker, OnRealGameStatusChanged, _devices.SteamRunningAppId);
         // Contador de FPS (filtra os processos do jogo, que mudam: launcher → jogo) e limite escolhido na Central.
-        SessionTools.BeginSession(GameExecutables.FromLaunchTarget(game.LaunchTarget), () => _monitor?.Tracker?.GameProcessIds.ToArray() ?? [], ToolChoices(effective));
+        SessionTools.BeginSession(GameExecutables.FromLaunchTarget(start.FileName), () => _monitor?.Tracker?.GameProcessIds.ToArray() ?? [], ToolChoices(effective));
         BeginSessionDevices(game, steps.Devices, tvReady); // TV (se ainda não ligou) e saída de áudio (MVP-002) em segundo plano
         LogRealSessionStarted(_logger, game.Id, plan.Strategy);
-        Toast(steps.Note ?? (tracker.Status == GameRunStatus.Running
+        Toast(steps.Note ?? EmulatorStartedNote(game) ?? (tracker.Status == GameRunStatus.Running
             ? $"Jogando {game.Title} · o Tako espera você voltar"
             : $"Abrindo {game.Title}{LaunchVia(game)} · aguardando o jogo iniciar"));
         CurrentPage.Refresh();
@@ -252,6 +256,7 @@ public sealed partial class ShellViewModel
         }
 
         RunningGame = null;
+        _runningEmulator = null;
     }
 
     /// <summary>"Voltar ao jogo" com um jogo real: traz a janela dele para frente, quando há uma.</summary>

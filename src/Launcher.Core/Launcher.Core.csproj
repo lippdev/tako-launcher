@@ -5,6 +5,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Tabela de emuladores, cores do RetroArch, pastas por sistema e BIOS conhecidas (EMU-001, ADR-0024). -->
+    <EmbeddedResource Include="Emulation\emulators.json" LogicalName="Launcher.Core.Emulation.emulators.json" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\ConsoleMode.Runtime\ConsoleMode.Runtime.csproj" />
   </ItemGroup>
 </Project>

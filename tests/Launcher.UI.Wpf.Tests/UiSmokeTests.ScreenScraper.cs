@@ -13,7 +13,7 @@ public sealed partial class UiSmokeTests
     /// <summary>
     /// ADR-0022: Configurações › Dados de ROMs (ScreenScraper) e ROM no "Adicionar jogo". A sobreposição tem o passo a
     /// passo; "Testar" sem conta avisa o que falta; conta errada dá mensagem clara; conta certa mostra nível e cota; Salvar
-    /// liga. A ROM pede o sistema, preenche a plataforma e não abre. "Testar" é simulado e não há provedores registrados:
+    /// liga. A ROM pede o sistema e preenche a plataforma; sem emulador, Jogar explica como configurar (ADR-0024). "Testar" é simulado e não há provedores registrados:
     /// o CI nunca fala com o ScreenScraper.
     /// </summary>
     private static void ScreenScraperDataSettings(ShellViewModel shell, MainWindow window, MetadataService metadata)
@@ -103,11 +103,14 @@ public sealed partial class UiSmokeTests
         var details = Assert.IsType<DetailsViewModel>(shell.CurrentPage);
         Assert.Equal("Lanterna Distante", details.Game.Title);
         Assert.Equal("snes", details.Game.Game.Platform);
-        Assert.Equal("Abrir no emulador (em breve)", details.PrimaryLabel);
+        Assert.Equal("Jogar", details.PrimaryLabel); // abre pelo emulador do sistema (ADR-0024)
         Assert.Contains(details.Stats, s => s.Label == "Sistema" && s.Value == "SNES");
         Snap(window, "80-detalhes-rom");
         details.PrimaryCommand.Execute(null);
-        Assert.Equal(ShellViewModel.RomLaunchNotice, shell.ToastMessage);
+        var noEmulator = Assert.IsType<DialogViewModel>(shell.TopOverlay); // o CI não tem emulador: explica como configurar
+        Assert.Equal("Nenhum emulador para SNES", noEmulator.Title);
+        Assert.Equal("Configurar emulação", noEmulator.Actions[0].Label);
+        shell.CloseOverlay(noEmulator);
         Assert.Null(shell.RunningGame);
         shell.Library.RemoveManual(details.Game.Id);
         Pump(0.3);

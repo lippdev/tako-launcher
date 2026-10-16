@@ -216,6 +216,7 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
         [GameStore.Gog] = Frozen("#7A3FD1"), // store-gog (DESIGN.md)
         [GameStore.Xbox] = Frozen("#107C10"),
         [GameStore.Manual] = Frozen("#3D5A80"),
+        [GameStore.Emulation] = Frozen(Core.Emulation.EmulationLibrarySource.Accent),
     };
 
     private static SolidColorBrush Frozen(string hex)

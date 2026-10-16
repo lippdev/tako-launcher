@@ -27,7 +27,7 @@ public sealed record ManualGameRecord
 
     /// <summary>
     /// Sistema da ROM ("snes", "ps2"; ver <see cref="Metadata.ScreenScraper.ScreenScraperSystems"/>): o arquivo é uma ROM,
-    /// não um executável. Nulo = jogo de PC. A ROM ainda não abre pelo Tako (épico EMU), só ganha os dados (ADR-0022).
+    /// não um executável. Nulo = jogo de PC. A ROM abre pelo emulador do sistema (ADR-0022/0024).
     /// </summary>
     public string? Platform { get; init; }
 

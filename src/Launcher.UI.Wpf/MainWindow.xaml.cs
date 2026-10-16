@@ -354,7 +354,7 @@ public partial class MainWindow : Window
         }
 
         // Atalho da Central (combinação segurada), com o Tako na frente ou atrás; e a tela de captura do atalho.
-        if (HandleControlCenterChord(snapshot?.Buttons ?? GamepadButtons.None))
+        if (HandleControlCenterChord(snapshot?.Buttons ?? GamepadButtons.None) || HandleEmulatorExitChord(snapshot?.Buttons ?? GamepadButtons.None))
         {
             return;
         }

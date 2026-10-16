@@ -18,6 +18,7 @@
         <ResourceDictionary Source="Resources/GameScreenViews.xaml" />
         <ResourceDictionary Source="Resources/GameOptionsViews.xaml" />
         <ResourceDictionary Source="Resources/SettingsViews.xaml" />
+        <ResourceDictionary Source="Resources/EmulationViews.xaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

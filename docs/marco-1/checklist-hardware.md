@@ -449,7 +449,7 @@ ao ScreenScraper.
 | SS3 | Testar com erros | Senha errada; depois sem internet | Mensagens diferentes e claras; nada é salvo |
 | SS4 | Testar e salvar | Conta certa › Testar › Salvar | "Tudo certo: conta …, nível …, N de M consultas restam hoje"; ao salvar, "ScreenScraper ligado"; linha "Ligado · sua conta" |
 | SS5 | Conta protegida | Abrir `%LOCALAPPDATA%\Tako\screenscraper.dat` no Bloco de Notas; reabrir a tela | Começa com `dpapi:` e não mostra usuário nem senha; o campo da senha vem vazio com "já salva" |
-| SS6 | Adicionar ROM | Adicionar jogo › escolher um `.sfc` | Pergunta "De qual sistema…" com SNES primeiro; título sem "(USA)"; detalhes com "Sistema: SNES" e botão "Abrir no emulador (em breve)", que só explica |
+| SS6 | Adicionar ROM | Adicionar jogo › escolher um `.sfc` | Pergunta "De qual sistema…" com SNES primeiro; título sem "(USA)"; detalhes com "Sistema: SNES" e botão "Jogar" (abre pelo emulador do sistema; sem emulador, explica como configurar, seção 25) |
 | SS7 | Casamento pelo hash | ROM de cartucho reconhecida | Nome brasileiro quando houver, sinopse em português (senão inglês), caixa como capa, fanart/captura no fundo, "Jogadores", nota "Crítica"; Opções mostra "ScreenScraper + IGDB" |
 | SS8 | .zip e arcade | `.zip` com um cartucho (sistema SNES) e um `.zip` do MAME (sistema Arcade) | Os dois casam pelo hash; anotar se algum só casou pelo nome |
 | SS9 | ISO grande e .chd | ISO de PS2 (> 64 MB) e um `.chd` de PS1 | A tela não trava durante o hash; anotar se a ISO casa só com CRC e se o `.chd` casa pelo nome; reabrir o Tako não lê a ISO de novo (`cache\rom-hashes.json`) |
@@ -501,6 +501,33 @@ escala do Windows em 100% e em 150–200%. Um jogo com arte clara em foco ajuda 
 | MC3 | Assistente sem confirmar | Repetir MC2 sem responder (ou com B) | Em 15 s as telas voltam; o passo diz que não foi confirmado e oferece tentar de novo ou pular |
 | MC4 | Tela desconectada | Desligar a TV escolhida e abrir o Modo Console | Cartão Tela de jogo "Com problema" dizendo que a tela não está conectada |
 | MC5 | Contador de FPS | Modo Console › Contador de FPS com o controle e depois com teclado e mouse | Com o controle "Mostrar FPS" e "Remover a permissão" ficam esmaecidas e explicam; com teclado e mouse pedem o UAC (seção 14) |
+
+## 25. Emulação (épico EMU, [ADR-0024](../adr/0024-emulacao.md))
+
+Precisa de emuladores instalados de jeitos diferentes e de **jogos seus, obtidos legalmente** (o Tako não baixa
+emuladores, BIOS nem ROMs): RetroArch (instalador ou zip) com pelo menos os cores Snes9x e SwanStation (ou Beetle PSX),
+um emulador pelo Scoop ou winget (ex.: DuckStation, PCSX2, PPSSPP), Dolphin pelo instalador e, se der, Ryujinx/Eden,
+Cemu, xemu, Xenia, melonDS, mGBA, Flycast, MAME e Vita3K. ROMs: uma pasta com subpastas (`snes`, `psx`, `ps2`, `gc`,
+`arcade`), um jogo de PS1 em `.cue` + `.bin`, um de vários discos com `.m3u` e um com "(Disc 1)"/"(Disc 2)" soltos.
+Anexe `logs\tako-AAAAMMDD.log` (linhas "Emuladores encontrados", "ROM … aberta no emulador" e "Saindo do emulador").
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| EM1 | Detecção | Configurações › Emulação › Emuladores | Cada emulador instalado aparece com a origem certa (pasta padrão, Scoop, winget, aplicativo instalado); o RetroArch lista os cores instalados. Anotar o caminho de qualquer um que não foi achado |
+| EM2 | Indicar à mão | "Indicar onde está um emulador" para um que não foi achado (ex.: zip numa pasta qualquer) | Escolher o .exe faz ele aparecer como "Escolhido por você"; "Voltar a procurar sozinho" esquece |
+| EM3 | Assistente | Configurações › Emulação › Configurar emulação, só com o controle | Lista os emuladores; "Escolher pasta" abre o seletor do Windows (anotar se dá para usar com o controle); mostra quem abre cada sistema e as BIOS faltando; "Tudo pronto" com o número de jogos |
+| EM4 | Pastas e multi-disco | Adicionar a pasta raiz com subpastas | Pergunta "Usar as subpastas"; a fonte Emulação aparece na barra lateral; `.cue` vira um jogo (sem os `.bin`), `.m3u` vira um jogo (sem os discos), "(Disc 1)/(Disc 2)" viram um jogo com "2 discos"; pastas `media`/`bios` ignoradas |
+| EM5 | Procurar de novo | Copiar uma ROM nova para uma subpasta › "Procurar emuladores e ROMs" | O jogo novo aparece; favoritos e tempo dos outros continuam; numa pasta grande, a segunda leitura é bem mais rápida (`cache\rom-scan.json`) |
+| EM6 | Abrir no RetroArch | SNES pelo RetroArch · Snes9x | Abre em tela cheia com `-L <core> "<rom>" -f` (ver o log); Central de Controle, contador de FPS, tela de jogo e áudio funcionam como num jogo de PC; ao fechar o RetroArch, "Bem-vindo de volta" com o tempo e o foco no mesmo jogo |
+| EM7 | Abrir nos standalone | Um jogo em cada emulador instalado (DuckStation, PCSX2, Dolphin, PPSSPP, Cemu, Ryujinx/Eden, xemu, Xenia, melonDS, mGBA, Flycast, MAME, Vita3K) | Cada um abre o jogo direto, em tela cheia quando o emulador aceita, e a sessão termina quando ele fecha. Anotar qual argumento da tabela (`emulators.json`) não funcionou na versão instalada |
+| EM8 | Sair pelo controle | No jogo, segurar View + Menu (Select + Start; Create + Options no DualSense) por meio segundo | O emulador fecha (pela janela ou pela tecla de sair dele) e o Tako volta com o foco; se não fechar em ~6 s, o Tako pergunta "… não fechou" com "Encerrar o emulador" e "Voltar ao jogo" |
+| EM9 | Atalhos do RetroArch | Configurações › Emulação › Atalhos do RetroArch; depois segurar Select + Start no RetroArch com o Tako desligado | `retroarch.cfg.tako-backup` criado ao lado do `retroarch.cfg`; só `input_quit_gamepad_combo` e `quit_press_twice` mudaram (se você já tinha mudado, ficam os seus); Select + Start fecha o RetroArch sozinho |
+| EM10 | Emulador por sistema e por jogo | Emulador de cada sistema › PS1 › RetroArch · SwanStation; depois um jogo › Opções › Emulador deste jogo › DuckStation | O sistema passa a abrir no RetroArch; o jogo escolhido continua no DuckStation; os detalhes mostram "Emulador" certo |
+| EM11 | Argumentos | Editor de argumentos de um emulador, de um sistema e de um jogo, só com o controle | Os marcadores entram com A; a prévia mostra a linha de comando; "{x}" desconhecido não salva; "Padrão" volta ao da tabela |
+| EM12 | .cfg do jogo | Opções › Configuração do RetroArch deste jogo › um `.cfg` com `video_shader_enable = "true"` | O RetroArch abre com `--appendconfig` e a opção vale só nesse jogo |
+| EM13 | BIOS faltando | Tirar a BIOS do PS1 da pasta `system` do RetroArch (ou do DuckStation) e abrir um jogo de PS1 | Antes de abrir: "… pode precisar de BIOS" com a pasta exata; "Abrir mesmo assim" abre; Configurações › Emulação › BIOS mostra o que falta |
+| EM14 | Sistema sem emulador | Jogo de um sistema sem emulador instalado (ex.: Dreamcast) | "Nenhum emulador para Dreamcast" explicando quais instalar, com "Configurar emulação" |
+| EM15 | Capas e filtro | ScreenScraper e/ou IGDB ligados; biblioteca › Emulação › Filtros | As ROMs ganham capa e dados pelo sistema; a seção "Sistema" filtra por console |
 
 ## Resultados
 

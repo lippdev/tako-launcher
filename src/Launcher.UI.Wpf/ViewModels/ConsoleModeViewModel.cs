@@ -124,10 +124,12 @@ public sealed partial class ConsoleModeViewModel : RowsPageViewModel
 }
 
 /// <summary>
-/// Detalhe de um recurso do Modo Console: o cartão do recurso no topo (com o estado) e as linhas dele. B volta aos
-/// cartões, com o foco no cartão de origem.
+/// Detalhe de um recurso do Modo Console (ou de uma página de Configurações › Emulação): o cartão do recurso no topo
+/// (com o estado) e as linhas dele. B volta à página de origem, com o foco no item de origem.
 /// </summary>
-public sealed class SettingsDetailViewModel(ShellViewModel shell, SettingRowViewModel feature, IReadOnlyList<SettingRowViewModel> rows, Action? beforeRefresh = null) : RowsPageViewModel(shell)
+/// <param name="overline">Texto acima do título (padrão "Modo Console").</param>
+/// <param name="routeKey">Item da barra lateral marcado (padrão o Modo Console).</param>
+public sealed class SettingsDetailViewModel(ShellViewModel shell, SettingRowViewModel feature, IReadOnlyList<SettingRowViewModel> rows, Action? beforeRefresh = null, string? overline = null, string? routeKey = null) : RowsPageViewModel(shell)
 {
     public SettingRowViewModel Feature { get; } = feature;
 
@@ -135,7 +137,9 @@ public sealed class SettingsDetailViewModel(ShellViewModel shell, SettingRowView
 
     public override string Title => Feature.Title;
 
-    public override string RouteKey => ConsoleModeViewModel.Route;
+    public string Overline { get; } = overline ?? "Modo Console";
+
+    public override string RouteKey => routeKey ?? ConsoleModeViewModel.Route;
 
     public override string? DefaultFocusKey => Rows.FirstOrDefault(r => r.IsShown && !r.IsHeader)?.Key;
 

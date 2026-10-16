@@ -12,9 +12,6 @@ namespace Launcher.UI.Wpf.ViewModels;
 /// </summary>
 public sealed partial class ShellViewModel
 {
-    /// <summary>ROMs ainda não abrem pelo Tako: o épico EMU traz os emuladores.</summary>
-    public const string RomLaunchNotice = "Abrir jogos de emulador chega numa próxima versão. Por enquanto o Tako mostra os dados e as artes da ROM.";
-
     /// <summary>"Indisponível nesta versão", "Desligado", "Ligado · sua conta", "Ligado · falta a conta" ou "Pausado · cota do dia".</summary>
     public string ScreenScraperSummary => (_metadata.HasScreenScraperAccess, _metadata.ScreenScraperSettings, _metadata.ScreenScraperPause) switch
     {
@@ -63,7 +60,7 @@ public sealed partial class ShellViewModel
 
     /// <summary>
     /// "Adicionar jogo" com uma ROM (ADR-0022): pergunta o sistema (os prováveis pela extensão primeiro; "Outro sistema"
-    /// lista todos), grava <see cref="Game.Platform"/> e mostra os detalhes. O jogo não abre: falta o emulador (épico EMU).
+    /// lista todos), grava <see cref="Game.Platform"/> e mostra os detalhes. O jogo abre pelo emulador do sistema (ADR-0024).
     /// </summary>
     internal void AddRom(string path)
     {
@@ -103,7 +100,7 @@ public sealed partial class ShellViewModel
         actions.Add(new OverlayAction("Cancelar", ActionStyle.Secondary, new RelayCommand(() => CloseOverlay(dialog!))));
         dialog = new DialogViewModel(
             "De qual sistema é este jogo?",
-            $"{System.IO.Path.GetFileName(path)}\nO Tako usa o sistema para achar os dados e as artes. Abrir pelo emulador chega numa próxima versão.",
+            $"{System.IO.Path.GetFileName(path)}\nO Tako usa o sistema para achar os dados, as artes e o emulador que abre o jogo.",
             actions);
         PushOverlay(dialog);
     }
