@@ -119,6 +119,14 @@ fn launchable_exists(path: &str) -> bool {
     p.is_file() || (p.is_dir() && p.extension().is_some_and(|e| e.eq_ignore_ascii_case("app")))
 }
 
+/// Jogo adicionado quebrado (LIB-004): o arquivo que o abre ou a pasta de trabalho sumiu. URI de loja não é
+/// verificada. Lê o disco: rode fora da thread da UI.
+pub fn is_broken(path: &str, working_directory: Option<&str>) -> bool {
+    !is_uri(path)
+        && (!launchable_exists(path)
+            || working_directory.is_some_and(|d| !d.trim().is_empty() && !Path::new(d).is_dir()))
+}
+
 fn parent_dir(path: &str) -> Option<String> {
     if is_uri(path) {
         return None;
@@ -209,6 +217,19 @@ mod tests {
                 .to_game()
                 .is_installed
         );
+    }
+
+    #[test]
+    fn broken_means_missing_file_or_folder_but_never_a_uri() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("jogo.sh");
+        std::fs::write(&exe, b"x").unwrap();
+        let (exe, folder) = (exe.to_str().unwrap(), dir.path().to_str().unwrap());
+        assert!(!is_broken(exe, Some(folder)));
+        assert!(!is_broken(exe, None));
+        assert!(is_broken(exe, Some("/nao/existe")));
+        assert!(is_broken("/nao/existe/jogo.sh", Some(folder)));
+        assert!(!is_broken("steam://rungameid/570", Some("/nao/existe")));
     }
 
     #[test]

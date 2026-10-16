@@ -195,6 +195,8 @@ pub struct Ctx {
     pub art_pins: std::sync::Arc<std::sync::Mutex<HashMap<String, ArtPins>>>,
     /// Fontes de metadados ligadas e a fila; `None` até `metadata::start_metadata` (e no `--simulate`).
     pub metadata: Option<std::rc::Rc<crate::metadata::Metadata>>,
+    /// Versão da biblioteca da última verificação de jogos quebrados (LIB-004).
+    pub broken_checked: Option<u64>,
 }
 
 pub type ArtPins = std::collections::BTreeMap<tako_core::library::ArtKind, String>;
@@ -231,6 +233,42 @@ impl Ctx {
         } = self;
         collections.apply_to(library.games_mut());
         self.dirty = true;
+    }
+
+    /// A biblioteca mudou: verifica fora da UI se o arquivo ou a pasta dos jogos adicionados sumiu (LIB-004).
+    /// Jogos que abrem por URI de loja ficam de fora.
+    pub fn check_broken(&mut self) {
+        let version = self.library.version();
+        if self.broken_checked == Some(version) {
+            return;
+        }
+        self.broken_checked = Some(version);
+        let targets: Vec<(String, String, Option<String>)> = self
+            .library
+            .games()
+            .iter()
+            .filter(|g| g.store() == tako_core::library::GameStore::Manual)
+            .filter_map(|g| {
+                let target = g.launch_target.clone()?;
+                Some((g.id.clone(), target, g.working_directory.clone()))
+            })
+            .collect();
+        crate::tasks::run(
+            self,
+            move || {
+                targets
+                    .into_iter()
+                    .filter(|(_, t, d)| tako_core::library::manual::is_broken(t, d.as_deref()))
+                    .map(|(id, ..)| id)
+                    .collect::<std::collections::HashSet<_>>()
+            },
+            |ctx, broken| {
+                for g in ctx.library.games_mut() {
+                    g.is_broken = broken.contains(&g.id);
+                }
+                ctx.dirty = true;
+            },
+        );
     }
 
     pub fn effect(&mut self, e: Effect) {

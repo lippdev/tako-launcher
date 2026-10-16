@@ -488,6 +488,7 @@ impl Shell {
     /// Calcula todas as propriedades do tema para este instante.
     pub fn render(&mut self, now: Instant) -> Out {
         let mut out = Out::default();
+        self.ctx.check_broken();
         if let Some((_, at)) = &self.ctx.toast
             && now.duration_since(*at) >= TOAST_TIME
         {

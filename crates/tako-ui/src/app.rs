@@ -179,6 +179,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pinned_ids: Default::default(),
         art_pins: Default::default(),
         metadata: None,
+        broken_checked: None,
     };
     ctx.sync_collections();
     ctx

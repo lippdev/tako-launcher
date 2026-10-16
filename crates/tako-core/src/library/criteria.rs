@@ -27,6 +27,7 @@ pub struct LibraryFacts {
     pub title: String,
     pub is_installed: bool,
     pub is_favorite: bool,
+    pub is_broken: bool,
     /// Fonte como aparece para o usuário ("Steam", "Adicionado").
     pub source: String,
     pub genres: Vec<String>,
@@ -46,6 +47,7 @@ impl LibraryFacts {
             title: game.title.clone(),
             is_installed: game.is_installed,
             is_favorite: game.is_favorite,
+            is_broken: game.is_broken,
             source: game_text::store_name(i18n::lang(), game.store()),
             genres: game.genres.clone(),
             last_played_at: game.last_played_at,
@@ -65,6 +67,8 @@ pub struct LibraryCriteria {
     pub favorites_only: bool,
     /// Só jogos já jogados (a mesma regra da fileira "Jogados recentemente" da Início).
     pub played_only: bool,
+    /// Só jogos adicionados cujo arquivo ou pasta sumiu (LIB-004).
+    pub broken_only: bool,
     /// Valores comparados sem diferenciar maiúsculas.
     pub sources: BTreeSet<String>,
     pub genres: BTreeSet<String>,
@@ -105,6 +109,7 @@ impl LibraryCriteria {
         usize::from(self.install != InstallFilter::Any)
             + usize::from(self.favorites_only)
             + usize::from(self.played_only)
+            + usize::from(self.broken_only)
             + self.sources.len()
             + self.genres.len()
             + self.collections.len()
@@ -139,6 +144,7 @@ impl LibraryCriteria {
         }
         (!self.favorites_only || game.is_favorite)
             && (!self.played_only || game.last_played_at.is_some())
+            && (!self.broken_only || game.is_broken)
             && (self.sources.is_empty() || self.has_source(&game.source))
             && (self.genres.is_empty() || game.genres.iter().any(|g| self.has_genre(g)))
             && (self.collections.is_empty()

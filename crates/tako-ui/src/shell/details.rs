@@ -45,6 +45,8 @@ pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
         ctx.effect(Effect::ResumeGame);
     } else if ctx.running.is_some() {
         return Nav::Layer(Box::new(dialogs::other_game_running(ctx, &g.id)));
+    } else if g.is_broken {
+        return Nav::Layer(Box::new(dialogs::broken_game(ctx, &g.id)));
     } else if g.can_play() {
         ctx.effect(Effect::Launch(g.id.clone()));
     } else if g.is_upcoming() || g.is_rom() {
@@ -175,7 +177,9 @@ impl Page for DetailsPage {
         if let Some(d) = &g.developer {
             meta.push(d.clone());
         }
-        let hint = if g.description.is_empty()
+        let hint = if g.is_broken {
+            ctx.t("game.broken_text")
+        } else if g.description.is_empty()
             && !super::settings::metadata::providers(ctx).igdb.enabled
         {
             ctx.t("details.metadata_hint")

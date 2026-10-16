@@ -215,6 +215,9 @@ pub struct Game {
 
     pub added_at: Option<DateTime<Utc>>,
     pub is_favorite: bool,
+    /// Jogo adicionado cujo arquivo ou pasta sumiu (LIB-004); a UI preenche depois de verificar o disco.
+    #[serde(default)]
+    pub is_broken: bool,
     pub last_played_at: Option<DateTime<Utc>>,
     #[serde(with = "duration_secs")]
     pub play_time: Duration,
