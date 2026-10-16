@@ -13,7 +13,7 @@ public sealed record UpdateInfo(string Version, string Name, string Notes, strin
 /// <summary>Escolhe a atualização na lista de releases do GitHub (puro, testável). Mesmas regras do Console Mode.</summary>
 public static class ReleaseFeed
 {
-    public const string Repository = "lippdev/ultralauncher";
+    public const string Repository = "lippdev/tako-launcher";
     public const string SetupAssetPrefix = "Tako-Setup";
     public const string PortableAssetPrefix = "Tako-Portable";
 

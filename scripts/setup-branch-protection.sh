@@ -9,7 +9,7 @@
 # Atenção: com isto ativo, a PR de um mantenedor só pode ser mergeada depois da aprovação do outro.
 set -euo pipefail
 
-REPO="${REPO:-lippdev/ultralauncher}"
+REPO="${REPO:-lippdev/tako-launcher}"
 
 for BRANCH in main develop; do
   echo "Protegendo $REPO@$BRANCH..."

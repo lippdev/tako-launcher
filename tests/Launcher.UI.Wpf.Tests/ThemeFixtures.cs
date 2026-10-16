@@ -49,7 +49,7 @@ internal static class ThemeFixtures
             if (!File.Exists(file) || Hash(file) != theme.Sha256)
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
-                http.DefaultRequestHeaders.UserAgent.ParseAdd("Tako-CI/0.1 (+https://github.com/lippdev/ultralauncher)");
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("Tako-CI/0.1 (+https://github.com/lippdev/tako-launcher)");
                 byte[] bytes = http.GetByteArrayAsync(theme.Package).GetAwaiter().GetResult();
                 File.WriteAllBytes(file, bytes);
             }

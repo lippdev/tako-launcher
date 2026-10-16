@@ -9,7 +9,7 @@
 
 | | UltraLauncher | Console Mode |
 |---|---|---|
-| Repositório | `lippdev/ultralauncher` (público) | `lippdev/consolemode` (público) |
+| Repositório | `lippdev/tako-launcher` (público) | `lippdev/consolemode` (público) |
 | Licença | MIT (`LICENSE`, © Filipe Moreira) | AGPL-3.0-only |
 | Autores com commits (out/2026) | lippdev, nextestudios | lippdev (241), nextestudios (16) e bots (codex, dependabot, pullfrog) |
 

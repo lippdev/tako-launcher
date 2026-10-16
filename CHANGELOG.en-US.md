@@ -1,8 +1,10 @@
 # Changelog
 
-English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
+English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Every change goes under `## [Unreleased]` in **both** files. Alphas and betas use those notes; for a stable release, rename `## [Unreleased]` to `## [X.Y.Z]` before merging into `main`. The workflow publishes the notes (this file's, with a link to the Portuguese one) and fails if either file is missing them (see CONTRIBUTING.md, section 8).
 
 ## [Unreleased]
+### For developers
+- **Automated releases:** every merge into `main` publishes the stable version at the top of the changelog; alphas and betas ship from `develop` via Actions › Release › Run workflow, numbered automatically. The workflow already has the Linux (deb, AppImage, tar.gz) and macOS (Apple Silicon and Intel) packages, turned off until there is a cross-platform front-end. The repository is now `lippdev/tako-launcher`.
 
 ## [0.1.0-alpha.10]
 ### What's new

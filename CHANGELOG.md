@@ -1,8 +1,10 @@
 # Histórico de alterações
 
-Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
+Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Cada mudança entra em `## [Unreleased]` **nos dois arquivos**. Alphas e betas usam essas notas; para a estável, troque `## [Unreleased]` por `## [X.Y.Z]` antes do merge em `main`. O workflow publica as notas na release (em inglês, com link para esta) e falha se faltarem em algum dos dois (ver CONTRIBUTING.md, seção 8).
 
 ## [Unreleased]
+### Para desenvolvedores
+- **Releases automáticas:** cada merge em `main` publica a estável do topo do changelog; alphas e betas saem da `develop` por Actions › Release › Run workflow, com o número calculado sozinho. O workflow já tem os pacotes de Linux (deb, AppImage, tar.gz) e macOS (Apple Silicon e Intel), desligados até existir um front-end multiplataforma. O repositório agora é `lippdev/tako-launcher`.
 
 ## [0.1.0-alpha.10]
 ### Novidades

@@ -129,7 +129,7 @@ public partial class App : Application
         {
             var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
             // CDNs e APIs exigem User-Agent identificável.
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("Tako/0.1 (+https://github.com/lippdev/ultralauncher)");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Tako/0.1 (+https://github.com/lippdev/tako-launcher)");
             return http;
         });
         services.AddSingleton<SteamArtResolver>();

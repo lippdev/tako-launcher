@@ -17,7 +17,7 @@ public class UpdateTests
             name = "Tako " + r.Tag.TrimStart('v'),
             draft = r.Draft,
             prerelease = r.Pre,
-            html_url = $"https://github.com/lippdev/ultralauncher/releases/tag/{r.Tag}",
+            html_url = $"https://github.com/lippdev/tako-launcher/releases/tag/{r.Tag}",
             body = "### What's new\n- **Your real library**: Steam games show up by themselves. (#13)\n- Other.",
             assets = new object[]
             {
@@ -75,7 +75,7 @@ public class UpdateTests
         var update = ReleaseFeed.Pick(Releases(("v0.2.0", false, false, false)), SemVer.Parse("0.1.0"), false, true)!;
 
         Assert.False(update.CanInstall);
-        Assert.Equal("https://github.com/lippdev/ultralauncher/releases/tag/v0.2.0", update.PageUrl);
+        Assert.Equal("https://github.com/lippdev/tako-launcher/releases/tag/v0.2.0", update.PageUrl);
     }
 
     [Fact]

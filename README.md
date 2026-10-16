@@ -12,7 +12,7 @@ Launcher de jogos para Windows 11 com experiência de console: gamepad-first, te
 
 ## Baixar
 
-Na [página de releases](https://github.com/lippdev/ultralauncher/releases), no mesmo formato do Console Mode:
+Na [página de releases](https://github.com/lippdev/tako-launcher/releases), no mesmo formato do Console Mode:
 - **Instalador:** `Tako-Setup-x64.exe` — instala para o seu usuário (sem administrador), com atalho no Menu Iniciar; dados em `%LOCALAPPDATA%\Tako`.
 - **Portátil:** `Tako-Portable-x64.exe` — um único executável; guarda os dados na pasta `Tako_Data` ao lado do arquivo.
 

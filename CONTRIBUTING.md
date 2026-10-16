@@ -16,10 +16,10 @@ Fonte de verdade de como trabalhamos. Contexto de produto: [`docs/PRD.md`](docs/
 Regras:
 
 1. **Nunca** commitar direto em `main` ou `develop`; tudo entra por Pull Request.
-2. `feature/*` → `develop`: **squash merge**. `release/*` e `hotfix/*` → `main`: **merge commit** (`--no-ff`), depois tag e merge de volta em `develop`.
+2. `feature/*` → `develop`: **squash merge**. `release/*` e `hotfix/*` → `main`: **merge commit** (`--no-ff`), depois merge de volta em `develop` (a tag sai pelo workflow de release).
 3. Branches de feature vivem poucos dias; histórias grandes são quebradas. Faça rebase em `develop` antes do PR.
 4. Apague a branch após o merge.
-5. Tags: `vMAJOR.MINOR.PATCH` (SemVer; pré-lançamentos `-alpha.N`, `-beta.N`, `-rc.N`). Builds `-alpha.N` para teste podem ser marcadas direto em `develop`; `beta`, `rc` e versões finais saem de `release/*` → `main`. Releases seguem o processo do Console Mode (seção 8).
+5. Tags: `vMAJOR.MINOR.PATCH` (SemVer; pré-lançamentos `-alpha.N` e `-beta.N`). Ninguém cria tag à mão: o workflow de release cria. Alphas e betas saem da `develop` quando um dev pede; versões finais saem a cada merge em `main` (seção 8).
 
 ## 2. Commits — Conventional Commits
 
@@ -71,16 +71,24 @@ Vale a DoD do [PRD §13](docs/PRD.md); o checklist está no template de PR.
 
 ## 8. Releases
 
-SemVer, `0.x` durante o MVP. Fluxo: `develop` → `release/X.Y.Z` → PR para `main` → tag → merge de volta em `develop`. O processo e os arquivos são os mesmos do Console Mode:
+SemVer, `0.x` durante o MVP. Tudo é feito pelo `.github/workflows/release.yml`; as regras de versão ficam em `build/resolve-release.sh` (roda também no Mac/Linux para conferir antes).
 
-1. Adicione a seção `## [X.Y.Z]` (ou `## [X.Y.Z-alpha.N]`) **nos dois changelogs**: `CHANGELOG.md` (português) e `CHANGELOG.en-US.md` (inglês). Um `(#NN)` no fim do item vira link para a PR. O workflow falha se faltar alguma seção.
-2. Publique de um destes jeitos (versão com hífen = pré-release):
-   - push de uma tag `vX.Y.Z` / `vX.Y.Z-alpha.N`; ou
-   - Actions › Release › Run workflow na `main`, com a versão e "publish" marcado (a tag é criada ali). Sem "publish", só gera os arquivos como artefato.
-3. A release sai com o nome `Tako X.Y.Z`, notas em inglês tiradas do `CHANGELOG.en-US.md` mais o link para o changelog em português, e os arquivos `Tako-Setup-x64.exe` (instalador Inno Setup, por usuário) e `Tako-Portable-x64.exe` (um único .exe; dados em `Tako_Data` ao lado). O kit do spike FSE (`Tako-FseKit-x64.zip`) acompanha enquanto o MVP-007 estiver aberto.
-4. Assinatura (SignPath) e envio ao winget ficam prontos no workflow e ligam quando as variáveis/segredos existirem (`SIGNPATH_*`, `WINGET_TOKEN`).
+**Notas.** Cada item novo entra em `## [Unreleased]` **nos dois changelogs**: `CHANGELOG.md` (português) e `CHANGELOG.en-US.md` (inglês). Um `(#NN)` no fim do item vira link para a PR. O workflow falha se faltarem notas em algum dos dois.
 
-Para gerar localmente: `.\build\Publish-Tako.ps1 -Runtime x64 -Target All -Version X.Y.Z`.
+**Alpha e beta (develop, quando pedir).** Actions › Release › Run workflow, branch `develop`, canal `alpha` ou `beta`. A versão sai sozinha: `X.Y.Z` do topo do changelog (o patch sobe se ela já saiu como estável) ou do campo `base_version`, e o número é o próximo depois das tags existentes (`0.2.0-alpha.3`, `0.2.0-beta.1`...). As notas vêm de `## [versão]`, se existir, ou de `## [Unreleased]`. Depois de uma beta, uma alpha da mesma base é recusada (seria mais antiga no SemVer e o app não a ofereceria).
+
+**Estável (main, automático).** Antes do PR para `main`, troque `## [Unreleased]` por `## [X.Y.Z]` nos dois changelogs (e deixe uma `## [Unreleased]` vazia acima). O merge em `main` publica `vX.Y.Z`. Sem seção estável no topo, ou com a tag já existente, o merge não publica nada; o motivo aparece no resumo do workflow. Se a publicação falhar no meio, rode o workflow na `main` com o canal `stable`.
+
+**Sem publicar.** Desmarque "publish" para só gerar os arquivos como artefato (vale em qualquer branch).
+
+**Arquivos.** A release sai com o nome `Tako X.Y.Z`, notas em inglês mais o link para o changelog em português, e uma lista de downloads por plataforma:
+
+- Windows: `Tako-Setup-x64.exe` (instalador Inno Setup, por usuário) e `Tako-Portable-x64.exe` (um único .exe; dados em `Tako_Data` ao lado). O kit do spike FSE (`Tako-FseKit-x64.zip`) acompanha enquanto o MVP-007 estiver aberto.
+- Linux (x64 e arm64): `.deb`, `.AppImage` e `.tar.gz`. macOS (Apple Silicon e Intel): `.dmg` e `.zip`. Ficam **desligados** enquanto a UI for só WPF: ligam quando existir a variável do repositório `TAKO_UNIX_PROJECT` com o `.csproj` de um front-end multiplataforma (opcionais: `TAKO_UNIX_FRAMEWORK`, padrão `net10.0`, e `TAKO_UNIX_EXECUTABLE`). Para testar o empacotamento antes, rode sem "publish" informando `unix_project`. No macOS a assinatura é ad hoc até existir uma conta Apple Developer (sem notarização).
+
+Assinatura no Windows (SignPath) e envio ao winget ficam prontos no workflow e ligam quando as variáveis/segredos existirem (`SIGNPATH_*`, `WINGET_TOKEN`).
+
+Para gerar localmente: `.\build\Publish-Tako.ps1 -Runtime x64 -Target All -Version X.Y.Z` (Windows) ou `build/publish-unix.sh <rid> X.Y.Z` com `TAKO_UNIX_PROJECT` definido (Linux/macOS).
 
 ## 9. Issues
 
