@@ -49,3 +49,326 @@ impl GameSettingsOverride {
         self.changed_count() == 0
     }
 }
+
+use super::audio::AudioOutputChoice;
+use super::screen::GameScreenSettings;
+use crate::devices::DisplayMode;
+
+/// Configurações do Tako que a sessão de jogo usa.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GlobalSessionSettings {
+    pub game_screen_enabled: bool,
+    /// Tela escolhida, mesmo com a tela de jogo desligada (um jogo pode pedir para usá-la).
+    pub game_screen_id: String,
+    pub game_screen_mode: Option<DisplayMode>,
+    pub game_screen_hdr: bool,
+    pub game_audio: Option<AudioOutputChoice>,
+}
+
+/// Por que o jogo pediu a tela de jogo e ela não pode ser usada.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameScreenProblem {
+    NoScreenChosen,
+}
+
+impl GameScreenProblem {
+    pub fn message(self) -> String {
+        match self {
+            GameScreenProblem::NoScreenChosen => crate::i18n::t("session.screen.none_chosen"),
+        }
+    }
+}
+
+/// O que vale na sessão deste jogo: o global com as escolhas do jogo por cima. FPS não entra (é do
+/// Console Mode).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EffectiveSessionSettings {
+    /// `None` = não usar a tela de jogo.
+    pub game_screen: Option<GameScreenSettings>,
+    pub game_screen_problem: Option<GameScreenProblem>,
+    pub game_audio: Option<AudioOutputChoice>,
+    pub extra_arguments: Option<String>,
+    pub working_directory: Option<String>,
+}
+
+impl EffectiveSessionSettings {
+    /// Argumentos do jogo seguidos dos extras deste jogo.
+    pub fn arguments(&self, game_arguments: Option<&str>) -> String {
+        join_arguments(game_arguments, self.extra_arguments.as_deref())
+    }
+}
+
+/// Ponto único onde a sessão decide o que vale: Configurações do Tako + deste jogo → efetivo.
+pub fn resolve(
+    global: &GlobalSessionSettings,
+    game: Option<&GameSettingsOverride>,
+) -> EffectiveSessionSettings {
+    let none = GameSettingsOverride::default();
+    let game = game.unwrap_or(&none);
+    let mut screen = None;
+    let mut problem = None;
+    if game.use_game_screen.unwrap_or(global.game_screen_enabled) {
+        if global.game_screen_id.trim().is_empty() {
+            // Só é problema quando o próprio jogo pediu; desligada no global e sem tela é o normal.
+            problem =
+                (game.use_game_screen == Some(true)).then_some(GameScreenProblem::NoScreenChosen);
+        } else {
+            let mode = match game.screen_mode.as_deref() {
+                None => global.game_screen_mode,
+                Some(GameSettingsOverride::KEEP_CURRENT_MODE) => None,
+                // Valor ilegível volta ao padrão.
+                Some(key) => DisplayMode::parse(key).or(global.game_screen_mode),
+            };
+            screen = Some(GameScreenSettings {
+                display_id: global.game_screen_id.clone(),
+                mode,
+                enable_hdr: game.hdr.unwrap_or(global.game_screen_hdr),
+            });
+        }
+    }
+    let game_audio = match game.audio_device_id.as_deref() {
+        None => global.game_audio.clone(),
+        Some(GameSettingsOverride::KEEP_AUDIO) => None,
+        Some(id) => {
+            let name = game
+                .audio_device_name
+                .as_deref()
+                .filter(|n| !n.trim().is_empty());
+            Some(AudioOutputChoice::new(id, name.unwrap_or(id)))
+        }
+    };
+    EffectiveSessionSettings {
+        game_screen: screen,
+        game_screen_problem: problem,
+        game_audio,
+        extra_arguments: normalize_arguments(game.extra_arguments.as_deref()),
+        working_directory: normalize_arguments(game.working_directory.as_deref()),
+    }
+}
+
+/// Junta argumentos com um espaço, ignorando os vazios.
+pub fn join_arguments(first: Option<&str>, second: Option<&str>) -> String {
+    [first, second]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .filter(|a| !a.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Texto digitado → sem espaços nas pontas; vazio vira `None`.
+pub fn normalize_arguments(text: Option<&str>) -> Option<String> {
+    text.map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(Into::into)
+}
+
+/// Combinações de tela + modo já confirmadas ("Você consegue ver esta tela?"), uma por linha, a mais
+/// recente primeiro (valor `GameScreenConfirmations` das configurações).
+pub mod game_screen_confirmations {
+    pub const MAX_REMEMBERED: usize = 8;
+
+    fn split(saved: Option<&str>) -> impl Iterator<Item = &str> {
+        saved
+            .unwrap_or_default()
+            .split('\n')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    }
+
+    /// `setup_key` quando já confirmada.
+    pub fn matching(saved: Option<&str>, setup_key: &str) -> Option<String> {
+        split(saved)
+            .any(|k| k.eq_ignore_ascii_case(setup_key))
+            .then(|| setup_key.to_owned())
+    }
+
+    /// Lembra a combinação confirmada, mantendo as [`MAX_REMEMBERED`] mais recentes.
+    pub fn remember(saved: Option<&str>, setup_key: &str) -> String {
+        let key = setup_key.trim();
+        if key.is_empty() {
+            return saved.unwrap_or_default().to_owned();
+        }
+        std::iter::once(key)
+            .chain(split(saved).filter(|k| !k.eq_ignore_ascii_case(key)))
+            .take(MAX_REMEMBERED)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    const TV_4K: DisplayMode = DisplayMode::new(3840, 2160, 120);
+
+    fn global() -> GlobalSessionSettings {
+        GlobalSessionSettings {
+            game_screen_enabled: true,
+            game_screen_id: r"\\.\DISPLAY2".into(),
+            game_screen_mode: Some(TV_4K),
+            game_screen_hdr: true,
+            game_audio: Some(AudioOutputChoice::new("{tv}", "TV (HDMI)")),
+        }
+    }
+
+    fn with(f: impl FnOnce(&mut GameSettingsOverride)) -> GameSettingsOverride {
+        let mut o = GameSettingsOverride::default();
+        f(&mut o);
+        o
+    }
+
+    #[test]
+    fn no_game_settings_means_the_global_ones() {
+        let e = resolve(&global(), None);
+        let screen = GameScreenSettings {
+            display_id: r"\\.\DISPLAY2".into(),
+            mode: Some(TV_4K),
+            enable_hdr: true,
+        };
+        assert_eq!(e.game_screen, Some(screen));
+        assert_eq!(e.game_screen_problem, None);
+        assert_eq!(e.game_audio, global().game_audio);
+        assert_eq!(e.extra_arguments, None);
+        assert_eq!(
+            e,
+            resolve(&global(), Some(&GameSettingsOverride::default()))
+        );
+    }
+
+    #[test]
+    fn game_can_skip_the_game_screen() {
+        let e = resolve(&global(), Some(&with(|o| o.use_game_screen = Some(false))));
+        assert_eq!((e.game_screen, e.game_screen_problem), (None, None));
+    }
+
+    #[test]
+    fn game_can_use_the_game_screen_even_when_it_is_off_globally() {
+        let off = GlobalSessionSettings {
+            game_screen_enabled: false,
+            ..global()
+        };
+        let e = resolve(&off, Some(&with(|o| o.use_game_screen = Some(true))));
+        assert_eq!(e.game_screen.unwrap().display_id, r"\\.\DISPLAY2");
+    }
+
+    #[test]
+    fn game_asking_for_the_game_screen_without_one_chosen_explains_why() {
+        let no_screen = GlobalSessionSettings {
+            game_screen_enabled: false,
+            game_screen_id: String::new(),
+            ..global()
+        };
+        let asked = resolve(&no_screen, Some(&with(|o| o.use_game_screen = Some(true))));
+        let enabled = GlobalSessionSettings {
+            game_screen_enabled: true,
+            ..no_screen
+        };
+        let not_asked = resolve(&enabled, None);
+        assert_eq!(asked.game_screen, None);
+        assert_eq!(
+            asked.game_screen_problem,
+            Some(GameScreenProblem::NoScreenChosen)
+        );
+        assert!(!GameScreenProblem::NoScreenChosen.message().is_empty());
+        assert_eq!(
+            (not_asked.game_screen, not_asked.game_screen_problem),
+            (None, None)
+        );
+    }
+
+    #[test]
+    fn game_resolution_overrides_the_global_mode() {
+        for (mode, expected) in [
+            ("1920x1080@60", Some(DisplayMode::new(1920, 1080, 60))),
+            ("", None),
+            ("lixo", Some(TV_4K)),
+        ] {
+            let o = with(|o| {
+                o.screen_mode = Some(mode.into());
+                o.hdr = Some(false);
+            });
+            let screen = resolve(&global(), Some(&o)).game_screen.unwrap();
+            assert_eq!(screen.mode, expected, "{mode}");
+            assert!(!screen.enable_hdr);
+        }
+    }
+
+    #[test]
+    fn game_audio_can_keep_the_current_output_or_pick_another() {
+        let keep = with(|o| o.audio_device_id = Some(String::new()));
+        let headset = with(|o| {
+            o.audio_device_id = Some("{fone}".into());
+            o.audio_device_name = Some("Fone".into());
+        });
+        let unnamed = with(|o| o.audio_device_id = Some("{fone}".into()));
+        assert_eq!(resolve(&global(), Some(&keep)).game_audio, None);
+        assert_eq!(
+            resolve(&global(), Some(&headset)).game_audio,
+            Some(AudioOutputChoice::new("{fone}", "Fone"))
+        );
+        assert_eq!(
+            resolve(&global(), Some(&unnamed)).game_audio.unwrap().name,
+            "{fone}"
+        );
+    }
+
+    #[test]
+    fn extra_arguments_go_after_the_game_arguments() {
+        for (game, extra, expected) in [
+            (None, None, ""),
+            (Some("-a"), None, "-a"),
+            (None, Some(" -dx11 "), "-dx11"),
+            (Some("-a -b"), Some("-windowed"), "-a -b -windowed"),
+            (Some("  "), Some("   "), ""),
+        ] {
+            let o = with(|o| o.extra_arguments = extra.map(Into::into));
+            assert_eq!(resolve(&global(), Some(&o)).arguments(game), expected);
+        }
+    }
+
+    #[test]
+    fn working_directory_is_normalized() {
+        let o = with(|o| o.working_directory = Some("  /jogos/x ".into()));
+        assert_eq!(
+            resolve(&global(), Some(&o)).working_directory.as_deref(),
+            Some("/jogos/x")
+        );
+        let blank = with(|o| o.working_directory = Some(" ".into()));
+        assert_eq!(resolve(&global(), Some(&blank)).working_directory, None);
+    }
+
+    #[test]
+    fn changed_count_ignores_blank_arguments() {
+        assert!(with(|o| o.extra_arguments = Some("  ".into())).is_default());
+        let two = with(|o| {
+            o.hdr = Some(false);
+            o.audio_device_id = Some(String::new());
+        });
+        assert_eq!(two.changed_count(), 2);
+    }
+
+    #[test]
+    fn confirmed_game_screen_setups_remember_each_mode() {
+        use game_screen_confirmations::*;
+        let mut saved = remember(None, "tv|current");
+        saved = remember(Some(&saved), "tv|1920x1080@60");
+        assert_eq!(
+            matching(Some(&saved), "tv|current").as_deref(),
+            Some("tv|current")
+        );
+        let upper = matching(Some(&saved), "TV|1920x1080@60");
+        assert_eq!(upper.as_deref(), Some("TV|1920x1080@60"));
+        assert_eq!(matching(Some(&saved), "tv|3840x2160@120"), None);
+        let old = matching(Some("tv|current"), "tv|current");
+        assert_eq!(old.as_deref(), Some("tv|current")); // valor antigo (uma só)
+        for i in 0..20 {
+            saved = remember(Some(&saved), &format!("tv|{i}"));
+        }
+        assert_eq!(saved.split('\n').count(), MAX_REMEMBERED);
+        assert_eq!(saved.split('\n').next(), Some("tv|19"));
+    }
+}

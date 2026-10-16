@@ -1,0 +1,8 @@
+[session.screen]
+not_connected = "the chosen game screen is not connected"
+none_chosen = "choose the game screen in Settings"
+no_hdr = "HDR is not available on {screen}"
+did_not_wake = "{screen} did not turn on"
+read_failed = "could not read the displays"
+already_active = "the game screen is already in focus"
+managed = "the resolution is set by the session (gamescope)"
