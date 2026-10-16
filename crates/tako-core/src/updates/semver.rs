@@ -43,9 +43,10 @@ impl SemVer {
         })
     }
 
-    /// Versão deste build (a do workspace).
+    /// Versão deste build: a da release (o CI define `TAKO_VERSION`, ex. 0.2.0-alpha.3) ou a do workspace. Sem isso
+    /// toda alpha se via como a versão do Cargo.toml e pedia atualização para a que já estava instalada.
     pub fn current() -> SemVer {
-        SemVer::parse(env!("CARGO_PKG_VERSION"))
+        SemVer::parse(option_env!("TAKO_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")))
     }
 }
 
