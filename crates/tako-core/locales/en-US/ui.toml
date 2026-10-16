@@ -30,6 +30,7 @@ exit = "Exit to desktop"
 
 [status]
 keyboard = "Keyboard"
+battery_low = "Low battery: {pad} at {percent}%"
 
 [home]
 recent = "Recently played"
@@ -154,6 +155,7 @@ pointer = "Pointer"
 end = "Close game"
 end_confirm = "Close the game"
 playing = "Playing now"
+pad_battery = "Controller at {percent}%"
 volume = "Volume"
 mute = "Mute"
 output = "AUDIO OUTPUT"
