@@ -79,6 +79,24 @@ public sealed class LocalGameLibrary(Func<IReadOnlyList<Game>> discover, ILibrar
         Refresh();
     }
 
+    public void Import(IReadOnlyList<ManualGameRecord> added, IReadOnlyDictionary<string, Func<GameStateRecord?, GameStateRecord>> state)
+    {
+        ArgumentNullException.ThrowIfNull(added);
+        ArgumentNullException.ThrowIfNull(state);
+        foreach (var record in added.Where(r => !store.Manual.Exists(m => m.Id == r.Id)))
+        {
+            store.Manual.Add(record);
+        }
+
+        foreach (var (id, change) in state)
+        {
+            store.State[id] = change(store.State.GetValueOrDefault(id));
+        }
+
+        store.Save();
+        Refresh();
+    }
+
     private void Update(string id, Func<GameStateRecord, GameStateRecord> change)
     {
         store.State[id] = change(store.State.GetValueOrDefault(id) ?? new GameStateRecord());

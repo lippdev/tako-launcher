@@ -53,6 +53,13 @@ public sealed partial class SettingsViewModel
         StoreRow("epic", GameStore.Epic, "Epic Games", "Store.Epic"),
         StoreRow("gog", GameStore.Gog, "GOG", "Store.Gog"),
         StoreRow("xbox", GameStore.Xbox, "Xbox (PC Game Pass)", "Store.Xbox"),
+        StoreRow("ubisoft", GameStore.Ubisoft, "Ubisoft Connect", "Store.Ubisoft"),
+        StoreRow("ea", GameStore.Ea, "EA app", "Store.Ea"),
+        StoreRow("battlenet", GameStore.BattleNet, "Battle.net", "Store.BattleNet"),
+        StoreRow("amazon", GameStore.Amazon, "Amazon Games", "Store.Amazon"),
+        Row("playnite-import", SettingKind.Action, "Importar do Playnite", Shell.ImportFromPlaynite,
+            description: () => "Traz jogos, tempo jogado, favoritos e categorias; só lê, nada muda no Playnite",
+            value: () => "Importar"),
         Header("organize", "Organização"),
         Row("collections", SettingKind.Action, "Coleções", Shell.ManageCollections,
             description: () => "Junte jogos do seu jeito; cada coleção vira uma fileira na Início e um filtro na biblioteca",
@@ -265,6 +272,7 @@ public sealed partial class SettingsViewModel
         + "• CapFrameX: cálculo do FPS e do 1% low, licença MIT\n"
         + "• PyWebOSTV: pareamento com TVs LG, licença MIT\n"
         + "• Tema Fullscreen padrão do Playnite (Josef Nemec): licença MIT\n"
+        + "• LiteDB e Playnite: leitura da biblioteca do Playnite e tabela de jogos do Battle.net, licença MIT\n"
         + "• Fontes Inter e Source Sans 3: SIL Open Font License\n"
         + "• Logos das lojas: Simple Icons (CC0); as marcas são dos respectivos donos\n"
         + "Os textos completos ficam no arquivo NOTICE.md, ao lado do Tako.exe.");

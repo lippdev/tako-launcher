@@ -293,7 +293,7 @@ public sealed partial class DetailsViewModel : PageViewModel
         (_, { IsRom: true }) => "Abrir no emulador (em breve)",
         (_, { IsInstalled: true }) => "Jogar",
         (_, { Store: GameStore.Manual }) => "Arquivo não encontrado",
-        _ => $"Instalar pela {Game.StoreName}",
+        _ => $"Instalar {GameText.StoreVia(Game.Game.Store)}",
     };
 
     public bool PrimaryHasPlayIcon => Game.Game.CanPlay;

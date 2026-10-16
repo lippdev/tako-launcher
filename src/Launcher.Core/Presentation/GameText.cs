@@ -23,11 +23,21 @@ public static class GameText
         GameStore.Epic => "Epic Games",
         GameStore.Gog => "GOG",
         GameStore.Xbox => "Xbox",
+        GameStore.Ubisoft => "Ubisoft Connect",
+        GameStore.Ea => "EA app",
+        GameStore.BattleNet => "Battle.net",
+        GameStore.Amazon => "Amazon Games",
         _ => "Adicionado",
     };
 
-    /// <summary>"da Steam", "da Epic Games", "do GOG", "do Xbox" (para frases como "jogos da Steam").</summary>
-    public static string StoreOf(GameStore store) => (store is GameStore.Gog or GameStore.Xbox ? "do " : "da ") + StoreName(store);
+    /// <summary>"da Steam", "da Epic Games", "do GOG", "do Xbox", "do EA app" (para frases como "jogos da Steam").</summary>
+    public static string StoreOf(GameStore store) =>
+        (Masculine(store) ? "do " : "da ") + StoreName(store);
+
+    /// <summary>"pela Steam", "pelo GOG", "pelo Battle.net" (para "Instalar pela Steam", "Abrindo pelo EA app").</summary>
+    public static string StoreVia(GameStore store) => (Masculine(store) ? "pelo " : "pela ") + StoreName(store);
+
+    private static bool Masculine(GameStore store) => store is GameStore.Gog or GameStore.Xbox or GameStore.Ea or GameStore.BattleNet;
 
     /// <summary>"Agora mesmo", "Jogado ontem", "Há 3 dias", "Há 2 semanas"...</summary>
     public static string LastPlayed(DateTimeOffset? lastPlayed, DateTimeOffset now)

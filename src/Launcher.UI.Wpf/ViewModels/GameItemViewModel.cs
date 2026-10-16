@@ -296,6 +296,10 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
         [GameStore.Epic] = Frozen("#2A2A2A"),
         [GameStore.Gog] = Frozen("#7A3FD1"), // store-gog (DESIGN.md)
         [GameStore.Xbox] = Frozen("#107C10"),
+        [GameStore.Ubisoft] = Frozen("#2E3192"), // store-ubisoft (DESIGN.md)
+        [GameStore.Ea] = Frozen("#D9302B"), // store-ea
+        [GameStore.BattleNet] = Frozen("#0B74DE"), // store-battlenet
+        [GameStore.Amazon] = Frozen("#B35C00"), // store-amazon
         [GameStore.Manual] = Frozen("#3D5A80"),
     };
 

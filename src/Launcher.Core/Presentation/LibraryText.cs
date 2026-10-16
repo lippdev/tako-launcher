@@ -66,4 +66,30 @@ public static class LibraryText
         string list = parts.Count == 1 ? parts[0] : $"{string.Join(", ", parts.SkipLast(1))} e {parts[^1]}";
         return $"{list} {(found.Sum(s => s.Count) == 1 ? "encontrado" : "encontrados")}";
     }
+
+    /// <summary>
+    /// Como o jogo abre, para o aviso "Abrindo…": " pela Steam", " pelo GOG Galaxy", " pelo Battle.net"; nada quando
+    /// abre direto pelo executável (adicionados e GOG sem Galaxy).
+    /// </summary>
+    public static string LaunchVia(Game game)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        return game.Store switch
+        {
+            GameStore.Manual or GameStore.Xbox => string.Empty,
+            GameStore.Gog => game.LaunchTarget?.EndsWith("GalaxyClient.exe", StringComparison.OrdinalIgnoreCase) == true ? " pelo GOG Galaxy" : string.Empty,
+            _ => " " + GameText.StoreVia(game.Store),
+        };
+    }
+
+    /// <summary>
+    /// Falha ao abrir um jogo que depende do cliente da loja (STORE-011/012): o aviso da última leitura ("EA app não
+    /// encontrado…", "Só o Origin está instalado…") quando o cliente falta ou está desatualizado; nulo nos demais casos.
+    /// </summary>
+    public static string? ClientMissing(Game game, Library.Sources.LibrarySourceReport? report)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        bool needsClient = game.Store is GameStore.Epic or GameStore.Ubisoft or GameStore.Ea or GameStore.BattleNet or GameStore.Amazon;
+        return needsClient && report is { ClientInstalled: false, Notice: { } notice } ? $"{notice} ({game.Title})" : null;
+    }
 }
