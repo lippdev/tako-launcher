@@ -3,6 +3,13 @@
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
 ## [Unreleased]
+### Correções
+- O portable (e o instalado) não pede mais atualização para a versão que já está aberta.
+- Passar o mouse sobre os cards não faz mais a fileira nem a página rolarem; o mouse só destaca, e quem rola é o controle ou o teclado.
+- Menos memória: o cache de imagens ficou bem menor e a biblioteca com muitos jogos não fica mais decodificando capas sem parar.
+- Dentro da Central, o atalho de teclado (Ctrl+Shift+Tab por padrão) volta para o jogo, como a dica na tela já dizia.
+
+## [0.2.0-alpha.3]
 ### Novidades
 - Status de cada jogo: Jogando, Zerado, Pausado, Abandonado ou Quero jogar. Muda pelo menu do card ou por Opções nos detalhes, aparece no cabeçalho dos detalhes e tem filtro próprio.
 - Jogos quebrados: o Tako confere sozinho os jogos adicionados à mão cujo arquivo ou pasta sumiu. O filtro "Só quebrados" mostra todos de uma vez, e jogar um deles oferece Editar ou Remover.

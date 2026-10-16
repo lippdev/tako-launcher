@@ -3,6 +3,13 @@
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
 ## [Unreleased]
+### Fixes
+- The portable build (and the installed one) no longer offers an update to the version that is already open.
+- Moving the mouse over cards no longer scrolls the row or the page; the mouse only highlights, scrolling stays with the controller and keyboard.
+- Less memory: the image cache is much smaller and large libraries no longer keep re-decoding covers.
+- Inside the Control Center, the keyboard shortcut (Ctrl+Shift+Tab by default) goes back to the game, as the on-screen hint said.
+
+## [0.2.0-alpha.3]
 ### What's new
 - Play status for each game: Playing, Beaten, Paused, Abandoned or Wishlist. Set it from the card menu or from Options in the details; it shows in the details header and has its own filter.
 - Broken games: Tako checks added games whose file or folder is gone. The "Broken only" filter lists them all, and playing one offers Edit or Remove.
