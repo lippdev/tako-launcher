@@ -147,7 +147,7 @@ pub fn pin(ctx: &mut Ctx, game: &Game, source: &str, id: Option<&str>, name: &st
     ctx.toast(text);
 }
 
-/// Texto digitado ou colado: confere na fonte (nome e ano) e fixa.
+/// Texto digitado ou colado: confere na fonte e mostra o nome (e o ano) antes de fixar.
 pub fn enter_id(ctx: &mut Ctx, game: &Game, source: &str, text: &str) {
     let input = parse_source_id(source, text);
     if let Some(p) = input.problem.clone() {
@@ -171,11 +171,35 @@ pub fn enter_id(ctx: &mut Ctx, game: &Game, source: &str, text: &str) {
                 if let Some(d) = m.release_date {
                     name.push_str(&format!(" ({})", d.year()));
                 }
-                pin(ctx, &game, &src, Some(&id), &name);
+                let layer = confirm_id(ctx, game.clone(), src.clone(), id, name);
+                super::add_game::open_layer(ctx, Box::new(layer));
             }
             None => ctx.toast(ctx.tf("source_ids.unknown_id", &[("source", &src)])),
         },
     );
+}
+
+/// "Usar {nome}?": o id digitado só é fixado depois de confirmar (o C# pedia o mesmo).
+fn confirm_id(ctx: &Ctx, game: Game, source: String, id: String, name: String) -> MenuLayer {
+    let text = ctx.tf(
+        "source_ids.confirm_text",
+        &[("source", &source), ("id", &id)],
+    );
+    MenuLayer::dialog(
+        ctx.tf("source_ids.confirm_title", &[("name", &name)]),
+        move |ctx| {
+            let (g, s, i, n) = (game.clone(), source.clone(), id.clone(), name.clone());
+            vec![
+                MenuItem::new(PanelRow::button("use", ctx.t("source_ids.use"))).on(move |ctx| {
+                    pin(ctx, &g, &s, Some(&i), &n);
+                    Flow::Close
+                }),
+                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                    .on(|_| Flow::Close),
+            ]
+        },
+    )
+    .text(text)
 }
 
 pub fn panel(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
@@ -418,6 +442,16 @@ mod tests {
             "slug sem id_from_slug"
         );
         enter_id(&mut ctx, &game, "IGDB", "113112");
+        // Pergunta antes de fixar: Cancelar não fixa, Usar fixa.
+        let mut ask = ctx.pending_layer.take().unwrap();
+        assert_eq!(ask.render(&ctx).title, "Usar Hades?");
+        assert!(!ctx.pinned_ids.contains_key(&game.id));
+        ask.handle(crate::shell::Cmd::Down, &mut ctx);
+        ask.handle(crate::shell::Cmd::Accept, &mut ctx);
+        assert!(!ctx.pinned_ids.contains_key(&game.id));
+        enter_id(&mut ctx, &game, "IGDB", "113112");
+        let mut ask = ctx.pending_layer.take().unwrap();
+        ask.handle(crate::shell::Cmd::Accept, &mut ctx);
         assert_eq!(ctx.pinned_ids[&game.id]["IGDB"], "113112");
         assert_eq!(ctx.toast.as_ref().unwrap().0, "Hades usa Hades no IGDB");
 
