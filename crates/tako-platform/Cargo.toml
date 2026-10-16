@@ -14,6 +14,9 @@ chrono.workspace = true
 tracing.workspace = true
 keyring.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+
 [lints.rust]
 # `unsafe` só é permitido aqui (PRD §5.1); cada bloco tem `// SAFETY:`.
 unsafe_code = "allow"

@@ -2,6 +2,8 @@
 
 use crate::Platform;
 
+pub mod dpapi;
+
 pub fn platform(_data_root: &std::path::Path) -> Platform {
     let mut p = Platform::simulated();
     p.secrets = std::sync::Arc::new(crate::secrets::OsSecrets);
