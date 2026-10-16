@@ -231,7 +231,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Atalho da Central (padrão Ctrl+Shift+T; durante um jogo real ele é global e chega por WM_HOTKEY).
+        // Atalho da Central (padrão Ctrl+Shift+Tab; durante um jogo real ele é global e chega por WM_HOTKEY).
         if (IsControlCenterKey(key))
         {
             e.Handled = true;

@@ -16,7 +16,7 @@ namespace Launcher.UI.Wpf;
 /// <summary>
 /// Atalho da Central de Controle (UX-005) e Central "ao vivo" sobre o jogo. Controle: a combinação configurada,
 /// segurada por meio segundo (padrão View + Y), lida com o Tako na frente ou atrás. Teclado: o atalho configurado
-/// (padrão Ctrl+Shift+T), registrado como atalho global do Windows enquanto um jogo real está aberto.
+/// (padrão Ctrl+Shift+Tab), registrado como atalho global do Windows enquanto um jogo real está aberto.
 /// </summary>
 public partial class MainWindow
 {

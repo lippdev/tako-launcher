@@ -6,7 +6,7 @@ namespace Launcher.UI.Wpf.ViewModels;
 
 /// <summary>
 /// Atalhos da Central de Controle (UX-005): combinação segurada no controle (padrão View + Y; Create/Share + △ no
-/// PlayStation) e atalho de teclado (padrão Ctrl+Shift+T), escolhidos em Configurações com telas de captura. As regras
+/// PlayStation) e atalho de teclado (padrão Ctrl+Shift+Tab), escolhidos em Configurações com telas de captura. As regras
 /// ficam em <see cref="ShortcutRules"/>: nenhuma combinação serve a duas ações do Tako.
 /// </summary>
 public sealed partial class ShellViewModel
@@ -22,10 +22,10 @@ public sealed partial class ShellViewModel
     /// <summary>"View + Y" (ou "Create + △" com um DualSense).</summary>
     public string ChordLabel => ControlCenterChord.Format(Settings.ControlCenterChord, PadFamily);
 
-    /// <summary>"Ctrl+Shift+T".</summary>
+    /// <summary>"Ctrl+Shift+Tab".</summary>
     public string KeyLabel => Settings.ControlCenterKey.Display;
 
-    /// <summary>Como abrir a Central no dispositivo em uso: "segure View + Y" ou "Ctrl+Shift+T".</summary>
+    /// <summary>Como abrir a Central no dispositivo em uso: "segure View + Y" ou "Ctrl+Shift+Tab".</summary>
     public string GuideName => InputKind == InputKind.Gamepad ? $"segure {ChordLabel}" : KeyLabel;
 
     /// <summary>Texto das linhas de atalho nas Configurações.</summary>

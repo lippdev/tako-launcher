@@ -152,7 +152,7 @@ public class ControlCenterShortcutTests
     [Fact]
     public void Default_keyboard_shortcut_has_no_known_conflict()
     {
-        Assert.Equal("Ctrl+Shift+T", KeyShortcut.Default.Display);
+        Assert.Equal("Ctrl+Shift+Tab", KeyShortcut.Default.Display);
         Assert.Equal(ShortcutCheck.Ok, ShortcutRules.CheckKeyboard(KeyShortcut.Default));
     }
 
