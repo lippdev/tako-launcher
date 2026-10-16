@@ -6,7 +6,9 @@
 
 use sdl3::event::Event;
 use sdl3::gamepad::{Axis, Button, Gamepad, GamepadType};
+use sdl3::joystick::PowerLevel;
 use std::collections::HashMap;
+use tako_core::input::low_battery_warning;
 
 /// Botões por posição (padrão Xbox: A embaixo). Mesmos bits de `GamepadButtons` do C#.
 pub mod buttons {
@@ -57,6 +59,8 @@ pub enum PadEvent {
 struct Pad {
     pad: Gamepad,
     state: PadState,
+    /// Já avisou de bateria fraca nesta conexão.
+    low_warned: bool,
 }
 
 pub struct Pads {
@@ -66,6 +70,8 @@ pub struct Pads {
     pads: HashMap<u32, Pad>,
     last_family: PadFamily,
     last_name: String,
+    /// Controle em uso (o último que conectou ou apertou um botão).
+    last_id: u32,
 }
 
 fn button_bit(b: Button) -> u32 {
@@ -120,6 +126,7 @@ impl Pads {
             pads: HashMap::new(),
             last_family: PadFamily::Xbox,
             last_name: String::new(),
+            last_id: 0,
         })
     }
 
@@ -170,11 +177,13 @@ impl Pads {
                     let family = family_of(pad.r#type());
                     self.last_family = family;
                     self.last_name = name.clone();
+                    self.last_id = which_id(&which);
                     self.pads.insert(
                         which_id(&which),
                         Pad {
                             pad,
                             state: PadState::default(),
+                            low_warned: false,
                         },
                     );
                     out.push(PadEvent::Connected { name, family });
@@ -219,16 +228,42 @@ impl Pads {
                 // O último controle usado define os glifos.
                 self.last_family = family_of(p.pad.r#type());
                 self.last_name = p.pad.name().unwrap_or_default();
+                self.last_id = id;
             } else {
                 p.state.buttons &= !bit;
             }
         }
     }
 
+    /// Lê a bateria pelo SDL (chamar de tempos em tempos, não a cada quadro): a do controle em uso e
+    /// `(nome, %)` dos que acabaram de ficar com bateria fraca (um aviso por conexão).
+    pub fn battery(&mut self) -> (Option<i32>, Vec<(String, i32)>) {
+        let mut low = Vec::new();
+        let mut active = None;
+        for (id, p) in &mut self.pads {
+            let level = battery_of(&p.pad);
+            if *id == self.last_id {
+                active = level;
+            }
+            if let Some(pct) = level
+                && low_battery_warning(&mut p.low_warned, level)
+            {
+                low.push((p.pad.name().unwrap_or_default(), pct));
+            }
+        }
+        (active, low)
+    }
+
     /// Estado somado: botões em OU; em cada eixo, o de maior módulo.
     pub fn state(&self) -> PadState {
         merge(self.pads.values().map(|p| p.state))
     }
+}
+
+/// Porcentagem de um controle sem fio na bateria; com fio, carregando ou desconhecida = `None`.
+fn battery_of(pad: &Gamepad) -> Option<i32> {
+    let info = pad.power_info();
+    (info.state == PowerLevel::OnBattery && info.percentage >= 0).then_some(info.percentage)
 }
 
 fn which_id(w: &sdl3::joystick::JoystickId) -> u32 {

@@ -549,6 +549,13 @@ impl Shell {
                 self.ctx.pad_name.clone()
             },
         );
+        out.set(
+            "pad-battery",
+            match self.ctx.pad_battery {
+                Some(p) if self.ctx.input == InputKind::Gamepad => format!("{p}%"),
+                _ => String::new(),
+            },
+        );
         out.set("see-all-label", self.ctx.t("home.see_all"));
         out
     }

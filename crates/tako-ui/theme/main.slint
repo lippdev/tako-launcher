@@ -249,10 +249,13 @@ component StatusCorner inherits HorizontalLayout {
     in property <string> clock;
     in property <string> input-label;
     in property <string> input-icon;
+    in property <string> pad-battery;
     spacing: 16 * Ui.u;
     alignment: end;
     Icon { name: input-icon; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
     if input-label != "": Text { text: input-label; color: Ui.on-accent-muted; font-size: Ui.label-md; font-family: Ui.font-text; vertical-alignment: center; }
+    if pad-battery != "": Icon { name: "battery"; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+    if pad-battery != "": Text { text: pad-battery; color: Ui.on-accent-muted; font-size: Ui.label-md; font-family: Ui.font-text; vertical-alignment: center; }
     Text { text: clock; color: Ui.on-accent; font-size: Ui.label-lg; font-weight: 600; font-family: Ui.font-text; vertical-alignment: center; }
 }
 
@@ -980,6 +983,7 @@ export component App inherits Window {
     in property <string> clock;
     in property <string> input-label;
     in property <string> input-icon: "gamepad";
+    in property <string> pad-battery;
     in property <string> toast;
     in property <[Hint]> hints;
     in property <bool> transparent-background;
@@ -1140,6 +1144,7 @@ export component App inherits Window {
         clock: clock;
         input-label: input-label;
         input-icon: input-icon;
+        pad-battery: pad-battery;
     }
 
     if control-center: ControlCenter {
