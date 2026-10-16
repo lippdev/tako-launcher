@@ -1,17 +1,19 @@
 //! Laço da interface: carrega o tema, monta o contexto, liga entrada (controle e teclado) e desenha quando
 //! algo muda. As tarefas longas (ler as lojas, metadados) rodam em threads e voltam pelo laço do Slint.
 
-use crate::gamepad::{PadEvent, Pads};
+use crate::gamepad::{PadEvent, PadState, Pads};
 use crate::shell::keys::{self, KeyAction};
 use crate::shell::{Cmd, Ctx, Effect, InputKind, Settings, Shell};
 use crate::{bridge, images, theme, values::ToValue};
 use slint::ComponentHandle;
-use slint_interpreter::{ComponentInstance, Value};
+use slint_interpreter::{ComponentDefinition, ComponentInstance, Value};
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
+use tako_core::input::shortcut::{ButtonChordDetector, chord};
 use tako_core::input::{AppCommand, GamepadButtons, GamepadInterpreter, GamepadSnapshot};
 use tako_core::library::{CollectionLibrary, Game, GameLibrary, system_clock};
 use tako_core::paths::DataPaths;
@@ -26,18 +28,42 @@ pub struct UiOptions {
     pub simulate: bool,
     /// Voltou de um jogo: foco nele e "Bem-vindo de volta".
     pub after_game: Option<(String, Duration)>,
+    /// Um jogo continua rodando (aberta pela Central ou "Início" durante o jogo): id e título.
+    pub running: Option<(String, String)>,
+    /// Abrir direto na Central rápida.
+    pub control_center: bool,
     pub safe_mode: bool,
+}
+
+/// O que fazer com a janela depois de um pedido.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostAction {
+    Stay,
+    /// Fecha a interface (o supervisor segue com o jogo, ou o app sai).
+    Close,
+    /// Esconde a janela e segue rodando (jogo acompanhado aqui mesmo, sem supervisor).
+    Hide,
+    /// Mostra a janela de novo.
+    Show,
+    /// Recarrega o tema (troca em tempo de execução).
+    ReloadTheme,
 }
 
 /// O que o app (binário) faz com os pedidos da interface que saem dela: abrir jogos, sair, atualizar.
 pub trait Host {
-    /// Devolve `true` se a interface deve fechar agora (o jogo vai rodar com o supervisor).
-    fn handle(&mut self, effect: &Effect, ctx: &mut Ctx) -> bool;
+    fn handle(&mut self, effect: &Effect, ctx: &mut Ctx) -> HostAction;
+    /// A cada 16 ms com o estado do controle (sessão sem supervisor, heartbeat).
+    fn tick(&mut self, _ctx: &mut Ctx, _pad: &PadState, _now: Duration) -> HostAction {
+        HostAction::Stay
+    }
 }
 
+#[derive(Clone)]
 pub struct App {
-    pub ui: ComponentInstance,
+    pub ui: Rc<RefCell<ComponentInstance>>,
     pub shell: Rc<RefCell<Shell>>,
+    host: Rc<RefCell<dyn Host>>,
+    builtin: PathBuf,
 }
 
 fn cmd_of(c: AppCommand) -> Cmd {
@@ -60,7 +86,6 @@ fn cmd_of(c: AppCommand) -> Cmd {
 /// Monta o contexto: banco, biblioteca (estado salvo), coleções e plataforma. As lojas são lidas depois,
 /// em segundo plano, para a primeira tela aparecer logo.
 pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
-    let paths_for_art = paths.clone();
     let _ = std::fs::create_dir_all(&paths.root);
     let database = (!simulate).then(|| TakoDatabase::new(paths.database()));
     let settings = Settings::new(database.clone().map(db::SettingsStore::new));
@@ -97,6 +122,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
     if let Err(e) = collections.load() {
         tracing::error!("coleções: {e}");
     }
+    let art = crate::art::cache(&paths);
     let mut ctx = Ctx {
         paths,
         library,
@@ -124,7 +150,9 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         leave_details: false,
         queued_launch: None,
         found,
-        art: crate::art::cache(&paths_for_art),
+        art,
+        controller_mouse: false,
+        welcome_back: None,
         dirty: true,
     };
     ctx.sync_collections();
@@ -172,248 +200,13 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
         .ok();
 }
 
-impl App {
-    /// Carrega o tema (o escolhido ou o padrão) e liga tudo. `host` recebe os pedidos de sessão e saída.
-    pub fn new(ctx: Ctx, opts: &UiOptions, host: Rc<RefCell<dyn Host>>) -> Result<App, String> {
-        let builtin =
-            theme::install_builtin(&ctx.paths.themes()).map_err(|e| format!("tema padrão: {e}"))?;
-        let def = load_theme(&ctx, &builtin)?;
-        let ui = def.create().map_err(|e| e.to_string())?;
-        let mut shell = Shell::new(ctx);
-        shell.ctx.safe_mode = opts.safe_mode;
-        if let Some((id, played)) = &opts.after_game {
-            shell.focus_game(id);
-            let title = shell
-                .ctx
-                .library
-                .find(id)
-                .map(|g| g.title.clone())
-                .unwrap_or_default();
-            let text = if played.is_zero() {
-                shell.ctx.tf("session.welcome_back", &[("game", &title)])
-            } else {
-                shell.ctx.tf(
-                    "session.welcome_back_played",
-                    &[
-                        ("game", &title),
-                        (
-                            "time",
-                            &tako_core::presentation::game_text::session_played(
-                                i18n::lang(),
-                                *played,
-                            ),
-                        ),
-                    ],
-                )
-            };
-            shell.ctx.toast(text);
-        }
-        let shell = Rc::new(RefCell::new(shell));
-        crate::tasks::attach(&shell);
-        let app = App { ui, shell };
-        app.wire(host);
-        Ok(app)
-    }
-
-    fn wire(&self, host: Rc<RefCell<dyn Host>>) {
-        let shell = self.shell.clone();
-        let weak = self.ui.as_weak();
-        let render_now = {
-            let shell = shell.clone();
-            let weak = weak.clone();
-            let host = host.clone();
-            Rc::new(move || {
-                if let Some(ui) = weak.upgrade() {
-                    pump_effects(&shell, &host, &ui);
-                    render(&shell, &ui);
-                }
-            })
-        };
-
-        // Imagens: ao chegar uma, redesenha.
-        {
-            let shell = shell.clone();
-            let resolver = crate::art::resolver(&shell.borrow().ctx);
-            let r = render_now.clone();
-            images::init(resolver, 2, move || {
-                shell.borrow_mut().ctx.dirty = true;
-                r();
-            });
-        }
-
-        let on_cmd = {
-            let shell = shell.clone();
-            let r = render_now.clone();
-            Rc::new(move |cmd: Cmd| {
-                {
-                    let mut s = shell.borrow_mut();
-                    match cmd {
-                        Cmd::PrevSection => s.section(false),
-                        Cmd::NextSection => s.section(true),
-                        c => s.handle(c),
-                    }
-                }
-                r();
-            })
-        };
-
-        {
-            let shell = shell.clone();
-            let r = render_now.clone();
-            let on_cmd = on_cmd.clone();
-            let _ = self.ui.set_callback("key", move |args| {
-                let text = arg_str(args, 0);
-                let ctrl = matches!(args.get(2), Some(Value::Bool(true)));
-                let alt = matches!(args.get(4), Some(Value::Bool(true)));
-                let action = {
-                    let mut s = shell.borrow_mut();
-                    s.ctx.input = InputKind::Keyboard;
-                    keys::map(&text, ctrl, alt, s.typing())
-                };
-                match action {
-                    KeyAction::Cmd(c) => on_cmd(c),
-                    KeyAction::Text(t) => {
-                        shell.borrow_mut().text(&t);
-                        r();
-                    }
-                    KeyAction::Erase => {
-                        shell.borrow_mut().erase();
-                        r();
-                    }
-                    KeyAction::Ignore => return Value::Bool(false),
-                }
-                Value::Bool(true)
-            });
-        }
-        {
-            let shell = shell.clone();
-            let r = render_now.clone();
-            let _ = self.ui.set_callback("clicked", move |args| {
-                shell
-                    .borrow_mut()
-                    .click(&arg_str(args, 0), arg_num(args, 1));
-                r();
-                Value::Void
-            });
-        }
-        {
-            let shell = shell.clone();
-            let r = render_now.clone();
-            let _ = self.ui.set_callback("hovered", move |args| {
-                shell
-                    .borrow_mut()
-                    .hover(&arg_str(args, 0), arg_num(args, 1));
-                r();
-                Value::Void
-            });
-        }
-        {
-            let shell = shell.clone();
-            let r = render_now.clone();
-            let _ = self.ui.set_callback("hint-clicked", move |args| {
-                shell.borrow_mut().hint_clicked(arg_num(args, 0));
-                r();
-                Value::Void
-            });
-        }
-        let _ = self.ui.set_callback("key-released", |_| Value::Void);
-
-        // Controle: o SDL é lido a cada 16 ms enquanto a interface está aberta (como o XInput do C#).
-        let pads = Pads::open()
-            .map_err(|e| tracing::warn!("controles indisponíveis: {e}"))
-            .ok();
-        let pads = Rc::new(RefCell::new(pads));
-        let interp = Rc::new(RefCell::new(GamepadInterpreter::new()));
-        let started = Instant::now();
-        let timer = slint::Timer::default();
-        {
-            let shell = shell.clone();
-            let r = render_now.clone();
-            let on_cmd = on_cmd.clone();
-            let mut last_clock = String::new();
-            let weak = weak.clone();
-            timer.start(
-                slint::TimerMode::Repeated,
-                Duration::from_millis(16),
-                move || {
-                    let mut fired = Vec::new();
-                    if let Some(p) = pads.borrow_mut().as_mut() {
-                        for ev in p.poll() {
-                            let mut s = shell.borrow_mut();
-                            match ev {
-                                PadEvent::Connected { name, family } => {
-                                    s.ctx.pad = family;
-                                    s.ctx.pad_name = name;
-                                    s.ctx.input = InputKind::Gamepad;
-                                }
-                                PadEvent::Disconnected { .. } => {}
-                            }
-                            s.ctx.pads_connected = p.count();
-                            s.ctx.dirty = true;
-                        }
-                        let st = p.state();
-                        let snap = GamepadSnapshot::new(
-                            GamepadButtons(st.buttons),
-                            st.left_x as f64,
-                            -st.left_y as f64,
-                        );
-                        fired = interp.borrow_mut().update(
-                            snap,
-                            started.elapsed(),
-                            GamepadButtons::NONE,
-                        );
-                        if !fired.is_empty() {
-                            let mut s = shell.borrow_mut();
-                            s.ctx.input = InputKind::Gamepad;
-                            s.ctx.pad = p.family();
-                            s.ctx.pad_name = p.name().to_owned();
-                        }
-                    }
-                    for c in fired {
-                        on_cmd(cmd_of(c));
-                    }
-                    // Relógio e avisos que expiram.
-                    let clock = chrono::Local::now().format("%H:%M").to_string();
-                    let toast_expired = shell
-                        .borrow()
-                        .ctx
-                        .toast
-                        .as_ref()
-                        .is_some_and(|(_, at)| at.elapsed() >= crate::shell::TOAST_TIME);
-                    if clock != last_clock {
-                        if let Some(ui) = weak.upgrade() {
-                            bridge::set(&ui, "clock", clock.to_value());
-                        }
-                        last_clock = clock;
-                    }
-                    if toast_expired || shell.borrow().ctx.dirty {
-                        shell.borrow_mut().ctx.dirty = true;
-                        r();
-                    }
-                },
-            );
-        }
-        std::mem::forget(timer);
-        render_now();
-    }
-
-    pub fn run(&self) -> Result<(), String> {
-        self.ui.show().map_err(|e| e.to_string())?;
-        rescan(&self.shell);
-        slint::run_event_loop_until_quit().map_err(|e| e.to_string())
-    }
-}
-
-fn load_theme(
-    ctx: &Ctx,
-    builtin: &std::path::Path,
-) -> Result<slint_interpreter::ComponentDefinition, String> {
+/// O tema escolhido ou, se ele falhar, o padrão (PRD §7: volta ao padrão sem loop de falha).
+fn load_theme(ctx: &Ctx, builtin: &std::path::Path) -> Result<ComponentDefinition, String> {
     let selected = tako_themes::selected(&ctx.paths.themes());
     if let Some(id) = selected.filter(|_| !ctx.safe_mode) {
         let dir = ctx.paths.themes().join(&id);
-        let entry = tako_themes::validate_package(&dir).map(|m| dir.join(m.entry));
-        match entry {
-            Ok(entry) => match theme::compile(&entry, builtin) {
+        match tako_themes::validate_package(&dir) {
+            Ok(m) => match theme::compile(&dir.join(m.entry), builtin) {
                 Ok(def) => return Ok(def),
                 Err(e) => tracing::error!("tema {id} não compilou, usando o padrão: {e}"),
             },
@@ -421,6 +214,326 @@ fn load_theme(
         }
     }
     theme::compile(&builtin.join("main.slint"), builtin).map_err(|e| e.to_string())
+}
+
+impl App {
+    /// Carrega o tema (o escolhido ou o padrão) e liga tudo. `host` recebe os pedidos de sessão e saída.
+    pub fn new(ctx: Ctx, opts: &UiOptions, host: Rc<RefCell<dyn Host>>) -> Result<App, String> {
+        let builtin =
+            theme::install_builtin(&ctx.paths.themes()).map_err(|e| format!("tema padrão: {e}"))?;
+        let mut ctx = ctx;
+        ctx.safe_mode = opts.safe_mode;
+        let def = load_theme(&ctx, &builtin)?;
+        let ui = def.create().map_err(|e| e.to_string())?;
+        let mut shell = Shell::new(ctx);
+        if let Some((id, title)) = &opts.running {
+            shell.ctx.running = Some(crate::shell::RunningGame {
+                id: id.clone(),
+                title: title.clone(),
+            });
+        }
+        if opts.control_center {
+            shell.open_control_center();
+        }
+        if let Some((id, played)) = &opts.after_game {
+            if let Err(e) = shell.ctx.library.record_session(id, *played) {
+                tracing::warn!("tempo de jogo de {id}: {e}");
+            }
+            shell.ctx.welcome_back = Some((id.clone(), *played));
+        }
+        let shell = Rc::new(RefCell::new(shell));
+        crate::tasks::attach(&shell);
+        let app = App {
+            ui: Rc::new(RefCell::new(ui)),
+            shell,
+            host,
+            builtin,
+        };
+        app.wire_ui();
+        app.start_input();
+        app.redraw();
+        Ok(app)
+    }
+
+    /// Trata os pedidos pendentes e desenha se algo mudou.
+    pub fn redraw(&self) {
+        let action = pump_effects(&self.shell, &self.host);
+        self.apply(action);
+        render(&self.shell, &self.ui.borrow());
+    }
+
+    pub fn apply(&self, action: HostAction) {
+        match action {
+            HostAction::Stay => {}
+            HostAction::Close => {
+                let _ = self.ui.borrow().hide();
+                let _ = slint::quit_event_loop();
+            }
+            HostAction::Hide => {
+                let _ = self.ui.borrow().hide();
+            }
+            HostAction::Show => {
+                let _ = self.ui.borrow().show();
+                self.shell.borrow_mut().ctx.dirty = true;
+            }
+            HostAction::ReloadTheme => self.reload_theme(),
+        }
+    }
+
+    /// Troca de tema em tempo de execução: nova instância com as mesmas ligações; o estado continua na `Shell`.
+    pub fn reload_theme(&self) {
+        let def = match load_theme(&self.shell.borrow().ctx, &self.builtin) {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::error!("tema: {e}");
+                return;
+            }
+        };
+        let new = match def.create() {
+            Ok(n) => n,
+            Err(e) => {
+                tracing::error!("tema: {e}");
+                return;
+            }
+        };
+        let old = self.ui.replace(new);
+        self.wire_ui();
+        let _ = self.ui.borrow().show();
+        let _ = old.hide();
+        self.shell.borrow_mut().ctx.dirty = true;
+        render(&self.shell, &self.ui.borrow());
+    }
+
+    fn on_cmd(&self, cmd: Cmd) {
+        {
+            let mut s = self.shell.borrow_mut();
+            match cmd {
+                Cmd::PrevSection => s.section(false),
+                Cmd::NextSection => s.section(true),
+                c => s.handle(c),
+            }
+        }
+        self.redraw();
+    }
+
+    fn wire_ui(&self) {
+        let ui = self.ui.borrow();
+        {
+            let app = self.clone();
+            let _ = ui.set_callback("key", move |args| {
+                let text = arg_str(args, 0);
+                let ctrl = matches!(args.get(2), Some(Value::Bool(true)));
+                let alt = matches!(args.get(4), Some(Value::Bool(true)));
+                let action = {
+                    let mut s = app.shell.borrow_mut();
+                    s.ctx.input = InputKind::Keyboard;
+                    keys::map(&text, ctrl, alt, s.typing())
+                };
+                match action {
+                    KeyAction::Cmd(c) => app.on_cmd(c),
+                    KeyAction::Text(t) => {
+                        app.shell.borrow_mut().text(&t);
+                        app.redraw();
+                    }
+                    KeyAction::Erase => {
+                        app.shell.borrow_mut().erase();
+                        app.redraw();
+                    }
+                    KeyAction::Ignore => return Value::Bool(false),
+                }
+                Value::Bool(true)
+            });
+        }
+        {
+            let app = self.clone();
+            let _ = ui.set_callback("clicked", move |args| {
+                app.shell
+                    .borrow_mut()
+                    .click(&arg_str(args, 0), arg_num(args, 1));
+                app.redraw();
+                Value::Void
+            });
+        }
+        {
+            let app = self.clone();
+            let _ = ui.set_callback("hovered", move |args| {
+                app.shell
+                    .borrow_mut()
+                    .hover(&arg_str(args, 0), arg_num(args, 1));
+                app.redraw();
+                Value::Void
+            });
+        }
+        {
+            let app = self.clone();
+            let _ = ui.set_callback("hint-clicked", move |args| {
+                app.shell.borrow_mut().hint_clicked(arg_num(args, 0));
+                app.redraw();
+                Value::Void
+            });
+        }
+        let _ = ui.set_callback("key-released", |_| Value::Void);
+        // Fechar a janela pelo sistema (Alt+F4, botão da janela) é o mesmo que "Sair para o desktop".
+        let app = self.clone();
+        ui.window().on_close_requested(move || {
+            {
+                let mut s = app.shell.borrow_mut();
+                app.host
+                    .borrow_mut()
+                    .handle(&Effect::ExitToDesktop, &mut s.ctx);
+            }
+            let _ = slint::quit_event_loop();
+            slint::CloseRequestResponse::HideWindow
+        });
+    }
+
+    /// Controle (SDL lido a cada 16 ms enquanto a interface está aberta, como o XInput do C#), relógio,
+    /// atalho da Central e o `tick` do host.
+    fn start_input(&self) {
+        {
+            let app = self.clone();
+            let resolver = crate::art::resolver(&self.shell.borrow().ctx);
+            images::init(resolver, 2, move || {
+                app.shell.borrow_mut().ctx.dirty = true;
+                app.redraw();
+            });
+        }
+        let mut pads = Pads::open()
+            .map_err(|e| tracing::warn!("controles indisponíveis: {e}"))
+            .ok();
+        let mut interp = GamepadInterpreter::new();
+        let chord_value = self
+            .shell
+            .borrow()
+            .ctx
+            .settings
+            .get(crate::shell::ctx::keys::CONTROL_CENTER_CHORD)
+            .map(str::to_owned);
+        let mut chord = ButtonChordDetector::new(chord::parse(chord_value.as_deref()));
+        let started = Instant::now();
+        let app = self.clone();
+        let mut last_clock = String::new();
+        let timer = slint::Timer::default();
+        timer.start(
+            slint::TimerMode::Repeated,
+            Duration::from_millis(16),
+            move || {
+                let now = started.elapsed();
+                let mut fired = Vec::new();
+                let mut pad_state = PadState::default();
+                let mut chord_fired = false;
+                if let Some(p) = pads.as_mut() {
+                    for ev in p.poll() {
+                        let mut s = app.shell.borrow_mut();
+                        if let PadEvent::Connected { name, family } = ev {
+                            s.ctx.pad = family;
+                            s.ctx.pad_name = name;
+                            s.ctx.input = InputKind::Gamepad;
+                        }
+                        s.ctx.pads_connected = p.count();
+                        s.ctx.dirty = true;
+                    }
+                    pad_state = p.state();
+                    let pressed = GamepadButtons(pad_state.buttons);
+                    chord_fired = chord.update(pressed, now);
+                    let snap = GamepadSnapshot::new(
+                        pressed,
+                        pad_state.left_x as f64,
+                        -pad_state.left_y as f64,
+                    );
+                    fired = interp.update(snap, now, chord.suppressed(pressed));
+                    if !fired.is_empty() {
+                        let mut s = app.shell.borrow_mut();
+                        s.ctx.input = InputKind::Gamepad;
+                        s.ctx.pad = p.family();
+                        s.ctx.pad_name = p.name().to_owned();
+                    }
+                }
+                if chord_fired {
+                    let mut s = app.shell.borrow_mut();
+                    if s.control_center_open() {
+                        s.close_control_center();
+                        if s.ctx.running.is_some() {
+                            s.ctx.effect(Effect::ResumeGame);
+                        }
+                    } else if s.ctx.running.is_some() {
+                        s.open_control_center();
+                    }
+                    fired.clear();
+                }
+                for c in fired {
+                    let mut s = app.shell.borrow_mut();
+                    match cmd_of(c) {
+                        Cmd::PrevSection => s.section(false),
+                        Cmd::NextSection => s.section(true),
+                        c => s.handle(c),
+                    }
+                }
+                let action = {
+                    let mut s = app.shell.borrow_mut();
+                    app.host.borrow_mut().tick(&mut s.ctx, &pad_state, now)
+                };
+                app.apply(action);
+                // Relógio e avisos que expiram.
+                let clock = chrono::Local::now().format("%H:%M").to_string();
+                if clock != last_clock {
+                    bridge::set(&app.ui.borrow(), "clock", clock.to_value());
+                    last_clock = clock;
+                }
+                let expired = app
+                    .shell
+                    .borrow()
+                    .ctx
+                    .toast
+                    .as_ref()
+                    .is_some_and(|(_, at)| at.elapsed() >= crate::shell::TOAST_TIME);
+                if expired {
+                    app.shell.borrow_mut().ctx.dirty = true;
+                }
+                let pending = {
+                    let s = app.shell.borrow();
+                    s.ctx.dirty || !s.ctx.effects.is_empty()
+                };
+                if pending {
+                    app.redraw();
+                }
+            },
+        );
+        std::mem::forget(timer);
+    }
+
+    pub fn run(&self) -> Result<(), String> {
+        self.ui.borrow().show().map_err(|e| e.to_string())?;
+        rescan(&self.shell);
+        slint::run_event_loop_until_quit().map_err(|e| e.to_string())
+    }
+}
+
+/// "Bem-vindo de volta" com o tempo jogado e o foco no jogo (o tempo já foi gravado por quem chama).
+pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration) {
+    shell.ctx.running = None;
+    shell.focus_game(id);
+    let title = shell
+        .ctx
+        .library
+        .find(id)
+        .map(|g| g.title.clone())
+        .unwrap_or_default();
+    let text = if played.is_zero() {
+        shell.ctx.tf("session.welcome_back", &[("game", &title)])
+    } else {
+        shell.ctx.tf(
+            "session.welcome_back_played",
+            &[
+                ("game", &title),
+                (
+                    "time",
+                    &tako_core::presentation::game_text::session_played(i18n::lang(), played),
+                ),
+            ],
+        )
+    };
+    shell.ctx.toast(text);
 }
 
 fn arg_str(args: &[Value], i: usize) -> String {
@@ -437,12 +550,13 @@ fn arg_num(args: &[Value], i: usize) -> usize {
     }
 }
 
-fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>, ui: &ComponentInstance) {
+/// Trata os pedidos da interface: os comuns aqui, o resto com o host.
+fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> HostAction {
     loop {
         let effect = {
             let mut s = shell.borrow_mut();
             if s.ctx.effects.is_empty() {
-                return;
+                return HostAction::Stay;
             }
             s.ctx.effects.remove(0)
         };
@@ -450,14 +564,15 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>, ui: &C
             rescan(shell);
             continue;
         }
-        let close = {
+        let action = {
             let mut s = shell.borrow_mut();
-            host.borrow_mut().handle(&effect, &mut s.ctx)
+            match crate::effects::common(&effect, &mut s) {
+                Some(a) => a,
+                None => host.borrow_mut().handle(&effect, &mut s.ctx),
+            }
         };
-        if close {
-            let _ = ui.hide();
-            let _ = slint::quit_event_loop();
-            return;
+        if action != HostAction::Stay {
+            return action;
         }
     }
 }
@@ -469,6 +584,9 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         return;
     }
     s.ctx.dirty = false;
+    if let Some((id, played)) = s.ctx.welcome_back.take() {
+        welcome_back(&mut s, &id, played);
+    }
     if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
         s.ctx.grid_columns = (n as usize).max(1);
     }

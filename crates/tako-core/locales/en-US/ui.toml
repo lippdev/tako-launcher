@@ -145,3 +145,32 @@ title = "About"
 subtitle = "Tako's version, license and source code."
 version = "Version"
 source = "Source code"
+
+[session.ui]
+not_found = "Game not found"
+screen_failed = "Couldn't use the game screen"
+
+[cc]
+home = "Home"
+back_to_game = "Back to game"
+audio = "Audio"
+screen = "Screen"
+pointer = "Pointer"
+end = "Close game"
+end_confirm = "Close the game"
+playing = "Playing now"
+volume = "Volume"
+mute = "Mute"
+output = "AUDIO OUTPUT"
+audio_set = "Audio on {device}"
+audio_unavailable = "Audio unavailable"
+screen_unavailable = "No screen found"
+pointer_hide = "Hide the pointer"
+pointer_stick = "Move with the stick"
+
+[effects]
+cache_cleared = "Image cache cleared ({size})"
+portable = "portable"
+installed = "installed"
+report_title = "System report"
+report_saved = "Saved to {path}. Attach this file when you report a problem."

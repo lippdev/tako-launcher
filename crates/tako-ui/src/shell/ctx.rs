@@ -21,6 +21,10 @@ pub enum Effect {
     ResumeGame,
     /// Encerrar o jogo que está rodando.
     EndGame,
+    /// Central › Início: a biblioteca abre e o jogo continua rodando.
+    GoHomeKeepingGame,
+    /// O usuário mudou o ponteiro na Central (esconder / mover com o analógico).
+    PointerChanged,
     Rescan,
     /// Escolher um arquivo para "Adicionar jogo".
     AddGame,
@@ -165,6 +169,10 @@ pub struct Ctx {
     pub found: std::sync::Arc<std::sync::Mutex<Vec<tako_core::library::Game>>>,
     /// Cache de imagens em disco (com limite).
     pub art: std::sync::Arc<tako_core::metadata::art_cache::ArtCache>,
+    /// Mover o ponteiro com o analógico durante a sessão (o supervisor executa).
+    pub controller_mouse: bool,
+    /// O jogo terminou: foco nele e "Bem-vindo de volta" no próximo desenho (id, tempo jogado).
+    pub welcome_back: Option<(String, std::time::Duration)>,
     /// Algo mudou e a tela precisa ser redesenhada.
     pub dirty: bool,
 }

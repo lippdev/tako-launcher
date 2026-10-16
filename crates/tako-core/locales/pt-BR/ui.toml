@@ -145,3 +145,32 @@ title = "Sobre"
 subtitle = "Versão, licença e código-fonte do Tako."
 version = "Versão"
 source = "Código-fonte"
+
+[session.ui]
+not_found = "Jogo não encontrado"
+screen_failed = "Não foi possível usar a tela de jogo"
+
+[cc]
+home = "Início"
+back_to_game = "Voltar ao jogo"
+audio = "Áudio"
+screen = "Tela"
+pointer = "Ponteiro"
+end = "Encerrar jogo"
+end_confirm = "Encerrar o jogo"
+playing = "Jogando agora"
+volume = "Volume"
+mute = "Sem som"
+output = "SAÍDA DE ÁUDIO"
+audio_set = "Áudio em {device}"
+audio_unavailable = "Áudio indisponível"
+screen_unavailable = "Nenhuma tela encontrada"
+pointer_hide = "Esconder o ponteiro"
+pointer_stick = "Mover com o analógico"
+
+[effects]
+cache_cleared = "Cache de imagens limpo ({size})"
+portable = "portátil"
+installed = "instalada"
+report_title = "Relatório do sistema"
+report_saved = "Salvo em {path}. Anexe este arquivo ao relatar um problema."

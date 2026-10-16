@@ -4816,6 +4816,9 @@ dependencies = [
 name = "tako"
 version = "0.2.0-alpha.1"
 dependencies = [
+ "serde",
+ "serde_json",
+ "slint",
  "tako-core",
  "tako-platform",
  "tako-sources",

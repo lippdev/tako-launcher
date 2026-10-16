@@ -2,6 +2,7 @@
 //! avisos. Puro Rust e testável sem janela: `render` produz as propriedades do tema, o `bridge` as aplica.
 
 pub mod art;
+pub mod control_center;
 pub mod ctx;
 pub mod details;
 pub mod dialogs;
@@ -94,6 +95,8 @@ pub struct Shell {
     pages: Vec<Box<dyn Page>>,
     layers: Vec<Box<dyn Layer>>,
     sidebar: sidebar::Sidebar,
+    /// Central rápida aberta (durante um jogo).
+    cc: Option<control_center::ControlCenter>,
 }
 
 impl Shell {
@@ -103,6 +106,7 @@ impl Shell {
             pages: vec![Box::new(home::HomePage::new())],
             layers: Vec::new(),
             sidebar: sidebar::Sidebar::default(),
+            cc: None,
         };
         shell.ctx.dirty = true;
         shell
@@ -156,8 +160,28 @@ impl Shell {
         self.ctx.dirty = true;
     }
 
+    pub fn open_control_center(&mut self) {
+        self.cc = Some(control_center::ControlCenter::new());
+        self.ctx.dirty = true;
+    }
+
+    pub fn control_center_open(&self) -> bool {
+        self.cc.is_some()
+    }
+
+    pub fn close_control_center(&mut self) {
+        self.cc = None;
+        self.ctx.dirty = true;
+    }
+
     pub fn handle(&mut self, cmd: Cmd) {
         self.ctx.dirty = true;
+        if let Some(cc) = self.cc.as_mut() {
+            if cc.handle(cmd, &mut self.ctx) {
+                self.cc = None;
+            }
+            return;
+        }
         if let Some(mut top) = self.layers.pop() {
             let flow = top.handle(cmd, &mut self.ctx);
             self.apply_flow(top, flow);
@@ -195,6 +219,14 @@ impl Shell {
 
     pub fn click(&mut self, zone: &str, index: usize) {
         self.ctx.dirty = true;
+        if let Some(cc) = self.cc.as_mut() {
+            if let Some(z) = zone.strip_prefix("cc-")
+                && cc.click(z, index, &mut self.ctx)
+            {
+                self.cc = None;
+            }
+            return;
+        }
         if let Some(rest) = zone.strip_prefix("overlay-") {
             if let Some(mut top) = self.layers.pop() {
                 let flow = top.click(rest, index, &mut self.ctx);
@@ -394,7 +426,7 @@ impl Shell {
 
     /// Seções com LB/RB valem em qualquer página de rota (a de Configurações usa para categorias).
     pub fn section(&mut self, forward: bool) {
-        if self.layers.is_empty() && self.page().kind() != "settings" {
+        if self.layers.is_empty() && self.cc.is_none() && self.page().kind() != "settings" {
             self.cycle_section(forward);
         } else {
             self.handle(if forward {
@@ -406,6 +438,9 @@ impl Shell {
     }
 
     pub fn hints(&self) -> Vec<Hint> {
+        if let Some(cc) = &self.cc {
+            return cc.hints(&self.ctx);
+        }
         if let Some(l) = self.layers.last() {
             return l.hints(&self.ctx);
         }
@@ -454,6 +489,10 @@ impl Shell {
             let Shell { pages, ctx, .. } = self;
             let n = pages.len();
             pages[n - 1].render(ctx, &mut out);
+        }
+        match &self.cc {
+            Some(cc) => cc.render(&self.ctx, &mut out),
+            None => out.set("control-center", false),
         }
         let overlays: Vec<_> = self.layers.iter().map(|l| l.render(&self.ctx)).collect();
         out.set("overlays", overlays);
