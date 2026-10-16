@@ -13,7 +13,7 @@ pub const LIBRARY: &str = "tako";
 
 /// Grava o tema padrão em `<themes>/.builtin-<versão>` (uma vez por versão) e devolve a pasta.
 pub fn install_builtin(themes_dir: &Path) -> std::io::Result<PathBuf> {
-    let dir = themes_dir.join(format!(".builtin-{}", env!("CARGO_PKG_VERSION")));
+    let dir = themes_dir.join(format!(".builtin-{}", crate::version()));
     if dir.join("main.slint").exists() && !cfg!(debug_assertions) {
         return Ok(dir);
     }
