@@ -4816,6 +4816,7 @@ dependencies = [
 name = "tako"
 version = "0.2.0-alpha.1"
 dependencies = [
+ "chrono",
  "serde",
  "serde_json",
  "slint",

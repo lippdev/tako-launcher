@@ -3,6 +3,7 @@
 //! `tako` (versão publicada) = supervisor, que abre `tako --ui`; `tako --no-supervisor` = só a interface.
 //! `--simulate` usa a biblioteca de demonstração e funções de plataforma em memória.
 
+mod bench;
 mod hosts;
 mod protocol;
 mod supervisor;
@@ -59,8 +60,15 @@ fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
 }
 
 fn main() {
+    let started = std::time::Instant::now();
     let all: Vec<String> = std::env::args().collect();
     let has = |f: &str| args::has(&all, f);
+    if has("--bench") {
+        std::process::exit(bench::run(started, value(&all, "--data-dir")));
+    }
+    if has("--bench-supervisor") {
+        std::process::exit(bench::supervisor_rss());
+    }
     if has("--version") {
         println!("tako {}", tako_ui::version());
         return;
