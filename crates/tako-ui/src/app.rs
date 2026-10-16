@@ -88,18 +88,16 @@ fn cmd_of(c: AppCommand) -> Cmd {
 pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
     let _ = std::fs::create_dir_all(&paths.root);
     let database = (!simulate).then(|| TakoDatabase::new(paths.database()));
-    if let Some(d) = &database {
+    if database.is_some() {
         // Chaves das alphas C# (DPAPI ou texto) vão para o cofre do SO uma vez; antes de ler as configurações.
         #[cfg(windows)]
         let decrypt = tako_platform::windows::dpapi::unprotect;
         #[cfg(not(windows))]
         let decrypt = |_: &[u8]| None;
-        let secrets = platform.secrets.clone();
         if let Err(e) = tako_core::persistence::alpha_migration::migrate_secrets(
             &paths.root,
             decrypt,
-            &db::SettingsStore::new(d.clone()),
-            |k, v| secrets.set(k, v),
+            &crate::shell::settings::metadata::Vault(platform.secrets.as_ref()),
         ) {
             tracing::warn!("segredos das alphas: {e}");
         }
@@ -171,6 +169,9 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         welcome_back: None,
         move_window: None,
         dirty: true,
+        pressed_buttons: 0,
+        pad_stick: (0.0, 0.0),
+        live_pad: Default::default(),
     };
     ctx.sync_collections();
     ctx
@@ -457,6 +458,12 @@ impl App {
                         s.ctx.dirty = true;
                     }
                     pad_state = p.state();
+                    {
+                        let mut s = app.shell.borrow_mut();
+                        (s.ctx.pressed_buttons, s.ctx.pad_stick) =
+                            (pad_state.buttons, (pad_state.left_x, pad_state.left_y));
+                        s.ctx.dirty |= s.ctx.live_pad.take();
+                    }
                     let pressed = GamepadButtons(pad_state.buttons);
                     chord_fired = chord.update(pressed, now);
                     let snap = GamepadSnapshot::new(

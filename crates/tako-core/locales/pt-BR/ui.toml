@@ -140,11 +140,6 @@ delete = "Apagar"
 space = "Espaço"
 done = "Pronto"
 
-[settings.about]
-title = "Sobre"
-subtitle = "Versão, licença e código-fonte do Tako."
-version = "Versão"
-source = "Código-fonte"
 
 [session.ui]
 not_found = "Jogo não encontrado"

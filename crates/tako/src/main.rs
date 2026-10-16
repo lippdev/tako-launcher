@@ -46,6 +46,9 @@ fn init_logs(paths: &DataPaths, role: &str) {
     tracing::info!("tako {} ({role}) iniciando", tako_ui::version());
 }
 
+/// Definida no Tako reaberto por ele mesmo (saída do modo seguro): espera o anterior soltar a trava.
+pub const RESTART_ENV: &str = "TAKO_RESTARTED";
+
 /// Só um Tako por usuário: um segundo `tako` sai sem abrir outra janela.
 fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
     let _ = std::fs::create_dir_all(&paths.root);
@@ -56,6 +59,17 @@ fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
         .open(paths.root.join("tako.lock"))
         .ok()?;
     // shortcut: o segundo Tako só sai; trazer a janela do primeiro para a frente fica para quando houver IPC nomeado.
+    let tries = if std::env::var_os(RESTART_ENV).is_some() {
+        50
+    } else {
+        1
+    };
+    for _ in 1..tries {
+        if file.try_lock().is_ok() {
+            return Some(file);
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
     file.try_lock().ok().map(|_| file)
 }
 

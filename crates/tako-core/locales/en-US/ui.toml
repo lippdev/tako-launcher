@@ -140,11 +140,6 @@ delete = "Delete"
 space = "Space"
 done = "Done"
 
-[settings.about]
-title = "About"
-subtitle = "Tako's version, license and source code."
-version = "Version"
-source = "Source code"
 
 [session.ui]
 not_found = "Game not found"

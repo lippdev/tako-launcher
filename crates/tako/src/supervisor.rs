@@ -140,6 +140,11 @@ impl Supervisor {
             {
                 return 0;
             }
+            if ui.closing.as_deref() == Some("normal") {
+                // Saiu do modo seguro: reabre a interface normal.
+                safe = false;
+                continue;
+            }
             if self.running.is_some() {
                 // A interface fechou para o jogo (ou caiu durante ele): o supervisor segue com a sessão.
                 launch = self.game_loop();

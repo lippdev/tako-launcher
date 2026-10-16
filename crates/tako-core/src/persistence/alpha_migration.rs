@@ -7,7 +7,11 @@
 //!   para o cofre do SO e os arquivos viram `.dat.migrado`. A decifragem fica em `tako-platform`.
 
 use super::database::with_suffix;
-use super::{Result, SettingsStore, migrator};
+use super::{Result, migrator};
+use crate::metadata::SecretStore;
+use crate::metadata::igdb::IgdbSettings;
+use crate::metadata::screenscraper::ScreenScraperSettings;
+use crate::metadata::steamgriddb::SteamGridDbSettings;
 use crate::paths::DataPaths;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -251,23 +255,44 @@ pub fn mark_migrated(secrets: &MigratedSecrets) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Fluxo completo: lê os `.dat`, grava os segredos com `store_secret` (o cofre do SO) e as opções em `settings`,
-/// e só então renomeia os arquivos. Qualquer falha deixa os `.dat` no lugar para tentar de novo.
+/// Fluxo completo: lê os `.dat`, grava cada provedor lido no cofre do SO no formato que as Configurações e a
+/// busca de metadados leem (`IgdbSettings::save` etc.) e só então renomeia os arquivos. Qualquer falha deixa os
+/// `.dat` no lugar para tentar de novo.
 pub fn migrate_secrets(
     root: &Path,
     decrypt: impl Fn(&[u8]) -> Option<Vec<u8>>,
-    settings: &SettingsStore,
-    mut store_secret: impl FnMut(&str, &str) -> std::result::Result<(), String>,
+    store: &dyn SecretStore,
 ) -> std::result::Result<MigratedSecrets, String> {
-    let secrets = read_secrets(root, decrypt);
+    let s = read_secrets(root, decrypt);
+    let read = |name: &str| s.read_files.iter().any(|p| p.ends_with(name));
+    if read(IGDB_FILE) {
+        IgdbSettings {
+            enabled: s.igdb_enabled.unwrap_or(false),
+            client_id: s.igdb_client_id.clone().unwrap_or_default(),
+            client_secret: s.igdb_client_secret.clone().unwrap_or_default(),
+        }
+        .save(store)?;
+    }
+    if read(SCREENSCRAPER_FILE) {
+        ScreenScraperSettings {
+            enabled: s.screenscraper_enabled.unwrap_or(false),
+            user: s.screenscraper_user.clone().unwrap_or_default(),
+            password: s.screenscraper_password.clone().unwrap_or_default(),
+        }
+        .save(store)?;
+    }
+    if read(STEAMGRIDDB_FILE) {
+        SteamGridDbSettings {
+            enabled: s.steamgriddb_enabled.unwrap_or(false),
+            api_key: s.steamgriddb_api_key.clone().unwrap_or_default(),
+            auto_fill: s.steamgriddb_auto_fill.unwrap_or(false),
+            animated: s.steamgriddb_animated.unwrap_or(false),
+        }
+        .save(store)?;
+    }
+    let secrets = s;
     if secrets.read_files.is_empty() {
         return Ok(secrets);
-    }
-    for (key, value) in secrets.secret_entries() {
-        store_secret(key, value)?;
-    }
-    for (key, value) in secrets.flag_entries() {
-        settings.set_bool(key, value).map_err(|e| e.to_string())?;
     }
     mark_migrated(&secrets).map_err(|e| e.to_string())?;
     tracing::info!(
@@ -435,40 +460,35 @@ mod tests {
         assert!(read_secrets(root, fake_decrypt).read_files.is_empty());
     }
 
+    #[derive(Default)]
+    struct TestVault(std::cell::RefCell<HashMap<String, String>>);
+    impl SecretStore for TestVault {
+        fn get(&self, key: &str) -> Option<String> {
+            self.0.borrow().get(key).cloned()
+        }
+        fn set(&self, key: &str, value: &str) -> std::result::Result<(), String> {
+            self.0.borrow_mut().insert(key.into(), value.into());
+            Ok(())
+        }
+    }
+
     #[test]
     fn migration_stores_secrets_flags_and_renames_the_files() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write_alpha_files(root);
-        let settings = SettingsStore::new(TakoDatabase::new(root.join("tako.db")));
-        let mut vault = HashMap::new();
+        let vault = TestVault::default();
 
-        let s = migrate_secrets(root, fake_decrypt, &settings, |k, v| {
-            vault.insert(k.to_string(), v.to_string());
-            Ok(())
-        })
-        .unwrap();
+        let s = migrate_secrets(root, fake_decrypt, &vault).unwrap();
 
         assert_eq!(s.read_files.len(), 3);
-        assert_eq!(vault[secret_keys::IGDB_CLIENT_SECRET], "s3cr3t");
-        assert_eq!(vault[secret_keys::SCREENSCRAPER_PASSWORD], "senha");
-        assert_eq!(vault.len(), 5);
-        assert_eq!(
-            settings.get_bool(setting_keys::IGDB_ENABLED).unwrap(),
-            Some(true)
-        );
-        assert_eq!(
-            settings
-                .get_bool(setting_keys::SCREENSCRAPER_ENABLED)
-                .unwrap(),
-            Some(false)
-        );
-        assert_eq!(
-            settings
-                .get_bool(setting_keys::STEAMGRIDDB_AUTO_FILL)
-                .unwrap(),
-            Some(true)
-        );
+        let igdb = IgdbSettings::load(&vault);
+        assert!(igdb.enabled);
+        assert_eq!(igdb.client_secret, "s3cr3t");
+        let ss = ScreenScraperSettings::load(&vault);
+        assert!(!ss.enabled);
+        assert_eq!(ss.password, "senha");
+        assert!(SteamGridDbSettings::load(&vault).auto_fill);
         for f in [IGDB_FILE, SCREENSCRAPER_FILE, STEAMGRIDDB_FILE] {
             assert!(!root.join(f).exists());
             assert!(root.join(format!("{f}{MIGRATED_SUFFIX}")).exists());
@@ -481,11 +501,17 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write_alpha_files(root);
-        let settings = SettingsStore::new(TakoDatabase::new(root.join("tako.db")));
+        struct Closed;
+        impl SecretStore for Closed {
+            fn get(&self, _: &str) -> Option<String> {
+                None
+            }
+            fn set(&self, _: &str, _: &str) -> std::result::Result<(), String> {
+                Err("cofre fechado".into())
+            }
+        }
 
-        let r = migrate_secrets(root, fake_decrypt, &settings, |_, _| {
-            Err("cofre fechado".into())
-        });
+        let r = migrate_secrets(root, fake_decrypt, &Closed);
 
         assert!(r.is_err());
         assert!(root.join(IGDB_FILE).exists());

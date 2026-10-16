@@ -176,10 +176,8 @@ impl Page for DetailsPage {
             meta.push(d.clone());
         }
         let hint = if g.description.is_empty()
-            && !ctx.settings.bool(
-                tako_core::persistence::alpha_migration::setting_keys::IGDB_ENABLED,
-                false,
-            ) {
+            && !super::settings::metadata::providers(ctx).igdb.enabled
+        {
             ctx.t("details.metadata_hint")
         } else {
             g.note.clone().unwrap_or_default()

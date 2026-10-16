@@ -35,6 +35,10 @@ pub enum Effect {
     RefreshMetadata(Option<String>),
     ClearArtCache,
     ApplyTheme(String),
+    /// Escolher um pacote `.takotheme` e instalá-lo (`tako_themes::install`), depois redesenhar a lista.
+    InstallTheme,
+    /// Sair do modo seguro: reabrir o Tako normalmente (temas e opções voltam).
+    ExitSafeMode,
     ImportPlaynite,
     SaveDiagnostics,
     /// Aplicar a tela de jogo para o usuário confirmar (configurações).
@@ -177,6 +181,12 @@ pub struct Ctx {
     pub move_window: Option<tako_core::devices::ScreenBounds>,
     /// Algo mudou e a tela precisa ser redesenhada.
     pub dirty: bool,
+    /// Botões segurados agora (`GamepadButtons`), lidos pelo app a cada 16 ms.
+    pub pressed_buttons: u32,
+    /// Analógico esquerdo agora (-1..1, Y para baixo positivo).
+    pub pad_stick: (f32, f32),
+    /// Uma camada que mostra o controle ao vivo pede outro desenho no próximo ciclo (marca a cada desenho).
+    pub live_pad: std::cell::Cell<bool>,
 }
 
 impl Ctx {

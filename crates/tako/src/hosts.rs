@@ -83,6 +83,12 @@ impl Host for SupervisedHost {
                 });
                 return HostAction::Close;
             }
+            Effect::ExitSafeMode => {
+                self.send(&UiMsg::Closing {
+                    reason: "normal".into(),
+                });
+                return HostAction::Close;
+            }
             other => tracing::info!("pedido sem tratamento: {other:?}"),
         }
         HostAction::Stay
@@ -143,6 +149,7 @@ impl Host for LocalHost {
             }
             Effect::GoHomeKeepingGame => {}
             Effect::ExitToDesktop => return HostAction::Close,
+            Effect::ExitSafeMode => return restart_normal(ctx),
             other => tracing::info!("pedido sem tratamento: {other:?}"),
         }
         HostAction::Stay
@@ -175,5 +182,26 @@ impl Host for LocalHost {
         ctx.open_details = None;
         ctx.welcome_back = Some((id, played));
         HostAction::Show
+    }
+}
+
+/// Sem supervisor: abre outro Tako sem `--safe-mode` (ele espera este soltar a trava) e fecha este.
+fn restart_normal(ctx: &mut Ctx) -> HostAction {
+    let spawned = std::env::current_exe().and_then(|exe| {
+        std::process::Command::new(exe)
+            .args(
+                std::env::args()
+                    .skip(1)
+                    .filter(|a| a != tako_core::supervision::args::SAFE_MODE),
+            )
+            .env(crate::RESTART_ENV, "1")
+            .spawn()
+    });
+    match spawned {
+        Ok(_) => HostAction::Close,
+        Err(e) => {
+            ctx.toast(e.to_string());
+            HostAction::Stay
+        }
     }
 }
