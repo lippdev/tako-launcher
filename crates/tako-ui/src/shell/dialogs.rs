@@ -5,7 +5,7 @@ use super::layer::{Flow, MenuItem, MenuLayer};
 use super::library::Criteria;
 use super::{Ctx, Effect};
 use crate::model::PanelRow;
-use tako_core::library::{GameStore, LibraryFilter, collections, query};
+use tako_core::library::{GameStore, LibraryFilter, PlayStatus, collections, query};
 use tako_core::presentation::{game_text, library_text};
 
 pub fn toggle_favorite(ctx: &mut Ctx, id: &str) {
@@ -20,6 +20,54 @@ pub fn toggle_favorite(ctx: &mut Ctx, id: &str) {
         }
         Err(e) => tracing::error!("favoritar: {e}"),
     }
+}
+
+/// "Status: Zerado" (o rótulo da linha que abre a escolha e o aviso depois de mudar).
+fn status_text(ctx: &Ctx, status: Option<PlayStatus>) -> String {
+    ctx.tf(
+        "game.status_set",
+        &[("status", &library_text::status_label(ctx.lang(), status))],
+    )
+}
+
+/// Linha "Status: ..." do menu do card e das opções dos detalhes (LIB-001).
+fn status_item(ctx: &Ctx, id: &str) -> MenuItem {
+    let status = ctx.library.find(id).and_then(|g| g.play_status);
+    let id = id.to_owned();
+    MenuItem::new(PanelRow::button("status", status_text(ctx, status)).icon("check"))
+        .on(move |ctx| Flow::Replace(Box::new(choose_status(ctx, &id))))
+}
+
+/// Escolha do status do jogo: "Sem status" e os cinco status; fecha ao escolher.
+pub fn choose_status(ctx: &Ctx, id: &str) -> MenuLayer {
+    let title = ctx
+        .library
+        .find(id)
+        .map(|g| g.title.clone())
+        .unwrap_or_default();
+    let id = id.to_owned();
+    MenuLayer::dialog(ctx.t("game.status"), move |ctx| {
+        let current = ctx.library.find(&id).and_then(|g| g.play_status);
+        std::iter::once(None)
+            .chain(PlayStatus::ALL.map(Some))
+            .map(|s| {
+                let id = id.clone();
+                MenuItem::new(PanelRow::radio(
+                    s.map_or("none", PlayStatus::key),
+                    library_text::status_label(ctx.lang(), s),
+                    current == s,
+                ))
+                .on(move |ctx| {
+                    match ctx.library.set_status(&id, s) {
+                        Ok(()) => ctx.toast(status_text(ctx, s)),
+                        Err(e) => tracing::error!("status: {e}"),
+                    }
+                    Flow::Close
+                })
+            })
+            .collect()
+    })
+    .overline(title.to_uppercase())
 }
 
 pub fn confirm_exit(ctx: &Ctx) -> MenuLayer {
@@ -66,7 +114,7 @@ pub fn other_game_running(ctx: &Ctx, id: &str) -> MenuLayer {
     )
 }
 
-/// ☰ numa capa: Jogar, Favoritar, Coleção, Configurações deste jogo, Detalhes.
+/// ☰ numa capa: Jogar, Favoritar, Status, Coleção, Configurações deste jogo, Detalhes.
 pub fn quick_actions(ctx: &Ctx, id: &str) -> MenuLayer {
     let title = ctx
         .library
@@ -100,6 +148,7 @@ pub fn quick_actions(ctx: &Ctx, id: &str) -> MenuLayer {
                 toggle_favorite(ctx, &b);
                 Flow::Stay
             }),
+            status_item(ctx, &id),
             MenuItem::new(
                 PanelRow::button("collections", ctx.t("dialog.add_to_collection")).icon("grid"),
             )
@@ -118,7 +167,7 @@ pub fn quick_actions(ctx: &Ctx, id: &str) -> MenuLayer {
     })
 }
 
-/// Opções do jogo (detalhes): abrir na Steam, imagens, fontes e ids, editar, abrir pasta, remover.
+/// Opções do jogo (detalhes): status, abrir na Steam, imagens, fontes e ids, editar, abrir pasta, remover.
 pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
     let title = ctx
         .library
@@ -130,7 +179,7 @@ pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
         let Some(g) = ctx.library.find(&id) else {
             return Vec::new();
         };
-        let mut v = Vec::new();
+        let mut v = vec![status_item(ctx, &id)];
         if let Some(app) = g.steam_app_id {
             v.push(
                 MenuItem::new(
@@ -312,7 +361,7 @@ pub fn new_collection(ctx: &Ctx, add_game: Option<String>) -> KeyboardLayer {
     })
 }
 
-/// Painel de filtros da biblioteca (mostrar, ordenar, coleção, fonte, gênero).
+/// Painel de filtros da biblioteca (mostrar, ordenar, coleção, status, fonte, gênero).
 pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> MenuLayer {
     MenuLayer::panel(ctx.t("filters.title"), move |ctx| {
         let lang = ctx.lang();
@@ -397,6 +446,26 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
             .iter()
             .filter(|g| route.matches(g))
             .collect();
+        v.push(MenuItem::new(PanelRow::header(ctx.t("filters.status"))));
+        for s in PlayStatus::ALL {
+            let cr = criteria.clone();
+            let n = games.iter().filter(|g| g.play_status == Some(s)).count();
+            v.push(
+                MenuItem::new(
+                    PanelRow::check(
+                        s.key(),
+                        library_text::status_label(lang, Some(s)),
+                        c.statuses.contains(&s),
+                    )
+                    .value(n.to_string()),
+                )
+                .on(move |_| {
+                    let next = cr.borrow().toggle_status(s);
+                    *cr.borrow_mut() = next;
+                    Flow::Stay
+                }),
+            );
+        }
         let sources = query::sources(games.iter().copied(), |g| {
             tako_core::library::LibraryFacts::of(g)
         });
@@ -455,4 +524,67 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
 /// "Configurações deste jogo": cada linha começa em "Padrão: <valor do Tako>"; o que o jogo muda fica em negrito.
 pub fn game_settings(ctx: &Ctx, id: &str) -> Box<dyn super::Layer> {
     super::game_settings::panel(ctx, id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shell::layer::Layer;
+    use tako_core::library::{LibraryCriteria, ManualGameRecord};
+
+    fn accept(ctx: &mut Ctx, layer: &MenuLayer, key: &str) -> Flow {
+        let item = (layer.build)(ctx)
+            .into_iter()
+            .find(|i| i.row.key == key)
+            .unwrap_or_else(|| panic!("sem a linha {key}"));
+        (item.accept.unwrap())(ctx)
+    }
+
+    #[test]
+    fn status_set_from_the_card_menu_filters_and_persists() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let record = ManualGameRecord::create("Jogo", "/nao/existe.sh", chrono::Utc::now());
+        let id = record.id.clone();
+        ctx.library.add_manual(record).unwrap();
+
+        let menu = quick_actions(&ctx, &id);
+        let Flow::Replace(_) = accept(&mut ctx, &menu, "status") else {
+            panic!("escolha do status");
+        };
+        let picker = choose_status(&ctx, &id);
+        assert!(matches!(accept(&mut ctx, &picker, "beaten"), Flow::Close));
+        assert_eq!(ctx.toast.as_ref().unwrap().0, "Status: Zerado");
+        let rows = picker.render(&ctx).rows;
+        assert_eq!(rows[2].title, "Zerado");
+        assert!(rows[2].on);
+
+        let criteria: Criteria = Default::default();
+        let filters = library_filters(&ctx, criteria.clone(), LibraryFilter::All);
+        accept(&mut ctx, &filters, "abandoned");
+        let shown = |c: &Criteria, ctx: &Ctx| {
+            query::apply(ctx.library.games(), LibraryFilter::All, &c.borrow()).len()
+        };
+        assert_eq!(shown(&criteria, &ctx), 0);
+        accept(&mut ctx, &filters, "beaten");
+        assert_eq!(shown(&criteria, &ctx), 1);
+        assert_eq!(
+            *criteria.borrow(),
+            LibraryCriteria::default()
+                .toggle_status(PlayStatus::Abandoned)
+                .toggle_status(PlayStatus::Beaten)
+        );
+
+        // Reabrir o banco mantém o status.
+        drop(ctx);
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            false,
+        );
+        assert_eq!(
+            ctx.library.find(&id).unwrap().play_status,
+            Some(PlayStatus::Beaten)
+        );
+    }
 }

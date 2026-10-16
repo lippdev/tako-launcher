@@ -112,6 +112,7 @@ fn change(source: &tako_sources::playnite::library::PlayniteGame, store: GameSto
             .as_ref()
             .map(|c| c.sessions.clone())
             .unwrap_or_default();
+        let play_status = current.as_ref().and_then(|c| c.play_status);
         let current = current.map(|c| PlayniteState {
             is_favorite: c.is_favorite,
             last_played_at: c.last_played_at,
@@ -120,6 +121,7 @@ fn change(source: &tako_sources::playnite::library::PlayniteGame, store: GameSto
         let s = import::merge_state(current.as_ref(), &source, store);
         GameStateRecord {
             is_favorite: s.is_favorite,
+            play_status,
             last_played_at: s.last_played_at,
             play_minutes: s.play_minutes,
             sessions,

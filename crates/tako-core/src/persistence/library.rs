@@ -4,7 +4,7 @@
 
 use super::database::{CORRUPTED_SUFFIX, with_suffix};
 use super::{Result, TakoDatabase, format_date, parse_date, parse_date_or_epoch};
-use crate::library::{GameTrackingStrategy, PlaySession};
+use crate::library::{GameTrackingStrategy, PlaySession, PlayStatus};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 use serde::Deserialize;
@@ -38,6 +38,7 @@ pub struct ManualGameRow {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct GameStateRow {
     pub is_favorite: bool,
+    pub play_status: Option<PlayStatus>,
     pub last_played_at: Option<DateTime<Utc>>,
     pub play_minutes: f64,
     /// Linhas de `play_sessions`, da mais antiga para a mais recente.
@@ -136,6 +137,7 @@ fn read_legacy_json(path: &Path) -> Result<LibraryData> {
             .map(|(id, s)| {
                 let row = GameStateRow {
                     is_favorite: s.is_favorite,
+                    play_status: None,
                     last_played_at: s.last_played_at.as_deref().and_then(parse_date),
                     play_minutes: s.play_minutes,
                     sessions: Vec::new(),
@@ -210,7 +212,7 @@ fn write(conn: &Connection, data: &LibraryData, verb: &str) -> Result<()> {
         ])?;
     }
     let mut state = conn.prepare(&format!(
-        "{verb} INTO game_state (game_id, is_favorite, last_played_at, play_minutes) VALUES (?1, ?2, ?3, ?4);"
+        "{verb} INTO game_state (game_id, is_favorite, last_played_at, play_minutes, status) VALUES (?1, ?2, ?3, ?4, ?5);"
     ))?;
     let mut session = conn
         .prepare("INSERT INTO play_sessions (game_id, started_at, seconds) VALUES (?1, ?2, ?3);")?;
@@ -220,6 +222,7 @@ fn write(conn: &Connection, data: &LibraryData, verb: &str) -> Result<()> {
             s.is_favorite,
             s.last_played_at.map(format_date),
             s.play_minutes,
+            s.play_status.map(PlayStatus::key),
         ])?;
         for p in &s.sessions {
             session.execute(params![
@@ -259,11 +262,17 @@ fn read_manual(conn: &Connection) -> Result<Vec<ManualGameRow>> {
 }
 
 fn read_state(conn: &Connection) -> Result<HashMap<String, GameStateRow>> {
-    let mut stmt =
-        conn.prepare("SELECT game_id, is_favorite, last_played_at, play_minutes FROM game_state;")?;
+    let mut stmt = conn.prepare(
+        "SELECT game_id, is_favorite, last_played_at, play_minutes, status FROM game_state;",
+    )?;
     let rows = stmt.query_map([], |r| {
         let row = GameStateRow {
             is_favorite: r.get::<_, i64>(1)? != 0,
+            // Status desconhecido (versão mais nova gravou outro nome) fica sem status.
+            play_status: r
+                .get::<_, Option<String>>(4)?
+                .as_deref()
+                .and_then(PlayStatus::from_key),
             last_played_at: r
                 .get::<_, Option<String>>(2)?
                 .as_deref()
@@ -330,6 +339,7 @@ mod tests {
         });
         let state = GameStateRow {
             is_favorite: true,
+            play_status: Some(PlayStatus::Paused),
             last_played_at: Some(added()),
             play_minutes: 42.5,
             sessions: vec![PlaySession {

@@ -62,6 +62,8 @@ install_via_store = "Instalar via loja"
 not_installed = "Não instalado"
 favorited = "Adicionado aos favoritos"
 unfavorited = "Removido dos favoritos"
+status = "Status"
+status_set = "Status: {status}"
 
 [details]
 play_time = "Tempo de jogo"
@@ -115,6 +117,7 @@ sort = "ORDENAR POR"
 collection = "COLEÇÃO"
 source = "FONTE"
 genre = "GÊNERO"
+status = "STATUS"
 filters = "FILTROS"
 clear = "Limpar filtros"
 

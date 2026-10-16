@@ -81,6 +81,8 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         7,
         "ALTER TABLE game_settings ADD COLUMN working_directory TEXT;",
     ),
+    // Status do jogo (LIB-001): jogando, zerado, pausado, abandonado, quero jogar.
+    (8, "ALTER TABLE game_state ADD COLUMN status TEXT;"),
     // Histórico de sessões (SESSION-002); a biblioteca guarda só as últimas por jogo.
     (
         9,
@@ -176,9 +178,8 @@ pub(crate) mod tests {
 
     #[test]
     fn migrations_are_in_strictly_increasing_order() {
-        // Branches paralelas reservam números: um buraco temporário é aceito, ordem fora não.
-        assert_eq!(MIGRATIONS[0].0, 1);
-        assert!(MIGRATIONS.windows(2).all(|w| w[0].0 < w[1].0));
+        let versions: Vec<u32> = MIGRATIONS.iter().map(|m| m.0).collect();
+        assert_eq!(versions, (1..=MIGRATIONS.len() as u32).collect::<Vec<_>>());
     }
 
     #[test]

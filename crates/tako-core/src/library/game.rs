@@ -115,6 +115,43 @@ impl GameTrackingStrategy {
     }
 }
 
+/// Andamento do jogo marcado pelo usuário (LIB-001). `None` no jogo = sem status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum PlayStatus {
+    Playing,
+    Beaten,
+    Paused,
+    Abandoned,
+    Wishlist,
+}
+
+impl PlayStatus {
+    pub const ALL: [PlayStatus; 5] = [
+        PlayStatus::Playing,
+        PlayStatus::Beaten,
+        PlayStatus::Paused,
+        PlayStatus::Abandoned,
+        PlayStatus::Wishlist,
+    ];
+
+    /// Chave gravada em `game_state.status` e usada nos textos (`play_status.<chave>`).
+    pub fn key(self) -> &'static str {
+        match self {
+            PlayStatus::Playing => "playing",
+            PlayStatus::Beaten => "beaten",
+            PlayStatus::Paused => "paused",
+            PlayStatus::Abandoned => "abandoned",
+            PlayStatus::Wishlist => "wishlist",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|k| k.key().eq_ignore_ascii_case(key.trim()))
+    }
+}
+
 /// Tipo de arte que o usuário pode escolher (ADR-0023 do C#).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArtKind {
@@ -215,6 +252,7 @@ pub struct Game {
 
     pub added_at: Option<DateTime<Utc>>,
     pub is_favorite: bool,
+    pub play_status: Option<PlayStatus>,
     pub last_played_at: Option<DateTime<Utc>>,
     #[serde(with = "duration_secs")]
     pub play_time: Duration,
@@ -315,6 +353,9 @@ mod tests {
         }
         for k in ArtKind::ALL {
             assert_eq!(ArtKind::from_key(k.key()), Some(k));
+        }
+        for k in PlayStatus::ALL {
+            assert_eq!(PlayStatus::from_key(k.key()), Some(k));
         }
     }
 }

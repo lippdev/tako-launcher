@@ -1,6 +1,6 @@
 //! Port de `Library/ManualGame.cs`: jogo adicionado pelo usuário e estado do usuário por jogo.
 
-use super::{Game, GameStore, GameTrackingStrategy};
+use super::{Game, GameStore, GameTrackingStrategy, PlayStatus};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -26,10 +26,12 @@ pub struct ManualGameRecord {
     pub platform: Option<String>,
 }
 
-/// Estado do usuário por jogo (qualquer loja): favorito, última vez aberto pelo launcher e tempo registrado.
+/// Estado do usuário por jogo (qualquer loja): favorito, status, última vez aberto pelo launcher e tempo registrado.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct GameStateRecord {
     pub is_favorite: bool,
+    #[serde(default)]
+    pub play_status: Option<PlayStatus>,
     pub last_played_at: Option<DateTime<Utc>>,
     pub play_minutes: f64,
     /// Histórico (SESSION-002), da mais antiga para a mais recente; só as últimas `MAX_SESSIONS`.

@@ -148,7 +148,7 @@ fn csharp_v6_database_opens_without_data_loss() {
     assert_eq!(ids["IGDB"], "900001");
     assert_eq!(ids["SteamGridDB"], "");
 
-    // Esquema: a última versão em cima, histórico da alpha intacto, cópia de segurança feita.
+    // Esquema: a versão mais nova em cima, histórico da alpha intacto, cópia de segurança feita.
     let conn = db.open().unwrap();
     assert_eq!(
         migrator::current_version(&conn).unwrap(),

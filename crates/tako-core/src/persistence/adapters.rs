@@ -32,6 +32,7 @@ impl library::LibraryStore for SqlLibrary {
                         k.clone(),
                         GameStateRow {
                             is_favorite: s.is_favorite,
+                            play_status: s.play_status,
                             last_played_at: s.last_played_at,
                             play_minutes: s.play_minutes,
                             sessions: s.sessions.clone(),
@@ -77,6 +78,7 @@ fn to_row(r: ManualGameRecord) -> ManualGameRow {
 fn to_state(s: GameStateRow) -> GameStateRecord {
     GameStateRecord {
         is_favorite: s.is_favorite,
+        play_status: s.play_status,
         last_played_at: s.last_played_at,
         play_minutes: s.play_minutes,
         sessions: s.sessions,
@@ -145,6 +147,7 @@ mod tests {
             "steam:1".into(),
             GameStateRecord {
                 is_favorite: true,
+                play_status: Some(library::PlayStatus::Beaten),
                 last_played_at: None,
                 play_minutes: 3.0,
                 ..Default::default()
@@ -154,6 +157,10 @@ mod tests {
         let back = library::LibraryStore::load(&mut lib);
         assert_eq!(back.manual[0].title, "A");
         assert!(back.state["steam:1"].is_favorite);
+        assert_eq!(
+            back.state["steam:1"].play_status,
+            Some(library::PlayStatus::Beaten)
+        );
 
         let mut cols = SqlCollections::new(db);
         let c = CollectionInfo {

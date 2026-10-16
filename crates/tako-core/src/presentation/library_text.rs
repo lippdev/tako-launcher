@@ -3,7 +3,7 @@
 use super::game_text::{store_of, store_via, via_name};
 use super::{tr, trn};
 use crate::i18n::Lang;
-use crate::library::{Game, GameStore, InstallFilter, LibrarySort};
+use crate::library::{Game, GameStore, InstallFilter, LibrarySort, PlayStatus};
 
 /// Ordem das opções de ordenação no painel e no botão "Ordenar".
 pub const SORT_ORDER: [LibrarySort; 5] = [
@@ -32,6 +32,12 @@ pub fn install_label(lang: Lang, install: InstallFilter) -> String {
         InstallFilter::Any => "any",
     };
     tr(lang, &format!("library.install.{key}"), &[])
+}
+
+/// "Jogando", "Zerado"...; `None` = "Sem status".
+pub fn status_label(lang: Lang, status: Option<PlayStatus>) -> String {
+    let key = status.map_or("none", PlayStatus::key);
+    tr(lang, &format!("library.status.{key}"), &[])
 }
 
 /// A opção seguinte da lista de ordenação (volta ao início no fim).

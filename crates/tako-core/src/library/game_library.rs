@@ -1,7 +1,9 @@
 //! Port de `IGameLibrary`, `LocalGameLibrary` e `InMemoryGameLibrary` (MVP-023): jogos encontrados nas lojas mais
 //! os adicionados pelo usuário, com favorito, "jogado por último" e tempo guardados num [`LibraryStore`].
 
-use super::{Clock, Game, GameStateRecord, GameStore, ManualGameRecord, PlaySession, duplicates};
+use super::{
+    Clock, Game, GameStateRecord, GameStore, ManualGameRecord, PlaySession, PlayStatus, duplicates,
+};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
@@ -140,6 +142,12 @@ impl GameLibrary {
         self.update_state(id, |s| s.is_favorite = favorite)
     }
 
+    /// Muda o status do jogo (LIB-001); `None` tira o status.
+    pub fn set_status(&mut self, id: &str, status: Option<PlayStatus>) -> Result<(), LibraryError> {
+        self.find_mut(id)?.play_status = status;
+        self.update_state(id, |s| s.play_status = status)
+    }
+
     /// Registra o fim de uma sessão: o jogo vai para o topo de "Jogados recentemente" e a sessão entra no
     /// histórico (duração zero é só a abertura, sem sessão).
     pub fn record_session(&mut self, id: &str, duration: Duration) -> Result<(), LibraryError> {
@@ -256,6 +264,7 @@ impl GameLibrary {
             }
             if let Some(state) = self.data.state.get(&game.id) {
                 game.is_favorite = state.is_favorite;
+                game.play_status = state.play_status;
                 if game.last_played_at.is_none() || state.last_played_at > game.last_played_at {
                     game.last_played_at = state.last_played_at;
                 }
