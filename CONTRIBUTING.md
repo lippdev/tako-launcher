@@ -40,9 +40,11 @@ Regras:
 
 ## 4. Definition of Done
 
-Vale a DoD do [PRD §13](docs/PRD.md); o checklist está no template de PR.
+Vale a DoD do [PRD §12](docs/PRD.md); o checklist está no template de PR.
 
 ## 5. Padrões de código (C# / .NET 10)
+
+> Valem para o código C#/WPF até o corte (PRD MIG-043). Os padrões do código Rust entram aqui no MIG-010; até lá, vale a [PRD §5](docs/PRD.md).
 
 - `.editorconfig` + analyzers; **warnings são erros**. Rode `dotnet format` antes do commit.
 - `Nullable` habilitado; sem `!` sem comentário justificando.
@@ -52,7 +54,7 @@ Vale a DoD do [PRD §13](docs/PRD.md); o checklist está no template de PR.
 - Logs estruturados com `Microsoft.Extensions.Logging`. **Nunca** logar credenciais ou tokens.
 - Não engolir exceções; tratar nos limites (UI, IPC, processo) e levar a sessão a `Error → Recovery`.
 
-## 6. Regras arquiteturais (PRD §4.3)
+## 6. Regras arquiteturais (código C#)
 
 1. Dependências fluem para dentro: `UI.Wpf`/`Host` → `Core`/`Themes` → `ConsoleMode.Runtime` (contratos). `Core` **não** referencia WPF.
 2. Temas e `PlayniteCompat` nunca acessam serviços privilegiados do runtime.
@@ -84,7 +86,7 @@ Para gerar localmente: `.\build\Publish-Tako.ps1 -Runtime x64 -Target All -Versi
 
 ## 9. Issues
 
-Cada item do PRD (ex.: `MVP-005`) vira uma issue com o ID no título. Labels: `epic:*`, `priority:P0..P3`, `type:story|bug|spike`, `blocked`. P0 primeiro; nada de P1+ antes do gate do Marco 0 ([`docs/ROADMAP.md`](docs/ROADMAP.md)).
+Cada item do PRD (ex.: `MVP-005`) vira uma issue com o ID no título. Labels: `epic:*`, `priority:P0..P3`, `type:story|bug|spike`, `blocked`. P0 primeiro, na ordem do [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## 10. Licença
 
