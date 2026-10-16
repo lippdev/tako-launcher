@@ -83,6 +83,9 @@ public sealed class SteamGridDbClient : IDisposable
 
     public bool IsConfigured => _settings().IsActive;
 
+    /// <summary>Última falha de rede ou de chave (estado "Com problema" nas Configurações); limpa no próximo sucesso.</summary>
+    public SteamGridDbFailure? LastFailure { get; private set; }
+
     /// <summary>Consultas que chegaram à rede (sem contar o cache).</summary>
     public int NetworkRequests { get; private set; }
 
@@ -107,7 +110,18 @@ public sealed class SteamGridDbClient : IDisposable
         await _queue.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            string? json = await SendAsync(path, key.ApiKey, cancellationToken).ConfigureAwait(false);
+            string? json;
+            try
+            {
+                json = await SendAsync(path, key.ApiKey, cancellationToken).ConfigureAwait(false);
+                LastFailure = null;
+            }
+            catch (SteamGridDbException ex)
+            {
+                LastFailure = ex.Failure;
+                throw;
+            }
+
             if (json is null)
             {
                 return null;

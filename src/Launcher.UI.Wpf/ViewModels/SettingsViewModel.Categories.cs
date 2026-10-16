@@ -57,17 +57,45 @@ public sealed partial class SettingsViewModel
         Row("collections", SettingKind.Action, "Coleções", Shell.ManageCollections,
             description: () => "Junte jogos do seu jeito; cada coleção vira uma fileira na Início e um filtro na biblioteca",
             value: () => CollectionsSummary),
-        Row("metadata", SettingKind.Action, "Atualizar informações dos jogos", Shell.RefreshMetadata,
-            description: () => "Descrição, gêneros, lançamento, notas e artes (loja da Steam e, se ligada, IGDB)",
-            value: () => "Atualizar"),
+    ];
 
-        // Fontes de dados dos jogos (ADR-0021/0022): cada uma abre o próprio painel.
+    // ---------------------------------------------------------------- Capas e metadados (ADR-0023)
+
+    private List<SettingRowViewModel> MetadataRows() =>
+    [
+        // Fontes de dados e artes: cada uma abre o próprio painel (as chaves continuam nos mesmos arquivos).
+        Header("sources", "Fontes"),
         Row("igdb", SettingKind.Action, "Dados dos jogos (IGDB)", () => Shell.OpenIgdbSettingsCommand.Execute(null),
             description: () => "Informações e artes de jogos de qualquer loja e de consoles, com a sua chave gratuita da Twitch",
             value: () => Shell.IgdbSummary),
         Row("screenscraper", SettingKind.Action, "Dados de ROMs (ScreenScraper)", () => Shell.OpenScreenScraperSettingsCommand.Execute(null),
             description: () => "Caixas, logos, vídeos e informações de jogos de console, reconhecidos pelo arquivo, com a sua conta gratuita",
             value: () => Shell.ScreenScraperSummary),
+        Row("steamgriddb", SettingKind.Action, "Capas da comunidade (SteamGridDB)", () => Shell.OpenSteamGridDbSettingsCommand.Execute(null),
+            description: () => "Capas, fundos, logos e ícones feitos por fãs para qualquer jogo, com a sua chave gratuita",
+            value: () => Shell.SteamGridDbSummary),
+        Header("covers", "Capas"),
+        Row("sgdb-autofill", SettingKind.Toggle, "Usar o SteamGridDB quando faltar capa", Shell.ToggleSteamGridDbAutoFill,
+            description: () => Shell.MetadataSettings.SteamGridDbSettings.IsActive
+                ? "Jogos que ficaram sem capa nas outras fontes ganham a mais votada da comunidade"
+                : "Configure o SteamGridDB acima para ligar",
+            isOn: () => Shell.MetadataSettings.SteamGridDbSettings is { IsActive: true, AutoFill: true }),
+        Row("sgdb-animated", SettingKind.Toggle, "Mostrar capas animadas no seletor", Shell.ToggleSteamGridDbAnimated,
+            description: () => "O SteamGridDB também tem capas que se mexem; o seletor mostra só as paradas quando desligado",
+            isOn: () => Shell.MetadataSettings.SteamGridDbSettings.Animated),
+        Row("animated-covers", SettingKind.Choice, "Capas animadas", Shell.CycleAnimatedCovers,
+            description: () => "Só a capa em foco se mexe por padrão; todas param durante o jogo e com \"Reduzir animações\"",
+            value: () => Core.Presentation.AnimationPolicy.Label(Settings.AnimatedCovers)),
+        Row("art-order", SettingKind.Info, "Ordem das capas automáticas", () => Shell.Toast("Escolha outra capa em Detalhes › Opções › Trocar imagens; a sua escolha nunca é trocada"),
+            description: () => "Jogos da Steam usam a arte da Steam; os de outras lojas, a IGDB; as ROMs, o ScreenScraper; o SteamGridDB completa o que faltar",
+            value: () => "Steam › IGDB › ScreenScraper › SteamGridDB"),
+        Header("maintenance", "Manutenção"),
+        Row("metadata", SettingKind.Action, "Atualizar dados de todos os jogos", Shell.RefreshMetadata,
+            description: () => "Busca de novo descrição, gêneros, lançamento, notas e artes em todas as fontes ligadas; as suas escolhas ficam",
+            value: () => "Atualizar"),
+        Row("art-cache", SettingKind.Action, "Limpar cache de imagens", Shell.ClearArtCache,
+            description: () => "Apaga as imagens baixadas; elas voltam a baixar quando aparecem. As capas que você escolheu ficam",
+            value: () => Shell.ArtCacheSummary),
     ];
 
     /// <summary>"Criar", "1 coleção", "3 coleções".</summary>

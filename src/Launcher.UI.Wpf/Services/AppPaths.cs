@@ -54,6 +54,15 @@ public static class AppPaths
     /// <summary>ScreenScraper ligado e a conta do usuário (usuário e senha), cifrados com DPAPI (ADR-0022).</summary>
     public static string ScreenScraperSettingsFile => Path.Combine(DataRoot, "screenscraper.dat");
 
+    /// <summary>SteamGridDB ligado, a chave da API do usuário e as opções de capas, cifrados com DPAPI (ADR-0023).</summary>
+    public static string SteamGridDbSettingsFile => Path.Combine(DataRoot, "steamgriddb.dat");
+
+    /// <summary>Respostas do SteamGridDB, uma por consulta, sem a chave (ADR-0023).</summary>
+    public static string SteamGridDbCache => Path.Combine(DataRoot, "cache", "steamgriddb");
+
+    /// <summary>Cópias das imagens do PC escolhidas como capa (fora do cache: limpar o cache não as apaga).</summary>
+    public static string ChosenArtDirectory => Path.Combine(DataRoot, "art-choices");
+
     /// <summary>Marcador de sessão em andamento (proteção contra loop de travamento, MVP-036).</summary>
     public static string SessionFile => Path.Combine(DataRoot, "session.json");
 

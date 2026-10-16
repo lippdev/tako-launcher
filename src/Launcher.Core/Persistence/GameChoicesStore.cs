@@ -54,6 +54,28 @@ public sealed class GameChoicesStore(TakoDatabase database)
         command.ExecuteNonQuery();
     }
 
+    /// <summary>Ids fixados de todos os jogos (uma consulta só, para a rodada de metadados).</summary>
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> LoadAllIds()
+    {
+        var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        using var connection = database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT game_id, source, source_id FROM game_source_ids;";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            string gameId = reader.GetString(0);
+            if (!result.TryGetValue(gameId, out var ids))
+            {
+                result[gameId] = ids = new Dictionary<string, string>(StringComparer.Ordinal);
+            }
+
+            ids[reader.GetString(1)] = reader.GetString(2);
+        }
+
+        return result.ToDictionary(kv => kv.Key, kv => (IReadOnlyDictionary<string, string>)kv.Value, StringComparer.Ordinal);
+    }
+
     /// <summary>Ids fixados por fonte; id vazio = "nenhum" (a fonte fica de fora deste jogo).</summary>
     public IReadOnlyDictionary<string, string> LoadIds(string gameId)
     {

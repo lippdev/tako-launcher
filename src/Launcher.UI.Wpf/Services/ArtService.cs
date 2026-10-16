@@ -112,6 +112,74 @@ public sealed partial class ArtService : IDisposable
 
     public void Dispose() => _decoders.Dispose();
 
+    /// <summary>
+    /// Arquivo local da imagem (baixa para o cache se preciso), para quem precisa dos bytes (capas animadas); nulo sem
+    /// arte ou sem rede.
+    /// </summary>
+    public async Task<string?> GetFileAsync(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        try
+        {
+            return await LocateAsync(uri).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or UnauthorizedAccessException)
+        {
+            LogArtFailed(_logger, uri, ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>Tamanho do cache de imagens no disco (Configurações › Capas e metadados).</summary>
+    public long DiskCacheBytes()
+    {
+        try
+        {
+            return Directory.Exists(_cacheDirectory)
+                ? new DirectoryInfo(_cacheDirectory).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
+                : 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// "Limpar cache de imagens": apaga os arquivos baixados (voltam a baixar quando aparecem) e as imagens decodificadas
+    /// na memória. As imagens escolhidas do PC ficam em outra pasta e não são apagadas. Devolve os bytes liberados.
+    /// </summary>
+    public long ClearDiskCache()
+    {
+        long freed = 0;
+        lock (_gate)
+        {
+            _small.Clear();
+            _large.Clear();
+        }
+
+        if (!Directory.Exists(_cacheDirectory))
+        {
+            return 0;
+        }
+
+        foreach (var file in new DirectoryInfo(_cacheDirectory).EnumerateFiles("*", SearchOption.AllDirectories))
+        {
+            try
+            {
+                long size = file.Length;
+                file.Delete();
+                freed += size;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Em uso agora: fica para a próxima limpeza.
+            }
+        }
+
+        return freed;
+    }
+
     private int DecodeWidth(int displayWidth) => (int)Math.Ceiling(displayWidth * Math.Max(1, RenderScale));
 
     private SizedLruCache<(Uri, int), ImageSource?> CacheFor((Uri Uri, int Width) key) => key.Width >= LargeImageWidth ? _large : _small;

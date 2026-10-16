@@ -93,12 +93,18 @@ public sealed partial class SteamGridDbProvider(SteamGridDbClient client, TimePr
     }
 
     /// <summary>Imagens do jogo com o filtro do seletor (lista vazia se o SteamGridDB não tiver ou falhar).</summary>
-    public async Task<IReadOnlyList<ArtCandidate>> ImagesAsync(string gameId, SteamGridDbFilter filter, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ArtCandidate>> ImagesAsync(string gameId, SteamGridDbFilter filter, CancellationToken cancellationToken, int page = 0)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        var data = await QueryAsync(SteamGridDbQueries.Images(gameId, filter), cancellationToken).ConfigureAwait(false);
+        var data = await QueryAsync(SteamGridDbQueries.Images(gameId, filter, page), cancellationToken).ConfigureAwait(false);
         return data is { } list ? SteamGridDbQueries.Apply(SteamGridDbParser.Images(list, filter.Kind), filter) : [];
     }
+
+    /// <summary>Busca livre por nome (campo de busca do seletor): outro jogo ou outro termo.</summary>
+    public async Task<IReadOnlyList<MetadataMatch>> SearchTermAsync(string term, CancellationToken cancellationToken) =>
+        IsEnabled && !string.IsNullOrWhiteSpace(term) && await QueryAsync(SteamGridDbQueries.Autocomplete(term), cancellationToken).ConfigureAwait(false) is { } found
+            ? SteamGridDbParser.Games(found)
+            : [];
 
     /// <summary>Falha em segundo plano não interrompe nada: fica registrada e volta nula.</summary>
     private async Task<System.Text.Json.JsonElement?> QueryAsync(string path, CancellationToken cancellationToken)

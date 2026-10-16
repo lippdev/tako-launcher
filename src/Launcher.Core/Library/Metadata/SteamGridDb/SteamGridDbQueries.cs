@@ -61,7 +61,7 @@ public static class SteamGridDbQueries
     /// Imagens do jogo com o filtro: <c>grids</c> (capa), <c>heroes</c> (fundo), <c>logos</c> e <c>icons</c>; dimensões só
     /// para a capa; <c>types=static</c> sem as animadas; NSFW e humor desligados.
     /// </summary>
-    public static string Images(string gameId, SteamGridDbFilter filter)
+    public static string Images(string gameId, SteamGridDbFilter filter, int page = 0)
     {
         ArgumentNullException.ThrowIfNull(filter);
         string endpoint = filter.Kind switch
@@ -85,6 +85,11 @@ public static class SteamGridDbQueries
         query.Add("types=" + (filter.Animated ? "static,animated" : "static"));
         query.Add("nsfw=false");
         query.Add("humor=false");
+        if (page > 0)
+        {
+            query.Add("page=" + page.ToString(CultureInfo.InvariantCulture)); // rolagem infinita do seletor
+        }
+
         return $"{endpoint}/game/{Uri.EscapeDataString(gameId)}?{string.Join("&", query)}";
     }
 

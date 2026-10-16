@@ -64,6 +64,9 @@ public sealed partial class UiSmokeTests
         var hotkey = new SimulatedEmergencyHotkey();
         string igdbFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-igdb-{Guid.NewGuid():N}.dat");
         string screenScraperFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-screenscraper-{Guid.NewGuid():N}.dat");
+        string steamGridDbFile = Path.Combine(Path.GetTempPath(), $"tako-smoke-steamgriddb-{Guid.NewGuid():N}.dat");
+        var artCatalog = new FakeArtCatalog();
+        var sourceIds = new FakeSourceIds();
         var consoleFiles = new ConsoleModeFiles(
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-{Guid.NewGuid():N}.json"),
             Path.Combine(Path.GetTempPath(), $"tako-smoke-console-environment-{Guid.NewGuid():N}.json"));
@@ -92,7 +95,12 @@ public sealed partial class UiSmokeTests
                 // simulado e não há provedores), para a tela seguir o caminho de uma versão de release sem ir à rede.
                 .AddSingleton(new Launcher.Core.Library.Metadata.ScreenScraper.ScreenScraperSettingsStore(screenScraperFile, new ConsoleMode.Runtime.Windows.DpapiSecretProtector()))
                 .AddSingleton(new Launcher.Core.Library.Metadata.ScreenScraper.ScreenScraperSoftware("teste", "teste", "Tako"))
-                .RemoveAll<Launcher.Core.Library.Metadata.IMetadataProvider>());
+                .RemoveAll<Launcher.Core.Library.Metadata.IMetadataProvider>()
+                // Capas e metadados (ADR-0023): chave do SteamGridDB num arquivo temporário; catálogo de imagens e "Fontes e
+                // IDs" simulados, com imagens geradas no teste.
+                .AddSingleton(new Launcher.Core.Library.Metadata.SteamGridDb.SteamGridDbSettingsStore(steamGridDbFile, new ConsoleMode.Runtime.Windows.DpapiSecretProtector()))
+                .AddSingleton<IArtCatalog>(artCatalog)
+                .AddSingleton<ISourceIdService>(sourceIds));
         var theme = services.GetRequiredService<ThemeService>().Apply(ThemeService.DefaultTheme);
         Assert.True(theme.Succeeded, theme.Error);
 
@@ -537,6 +545,9 @@ public sealed partial class UiSmokeTests
 
         // --- Dados de ROMs (ScreenScraper, ADR-0022): conta do usuário, Testar simulado, ROM no "Adicionar jogo".
         ScreenScraperDataSettings(shell, window, services.GetRequiredService<MetadataService>());
+
+        // --- Capas e metadados (ADR-0023): seletor de imagens, Fontes e IDs, SteamGridDB e a categoria nova.
+        CoversAndSourceIds(shell, window, services.GetRequiredService<MetadataService>(), artCatalog, sourceIds);
 
         // --- Segurança de temas (frente H): caminhos montados por dados não carregam (MVP-016, questão aberta 8).
         ThemeSecurity(services, bindingErrors);

@@ -15,6 +15,7 @@ using Launcher.Core.Library.Gog;
 using Launcher.Core.Library.Metadata;
 using Launcher.Core.Library.Metadata.Igdb;
 using Launcher.Core.Library.Metadata.ScreenScraper;
+using Launcher.Core.Library.Metadata.SteamGridDb;
 using Launcher.Core.Library.Sources;
 using Launcher.Core.Library.Steam;
 using Launcher.Core.Library.Xbox;
@@ -138,10 +139,22 @@ public partial class App : Application
         services.AddSingleton(_ => new ScreenScraperSettingsStore(AppPaths.ScreenScraperSettingsFile, new DpapiSecretProtector()));
         services.AddSingleton(sp => new ScreenScraperClient(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ScreenScraperSoftware>(), () => sp.GetRequiredService<ScreenScraperSettingsStore>().Current, sp.GetRequiredService<TimeProvider>(), new IgdbFileCache(AppPaths.ScreenScraperCache, sp.GetRequiredService<TimeProvider>())));
         services.AddSingleton(_ => new RomHashCache(AppPaths.RomHashesFile));
+        // SteamGridDB (ADR-0023): chave da API do próprio usuário (DPAPI); capas, fundos, logos e ícones da comunidade.
+        services.AddSingleton(_ => new SteamGridDbSettingsStore(AppPaths.SteamGridDbSettingsFile, new DpapiSecretProtector()));
+        services.AddSingleton(sp => new SteamGridDbClient(sp.GetRequiredService<HttpClient>(), () => sp.GetRequiredService<SteamGridDbSettingsStore>().Current, sp.GetRequiredService<TimeProvider>(), new IgdbFileCache(AppPaths.SteamGridDbCache, sp.GetRequiredService<TimeProvider>(), TimeSpan.FromDays(7))));
+        // Os provedores também são pedidos pelo nome (seletor de imagens): um objeto só por provedor.
+        services.AddSingleton<IgdbProvider>();
+        services.AddSingleton<ScreenScraperProvider>();
+        services.AddSingleton<SteamGridDbProvider>();
         services.AddSingleton<IMetadataProvider, SteamStoreProvider>();
-        services.AddSingleton<IMetadataProvider, IgdbProvider>();
-        services.AddSingleton<IMetadataProvider, ScreenScraperProvider>();
+        services.AddSingleton<IMetadataProvider>(sp => sp.GetRequiredService<IgdbProvider>());
+        services.AddSingleton<IMetadataProvider>(sp => sp.GetRequiredService<ScreenScraperProvider>());
+        services.AddSingleton<IMetadataProvider>(sp => sp.GetRequiredService<SteamGridDbProvider>());
+        services.AddSingleton(sp => new GameChoicesStore(sp.GetRequiredService<TakoDatabase>()));
         services.AddSingleton<MetadataService>();
+        services.AddSingleton<ISourceIdService>(sp => sp.GetRequiredService<MetadataService>());
+        services.AddSingleton<IArtCatalog, ArtCatalog>();
+        services.AddSingleton<AnimatedArtService>();
         services.AddSingleton<SupervisorLink>();
         services.AddSingleton<UpdateService>();
         services.AddSingleton(sp => new SessionJournal(AppPaths.SessionFile, sp.GetRequiredService<TimeProvider>()));
