@@ -1,0 +1,11 @@
+# Cores do global `Ui` (tokens.slint do tema padrão) trocadas por este tema.
+canvas = "#000000"
+on-accent-muted = "#FFFFFFEB"
+on-accent-subtle = "#FFFFFFC2"
+surface-1 = "#FFFFFF38"
+surface-2 = "#FFFFFF59"
+surface-sidebar = "#000000B3"
+on-surface-solid-muted = "#2E323A"
+control-track-off = "#FFFFFF66"
+control-off = "#FFFFFFCC"
+scrim = "#000000CC"

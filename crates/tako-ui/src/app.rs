@@ -223,19 +223,25 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
 }
 
 /// O tema escolhido ou, se ele falhar, o padrão (PRD §7: volta ao padrão sem loop de falha).
-fn load_theme(ctx: &Ctx, builtin: &std::path::Path) -> Result<ComponentDefinition, String> {
+/// Também devolve a pasta do tema escolhido (para o `tokens.toml`); `None` = o padrão.
+fn load_theme(
+    ctx: &Ctx,
+    builtin: &std::path::Path,
+) -> Result<(ComponentDefinition, Option<std::path::PathBuf>), String> {
     let selected = tako_themes::selected(&ctx.paths.themes());
     if let Some(id) = selected.filter(|_| !ctx.safe_mode) {
         let dir = ctx.paths.themes().join(&id);
         match tako_themes::validate_package(&dir) {
             Ok(m) => match theme::compile(&dir.join(m.entry), builtin) {
-                Ok(def) => return Ok(def),
+                Ok(def) => return Ok((def, Some(dir))),
                 Err(e) => tracing::error!("tema {id} não compilou, usando o padrão: {e}"),
             },
             Err(p) => tracing::error!("tema {id} inválido, usando o padrão: {p:?}"),
         }
     }
-    theme::compile(&builtin.join("main.slint"), builtin).map_err(|e| e.to_string())
+    theme::compile(&builtin.join("main.slint"), builtin)
+        .map(|def| (def, None))
+        .map_err(|e| e.to_string())
 }
 
 impl App {
@@ -245,8 +251,9 @@ impl App {
             theme::install_builtin(&ctx.paths.themes()).map_err(|e| format!("tema padrão: {e}"))?;
         let mut ctx = ctx;
         ctx.safe_mode = opts.safe_mode;
-        let def = load_theme(&ctx, &builtin)?;
+        let (def, dir) = load_theme(&ctx, &builtin)?;
         let ui = def.create().map_err(|e| e.to_string())?;
+        theme::apply_tokens(&ui, dir.as_deref());
         let mut shell = Shell::new(ctx);
         if let Some((id, title)) = &opts.running {
             shell.ctx.running = Some(crate::shell::RunningGame {
@@ -311,7 +318,7 @@ impl App {
 
     /// Troca de tema em tempo de execução: nova instância com as mesmas ligações; o estado continua na `Shell`.
     pub fn reload_theme(&self) {
-        let def = match load_theme(&self.shell.borrow().ctx, &self.builtin) {
+        let (def, dir) = match load_theme(&self.shell.borrow().ctx, &self.builtin) {
             Ok(d) => d,
             Err(e) => {
                 tracing::error!("tema: {e}");
@@ -325,6 +332,9 @@ impl App {
                 return;
             }
         };
+        theme::apply_tokens(&new, dir.as_deref());
+        new.window()
+            .set_fullscreen(self.ui.borrow().window().is_fullscreen());
         let old = self.ui.replace(new);
         self.wire_ui();
         let _ = self.ui.borrow().show();

@@ -1,0 +1,7 @@
+id = "tako-alto-contraste"
+name = "Tako Alto contraste"
+version = "1.0.0"
+author = "Tako"
+api = 1
+entry = "main.slint"
+description = "O tema do Tako com fundo preto, superfícies mais claras e textos mais fortes."

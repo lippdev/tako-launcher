@@ -5042,6 +5042,7 @@ dependencies = [
  "tako-sources",
  "tako-themes",
  "tempfile",
+ "toml",
  "tracing",
 ]
 

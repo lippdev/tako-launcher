@@ -10,26 +10,26 @@ export global Ui {
     // "xbox", "playstation", "nintendo" ou "keyboard": muda os glifos das dicas.
     in property <string> input-kind: "xbox";
 
-    out property <color> canvas: #0E1116;
-    out property <color> on-accent: #FFFFFF;
-    out property <color> on-accent-muted: #FFFFFFB8;
-    out property <color> on-accent-subtle: #FFFFFF80;
-    out property <color> surface-1: #FFFFFF1F;
-    out property <color> surface-2: #FFFFFF33;
-    out property <color> surface-sidebar: #FFFFFF2E;
-    out property <color> surface-solid: #FFFFFF;
-    out property <color> on-surface-solid: #11141A;
-    out property <color> on-surface-solid-muted: #565C68;
-    out property <color> control-track-off: #FFFFFF40;
-    out property <color> control-off: #FFFFFF8C;
-    out property <color> control-on-on-solid: #0B7A3B;
-    out property <color> control-off-on-solid: #5B6170;
-    out property <color> control-track-on-solid: #11141A33;
-    out property <color> value-pill-on-solid: #11141A1A;
-    out property <color> scrim: #00000099;
-    out property <color> success: #3DDC84;
-    out property <color> warning: #FFB020;
-    out property <color> error: #FF5A5F;
+    in-out property <color> canvas: #0E1116;
+    in-out property <color> on-accent: #FFFFFF;
+    in-out property <color> on-accent-muted: #FFFFFFB8;
+    in-out property <color> on-accent-subtle: #FFFFFF80;
+    in-out property <color> surface-1: #FFFFFF1F;
+    in-out property <color> surface-2: #FFFFFF33;
+    in-out property <color> surface-sidebar: #FFFFFF2E;
+    in-out property <color> surface-solid: #FFFFFF;
+    in-out property <color> on-surface-solid: #11141A;
+    in-out property <color> on-surface-solid-muted: #565C68;
+    in-out property <color> control-track-off: #FFFFFF40;
+    in-out property <color> control-off: #FFFFFF8C;
+    in-out property <color> control-on-on-solid: #0B7A3B;
+    in-out property <color> control-off-on-solid: #5B6170;
+    in-out property <color> control-track-on-solid: #11141A33;
+    in-out property <color> value-pill-on-solid: #11141A1A;
+    in-out property <color> scrim: #00000099;
+    in-out property <color> success: #3DDC84;
+    in-out property <color> warning: #FFB020;
+    in-out property <color> error: #FF5A5F;
 
     out property <duration> focus-time: reduce-motion ? 0ms : 160ms;
     out property <duration> page-time: reduce-motion ? 0ms : 280ms;
