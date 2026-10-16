@@ -55,5 +55,29 @@ public sealed class InMemoryGameLibrary(IEnumerable<Game> games, TimeProvider ti
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    public void Import(IReadOnlyList<ManualGameRecord> added, IReadOnlyDictionary<string, Func<GameStateRecord?, GameStateRecord>> state)
+    {
+        ArgumentNullException.ThrowIfNull(added);
+        ArgumentNullException.ThrowIfNull(state);
+        foreach (var record in added.Where(r => Find(r.Id) is null))
+        {
+            _manual.Add(record);
+            _games.Add(record.ToGame());
+        }
+
+        foreach (var (id, change) in state)
+        {
+            if (Find(id) is { } game)
+            {
+                var next = change(new GameStateRecord { IsFavorite = game.IsFavorite, LastPlayedAt = game.LastPlayedAt });
+                game.IsFavorite = next.IsFavorite;
+                game.LastPlayedAt = next.LastPlayedAt;
+                game.PlayTime = TimeSpan.FromMinutes(Math.Max(game.PlayTime.TotalMinutes, next.PlayMinutes));
+            }
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     public void Refresh() => Changed?.Invoke(this, EventArgs.Empty);
 }

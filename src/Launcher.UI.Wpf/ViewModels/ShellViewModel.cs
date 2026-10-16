@@ -921,6 +921,10 @@ public sealed partial class ShellViewModel : ObservableObject
             Library("library:epic", "Epic Games", "Store.Epic", LibraryFilter.ForStore(GameStore.Epic), badge: StoreBrush(GameStore.Epic)),
             Library("library:gog", "GOG", "Store.Gog", LibraryFilter.ForStore(GameStore.Gog), badge: StoreBrush(GameStore.Gog)),
             Library("library:xbox", "Xbox", "Store.Xbox", LibraryFilter.ForStore(GameStore.Xbox), badge: StoreBrush(GameStore.Xbox)),
+            Library("library:ubisoft", "Ubisoft Connect", "Store.Ubisoft", LibraryFilter.ForStore(GameStore.Ubisoft), badge: StoreBrush(GameStore.Ubisoft)),
+            Library("library:ea", "EA app", "Store.Ea", LibraryFilter.ForStore(GameStore.Ea), badge: StoreBrush(GameStore.Ea)),
+            Library("library:battlenet", "Battle.net", "Store.BattleNet", LibraryFilter.ForStore(GameStore.BattleNet), badge: StoreBrush(GameStore.BattleNet)),
+            Library("library:amazon", "Amazon Games", "Store.Amazon", LibraryFilter.ForStore(GameStore.Amazon), badge: StoreBrush(GameStore.Amazon)),
             Library("library:manual", "Adicionados", "Store.Manual", LibraryFilter.ForStore(GameStore.Manual), badge: StoreBrush(GameStore.Manual)),
             // ADR-0020: o que veio do Console Mode tem menu próprio, fora das Configurações.
             new(ConsoleModeViewModel.Route, "Modo Console", "Icon.Tv", new RelayCommand(OpenConsoleMode)) { IsBottom = true },

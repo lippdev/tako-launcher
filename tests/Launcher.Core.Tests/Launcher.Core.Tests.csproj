@@ -5,7 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Launcher.Core\Launcher.Core.csproj" />
   </ItemGroup>
-  <!-- Arquivos de exemplo (fictícios) das lojas: Xbox, Epic e GOG (ADR-0019). -->
+  <!-- Arquivos de exemplo (fictícios) das lojas: Xbox, Epic, GOG e EA (ADR-0019). -->
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
@@ -16,6 +16,8 @@
   <!-- Biblioteca fictícia só para testes (o app usa a biblioteca real). -->
   <ItemGroup>
     <Compile Include="..\Shared\SampleLibrary.cs" Link="Shared\SampleLibrary.cs" />
+    <Compile Include="..\Shared\LiteDbV7Writer.cs" Link="Shared\LiteDbV7Writer.cs" />
+    <Compile Include="..\Shared\PlayniteSample.cs" Link="Shared\PlayniteSample.cs" />
     <EmbeddedResource Include="..\Shared\SampleLibrary.json" LogicalName="Launcher.Tests.SampleLibrary.json" Link="Shared\SampleLibrary.json" />
   </ItemGroup>
 </Project>

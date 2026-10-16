@@ -79,9 +79,8 @@ public sealed partial class ShellViewModel
             await RestoreGameScreenAsync().ConfigureAwait(true);
             _environment.Discard();
             // Cliente da loja ausente (STORE-012): o protocolo não está registrado no Windows.
-            Toast(game.Store == GameStore.Epic && LibrarySources.Reports.GetValueOrDefault(GameStore.Epic) is { ClientInstalled: false }
-                ? $"Epic Games Launcher não encontrado: instale-o para abrir {game.Title}"
-                : $"Não foi possível abrir {game.Title}: {ex.Message}");
+            Toast(LibraryText.ClientMissing(game, LibrarySources.Reports.GetValueOrDefault(game.Store))
+                ?? $"Não foi possível abrir {game.Title}: {ex.Message}");
             return;
         }
 
@@ -119,14 +118,8 @@ public sealed partial class ShellViewModel
         CurrentPage.Refresh();
     }
 
-    /// <summary>" pela Steam", " pela Epic Games", " pelo GOG Galaxy" ou nada (executável direto).</summary>
-    private static string LaunchVia(Game game) => game.Store switch
-    {
-        GameStore.Steam => " pela Steam",
-        GameStore.Epic => " pela Epic Games",
-        GameStore.Gog when game.LaunchTarget?.EndsWith("GalaxyClient.exe", StringComparison.OrdinalIgnoreCase) == true => " pelo GOG Galaxy",
-        _ => string.Empty,
-    };
+    /// <summary>" pela Steam", " pelo GOG Galaxy", " pelo EA app" ou nada (executável direto).</summary>
+    private static string LaunchVia(Game game) => LibraryText.LaunchVia(game);
 
     private static int? RootProcessId(Process? process)
     {
