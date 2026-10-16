@@ -293,7 +293,14 @@ impl ControlCenter {
             "cc-game-title",
             running.map(|r| r.title.clone()).unwrap_or_default(),
         );
-        out.set("cc-game-meta", ctx.t("cc.playing"));
+        let mut meta = ctx.t("cc.playing");
+        if let Some(p) = ctx.pad_battery {
+            meta = format!(
+                "{meta} · {}",
+                ctx.tf("cc.pad_battery", &[("percent", &p.to_string())])
+            );
+        }
+        out.set("cc-game-meta", meta);
     }
 
     pub fn hints(&self, ctx: &Ctx) -> Vec<Hint> {

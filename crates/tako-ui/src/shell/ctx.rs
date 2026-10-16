@@ -135,6 +135,7 @@ pub mod keys {
     pub const HIDE_CURSOR: &str = "HideCursorDuringGame";
     pub const CONTROLLER_MOUSE: &str = "ControllerMouseDuringGame";
     pub const SAFE_MODE: &str = "SafeMode";
+    pub const DISCORD_PRESENCE: &str = "DiscordRichPresence";
 }
 
 pub struct Ctx {
@@ -151,6 +152,8 @@ pub struct Ctx {
     pub pads_connected: usize,
     /// O controle em uso caiu e nenhum outro ficou: o aviso "Controle desconectado" fica na tela.
     pub pad_lost: bool,
+    /// Bateria (%) do controle sem fio em uso; `None` = com fio, desconhecida ou sem controle.
+    pub pad_battery: Option<i32>,
     pub input: InputKind,
     pub toast: Option<(String, Instant)>,
     pub effects: Vec<Effect>,
