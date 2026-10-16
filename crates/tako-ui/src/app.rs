@@ -551,6 +551,7 @@ impl App {
     }
 
     pub fn run(&self) -> Result<(), String> {
+        CURRENT.with(|c| *c.borrow_mut() = Some(self.clone()));
         let ui = self.ui.borrow();
         // Como o WPF (sem borda, maximizado). Builds de desenvolvimento abrem em janela; TAKO_WINDOWED força janela.
         ui.window()
@@ -560,6 +561,27 @@ impl App {
         rescan(&self.shell);
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
     }
+}
+
+thread_local! {
+    /// O app rodando nesta thread (a da interface), para pedidos que chegam de fora (outro Tako aberto).
+    static CURRENT: RefCell<Option<App>> = const { RefCell::new(None) };
+}
+
+/// Traz a janela para a frente (alguém abriu o Tako de novo). No Wayland o compositor pode só destacar a
+/// janela em vez de focar: lá roubar o foco não é permitido.
+pub fn raise_current() {
+    CURRENT.with(|c| {
+        let Some(app) = c.borrow().clone() else {
+            return;
+        };
+        let ui = app.ui.borrow();
+        let window = ui.window();
+        let _ = window.show();
+        window.set_minimized(false);
+        use slint::winit_030::WinitWindowAccessor;
+        window.with_winit_window(|w| w.focus_window());
+    });
 }
 
 /// "Bem-vindo de volta" com o tempo jogado e o foco no jogo (o tempo já foi gravado por quem chama).

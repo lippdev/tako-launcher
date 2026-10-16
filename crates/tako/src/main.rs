@@ -49,6 +49,9 @@ fn init_logs(paths: &DataPaths, role: &str) {
 /// Definida no Tako reaberto por ele mesmo (saída do modo seguro): espera o anterior soltar a trava.
 pub const RESTART_ENV: &str = "TAKO_RESTARTED";
 
+/// Pedido do segundo Tako ao que já está aberto (o supervisor apaga ao atender).
+pub const ACTIVATE_FILE: &str = "tako.activate";
+
 /// Só um Tako por usuário: um segundo `tako` sai sem abrir outra janela.
 fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
     let _ = std::fs::create_dir_all(&paths.root);
@@ -108,7 +111,8 @@ fn main() {
     if role == ProcessRole::Supervisor {
         init_logs(&paths, "supervisor");
         let Some(_lock) = single_instance(&paths) else {
-            tracing::info!("o Tako já está aberto");
+            tracing::info!("o Tako já está aberto; pedindo para ele vir para a frente");
+            let _ = std::fs::write(paths.root.join(ACTIVATE_FILE), b"");
             return;
         };
         let code = supervisor::Supervisor::new(paths, platform, &all).run(has(args::SAFE_MODE));
@@ -122,6 +126,8 @@ fn main() {
         match single_instance(&paths) {
             Some(l) => Some(l),
             None => {
+                // shortcut: sem supervisor (desenvolvimento, --no-supervisor) ninguém atende o pedido de vir para
+                // a frente; só a versão publicada (com supervisor) ativa a janela aberta.
                 tracing::info!("o Tako já está aberto");
                 return;
             }
@@ -167,10 +173,16 @@ fn main() {
         // Mensagens do supervisor (o jogo em segundo plano terminou).
         std::thread::spawn(|| {
             protocol::read_lines::<protocol::SupMsg>(BufReader::new(std::io::stdin()), |m| {
-                let protocol::SupMsg::GameEnded {
-                    game_id,
-                    played_secs,
-                } = m;
+                let (game_id, played_secs) = match m {
+                    protocol::SupMsg::GameEnded {
+                        game_id,
+                        played_secs,
+                    } => (game_id, played_secs),
+                    protocol::SupMsg::Activate => {
+                        let _ = slint::invoke_from_event_loop(tako_ui::app::raise_current);
+                        return;
+                    }
+                };
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(shell) = tako_ui::tasks::shell() {
                         let mut s = shell.borrow_mut();

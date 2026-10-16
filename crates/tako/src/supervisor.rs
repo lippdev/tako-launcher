@@ -61,6 +61,11 @@ impl Supervisor {
         }
     }
 
+    /// Outro Tako foi aberto (ver `ACTIVATE_FILE`)? Consome o pedido.
+    fn activation_requested(&self) -> bool {
+        std::fs::remove_file(self.paths.root.join(crate::ACTIVATE_FILE)).is_ok()
+    }
+
     fn now(&self) -> Duration {
         self.started.elapsed()
     }
@@ -120,6 +125,7 @@ impl Supervisor {
     /// Laço principal; devolve o código de saída do processo.
     pub fn run(mut self, safe_mode: bool) -> i32 {
         session::recover_after_crash(&self.platform, &self.paths);
+        self.activation_requested(); // pedido velho, de antes desta execução
         let mut safe = matches!(
             self.watch.begin(safe_mode),
             tako_core::supervision::UiLaunchMode::SafeMode
@@ -183,6 +189,11 @@ impl Supervisor {
                     self.on_message(msg, ui);
                 }
                 return status.code().unwrap_or(-1);
+            }
+            if self.activation_requested()
+                && let Some(stdin) = ui.stdin.as_mut()
+            {
+                let _ = protocol::write(stdin, &SupMsg::Activate);
             }
             if let Some(reason) = self.watch.check(self.now()) {
                 tracing::warn!("interface sem resposta ({reason:?}); encerrando");
@@ -290,8 +301,10 @@ impl Supervisor {
             let dt = last.elapsed().as_secs_f64();
             last = Instant::now();
             let pad = self.pads.as_ref().map(|p| p.state()).unwrap_or_default();
+            // Atalho do controle, do teclado ou o Tako aberto de novo: a interface volta por cima do jogo.
             if self.chord.update(GamepadButtons(pad.buttons), now)
                 || pressed.swap(false, std::sync::atomic::Ordering::Relaxed)
+                || self.activation_requested()
             {
                 return Launch {
                     control_center: true,
