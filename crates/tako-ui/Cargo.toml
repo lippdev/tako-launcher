@@ -13,11 +13,15 @@ tako-platform.workspace = true
 tako-sources.workspace = true
 slint.workspace = true
 slint-interpreter.workspace = true
+sdl3.workspace = true
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 image.workspace = true
 spin_on = "0.1"
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true
