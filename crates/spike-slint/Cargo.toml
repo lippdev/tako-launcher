@@ -1,0 +1,13 @@
+[package]
+name = "spike-slint"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+slint-interpreter = { version = "1.18.1", default-features = false, features = ["backend-default", "renderer-femtovg", "renderer-software", "compat-1-2"] }
+slint = { version = "1.18.1", default-features = false, features = ["std", "compat-1-2"] }
+sdl3 = { version = "0.20.0", features = ["build-from-source-static"] }
+spin_on = "0.1"
+libc = "0.2"

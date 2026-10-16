@@ -1,0 +1,23 @@
+[package]
+name = "tako-platform"
+description = "Funções de plataforma do Tako (telas, áudio, cursor, processos, segredos) por SO."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tako-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+keyring.workspace = true
+
+[lints.rust]
+# `unsafe` só é permitido aqui (PRD §5.1); cada bloco tem `// SAFETY:`.
+unsafe_code = "allow"
+
+[lints.clippy]
+unwrap_used = "warn"
+undocumented_unsafe_blocks = "warn"

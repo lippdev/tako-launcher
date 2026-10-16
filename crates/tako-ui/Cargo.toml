@@ -1,0 +1,22 @@
+[package]
+name = "tako-ui"
+description = "Interface Slint do Tako: telas, foco, animações e ligação com o core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tako-core.workspace = true
+tako-themes.workspace = true
+tako-platform.workspace = true
+tako-sources.workspace = true
+slint.workspace = true
+slint-interpreter.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+image.workspace = true
+
+[lints]
+workspace = true

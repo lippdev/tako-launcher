@@ -1,0 +1,21 @@
+[package]
+name = "tako-themes"
+description = "Formato de tema do Tako (.takotheme), validação, instalação e carregamento seguro (PRD §7)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tako-core.workspace = true
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

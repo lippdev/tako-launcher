@@ -16,3 +16,6 @@ artifacts/
 packaging/fse-dev/layout/
 dist/
 Tako_Data/
+
+# Rust
+/target/
