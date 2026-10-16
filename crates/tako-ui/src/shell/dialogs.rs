@@ -129,9 +129,9 @@ pub fn quick_actions(ctx: &Ctx, id: &str) -> MenuLayer {
         let (a, b, c, d, e) = (id.clone(), id.clone(), id.clone(), id.clone(), id.clone());
         vec![
             MenuItem::new(PanelRow::button("play", super::tiles::play_label(ctx, g)).icon("play"))
-                .on(move |ctx| {
-                    let _ = super::details::primary_action(ctx, &a);
-                    Flow::Close
+                .on(move |ctx| match super::details::primary_action(ctx, &a) {
+                    super::Nav::Layer(layer) => Flow::Replace(layer),
+                    _ => Flow::Close,
                 }),
             MenuItem::new(
                 PanelRow::button(
@@ -235,6 +235,28 @@ pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
         }
         v
     })
+}
+
+/// Jogo quebrado (LIB-004): o arquivo ou a pasta sumiu; corrigir pelo "Editar" ou remover da biblioteca.
+pub fn broken_game(ctx: &Ctx, id: &str) -> MenuLayer {
+    let title = ctx
+        .library
+        .find(id)
+        .map(|g| g.title.clone())
+        .unwrap_or_default();
+    let id = id.to_owned();
+    MenuLayer::dialog(ctx.t("game.missing_file"), move |ctx| {
+        let (a, b) = (id.clone(), id.clone());
+        vec![
+            MenuItem::new(PanelRow::button("edit", ctx.t("options.edit")).icon("gear"))
+                .on(move |ctx| Flow::Replace(super::edit_game::panel(ctx, &a))),
+            MenuItem::new(PanelRow::button("remove", ctx.t("options.remove")).danger())
+                .on(move |ctx| Flow::Replace(Box::new(confirm_remove(ctx, &b)))),
+            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
+        ]
+    })
+    .overline(title.to_uppercase())
+    .text(ctx.t("game.broken_text"))
 }
 
 /// Histórico de sessões (SESSION-002): data, hora e duração, da mais recente para a mais antiga.
@@ -407,6 +429,19 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                 Flow::Stay
             }),
         );
+        let cr = criteria.clone();
+        v.push(
+            MenuItem::new(PanelRow::toggle(
+                "broken",
+                ctx.t("filters.broken"),
+                c.broken_only,
+            ))
+            .on(move |_| {
+                let mut c = cr.borrow_mut();
+                c.broken_only = !c.broken_only;
+                Flow::Stay
+            }),
+        );
         v.push(MenuItem::new(PanelRow::header(ctx.t("filters.sort"))));
         for s in library_text::SORT_ORDER {
             let cr = criteria.clone();
@@ -538,6 +573,52 @@ mod tests {
             .find(|i| i.row.key == key)
             .unwrap_or_else(|| panic!("sem a linha {key}"));
         (item.accept.unwrap())(ctx)
+    }
+
+    #[test]
+    fn broken_games_are_found_filtered_and_offer_edit_or_remove() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let exe = dir.path().join("ok.sh");
+        std::fs::write(&exe, "").unwrap();
+        let now = chrono::Utc::now();
+        let ok = ManualGameRecord::create("Ok", &exe.to_string_lossy(), now);
+        let gone = ManualGameRecord::create("Sumiu", "/nao/existe/jogo.sh", now);
+        let store = ManualGameRecord::create("Loja", "steam://rungameid/570", now);
+        let gone_id = gone.id.clone();
+        for r in [ok, gone, store] {
+            ctx.library.add_manual(r).unwrap();
+        }
+        ctx.check_broken();
+        let broken: Vec<_> = ctx.library.games().iter().filter(|g| g.is_broken).collect();
+        assert_eq!(broken.len(), 1);
+        assert_eq!(broken[0].id, gone_id);
+
+        let criteria: Criteria = Default::default();
+        let filters = library_filters(&ctx, criteria.clone(), LibraryFilter::All);
+        accept(&mut ctx, &filters, "broken");
+        let shown = query::apply(ctx.library.games(), LibraryFilter::All, &criteria.borrow());
+        assert_eq!(shown.len(), 1);
+        assert_eq!(shown[0].id, gone_id);
+
+        // Jogar pelo menu do card abre o aviso com Editar e Remover.
+        let menu = quick_actions(&ctx, &gone_id);
+        let Flow::Replace(dialog) = accept(&mut ctx, &menu, "play") else {
+            panic!("aviso de jogo quebrado");
+        };
+        let o = dialog.render(&ctx);
+        assert_eq!(o.title, "Arquivo não encontrado");
+        let keys: Vec<_> = o.rows.iter().map(|r| r.key.as_str()).collect();
+        assert_eq!(keys, ["edit", "remove", "cancel"]);
+        let warning = broken_game(&ctx, &gone_id);
+        let Flow::Replace(mut confirm) = accept(&mut ctx, &warning, "remove") else {
+            panic!("confirmar remoção");
+        };
+        assert!(matches!(
+            confirm.handle(super::super::Cmd::Accept, &mut ctx),
+            Flow::Close
+        ));
+        assert!(ctx.library.find(&gone_id).is_none());
     }
 
     #[test]

@@ -488,6 +488,7 @@ impl Shell {
     /// Calcula todas as propriedades do tema para este instante.
     pub fn render(&mut self, now: Instant) -> Out {
         let mut out = Out::default();
+        self.ctx.check_broken();
         if self.ctx.toast_expired(now) {
             self.ctx.toast = None;
         }
