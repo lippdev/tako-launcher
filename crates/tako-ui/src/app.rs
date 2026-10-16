@@ -641,10 +641,12 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
         }
         let action = {
             let mut s = shell.borrow_mut();
-            match crate::effects::common(&effect, &mut s) {
+            let a = match crate::effects::common(&effect, &mut s) {
                 Some(a) => a,
                 None => host.borrow_mut().handle(&effect, &mut s.ctx),
-            }
+            };
+            s.after_action();
+            a
         };
         if action != HostAction::Stay {
             return action;
@@ -703,4 +705,31 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::HERO))
         .unwrap_or_default();
     bridge::set(ui, "backdrop", art.to_value());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct NoHost;
+    impl Host for NoHost {
+        fn handle(&mut self, _: &Effect, _: &mut Ctx) -> HostAction {
+            HostAction::Stay
+        }
+    }
+
+    #[test]
+    fn dialog_opened_by_an_effect_shows_without_a_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        let shell = Rc::new(RefCell::new(Shell::new(ctx)));
+        let host: Rc<RefCell<dyn Host>> = Rc::new(RefCell::new(NoHost));
+        shell.borrow_mut().ctx.effect(Effect::SaveDiagnostics);
+        pump_effects(&shell, &host);
+        assert!(
+            shell.borrow().has_layers(),
+            "o relatório do sistema abre um diálogo"
+        );
+        assert!(shell.borrow().ctx.pending_layer.is_none());
+    }
 }

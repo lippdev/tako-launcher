@@ -300,8 +300,9 @@ impl Shell {
         self.after_action();
     }
 
-    /// Pedidos que camadas fazem às páginas (abrir os detalhes, sair dos detalhes de um jogo removido).
-    fn after_action(&mut self) {
+    /// Pedidos que camadas, efeitos e tarefas em segundo plano fazem às páginas (abrir um diálogo, abrir os
+    /// detalhes, sair dos detalhes de um jogo removido).
+    pub(crate) fn after_action(&mut self) {
         if let Some(l) = self.ctx.pending_layer.take() {
             self.layers.push(l);
         }

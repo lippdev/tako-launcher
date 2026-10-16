@@ -57,6 +57,7 @@ pub fn run<R: Send + 'static>(
             if let Some(shell) = shell() {
                 let mut s = shell.borrow_mut();
                 done(&mut s.ctx, result);
+                s.after_action(); // um diálogo aberto pelo resultado aparece já, sem esperar uma tecla
                 s.ctx.dirty = true;
             }
         });
