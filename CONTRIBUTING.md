@@ -26,7 +26,7 @@ Regras:
 `<tipo>(<escopo>): <descrição no imperativo, até 72 caracteres>`
 
 - Tipos: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- Escopos: `host`, `core`, `ui`, `themes`, `compat-p10`, `runtime`, `ipc`, `fse`, `docs`, `ci`.
+- Escopos: `core`, `sources`, `platform`, `themes`, `ui`, `app`, `docs`, `ci`, `build` (e, até o corte, os do C#: `host`, `compat-p10`, `runtime`, `ipc`, `fse`).
 - Referencie a história no rodapé: `Refs: MVP-005`. Breaking change: `feat(ipc)!:` + rodapé `BREAKING CHANGE:`.
 
 ## 3. Pull Requests
@@ -42,38 +42,47 @@ Regras:
 
 Vale a DoD do [PRD §12](docs/PRD.md); o checklist está no template de PR.
 
-## 5. Padrões de código (C# / .NET 10)
+## 5. Padrões de código (Rust)
 
-> Valem para o código C#/WPF até o corte (PRD MIG-043). Os padrões do código Rust entram aqui no MIG-010; até lá, vale a [PRD §5](docs/PRD.md).
+Vale para o Tako em Rust (PRD v0.2, §4 e §5). O código C#/WPF continua com as regras da seção 5.1 até o corte (MIG-043).
+
+- Rust edição 2024, toolchain fixada em `rust-toolchain.toml`. Antes do commit: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` e `cargo test --workspace`. O CI roda os três nos três SOs.
+- Nomes em inglês; comentários e documentação em português, curtos, explicando o **porquê** (o que o código não mostra).
+- O menor código que resolve: sem abstração, opção ou dependência "para depois". Prefira a biblioteca padrão e as dependências já listadas em `[workspace.dependencies]`; dependência nova entra lá.
+- **Dados externos não são confiáveis** (arquivos das lojas, JSON de APIs, temas, arquivos do usuário): limite de tamanho, nada de `unwrap`/`expect`/pânico em entrada inválida e teste com entrada quebrada. `unwrap` só em testes.
+- Erros: `thiserror` nos tipos públicos; `Result<_, String>` onde for mais simples. Nunca engolir um erro sem log.
+- Logs com `tracing`. **Nunca** logar credenciais ou tokens (a redação do `tako_core::diagnostics` é a última barreira, não a primeira).
+- Textos da interface sempre por `tako_core::i18n` (`t`, `tf`, `tn`), com a chave nos dois catálogos (`crates/tako-core/locales/{pt-BR,en-US}/<módulo>.toml`); o teste `catalogs_match` reprova chave faltando.
+
+### 5.1 Padrões de código (C# / .NET 10, até o corte)
 
 - `.editorconfig` + analyzers; **warnings são erros**. Rode `dotnet format` antes do commit.
 - `Nullable` habilitado; sem `!` sem comentário justificando.
 - Namespaces file-scoped; campos privados `_camelCase` (constantes e `static readonly` em PascalCase); métodos assíncronos terminam em `Async` e aceitam `CancellationToken`.
 - **MVVM** na UI: sem lógica de negócio em code-behind.
-- Injeção de dependência (`Microsoft.Extensions.DependencyInjection`); sem singletons estáticos.
 - Logs estruturados com `Microsoft.Extensions.Logging`. **Nunca** logar credenciais ou tokens.
-- Não engolir exceções; tratar nos limites (UI, IPC, processo) e levar a sessão a `Error → Recovery`.
 
-## 6. Regras arquiteturais (código C#)
+## 6. Regras arquiteturais
 
-1. Dependências fluem para dentro: `UI.Wpf`/`Host` → `Core`/`Themes` → `ConsoleMode.Runtime` (contratos). `Core` **não** referencia WPF.
-2. Temas e `PlayniteCompat` nunca acessam serviços privilegiados do runtime.
-3. A UI não restaura monitores/áudio; o runtime restaura e sobrevive à falha da UI.
-4. IPC: Named Pipes restritos ao usuário local + JSON-RPC **versionado**; mudança de contrato exige teste de contrato.
-5. Máquina de estados de sessão com transições idempotentes; transição inválida não altera o Windows.
-6. Biblioteca 100% offline. Fontes JSON, URLs e pacotes de tema são **dados não confiáveis**.
-7. Proibido: executar arquivos baixados, desativar Defender/anti-cheat, injetar gráficos silenciosamente.
-8. Decisões relevantes viram ADR em `docs/adr/`.
+1. Crates (PRD §5.1): `tako` → `tako-ui` → `tako-core`; `tako-sources`, `tako-platform` e `tako-themes` dependem de `tako-core`, nunca o contrário. `tako-core` não conhece UI nem SO.
+2. Os contratos das funções de plataforma ficam em `tako_core::devices` (com versões em memória para testes); as implementações por SO ficam em `tako-platform`, atrás de `#[cfg(target_os = "...")]`. Código de SO só existe em `tako-platform` e `tako-sources`.
+3. `unsafe` só em `tako-platform`, e cada bloco com `// SAFETY:` explicando por que é seguro.
+4. A interface não restaura tela nem áudio: o supervisor restaura e sobrevive à queda da interface (ADR-0026). Durante o jogo, o processo da interface termina.
+5. Sessão: transições idempotentes; restaurar duas vezes não desfaz nada a mais. Transição inválida não mexe no sistema.
+6. Temas são dados: só apresentação, sem rede, disco ou processos; validados antes de carregar e com volta ao tema padrão (PRD §7).
+7. Biblioteca 100% offline. Proibido: executar arquivos baixados, desativar antivírus/anti-cheat, injetar qualquer coisa em jogos.
+8. Decisões relevantes viram ADR em `docs/adr/` (a partir da ADR-0023 para o Rust).
 
 ## 7. Testes
 
-- Unitários (xUnit) para Core/Themes; contrato para IPC; regressão para a máquina de estados.
-- Meta de 80% de cobertura em `Launcher.Core`.
-- Testes que exigem monitores, áudio, controle ou FSE reais não rodam no CI: marque com `[Trait("Category","Hardware")]` (excluídos no CI via `--filter-not-trait "Category=Hardware"`) e use checklists em `docs/testing/`.
+- Testes de unidade ao lado do código (`#[cfg(test)]`), portados dos testes C# quando o módulo vem de lá, com fixtures fictícias.
+- Parsers de loja e de API testados em todos os SOs (são código puro); só a descoberta de pastas e o registro dependem do SO.
+- Funções que exigem monitor, áudio, controle ou permissões reais não rodam no CI: use as versões em memória (`tako_core::devices::fake`) nos testes e os checklists de hardware em `docs/testing/` (`windows.md`, `linux.md`, `macos.md`) na PR.
+- O tema padrão é compilado nos testes do `tako-ui`; um tema quebrado precisa cair no padrão sem loop de falha.
 
 ## 8. Releases
 
-SemVer, `0.x` durante o MVP. Fluxo: `develop` → `release/X.Y.Z` → PR para `main` → tag → merge de volta em `develop`. O processo e os arquivos são os mesmos do Console Mode:
+SemVer. O Tako em Rust sai pelo workflow `Release` (`.github/workflows/release.yml`, regras em `build/resolve-release.sh`): push na `main` publica a estável do topo do `CHANGELOG.md`; na `develop`, *Run workflow* com o canal alpha ou beta publica a próxima pré-release. Pacotes: `build/rust/Package-Tako.ps1` (Windows) e `build/rust/package.sh` (Linux e macOS). A versão C#/WPF tem o workflow manual `release-wpf.yml` até o corte. O processo anterior, ainda válido para a WPF:
 
 1. Adicione a seção `## [X.Y.Z]` (ou `## [X.Y.Z-alpha.N]`) **nos dois changelogs**: `CHANGELOG.md` (português) e `CHANGELOG.en-US.md` (inglês). Um `(#NN)` no fim do item vira link para a PR. O workflow falha se faltar alguma seção.
 2. Publique de um destes jeitos (versão com hífen = pré-release):
