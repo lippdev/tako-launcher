@@ -57,7 +57,7 @@ Teste cada um por USB e, quando houver, por Bluetooth.
 | C8 | Trocar de controle | Desligar o Xbox e ligar o DualSense | Aviso de troca; dicas mudam; nada acionado sozinho |
 | C9 | Voltar de um jogo com A pressionado | Fechar um jogo com A e voltar ao Tako | O A que fechou o jogo não abre nada no Tako |
 | C10 | Atalho da Central no controle | Durante um jogo simulado, segurar View + Y (Create + △ no DualSense, Share + △ no DualShock 4) por meio segundo | Abre a Central; segurar de novo fecha. Apertar rápido não abre. O Guia/PS sozinho não abre mais a Central |
-| C11 | Sem controle nenhum | Usar só o teclado do início ao fim | Todas as telas alcançáveis (Ctrl+Shift+T abre a Central de Controle) |
+| C11 | Sem controle nenhum | Usar só o teclado do início ao fim | Todas as telas alcançáveis (Ctrl+Shift+Tab abre a Central de Controle) |
 
 ## 4. Steam
 
@@ -184,7 +184,7 @@ Com um jogo real aberto pelo Tako (ex.: um jogo da Steam em tela cheia sem borda
 
 | # | Caso | Esperado |
 |---|---|---|
-| CJ1 | Atalho da Central (segurar View + Y, ou Ctrl+Shift+T) durante o jogo | Em janela ou tela cheia sem bordas: a Central abre por cima do jogo, que continua visível e rodando atrás (ver §23). Em tela cheia exclusiva: o Tako vem para a frente com a Central sobre a arte do jogo. B, o atalho ou "Voltar ao jogo" devolvem o jogo. A Barra de Jogo do Xbox **não** abre junto |
+| CJ1 | Atalho da Central (segurar View + Y, ou Ctrl+Shift+Tab) durante o jogo | Em janela ou tela cheia sem bordas: a Central abre por cima do jogo, que continua visível e rodando atrás (ver §23). Em tela cheia exclusiva: o Tako vem para a frente com a Central sobre a arte do jogo. B, o atalho ou "Voltar ao jogo" devolvem o jogo. A Barra de Jogo do Xbox **não** abre junto |
 | CJ2 | Janelas abertas | A fileira lista as janelas do Alt+Tab com ícones; A alterna para uma (o jogo segue aberto); X fecha (um programa com algo não salvo pergunta antes) |
 | CJ3 | Encerrar jogo (jogo real) | O jogo recebe o pedido de fechar e volta à frente; ao fechar, "Bem-vindo de volta" |
 | CJ4 | Desempenho | Cartão e painel mostram CPU, GPU (com temperatura, se o driver informar) e RAM próximos do Gerenciador de Tarefas |
@@ -478,7 +478,7 @@ Com um jogo real aberto pelo Tako. Teste num jogo em **janela sem bordas** (ex.:
 | AT2 | Trocar o atalho do controle | Configurações › Controles › "Abrir a Central de Controle no controle" › segurar View + X por 1 s | Salvo; no jogo, View + X abre e View + Y não. Tentar LB + RB: recusado com "já servem para navegar no Tako". Tocar B cancela |
 | AT3 | Trocar o atalho do teclado | Configurações › Controles › "… no teclado" › Ctrl+Alt+F10 | Salvo; Ctrl+Alt+F10 abre a Central **com o jogo na frente**. Shift+Tab é recusado (Steam); Ctrl+Shift+O é aceito com aviso (AMD) |
 | AT4 | Atalho já usado por outro programa | Escolher um atalho que outro programa registrou (ex.: o do Discord ou do OBS) e abrir um jogo | Aviso "já é usado por outro programa · troque o atalho nas Configurações"; o atalho continua valendo com o Tako na frente |
-| AT5 | Restaurar padrão | "Restaurar atalhos padrão" | Volta a View + Y e Ctrl+Shift+T |
+| AT5 | Restaurar padrão | "Restaurar atalhos padrão" | Volta a View + Y e Ctrl+Shift+Tab |
 | AT6 | Steam e Barra de Jogo | Com a Steam aberta, segurar View + Y no jogo | Só a Central abre (a sobreposição da Steam e a Barra de Jogo não) |
 
 ## 24. Configurações em categorias e menu Modo Console (UX-006/009, [ADR-0020](../adr/0020-organizacao-das-configuracoes.md))

@@ -246,17 +246,17 @@ public enum KeyModifiers
 
 /// <summary>
 /// Atalho de teclado (UX-005), com a tecla pelo nome do <c>Key</c> do WPF ("T", "F10", "OemTilde"). Padrão
-/// <c>Ctrl+Shift+T</c>: o Shift+Tab é da Steam (e do GOG Galaxy), e o <c>Ctrl+Shift+O</c> é o painel de métricas do AMD Adrenalin.
+/// <c>Ctrl+Shift+Tab</c>: o Shift+Tab é da Steam (e do GOG Galaxy), e o <c>Ctrl+Shift+O</c> é o painel de métricas do AMD Adrenalin.
 /// </summary>
 public readonly record struct KeyShortcut(KeyModifiers Modifiers, string Key)
 {
-    public static readonly KeyShortcut Default = new(KeyModifiers.Ctrl | KeyModifiers.Shift, "T");
+    public static readonly KeyShortcut Default = new(KeyModifiers.Ctrl | KeyModifiers.Shift, "Tab");
 
     /// <summary>Teclas que só modificam: o atalho espera a tecla de verdade.</summary>
     public static bool IsModifierKey(string key) => key is "LeftCtrl" or "RightCtrl" or "LeftAlt" or "RightAlt" or "LeftShift" or "RightShift"
         or "LWin" or "RWin" or "System" or "None" or "ImeProcessed" or "DeadCharProcessed";
 
-    /// <summary>"Ctrl+Shift+T".</summary>
+    /// <summary>"Ctrl+Shift+Tab".</summary>
     public string Display
     {
         get

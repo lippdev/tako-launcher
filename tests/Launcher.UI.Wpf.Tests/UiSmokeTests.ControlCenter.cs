@@ -226,7 +226,7 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Accept);
         Assert.Equal(ControlCenterChord.Default, shell.Settings.ControlCenterChord);
         Assert.Equal(KeyShortcut.Default, shell.Settings.ControlCenterKey);
-        Assert.Equal("Ctrl+Shift+T", shell.KeyLabel);
+        Assert.Equal("Ctrl+Shift+Tab", shell.KeyLabel);
         Assert.True(nav.FocusDefault("settings:theme"));
     }
 }

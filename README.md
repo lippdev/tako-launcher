@@ -58,7 +58,7 @@ Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualS
 | Favoritar · buscar | X · Y | □ · △ | F · / |
 | Trocar de seção | LB / RB | L1 / R1 | Q / E |
 | Configurações (ou ações da capa em foco) | Menu (☰) | Options | M |
-| **Central de Controle** (abrir e fechar, durante o jogo) | **segurar View + Y** por meio segundo | **segurar Create + △** (Share + △ no DualShock 4) | **Ctrl+Shift+T** |
+| **Central de Controle** (abrir e fechar, durante o jogo) | **segurar View + Y** por meio segundo | **segurar Create + △** (Share + △ no DualShock 4) | **Ctrl+Shift+Tab** |
 
 O atalho da Central muda em Configurações › "Abrir a Central de Controle no controle" e "… no teclado" (há "Restaurar atalhos padrão"). O Guia/PS e o Shift+Tab não abrem mais a Central: o Guia abre a Barra de Jogo do Xbox e a Steam, e o Shift+Tab é a sobreposição da Steam. Com um jogo em janela ou em tela cheia sem bordas, a Central abre por cima do jogo, que continua rodando atrás; em tela cheia exclusiva, o Tako vem para a frente com a arte do jogo (detalhes no [DESIGN.md](DESIGN.md), Menu rápido).
 

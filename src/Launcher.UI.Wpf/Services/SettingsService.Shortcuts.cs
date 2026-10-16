@@ -11,7 +11,7 @@ public sealed partial class SettingsService
     [ObservableProperty]
     private GamepadButtons _controlCenterChord = Chord.Default;
 
-    /// <summary>Atalho de teclado, também global durante um jogo; padrão Ctrl+Shift+T.</summary>
+    /// <summary>Atalho de teclado, também global durante um jogo; padrão Ctrl+Shift+Tab.</summary>
     [ObservableProperty]
     private KeyShortcut _controlCenterKey = KeyShortcut.Default;
 
