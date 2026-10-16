@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 mod audio;
 mod autostart;
-pub mod dpapi;
 mod display;
+pub mod dpapi;
 mod pointer;
 mod process;
 
