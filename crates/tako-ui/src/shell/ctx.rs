@@ -1,0 +1,268 @@
+//! Contexto compartilhado pelas páginas e camadas: biblioteca, configurações, plataforma e o que a interface
+//! pede ao resto do app (efeitos).
+
+use super::Cmd;
+use crate::gamepad::PadFamily;
+use crate::model::Hint;
+use std::collections::HashMap;
+use std::time::Instant;
+use tako_core::i18n::{self, Lang};
+use tako_core::library::{CollectionLibrary, GameLibrary};
+use tako_core::paths::DataPaths;
+use tako_core::persistence::{GameChoicesStore, GameSettingsStore, SettingsStore};
+use tako_platform::Platform;
+
+/// Pedido da interface ao app (tarefas longas, outras janelas, sair).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Effect {
+    /// Abrir o jogo (o app resolve configurações e passa a sessão ao supervisor).
+    Launch(String),
+    /// Voltar ao jogo que está rodando.
+    ResumeGame,
+    /// Encerrar o jogo que está rodando.
+    EndGame,
+    Rescan,
+    /// Escolher um arquivo para "Adicionar jogo".
+    AddGame,
+    OpenFolder(String),
+    OpenUrl(String),
+    CheckUpdates,
+    InstallUpdate,
+    RefreshMetadata(Option<String>),
+    ClearArtCache,
+    ApplyTheme(String),
+    ImportPlaynite,
+    SaveDiagnostics,
+    /// Aplicar a tela de jogo para o usuário confirmar (configurações).
+    TestGameScreen,
+    /// Mudou algo que exige reler a biblioteca (lojas ligadas/desligadas).
+    ReloadLibrary,
+    ExitToDesktop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InputKind {
+    #[default]
+    Gamepad,
+    Keyboard,
+}
+
+/// Jogo rodando em segundo plano (o usuário voltou à Início sem fechar).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunningGame {
+    pub id: String,
+    pub title: String,
+}
+
+pub use tako_sources::report::LibrarySourceReport as SourceReport;
+
+/// Configurações do app: `settings` do banco (chave/valor, mesmo formato das alphas), com cache em memória.
+pub struct Settings {
+    store: Option<SettingsStore>,
+    values: HashMap<String, String>,
+}
+
+impl Settings {
+    pub fn new(store: Option<SettingsStore>) -> Settings {
+        let values = store
+            .as_ref()
+            .and_then(|s| s.load_all().ok())
+            .unwrap_or_default();
+        Settings { store, values }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.values.get(key).map(String::as_str)
+    }
+
+    pub fn string(&self, key: &str) -> String {
+        self.get(key).unwrap_or_default().to_owned()
+    }
+
+    pub fn bool(&self, key: &str, default: bool) -> bool {
+        self.get(key)
+            .and_then(tako_core::persistence::parse_bool)
+            .unwrap_or(default)
+    }
+
+    pub fn set(&mut self, key: &str, value: &str) {
+        self.values.insert(key.to_owned(), value.to_owned());
+        if let Some(s) = &self.store
+            && let Err(e) = s.set(key, value)
+        {
+            tracing::error!("não foi possível gravar a configuração {key}: {e}");
+        }
+    }
+
+    pub fn set_bool(&mut self, key: &str, value: bool) {
+        self.set(key, if value { "true" } else { "false" });
+    }
+
+    pub fn toggle(&mut self, key: &str, default: bool) -> bool {
+        let v = !self.bool(key, default);
+        self.set_bool(key, v);
+        v
+    }
+}
+
+/// Nomes das configurações (iguais aos das alphas C#, para a migração).
+pub mod keys {
+    pub const DYNAMIC_COLOR: &str = "DynamicColor";
+    pub const REDUCED_MOTION: &str = "ReducedMotion";
+    pub const RESTORE_ENVIRONMENT: &str = "RestoreEnvironmentAfterGame";
+    pub const DEVELOPER: &str = "DeveloperOptions";
+    pub const GAME_SCREEN_ENABLED: &str = "GameScreenEnabled";
+    pub const GAME_SCREEN_ID: &str = "GameScreenId";
+    pub const GAME_SCREEN_NAME: &str = "GameScreenName";
+    pub const GAME_SCREEN_HIDE_OTHERS: &str = "GameScreenHideOthers";
+    pub const GAME_SCREEN_MODE: &str = "GameScreenMode";
+    pub const GAME_SCREEN_HDR: &str = "GameScreenHdr";
+    pub const GAME_SCREEN_CONFIRMED: &str = "GameScreenConfirmedSetup";
+    pub const GAME_AUDIO_ID: &str = "GameAudioDeviceId";
+    pub const GAME_AUDIO_NAME: &str = "GameAudioDeviceName";
+    pub const DISABLED_STORES: &str = "DisabledStores";
+    pub const CONTROL_CENTER_CHORD: &str = "ControlCenterChord";
+    pub const CONTROL_CENTER_KEY: &str = "ControlCenterKey";
+    pub const LANGUAGE: &str = "Language";
+    pub const HIDE_CURSOR: &str = "HideCursorDuringGame";
+    pub const CONTROLLER_MOUSE: &str = "ControllerMouseDuringGame";
+    pub const SAFE_MODE: &str = "SafeMode";
+}
+
+pub struct Ctx {
+    pub paths: DataPaths,
+    pub library: GameLibrary,
+    pub collections: CollectionLibrary,
+    pub settings: Settings,
+    pub game_settings: Option<GameSettingsStore>,
+    pub choices: Option<GameChoicesStore>,
+    pub platform: Platform,
+    pub version: String,
+    pub pad: PadFamily,
+    pub pad_name: String,
+    pub pads_connected: usize,
+    pub input: InputKind,
+    pub toast: Option<(String, Instant)>,
+    pub effects: Vec<Effect>,
+    pub running: Option<RunningGame>,
+    pub sources: Vec<SourceReport>,
+    /// Texto da última verificação de atualização (Configurações › Geral).
+    pub update_status: String,
+    pub update_ready: Option<String>,
+    pub safe_mode: bool,
+    pub scanning: bool,
+    /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
+    pub grid_columns: usize,
+    /// Camada que uma página pediu para abrir junto com ela.
+    pub pending_layer: Option<Box<dyn super::Layer>>,
+    /// Abrir os detalhes deste jogo (pedido de um diálogo).
+    pub open_details: Option<String>,
+    /// Sair dos detalhes (o jogo foi removido).
+    pub leave_details: bool,
+    /// Jogo a abrir assim que o atual terminar ("Encerrar e jogar").
+    pub queued_launch: Option<String>,
+    /// Jogos achados na última leitura das lojas (a biblioteca lê daqui no `refresh`).
+    pub found: std::sync::Arc<std::sync::Mutex<Vec<tako_core::library::Game>>>,
+    /// Cache de imagens em disco (com limite).
+    pub art: std::sync::Arc<tako_core::metadata::art_cache::ArtCache>,
+    /// Algo mudou e a tela precisa ser redesenhada.
+    pub dirty: bool,
+}
+
+impl Ctx {
+    /// Sem banco nem lojas (`--simulate`).
+    pub fn simulated(&self) -> bool {
+        self.game_settings.is_none()
+    }
+
+    pub fn lang(&self) -> Lang {
+        i18n::lang()
+    }
+
+    pub fn t(&self, key: &str) -> String {
+        i18n::t(key)
+    }
+
+    pub fn tf(&self, key: &str, args: &[(&str, &str)]) -> String {
+        i18n::tf(key, args)
+    }
+
+    pub fn toast(&mut self, text: impl Into<String>) {
+        self.toast = Some((text.into(), Instant::now()));
+        self.dirty = true;
+    }
+
+    /// Depois de mudar coleções: os jogos passam a saber em quais estão.
+    pub fn sync_collections(&mut self) {
+        let Ctx {
+            collections,
+            library,
+            ..
+        } = self;
+        collections.apply_to(library.games_mut());
+        self.dirty = true;
+    }
+
+    pub fn effect(&mut self, e: Effect) {
+        self.effects.push(e);
+    }
+
+    /// Glifo do botão para a entrada em uso (controle Xbox, PlayStation, Nintendo ou teclado).
+    pub fn glyph(&self, cmd: Cmd) -> &'static str {
+        if self.input == InputKind::Keyboard {
+            return match cmd {
+                Cmd::Accept => "Enter",
+                Cmd::Back => "Esc",
+                Cmd::Favorite => "F",
+                Cmd::Search => "/",
+                Cmd::PrevSection => "Q",
+                Cmd::NextSection => "E",
+                Cmd::Menu => "M",
+                Cmd::Guide => "Ctrl+⇧+Tab",
+                _ => "",
+            };
+        }
+        match (self.pad, cmd) {
+            (PadFamily::PlayStation, Cmd::Accept) => "✕",
+            (PadFamily::PlayStation, Cmd::Back) => "○",
+            (PadFamily::PlayStation, Cmd::Favorite) => "□",
+            (PadFamily::PlayStation, Cmd::Search) => "△",
+            (PadFamily::PlayStation, Cmd::PrevSection) => "L1",
+            (PadFamily::PlayStation, Cmd::NextSection) => "R1",
+            (PadFamily::PlayStation, Cmd::Menu) => "Options",
+            (PadFamily::PlayStation, Cmd::Guide) => "PS",
+            // Nintendo: A e B trocados de lugar (o SDL entrega por posição).
+            (PadFamily::Nintendo, Cmd::Accept) => "B",
+            (PadFamily::Nintendo, Cmd::Back) => "A",
+            (PadFamily::Nintendo, Cmd::Favorite) => "Y",
+            (PadFamily::Nintendo, Cmd::Search) => "X",
+            (PadFamily::Nintendo, Cmd::PrevSection) => "L",
+            (PadFamily::Nintendo, Cmd::NextSection) => "R",
+            (PadFamily::Nintendo, Cmd::Menu) => "+",
+            (PadFamily::Nintendo, Cmd::Guide) => "⌂",
+            (_, Cmd::Accept) => "A",
+            (_, Cmd::Back) => "B",
+            (_, Cmd::Favorite) => "X",
+            (_, Cmd::Search) => "Y",
+            (_, Cmd::PrevSection) => "LB",
+            (_, Cmd::NextSection) => "RB",
+            (_, Cmd::Menu) => "☰",
+            (_, Cmd::Guide) => "⌂",
+            _ => "",
+        }
+    }
+
+    pub fn hint(&self, cmd: Cmd, label: &str) -> Hint {
+        Hint {
+            glyph: self.glyph(cmd).into(),
+            label: label.into(),
+        }
+    }
+
+    pub fn hint_raw(&self, glyph: &str, label: &str) -> Hint {
+        Hint {
+            glyph: glyph.into(),
+            label: label.into(),
+        }
+    }
+}

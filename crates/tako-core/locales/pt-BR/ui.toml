@@ -1,0 +1,147 @@
+[common]
+done = "Pronto"
+soon = "Em breve"
+
+[hint]
+select = "Selecionar"
+details = "Detalhes"
+favorite = "Favoritar"
+actions = "Ações"
+options = "Opções"
+search = "Buscar"
+section = "Seção"
+back = "Voltar"
+close = "Fechar"
+adjust = "Ajustar"
+categories = "Categorias"
+category = "Categoria"
+back_to_game = "Voltar ao jogo"
+
+[nav]
+home = "Início"
+all = "Todos os jogos"
+installed = "Instalados"
+favorites = "Favoritos"
+manual = "Adicionados"
+section_library = "BIBLIOTECA"
+section_sources = "FONTES"
+settings = "Configurações"
+exit = "Sair para o desktop"
+
+[status]
+keyboard = "Teclado"
+
+[home]
+recent = "Jogados recentemente"
+added = "Adicionados recentemente"
+see_all = "Ver todos"
+continue = "Continuar jogando"
+installed = "Instalado"
+playing_now = "Jogando agora"
+empty_title = "Nenhum jogo ainda"
+empty_text = "O Tako encontra sozinho os jogos instalados pelas lojas. Para outros jogos, adicione o executável ou atalho; capa, descrição e nota vêm automaticamente."
+add_game = "Adicionar jogo"
+rescan = "Procurar de novo"
+
+[library]
+search = "Buscar"
+clear = "Limpar"
+count_of = "{n} de {total}"
+empty = "Nenhum jogo aqui ainda"
+empty_text = "Os jogos aparecem aqui assim que o Tako os encontrar nas lojas ou você adicionar um."
+none_found = "Nenhum jogo encontrado"
+none_found_text = "Tente outra busca ou limpe os filtros."
+
+[game]
+play = "Jogar"
+resume = "Voltar ao jogo"
+upcoming = "Avisar no lançamento"
+rom_soon = "Abrir no emulador (em breve)"
+missing_file = "Arquivo não encontrado"
+install_via_store = "Instalar via loja"
+not_installed = "Não instalado"
+favorited = "Adicionado aos favoritos"
+unfavorited = "Removido dos favoritos"
+
+[details]
+play_time = "Tempo de jogo"
+last_played = "Última vez"
+metacritic = "Metacritic"
+critics = "Crítica"
+size = "Tamanho"
+release = "Lançamento"
+genres = "Gênero"
+developer = "Desenvolvedora"
+series = "Série"
+system = "Sistema"
+players = "Jogadores"
+status = "Status"
+also_in = "Também em"
+favorite = "Favoritar"
+unfavorite = "Desfavoritar"
+options = "Opções"
+collections = "Coleções"
+collections_n = "Coleções ({n})"
+game_settings = "Configurações deste jogo"
+metadata_hint = "Ligue a IGDB em Configurações › Capas e metadados para completar a descrição e as notas."
+
+[dialog]
+add_to_collection = "Adicionar à coleção"
+
+[options]
+open_steam = "Abrir na Steam"
+change_art = "Trocar imagens"
+source_ids = "Fontes e IDs"
+edit = "Editar"
+open_folder = "Abrir pasta"
+remove = "Remover da biblioteca"
+remove_title = "Remover {game}?"
+remove_text = "O jogo sai do Tako; os arquivos no disco ficam onde estão."
+removed = "Jogo removido"
+
+[collections]
+title = "Coleções"
+new = "Nova coleção"
+name_rule = "Até 40 caracteres, sem repetir o nome de outra coleção."
+
+[filters]
+title = "Filtros"
+show = "MOSTRAR"
+install = "Instalação"
+favorites_only = "Só favoritos"
+played = "Jogados recentemente"
+sort = "ORDENAR POR"
+collection = "COLEÇÃO"
+source = "FONTE"
+genre = "GÊNERO"
+filters = "FILTROS"
+clear = "Limpar filtros"
+
+[exit]
+title = "Sair para o desktop?"
+text = "O Tako fecha e você volta para a área de trabalho."
+confirm = "Sair"
+
+[session]
+other_running = "{game} ainda está aberto"
+end_and_play = "Encerrar e jogar este"
+opening = "Abrindo {game}"
+welcome_back = "Bem-vindo de volta · {game}"
+welcome_back_played = "Bem-vindo de volta · {game} · {time}"
+
+[search]
+title = "Buscar jogos"
+hint = "Sem acento: \"pokemon\" acha \"Pokémon\"."
+placeholder = "Digite o nome do jogo"
+
+[keyboard]
+type = "Digitar"
+delete = "Apagar"
+space = "Espaço"
+done = "Pronto"
+
+[settings.about]
+title = "Sobre"
+subtitle = "Versão, licença e código-fonte do Tako."
+version = "Versão"
+source = "Código-fonte"

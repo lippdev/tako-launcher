@@ -1,0 +1,147 @@
+[common]
+done = "Done"
+soon = "Coming soon"
+
+[hint]
+select = "Select"
+details = "Details"
+favorite = "Favorite"
+actions = "Actions"
+options = "Options"
+search = "Search"
+section = "Section"
+back = "Back"
+close = "Close"
+adjust = "Adjust"
+categories = "Categories"
+category = "Category"
+back_to_game = "Back to game"
+
+[nav]
+home = "Home"
+all = "All games"
+installed = "Installed"
+favorites = "Favorites"
+manual = "Added"
+section_library = "LIBRARY"
+section_sources = "SOURCES"
+settings = "Settings"
+exit = "Exit to desktop"
+
+[status]
+keyboard = "Keyboard"
+
+[home]
+recent = "Recently played"
+added = "Recently added"
+see_all = "See all"
+continue = "Continue playing"
+installed = "Installed"
+playing_now = "Playing now"
+empty_title = "No games yet"
+empty_text = "Tako finds the games installed by your stores on its own. For other games, add the executable or shortcut; cover, description and score come automatically."
+add_game = "Add game"
+rescan = "Search again"
+
+[library]
+search = "Search"
+clear = "Clear"
+count_of = "{n} of {total}"
+empty = "No games here yet"
+empty_text = "Games show up here as soon as Tako finds them in your stores or you add one."
+none_found = "No games found"
+none_found_text = "Try another search or clear the filters."
+
+[game]
+play = "Play"
+resume = "Back to game"
+upcoming = "Notify me at launch"
+rom_soon = "Open in emulator (coming soon)"
+missing_file = "File not found"
+install_via_store = "Install from the store"
+not_installed = "Not installed"
+favorited = "Added to favorites"
+unfavorited = "Removed from favorites"
+
+[details]
+play_time = "Play time"
+last_played = "Last played"
+metacritic = "Metacritic"
+critics = "Critics"
+size = "Size"
+release = "Release"
+genres = "Genre"
+developer = "Developer"
+series = "Series"
+system = "System"
+players = "Players"
+status = "Status"
+also_in = "Also in"
+favorite = "Favorite"
+unfavorite = "Unfavorite"
+options = "Options"
+collections = "Collections"
+collections_n = "Collections ({n})"
+game_settings = "Settings for this game"
+metadata_hint = "Turn on IGDB in Settings › Covers and metadata to fill in the description and scores."
+
+[dialog]
+add_to_collection = "Add to collection"
+
+[options]
+open_steam = "Open in Steam"
+change_art = "Change images"
+source_ids = "Sources and IDs"
+edit = "Edit"
+open_folder = "Open folder"
+remove = "Remove from library"
+remove_title = "Remove {game}?"
+remove_text = "The game leaves Tako; its files on disk stay where they are."
+removed = "Game removed"
+
+[collections]
+title = "Collections"
+new = "New collection"
+name_rule = "Up to 40 characters, not the same as another collection."
+
+[filters]
+title = "Filters"
+show = "SHOW"
+install = "Install status"
+favorites_only = "Favorites only"
+played = "Recently played"
+sort = "SORT BY"
+collection = "COLLECTION"
+source = "SOURCE"
+genre = "GENRE"
+filters = "FILTERS"
+clear = "Clear filters"
+
+[exit]
+title = "Exit to desktop?"
+text = "Tako closes and you go back to the desktop."
+confirm = "Exit"
+
+[session]
+other_running = "{game} is still open"
+end_and_play = "Close it and play this one"
+opening = "Opening {game}"
+welcome_back = "Welcome back · {game}"
+welcome_back_played = "Welcome back · {game} · {time}"
+
+[search]
+title = "Search games"
+hint = "No accents needed: \"pokemon\" finds \"Pokémon\"."
+placeholder = "Type the game's name"
+
+[keyboard]
+type = "Type"
+delete = "Delete"
+space = "Space"
+done = "Done"
+
+[settings.about]
+title = "About"
+subtitle = "Tako's version, license and source code."
+version = "Version"
+source = "Source code"

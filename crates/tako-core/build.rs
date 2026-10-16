@@ -1,5 +1,5 @@
-//! Junta os catálogos `locales/<idioma>/*.toml` num só arquivo por idioma (cada módulo tem o seu
-//! arquivo, para PRs paralelas não brigarem pelo mesmo catálogo).
+//! Lista os catálogos `locales/<idioma>/*.toml` (um por módulo, para PRs paralelas não brigarem pelo
+//! mesmo arquivo); o `i18n` lê e junta todos.
 
 use std::{env, fs, path::Path};
 
@@ -17,12 +17,19 @@ fn main() {
             })
             .unwrap_or_default();
         files.sort();
-        let mut all = String::new();
+        // Cada arquivo é um documento TOML próprio (dois módulos podem ter a mesma tabela, como `[library]`).
+        let manifest = env::var("CARGO_MANIFEST_DIR").expect("dir");
+        let mut code = String::from("&[\n");
         for f in files {
             println!("cargo:rerun-if-changed={}", f.display());
-            all.push_str(&fs::read_to_string(&f).expect("ler catálogo"));
-            all.push('\n');
+            let abs = Path::new(&manifest).join(&f);
+            code.push_str(&format!(
+                "    ({:?}, include_str!({:?})),\n",
+                f.display().to_string(),
+                abs.display().to_string()
+            ));
         }
-        fs::write(Path::new(&out).join(format!("{lang}.toml")), all).expect("gravar catálogo");
+        code.push_str("]\n");
+        fs::write(Path::new(&out).join(format!("{lang}.rs")), code).expect("gravar catálogo");
     }
 }

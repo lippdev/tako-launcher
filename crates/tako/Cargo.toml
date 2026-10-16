@@ -13,6 +13,7 @@ tako-sources.workspace = true
 tako-themes.workspace = true
 tako-ui.workspace = true
 tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [lints]
 workspace = true

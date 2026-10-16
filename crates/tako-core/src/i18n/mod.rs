@@ -45,11 +45,13 @@ impl Lang {
 
 type Catalog = HashMap<String, String>;
 
-fn parse(src: &str) -> Catalog {
-    let table: toml::Table =
-        toml::from_str(src).unwrap_or_else(|e| panic!("catálogo inválido: {e}"));
+fn parse(files: &[(&str, &str)]) -> Catalog {
     let mut out = Catalog::new();
-    flatten("", &table, &mut out);
+    for (name, src) in files {
+        let table: toml::Table =
+            toml::from_str(src).unwrap_or_else(|e| panic!("catálogo inválido {name}: {e}"));
+        flatten("", &table, &mut out);
+    }
     out
 }
 
@@ -74,8 +76,8 @@ fn catalogs() -> &'static (Catalog, Catalog) {
     static C: OnceLock<(Catalog, Catalog)> = OnceLock::new();
     C.get_or_init(|| {
         (
-            parse(include_str!(concat!(env!("OUT_DIR"), "/pt-BR.toml"))),
-            parse(include_str!(concat!(env!("OUT_DIR"), "/en-US.toml"))),
+            parse(include!(concat!(env!("OUT_DIR"), "/pt-BR.rs"))),
+            parse(include!(concat!(env!("OUT_DIR"), "/en-US.rs"))),
         )
     })
 }

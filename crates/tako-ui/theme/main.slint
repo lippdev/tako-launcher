@@ -58,6 +58,9 @@ export struct Details {
     hint: string,
 }
 
+// Tecla do teclado virtual: posição em colunas e linhas (as teclas largas ocupam várias colunas).
+export struct Key { label: string, row: int, col: int, span: int }
+
 // Camada por cima da página. `kind`: dialog, panel (lateral), keyboard, art, launch, progress, recovery.
 export struct Overlay {
     kind: string,
@@ -69,7 +72,7 @@ export struct Overlay {
     wide: bool,
     image: image,
     // Teclado virtual.
-    keys: [string],
+    keys: [Key],
     key-cols: int,
     input: string,
     input-hint: string,
@@ -775,16 +778,17 @@ component OverlayView inherits Rectangle {
                 Rectangle {
                     property <int> cols: max(1, ov.key-cols);
                     property <length> kw: (self.width - (cols - 1) * 10 * Ui.u) / cols;
-                    height: ceil(ov.keys.length / cols) * 74 * Ui.u;
+                    property <int> rows: ov.keys.length == 0 ? 0 : ov.keys[ov.keys.length - 1].row + 1;
+                    height: rows * 74 * Ui.u;
                     for k[i] in ov.keys: Rectangle {
-                        x: mod(i, cols) * (kw + 10 * Ui.u);
-                        y: floor(i / cols) * 74 * Ui.u;
-                        width: kw;
+                        x: k.col * (kw + 10 * Ui.u);
+                        y: k.row * 74 * Ui.u;
+                        width: k.span * kw + (k.span - 1) * 10 * Ui.u;
                         height: 64 * Ui.u;
                         border-radius: Ui.radius-sm;
                         background: i == ov.sel ? Ui.surface-solid : Ui.surface-1;
                         Text {
-                            text: k;
+                            text: k.label;
                             color: i == ov.sel ? Ui.on-surface-solid : Ui.on-accent;
                             font-size: Ui.label-lg;
                             font-weight: 600;

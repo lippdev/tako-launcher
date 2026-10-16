@@ -171,6 +171,10 @@ theme_struct! {
 }
 
 theme_struct! {
+    pub struct Key { pub label: String, pub row: i32, pub col: i32, pub span: i32 }
+}
+
+theme_struct! {
     /// Camada sobre a página. `kind`: dialog, panel, keyboard, art, launch, progress, recovery.
     pub struct Overlay {
         pub kind: String,
@@ -181,7 +185,7 @@ theme_struct! {
         pub sel: i32,
         pub wide: bool,
         pub image: Image,
-        pub keys: Vec<String>,
+        pub keys: Vec<Key>,
         pub key_cols: i32,
         pub input: String,
         pub input_hint: String,

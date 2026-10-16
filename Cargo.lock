@@ -4822,6 +4822,7 @@ dependencies = [
  "tako-themes",
  "tako-ui",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -4908,6 +4909,7 @@ dependencies = [
 name = "tako-ui"
 version = "0.2.0-alpha.1"
 dependencies = [
+ "chrono",
  "image",
  "sdl3",
  "serde",
