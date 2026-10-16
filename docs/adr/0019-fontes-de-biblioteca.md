@@ -159,5 +159,5 @@ rodarem no Mac.
   Battle.net abre o próprio cliente quando não conhece o jogo. Instalar jogos pelas lojas continua fora.
 - O formato dos manifests da Epic, as chaves do GOG, da Ubisoft e da EA, o `product.db` do Battle.net, o banco do
   Amazon Games e o arquivo do Playnite não são documentados publicamente; mudanças quebram só a fonte delas (falha
-  isolada, aviso nas Configurações, log). Validação real no checklist de hardware §15 (Xbox), §17 (Epic e GOG) e §25
+  isolada, aviso nas Configurações, log). Validação real no checklist de hardware §15 (Xbox), §17 (Epic e GOG) e §26
   (Ubisoft, EA, Battle.net, Amazon e Playnite).
