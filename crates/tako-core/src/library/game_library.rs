@@ -1,9 +1,14 @@
 //! Port de `IGameLibrary`, `LocalGameLibrary` e `InMemoryGameLibrary` (MVP-023): jogos encontrados nas lojas mais
 //! os adicionados pelo usuário, com favorito, "jogado por último" e tempo guardados num [`LibraryStore`].
 
-use super::{Clock, Game, GameStateRecord, GameStore, ManualGameRecord, PlayStatus, duplicates};
+use super::{
+    Clock, Game, GameStateRecord, GameStore, ManualGameRecord, PlaySession, PlayStatus, duplicates,
+};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+
+/// Sessões guardadas por jogo: as mais antigas saem para a tabela não crescer sem fim.
+pub const MAX_SESSIONS: usize = 100;
 
 /// O que fica guardado da biblioteca: jogos adicionados e estado por jogo.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -143,16 +148,31 @@ impl GameLibrary {
         self.update_state(id, |s| s.play_status = status)
     }
 
-    /// Registra o fim de uma sessão: o jogo vai para o topo de "Jogados recentemente".
+    /// Registra o fim de uma sessão: o jogo vai para o topo de "Jogados recentemente" e a sessão entra no
+    /// histórico (duração zero é só a abertura, sem sessão).
     pub fn record_session(&mut self, id: &str, duration: Duration) -> Result<(), LibraryError> {
         let now = (self.clock)();
         let game = self.find_mut(id)?;
         game.last_played_at = Some(now);
         game.play_time += duration;
+        let started_at = now - chrono::TimeDelta::from_std(duration).unwrap_or_default();
         self.update_state(id, |s| {
             s.last_played_at = Some(now);
             s.play_minutes += duration.as_secs_f64() / 60.0;
+            if !duration.is_zero() {
+                s.sessions.push(PlaySession {
+                    started_at,
+                    duration,
+                });
+                let extra = s.sessions.len().saturating_sub(MAX_SESSIONS);
+                s.sessions.drain(..extra);
+            }
         })
+    }
+
+    /// Sessões do jogo, da mais antiga para a mais recente.
+    pub fn sessions(&self, id: &str) -> &[PlaySession] {
+        self.data.state.get(id).map_or(&[], |s| &s.sessions)
     }
 
     /// O jogo foi aberto pelo launcher agora (a duração chega com o acompanhamento da sessão).
@@ -292,6 +312,26 @@ mod tests {
         assert_eq!(
             library.find("gow3").unwrap().play_time,
             before + Duration::from_secs(25 * 60)
+        );
+        assert_eq!(
+            library.sessions("gow3"),
+            [PlaySession {
+                started_at: sample::now() + TimeDelta::minutes(5),
+                duration: Duration::from_secs(25 * 60),
+            }]
+        );
+        library.record_launch("gow3").unwrap(); // abrir não conta como sessão
+        for _ in 0..MAX_SESSIONS {
+            library
+                .record_session("gow3", Duration::from_secs(60))
+                .unwrap();
+        }
+        let sessions = library.sessions("gow3");
+        assert_eq!(sessions.len(), MAX_SESSIONS);
+        assert!(
+            sessions
+                .iter()
+                .all(|s| s.duration == Duration::from_secs(60))
         );
         assert_eq!(
             library.record_launch("nao-existe"),

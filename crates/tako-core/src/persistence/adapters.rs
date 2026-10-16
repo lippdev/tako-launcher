@@ -35,6 +35,7 @@ impl library::LibraryStore for SqlLibrary {
                             play_status: s.play_status,
                             last_played_at: s.last_played_at,
                             play_minutes: s.play_minutes,
+                            sessions: s.sessions.clone(),
                         },
                     )
                 })
@@ -80,6 +81,7 @@ fn to_state(s: GameStateRow) -> GameStateRecord {
         play_status: s.play_status,
         last_played_at: s.last_played_at,
         play_minutes: s.play_minutes,
+        sessions: s.sessions,
     }
 }
 
@@ -148,6 +150,7 @@ mod tests {
                 play_status: Some(library::PlayStatus::Beaten),
                 last_played_at: None,
                 play_minutes: 3.0,
+                ..Default::default()
             },
         );
         library::LibraryStore::save(&mut lib, &data).unwrap();

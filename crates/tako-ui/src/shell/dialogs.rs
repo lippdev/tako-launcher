@@ -6,7 +6,7 @@ use super::library::Criteria;
 use super::{Ctx, Effect};
 use crate::model::PanelRow;
 use tako_core::library::{GameStore, LibraryFilter, PlayStatus, collections, query};
-use tako_core::presentation::library_text;
+use tako_core::presentation::{game_text, library_text};
 
 pub fn toggle_favorite(ctx: &mut Ctx, id: &str) {
     match ctx.library.toggle_favorite(id) {
@@ -201,6 +201,13 @@ pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
             MenuItem::new(PanelRow::button("ids", ctx.t("options.source_ids")).icon("search"))
                 .on(move |ctx| Flow::Replace(super::source_ids::panel(ctx, &i))),
         );
+        if !ctx.library.sessions(&id).is_empty() {
+            let i = id.clone();
+            v.push(
+                MenuItem::new(PanelRow::button("sessions", ctx.t("options.sessions")).icon("play"))
+                    .on(move |ctx| Flow::Replace(Box::new(sessions(ctx, &i)))),
+            );
+        }
         if g.store() == GameStore::Manual {
             let i = id.clone();
             v.push(
@@ -227,6 +234,32 @@ pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
             );
         }
         v
+    })
+}
+
+/// Histórico de sessões (SESSION-002): data, hora e duração, da mais recente para a mais antiga.
+fn sessions(ctx: &Ctx, id: &str) -> MenuLayer {
+    let id = id.to_owned();
+    MenuLayer::panel(ctx.t("options.sessions"), move |ctx| {
+        let lang = ctx.lang();
+        ctx.library
+            .sessions(&id)
+            .iter()
+            .rev()
+            .map(|s| {
+                let at = s.started_at.with_timezone(&chrono::Local);
+                let when = format!(
+                    "{} {}",
+                    game_text::date(lang, at.date_naive()),
+                    at.format("%H:%M")
+                );
+                MenuItem::new(PanelRow::info(
+                    "session",
+                    when,
+                    game_text::session_played(lang, s.duration),
+                ))
+            })
+            .collect()
     })
 }
 
