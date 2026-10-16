@@ -367,10 +367,12 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 
 - [ ] **DATA-001:** enviar dados de uso e falhas para os desenvolvedores, **desligado por padrão** e com opt-in explícito: anônimo, sem lista de jogos nem caminhos, com tela mostrando o que é enviado e opção de apagar. Precisa seguir LGPD e GDPR e escolher o serviço que recebe os dados.
 
-### Épico DL — Downloads (P3, decisão pendente)
+### Épico DL — Downloads (P3)
 
-- [ ] **DL-001:** baixar jogos por torrent a partir de fontes em `.json`, como o Hydra Launcher. **Decisão pendente do mantenedor:** as fontes que circulam para o Hydra são em grande parte repacks pirateados. O Tako só pode trazer ou facilitar fontes de conteúdo legal (jogos grátis, DRM-free, homebrew, jogos que o usuário possui), ou o projeto fica exposto a DMCA (repositório, releases e parcerias como a DEALS-001). Definir a regra antes de qualquer código.
-- [ ] **DL-002:** depois do DL-001, integrar serviços de download acelerado como o Real-Debrid, com a conta do próprio usuário. Mesma restrição.
+Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes são do usuário e ficam a critério dele; o Tako não traz, não recomenda e não lista fontes, nem na interface nem na documentação.
+
+- [ ] **DL-001:** baixar jogos por torrent a partir de fontes `.json` que o próprio usuário adiciona, como o Hydra Launcher. Quando um item da fonte é um jogo que já existe numa biblioteca (Steam, Epic, adicionado à mão, etc.), o download se vincula a esse jogo: o card e os detalhes mostram "Baixando Batman: Arkham Knight" com progresso, em vez de criar um jogo novo. Ao terminar, o jogo fica instalado e jogável pelo Tako.
+- [ ] **DL-002:** depois do DL-001, usar serviços de download acelerado como o Real-Debrid, com a conta do próprio usuário.
 
 ### Épico DEALS — Promoções (P3)
 
