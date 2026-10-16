@@ -78,6 +78,7 @@ fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
 
 fn main() {
     let started = std::time::Instant::now();
+    tako_platform::tune_allocator();
     let all: Vec<String> = std::env::args().collect();
     let has = |f: &str| args::has(&all, f);
     if has("--bench") {

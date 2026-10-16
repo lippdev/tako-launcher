@@ -31,6 +31,19 @@ pub fn global_hotkey(
         None
     }
 }
+
+/// Chamar no início do `main`. No glibc o limiar de `mmap` sobe sozinho depois de cada bloco grande liberado
+/// (até 32 MB); daí os buffers de decodificação das artes (vários MB, um por imagem) passam a vir do heap, que
+/// fragmenta e não devolve a memória ao SO (medido: ~70 MB a mais em repouso na home). Fixar o limiar em 1 MB
+/// mantém esses blocos em `mmap`, devolvidos no `free`. Windows e macOS já devolvem blocos grandes.
+pub fn tune_allocator() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    // SAFETY: `mallopt` só ajusta um parâmetro do alocador; chamado antes de criar threads.
+    unsafe {
+        libc::mallopt(libc::M_MMAP_THRESHOLD, 1024 * 1024);
+    }
+}
+
 // Parte só é usada no Linux; nos outros SOs compila para os testes rodarem.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod unix;
