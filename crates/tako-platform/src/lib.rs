@@ -10,6 +10,27 @@ use tako_core::devices::{
 };
 
 pub mod secrets;
+
+/// Atalho de teclado global durante o jogo; o retorno mantém o atalho registrado até ser solto. `None` = sem
+/// atalho (tecla sem equivalente, atalho em uso por outro app ou SO sem suporte).
+/// shortcut: só Windows; Linux (portal GlobalShortcuts no Wayland, XGrabKey no X11) e macOS (CGEventTap com
+/// Acessibilidade) ficam sem atalho de teclado durante o jogo, só o do controle. Fazer quando houver pedido.
+pub fn global_hotkey(
+    shortcut: &tako_core::input::shortcut::KeyShortcut,
+    on_press: impl Fn() + Send + 'static,
+) -> Option<Box<dyn std::any::Any>> {
+    #[cfg(target_os = "windows")]
+    {
+        let vk = shortcut.virtual_key()?;
+        windows::hotkey::register(shortcut.modifiers.0 as u32, vk, on_press)
+            .map(|h| Box::new(h) as Box<dyn std::any::Any>)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (shortcut, on_press);
+        None
+    }
+}
 // Parte só é usada no Linux; nos outros SOs compila para os testes rodarem.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod unix;

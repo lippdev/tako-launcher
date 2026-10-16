@@ -40,15 +40,14 @@ pub struct Supervisor {
     running: Option<Running>,
     pads: Option<Pads>,
     chord: ButtonChordDetector,
+    key: tako_core::input::shortcut::KeyShortcut,
 }
 
 impl Supervisor {
     pub fn new(paths: DataPaths, platform: Platform, all_args: &[String]) -> Supervisor {
-        let chord_value = TakoDatabase::new(paths.database());
-        let chord_value = SettingsStore::new(chord_value)
-            .get("ControlCenterChord")
-            .ok()
-            .flatten();
+        let settings = SettingsStore::new(TakoDatabase::new(paths.database()));
+        let chord_value = settings.get("ControlCenterChord").ok().flatten();
+        let key = settings.get("ControlCenterKey").ok().flatten();
         Supervisor {
             paths,
             platform,
@@ -58,6 +57,7 @@ impl Supervisor {
             running: None,
             pads: None,
             chord: ButtonChordDetector::new(chord::parse(chord_value.as_deref())),
+            key: tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
         }
     }
 
@@ -257,6 +257,18 @@ impl Supervisor {
                 .map_err(|e| tracing::warn!("controles: {e}"))
                 .ok();
         }
+        // Atalho de teclado da Central (só Windows): marca e acorda a espera dos controles.
+        let pressed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let _hotkey = {
+            let pressed = pressed.clone();
+            let wake = self.pads.as_ref().and_then(Pads::waker);
+            tako_platform::global_hotkey(&self.key, move || {
+                pressed.store(true, std::sync::atomic::Ordering::Relaxed);
+                if let Some(w) = &wake {
+                    w();
+                }
+            })
+        };
         let mut last_poll = Instant::now();
         let mut last = Instant::now();
         loop {
@@ -278,7 +290,9 @@ impl Supervisor {
             let dt = last.elapsed().as_secs_f64();
             last = Instant::now();
             let pad = self.pads.as_ref().map(|p| p.state()).unwrap_or_default();
-            if self.chord.update(GamepadButtons(pad.buttons), now) {
+            if self.chord.update(GamepadButtons(pad.buttons), now)
+                || pressed.swap(false, std::sync::atomic::Ordering::Relaxed)
+            {
                 return Launch {
                     control_center: true,
                     ..Default::default()

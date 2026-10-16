@@ -364,6 +364,45 @@ impl KeyShortcut {
         format!("{}|{}", self.modifiers.0, self.key)
     }
 
+    /// Código de tecla virtual do Windows (`VK_*`) para o atalho global durante o jogo. Os modificadores já
+    /// valem como `MOD_*` (mesmos bits do `ModifierKeys` do WPF). `None` = tecla sem equivalente.
+    pub fn virtual_key(&self) -> Option<u32> {
+        let k = self.key.as_str();
+        let b = k.as_bytes();
+        if b.len() == 1 && b[0].is_ascii_uppercase() {
+            return Some(b[0] as u32);
+        }
+        if b.len() == 2 && b[0] == b'D' && b[1].is_ascii_digit() {
+            return Some(b[1] as u32);
+        }
+        if let Some(n) = k.strip_prefix('F').and_then(|n| n.parse::<u32>().ok()) {
+            return (1..=24).contains(&n).then_some(0x6F + n);
+        }
+        if let Some(n) = k.strip_prefix("NumPad").and_then(|n| n.parse::<u32>().ok()) {
+            return (n <= 9).then_some(0x60 + n);
+        }
+        Some(match k {
+            "Back" => 0x08,
+            "Tab" => 0x09,
+            "Return" | "Enter" => 0x0D,
+            "Pause" => 0x13,
+            "Escape" => 0x1B,
+            "Space" => 0x20,
+            "Prior" | "PageUp" => 0x21,
+            "Next" | "PageDown" => 0x22,
+            "End" => 0x23,
+            "Home" => 0x24,
+            "Left" => 0x25,
+            "Up" => 0x26,
+            "Right" => 0x27,
+            "Down" => 0x28,
+            "Insert" => 0x2D,
+            "Delete" => 0x2E,
+            "OemTilde" | "Oem3" => 0xC0,
+            _ => return None,
+        })
+    }
+
     /// Inválido volta ao padrão.
     pub fn parse(text: Option<&str>) -> KeyShortcut {
         let Some((mods, key)) = text.and_then(|t| t.split_once('|')) else {
@@ -877,5 +916,17 @@ mod tests {
         ] {
             assert_eq!(KeyShortcut::key_name(k), e);
         }
+    }
+
+    #[test]
+    fn virtual_keys_follow_the_wpf_key_names() {
+        let vk = |k: &str| KeyShortcut::new(KeyModifiers::CTRL, k).virtual_key();
+        assert_eq!(vk("T"), Some(0x54));
+        assert_eq!(vk("D7"), Some(0x37));
+        assert_eq!(vk("F10"), Some(0x79));
+        assert_eq!(vk("Tab"), Some(0x09));
+        assert_eq!(vk("NumPad3"), Some(0x63));
+        assert_eq!(vk("F25"), None);
+        assert_eq!(vk("Oem102"), None);
     }
 }

@@ -102,6 +102,9 @@ pub fn family_of(t: GamepadType) -> PadFamily {
     }
 }
 
+/// Evento vazio que só acorda a espera.
+struct Wake;
+
 impl Pads {
     /// Liga só o subsistema de controles (sem vídeo nem áudio do SDL).
     pub fn open() -> Result<Pads, String> {
@@ -118,6 +121,14 @@ impl Pads {
             last_family: PadFamily::Xbox,
             last_name: String::new(),
         })
+    }
+
+    /// Função que acorda um [`Pads::wait`] em outra thread (ex.: o atalho de teclado durante o jogo).
+    pub fn waker(&self) -> Option<impl Fn() + Send + 'static> {
+        let events = self._sdl.event().ok()?;
+        events.register_custom_event::<Wake>().ok()?;
+        let sender = events.event_sender();
+        Some(move || drop(sender.push_custom_event(Wake)))
     }
 
     pub fn count(&self) -> usize {

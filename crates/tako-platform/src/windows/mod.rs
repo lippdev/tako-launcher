@@ -8,6 +8,7 @@ mod audio;
 mod autostart;
 mod display;
 pub mod dpapi;
+pub mod hotkey;
 mod pointer;
 mod process;
 
