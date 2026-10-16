@@ -62,7 +62,11 @@ const SIDELOAD: &str = r#"{ "games": [
 fn write(root: &Path, rel: &str, text: &str, dir: &Path) {
     let path = root.join(rel);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    fs::write(path, text.replace("@DIR@", &dir.to_str().unwrap().replace('\\', "/"))).unwrap();
+    fs::write(
+        path,
+        text.replace("@DIR@", &dir.to_str().unwrap().replace('\\', "/")),
+    )
+    .unwrap();
 }
 
 fn fake_heroic() -> (tempfile::TempDir, PathBuf) {
