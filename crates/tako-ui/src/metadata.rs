@@ -318,8 +318,7 @@ pub(crate) fn test_ctx(
     dir: &std::path::Path,
     simulate: bool,
 ) -> (std::sync::MutexGuard<'static, ()>, Ctx) {
-    static LOCK: Mutex<()> = Mutex::new(());
-    let guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let ctx = crate::app::build_ctx(
         tako_core::paths::DataPaths::at(dir),
         tako_platform::Platform::simulated(),

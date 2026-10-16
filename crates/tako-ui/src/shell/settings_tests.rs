@@ -1,14 +1,12 @@
 use super::*;
 use crate::shell::Layer;
-use std::sync::Mutex;
 use tako_core::input::GamepadButtons as B;
 use tako_core::input::shortcut::chord;
 use tako_core::library::GameStore;
 use tako_core::paths::DataPaths;
 use tako_platform::Platform;
 
-/// O idioma é global: os testes daqui não rodam juntos.
-static LOCK: Mutex<()> = Mutex::new(());
+use crate::LANG_LOCK as LOCK;
 
 fn ctx() -> (tempfile::TempDir, Ctx) {
     let dir = tempfile::tempdir().unwrap();

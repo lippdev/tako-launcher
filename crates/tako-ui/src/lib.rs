@@ -22,3 +22,7 @@ pub mod values;
 pub fn version() -> &'static str {
     option_env!("TAKO_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
 }
+
+/// O idioma é global: testes que dependem dele (ou o trocam) rodam um por vez.
+#[cfg(test)]
+pub(crate) static LANG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());

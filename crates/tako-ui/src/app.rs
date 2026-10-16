@@ -107,7 +107,10 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         .get(crate::shell::ctx::keys::LANGUAGE)
         .and_then(Lang::from_code)
         .unwrap_or_else(Lang::from_env);
-    i18n::set_lang(lang);
+    // Nos testes o idioma é global e quem precisa dele o define (sob `LANG_LOCK`), não o ambiente da máquina.
+    if !cfg!(test) {
+        i18n::set_lang(lang);
+    }
 
     let store: Box<dyn tako_core::library::LibraryStore + Send> = match &database {
         Some(d) => Box::new(db::LibraryStore::new(
