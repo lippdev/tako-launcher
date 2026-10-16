@@ -1,6 +1,6 @@
 # ADR-0012: Supervisor da UI no próprio Tako.exe e IPC versionado por Named Pipes
 
-- Status: Proposta
+- Status: Substituída por [ADR-0026](0026-supervisor-e-processo-durante-o-jogo.md)
 - Data: 2026-10-15
 - Itens: MVP-003 (IPC), MVP-006 (supervisor)
 

@@ -1,6 +1,6 @@
 # ADR-0015: Monitores vindos do Console Mode e "Tela de jogo"
 
-- Status: Proposta
+- Status: Substituída por [ADR-0024](0024-matriz-de-plataforma.md) (tela de jogo) e [ADR-0025](0025-fronteira-com-o-console-mode.md) (o resto sai do Tako)
 - Data: 2026-10-15
 - Complementa: [ADR-0013](0013-estado-de-monitores-e-audio.md) (a parte de áudio não muda)
 - Depende de: [ADR-0014](0014-licenca-agpl.md) (Tako sob AGPL-3.0-only)

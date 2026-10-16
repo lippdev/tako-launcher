@@ -1,6 +1,6 @@
 # ADR-0021: Metadados pela IGDB com a chave da Twitch de cada usuário e combinação de N provedores
 
-- Status: Proposta
+- Status: Histórico (implementação C#). A decisão vale para o Rust (MIG-028)
 - Data: 2026-10-15
 
 ## Contexto

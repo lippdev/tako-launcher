@@ -1,6 +1,6 @@
 # ADR-0020: Organização das Configurações e menu Modo Console
 
-- Status: Proposta
+- Status: Histórico (implementação C#). O menu Modo Console sai do Tako ([ADR-0025](0025-fronteira-com-o-console-mode.md)); as categorias seguem na interface Slint
 - Data: 2026-10-15
 
 ## Contexto

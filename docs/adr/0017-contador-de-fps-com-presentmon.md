@@ -1,6 +1,6 @@
 # ADR-0017: Contador de FPS próprio pelo PresentMon, sem RTSS
 
-- Status: Proposta
+- Status: Substituída por [ADR-0025](0025-fronteira-com-o-console-mode.md): o contador de FPS sai do Tako
 - Data: 2026-10-15
 
 ## Contexto

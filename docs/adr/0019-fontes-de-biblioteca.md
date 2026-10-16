@@ -1,6 +1,6 @@
 # ADR-0019: Fontes de biblioteca (Steam, Epic Games, GOG, Xbox, Ubisoft Connect, EA app, Battle.net, Amazon Games e Playnite)
 
-- Status: Proposta
+- Status: Histórico (implementação C#). As regras valem para as fontes em Rust (`tako-sources`, MIG-025 a MIG-027)
 - Data: 2026-10-15
 
 ## Contexto

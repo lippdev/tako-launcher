@@ -1,6 +1,6 @@
 # ADR-0022: ScreenScraper para jogos de emulador (ROMs), com a conta de cada usuário e as credenciais do software só no build de release
 
-- Status: Proposta
+- Status: Histórico (implementação C#). A decisão vale para o Rust (MIG-028)
 - Data: 2026-10-15
 
 ## Contexto

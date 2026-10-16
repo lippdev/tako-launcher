@@ -1,6 +1,6 @@
 # ADR-0018: Limite de FPS pelo driver de vídeo
 
-- Status: Proposta
+- Status: Substituída por [ADR-0025](0025-fronteira-com-o-console-mode.md): o limite de FPS sai do Tako
 - Data: 2026-10-15
 
 ## Contexto

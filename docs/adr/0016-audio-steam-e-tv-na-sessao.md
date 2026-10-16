@@ -1,6 +1,6 @@
 # ADR-0016: Áudio, Steam e TV durante a sessão de jogo
 
-- Status: Proposta
+- Status: Substituída por [ADR-0024](0024-matriz-de-plataforma.md) (áudio) e [ADR-0025](0025-fronteira-com-o-console-mode.md) (Steam na bandeja e TV saem do Tako)
 - Data: 2026-10-15
 
 ## Contexto
