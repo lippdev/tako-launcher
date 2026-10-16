@@ -730,6 +730,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::HERO))
         .unwrap_or_default();
     bridge::set(ui, "backdrop", art.to_value());
+    images::frame_done();
 }
 
 #[cfg(test)]
