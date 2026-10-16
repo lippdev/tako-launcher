@@ -131,7 +131,7 @@ fn system_entries() -> Vec<(String, PathBuf)> {
 }
 
 /// Adiciona o arquivo escolhido: `.desktop` e `.app` pelo que declaram; ROM pergunta o sistema; o resto vira jogo
-/// de PC com o nome do arquivo.
+/// de PC com o nome do produto (`.exe` no Windows) ou do arquivo.
 pub fn add_path(ctx: &mut Ctx, path: &Path) {
     let text = path.to_string_lossy().into_owned();
     if let Some(existing) = ctx.library.games().iter().find(|g| {
@@ -239,9 +239,17 @@ fn choose_system(ctx: &Ctx, path: PathBuf, found: Vec<&'static EmulatedSystem>) 
     Box::new(layer)
 }
 
-/// Nome do arquivo sem extensão nem separadores ("hollow_knight.exe" → "hollow knight").
-// shortcut: sem o nome do produto do .exe (versão do arquivo, só no Windows); ler o recurso se pedirem.
+/// Nome do produto do `.exe` no Windows ("ELDEN RING™" → "ELDEN RING"); senão o nome do arquivo sem extensão nem
+/// separadores ("hollow_knight.exe" → "hollow knight").
 fn guess_title(path: &Path) -> String {
+    #[cfg(target_os = "windows")]
+    if path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("exe"))
+        && let Some(t) = product_title(tako_platform::windows::version_info::names(path))
+    {
+        return t;
+    }
     let stem = path
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
@@ -250,9 +258,36 @@ fn guess_title(path: &Path) -> String {
     if t.is_empty() { stem } else { t }
 }
 
+/// Primeiro de ProductName e FileDescription que sirva de título: com mais de 2 letras, sem "launcher" (o .exe do
+/// launcher da loja não é o jogo); tira ™ e ®.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn product_title(candidates: [Option<String>; 2]) -> Option<String> {
+    candidates.into_iter().flatten().find_map(|c| {
+        let ok =
+            !c.trim().is_empty() && !c.to_lowercase().contains("launcher") && c.chars().count() > 2;
+        ok.then(|| c.replace(['™', '®'], "").trim().to_owned())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn product_title_skips_launchers_and_short_names() {
+        let s = |v: &str| Some(v.to_owned());
+        assert_eq!(
+            product_title([s("ELDEN RING™"), s("elden ring")]).as_deref(),
+            Some("ELDEN RING")
+        );
+        assert_eq!(
+            product_title([s("Rockstar Games Launcher"), s("GTA V®")]).as_deref(),
+            Some("GTA V")
+        );
+        assert_eq!(product_title([None, s("Hades")]).as_deref(), Some("Hades"));
+        assert_eq!(product_title([s("  "), s("UE")]), None);
+        assert_eq!(product_title([None, None]), None);
+    }
 
     #[test]
     fn adds_executables_once_and_asks_the_system_of_roms() {
