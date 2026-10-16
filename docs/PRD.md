@@ -326,6 +326,7 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 - [ ] **THEME-003:** edição de cores, fontes e fundo pelo próprio Tako.
 - [ ] **THEME-004:** instalar tema por URL de repositório, com atualização opcional.
 - [ ] **THEME-005:** galeria comunitária de temas.
+- [ ] **THEME-006:** criar o próprio tema pelo Tako, sem editar arquivos: partir do tema padrão (ou de um instalado), escolher cores, fonte e fundo com prévia ao vivo, dar nome, salvar como tema instalado e exportar como `.takotheme` para compartilhar. Base: os `tokens.toml` (temas que só trocam a paleta) e THEME-002/003.
 - [ ] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil.
 
 ### Épico PERF (P2)
