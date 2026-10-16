@@ -32,8 +32,12 @@ impl GameSettingsOverride {
             self.screen_mode.is_some(),
             self.hdr.is_some(),
             self.audio_device_id.is_some(),
-            self.extra_arguments.as_deref().is_some_and(|a| !a.trim().is_empty()),
-            self.working_directory.as_deref().is_some_and(|a| !a.trim().is_empty()),
+            self.extra_arguments
+                .as_deref()
+                .is_some_and(|a| !a.trim().is_empty()),
+            self.working_directory
+                .as_deref()
+                .is_some_and(|a| !a.trim().is_empty()),
         ]
         .into_iter()
         .filter(|b| *b)

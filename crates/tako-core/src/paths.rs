@@ -136,7 +136,7 @@ pub fn resolve(
                     .join("Tako")
             } else {
                 env("XDG_DATA_HOME")
-                    .filter(|p| p.is_absolute())
+                    .filter(|p| p.has_root())
                     .unwrap_or_else(|| home.join(".local").join("share"))
                     .join("tako")
             };
