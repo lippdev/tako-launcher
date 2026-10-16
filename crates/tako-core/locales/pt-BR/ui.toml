@@ -30,6 +30,8 @@ exit = "Sair para o desktop"
 
 [status]
 keyboard = "Teclado"
+pad_disconnected = "Controle desconectado"
+pad_connected = "Controle conectado"
 battery_low = "Bateria fraca: {pad} com {percent}%"
 
 [home]

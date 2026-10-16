@@ -489,9 +489,7 @@ impl Shell {
     pub fn render(&mut self, now: Instant) -> Out {
         let mut out = Out::default();
         self.ctx.check_broken();
-        if let Some((_, at)) = &self.ctx.toast
-            && now.duration_since(*at) >= TOAST_TIME
-        {
+        if self.ctx.toast_expired(now) {
             self.ctx.toast = None;
         }
         let kind = self.page().kind();
