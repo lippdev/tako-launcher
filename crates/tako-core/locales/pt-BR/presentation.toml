@@ -1,0 +1,45 @@
+[presentation]
+store.manual = "Adicionado"
+store_of.masculine = "do {store}"
+store_of.feminine = "da {store}"
+store_via.masculine = "pelo {store}"
+store_via.feminine = "pela {store}"
+
+[presentation.last_played]
+never = "Nunca jogado"
+now = "Agora mesmo"
+yesterday = "Jogado ontem"
+days.one = "Há {n} dia"
+days.other = "Há {n} dias"
+weeks.one = "Há {n} semana"
+weeks.other = "Há {n} semanas"
+months.one = "Há {n} mês"
+months.other = "Há {n} meses"
+
+[presentation.play_time]
+minutes = "{n} min"
+hours = "{n} h"
+
+[presentation.session]
+less_than_minute = "menos de 1 min jogado"
+minutes.one = "{n} min jogado"
+minutes.other = "{n} min jogados"
+hours = "{h} h jogadas"
+hours_minutes = "{h} h {m} min jogados"
+
+[presentation.date]
+long = "%d/%m/%Y"
+short = "%d/%m"
+
+[presentation.status]
+upcoming = "Lança em {date}"
+rom = "ROM no disco"
+rom_missing = "ROM não encontrada"
+installed = "Instalado"
+not_installed = "Não instalado"
+
+[presentation.keyboard]
+backspace = "Apagar"
+space = "Espaço"
+clear = "Limpar"
+done = "Pronto"

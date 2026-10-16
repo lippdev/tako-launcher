@@ -1,0 +1,29 @@
+[library]
+no_games = "Nenhum jogo"
+filters = "Filtros"
+filters_active = "Filtros ({n})"
+list_and = "{list} e {last}"
+list_or = "{list} ou {last}"
+
+[library.sort]
+recently_played = "Último jogado"
+name = "Nome"
+play_time = "Tempo de jogo"
+rating = "Nota"
+recently_added = "Data de adição"
+
+[library.install]
+any = "Todos"
+installed = "Instalados"
+not_installed = "Não instalados"
+
+[library.scan]
+all_disabled = "Todas as lojas estão desligadas nas Configurações"
+none_found = "Nenhum jogo {stores} encontrado neste PC"
+found.one = "{list} encontrado"
+found.other = "{list} encontrados"
+
+[library.collection]
+name_empty = "Dê um nome à coleção."
+name_too_long = "Use até {n} letras."
+name_taken = "Já existe uma coleção com esse nome."

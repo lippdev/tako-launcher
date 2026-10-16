@@ -1,0 +1,29 @@
+[library]
+no_games = "No games"
+filters = "Filters"
+filters_active = "Filters ({n})"
+list_and = "{list} and {last}"
+list_or = "{list} or {last}"
+
+[library.sort]
+recently_played = "Last played"
+name = "Name"
+play_time = "Play time"
+rating = "Rating"
+recently_added = "Date added"
+
+[library.install]
+any = "All"
+installed = "Installed"
+not_installed = "Not installed"
+
+[library.scan]
+all_disabled = "All stores are turned off in Settings"
+none_found = "No games {stores} found on this PC"
+found.one = "{list} found"
+found.other = "{list} found"
+
+[library.collection]
+name_empty = "Give the collection a name."
+name_too_long = "Use up to {n} characters."
+name_taken = "A collection with this name already exists."
