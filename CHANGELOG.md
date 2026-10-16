@@ -4,6 +4,26 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 
+## [0.1.0-alpha.10]
+### Novidades
+- Mais lojas na biblioteca: jogos da **Epic Games**, do **GOG** e do **Xbox / PC Game Pass** aparecem sozinhos e abrem pelo próprio cliente da loja. Cada loja liga e desliga em Configurações › Biblioteca e lojas, e um jogo presente em duas lojas aparece uma vez para cada loja, com o aviso "Também em". (#39, #40)
+- **Menu Modo Console** na barra lateral, com cartões para Tela de jogo, TV, Áudio do jogo, Steam na bandeja, Contador de FPS e Limite de FPS, cada um mostrando se está ligado, desligado ou precisa de atenção. O assistente "Configurar para jogar na TV" guia passo a passo. (#45)
+- **Modo console ao abrir:** com a opção ligada, o Tako abre direto na TV e só devolve as telas para a mesa ao sair ou em "Voltar ao PC". Atalho de emergência: Ctrl+Alt+Shift+D. A volta para a mesa não trava mais a tela. (#42)
+- **TVs LG (webOS) e Samsung (Tizen)**, além das Google TV e Android TV: ligar, trocar para a entrada do PC e colocar em espera. (#38)
+- **Coleções e configurações por jogo:** crie coleções, que aparecem na tela inicial e nos filtros. Cada jogo pode ter a própria tela de jogo, resolução, HDR, saída de áudio, limite de FPS e contador. O botão ☰ numa capa abre as ações rápidas. (#41)
+- **Dados dos jogos pela IGDB e pelo ScreenScraper**, com a sua própria chave (Twitch) ou conta, guardadas cifradas neste PC. A Steam continua sendo consultada para todos os jogos. O ScreenScraper identifica ROMs de emulador pelo arquivo, e "Adicionar jogo" já aceita ROMs com a escolha do sistema. Abrir a ROM no emulador vem depois. (#46, #47)
+- **Central de Controle com o jogo ao vivo por trás**, como na Steam, quando o jogo roda em janela ou sem bordas. O atalho agora é segurar **Select + △** (Create + △ no PlayStation, View + Y no Xbox) ou **Ctrl+Shift+T**, e os dois podem ser trocados em Configurações › Controles. (#44)
+- Configurações › Sistema › **Teste de controle** mostra ao vivo o que o controle envia e copia o resultado para você mandar quando algo der errado. (#43)
+
+### Correções
+- **DualSense e DualSense Edge pelo Bluetooth com a Steam fechada:** o direcional para cima ficava preso e os botões não respondiam. O Tako também soma o controle virtual da Steam e o PlayStation sem um cancelar o outro, e ignora o eco de setas do teclado que a Steam envia. (#43)
+- **Configurações:** organizadas em categorias, sem itens cortados pela barra de dicas, sem textos técnicos e com as opções de desenvolvedor escondidas. A barra de dicas encurta em vez de cortar, e senhas e chaves aparecem mascaradas. (#45)
+- **Janelas abertas na Central:** os títulos não ficam mais cortados e o cartão focado aparece inteiro. (#44)
+
+### Para desenvolvedores
+- ADR-0019 (fontes de biblioteca), ADR-0020 (organização das Configurações), ADR-0021 (IGDB) e ADR-0022 (ScreenScraper). O checklist de hardware vai até a seção 24.
+- A credencial de software do ScreenScraper vem dos segredos `SCREENSCRAPER_DEVID` e `SCREENSCRAPER_DEVPASSWORD` do CI. Sem eles, o ScreenScraper aparece como indisponível.
+
 ## [0.1.0-alpha.9]
 ### Novidades
 - Contador de FPS próprio, sem RTSS: o Tako mede o FPS, o tempo de quadro e o 1% low pelo PresentMon da Intel, como o CapFrameX, sem entrar no jogo. Acabam os conflitos com o MSI Afterburner e com anti-cheat. O contador aparece numa janela própria por cima do jogo, nos estilos Só FPS, Compacto e Detalhado. (#36)
