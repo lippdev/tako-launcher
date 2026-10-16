@@ -8,6 +8,7 @@ pub mod effects;
 pub mod gamepad;
 pub mod images;
 pub mod model;
+pub mod playnite;
 pub mod screen_test;
 pub mod session;
 pub mod shell;
