@@ -4736,6 +4736,7 @@ dependencies = [
  "serde_json",
  "slint",
  "slint-interpreter",
+ "spin_on",
  "tako-core",
  "tako-platform",
  "tako-sources",
