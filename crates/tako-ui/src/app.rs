@@ -88,6 +88,22 @@ fn cmd_of(c: AppCommand) -> Cmd {
 pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
     let _ = std::fs::create_dir_all(&paths.root);
     let database = (!simulate).then(|| TakoDatabase::new(paths.database()));
+    if let Some(d) = &database {
+        // Chaves das alphas C# (DPAPI ou texto) vão para o cofre do SO uma vez; antes de ler as configurações.
+        #[cfg(windows)]
+        let decrypt = tako_platform::windows::dpapi::unprotect;
+        #[cfg(not(windows))]
+        let decrypt = |_: &[u8]| None;
+        let secrets = platform.secrets.clone();
+        if let Err(e) = tako_core::persistence::alpha_migration::migrate_secrets(
+            &paths.root,
+            decrypt,
+            &db::SettingsStore::new(d.clone()),
+            |k, v| secrets.set(k, v),
+        ) {
+            tracing::warn!("segredos das alphas: {e}");
+        }
+    }
     let settings = Settings::new(database.clone().map(db::SettingsStore::new));
     let lang = settings
         .get(crate::shell::ctx::keys::LANGUAGE)
@@ -251,6 +267,12 @@ impl App {
         };
         app.wire_ui();
         app.start_input();
+        {
+            let mut s = app.shell.borrow_mut();
+            if tako_core::updates::UpdatePreferences::load(&s.ctx.paths.updates()).auto_update {
+                crate::effects::check_updates(&mut s.ctx, false);
+            }
+        }
         app.redraw();
         Ok(app)
     }
