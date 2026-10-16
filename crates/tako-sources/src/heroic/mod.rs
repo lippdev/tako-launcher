@@ -213,7 +213,7 @@ fn cached_art(root: &Path, art: Option<&str>, suffix: &str) -> Option<String> {
     let art = art?.trim();
     if let Some(local) = art
         .strip_prefix("file://")
-        .or(art.starts_with('/').then_some(art))
+        .or(Path::new(art).is_absolute().then_some(art))
     {
         let path = Path::new(local);
         return path.is_file().then(|| file_uri(path));
