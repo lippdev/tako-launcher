@@ -448,6 +448,17 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             .desc(ctx.t("settings.system.safemode_off_desc")),
         )
     });
+    if crate::discord::available() {
+        v.push(MenuItem::new(PanelRow::header(
+            ctx.t("settings.system.integrations_header"),
+        )));
+        v.push(toggle(
+            ctx,
+            "settings.system.discord",
+            keys::DISCORD_PRESENCE,
+            false,
+        ));
+    }
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.system.advanced_header"),
     )));
