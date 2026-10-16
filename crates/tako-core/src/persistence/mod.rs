@@ -3,6 +3,7 @@
 //! O esquema é o mesmo das alphas (v1..v6) mais as versões novas do Rust: um banco da alpha abre sem mudanças.
 //! Datas são texto ISO-8601 no formato "O" do .NET (`2026-10-15T12:00:00.0000000+00:00`).
 
+mod adapters;
 pub mod alpha_migration;
 mod choices;
 mod collections;
@@ -20,7 +21,7 @@ pub use collections::{CollectionRow, CollectionStore};
 pub use database::TakoDatabase;
 pub use game_settings::GameSettingsStore;
 pub use library::{GameStateRow, IMPORTED_SUFFIX, LibraryData, LibraryStore, ManualGameRow};
-pub use settings::SettingsStore;
+pub use settings::{SettingsStore, parse_bool};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 
