@@ -3,6 +3,20 @@
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
 ## [Unreleased]
+### Novidades
+- **O Tako agora é escrito em Rust, com interface em Slint, e roda no Windows, no Linux e no macOS.** Instalador e portátil no Windows; deb, AppImage e tar.gz no Linux; dmg e zip no macOS. (PRD v0.2)
+- Durante o jogo, a janela do Tako fecha e fica só um processo pequeno, sem janela e sem desenhar nada. Ele acompanha o jogo, esconde o cursor, move o ponteiro pelo controle e devolve tela e áudio no fim. (ADR-0026)
+- **Central rápida reduzida:** Início sem fechar o jogo, voltar ao jogo, áudio, tela, ponteiro e encerrar jogo. Abre com Select + Y no controle e, no Windows, com Ctrl+Shift+Tab.
+- **Temas trocáveis na hora**, incluindo o novo "Tako Alto contraste". Um tema pode trocar só as cores do padrão (`tokens.toml`). Se um tema quebrar, o Tako volta ao padrão.
+- Linux: lojas Steam (nativa, Flatpak e Snap), Heroic e Lutris. macOS: Steam e Heroic (Epic e GOG). "Adicionar jogo" aceita `.desktop`, AppImage, binários e `.app`.
+- Quem vem das alphas mantém biblioteca, coleções, tempo de jogo, capas escolhidas e configurações. As chaves dos provedores vão para o cofre de senhas do sistema.
+
+### Mudanças
+- Saíram do Tako e vão para o Console Mode: controle da TV, contador e limite de FPS, Steam na bandeja e "modo console ao abrir". (ADR-0025)
+
+### Para desenvolvedores
+- Workspace Rust em `crates/`; ADR-0023 a ADR-0026. Os ADRs 0011 a 0022 viraram histórico.
+- `tako --bench` e o job `bench` do CI medem a §8.1 do PRD. Estado da paridade em `docs/marco-2/paridade.md`; roteiros de teste em `docs/testing/`.
 
 ## [0.1.0-alpha.10]
 ### Novidades

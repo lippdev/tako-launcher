@@ -57,3 +57,9 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Ligar a opção cria `~/.config/autostart/tako.desktop`; o Tako abre no próximo login.
 - [ ] No AppImage, o `Exec` aponta para o arquivo `.AppImage`, não para `/tmp/.mount_*`.
 - [ ] Desligar a opção apaga o arquivo.
+
+## Tela de jogo, Central e temas
+
+- [ ] Configurações › Tela e áudio › Testar: o Tako vai para a tela de jogo, pergunta "Você consegue ver esta tela?" e as telas voltam com ou sem resposta (15 s).
+- [ ] Com um jogo aberto, segurar Select + Y (Create + △) abre a Central. Não há atalho de teclado durante o jogo neste SO.
+- [ ] Aparência › Tema › "Tako Alto contraste" troca na hora e continua em tela cheia.

@@ -251,43 +251,43 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 
 ### Fase 0 — Decisão técnica (P0)
 
-- [ ] **MIG-001 — Spike Slint.** Protótipo com a grade de 1.000 capas, foco animado, controle via SDL3 e um tema `.slint` carregado em tempo de execução, rodando em Windows, Linux (X11, Wayland KDE e gamescope) e macOS. **Gate:** cumpre as metas da §8.1 em pelo menos duas máquinas de referência e carrega o tema em runtime. Resultado num ADR (ADR-0023) com os números. Se não cumprir, parar e levar os números aos mantenedores (D-02).
-- [ ] **MIG-002 — Spike de plataforma.** Provar as quatro funções de D-03 em cada SO (§5.3), principalmente o cursor no Wayland e no macOS e a resolução no Wayland. Resultado: ADR-0024 com a matriz real de suporte.
-- [ ] **MIG-003 — ADR da fronteira Tako × Console Mode.** Registrar a §3 e o contrato esperado da futura API (para o épico CMI). ADR-0025.
-- [ ] **MIG-004 — Marcar ADRs antigos.** ADRs 0011 a 0022 recebem "Substituído por" ou "Histórico (implementação C#)".
+- [ ] **MIG-001 — Spike Slint.** Protótipo com a grade de 1.000 capas, foco animado, controle via SDL3 e um tema `.slint` carregado em tempo de execução, rodando em Windows, Linux (X11, Wayland KDE e gamescope) e macOS. **Gate:** cumpre as metas da §8.1 em pelo menos duas máquinas de referência e carrega o tema em runtime. Resultado num ADR (ADR-0023) com os números. Se não cumprir, parar e levar os números aos mantenedores (D-02). _Estado: código e números do CI prontos (ADR-0023); falta o gate nas duas máquinas de referência._
+- [ ] **MIG-002 — Spike de plataforma.** Provar as quatro funções de D-03 em cada SO (§5.3), principalmente o cursor no Wayland e no macOS e a resolução no Wayland. Resultado: ADR-0024 com a matriz real de suporte. _Estado: matriz em ADR-0024; falta provar em hardware (`docs/testing/`)._
+- [x] **MIG-003 — ADR da fronteira Tako × Console Mode.** Registrar a §3 e o contrato esperado da futura API (para o épico CMI). ADR-0025.
+- [x] **MIG-004 — Marcar ADRs antigos.** ADRs 0011 a 0022 recebem "Substituído por" ou "Histórico (implementação C#)".
 
 ### Fase 1 — Fundação Rust (P0)
 
-- [ ] **MIG-010 — Workspace e CI.** Crates da §5.1, `rust-toolchain.toml`, CI com fmt, clippy e testes na matriz dos três SOs; padrões de código Rust no `CONTRIBUTING.md` (§5 a §7). Aceite: PR de exemplo verde nos três.
-- [ ] **MIG-011 — Persistência.** SQLite com o esquema atual e migrações versionadas. Aceite: abre um banco das alphas sem perder dados.
-- [ ] **MIG-012 — Modelo e consulta da biblioteca.** Port de `Game`, `LibraryQuery`, `LibraryCriteria`, `SearchText`, `Collections`, `StoreDuplicates`, com os testes.
-- [ ] **MIG-013 — Navegação espacial e grade virtual.** Port de `SpatialNavigator`, `ScrollMath`, `VirtualGrid`, `RowReveal`, com os testes.
-- [ ] **MIG-014 — Entrada.** SDL3, mapeamento de botões para ações, repetição ao segurar, hotplug, filtro de eco do teclado da Steam (`InputEchoFilter`) e fusão Steam + PlayStation (`GamepadFusion`).
-- [ ] **MIG-015 — Logs e diagnóstico.** `tracing`, arquivo rotativo, redação (port do `LogRedactor`), relatório do sistema.
-- [ ] **MIG-016 — Supervisor e diário de sessão.** Socket local restrito, diário em disco, restauração após queda. Aceite: matar a interface no meio da sessão restaura tela e áudio.
+- [x] **MIG-010 — Workspace e CI.** Crates da §5.1, `rust-toolchain.toml`, CI com fmt, clippy e testes na matriz dos três SOs; padrões de código Rust no `CONTRIBUTING.md` (§5 a §7). Aceite: PR de exemplo verde nos três.
+- [x] **MIG-011 — Persistência.** SQLite com o esquema atual e migrações versionadas. Aceite: abre um banco das alphas sem perder dados.
+- [x] **MIG-012 — Modelo e consulta da biblioteca.** Port de `Game`, `LibraryQuery`, `LibraryCriteria`, `SearchText`, `Collections`, `StoreDuplicates`, com os testes.
+- [x] **MIG-013 — Navegação espacial e grade virtual.** Port de `SpatialNavigator`, `ScrollMath`, `VirtualGrid`, `RowReveal`, com os testes.
+- [x] **MIG-014 — Entrada.** SDL3, mapeamento de botões para ações, repetição ao segurar, hotplug, filtro de eco do teclado da Steam (`InputEchoFilter`) e fusão Steam + PlayStation (`GamepadFusion`).
+- [x] **MIG-015 — Logs e diagnóstico.** `tracing`, arquivo rotativo, redação (port do `LogRedactor`), relatório do sistema.
+- [ ] **MIG-016 — Supervisor e diário de sessão.** Socket local restrito, diário em disco, restauração após queda. Aceite: matar a interface no meio da sessão restaura tela e áudio. _Estado: supervisor e diário prontos (ADR-0026); falta o teste de queda em hardware._
 
 ### Fase 2 — Paridade (P0)
 
-- [ ] **MIG-020 — Resolução e taxa** nos três SOs (§5.3), com aplicar, confirmar e restaurar.
-- [ ] **MIG-021 — Saída de áudio** nos três SOs.
-- [ ] **MIG-022 — Esconder o cursor** nos três SOs, com as limitações do MIG-002 explicadas na interface.
-- [ ] **MIG-023 — Cursor pelo controle** nos três SOs (analógico, cliques, rolagem, aceleração; port do `ControllerMouseMath`). Linux: regra udev no pacote. macOS: fluxo da permissão de Acessibilidade.
-- [ ] **MIG-024 — Abrir jogos e acompanhar a sessão.** Por loja e manual; fim por processo ou pela estratégia da loja; volta com foco.
-- [ ] **MIG-025 — Fontes de biblioteca do Windows.** Steam, Epic, GOG, Xbox/Microsoft Store, Ubisoft, EA, Battle.net, Amazon, importação do Playnite. Port dos parsers e dos testes.
-- [ ] **MIG-026 — Fontes de biblioteca do Linux.** Steam (nativo, Flatpak e Snap; jogos Proton), Heroic (Epic, GOG, Amazon), Lutris, jogos manuais (`.desktop`, AppImage, binário).
-- [ ] **MIG-027 — Fontes de biblioteca do macOS.** Steam, GOG/Epic quando instalados, apps manuais (`.app`).
-- [ ] **MIG-028 — Metadados e arte.** Steam Store, IGDB, ScreenScraper, SteamGridDB, mesclagem e escolhas por fonte; cache de imagens com limite.
-- [ ] **MIG-029 — Interface completa.** Todas as telas da §6 no tema padrão, com controle e teclado, nos dois idiomas.
-- [ ] **MIG-030 — Migração de dados das alphas.** Detectar a pasta de dados do Tako C# (instalado e portable), importar banco, configurações, escolhas de arte e coleções; decifrar os segredos DPAPI e regravar no `keyring`. Aceite: um usuário da alpha abre a versão Rust e vê a mesma biblioteca, já logado nos provedores.
-- [ ] **MIG-031 — Temas.** Formato da §7, validação, instalação, troca em tempo de execução e volta ao padrão após falha; tema padrão e um alternativo.
-- [ ] **MIG-032 — Atualizações.** Port do `ReleaseFeed` e do `SemVer`, escolha do arquivo por SO e tipo de instalação, verificação do SHA-256.
+- [ ] **MIG-020 — Resolução e taxa** nos três SOs (§5.3), com aplicar, confirmar e restaurar. _Estado: código pronto; falta validar em hardware (`docs/testing/`)._
+- [ ] **MIG-021 — Saída de áudio** nos três SOs. _Estado: código pronto; falta validar em hardware (`docs/testing/`)._
+- [ ] **MIG-022 — Esconder o cursor** nos três SOs, com as limitações do MIG-002 explicadas na interface. _Estado: código pronto; falta validar em hardware (`docs/testing/`)._
+- [ ] **MIG-023 — Cursor pelo controle** nos três SOs (analógico, cliques, rolagem, aceleração; port do `ControllerMouseMath`). Linux: regra udev no pacote. macOS: fluxo da permissão de Acessibilidade. _Estado: código pronto; falta validar em hardware (`docs/testing/`)._
+- [ ] **MIG-024 — Abrir jogos e acompanhar a sessão.** Por loja e manual; fim por processo ou pela estratégia da loja; volta com foco. _Estado: código pronto; falta validar em hardware (`docs/testing/`)._
+- [x] **MIG-025 — Fontes de biblioteca do Windows.** Steam, Epic, GOG, Xbox/Microsoft Store, Ubisoft, EA, Battle.net, Amazon, importação do Playnite. Port dos parsers e dos testes.
+- [x] **MIG-026 — Fontes de biblioteca do Linux.** Steam (nativo, Flatpak e Snap; jogos Proton), Heroic (Epic, GOG, Amazon), Lutris, jogos manuais (`.desktop`, AppImage, binário).
+- [x] **MIG-027 — Fontes de biblioteca do macOS.** Steam, GOG/Epic quando instalados, apps manuais (`.app`).
+- [x] **MIG-028 — Metadados e arte.** Steam Store, IGDB, ScreenScraper, SteamGridDB, mesclagem e escolhas por fonte; cache de imagens com limite.
+- [x] **MIG-029 — Interface completa.** Todas as telas da §6 no tema padrão, com controle e teclado, nos dois idiomas.
+- [x] **MIG-030 — Migração de dados das alphas.** Detectar a pasta de dados do Tako C# (instalado e portable), importar banco, configurações, escolhas de arte e coleções; decifrar os segredos DPAPI e regravar no `keyring`. Aceite: um usuário da alpha abre a versão Rust e vê a mesma biblioteca, já logado nos provedores.
+- [x] **MIG-031 — Temas.** Formato da §7, validação, instalação, troca em tempo de execução e volta ao padrão após falha; tema padrão e um alternativo.
+- [x] **MIG-032 — Atualizações.** Port do `ReleaseFeed` e do `SemVer`, escolha do arquivo por SO e tipo de instalação, verificação do SHA-256.
 
 ### Fase 3 — Distribuição e corte (P0)
 
-- [ ] **MIG-040 — Empacotamento Rust.** Adaptar o `release.yml` e os scripts (`build/`) para `cargo`: Windows (instalador e portable), Linux (deb com regra udev, AppImage, tar.gz; x64 e arm64), macOS (`.app`, dmg e zip; arm64 e x64). Os nomes de arquivo precisam continuar compatíveis com o atualizador das alphas C# (`Tako-Setup-*.exe`, `Tako-Portable-*.exe`), para que elas encontrem a versão Rust.
-- [ ] **MIG-041 — Benchmark.** Medir as métricas da §8.1 no CI e nas máquinas de referência; publicar em `docs/`.
-- [ ] **MIG-042 — Checklists de hardware** por SO, em `docs/testing/`.
-- [ ] **MIG-043 — Corte.** Remover a solução C#/WPF do repositório e do CI. Changelog da primeira release Rust com o que saiu (§3) e o que mudou (temas do Playnite). Aceite: MIG-010 a MIG-042 concluídos e uma beta Rust testada nos três SOs.
+- [x] **MIG-040 — Empacotamento Rust.** Adaptar o `release.yml` e os scripts (`build/`) para `cargo`: Windows (instalador e portable), Linux (deb com regra udev, AppImage, tar.gz; x64 e arm64), macOS (`.app`, dmg e zip; arm64 e x64). Os nomes de arquivo precisam continuar compatíveis com o atualizador das alphas C# (`Tako-Setup-*.exe`, `Tako-Portable-*.exe`), para que elas encontrem a versão Rust.
+- [ ] **MIG-041 — Benchmark.** Medir as métricas da §8.1 no CI e nas máquinas de referência; publicar em `docs/`. _Estado: `tako --bench` e job `bench` no CI; faltam as máquinas de referência (`docs/marco-2/paridade.md`)._
+- [x] **MIG-042 — Checklists de hardware** por SO, em `docs/testing/`.
+- [ ] **MIG-043 — Corte.** Remover a solução C#/WPF do repositório e do CI. Changelog da primeira release Rust com o que saiu (§3) e o que mudou (temas do Playnite). Aceite: MIG-010 a MIG-042 concluídos e uma beta Rust testada nos três SOs. _Estado: aguarda a beta Rust testada nos três SOs._
 
 ### Épico CMI — Integração com o Console Mode (BACKLOG, P1, depende do Console Mode)
 

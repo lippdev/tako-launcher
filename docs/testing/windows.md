@@ -56,3 +56,33 @@ Para cada um: abre, o Tako detecta o jogo rodando, "Encerrar jogo" fecha a janel
 2. Saia e entre de novo no Windows: o Tako abre.
 3. Mova a pasta do Tako portátil: a opção aparece desligada (o valor aponta para outra cópia).
 4. Desligue a opção: o valor `Tako` some do registro.
+
+## 7. Teste da tela de jogo
+
+1. Configurações › Tela e áudio: escolha a TV como tela de jogo e um modo diferente do atual; "Testar".
+2. O Tako vai para a TV e pergunta "Você consegue ver esta tela?". "Sim" volta as telas e mostra "Tela de jogo confirmada".
+3. Repita sem responder: depois de 15 s as telas voltam sozinhas e o Tako volta para o monitor principal.
+
+## 8. Central durante o jogo
+
+1. Com um jogo aberto, segure View + Y (Create + △ no PlayStation): a Central abre por cima do jogo.
+2. Com o teclado, Ctrl+Shift+Tab (ou o atalho escolhido em Configurações › Controles) abre a Central.
+3. Depois do jogo, Ctrl+Shift+Tab volta a funcionar no navegador (o atalho foi liberado).
+
+## 9. Importar do Playnite
+
+1. Com o Playnite instalado e jogos manuais nele, Configurações › Biblioteca › Importar do Playnite.
+2. Confirme a leitura: a prévia mostra jogos novos, jogos já existentes e coleções. "Importar" traz os jogos, favoritos, tempo e categorias como coleções.
+3. Com o Playnite aberto, a leitura pode falhar com "está em uso": feche o Playnite e repita.
+
+## 10. Migração das alphas C#
+
+1. Num PC com uma alpha C# (biblioteca, coleções, escolhas de arte e chave da IGDB salvas), instale a versão Rust por cima.
+2. A biblioteca, as coleções, o tempo de jogo e as capas escolhidas aparecem iguais. Existe `tako.db.alpha-backup` na pasta de dados.
+3. Configurações › Capas e metadados: a IGDB aparece ligada e com a chave. Os arquivos `*.dat` da alpha viraram `*.dat.migrado`.
+
+## 11. Temas
+
+1. Configurações › Aparência › Tema: escolha "Tako Alto contraste". A tela muda na hora, sem reabrir, e continua em tela cheia.
+2. "Instalar tema…" com um `.takotheme` válido: aparece a mensagem de instalado e o tema entra na lista.
+3. Abra com `--safe-mode`: o tema padrão é usado; Configurações › Sistema › "Sair do modo seguro" reabre o Tako com o tema escolhido.

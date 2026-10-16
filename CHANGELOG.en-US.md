@@ -3,6 +3,20 @@
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
 ## [Unreleased]
+### What's new
+- **Tako is now written in Rust, with a Slint interface, and runs on Windows, Linux and macOS.** Installer and portable on Windows; deb, AppImage and tar.gz on Linux; dmg and zip on macOS. (PRD v0.2)
+- While you play, Tako's window closes and only a small process stays, with no window and nothing drawn. It follows the game, hides the cursor, moves the pointer with the controller and puts the display and audio back at the end. (ADR-0026)
+- **Smaller quick menu:** Home without closing the game, back to game, audio, screen, pointer and close game. Opens with Select + Y on the controller and, on Windows, with Ctrl+Shift+Tab.
+- **Themes switch on the fly**, including the new "Tako Alto contraste" (high contrast). A theme can change only the default theme's colors (`tokens.toml`). If a theme breaks, Tako falls back to the default one.
+- Linux: Steam (native, Flatpak and Snap), Heroic and Lutris. macOS: Steam and Heroic (Epic and GOG). "Add game" takes `.desktop` files, AppImages, binaries and `.app` bundles.
+- Coming from the alphas, you keep your library, collections, play time, chosen covers and settings. Provider keys move to the system's password vault.
+
+### Changes
+- Moved out of Tako and into Console Mode: TV control, FPS counter and limit, Steam in the tray and "console mode on launch". (ADR-0025)
+
+### For developers
+- Rust workspace in `crates/`; ADR-0023 to ADR-0026. ADRs 0011 to 0022 are now history.
+- `tako --bench` and the CI `bench` job measure PRD §8.1. Parity status in `docs/marco-2/paridade.md`; test scripts in `docs/testing/`.
 
 ## [0.1.0-alpha.10]
 ### What's new
