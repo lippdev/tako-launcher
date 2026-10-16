@@ -151,6 +151,9 @@ public sealed partial class UiSmokeTests
         // --- Busca, filtros e ordenação da biblioteca (frente E: UX-001/002/004).
         LibrarySearchAndFilters(shell, window);
 
+        // --- Linha focada legível (chave, marcador, contagem) e painel acima da barra de dicas (MVP-029, UX-009).
+        FocusedRowsInFilters(shell, window);
+
         // --- Coleções, menu rápido e configurações por jogo (UX-003/005/007).
         CollectionsAndGameSettings(shell, window);
 
@@ -224,6 +227,7 @@ public sealed partial class UiSmokeTests
         Assert.Equal(volume + 5, shell.AudioVolume.Current()!.VolumePercent);
         Pump(0.5);
         Snap(window, "11-painel-audio");
+        FocusedRowsInControlCenterAudio(window);
         Press(window, AppCommand.Down);
         Press(window, AppCommand.Right);
         Assert.Equal("controller", center.Popover!.Key);
@@ -1259,6 +1263,8 @@ public sealed partial class UiSmokeTests
     /// <summary>Renderiza o palco (1080 de altura, largura conforme a proporção) para PNG; <paramref name="scale"/> 2 = 4K.</summary>
     private static void Snap(MainWindow window, string name, double scale = 1)
     {
+        // Toda captura confere o item focado com superfície sólida (UiSmokeTests.FocusContrast.cs).
+        AssertFocusedRowReadable(window, name);
         var stage = window.StageElement;
         stage.UpdateLayout();
         double width = stage.ActualWidth;

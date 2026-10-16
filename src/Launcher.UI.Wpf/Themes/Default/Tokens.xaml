@@ -20,6 +20,19 @@
   <SolidColorBrush x:Key="WarningBrush" Color="#FFFFB020" />
   <SolidColorBrush x:Key="ErrorBrush" Color="#FFFF5A5F" />
 
+  <!--
+    Controles dentro de linhas (chave, marcador, valor, seta, barra). Sobre o painel escuro/accent usam os tokens acima;
+    numa linha focada (superfície sólida branca) trocam para os "OnSolid", com contraste WCAG AA (DESIGN.md › Foco).
+  -->
+  <SolidColorBrush x:Key="ControlKnobBrush" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="ControlTrackOffBrush" Color="#40FFFFFF" />
+  <SolidColorBrush x:Key="ControlOffBrush" Color="#8CFFFFFF" />
+  <SolidColorBrush x:Key="OnSurfaceSolidMutedBrush" Color="#FF565C68" />
+  <SolidColorBrush x:Key="ControlOnOnSolidBrush" Color="#FF0B7A3B" />
+  <SolidColorBrush x:Key="ControlOffOnSolidBrush" Color="#FF5B6170" />
+  <SolidColorBrush x:Key="ControlTrackOnSolidBrush" Color="#3311141A" />
+  <SolidColorBrush x:Key="ValuePillOnSolidBrush" Color="#1A11141A" />
+
   <!-- Tipografia (SIL OFL, empacotadas com o app): Inter no texto; Source Sans 3 (humanista da linha Frutiger, como a SST do PS5) nos títulos -->
   <FontFamily x:Key="FontText">pack://application:,,,/Tako;component/Assets/Fonts/#Inter</FontFamily>
   <FontFamily x:Key="FontDisplay">pack://application:,,,/Tako;component/Assets/Fonts/#Source Sans 3</FontFamily>

@@ -519,12 +519,12 @@
                                   Visibility="{Binding IconKey, Converter={StaticResource NotNullToVisibility}}" />
                           <!-- Fim da linha: marcador, chave, valor ou bateria. -->
                           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock x:Name="End" Text="{Binding EndText}" FontSize="{DynamicResource FsLabelMd}" Opacity="0.65" VerticalAlignment="Center" />
-                            <Ellipse x:Name="Radio" Width="26" Height="26" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="3" Opacity="0.5" Visibility="Collapsed" />
+                            <TextBlock x:Name="End" Text="{Binding EndText}" Style="{StaticResource RowEndText}" />
+                            <ContentControl x:Name="Radio" Style="{StaticResource RadioVisual}" Tag="{Binding IsOn}" Visibility="Collapsed" />
                             <ContentControl x:Name="Toggle" Style="{StaticResource ToggleVisual}" Tag="{Binding IsOn}" Visibility="Collapsed" />
                           </StackPanel>
                           <Grid x:Name="Bar" Tag="bar" Width="360" Height="26" Margin="18,0,22,0" HorizontalAlignment="Left" Background="Transparent" Visibility="Collapsed">
-                            <Border Height="10" CornerRadius="5" Background="#33FFFFFF" />
+                            <Border Style="{StaticResource SliderTrack}" />
                             <Border Height="10" CornerRadius="5" HorizontalAlignment="Left" Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                     Width="{Binding Fraction, Converter={StaticResource FractionToWidth}, ConverterParameter=360}" />
                             <Ellipse Width="26" Height="26" HorizontalAlignment="Left" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
@@ -537,10 +537,6 @@
                         <DataTrigger Binding="{Binding IsRadio}" Value="True">
                           <Setter TargetName="Radio" Property="Visibility" Value="Visible" />
                         </DataTrigger>
-                        <DataTrigger Binding="{Binding IsOn}" Value="True">
-                          <Setter TargetName="Radio" Property="Opacity" Value="1" />
-                          <Setter TargetName="Radio" Property="StrokeThickness" Value="8" />
-                        </DataTrigger>
                         <DataTrigger Binding="{Binding IsToggle}" Value="True">
                           <Setter TargetName="Toggle" Property="Visibility" Value="Visible" />
                           <Setter TargetName="Radio" Property="Visibility" Value="Collapsed" />
@@ -550,8 +546,7 @@
                           <Setter TargetName="Label" Property="Visibility" Value="Collapsed" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsBattery}" Value="True">
-                          <Setter TargetName="End" Property="Foreground" Value="{DynamicResource SuccessBrush}" />
-                          <Setter TargetName="End" Property="Opacity" Value="1" />
+                          <Setter TargetName="End" Property="Style" Value="{StaticResource RowEndTextSuccess}" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsDanger}" Value="True">
                           <Setter TargetName="Row" Property="Tag" Value="danger" />
@@ -630,7 +625,7 @@
           </ControlTemplate>
         </Button.Template>
       </Button>
-      <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{StaticResource HintBarReserve}">
         <StackPanel>
           <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Text}" Margin="0,16,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />

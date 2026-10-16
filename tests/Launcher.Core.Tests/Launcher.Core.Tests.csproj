@@ -9,6 +9,10 @@
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- Tokens do tema padrão (o mesmo arquivo do app), para conferir o contraste das linhas focadas (UX-009). -->
+  <ItemGroup>
+    <None Include="..\..\src\Launcher.UI.Wpf\Themes\Default\Tokens.xaml" Link="Fixtures\Theme\Tokens.xaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
   <!-- Biblioteca fictícia só para testes (o app usa a biblioteca real). -->
   <ItemGroup>
     <Compile Include="..\Shared\SampleLibrary.cs" Link="Shared\SampleLibrary.cs" />

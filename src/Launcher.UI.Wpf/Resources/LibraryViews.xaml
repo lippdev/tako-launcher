@@ -42,8 +42,9 @@
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
               <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
-              <Setter TargetName="Body" Property="Background" Value="White" />
-              <Setter Property="Foreground" Value="#FF11141A" />
+              <Setter TargetName="Body" Property="Background" Value="{DynamicResource SurfaceSolidBrush}" />
+              <Setter Property="Foreground" Value="{DynamicResource OnSurfaceSolidBrush}" />
+              <Setter Property="c:FocusSurface.IsSolid" Value="True" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -57,7 +58,7 @@
       <Button Template="{StaticResource SidePanelScrim}" Command="{Binding DataContext.BackCommand, RelativeSource={RelativeSource AncestorType=Window}}" Focusable="False" Cursor="Arrow" />
 
       <Border Width="760" HorizontalAlignment="Right" Background="{DynamicResource PanelStrongBrush}">
-        <StackPanel Margin="40,0,20,40" VerticalAlignment="Center">
+        <StackPanel Margin="40,0,20,88" VerticalAlignment="Center">
           <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" Margin="0,0,0,24" />
 
           <!-- Campo: o texto buscado com o cursor no fim. -->
@@ -135,7 +136,8 @@
 
       <!-- Painel à direita, na altura da tela; a lista rola com o foco. -->
       <Border Width="640" HorizontalAlignment="Right" Background="{DynamicResource PanelStrongBrush}">
-        <Canvas x:Name="Viewport" ClipToBounds="True">
+        <!-- A moldura termina acima da barra de dicas: nenhuma linha fica por baixo dela (DESIGN.md › Layout). -->
+        <Canvas x:Name="Viewport" ClipToBounds="True" Margin="{StaticResource HintBarReserve}">
           <StackPanel nav:Nav.ScrollHost="Vertical" Width="{Binding ActualWidth, ElementName=Viewport}">
             <StackPanel.RenderTransform>
               <TranslateTransform />
@@ -148,7 +150,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <StackPanel Margin="0,12,0,18">
-                    <TextBlock Text="{Binding Title, Converter={StaticResource Upper}}" Margin="0,0,0,12" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold" Foreground="#80FFFFFF" />
+                    <TextBlock Text="{Binding Title, Converter={StaticResource Upper}}" Margin="0,0,0,12" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold" Foreground="{DynamicResource OnAccentSubtleBrush}" />
                     <TextBlock Text="{Binding Description}" Margin="0,-4,0,12" TextWrapping="Wrap" FontSize="{DynamicResource FsLabelSm}" Foreground="#8CFFFFFF"
                                Visibility="{Binding Description, Converter={StaticResource NotNullToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
@@ -157,8 +159,8 @@
                           <Button Style="{StaticResource PanelRow}" Command="{Binding Command}" nav:Nav.Group="filters" nav:Nav.Key="{Binding Label, StringFormat=filter:{0}}">
                             <DockPanel>
                               <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding EndText}" FontSize="{DynamicResource FsLabelMd}" Opacity="0.65" VerticalAlignment="Center" Margin="12,0,0,0" />
-                                <Ellipse x:Name="Radio" Width="26" Height="26" Margin="16,0,0,0" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="3" Opacity="0.5" Visibility="Collapsed" />
+                                <TextBlock Text="{Binding EndText}" Style="{StaticResource RowEndText}" Margin="12,0,0,0" />
+                                <ContentControl x:Name="Radio" Style="{StaticResource RadioVisual}" Tag="{Binding IsOn}" Margin="16,0,0,0" Visibility="Collapsed" />
                                 <ContentControl x:Name="Toggle" Style="{StaticResource ToggleVisual}" Tag="{Binding IsOn}" Margin="16,0,0,0" Visibility="Collapsed" />
                               </StackPanel>
                               <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -167,10 +169,6 @@
                           <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsRadio}" Value="True">
                               <Setter TargetName="Radio" Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsOn}" Value="True">
-                              <Setter TargetName="Radio" Property="Opacity" Value="1" />
-                              <Setter TargetName="Radio" Property="StrokeThickness" Value="8" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsToggle}" Value="True">
                               <Setter TargetName="Toggle" Property="Visibility" Value="Visible" />

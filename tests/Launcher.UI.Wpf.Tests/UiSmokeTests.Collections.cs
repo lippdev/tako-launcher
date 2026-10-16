@@ -150,6 +150,16 @@ public sealed partial class UiSmokeTests
         Assert.Equal("-dx11", settings.Current.ExtraArguments);
         Assert.Equal("4 mudanças só para este jogo", settings.Summary);
         Snap(window, "85-configuracoes-do-jogo");
+        // Linha focada com valor próprio do jogo (negrito) e a última linha: legíveis e acima da barra de dicas.
+        foreach (string key in (string[])["gs:fps", "gs:reset"])
+        {
+            shell.RequestFocus(key);
+            Pump(0.6);
+            Assert.Equal(key, Nav.GetKey(nav.Focused!));
+            Snap(window, $"85a-configuracoes-do-jogo-foco-{key[3..]}");
+            AssertFocusedRowReadable(window, $"Configurações deste jogo › {key}", requireSolid: true);
+            AssertAboveHintBar(window, $"Configurações deste jogo › {key}");
+        }
 
         // O resolvedor (ponto único da sessão) vê as escolhas, gravadas no banco; o outro jogo segue o padrão.
         Assert.Equal(settings.Current, shell.LoadGameSettings(first.Id));

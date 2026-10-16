@@ -13,7 +13,8 @@
       <Button Template="{StaticResource SidePanelScrim}" Command="{Binding DataContext.BackCommand, RelativeSource={RelativeSource AncestorType=Window}}" Focusable="False" Cursor="Arrow" />
 
       <Border Width="760" HorizontalAlignment="Right" Background="{DynamicResource PanelStrongBrush}">
-        <Canvas x:Name="Viewport" ClipToBounds="True">
+        <!-- A moldura termina acima da barra de dicas: nenhuma linha fica por baixo dela (DESIGN.md › Layout). -->
+        <Canvas x:Name="Viewport" ClipToBounds="True" Margin="{StaticResource HintBarReserve}">
           <StackPanel nav:Nav.ScrollHost="Vertical" Width="{Binding ActualWidth, ElementName=Viewport}">
             <StackPanel.RenderTransform>
               <TranslateTransform />
@@ -27,7 +28,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <StackPanel Margin="0,12,0,18">
-                    <TextBlock Text="{Binding Title, Converter={StaticResource Upper}}" Margin="0,0,0,12" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold" Foreground="#80FFFFFF" />
+                    <TextBlock Text="{Binding Title, Converter={StaticResource Upper}}" Margin="0,0,0,12" FontSize="{DynamicResource FsLabelSm}" FontWeight="Bold" Foreground="{DynamicResource OnAccentSubtleBrush}" />
                     <TextBlock Text="{Binding Description}" Margin="0,-4,0,12" TextWrapping="Wrap" FontSize="{DynamicResource FsLabelSm}" Foreground="#8CFFFFFF"
                                Visibility="{Binding Description, Converter={StaticResource NotNullToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
@@ -36,15 +37,14 @@
                           <Button Style="{StaticResource PanelRow}" Command="{Binding Command}" nav:Nav.Group="game-settings" nav:Nav.Key="{Binding Key}">
                             <DockPanel>
                               <TextBlock x:Name="Value" DockPanel.Dock="Right" Text="{Binding EndText}" MaxWidth="340" TextTrimming="CharacterEllipsis"
-                                         FontSize="{DynamicResource FsLabelMd}" Opacity="0.65" VerticalAlignment="Center" Margin="16,0,0,0" />
+                                         Style="{StaticResource RowEndText}" Margin="16,0,0,0" />
                               <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             </DockPanel>
                           </Button>
                           <DataTemplate.Triggers>
                             <!-- Escolha própria do jogo: o valor aparece inteiro, em negrito. -->
                             <DataTrigger Binding="{Binding IsOn}" Value="True">
-                              <Setter TargetName="Value" Property="Opacity" Value="1" />
-                              <Setter TargetName="Value" Property="FontWeight" Value="Bold" />
+                              <Setter TargetName="Value" Property="Style" Value="{StaticResource RowEndTextStrong}" />
                             </DataTrigger>
                           </DataTemplate.Triggers>
                         </DataTemplate>
