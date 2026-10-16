@@ -123,6 +123,8 @@ public sealed partial class ShellViewModel
         actions.Add(new OverlayAction(item.IsFavorite ? "Tirar dos favoritos" : "Favoritar", ActionStyle.Secondary, new RelayCommand(() => Run(() => ToggleFavorite(item)))));
         actions.Add(new OverlayAction("Adicionar à coleção", ActionStyle.Secondary, new RelayCommand(() => Run(() => ChooseCollections(item)))));
         actions.Add(new OverlayAction("Configurações deste jogo", ActionStyle.Secondary, new RelayCommand(() => Run(() => OpenGameSettings(item)))));
+        actions.Add(new OverlayAction("Trocar capa", ActionStyle.Secondary, new RelayCommand(() => Run(() => OpenArtPicker(item)))));
+        actions.Add(new OverlayAction("Fontes e IDs", ActionStyle.Secondary, new RelayCommand(() => Run(() => OpenSourceIds(item)))));
         actions.Add(new OverlayAction("Detalhes", ActionStyle.Secondary, new RelayCommand(() => Run(() => OpenDetails(item))), IsDefault: actions.Count == 0));
         dialog = new DialogViewModel(item.Title, QuickActionsText(item), actions);
         PushOverlay(dialog);

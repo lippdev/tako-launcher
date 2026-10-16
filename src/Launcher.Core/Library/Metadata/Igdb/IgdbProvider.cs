@@ -13,7 +13,7 @@ namespace Launcher.Core.Library.Metadata.Igdb;
 /// <see cref="PrefetchAsync"/> resolve a biblioteca inteira em poucas consultas em lote. Sem chave configurada, fica
 /// desligado e não consulta nada.
 /// </summary>
-public sealed partial class IgdbProvider(IgdbClient client, TimeProvider time, ILogger<IgdbProvider>? logger = null) : IBatchMetadataProvider
+public sealed partial class IgdbProvider(IgdbClient client, TimeProvider time, ILogger<IgdbProvider>? logger = null) : IBatchMetadataProvider, ISlugResolver
 {
     private static readonly string[] ExactOrder = [ExternalGameIds.Steam, ExternalGameIds.Gog, ExternalGameIds.Epic, ExternalGameIds.Microsoft];
 
@@ -21,6 +21,7 @@ public sealed partial class IgdbProvider(IgdbClient client, TimeProvider time, I
     private readonly ConcurrentDictionary<(string Source, string Uid), long> _external = new();
     private readonly ConcurrentDictionary<(string Source, string Uid), bool> _externalMisses = new();
     private readonly ConcurrentDictionary<long, GameMetadata> _games = new();
+    private readonly ConcurrentDictionary<long, JsonElement> _raw = new();
 
     public string Name => MetadataPriority.Igdb;
 
@@ -101,6 +102,34 @@ public sealed partial class IgdbProvider(IgdbClient client, TimeProvider time, I
         return _games.TryGetValue(gameId, out var metadata) ? metadata with { FetchedAt = time.GetUtcNow() } : null;
     }
 
+    /// <summary><c>igdb.com/games/hades</c> → id do jogo ("Fontes e IDs", ADR-0023).</summary>
+    public async Task<string?> IdFromSlugAsync(string slug, CancellationToken cancellationToken)
+    {
+        if (!IsEnabled || string.IsNullOrWhiteSpace(slug)
+            || await QueryAsync("games", IgdbQueries.BySlug(slug), cancellationToken).ConfigureAwait(false) is not { } array)
+        {
+            return null;
+        }
+
+        return array.EnumerateArray().Select(g => g.TryGetProperty("id", out var id) && id.TryGetInt64(out long value) ? IgdbClient.Number(value) : null).FirstOrDefault(i => i is not null);
+    }
+
+    /// <summary>Capa, artes oficiais e capturas do jogo para o seletor de imagens (ADR-0023).</summary>
+    public async Task<IReadOnlyList<Art.ArtCandidate>> ImagesAsync(string id, CancellationToken cancellationToken)
+    {
+        if (!IsEnabled || !long.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out long gameId))
+        {
+            return [];
+        }
+
+        if (!_raw.ContainsKey(gameId))
+        {
+            await FetchGamesAsync([gameId], cancellationToken).ConfigureAwait(false);
+        }
+
+        return _raw.TryGetValue(gameId, out var game) ? IgdbParser.Images(game) : [];
+    }
+
     /// <summary>Lote: uma consulta de <c>external_games</c> por loja e uma de <c>games</c> a cada 500 jogos.</summary>
     public async Task PrefetchAsync(IReadOnlyCollection<MetadataLookup> lookups, CancellationToken cancellationToken)
     {
@@ -173,6 +202,7 @@ public sealed partial class IgdbProvider(IgdbClient client, TimeProvider time, I
         if (IgdbParser.Game(item, time.GetUtcNow()) is { } metadata && long.TryParse(metadata.SourceIds[Name], NumberStyles.None, CultureInfo.InvariantCulture, out long id))
         {
             _games[id] = metadata;
+            _raw[id] = item.Clone();
             foreach (var (source, uid) in metadata.SourceIds.Where(kv => kv.Key != Name))
             {
                 _external.TryAdd((source, uid), id);

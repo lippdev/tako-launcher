@@ -107,6 +107,24 @@ public sealed class Game
     /// <summary>Outras mídias por tipo (<see cref="Metadata.GameMedia"/>): caixa 3D, logo, marquee, captura, fanart, vídeo.</summary>
     public IReadOnlyDictionary<string, Uri> Media { get; set; } = new Dictionary<string, Uri>();
 
+    /// <summary>
+    /// Artes escolhidas pelo usuário, por tipo (ADR-0023): valem mais que as automáticas (<see cref="CoverUri"/>,
+    /// <see cref="HeroUri"/>, <see cref="Media"/>) e o agente de metadados nunca as troca. Vazio = tudo automático.
+    /// </summary>
+    public IReadOnlyDictionary<Metadata.Art.ArtKind, Uri> PinnedArt { get; set; } = new Dictionary<Metadata.Art.ArtKind, Uri>();
+
+    /// <summary>Capa exibida: a escolhida pelo usuário ou a automática.</summary>
+    public Uri? ShownCover => PinnedArt.GetValueOrDefault(Metadata.Art.ArtKind.Cover) ?? CoverUri;
+
+    /// <summary>Arte de fundo exibida: a escolhida pelo usuário ou a automática.</summary>
+    public Uri? ShownHero => PinnedArt.GetValueOrDefault(Metadata.Art.ArtKind.Hero) ?? HeroUri;
+
+    /// <summary>Logo exibido (sem fundo), quando há.</summary>
+    public Uri? ShownLogo => PinnedArt.GetValueOrDefault(Metadata.Art.ArtKind.Logo) ?? Media.GetValueOrDefault(Metadata.GameMedia.Logo);
+
+    /// <summary>Ícone exibido, quando há.</summary>
+    public Uri? ShownIcon => PinnedArt.GetValueOrDefault(Metadata.Art.ArtKind.Icon) ?? Media.GetValueOrDefault(Metadata.GameMedia.Icon);
+
     /// <summary>Jogo correspondente na Steam (da própria loja ou encontrado pelos metadados).</summary>
     public int? SteamAppId { get; set; }
 

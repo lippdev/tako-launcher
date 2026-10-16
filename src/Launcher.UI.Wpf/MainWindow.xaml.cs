@@ -85,6 +85,9 @@ public partial class MainWindow : Window
         _shell.ReadControllers = ProbeControllers;
         InitializeControlCenterShortcuts();
 
+        // Capas animadas param com a janela em segundo plano (ADR-0023).
+        Activated += (_, _) => _shell.IsWindowActive = true;
+        Deactivated += (_, _) => _shell.IsWindowActive = false;
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewTextInput += OnPreviewTextInput;
         PreviewMouseMove += OnPreviewMouseMove;
@@ -154,6 +157,14 @@ public partial class MainWindow : Window
         var focused = _navigator.Focused;
         bool noOverlay = _shell.TopOverlay is null;
         var search = _shell.TopOverlay as SearchViewModel;
+        // Modais com botões próprios (seletor de imagens, Fontes e IDs, ADR-0023): LB/RB, X, Y e ☰ vão para eles.
+        if (_shell.TopOverlay is IOverlayInput modal
+            && command is AppCommand.PreviousSection or AppCommand.NextSection or AppCommand.Favorite or AppCommand.Search or AppCommand.Menu
+            && modal.HandleCommand(command))
+        {
+            return;
+        }
+
         switch (command)
         {
             // Teclado virtual da busca (UX-001): X apaga, Y põe espaço, ☰ conclui.

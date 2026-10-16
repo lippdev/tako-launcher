@@ -21,6 +21,13 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
     private bool _coverLoading;
     private bool _coverMissing;
 
+    // Capa animada (ADR-0023): quadro atual enquanto anima; nulo = capa estática.
+    private ImageSource? _frame;
+    private AnimatedFrames? _frames;
+    private System.Windows.Threading.DispatcherTimer? _timer;
+    private int _frameIndex;
+    private int _animationToken;
+
     [ObservableProperty]
     private bool _isRunning;
 
@@ -117,17 +124,23 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
     {
         get
         {
+            if (_frame is not null)
+            {
+                return _frame;
+            }
+
             if (_cover is not null && _cover.TryGetTarget(out var cover))
             {
+                CoverShown?.Invoke(this);
                 return cover;
             }
 
-            if (_coverMissing || Game.CoverUri is null)
+            if (_coverMissing || Game.ShownCover is null)
             {
                 return null;
             }
 
-            if (_art.TryGetCached(Game.CoverUri, CoverDisplayWidth, out var cached))
+            if (_art.TryGetCached(Game.ShownCover, CoverDisplayWidth, out var cached))
             {
                 Remember(cached);
                 return cached;
@@ -146,14 +159,14 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
         }
 
         _coverLoading = true;
-        var uri = Game.CoverUri;
+        var uri = Game.ShownCover;
         bool notify;
         try
         {
             // Nunca avisa no meio da leitura que pediu a capa (o binding ainda está lendo).
             await Task.Yield();
             var image = await _art.GetAsync(uri, CoverDisplayWidth).ConfigureAwait(true);
-            bool stale = uri != Game.CoverUri; // a capa mudou durante a carga: lê de novo
+            bool stale = uri != Game.ShownCover; // a capa mudou durante a carga: lê de novo
             if (!stale)
             {
                 Remember(image);
@@ -178,7 +191,74 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
         _coverMissing = image is null;
     }
 
-    public Task<ImageSource?> LoadHeroAsync() => _art.GetAsync(Game.HeroUri, HeroDisplayWidth);
+    public Task<ImageSource?> LoadHeroAsync() => _art.GetAsync(Game.ShownHero, HeroDisplayWidth);
+
+    /// <summary>A capa apareceu na tela (o modo "Sempre" das capas animadas usa para escolher quais animar).</summary>
+    internal Action<GameItemViewModel>? CoverShown { get; set; }
+
+    /// <summary>A capa está se mexendo agora.</summary>
+    public bool IsAnimating => _timer is not null;
+
+    /// <summary>
+    /// Começa a animar a capa, se ela for animada (WebP, APNG, GIF): os quadros são preparados fora da thread da UI e
+    /// trocados por um temporizador só deste item. Capa estática: nada muda.
+    /// </summary>
+    internal async Task StartAnimationAsync(AnimatedArtService animated)
+    {
+        if (_timer is not null || !AnimatedArtService.MightAnimate(Game.ShownCover))
+        {
+            return;
+        }
+
+        int token = ++_animationToken;
+        await Task.Yield(); // nunca troca a capa no meio da leitura que pediu a animação
+        var frames = await animated.LoadAsync(Game.ShownCover, CoverDisplayWidth).ConfigureAwait(true);
+        if (frames is null || token != _animationToken || _timer is not null)
+        {
+            return;
+        }
+
+        _frames = frames;
+        _frameIndex = 0;
+        _timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);
+        _timer.Tick += (_, _) => NextFrame();
+        ShowFrame();
+        _timer.Start();
+    }
+
+    /// <summary>Para no primeiro quadro estático (fora de foco, jogo aberto, janela em segundo plano...).</summary>
+    internal void StopAnimation()
+    {
+        _animationToken++;
+        if (_timer is null)
+        {
+            return;
+        }
+
+        _timer.Stop();
+        _timer = null;
+        _frames = null;
+        _frame = null;
+        OnPropertyChanged(nameof(Cover));
+    }
+
+    private void NextFrame()
+    {
+        if (_frames is null)
+        {
+            return;
+        }
+
+        _frameIndex = (_frameIndex + 1) % _frames.Frames.Count;
+        ShowFrame();
+    }
+
+    private void ShowFrame()
+    {
+        _frame = _frames!.Frames[_frameIndex];
+        _timer!.Interval = TimeSpan.FromMilliseconds(_frames.Delays[_frameIndex]);
+        OnPropertyChanged(nameof(Cover));
+    }
 
     /// <summary>Recalcula textos derivados do estado do usuário (favorito, tempo jogado) e dos metadados.</summary>
     public void Refresh()
@@ -189,6 +269,7 @@ public sealed partial class GameItemViewModel : ObservableObject, INavKeyed
     /// <summary>A capa mudou (metadados encontraram a arte, ou o usuário escolheu outra imagem): recarrega se estiver na tela.</summary>
     public void ReloadArt()
     {
+        StopAnimation();
         _cover = null;
         _coverMissing = false;
         OnPropertyChanged(nameof(Cover));

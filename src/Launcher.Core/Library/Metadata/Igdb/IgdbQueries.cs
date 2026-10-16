@@ -60,6 +60,9 @@ public static class IgdbQueries
         return $"fields game, uid, external_game_source; where external_game_source = {source.ToString(CultureInfo.InvariantCulture)} & uid = ({quoted}); limit {Math.Clamp(list.Count * 2, 1, MaxLimit).ToString(CultureInfo.InvariantCulture)};";
     }
 
+    /// <summary>Id do jogo pelo nome na URL (<c>igdb.com/games/&lt;slug&gt;</c>).</summary>
+    public static string BySlug(string slug) => $"fields id, name; where slug = \"{Escape(slug.Trim().ToLowerInvariant())}\"; limit 1;";
+
     /// <summary>Consulta mínima do botão "Testar".</summary>
     public const string Ping = "fields name; limit 1;";
 

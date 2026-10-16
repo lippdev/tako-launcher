@@ -81,7 +81,39 @@ public static class IgdbParser
         {
             Year = game.TryGetProperty("first_release_date", out var date) && date.TryGetInt64(out long seconds) ? DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime.Year : null,
             Platforms = platforms.Count == 0 ? null : string.Join(", ", platforms),
+            CoverUrl = game.TryGetProperty("cover", out var cover) && Text(cover, "image_id") is { } coverId ? IgdbQueries.Image(coverId, "t_cover_small") : null,
         };
+    }
+
+    /// <summary>
+    /// Imagens do jogo para o seletor (ADR-0023): capa (e a capa do Brasil) em <c>t_cover_big_2x</c>; artes oficiais em
+    /// <c>t_1080p</c> e capturas em <c>t_screenshot_huge</c> como fundo. Miniaturas nos tamanhos pequenos da IGDB.
+    /// </summary>
+    public static IReadOnlyList<Art.ArtCandidate> Images(JsonElement game)
+    {
+        var result = new List<Art.ArtCandidate>();
+        void Add(string? imageId, Art.ArtKind kind, string size, string thumb, string label)
+        {
+            if (imageId is not null && !result.Exists(r => r.Url == IgdbQueries.Image(imageId, size)))
+            {
+                result.Add(new Art.ArtCandidate(MetadataPriority.Igdb, kind, IgdbQueries.Image(imageId, size)) { Thumbnail = IgdbQueries.Image(imageId, thumb), Label = label });
+            }
+        }
+
+        Add(game.TryGetProperty("cover", out var cover) ? Text(cover, "image_id") : null, Art.ArtKind.Cover, "t_cover_big_2x", "t_cover_big", "Capa");
+        var brazil = Array(game, "game_localizations").FirstOrDefault(IsBrazil);
+        Add(brazil.ValueKind == JsonValueKind.Object && brazil.TryGetProperty("cover", out var local) ? Text(local, "image_id") : null, Art.ArtKind.Cover, "t_cover_big_2x", "t_cover_big", "Capa (Brasil)");
+        foreach (var artwork in Array(game, "artworks"))
+        {
+            Add(Text(artwork, "image_id"), Art.ArtKind.Hero, ArtworkSize, "t_screenshot_med", "Arte oficial");
+        }
+
+        foreach (var shot in Array(game, "screenshots"))
+        {
+            Add(Text(shot, "image_id"), Art.ArtKind.Hero, ScreenshotSize, "t_screenshot_med", "Captura");
+        }
+
+        return result;
     }
 
     /// <summary>Resposta de <c>external_games</c> → (uid na loja → id do jogo na IGDB).</summary>

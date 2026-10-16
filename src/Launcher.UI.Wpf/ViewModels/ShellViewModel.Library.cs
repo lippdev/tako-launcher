@@ -28,7 +28,7 @@ public sealed partial class ShellViewModel
             ids.Add(game.Id);
             if (!_items.TryGetValue(game.Id, out var item) || item.Game != game)
             {
-                item = new GameItemViewModel(game, _art, _time);
+                item = new GameItemViewModel(game, _art, _time) { CoverShown = OnCoverShown };
                 _items[game.Id] = item;
                 // Jogo recriado enquanto roda (ex.: editado): o item novo continua "Voltar ao jogo".
                 if (RunningGame?.Id == game.Id)
@@ -56,10 +56,10 @@ public sealed partial class ShellViewModel
             return;
         }
 
-        var previousCover = game.CoverUri;
+        var previousCover = game.ShownCover;
         _metadata.ApplyCached(game);
         item.Refresh();
-        if (game.CoverUri != previousCover)
+        if (game.ShownCover != previousCover)
         {
             item.ReloadArt();
             if (_backdropGameId == id)
@@ -148,16 +148,13 @@ public sealed partial class ShellViewModel
             actions.Add(new OverlayAction("Abrir na Steam", ActionStyle.Primary, new RelayCommand(() => { Close(); OpenUri($"steam://nav/games/details/{appId}"); }), IsDefault: true));
         }
 
-        // Jogos sem appid próprio da Steam (adicionados, Epic, GOG...) casam pelo nome; o usuário pode corrigir.
-        if (game.Store != GameStore.Steam)
-        {
-            actions.Add(new OverlayAction("Corrigir correspondência", ActionStyle.Primary, new RelayCommand(() => { Close(); _ = FixMatchAsync(item); }), IsDefault: true));
-        }
+        // ADR-0023: imagens por fonte e o id do jogo em cada fonte (substitui "Corrigir correspondência" e "Trocar capa").
+        actions.Add(new OverlayAction("Trocar imagens", game.Store == GameStore.Steam ? ActionStyle.Secondary : ActionStyle.Primary, new RelayCommand(() => { Close(); OpenArtPicker(item); }), IsDefault: game.Store != GameStore.Steam));
+        actions.Add(new OverlayAction("Fontes e IDs", ActionStyle.Secondary, new RelayCommand(() => { Close(); OpenSourceIds(item); })));
 
         if (game.Store == GameStore.Manual)
         {
             actions.Add(new OverlayAction("Editar", ActionStyle.Secondary, new RelayCommand(() => { Close(); EditGame(item); })));
-            actions.Add(new OverlayAction("Trocar capa", ActionStyle.Secondary, new RelayCommand(() => { Close(); ChangeCover(item); })));
         }
 
         if (game.InstallPath is { } folder && Directory.Exists(folder))
@@ -187,59 +184,6 @@ public sealed partial class ShellViewModel
     private static string GameTextStore(Game game) => GameTextStore(game.Store);
 
     private static string GameTextStore(GameStore store) => Core.Presentation.GameText.StoreName(store);
-
-    /// <summary>
-    /// Como no Plex: mostra os resultados de todas as fontes ligadas (Steam, IGDB...), cada um com a fonte, e fixa o
-    /// escolhido. Os casados por id (mesmo jogo na loja) vêm marcados.
-    /// </summary>
-    private async Task FixMatchAsync(GameItemViewModel item)
-    {
-        Toast($"Buscando \"{item.Title}\" em {_metadata.ProviderName}…");
-        var all = await _metadata.SearchAsync(item.Game).ConfigureAwait(true);
-        // Até 4 por fonte, para nenhuma esconder as outras.
-        var results = all.GroupBy(m => m.Source).SelectMany(g => g.Take(4)).ToList();
-        DialogViewModel? dialog = null;
-        var actions = results
-            .Select((match, i) => new OverlayAction(Core.Presentation.GameText.MatchLabel(match), i == 0 ? ActionStyle.Primary : ActionStyle.Secondary, new RelayCommand(async () =>
-            {
-                CloseOverlay(dialog!);
-                bool ok = await _metadata.PinAsync(item.Game, match).ConfigureAwait(true);
-                Toast(ok ? $"{item.Title} agora usa os dados de {match.Title} ({match.Source})" : "Não foi possível buscar os dados agora; tente de novo");
-            }), IsDefault: i == 0))
-            .Append(new OverlayAction("Cancelar", ActionStyle.Secondary, new RelayCommand(() => CloseOverlay(dialog!)), IsDefault: results.Count == 0))
-            .ToList();
-        string empty = item.Game.Store == GameStore.Manual
-            ? $"Nada encontrado para \"{item.Title}\" em {_metadata.ProviderName}. Renomeie o atalho ou escolha uma capa manualmente."
-            : $"Nada encontrado para \"{item.Title}\" em {_metadata.ProviderName}.";
-        if (results.Count == 0 && MetadataHintFor(item.Game) is not null)
-        {
-            empty += " Com a IGDB ligada (Configurações › Biblioteca e lojas › Dados dos jogos), a busca inclui jogos de outras lojas e de consoles.";
-        }
-
-        dialog = new DialogViewModel("Qual destes é o seu jogo?", results.Count == 0 ? empty : $"Resultados para \"{item.Title}\":", actions);
-        PushOverlay(dialog);
-    }
-
-    private void ChangeCover(GameItemViewModel item)
-    {
-        if (Library.FindManual(item.Id) is not { } record)
-        {
-            return;
-        }
-
-        var dialog = new OpenFileDialog { Title = $"Capa de {item.Title} (vertical, 2:3)", Filter = ImageFilter, CheckFileExists = true };
-        if (dialog.ShowDialog(System.Windows.Application.Current?.MainWindow) != true)
-        {
-            return;
-        }
-
-        Library.UpdateManual(record with { CoverPath = dialog.FileName });
-        Toast("Capa atualizada");
-        if (Library.Find(item.Id) is { } updated && CurrentPage is DetailsViewModel)
-        {
-            Navigate(new DetailsViewModel(this, ItemFor(updated)), replace: true);
-        }
-    }
 
     /// <summary>Editar jogo adicionado (MVP-024): nome, argumentos, pasta de trabalho e como reconhecer o fim do jogo.</summary>
     public void EditGame(GameItemViewModel item)

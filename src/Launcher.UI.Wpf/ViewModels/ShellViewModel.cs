@@ -102,9 +102,15 @@ public sealed partial class ShellViewModel : ObservableObject
         GameSettingsStore gameSettings,
         ConsoleModeSession consoleMode,
         IEmergencyHotkey emergencyHotkey,
+        IArtCatalog artCatalog,
+        ISourceIdService sourceIds,
+        AnimatedArtService animatedArt,
         TimeProvider time,
         ILogger<ShellViewModel> logger)
     {
+        _artCatalog = artCatalog;
+        _sourceIds = sourceIds;
+        _animatedArt = animatedArt;
         Library = library;
         LibrarySources = librarySources;
         _art = art;
@@ -131,6 +137,13 @@ public sealed partial class ShellViewModel : ObservableObject
         SyncSidebar();
         UpdateClock();
         _clockTimer.Tick += (_, _) => UpdateClock();
+        Settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(SettingsService.ReducedMotion) or nameof(SettingsService.AnimatedCovers))
+            {
+                UpdateAnimations();
+            }
+        };
         _clockTimer.Start();
         _toastTimer.Tick += (_, _) => { IsToastVisible = false; _toastTimer.Stop(); };
         _launchTimer.Tick += (_, _) => { _launchTimer.Stop(); StartSession(); };
@@ -222,6 +235,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public void OpenSettings()
     {
         OnPropertyChanged(nameof(ScreenScraperSummary)); // a pausa por cota muda sem aviso (ADR-0022)
+        _artCacheBytes = null; // o tamanho do cache de imagens é relido ao abrir as Configurações
         Navigate(new SettingsViewModel(this, Settings, _themes), replace: CurrentPage is SettingsViewModel);
     }
 
@@ -649,6 +663,7 @@ public sealed partial class ShellViewModel : ObservableObject
         OnPropertyChanged(nameof(IsQuickMenuOpen));
         UpdateHints();
         OnOverlaysChangedForUpdates();
+        UpdateAnimations(); // modal ou jogo aberto: as capas animadas param
     }
 
     // ---------------------------------------------------------------- Fundo dinâmico
@@ -697,6 +712,13 @@ public sealed partial class ShellViewModel : ObservableObject
                 SetBackdrop(game);
             }
         }
+
+        if (context is ArtTileViewModel tile && TopOverlay is ArtPickerViewModel picker)
+        {
+            picker.OnTileFocused(tile); // prévia grande da miniatura focada
+        }
+
+        UpdateAnimations(); // só a capa em foco se mexe
 
         UpdateHints();
     }
@@ -753,6 +775,9 @@ public sealed partial class ShellViewModel : ObservableObject
                 list.Add(("y", "Espaço", AppCommand.Search));
                 list.Add(("menu", "Pronto", AppCommand.Menu));
                 list.Add(("b", "Fechar", AppCommand.Back));
+                break;
+            case IOverlayHints custom:
+                list.AddRange(custom.Hints); // modais com LB/RB, X, Y e ☰ próprios (ADR-0023)
                 break;
             case not null:
                 list.Add(("a", "Selecionar", AppCommand.Accept));

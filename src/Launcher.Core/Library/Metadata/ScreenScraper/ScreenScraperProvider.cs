@@ -125,6 +125,19 @@ public sealed partial class ScreenScraperProvider(ScreenScraperClient client, Ro
         return metadata with { FetchedAt = time.GetUtcNow() };
     }
 
+    /// <summary>Todas as mídias do jogo (caixas, fanart, capturas e logos por região) para o seletor de imagens (ADR-0023).</summary>
+    public async Task<IReadOnlyList<Art.ArtCandidate>> MediaAsync(string id, CancellationToken cancellationToken)
+    {
+        if (!IsEnabled || IsPaused || string.IsNullOrWhiteSpace(id)
+            || await QueryAsync("jeuInfos.php", [new("gameid", id)], cancellationToken).ConfigureAwait(false) is not { } response
+            || !response.TryGetProperty("jeu", out var jeu))
+        {
+            return [];
+        }
+
+        return ScreenScraperParser.MediaCandidates(jeu);
+    }
+
     /// <summary>
     /// Parâmetros do <c>jeuInfos.php</c> para a ROM: sistema, tipo (rom/iso), nome, tamanho e os hashes calculados
     /// (<see cref="RomHasher"/>). Puro, testado.

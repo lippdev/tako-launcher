@@ -19,7 +19,7 @@ public sealed partial class ShellViewModel
 
     /// <summary>Aviso discreto nos detalhes: jogo sem dados que poderia ganhá-los com a IGDB ligada.</summary>
     public string? MetadataHintFor(Game game) => _metadata.CouldUseIgdb(game)
-        ? "Sem informações deste jogo? Ligue a IGDB em Configurações › Biblioteca e lojas › Dados dos jogos para buscar em mais fontes."
+        ? "Sem informações deste jogo? Ligue a IGDB em Configurações › Capas e metadados › Dados dos jogos (IGDB) para buscar em mais fontes."
         : null;
 
     [RelayCommand]

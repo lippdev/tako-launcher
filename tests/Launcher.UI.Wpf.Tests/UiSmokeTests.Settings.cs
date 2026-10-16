@@ -32,7 +32,7 @@ public sealed partial class UiSmokeTests
         Pump(0.8);
         var settings = Assert.IsType<SettingsViewModel>(shell.CurrentPage);
         Assert.Equal("settings-cat:geral", Nav.GetKey(nav.Focused!));
-        Assert.Equal(["geral", "biblioteca", "aparencia", "controles", "sistema", "sobre"], settings.Categories.Select(c => c.Id));
+        Assert.Equal(["geral", "biblioteca", "metadados", "aparencia", "controles", "sistema", "sobre"], settings.Categories.Select(c => c.Id));
 
         // Nenhum texto de desenvolvedor visível: sem IDs internos do PRD/ADR nem nomes técnicos.
         foreach (var row in settings.Categories.SelectMany(c => c.Rows))
@@ -84,9 +84,9 @@ public sealed partial class UiSmokeTests
         Press(window, AppCommand.Accept);
         Assert.False(shell.Settings.DeveloperOptions);
 
-        // Segredos (IGDB e ScreenScraper) aparecem como ● até pedir "Mostrar"; as duas linhas ficam em Biblioteca e lojas.
+        // Segredos (IGDB e ScreenScraper) aparecem como ● até pedir "Mostrar"; as linhas ficam em Capas e metadados (ADR-0023).
         Assert.True(nav.FocusDefault("settings:screenscraper"));
-        Assert.Equal("biblioteca", settings.SelectedCategory.Id);
+        Assert.Equal("metadados", settings.SelectedCategory.Id);
         Assert.True(nav.FocusDefault("settings:igdb"));
         Press(window, AppCommand.Accept);
         Pump(0.5);

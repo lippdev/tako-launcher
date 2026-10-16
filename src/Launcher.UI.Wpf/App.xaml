@@ -13,6 +13,7 @@
         <ResourceDictionary Source="Resources/LibraryViews.xaml" />
         <ResourceDictionary Source="Resources/DeviceViews.xaml" />
         <ResourceDictionary Source="Resources/MetadataViews.xaml" />
+        <ResourceDictionary Source="Resources/CoverViews.xaml" />
         <ResourceDictionary Source="Resources/ThemeViews.xaml" />
         <ResourceDictionary Source="Resources/DiagnosticsViews.xaml" />
         <ResourceDictionary Source="Resources/GameScreenViews.xaml" />

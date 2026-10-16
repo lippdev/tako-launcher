@@ -70,5 +70,13 @@ public sealed class SizedLruCache<TKey, TValue>
         return true;
     }
 
+    /// <summary>Esvazia o cache (ex.: "Limpar cache de imagens").</summary>
+    public void Clear()
+    {
+        _map.Clear();
+        _order.Clear();
+        TotalCost = 0;
+    }
+
     private readonly record struct Entry(TKey Key, TValue Value, long Cost);
 }
