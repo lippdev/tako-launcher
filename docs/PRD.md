@@ -335,6 +335,14 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [ ] **THEME-008:** cinco temas oficiais bem diferentes entre si (layout, navegação e identidade, não só cores), começando por uma lista de propostas para escolher.
 - [ ] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil.
 
+### Épico LIB — Organização da biblioteca (P2)
+
+- [ ] **LIB-001:** status de cada jogo (jogando, zerado, pausado, abandonado, quero jogar), mudado pelos detalhes ou pelo menu do card, com filtro no painel.
+- [ ] **LIB-002:** tags próprias do usuário: criar, aplicar a vários jogos de uma vez e filtrar.
+- [ ] **LIB-003:** coleções automáticas: salvar uma combinação de filtros (gênero, fonte, tempo jogado, status, tag) como coleção que se atualiza sozinha.
+- [ ] **LIB-004:** jogos quebrados: verificar em segundo plano executáveis e pastas que sumiram, listar esses jogos e oferecer corrigir o caminho ou remover. Hoje só os detalhes avisam, um jogo por vez.
+- [ ] **LIB-005:** armazenamento: quanto cada jogo ocupa, total por disco, e ordenar por tamanho.
+
 ### Épico ART — Capas e arte (P2)
 
 - [ ] **ART-001:** casar a biblioteca inteira com as capas certas sozinho, como o Plex faz com filmes: reconhece o nome do jogo, escolhe capa, fundo, logo e ícone, e o usuário só corrige o que ficou errado. Refs: Steam ROM Manager, BoilR, SteamGridDB Decky, Steam Art Manager.
@@ -354,11 +362,18 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 ### Épico INPUT — Controles (P2)
 
 - [ ] **INPUT-001:** personalizar os controles do próprio Tako: remapear cada ação (aceitar, voltar, menu, seções, atalho da Central) por controle, com perfis.
+- [ ] **INPUT-003:** bateria dos controles sem fio na barra superior e na Central, com aviso de bateria fraca.
+- [ ] **INPUT-004:** reconexão assistida: quando o controle cai, o Tako avisa, não perde o foco e volta a navegar assim que um controle reconecta (ou outro assume).
 - [ ] **INPUT-002:** remapear controles para os jogos, como a Entrada Steam: perfis por jogo, botões, analógicos, gatilhos e mouse/teclado. Precisa de um controle virtual no SO (uinput no Linux; no Windows o ViGEmBus foi descontinuado, então é preciso escolher outro driver). Começa por um estudo.
 
 ### Épico SESSION — Sessões de jogo (P2)
 
 - [ ] **SESSION-001:** retomada rápida, como o Quick Resume do Xbox Series: suspender o jogo aberto (sem fechar) ao abrir outro e voltar exatamente onde estava. No PC fica na memória, não sobrevive a reiniciar o computador. Não funciona com jogos online nem com anti-cheat, que precisam ficar de fora. Começa por um estudo.
+- [ ] **SESSION-002:** histórico de sessões: data, hora e duração de cada vez que o jogo rodou (hoje só o total e a última vez), nos detalhes do jogo.
+- [ ] **SESSION-003:** jogo que fechou sozinho em poucos segundos ou com código de erro gera um aviso com o que se sabe (código, log do Tako, sugestão), em vez de voltar em silêncio.
+- [ ] **SESSION-004:** por jogo, variáveis de ambiente e comandos antes e depois de jogar (argumentos e pasta de trabalho já existem), com consentimento. Base do EXT-001.
+- [ ] **SESSION-005 (Linux):** escolher Proton ou Wine (versão e prefixo) para jogos de Windows adicionados à mão.
+- [ ] **SESSION-006:** "Reparar jogo": abrir a verificação de arquivos da loja dona do jogo (Steam, Epic, GOG, etc.) quando ela oferece.
 
 ### Épico VOICE e AI — Busca por voz e IA (P3)
 
@@ -384,6 +399,8 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 
 - [ ] **EXT-001:** eventos de sessão (`GameStarting`, `GameStarted`, `GameExited`) e ferramentas externas por jogo (pré e pós-execução), com consentimento.
 - [ ] **EXT-002:** API local de integração (a mesma base que o Console Mode usará no sentido inverso).
+- [ ] **EXT-004:** Discord Rich Presence: mostrar o jogo aberto no Discord, desligado por padrão.
+- [ ] **EXT-005:** links `tako://` para abrir um jogo ou uma tela do Tako de fora (atalhos, Stream Deck, ART-002).
 - [ ] **EXT-003:** plugins de metadados e de fontes, sem acesso privilegiado.
 
 ### Épico STREAM (P3)

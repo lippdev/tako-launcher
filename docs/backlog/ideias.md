@@ -1,6 +1,6 @@
 # Catálogo de ideias
 
-Ideias do mantenedor (2026-10-16) para depois da paridade. Todas são **COULD** até serem priorizadas; ao entrar no plano, uma ideia vira item do PRD (§9) com critério de aceite. A coluna "Relação" aponta o item do PRD que já cobre parte dela.
+Ideias do mantenedor (2026-10-16) para depois da paridade. As que já valiam entrar viraram itens do PRD (LIB-001 a 005, INPUT-003/004, SESSION-002 a 006, EXT-004/005) e saíram daqui; o modo de segurança também saiu, porque já existe (`--safe-mode`). Todas são **COULD** até serem priorizadas; ao entrar no plano, uma ideia vira item do PRD (§9) com critério de aceite. A coluna "Relação" aponta o item do PRD que já cobre parte dela.
 
 Regras que valem para todas: o que expõe dados do usuário (listas públicas, perfil, estatísticas) é opt-in; nada roda durante o jogo sem motivo; downloads seguem a decisão do épico DL.
 
@@ -8,15 +8,10 @@ Regras que valem para todas: o que expõe dados do usuário (listas públicas, p
 
 | ID | Ideia | Relação |
 |---|---|---|
-| IDEA-LIB-01 | Bibliotecas inteligentes: coleções automáticas por gênero, tempo jogado, plataforma e outros critérios |  |
-| IDEA-LIB-02 | Status personalizados: jogando, zerado, abandonado, quero jogar, pausado |  |
 | IDEA-LIB-03 | HowLongToBeat: estimativa de tempo para terminar cada jogo | provedor de metadados |
 | IDEA-LIB-04 | Roleta de jogos: sortear o próximo jogo da biblioteca |  |
-| IDEA-LIB-05 | Detector de jogos quebrados: executáveis removidos, caminhos inválidos, instalações corrompidas |  |
-| IDEA-LIB-06 | Gerenciador de armazenamento: quanto cada jogo ocupa, por disco |  |
 | IDEA-LIB-07 | Edição em massa: nomes, categorias, capas e tags de vários jogos de uma vez |  |
-| IDEA-LIB-08 | Tags personalizadas |  |
-| IDEA-LIB-09 | Jogos não instalados: mostrar o que o usuário possui mesmo sem instalação local |  |
+| IDEA-LIB-09 | Jogos não instalados: mostrar o que o usuário possui mesmo sem instalação local | o filtro "Não instalado" já existe; falta listar o que cada loja diz que o usuário possui |
 | IDEA-LIB-10 | Importar coleções e configurações do ES-DE, Pegasus e LaunchBox | SRC-001 |
 | IDEA-LIB-11 | Gerenciador de DLCs: instaladas, disponíveis e ausentes |  |
 | IDEA-LIB-12 | Biblioteca compartilhável: exportar uma lista pública dos jogos | opt-in |
@@ -29,11 +24,9 @@ Regras que valem para todas: o que expõe dados do usuário (listas públicas, p
 | IDEA-INPUT-04 | Giroscópio: mapear movimento para ações ou mouse | INPUT-002 |
 | IDEA-INPUT-05 | Menus radiais por combinação de botões |  |
 | IDEA-INPUT-06 | Macros de controle, respeitando limites de jogos e anti-cheat | INPUT-002 |
-| IDEA-INPUT-07 | Indicador de bateria dos controles conectados |  |
 | IDEA-INPUT-08 | Perfis comunitários de controles: baixar e compartilhar | INPUT-002 |
 | IDEA-INPUT-09 | Calibração de analógicos: deadzones, curvas e sensibilidade | INPUT-001 |
 | IDEA-INPUT-10 | Múltiplos controles: identificar e configurar cada jogador |  |
-| IDEA-INPUT-11 | Reconexão assistida: recuperar a navegação quando um controle desconectar |  |
 | IDEA-INPUT-12 | Layout adaptativo: alternar sozinho entre interface de controle e de mouse/teclado |  |
 | IDEA-INPUT-13 | Navegação por gestos no touchpad do DualSense e similares |  |
 | IDEA-INPUT-14 | Teclado virtual avançado: sugestões, histórico e digitação por controle |  |
@@ -44,11 +37,7 @@ Regras que valem para todas: o que expõe dados do usuário (listas públicas, p
 
 | ID | Ideia | Relação |
 |---|---|---|
-| IDEA-RUN-01 | Perfis de inicialização: variáveis de ambiente, parâmetros e scripts por jogo | EXT-001 |
-| IDEA-RUN-02 | Proton/Wine: escolher versões e configurações de compatibilidade (Linux) |  |
-| IDEA-RUN-03 | Detector de crashes com diagnóstico |  |
 | IDEA-RUN-04 | Gerenciador de saves: localizar e fazer backup | CLOUD-001 |
-| IDEA-RUN-05 | Histórico de sessões: quando e por quanto tempo cada jogo rodou |  |
 | IDEA-RUN-06 | Quick Switch: trocar rápido entre jogos abertos, quando possível | SESSION-001 |
 | IDEA-RUN-07 | Suspensão de sessões como alternativa limitada ao Quick Resume | SESSION-001 |
 | IDEA-RUN-08 | Modo recuperação: restaurar uma sessão interrompida quando o jogo permitir |  |
@@ -56,7 +45,6 @@ Regras que valem para todas: o que expõe dados do usuário (listas públicas, p
 | IDEA-RUN-10 | Perfis de compatibilidade por jogo e por SO |  |
 | IDEA-RUN-11 | Capturas organizadas: screenshots e gravações por jogo numa galeria |  |
 | IDEA-RUN-12 | Gerenciador de mods via Vortex e Mod Organizer 2 |  |
-| IDEA-RUN-13 | Verificador de integridade: abrir o reparo da loja do jogo |  |
 
 ## Loja, descobertas e promoções
 
@@ -131,7 +119,6 @@ Regras que valem para todas: o que expõe dados do usuário (listas públicas, p
 
 | ID | Ideia | Relação |
 |---|---|---|
-| IDEA-SOC-01 | Discord Rich Presence |  |
 | IDEA-SOC-02 | Agregador de conquistas das lojas num perfil |  |
 | IDEA-SOC-03 | Estatísticas pessoais e retrospectiva |  |
 | IDEA-SOC-04 | Perfil público opcional | opt-in |
@@ -147,10 +134,8 @@ Regras que valem para todas: o que expõe dados do usuário (listas públicas, p
 | ID | Ideia | Relação |
 |---|---|---|
 | IDEA-SYS-01 | Atalhos para cloud gaming (GeForce NOW, Xbox Cloud Gaming) |  |
-| IDEA-SYS-02 | Comandos `tako://` para abrir jogos e telas | ART-002 usa o mesmo protocolo |
 | IDEA-SYS-03 | Stream Deck | EXT-002 |
 | IDEA-SYS-04 | API de automação para Home Assistant e ferramentas locais | EXT-002 |
-| IDEA-SYS-05 | Modo de segurança: abrir sem as personalizações que causam erro |  |
 | IDEA-SYS-06 | Perfis de instalação: várias bibliotecas e ambientes na mesma máquina | UX-004 |
 | IDEA-SYS-07 | Importar e exportar configurações em formato aberto | CLOUD-001 |
 | IDEA-SYS-08 | Gerenciador de extensões | EXT-003 |

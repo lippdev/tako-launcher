@@ -25,6 +25,10 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 
 ## SHOULD
 
+- **LIB-001** Status de jogo; **LIB-004** jogos quebrados na biblioteca toda.
+- **SESSION-002** Histórico de sessões.
+- **INPUT-003** Bateria dos controles; **INPUT-004** reconexão assistida.
+- **EXT-004** Discord Rich Presence.
 - **UX-003** Assistente da primeira execução (idioma, lojas, provedores de metadados).
 - **SRC-003** Cliente de loja ausente: oferecer abrir ou instalar, além do aviso.
 - Atalho de teclado da Central durante o jogo no Linux (X11) e no macOS.
@@ -36,6 +40,9 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 
 ## COULD
 
+- **LIB-002** Tags; **LIB-003** coleções automáticas; **LIB-005** armazenamento.
+- **SESSION-003** Aviso de crash; **SESSION-004** variáveis e comandos por jogo; **SESSION-005** Proton/Wine (Linux); **SESSION-006** Reparar jogo.
+- **EXT-005** Links `tako://`.
 - **THEME-006** Criar o próprio tema pelo Tako (pedido do mantenedor).
 - **THEME-007** Música de fundo e sons por tema; **THEME-008** cinco temas oficiais bem diferentes.
 - **ART-001** Capas certas para a biblioteca inteira, como o Plex; **ART-002** um clique no site do SteamGridDB (como o SGDBoop); **ART-003** galeria de capas online.
