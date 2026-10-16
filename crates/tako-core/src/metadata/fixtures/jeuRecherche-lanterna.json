@@ -1,0 +1,20 @@
+{
+  "header": { "APIversion": "2.0", "commandRequested": "jeuRecherche.php (escrito à mão para os testes)", "success": "true", "error": "" },
+  "response": {
+    "ssuser": { "id": "jogador", "niveau": "1", "maxthreads": "1", "requeststoday": "121", "maxrequestsperday": "20000" },
+    "jeux": [
+      {
+        "id": "900077",
+        "noms": [{ "region": "us", "text": "Distant Lantern" }, { "region": "br", "text": "Lanterna Distante" }],
+        "systeme": { "id": "4", "text": "Super Nintendo" },
+        "dates": [{ "region": "us", "text": "1994-08-01" }]
+      },
+      {
+        "id": "900078",
+        "noms": [{ "region": "wor", "text": "Distant Lantern 2" }],
+        "systeme": { "id": "999", "text": "Sistema Desconhecido" },
+        "dates": [{ "region": "wor", "text": "1996" }]
+      }
+    ]
+  }
+}

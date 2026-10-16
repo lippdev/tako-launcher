@@ -1,0 +1,381 @@
+//! Cache de artes no disco (port da parte de arquivos de `ArtService.cs`), agora com limite: quando
+//! passa do total (1 GiB por padrão), apaga os arquivos usados há mais tempo. Aceita `https://`,
+//! arquivos locais, `steam-art://` (vários candidatos) e `ssmedia://` (credenciais só na hora).
+
+use super::cache::write_atomic;
+use super::http::{Http, HttpRequest, hex};
+use super::screenscraper::{MEDIA_SCHEME, ScreenScraperClient};
+use super::steam_art::{ArtSource, SteamArtResolver};
+use super::{STEAM_ART_SCHEME, scheme_of};
+use sha2::{Digest, Sha256};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+
+pub const DEFAULT_LIMIT: u64 = 1024 * 1024 * 1024;
+/// Imagem maior que isso não é baixada.
+pub const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
+
+pub struct ArtCache {
+    dir: PathBuf,
+    limit: AtomicU64,
+    http: Arc<dyn Http>,
+    steam: SteamArtResolver,
+    screenscraper: Option<Arc<ScreenScraperClient>>,
+    // Uma limpeza por vez.
+    evicting: Mutex<()>,
+}
+
+impl ArtCache {
+    /// `dir` = `DataPaths::art_cache()`.
+    pub fn new(
+        dir: impl Into<PathBuf>,
+        http: Arc<dyn Http>,
+        steam: SteamArtResolver,
+        screenscraper: Option<Arc<ScreenScraperClient>>,
+    ) -> Self {
+        ArtCache {
+            dir: dir.into(),
+            limit: AtomicU64::new(DEFAULT_LIMIT),
+            http,
+            steam,
+            screenscraper,
+            evicting: Mutex::new(()),
+        }
+    }
+
+    pub fn limit(&self) -> u64 {
+        self.limit.load(Ordering::Relaxed)
+    }
+
+    /// Novo limite em bytes; aplicado já.
+    pub fn set_limit(&self, bytes: u64) {
+        self.limit.store(bytes, Ordering::Relaxed);
+        self.enforce_limit(None);
+    }
+
+    /// Arquivo local da imagem (baixa para o cache se preciso); `None` sem arte ou sem rede.
+    /// Bloqueante: chamar fora da thread da UI.
+    pub fn locate(&self, uri: &str) -> Option<PathBuf> {
+        let scheme = scheme_of(uri);
+        match scheme.as_deref() {
+            None | Some("file") => return file_path(uri).filter(|p| p.is_file()),
+            _ => {}
+        }
+        let cached = self.cache_path(uri);
+        if cached.is_file() {
+            touch(&cached);
+            return Some(cached);
+        }
+        match scheme.as_deref() {
+            Some(MEDIA_SCHEME) => {
+                let bytes = self
+                    .screenscraper
+                    .as_ref()?
+                    .download_media(uri, MAX_IMAGE_BYTES)
+                    .filter(|b| looks_like_image(b))?;
+                self.store(&cached, &bytes)
+            }
+            // Artes da Steam: o cache vale para o endereço lógico, sem nova consulta à rede.
+            Some(STEAM_ART_SCHEME) => self.steam.resolve(uri).into_iter().find_map(|c| match c {
+                ArtSource::File(p) => Some(p), // cache da própria Steam
+                ArtSource::Url(u) => self.download(&u).and_then(|b| self.store(&cached, &b)),
+            }),
+            Some("https" | "http") => self.download(uri).and_then(|b| self.store(&cached, &b)),
+            _ => None,
+        }
+    }
+
+    /// Nome no cache: hash do endereço lógico + extensão (`.img` para esquemas internos).
+    pub fn cache_path(&self, uri: &str) -> PathBuf {
+        let name = &hex(&Sha256::digest(uri))[..32];
+        let ext = match scheme_of(uri).as_deref() {
+            Some("https" | "http") => uri
+                .split(['?', '#'])
+                .next()
+                .and_then(|p| p.rsplit('/').next())
+                .and_then(|f| f.rsplit_once('.'))
+                .map(|(_, e)| e.to_ascii_lowercase())
+                .filter(|e| {
+                    (1..=5).contains(&e.len()) && e.bytes().all(|b| b.is_ascii_alphanumeric())
+                })
+                .unwrap_or_else(|| "img".into()),
+            _ => "img".into(),
+        };
+        self.dir.join(format!("{name}.{ext}"))
+    }
+
+    /// Tamanho do cache no disco (Configurações › Capas e metadados).
+    pub fn disk_bytes(&self) -> u64 {
+        self.files().iter().map(|(_, size, _)| size).sum()
+    }
+
+    /// "Limpar cache de imagens": apaga os baixados; devolve os bytes liberados.
+    pub fn clear(&self) -> u64 {
+        // Arquivo em uso agora: fica para a próxima limpeza.
+        self.files()
+            .into_iter()
+            .filter(|(p, _, _)| std::fs::remove_file(p).is_ok())
+            .map(|(_, size, _)| size)
+            .sum()
+    }
+
+    fn download(&self, url: &str) -> Option<Vec<u8>> {
+        let mut req = HttpRequest::get(url);
+        req.max_bytes = MAX_IMAGE_BYTES;
+        let r = match self.http.send(&req) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("Arte indisponível: {e}");
+                return None;
+            }
+        };
+        let type_ok = r.content_type.as_deref().is_none_or(|c| {
+            let c = c.to_ascii_lowercase();
+            c.starts_with("image/") || c.starts_with("application/octet-stream")
+        });
+        (r.is_success() && type_ok && looks_like_image(&r.body)).then_some(r.body)
+    }
+
+    fn store(&self, path: &Path, bytes: &[u8]) -> Option<PathBuf> {
+        if let Err(e) = write_atomic(path, bytes) {
+            tracing::warn!("Não foi possível gravar a arte no cache: {e}");
+            return None;
+        }
+        self.enforce_limit(Some(path));
+        Some(path.to_path_buf())
+    }
+
+    /// Acima do limite, apaga os usados há mais tempo (a data de modificação marca o último uso).
+    fn enforce_limit(&self, keep: Option<&Path>) {
+        let _one = self.evicting.lock().unwrap_or_else(|e| e.into_inner());
+        let mut files = self.files();
+        let mut total: u64 = files.iter().map(|(_, s, _)| s).sum();
+        let limit = self.limit();
+        if total <= limit {
+            return;
+        }
+        files.sort_by_key(|(_, _, used)| *used);
+        for (p, size, _) in files {
+            if total <= limit {
+                break;
+            }
+            if Some(p.as_path()) != keep && std::fs::remove_file(&p).is_ok() {
+                total -= size;
+            }
+        }
+    }
+
+    /// (caminho, tamanho, último uso) dos arquivos do cache.
+    fn files(&self) -> Vec<(PathBuf, u64, SystemTime)> {
+        let Ok(entries) = std::fs::read_dir(&self.dir) else {
+            return Vec::new();
+        };
+        entries
+            .filter_map(Result::ok)
+            .filter_map(|e| {
+                let m = e.metadata().ok().filter(|m| m.is_file())?;
+                Some((
+                    e.path(),
+                    m.len(),
+                    m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+                ))
+            })
+            .collect()
+    }
+}
+
+// Marca o uso (a data de acesso do disco não é confiável: `noatime`, `relatime`).
+fn touch(path: &Path) {
+    if let Ok(f) = std::fs::File::options().write(true).open(path) {
+        let _ = f.set_modified(SystemTime::now());
+    }
+}
+
+/// PNG, JPEG, GIF, WebP ou BMP pela assinatura: texto de erro com status 200 não entra no cache.
+pub fn looks_like_image(b: &[u8]) -> bool {
+    b.starts_with(&[0x89, b'P', b'N', b'G'])
+        || b.starts_with(&[0xFF, 0xD8, 0xFF])
+        || b.starts_with(b"GIF8")
+        || (b.len() >= 12 && b.starts_with(b"RIFF") && &b[8..12] == b"WEBP")
+        || b.starts_with(b"BM")
+}
+
+/// `file:///C:/a%20b.png` ou um caminho comum → caminho.
+pub fn file_path(uri: &str) -> Option<PathBuf> {
+    let Some(rest) = uri.strip_prefix("file://") else {
+        return (!uri.trim().is_empty()).then(|| PathBuf::from(uri));
+    };
+    let decoded = percent_decode(rest)?;
+    // "/C:/x" (Windows) → "C:/x".
+    let b = decoded.as_bytes();
+    let path = if b.len() > 2 && b[0] == b'/' && b[2] == b':' && b[1].is_ascii_alphabetic() {
+        &decoded[1..]
+    } else {
+        &decoded
+    };
+    Some(PathBuf::from(path))
+}
+
+fn percent_decode(s: &str) -> Option<String> {
+    let mut out = Vec::with_capacity(s.len());
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        let byte = (b[i] == b'%' && i + 2 < b.len())
+            .then(|| std::str::from_utf8(&b[i + 1..i + 3]).ok())
+            .flatten()
+            .and_then(|h| u8::from_str_radix(h, 16).ok());
+        if let Some(byte) = byte {
+            out.push(byte);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metadata::http::HttpResponse;
+    use crate::metadata::test_support::FakeHttp;
+
+    const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 13, 10, 26, 10, 0, 0, 0, 0];
+
+    fn png_http() -> Arc<FakeHttp> {
+        let mut http = FakeHttp::with_fallback(404, "");
+        http.rule = Some(Box::new(|req| {
+            req.url.contains("/ok").then(|| HttpResponse {
+                status: 200,
+                body: PNG.repeat(100),
+                content_type: Some("image/png".into()),
+                retry_after: None,
+            })
+        }));
+        Arc::new(http)
+    }
+
+    fn cache(dir: &Path, http: Arc<FakeHttp>) -> ArtCache {
+        ArtCache::new(dir, http.clone(), SteamArtResolver::new(http, None), None)
+    }
+
+    #[test]
+    fn downloads_once_and_reuses_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let http = png_http();
+        let c = cache(dir.path(), http.clone());
+        let p = c.locate("https://cdn.example/ok/capa.PNG?x=1").unwrap();
+        assert_eq!(p.extension().unwrap(), "png");
+        assert_eq!(c.locate("https://cdn.example/ok/capa.PNG?x=1"), Some(p));
+        assert_eq!(http.sent().len(), 1);
+        assert_eq!(c.disk_bytes(), 1200);
+        assert_eq!(c.clear(), 1200);
+        assert_eq!(c.disk_bytes(), 0);
+    }
+
+    #[test]
+    fn rejects_text_answers_and_bad_content_types() {
+        let dir = tempfile::tempdir().unwrap();
+        let c = cache(
+            dir.path(),
+            Arc::new(FakeHttp::with_fallback(200, "NOMEDIA")),
+        );
+        assert!(c.locate("https://cdn.example/a.png").is_none());
+        let mut html = FakeHttp::new();
+        html.rule = Some(Box::new(|_| {
+            Some(HttpResponse {
+                status: 200,
+                body: PNG.to_vec(),
+                content_type: Some("text/html".into()),
+                retry_after: None,
+            })
+        }));
+        assert!(
+            cache(dir.path(), Arc::new(html))
+                .locate("https://cdn.example/b.png")
+                .is_none()
+        );
+        assert_eq!(cache(dir.path(), png_http()).disk_bytes(), 0);
+    }
+
+    #[test]
+    fn steam_art_tries_candidates_in_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let http = png_http();
+        // API sem artes; a CDN antiga responde 404: não há arte.
+        let c = cache(dir.path(), http.clone());
+        assert!(c.locate("steam-art://570/cover").is_none());
+        let mut good = FakeHttp::with_fallback(404, "");
+        good.rule = Some(Box::new(|req| {
+            req.url
+                .ends_with("library_600x900_2x.jpg")
+                .then(|| HttpResponse {
+                    status: 200,
+                    body: PNG.to_vec(),
+                    content_type: Some("image/jpeg".into()),
+                    retry_after: None,
+                })
+        }));
+        let good = Arc::new(good);
+        let c = cache(dir.path(), good.clone());
+        let p = c.locate("steam-art://570/cover").unwrap();
+        assert_eq!(p.extension().unwrap(), "img");
+        let before = good.sent().len();
+        assert_eq!(c.locate("steam-art://570/cover"), Some(p));
+        assert_eq!(good.sent().len(), before);
+    }
+
+    #[test]
+    fn evicts_the_least_recently_used_files_over_the_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let c = cache(dir.path(), png_http());
+        let a = c.locate("https://x/ok/a.png").unwrap();
+        let old = SystemTime::now() - std::time::Duration::from_secs(3600);
+        std::fs::File::options()
+            .write(true)
+            .open(&a)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let b = c.locate("https://x/ok/b.png").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&b)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        // Usar "a" de novo o torna o mais recente.
+        assert_eq!(c.locate("https://x/ok/a.png"), Some(a.clone()));
+        c.set_limit(2500);
+        let third = c.locate("https://x/ok/c.png").unwrap();
+        assert!(a.exists() && third.exists());
+        assert!(!b.exists());
+        assert!(c.disk_bytes() <= 2500);
+        // Um arquivo só maior que o limite fica (é o que vai aparecer).
+        c.set_limit(10);
+        let d = c.locate("https://x/ok/d.png").unwrap();
+        assert!(d.exists());
+    }
+
+    #[test]
+    fn local_files_and_file_uris() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("minha capa.png");
+        std::fs::write(&f, PNG).unwrap();
+        let c = cache(dir.path(), png_http());
+        assert_eq!(c.locate(&f.to_string_lossy()), Some(f.clone()));
+        let uri = format!("file://{}", f.to_string_lossy().replace(' ', "%20"));
+        assert_eq!(c.locate(&uri), Some(f));
+        assert_eq!(
+            file_path("file:///C:/capas/a.png"),
+            Some(PathBuf::from("C:/capas/a.png"))
+        );
+        assert!(c.locate("file:///nao/existe.png").is_none());
+        assert!(c.locate("ssmedia://neoclone.screenscraper.fr/x").is_none()); // sem cliente
+        assert_eq!(file_path("file:///a%2"), Some(PathBuf::from("/a%2")));
+    }
+}
