@@ -32,6 +32,7 @@ Regras:
 ## 3. Pull Requests
 
 - Título segue Conventional Commits (validado no CI); descrição usa o template.
+- O CI roda só em PR com código (PRs só de docs, design ou imagens não rodam), fora de rascunho, e cancela a execução anterior a cada push. Instalador e portable rodam em PR para a `main` ou com o label `package`; o benchmark, com o label `benchmark`. Os dois também podem ser pedidos em Actions › CI › Run workflow.
 - Um PR = uma história. Preferir menos de 400 linhas alteradas.
 - Para merge: CI verde, **1 aprovação** de um code owner (ver `.github/CODEOWNERS`), conversas resolvidas, DoD cumprida.
 - PRs que tocam `runtime`, `ipc`, `themes` ou segurança: o revisor confirma explicitamente o item "Segurança e permissões revisadas" do checklist. Com três ou mais mantenedores, passam a exigir **2 aprovações**.

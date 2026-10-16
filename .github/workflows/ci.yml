@@ -1,11 +1,41 @@
 name: CI
+# Roda só onde ajuda o desenvolvimento:
+#  - PR para develop/main que mexe em código (só docs, design e imagens não rodam) e não está em rascunho;
+#  - um push novo na PR cancela a execução anterior;
+#  - sem execução no push para develop/main (a PR já testou; o push na main roda o workflow de release);
+#  - pacote (instalador + portable) só em PR para a main ou com o label "package";
+#  - benchmark só com o label "benchmark" ou rodando à mão (Actions > CI > Run workflow).
+# O título da PR é conferido em pr-title.yml, que roda também nas PRs só de docs.
 on:
   pull_request:
     branches: [develop, main]
-  push:
-    branches: [develop, main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "design/**"
+      - "logo/**"
+      - "LICENSE"
+  workflow_dispatch:
+    inputs:
+      benchmark:
+        description: "Also run the benchmark"
+        type: boolean
+        default: false
+      package:
+        description: "Also build the installer and portable"
+        type: boolean
+        default: false
+
+concurrency:
+  # Adicionar um label não cancela a execução do código em andamento. Uma PR aberta já com label recebe também o evento
+  # "labeled"; por isso, no "opened", os jobs por label esperam esse evento em vez de rodar duas vezes.
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'labeled' && github.event.label.name || 'code' }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
+    if: github.event_name == 'workflow_dispatch' || (github.event.action != 'labeled' && !github.event.pull_request.draft)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,9 +54,13 @@ jobs:
           name: ui-screenshots
           path: tests/Launcher.UI.Wpf.Tests/bin/Release/**/screenshots/
           if-no-files-found: ignore
-  # Instalador e portable em toda PR (mesmo script da release): a release não quebra só na hora da tag.
+  # Instalador e portable (mesmo script da release) antes de chegar à main: a release não quebra na hora de publicar.
   package:
-    if: github.event_name == 'pull_request'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.package)
+      || (github.event_name == 'pull_request' && !github.event.pull_request.draft && (
+        (github.event.action != 'labeled' && (github.base_ref == 'main' || (github.event.action != 'opened' && contains(github.event.pull_request.labels.*.name, 'package'))))
+        || (github.event.action == 'labeled' && github.event.label.name == 'package')))
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +85,11 @@ jobs:
   # Benchmark (MVP-035, frente G): números vão para o artefato "benchmark" e o resumo do job. Runners variam, então
   # nenhum número reprova; só reprova se o Tako travar, quebrar ou não chegar à tela interativa.
   benchmark:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.benchmark)
+      || (github.event_name == 'pull_request' && !github.event.pull_request.draft && (
+        (github.event.action != 'labeled' && github.event.action != 'opened' && contains(github.event.pull_request.labels.*.name, 'benchmark'))
+        || (github.event.action == 'labeled' && github.event.label.name == 'benchmark')))
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -77,10 +116,3 @@ jobs:
             ${{ runner.temp }}/benchmark/benchmark.md
             ${{ runner.temp }}/benchmark/runs/
           if-no-files-found: ignore
-  pr-title:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: amannn/action-semantic-pull-request@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
