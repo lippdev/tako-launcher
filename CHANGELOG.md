@@ -4,6 +4,14 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 ### Novidades
+- Status de cada jogo: Jogando, Zerado, Pausado, Abandonado ou Quero jogar. Muda pelo menu do card ou por Opções nos detalhes, aparece no cabeçalho dos detalhes e tem filtro próprio.
+- Jogos quebrados: o Tako confere sozinho os jogos adicionados à mão cujo arquivo ou pasta sumiu. O filtro "Só quebrados" mostra todos de uma vez, e jogar um deles oferece Editar ou Remover.
+- Histórico de sessões: cada vez que um jogo roda fica registrada a data, a hora e a duração (as últimas 100 por jogo), em Opções › Sessões nos detalhes.
+- Bateria dos controles sem fio no canto superior e na Central, com aviso quando fica fraca.
+- Se o controle desconecta, o Tako avisa e não perde o lugar; ao reconectar, a navegação continua de onde parou.
+
+## [0.2.0-alpha.2]
+### Novidades
 - Abrir o Tako de novo traz a janela que já está aberta para a frente. Durante o jogo, abre a Central por cima do jogo.
 - O atalho de teclado da Central volta a ser escolhido apertando as teclas, como antes.
 - Ao adicionar um `.exe` no Windows, o nome do jogo vem do nome do produto gravado no arquivo, e não mais do nome do arquivo.

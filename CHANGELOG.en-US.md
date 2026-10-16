@@ -4,6 +4,14 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 ### What's new
+- Play status for each game: Playing, Beaten, Paused, Abandoned or Wishlist. Set it from the card menu or from Options in the details; it shows in the details header and has its own filter.
+- Broken games: Tako checks added games whose file or folder is gone. The "Broken only" filter lists them all, and playing one offers Edit or Remove.
+- Session history: every time a game runs, the date, time and length are kept (the last 100 per game), under Options › Sessions in the details.
+- Battery of wireless controllers in the top corner and the Control Center, with a warning when it runs low.
+- When the controller disconnects, Tako tells you and keeps your place; once it reconnects, navigation picks up where you left off.
+
+## [0.2.0-alpha.2]
+### What's new
 - Opening Tako again brings the window that is already open to the front. During a game, it opens the Control Center over the game.
 - The Control Center keyboard shortcut is picked by pressing the keys again, as before.
 - When adding an `.exe` on Windows, the game's name comes from the product name stored in the file instead of the file name.
