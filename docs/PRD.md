@@ -289,6 +289,8 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 - [x] **MIG-042 — Checklists de hardware** por SO, em `docs/testing/`.
 - [ ] **MIG-043 — Corte.** Remover a solução C#/WPF do repositório e do CI. Changelog da primeira release Rust com o que saiu (§3) e o que mudou (temas do Playnite). Aceite: MIG-010 a MIG-042 concluídos e uma beta Rust testada nos três SOs. _Estado: aguarda a beta Rust testada nos três SOs._
 
+Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias.md); entram aqui quando forem para o plano.
+
 ### Épico CMI — Integração com o Console Mode (BACKLOG, P1, depende do Console Mode)
 
 - [ ] **CMI-001 — API local no Console Mode** (no repositório dele): descoberta, versão, capacidades e comandos (TV, sobreposições, sessão de console). Contrato definido no ADR-0025.

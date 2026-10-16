@@ -51,6 +51,8 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 - **UX-002** Arte animada, **UX-004** Perfis locais.
 - **THEME-001 a 005**, **PERF-001/002**.
 
+- Catálogo de ideias em `docs/backlog/ideias.md` (IDEA-*): COULD até o mantenedor priorizar.
+
 ## WON'T (agora)
 
 - **PLAT-004/005** Assinatura no macOS e no Windows, e winget: precisam das contas e certificados do mantenedor.
