@@ -14,8 +14,15 @@ chrono.workspace = true
 tracing.workspace = true
 rusqlite.workspace = true
 regex.workspace = true
-sha2.workspace = true
 plist.workspace = true
+thiserror.workspace = true
+roxmltree.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-registry.workspace = true
+windows.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

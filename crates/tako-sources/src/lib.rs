@@ -7,7 +7,54 @@
 
 use tako_core::library::{Game, GameStore};
 
+pub mod amazon;
+pub mod battlenet;
+pub mod ea;
+pub mod epic;
+pub mod fs;
+pub mod gog;
+pub mod install_dates;
+pub mod playnite;
 pub mod registry;
+#[cfg(windows)]
+pub mod registry_windows;
+pub mod report;
+pub mod steam;
+pub mod text;
+pub mod ubisoft;
+pub mod uninstall;
+pub mod windows_path;
+pub mod xbox;
+
+/// Steam: em todos os SOs (raiz achada por [`steam::find_root`]).
+pub fn steam_source() -> Box<dyn LibrarySource> {
+    Box::new(steam::SteamLibrarySource::new(steam::find_root()))
+}
+
+/// Lojas só do Windows, na ordem da barra lateral (a Steam vem de [`steam_source`]).
+#[cfg(windows)]
+pub fn windows_sources(
+    registry: std::sync::Arc<dyn registry::RegistryReader>,
+) -> Vec<Box<dyn LibrarySource>> {
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
+    let (program_data, local_app_data) = (env("ProgramData"), env("LOCALAPPDATA"));
+    let r = || registry.clone();
+    vec![
+        Box::new(epic::EpicLibrarySource::new(r(), &program_data)),
+        Box::new(gog::GogLibrarySource::new(r())),
+        Box::new(xbox::XboxLibrarySource::new(Box::new(
+            xbox::windows::WindowsXboxSystem::new(r()),
+        ))),
+        Box::new(ubisoft::UbisoftLibrarySource::new(r())),
+        Box::new(ea::EaLibrarySource::new(r())),
+        Box::new(battlenet::BattleNetLibrarySource::new(
+            r(),
+            &program_data,
+            Some(env("ProgramFiles(x86)")),
+        )),
+        Box::new(amazon::AmazonLibrarySource::new(r(), &local_app_data)),
+    ]
+}
 
 // Linux e macOS (MIG-026/027): parsers puros, só a descoberta de pastas tem cfg.
 pub mod desktop_entries;
@@ -79,4 +126,10 @@ pub fn file_uri(path: &std::path::Path) -> String {
         }
     }
     out
+}
+
+/// Texto de um arquivo de loja: UTF-8 sem o BOM (como o `File.ReadAllText` do C#), bytes inválidos trocados.
+pub fn text_of(bytes: &[u8]) -> String {
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    String::from_utf8_lossy(bytes).into_owned()
 }

@@ -4733,13 +4733,18 @@ dependencies = [
  "chrono",
  "plist",
  "regex",
+ "roxmltree",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "tako-core",
  "tempfile",
+ "thiserror 2.0.21",
  "tracing",
+ "uuid",
+ "windows",
+ "windows-registry",
 ]
 
 [[package]]
