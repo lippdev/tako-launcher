@@ -39,6 +39,8 @@ pub enum UiMsg {
 pub enum SupMsg {
     /// O jogo em segundo plano terminou (a interface estava aberta).
     GameEnded { game_id: String, played_secs: u64 },
+    /// Alguém abriu o Tako de novo: trazer a janela para a frente.
+    Activate,
 }
 
 pub fn write<T: Serialize>(out: &mut impl Write, msg: &T) -> std::io::Result<()> {
