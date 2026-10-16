@@ -29,6 +29,7 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 - **SRC-003** Cliente de loja ausente: oferecer abrir ou instalar, além do aviso.
 - Atalho de teclado da Central durante o jogo no Linux (X11) e no macOS.
 - **SRC-004** Jogos não Steam adicionados à Steam.
+- **PLAT-007** Integração com o AnyFSE (Tako como app inicial do Xbox mode pelo projeto da comunidade). O WPF publicava um kit de experimento para o mesmo fim (`Tako-FseKit`), que o Rust não tem.
 - **PLAT-002** Pacotes AUR e Flatpak.
 - Testes de interface das telas principais (§8.4).
 

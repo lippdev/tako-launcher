@@ -304,6 +304,7 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 - [ ] **PLAT-004 (macOS):** assinatura Developer ID e notarização.
 - [ ] **PLAT-005 (Windows):** assinatura de código (SignPath) e winget.
 - [ ] **PLAT-006:** abrir com o sistema e iniciar direto em tela cheia, em cada SO.
+- [ ] **PLAT-007 (Windows):** integração com o [AnyFSE](https://github.com/ashpynov/AnyFSE), projeto da comunidade que põe um launcher de terceiros como app inicial do Xbox mode (tela cheia de jogos do Windows 11), enquanto o caminho oficial (PLAT-003) depende da Microsoft. Escopo: o Tako funciona como alvo do AnyFSE (abre em tela cheia, sem janela de desktop, volta certo de um jogo), o Tako detecta o AnyFSE instalado e ensina a configuração, e um roteiro de teste em `docs/testing/windows.md`. O AnyFSE pede Modo de Desenvolvedor (ver `docs/spikes/MVP-007-fse.md`); o Tako não liga isso sozinho.
 
 ### Épico SRC — Mais fontes (P1)
 
