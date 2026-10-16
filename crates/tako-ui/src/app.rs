@@ -164,6 +164,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         safe_mode: false,
         scanning: false,
         grid_columns: 7,
+        pointer: false,
         pending_layer: None,
         open_details: None,
         leave_details: false,
@@ -725,6 +726,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     let color = |c: tako_core::presentation::color::Rgb| slint::Color::from_rgb_u8(c.r, c.g, c.b);
     bridge::set_global(ui, "Ui", "accent", color(palette.accent).to_value());
     bridge::set_global(ui, "Ui", "accent-deep", color(palette.deep).to_value());
+    bridge::set_global(ui, "Ui", "pointer", s.ctx.pointer.to_value());
     bridge::set_global(
         ui,
         "Ui",
