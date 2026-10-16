@@ -31,6 +31,10 @@ colors:
   store-epic: "#2A2A2A"
   store-gog: "#7A3FD1"
   store-xbox: "#107C10"
+  store-ubisoft: "#2E3192"
+  store-ea: "#D9302B"
+  store-battlenet: "#0B74DE"
+  store-amazon: "#B35C00"
   store-manual: "#3D5A80"
 
 typography:

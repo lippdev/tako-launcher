@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exemplo fictício no formato do EA app (DiPManifest 4.0); nenhum dado real. -->
+<DiPManifest version="4.0">
+  <buildMetaData>
+    <featureFlags autoUpdateEnabled="1" />
+  </buildMetaData>
+  <contentIDs>
+    <contentID>1077777</contentID>
+    <contentID>1077778</contentID>
+  </contentIDs>
+  <gameTitles>
+    <gameTitle locale="en_US">Starfall Arena</gameTitle>
+    <gameTitle locale="pt_BR">Arena Estelar</gameTitle>
+  </gameTitles>
+  <runtime>
+    <launcher>
+      <filePath>[HKEY_LOCAL_MACHINE\SOFTWARE\EA Games\Arena Estelar\Install Dir]arena.exe</filePath>
+    </launcher>
+  </runtime>
+</DiPManifest>

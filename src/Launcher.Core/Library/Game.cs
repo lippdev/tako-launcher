@@ -6,6 +6,10 @@ public enum GameStore
     Epic,
     Gog,
     Xbox,
+    Ubisoft,
+    Ea,
+    BattleNet,
+    Amazon,
     Manual,
 }
 

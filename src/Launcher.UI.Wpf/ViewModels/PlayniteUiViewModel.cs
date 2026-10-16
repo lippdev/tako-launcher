@@ -116,6 +116,10 @@ public sealed class PlayniteUiViewModel : IP10Host, IDisposable
         GameStore.Epic => "Epic",
         GameStore.Gog => "GOG",
         GameStore.Xbox => "Xbox",
+        GameStore.Ubisoft => "Ubisoft Connect",
+        GameStore.Ea => "EA app",
+        GameStore.BattleNet => "Battle.net",
+        GameStore.Amazon => "Amazon Games",
         _ => "Playnite",
     };
 

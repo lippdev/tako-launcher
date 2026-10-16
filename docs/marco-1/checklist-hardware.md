@@ -502,6 +502,31 @@ escala do Windows em 100% e em 150–200%. Um jogo com arte clara em foco ajuda 
 | MC4 | Tela desconectada | Desligar a TV escolhida e abrir o Modo Console | Cartão Tela de jogo "Com problema" dizendo que a tela não está conectada |
 | MC5 | Contador de FPS | Modo Console › Contador de FPS com o controle e depois com teclado e mouse | Com o controle "Mostrar FPS" e "Remover a permissão" ficam esmaecidas e explicam; com teclado e mouse pedem o UAC (seção 14) |
 
+## 25. Ubisoft Connect, EA app, Battle.net, Amazon Games e Playnite ([ADR-0019](../adr/0019-fontes-de-biblioteca.md))
+
+Precisa de contas reais com **um jogo instalado em cada cliente**. Os jogos são lidos com os clientes **fechados**;
+abrir passa sempre pelo cliente oficial (login e DRM ficam com ele). Anote em "Observações" o jogo usado em cada linha.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| UB1 | Jogos da Ubisoft | Ubisoft Connect com 1+ jogo instalado (de preferência um em outro disco), cliente fechado; abrir o Tako | O jogo aparece em "Ubisoft Connect" com o nome certo (não o da pasta, quando há chave de desinstalação) |
+| UB2 | Abrir pela Ubisoft | Jogar o jogo | "Abrindo … pela Ubisoft Connect"; o cliente abre (login), o jogo inicia; o Tako reconhece o jogo rodando e o fim ao fechar |
+| EA1 | Jogos do EA app | EA app com 1+ jogo instalado, EA app fechado | O jogo aparece em "EA app" com o nome em português ou inglês |
+| EA2 | Abrir pelo EA app | Jogar o jogo | "Abrindo … pelo EA app"; o EA app abre e inicia **este** jogo (anotar se `origin2://` com o id de conteúdo funcionou ou se só abriu o EA app) |
+| EA3 | Só o Origin | PC com o Origin antigo e sem o EA app (se houver como reproduzir) | Configurações › EA app: "Só o Origin está instalado e ele não abre mais os jogos: instale o EA app"; Jogar mostra o mesmo aviso |
+| BN1 | Jogos do Battle.net | Battle.net com 1+ jogo (ex.: Overwatch 2, Hearthstone, Diablo IV), Battle.net fechado | O jogo aparece em "Battle.net" com o nome da tabela |
+| BN2 | Abrir pelo Battle.net | Jogar o jogo | "Abrindo … pelo Battle.net"; o Battle.net abre e inicia o jogo (`--exec="launch <código>"`); fim da sessão reconhecido |
+| BN3 | Jogo fora da tabela | Um jogo do Battle.net que o Tako não conhece (ex.: WoW Classic, se instalado) | Aparece com o nome do Windows ou da pasta; Jogar abre o Battle.net para escolher |
+| AM1 | Jogos do Amazon Games | Amazon Games com 1+ jogo (ex.: do Prime Gaming) instalado, cliente fechado | O jogo aparece em "Amazon Games" |
+| AM2 | Abrir pela Amazon | Jogar o jogo | "Abrindo … pela Amazon Games"; o cliente abre e o jogo inicia; fim da sessão reconhecido |
+| CL1 | Cliente ausente | Desinstalar um dos clientes deixando o jogo (ou testar num PC sem ele) | Configurações › Biblioteca e lojas: "<cliente> não encontrado: instale-o para abrir estes jogos"; Jogar mostra o aviso com o nome do jogo; nada trava |
+| CL2 | Desligar lojas | Configurações › Biblioteca e lojas: A em cada uma das quatro lojas e de novo | Os jogos somem e voltam; favoritos e tempo continuam; tudo só com o controle |
+| PN1 | Importar do Playnite | Playnite com biblioteca real (lojas + jogos adicionados à mão + categorias + 1 ROM), Playnite **fechado**; Configurações › Importar do Playnite | Diálogo de consentimento com a pasta; "Ler biblioteca" mostra a prévia (novos, já no Tako, coleções, ignorados) |
+| PN2 | Confirmar | "Importar" na prévia | Jogos adicionados à mão entram em "Adicionados" e abrem; jogos de loja **não** duplicam; tempo, favoritos e coleções aparecem; a ROM entra com o sistema |
+| PN3 | Nada muda no Playnite | Comparar data/tamanho dos arquivos de `%APPDATA%\Playnite\library` antes/depois e abrir o Playnite | Arquivos iguais; o Playnite abre normalmente |
+| PN4 | Importar de novo | Repetir PN1–PN2 | Prévia diz que os jogos já estão no Tako; nada duplica |
+| PN5 | Playnite aberto | Repetir com o Playnite aberto | Lê normalmente ou pede "feche o Playnite e tente de novo"; nunca trava |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.

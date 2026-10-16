@@ -25,6 +25,12 @@ public interface IGameLibrary
 
     void RemoveManual(string id);
 
+    /// <summary>
+    /// Importação em lote (STORE-009): adiciona os jogos e muda o estado (favorito, tempo, última vez) dos indicados,
+    /// gravando tudo de uma vez. Jogo já adicionado com o mesmo id é ignorado.
+    /// </summary>
+    void Import(IReadOnlyList<ManualGameRecord> added, IReadOnlyDictionary<string, Func<GameStateRecord?, GameStateRecord>> state);
+
     /// <summary>Procura jogos instalados de novo.</summary>
     void Refresh();
 }

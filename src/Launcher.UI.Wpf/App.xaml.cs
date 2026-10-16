@@ -10,6 +10,9 @@ using ConsoleMode.Runtime.Windows;
 using ConsoleMode.Runtime.Windows.SessionTools;
 using Launcher.Core.Diagnostics;
 using Launcher.Core.Library;
+using Launcher.Core.Library.Amazon;
+using Launcher.Core.Library.BattleNet;
+using Launcher.Core.Library.Ea;
 using Launcher.Core.Library.Epic;
 using Launcher.Core.Library.Gog;
 using Launcher.Core.Library.Metadata;
@@ -17,6 +20,7 @@ using Launcher.Core.Library.Metadata.Igdb;
 using Launcher.Core.Library.Metadata.ScreenScraper;
 using Launcher.Core.Library.Sources;
 using Launcher.Core.Library.Steam;
+using Launcher.Core.Library.Ubisoft;
 using Launcher.Core.Library.Xbox;
 using Launcher.Core.Persistence;
 using Launcher.Core.Resilience;
@@ -195,7 +199,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Lojas da biblioteca (ADR-0019): Steam, Epic, GOG e Xbox, lidas do disco e do registro sem os clientes abertos; as
+    /// Lojas da biblioteca (ADR-0019): Steam, Epic, GOG, Xbox, Ubisoft Connect, EA app, Battle.net e Amazon Games, lidas
+    /// do disco e do registro sem os clientes abertos; as
     /// desligadas nas Configurações ficam de fora.
     /// </summary>
     private static LibrarySources CreateLibrarySources(IServiceProvider services)
@@ -204,12 +209,17 @@ public partial class App : Application
         services.GetRequiredService<SteamArtResolver>().SteamRoot = steamRoot;
         var registry = services.GetRequiredService<IRegistryReader>();
         var logger = services.GetRequiredService<ILogger<App>>();
+        string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         return new LibrarySources(
             [
                 new SteamLibrarySource(steamRoot),
-                new EpicLibrarySource(registry, Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)),
+                new EpicLibrarySource(registry, programData),
                 new GogLibrarySource(registry),
                 new XboxLibrarySource(services.GetRequiredService<IXboxSystem>()),
+                new UbisoftLibrarySource(registry),
+                new EaLibrarySource(registry),
+                new BattleNetLibrarySource(registry, programData, programFilesX86: Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)),
+                new AmazonLibrarySource(registry, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)),
             ],
             services.GetRequiredService<SettingsService>().IsStoreEnabled,
             (store, ex) => LogStoreScanFailed(logger, ex, store));

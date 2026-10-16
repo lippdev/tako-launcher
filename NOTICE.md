@@ -94,6 +94,41 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## LiteDB e Playnite (importação da biblioteca do Playnite e tabela do Battle.net)
+
+A leitura, só de leitura, dos arquivos do LiteDB 4 que o Playnite usa (`src/Launcher.Core/Library/Playnite/LiteDbV7Reader.cs`)
+foi adaptada do leitor do formato antigo do LiteDB (<https://github.com/mbdavid/LiteDB>,
+`LiteDB/Engine/FileReader/FileReaderV7.cs` e `LiteDB/Document/Bson/BsonReader.cs`), na versão incluída no Playnite
+(<https://github.com/JosefNemec/Playnite>, `source/Playnite/Database/Collections/LiteDBFileReaderV7.cs`). A tabela de
+jogos do Battle.net (`src/Launcher.Core/Library/BattleNet/BattleNetProducts.cs`) e os ids dos plugins de biblioteca
+foram adaptados das extensões oficiais do Playnite (<https://github.com/JosefNemec/PlayniteExtensions>,
+`source/Libraries/BattleNetLibrary/Models/BattleNetGames.cs`). O Tako não inclui o LiteDB como pacote.
+
+```
+MIT License
+
+Copyright (c) 2014-2022 Mauricio David (LiteDB)
+Copyright (c) 2020 Josef Nemec (Playnite e PlayniteExtensions)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## Serviços de dados de jogos
 
 O Tako não distribui dados nem imagens de jogos: eles são baixados em tempo de execução para o cache local do usuário.
