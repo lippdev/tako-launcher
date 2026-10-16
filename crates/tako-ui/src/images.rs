@@ -20,30 +20,66 @@ struct Request {
     max_h: u32,
 }
 
+/// Teto do LRU. Cabe a home inteira (capas de 300x450 ≈ 0,5 MB, fundo ≈ 5–8 MB) com folga para voltar
+/// rápido; o que está na tela nunca sai (ver `Lru::evict`), então o teto vale para o que está fora dela.
+const LIMIT: usize = 48 * 1024 * 1024;
+
 struct Lru {
-    map: HashMap<String, (Image, usize)>,
+    /// Imagem, bytes e o último quadro (`frame`) em que foi pedida.
+    map: HashMap<String, (Image, usize, u64)>,
     order: VecDeque<String>,
     bytes: usize,
     limit: usize,
+    frame: u64,
 }
 
 impl Lru {
-    fn touch(&mut self, key: &str) {
+    fn new(limit: usize) -> Lru {
+        Lru {
+            map: HashMap::new(),
+            order: VecDeque::new(),
+            bytes: 0,
+            limit,
+            frame: 0,
+        }
+    }
+    fn get(&mut self, key: &str) -> Option<Image> {
+        let frame = self.frame;
+        let (img, _, seen) = self.map.get_mut(key)?;
+        *seen = frame;
+        let img = img.clone();
         if let Some(pos) = self.order.iter().position(|k| k == key)
             && let Some(k) = self.order.remove(pos)
         {
             self.order.push_back(k);
         }
+        Some(img)
     }
     fn insert(&mut self, key: String, img: Image, bytes: usize) {
         self.bytes += bytes;
         self.order.push_back(key.clone());
-        self.map.insert(key, (img, bytes));
-        while self.bytes > self.limit && self.order.len() > 1 {
-            let Some(old) = self.order.pop_front() else {
+        self.map.insert(key, (img, bytes, self.frame));
+        // Entre quadros: o que o último quadro mostrou continua protegido.
+        self.evict(self.frame.saturating_sub(1));
+    }
+    /// Fim de um quadro: só o que ele pediu fica protegido.
+    fn frame_done(&mut self) {
+        self.evict(self.frame);
+        self.frame += 1;
+    }
+    /// Tira as mais antigas até caber no teto, mas nunca as pedidas desde o quadro `keep_from`: se a tela
+    /// mostra mais do que o teto, tirar uma delas só faria pedir de novo e decodificar em loop.
+    fn evict(&mut self, keep_from: u64) {
+        while self.bytes > self.limit {
+            let Some(old) = self.order.front() else {
                 break;
             };
-            if let Some((_, b)) = self.map.remove(&old) {
+            if self.map.get(old).is_some_and(|e| e.2 >= keep_from) {
+                break;
+            }
+            if let Some(old) = self.order.pop_front()
+                && let Some((_, b, _)) = self.map.remove(&old)
+            {
                 self.bytes -= b;
             }
         }
@@ -60,7 +96,7 @@ struct State {
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State {
-        lru: Lru { map: HashMap::new(), order: VecDeque::new(), bytes: 0, limit: 160 * 1024 * 1024 },
+        lru: Lru::new(LIMIT),
         pending: HashSet::new(),
         failed: HashSet::new(),
         tx: None,
@@ -95,9 +131,7 @@ pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
     let key = format!("{max_w}x{max_h}|{uri}");
     STATE.with(|s| {
         let mut s = s.borrow_mut();
-        if let Some((img, _)) = s.lru.map.get(&key) {
-            let img = img.clone();
-            s.lru.touch(&key);
+        if let Some(img) = s.lru.get(&key) {
             return Some(img);
         }
         if s.pending.contains(&key) || s.failed.contains(&key) {
@@ -116,6 +150,11 @@ pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
         }
         None
     })
+}
+
+/// Chamar depois de montar cada quadro (todas as `get` da tela já feitas).
+pub fn frame_done() {
+    STATE.with(|s| s.borrow_mut().lru.frame_done());
 }
 
 /// Esquece falhas (ex.: depois de baixar novas artes).
@@ -262,16 +301,26 @@ mod tests {
     }
 
     #[test]
-    fn lru_evicts_by_bytes() {
-        let mut l = Lru {
-            map: HashMap::new(),
-            order: VecDeque::new(),
-            bytes: 0,
-            limit: 10,
-        };
+    fn lru_evicts_by_bytes_but_keeps_what_is_on_screen() {
+        let mut l = Lru::new(10);
         l.insert("a".into(), Image::default(), 6);
+        l.frame_done();
+        // "a" estava no último quadro: continua até um quadro terminar sem ela.
         l.insert("b".into(), Image::default(), 6);
+        assert!(l.map.contains_key("a"));
+        assert!(l.get("b").is_some());
+        l.frame_done();
         assert!(!l.map.contains_key("a"));
         assert_eq!(l.bytes, 6);
+        // A tela pede mais que o teto: nada do quadro sai.
+        assert!(l.get("b").is_some());
+        l.insert("c".into(), Image::default(), 6);
+        assert!(l.get("c").is_some());
+        l.frame_done();
+        assert_eq!(l.bytes, 12);
+        // Fora da tela de novo: volta ao teto.
+        assert!(l.get("c").is_some());
+        l.frame_done();
+        assert_eq!((l.map.contains_key("b"), l.bytes), (false, 6));
     }
 }
