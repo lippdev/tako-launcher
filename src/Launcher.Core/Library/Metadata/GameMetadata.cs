@@ -159,6 +159,9 @@ public static class GameMedia
 
     /// <summary>Vídeo de apresentação: só o endereço; baixado sob demanda.</summary>
     public const string Video = "video";
+
+    /// <summary>Ícone quadrado do jogo (SteamGridDB, Steam).</summary>
+    public const string Icon = "icon";
 }
 
 /// <summary>Resultado de busca de um provedor; <see cref="Source"/> diz de onde veio ("Corrigir correspondência" mostra).</summary>
@@ -172,6 +175,9 @@ public sealed record MetadataMatch(string Source, string Id, string Title)
 
     /// <summary>Casado por identificador (appid, id da GOG...), sem ambiguidade: dispensa a comparação de nomes.</summary>
     public bool IsExact { get; init; }
+
+    /// <summary>Miniatura da capa, quando a busca já a traz (mostrada na escolha do candidato).</summary>
+    public Uri? CoverUrl { get; init; }
 
     public int? SteamAppId => Source == SteamStoreProvider.SourceName && int.TryParse(Id, NumberStyles.None, CultureInfo.InvariantCulture, out int id) ? id : null;
 
@@ -220,6 +226,22 @@ public interface IMetadataProvider
 public interface IPausableMetadataProvider : IMetadataProvider
 {
     bool IsPaused { get; }
+}
+
+/// <summary>
+/// Provedor que só completa artes (SteamGridDB, ADR-0023): fica fora de "Corrigir correspondência" automática e só é
+/// consultado para jogos que as outras fontes deixaram sem capa, e só com <see cref="AutoFill"/> ligado.
+/// </summary>
+public interface IArtFallbackProvider : IMetadataProvider
+{
+    /// <summary>"Usar quando faltar capa" ligado.</summary>
+    bool AutoFill { get; }
+}
+
+/// <summary>Fonte que aceita o nome do jogo na URL (IGDB: <c>igdb.com/games/hades</c>) e devolve o id.</summary>
+public interface ISlugResolver
+{
+    Task<string?> IdFromSlugAsync(string slug, CancellationToken cancellationToken);
 }
 
 /// <summary>Provedor que consegue adiantar muitos jogos de uma vez (consulta em lote) antes da atualização jogo a jogo.</summary>

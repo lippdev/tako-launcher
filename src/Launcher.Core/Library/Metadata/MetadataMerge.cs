@@ -78,6 +78,9 @@ public static class MetadataPriority
     /// <summary>Provedor de ROMs (ADR-0022): casa pelo hash da ROM e traz a mídia de emulação.</summary>
     public const string ScreenScraper = "ScreenScraper";
 
+    /// <summary>Artes da comunidade (ADR-0023): só completa a capa e o fundo de quem ficou sem, quando o usuário liga.</summary>
+    public const string SteamGridDb = "SteamGridDB";
+
     public static MetadataKind KindOf(Game game)
     {
         ArgumentNullException.ThrowIfNull(game);
@@ -95,9 +98,9 @@ public static class MetadataPriority
     /// <summary>Ordem geral das fontes para o tipo de jogo.</summary>
     public static IReadOnlyList<string> Order(MetadataKind kind) => kind switch
     {
-        MetadataKind.Steam => [SteamStoreProvider.SourceName, Igdb, ScreenScraper],
-        MetadataKind.Emulated => [ScreenScraper, Igdb, SteamStoreProvider.SourceName],
-        _ => [Igdb, SteamStoreProvider.SourceName, ScreenScraper],
+        MetadataKind.Steam => [SteamStoreProvider.SourceName, Igdb, ScreenScraper, SteamGridDb],
+        MetadataKind.Emulated => [ScreenScraper, Igdb, SteamStoreProvider.SourceName, SteamGridDb],
+        _ => [Igdb, SteamStoreProvider.SourceName, ScreenScraper, SteamGridDb],
     };
 
     /// <summary>
@@ -106,7 +109,7 @@ public static class MetadataPriority
     /// </summary>
     public static IReadOnlyList<string> Order(MetadataKind kind, MetadataField field) => (kind, field) switch
     {
-        (MetadataKind.Pc, MetadataField.Art) => [SteamStoreProvider.SourceName, Igdb, ScreenScraper],
+        (MetadataKind.Pc, MetadataField.Art) => [SteamStoreProvider.SourceName, Igdb, ScreenScraper, SteamGridDb],
         _ => Order(kind),
     };
 

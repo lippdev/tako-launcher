@@ -73,6 +73,22 @@ public static class SchemaMigrator
         new(5, """
             ALTER TABLE manual_games ADD COLUMN platform TEXT;
             """),
+        // Escolhas do usuário por jogo (ADR-0023): imagem fixada por tipo (capa, fundo, logo, ícone) e id fixado por
+        // fonte ("Fontes e IDs"; id vazio = "nenhum"). O agente de metadados nunca troca o que está aqui.
+        new(6, """
+            CREATE TABLE IF NOT EXISTS game_art (
+                game_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                url TEXT NOT NULL,
+                PRIMARY KEY (game_id, kind)
+            );
+            CREATE TABLE IF NOT EXISTS game_source_ids (
+                game_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                PRIMARY KEY (game_id, source)
+            );
+            """),
     ];
 
     public static int LatestVersion => Migrations[^1].Version;

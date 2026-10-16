@@ -130,8 +130,81 @@ public static class ScreenScraperParser
         {
             Year = ReleaseDate(jeu)?.Year ?? Year(jeu),
             Platforms = platform,
+            CoverUrl = Media(jeu).GetValueOrDefault(GameMedia.Box2D),
         };
     }
+
+    // Tipo de mídia do ScreenScraper → tipo de imagem do seletor e o rótulo (ADR-0023).
+    private static readonly (string Type, Art.ArtKind Kind, string Label)[] PickerTypes =
+    [
+        ("box-2D", Art.ArtKind.Cover, "Caixa 2D"),
+        ("box-3D", Art.ArtKind.Cover, "Caixa 3D"),
+        ("fanart", Art.ArtKind.Hero, "Fanart"),
+        ("ss", Art.ArtKind.Hero, "Captura"),
+        ("sstitle", Art.ArtKind.Hero, "Tela de título"),
+        ("wheel-hd", Art.ArtKind.Logo, "Logo (HD)"),
+        ("wheel", Art.ArtKind.Logo, "Logo"),
+    ];
+
+    /// <summary>
+    /// Todas as mídias do jogo para o seletor de imagens, uma por tipo e região ("Caixa 2D · EUA"), na ordem das regiões
+    /// preferidas, sem credenciais na URL.
+    /// </summary>
+    public static IReadOnlyList<Art.ArtCandidate> MediaCandidates(JsonElement jeu)
+    {
+        var items = Array(jeu, "medias")
+            .Select(m => (Type: Text(m, "type"), Region: Text(m, "region"), Url: ScreenScraperMedia.FromResponse(Text(m, "url"))))
+            .Where(m => m.Type is not null && m.Url is not null)
+            .ToList();
+        var result = new List<Art.ArtCandidate>();
+        foreach (var (type, kind, label) in PickerTypes)
+        {
+            var ofType = items.Where(m => string.Equals(m.Type, type, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(m => RegionRank(m.Region));
+            foreach (var item in ofType)
+            {
+                if (!result.Exists(r => r.Url == item.Url))
+                {
+                    result.Add(new Art.ArtCandidate(MetadataPriority.ScreenScraper, kind, item.Url!) { Label = item.Region is { } region ? $"{label} · {RegionName(region)}" : label });
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static int RegionRank(string? region)
+    {
+        for (int i = 0; i < MediaRegions.Count; i++)
+        {
+            if (string.Equals(MediaRegions[i], region, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return MediaRegions.Count;
+    }
+
+    /// <summary>Nome da região para a tela.</summary>
+    public static string RegionName(string region) => region.ToLowerInvariant() switch
+    {
+        "br" => "Brasil",
+        "pt" => "Portugal",
+        "us" => "EUA",
+        "wor" => "Mundo",
+        "eu" => "Europa",
+        "jp" => "Japão",
+        "ss" => "ScreenScraper",
+        "fr" => "França",
+        "de" => "Alemanha",
+        "uk" => "Reino Unido",
+        "kr" => "Coreia",
+        "cn" => "China",
+        "asi" => "Ásia",
+        "au" => "Austrália",
+        _ => region.ToUpperInvariant(),
+    };
 
     /// <summary>Nome pela região preferida (<see cref="NameRegions"/>); senão, o primeiro.</summary>
     public static string? Title(JsonElement jeu)

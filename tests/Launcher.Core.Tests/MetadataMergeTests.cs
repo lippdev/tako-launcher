@@ -98,8 +98,8 @@ public sealed class MetadataMergeTests
         Assert.Equal(["Plataforma"], merged.Genres);
         Assert.Equal(rom.CoverUrl, merged.CoverUrl);
         Assert.Equal("Estúdio Farol", merged.Publisher);
-        Assert.Equal(["Steam", "IGDB", "ScreenScraper"], MetadataPriority.Order(MetadataKind.Steam));
-        Assert.Equal(["IGDB", "Steam", "ScreenScraper"], MetadataPriority.Order(MetadataKind.Pc));
+        Assert.Equal(["Steam", "IGDB", "ScreenScraper", "SteamGridDB"], MetadataPriority.Order(MetadataKind.Steam));
+        Assert.Equal(["IGDB", "Steam", "ScreenScraper", "SteamGridDB"], MetadataPriority.Order(MetadataKind.Pc));
     }
 
     [Fact]
@@ -200,25 +200,20 @@ public sealed class MetadataMergeTests
     }
 
     [Fact]
-    public async Task Pinning_an_igdb_result_brings_the_steam_data_and_is_kept_on_refresh()
+    public async Task Legacy_pinned_match_is_kept_on_refresh()
     {
         var steam = new FakeProvider("Steam", SteamPart, exactKey: "Steam") { SearchResults = [MetadataMatch.Steam("Errado", 1)] };
         var igdb = new FakeProvider("IGDB", IgdbPart);
         var time = new FixedTimeProvider(Now);
         var agent = new MetadataAgent([steam, igdb], time);
         var game = Game(GameStore.Manual, title: "lanterna.exe");
-
-        var pinned = await agent.PinAsync(game, new MetadataMatch("IGDB", "900001", "Lanterna Distante"), TestContext.Current.CancellationToken);
-
-        Assert.True(pinned!.IsPinned);
-        Assert.Equal("900001", pinned.IdIn("IGDB"));
-        Assert.Equal(4000001, pinned.SteamAppId);
-        Assert.Equal(0, steam.Searches);
+        var pinned = MetadataMerge.Combine([IgdbPart], MetadataKind.Pc, Now, ["IGDB"]) with { IsPinned = true };
 
         time.Now += TimeSpan.FromDays(40);
         var refreshed = (await agent.UpdateAsync(game, pinned, false, TestContext.Current.CancellationToken)).Metadata!;
         Assert.True(refreshed.IsPinned);
         Assert.Equal("900001", refreshed.IdIn("IGDB"));
+        Assert.Equal(4000001, refreshed.SteamAppId);
         Assert.Equal(0, steam.Searches + igdb.Searches); // fixado: sem busca por nome
     }
 

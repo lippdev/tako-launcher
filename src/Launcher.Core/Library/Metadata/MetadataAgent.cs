@@ -38,12 +38,59 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         _ => cached,
     };
 
-    /// <summary>Precisa consultar: sem cache, cache velho ou uma fonte ligada que ainda não foi consultada.</summary>
-    public bool NeedsUpdate(Game game, GameMetadata? cached, bool force = false)
+    /// <summary>
+    /// Precisa consultar: sem cache, cache velho, uma fonte ligada que ainda não foi consultada ou um id fixado pelo
+    /// usuário ("Fontes e IDs", ADR-0023) diferente do que está no cache.
+    /// </summary>
+    public bool NeedsUpdate(Game game, GameMetadata? cached, bool force = false, IReadOnlyDictionary<string, string>? pinned = null)
     {
         ArgumentNullException.ThrowIfNull(game);
         cached = Normalize(cached);
-        return force || cached is null || IsStale(cached) || For(MetadataPriority.KindOf(game)).Any(p => !IsPaused(p) && !cached.Consulted.Contains(p.Name));
+        var sources = For(MetadataPriority.KindOf(game));
+        return force || cached is null || IsStale(cached)
+            || sources.Any(p => !IsPaused(p) && !cached.Consulted.Contains(p.Name))
+            || PinChanged(cached, pinned, sources);
+    }
+
+    /// <summary>Fontes ligadas que atendem o jogo (as de "Fontes e IDs"), na ordem do tipo; inclui as que só completam artes.</summary>
+    public IReadOnlyList<IMetadataProvider> Sources(Game game)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        var kind = MetadataPriority.KindOf(game);
+        return MetadataPriority.Sort(Enabled.Where(p => MetadataPriority.Applies(p.Name, kind)), p => p.Name, MetadataPriority.Order(kind));
+    }
+
+    /// <summary>Busca o termo numa fonte só ("Fontes e IDs"); sem resultados, tenta o termo limpo.</summary>
+    public async Task<IReadOnlyList<MetadataMatch>> SearchSourceAsync(Game game, string source, string term, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        if (Sources(game).FirstOrDefault(p => p.Name == source) is not { } provider || IsPaused(provider) || string.IsNullOrWhiteSpace(term))
+        {
+            return [];
+        }
+
+        return await SearchProviderAsync(provider, MetadataLookup.For(game) with { Title = term.Trim() }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Id digitado ou colado → id na fonte (a IGDB resolve o nome da URL) e os dados que ele representa, para mostrar o
+    /// nome antes de aplicar. Nulo quando a fonte não conhece o id.
+    /// </summary>
+    public async Task<(string Id, GameMetadata Metadata)?> ValidateAsync(string source, Art.SourceIdParse input, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        if (!input.IsValid || _providers.FirstOrDefault(p => p.Name == source && p.IsEnabled) is not { } provider)
+        {
+            return null;
+        }
+
+        string? id = input.Id;
+        if (id is null && input.Slug is { } slug && provider is ISlugResolver resolver)
+        {
+            id = await resolver.IdFromSlugAsync(slug, cancellationToken).ConfigureAwait(false);
+        }
+
+        return id is not null && await provider.FetchAsync(id, cancellationToken).ConfigureAwait(false) is { } metadata ? (id, metadata) : null;
     }
 
     /// <summary>Lote antes da rodada: provedores que sabem resolver muitos jogos de uma vez (IGDB).</summary>
@@ -62,28 +109,39 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         }
     }
 
-    public async Task<MetadataUpdate> UpdateAsync(Game game, GameMetadata? cached, bool force, CancellationToken cancellationToken)
+    /// <summary>
+    /// Consulta as fontes que faltam. <paramref name="pinned"/> são os ids que o usuário fixou por fonte ("Fontes e IDs"):
+    /// valem mais que os da loja e os aprendidos, a fonte não é buscada pelo nome e id vazio quer dizer "nenhum" (a
+    /// fonte fica de fora deste jogo).
+    /// </summary>
+    public async Task<MetadataUpdate> UpdateAsync(Game game, GameMetadata? cached, bool force, CancellationToken cancellationToken, IReadOnlyDictionary<string, string>? pinned = null)
     {
         ArgumentNullException.ThrowIfNull(game);
         cached = Normalize(cached);
-        if (!NeedsUpdate(game, cached, force))
+        pinned ??= new Dictionary<string, string>();
+        if (!NeedsUpdate(game, cached, force, pinned))
         {
             return new MetadataUpdate(null, false);
         }
 
-        bool pinned = cached?.IsPinned == true;
-        bool refreshAll = force || cached is null || IsStale(cached);
+        bool legacyPinned = cached?.IsPinned == true;
+        bool refreshAll = force || cached is null || IsStale(cached) || PinChanged(cached, pinned, For(MetadataPriority.KindOf(game)));
         var kind = MetadataPriority.KindOf(game);
         var enabled = For(kind);
         var keep = refreshAll ? [] : cached!.Parts.Where(p => enabled.Any(e => e.Name == p.Source)).ToList();
         var consulted = refreshAll ? [] : cached!.Consulted.Where(name => enabled.Any(e => e.Name == name)).ToList();
         var ids = new Dictionary<string, string>(ExternalGameIds.For(game), StringComparer.Ordinal);
-        if (pinned)
+        if (legacyPinned)
         {
             foreach (var (source, id) in cached!.SourceIds)
             {
                 ids[source] = id; // escolha do usuário vale mais que o appid da loja
             }
+        }
+
+        foreach (var (source, id) in pinned.Where(kv => kv.Value.Length > 0))
+        {
+            ids[source] = id; // id fixado em "Fontes e IDs" vale mais que todos
         }
 
         foreach (var part in keep)
@@ -96,8 +154,17 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         bool queried = false;
         foreach (var provider in enabled.Where(p => !consulted.Contains(p.Name) && !IsPaused(p)))
         {
+            bool none = pinned.TryGetValue(provider.Name, out string? chosen) && chosen.Length == 0;
+            bool hasArt = parts.Exists(p => p.CoverUrl is not null || p.SteamAppId is not null);
+            if (none || (provider is IArtFallbackProvider && hasArt && !pinned.ContainsKey(provider.Name)))
+            {
+                // "Nenhum" escolhido pelo usuário, ou fonte de artes para um jogo que já tem capa: nada a consultar.
+                consulted.Add(provider.Name);
+                continue;
+            }
+
             queried = true;
-            var outcome = await ConsultAsync(provider, game, ids, titleSearch: !pinned, cancellationToken).ConfigureAwait(false);
+            var outcome = await ConsultAsync(provider, game, ids, titleSearch: !legacyPinned && !pinned.ContainsKey(provider.Name), cancellationToken).ConfigureAwait(false);
             if (outcome.Transient || IsPaused(provider))
             {
                 // Limite da API, fora do ar ou provedor pausado durante a consulta (cota do dia do ScreenScraper): fica
@@ -120,7 +187,25 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
 
         // Só parte das fontes consultada agora: o prazo de validade continua o da rodada completa anterior.
         var fetchedAt = refreshAll ? time.GetUtcNow() : cached!.FetchedAt;
-        var combined = MetadataMerge.Combine(parts, kind, fetchedAt, consulted) with { IsPinned = pinned };
+        var combined = MetadataMerge.Combine(parts, kind, fetchedAt, consulted) with { IsPinned = legacyPinned };
+        if (pinned.Count > 0)
+        {
+            var sourceIds = new Dictionary<string, string>(combined.SourceIds, StringComparer.Ordinal);
+            foreach (var (source, id) in pinned)
+            {
+                if (id.Length > 0)
+                {
+                    sourceIds[source] = id;
+                }
+                else
+                {
+                    sourceIds.Remove(source);
+                }
+            }
+
+            combined = combined with { SourceIds = sourceIds };
+        }
+
         return new MetadataUpdate(combined, queried);
     }
 
@@ -130,7 +215,7 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         ArgumentNullException.ThrowIfNull(game);
         var lookup = MetadataLookup.For(game);
         var results = new List<MetadataMatch>();
-        foreach (var provider in For(MetadataPriority.KindOf(game)).Where(p => !IsPaused(p)))
+        foreach (var provider in For(MetadataPriority.KindOf(game)).Where(p => !IsPaused(p) && p is not IArtFallbackProvider))
         {
             results.AddRange(await SearchProviderAsync(provider, lookup, cancellationToken).ConfigureAwait(false));
         }
@@ -138,48 +223,18 @@ public sealed class MetadataAgent(IEnumerable<IMetadataProvider> providers, Time
         return results;
     }
 
-    /// <summary>Correspondência escolhida pelo usuário: os dados dela e, pelos ids que ela traz, os das outras fontes.</summary>
-    public async Task<GameMetadata?> PinAsync(Game game, MetadataMatch match, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(game);
-        ArgumentNullException.ThrowIfNull(match);
-        if (_providers.FirstOrDefault(p => p.Name == match.Source) is not { } chosen
-            || await chosen.FetchAsync(match.Id, cancellationToken).ConfigureAwait(false) is not { } metadata)
-        {
-            return null;
-        }
-
-        var kind = MetadataPriority.KindOf(game);
-        var ids = new Dictionary<string, string>(StringComparer.Ordinal) { [chosen.Name] = match.Id };
-        Learn(ids, metadata);
-        var parts = new List<GameMetadata> { metadata };
-        var consulted = new List<string> { chosen.Name };
-        foreach (var provider in For(kind).Where(p => p != chosen && !IsPaused(p)))
-        {
-            var outcome = await ConsultAsync(provider, game, ids, titleSearch: false, cancellationToken).ConfigureAwait(false);
-            if (!outcome.Transient && !IsPaused(provider))
-            {
-                consulted.Add(provider.Name);
-            }
-
-            if (outcome.Metadata is { } other)
-            {
-                parts.Add(other);
-                Learn(ids, other);
-            }
-        }
-
-        var combined = MetadataMerge.Combine(parts, kind, time.GetUtcNow(), consulted);
-        var pinnedIds = new Dictionary<string, string>(combined.SourceIds, StringComparer.Ordinal) { [chosen.Name] = match.Id };
-        return combined with { IsPinned = true, SourceIds = pinnedIds };
-    }
-
     /// <summary>
     /// Fontes ligadas que atendem o tipo de jogo, na ordem dele. O ScreenScraper só atende ROMs (ADR-0022): consultá-lo
     /// para jogos de PC gastaria a cota diária do usuário sem ganho.
     /// </summary>
     private IReadOnlyList<IMetadataProvider> For(MetadataKind kind) =>
-        MetadataPriority.Sort(Enabled.Where(p => MetadataPriority.Applies(p.Name, kind)), p => p.Name, MetadataPriority.Order(kind));
+        MetadataPriority.Sort(Enabled.Where(p => MetadataPriority.Applies(p.Name, kind) && p is not IArtFallbackProvider { AutoFill: false }), p => p.Name, MetadataPriority.Order(kind));
+
+    /// <summary>Algum id fixado pelo usuário (de uma fonte consultada) difere do cache, ou "nenhum" com dados no cache.</summary>
+    private static bool PinChanged(GameMetadata cached, IReadOnlyDictionary<string, string>? pinned, IReadOnlyList<IMetadataProvider> sources) =>
+        pinned is not null && pinned.Any(kv => sources.Any(p => p.Name == kv.Key && p is not IArtFallbackProvider) && (kv.Value.Length > 0
+            ? cached.Parts.FirstOrDefault(p => p.Source == kv.Key)?.IdIn(kv.Key) != kv.Value
+            : cached.Parts.Any(p => p.Source == kv.Key)));
 
     /// <summary>Pausado (ex.: cota do dia): não é consultado agora, mas os dados que já trouxe continuam na combinação.</summary>
     private static bool IsPaused(IMetadataProvider provider) => provider is IPausableMetadataProvider { IsPaused: true };

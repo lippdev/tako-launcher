@@ -103,7 +103,7 @@ public sealed class IgdbTests
         var first = IgdbParser.Match(Games()[0])!;
         var second = IgdbParser.Match(Games()[1])!;
 
-        Assert.Equal(new MetadataMatch("IGDB", "900001", "Lanterna Distante") { Year = 2024, Platforms = "PC, Nintendo Switch" }, first);
+        Assert.Equal(new MetadataMatch("IGDB", "900001", "Lanterna Distante") { Year = 2024, Platforms = "PC, Nintendo Switch", CoverUrl = new Uri("https://images.igdb.com/igdb/image/upload/t_cover_small/cofake01.jpg") }, first);
         Assert.Equal("Lanterna Distante 2 (2026) · SNES · IGDB", GameText.MatchLabel(second));
         Assert.Equal("✓ Lanterna Distante (2024) · PC, Nintendo Switch · IGDB", GameText.MatchLabel(first with { IsExact = true }));
         Assert.Equal("Hades · Steam", GameText.MatchLabel(MetadataMatch.Steam("Hades", 1145360)));

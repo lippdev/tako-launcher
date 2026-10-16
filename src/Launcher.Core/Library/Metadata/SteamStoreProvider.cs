@@ -37,7 +37,10 @@ public sealed partial class SteamStoreProvider(HttpClient http) : IMetadataProvi
 
         return [.. items.EnumerateArray()
             .Where(i => i.TryGetProperty("type", out var type) && type.GetString() == "app")
-            .Select(i => MetadataMatch.Steam(i.GetProperty("name").GetString() ?? string.Empty, i.GetProperty("id").GetInt32()))];
+            .Select(i => MetadataMatch.Steam(i.GetProperty("name").GetString() ?? string.Empty, i.GetProperty("id").GetInt32()) with
+            {
+                CoverUrl = i.TryGetProperty("tiny_image", out var tiny) && Uri.TryCreate(tiny.GetString(), UriKind.Absolute, out var image) ? image : null,
+            })];
     }
 
     /// <summary>O appid já é o id da Steam: jogos da Steam (ou que outro provedor ligou a um appid) casam direto.</summary>
