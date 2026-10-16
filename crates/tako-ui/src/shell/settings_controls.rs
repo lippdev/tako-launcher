@@ -4,7 +4,7 @@
 //! As camadas só recebem `Cmd`; a captura e o teste leem `ctx.pressed_buttons` a cada desenho e pedem
 //! desenho contínuo pelo `ctx.live_pad` enquanto estão abertas.
 
-use super::{Ctx, Flow, MenuItem, MenuLayer, action, described};
+use super::{Ctx, Flow, MenuItem, action, described};
 use crate::gamepad::PadFamily;
 use crate::model::{Hint, Overlay, PanelRow};
 use crate::shell::ctx::{InputKind, keys};
@@ -12,7 +12,8 @@ use crate::shell::{Cmd, Layer};
 use std::cell::{Cell, RefCell};
 use std::time::Instant;
 use tako_core::input::shortcut::{
-    ChordCapture, ChordCaptureState, GamepadFamily, KeyModifiers, KeyShortcut, check_chord, chord,
+    ChordCapture, ChordCaptureState, GamepadFamily, KeyModifiers, KeyShortcut, check_chord,
+    check_keyboard, chord,
 };
 use tako_core::input::{GamepadButtons, GamepadSnapshot, controller_test};
 
@@ -30,15 +31,6 @@ fn chord_label(ctx: &Ctx) -> String {
 
 fn key_label(ctx: &Ctx) -> String {
     KeyShortcut::parse(ctx.settings.get(keys::CONTROL_CENTER_KEY)).display()
-}
-
-/// Atalhos de teclado seguros para a Central (sem captura de tecla: o tema não entrega as teclas cruas).
-fn key_presets() -> [KeyShortcut; 3] {
-    [
-        KeyShortcut::default(),
-        KeyShortcut::new(KeyModifiers::CTRL | KeyModifiers::ALT, "T"),
-        KeyShortcut::new(KeyModifiers::CTRL | KeyModifiers::SHIFT, "F12"),
-    ]
 }
 
 pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
@@ -70,7 +62,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             },
         ),
         MenuItem::new(described(ctx, "settings.controls.key").value(key_label(ctx)))
-            .on(|ctx| Flow::Push(Box::new(key_panel(ctx)))),
+            .on(|_| Flow::Push(Box::new(KeyLayer::default()))),
         MenuItem::new(
             PanelRow::action("reset", ctx.t("settings.controls.reset"))
                 .desc(defaults)
@@ -98,22 +90,101 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     ]
 }
 
-fn key_panel(ctx: &Ctx) -> MenuLayer {
-    MenuLayer::panel(ctx.t("settings.controls.key_title"), |ctx| {
-        let current = KeyShortcut::parse(ctx.settings.get(keys::CONTROL_CENTER_KEY));
-        key_presets()
-            .into_iter()
-            .map(|k| {
-                let on = k == current;
-                MenuItem::new(PanelRow::radio(k.serialize(), k.display(), on)).on(move |ctx| {
-                    ctx.settings.set(keys::CONTROL_CENTER_KEY, &k.serialize());
-                    ctx.toast(ctx.tf("settings.controls.saved", &[("shortcut", &k.display())]));
-                    Flow::Stay
-                })
-            })
-            .collect()
-    })
-    .text(ctx.t("settings.controls.key_text"))
+/// "Aperte as teclas que quer usar" (port do `ShortcutCaptureViewModel` de teclado): a primeira tecla de verdade
+/// com os modificadores pressionados; recusada, mostra o motivo e espera outra. Esc sozinho cancela.
+#[derive(Default)]
+pub(crate) struct KeyLayer {
+    pressed: String,
+    error: Option<String>,
+}
+
+fn kept(ctx: &mut Ctx) -> Flow {
+    ctx.toast(ctx.tf("settings.controls.kept", &[("shortcut", &key_label(ctx))]));
+    Flow::Close
+}
+
+impl Layer for KeyLayer {
+    fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Flow {
+        // Do controle (as teclas chegam por `key`): B cancela.
+        match cmd {
+            Cmd::Back => kept(ctx),
+            _ => Flow::Stay,
+        }
+    }
+
+    fn key(&mut self, text: &str, mods: KeyModifiers, ctx: &mut Ctx) -> Option<Flow> {
+        let Some(key) = crate::shell::keys::wpf_key(text) else {
+            return Some(Flow::Stay);
+        };
+        if key == "Escape" && mods == KeyModifiers::NONE {
+            return Some(kept(ctx));
+        }
+        if KeyShortcut::is_modifier_key(&key) {
+            self.pressed = if mods == KeyModifiers::NONE {
+                String::new()
+            } else {
+                KeyShortcut::new(mods, "…").display()
+            };
+            return Some(Flow::Stay);
+        }
+        let shortcut = KeyShortcut::new(mods, &key);
+        self.pressed = shortcut.display();
+        // O Tako em Rust não tem outro atalho global de teclado para conferir.
+        let check = check_keyboard(&shortcut, &[]);
+        if let Some(e) = check.error {
+            self.error = Some(e);
+            return Some(Flow::Stay);
+        }
+        ctx.settings
+            .set(keys::CONTROL_CENTER_KEY, &shortcut.serialize());
+        ctx.toast(match check.warning {
+            Some(w) => ctx.tf("settings.controls.saved_warning", &[("warning", &w)]),
+            None => ctx.tf(
+                "settings.controls.saved",
+                &[("shortcut", &shortcut.display())],
+            ),
+        });
+        Some(Flow::Close)
+    }
+
+    fn render(&self, ctx: &Ctx) -> Overlay {
+        let pressed = if self.pressed.is_empty() {
+            ctx.t("settings.controls.no_key_pressed")
+        } else {
+            self.pressed.clone()
+        };
+        let mut row = PanelRow::info("pressed", ctx.t("settings.controls.pressed"), pressed);
+        if let Some(e) = &self.error {
+            row = row.desc(e.clone()).emphasized(true);
+        }
+        Overlay {
+            kind: "dialog".into(),
+            title: ctx.t("settings.controls.key_title"),
+            overline: ctx.t("settings.controls.key_prompt").to_uppercase(),
+            text: ctx.t("settings.controls.key_text"),
+            rows: vec![
+                PanelRow::info(
+                    "current",
+                    ctx.t("settings.controls.current"),
+                    key_label(ctx),
+                ),
+                row,
+            ],
+            sel: -1,
+            ..Default::default()
+        }
+    }
+
+    fn hints(&self, ctx: &Ctx) -> Vec<Hint> {
+        vec![ctx.hint(Cmd::Back, &ctx.t("common.cancel"))]
+    }
+
+    fn click(&mut self, zone: &str, _index: usize, _ctx: &mut Ctx) -> Flow {
+        if zone == "outside" {
+            return Flow::Close;
+        }
+        Flow::Stay
+    }
 }
 
 /// "Segure os botões que quer usar": vale o conjunto segurado por 1 s; A salva, B cancela.

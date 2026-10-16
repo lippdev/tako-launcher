@@ -71,9 +71,91 @@ pub fn map(text: &str, ctrl: bool, alt: bool, typing: bool) -> KeyAction {
     }
 }
 
+/// Texto da tecla do Slint → nome do `Key` do WPF, como o atalho da Central guarda ("T", "D5", "F10", "Tab").
+/// `None` = tecla sem nome no atalho (Caps Lock, Menu, letras acentuadas...).
+pub fn wpf_key(text: &str) -> Option<String> {
+    let mut chars = text.chars();
+    let (Some(c), None) = (chars.next(), chars.next()) else {
+        return None;
+    };
+    if let Some(n) = (c as u32).checked_sub(0xF704).filter(|n| *n < 24) {
+        return Some(format!("F{}", n + 1));
+    }
+    if c.is_ascii_alphabetic() {
+        return Some(c.to_ascii_uppercase().to_string());
+    }
+    if c.is_ascii_digit() {
+        return Some(format!("D{c}"));
+    }
+    // shortcut: Shift+número pelo layout US/ABNT2 (o Slint entrega o símbolo); outros layouts caem em `None`.
+    if let Some(d) = ")!@#$%¨&*(".chars().position(|x| x == c) {
+        return Some(format!("D{d}"));
+    }
+    Some(
+        match c {
+            BACKSPACE => "Back",
+            TAB | '\u{0019}' => "Tab",
+            ENTER => "Return",
+            ESCAPE => "Escape",
+            DELETE => "Delete",
+            ' ' => "Space",
+            '\u{0010}' => "LeftShift",
+            '\u{0011}' => "LeftCtrl",
+            '\u{0012}' => "LeftAlt",
+            '\u{0013}' => "RightAlt",
+            '\u{0015}' => "RightShift",
+            '\u{0016}' => "RightCtrl",
+            '\u{0017}' => "LWin",
+            '\u{0018}' => "RWin",
+            UP => "Up",
+            DOWN => "Down",
+            LEFT => "Left",
+            RIGHT => "Right",
+            '\u{F727}' => "Insert",
+            '\u{F729}' => "Home",
+            '\u{F72B}' => "End",
+            '\u{F72C}' => "PageUp",
+            '\u{F72D}' => "PageDown",
+            '\u{F730}' => "Pause",
+            // A tecla à esquerda do 1 (' no ABNT2, ` no US); as outras Oem ficam de fora: o atalho global do
+            // Windows não as conhece (`KeyShortcut::virtual_key`).
+            '`' | '~' | '\'' | '"' => "OemTilde",
+            _ => return None,
+        }
+        .to_owned(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slint_keys_become_wpf_key_names() {
+        for (text, name) in [
+            ("t", "T"),
+            ("T", "T"),
+            ("5", "D5"),
+            ("%", "D5"),
+            ("\u{F70D}", "F10"),
+            ("\u{F71B}", "F24"),
+            ("\t", "Tab"),
+            ("\u{19}", "Tab"),
+            ("\n", "Return"),
+            ("\u{1b}", "Escape"),
+            (" ", "Space"),
+            ("\u{F700}", "Up"),
+            ("\u{F72C}", "PageUp"),
+            ("\u{11}", "LeftCtrl"),
+            ("\u{15}", "RightShift"),
+            ("'", "OemTilde"),
+        ] {
+            assert_eq!(wpf_key(text).as_deref(), Some(name), "{text:?}");
+        }
+        for text in ["", "ab", "é", "-", "\u{14}", "\u{F735}"] {
+            assert_eq!(wpf_key(text), None, "{text:?}");
+        }
+    }
 
     #[test]
     fn navigation_keys() {
