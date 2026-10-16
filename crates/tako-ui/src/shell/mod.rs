@@ -216,6 +216,27 @@ impl Shell {
         }
     }
 
+    /// Tecla crua para a camada de cima; `false` = segue o mapa de comandos.
+    pub fn key(&mut self, text: &str, mods: tako_core::input::shortcut::KeyModifiers) -> bool {
+        if self.cc.is_some() {
+            return false;
+        }
+        let Some(mut top) = self.layers.pop() else {
+            return false;
+        };
+        match top.key(text, mods, &mut self.ctx) {
+            Some(flow) => {
+                self.ctx.dirty = true;
+                self.apply_flow(top, flow);
+                true
+            }
+            None => {
+                self.layers.push(top);
+                false
+            }
+        }
+    }
+
     pub fn erase(&mut self) {
         if let Some(top) = self.layers.last_mut() {
             top.erase(&mut self.ctx);

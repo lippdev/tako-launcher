@@ -294,3 +294,39 @@ fn chord_capture_saves_the_held_buttons() {
         B::VIEW | B::X
     );
 }
+
+#[test]
+fn key_capture_refuses_conflicts_and_saves_the_pressed_shortcut() {
+    use tako_core::input::shortcut::{KeyModifiers as M, KeyShortcut};
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let mut layer = controls::KeyLayer::default();
+    // Ctrl sozinho só mostra o que está pressionado.
+    assert!(matches!(
+        layer.key("\u{11}", M::CTRL, &mut ctx),
+        Some(Flow::Stay)
+    ));
+    assert_eq!(layer.render(&ctx).rows[1].value, "Ctrl+…");
+    // Shift+Tab (Backtab no Slint) é da Steam: recusa e explica.
+    assert!(matches!(
+        layer.key("\u{19}", M::SHIFT, &mut ctx),
+        Some(Flow::Stay)
+    ));
+    assert!(layer.render(&ctx).rows[1].description.contains("Steam"));
+    assert!(ctx.settings.get(keys::CONTROL_CENTER_KEY).is_none());
+    assert!(matches!(
+        layer.key("t", M::CTRL | M::ALT, &mut ctx),
+        Some(Flow::Close)
+    ));
+    assert_eq!(
+        KeyShortcut::parse(ctx.settings.get(keys::CONTROL_CENTER_KEY)),
+        KeyShortcut::new(M::CTRL | M::ALT, "T")
+    );
+    // Esc sozinho cancela e mantém o atalho.
+    let mut again = controls::KeyLayer::default();
+    assert!(matches!(
+        again.key("\u{1b}", M::NONE, &mut ctx),
+        Some(Flow::Close)
+    ));
+    assert_eq!(ctx.toast.as_ref().unwrap().0, "Atalho mantido · Ctrl+Alt+T");
+}

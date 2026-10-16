@@ -30,6 +30,16 @@ pub trait Layer {
     }
     fn text(&mut self, _text: &str, _ctx: &mut Ctx) {}
     fn erase(&mut self, _ctx: &mut Ctx) {}
+    /// Tecla física crua (`text` do Slint) com os modificadores, antes de virar comando: `Some` = a camada tratou
+    /// (captura do atalho de teclado).
+    fn key(
+        &mut self,
+        _text: &str,
+        _mods: tako_core::input::shortcut::KeyModifiers,
+        _ctx: &mut Ctx,
+    ) -> Option<Flow> {
+        None
+    }
     /// Clique/toque numa zona da camada (índice da linha, tecla...). Padrão: focar e aceitar.
     fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Flow {
         let _ = (zone, index);

@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
-use tako_core::input::shortcut::{ButtonChordDetector, chord};
+use tako_core::input::shortcut::{ButtonChordDetector, KeyModifiers, chord};
 use tako_core::input::{AppCommand, GamepadButtons, GamepadInterpreter, GamepadSnapshot};
 use tako_core::library::{CollectionLibrary, Game, GameLibrary, system_clock};
 use tako_core::paths::DataPaths;
@@ -365,10 +365,24 @@ impl App {
             let _ = ui.set_callback("key", move |args| {
                 let text = arg_str(args, 0);
                 let ctrl = matches!(args.get(2), Some(Value::Bool(true)));
+                let shift = matches!(args.get(3), Some(Value::Bool(true)));
                 let alt = matches!(args.get(4), Some(Value::Bool(true)));
                 let action = {
                     let mut s = app.shell.borrow_mut();
                     s.ctx.input = InputKind::Keyboard;
+                    let mods = [
+                        (ctrl, KeyModifiers::CTRL),
+                        (alt, KeyModifiers::ALT),
+                        (shift, KeyModifiers::SHIFT),
+                    ]
+                    .into_iter()
+                    .filter(|(on, _)| *on)
+                    .fold(KeyModifiers::NONE, |a, (_, m)| a | m);
+                    if s.key(&text, mods) {
+                        drop(s);
+                        app.redraw();
+                        return Value::Bool(true);
+                    }
                     keys::map(&text, ctrl, alt, s.typing())
                 };
                 match action {
