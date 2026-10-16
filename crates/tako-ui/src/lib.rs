@@ -4,6 +4,7 @@ pub mod app;
 pub mod art;
 pub mod bridge;
 pub mod demo;
+pub mod discord;
 pub mod effects;
 pub mod gamepad;
 pub mod images;

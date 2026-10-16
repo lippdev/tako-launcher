@@ -135,6 +135,7 @@ pub mod keys {
     pub const HIDE_CURSOR: &str = "HideCursorDuringGame";
     pub const CONTROLLER_MOUSE: &str = "ControllerMouseDuringGame";
     pub const SAFE_MODE: &str = "SafeMode";
+    pub const DISCORD_PRESENCE: &str = "DiscordRichPresence";
 }
 
 pub struct Ctx {

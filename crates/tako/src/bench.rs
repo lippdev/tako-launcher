@@ -191,6 +191,7 @@ pub fn supervisor_rss() -> i32 {
         hide_cursor: false,
         controller_mouse: false,
         restore: false,
+        discord: false,
     };
     let mut running = match tako_ui::session::Running::new(req) {
         Ok(r) => r,
