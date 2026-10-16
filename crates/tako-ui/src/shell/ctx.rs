@@ -186,6 +186,8 @@ pub struct Ctx {
     pub move_window: Option<tako_core::devices::ScreenBounds>,
     /// Algo mudou e a tela precisa ser redesenhada.
     pub dirty: bool,
+    /// O último foco veio do mouse passando por cima: o tema destaca, mas não rola (só teclado/controle revelam).
+    pub pointer: bool,
     /// Botões segurados agora (`GamepadButtons`), lidos pelo app a cada 16 ms.
     pub pressed_buttons: u32,
     /// Analógico esquerdo agora (-1..1, Y para baixo positivo).

@@ -9,6 +9,8 @@ export global Ui {
     in property <bool> reduce-motion: false;
     // "xbox", "playstation", "nintendo" ou "keyboard": muda os glifos das dicas.
     in property <string> input-kind: "xbox";
+    // O foco mais recente veio do mouse passando por cima: destaca o item, mas listas e fileiras não rolam até ele.
+    in property <bool> pointer: false;
 
     in-out property <color> canvas: #0E1116;
     in-out property <color> on-accent: #FFFFFF;

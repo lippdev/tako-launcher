@@ -159,6 +159,7 @@ impl Shell {
 
     /// Mostra um jogo na tela onde ele está (volta do jogo: foco onde estava).
     pub fn focus_game(&mut self, id: &str) {
+        self.ctx.pointer = false;
         let ctx = &self.ctx;
         if let Some(p) = self.pages.last_mut() {
             p.focus_game(id, ctx);
@@ -182,6 +183,7 @@ impl Shell {
 
     pub fn handle(&mut self, cmd: Cmd) {
         self.ctx.dirty = true;
+        self.ctx.pointer = false;
         if let Some(cc) = self.cc.as_mut() {
             if cc.handle(cmd, &mut self.ctx) {
                 self.cc = None;
@@ -246,6 +248,7 @@ impl Shell {
 
     pub fn click(&mut self, zone: &str, index: usize) {
         self.ctx.dirty = true;
+        self.ctx.pointer = false;
         if let Some(cc) = self.cc.as_mut() {
             if let Some(z) = zone.strip_prefix("cc-")
                 && cc.click(z, index, &mut self.ctx)
@@ -294,6 +297,8 @@ impl Shell {
                 pages[n - 1].hover(zone, index, ctx);
             }
         }
+        // O foco segue o mouse, mas a fileira/página não rola por isso (ver `Ui.pointer` no tema).
+        self.ctx.pointer = true;
         self.ctx.dirty = true;
     }
 
@@ -573,5 +578,34 @@ impl Shell {
         let n = pages.len();
         pages[n - 1].resumed(ctx);
         ctx.dirty = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hover_focuses_without_reveal_and_commands_reveal_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        let mut shell = Shell::new(ctx);
+        // Mouse sobre a última capa visível: o tema destaca, mas a fileira não rola.
+        shell.hover("row-0", 5);
+        assert!(shell.ctx.pointer);
+        // Direita/Baixo pelo comando voltam a revelar o item focado.
+        shell.handle(Cmd::Right);
+        assert!(!shell.ctx.pointer);
+        shell.hover("row-0", 5);
+        shell.handle(Cmd::Down);
+        assert!(!shell.ctx.pointer);
+        // Clique numa capa parcialmente visível pode trazê-la para a tela.
+        shell.hover("row-0", 5);
+        shell.click("row-0", 5);
+        assert!(!shell.ctx.pointer);
     }
 }

@@ -286,7 +286,10 @@ component GameRow inherits Rectangle {
     callback clicked(int);
     callback hovered(int);
     property <length> step: 230 * Ui.u;
-    property <int> anchor: max(0, sel);
+    // A âncora só segue o foco do teclado/controle; o mouse por cima não rola a fileira.
+    property <int> anchor;
+    init => { anchor = max(0, sel); }
+    changed sel => { if (!Ui.pointer) { anchor = max(0, sel); } }
     height: 60 * Ui.u + 370 * Ui.u + 40 * Ui.u;
     HorizontalLayout {
         y: 0;
@@ -350,7 +353,10 @@ component HomePage inherits Rectangle {
     callback hovered(string, int);
     property <length> hero-h: 560 * Ui.u;
     property <length> row-h: 470 * Ui.u;
-    property <length> scroll: row-focus <= 0 ? 0 : -(hero-h - 120 * Ui.u + (row-focus - 1) * row-h);
+    property <int> shown-row;
+    init => { shown-row = row-focus; }
+    changed row-focus => { if (!Ui.pointer) { shown-row = row-focus; } }
+    property <length> scroll: shown-row <= 0 ? 0 : -(hero-h - 120 * Ui.u + (shown-row - 1) * row-h);
     clip: true;
     if empty: VerticalLayout {
         x: 64 * Ui.u;
@@ -437,7 +443,10 @@ component LibraryPage inherits Rectangle {
     property <length> cell-h: 420 * Ui.u;
     property <length> top: 230 * Ui.u;
     property <int> rows: ceil(tiles.length / columns);
-    property <int> focus-row: sel < 0 ? 0 : floor(sel / columns);
+    property <int> shown;
+    init => { shown = sel; }
+    changed sel => { if (!Ui.pointer) { shown = sel; } }
+    property <int> focus-row: shown < 0 ? 0 : floor(shown / columns);
     property <length> view-h: self.height - top - Ui.hint-bar;
     property <length> scroll: min(0, max(view-h - rows * cell-h, -(focus-row * cell-h) + (view-h - cell-h) / 2));
     VerticalLayout {
@@ -595,7 +604,10 @@ component SettingsPage inherits Rectangle {
     property <length> top: 180 * Ui.u;
     property <length> row-h: 108 * Ui.u;
     property <length> view-h: self.height - top - Ui.hint-bar - 120 * Ui.u;
-    property <length> scroll: min(0, max(view-h - rows.length * row-h, -(max(0, row-focus) * row-h) + (view-h - row-h) / 2));
+    property <int> shown-row;
+    init => { shown-row = row-focus; }
+    changed row-focus => { if (!Ui.pointer) { shown-row = row-focus; } }
+    property <length> scroll: min(0, max(view-h - rows.length * row-h, -(max(0, shown-row) * row-h) + (view-h - row-h) / 2));
     Text { x: 64 * Ui.u; y: 56 * Ui.u; text: title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; }
     VerticalLayout {
         x: 64 * Ui.u;
@@ -669,7 +681,10 @@ component RowList inherits Rectangle {
     callback clicked(int);
     callback hovered(int);
     property <length> row-h: 100 * Ui.u;
-    property <length> scroll: min(0, max(self.height - rows.length * row-h, -(max(0, sel) * row-h) + (self.height - row-h) / 2));
+    property <int> shown;
+    init => { shown = sel; }
+    changed sel => { if (!Ui.pointer) { shown = sel; } }
+    property <length> scroll: min(0, max(self.height - rows.length * row-h, -(max(0, shown) * row-h) + (self.height - row-h) / 2));
     clip: true;
     Rectangle {
         y: scroll;
@@ -850,7 +865,11 @@ component OverlayView inherits Rectangle {
                 Rectangle {
                     horizontal-stretch: 1;
                     clip: true;
-                    property <int> focus-row: floor(max(0, ov.sel) / cols);
+                    property <int> sel: ov.sel;
+                    property <int> shown;
+                    init => { shown = sel; }
+                    changed sel => { if (!Ui.pointer) { shown = sel; } }
+                    property <int> focus-row: floor(max(0, shown) / cols);
                     property <length> th: tw * 1.5 + 20 * Ui.u;
                     if ov.thumbs.length == 0: Text { y: 20 * Ui.u; text: ov.text; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; wrap: word-wrap; }
                     Rectangle {
