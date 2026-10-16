@@ -6,7 +6,7 @@ name: Release
 #  - Actions > Release > Run workflow na develop, canal alpha ou beta: a pré-release sai com o próximo número
 #    (0.2.0-alpha.3, 0.2.0-beta.1...). Notas da seção da versão ou, sem ela, da [Unreleased].
 #  - Run workflow em outra branch, com "publish" desmarcado: só compila e guarda os arquivos como artefato.
-# Saídas: Windows (instalador e portable; x64 e arm64), Linux (deb, AppImage, tar.gz; x64 e arm64) e macOS (dmg e zip;
+# Saídas: Windows (instalador e portable; só x64), Linux (deb, AppImage, tar.gz; x64 e arm64) e macOS (dmg e zip;
 # Apple Silicon e Intel). A versão C#/WPF tem o próprio workflow manual (release-wpf.yml) até o corte (MIG-043).
 on:
   push:
@@ -87,7 +87,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, arm64]
+        # Windows só em x86-64 (PRD §8.2); o empacotamento aceita arm64 se um dia entrar.
+        arch: [x64]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -245,7 +246,7 @@ jobs:
           {
             printf '%s\n' "${notes%%$'\n---\n'*}"
             echo "### Downloads"; echo
-            section "Windows (x64 = Intel/AMD, arm64 = ARM)" "Tako-Setup-* Tako-Portable-*"
+            section "Windows (x64 = Intel/AMD)" "Tako-Setup-* Tako-Portable-*"
             section "Linux (x64 = Intel/AMD, arm64 = ARM)" "Tako-Linux-*"
             section "macOS (arm64 = Apple Silicon, x64 = Intel)" "Tako-macOS-*"
             echo "---"; echo
@@ -283,6 +284,6 @@ jobs:
         with:
           identifier: lippdev.Tako
           release-tag: ${{ needs.resolve.outputs.tag }}
-          installers-regex: 'Tako-Setup-(x64|arm64)\.exe$'
+          installers-regex: 'Tako-Setup-x64\.exe$'
           fork-user: lippdev
           token: ${{ env.WINGET_TOKEN }}
