@@ -17,6 +17,14 @@ any = "Todos"
 installed = "Instalados"
 not_installed = "Não instalados"
 
+[library.status]
+none = "Sem status"
+playing = "Jogando"
+beaten = "Zerado"
+paused = "Pausado"
+abandoned = "Abandonado"
+wishlist = "Quero jogar"
+
 [library.scan]
 all_disabled = "Todas as lojas estão desligadas nas Configurações"
 none_found = "Nenhum jogo {stores} encontrado neste PC"
