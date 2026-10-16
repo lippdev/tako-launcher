@@ -304,11 +304,12 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 - [ ] **PLAT-004 (macOS):** assinatura Developer ID e notarização.
 - [ ] **PLAT-005 (Windows):** assinatura de código (SignPath) e winget.
 - [ ] **PLAT-006:** abrir com o sistema e iniciar direto em tela cheia, em cada SO.
+- [ ] **PLAT-008:** canal Nightly: build automática da `develop` todo dia em que houver mudança, publicada como pré-release `nightly` (sem changelog manual, notas pelos commits) e escolhida no atualizador como "Versões noturnas", separada de alpha e beta.
 - [ ] **PLAT-007 (Windows):** integração com o [AnyFSE](https://github.com/ashpynov/AnyFSE), projeto da comunidade que põe um launcher de terceiros como app inicial do Xbox mode (tela cheia de jogos do Windows 11), enquanto o caminho oficial (PLAT-003) depende da Microsoft. Escopo: o Tako funciona como alvo do AnyFSE (abre em tela cheia, sem janela de desktop, volta certo de um jogo), o Tako detecta o AnyFSE instalado e ensina a configuração, e um roteiro de teste em `docs/testing/windows.md`. O AnyFSE pede Modo de Desenvolvedor (ver `docs/spikes/MVP-007-fse.md`); o Tako não liga isso sozinho.
 
 ### Épico SRC — Mais fontes (P1)
 
-- [ ] **SRC-001:** emuladores (RetroArch e standalone), bibliotecas de ROMs do usuário e sistemas, nos três SOs.
+- [ ] **SRC-001:** emuladores (RetroArch e standalone), bibliotecas de ROMs do usuário e sistemas, nos três SOs. Inclui importar direto dos principais emuladores e frontends os jogos que eles já conhecem (playlists do RetroArch, listas do ES-DE, bibliotecas do Dolphin, PCSX2, DuckStation, PPSSPP, Ryujinx e afins), com o comando certo para abrir cada jogo no emulador.
 - [ ] **SRC-002 (Linux):** Bottles e itch.io.
 - [ ] **SRC-003:** detectar cliente de loja ausente e oferecer abri-lo ou instalá-lo pelo caminho oficial.
 - [ ] **SRC-004:** jogos não Steam adicionados à Steam (atalhos), nos três SOs.
@@ -328,12 +329,29 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 - [ ] **THEME-004:** instalar tema por URL de repositório, com atualização opcional.
 - [ ] **THEME-005:** galeria comunitária de temas.
 - [ ] **THEME-006:** criar o próprio tema pelo Tako, sem editar arquivos: partir do tema padrão (ou de um instalado), escolher cores, fonte e fundo com prévia ao vivo, dar nome, salvar como tema instalado e exportar como `.takotheme` para compartilhar. Base: os `tokens.toml` (temas que só trocam a paleta) e THEME-002/003.
+- [ ] **THEME-007:** música de fundo e sons de navegação por tema (o tema traz os arquivos; volume próprio e opção de desligar; nunca toca durante o jogo).
+- [ ] **THEME-008:** cinco temas oficiais bem diferentes entre si (layout, navegação e identidade, não só cores), começando por uma lista de propostas para escolher.
 - [ ] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil.
+
+### Épico ART — Capas e arte (P2)
+
+- [ ] **ART-001:** casar a biblioteca inteira com as capas certas sozinho, como o Plex faz com filmes: reconhece o nome do jogo, escolhe capa, fundo, logo e ícone, e o usuário só corrige o que ficou errado. Refs: Steam ROM Manager, BoilR, SteamGridDB Decky, Steam Art Manager.
+- [ ] **ART-002:** aplicar uma imagem do site do SteamGridDB num jogo com um clique (protocolo próprio, como o SGDBoop).
+- [ ] **ART-003:** biblioteca de capas online: o usuário escolhe capas personalizadas de uma galeria e envia as suas, além das do SteamGridDB.
+
+### Épico BRAND — Identidade (P2)
+
+- [ ] **BRAND-001:** animação do Tako (o polvo), usada no app (espera, estados vazios, Bem-vindo de volta).
+- [ ] **BRAND-002:** animação de entrada ao abrir o app, curta, pulável, desligada com "Reduzir animações" e sem atrasar a primeira tela (§8.1).
 
 ### Épico PERF (P2)
 
 - [ ] **PERF-001:** painel de diagnóstico do próprio Tako (memória, CPU, tempo de abertura).
 - [ ] **PERF-002:** presets de tela por jogo e por monitor, incluindo HDR e VRR onde o SO expõe.
+
+### Épico DEALS — Promoções (P3)
+
+- [ ] **DEALS-001:** página de promoções: jogos em oferta nas lojas (Green Man Gaming, Nuuvem, Instant Gaming e outras), com preço, desconto e link de afiliado, em layout parecido com uma loja. O Tako não vende nada: o link abre a loja no navegador. Precisa dizer claramente que os links são de afiliado e escolher a fonte dos preços (API da loja, programa de afiliados ou agregador).
 
 ### Épico EXT (P3)
 

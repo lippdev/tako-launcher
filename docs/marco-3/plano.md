@@ -32,12 +32,17 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 - **PLAT-007** Integração com o AnyFSE (Tako como app inicial do Xbox mode pelo projeto da comunidade). O WPF publicava um kit de experimento para o mesmo fim (`Tako-FseKit`), que o Rust não tem.
 - **PLAT-002** Pacotes AUR e Flatpak.
 - Testes de interface das telas principais (§8.4).
+- **PLAT-008** Canal Nightly (build diária da `develop`): acelera os testes de cada PR.
 
 ## COULD
 
 - **THEME-006** Criar o próprio tema pelo Tako (pedido do mantenedor).
+- **THEME-007** Música de fundo e sons por tema; **THEME-008** cinco temas oficiais bem diferentes.
+- **ART-001** Capas certas para a biblioteca inteira, como o Plex; **ART-002** um clique no site do SteamGridDB (como o SGDBoop); **ART-003** galeria de capas online.
+- **BRAND-001** Animação do Tako (polvo); **BRAND-002** animação de entrada.
+- **DEALS-001** Página de promoções com links de afiliado.
 - **UX-001** Tamanho de texto e sons de navegação.
-- **SRC-001** Emuladores e ROMs, **SRC-002** Bottles e itch.io.
+- **SRC-001** Emuladores e ROMs, incluindo importar dos principais emuladores; **SRC-002** Bottles e itch.io.
 - **UX-002** Arte animada, **UX-004** Perfis locais.
 - **THEME-001 a 005**, **PERF-001/002**.
 
