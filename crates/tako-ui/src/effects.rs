@@ -35,6 +35,9 @@ pub fn common(effect: &Effect, shell: &mut Shell) -> Option<HostAction> {
         Effect::ApplyTheme(_) => return Some(HostAction::ReloadTheme),
         Effect::TestGameScreen => crate::screen_test::start(ctx),
         Effect::ImportPlaynite => crate::playnite::start(ctx),
+        Effect::AddGame => crate::shell::add_game::add_game(ctx),
+        Effect::InstallTheme => install_theme(ctx),
+        Effect::RefreshMetadata(id) => crate::metadata::refresh(ctx, id.as_deref()),
         _ => return None,
     }
     Some(HostAction::Stay)
@@ -289,4 +292,32 @@ fn save_report(ctx: &mut Ctx) {
         }
         Err(e) => ctx.toast(e.to_string()),
     }
+}
+
+/// Aparência › Instalar tema…: escolhe um `.takotheme` e o instala ao lado dos outros (não o aplica).
+fn install_theme(ctx: &mut Ctx) {
+    let title = ctx.t("settings.appearance.install");
+    crate::shell::add_game::pick(
+        ctx,
+        move || {
+            rfd::FileDialog::new()
+                .set_title(&title)
+                .add_filter("Tako", &["takotheme"])
+                .pick_file()
+        },
+        |ctx, path| match tako_themes::install(&path, &ctx.paths.themes()) {
+            Ok(t) => {
+                let name = t
+                    .manifest
+                    .as_ref()
+                    .map(|m| m.name.clone())
+                    .unwrap_or_else(|_| t.id());
+                ctx.toast(ctx.tf("effects.theme_installed", &[("name", &name)]));
+            }
+            Err(problems) => {
+                let text: Vec<String> = problems.into_iter().map(|p| p.message).collect();
+                ctx.toast(text.join(" "));
+            }
+        },
+    );
 }

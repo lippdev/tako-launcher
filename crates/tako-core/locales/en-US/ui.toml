@@ -164,6 +164,7 @@ pointer_hide = "Hide the pointer"
 pointer_stick = "Move with the stick"
 
 [effects]
+theme_installed = "Theme {name} installed · pick it in Appearance › Theme"
 cache_cleared = "Image cache cleared ({size})"
 portable = "portable"
 installed = "installed"

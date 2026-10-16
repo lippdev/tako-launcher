@@ -265,6 +265,7 @@ impl App {
         }
         let shell = Rc::new(RefCell::new(shell));
         crate::tasks::attach(&shell);
+        crate::metadata::start_metadata(&shell);
         let app = App {
             ui: Rc::new(RefCell::new(ui)),
             shell,

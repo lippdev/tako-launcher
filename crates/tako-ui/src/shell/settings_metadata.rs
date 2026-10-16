@@ -68,6 +68,12 @@ pub(crate) fn update(ctx: &mut Ctx, change: impl FnOnce(&mut Providers)) {
         result = result.and(new.sgdb.save(&vault));
     }
     forget(CACHE);
+    // As fontes leem as chaves ao começar: recomeça com as novas (fora deste empréstimo do Shell).
+    let _ = slint::invoke_from_event_loop(|| {
+        if let Some(shell) = crate::tasks::shell() {
+            crate::metadata::start_metadata(&shell);
+        }
+    });
     if let Err(e) = result {
         ctx.toast(ctx.tf("settings.metadata.save_failed", &[("error", &e)]));
     }

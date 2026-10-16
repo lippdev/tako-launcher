@@ -164,6 +164,7 @@ pointer_hide = "Esconder o ponteiro"
 pointer_stick = "Mover com o analógico"
 
 [effects]
+theme_installed = "Tema {name} instalado · escolha-o em Aparência › Tema"
 cache_cleared = "Cache de imagens limpo ({size})"
 portable = "portátil"
 installed = "instalada"
