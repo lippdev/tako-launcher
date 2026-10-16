@@ -3,7 +3,7 @@
 use super::{Cmd, Ctx, Effect, Nav, Out, Page, dialogs, tiles};
 use crate::model::{Details, Hint, PanelRow, Stat};
 use tako_core::library::{Game, GameStore};
-use tako_core::presentation::game_text;
+use tako_core::presentation::{game_text, library_text};
 
 pub struct DetailsPage {
     id: String,
@@ -177,6 +177,13 @@ impl Page for DetailsPage {
         if let Some(d) = &g.developer {
             meta.push(d.clone());
         }
+        let mut overline = game_text::status(lang, g);
+        if g.play_status.is_some() {
+            overline = format!(
+                "{overline} · {}",
+                library_text::status_label(lang, g.play_status)
+            );
+        }
         let hint = if g.is_broken {
             ctx.t("game.broken_text")
         } else if g.description.is_empty()
@@ -190,7 +197,7 @@ impl Page for DetailsPage {
             "details",
             Details {
                 title: g.title.clone(),
-                overline: game_text::status(lang, g).to_uppercase(),
+                overline: overline.to_uppercase(),
                 meta: meta.join(" · "),
                 description: g.description.clone(),
                 art: tiles::image(g.shown_hero(), tiles::HERO),

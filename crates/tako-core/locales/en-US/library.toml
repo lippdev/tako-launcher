@@ -17,6 +17,14 @@ any = "All"
 installed = "Installed"
 not_installed = "Not installed"
 
+[library.status]
+none = "No status"
+playing = "Playing"
+beaten = "Beaten"
+paused = "On hold"
+abandoned = "Abandoned"
+wishlist = "Want to play"
+
 [library.scan]
 all_disabled = "All stores are turned off in Settings"
 none_found = "No games {stores} found on this PC"

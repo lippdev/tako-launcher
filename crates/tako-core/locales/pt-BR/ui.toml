@@ -63,6 +63,8 @@ not_installed = "Não instalado"
 favorited = "Adicionado aos favoritos"
 unfavorited = "Removido dos favoritos"
 broken_text = "O arquivo ou a pasta deste jogo não existe mais. Corrija em Editar ou remova o jogo da biblioteca."
+status = "Status"
+status_set = "Status: {status}"
 
 [details]
 play_time = "Tempo de jogo"
@@ -116,6 +118,7 @@ sort = "ORDENAR POR"
 collection = "COLEÇÃO"
 source = "FONTE"
 genre = "GÊNERO"
+status = "STATUS"
 filters = "FILTROS"
 clear = "Limpar filtros"
 
