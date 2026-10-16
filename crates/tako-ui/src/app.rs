@@ -131,10 +131,6 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
     ctx
 }
 
-thread_local! {
-    static SHELL: RefCell<std::rc::Weak<RefCell<Shell>>> = const { RefCell::new(std::rc::Weak::new()) };
-}
-
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar.
 pub fn rescan(shell: &Rc<RefCell<Shell>>) {
     let (found, disabled, simulate) = {
@@ -151,8 +147,6 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
             s.ctx.simulated(),
         )
     };
-    // O laço do Slint roda na thread da UI: o resultado volta para a mesma `Shell` por um thread-local.
-    SHELL.with(|s| *s.borrow_mut() = Rc::downgrade(shell));
     std::thread::Builder::new()
         .name("tako-scan".into())
         .spawn(move || {
@@ -165,7 +159,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
                 *f = games;
             }
             let _ = slint::invoke_from_event_loop(move || {
-                if let Some(shell) = SHELL.with(|s| s.borrow().upgrade()) {
+                if let Some(shell) = crate::tasks::shell() {
                     let mut s = shell.borrow_mut();
                     s.ctx.library.refresh();
                     s.ctx.sync_collections();
@@ -215,6 +209,7 @@ impl App {
             shell.ctx.toast(text);
         }
         let shell = Rc::new(RefCell::new(shell));
+        crate::tasks::attach(&shell);
         let app = App { ui, shell };
         app.wire(host);
         Ok(app)

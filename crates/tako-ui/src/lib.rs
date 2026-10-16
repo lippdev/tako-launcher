@@ -9,6 +9,7 @@ pub mod images;
 pub mod model;
 pub mod shell;
 pub mod sources;
+pub mod tasks;
 pub mod theme;
 pub mod values;
 
