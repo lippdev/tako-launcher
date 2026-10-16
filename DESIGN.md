@@ -22,6 +22,15 @@ colors:
   surface-sidebar: "#FFFFFF2E"
   surface-solid: "#FFFFFF"
   on-surface-solid: "#11141A"
+  # Controles dentro de linhas focáveis (ver Components › Foco): no painel e na linha focada (surface-solid).
+  on-surface-solid-muted: "#565C68"
+  control-knob: "#FFFFFF"
+  control-track-off: "#FFFFFF40"
+  control-off: "#FFFFFF8C"
+  control-on-on-solid: "#0B7A3B"
+  control-off-on-solid: "#5B6170"
+  control-track-on-solid: "#11141A33"
+  value-pill-on-solid: "#11141A1A"
   focus-ring: "#FFFFFF"
   scrim: "#00000099"
   success: "#3DDC84"
@@ -165,7 +174,24 @@ components:
   hint-bar:
     textColor: "{colors.on-accent-muted}"
     typography: "{typography.label-sm}"
-    height: 72px
+    height: 88px
+  panel-row-focused:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+  panel-row-focused-secondary:
+    textColor: "{colors.on-surface-solid-muted}"
+  toggle-on:
+    backgroundColor: "{colors.success}"
+    knobColor: "{colors.control-knob}"
+  toggle-off:
+    backgroundColor: "{colors.control-track-off}"
+    knobColor: "{colors.control-knob}"
+  toggle-on-focused:
+    backgroundColor: "{colors.control-on-on-solid}"
+    knobColor: "{colors.control-knob}"
+  toggle-off-focused:
+    borderColor: "{colors.control-off-on-solid}"
+    knobColor: "{colors.control-off-on-solid}"
   settings-category:
     textColor: "{colors.on-accent}"
     typography: "{typography.label-lg}"
@@ -233,7 +259,7 @@ Princípios:
 - **accent-deep:** o accent escurecido ~45% em luminância. Garante contraste do texto branco na metade de baixo.
 - **Fallback (#2B3A55):** azul-ardósia para jogos sem arte ou com cor dominante pouco saturada.
 - **Superfícies:** brancos com alpha (`surface-1` 12%, `surface-2` 20%, `surface-sidebar` 18%). Funcionam sobre qualquer accent.
-- **Surface solid / on-surface-solid:** branco opaco com texto escuro, reservado à ação principal da tela (Jogar) e ao item ativo da barra lateral.
+- **Surface solid / on-surface-solid:** branco opaco com texto escuro, reservado à ação principal da tela (Jogar), ao item ativo da barra lateral e ao item focado de listas e painéis (linha de painel, categoria, tecla). Tudo que fica dentro dele usa as cores "sobre superfície sólida" (`on-surface-solid`, `on-surface-solid-muted`, `control-*-on-solid`; ver Components › Foco).
 - **Contraste:** se o accent tiver luminância relativa > 0.35, escurecer até atingir 4.5:1 com branco antes de usar como fundo.
 
 ## Typography
@@ -254,6 +280,7 @@ Títulos (`display`, `headline-*`) em Source Sans 3 leve, humanista da linha Fru
 - **Início:** a primeira fileira é sempre **Jogados recentemente** (só jogos já jogados, do mais recente ao mais antigo), e o destaque abre no último jogado ("Continuar jogando"). Ao fim de uma sessão, o jogo volta para o primeiro lugar e a fileira volta ao início.
 - **Barra de dicas:** rodapé fixo com os glifos do controle e a ação de cada botão na tela atual. Sem largura (4:3, 16:10, escala alta, teclado), primeiro abrevia ("Configurações" → "Ajustes", menos espaço entre as dicas) e depois esconde as menos importantes (seção, busca); A e B ficam sempre. Nunca corta uma dica no meio.
 - **Listas que rolam com o foco:** o item focado fica inteiro entre o cabeçalho e a barra de dicas, com folga (o anel de foco não encosta na moldura). Listas que não começam no topo da tela rolam numa moldura com recorte que termina acima da barra de dicas.
+- **Painéis laterais e diálogos:** reservam a altura da barra de dicas (88, `HintBarReserve`). O fundo do painel vai até a base da tela, mas a lista rola numa moldura que termina acima da barra, então nenhuma linha (focada ou não) aparece por baixo das dicas; os diálogos centralizam na área acima dela.
 - **Cabeçalho fixo:** título da página, busca e status não rolam. O conteúdo rola numa moldura que esmaece antes do cabeçalho e antes da barra de dicas, então nada passa por trás desses textos.
 - **Status do sistema:** canto superior direito, acima da busca: entrada atual (ícone de controle com o nome, ou teclado) e a hora. Aparece em todas as telas.
 - **Grade da biblioteca:** capas 2:3 (204x306), 7 colunas quando a barra lateral está recolhida. O fundo e o accent acompanham a capa em foco, como na Início.
@@ -268,7 +295,9 @@ Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da bar
 
 ## Components
 
-- **Foco:** anel branco de 4px afastado 6px do elemento, escala `motion.focus-scale` em capas, transição `motion.focus`. Itens de lista não escalam: ganham fundo `surface-2`.
+- **Foco:** anel branco de 4px afastado 6px do elemento, escala `motion.focus-scale` em capas, transição `motion.focus`. Itens de lista não escalam: ganham fundo `surface-2` (linhas de Configurações, cartões) ou viram a superfície sólida branca (linhas de painel — filtros, Configurações deste jogo, painéis da Central —, categorias, teclas).
+  - **Controles na linha focada (MVP-029, UX-009):** numa linha branca, nada pode ser branco. Chave ligada: trilho `control-on-on-solid` (verde escuro) com bolinha branca; desligada: trilho contornado e bolinha em `control-off-on-solid`. Marcador (○/◉): contorno `control-off-on-solid`, escolhido em `on-surface-solid`. Título, seta, ícones e valor em destaque em `on-surface-solid`; contagem e valor secundário em `on-surface-solid-muted` (nunca por opacidade); valor positivo (bateria) em `control-on-on-solid`; pílula de valor em `value-pill-on-solid`; trilho da barra de volume em `control-track-on-solid`. Fora do foco, os mesmos controles usam `success`, `control-track-off`, `control-off` e `on-accent-muted`.
+  - **Contraste:** WCAG AA — texto 4.5:1 (texto grande, 24px ou 18.66px em negrito, 3:1), componentes 3:1 contra o fundo em que estão. Implementação: a linha marca `FocusSurface.IsSolid` (herdado) e os estilos `ToggleVisual`, `RadioVisual`, `RowEndText`, `RowIcon`, `ValuePill` e `SliderTrack` trocam de cor sozinhos. Os testes conferem os tokens e, a cada captura do teste de fumaça, as cores reais do item focado.
 - **Game card:** capa 2:3, nome (`label-md`, uma linha com reticências) e loja + tamanho (`label-sm`) abaixo. Em foco, só a capa escala; o texto não se move. O destaque da Home troca para o jogo.
 - **Fileiras:** o item em foco fica ancorado na primeira posição e a fileira rola por baixo dele, até o fim da lista.
 - **Botão primário (Jogar):** pílula branca com ícone de play. Um por tela.

@@ -37,6 +37,7 @@
             <Trigger Property="IsKeyboardFocused" Value="True">
               <Setter TargetName="Body" Property="Background" Value="{DynamicResource SurfaceSolidBrush}" />
               <Setter Property="Foreground" Value="{DynamicResource OnSurfaceSolidBrush}" />
+              <Setter Property="c:FocusSurface.IsSolid" Value="True" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -157,15 +158,15 @@
         <DockPanel>
           <!-- Valor à direita: chave, ou pílula com o valor (legível sobre qualquer arte) e a seta. -->
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="24,0,0,0">
-            <Border x:Name="Value" CornerRadius="18" Background="{DynamicResource Surface2Brush}" Padding="16,6" MaxWidth="380"
+            <Border x:Name="Value" Style="{StaticResource ValuePill}" MaxWidth="380"
                     Visibility="{Binding HasValue, Converter={StaticResource BoolToVisibility}}">
               <TextBlock Text="{Binding ValueText}" FontSize="{DynamicResource FsLabelMd}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
             </Border>
             <ContentControl x:Name="Toggle" Style="{StaticResource ToggleVisual}" Tag="{Binding IsOn}" Visibility="Collapsed" />
-            <c:Icon x:Name="Arrow" Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource OnAccentBrush}" />
+            <c:Icon x:Name="Arrow" Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource RowIcon}" />
           </StackPanel>
           <c:Icon x:Name="Glyph" DockPanel.Dock="Left" Key="{Binding IconKey}" Width="30" Height="30" Margin="0,0,20,0" VerticalAlignment="Center"
-                  Foreground="{DynamicResource OnAccentBrush}" Visibility="{Binding IconKey, Converter={StaticResource NotNullToVisibility}}" />
+                  Style="{StaticResource RowIcon}" Visibility="{Binding IconKey, Converter={StaticResource NotNullToVisibility}}" />
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
             <TextBlock Text="{Binding Description}" Margin="0,6,0,0" FontSize="{DynamicResource FsLabelSm}" Foreground="{DynamicResource OnAccentMutedBrush}"
@@ -340,7 +341,7 @@
           </ControlTemplate>
         </Button.Template>
       </Button>
-      <Border Width="1000" MaxHeight="900" CornerRadius="28" Background="#FF1A1E26" Padding="56,44" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border Width="1000" MaxHeight="900" CornerRadius="28" Background="#FF1A1E26" Padding="56,44" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{StaticResource HintBarReserve}">
         <StackPanel>
           <TextBlock Text="{Binding Heading, Converter={StaticResource Upper}}" Style="{StaticResource Overline}" />
           <!-- Passos: o atual em branco, os feitos com ✓. -->

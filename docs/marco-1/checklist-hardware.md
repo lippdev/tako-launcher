@@ -502,6 +502,17 @@ escala do Windows em 100% e em 150–200%. Um jogo com arte clara em foco ajuda 
 | MC4 | Tela desconectada | Desligar a TV escolhida e abrir o Modo Console | Cartão Tela de jogo "Com problema" dizendo que a tela não está conectada |
 | MC5 | Contador de FPS | Modo Console › Contador de FPS com o controle e depois com teclado e mouse | Com o controle "Mostrar FPS" e "Remover a permissão" ficam esmaecidas e explicam; com teclado e mouse pedem o UAC (seção 14) |
 
+## 25. Linha focada legível na TV (MVP-029 / UX-009)
+
+Na TV, a 3 metros, com o controle. Em cada linha focada (branca) os controles continuam visíveis.
+
+| # | Caso | Como testar | Esperado |
+|---|---|---|---|
+| FR1 | Filtros | Biblioteca › Filtros; focar uma chave ligada, uma desligada, uma opção de Ordenar e um gênero com contagem | Chave ligada verde-escura com bolinha branca; desligada com contorno e bolinha escuros; ○/◉ escuros; contagem cinza-escura legível |
+| FR2 | Fim do painel | Descer até a última linha dos filtros e de Configurações deste jogo | Nenhuma linha aparece por baixo da barra de dicas; a linha focada fica inteira acima dela |
+| FR3 | Central de Controle | Painéis Áudio (Mudo, saída), Tela (HDR, resolução) e Controle (bateria) | Mesmo comportamento de FR1; o valor da bateria legível na linha focada |
+| FR4 | Barra lateral e categorias | Item selecionado da barra lateral com contagem; categorias das Configurações | Contagem e ícone legíveis sobre o branco |
+
 ## Resultados
 
 Os campos Máquina, Windows, Monitor(es), Controles e Versão saem do diagnóstico do sistema; cole o relatório completo logo abaixo da tabela, dentro de um bloco de código.

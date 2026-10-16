@@ -89,7 +89,7 @@
   <DataTemplate DataType="{x:Type vm:ShortcutCaptureViewModel}">
     <Grid>
       <Rectangle Fill="{DynamicResource ScrimBrush}" />
-      <Border Width="900" CornerRadius="28" Background="#FF1A1E26" Padding="56,48" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border Width="900" CornerRadius="28" Background="#FF1A1E26" Padding="56,48" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{StaticResource HintBarReserve}">
         <StackPanel>
           <TextBlock Text="{Binding Title}" FontSize="{DynamicResource FsLabelMd}" FontWeight="SemiBold" Foreground="{DynamicResource OnAccentMutedBrush}" />
           <TextBlock Text="{Binding Prompt}" Margin="0,10,0,0" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -121,7 +121,7 @@
   <DataTemplate DataType="{x:Type vm:EditGameViewModel}">
     <Grid>
       <Rectangle Fill="{DynamicResource ScrimBrush}" />
-      <Border Width="980" CornerRadius="28" Background="#FF1A1E26" Padding="56,48" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border Width="980" CornerRadius="28" Background="#FF1A1E26" Padding="56,48" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{StaticResource HintBarReserve}">
         <StackPanel>
           <TextBlock Text="Editar jogo" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" />
           <TextBlock Text="{Binding Target}" Margin="0,10,0,0" FontSize="{DynamicResource FsLabelMd}" Foreground="{DynamicResource OnAccentSubtleBrush}" TextTrimming="CharacterEllipsis" />

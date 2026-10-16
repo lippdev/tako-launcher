@@ -10,7 +10,7 @@
   <DataTemplate DataType="{x:Type vm:ScreenConfirmViewModel}">
     <Grid>
       <Rectangle Fill="{DynamicResource ScrimBrush}" />
-      <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{StaticResource HintBarReserve}">
         <StackPanel>
           <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Text}" Margin="0,16,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />
@@ -26,7 +26,7 @@
   <DataTemplate DataType="{x:Type vm:ProgressOverlayViewModel}">
     <Grid>
       <Rectangle Fill="{DynamicResource ScrimBrush}" />
-      <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border Width="820" CornerRadius="28" Background="#FF1A1E26" Padding="56" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{StaticResource HintBarReserve}">
         <StackPanel>
           <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource FontDisplay}" FontSize="{DynamicResource FsHeadlineMd}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Detail}" Margin="0,16,0,0" FontSize="{DynamicResource FsBodyLg}" Foreground="#B3FFFFFF" TextWrapping="Wrap" />

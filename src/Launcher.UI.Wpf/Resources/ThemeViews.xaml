@@ -22,7 +22,7 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
               <TextBlock Text="Escolher" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
-              <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+              <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Style="{StaticResource RowIcon}" />
             </StackPanel>
             <StackPanel>
               <TextBlock Text="Importar tema do Playnite (.pthm)" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
@@ -34,7 +34,7 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
               <TextBlock Text="Restaurar" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
-              <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+              <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Style="{StaticResource RowIcon}" />
             </StackPanel>
             <StackPanel>
               <TextBlock Text="Restaurar tema padrão" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" />
@@ -51,7 +51,7 @@
                 <DockPanel>
                   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Badge}" FontSize="{DynamicResource FsLabelLg}" FontWeight="Bold" />
-                    <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Foreground="{DynamicResource OnAccentBrush}" />
+                    <c:Icon Key="Icon.Chevron" Width="24" Height="24" Margin="12,0,0,0" Style="{StaticResource RowIcon}" />
                   </StackPanel>
                   <StackPanel>
                     <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FsLabelLg}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
