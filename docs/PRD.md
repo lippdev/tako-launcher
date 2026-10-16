@@ -194,59 +194,59 @@ Todas as histórias abaixo têm prioridade **P0** e devem ser consideradas candi
 
 ## Épico MVP-A — Fundação técnica
 
-- [ ] **MVP-001 — Criar estrutura do projeto.** Definir projetos Host, Core, UI, Themes e Runtime. Aceite: solução compila em CI Windows com dependências documentadas.
-- [ ] **MVP-002 — Extrair contratos do Console Runtime.** Reutilizar interfaces de sessão, monitores e áudio. Aceite: integração funciona sem regressão nos fluxos do Console Mode.
-- [ ] **MVP-003 — Implementar comunicação IPC.** Named Pipes com protocolo versionado. Aceite: Host e Runtime trocam comandos, respostas e eventos, inclusive após reconexão.
-- [ ] **MVP-004 — Implementar máquina de estados de sessão.** Aceite: estados válidos são rastreados e transições inválidas não causam alterações no Windows.
-- [ ] **MVP-005 — Implementar persistência SQLite.** Aceite: biblioteca e configurações sobrevivem a reinicializações e migrações de esquema.
-- [ ] **MVP-006 — Criar supervisor de processos.** Aceite: falha da UI não impede encerramento ou recuperação segura da sessão.
+- [x] **MVP-001 — Criar estrutura do projeto.** Definir projetos Host, Core, UI, Themes e Runtime. Aceite: solução compila em CI Windows com dependências documentadas.
+- [x] **MVP-002 — Extrair contratos do Console Runtime.** Reutilizar interfaces de sessão, monitores e áudio. Aceite: integração funciona sem regressão nos fluxos do Console Mode.
+- [x] **MVP-003 — Implementar comunicação IPC.** Named Pipes com protocolo versionado. Aceite: Host e Runtime trocam comandos, respostas e eventos, inclusive após reconexão.
+- [x] **MVP-004 — Implementar máquina de estados de sessão.** Aceite: estados válidos são rastreados e transições inválidas não causam alterações no Windows.
+- [x] **MVP-005 — Implementar persistência SQLite.** Aceite: biblioteca e configurações sobrevivem a reinicializações e migrações de esquema.
+- [x] **MVP-006 — Criar supervisor de processos.** Aceite: falha da UI não impede encerramento ou recuperação segura da sessão.
 
 ## Épico MVP-B — Full Screen Experience
 
 - [ ] **MVP-007 — Investigar integração oficial FSE.** Validar registro e inicialização do launcher como aplicativo principal em configurações suportadas. Aceite: matriz documentada com builds, dispositivos, permissões, procedimento reproduzível e limitações.
-- [ ] **MVP-008 — Detectar suporte e estado do FSE.** Aceite: ambientes suportados, indisponíveis e indeterminados são diferenciados sem falsos positivos.
+- [x] **MVP-008 — Detectar suporte e estado do FSE.** Aceite: ambientes suportados, indisponíveis e indeterminados são diferenciados sem falsos positivos.
 - [ ] **MVP-009 — Implementar host compatível com FSE.** Aceite: demonstrar inicialização e retorno em pelo menos um ambiente com suporte oficial confirmado.
-- [ ] **MVP-010 — Implementar Fullscreen convencional.** Aceite: usuários sem FSE abrem e utilizam o launcher normalmente.
-- [ ] **MVP-011 — Implementar fallback para desktop.** Aceite: erro no modo Fullscreen oferece recuperação e não deixa o usuário preso em uma tela vazia.
-- [ ] **MVP-012 — Garantir compatibilidade com entrada e saída do modo console.** Aceite: monitores, resolução e áudio retornam aos estados registrados antes da sessão.
+- [x] **MVP-010 — Implementar Fullscreen convencional.** Aceite: usuários sem FSE abrem e utilizam o launcher normalmente.
+- [x] **MVP-011 — Implementar fallback para desktop.** Aceite: erro no modo Fullscreen oferece recuperação e não deixa o usuário preso em uma tela vazia.
+- [x] **MVP-012 — Garantir compatibilidade com entrada e saída do modo console.** Aceite: monitores, resolução e áudio retornam aos estados registrados antes da sessão.
 
 **Gate técnico:** não declarar compatibilidade nativa FSE em Windows comuns até comprovar suporte. O MVP poderá ser distribuído como prévia Fullscreen caso a integração oficial com FSE continue restrita.
 
 ## Épico MVP-C — Theme Engine Playnite
 
-- [ ] **MVP-013 — Criar tema padrão próprio.** Aceite: todas as operações essenciais funcionam sem temas externos.
-- [ ] **MVP-014 — Importar pacotes `.pthm`.** Aceite: usuário seleciona arquivo e o sistema identifica o pacote sem Playnite instalado.
-- [ ] **MVP-015 — Validar `theme.yaml`.** Aceite: nome, versão, modo, identificador e ThemeApiVersion são interpretados; temas incompatíveis recebem diagnóstico.
-- [ ] **MVP-016 — Implementar carregador XAML restrito.** Aceite: tipos e recursos permitidos são carregados; componentes perigosos ou desconhecidos são rejeitados antes da interpretação.
-- [ ] **MVP-017 — Implementar recursos de tema e herança.** Aceite: estilos, recursos, mídias e arquivos parciais herdam os componentes padrão definidos pelo adaptador.
-- [ ] **MVP-018 — Implementar adaptadores de dados.** Aceite: nomes, capas, biblioteca, seleção e comandos essenciais funcionam com os bindings suportados.
-- [ ] **MVP-019 — Implementar controles `PART_` prioritários.** Aceite: componentes de seleção, lista e detalhes possuem comportamento equivalente ao subset documentado.
-- [ ] **MVP-020 — Gerenciar temas instalados.** Aceite: listar, ativar, desativar, remover e restaurar tema padrão.
-- [ ] **MVP-021 — Implementar fallback de renderização.** Aceite: falha de tema não impede a inicialização nem causa loop de crash.
-- [ ] **MVP-022 — Homologar temas reais.** Aceite: três temas de teste, incluindo um tema parcial, com matriz explícita de recursos suportados e não suportados.
+- [x] **MVP-013 — Criar tema padrão próprio.** Aceite: todas as operações essenciais funcionam sem temas externos.
+- [x] **MVP-014 — Importar pacotes `.pthm`.** Aceite: usuário seleciona arquivo e o sistema identifica o pacote sem Playnite instalado.
+- [x] **MVP-015 — Validar `theme.yaml`.** Aceite: nome, versão, modo, identificador e ThemeApiVersion são interpretados; temas incompatíveis recebem diagnóstico.
+- [x] **MVP-016 — Implementar carregador XAML restrito.** Aceite: tipos e recursos permitidos são carregados; componentes perigosos ou desconhecidos são rejeitados antes da interpretação.
+- [x] **MVP-017 — Implementar recursos de tema e herança.** Aceite: estilos, recursos, mídias e arquivos parciais herdam os componentes padrão definidos pelo adaptador.
+- [x] **MVP-018 — Implementar adaptadores de dados.** Aceite: nomes, capas, biblioteca, seleção e comandos essenciais funcionam com os bindings suportados.
+- [x] **MVP-019 — Implementar controles `PART_` prioritários.** Aceite: componentes de seleção, lista e detalhes possuem comportamento equivalente ao subset documentado.
+- [x] **MVP-020 — Gerenciar temas instalados.** Aceite: listar, ativar, desativar, remover e restaurar tema padrão.
+- [x] **MVP-021 — Implementar fallback de renderização.** Aceite: falha de tema não impede a inicialização nem causa loop de crash.
+- [x] **MVP-022 — Homologar temas reais.** Aceite: três temas de teste, incluindo um tema parcial, com matriz explícita de recursos suportados e não suportados.
 
 ## Épico MVP-D — Biblioteca e jogos
 
-- [ ] **MVP-023 — Criar biblioteca local.** Aceite: jogos cadastrados são apresentados em uma grade navegável.
-- [ ] **MVP-024 — Importar executáveis manualmente.** Aceite: adicionar `.exe`, definir nome, pasta de trabalho e argumentos opcionais.
-- [ ] **MVP-025 — Criar tela de detalhes.** Aceite: capa, nome, informações disponíveis e botão Jogar aparecem no tema padrão e no tema homologado.
-- [ ] **MVP-026 — Executar jogos e reconhecer encerramento.** Aceite: jogo inicia corretamente e o launcher detecta o término por estratégia configurada.
-- [ ] **MVP-027 — Retomar a biblioteca após jogar.** Aceite: foco e seleção anterior são recuperados; sessão e áudio permanecem consistentes.
+- [x] **MVP-023 — Criar biblioteca local.** Aceite: jogos cadastrados são apresentados em uma grade navegável.
+- [x] **MVP-024 — Importar executáveis manualmente.** Aceite: adicionar `.exe`, definir nome, pasta de trabalho e argumentos opcionais.
+- [x] **MVP-025 — Criar tela de detalhes.** Aceite: capa, nome, informações disponíveis e botão Jogar aparecem no tema padrão e no tema homologado.
+- [x] **MVP-026 — Executar jogos e reconhecer encerramento.** Aceite: jogo inicia corretamente e o launcher detecta o término por estratégia configurada.
+- [x] **MVP-027 — Retomar a biblioteca após jogar.** Aceite: foco e seleção anterior são recuperados; sessão e áudio permanecem consistentes.
 
 ## Épico MVP-E — Controle e usabilidade
 
-- [ ] **MVP-028 — Navegação integral por joystick.** Aceite: fluxo Início → Biblioteca → Detalhes → Jogar funciona sem mouse e teclado.
-- [ ] **MVP-029 — Implementar gerenciamento consistente de foco.** Aceite: nenhuma tela essencial fica sem elemento selecionável ou com foco inacessível.
-- [ ] **MVP-030 — Implementar ações de voltar e menu.** Aceite: usuário consegue retornar, abrir opções e sair do launcher usando o controle, sem colisão com atalhos existentes do Console Mode.
-- [ ] **MVP-031 — Tratar desconexão de controle.** Aceite: reconexão não exige reiniciar o launcher e teclado permanece como alternativa de recuperação.
+- [x] **MVP-028 — Navegação integral por joystick.** Aceite: fluxo Início → Biblioteca → Detalhes → Jogar funciona sem mouse e teclado.
+- [x] **MVP-029 — Implementar gerenciamento consistente de foco.** Aceite: nenhuma tela essencial fica sem elemento selecionável ou com foco inacessível.
+- [x] **MVP-030 — Implementar ações de voltar e menu.** Aceite: usuário consegue retornar, abrir opções e sair do launcher usando o controle, sem colisão com atalhos existentes do Console Mode.
+- [x] **MVP-031 — Tratar desconexão de controle.** Aceite: reconexão não exige reiniciar o launcher e teclado permanece como alternativa de recuperação.
 
 ## Épico MVP-F — Qualidade e distribuição
 
-- [ ] **MVP-032 — Criar instalador e versão portable.** Aceite: instalação limpa em ambiente Windows suportado, sem exigir Playnite.
-- [ ] **MVP-033 — Criar logs de diagnóstico.** Aceite: falhas de FSE, UI, temas e execução de jogos podem ser identificadas sem expor dados sensíveis.
+- [x] **MVP-032 — Criar instalador e versão portable.** Aceite: instalação limpa em ambiente Windows suportado, sem exigir Playnite.
+- [x] **MVP-033 — Criar logs de diagnóstico.** Aceite: falhas de FSE, UI, temas e execução de jogos podem ser identificadas sem expor dados sensíveis.
 - [ ] **MVP-034 — Criar testes automatizados e checklists de hardware.** Aceite: CI executa testes de lógica e build; casos de monitores, áudio e controle são verificados em Windows real.
 - [ ] **MVP-035 — Construir benchmark inicial.** Aceite: medir consumo de CPU/RAM, tempo de entrada, fluidez da UI e overhead com jogo em execução.
-- [ ] **MVP-036 — Criar mecanismo de recuperação de configuração.** Aceite: saída inesperada, erro de tema ou falha de processo não deixam o PC sem um caminho funcional de volta ao desktop.
+- [x] **MVP-036 — Criar mecanismo de recuperação de configuração.** Aceite: saída inesperada, erro de tema ou falha de processo não deixam o PC sem um caminho funcional de volta ao desktop.
 
 ---
 
@@ -254,27 +254,27 @@ Todas as histórias abaixo têm prioridade **P0** e devem ser consideradas candi
 
 ## Épico UX — Interface e navegação
 
-- [ ] **UX-001:** busca de jogos por texto com teclado virtual.
-- [ ] **UX-002:** filtros por biblioteca, gênero, favorito e instalado.
-- [ ] **UX-003:** sistema de coleções personalizadas.
-- [ ] **UX-004:** ordenação por último jogado, nome e tempo de jogo.
-- [ ] **UX-005:** atalhos rápidos de ações por controle.
-- [ ] **UX-006:** configurações completas dentro da interface Fullscreen.
-- [ ] **UX-007:** editor de configurações de cada jogo.
-- [ ] **UX-008:** suporte a múltiplas resoluções, DPI e proporções de tela.
+- [x] **UX-001:** busca de jogos por texto com teclado virtual.
+- [x] **UX-002:** filtros por biblioteca, gênero, favorito e instalado.
+- [x] **UX-003:** sistema de coleções personalizadas.
+- [x] **UX-004:** ordenação por último jogado, nome e tempo de jogo.
+- [x] **UX-005:** atalhos rápidos de ações por controle.
+- [x] **UX-006:** configurações completas dentro da interface Fullscreen.
+- [x] **UX-007:** editor de configurações de cada jogo.
+- [x] **UX-008:** suporte a múltiplas resoluções, DPI e proporções de tela.
 - [ ] **UX-009:** configurações acessíveis de som, animação e contraste.
-- [ ] **UX-010:** tela inicial com jogos recentes e função Continuar Jogando.
+- [x] **UX-010:** tela inicial com jogos recentes e função Continuar Jogando.
 
 **Aceite do épico:** os principais recursos são acessíveis sem mouse, preservam foco corretamente e funcionam com diferentes tamanhos de tela.
 
 ## Épico DESK — Desktop controlado por joystick
 
-- [ ] **DESK-001:** integrar ControlFS como gerenciador de arquivos.
+- [x] **DESK-001:** integrar ControlFS como gerenciador de arquivos.
 - [ ] **DESK-002:** integrar JoyChromium ou navegador equivalente.
-- [ ] **DESK-003:** oferecer cursor virtual pelo analógico.
+- [x] **DESK-003:** oferecer cursor virtual pelo analógico.
 - [ ] **DESK-004:** configurar ações de clique esquerdo, direito e scroll.
 - [ ] **DESK-005:** criar teclado virtual contextual.
-- [ ] **DESK-006:** alternar entre aplicativos e janelas abertas.
+- [x] **DESK-006:** alternar entre aplicativos e janelas abertas.
 - [ ] **DESK-007:** executar instaladores com apoio do cursor virtual.
 - [ ] **DESK-008:** oferecer seleção, cópia, movimentação, extração e renomeação de arquivos.
 - [ ] **DESK-009:** adicionar assistente de configuração de jogos standalone.
@@ -286,16 +286,16 @@ Todas as histórias abaixo têm prioridade **P0** e devem ser consideradas candi
 
 ## Épico STORE — Plataformas de jogos
 
-- [ ] **STORE-001:** importar jogos instalados da Steam.
-- [ ] **STORE-002:** integrar jogos da Epic Games.
-- [ ] **STORE-003:** integrar GOG Galaxy ou biblioteca GOG.
-- [ ] **STORE-004:** identificar jogos do Xbox / Microsoft Store, respeitando restrições do pacote.
+- [x] **STORE-001:** importar jogos instalados da Steam.
+- [x] **STORE-002:** integrar jogos da Epic Games.
+- [x] **STORE-003:** integrar GOG Galaxy ou biblioteca GOG.
+- [x] **STORE-004:** identificar jogos do Xbox / Microsoft Store, respeitando restrições do pacote.
 - [ ] **STORE-005:** integrar Ubisoft Connect.
 - [ ] **STORE-006:** integrar EA App.
 - [ ] **STORE-007:** integrar Battle.net.
 - [ ] **STORE-008:** integrar Amazon Games.
 - [ ] **STORE-009:** importar catálogos existentes do Playnite, mediante suporte e consentimento.
-- [ ] **STORE-010:** unificar jogos duplicados sem perder a identidade da loja.
+- [x] **STORE-010:** unificar jogos duplicados sem perder a identidade da loja.
 - [ ] **STORE-011:** abrir instaladores e clientes oficiais quando exigidos.
 - [ ] **STORE-012:** detectar se um cliente de loja está ausente ou desatualizado.
 
@@ -319,7 +319,7 @@ Todas as histórias abaixo têm prioridade **P0** e devem ser consideradas candi
 - [ ] **SOURCE-014:** integrar downloads BitTorrent opcionais de conteúdo autorizado.
 - [ ] **SOURCE-015:** oferecer extração de arquivos compatíveis.
 - [ ] **SOURCE-016:** criar sistema de quarentena e confirmação antes de executar arquivos baixados.
-- [ ] **SOURCE-017:** integrar metadados e capas com provedores licenciados.
+- [x] **SOURCE-017:** integrar metadados e capas com provedores licenciados.
 - [ ] **SOURCE-018:** tratar fontes inválidas, indisponíveis e links quebrados.
 - [ ] **SOURCE-019:** implementar atualização e cache de catálogos.
 - [ ] **SOURCE-020:** configurar pasta padrão de downloads.
@@ -355,12 +355,12 @@ Todas as histórias abaixo têm prioridade **P0** e devem ser consideradas candi
 - [ ] **PERF-001:** monitorar consumo de RAM e CPU do launcher.
 - [ ] **PERF-002:** suspender ou encerrar a UI principal durante o jogo.
 - [ ] **PERF-003:** minimizar polling e trabalho de background.
-- [ ] **PERF-004:** implementar cache de imagens e lazy loading.
-- [ ] **PERF-005:** disponibilizar contador de FPS próprio, sem injeção, pelo PresentMon (ADR-0017; substitui a integração com o RTSS).
+- [x] **PERF-004:** implementar cache de imagens e lazy loading.
+- [x] **PERF-005:** disponibilizar contador de FPS próprio, sem injeção, pelo PresentMon (ADR-0017; substitui a integração com o RTSS).
 - [ ] **PERF-006:** registrar FPS médio e 1% lows em benchmarks.
 - [ ] **PERF-007:** estudar métricas de frametime e latência de apresentação.
-- [ ] **PERF-008:** permitir limitar FPS nos cenários compatíveis.
-- [ ] **PERF-009:** integrar perfis de resolução e taxa de atualização.
+- [x] **PERF-008:** permitir limitar FPS nos cenários compatíveis.
+- [x] **PERF-009:** integrar perfis de resolução e taxa de atualização.
 - [ ] **PERF-010:** expor controles HDR e VRR suportados.
 - [ ] **PERF-011:** oferecer presets por jogo e monitor.
 - [ ] **PERF-012:** estudar impacto do Windows Game Mode e FSE.
