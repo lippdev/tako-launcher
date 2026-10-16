@@ -41,6 +41,10 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 - **ART-001** Capas certas para a biblioteca inteira, como o Plex; **ART-002** um clique no site do SteamGridDB (como o SGDBoop); **ART-003** galeria de capas online.
 - **BRAND-001** Animação do Tako (polvo); **BRAND-002** animação de entrada.
 - **DEALS-001** Página de promoções com links de afiliado.
+- **INPUT-001** Remapear os controles do Tako; **INPUT-002** remapear para os jogos, como a Entrada Steam (estudo).
+- **SESSION-001** Retomada rápida, como o Quick Resume (estudo).
+- **VOICE-001** Busca por voz; **AI-001** assistente de IA para a biblioteca (estudo).
+- **DATA-001** Dados de melhoria, só com opt-in.
 - **UX-001** Tamanho de texto e sons de navegação.
 - **SRC-001** Emuladores e ROMs, incluindo importar dos principais emuladores; **SRC-002** Bottles e itch.io.
 - **UX-002** Arte animada, **UX-004** Perfis locais.
@@ -53,3 +57,4 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 - **PLAT-001** Sessão gamescope: precisa de validação em hardware.
 - **CMI-*** Integração com o Console Mode: depende da API dele.
 - **EXT, STREAM, CLOUD, SOURCE**: P3.
+- **DL-001/002** Downloads por torrent e Real-Debrid: esperam a decisão do mantenedor sobre limitar a conteúdo legal (risco de DMCA).
