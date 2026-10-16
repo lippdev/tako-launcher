@@ -30,6 +30,8 @@ exit = "Exit to desktop"
 
 [status]
 keyboard = "Keyboard"
+pad_disconnected = "Controller disconnected"
+pad_connected = "Controller connected"
 battery_low = "Low battery: {pad} at {percent}%"
 
 [home]

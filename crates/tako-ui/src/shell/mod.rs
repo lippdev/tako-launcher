@@ -488,9 +488,7 @@ impl Shell {
     /// Calcula todas as propriedades do tema para este instante.
     pub fn render(&mut self, now: Instant) -> Out {
         let mut out = Out::default();
-        if let Some((_, at)) = &self.ctx.toast
-            && now.duration_since(*at) >= TOAST_TIME
-        {
+        if self.ctx.toast_expired(now) {
             self.ctx.toast = None;
         }
         let kind = self.page().kind();

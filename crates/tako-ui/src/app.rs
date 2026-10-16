@@ -1,7 +1,7 @@
 //! Laço da interface: carrega o tema, monta o contexto, liga entrada (controle e teclado) e desenha quando
 //! algo muda. As tarefas longas (ler as lojas, metadados) rodam em threads e voltam pelo laço do Slint.
 
-use crate::gamepad::{PadEvent, PadState, Pads};
+use crate::gamepad::{PadState, Pads};
 use crate::shell::keys::{self, KeyAction};
 use crate::shell::{Cmd, Ctx, Effect, InputKind, Settings, Shell};
 use crate::{bridge, images, theme, values::ToValue};
@@ -152,6 +152,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pad: Default::default(),
         pad_name: String::new(),
         pads_connected: 0,
+        pad_lost: false,
         pad_battery: None,
         input: InputKind::Keyboard,
         toast: None,
@@ -482,14 +483,9 @@ impl App {
                 let mut chord_fired = false;
                 if let Some(p) = pads.as_mut() {
                     for ev in p.poll() {
-                        let mut s = app.shell.borrow_mut();
-                        if let PadEvent::Connected { name, family } = ev {
-                            s.ctx.pad = family;
-                            s.ctx.pad_name = name;
-                            s.ctx.input = InputKind::Gamepad;
-                        }
-                        s.ctx.pads_connected = p.count();
-                        s.ctx.dirty = true;
+                        app.shell.borrow_mut().ctx.pad_event(ev, p.count());
+                        // O que já estiver apertado no controle que voltou (ou no outro) só vale depois de solto.
+                        interp.reset();
                         next_battery = now;
                     }
                     // Bateria a cada 30 s (e logo depois de um controle entrar ou sair), nunca por quadro.
@@ -562,13 +558,7 @@ impl App {
                     bridge::set(&app.ui.borrow(), "clock", clock.to_value());
                     last_clock = clock;
                 }
-                let expired = app
-                    .shell
-                    .borrow()
-                    .ctx
-                    .toast
-                    .as_ref()
-                    .is_some_and(|(_, at)| at.elapsed() >= crate::shell::TOAST_TIME);
+                let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {
                     app.shell.borrow_mut().ctx.dirty = true;
                 }
@@ -765,5 +755,43 @@ mod tests {
             "o relatório do sistema abre um diálogo"
         );
         assert!(shell.borrow().ctx.pending_layer.is_none());
+    }
+
+    #[test]
+    fn controller_drop_keeps_focus_and_reconnect_resumes() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        i18n::set_lang(Lang::PtBr);
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        let mut shell = Shell::new(ctx);
+        shell.ctx.input = InputKind::Gamepad;
+        for c in [Cmd::Down, Cmd::Right] {
+            shell.handle(c);
+        }
+        let focus = shell.focused_game();
+        assert!(focus.is_some());
+
+        shell
+            .ctx
+            .pad_event(crate::gamepad::PadEvent::Disconnected { remaining: 0 }, 0);
+        let later = Instant::now() + crate::shell::TOAST_TIME * 2;
+        shell.render(later);
+        assert_eq!(shell.focused_game(), focus);
+        assert!(!shell.has_layers());
+        let toast = |s: &Shell| s.ctx.toast.as_ref().map(|(t, _)| t.clone());
+        assert_eq!(toast(&shell).as_deref(), Some("Controle desconectado"));
+
+        shell.ctx.pad_event(
+            crate::gamepad::PadEvent::Connected {
+                name: "Outro".into(),
+                family: Default::default(),
+            },
+            1,
+        );
+        assert_eq!(toast(&shell).as_deref(), Some("Controle conectado"));
+        shell.render(later);
+        assert_eq!(toast(&shell), None);
+        shell.handle(Cmd::Right);
+        assert_ne!(shell.focused_game(), focus);
     }
 }

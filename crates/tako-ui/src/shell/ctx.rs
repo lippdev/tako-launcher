@@ -2,7 +2,7 @@
 //! pede ao resto do app (efeitos).
 
 use super::Cmd;
-use crate::gamepad::PadFamily;
+use crate::gamepad::{PadEvent, PadFamily};
 use crate::model::Hint;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -150,6 +150,8 @@ pub struct Ctx {
     pub pad: PadFamily,
     pub pad_name: String,
     pub pads_connected: usize,
+    /// O controle em uso caiu e nenhum outro ficou: o aviso "Controle desconectado" fica na tela.
+    pub pad_lost: bool,
     /// Bateria (%) do controle sem fio em uso; `None` = com fio, desconhecida ou sem controle.
     pub pad_battery: Option<i32>,
     pub input: InputKind,
@@ -222,6 +224,38 @@ impl Ctx {
 
     pub fn toast(&mut self, text: impl Into<String>) {
         self.toast = Some((text.into(), Instant::now()));
+        self.dirty = true;
+    }
+
+    /// O aviso atual já passou do tempo (o de controle desconectado fica até um controle voltar).
+    pub fn toast_expired(&self, now: Instant) -> bool {
+        !(self.pad_lost && self.input == InputKind::Gamepad)
+            && self
+                .toast
+                .as_ref()
+                .is_some_and(|(_, at)| now.duration_since(*at) >= super::TOAST_TIME)
+    }
+
+    /// Controle entrou ou saiu. Fora do jogo avisa, sem mexer no foco nem nas camadas; durante o jogo o
+    /// fluxo da sobreposição segue como está.
+    pub fn pad_event(&mut self, ev: PadEvent, count: usize) {
+        match ev {
+            PadEvent::Connected { name, family } => {
+                self.pad = family;
+                self.pad_name = name;
+                self.input = InputKind::Gamepad;
+                if std::mem::take(&mut self.pad_lost) {
+                    self.toast(self.t("status.pad_connected"));
+                }
+            }
+            PadEvent::Disconnected { remaining } => {
+                if self.running.is_none() && self.input == InputKind::Gamepad {
+                    self.pad_lost = remaining == 0;
+                    self.toast(self.t("status.pad_disconnected"));
+                }
+            }
+        }
+        self.pads_connected = count;
         self.dirty = true;
     }
 
