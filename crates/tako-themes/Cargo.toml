@@ -13,8 +13,6 @@ toml.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 zip.workspace = true
-
-[dev-dependencies]
 tempfile.workspace = true
 
 [lints]
