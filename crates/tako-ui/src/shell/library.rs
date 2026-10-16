@@ -11,6 +11,16 @@ use tako_core::presentation::{game_text, library_text};
 
 pub type Criteria = Rc<RefCell<LibraryCriteria>>;
 
+/// Linhas da grade que pedem capa, em volta da linha do foco. O tema padrão rola seguindo o foco e só
+/// desenha ~5 linhas; pedir as capas da biblioteca inteira não cabe no LRU (1.000 jogos ≈ 540 MB).
+/// shortcut: um tema que mostre mais de 9 linhas de uma vez vê as de fora sem capa; passar a área visível do
+/// tema para cá se aparecer um.
+fn near_rows(focus: Option<usize>, cols: usize) -> std::ops::RangeInclusive<usize> {
+    const NEAR: usize = 4;
+    let row = focus.unwrap_or(0) / cols.max(1);
+    row.saturating_sub(NEAR)..=row + NEAR
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Chip {
     Search,
@@ -268,10 +278,13 @@ impl Page for LibraryPage {
                 -1
             },
         );
+        let cols = ctx.grid_columns.max(1);
+        let near = near_rows(self.focus, cols);
         let tiles: Vec<_> = ids
             .iter()
             .filter_map(|id| ctx.library.find(id))
-            .map(|g| tiles::tile(ctx, g))
+            .enumerate()
+            .map(|(i, g)| tiles::tile(ctx, g, near.contains(&(i / cols))))
             .collect();
         out.set("library-tiles", tiles);
         out.set("library-focus", self.focus.map(|f| f as i32).unwrap_or(-1));
@@ -334,5 +347,18 @@ impl Page for LibraryPage {
         if let Some(i) = self.ids(ctx).iter().position(|x| x == id) {
             self.focus = Some(i);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::near_rows;
+
+    #[test]
+    fn covers_only_near_the_focused_row() {
+        assert_eq!(near_rows(None, 7), 0..=4);
+        assert_eq!(near_rows(Some(6), 7), 0..=4);
+        assert_eq!(near_rows(Some(70), 7), 6..=14);
+        assert_eq!(near_rows(Some(3), 0), 0..=7);
     }
 }

@@ -28,12 +28,13 @@ pub fn meta(ctx: &Ctx, g: &Game) -> String {
     parts.join(" · ")
 }
 
-pub fn tile(ctx: &Ctx, g: &Game) -> Tile {
+/// `cover: false` não pede a capa (tile fora da área que o tema desenha).
+pub fn tile(ctx: &Ctx, g: &Game, cover: bool) -> Tile {
     Tile {
         id: g.id.clone(),
         title: g.title.clone(),
         meta: meta(ctx, g),
-        cover: image(g.shown_cover(), COVER),
+        cover: image(g.shown_cover().filter(|_| cover), COVER),
         accent: parse_color(&g.accent),
         installed: g.is_installed,
         favorite: g.is_favorite,

@@ -345,7 +345,7 @@ impl Page for HomePage {
                     .ids
                     .iter()
                     .filter_map(|id| ctx.library.find(id))
-                    .map(|g| tiles::tile(ctx, g))
+                    .map(|g| tiles::tile(ctx, g, true))
                     .collect(),
                 see_all: true,
             })
