@@ -349,6 +349,29 @@ Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo de
 - [ ] **PERF-001:** painel de diagnóstico do próprio Tako (memória, CPU, tempo de abertura).
 - [ ] **PERF-002:** presets de tela por jogo e por monitor, incluindo HDR e VRR onde o SO expõe.
 
+### Épico INPUT — Controles (P2)
+
+- [ ] **INPUT-001:** personalizar os controles do próprio Tako: remapear cada ação (aceitar, voltar, menu, seções, atalho da Central) por controle, com perfis.
+- [ ] **INPUT-002:** remapear controles para os jogos, como a Entrada Steam: perfis por jogo, botões, analógicos, gatilhos e mouse/teclado. Precisa de um controle virtual no SO (uinput no Linux; no Windows o ViGEmBus foi descontinuado, então é preciso escolher outro driver). Começa por um estudo.
+
+### Épico SESSION — Sessões de jogo (P2)
+
+- [ ] **SESSION-001:** retomada rápida, como o Quick Resume do Xbox Series: suspender o jogo aberto (sem fechar) ao abrir outro e voltar exatamente onde estava. No PC fica na memória, não sobrevive a reiniciar o computador. Não funciona com jogos online nem com anti-cheat, que precisam ficar de fora. Começa por um estudo.
+
+### Épico VOICE e AI — Busca por voz e IA (P3)
+
+- [ ] **VOICE-001:** procurar jogos falando ("abrir Hades", "jogos de corrida"), com reconhecimento de fala local (sem mandar áudio para fora) e nos dois idiomas.
+- [ ] **AI-001:** estudo de um assistente de IA para organizar e gerenciar a biblioteca (coleções, limpeza, recomendações, configurações por jogo). Downloads pelo assistente seguem a mesma regra do épico DL.
+
+### Épico DATA — Dados de melhoria (P3)
+
+- [ ] **DATA-001:** enviar dados de uso e falhas para os desenvolvedores, **desligado por padrão** e com opt-in explícito: anônimo, sem lista de jogos nem caminhos, com tela mostrando o que é enviado e opção de apagar. Precisa seguir LGPD e GDPR e escolher o serviço que recebe os dados.
+
+### Épico DL — Downloads (P3, decisão pendente)
+
+- [ ] **DL-001:** baixar jogos por torrent a partir de fontes em `.json`, como o Hydra Launcher. **Decisão pendente do mantenedor:** as fontes que circulam para o Hydra são em grande parte repacks pirateados. O Tako só pode trazer ou facilitar fontes de conteúdo legal (jogos grátis, DRM-free, homebrew, jogos que o usuário possui), ou o projeto fica exposto a DMCA (repositório, releases e parcerias como a DEALS-001). Definir a regra antes de qualquer código.
+- [ ] **DL-002:** depois do DL-001, integrar serviços de download acelerado como o Real-Debrid, com a conta do próprio usuário. Mesma restrição.
+
 ### Épico DEALS — Promoções (P3)
 
 - [ ] **DEALS-001:** página de promoções: jogos em oferta nas lojas (Green Man Gaming, Nuuvem, Instant Gaming e outras), com preço, desconto e link de afiliado, em layout parecido com uma loja. O Tako não vende nada: o link abre a loja no navegador. Precisa dizer claramente que os links são de afiliado e escolher a fonte dos preços (API da loja, programa de afiliados ou agregador).
