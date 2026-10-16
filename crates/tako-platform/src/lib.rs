@@ -17,6 +17,11 @@ pub mod linux;
 pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
+// Partes puras do Windows, compiladas e testadas em todo SO.
+#[path = "windows/identity.rs"]
+pub mod windows_identity;
+#[path = "windows/startup.rs"]
+pub mod windows_startup;
 
 /// Conjunto de funções de plataforma usado pela sessão e pela UI.
 #[derive(Clone)]

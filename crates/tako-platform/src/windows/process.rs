@@ -1,0 +1,189 @@
+//! Abrir jogos e observar processos: `ShellExecuteExW`, retrato pelo Toolhelp (port de
+//! `Launcher.UI.Wpf/Services/ProcessSnapshot.cs`) e `WM_CLOSE` nas janelas do jogo.
+
+use chrono::{DateTime, Utc};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, PoisonError};
+use tako_core::devices::{DeviceError, DeviceResult, ProcessEntry, ProcessLauncher};
+use windows::Win32::Foundation::{CloseHandle, FILETIME, HWND, LPARAM, WPARAM};
+use windows::Win32::System::Diagnostics::ToolHelp::*;
+use windows::Win32::System::Threading::*;
+use windows::Win32::UI::Shell::{SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW};
+use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::{BOOL, PCWSTR, PWSTR};
+
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(Some(0)).collect()
+}
+
+/// FILETIME (100 ns desde 1601) → UTC.
+fn from_filetime(ft: FILETIME) -> Option<DateTime<Utc>> {
+    let ticks = (u64::from(ft.dwHighDateTime) << 32) | u64::from(ft.dwLowDateTime);
+    let secs = (ticks / 10_000_000) as i64 - 11_644_473_600;
+    DateTime::from_timestamp(secs, (ticks % 10_000_000) as u32 * 100)
+}
+
+/// Caminho do executável e início.
+type ProcessInfo = (Option<String>, Option<DateTime<Utc>>);
+
+/// Caminho e início do processo; acesso negado (sistema, outro usuário, anti-cheat) vira `None`, sem erro.
+fn query(pid: u32) -> ProcessInfo {
+    // SAFETY: o handle é fechado no fim; os buffers têm o tamanho informado.
+    unsafe {
+        let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+            return (None, None);
+        };
+        let mut buf = [0u16; 1024];
+        let mut size = buf.len() as u32;
+        let path =
+            QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut size)
+                .ok()
+                .map(|()| String::from_utf16_lossy(&buf[..size as usize]));
+        let (mut created, mut exit, mut kernel, mut user) = Default::default();
+        let started = GetProcessTimes(h, &mut created, &mut exit, &mut kernel, &mut user)
+            .ok()
+            .and_then(|()| from_filetime(created));
+        let _ = CloseHandle(h);
+        (path, started)
+    }
+}
+
+/// Processos do Windows. Caminhos ficam em cache por PID: cada retrato só consulta os novos.
+#[derive(Default)]
+pub struct WindowsProcesses {
+    cache: Mutex<HashMap<u32, ProcessInfo>>,
+}
+
+struct CloseTargets<'a> {
+    pids: &'a HashSet<u32>,
+    windows: Vec<HWND>,
+}
+
+unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    // SAFETY: `lparam` é o `&mut CloseTargets` passado a `EnumWindows`, vivo durante a enumeração.
+    let targets = unsafe { &mut *(lparam.0 as *mut CloseTargets) };
+    let mut pid = 0;
+    // SAFETY: `hwnd` vem do próprio `EnumWindows`.
+    unsafe {
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        // Só janelas principais: visíveis e sem dono (diálogos fecham junto com a dona).
+        if targets.pids.contains(&pid)
+            && IsWindowVisible(hwnd).as_bool()
+            && GetWindow(hwnd, GW_OWNER).is_err()
+        {
+            targets.windows.push(hwnd);
+        }
+    }
+    BOOL(1)
+}
+
+impl ProcessLauncher for WindowsProcesses {
+    fn launch(
+        &self,
+        target: &str,
+        arguments: Option<&str>,
+        working_dir: Option<&str>,
+    ) -> DeviceResult<Option<u32>> {
+        let file = wide(target);
+        let args = arguments.map(wide);
+        let dir = working_dir.map(wide);
+        let ptr = |v: &Option<Vec<u16>>| v.as_ref().map_or(PCWSTR::null(), |v| PCWSTR(v.as_ptr()));
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: size_of::<SHELLEXECUTEINFOW>() as u32,
+            fMask: SEE_MASK_NOCLOSEPROCESS,
+            lpFile: PCWSTR(file.as_ptr()),
+            lpParameters: ptr(&args),
+            lpDirectory: ptr(&dir),
+            nShow: SW_SHOWNORMAL.0,
+            ..Default::default()
+        };
+        // SAFETY: os textos terminam em 0 e vivem até o fim da função.
+        unsafe { ShellExecuteExW(&mut info) }.map_err(|e| {
+            DeviceError::Failed(format!("ShellExecuteEx falhou para {target}: {e}"))
+        })?;
+        // URIs e `shell:AppsFolder\…` não devolvem processo.
+        if info.hProcess.is_invalid() {
+            return Ok(None);
+        }
+        // SAFETY: handle devolvido pelo `SEE_MASK_NOCLOSEPROCESS`, fechado aqui.
+        let pid = unsafe {
+            let pid = GetProcessId(info.hProcess);
+            let _ = CloseHandle(info.hProcess);
+            pid
+        };
+        Ok((pid != 0).then_some(pid))
+    }
+
+    fn snapshot(&self) -> Vec<ProcessEntry> {
+        // SAFETY: retrato de processos; o handle é fechado no fim.
+        let Ok(snap) = (unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }) else {
+            return Vec::new();
+        };
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut entries = Vec::with_capacity(400);
+        let mut seen = HashSet::new();
+        let mut e = PROCESSENTRY32W {
+            dwSize: size_of::<PROCESSENTRY32W>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: `e` tem `dwSize` preenchido; `snap` é um retrato válido.
+        let mut ok = unsafe { Process32FirstW(snap, &mut e) }.is_ok();
+        while ok {
+            let pid = e.th32ProcessID;
+            seen.insert(pid);
+            let (path, started) = cache.entry(pid).or_insert_with(|| query(pid)).clone();
+            entries.push(ProcessEntry {
+                pid,
+                parent_pid: (e.th32ParentProcessID != 0).then_some(e.th32ParentProcessID),
+                exe_path: path,
+                started_at: started,
+            });
+            // SAFETY: como acima.
+            ok = unsafe { Process32NextW(snap, &mut e) }.is_ok();
+        }
+        // SAFETY: handle aberto acima.
+        let _ = unsafe { CloseHandle(snap) };
+        cache.retain(|pid, _| seen.contains(pid));
+        entries
+    }
+
+    fn request_close(&self, pids: &[u32]) -> DeviceResult<()> {
+        let pids: HashSet<u32> = pids.iter().copied().collect();
+        let mut targets = CloseTargets {
+            pids: &pids,
+            windows: Vec::new(),
+        };
+        // SAFETY: `targets` vive durante toda a enumeração, que é síncrona.
+        let _ = unsafe {
+            EnumWindows(
+                Some(collect),
+                LPARAM(&mut targets as *mut CloseTargets as isize),
+            )
+        };
+        if targets.windows.is_empty() {
+            return Err(DeviceError::NotFound(
+                "nenhuma janela do jogo para fechar".into(),
+            ));
+        }
+        for hwnd in targets.windows {
+            // SAFETY: mensagem postada (sem esperar) para uma janela de outro processo.
+            let _ = unsafe { PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0)) };
+        }
+        Ok(())
+    }
+
+    fn steam_running_app_id(&self) -> u32 {
+        windows_registry::CURRENT_USER
+            .open(r"Software\Valve\Steam")
+            .and_then(|k| k.get_u32("RunningAppID"))
+            .unwrap_or(0)
+    }
+
+    fn open_folder(&self, path: &str) -> DeviceResult<()> {
+        std::process::Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map(drop)
+            .map_err(|e| DeviceError::Failed(format!("explorer: {e}")))
+    }
+}

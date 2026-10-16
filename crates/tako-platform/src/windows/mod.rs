@@ -1,11 +1,25 @@
-//! Implementações para windows (PRD §5.3). Até cada função ficar pronta, usa a simulada do core.
+//! Implementações para Windows (PRD §5.3): telas pela CCD, áudio pelo Core Audio, cursor por `SetSystemCursor`
+//! e `SendInput`, processos pelo Shell e Toolhelp, abrir ao entrar pelo registro.
 
 use crate::Platform;
+use std::sync::Arc;
 
+mod audio;
+mod autostart;
 pub mod dpapi;
+mod display;
+mod pointer;
+mod process;
 
-pub fn platform(_data_root: &std::path::Path) -> Platform {
-    let mut p = Platform::simulated();
-    p.secrets = std::sync::Arc::new(crate::secrets::OsSecrets);
-    p
+pub fn platform(data_root: &std::path::Path) -> Platform {
+    let pointer = Arc::new(pointer::WindowsPointer::new(data_root));
+    Platform {
+        displays: Arc::new(display::WindowsDisplays::default()),
+        audio: Arc::new(audio::WindowsAudio::default()),
+        cursor: pointer.clone(),
+        pointer,
+        processes: Arc::new(process::WindowsProcesses::default()),
+        secrets: Arc::new(crate::secrets::OsSecrets),
+        autostart: Arc::new(autostart::WindowsAutostart),
+    }
 }

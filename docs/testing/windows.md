@@ -1,0 +1,58 @@
+# Teste manual no Windows (MIG-020 a MIG-024)
+
+Roteiro curto para validar em hardware real o que a CI não alcança. Use um PC com Windows 10 ou 11, um monitor e, se possível, uma TV na HDMI, um fone ou caixa de som extra e um controle (Xbox ou PlayStation).
+
+Antes de começar: abra o Tako uma vez e confira na pasta de dados (`%LOCALAPPDATA%\Tako` na versão instalada, ao lado do executável na portátil) que não existe o arquivo `cursor-hidden`.
+
+## 1. Resolução e taxa (MIG-020)
+
+1. Em Configurações › Tela, confira que a lista mostra todas as telas conectadas, com o nome do monitor (não `\\.\DISPLAY1`).
+2. Escolha uma resolução e taxa diferentes da atual (ex.: 1920 × 1080 · 60 Hz) e aplique.
+3. A imagem muda e o Tako pede confirmação. **Não confirme**: espere o tempo acabar. A resolução anterior volta sozinha.
+4. Repita e **confirme**. A nova resolução fica.
+5. Configure um jogo com "Tela de jogo" = só a TV, resolução 4K e HDR ligado. Abra o jogo.
+6. Durante o jogo: só a TV está ligada, como principal, na resolução pedida, com HDR (Configurações do Windows › Tela mostra HDR ativo).
+7. Feche o jogo. Monitor e TV voltam exatamente como antes: mesmas telas ligadas, a mesma principal, posições, resolução, taxa (59,94 continua 59,94), rotação e HDR.
+8. Reinicie o PC com o jogo aberto (simula queda). Abra o Tako: a configuração anterior é restaurada.
+9. Com uma tela na vertical (90°), repita 5–7 e confira que a rotação volta.
+
+## 2. Saída de áudio (MIG-021)
+
+1. Em Configurações › Áudio, a lista mostra todas as saídas ativas pelo nome (ex.: "Alto-falantes (Realtek)"), com a padrão marcada.
+2. Configure o jogo para sair no fone. Abra o jogo: o som sai no fone. No Painel de Som do Windows, o fone é o padrão **e** o padrão de comunicação.
+3. Feche o jogo: a saída padrão, o volume e o mudo de cada saída voltam como estavam.
+4. Mude o volume e o mudo pelo Tako: o ícone de volume do Windows acompanha.
+5. Se o Tako disser que não consegue trocar a saída padrão neste Windows, anote a versão do Windows (`winver`) no relato.
+
+## 3. Esconder o cursor (MIG-022)
+
+1. Ligue "Esconder o ponteiro" e abra um jogo: o ponteiro some em todo lugar, inclusive sobre outros apps.
+2. Feche o jogo: o ponteiro volta, com o esquema do usuário (teste com um esquema diferente do padrão, ex.: "Windows Preto").
+3. Queda: com o ponteiro escondido, encerre o Tako pelo Gerenciador de Tarefas. O ponteiro continua escondido e existe `cursor-hidden` na pasta de dados.
+4. Abra o Tako de novo: o ponteiro volta na hora e o arquivo `cursor-hidden` some.
+
+## 4. Mouse pelo controle (MIG-023)
+
+1. Ligue o mouse pelo controle e abra um jogo ou emulador com menu que só aceita mouse.
+2. Analógico esquerdo move o ponteiro, suave, mais rápido quanto mais empurrado.
+3. Analógico direito rola para cima/baixo e para os lados.
+4. A clica; dois toques = botão direito; segurar A arrasta (solte e confira que o botão não ficou preso).
+5. Com o jogo rodando como administrador, o ponteiro não se move (limitação do Windows): confira que o Tako não trava nem enche o log.
+6. Repita 2–4 com controle PlayStation.
+
+## 5. Abrir jogos de cada loja (MIG-024)
+
+Para cada um: abre, o Tako detecta o jogo rodando, "Encerrar jogo" fecha a janela (sem matar o processo) e, ao sair, o Tako volta com foco.
+
+1. **Steam**: jogo instalado. Durante o jogo, o Tako reconhece o `RunningAppID`; o fim vale quando a Steam diz que o jogo parou.
+2. **Epic**, **GOG Galaxy**, **EA app**, **Ubisoft Connect**, **Battle.net**: um jogo de cada (abre pela URI da loja).
+3. **Xbox / Microsoft Store**: um jogo da Store (abre por `shell:AppsFolder\…`, sem PID): o Tako acompanha pelo processo do jogo.
+4. **Jogo manual**: um `.exe` com argumentos e pasta de trabalho; um atalho `.lnk`; um `.bat`.
+5. **Abrir pasta** do jogo: abre no Explorador de Arquivos.
+
+## 6. Abrir ao entrar no Windows
+
+1. Ligue "Abrir ao iniciar o Windows". Em `regedit`, `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` tem o valor `Tako` = `"<caminho do Tako.exe>" --startup`.
+2. Saia e entre de novo no Windows: o Tako abre.
+3. Mova a pasta do Tako portátil: a opção aparece desligada (o valor aponta para outra cópia).
+4. Desligue a opção: o valor `Tako` some do registro.
