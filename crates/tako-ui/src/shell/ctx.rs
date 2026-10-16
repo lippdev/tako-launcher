@@ -173,6 +173,8 @@ pub struct Ctx {
     pub controller_mouse: bool,
     /// O jogo terminou: foco nele e "Bem-vindo de volta" no próximo desenho (id, tempo jogado).
     pub welcome_back: Option<(String, std::time::Duration)>,
+    /// Levar a janela para estes limites no próximo desenho (teste da tela de jogo).
+    pub move_window: Option<tako_core::devices::ScreenBounds>,
     /// Algo mudou e a tela precisa ser redesenhada.
     pub dirty: bool,
 }

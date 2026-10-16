@@ -33,6 +33,7 @@ pub fn common(effect: &Effect, shell: &mut Shell) -> Option<HostAction> {
         Effect::CheckUpdates => check_updates(ctx, true),
         Effect::InstallUpdate => return Some(install_update(ctx)),
         Effect::ApplyTheme(_) => return Some(HostAction::ReloadTheme),
+        Effect::TestGameScreen => crate::screen_test::start(ctx),
         _ => return None,
     }
     Some(HostAction::Stay)

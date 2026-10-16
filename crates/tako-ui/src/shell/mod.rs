@@ -132,6 +132,11 @@ impl Shell {
         self.ctx.dirty = true;
     }
 
+    pub fn pop_layer(&mut self) {
+        self.layers.pop();
+        self.ctx.dirty = true;
+    }
+
     pub fn close_layers(&mut self) {
         self.layers.clear();
         self.ctx.dirty = true;

@@ -169,6 +169,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         art,
         controller_mouse: false,
         welcome_back: None,
+        move_window: None,
         dirty: true,
     };
     ctx.sync_collections();
@@ -525,7 +526,12 @@ impl App {
     }
 
     pub fn run(&self) -> Result<(), String> {
-        self.ui.borrow().show().map_err(|e| e.to_string())?;
+        let ui = self.ui.borrow();
+        // Como o WPF (sem borda, maximizado). Builds de desenvolvimento abrem em janela; TAKO_WINDOWED força janela.
+        ui.window()
+            .set_fullscreen(!cfg!(debug_assertions) && std::env::var_os("TAKO_WINDOWED").is_none());
+        ui.show().map_err(|e| e.to_string())?;
+        drop(ui);
         rescan(&self.shell);
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
     }
@@ -608,6 +614,17 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     s.ctx.dirty = false;
     if let Some((id, played)) = s.ctx.welcome_back.take() {
         welcome_back(&mut s, &id, played);
+    }
+    if let Some(b) = s.ctx.move_window.take() {
+        let w = ui.window();
+        let full = w.is_fullscreen();
+        w.set_fullscreen(false);
+        w.set_position(slint::PhysicalPosition::new(b.x, b.y));
+        w.set_size(slint::PhysicalSize::new(
+            b.width.max(1) as u32,
+            b.height.max(1) as u32,
+        ));
+        w.set_fullscreen(full);
     }
     if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
         s.ctx.grid_columns = (n as usize).max(1);
