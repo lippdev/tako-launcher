@@ -45,6 +45,7 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 - **SESSION-001** Retomada rápida, como o Quick Resume (estudo).
 - **VOICE-001** Busca por voz; **AI-001** assistente de IA para a biblioteca (estudo).
 - **DATA-001** Dados de melhoria, só com opt-in.
+- **DL-001** Downloads por torrent de fontes `.json` do usuário, vinculados ao jogo da biblioteca; **DL-002** Real-Debrid. O Tako só fornece a ferramenta.
 - **UX-001** Tamanho de texto e sons de navegação.
 - **SRC-001** Emuladores e ROMs, incluindo importar dos principais emuladores; **SRC-002** Bottles e itch.io.
 - **UX-002** Arte animada, **UX-004** Perfis locais.
@@ -57,4 +58,3 @@ Conferido sem precisar de mudança: escala de 720p a 4K (o layout acompanha a al
 - **PLAT-001** Sessão gamescope: precisa de validação em hardware.
 - **CMI-*** Integração com o Console Mode: depende da API dele.
 - **EXT, STREAM, CLOUD, SOURCE**: P3.
-- **DL-001/002** Downloads por torrent e Real-Debrid: esperam a decisão do mantenedor sobre limitar a conteúdo legal (risco de DMCA).
