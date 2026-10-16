@@ -89,6 +89,7 @@ metadata_hint = "Ligue a IGDB em Configurações › Capas e metadados para comp
 add_to_collection = "Adicionar à coleção"
 
 [options]
+sessions = "Sessões"
 open_steam = "Abrir na Steam"
 change_art = "Trocar imagens"
 source_ids = "Fontes e IDs"

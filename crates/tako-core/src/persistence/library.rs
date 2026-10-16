@@ -4,7 +4,7 @@
 
 use super::database::{CORRUPTED_SUFFIX, with_suffix};
 use super::{Result, TakoDatabase, format_date, parse_date, parse_date_or_epoch};
-use crate::library::GameTrackingStrategy;
+use crate::library::{GameTrackingStrategy, PlaySession};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 use serde::Deserialize;
@@ -40,6 +40,8 @@ pub struct GameStateRow {
     pub is_favorite: bool,
     pub last_played_at: Option<DateTime<Utc>>,
     pub play_minutes: f64,
+    /// Linhas de `play_sessions`, da mais antiga para a mais recente.
+    pub sessions: Vec<PlaySession>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -70,11 +72,13 @@ impl LibraryStore {
         })
     }
 
-    /// Regrava as duas tabelas numa transação: ou tudo é salvo, ou nada muda.
+    /// Regrava as tabelas numa transação: ou tudo é salvo, ou nada muda.
     pub fn save(&self, data: &LibraryData) -> Result<()> {
         let conn = self.db.open()?;
         let tx = conn.unchecked_transaction()?;
-        tx.execute_batch("DELETE FROM manual_games; DELETE FROM game_state;")?;
+        tx.execute_batch(
+            "DELETE FROM manual_games; DELETE FROM game_state; DELETE FROM play_sessions;",
+        )?;
         write(&tx, data, "INSERT OR REPLACE")?;
         tx.commit()?;
         Ok(())
@@ -134,6 +138,7 @@ fn read_legacy_json(path: &Path) -> Result<LibraryData> {
                     is_favorite: s.is_favorite,
                     last_played_at: s.last_played_at.as_deref().and_then(parse_date),
                     play_minutes: s.play_minutes,
+                    sessions: Vec::new(),
                 };
                 (id, row)
             })
@@ -207,6 +212,8 @@ fn write(conn: &Connection, data: &LibraryData, verb: &str) -> Result<()> {
     let mut state = conn.prepare(&format!(
         "{verb} INTO game_state (game_id, is_favorite, last_played_at, play_minutes) VALUES (?1, ?2, ?3, ?4);"
     ))?;
+    let mut session = conn
+        .prepare("INSERT INTO play_sessions (game_id, started_at, seconds) VALUES (?1, ?2, ?3);")?;
     for (id, s) in &data.state {
         state.execute(params![
             id,
@@ -214,6 +221,13 @@ fn write(conn: &Connection, data: &LibraryData, verb: &str) -> Result<()> {
             s.last_played_at.map(format_date),
             s.play_minutes,
         ])?;
+        for p in &s.sessions {
+            session.execute(params![
+                id,
+                format_date(p.started_at),
+                p.duration.as_secs() as i64
+            ])?;
+        }
     }
     Ok(())
 }
@@ -255,10 +269,23 @@ fn read_state(conn: &Connection) -> Result<HashMap<String, GameStateRow>> {
                 .as_deref()
                 .and_then(parse_date),
             play_minutes: r.get(3)?,
+            sessions: Vec::new(),
         };
         Ok((r.get(0)?, row))
     })?;
-    Ok(rows.collect::<rusqlite::Result<_>>()?)
+    let mut state: HashMap<String, GameStateRow> = rows.collect::<rusqlite::Result<_>>()?;
+    let mut stmt =
+        conn.prepare("SELECT game_id, started_at, seconds FROM play_sessions ORDER BY rowid;")?;
+    let mut rows = stmt.query([])?;
+    while let Some(r) = rows.next()? {
+        if let Some(s) = state.get_mut(&r.get::<_, String>(0)?) {
+            s.sessions.push(PlaySession {
+                started_at: parse_date_or_epoch(&r.get::<_, String>(1)?),
+                duration: std::time::Duration::from_secs(r.get::<_, i64>(2)?.max(0) as u64),
+            });
+        }
+    }
+    Ok(state)
 }
 
 #[cfg(test)]
@@ -305,6 +332,10 @@ mod tests {
             is_favorite: true,
             last_played_at: Some(added()),
             play_minutes: 42.5,
+            sessions: vec![PlaySession {
+                started_at: added(),
+                duration: std::time::Duration::from_secs(90),
+            }],
         };
         data.state.insert("steam:570".into(), state.clone());
         store.save(&data).unwrap();

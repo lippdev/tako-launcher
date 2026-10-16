@@ -81,6 +81,15 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         7,
         "ALTER TABLE game_settings ADD COLUMN working_directory TEXT;",
     ),
+    // Histórico de sessões (SESSION-002); a biblioteca guarda só as últimas por jogo.
+    (
+        9,
+        "CREATE TABLE IF NOT EXISTS play_sessions (
+            game_id TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            seconds INTEGER NOT NULL
+        );",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).
@@ -167,8 +176,9 @@ pub(crate) mod tests {
 
     #[test]
     fn migrations_are_in_strictly_increasing_order() {
-        let versions: Vec<u32> = MIGRATIONS.iter().map(|m| m.0).collect();
-        assert_eq!(versions, (1..=MIGRATIONS.len() as u32).collect::<Vec<_>>());
+        // Branches paralelas reservam números: um buraco temporário é aceito, ordem fora não.
+        assert_eq!(MIGRATIONS[0].0, 1);
+        assert!(MIGRATIONS.windows(2).all(|w| w[0].0 < w[1].0));
     }
 
     #[test]

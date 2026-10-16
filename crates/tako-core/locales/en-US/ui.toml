@@ -89,6 +89,7 @@ metadata_hint = "Turn on IGDB in Settings › Covers and metadata to fill in the
 add_to_collection = "Add to collection"
 
 [options]
+sessions = "Sessions"
 open_steam = "Open in Steam"
 change_art = "Change images"
 source_ids = "Sources and IDs"

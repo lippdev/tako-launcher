@@ -34,6 +34,7 @@ impl library::LibraryStore for SqlLibrary {
                             is_favorite: s.is_favorite,
                             last_played_at: s.last_played_at,
                             play_minutes: s.play_minutes,
+                            sessions: s.sessions.clone(),
                         },
                     )
                 })
@@ -78,6 +79,7 @@ fn to_state(s: GameStateRow) -> GameStateRecord {
         is_favorite: s.is_favorite,
         last_played_at: s.last_played_at,
         play_minutes: s.play_minutes,
+        sessions: s.sessions,
     }
 }
 
@@ -145,6 +147,7 @@ mod tests {
                 is_favorite: true,
                 last_played_at: None,
                 play_minutes: 3.0,
+                ..Default::default()
             },
         );
         library::LibraryStore::save(&mut lib, &data).unwrap();

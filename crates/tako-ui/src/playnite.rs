@@ -108,6 +108,10 @@ fn preview(ctx: &Ctx, plan: Rc<import::PlayniteImportPlan>) -> MenuLayer {
 fn change(source: &tako_sources::playnite::library::PlayniteGame, store: GameStore) -> StateChange {
     let source = source.clone();
     Box::new(move |current: Option<GameStateRecord>| {
+        let sessions = current
+            .as_ref()
+            .map(|c| c.sessions.clone())
+            .unwrap_or_default();
         let current = current.map(|c| PlayniteState {
             is_favorite: c.is_favorite,
             last_played_at: c.last_played_at,
@@ -118,6 +122,7 @@ fn change(source: &tako_sources::playnite::library::PlayniteGame, store: GameSto
             is_favorite: s.is_favorite,
             last_played_at: s.last_played_at,
             play_minutes: s.play_minutes,
+            sessions,
         }
     })
 }
