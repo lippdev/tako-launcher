@@ -10,6 +10,9 @@ use tako_core::devices::{
 };
 
 pub mod secrets;
+// Parte só é usada no Linux; nos outros SOs compila para os testes rodarem.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+mod unix;
 
 #[cfg(target_os = "linux")]
 pub mod linux;

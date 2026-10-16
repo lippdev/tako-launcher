@@ -37,6 +37,13 @@ insta = "1"
 slint = { version = "1.18.1", default-features = false, features = ["std", "compat-1-2"] }
 slint-interpreter = { version = "1.18.1", default-features = false, features = ["backend-default", "renderer-femtovg", "renderer-software", "compat-1-2"] }
 roxmltree = "0.21"
+libc = "0.2"
+x11rb = { version = "0.13", features = ["randr", "xfixes"] }
+zbus = "5"
+evdev = "0.13"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+objc2-core-audio = "0.3"
 sdl3 = { version = "0.20.0", features = ["build-from-source-static"] }
 windows = { version = "0.62", features = [
     "ApplicationModel",

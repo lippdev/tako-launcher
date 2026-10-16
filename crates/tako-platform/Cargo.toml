@@ -18,6 +18,18 @@ keyring.workspace = true
 windows.workspace = true
 windows-core.workspace = true
 windows-registry.workspace = true
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11rb.workspace = true
+zbus.workspace = true
+evdev.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-core-foundation.workspace = true
+objc2-core-graphics.workspace = true
+objc2-core-audio.workspace = true
 
 [lints.rust]
 # `unsafe` só é permitido aqui (PRD §5.1); cada bloco tem `// SAFETY:`.
