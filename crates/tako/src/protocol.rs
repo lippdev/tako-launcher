@@ -49,6 +49,9 @@ pub enum SupMsg {
     },
     /// Alguém abriu o Tako de novo: trazer a janela para a frente.
     Activate,
+    OpenLink {
+        url: String,
+    },
     /// A janela do jogo apareceu: a interface sai de "Abrindo…" (some aos poucos e fecha).
     GameShown,
 }

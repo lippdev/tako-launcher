@@ -90,6 +90,11 @@ Source: "..\Tako.installed"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\tako"; ValueType: string; ValueData: "URL:Tako"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\tako"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\tako\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExe}"" --open-url ""%1"""
+
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
 ; Silent installs (in-app updates): bring the app back afterwards, unless the update runs as the app exits (/NOLAUNCH=1).

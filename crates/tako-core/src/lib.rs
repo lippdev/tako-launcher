@@ -8,6 +8,7 @@ pub mod diagnostics;
 pub mod i18n;
 pub mod input;
 pub mod library;
+pub mod links;
 pub mod metadata;
 pub mod navigation;
 pub mod paths;

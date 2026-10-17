@@ -85,6 +85,16 @@ fn main() {
     let started = std::time::Instant::now();
     tako_platform::tune_allocator();
     let all: Vec<String> = std::env::args().collect();
+    let link_url = tako_core::links::argument(&all).map(str::to_owned);
+    let link = link_url.as_deref().and_then(tako_core::links::parse);
+    // Uma URL do navegador não pode injetar opções como --data-dir por aspas na linha do Windows.
+    let internal_ui =
+        std::env::var_os("TAKO_SUPERVISOR_PID").is_some() && args::has(&all, args::UI);
+    let protocol_only = all.len() == 2 || (all.len() == 3 && all[1] == "--open-url");
+    if link_url.is_some() && (link.is_none() || (!internal_ui && !protocol_only)) {
+        eprintln!("tako: link inválido");
+        std::process::exit(2);
+    }
     let has = |f: &str| args::has(&all, f);
     if has("--bench") || has("--bench-supervisor") || has("--version") {
         tako_platform::attach_parent_console();
@@ -121,7 +131,12 @@ fn main() {
         init_logs(&paths, "supervisor");
         let Some(_lock) = single_instance(&paths) else {
             tracing::info!("o Tako já está aberto; pedindo para ele vir para a frente");
-            let _ = std::fs::write(paths.root.join(ACTIVATE_FILE), b"");
+            if let Err(e) = std::fs::write(
+                paths.root.join(ACTIVATE_FILE),
+                link_url.as_deref().unwrap_or_default(),
+            ) {
+                tracing::warn!("pedido de ativação: {e}");
+            }
             return;
         };
         let code = supervisor::Supervisor::new(paths, platform, &all).run(has(args::SAFE_MODE));
@@ -138,6 +153,12 @@ fn main() {
                 // shortcut: sem supervisor (desenvolvimento, --no-supervisor) ninguém atende o pedido de vir para
                 // a frente; só a versão publicada (com supervisor) ativa a janela aberta.
                 tracing::info!("o Tako já está aberto");
+                if let Err(e) = std::fs::write(
+                    paths.root.join(ACTIVATE_FILE),
+                    link_url.as_deref().unwrap_or_default(),
+                ) {
+                    tracing::warn!("pedido de ativação: {e}");
+                }
                 return;
             }
         }
@@ -161,6 +182,7 @@ fn main() {
     let running =
         value(&all, "--running").map(|id| (id, value(&all, "--running-title").unwrap_or_default()));
     let opts = UiOptions {
+        link,
         simulate,
         after_game,
         running,
@@ -191,6 +213,12 @@ fn main() {
                     } => (game_id, played_secs, GameEnd::from_key(&end)),
                     protocol::SupMsg::Activate => {
                         let _ = slint::invoke_from_event_loop(tako_ui::app::raise_current);
+                        return;
+                    }
+                    protocol::SupMsg::OpenLink { url } => {
+                        let _ = slint::invoke_from_event_loop(move || {
+                            tako_ui::app::open_current_link(&url)
+                        });
                         return;
                     }
                     protocol::SupMsg::GameShown => {
