@@ -21,7 +21,8 @@ impl GameSettingsStore {
         let row = conn
             .query_row(
                 "SELECT use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
-                        extra_arguments, working_directory
+                        extra_arguments, working_directory, environment, before_command, after_command,
+                        approved_commands
                  FROM game_settings WHERE game_id = ?1;",
                 [game_id],
                 |r| {
@@ -37,6 +38,10 @@ impl GameSettingsStore {
                         show_fps: r.get::<_, Option<i64>>(6)?.map(|v| v != 0),
                         extra_arguments: r.get(7)?,
                         working_directory: r.get(8)?,
+                        environment: r.get(9)?,
+                        before_command: r.get(10)?,
+                        after_command: r.get(11)?,
+                        approved_commands: r.get(12)?,
                     })
                 },
             )
@@ -48,15 +53,19 @@ impl GameSettingsStore {
         require(game_id, "game_id")?;
         let conn = self.db.open()?;
         // O FPS não conta em `is_default`, mas a linha fica se a alpha gravou um: não perde o dado (D-06).
-        if settings.is_default() && settings.fps_limit.is_none() && settings.show_fps.is_none() {
+        if settings.is_default()
+            && settings.fps_limit.is_none()
+            && settings.show_fps.is_none()
+            && settings.approved_commands.is_none()
+        {
             conn.execute("DELETE FROM game_settings WHERE game_id = ?1;", [game_id])?;
             return Ok(());
         }
         conn.execute(
             "INSERT OR REPLACE INTO game_settings
                 (game_id, use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
-                 extra_arguments, working_directory)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10);",
+                 extra_arguments, working_directory, environment, before_command, after_command, approved_commands)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14);",
             params![
                 game_id,
                 settings.use_game_screen,
@@ -68,6 +77,10 @@ impl GameSettingsStore {
                 settings.show_fps,
                 normalize(settings.extra_arguments.as_deref()),
                 normalize(settings.working_directory.as_deref()),
+                normalize(settings.environment.as_deref()),
+                normalize(settings.before_command.as_deref()),
+                normalize(settings.after_command.as_deref()),
+                settings.approved_commands,
             ],
         )?;
         Ok(())
@@ -99,6 +112,10 @@ mod tests {
             show_fps: Some(true),
             extra_arguments: Some(" -dx11 ".into()),
             working_directory: Some("  ".into()),
+            environment: Some("DXVK_HUD=fps".into()),
+            before_command: Some(" antes.bat ".into()),
+            after_command: None,
+            approved_commands: Some("antes.bat\n".into()),
         };
 
         assert_eq!(
@@ -110,6 +127,7 @@ mod tests {
         let expected = GameSettingsOverride {
             extra_arguments: Some("-dx11".into()),
             working_directory: None,
+            before_command: Some("antes.bat".into()),
             ..settings
         };
         assert_eq!(store.load("steam:570").unwrap(), expected);

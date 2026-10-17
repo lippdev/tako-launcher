@@ -114,6 +114,79 @@ impl ProcessLauncher for WindowsProcesses {
         Ok((pid != 0).then_some(pid))
     }
 
+    /// Executável com variáveis: `CreateProcess` pelo `Command` (o `ShellExecuteEx` não recebe ambiente). Atalhos,
+    /// URIs e jogos que pedem administrador seguem pelo `launch`, sem as variáveis.
+    fn launch_with_env(
+        &self,
+        target: &str,
+        arguments: Option<&str>,
+        working_dir: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        use std::os::windows::process::CommandExt;
+        let is_exe = std::path::Path::new(target)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("exe"));
+        if env.is_empty() || !is_exe {
+            if !env.is_empty() {
+                tracing::warn!("variáveis de ambiente só valem para executáveis: {target}");
+            }
+            return self.launch(target, arguments, working_dir);
+        }
+        let mut cmd = std::process::Command::new(target);
+        if let Some(a) = arguments {
+            cmd.raw_arg(a);
+        }
+        if let Some(d) = working_dir {
+            cmd.current_dir(d);
+        }
+        cmd.envs(env.iter().map(|(k, v)| (k, v)));
+        const ERROR_ELEVATION_REQUIRED: i32 = 740;
+        match cmd.spawn() {
+            Ok(child) => Ok(Some(child.id())),
+            Err(e) if e.raw_os_error() == Some(ERROR_ELEVATION_REQUIRED) => {
+                tracing::warn!("{target} pede administrador; abrindo sem as variáveis de ambiente");
+                self.launch(target, arguments, working_dir)
+            }
+            Err(e) => Err(DeviceError::Failed(format!(
+                "não foi possível abrir {target}: {e}"
+            ))),
+        }
+    }
+
+    fn run_command(&self, command: &str, wait: Option<std::time::Duration>) -> DeviceResult<()> {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let mut child = std::process::Command::new("cmd")
+            .arg("/C")
+            .raw_arg(command)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| DeviceError::Failed(format!("comando \"{command}\": {e}")))?;
+        let Some(limit) = wait else {
+            return Ok(());
+        };
+        let started = std::time::Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) if status.success() => return Ok(()),
+                Ok(Some(status)) => {
+                    return Err(DeviceError::Failed(format!(
+                        "comando \"{command}\" saiu com {status}"
+                    )));
+                }
+                Ok(None) if started.elapsed() >= limit => {
+                    return Err(DeviceError::Failed(format!(
+                        "comando \"{command}\" não terminou em {} s",
+                        limit.as_secs()
+                    )));
+                }
+                Ok(None) => std::thread::sleep(std::time::Duration::from_millis(100)),
+                Err(e) => return Err(DeviceError::Failed(format!("comando \"{command}\": {e}"))),
+            }
+        }
+    }
+
     fn snapshot(&self) -> Vec<ProcessEntry> {
         // SAFETY: retrato de processos; o handle é fechado no fim.
         let Ok(snap) = (unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }) else {
@@ -261,5 +334,23 @@ impl ProcessLauncher for WindowsProcesses {
             .spawn()
             .map(drop)
             .map_err(|e| DeviceError::Failed(format!("explorer: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn user_commands_report_failure_and_timeouts() {
+        let p = WindowsProcesses::default();
+        let wait = Some(Duration::from_secs(10));
+        assert!(p.run_command("exit 0", wait).is_ok());
+        let failed = p.run_command("exit 3", wait).unwrap_err().to_string();
+        assert!(failed.contains("saiu com"), "{failed}");
+        let slow = p.run_command("ping -n 5 127.0.0.1 >nul", Some(Duration::from_millis(300)));
+        assert!(slow.unwrap_err().to_string().contains("não terminou"));
+        assert!(p.run_command("exit 3", None).is_ok());
     }
 }

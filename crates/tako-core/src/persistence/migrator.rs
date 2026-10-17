@@ -101,6 +101,14 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
             PRIMARY KEY (game_id, tag)
         );",
     ),
+    // Variáveis de ambiente e comandos antes e depois de jogar, com o texto permitido (SESSION-004).
+    (
+        11,
+        "ALTER TABLE game_settings ADD COLUMN environment TEXT;
+         ALTER TABLE game_settings ADD COLUMN before_command TEXT;
+         ALTER TABLE game_settings ADD COLUMN after_command TEXT;
+         ALTER TABLE game_settings ADD COLUMN approved_commands TEXT;",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).

@@ -18,6 +18,46 @@ pub struct GameSettingsOverride {
     pub extra_arguments: Option<String>,
     /// Pasta de trabalho do jogo (PRD §6); vazio = a do executável.
     pub working_directory: Option<String>,
+    /// Variáveis de ambiente (SESSION-004): `NOME=valor`, separadas por `;` ou por linha.
+    #[serde(default)]
+    pub environment: Option<String>,
+    /// Comando rodado antes de abrir o jogo (espera até [`BEFORE_COMMAND_WAIT`]).
+    #[serde(default)]
+    pub before_command: Option<String>,
+    /// Comando rodado quando o jogo termina.
+    #[serde(default)]
+    pub after_command: Option<String>,
+    /// Os comandos que o usuário permitiu, exatamente como estavam (ver [`commands_text`]). Mudou o texto, pergunta
+    /// de novo: comandos vindos de fora (importação, extensão) nunca rodam sem o usuário ver.
+    #[serde(default)]
+    pub approved_commands: Option<String>,
+}
+
+/// Quanto o comando de antes pode demorar antes de o jogo abrir mesmo assim.
+pub const BEFORE_COMMAND_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Os dois comandos num texto só, para comparar com o que foi permitido; `None` sem nenhum comando.
+pub fn commands_text(before: Option<&str>, after: Option<&str>) -> Option<String> {
+    let before = normalize_arguments(before).unwrap_or_default();
+    let after = normalize_arguments(after).unwrap_or_default();
+    (!before.is_empty() || !after.is_empty()).then(|| format!("{before}\n{after}"))
+}
+
+/// `NOME=valor` separados por `;` ou por linha. Nome inválido (vazio, com espaço ou `=`) é ignorado.
+pub fn parse_environment(text: Option<&str>) -> Vec<(String, String)> {
+    text.unwrap_or_default()
+        .split(['\n', ';'])
+        .filter_map(|item| {
+            let (name, value) = item.split_once('=')?;
+            let name = name.trim();
+            let valid = name
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+            valid.then(|| (name.to_owned(), value.trim().to_owned()))
+        })
+        .collect()
 }
 
 impl GameSettingsOverride {
@@ -38,6 +78,9 @@ impl GameSettingsOverride {
             self.working_directory
                 .as_deref()
                 .is_some_and(|a| !a.trim().is_empty()),
+            !parse_environment(self.environment.as_deref()).is_empty(),
+            normalize_arguments(self.before_command.as_deref()).is_some(),
+            normalize_arguments(self.after_command.as_deref()).is_some(),
         ]
         .into_iter()
         .filter(|b| *b)
@@ -47,6 +90,14 @@ impl GameSettingsOverride {
     /// FPS não conta: não aparece mais na interface.
     pub fn is_default(&self) -> bool {
         self.changed_count() == 0
+    }
+
+    /// O usuário viu e permitiu os comandos como estão agora.
+    pub fn approve_commands(&mut self) {
+        self.approved_commands = commands_text(
+            self.before_command.as_deref(),
+            self.after_command.as_deref(),
+        );
     }
 }
 
@@ -89,6 +140,11 @@ pub struct EffectiveSessionSettings {
     pub game_audio: Option<AudioOutputChoice>,
     pub extra_arguments: Option<String>,
     pub working_directory: Option<String>,
+    pub environment: Vec<(String, String)>,
+    pub before_command: Option<String>,
+    pub after_command: Option<String>,
+    /// Sem comandos, ou com os comandos já permitidos como estão.
+    pub commands_approved: bool,
 }
 
 impl EffectiveSessionSettings {
@@ -143,6 +199,16 @@ pub fn resolve(
         game_audio,
         extra_arguments: normalize_arguments(game.extra_arguments.as_deref()),
         working_directory: normalize_arguments(game.working_directory.as_deref()),
+        environment: parse_environment(game.environment.as_deref()),
+        before_command: normalize_arguments(game.before_command.as_deref()),
+        after_command: normalize_arguments(game.after_command.as_deref()),
+        commands_approved: match commands_text(
+            game.before_command.as_deref(),
+            game.after_command.as_deref(),
+        ) {
+            None => true,
+            current => game.approved_commands == current,
+        },
     }
 }
 
@@ -219,6 +285,36 @@ mod tests {
         let mut o = GameSettingsOverride::default();
         f(&mut o);
         o
+    }
+
+    #[test]
+    fn environment_and_commands_need_the_user_to_allow_them() {
+        let env = parse_environment(Some(
+            "DXVK_HUD=fps; bad name=1\n_X=a=b\n=vazio;9X=1;SEM_IGUAL",
+        ));
+        assert_eq!(
+            env,
+            [
+                ("DXVK_HUD".into(), "fps".into()),
+                ("_X".into(), "a=b".into())
+            ]
+        );
+
+        let mut o = with(|o| {
+            o.before_command = Some(" mount.bat ".into());
+            o.environment = Some("A=1".into());
+        });
+        assert_eq!(o.changed_count(), 2);
+        let e = resolve(&global(), Some(&o));
+        assert_eq!(e.before_command.as_deref(), Some("mount.bat"));
+        assert!(!e.commands_approved);
+        o.approve_commands();
+        assert!(resolve(&global(), Some(&o)).commands_approved);
+        // Mudou o comando: pergunta de novo.
+        o.after_command = Some("umount.bat".into());
+        assert!(!resolve(&global(), Some(&o)).commands_approved);
+        // Sem comandos não há o que permitir.
+        assert!(resolve(&global(), None).commands_approved);
     }
 
     #[test]

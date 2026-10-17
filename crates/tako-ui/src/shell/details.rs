@@ -51,6 +51,8 @@ pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
         && let Some(notice) = client_missing(ctx, &g)
     {
         return Nav::Layer(Box::new(dialogs::client_missing(ctx, &g, notice)));
+    } else if g.can_play() && !crate::session::effective(ctx, &g.id).commands_approved {
+        return Nav::Layer(Box::new(dialogs::approve_commands(ctx, &g.id)));
     } else if g.can_play() {
         ctx.effect(Effect::Launch(g.id.clone()));
     } else if g.is_upcoming() || g.is_rom() {

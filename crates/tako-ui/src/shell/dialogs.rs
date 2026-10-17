@@ -152,6 +152,32 @@ pub fn game_ended_badly(ctx: &Ctx, id: &str, end: tako_core::session::GameEnd) -
     .text(ctx.t(text))
 }
 
+/// Comandos deste jogo que o usuário ainda não permitiu (SESSION-004): mostra o texto exato antes de rodar.
+pub fn approve_commands(ctx: &Ctx, id: &str) -> MenuLayer {
+    let eff = crate::session::effective(ctx, id);
+    let mut text = vec![ctx.t("session.commands_text")];
+    if let Some(c) = &eff.before_command {
+        text.push(ctx.tf("session.commands_before", &[("command", c)]));
+    }
+    if let Some(c) = &eff.after_command {
+        text.push(ctx.tf("session.commands_after", &[("command", c)]));
+    }
+    let id = id.to_owned();
+    MenuLayer::dialog(ctx.t("session.commands_title"), move |ctx| {
+        let id = id.clone();
+        vec![
+            MenuItem::new(PanelRow::button("allow", ctx.t("session.commands_allow")).icon("play"))
+                .on(move |ctx| {
+                    super::game_settings::approve_commands(ctx, &id);
+                    ctx.effect(Effect::Launch(id.clone()));
+                    Flow::Close
+                }),
+            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(text.join("\n"))
+}
+
 /// Outro jogo está aberto: termine antes de abrir este (o C# pedia o mesmo).
 pub fn other_game_running(ctx: &Ctx, id: &str) -> MenuLayer {
     let running = ctx
@@ -832,6 +858,42 @@ mod tests {
             .map(|i| i.row.key)
             .collect();
         assert!(!keys.iter().any(|k| k == "repair"));
+    }
+
+    #[test]
+    fn game_commands_run_only_after_the_user_allows_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let exe = dir.path().join("jogo.exe");
+        std::fs::write(&exe, "").unwrap();
+        let record = ManualGameRecord::create("Jogo", &exe.to_string_lossy(), chrono::Utc::now());
+        let id = record.id.clone();
+        ctx.library.add_manual(record).unwrap();
+        let store = ctx.game_settings.clone().unwrap();
+        let mut o = store.load(&id).unwrap();
+        o.before_command = Some("montar.bat".into());
+        store.save(&id, &o).unwrap();
+
+        let super::super::Nav::Layer(dialog) = super::super::details::primary_action(&mut ctx, &id)
+        else {
+            panic!("pedido de permissão");
+        };
+        assert!(ctx.effects.is_empty());
+        let out = dialog.render(&ctx);
+        assert_eq!(out.title, "Permitir os comandos deste jogo?");
+        let ask = approve_commands(&ctx, &id);
+        assert!(matches!(accept(&mut ctx, &ask, "allow"), Flow::Close));
+        assert!(matches!(&ctx.effects[..], [Effect::Launch(g)] if g == &id));
+        assert!(crate::session::effective(&ctx, &id).commands_approved);
+
+        // Permitido: Jogar abre direto até o comando mudar.
+        ctx.effects.clear();
+        super::super::details::primary_action(&mut ctx, &id);
+        assert!(matches!(&ctx.effects[..], [Effect::Launch(_)]));
+        let mut o = store.load(&id).unwrap();
+        o.before_command = Some("outro.bat".into());
+        store.save(&id, &o).unwrap();
+        assert!(!crate::session::effective(&ctx, &id).commands_approved);
     }
 
     #[test]

@@ -172,6 +172,32 @@ fn edit_arguments(ctx: &Ctx, id: &str) -> Flow {
     ))
 }
 
+/// O usuário permitiu os comandos como estão (SESSION-004).
+pub(crate) fn approve_commands(ctx: &mut Ctx, id: &str) {
+    change(ctx, id, Override::approve_commands);
+}
+
+/// Texto livre de uma linha (variáveis e comandos): vazio volta ao padrão.
+fn edit_text(
+    ctx: &Ctx,
+    id: &str,
+    title: &str,
+    hint: &str,
+    get: fn(&Override) -> Option<String>,
+    set: fn(&mut Override, Option<String>),
+) -> Flow {
+    let text = get(&current(ctx, id)).unwrap_or_default();
+    let id = id.to_owned();
+    Flow::Push(Box::new(
+        KeyboardLayer::new(ctx, ctx.t(title), &text, move |ctx, t| {
+            let value = normalize_arguments(Some(t));
+            change(ctx, &id, |o| set(o, value));
+            Flow::Close
+        })
+        .hint(ctx.t(hint)),
+    ))
+}
+
 /// Pasta que não existe não é aceita; vazio = a pasta do executável.
 pub fn folder_problem(ctx: &Ctx, folder: &str) -> Option<String> {
     let f = folder.trim();
@@ -348,6 +374,58 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
         ))
         .on(move |ctx| edit_folder(ctx, &a)),
     );
+    let env = tako_core::session::settings::parse_environment(c.environment.as_deref());
+    let a = i();
+    v.push(
+        MenuItem::new(row(
+            "env",
+            ctx.t("game_settings.environment"),
+            if env.is_empty() {
+                ctx.t("game_settings.none")
+            } else {
+                tako_core::i18n::tn("game_settings.environment_count", env.len() as i64, &[])
+            },
+            !env.is_empty(),
+        ))
+        .on(move |ctx| {
+            edit_text(
+                ctx,
+                &a,
+                "game_settings.environment",
+                "game_settings.environment_hint",
+                |o| o.environment.clone(),
+                |o, v| o.environment = v,
+            )
+        }),
+    );
+    for (key, text, hint, get, set) in [
+        (
+            "before",
+            "game_settings.before_command",
+            "game_settings.commands_hint",
+            (|o: &Override| o.before_command.clone()) as fn(&Override) -> Option<String>,
+            (|o: &mut Override, v| o.before_command = v) as fn(&mut Override, Option<String>),
+        ),
+        (
+            "after",
+            "game_settings.after_command",
+            "game_settings.commands_hint",
+            |o: &Override| o.after_command.clone(),
+            |o: &mut Override, v| o.after_command = v,
+        ),
+    ] {
+        let value = normalize_arguments(get(&c).as_deref());
+        let a = i();
+        v.push(
+            MenuItem::new(row(
+                key,
+                ctx.t(text),
+                value.clone().unwrap_or_else(|| ctx.t("game_settings.none")),
+                value.is_some(),
+            ))
+            .on(move |ctx| edit_text(ctx, &a, text, hint, get, set)),
+        );
+    }
 
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("game_settings.defaults"),

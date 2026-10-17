@@ -303,6 +303,10 @@ pub struct FakeProcesses {
     pub running: Mutex<Vec<ProcessEntry>>,
     pub launched: Mutex<Vec<String>>,
     pub steam_app: Mutex<u32>,
+    /// Variáveis da última abertura com `launch_with_env`.
+    pub env: Mutex<Vec<(String, String)>>,
+    /// Comandos rodados por `run_command`.
+    pub commands: Mutex<Vec<String>>,
     next_pid: Mutex<u32>,
 }
 
@@ -330,6 +334,20 @@ impl ProcessLauncher for FakeProcesses {
             started_at: Some(chrono::Utc::now()),
         });
         Ok(Some(pid))
+    }
+    fn launch_with_env(
+        &self,
+        target: &str,
+        args: Option<&str>,
+        cwd: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        *lock(&self.env) = env.to_vec();
+        self.launch(target, args, cwd)
+    }
+    fn run_command(&self, command: &str, _wait: Option<std::time::Duration>) -> DeviceResult<()> {
+        lock(&self.commands).push(command.to_owned());
+        Ok(())
     }
     fn snapshot(&self) -> Vec<ProcessEntry> {
         lock(&self.running).clone()
