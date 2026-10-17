@@ -133,6 +133,9 @@ confirm = "Sair"
 
 [session]
 other_running = "{game} ainda está aberto"
+launching = "Abrindo"
+launching_slow = "Ainda abrindo. A loja pode estar atualizando ou verificando o jogo; ele aparece aqui assim que abrir."
+back_to_tako = "Voltar ao Tako"
 closing = "Fechando {game}…"
 closing_wait = "Esperando o jogo fechar."
 closing_stuck = "O jogo ainda não fechou. Ele pode estar perguntando se você quer salvar: volte ao jogo para responder, ou force o encerramento (o que não foi salvo se perde)."

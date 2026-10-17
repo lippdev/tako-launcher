@@ -14,7 +14,7 @@ pub use display::{
     ConnectedDisplay, DisplayMode, DisplayTopology, Displays, HdrStatus, MonitorState, ScreenBounds,
 };
 pub use pointer::{CursorControl, MouseButton, PointerInjector};
-pub use process::{ProcessEntry, ProcessLauncher};
+pub use process::{GameWindow, ProcessEntry, ProcessLauncher};
 
 /// Erro de uma função de plataforma. A mensagem vai para o log e, resumida, para o usuário.
 #[derive(Debug, thiserror::Error)]

@@ -186,6 +186,14 @@ pub struct Ctx {
     pub welcome_back: Option<(String, std::time::Duration)>,
     /// Desenhar de novo neste instante mesmo sem entrada (camadas que mudam com o tempo).
     pub redraw_at: Option<Instant>,
+    /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).
+    pub launching: bool,
+    /// Saindo para o jogo: a interface some aos poucos antes de fechar.
+    pub leaving: bool,
+    /// Até quando a janela fica por cima de tudo em "Abrindo…" (esconde as janelas de inicialização do jogo).
+    pub launch_on_top_until: Option<Instant>,
+    /// A janela está por cima de tudo agora (o que foi aplicado no SO).
+    pub window_on_top: bool,
     /// Levar a janela para estes limites no próximo desenho (teste da tela de jogo).
     pub move_window: Option<tako_core::devices::ScreenBounds>,
     /// Algo mudou e a tela precisa ser redesenhada.

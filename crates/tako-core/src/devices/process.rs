@@ -13,6 +13,16 @@ pub struct ProcessEntry {
     pub started_at: Option<DateTime<Utc>>,
 }
 
+/// Janela do jogo na tela.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameWindow {
+    None,
+    /// Visível, mas sem cobrir o monitor (jogo em janela, ou a janela inicial antes de ir para tela cheia).
+    Windowed,
+    /// Cobre o monitor inteiro (tela cheia ou sem borda).
+    Fullscreen,
+}
+
 pub trait ProcessLauncher: Send + Sync {
     /// Abre um caminho (executável, script, `.desktop`, `.app`, atalho) ou uma URI pelo jeito do SO.
     /// Devolve o PID quando o SO informa um processo (URIs normalmente não informam).
@@ -27,6 +37,15 @@ pub trait ProcessLauncher: Send + Sync {
     fn request_close(&self, pids: &[u32]) -> DeviceResult<()>;
     /// Encerra à força (o jogo não respondeu ao pedido de fechar).
     fn force_close(&self, pids: &[u32]) -> DeviceResult<()>;
+    /// A maior janela principal destes processos (a interface sai da tela "Abrindo…" quando o jogo cobre a tela).
+    /// Sem como saber, basta haver processo.
+    fn game_window(&self, pids: &[u32]) -> GameWindow {
+        if pids.is_empty() {
+            GameWindow::None
+        } else {
+            GameWindow::Fullscreen
+        }
+    }
     /// `RunningAppID` da Steam (registro no Windows, `registry.vdf` no Linux e no macOS). 0 = nenhum.
     fn steam_running_app_id(&self) -> u32;
     /// Abre uma pasta no gerenciador de arquivos.

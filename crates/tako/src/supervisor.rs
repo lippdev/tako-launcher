@@ -40,6 +40,8 @@ pub struct Supervisor {
     running: Option<Running>,
     /// Encerrar jogo foi pedido: confere o fim a cada volta (0,5 s), a interface mostra "Fechando o jogo…".
     closing: bool,
+    /// O jogo abriu com a interface em "Abrindo…": avisar quando a janela dele aparecer.
+    launching: bool,
     pads: Option<Pads>,
     chord: ButtonChordDetector,
     key: tako_core::input::shortcut::KeyShortcut,
@@ -58,6 +60,7 @@ impl Supervisor {
             started: Instant::now(),
             running: None,
             closing: false,
+            launching: false,
             pads: None,
             chord: ButtonChordDetector::new(chord::parse(chord_value.as_deref())),
             key: tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
@@ -144,6 +147,8 @@ impl Supervisor {
             };
             launch = Launch::default();
             let code = self.watch_ui(&mut ui);
+            // "Abrindo…" só vale para a interface que abriu o jogo.
+            self.launching = false;
             if let Some(reason) = &ui.closing
                 && reason == "update"
             {
@@ -203,7 +208,7 @@ impl Supervisor {
                 let _ = ui.child.kill();
             }
             // Jogo rodando com a interface aberta (Início durante o jogo).
-            let every = if self.closing {
+            let every = if self.closing || self.launching {
                 Duration::from_millis(500)
             } else {
                 Running::POLL
@@ -220,6 +225,17 @@ impl Supervisor {
                                 played_secs: played.as_secs(),
                             },
                         );
+                    }
+                } else if self.launching
+                    && self
+                        .running
+                        .as_mut()
+                        .is_some_and(|r| r.window_shown(&self.platform))
+                {
+                    self.launching = false;
+                    tracing::info!("janela do jogo na tela");
+                    if let Some(stdin) = ui.stdin.as_mut() {
+                        let _ = protocol::write(stdin, &SupMsg::GameShown);
                     }
                 }
             }
@@ -247,6 +263,7 @@ impl Supervisor {
                     );
                     r.begin(&self.platform);
                     self.running = Some(r);
+                    self.launching = true;
                 }
                 Err(e) => tracing::warn!("acompanhar o jogo: {e}"),
             },

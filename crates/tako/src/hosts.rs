@@ -63,8 +63,16 @@ impl Host for SupervisedHost {
         match effect {
             Effect::Launch(id) => {
                 if let Some(req) = launch(ctx, id) {
+                    ctx.running = Some(RunningGame {
+                        id: req.game_id.clone(),
+                        title: req.title.clone(),
+                    });
                     self.send(&UiMsg::Track { req });
-                    return HostAction::Close;
+                    if self.lost {
+                        return HostAction::Close;
+                    }
+                    // A interface fica em "Abrindo…" até o supervisor avisar que a janela do jogo apareceu.
+                    return HostAction::Launching;
                 }
             }
             Effect::ResumeGame => {

@@ -4,7 +4,7 @@
 use chrono::{DateTime, Utc};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, PoisonError};
-use tako_core::devices::{DeviceError, DeviceResult, ProcessEntry, ProcessLauncher};
+use tako_core::devices::{DeviceError, DeviceResult, GameWindow, ProcessEntry, ProcessLauncher};
 use windows::Win32::Foundation::{CloseHandle, FILETIME, HWND, LPARAM, WPARAM};
 use windows::Win32::System::Diagnostics::ToolHelp::*;
 use windows::Win32::System::Threading::*;
@@ -191,6 +191,61 @@ impl ProcessLauncher for WindowsProcesses {
         } else {
             Err(DeviceError::Failed(failed.join("; ")))
         }
+    }
+
+    fn game_window(&self, pids: &[u32]) -> GameWindow {
+        use windows::Win32::Foundation::RECT;
+        use windows::Win32::Graphics::Gdi::{
+            GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
+        };
+        let pids: HashSet<u32> = pids.iter().copied().collect();
+        if pids.is_empty() {
+            return GameWindow::None;
+        }
+        let mut targets = CloseTargets {
+            pids: &pids,
+            windows: Vec::new(),
+        };
+        // SAFETY: `targets` vive durante toda a enumeração, que é síncrona.
+        let _ = unsafe {
+            EnumWindows(
+                Some(collect),
+                LPARAM(&mut targets as *mut CloseTargets as isize),
+            )
+        };
+        let mut best = GameWindow::None;
+        for hwnd in targets.windows {
+            let mut r = RECT::default();
+            let mut mi = MONITORINFO {
+                cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+                ..Default::default()
+            };
+            // SAFETY: só lê o retângulo da janela (listada agora há pouco) e o do monitor em que ela está.
+            let ok = unsafe {
+                GetWindowRect(hwnd, &mut r).is_ok()
+                    && GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mut mi)
+                        .as_bool()
+            };
+            // Janelas minúsculas (ocultas de serviço, 1x1) não contam como o jogo na tela.
+            if !ok || r.right - r.left < 320 || r.bottom - r.top < 240 {
+                continue;
+            }
+            // Com barra de título é janela (o RE2 abre assim, maximizado, antes de ir para tela cheia).
+            // SAFETY: só lê o estilo da janela.
+            let style = unsafe { GetWindowLongW(hwnd, GWL_STYLE) } as u32;
+            let captioned = style & WS_CAPTION.0 == WS_CAPTION.0;
+            let m = mi.rcMonitor;
+            if !captioned
+                && r.left <= m.left
+                && r.top <= m.top
+                && r.right >= m.right
+                && r.bottom >= m.bottom
+            {
+                return GameWindow::Fullscreen;
+            }
+            best = GameWindow::Windowed;
+        }
+        best
     }
 
     fn steam_running_app_id(&self) -> u32 {

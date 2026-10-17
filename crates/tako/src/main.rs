@@ -190,6 +190,10 @@ fn main() {
                         let _ = slint::invoke_from_event_loop(tako_ui::app::raise_current);
                         return;
                     }
+                    protocol::SupMsg::GameShown => {
+                        let _ = slint::invoke_from_event_loop(tako_ui::app::game_shown);
+                        return;
+                    }
                 };
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(shell) = tako_ui::tasks::shell() {

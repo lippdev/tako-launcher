@@ -133,6 +133,9 @@ confirm = "Exit"
 
 [session]
 other_running = "{game} is still open"
+launching = "Opening"
+launching_slow = "Still opening. The store may be updating or verifying the game; it shows up here as soon as it opens."
+back_to_tako = "Back to Tako"
 closing = "Closing {game}…"
 closing_wait = "Waiting for the game to close."
 closing_stuck = "The game hasn't closed yet. It may be asking whether to save: go back to the game to answer, or force it to close (anything unsaved is lost)."

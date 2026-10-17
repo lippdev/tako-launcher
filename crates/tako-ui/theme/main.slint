@@ -705,8 +705,51 @@ component RowList inherits Rectangle {
 component OverlayView inherits Rectangle {
     in property <Overlay> ov;
     in property <bool> top-most;
+    // Arte do jogo em foco e "saindo para o jogo" (só para "Abrindo…").
+    in property <image> art;
+    in property <bool> leaving;
     callback clicked(string, int);
     callback hovered(string, int);
+    // "Abrindo…": a arte do jogo em tela cheia até a janela dele aparecer; aí some aos poucos (a janela fica
+    // transparente e o jogo aparece por trás).
+    if ov.kind == "splash": Rectangle {
+        opacity: leaving ? 0 : 1;
+        animate opacity { duration: 450ms; easing: ease-in-out; }
+        background: @linear-gradient(160deg, Ui.accent 0%, Ui.accent-deep 100%);
+        if art.width > 0: Image {
+            width: parent.width;
+            height: parent.height;
+            source: art;
+            image-fit: cover;
+        }
+        Rectangle { background: @linear-gradient(0deg, #000000E6 0%, #00000099 35%, #00000000 70%); }
+        TouchArea { }
+        VerticalLayout {
+            x: Ui.safe-x;
+            y: parent.height - Ui.hint-bar - self.height - 24 * Ui.u;
+            width: parent.width * 0.6;
+            height: self.preferred-height;
+            spacing: 14 * Ui.u;
+            Overline { text: ov.overline; color: Ui.on-accent; }
+            Text { text: ov.title; color: Ui.on-accent; font-size: Ui.display; font-family: Ui.font-title; font-weight: 700; wrap: word-wrap; }
+            // Barra indeterminada: o jogo está carregando.
+            Rectangle {
+                width: 360 * Ui.u;
+                height: 6 * Ui.u;
+                border-radius: self.height / 2;
+                background: #FFFFFF33;
+                clip: true;
+                property <float> t: mod(animation-tick() / 1400ms, 1);
+                Rectangle {
+                    width: 120 * Ui.u;
+                    x: (parent.width + self.width) * t - self.width;
+                    border-radius: parent.border-radius;
+                    background: Ui.on-accent;
+                }
+            }
+            if ov.text != "": Text { text: ov.text; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; wrap: word-wrap; }
+        }
+    }
     // Painel lateral: à direita, na altura da tela; o resto da página aparece atrás.
     if ov.kind == "panel": Rectangle {
         background: Ui.scrim;
@@ -1016,6 +1059,8 @@ export component App inherits Window {
     in property <string> toast;
     in property <[Hint]> hints;
     in property <bool> transparent-background;
+    // A janela do jogo apareceu: "Abrindo…" some aos poucos.
+    in property <bool> leaving;
 
     // Barra lateral.
     in property <[NavItem]> sidebar;
@@ -1096,7 +1141,7 @@ export component App inherits Window {
     }
     changed height => { Ui.u = self.height / 1080; }
 
-    if !control-center || !transparent-background: Backdrop {
+    if show-tako: Backdrop {
         art: backdrop;
         dim-left: page == "settings";
     }
@@ -1105,10 +1150,12 @@ export component App inherits Window {
 
     // Central por cima do jogo: só a barra dela; o jogo aparece pela janela transparente.
     property <bool> over-game: control-center && transparent-background;
+    // O Tako (fundo, páginas, barra lateral, dicas) some por cima do jogo: Central sobre ele ou saindo para ele.
+    property <bool> show-tako: !(transparent-background && (control-center || leaving));
 
     Rectangle {
         x: content-x;
-        visible: !over-game;
+        visible: show-tako;
         width: root.width - content-x;
         animate x, width { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
         if page == "home": HomePage {
@@ -1159,7 +1206,7 @@ export component App inherits Window {
         }
     }
 
-    if sidebar-visible && page != "details" && !control-center: Sidebar {
+    if sidebar-visible && page != "details" && !control-center && show-tako: Sidebar {
         x: 0;
         height: root.height;
         items: sidebar;
@@ -1169,7 +1216,7 @@ export component App inherits Window {
         hovered(i) => { root.hovered("sidebar", i); }
     }
 
-    if !control-center: StatusCorner {
+    if !control-center && show-tako: StatusCorner {
         x: root.width - 600 * Ui.u - Ui.safe-x;
         y: 14 * Ui.u;
         width: 600 * Ui.u;
@@ -1195,13 +1242,15 @@ export component App inherits Window {
 
     for ov[i] in overlays: OverlayView {
         ov: ov;
+        art: backdrop;
+        leaving: leaving;
         top-most: i == overlays.length - 1;
         clicked(z, idx) => { if (i == overlays.length - 1) { root.clicked("overlay-" + z, idx); } }
         hovered(z, idx) => { if (i == overlays.length - 1) { root.hovered("overlay-" + z, idx); } }
     }
 
     HintBar {
-        visible: !over-game;
+        visible: show-tako;
         y: root.height - self.height;
         width: root.width;
         hints: hints;

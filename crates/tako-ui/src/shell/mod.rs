@@ -13,6 +13,7 @@ pub mod game_settings;
 pub mod home;
 pub mod keyboard;
 pub mod keys;
+pub mod launch_splash;
 pub mod layer;
 pub mod library;
 pub mod settings;
@@ -197,8 +198,18 @@ impl Shell {
         self.ctx.dirty = true;
     }
 
+    /// Jogar: "Abrindo…" com a arte do jogo até a janela dele aparecer.
+    pub fn begin_launch_splash(&mut self) {
+        self.cc = None;
+        self.layers.retain(|l| !l.ends_with_game());
+        let layer = launch_splash::LaunchSplash::new(&mut self.ctx);
+        self.layers.push(Box::new(layer));
+        self.ctx.dirty = true;
+    }
+
     /// O jogo terminou: fecha as camadas que dependiam dele.
     pub fn close_game_layers(&mut self) {
+        self.ctx.launching = false;
         self.layers.retain(|l| !l.ends_with_game());
         self.ctx.dirty = true;
     }
@@ -550,6 +561,11 @@ impl Shell {
                 out.set("control-center", false);
                 out.set("transparent-background", false);
             }
+        }
+        // A janela do jogo apareceu: tudo some aos poucos e o jogo aparece pela janela transparente.
+        out.set("leaving", self.ctx.leaving);
+        if self.ctx.leaving {
+            out.set("transparent-background", true);
         }
         let overlays: Vec<_> = self.layers.iter().map(|l| l.render(&self.ctx)).collect();
         out.set("overlays", overlays);
