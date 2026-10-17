@@ -245,6 +245,12 @@ profile_delete_desc = "Os controles que usam {name} voltam ao Padrão"
 profile_delete_title = "Excluir o perfil {name}?"
 profile_delete_text = "Os controles que usam este perfil voltam aos botões do perfil Padrão."
 profile_deleted = "Perfil {name} excluído"
+hide_pads = "Esconder o controle do jogo com a Central aberta"
+hide_pads_desc = "Pelo driver HidHide: o jogo não anda junto enquanto você usa a Central, e recebe o controle de volta ao voltar"
+hidhide = "Driver opcional: esconder o controle do jogo"
+hidhide_desc = "Alguns jogos (ex.: Resident Evil 2) continuam recebendo o controle com a Central aberta. O driver gratuito HidHide resolve: instale pela página oficial e reinicie o PC"
+hidhide_value = "Abrir a página"
+hidhide_opened = "Página do HidHide aberta no navegador"
 
 [settings.system]
 title = "Sistema"

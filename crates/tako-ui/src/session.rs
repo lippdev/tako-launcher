@@ -248,6 +248,10 @@ pub fn restore_now(platform: &Platform, paths: &DataPaths, recorded: bool) {
 /// Ao abrir: restaura o que uma sessão anterior deixou (queda do Tako ou do PC no meio do jogo).
 pub fn recover_after_crash(platform: &Platform, paths: &DataPaths) {
     platform.cursor.recover_after_crash();
+    // Controles escondidos do jogo (INPUT-005) por uma execução que caiu com a Central aberta.
+    if let Err(e) = platform.controller_hiding.reveal() {
+        tracing::warn!("não foi possível devolver os controles escondidos: {e}");
+    }
     let env = Env {
         displays: platform.displays.as_ref(),
         audio: platform.audio.as_ref(),

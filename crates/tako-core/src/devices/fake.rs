@@ -366,3 +366,47 @@ impl ProcessLauncher for FakeProcesses {
         Ok(())
     }
 }
+
+/// Driver de esconder controles simulado: guarda o que está escondido.
+#[derive(Debug)]
+pub struct FakeHiding {
+    pub installed: bool,
+    pub hidden: Mutex<Vec<(u16, u16)>>,
+    pub log: Mutex<Vec<String>>,
+}
+
+impl FakeHiding {
+    pub fn new(installed: bool) -> Self {
+        FakeHiding {
+            installed,
+            hidden: Mutex::new(Vec::new()),
+            log: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl ControllerHiding for FakeHiding {
+    fn available(&self) -> bool {
+        self.installed
+    }
+    fn supported(&self) -> bool {
+        true
+    }
+    fn hide(&self, pads: &[(u16, u16)]) -> DeviceResult<()> {
+        if !self.installed {
+            return Err(DeviceError::NotFound("driver".into()));
+        }
+        *lock(&self.hidden) = pads.to_vec();
+        lock(&self.log).push(format!("hide {pads:04x?}"));
+        Ok(())
+    }
+    fn reveal(&self) -> DeviceResult<()> {
+        if !std::mem::take(&mut *lock(&self.hidden)).is_empty() {
+            lock(&self.log).push("reveal".into());
+        }
+        Ok(())
+    }
+    fn is_hidden(&self) -> bool {
+        !lock(&self.hidden).is_empty()
+    }
+}

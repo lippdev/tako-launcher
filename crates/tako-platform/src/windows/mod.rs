@@ -9,6 +9,7 @@ mod audio;
 mod autostart;
 mod display;
 pub mod dpapi;
+mod hidhide;
 pub mod hotkey;
 mod pointer;
 mod process;
@@ -24,5 +25,6 @@ pub fn platform(data_root: &std::path::Path) -> Platform {
         processes: Arc::new(process::WindowsProcesses::default()),
         secrets: Arc::new(crate::secrets::OsSecrets),
         autostart: Arc::new(autostart::WindowsAutostart),
+        controller_hiding: Arc::new(hidhide::HidHide::new(data_root)),
     }
 }

@@ -245,6 +245,12 @@ profile_delete_desc = "Controllers using {name} go back to Default"
 profile_delete_title = "Delete the {name} profile?"
 profile_delete_text = "Controllers using this profile go back to the Default profile's buttons."
 profile_deleted = "{name} profile deleted"
+hide_pads = "Hide the controller from the game while the Control Center is open"
+hide_pads_desc = "Through the HidHide driver: the game doesn't move along while you use the Control Center, and gets the controller back when you return"
+hidhide = "Optional driver: hide the controller from the game"
+hidhide_desc = "Some games (e.g. Resident Evil 2) keep receiving the controller with the Control Center open. The free HidHide driver fixes it: install it from the official page and restart the PC"
+hidhide_value = "Open page"
+hidhide_opened = "HidHide page opened in the browser"
 
 [settings.system]
 title = "System"

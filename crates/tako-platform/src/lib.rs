@@ -5,7 +5,8 @@
 
 use std::sync::Arc;
 use tako_core::devices::{
-    AudioOutputs, CursorControl, Displays, PointerInjector, ProcessLauncher,
+    AudioOutputs, ControllerHiding, CursorControl, Displays, NoHiding, PointerInjector,
+    ProcessLauncher,
     fake::{FakeAudio, FakeDisplays, FakePointer, FakeProcesses},
 };
 
@@ -68,6 +69,8 @@ pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
 // Partes puras do Windows, compiladas e testadas em todo SO.
+#[path = "windows/hidhide_lists.rs"]
+pub mod windows_hidhide;
 #[path = "windows/identity.rs"]
 pub mod windows_identity;
 #[path = "windows/startup.rs"]
@@ -83,6 +86,8 @@ pub struct Platform {
     pub processes: Arc<dyn ProcessLauncher>,
     pub secrets: Arc<dyn secrets::Secrets>,
     pub autostart: Arc<dyn Autostart>,
+    /// Esconder o controle do jogo com a Central aberta (INPUT-005).
+    pub controller_hiding: Arc<dyn ControllerHiding>,
 }
 
 /// Abrir o Tako ao entrar no sistema.
@@ -115,6 +120,7 @@ impl Platform {
             processes: Arc::new(FakeProcesses::default()),
             secrets: Arc::new(secrets::MemorySecrets::default()),
             autostart: Arc::new(NoAutostart::default()),
+            controller_hiding: Arc::new(NoHiding),
         }
     }
 
