@@ -43,6 +43,8 @@ pub enum Effect {
     InstallTheme,
     /// Sair do modo seguro: reabrir o Tako normalmente (temas e opções voltam).
     ExitSafeMode,
+    /// Outro perfil passou a ser o em uso (UX-004): reabrir o Tako com os dados dele.
+    SwitchProfile,
     ImportPlaynite,
     SaveDiagnostics,
     /// Aplicar a tela de jogo para o usuário confirmar (configurações).

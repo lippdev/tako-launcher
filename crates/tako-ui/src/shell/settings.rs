@@ -220,6 +220,12 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
     };
     let v = vec![
         MenuItem::new(
+            PanelRow::action("profiles", ctx.t("profiles.title"))
+                .desc(ctx.t("profiles.desc"))
+                .value(super::profiles::active_name(ctx)),
+        )
+        .on(|ctx| Flow::Push(Box::new(super::profiles::panel(ctx)))),
+        MenuItem::new(
             PanelRow::toggle(
                 "startup",
                 ctx.t("settings.general.startup"),
