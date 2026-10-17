@@ -177,13 +177,48 @@ fn update_toggle(
     })
 }
 
+/// Modo Xbox do Windows 11 pelo AnyFSE (PLAT-007): diz se está instalado e ensina a pôr o Tako como app inicial.
+#[cfg(windows)]
+fn xbox_mode_row(ctx: &Ctx) -> MenuItem {
+    let installed = tako_platform::windows::anyfse::installed();
+    MenuItem::new(
+        PanelRow::action("xbox-mode", ctx.t("settings.general.xbox_mode"))
+            .desc(ctx.t("settings.general.xbox_mode_desc"))
+            .value(ctx.t(if installed {
+                "settings.general.anyfse_installed"
+            } else {
+                "settings.general.anyfse_missing"
+            })),
+    )
+    .on(|ctx| Flow::Push(Box::new(xbox_mode_panel(ctx))))
+}
+
+#[cfg(windows)]
+fn xbox_mode_panel(ctx: &Ctx) -> MenuLayer {
+    let exe = std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    MenuLayer::panel(ctx.t("settings.general.xbox_mode"), |ctx| {
+        vec![
+            MenuItem::new(
+                PanelRow::action("page", ctx.t("settings.general.anyfse_page"))
+                    .value("github.com/ashpynov/AnyFSE"),
+            )
+            .on(effect(Effect::OpenUrl(
+                tako_platform::windows::anyfse::PAGE.into(),
+            ))),
+        ]
+    })
+    .text(ctx.tf("settings.general.xbox_mode_steps", &[("exe", &exe)]))
+}
+
 fn general(ctx: &Ctx) -> Vec<MenuItem> {
     let status = if ctx.update_status.is_empty() {
         ctx.t("settings.general.updates_desc")
     } else {
         ctx.update_status.clone()
     };
-    vec![
+    let mut v = vec![
         MenuItem::new(
             PanelRow::toggle(
                 "startup",
@@ -242,7 +277,11 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
             |p| p.nightly,
             |p| p.nightly = !p.nightly,
         ),
-    ]
+    ];
+    // Logo depois de "Abrir o Tako ao entrar no sistema".
+    #[cfg(windows)]
+    v.insert(1, xbox_mode_row(ctx));
+    v
 }
 
 // ---------------------------------------------------------------- Aparência

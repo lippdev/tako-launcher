@@ -86,3 +86,18 @@ Para cada um: abre, o Tako detecta o jogo rodando, "Encerrar jogo" fecha a janel
 1. Configurações › Aparência › Tema: escolha "Tako Alto contraste". A tela muda na hora, sem reabrir, e continua em tela cheia.
 2. "Instalar tema…" com um `.takotheme` válido: aparece a mensagem de instalado e o tema entra na lista.
 3. Abra com `--safe-mode`: o tema padrão é usado; Configurações › Sistema › "Sair do modo seguro" reabre o Tako com o tema escolhido.
+
+## 12. Modo Xbox pelo AnyFSE (PLAT-007)
+
+Precisa de um Windows 11 com a experiência em tela cheia disponível (portátil como o ROG Ally ou ativada com o
+XboxFullscreenExperienceTool).
+
+1. Sem o AnyFSE: Configurações › Geral › "Modo Xbox do Windows" mostra "Como configurar"; o painel traz os passos, o
+   caminho deste Tako.exe e o link da página.
+2. Instale o AnyFSE (`AnyFSE.Installer.exe`). Reabra o painel: mostra "AnyFSE instalado".
+3. Em AnyFSE › Configure, escolha executável personalizado com o caminho mostrado no painel. Em Configurações do
+   Windows › Jogos › Experiência em tela cheia, escolha o AnyFSE como app inicial.
+4. Entre no modo Xbox (Win+F11 ou reiniciando no modo): o Tako abre em tela cheia, sem a área de trabalho por trás, e o
+   controle navega sem clicar antes.
+5. Abra um jogo e feche-o: o Tako volta em tela cheia, com o foco no jogo. Repita pela Central (Encerrar jogo).
+6. Saia do Tako (Sair para o desktop): o comportamento segue a opção "Exit FSE on Launcher exit" do AnyFSE.

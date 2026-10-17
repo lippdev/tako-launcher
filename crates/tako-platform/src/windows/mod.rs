@@ -4,6 +4,7 @@
 use crate::Platform;
 use std::sync::Arc;
 
+pub mod anyfse;
 mod audio;
 mod autostart;
 mod display;
