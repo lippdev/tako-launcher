@@ -7,6 +7,7 @@ Launcher de jogos para Windows 11 com experiência de console: gamepad-first, te
 - Produto e backlog: [`docs/PRD.md`](docs/PRD.md)
 - Por onde começar: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - Biblioteca, metadados e artes: [`docs/metadados.md`](docs/metadados.md)
+- Criar temas (API de temas e `tako theme check`): [`docs/themes/`](docs/themes/README.md)
 - Como contribuir (Git Flow, commits, PRs, DoD, arquitetura): [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Decisões de arquitetura: [`docs/adr/`](docs/adr/)
 

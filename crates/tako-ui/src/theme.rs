@@ -3,6 +3,7 @@
 use slint_interpreter::{Compiler, ComponentDefinition};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use tako_core::i18n::tf;
 
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/default_theme.rs"));
@@ -121,6 +122,55 @@ pub fn compile(entry: &Path, builtin: &Path) -> Result<ComponentDefinition, Them
     })
 }
 
+/// `tako theme check <pasta ou .takotheme>` (THEME-001): as mesmas regras de instalar (manifesto, limites, caminhos,
+/// tipos de arquivo) e a compilação do `.slint` com a biblioteca `@tako`, numa pasta temporária: nada é instalado.
+/// Devolve o manifesto ou as mensagens de problema.
+pub fn check(package: &Path) -> Result<tako_themes::ThemeManifest, Vec<String>> {
+    let tmp = tempfile::tempdir().map_err(|e| vec![e.to_string()])?;
+    let builtin = install_builtin(tmp.path()).map_err(|e| vec![e.to_string()])?;
+    let installed = tako_themes::install(package, &tmp.path().join("check"))
+        .map_err(|p| p.into_iter().map(|p| p.message).collect::<Vec<_>>())?;
+    let manifest = installed
+        .manifest
+        .map_err(|p| p.into_iter().map(|p| p.message).collect::<Vec<_>>())?;
+    let def = compile(&installed.dir.join(&manifest.entry), &builtin).map_err(|e| e.messages)?;
+    // `tokens.toml`: o Tako ignora a chave ou a cor inválida ao carregar; aqui o autor fica sabendo.
+    if let Ok(text) = std::fs::read_to_string(installed.dir.join("tokens.toml")) {
+        let colors: Vec<String> = def
+            .global_properties("Ui")
+            .map(|p| {
+                p.filter(|(_, t)| *t == slint_interpreter::ValueType::Brush)
+                    .map(|(n, _)| n)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let problems = token_problems(&text, &colors);
+        if !problems.is_empty() {
+            return Err(problems);
+        }
+    }
+    Ok(manifest)
+}
+
+fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
+    let table: toml::Table = match text.parse() {
+        Ok(t) => t,
+        Err(e) => return vec![tf("themes.check.tokens_invalid", &[("error", e.message())])],
+    };
+    table
+        .iter()
+        .filter_map(|(name, value)| {
+            if !colors.iter().any(|c| c == name) {
+                Some(tf("themes.check.token_unknown", &[("name", name)]))
+            } else if value.as_str().and_then(parse_color).is_none() {
+                Some(tf("themes.check.token_invalid", &[("name", name)]))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,6 +215,60 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn the_public_theme_docs_cover_every_property_and_callback_of_app() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = install_builtin(tmp.path()).unwrap();
+        let def = compile(&dir.join("main.slint"), &dir).unwrap();
+        for doc in [
+            include_str!("../../../docs/themes/README.md"),
+            include_str!("../../../docs/themes/README.en-US.md"),
+        ] {
+            let names = def.properties().map(|(n, _)| n).chain(def.callbacks());
+            for name in names {
+                assert!(
+                    doc.contains(&format!("`{name}`"))
+                        || doc.contains(&format!("`{name}("))
+                        || doc.contains(&format!(", `{name}")),
+                    "falta {name} na documentação"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn theme_check_validates_without_installing() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let tmp = tempfile::tempdir().unwrap();
+        install_builtin(tmp.path()).unwrap();
+        let alt = tmp.path().join("tako-alto-contraste");
+        let m = check(&alt).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(m.id, "tako-alto-contraste");
+        // Token que não existe e cor quebrada.
+        std::fs::write(
+            alt.join("tokens.toml"),
+            "canvas = \"preto\"
+nada = \"#000000\"
+",
+        )
+        .unwrap();
+        let e = check(&alt).unwrap_err();
+        assert_eq!(e.len(), 2, "{e:?}");
+        assert!(e.iter().any(|p| p.contains("nada")), "{e:?}");
+        // `.slint` que não compila.
+        std::fs::remove_file(alt.join("tokens.toml")).unwrap();
+        std::fs::write(
+            alt.join("main.slint"),
+            "export component App inherits Window { x: ; }",
+        )
+        .unwrap();
+        assert!(check(&alt).is_err());
+        // Manifesto faltando.
+        std::fs::remove_file(alt.join("theme.toml")).unwrap();
+        assert!(check(&alt).is_err());
     }
 
     #[test]

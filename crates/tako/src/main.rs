@@ -109,6 +109,11 @@ fn main() {
         println!("tako {}", tako_ui::version());
         return;
     }
+    // `tako theme check <pasta ou .takotheme>` (THEME-001): para autores de temas, sem abrir o Tako.
+    if all.get(1).map(String::as_str) == Some("theme") {
+        tako_platform::attach_parent_console();
+        std::process::exit(theme_check(&all[2..]));
+    }
     let simulate = has("--simulate");
     let paths = match value(&all, "--data-dir") {
         Some(d) => DataPaths::at(d),
@@ -242,5 +247,36 @@ fn main() {
     if let Err(e) = app.run() {
         eprintln!("tako: {e}");
         std::process::exit(1);
+    }
+}
+
+/// `tako theme check <caminho>`: 0 = tema válido, 1 = problemas (listados), 2 = uso errado.
+fn theme_check(args: &[String]) -> i32 {
+    use tako_core::i18n::{self, Lang, t, tf};
+    i18n::set_lang(Lang::from_env());
+    let (Some("check"), Some(path), None) =
+        (args.first().map(String::as_str), args.get(1), args.get(2))
+    else {
+        eprintln!("{}", t("themes.check.usage"));
+        return 2;
+    };
+    match tako_ui::theme::check(std::path::Path::new(path)) {
+        Ok(m) => {
+            let args = [
+                ("name", m.name.as_str()),
+                ("version", m.version.as_str()),
+                ("id", m.id.as_str()),
+                ("api", m.api.as_str()),
+            ];
+            println!("{}", tf("themes.check.ok", &args));
+            0
+        }
+        Err(problems) => {
+            eprintln!("{}", t("themes.check.failed"));
+            for p in problems {
+                eprintln!("- {p}");
+            }
+            1
+        }
     }
 }
