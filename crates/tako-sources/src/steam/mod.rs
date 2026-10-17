@@ -1,7 +1,9 @@
 //! Steam nos três SOs (port de `Library/Steam`): jogos instalados lidos dos arquivos da Steam, sem
 //! API nem Steam aberta. Bibliotecas em `steamapps/libraryfolders.vdf`, jogos em `appmanifest_*.acf`
 //! e tempo jogado / última vez em `userdata/<conta>/config/localconfig.vdf` (da conta usada por último).
+//! Jogos não Steam adicionados à Steam ficam em [`shortcuts`].
 
+pub mod shortcuts;
 pub mod vdf;
 
 use crate::{LibraryScan, LibrarySource};
@@ -132,23 +134,28 @@ fn read_manifest(
 }
 
 /// Tempo jogado e última vez por jogo, da conta cujo `localconfig.vdf` mudou por último.
-fn read_usage(steam_root: &Path) -> HashMap<u32, (Option<DateTime<Utc>>, Duration)> {
-    let mut usage = HashMap::new();
-    let Ok(users) = std::fs::read_dir(steam_root.join("userdata")) else {
-        return usage;
-    };
-    let config = users
+/// `userdata/<conta>/config` da conta usada por último (a do `localconfig.vdf` mais recente).
+fn last_user_config(steam_root: &Path) -> Option<PathBuf> {
+    let users = std::fs::read_dir(steam_root.join("userdata")).ok()?;
+    users
         .flatten()
-        .map(|d| d.path().join("config").join("localconfig.vdf"))
+        .map(|d| d.path().join("config"))
         .filter_map(|p| {
-            let modified = std::fs::metadata(&p).and_then(|m| m.modified()).ok()?;
+            let modified = std::fs::metadata(p.join("localconfig.vdf"))
+                .and_then(|m| m.modified())
+                .ok()?;
             Some((modified, p))
         })
-        .max_by_key(|(m, _): &(SystemTime, PathBuf)| *m);
-    let Some((_, config)) = config else {
+        .max_by_key(|(m, _): &(SystemTime, PathBuf)| *m)
+        .map(|(_, p)| p)
+}
+
+fn read_usage(steam_root: &Path) -> HashMap<u32, (Option<DateTime<Utc>>, Duration)> {
+    let mut usage = HashMap::new();
+    let Some(config) = last_user_config(steam_root) else {
         return usage;
     };
-    let Ok(root) = vdf::load(&config) else {
+    let Ok(root) = vdf::load(&config.join("localconfig.vdf")) else {
         return usage;
     };
     let Some(apps) = root.path(&["UserLocalConfigStore", "Software", "Valve", "Steam", "apps"])
@@ -263,7 +270,11 @@ impl LibrarySource for SteamLibrarySource {
         match &self.root {
             None => LibraryScan::missing(t("sources.steam.missing")),
             Some(root) => LibraryScan {
-                games: scan(root).iter().map(to_game).collect(),
+                games: scan(root)
+                    .iter()
+                    .map(to_game)
+                    .chain(last_user_config(root).map_or_else(Vec::new, |c| shortcuts::scan(&c)))
+                    .collect(),
                 client_installed: true,
                 notice: None,
             },
