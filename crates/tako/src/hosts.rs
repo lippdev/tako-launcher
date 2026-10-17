@@ -98,6 +98,12 @@ impl Host for SupervisedHost {
                 });
                 return HostAction::Close;
             }
+            Effect::SwitchProfile => {
+                self.send(&UiMsg::Closing {
+                    reason: "profile".into(),
+                });
+                return HostAction::Close;
+            }
             other => tracing::info!("pedido sem tratamento: {other:?}"),
         }
         HostAction::Stay
@@ -165,7 +171,7 @@ impl Host for LocalHost {
             }
             Effect::GoHomeKeepingGame => {}
             Effect::ExitToDesktop => return HostAction::Close,
-            Effect::ExitSafeMode => return restart_normal(ctx),
+            Effect::ExitSafeMode | Effect::SwitchProfile => return restart_normal(ctx),
             other => tracing::info!("pedido sem tratamento: {other:?}"),
         }
         HostAction::Stay

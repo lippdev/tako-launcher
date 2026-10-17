@@ -103,7 +103,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         #[cfg(not(windows))]
         let decrypt = |_: &[u8]| None;
         if let Err(e) = tako_core::persistence::alpha_migration::migrate_secrets(
-            &paths.root,
+            &paths.machine,
             decrypt,
             &crate::shell::settings::metadata::Vault(platform.secrets.as_ref()),
         ) {
@@ -366,6 +366,15 @@ impl App {
             shell.ctx.welcome_back = Some((id.clone(), *played, *end));
         } else if !opts.control_center {
             crate::shell::first_run::open_if_needed(&mut shell);
+        }
+        // "Quem está jogando?" (UX-004) só numa abertura comum; fica por cima do assistente da primeira execução.
+        let plain_start = opts.after_game.is_none()
+            && opts.running.is_none()
+            && !opts.control_center
+            && opts.link.is_none()
+            && !opts.simulate;
+        if let Some(who) = crate::shell::profiles::chooser_on_start(&shell.ctx, plain_start) {
+            shell.push_layer(Box::new(who));
         }
         let shell = Rc::new(RefCell::new(shell));
         crate::tasks::attach(&shell);

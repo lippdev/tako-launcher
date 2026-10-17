@@ -82,8 +82,7 @@ pub struct Supervisor {
 
 impl Supervisor {
     pub fn new(paths: DataPaths, platform: Platform, all_args: &[String]) -> Supervisor {
-        let settings = SettingsStore::new(TakoDatabase::new(paths.database()));
-        let key = settings.get("ControlCenterKey").ok().flatten();
+        let (profiles, key) = shortcuts(&paths);
         Supervisor {
             initial_link: tako_core::links::argument(all_args).map(str::to_owned),
             paths,
@@ -96,8 +95,8 @@ impl Supervisor {
             launching: false,
             pads: None,
             chord: ButtonChordDetector::new(chord::DEFAULT),
-            profiles: load_profiles(&settings),
-            key: tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
+            profiles,
+            key,
         }
     }
 
@@ -213,6 +212,11 @@ impl Supervisor {
             if ui.closing.as_deref() == Some("normal") {
                 // Saiu do modo seguro: reabre a interface normal.
                 safe = false;
+                continue;
+            }
+            if ui.closing.as_deref() == Some("profile") {
+                // Trocou de perfil (UX-004): os atalhos da Central são do perfil novo.
+                (self.profiles, self.key) = shortcuts(&self.paths);
                 continue;
             }
             if self.running.is_some() {
@@ -371,10 +375,8 @@ impl Supervisor {
     /// Sem interface, durante o jogo. Sem polling ativo: espera eventos do controle por até 2 s (16 ms só com o
     /// ponteiro pelo controle ligado). Devolve como reabrir a interface.
     fn game_loop(&mut self) -> Launch {
-        // A interface pode ter mudado os perfis antes do jogo.
-        self.profiles = load_profiles(&SettingsStore::new(TakoDatabase::new(
-            self.paths.database(),
-        )));
+        // A interface pode ter mudado os perfis de botões (ou o atalho) antes do jogo; vale o perfil local em uso.
+        (self.profiles, self.key) = shortcuts(&self.paths);
         if self.pads.is_none() {
             self.pads = Pads::open()
                 .map_err(|e| tracing::warn!("controles: {e}"))
@@ -459,6 +461,13 @@ impl Supervisor {
     }
 }
 
-fn load_profiles(settings: &SettingsStore) -> Profiles {
-    Profiles::load(|k| settings.get(k).ok().flatten())
+/// Perfis de botões e atalho de teclado da Central, gravados nas configurações do perfil local em uso (UX-004).
+fn shortcuts(machine: &DataPaths) -> (Profiles, tako_core::input::shortcut::KeyShortcut) {
+    let paths = tako_core::profiles::Profiles::load(&machine.machine).paths(machine);
+    let settings = SettingsStore::new(TakoDatabase::new(paths.database()));
+    let key = settings.get("ControlCenterKey").ok().flatten();
+    (
+        Profiles::load(|k| settings.get(k).ok().flatten()),
+        tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
+    )
 }

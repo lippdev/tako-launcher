@@ -14,6 +14,7 @@ pub mod navigation;
 pub mod paths;
 pub mod persistence;
 pub mod presentation;
+pub mod profiles;
 pub mod session;
 pub mod supervision;
 pub mod updates;

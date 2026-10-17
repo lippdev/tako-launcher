@@ -37,13 +37,30 @@ impl Os {
 }
 
 /// Onde ficam os dados e se a instalação é portable.
+///
+/// `machine` é a pasta da instalação; `root`, a do perfil em uso (UX-004). O perfil principal usa a própria
+/// pasta da instalação, então quem tinha dados antes dos perfis continua com eles no mesmo lugar. Do perfil:
+/// banco (biblioteca, favoritos, tempo de jogo, configurações), imagens escolhidas e temas. Da máquina: logs,
+/// caches, sessão de jogo e atualizações.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataPaths {
     pub kind: InstallKind,
     pub root: PathBuf,
+    pub machine: PathBuf,
 }
 
+/// Pasta dos perfis além do principal.
+pub const PROFILES_DIR: &str = "profiles";
+
 impl DataPaths {
+    fn new(kind: InstallKind, root: PathBuf) -> DataPaths {
+        DataPaths {
+            kind,
+            machine: root.clone(),
+            root,
+        }
+    }
+
     /// Resolve para o executável atual e o ambiente do processo.
     pub fn detect() -> DataPaths {
         let exe_dir = std::env::current_exe()
@@ -60,26 +77,24 @@ impl DataPaths {
 
     /// Para testes e para `--data-dir`.
     pub fn at(root: impl Into<PathBuf>) -> DataPaths {
+        DataPaths::new(InstallKind::Portable, root.into())
+    }
+
+    /// As mesmas pastas da máquina com os dados do perfil `dir` (`None` = o principal). `dir` vem de
+    /// `profiles::Profile::dir`, já validado (só letras, números e `-`).
+    pub fn for_profile(&self, dir: Option<&str>) -> DataPaths {
         DataPaths {
-            kind: InstallKind::Portable,
-            root: root.into(),
+            kind: self.kind,
+            root: match dir {
+                Some(d) => self.machine.join(PROFILES_DIR).join(d),
+                None => self.machine.clone(),
+            },
+            machine: self.machine.clone(),
         }
     }
 
     pub fn database(&self) -> PathBuf {
         self.root.join("tako.db")
-    }
-    pub fn logs(&self) -> PathBuf {
-        self.root.join("logs")
-    }
-    pub fn cache(&self) -> PathBuf {
-        self.root.join("cache")
-    }
-    pub fn art_cache(&self) -> PathBuf {
-        self.root.join("cache").join("art")
-    }
-    pub fn metadata_cache(&self) -> PathBuf {
-        self.root.join("cache").join("metadata")
     }
     pub fn art_choices(&self) -> PathBuf {
         self.root.join("art-choices")
@@ -87,17 +102,29 @@ impl DataPaths {
     pub fn themes(&self) -> PathBuf {
         self.root.join("themes")
     }
+    pub fn logs(&self) -> PathBuf {
+        self.machine.join("logs")
+    }
+    pub fn cache(&self) -> PathBuf {
+        self.machine.join("cache")
+    }
+    pub fn art_cache(&self) -> PathBuf {
+        self.cache().join("art")
+    }
+    pub fn metadata_cache(&self) -> PathBuf {
+        self.cache().join("metadata")
+    }
     pub fn session_journal(&self) -> PathBuf {
-        self.root.join("session.json")
+        self.machine.join("session.json")
     }
     pub fn session_environment(&self) -> PathBuf {
-        self.root.join("session-environment.json")
+        self.machine.join("session-environment.json")
     }
     pub fn cursor_marker(&self) -> PathBuf {
-        self.root.join("cursor-hidden")
+        self.machine.join("cursor-hidden")
     }
     pub fn updates(&self) -> PathBuf {
-        self.root.join("updates.json")
+        self.machine.join("updates.json")
     }
 }
 
@@ -108,10 +135,7 @@ pub fn resolve(
     env: impl Fn(&str) -> Option<PathBuf>,
     exists: impl Fn(&Path) -> bool,
 ) -> DataPaths {
-    let portable = DataPaths {
-        kind: InstallKind::Portable,
-        root: exe_dir.join(PORTABLE_DIR),
-    };
+    let portable = DataPaths::new(InstallKind::Portable, exe_dir.join(PORTABLE_DIR));
     match os {
         Os::Windows => {
             if !exists(&exe_dir.join(INSTALLED_MARKER)) {
@@ -120,10 +144,7 @@ pub fn resolve(
             let base = env("LOCALAPPDATA")
                 .or_else(|| env("USERPROFILE").map(|h| h.join("AppData").join("Local")))
                 .unwrap_or_else(|| exe_dir.to_path_buf());
-            DataPaths {
-                kind: InstallKind::Installed,
-                root: base.join("Tako"),
-            }
+            DataPaths::new(InstallKind::Installed, base.join("Tako"))
         }
         Os::Linux | Os::MacOs => {
             if exists(&exe_dir.join(PORTABLE_DIR)) || exists(&exe_dir.join(PORTABLE_MARKER)) {
@@ -140,10 +161,7 @@ pub fn resolve(
                     .unwrap_or_else(|| home.join(".local").join("share"))
                     .join("tako")
             };
-            DataPaths {
-                kind: InstallKind::Installed,
-                root,
-            }
+            DataPaths::new(InstallKind::Installed, root)
         }
     }
 }

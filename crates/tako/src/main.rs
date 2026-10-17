@@ -171,6 +171,8 @@ fn main() {
     if !supervised && !simulate {
         tako_ui::session::recover_after_crash(&platform, &paths);
     }
+    // Perfil em uso (UX-004): banco, imagens escolhidas e temas dele; logs, caches e sessão ficam na instalação.
+    let paths = tako_core::profiles::Profiles::load(&paths.machine).paths(&paths);
     let mut ctx = build_ctx(paths, platform, simulate);
     ctx.controller_mouse = has("--controller-mouse");
     let after_game = value(&all, "--after-game").map(|id| {

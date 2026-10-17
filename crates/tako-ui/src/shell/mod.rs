@@ -20,6 +20,7 @@ pub mod layer;
 pub mod library;
 mod links;
 pub mod performance;
+pub mod profiles;
 pub mod settings;
 pub mod sidebar;
 pub mod smart;
