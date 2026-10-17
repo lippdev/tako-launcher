@@ -214,14 +214,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
     std::thread::Builder::new()
         .name("tako-scan".into())
         .spawn(move || {
-            let (games, reports) = if simulate {
-                (crate::demo::games(), Vec::new())
-            } else {
-                crate::sources::scan(&disabled)
-            };
-            if let Ok(mut f) = found.lock() {
-                *f = games;
-            }
+            let reports = scan_into(&found, &disabled, simulate);
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(shell) = crate::tasks::shell() {
                     let mut s = shell.borrow_mut();
@@ -234,6 +227,23 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
             });
         })
         .ok();
+}
+
+/// Lê as lojas e troca os jogos encontrados. Em simulação a lista é a que o ctx já tem (a demonstração ou os
+/// 1.000 jogos do bench): reler não pode trocá-la, senão o bench passa a medir 12 jogos.
+fn scan_into(
+    found: &Mutex<Vec<Game>>,
+    disabled: &str,
+    simulate: bool,
+) -> Vec<tako_sources::report::LibrarySourceReport> {
+    if simulate {
+        return Vec::new();
+    }
+    let (games, reports) = crate::sources::scan(disabled);
+    if let Ok(mut f) = found.lock() {
+        *f = games;
+    }
+    reports
 }
 
 /// O tema escolhido ou, se ele falhar, o padrão (PRD §7: volta ao padrão sem loop de falha).
@@ -868,5 +878,18 @@ mod tests {
         assert_eq!(toast(&shell), None);
         shell.handle(Cmd::Right);
         assert_ne!(shell.focused_game(), focus);
+    }
+
+    #[test]
+    fn simulated_rescan_keeps_the_library_it_was_given() {
+        let bench: Vec<Game> = (0..1000)
+            .map(|i| Game {
+                id: format!("bench:{i}"),
+                ..Default::default()
+            })
+            .collect();
+        let found = Mutex::new(bench);
+        assert!(scan_into(&found, "", true).is_empty());
+        assert_eq!(found.lock().unwrap().len(), 1000);
     }
 }
