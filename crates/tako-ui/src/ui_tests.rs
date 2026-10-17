@@ -266,6 +266,31 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
                     .iter()
                     .all(|g| g.is_favorite)
             );
+            shell.click("tab", 0);
+            shell
+                .desktop_library()
+                .unwrap()
+                .criteria
+                .borrow_mut()
+                .favorites_only = true;
+            assert_eq!(
+                property(&draw(&mut shell), "desk-filtered"),
+                &Value::Bool(true)
+            );
+            assert!(
+                shell
+                    .desktop_library()
+                    .unwrap()
+                    .games(&shell.ctx)
+                    .iter()
+                    .all(|g| g.is_favorite)
+            );
+            shell
+                .desktop_library()
+                .unwrap()
+                .criteria
+                .borrow_mut()
+                .favorites_only = false;
             shell.click("tab", 2);
             if shell.ctx.collections.collections().is_empty() {
                 shell
@@ -303,6 +328,13 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
             "a preferência persiste após recarregar"
         );
         shell.ctx.settings.set_bool(ASK_SETTING, true);
+        shell.ask_big_picture = true;
+        crate::shell::desktop::ask_big_picture(&mut shell, Duration::ZERO);
+        shell.click("overlay-row", 0);
+        assert_eq!(
+            shell.ctx.effects.pop(),
+            Some(Effect::SwitchMode(UiMode::BigPicture))
+        );
         shell.ask_big_picture = true;
         crate::shell::desktop::ask_big_picture(
             &mut shell,

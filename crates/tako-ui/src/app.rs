@@ -1260,18 +1260,21 @@ mod tests {
             app.apply(HostAction::Launching);
             app.game_shown();
             assert!(!app.shell.borrow().ctx.launching);
+            assert!(app.ui.borrow().window().is_minimized());
             assert!(
                 app.ui.borrow().window().is_visible(),
                 "a UI desktop continua viva"
             );
             app.toggle_control_center();
             assert!(app.shell.borrow().control_center_open());
+            assert!(!app.ui.borrow().window().is_minimized());
             assert_eq!(
                 app.ui.borrow().get_property("control-center").unwrap(),
                 Value::Bool(true)
             );
             app.toggle_control_center();
             assert!(!app.shell.borrow().control_center_open());
+            assert!(app.ui.borrow().window().is_minimized());
             app.toggle_control_center();
             app.shell.borrow_mut().click("cc-icon", 6);
             app.shell.borrow_mut().click("cc-panel", 0);
@@ -1285,6 +1288,7 @@ mod tests {
                     s.ctx.dirty = true;
                 }
                 app.redraw();
+                assert!(!app.ui.borrow().window().is_minimized());
                 assert!(app.shell.borrow().ctx.running.is_none());
                 assert!(!app.shell.borrow().control_center_open());
                 assert_eq!(app.shell.borrow().page().kind(), "desk-library");
