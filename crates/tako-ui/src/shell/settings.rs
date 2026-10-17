@@ -486,6 +486,23 @@ fn pick_theme(ctx: &mut Ctx, id: Option<&str>) -> Flow {
 
 fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
     vec![
+        MenuItem::new(PanelRow::choice(
+            "text-size",
+            ctx.t("accessibility.text_size"),
+            format!("{}%", crate::navigation_feedback::text_size(&ctx.settings)),
+        ))
+        .on(|ctx| change_text_size(ctx, 1))
+        .on_adjust(change_text_size),
+        MenuItem::new(
+            PanelRow::choice(
+                "navigation-volume",
+                ctx.t("accessibility.sound_volume"),
+                format!("{}%", crate::navigation_feedback::volume(&ctx.settings)),
+            )
+            .desc(ctx.t("accessibility.sound_desc")),
+        )
+        .on(|ctx| change_navigation_volume(ctx, 1))
+        .on_adjust(change_navigation_volume),
         MenuItem::new(
             PanelRow::action("theme", ctx.t("settings.appearance.theme"))
                 .desc(ctx.t("settings.appearance.theme_desc"))
@@ -505,6 +522,27 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             false,
         ),
     ]
+}
+
+fn change_text_size(ctx: &mut Ctx, direction: i32) -> Flow {
+    use crate::navigation_feedback::{self as feedback, TEXT_SIZES};
+    let index = TEXT_SIZES
+        .iter()
+        .position(|n| *n == feedback::text_size(&ctx.settings))
+        .unwrap_or(0) as i32;
+    let next = (index + direction.signum()).rem_euclid(TEXT_SIZES.len() as i32) as usize;
+    ctx.settings
+        .set(feedback::TEXT_SIZE, &TEXT_SIZES[next].to_string());
+    ctx.dirty = true;
+    Flow::Stay
+}
+
+fn change_navigation_volume(ctx: &mut Ctx, direction: i32) -> Flow {
+    use crate::navigation_feedback as feedback;
+    let next = (i32::from(feedback::volume(&ctx.settings)) + direction.signum() * 10).clamp(0, 100);
+    ctx.settings.set(feedback::SOUND_VOLUME, &next.to_string());
+    ctx.dirty = true;
+    Flow::Stay
 }
 
 // ---------------------------------------------------------------- Sistema

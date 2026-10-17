@@ -65,6 +65,28 @@ fn navigates_between_categories_and_rows() {
 }
 
 #[test]
+fn text_size_and_navigation_volume_persist_and_are_bounded() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_guard, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+    let items = rows_of(&ctx, "appearance");
+    let text = find(&items, "text-size");
+    let sound = find(&items, "navigation-volume");
+    adjust(&mut ctx, &text, -1);
+    assert_eq!(crate::navigation_feedback::text_size(&ctx.settings), 125);
+    for _ in 0..20 {
+        adjust(&mut ctx, &sound, 1);
+    }
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 100);
+    for _ in 0..8 {
+        adjust(&mut ctx, &sound, -1);
+    }
+    drop(ctx);
+    let ctx = crate::app::build_ctx(DataPaths::at(dir.path()), Platform::simulated(), false);
+    assert_eq!(crate::navigation_feedback::text_size(&ctx.settings), 125);
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 20);
+}
+
+#[test]
 fn toggles_persist_in_settings() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();

@@ -7,6 +7,7 @@ export global Ui {
     in property <color> accent: #2B3A55;
     in property <color> accent-deep: #161E2C;
     in property <bool> reduce-motion: false;
+    in property <float> text-scale: 1;
     // "xbox", "playstation", "nintendo" ou "keyboard": muda os glifos das dicas.
     in property <string> input-kind: "xbox";
     // O foco mais recente veio do mouse passando por cima: destaca o item, mas listas e fileiras não rolam até ele.
@@ -38,15 +39,15 @@ export global Ui {
     out property <duration> color-time: reduce-motion ? 0ms : 600ms;
 
     // Tipografia (px do palco).
-    out property <length> display: 84 * u;
-    out property <length> headline-lg: 64 * u;
-    out property <length> headline-md: 38 * u;
-    out property <length> title-md: 26 * u;
-    out property <length> body-lg: 26 * u;
-    out property <length> body-md: 22 * u;
-    out property <length> label-lg: 24 * u;
-    out property <length> label-md: 20 * u;
-    out property <length> label-sm: 18 * u;
+    out property <length> display: 84 * u * text-scale;
+    out property <length> headline-lg: 64 * u * text-scale;
+    out property <length> headline-md: 38 * u * text-scale;
+    out property <length> title-md: 26 * u * text-scale;
+    out property <length> body-lg: 26 * u * text-scale;
+    out property <length> body-md: 22 * u * text-scale;
+    out property <length> label-lg: 24 * u * text-scale;
+    out property <length> label-md: 20 * u * text-scale;
+    out property <length> label-sm: 18 * u * text-scale;
 
     out property <string> font-title: "Source Sans 3";
     out property <string> font-text: "Inter";

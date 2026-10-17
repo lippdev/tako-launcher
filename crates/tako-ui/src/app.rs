@@ -434,6 +434,7 @@ impl App {
     }
 
     fn on_cmd(&self, cmd: Cmd) {
+        crate::navigation_feedback::play(&self.shell.borrow().ctx, cmd);
         {
             let mut s = self.shell.borrow_mut();
             match cmd {
@@ -498,6 +499,7 @@ impl App {
         {
             let app = self.clone();
             let _ = ui.set_callback("clicked", move |args| {
+                crate::navigation_feedback::play(&app.shell.borrow().ctx, Cmd::Accept);
                 app.shell
                     .borrow_mut()
                     .click(&arg_str(args, 0), arg_num(args, 1));
@@ -839,6 +841,7 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
 /// Desenha se algo mudou: propriedades da página, cor do jogo em foco e colunas da grade.
 pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     let mut s = shell.borrow_mut();
+    crate::navigation_feedback::sync(&s.ctx);
     if !s.ctx.dirty {
         return;
     }
@@ -890,6 +893,12 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     bridge::set_global(ui, "Ui", "accent", color(palette.accent).to_value());
     bridge::set_global(ui, "Ui", "accent-deep", color(palette.deep).to_value());
     bridge::set_global(ui, "Ui", "pointer", s.ctx.pointer.to_value());
+    bridge::set_global(
+        ui,
+        "Ui",
+        "text-scale",
+        (crate::navigation_feedback::text_size(&s.ctx.settings) as f32 / 100.).to_value(),
+    );
     bridge::set_global(
         ui,
         "Ui",
