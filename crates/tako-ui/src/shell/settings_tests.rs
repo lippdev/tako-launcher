@@ -631,3 +631,41 @@ fn hiding_the_controller_offers_the_driver_or_the_option() {
     accept(&mut ctx, &option);
     assert!(!ctx.settings.bool(SETTING, true));
 }
+
+#[test]
+fn each_monitor_gets_back_its_own_resolution_and_hdr() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let display = find(&screen::rows(&ctx), "display");
+    // TV: a maior resolução e HDR.
+    adjust(&mut ctx, &display, -1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY2");
+    let mode = find(&screen::rows(&ctx), "mode");
+    adjust(&mut ctx, &mode, 1);
+    let hdr = find(&screen::rows(&ctx), "settings.screen.hdr");
+    accept(&mut ctx, &hdr);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "3840x2160@120");
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_HDR, false));
+    // Monitor sem preset: o padrão (manter a atual, sem HDR); depois, 60 Hz.
+    adjust(&mut ctx, &display, -1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY1");
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "");
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
+    let mode = find(&screen::rows(&ctx), "mode");
+    adjust(&mut ctx, &mode, 1);
+    adjust(&mut ctx, &mode, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "1920x1080@60");
+    // De volta à TV: o preset dela volta; e ao monitor, o dele.
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "3840x2160@120");
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_HDR, false));
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "1920x1080@60");
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
+    // Valor quebrado volta ao padrão: a tela troca sem preset.
+    ctx.settings.set(keys::GAME_SCREEN_PRESETS, "{quebrado");
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY2");
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "");
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
+}

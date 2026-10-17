@@ -79,11 +79,6 @@ fn screen_of(ctx: &Ctx, o: &Override) -> String {
         .unwrap_or_else(|| ctx.settings.string(keys::GAME_SCREEN_ID))
 }
 
-/// O jogo usa outra tela que não a do Tako: a resolução do Tako não vale para ela.
-fn own_screen(ctx: &Ctx, o: &Override) -> bool {
-    !screen_of(ctx, o).eq_ignore_ascii_case(&ctx.settings.string(keys::GAME_SCREEN_ID))
-}
-
 /// Resoluções da tela do jogo (vazio sem tela escolhida).
 fn modes(ctx: &Ctx, o: &Override) -> Vec<String> {
     let screen = screen_of(ctx, o);
@@ -362,12 +357,10 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
         .on_adjust(move |ctx, d| cycle_screen(ctx, &b, d)),
     );
 
-    // Em outra tela, o padrão é manter a resolução dela (a do Tako é da tela de jogo dele).
-    let global_mode = if own_screen(ctx, &c) {
-        String::new()
-    } else {
-        s.string(keys::GAME_SCREEN_MODE)
-    };
+    // Em outra tela, o padrão é o preset dela (a resolução do Tako é da tela de jogo dele).
+    let (default_mode, default_hdr) =
+        crate::session::global_settings(ctx).screen_defaults(&screen_of(ctx, &c));
+    let global_mode = default_mode.map(|m| m.key()).unwrap_or_default();
     let mode_value = match c.screen_mode.as_deref() {
         None => default_of(
             ctx,
@@ -394,7 +387,7 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
 
     let hdr_value = match c.hdr {
         Some(h) => on_off(ctx, h),
-        None => default_of(ctx, &on_off(ctx, s.bool(keys::GAME_SCREEN_HDR, false))),
+        None => default_of(ctx, &on_off(ctx, default_hdr)),
     };
     let (a, b) = (i(), i());
     let toggle_hdr = move |ctx: &mut Ctx, dir: i32, id: &str| {
@@ -556,6 +549,7 @@ mod tests {
     use crate::model::Overlay;
     use crate::shell::Cmd;
     use tako_core::paths::DataPaths;
+    use tako_core::session::settings::{MonitorPreset, MonitorPresets};
     use tako_platform::Platform;
 
     fn rows_of(o: &Overlay) -> Vec<(String, String, bool)> {
@@ -682,6 +676,28 @@ mod tests {
         // Na outra tela, a resolução do Tako não vale: mantém a atual.
         assert_eq!(value(&o, "mode").0, "Padrão: manter a atual");
         assert_eq!(value(&o, "screen").0, "Padrão: Sim");
+        // Com um preset do monitor (Configurações › Tela de jogo), ele passa a ser o padrão do jogo.
+        let full_hd = DisplayMode::new(1920, 1080, 60);
+        let mut presets = MonitorPresets::default();
+        let preset = MonitorPreset {
+            mode: Some(full_hd),
+            hdr: true,
+        };
+        presets.set(&screens[0].id, preset);
+        ctx.settings
+            .set(keys::GAME_SCREEN_PRESETS, &presets.to_text());
+        let o = layer.render(&ctx);
+        assert_eq!(
+            value(&o, "mode"),
+            ("Padrão: 1920 × 1080 · 60 Hz".into(), false)
+        );
+        assert_eq!(value(&o, "hdr"), ("Padrão: Ligado".into(), false));
+        // O que a sessão usa (no --simulate as escolhas do jogo ficam só na memória).
+        let global = crate::session::global_settings(&ctx);
+        let s = tako_core::session::settings::resolve(&global, Some(&current(&ctx, &id)));
+        let s = s.game_screen.unwrap();
+        assert_eq!((s.mode, s.enable_hdr), (Some(full_hd), true));
+        ctx.settings.set(keys::GAME_SCREEN_PRESETS, "");
         let saved = current(&ctx, &id);
         assert_eq!(saved.screen_id.as_deref(), Some(screens[0].id.as_str()));
         assert_eq!(

@@ -6,6 +6,7 @@ use crate::model::PanelRow;
 use crate::shell::ctx::keys;
 use std::time::Duration;
 use tako_core::devices::{AudioDevice, ConnectedDisplay, DisplayMode, HdrStatus};
+use tako_core::session::settings::{MonitorPreset, MonitorPresets};
 
 /// Ler as telas pode rodar programas do SO (xrandr, kscreen): no máximo a cada 3 s.
 const TTL: Duration = Duration::from_secs(3);
@@ -44,6 +45,28 @@ fn audio(ctx: &Ctx) -> Result<(bool, Vec<AudioDevice>), String> {
             .map(|s| (a.can_set_default(), s.devices))
             .map_err(|e| e.to_string())
     })
+}
+
+/// Presets de cada monitor (PERF-002).
+pub(crate) fn presets(ctx: &Ctx) -> MonitorPresets {
+    MonitorPresets::parse(&ctx.settings.string(keys::GAME_SCREEN_PRESETS))
+}
+
+/// Guarda a resolução e o HDR da tela de jogo como o preset dela, para voltarem quando ela for escolhida de novo.
+fn remember_preset(ctx: &mut Ctx) {
+    let id = ctx.settings.string(keys::GAME_SCREEN_ID);
+    if id.trim().is_empty() {
+        return;
+    }
+    let mut all = presets(ctx);
+    all.set(
+        &id,
+        MonitorPreset {
+            mode: DisplayMode::parse(&ctx.settings.string(keys::GAME_SCREEN_MODE)),
+            hdr: ctx.settings.bool(keys::GAME_SCREEN_HDR, false),
+        },
+    );
+    ctx.settings.set(keys::GAME_SCREEN_PRESETS, &all.to_text());
 }
 
 /// Próximo da lista (com volta), a partir do atual.
@@ -111,10 +134,14 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                     match cycle(&list, cur, dir) {
                         None => ctx.toast(ctx.t("settings.screen.no_displays")),
                         Some(d) => {
+                            remember_preset(ctx);
                             ctx.settings.set(keys::GAME_SCREEN_ID, &d.id);
                             ctx.settings.set(keys::GAME_SCREEN_NAME, &d.name);
-                            // Resolução de outra tela não vale para esta.
-                            ctx.settings.set(keys::GAME_SCREEN_MODE, "");
+                            // Volta o que esta tela tinha; sem preset, o padrão (manter a atual, sem HDR).
+                            let p = presets(ctx).get(&d.id).unwrap_or_default();
+                            let mode = p.mode.map(|m| m.key()).unwrap_or_default();
+                            ctx.settings.set(keys::GAME_SCREEN_MODE, &mode);
+                            ctx.settings.set_bool(keys::GAME_SCREEN_HDR, p.hdr);
                         }
                     }
                 }
@@ -170,6 +197,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                     if let Some(m) = cycle(&all, i, dir) {
                         let key = m.map(|m| m.key()).unwrap_or_default();
                         ctx.settings.set(keys::GAME_SCREEN_MODE, &key);
+                        remember_preset(ctx);
                     }
                 }
             }
@@ -184,10 +212,12 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         .and_then(|l| l.iter().find(|d| d.id.eq_ignore_ascii_case(&id)))
         .is_some_and(|d| d.hdr != HdrStatus::Unsupported);
     if hdr {
-        v.push(disable(
-            toggle(ctx, "settings.screen.hdr", keys::GAME_SCREEN_HDR, false),
-            usable,
-        ));
+        let item = toggle(ctx, "settings.screen.hdr", keys::GAME_SCREEN_HDR, false).on(|ctx| {
+            ctx.settings.toggle(keys::GAME_SCREEN_HDR, false);
+            remember_preset(ctx);
+            Flow::Stay
+        });
+        v.push(disable(item, usable));
     }
     v.push(disable(
         MenuItem::new(super::action(ctx, "settings.screen.test")).on(|ctx| {

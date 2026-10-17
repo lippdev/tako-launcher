@@ -168,6 +168,8 @@ pub mod keys {
     pub const GAME_SCREEN_HIDE_OTHERS: &str = "GameScreenHideOthers";
     pub const GAME_SCREEN_MODE: &str = "GameScreenMode";
     pub const GAME_SCREEN_HDR: &str = "GameScreenHdr";
+    /// Resolução e HDR de cada monitor (PERF-002), em JSON.
+    pub const GAME_SCREEN_PRESETS: &str = "GameScreenPresets";
     pub const GAME_SCREEN_CONFIRMED: &str = "GameScreenConfirmedSetup";
     pub const GAME_AUDIO_ID: &str = "GameAudioDeviceId";
     pub const GAME_AUDIO_NAME: &str = "GameAudioDeviceName";
