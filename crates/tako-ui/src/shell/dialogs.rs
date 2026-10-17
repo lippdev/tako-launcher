@@ -611,6 +611,20 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                 Flow::Stay
             }),
         );
+        let cr = criteria.clone();
+        v.push(
+            MenuItem::new(PanelRow::choice(
+                "play-time",
+                ctx.t("smart.play_time"),
+                ctx.t(c.play_time.key()),
+            ))
+            .on(move |ctx| {
+                let mut c = cr.borrow_mut();
+                c.play_time = c.play_time.next();
+                ctx.dirty = true;
+                Flow::Stay
+            }),
+        );
         v.push(MenuItem::new(PanelRow::header(ctx.t("filters.sort"))));
         for s in library_text::SORT_ORDER {
             let cr = criteria.clone();
@@ -740,6 +754,22 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                     let next = cr.borrow().clear_filters();
                     *cr.borrow_mut() = next;
                     Flow::Stay
+                }),
+            );
+        }
+        // Coleção automática (LIB-003): estes filtros, a rota da página e a ordenação, com um nome.
+        if c.has_filters() || c.has_search() || route != LibraryFilter::All {
+            if !c.has_filters() {
+                v.push(MenuItem::new(PanelRow::header(ctx.t("filters.filters"))));
+            }
+            let saved = c.clone();
+            v.push(
+                MenuItem::new(
+                    PanelRow::action("save-smart", ctx.t("smart.save"))
+                        .desc(ctx.t("smart.save_desc")),
+                )
+                .on(move |ctx| {
+                    Flow::Push(Box::new(super::smart::save_as(ctx, saved.clone(), route)))
                 }),
             );
         }

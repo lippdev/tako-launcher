@@ -12,12 +12,59 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 /// Filtro de instalação do painel de filtros.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum InstallFilter {
     #[default]
     Any,
     Installed,
     NotInstalled,
+}
+
+/// Faixas sem sobreposição, em segundos, para filtros e coleções automáticas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum PlayTimeFilter {
+    #[default]
+    Any,
+    Unplayed,
+    UnderHour,
+    OneToTenHours,
+    OverTenHours,
+}
+
+impl PlayTimeFilter {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Any => Self::Unplayed,
+            Self::Unplayed => Self::UnderHour,
+            Self::UnderHour => Self::OneToTenHours,
+            Self::OneToTenHours => Self::OverTenHours,
+            Self::OverTenHours => Self::Any,
+        }
+    }
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Any => "smart.time.any",
+            Self::Unplayed => "smart.time.unplayed",
+            Self::UnderHour => "smart.time.under_hour",
+            Self::OneToTenHours => "smart.time.one_to_ten",
+            Self::OverTenHours => "smart.time.over_ten",
+        }
+    }
+
+    fn matches(self, time: Duration) -> bool {
+        match self {
+            Self::Any => true,
+            Self::Unplayed => time.is_zero(),
+            Self::UnderHour => !time.is_zero() && time < Duration::from_secs(3600),
+            Self::OneToTenHours => {
+                (Duration::from_secs(3600)..Duration::from_secs(36000)).contains(&time)
+            }
+            Self::OverTenHours => time >= Duration::from_secs(36000),
+        }
+    }
 }
 
 /// O que os filtros e a ordenação precisam saber de um item. Serve aos jogos do Tako ([`LibraryFacts::of`]) e aos
@@ -67,7 +114,8 @@ impl LibraryFacts {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct LibraryCriteria {
     /// Texto da busca (sem acento e sem diferenciar maiúsculas; ver [`super::search_text`]).
     pub search: String,
@@ -75,6 +123,7 @@ pub struct LibraryCriteria {
     pub favorites_only: bool,
     /// Só jogos já jogados (a mesma regra da fileira "Jogados recentemente" da Início).
     pub played_only: bool,
+    pub play_time: PlayTimeFilter,
     /// Só jogos adicionados cujo arquivo ou pasta sumiu (LIB-004).
     pub broken_only: bool,
     /// Valores comparados sem diferenciar maiúsculas.
@@ -121,6 +170,7 @@ impl LibraryCriteria {
         usize::from(self.install != InstallFilter::Any)
             + usize::from(self.favorites_only)
             + usize::from(self.played_only)
+            + usize::from(self.play_time != PlayTimeFilter::Any)
             + usize::from(self.broken_only)
             + self.sources.len()
             + self.genres.len()
@@ -169,6 +219,7 @@ impl LibraryCriteria {
         }
         (!self.favorites_only || game.is_favorite)
             && (!self.played_only || game.last_played_at.is_some())
+            && self.play_time.matches(game.play_time)
             && (!self.broken_only || game.is_broken)
             && (self.sources.is_empty() || self.has_source(&game.source))
             && (self.genres.is_empty() || game.genres.iter().any(|g| self.has_genre(g)))
@@ -253,6 +304,31 @@ impl LibraryCriteria {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn time_ranges_partition_the_boundaries() {
+        let ranges = [
+            PlayTimeFilter::Unplayed,
+            PlayTimeFilter::UnderHour,
+            PlayTimeFilter::OneToTenHours,
+            PlayTimeFilter::OverTenHours,
+        ];
+        for (seconds, expected) in [(0, 0), (1, 1), (3599, 1), (3600, 2), (35999, 2), (36000, 3)] {
+            let facts = LibraryFacts {
+                play_time: Duration::from_secs(seconds),
+                ..Default::default()
+            };
+            for (i, range) in ranges.into_iter().enumerate() {
+                let c = LibraryCriteria {
+                    play_time: range,
+                    ..Default::default()
+                };
+                assert_eq!(c.matches(&facts), i == expected);
+                assert_eq!(c.active_filter_count(), 1);
+                assert!(c.clear_filters().matches(&facts));
+            }
+        }
+    }
 
     #[test]
     fn clearing_filters_keeps_search_and_sort() {
