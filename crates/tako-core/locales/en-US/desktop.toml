@@ -22,7 +22,20 @@ never = "Never"
 about = "About the game"
 details = "Details"
 add_game = "Add game"
+search_key = "Ctrl + K"
+search_esc = "Esc"
 theme_big_picture = "Themes apply to full screen. Desktop mode uses Tako's own look."
+
+[desktop.menu]
+brand = "Tako: open menu"
+settings = "Settings"
+settings_key = "Ctrl + ,"
+switch_profile = "Switch profile…"
+big_picture = "Go to full screen"
+big_picture_key = "F11"
+check_updates = "Check for updates…"
+quit = "Quit Tako"
+quit_key = "Alt + F4"
 
 [desktop.ask]
 title = "Controller connected"

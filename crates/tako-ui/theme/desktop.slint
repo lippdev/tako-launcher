@@ -139,12 +139,23 @@ component Vidro inherits Rectangle {
     @children
 }
 
-// Anel de foco do teclado (o mouse não mostra), por dentro do elemento.
+// Foco do teclado ou do controle, como na Apple TV: o item clareia (`focus-fill`), ganha um contorno fino
+// (`focus-ring`) e um brilho em volta (`focus-glow`). Nunca muda a geometria; o mouse não mostra.
 component FocusRing inherits Rectangle {
-    in property <length> radius: Ui.radius-md;
+    in property <length> radius: Ui.radius-row;
     border-radius: radius;
-    border-width: 2px;
-    border-color: Ui.surface-solid;
+    background: Ui.focus-fill;
+    border-width: 1px;
+    border-color: Ui.focus-ring;
+    Rectangle {
+        x: -Ui.focus-ring-width;
+        y: -Ui.focus-ring-width;
+        width: parent.width + 2 * Ui.focus-ring-width;
+        height: parent.height + 2 * Ui.focus-ring-width;
+        border-radius: root.radius + Ui.focus-ring-width;
+        border-width: Ui.focus-ring-width;
+        border-color: Ui.focus-glow;
+    }
 }
 
 // Botão do desktop: primário (sólido), perigo (texto vermelho) ou comum (translúcido). Só ícone quando sem rótulo.
@@ -191,33 +202,39 @@ component DeskButton inherits Rectangle {
     }
 }
 
-// Campo de busca: o texto vai inteiro para o Tako a cada mudança. Esc limpa (ou sai do campo); Enter volta à lista.
+// Campo de busca da barra (CampoDeBusca): o texto vai inteiro para o Tako a cada mudança. Esc limpa (ou sai do
+// campo); ↓ e Enter voltam à lista. O atalho aparece num keycap (Ctrl + K; "Esc" com o campo em foco).
 component SearchBox inherits Rectangle {
     in property <string> text;
     in property <string> hint;
+    in property <string> key-label;
+    in property <string> esc-label;
+    in property <bool> focused;
     callback edited(string);
     callback leave();
     public function focus-input() { ti.focus(); }
-    height: 52 * Ui.u;
-    border-radius: Ui.radius-md;
-    background: ti.has-focus ? Ui.surface-2 : (sta.has-hover ? Ui.surface-1 : Ui.surface-1.with-alpha(0.07));
-    border-width: ti.has-focus ? 1px : 0;
-    border-color: Ui.on-accent-subtle;
+    height: Ui.control-height;
+    border-radius: Ui.radius-control;
+    background: ti.has-focus || sta.has-hover ? Ui.glass-hover : Ui.glass-control;
+    border-width: 1px;
+    border-color: ti.has-focus ? Ui.glass-edge-strong : Ui.glass-edge;
+    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
     // O Tako pode mudar o texto (Limpar): o campo segue quando não está sendo editado.
     changed text => { if (ti.text != text) { ti.text = text; } }
+    if focused && !ti.has-focus: FocusRing { radius: Ui.radius-control; }
     sta := TouchArea { mouse-cursor: MouseCursor.text; clicked => { ti.focus(); } }
     HorizontalLayout {
-        padding-left: 18 * Ui.u;
-        padding-right: 18 * Ui.u;
-        spacing: 12 * Ui.u;
-        Icon { name: "search"; size: 22 * Ui.u; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+        padding-left: Ui.space-16;
+        padding-right: Ui.space-8;
+        spacing: Ui.space-12;
+        Icon { name: "search"; size: 20px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
         Rectangle {
             horizontal-stretch: 1;
             if ti.text == "": Text {
                 width: parent.width;
                 text: hint;
-                color: Ui.on-accent-subtle;
-                font-size: Ui.label-md;
+                color: Ui.desk-on-subtle;
+                font-size: Ui.desk-label;
                 vertical-alignment: center;
                 overflow: elide;
             }
@@ -243,85 +260,158 @@ component SearchBox inherits Rectangle {
                     height: parent.height;
                     text: root.text;
                     color: Ui.on-accent;
-                    font-size: Ui.label-md;
+                    font-size: Ui.desk-label;
                     vertical-alignment: center;
                     single-line: true;
-                    selection-background-color: Ui.surface-2;
+                    selection-background-color: Ui.glass-pressed;
                     selection-foreground-color: Ui.on-accent;
                     edited => { root.edited(self.text); }
                     accepted => { root.leave(); }
                 }
             }
         }
+        if key-label != "": Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 26px;
+            width: kt.preferred-width + 2 * Ui.space-8;
+            border-radius: 7px;
+            background: Ui.keycap-bg;
+            border-width: 1px;
+            border-color: Ui.glass-edge;
+            kt := Text {
+                text: ti.has-focus ? esc-label : key-label;
+                color: Ui.desk-on-subtle;
+                font-size: Ui.desk-keycap;
+                font-weight: 600;
+            }
+        }
     }
 }
 
-// Barra de cima: marca, Biblioteca e Configurações à esquerda; o botão da tela cheia à direita.
+// Barra superior (BarraSuperior): marca que abre o menu do Tako, guias das áreas em caixa alta, busca e Tela cheia,
+// numa só peça de vidro. Configurações fica no menu da marca.
 component TopBar inherits Vidro {
     in property <[DeskNav]> items;
     in property <string> big-picture-label;
+    in property <string> brand-label;
+    in property <bool> brand-open;
     in property <bool> show-search;
     in property <string> search;
     in property <string> search-hint;
+    in property <string> search-key;
+    in property <string> search-esc;
+    in property <bool> small;
+    // Foco do teclado na barra: -1 fora dela; 0 marca, 1 guia, 2 busca, 3 Tela cheia.
+    in property <int> focus-index: -1;
     callback clicked(string, int);
     callback edited(string, string);
     callback leave();
+    // Onde abrir o menu da marca: 8 abaixo da barra, alinhado à marca.
+    callback brand-menu(length, length);
     public function focus-search() { sb.focus-input(); }
     height: Ui.topbar-height;
     HorizontalLayout {
-        padding-left: 28 * Ui.u;
-        padding-right: 28 * Ui.u;
-        spacing: 8 * Ui.u;
-        alignment: start;
-        Image {
-            source: @image-url("tako-mark.png");
-            width: 34 * Ui.u;
-            height: 34 * Ui.u;
+        padding-left: small ? 6px : Ui.space-12;
+        padding-right: small ? Ui.space-8 : Ui.space-12;
+        spacing: small ? Ui.space-8 : Ui.space-12;
+        brand := Rectangle {
             y: (parent.height - self.height) / 2;
-            image-fit: contain;
-        }
-        Rectangle { width: 20 * Ui.u; }
-        for it[i] in items: Rectangle {
-            y: (parent.height - self.height) / 2;
-            height: 48 * Ui.u;
-            width: nl.preferred-width;
-            border-radius: Ui.radius-md;
-            background: it.selected ? Ui.surface-1 : (nta.has-hover ? Ui.surface-1.with-alpha(0.06) : transparent);
-            animate background { duration: Ui.focus-time; }
-            nl := HorizontalLayout {
-                padding-left: 18 * Ui.u;
-                padding-right: 18 * Ui.u;
-                spacing: 10 * Ui.u;
-                Icon { name: it.icon; size: 22 * Ui.u; y: (parent.height - self.height) / 2; tint: it.selected ? Ui.on-accent : Ui.on-accent-muted; }
-                Text {
-                    text: it.label;
-                    color: it.selected ? Ui.on-accent : Ui.on-accent-muted;
-                    font-size: Ui.label-md;
-                    font-weight: 600;
-                    vertical-alignment: center;
+            height: Ui.control-height;
+            width: bl.preferred-width;
+            border-radius: self.height / 2;
+            background: bta.has-hover || brand-open ? Ui.glass-hover : transparent;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: button;
+            accessible-label: brand-label;
+            if focus-index == 0: FocusRing { radius: parent.height / 2; }
+            bl := HorizontalLayout {
+                padding-left: Ui.space-8;
+                padding-right: 10px;
+                spacing: 4px;
+                Image {
+                    source: @image-url("tako-logo.png");
+                    height: small ? 38px : 46px;
+                    width: self.height * 495 / 192;
+                    y: (parent.height - self.height) / 2;
+                    image-fit: contain;
+                }
+                Icon { name: "chevron-down"; size: 12px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+            }
+            bta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.brand-menu(brand.absolute-position.x, root.absolute-position.y + root.height + Ui.space-8);
+                    root.clicked("desk-brand", 0);
                 }
             }
-            nta := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.clicked("desk-nav", i); }
+        }
+        Rectangle { width: small ? 0 : Ui.space-16; }
+        HorizontalLayout {
+            spacing: small ? 18px : Ui.space-28;
+            for it[i] in items: Rectangle {
+                width: gt.preferred-width;
+                accessible-role: tab;
+                accessible-label: it.label;
+                if focus-index == 1 + i: FocusRing { radius: Ui.radius-thumb; }
+                gt := Text {
+                    text: it.label.to-uppercase();
+                    color: it.selected || gta.has-hover || focus-index == 1 + i ? Ui.on-accent : Ui.desk-on-muted;
+                    font-size: Ui.desk-label;
+                    font-weight: 700;
+                    letter-spacing: 0.04 * self.font-size;
+                    vertical-alignment: center;
+                    animate color { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                }
+                if it.selected: Rectangle {
+                    y: parent.height - 12px - self.height;
+                    height: 2px;
+                    border-radius: 1px;
+                    background: Ui.on-accent;
+                }
+                gta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.clicked("desk-nav", 0); }
+                }
             }
         }
         Rectangle { horizontal-stretch: 1; }
         sb := SearchBox {
             visible: show-search;
             y: (parent.height - self.height) / 2;
-            width: show-search ? clamp(root.width * 0.22, 240px, 380px) : 0;
+            width: !show-search ? 0 : (small ? 190px : clamp(root.width * 0.2, 240px, 380px));
             text: search;
             hint: search-hint;
+            key-label: small ? "" : search-key;
+            esc-label: search-esc;
+            focused: focus-index == 2;
             edited(t) => { root.edited("search", t); }
             leave => { root.leave(); }
         }
-        DeskButton {
+        // Tela cheia: dentro do vidro é preenchimento (`glass-control`), com o raio da busca; só o ícone na janela pequena.
+        Rectangle {
             y: (parent.height - self.height) / 2;
-            height: 48 * Ui.u;
-            label: big-picture-label;
-            icon: "tv";
-            clicked => { root.clicked("desk-nav", 2); }
+            height: Ui.control-height;
+            width: small ? self.height : fl.preferred-width;
+            border-radius: Ui.radius-control;
+            background: fta.pressed ? Ui.glass-pressed : (fta.has-hover ? Ui.glass-hover : Ui.glass-control);
+            border-width: 1px;
+            border-color: Ui.glass-edge;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: button;
+            accessible-label: big-picture-label;
+            if focus-index == 3: FocusRing { radius: Ui.radius-control; }
+            fl := HorizontalLayout {
+                padding-left: small ? 0 : 18px;
+                padding-right: small ? 0 : 18px;
+                spacing: 10px;
+                alignment: center;
+                Icon { name: "tv"; size: 20px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+                if !small: Text { text: big-picture-label; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+            }
+            fta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked("desk-nav", 2); }
+            }
         }
     }
 }
@@ -1036,57 +1126,63 @@ component DeskOverlay inherits Rectangle {
             }
         }
     }
-    // Menu junto do ponteiro (⋯ e botão direito); clique fora fecha.
+    // Menu (MenuDeContexto, MenuDoTako): vidro de camada junto do ponteiro, do botão ⋯ ou da marca; clique fora
+    // fecha. Item de 36 com ícone de 18, atalho à direita e divisórias entre grupos.
     if ov.kind == "menu": Rectangle {
         TouchArea { clicked => { root.clicked("outside", 0); } }
-        Rectangle {
-            width: 320 * Ui.u;
+        Vidro {
+            layer: true;
+            radius: Ui.radius-control;
+            width: ov.title == "" ? 280px : 260px;
             height: min(ml.preferred-height, root.height - 40px);
             x: clamp(menu-x, 12px, root.width - self.width - 12px);
             y: clamp(menu-y, 12px, root.height - self.height - 12px);
-            border-radius: Ui.radius-md;
-            background: Ui.accent-deep.mix(Ui.canvas, 0.25);
-            border-width: 1px;
-            border-color: Ui.surface-1;
-            drop-shadow-offset-y: Ui.shadow-layer-y;
-            drop-shadow-blur: Ui.shadow-layer-blur;
-            drop-shadow-color: Ui.shadow-layer-color;
-            clip: true;
             TouchArea { }
             ml := VerticalLayout {
-                padding: 6 * Ui.u;
-                spacing: 2 * Ui.u;
+                padding: 6px;
+                spacing: 2px;
                 if ov.title != "": Text {
                     text: ov.title;
-                    color: Ui.on-accent-subtle;
-                    font-size: Ui.label-sm;
+                    color: Ui.desk-on-subtle;
+                    font-size: Ui.desk-label-sm;
                     font-weight: 600;
-                    height: 36 * Ui.u;
+                    height: 30px;
                     vertical-alignment: center;
                     overflow: elide;
-                    x: 12 * Ui.u;
+                    x: 10px;
                 }
                 for r[i] in ov.rows: Rectangle {
-                    height: 42 * Ui.u;
-                    border-radius: Ui.radius-sm;
-                    background: mta.has-hover && r.enabled ? Ui.surface-1 : (focus-visible && i == ov.sel && top-most ? Ui.surface-1.with-alpha(0.08) : transparent);
+                    height: r.kind == "separator" ? 9px : 36px;
+                    border-radius: 10px;
+                    background: r.kind != "separator" && mta.has-hover && r.enabled ? Ui.glass-hover : transparent;
+                    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                     opacity: r.enabled ? 1 : 0.5;
-                    if focus-visible && i == ov.sel && top-most: FocusRing { radius: Ui.radius-sm; }
-                    HorizontalLayout {
-                        padding-left: 12 * Ui.u;
-                        padding-right: 12 * Ui.u;
-                        spacing: 12 * Ui.u;
-                        Icon { name: r.icon; size: 20 * Ui.u; tint: r.style == "danger" ? Ui.error : Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+                    if r.kind == "separator": Rectangle { x: 8px; width: parent.width - 16px; height: 1px; background: Ui.divider; }
+                    if focus-visible && i == ov.sel && top-most: FocusRing { radius: 10px; }
+                    if r.kind != "separator": HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 10px;
+                        Icon { name: r.icon; size: 18px; tint: r.style == "danger" ? Ui.error : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                         Text {
                             text: r.title;
                             color: r.style == "danger" ? Ui.error : Ui.on-accent;
-                            font-size: Ui.label-md;
+                            font-size: Ui.desk-label;
+                            font-weight: 500;
                             vertical-alignment: center;
                             horizontal-stretch: 1;
                             overflow: elide;
                         }
+                        if r.value != "": Text {
+                            text: r.value;
+                            color: Ui.desk-on-subtle;
+                            font-size: Ui.desk-keycap;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                        }
                     }
                     mta := TouchArea {
+                        enabled: r.kind != "separator";
                         mouse-cursor: pointer;
                         clicked => { root.clicked("row", i); }
                     }
@@ -1244,6 +1340,10 @@ export component Desktop inherits Window {
     // Barra de cima.
     in property <[DeskNav]> desk-nav;
     in property <string> desk-big-picture-label;
+    in property <string> desk-brand-label;
+    in property <string> desk-search-key;
+    in property <string> desk-search-esc;
+    in property <int> desk-search-focus;
     in property <bool> desk-focus-visible;
 
     // Biblioteca.
@@ -1326,11 +1426,17 @@ export component Desktop inherits Window {
     changed page => { root.sync-art(); }
     changed desk-game => { root.sync-art(); }
 
-    // Teclado: o Tako decide o que cada tecla faz; Ctrl+F vai para a busca.
+    changed desk-search-focus => { bar.focus-search(); }
+
+    // Teclado: o Tako decide o que cada tecla faz; Ctrl+K (ou Ctrl+F) vai para a busca e Ctrl+, para as Configurações.
     fs := FocusScope {
         key-pressed(e) => {
-            if (e.modifiers.control && !e.modifiers.alt && (e.text == "f" || e.text == "F") && page == "desk-library" && overlays.length == 0) {
+            if (e.modifiers.control && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && page == "desk-library" && overlays.length == 0) {
                 bar.focus-search();
+                return accept;
+            }
+            if (e.modifiers.control && !e.modifiers.alt && e.text == "," && overlays.length == 0) {
+                root.clicked("desk-nav", 1);
                 return accept;
             }
             if (root.key(e.text, e.repeat, e.modifiers.control, e.modifiers.shift, e.modifiers.alt)) { return accept; }
@@ -1353,9 +1459,19 @@ export component Desktop inherits Window {
         bar := TopBar {
             items: desk-nav;
             big-picture-label: desk-big-picture-label;
+            brand-label: desk-brand-label;
+            brand-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "menu" && overlays[overlays.length - 1].title == "";
             show-search: page == "desk-library";
             search: desk-search;
             search-hint: desk-search-hint;
+            search-key: desk-search-key;
+            search-esc: desk-search-esc;
+            small: root.small;
+            focus-index: desk-focus-visible && desk-zone == "bar" && page == "desk-library" ? desk-zone-index : -1;
+            brand-menu(x, y) => {
+                root.menu-x = x;
+                root.menu-y = y;
+            }
             edited(z, t) => { root.edited(z, t); }
             leave => { fs.focus(); }
             clicked(z, i) => {

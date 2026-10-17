@@ -32,6 +32,10 @@ pub enum Tab {
 
 const TABS: [Tab; 3] = [Tab::All, Tab::Favorites, Tab::Collections];
 
+/// Itens da barra superior na ordem do Tab: marca, guia Biblioteca, busca, Tela cheia.
+const BAR_ITEMS: usize = 4;
+const BAR_SEARCH: usize = 2;
+
 /// Coleção escolhida na aba Coleções: do usuário ou automática (LIB-003).
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Pick {
@@ -42,6 +46,8 @@ enum Pick {
 /// Onde está o foco do teclado.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Zone {
+    /// Barra superior: marca (menu do Tako), guia Biblioteca, busca e Tela cheia.
+    Bar,
     Tabs,
     Collections,
     List,
@@ -65,6 +71,8 @@ pub struct DesktopLibrary {
     zone: Zone,
     /// Aba, coleção ou ação com o foco do teclado (conforme a zona).
     index: usize,
+    /// Cresce a cada pedido de foco na busca pelo teclado (o campo é do tema).
+    search_focus: i32,
 }
 
 impl Default for DesktopLibrary {
@@ -82,6 +90,7 @@ impl DesktopLibrary {
             selected: None,
             zone: Zone::List,
             index: 0,
+            search_focus: 0,
         }
     }
 
@@ -217,7 +226,7 @@ impl DesktopLibrary {
     }
 
     fn zones(&self) -> Vec<Zone> {
-        let mut v = vec![Zone::Tabs];
+        let mut v = vec![Zone::Bar, Zone::Tabs];
         if self.tab == Tab::Collections {
             v.push(Zone::Collections);
         }
@@ -343,6 +352,22 @@ impl Page for DesktopLibrary {
                 if let Some(a) = action {
                     return self.run(a, ctx);
                 }
+            }
+            (Zone::Bar, Cmd::Left) => self.index = self.index.saturating_sub(1),
+            (Zone::Bar, Cmd::Right) => self.index = (self.index + 1).min(BAR_ITEMS - 1),
+            (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
+            (Zone::Bar, Cmd::Accept) => match self.index {
+                0 => return Nav::Layer(Box::new(brand_menu())),
+                BAR_SEARCH => {
+                    self.search_focus += 1;
+                    self.zone = Zone::List;
+                }
+                3 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
+                _ => self.zone = Zone::List,
+            },
+            (Zone::Tabs, Cmd::Up) => {
+                self.zone = Zone::Bar;
+                self.index = 0;
             }
             (Zone::Tabs, Cmd::Left) => self.index = self.index.saturating_sub(1),
             (Zone::Tabs, Cmd::Right) => self.index = (self.index + 1).min(TABS.len() - 1),
@@ -597,6 +622,7 @@ impl Page for DesktopLibrary {
         out.set(
             "desk-zone",
             match self.zone {
+                Zone::Bar => "bar",
                 Zone::Tabs => "tabs",
                 Zone::Collections => "collections",
                 Zone::List => "list",
@@ -604,6 +630,7 @@ impl Page for DesktopLibrary {
             },
         );
         out.set("desk-zone-index", self.index as i32);
+        out.set("desk-search-focus", self.search_focus);
         let (title, text) = if self.tab == Tab::Collections && picks.is_empty() {
             (
                 ctx.t("desktop.no_collections"),
@@ -656,6 +683,55 @@ impl Page for DesktopLibrary {
 
 /// Aberto no desktop com um controle conectado: pergunta uma vez se quer a tela cheia (ADR-0027). O SDL avisa
 /// os controles já ligados nos primeiros quadros; depois de `ASK_WINDOW`, um controle novo não pergunta.
+/// Menu da marca (MenuDoTako), como o menu "Steam": Configurações e as ações da conta e do app, fora das guias.
+pub fn brand_menu() -> super::layer::MenuLayer {
+    use super::layer::{Flow, MenuItem, MenuLayer};
+    MenuLayer::menu(String::new(), |ctx| {
+        vec![
+            MenuItem::new(
+                PanelRow::button("settings", ctx.t("desktop.menu.settings"))
+                    .icon("gear")
+                    .value(ctx.t("desktop.menu.settings_key")),
+            )
+            .on(|ctx| {
+                ctx.open_route = Some("settings".into());
+                Flow::CloseAll
+            }),
+            MenuItem::new(
+                PanelRow::button("profile", ctx.t("desktop.menu.switch_profile")).icon("user"),
+            )
+            .on(|ctx| Flow::Replace(Box::new(super::profiles::panel(ctx)))),
+            MenuItem::new(
+                PanelRow::button("big-picture", ctx.t("desktop.menu.big_picture"))
+                    .icon("tv")
+                    .value(ctx.t("desktop.menu.big_picture_key")),
+            )
+            .on(|ctx| {
+                ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture));
+                Flow::CloseAll
+            }),
+            MenuItem::new(PanelRow::separator()),
+            MenuItem::new(
+                PanelRow::button("updates", ctx.t("desktop.menu.check_updates")).icon("info"),
+            )
+            .on(|ctx| {
+                ctx.effect(Effect::CheckUpdates);
+                Flow::CloseAll
+            }),
+            MenuItem::new(PanelRow::separator()),
+            MenuItem::new(
+                PanelRow::button("quit", ctx.t("desktop.menu.quit"))
+                    .icon("power")
+                    .value(ctx.t("desktop.menu.quit_key")),
+            )
+            .on(|ctx| {
+                ctx.effect(Effect::ExitToDesktop);
+                Flow::CloseAll
+            }),
+        ]
+    })
+}
+
 pub fn ask_big_picture(shell: &mut super::Shell, since_start: std::time::Duration) {
     use crate::mode::{ASK_SETTING, ASK_WINDOW};
     if !shell.ask_big_picture {
@@ -717,6 +793,44 @@ mod tests {
 
     fn page(shell: &Shell) -> &DesktopLibrary {
         shell.desktop_library().unwrap()
+    }
+
+    #[test]
+    fn the_brand_opens_the_tako_menu_and_the_bar_is_the_first_keyboard_zone() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        // Menu da marca: Configurações abre a página; Tela cheia troca de modo.
+        shell.click("desk-brand", 0);
+        assert!(shell.has_layers());
+        shell.click("overlay-row", 0);
+        assert!(!shell.has_layers());
+        assert_eq!(shell.page().kind(), "settings");
+        shell.click("desk-nav", 0);
+        shell.click("desk-brand", 0);
+        shell.click("overlay-row", 2);
+        assert_eq!(
+            shell.ctx.effects.pop(),
+            Some(Effect::SwitchMode(crate::mode::UiMode::BigPicture))
+        );
+        // Separadores não recebem foco: ↓ pula de "Tela cheia" para "Procurar atualizações".
+        let rows = crate::shell::layer::Layer::render(&brand_menu(), &shell.ctx).rows;
+        assert_eq!(rows[3].kind, "separator");
+        assert!(!rows[3].is_focusable());
+
+        // Teclado: subir das abas chega à barra; Enter na busca pede o foco do campo.
+        shell.handle(Cmd::Up);
+        shell.handle(Cmd::Up);
+        while page(&shell).zone() != Zone::Tabs {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Accept);
+        assert_eq!(page(&shell).search_focus, 1);
+        assert_eq!(page(&shell).zone(), Zone::List);
     }
 
     #[test]

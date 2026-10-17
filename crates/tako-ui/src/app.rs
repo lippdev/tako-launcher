@@ -191,6 +191,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pointer: false,
         pending_layer: None,
         open_details: None,
+        open_route: None,
         leave_details: false,
         queued_launch: None,
         found,

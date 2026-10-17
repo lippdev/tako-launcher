@@ -444,6 +444,11 @@ impl Shell {
             self.desktop_nav(index);
             return;
         }
+        if zone == "desk-brand" {
+            self.layers.push(Box::new(desktop::brand_menu()));
+            self.ctx.dirty = true;
+            return;
+        }
         self.sidebar.focus = None;
         let nav = {
             let Shell { pages, ctx, .. } = self;
@@ -515,6 +520,9 @@ impl Shell {
             } else {
                 self.pages.push(Box::new(details::DetailsPage::new(&id)));
             }
+        }
+        if let Some(route) = self.ctx.open_route.take() {
+            self.open_route(&route);
         }
         if std::mem::take(&mut self.ctx.leave_details) && self.page().kind() == "details" {
             self.layers.clear();
@@ -760,7 +768,8 @@ impl Shell {
         out
     }
 
-    /// Barra de cima do desktop: Biblioteca, Configurações e o botão da tela cheia.
+    /// Barra de cima do desktop: as guias das áreas (Biblioteca; Loja e Perfil quando existirem), a busca e o botão
+    /// da tela cheia. Configurações fica no menu da marca.
     fn render_desktop_bar(&self, out: &mut Out) {
         let kind = self.page().kind();
         let item = |id: &str, label: &str, icon: &str, selected: bool| crate::model::NavItem {
@@ -772,12 +781,17 @@ impl Shell {
         };
         out.set(
             "desk-nav",
-            vec![
-                item("library", "desktop.library", "grid", kind == "desk-library"),
-                item("settings", "desktop.settings", "gear", kind == "settings"),
-            ],
+            vec![item(
+                "library",
+                "desktop.library",
+                "grid",
+                kind == "desk-library",
+            )],
         );
         out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
+        out.set("desk-brand-label", self.ctx.t("desktop.menu.brand"));
+        out.set("desk-search-key", self.ctx.t("desktop.search_key"));
+        out.set("desk-search-esc", self.ctx.t("desktop.search_esc"));
         out.set("desk-focus-visible", self.ctx.focus_visible);
     }
 

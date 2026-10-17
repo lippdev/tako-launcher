@@ -22,7 +22,20 @@ never = "Nunca"
 about = "Sobre o jogo"
 details = "Detalhes"
 add_game = "Adicionar jogo"
+search_key = "Ctrl + K"
+search_esc = "Esc"
 theme_big_picture = "O tema vale para a tela cheia. O modo desktop usa o visual do Tako."
+
+[desktop.menu]
+brand = "Tako: abrir menu"
+settings = "Configurações"
+settings_key = "Ctrl + ,"
+switch_profile = "Trocar perfil…"
+big_picture = "Ir para a tela cheia"
+big_picture_key = "F11"
+check_updates = "Procurar atualizações…"
+quit = "Sair do Tako"
+quit_key = "Alt + F4"
 
 [desktop.ask]
 title = "Controle conectado"

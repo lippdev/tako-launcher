@@ -360,7 +360,7 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
 }
 
 /// Captura da janela desktop para conferir com as prévias do design: `TAKO_SNAP_OUT=<pasta>` (obrigatório),
-/// `TAKO_SNAP_ART=<imagem>` (arte do jogo em foco) e `TAKO_SNAP_PAGE=settings` (opcional).
+/// `TAKO_SNAP_ART=<imagem>` (arte do jogo em foco), `TAKO_SNAP_PAGE=settings` e `TAKO_SNAP_CLICK` (opcionais).
 /// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
 #[test]
 #[ignore = "ferramenta manual de captura"]
@@ -401,6 +401,12 @@ fn desktop_snapshot() {
         shell.enter_desktop();
         if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("settings") {
             shell.open_route("settings");
+        }
+        // `TAKO_SNAP_CLICK=zona:índice,…`: cliques antes da captura (ex.: `desk-brand:0`, `game:3`).
+        for click in std::env::var("TAKO_SNAP_CLICK").unwrap_or_default().split(',') {
+            if let Some((zone, i)) = click.split_once(':') {
+                shell.click(zone, i.parse().unwrap_or(0));
+            }
         }
         ui.show().unwrap();
         for (w, h) in [(1600u32, 900u32), (960, 600)] {

@@ -227,6 +227,8 @@ pub struct Ctx {
     pub pending_layer: Option<Box<dyn super::Layer>>,
     /// Abrir os detalhes deste jogo (pedido de um diálogo).
     pub open_details: Option<String>,
+    /// Pedido de uma camada para abrir uma rota (ex.: Configurações pelo menu da marca no desktop).
+    pub open_route: Option<String>,
     /// Sair dos detalhes (o jogo foi removido).
     pub leave_details: bool,
     /// Jogo a abrir assim que o atual terminar ("Encerrar e jogar").
