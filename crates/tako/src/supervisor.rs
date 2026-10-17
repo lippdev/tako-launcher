@@ -282,13 +282,18 @@ impl Supervisor {
         };
         let mut last_poll = Instant::now();
         let mut last = Instant::now();
+        let mut last_buttons = 0;
         loop {
             let mouse = self
                 .running
                 .as_ref()
                 .is_some_and(|r| r.req.controller_mouse);
+            // Segurando o atalho do controle não chega evento novo: sem acordar antes, ele só disparava depois
+            // dos 2 s da espera (e nada, se soltasse antes).
             let wait = if mouse {
                 Duration::from_millis(16)
+            } else if self.chord.holding() {
+                Duration::from_millis(50)
             } else {
                 Running::POLL
             };
@@ -301,6 +306,10 @@ impl Supervisor {
             let dt = last.elapsed().as_secs_f64();
             last = Instant::now();
             let pad = self.pads.as_ref().map(|p| p.state()).unwrap_or_default();
+            if pad.buttons != last_buttons {
+                tracing::debug!("controle durante o jogo: botões {:#x}", pad.buttons);
+                last_buttons = pad.buttons;
+            }
             // Atalho do controle, do teclado ou o Tako aberto de novo: a interface volta por cima do jogo.
             if self.chord.update(GamepadButtons(pad.buttons), now)
                 || pressed.swap(false, std::sync::atomic::Ordering::Relaxed)
