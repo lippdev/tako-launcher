@@ -7,7 +7,8 @@ use crate::shell::dialogs;
 use crate::shell::keyboard::KeyboardLayer;
 use std::sync::OnceLock;
 use tako_core::i18n::tn;
-use tako_core::library::{GameStore, collections};
+use tako_core::library::{GameStore, collections, storage};
+use tako_core::metadata::art::format_bytes;
 use tako_core::presentation::game_text;
 use tako_sources::report::LibrarySourceReport;
 
@@ -124,6 +125,18 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.library.organize_header"),
     )));
+    let used: u64 = storage::totals(ctx.library.games())
+        .iter()
+        .map(|d| d.bytes)
+        .sum();
+    v.push(
+        MenuItem::new(
+            PanelRow::action("storage", ctx.t("storage.title"))
+                .desc(ctx.t("storage.desc"))
+                .value(format_bytes(used)),
+        )
+        .on(|ctx| Flow::Push(Box::new(storage_panel(ctx)))),
+    );
     let n = ctx.collections.collections().len();
     let summary = if n == 0 {
         ctx.t("settings.library.collections_create")
@@ -139,6 +152,53 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         .on(|ctx| Flow::Push(Box::new(collections_panel(ctx)))),
     );
     v
+}
+
+/// Maiores jogos listados no painel (o resto aparece na biblioteca ordenada por tamanho).
+const LARGEST: usize = 30;
+
+/// Armazenamento (LIB-005): total por disco e os maiores jogos instalados; A num jogo abre os detalhes.
+pub(super) fn storage_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("storage.title"), |ctx| {
+        let games = ctx.library.games();
+        let mut v: Vec<MenuItem> = vec![MenuItem::new(PanelRow::header(ctx.t("storage.disks")))];
+        v.extend(storage::totals(games).into_iter().map(|d| {
+            MenuItem::new(
+                PanelRow::info(d.disk.clone(), d.disk, format_bytes(d.bytes)).desc(tn(
+                    "common.games",
+                    d.games as i64,
+                    &[],
+                )),
+            )
+        }));
+        let mut largest: Vec<_> = games
+            .iter()
+            .filter(|g| g.is_installed && g.size_bytes.is_some())
+            .collect();
+        largest.sort_by_key(|g| std::cmp::Reverse(g.size_bytes));
+        v.push(MenuItem::new(PanelRow::header(ctx.t("storage.largest"))));
+        v.extend(largest.into_iter().take(LARGEST).map(|g| {
+            let id = g.id.clone();
+            MenuItem::new(
+                PanelRow::action(g.id.clone(), g.title.clone())
+                    .desc(game_text::store_name(ctx.lang(), g.store()))
+                    .value(format_bytes(g.size_bytes.unwrap_or_default())),
+            )
+            .on(move |ctx| {
+                ctx.open_details = Some(id.clone());
+                Flow::CloseAll
+            })
+        }));
+        if v.len() == 2 {
+            v.push(MenuItem::new(PanelRow::info(
+                "empty",
+                ctx.t("storage.empty"),
+                "",
+            )));
+        }
+        v
+    })
+    .text(ctx.t("storage.text"))
 }
 
 pub(crate) fn collections_panel(ctx: &Ctx) -> MenuLayer {

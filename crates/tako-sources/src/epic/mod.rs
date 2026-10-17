@@ -123,6 +123,7 @@ pub fn to_game(i: &EpicInstall, added_at: Option<DateTime<Utc>>) -> Game {
         title: i.display_name.clone(),
         store: Some(GameStore::Epic),
         size_label: crate::steam::size_label(i.install_size),
+        size_bytes: (i.install_size > 0).then_some(i.install_size),
         accent: ACCENT.to_owned(),
         is_installed: true,
         added_at,

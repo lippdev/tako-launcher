@@ -8,6 +8,7 @@ use crate::{bridge, images, theme, values::ToValue};
 use slint::ComponentHandle;
 use slint_interpreter::{ComponentDefinition, ComponentInstance, Value};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -216,6 +217,15 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
         .name("tako-scan".into())
         .spawn(move || {
             let reports = scan_into(&found, &disabled, simulate);
+            let to_measure: Vec<(String, String)> = found
+                .lock()
+                .map(|f| {
+                    f.iter()
+                        .filter(|g| tako_core::library::storage::needs_measure(g))
+                        .filter_map(|g| Some((g.id.clone(), g.install_path.clone()?)))
+                        .collect()
+                })
+                .unwrap_or_default();
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(shell) = crate::tasks::shell() {
                     let mut s = shell.borrow_mut();
@@ -226,6 +236,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
                     s.ctx.dirty = true;
                 }
             });
+            measure_sizes(&found, to_measure);
         })
         .ok();
 }
@@ -245,6 +256,42 @@ fn scan_into(
         *f = games;
     }
     reports
+}
+
+/// LIB-005: mede a pasta dos jogos sem tamanho da loja (depois da biblioteca já aparecer) e atualiza a biblioteca
+/// uma vez no fim. Junta pelo id: uma leitura nova no meio do caminho não perde nada.
+fn measure_sizes(found: &Arc<Mutex<Vec<Game>>>, to_measure: Vec<(String, String)>) {
+    use tako_core::library::storage;
+    if to_measure.is_empty() {
+        return;
+    }
+    let sizes: HashMap<String, u64> = to_measure
+        .into_iter()
+        .filter_map(|(id, path)| {
+            let bytes = storage::folder_size(std::path::Path::new(&path), storage::MAX_ENTRIES)?;
+            (bytes > 0).then_some((id, bytes))
+        })
+        .collect();
+    tracing::info!(medidos = sizes.len(), "tamanho das pastas dos jogos");
+    if sizes.is_empty() {
+        return;
+    }
+    if let Ok(mut f) = found.lock() {
+        for g in f.iter_mut().filter(|g| g.size_bytes.is_none()) {
+            if let Some(&bytes) = sizes.get(&g.id) {
+                g.size_bytes = Some(bytes);
+                g.size_label = tako_sources::steam::size_label(bytes);
+            }
+        }
+    }
+    let _ = slint::invoke_from_event_loop(|| {
+        if let Some(shell) = crate::tasks::shell() {
+            let mut s = shell.borrow_mut();
+            s.ctx.library.refresh();
+            s.ctx.sync_collections();
+            s.ctx.dirty = true;
+        }
+    });
 }
 
 /// O tema escolhido ou, se ele falhar, o padrão (PRD §7: volta ao padrão sem loop de falha).

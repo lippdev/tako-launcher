@@ -1,0 +1,7 @@
+[storage]
+title = "Armazenamento"
+desc = "Quanto os jogos instalados ocupam, por disco e por jogo."
+text = "A Steam e a Epic informam o tamanho; dos outros jogos o Tako mede a pasta depois de ler as lojas. Para ver todos, ordene a biblioteca por tamanho."
+disks = "DISCOS"
+largest = "MAIORES JOGOS"
+empty = "Nenhum jogo instalado com tamanho conhecido ainda"
