@@ -628,7 +628,7 @@ component SettingsPage inherits Rectangle {
 
 // Central rápida durante o jogo (DESIGN.md › Menu rápido), reduzida às funções do Tako. `overlay`: aberta por cima do
 // jogo (janela transparente, só a barra no alto, o jogo aparece atrás); senão cobre o Tako aberto.
-component ControlCenter inherits Rectangle {
+export component ControlCenter inherits Rectangle {
     in property <[PanelRow]> icons;
     in property <int> icon-focus;
     in property <int> panel-for;

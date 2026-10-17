@@ -1,5 +1,5 @@
-//! Hosts da interface: com supervisor (o jogo continua com ele e a interface fecha) ou sozinha
-//! (`--no-supervisor`: a janela some durante o jogo e o acompanhamento roda aqui mesmo).
+//! Hosts da interface: com supervisor (o jogo continua com ele) ou sozinha (`--no-supervisor`).
+//! Durante o jogo o desktop minimiza; a tela cheia fecha com supervisor ou se esconde sem ele (ADR-0027).
 
 use crate::protocol::{self, UiMsg};
 use std::time::{Duration, Instant};
@@ -246,6 +246,48 @@ fn restart_normal(ctx: &mut Ctx) -> HostAction {
         Err(e) => {
             ctx.toast(e.to_string());
             HostAction::Stay
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_launch_and_resume_minimize_desktop_and_hide_big_picture() {
+        for desktop in [true, false] {
+            let dir =
+                std::env::temp_dir().join(format!("tako-host-{}-{desktop}", std::process::id()));
+            let mut ctx = tako_ui::app::build_ctx(
+                tako_core::paths::DataPaths::at(&dir),
+                tako_platform::Platform::simulated(),
+                true,
+            );
+            ctx.library.refresh();
+            ctx.desktop = desktop;
+            let id = ctx
+                .library
+                .games()
+                .iter()
+                .find(|g| g.is_installed)
+                .unwrap()
+                .id
+                .clone();
+            let mut host = LocalHost::default();
+            let expected = if desktop {
+                HostAction::Minimize
+            } else {
+                HostAction::Hide
+            };
+            assert_eq!(host.handle(&Effect::Launch(id), &mut ctx), expected);
+            assert!(host.running.is_some() && ctx.running.is_some());
+            assert_eq!(host.handle(&Effect::ResumeGame, &mut ctx), expected);
+            host.handle(&Effect::EndGame, &mut ctx);
+            assert!(ctx.platform.processes.snapshot().is_empty());
+            let mut running = host.running.take().unwrap();
+            running.finish(&ctx.platform, &ctx.paths);
+            std::fs::remove_dir_all(dir).unwrap();
         }
     }
 }

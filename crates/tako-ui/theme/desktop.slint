@@ -13,6 +13,7 @@ import "fonts/SourceSans3-Semibold.ttf";
 import "fonts/SourceSans3-Bold.ttf";
 
 import { Ui } from "tokens.slint";
+import { ControlCenter } from "main.slint";
 import { PanelRow, Icon, Toggle } from "widgets.slint";
 import { Overlay, Overline, OverlayView } from "overlay.slint";
 
@@ -1058,6 +1059,14 @@ component DeskOverlay inherits Rectangle {
 }
 
 export component Desktop inherits Window {
+    in property <bool> control-center;
+    in property <[PanelRow]> cc-icons;
+    in property <int> cc-icon-focus;
+    in property <int> cc-panel-for: -1;
+    in property <[PanelRow]> cc-panel;
+    in property <int> cc-panel-focus: -1;
+    in property <string> cc-game-title;
+    in property <string> cc-game-meta;
     // Geral.
     in property <string> page: "desk-library";
     in property <string> toast;
@@ -1208,6 +1217,19 @@ export component Desktop inherits Window {
                 }
             }
         }
+    }
+
+    if control-center: ControlCenter {
+        icons: cc-icons;
+        icon-focus: cc-icon-focus;
+        panel-for: cc-panel-for;
+        panel: cc-panel;
+        panel-focus: cc-panel-focus;
+        game-title: cc-game-title;
+        game-meta: cc-game-meta;
+        overlay: false;
+        clicked(z, i) => { fs.focus(); root.clicked("cc-" + z, i); }
+        hovered(z, i) => { root.hovered("cc-" + z, i); }
     }
 
     for ov[i] in overlays: DeskOverlay {

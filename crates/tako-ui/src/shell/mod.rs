@@ -315,7 +315,10 @@ impl Shell {
 
     /// O jogo terminou: fecha as camadas que dependiam dele.
     pub fn close_game_layers(&mut self) {
+        self.cc = None;
         self.ctx.launching = false;
+        self.ctx.leaving = false;
+        self.ctx.launch_on_top_until = None;
         self.layers.retain(|l| !l.ends_with_game());
         self.ctx.dirty = true;
     }

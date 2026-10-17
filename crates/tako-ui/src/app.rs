@@ -397,9 +397,12 @@ impl App {
                 pid: None,
             });
         }
-        // A Central por cima do jogo é da tela cheia; no desktop a janela só volta.
-        if opts.control_center && opts.mode == UiMode::BigPicture {
-            shell.open_control_center_over_game();
+        if opts.control_center {
+            if opts.mode == UiMode::BigPicture {
+                shell.open_control_center_over_game();
+            } else {
+                shell.open_control_center();
+            }
         }
         if let Some((id, played, end)) = &opts.after_game {
             if let Err(e) = shell.ctx.library.record_session(id, *played) {
@@ -560,7 +563,29 @@ impl App {
         render(&self.shell, &self.ui.borrow());
     }
 
+    /// O mesmo atalho global ou do controle abre a Central e, repetido, volta ao jogo.
+    pub fn toggle_control_center(&self) {
+        {
+            let mut s = self.shell.borrow_mut();
+            if s.ctx.running.is_none() {
+                return;
+            }
+            if s.control_center_open() {
+                s.close_control_center();
+                s.ctx.effect(Effect::ResumeGame);
+            } else {
+                s.open_control_center();
+            }
+        }
+        restore(&self.ui.borrow());
+        self.redraw();
+    }
+
     fn on_cmd(&self, cmd: Cmd) {
+        if cmd == Cmd::Guide && self.shell.borrow().ctx.running.is_some() {
+            self.toggle_control_center();
+            return;
+        }
         crate::navigation_feedback::play(&self.shell.borrow().ctx, cmd);
         {
             let mut s = self.shell.borrow_mut();
@@ -719,6 +744,9 @@ impl App {
         let mut next_battery = Duration::ZERO;
         let mut next_install_check = Duration::ZERO;
         let mut next_live = Duration::ZERO;
+        // Só registra enquanto há jogo; ao fechar a UI, o supervisor assume o mesmo atalho.
+        let mut hotkey = None;
+        let mut hotkey_game = false;
         let timer = slint::Timer::default();
         timer.start(
             slint::TimerMode::Repeated,
@@ -780,30 +808,41 @@ impl App {
                     }
                 }
                 let desktop = app.mode.get() == UiMode::Desktop;
+                let running = app.shell.borrow().ctx.running.is_some();
+                if running != hotkey_game {
+                    hotkey_game = running;
+                    hotkey = if running {
+                        let key = tako_core::input::shortcut::KeyShortcut::parse(
+                            app.shell
+                                .borrow()
+                                .ctx
+                                .settings
+                                .get(crate::shell::ctx::keys::CONTROL_CENTER_KEY),
+                        );
+                        tako_platform::global_hotkey(&key, || {
+                            let _ = slint::invoke_from_event_loop(|| {
+                                CURRENT.with(|c| {
+                                    if let Some(app) = c.borrow().clone() {
+                                        app.toggle_control_center();
+                                    }
+                                });
+                            });
+                        })
+                    } else {
+                        None
+                    };
+                }
+                let _ = &hotkey;
                 {
                     let mut s = app.shell.borrow_mut();
                     crate::shell::desktop::ask_big_picture(&mut s, now);
                     // No desktop, durante o jogo, o controle é do jogo (a janela minimizada não reage).
-                    if desktop && s.ctx.running.is_some() {
+                    if desktop && s.ctx.running.is_some() && !s.control_center_open() {
                         fired.clear();
                     }
                 }
-                if chord_fired && desktop {
-                    // A Central é da tela cheia; no desktop o atalho traz a janela de volta durante o jogo.
-                    if app.shell.borrow().ctx.running.is_some() {
-                        restore(&app.ui.borrow());
-                    }
-                    fired.clear();
-                } else if chord_fired {
-                    let mut s = app.shell.borrow_mut();
-                    if s.control_center_open() {
-                        s.close_control_center();
-                        if s.ctx.running.is_some() {
-                            s.ctx.effect(Effect::ResumeGame);
-                        }
-                    } else if s.ctx.running.is_some() {
-                        s.open_control_center();
-                    }
+                if chord_fired {
+                    app.toggle_control_center();
                     fired.clear();
                 }
                 for c in fired {
@@ -927,36 +966,41 @@ fn leave_fade(settings: &crate::shell::Settings) -> Duration {
 /// já voltou ao Tako (B), fica aberta.
 pub fn game_shown() {
     CURRENT.with(|c| {
-        let Some(app) = c.borrow().clone() else {
-            return;
-        };
+        if let Some(app) = c.borrow().clone() {
+            app.game_shown();
+        }
+    });
+}
+
+impl App {
+    /// Resposta do supervisor: desktop minimiza; tela cheia fecha depois do fade.
+    pub fn game_shown(&self) {
         let fade = {
-            let mut s = app.shell.borrow_mut();
+            let mut s = self.shell.borrow_mut();
             if !s.ctx.launching {
                 return;
             }
-            if app.mode.get() == UiMode::Desktop {
-                // Desktop: o jogo apareceu, a janela vai para a barra de tarefas e volta quando ele fechar.
+            if self.mode.get() == UiMode::Desktop {
                 s.ctx.launching = false;
                 s.ctx.dirty = true;
                 drop(s);
-                app.apply(HostAction::Minimize);
-                app.redraw();
+                self.apply(HostAction::Minimize);
+                self.redraw();
                 return;
             }
             s.ctx.leaving = true;
             s.ctx.dirty = true;
             leave_fade(&s.ctx.settings)
         };
-        app.redraw();
-        slint::Timer::single_shot(fade, || {
-            CURRENT.with(|c| {
-                if let Some(app) = c.borrow().clone() {
-                    app.apply(HostAction::Close);
-                }
-            });
+        self.redraw();
+        let app = self.clone();
+        slint::Timer::single_shot(fade, move || {
+            // O jogo pode ter acabado ou o usuário ter trocado de modo durante o fade.
+            if app.mode.get() == UiMode::BigPicture && app.shell.borrow().ctx.leaving {
+                app.apply(HostAction::Close);
+            }
         });
-    });
+    }
 }
 
 /// "Bem-vindo de volta" com o tempo jogado e o foco no jogo (o tempo já foi gravado por quem chama). Se o jogo
@@ -964,6 +1008,9 @@ pub fn game_shown() {
 pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration, end: GameEnd) {
     shell.ctx.running = None;
     shell.close_game_layers();
+    if shell.ctx.desktop {
+        shell.open_route(crate::shell::desktop::ROUTE);
+    }
     shell.focus_game(id);
     if end != GameEnd::Normal {
         let code = end
@@ -1055,6 +1102,13 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         return;
     }
     s.ctx.dirty = false;
+    if let Some((id, played, end)) = s.ctx.welcome_back.take() {
+        // Desktop: a janela minimizada durante o jogo volta quando ele fecha (ADR-0027).
+        if s.ctx.desktop {
+            restore(ui);
+        }
+        welcome_back(&mut s, &id, played, end);
+    }
     let on_top = s.ctx.launching
         && s.ctx
             .launch_on_top_until
@@ -1069,13 +1123,6 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
                 WindowLevel::Normal
             })
         });
-    }
-    if let Some((id, played, end)) = s.ctx.welcome_back.take() {
-        // Desktop: a janela minimizada durante o jogo volta quando ele fecha (ADR-0027).
-        if s.ctx.desktop {
-            restore(ui);
-        }
-        welcome_back(&mut s, &id, played, end);
     }
     if let Some(b) = s.ctx.move_window.take() {
         let w = ui.window();
@@ -1137,6 +1184,118 @@ mod tests {
         fn handle(&mut self, _: &Effect, _: &mut Ctx) -> HostAction {
             HostAction::Stay
         }
+    }
+
+    #[test]
+    fn desktop_switches_windows_and_returns_from_the_minimized_game() {
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        std::thread::spawn(|| {
+            use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+            struct Software;
+            impl slint::platform::Platform for Software {
+                fn create_window_adapter(
+                    &self,
+                ) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError>
+                {
+                    Ok(MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer))
+                }
+            }
+            slint::platform::set_platform(Box::new(Software)).unwrap();
+            struct DesktopHost;
+            impl Host for DesktopHost {
+                fn handle(&mut self, effect: &Effect, _: &mut Ctx) -> HostAction {
+                    if *effect == Effect::ResumeGame {
+                        HostAction::Minimize
+                    } else {
+                        HostAction::Stay
+                    }
+                }
+            }
+            i18n::set_lang(Lang::PtBr);
+            let dir = tempfile::tempdir().unwrap();
+            let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+            ctx.library.refresh();
+            let builtin = theme::install_builtin(&ctx.paths.themes()).unwrap();
+            let ui = theme::compile_desktop(&builtin).unwrap().create().unwrap();
+            let mut shell = Shell::new(ctx);
+            shell.enter_desktop();
+            shell.click("game", 2);
+            let id = shell.focused_game().unwrap();
+            let app = App {
+                ui: Rc::new(RefCell::new(ui)),
+                shell: Rc::new(RefCell::new(shell)),
+                host: Rc::new(RefCell::new(DesktopHost)),
+                builtin,
+                mode: Rc::new(std::cell::Cell::new(UiMode::Desktop)),
+            };
+            app.wire_ui();
+            app.ui.borrow().show().unwrap();
+            // O botão e F11 pedem o mesmo efeito; a troca preserva o jogo nos dois sentidos.
+            app.shell.borrow_mut().click("desk-nav", 2);
+            assert!(
+                app.shell.borrow_mut().ctx.effects.remove(0)
+                    == Effect::SwitchMode(UiMode::BigPicture)
+            );
+            app.switch_mode(UiMode::BigPicture);
+            assert!(!app.shell.borrow().ctx.desktop);
+            assert_eq!(app.shell.borrow().focused_game(), Some(id.clone()));
+            app.switch_mode(UiMode::Desktop);
+            assert!(app.shell.borrow().ctx.desktop);
+            assert_eq!(app.shell.borrow().focused_game(), Some(id.clone()));
+            assert!(
+                app.shell
+                    .borrow_mut()
+                    .key(crate::shell::keys::F11, KeyModifiers::NONE)
+            );
+            assert_eq!(
+                app.shell.borrow_mut().ctx.effects.remove(0),
+                Effect::SwitchMode(UiMode::BigPicture)
+            );
+
+            app.shell.borrow_mut().ctx.running = Some(crate::shell::RunningGame {
+                id: id.clone(),
+                title: "Teste".into(),
+                pid: Some(1234),
+            });
+            app.apply(HostAction::Launching);
+            app.game_shown();
+            assert!(!app.shell.borrow().ctx.launching);
+            assert!(
+                app.ui.borrow().window().is_visible(),
+                "a UI desktop continua viva"
+            );
+            app.toggle_control_center();
+            assert!(app.shell.borrow().control_center_open());
+            assert_eq!(
+                app.ui.borrow().get_property("control-center").unwrap(),
+                Value::Bool(true)
+            );
+            app.toggle_control_center();
+            assert!(!app.shell.borrow().control_center_open());
+            app.toggle_control_center();
+            app.shell.borrow_mut().click("cc-icon", 6);
+            app.shell.borrow_mut().click("cc-panel", 0);
+            assert!(app.shell.borrow().ctx.effects.contains(&Effect::EndGame));
+            app.shell.borrow_mut().ctx.effects.clear();
+            app.shell.borrow_mut().open_route("settings");
+            for end in [GameEnd::Normal, GameEnd::Failed(3)] {
+                {
+                    let mut s = app.shell.borrow_mut();
+                    s.ctx.welcome_back = Some((id.clone(), Duration::from_secs(120), end));
+                    s.ctx.dirty = true;
+                }
+                app.redraw();
+                assert!(app.shell.borrow().ctx.running.is_none());
+                assert!(!app.shell.borrow().control_center_open());
+                assert_eq!(app.shell.borrow().page().kind(), "desk-library");
+                assert_eq!(app.shell.borrow().focused_game(), Some(id.clone()));
+                assert_eq!(app.shell.borrow().has_layers(), end != GameEnd::Normal);
+                app.shell.borrow_mut().close_layers();
+            }
+            app.ui.borrow().hide().unwrap();
+        })
+        .join()
+        .unwrap();
     }
 
     #[test]
