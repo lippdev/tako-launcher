@@ -7,7 +7,8 @@ use crate::model::Hint;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
-use tako_core::input::{AppCommand, ButtonMap, GamepadButtons};
+use tako_core::input::profiles::{Profile, Profiles};
+use tako_core::input::{AppCommand, GamepadButtons};
 use tako_core::library::{CollectionLibrary, GameLibrary};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{GameChoicesStore, GameSettingsStore, SettingsStore};
@@ -169,9 +170,8 @@ pub mod keys {
     pub const GAME_AUDIO_ID: &str = "GameAudioDeviceId";
     pub const GAME_AUDIO_NAME: &str = "GameAudioDeviceName";
     pub const DISABLED_STORES: &str = "DisabledStores";
-    pub const CONTROL_CENTER_CHORD: &str = "ControlCenterChord";
+    pub const CONTROL_CENTER_CHORD: &str = tako_core::input::profiles::keys::CHORD;
     pub const CONTROL_CENTER_KEY: &str = "ControlCenterKey";
-    pub const BUTTON_MAP: &str = "ControllerButtonMap";
     pub const LANGUAGE: &str = "Language";
     pub const HIDE_CURSOR: &str = "HideCursorDuringGame";
     pub const CONTROLLER_MOUSE: &str = "ControllerMouseDuringGame";
@@ -192,6 +192,12 @@ pub struct Ctx {
     pub version: String,
     pub pad: PadFamily,
     pub pad_name: String,
+    /// GUID do SDL do controle em uso (escolhe o perfil de botões).
+    pub pad_guid: String,
+    /// Controles conectados agora: `(guid, nome)`.
+    pub pads: Vec<(String, String)>,
+    /// Perfis de botões (INPUT-001), lidos das configurações; mudam só por [`Ctx::save_profiles`].
+    pub profiles: Profiles,
     pub pads_connected: usize,
     /// O controle em uso caiu e nenhum outro ficou: o aviso "Controle desconectado" fica na tela.
     pub pad_lost: bool,
@@ -299,9 +305,10 @@ impl Ctx {
     /// fluxo da sobreposição segue como está.
     pub fn pad_event(&mut self, ev: PadEvent, count: usize) {
         match ev {
-            PadEvent::Connected { name, family } => {
+            PadEvent::Connected { name, family, guid } => {
                 self.pad = family;
                 self.pad_name = name;
+                self.pad_guid = guid;
                 self.input = InputKind::Gamepad;
                 if std::mem::take(&mut self.pad_lost) {
                     self.toast(self.t("status.pad_connected"));
@@ -408,6 +415,11 @@ impl Ctx {
                 _ => "",
             };
         }
+        self.pad_glyph(cmd)
+    }
+
+    /// Glifo do comando no controle, mesmo com o teclado em uso (textos que falam do controle).
+    pub fn pad_glyph(&self, cmd: Cmd) -> &'static str {
         let command = match cmd {
             Cmd::Accept => AppCommand::Accept,
             Cmd::Back => AppCommand::Back,
@@ -419,14 +431,24 @@ impl Ctx {
             Cmd::Guide => return button_glyph(self.pad, GamepadButtons::GUIDE),
             _ => return "",
         };
-        // Os botões escolhidos em Configurações › Controles (INPUT-001).
-        self.button_map()
+        // Os botões do perfil do controle em uso (INPUT-001).
+        self.profile()
+            .buttons
             .button(command)
             .map_or("", |b| button_glyph(self.pad, b))
     }
 
-    pub fn button_map(&self) -> ButtonMap {
-        ButtonMap::parse(self.settings.get(keys::BUTTON_MAP))
+    /// Perfil de botões do controle em uso (sem controle, o padrão).
+    pub fn profile(&self) -> &Profile {
+        self.profiles.of(&self.pad_guid)
+    }
+
+    pub fn save_profiles(&mut self, profiles: Profiles) {
+        for (key, value) in profiles.save() {
+            self.settings.set(key, &value);
+        }
+        self.profiles = profiles;
+        self.dirty = true;
     }
 
     pub fn hint(&self, cmd: Cmd, label: &str) -> Hint {

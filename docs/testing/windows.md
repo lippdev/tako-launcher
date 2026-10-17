@@ -126,10 +126,17 @@ Precisa de internet e de um repositório no GitHub com uma release que tenha um 
    release nova no repositório e repita: o tema é atualizado e, se estiver em uso, a tela muda na hora.
 4. Remova o tema: "Atualizar temas" some.
 
-## 16. Botões do Tako (INPUT-001)
+## 16. Botões e perfis por controle (INPUT-001)
 
-1. Configurações › Controles › "Botões do Tako": Aceitar mostra A. Aperte A na linha: Aceitar passa a B, Voltar a A, e
-   o aviso diz as duas trocas.
-2. Navegue pelo Tako: B aceita e A volta, e as dicas da barra de baixo mostram os botões novos (com um DualSense, ○ e ✕).
-3. Feche e abra o Tako: a troca continua. A combinação da Central (View + Y) segue funcionando, inclusive durante o jogo.
-4. "Restaurar botões padrão" volta tudo; o teclado (Enter, Esc) não muda em nenhum momento.
+Precisa de dois controles (ex.: um Xbox e um DualSense).
+
+1. Configurações › Controles › "Botões do Tako · perfil Padrão": Aceitar mostra A. Aperte A na linha: Aceitar passa a
+   B, Voltar a A, e o aviso diz as duas trocas. As dicas da barra de baixo e o texto "Aperte B para salvar" da captura
+   da combinação seguem o botão novo.
+2. "Perfis de botões": os dois controles aparecem, os dois no Padrão; o que está em uso diz "Controle em uso".
+   "Novo perfil…" com o nome "Arcade": o controle em uso passa ao Arcade (uma cópia dos botões dele).
+3. Use o outro controle: continua no Padrão (A aceita). Na linha dele, aperte A: passa ao Arcade e os botões seguem.
+4. "Abrir com o controle" (na lista de botões do perfil Arcade): grave Guia + X. Abra um jogo: Guia + X abre a Central no controle do Arcade, e
+   View + Y abre no controle do Padrão (cada um a sua). A combinação sem View nem Guia é recusada.
+5. "Renomear perfil…" e "Excluir perfil": os controles do perfil excluído voltam ao Padrão.
+6. Feche e abra o Tako: perfis, escolha de cada controle e combinações continuam. O teclado (Enter, Esc) não muda.

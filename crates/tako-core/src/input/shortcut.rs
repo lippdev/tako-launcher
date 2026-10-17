@@ -160,7 +160,13 @@ impl ButtonChordDetector {
     }
 
     pub fn update(&mut self, pressed: B, now: Duration) -> bool {
-        if self.chord.is_empty() || !pressed.contains(self.chord) {
+        self.update_held(!self.chord.is_empty() && pressed.contains(self.chord), now)
+    }
+
+    /// Como [`update`](Self::update), com quem chama dizendo se a combinação está segurada (cada controle
+    /// tem a sua, pelo perfil: INPUT-001).
+    pub fn update_held(&mut self, held: bool, now: Duration) -> bool {
+        if !held {
             self.since = None;
             self.fired = false;
             self.progress = 0.0;
@@ -203,7 +209,7 @@ pub enum ChordCaptureState {
 }
 
 /// Tela "Segure os botões que quer usar": vale quando o conjunto fica igual por [`ChordCapture::HOLD_TIME`].
-/// Tocar B sozinho cancela.
+/// Tocar o botão de voltar (B, ou o do perfil) sozinho cancela.
 #[derive(Debug)]
 pub struct ChordCapture {
     since: Duration,
@@ -211,6 +217,8 @@ pub struct ChordCapture {
     pub holding: B,
     pub result: B,
     pub progress: f64,
+    /// Botão que cancela tocado sozinho: o de voltar do perfil do controle (INPUT-001).
+    pub cancel: B,
 }
 
 impl Default for ChordCapture {
@@ -221,6 +229,7 @@ impl Default for ChordCapture {
             holding: B::NONE,
             result: B::NONE,
             progress: 0.0,
+            cancel: B::B,
         }
     }
 }
@@ -234,7 +243,10 @@ impl ChordCapture {
 
     /// Recomeça depois de uma combinação recusada.
     pub fn restart(&mut self) {
-        *self = Self::default();
+        *self = ChordCapture {
+            cancel: self.cancel,
+            ..Self::default()
+        };
     }
 
     pub fn update(&mut self, pressed: B, now: Duration) -> ChordCaptureState {
@@ -251,7 +263,7 @@ impl ChordCapture {
             _ => {}
         }
         if pressed.is_empty() {
-            let tapped_back = self.state == Holding && self.holding == B::B;
+            let tapped_back = self.state == Holding && self.holding == self.cancel;
             self.state = if tapped_back { Cancelled } else { Waiting };
             self.holding = B::NONE;
             self.progress = 0.0;

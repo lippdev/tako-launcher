@@ -8,7 +8,7 @@ use sdl3::event::Event;
 use sdl3::gamepad::{Axis, Button, Gamepad, GamepadType};
 use sdl3::joystick::PowerLevel;
 use std::collections::HashMap;
-use tako_core::input::low_battery_warning;
+use tako_core::input::{GamepadButtons, low_battery_warning};
 
 /// Botões por posição (padrão Xbox: A embaixo). Mesmos bits de `GamepadButtons` do C#.
 pub mod buttons {
@@ -52,12 +52,20 @@ pub struct PadState {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PadEvent {
-    Connected { name: String, family: PadFamily },
-    Disconnected { remaining: usize },
+    /// `guid`: o do SDL (identifica o modelo; os perfis de botões são por ele).
+    Connected {
+        name: String,
+        family: PadFamily,
+        guid: String,
+    },
+    Disconnected {
+        remaining: usize,
+    },
 }
 
 struct Pad {
     pad: Gamepad,
+    guid: String,
     state: PadState,
     /// Já avisou de bateria fraca nesta conexão.
     low_warned: bool,
@@ -70,6 +78,7 @@ pub struct Pads {
     pads: HashMap<u32, Pad>,
     last_family: PadFamily,
     last_name: String,
+    last_guid: String,
     /// Controle em uso (o último que conectou ou apertou um botão).
     last_id: u32,
 }
@@ -126,6 +135,7 @@ impl Pads {
             pads: HashMap::new(),
             last_family: PadFamily::Xbox,
             last_name: String::new(),
+            last_guid: String::new(),
             last_id: 0,
         })
     }
@@ -148,6 +158,30 @@ impl Pads {
 
     pub fn name(&self) -> &str {
         &self.last_name
+    }
+
+    /// GUID do controle em uso.
+    pub fn guid(&self) -> &str {
+        &self.last_guid
+    }
+
+    /// Controles conectados: `(guid, nome)`.
+    pub fn connected(&self) -> Vec<(String, String)> {
+        let mut v: Vec<_> = self
+            .pads
+            .values()
+            .map(|p| (p.guid.clone(), p.pad.name().unwrap_or_default()))
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
+
+    /// Botões de cada controle (`(guid, botões)`), para traduzir pelo perfil de cada um.
+    pub fn buttons(&self) -> impl Iterator<Item = (&str, GamepadButtons)> {
+        self.pads
+            .values()
+            .map(|p| (p.guid.as_str(), GamepadButtons(p.state.buttons)))
     }
 
     /// Processa os eventos pendentes sem bloquear.
@@ -175,18 +209,21 @@ impl Pads {
                 if let Ok(pad) = self.subsystem.open(which) {
                     let name = pad.name().unwrap_or_default();
                     let family = family_of(pad.r#type());
+                    let guid = self.subsystem.guid_for_id(which).string();
                     self.last_family = family;
                     self.last_name = name.clone();
+                    self.last_guid = guid.clone();
                     self.last_id = which_id(&which);
                     self.pads.insert(
                         which_id(&which),
                         Pad {
                             pad,
+                            guid: guid.clone(),
                             state: PadState::default(),
                             low_warned: false,
                         },
                     );
-                    out.push(PadEvent::Connected { name, family });
+                    out.push(PadEvent::Connected { name, family, guid });
                 }
             }
             Event::GamepadRemoved { which, .. } => {
@@ -228,6 +265,7 @@ impl Pads {
                 // O último controle usado define os glifos.
                 self.last_family = family_of(p.pad.r#type());
                 self.last_name = p.pad.name().unwrap_or_default();
+                self.last_guid = p.guid.clone();
                 self.last_id = id;
             } else {
                 p.state.buttons &= !bit;

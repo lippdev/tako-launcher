@@ -5,6 +5,7 @@
 
 pub mod controller_mouse;
 pub mod controller_test;
+pub mod profiles;
 pub mod shortcut;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -180,6 +181,21 @@ impl ButtonMap {
         self.assign(command, next);
     }
 
+    /// Botões apertados num controle com este mapa, como se fossem do mapa padrão: o resto do Tako (o
+    /// intérprete, as dicas) só conhece o padrão. Direcional, View e Guia passam como estão.
+    pub fn to_default(&self, pressed: GamepadButtons) -> GamepadButtons {
+        let mapped = Self::buttons().fold(GamepadButtons::NONE, |a, b| a | b);
+        let mut out = pressed & !mapped;
+        for (button, command) in self.pairs() {
+            if pressed.contains(button)
+                && let Some(default) = ButtonMap::default().button(command)
+            {
+                out |= default;
+            }
+        }
+        out
+    }
+
     /// Valor das configurações: o botão de cada comando, na ordem de [`ButtonMap::commands`].
     pub fn serialize(&self) -> String {
         Self::commands()
@@ -223,7 +239,6 @@ pub struct GamepadInterpreter {
     held: BTreeMap<AppCommand, Option<Duration>>,
     pressed: BTreeSet<AppCommand>,
     suppress_held: bool,
-    map: ButtonMap,
 }
 
 impl GamepadInterpreter {
@@ -233,11 +248,6 @@ impl GamepadInterpreter {
 
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Botões escolhidos em Configurações › Controles (INPUT-001).
-    pub fn set_map(&mut self, map: ButtonMap) {
-        self.map = map;
     }
 
     /// Comandos mantidos pelo controle na última leitura (o filtro de eco consulta).
@@ -262,7 +272,7 @@ impl GamepadInterpreter {
     ) -> Vec<AppCommand> {
         let b = snapshot.buttons;
         let mut pressed = BTreeSet::new();
-        for (button, command) in self.map.pairs() {
+        for (button, command) in BUTTON_MAP {
             if b.contains(button) {
                 pressed.insert(command);
                 if ignore.contains(button) {
@@ -442,13 +452,16 @@ mod tests {
     }
 
     #[test]
-    fn interpreter_follows_the_button_map() {
+    fn mapped_buttons_reach_the_interpreter_as_the_default_ones() {
         let mut map = ButtonMap::default();
         map.assign(AppCommand::Accept, B::B);
+        assert_eq!(map.to_default(B::B | B::DPAD_UP), B::A | B::DPAD_UP);
+        assert_eq!(map.to_default(B::A | B::VIEW), B::B | B::VIEW);
         let mut pad = GamepadInterpreter::new();
-        pad.set_map(map);
-        assert_eq!(upd(&mut pad, pressed(B::B), ms(0)), [AppCommand::Accept]);
-        assert_eq!(upd(&mut pad, pressed(B::A), ms(10)), [AppCommand::Back]);
+        let s = pressed(map.to_default(B::B));
+        assert_eq!(upd(&mut pad, s, ms(0)), [AppCommand::Accept]);
+        let s = pressed(map.to_default(B::A));
+        assert_eq!(upd(&mut pad, s, ms(10)), [AppCommand::Back]);
     }
 
     // GamepadInterpreterTests

@@ -7,7 +7,7 @@ use std::io::BufReader;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
 use std::time::{Duration, Instant};
-use tako_core::input::GamepadButtons;
+use tako_core::input::profiles::Profiles;
 use tako_core::input::shortcut::{ButtonChordDetector, chord};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{SettingsStore, TakoDatabase};
@@ -74,6 +74,8 @@ pub struct Supervisor {
     launching: bool,
     pads: Option<Pads>,
     chord: ButtonChordDetector,
+    /// Perfis de botões: a combinação da Central é a do perfil de cada controle (INPUT-001).
+    profiles: Profiles,
     key: tako_core::input::shortcut::KeyShortcut,
     initial_link: Option<String>,
 }
@@ -81,7 +83,6 @@ pub struct Supervisor {
 impl Supervisor {
     pub fn new(paths: DataPaths, platform: Platform, all_args: &[String]) -> Supervisor {
         let settings = SettingsStore::new(TakoDatabase::new(paths.database()));
-        let chord_value = settings.get("ControlCenterChord").ok().flatten();
         let key = settings.get("ControlCenterKey").ok().flatten();
         Supervisor {
             initial_link: tako_core::links::argument(all_args).map(str::to_owned),
@@ -94,7 +95,8 @@ impl Supervisor {
             closing: false,
             launching: false,
             pads: None,
-            chord: ButtonChordDetector::new(chord::parse(chord_value.as_deref())),
+            chord: ButtonChordDetector::new(chord::DEFAULT),
+            profiles: load_profiles(&settings),
             key: tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
         }
     }
@@ -369,6 +371,10 @@ impl Supervisor {
     /// Sem interface, durante o jogo. Sem polling ativo: espera eventos do controle por até 2 s (16 ms só com o
     /// ponteiro pelo controle ligado). Devolve como reabrir a interface.
     fn game_loop(&mut self) -> Launch {
+        // A interface pode ter mudado os perfis antes do jogo.
+        self.profiles = load_profiles(&SettingsStore::new(TakoDatabase::new(
+            self.paths.database(),
+        )));
         if self.pads.is_none() {
             self.pads = Pads::open()
                 .map_err(|e| tracing::warn!("controles: {e}"))
@@ -418,7 +424,11 @@ impl Supervisor {
             }
             // Atalho do controle, do teclado ou o Tako aberto de novo: a interface volta por cima do jogo.
             let activation = self.activation_requested();
-            if self.chord.update(GamepadButtons(pad.buttons), now)
+            let central = self
+                .pads
+                .as_ref()
+                .is_some_and(|p| self.profiles.read(p.buttons()).central);
+            if self.chord.update_held(central, now)
                 || pressed.swap(false, std::sync::atomic::Ordering::Relaxed)
                 || activation.is_some()
             {
@@ -447,4 +457,8 @@ impl Supervisor {
             }
         }
     }
+}
+
+fn load_profiles(settings: &SettingsStore) -> Profiles {
+    Profiles::load(|k| settings.get(k).ok().flatten())
 }
