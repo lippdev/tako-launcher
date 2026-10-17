@@ -24,6 +24,7 @@ rfd.workspace = true
 spin_on = "0.1"
 
 [dev-dependencies]
+slint = { workspace = true, features = ["renderer-software"] }
 tempfile.workspace = true
 
 [lints]
