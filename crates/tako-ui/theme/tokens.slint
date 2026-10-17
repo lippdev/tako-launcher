@@ -37,6 +37,8 @@ export global Ui {
     out property <duration> focus-time: reduce-motion ? 0ms : 160ms;
     out property <duration> page-time: reduce-motion ? 0ms : 280ms;
     out property <duration> color-time: reduce-motion ? 0ms : 600ms;
+    // "Abrindo…" sumindo para o jogo; o app espera o mesmo tempo (`app::leave_fade`).
+    out property <duration> leave-time: reduce-motion ? 0ms : 450ms;
 
     // Tipografia (px do palco).
     out property <length> display: 84 * u * text-scale;
