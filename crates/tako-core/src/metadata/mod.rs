@@ -13,6 +13,7 @@ pub mod http;
 pub mod igdb;
 pub mod igdb_parse;
 pub mod merge;
+pub mod review;
 pub mod rom_hash;
 pub mod screenscraper;
 pub mod screenscraper_parse;
@@ -125,6 +126,10 @@ pub struct GameMetadata {
     pub players: Option<String>,
     /// Outras mídias por tipo (chaves em [`crate::library::media`]), só endereços.
     pub media: BTreeMap<String, String>,
+    /// Numa parte: a fonte achou o jogo só pelo nome (sem id da loja nem escolha do usuário). A revisão de
+    /// capas (ART-001) mostra estas quando o nome não bate exatamente.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub matched_by_title: bool,
 }
 
 impl GameMetadata {
@@ -178,6 +183,15 @@ impl GameMetadata {
         fill(&mut game.players, &self.players);
         if !self.media.is_empty() {
             game.media = self.media.clone();
+        }
+        // Logo e ícone da Steam pelo appid quando nenhuma fonte trouxe (ART-001): a tela mostra o nome se a
+        // Steam não tiver a imagem.
+        if let Some(app) = self.steam_app_id {
+            for kind in [crate::library::media::LOGO, crate::library::media::ICON] {
+                game.media
+                    .entry(kind.to_owned())
+                    .or_insert_with(|| steam_art(app, kind));
+            }
         }
         if self.steam_app_id.is_some() {
             game.steam_app_id = self.steam_app_id;

@@ -3,6 +3,7 @@
 
 pub mod add_game;
 pub mod art;
+pub(crate) mod art_review;
 pub mod closing_game;
 pub mod control_center;
 pub mod ctx;
