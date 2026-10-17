@@ -55,7 +55,7 @@ pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
         return Nav::Layer(Box::new(dialogs::approve_commands(ctx, &g.id)));
     } else if g.can_play() {
         ctx.effect(Effect::Launch(g.id.clone()));
-    } else if g.is_upcoming() || g.is_rom() {
+    } else if g.is_upcoming() {
         ctx.toast(tiles::play_label(ctx, &g));
     } else if let Some(uri) = install_uri(&g) {
         ctx.effect(Effect::OpenUrl(uri));

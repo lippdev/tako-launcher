@@ -208,7 +208,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
 
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar.
 pub fn rescan(shell: &Rc<RefCell<Shell>>) {
-    let (found, disabled, simulate, steam_key, steam_cache) = {
+    let (found, disabled, simulate, steam_key, steam_cache, emulators) = {
         let mut s = shell.borrow_mut();
         if s.ctx.scanning {
             return;
@@ -222,6 +222,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
             s.ctx.simulated(),
             s.ctx.platform.secrets.get(crate::steam_owned::SECRET),
             crate::steam_owned::cache(&s.ctx.paths),
+            crate::sources::emulator_config(&s.ctx.settings),
         )
     };
     std::thread::Builder::new()
@@ -235,7 +236,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
                 }
                 steam_cache
             });
-            let reports = scan_into(&found, &disabled, simulate, steam_owned);
+            let reports = scan_into(&found, &disabled, simulate, steam_owned, emulators);
             let to_measure: Vec<(String, String)> = found
                 .lock()
                 .map(|f| {
@@ -268,11 +269,12 @@ fn scan_into(
     disabled: &str,
     simulate: bool,
     steam_owned: Option<PathBuf>,
+    emulators: tako_sources::emulators::Config,
 ) -> Vec<tako_sources::report::LibrarySourceReport> {
     if simulate {
         return Vec::new();
     }
-    let (games, reports) = crate::sources::scan(disabled, steam_owned);
+    let (games, reports) = crate::sources::scan(disabled, steam_owned, emulators);
     if let Ok(mut f) = found.lock() {
         *f = games;
     }
@@ -1033,7 +1035,7 @@ mod tests {
             })
             .collect();
         let found = Mutex::new(bench);
-        assert!(scan_into(&found, "", true, None).is_empty());
+        assert!(scan_into(&found, "", true, None, Default::default()).is_empty());
         assert_eq!(found.lock().unwrap().len(), 1000);
     }
 

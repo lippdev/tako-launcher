@@ -137,6 +137,7 @@ text = "O Tako fecha e você volta para a área de trabalho."
 confirm = "Sair"
 
 [session]
+no_emulator = "Nenhum emulador deste PC abre este sistema: instale um em Configurações › Biblioteca › Emuladores e ROMs"
 other_running = "{game} ainda está aberto"
 launching = "Abrindo"
 launching_slow = "Ainda abrindo. A loja pode estar atualizando ou verificando o jogo; ele aparece aqui assim que abrir."

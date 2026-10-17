@@ -76,6 +76,27 @@ fn guard(paths: &DataPaths) -> SessionEnvironmentGuard {
     SessionEnvironmentGuard::new(PendingEnvironmentStore::new(paths.session_environment()))
 }
 
+/// A ROM com o comando do emulador; sem emulador para o sistema, o motivo.
+fn with_emulator(
+    ctx: &Ctx,
+    mut game: tako_core::library::Game,
+) -> Result<tako_core::library::Game, String> {
+    let rom = game.rom_path.clone().unwrap_or_default();
+    let config = crate::sources::emulator_config(&ctx.settings);
+    let Some((target, args, dir)) = tako_sources::emulators::command_for(
+        std::path::Path::new(&rom),
+        game.platform.as_deref(),
+        &config,
+    ) else {
+        return Err(ctx.t("session.no_emulator"));
+    };
+    game.launch_target = Some(target);
+    // Os argumentos extras das opções do jogo continuam valendo (entram depois, pelo `eff.arguments`).
+    game.launch_arguments = Some(args);
+    game.working_directory = dir.or(game.working_directory);
+    Ok(game)
+}
+
 /// Abre o jogo com tela, áudio e cursor da sessão. Em erro, desfaz o que já mudou.
 pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
     let game = ctx
@@ -83,6 +104,12 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         .find(game_id)
         .cloned()
         .ok_or_else(|| ctx.t("session.ui.not_found"))?;
+    // ROM adicionada à mão: abre pelo emulador do sistema dela (SRC-001).
+    let game = if game.store() == tako_core::library::GameStore::Manual && game.is_rom() {
+        with_emulator(ctx, game)?
+    } else {
+        game
+    };
     let target = game
         .launch_target
         .clone()

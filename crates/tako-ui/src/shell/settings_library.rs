@@ -34,7 +34,7 @@ pub(crate) fn toggle_store(disabled: &str, store: GameStore) -> String {
 
 fn store_icon(store: GameStore) -> String {
     match store {
-        GameStore::Heroic | GameStore::Lutris => String::new(),
+        GameStore::Heroic | GameStore::Lutris | GameStore::Emulators => String::new(),
         s => format!("store-{}", s.key().to_ascii_lowercase()),
     }
 }
@@ -227,6 +227,11 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                 .on(effect(Effect::ImportPlaynite)),
         );
     }
+    // Emuladores e ROMs (SRC-001): pastas, executáveis e o emulador de cada sistema.
+    v.push(
+        MenuItem::new(action(ctx, "settings.library.emulators"))
+            .on(|ctx| Flow::Push(Box::new(super::emulators::panel(ctx)))),
+    );
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.library.organize_header"),
     )));

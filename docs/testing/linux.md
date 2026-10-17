@@ -63,3 +63,11 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Configurações › Tela e áudio › Testar: o Tako vai para a tela de jogo, pergunta "Você consegue ver esta tela?" e as telas voltam com ou sem resposta (15 s).
 - [ ] Com um jogo aberto, segurar Select + Y (Create + △) abre a Central. Não há atalho de teclado durante o jogo neste SO.
 - [ ] Aparência › Tema › "Tako Alto contraste" troca na hora e continua em tela cheia.
+
+## Emuladores e ROMs (SRC-001)
+
+- [ ] RetroArch do pacote do sistema (no PATH), do Flatpak (`org.libretro.RetroArch`) e da Steam: aparece como "Encontrado" em Biblioteca › Emuladores e ROMs, e as playlists dele entram na loja Emuladores.
+- [ ] DuckStation ou PCSX2 em AppImage dentro de `~/Applications`: encontrado; a pasta de jogos configurada nele entra na biblioteca.
+- [ ] Emulador em Flatpak: o jogo abre por `flatpak run <id>` (ROM fora de `~` pode precisar de permissão de pasta no Flatseal: anotar).
+- [ ] ES-DE: os jogos da pasta `~/ROMs` aparecem com os nomes e capas do ES-DE; os escondidos nele não aparecem.
+- [ ] Abrir um jogo de cada emulador: tela cheia, direto no jogo, e o Tako acompanha até fechar.

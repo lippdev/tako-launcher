@@ -141,3 +141,24 @@ Precisa de dois controles (ex.: um Xbox e um DualSense).
 5. "Renomear perfil…" e "Excluir perfil": os controles do perfil excluído voltam ao Padrão.
 6. Feche e abra o Tako: perfis, escolha de cada controle e combinações continuam. O teclado (Enter, Esc) não muda.
 7. Dois controles do mesmo modelo têm o mesmo GUID no SDL: os dois usam o mesmo perfil (esperado).
+
+## 18. Emuladores e ROMs (SRC-001)
+
+Precisa de pelo menos o RetroArch (com um núcleo, ex.: Snes9x) e de algumas ROMs; melhor ainda com um emulador
+avulso (DuckStation, PCSX2, Dolphin, PPSSPP, Ryujinx, Cemu ou RPCS3) já configurado com a pasta de jogos dele.
+
+1. Configurações › Biblioteca: a loja "Emuladores" aparece. Sem nenhum emulador, ela diz como resolver.
+2. Biblioteca › Emuladores e ROMs: cada emulador instalado aparece como "Encontrado" com o caminho (instalador,
+   Scoop, RetroArch da Steam). Um que esteja em outra pasta: A → escolha o executável; "Procurar sozinho" desfaz.
+3. "Adicionar pasta…": escolha uma pasta com uma subpasta por sistema (`snes`, `psx`, `gc`…) ou a pasta de um sistema
+   e troque o sistema dela no diálogo. A biblioteca relê e os jogos aparecem em Emuladores.
+4. Os jogos das playlists do RetroArch aparecem com o nome e a capa que o RetroArch baixou; os da pasta do
+   DuckStation/PCSX2/Dolphin/etc. aparecem sem precisar adicionar nada no Tako. Um jogo de vários discos (`.m3u`)
+   aparece uma vez; o `.bin` de um `.cue` não aparece sozinho.
+5. Abra um jogo de cada emulador: ele abre em tela cheia, direto no jogo, e o Tako acompanha (Central, tempo
+   jogado, volta ao fechar o emulador).
+6. "Emulador de cada sistema": troque PlayStation entre Automático, DuckStation e RetroArch e abra o mesmo jogo:
+   abre no escolhido.
+7. Uma ROM de um sistema sem emulador (ex.: Wii U sem o Cemu) não aparece e entra no aviso da loja.
+8. Adicionar jogo › uma ROM solta (ex.: `.sfc`): escolha o sistema; o botão vira "Jogar" e abre no emulador do
+   sistema. Sem emulador para ele, aparece o aviso "Nenhum emulador deste PC abre este sistema".
