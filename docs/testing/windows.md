@@ -101,3 +101,15 @@ XboxFullscreenExperienceTool).
    controle navega sem clicar antes.
 5. Abra um jogo e feche-o: o Tako volta em tela cheia, com o foco no jogo. Repita pela Central (Encerrar jogo).
 6. Saia do Tako (Sair para o desktop): o comportamento segue a opção "Exit FSE on Launcher exit" do AnyFSE.
+
+## 13. Tela por jogo (PERF-002)
+
+Precisa de duas telas (ex.: monitor e TV).
+
+1. Configurações › Tela de jogo: escolha a TV, com uma resolução. Num jogo, Configurações deste jogo › "Tela deste jogo"
+   mostra "Padrão: TV".
+2. Troque para o monitor: "Usar a tela de jogo" passa a "Padrão: Sim" e "Resolução e taxa" a "Padrão: manter a atual";
+   as resoluções oferecidas são as do monitor. Escolha uma e o HDR.
+3. Abra o jogo: só o monitor fica ligado, com a resolução e o HDR escolhidos; a TV desliga. Ao fechar, tudo volta.
+4. Desconecte o monitor: a linha mostra "Monitor (desconectada)" e abrir o jogo avisa que a tela não está conectada.
+5. Outro jogo, sem tela própria, continua indo para a TV com a resolução do Tako.

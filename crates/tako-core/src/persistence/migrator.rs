@@ -109,6 +109,12 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
          ALTER TABLE game_settings ADD COLUMN after_command TEXT;
          ALTER TABLE game_settings ADD COLUMN approved_commands TEXT;",
     ),
+    // Tela própria de cada jogo (PERF-002).
+    (
+        12,
+        "ALTER TABLE game_settings ADD COLUMN screen_id TEXT;
+         ALTER TABLE game_settings ADD COLUMN screen_name TEXT;",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).

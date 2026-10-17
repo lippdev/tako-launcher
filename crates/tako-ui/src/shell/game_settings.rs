@@ -73,9 +73,20 @@ fn row(key: &str, title: String, value: String, overridden: bool) -> PanelRow {
     PanelRow::choice(key, title, value).emphasized(overridden)
 }
 
-/// Resoluções da tela de jogo configurada (vazio sem tela escolhida).
-fn modes(ctx: &Ctx) -> Vec<String> {
-    let screen = ctx.settings.string(keys::GAME_SCREEN_ID);
+/// A tela que o jogo usa: a dele (PERF-002) ou a tela de jogo do Tako (vazio sem nenhuma).
+fn screen_of(ctx: &Ctx, o: &Override) -> String {
+    normalize_arguments(o.screen_id.as_deref())
+        .unwrap_or_else(|| ctx.settings.string(keys::GAME_SCREEN_ID))
+}
+
+/// O jogo usa outra tela que não a do Tako: a resolução do Tako não vale para ela.
+fn own_screen(ctx: &Ctx, o: &Override) -> bool {
+    !screen_of(ctx, o).eq_ignore_ascii_case(&ctx.settings.string(keys::GAME_SCREEN_ID))
+}
+
+/// Resoluções da tela do jogo (vazio sem tela escolhida).
+fn modes(ctx: &Ctx, o: &Override) -> Vec<String> {
+    let screen = screen_of(ctx, o);
     if screen.is_empty() {
         return Vec::new();
     }
@@ -102,7 +113,7 @@ fn outputs(ctx: &Ctx) -> Vec<(String, String)> {
 
 fn cycle_mode(ctx: &mut Ctx, id: &str, dir: i32) -> Flow {
     let c = current(ctx, id);
-    let found = modes(ctx);
+    let found = modes(ctx, &c);
     let mut options = vec![None, Some(Override::KEEP_CURRENT_MODE.to_owned())];
     options.extend(found.iter().cloned().map(Some));
     if let Some(saved) = c.screen_mode.clone().filter(|s| !s.is_empty())
@@ -111,7 +122,7 @@ fn cycle_mode(ctx: &mut Ctx, id: &str, dir: i32) -> Flow {
         options.push(Some(saved)); // resolução de uma tela desligada agora: continua escolhível
     }
     if found.is_empty() && c.screen_mode.is_none() {
-        let no_screen = ctx.settings.string(keys::GAME_SCREEN_ID).is_empty();
+        let no_screen = screen_of(ctx, &c).is_empty();
         ctx.toast(ctx.t(if no_screen {
             "game_settings.choose_screen_first"
         } else {
@@ -120,6 +131,43 @@ fn cycle_mode(ctx: &mut Ctx, id: &str, dir: i32) -> Flow {
     }
     let next = cycle(&options, &c.screen_mode, dir);
     change(ctx, id, |o| o.screen_mode = next);
+    Flow::Stay
+}
+
+/// Padrão (a tela de jogo do Tako) e as telas conectadas; a escolhida e desconectada continua na lista.
+fn cycle_screen(ctx: &mut Ctx, id: &str, dir: i32) -> Flow {
+    let c = current(ctx, id);
+    let mut screens: Vec<(String, String)> = ctx
+        .platform
+        .displays
+        .list()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|d| (d.id, d.name))
+        .collect();
+    if let Some(saved) = normalize_arguments(c.screen_id.as_deref())
+        && !screens.iter().any(|(i, _)| i.eq_ignore_ascii_case(&saved))
+    {
+        let name = c.screen_name.clone().unwrap_or_else(|| saved.clone());
+        screens.push((saved, name));
+    }
+    let mut options: Vec<Option<(String, String)>> = vec![None];
+    options.extend(screens.into_iter().map(Some));
+    let cur = options
+        .iter()
+        .find(|o| {
+            o.as_ref().map(|(i, _)| i.to_lowercase())
+                == normalize_arguments(c.screen_id.as_deref()).map(|i| i.to_lowercase())
+        })
+        .cloned()
+        .unwrap_or(None);
+    let next = cycle(&options, &cur, dir);
+    change(ctx, id, |o| {
+        o.screen_name = next.as_ref().map(|(_, n)| n.clone());
+        o.screen_id = next.map(|(i, _)| i);
+        // As resoluções são de cada tela: a escolhida para a outra não vale aqui.
+        o.screen_mode = None;
+    });
     Flow::Stay
 }
 
@@ -242,7 +290,15 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     )));
     let screen_value = match c.use_game_screen {
         Some(b) => yes_no(ctx, b),
-        None => default_of(ctx, &yes_no(ctx, s.bool(keys::GAME_SCREEN_ENABLED, false))),
+        // Com uma tela própria escolhida, o jogo usa a tela (ver `resolve`).
+        None => default_of(
+            ctx,
+            &yes_no(
+                ctx,
+                normalize_arguments(c.screen_id.as_deref()).is_some()
+                    || s.bool(keys::GAME_SCREEN_ENABLED, false),
+            ),
+        ),
     };
     let (a, b) = (i(), i());
     let toggle_screen = move |ctx: &mut Ctx, dir: i32, id: &str| {
@@ -268,7 +324,50 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
         .on_adjust(move |ctx, d| toggle_screen(ctx, d, &b)),
     );
 
-    let global_mode = s.string(keys::GAME_SCREEN_MODE);
+    let screen_value = match normalize_arguments(c.screen_id.as_deref()) {
+        Some(sid) => {
+            let connected = ctx.platform.displays.list().unwrap_or_default();
+            match connected.iter().find(|d| d.id.eq_ignore_ascii_case(&sid)) {
+                Some(d) => d.name.clone(),
+                None => ctx.tf(
+                    "game_settings.disconnected",
+                    &[("screen", c.screen_name.as_deref().unwrap_or(&sid))],
+                ),
+            }
+        }
+        None => {
+            let name = s.string(keys::GAME_SCREEN_NAME);
+            default_of(
+                ctx,
+                &if name.is_empty() {
+                    ctx.t("game_settings.no_screen")
+                } else {
+                    name
+                },
+            )
+        }
+    };
+    let (a, b) = (i(), i());
+    v.push(
+        MenuItem::new(
+            row(
+                "which_screen",
+                ctx.t("game_settings.which_screen"),
+                screen_value,
+                normalize_arguments(c.screen_id.as_deref()).is_some(),
+            )
+            .desc(ctx.t("game_settings.which_screen_desc")),
+        )
+        .on(move |ctx| cycle_screen(ctx, &a, 1))
+        .on_adjust(move |ctx, d| cycle_screen(ctx, &b, d)),
+    );
+
+    // Em outra tela, o padrão é manter a resolução dela (a do Tako é da tela de jogo dele).
+    let global_mode = if own_screen(ctx, &c) {
+        String::new()
+    } else {
+        s.string(keys::GAME_SCREEN_MODE)
+    };
     let mode_value = match c.screen_mode.as_deref() {
         None => default_of(
             ctx,
@@ -498,7 +597,8 @@ mod tests {
         assert_eq!(value(&layer.render(&ctx), "screen"), ("Sim".into(), true));
         layer.handle(Cmd::Accept, &mut ctx);
         assert_eq!(value(&layer.render(&ctx), "screen"), ("Não".into(), true));
-        // HDR por ←/→.
+        // HDR por ←/→ (depois de "Tela deste jogo" e da resolução).
+        layer.handle(Cmd::Down, &mut ctx);
         layer.handle(Cmd::Down, &mut ctx);
         layer.handle(Cmd::Down, &mut ctx);
         layer.handle(Cmd::Right, &mut ctx);
@@ -555,6 +655,52 @@ mod tests {
         layer.handle(Cmd::Left, &mut ctx);
         layer.handle(Cmd::Left, &mut ctx);
         assert!(current(&ctx, &id).screen_mode.is_none());
+    }
+
+    #[test]
+    fn game_picks_its_own_screen_and_the_modes_follow_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), true);
+        let id = ctx.library.games()[0].id.clone();
+        let screens = ctx.platform.displays.list().unwrap();
+        // Tela de jogo do Tako: a segunda, com uma resolução própria.
+        ctx.settings.set(keys::GAME_SCREEN_ID, &screens[1].id);
+        ctx.settings.set(keys::GAME_SCREEN_NAME, &screens[1].name);
+        ctx.settings.set(keys::GAME_SCREEN_MODE, "1280x720@60");
+        let mut layer = panel(&ctx, &id);
+        let o = layer.render(&ctx);
+        assert_eq!(
+            value(&o, "which_screen"),
+            (format!("Padrão: {}", screens[1].name), false)
+        );
+        assert_eq!(value(&o, "mode").0, "Padrão: 1280 × 720 · 60 Hz");
+        let at = o.rows.iter().position(|r| r.key == "which_screen").unwrap();
+        layer.hover("row", at);
+        layer.handle(Cmd::Accept, &mut ctx);
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "which_screen"), (screens[0].name.clone(), true));
+        // Na outra tela, a resolução do Tako não vale: mantém a atual.
+        assert_eq!(value(&o, "mode").0, "Padrão: manter a atual");
+        assert_eq!(value(&o, "screen").0, "Padrão: Sim");
+        let saved = current(&ctx, &id);
+        assert_eq!(saved.screen_id.as_deref(), Some(screens[0].id.as_str()));
+        assert_eq!(
+            modes(&ctx, &saved),
+            ctx.platform
+                .displays
+                .modes(&screens[0].id)
+                .unwrap()
+                .iter()
+                .map(DisplayMode::key)
+                .collect::<Vec<_>>()
+        );
+        // Trocar de tela esquece a resolução escolhida para a anterior.
+        change(&mut ctx, &id, |o| {
+            o.screen_mode = Some("1920x1080@60".into())
+        });
+        layer.handle(Cmd::Left, &mut ctx);
+        let back = current(&ctx, &id);
+        assert!(back.is_default(), "{back:?}");
     }
 
     #[test]
