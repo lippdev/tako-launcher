@@ -203,6 +203,7 @@ pub fn to_game(app: &SteamApp) -> Game {
         title: app.name.clone(),
         store: Some(GameStore::Steam),
         size_label: size_label(app.size_on_disk),
+        size_bytes: (app.size_on_disk > 0).then_some(app.size_on_disk),
         accent: ACCENTS[id as usize % ACCENTS.len()].to_owned(),
         cover_uri: Some(format!("{ART_SCHEME}://{id}/cover")),
         hero_uri: Some(format!("{ART_SCHEME}://{id}/hero")),

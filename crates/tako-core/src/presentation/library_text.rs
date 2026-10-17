@@ -6,12 +6,13 @@ use crate::i18n::Lang;
 use crate::library::{Game, GameStore, InstallFilter, LibrarySort, PlayStatus};
 
 /// Ordem das opções de ordenação no painel e no botão "Ordenar".
-pub const SORT_ORDER: [LibrarySort; 5] = [
+pub const SORT_ORDER: [LibrarySort; 6] = [
     LibrarySort::RecentlyPlayed,
     LibrarySort::Name,
     LibrarySort::PlayTime,
     LibrarySort::Rating,
     LibrarySort::RecentlyAdded,
+    LibrarySort::Size,
 ];
 
 pub fn sort_label(lang: Lang, sort: LibrarySort) -> String {
@@ -21,6 +22,7 @@ pub fn sort_label(lang: Lang, sort: LibrarySort) -> String {
         LibrarySort::RecentlyAdded => "recently_added",
         LibrarySort::Rating => "rating",
         LibrarySort::RecentlyPlayed => "recently_played",
+        LibrarySort::Size => "size",
     };
     tr(lang, &format!("library.sort.{key}"), &[])
 }

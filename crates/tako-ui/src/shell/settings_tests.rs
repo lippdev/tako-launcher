@@ -330,3 +330,37 @@ fn key_capture_refuses_conflicts_and_saves_the_pressed_shortcut() {
     ));
     assert_eq!(ctx.toast.as_ref().unwrap().0, "Atalho mantido · Ctrl+Alt+T");
 }
+
+#[test]
+fn storage_lists_the_largest_games_and_sorts_by_size() {
+    use tako_core::library::{LibraryCriteria, LibraryFilter, LibrarySort, query};
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.library.refresh();
+    let biggest = ctx
+        .library
+        .games()
+        .iter()
+        .max_by_key(|g| g.size_bytes)
+        .map(|g| g.id.clone())
+        .unwrap();
+
+    let row = find(&rows_of(&ctx, "library"), "storage");
+    assert_ne!(row.row.value, "");
+    let mut panel = library::storage_panel(&ctx);
+    let rows = panel.render(&ctx).rows;
+    let first = rows.iter().position(|r| r.kind == "action").unwrap();
+    assert_eq!(rows[first].key, biggest);
+    assert!(matches!(
+        panel.click("row", first, &mut ctx),
+        Flow::CloseAll
+    ));
+    assert_eq!(ctx.open_details.as_deref(), Some(biggest.as_str()));
+
+    let by_size = LibraryCriteria {
+        sort: LibrarySort::Size,
+        ..Default::default()
+    };
+    let sorted = query::apply(ctx.library.games(), LibraryFilter::All, &by_size);
+    assert_eq!(sorted[0].id, biggest);
+}

@@ -10,6 +10,7 @@ pub mod game_library;
 pub mod manual;
 pub mod query;
 pub mod search_text;
+pub mod storage;
 pub mod tags;
 pub mod title_matcher;
 

@@ -45,6 +45,7 @@ pub fn games() -> Vec<Game> {
             description: format!("{title}: jogo de demonstração do Tako."),
             developer: Some("Estúdio".into()),
             size_label: Some(format!("{} GB", 2 + i * 3)),
+            size_bytes: Some((2 + i as u64 * 3) << 30),
             ..Default::default()
         })
         .collect()

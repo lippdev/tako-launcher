@@ -11,6 +11,7 @@ name = "Nome"
 play_time = "Tempo de jogo"
 rating = "Nota"
 recently_added = "Data de adição"
+size = "Tamanho"
 
 [library.install]
 any = "Todos"

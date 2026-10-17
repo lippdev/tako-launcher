@@ -36,16 +36,19 @@ pub enum LibrarySort {
     RecentlyAdded,
     /// Nota (Metacritic), maior primeiro; jogos sem nota no fim.
     Rating,
+    /// Tamanho instalado (LIB-005), maior primeiro; jogos sem tamanho no fim.
+    Size,
 }
 
 impl LibrarySort {
     /// Ordem de declaração (o `Enum.GetValues` do C#).
-    pub const ALL: [LibrarySort; 5] = [
+    pub const ALL: [LibrarySort; 6] = [
         LibrarySort::RecentlyPlayed,
         LibrarySort::Name,
         LibrarySort::PlayTime,
         LibrarySort::RecentlyAdded,
         LibrarySort::Rating,
+        LibrarySort::Size,
     ];
 }
 
@@ -126,6 +129,7 @@ pub fn apply_by<T>(
             LibrarySort::PlayTime => b.play_time.cmp(&a.play_time),
             LibrarySort::RecentlyAdded => b.added_at.cmp(&a.added_at),
             LibrarySort::Rating => newest_first(a.score, b.score),
+            LibrarySort::Size => newest_first(a.size_bytes, b.size_bytes),
             // Jogados primeiro (mais recente no topo); nunca jogados depois, por nome.
             LibrarySort::RecentlyPlayed => newest_first(a.last_played_at, b.last_played_at),
         };

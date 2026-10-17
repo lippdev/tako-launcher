@@ -35,6 +35,8 @@ pub struct LibraryFacts {
     pub play_time: Duration,
     /// Nota de 0 a 100 (Metacritic), quando existe.
     pub score: Option<i32>,
+    /// Tamanho instalado em bytes (LIB-005).
+    pub size_bytes: Option<u64>,
     pub added_at: Option<DateTime<Utc>>,
     /// Ids das coleções do usuário com o jogo (só os jogos do Tako têm).
     pub collections: BTreeSet<String>,
@@ -56,6 +58,7 @@ impl LibraryFacts {
             last_played_at: game.last_played_at,
             play_time: game.play_time,
             score: game.metacritic_score,
+            size_bytes: game.size_bytes,
             added_at: game.added_at,
             collections: game.collections.clone(),
             tags: game.tags.clone(),

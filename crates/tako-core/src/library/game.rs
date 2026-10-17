@@ -204,6 +204,9 @@ pub struct Game {
     pub title: String,
     pub store: Option<GameStore>,
     pub size_label: Option<String>,
+    /// Tamanho instalado em bytes (LIB-005): da loja ou medido na pasta; `None` = desconhecido.
+    #[serde(default)]
+    pub size_bytes: Option<u64>,
     /// Cor de destaque (#RRGGBB).
     pub accent: String,
 
