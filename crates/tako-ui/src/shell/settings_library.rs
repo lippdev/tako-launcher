@@ -242,6 +242,10 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         )
         .on(|ctx| Flow::Push(Box::new(storage_panel(ctx)))),
     );
+    v.push(
+        MenuItem::new(PanelRow::action("smart", ctx.t("smart.title")))
+            .on(|ctx| Flow::Push(Box::new(super::super::smart::panel(ctx)))),
+    );
     let n = ctx.collections.collections().len();
     let summary = if n == 0 {
         ctx.t("settings.library.collections_create")

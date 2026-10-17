@@ -552,29 +552,6 @@ fn new_tag(ctx: &Ctx, ids: Vec<String>) -> KeyboardLayer {
     .check(|ctx, name| tags::name_problem(name).map(|p| p.message(ctx.lang())))
 }
 
-/// Os critérios com a rota da página dentro (Instalados, Favoritos, uma loja), para valerem fora dela.
-fn with_route(c: &LibraryCriteria, route: LibraryFilter, ctx: &Ctx) -> LibraryCriteria {
-    match route {
-        LibraryFilter::All => c.clone(),
-        LibraryFilter::Installed => LibraryCriteria {
-            install: tako_core::library::InstallFilter::Installed,
-            ..c.clone()
-        },
-        LibraryFilter::Favorites => LibraryCriteria {
-            favorites_only: true,
-            ..c.clone()
-        },
-        LibraryFilter::Store(s) => {
-            let name = game_text::store_name(ctx.lang(), s);
-            if c.has_source(&name) {
-                c.clone()
-            } else {
-                c.toggle_source(&name)
-            }
-        }
-    }
-}
-
 /// Painel de filtros da biblioteca (mostrar, ordenar, coleção, status, fonte, gênero).
 pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> MenuLayer {
     MenuLayer::panel(ctx.t("filters.title"), move |ctx| {
@@ -631,6 +608,20 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
             .on(move |_| {
                 let mut c = cr.borrow_mut();
                 c.broken_only = !c.broken_only;
+                Flow::Stay
+            }),
+        );
+        let cr = criteria.clone();
+        v.push(
+            MenuItem::new(PanelRow::choice(
+                "play-time",
+                ctx.t("smart.play_time"),
+                ctx.t(c.play_time.key()),
+            ))
+            .on(move |ctx| {
+                let mut c = cr.borrow_mut();
+                c.play_time = c.play_time.next();
+                ctx.dirty = true;
                 Flow::Stay
             }),
         );
@@ -771,13 +762,15 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
             if !c.has_filters() {
                 v.push(MenuItem::new(PanelRow::header(ctx.t("filters.filters"))));
             }
-            let saved = with_route(&c, route, ctx);
+            let saved = c.clone();
             v.push(
                 MenuItem::new(
                     PanelRow::action("save-smart", ctx.t("smart.save"))
                         .desc(ctx.t("smart.save_desc")),
                 )
-                .on(move |ctx| Flow::Push(Box::new(super::smart::save_as(ctx, saved.clone())))),
+                .on(move |ctx| {
+                    Flow::Push(Box::new(super::smart::save_as(ctx, saved.clone(), route)))
+                }),
             );
         }
         // Tag em lote (LIB-002): os jogos que a página mostra com estes filtros.

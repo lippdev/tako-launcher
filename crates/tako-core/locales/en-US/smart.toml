@@ -1,0 +1,18 @@
+[smart]
+title = "Smart collections"
+save = "Save as smart collection"
+save_desc = "Saves this search, filters and sort order; games update automatically."
+saved = "Smart collection saved"
+name_rule = "Use a unique name of up to 40 characters."
+empty = "No smart collections"
+text = "Save a combination of library filters. Select a collection below to delete it."
+delete_title = "Delete {name}?"
+delete_text = "Only the collection will be deleted. Games stay in your library."
+play_time = "Time played"
+
+[smart.time]
+any = "Any time"
+unplayed = "No time played"
+under_hour = "Less than 1 hour"
+one_to_ten = "1 to less than 10 hours"
+over_ten = "10 hours or more"

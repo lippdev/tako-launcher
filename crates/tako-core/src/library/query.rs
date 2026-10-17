@@ -7,7 +7,9 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::HashMap;
 
 /// Filtro da biblioteca (barra lateral).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum LibraryFilter {
     #[default]
     All,
@@ -28,7 +30,17 @@ impl LibraryFilter {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum LibrarySort {
     #[default]

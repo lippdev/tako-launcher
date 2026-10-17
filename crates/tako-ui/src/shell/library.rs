@@ -60,10 +60,12 @@ impl LibraryPage {
     /// Página de uma rota da barra lateral; a de uma coleção automática já vem com os critérios dela.
     pub fn open(route: &str, ctx: &Ctx) -> LibraryPage {
         match super::smart::find(ctx, route) {
-            Some(c) => LibraryPage {
-                name: Some(c.name),
-                ..Self::with_criteria(route, c.criteria)
-            },
+            Some(c) => {
+                let mut page = Self::with_criteria(route, c.criteria_in(ctx.lang()));
+                page.name = Some(c.name);
+                page.filter = c.filter;
+                page
+            }
             None => Self::for_route(route),
         }
     }

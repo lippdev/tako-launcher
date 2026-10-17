@@ -6,6 +6,8 @@
 use super::collections::{MAX_NAME_LENGTH, NameProblem, clean_name};
 use super::criteria::LibraryCriteria;
 use super::query::title_eq;
+use super::{GameStore, LibraryFilter};
+use crate::{i18n::Lang, presentation::game_text};
 use serde::{Deserialize, Serialize};
 
 /// Configuração lida acima disto é lixo (centenas de coleções cabem em poucos KB).
@@ -16,6 +18,25 @@ pub struct SmartCollection {
     pub id: String,
     pub name: String,
     pub criteria: LibraryCriteria,
+    #[serde(default)]
+    pub filter: LibraryFilter,
+}
+
+impl SmartCollection {
+    /// Fontes são persistidas como identificadores; trocar o idioma não muda a coleção.
+    pub fn criteria_in(&self, lang: Lang) -> LibraryCriteria {
+        let mut criteria = self.criteria.clone();
+        criteria.sources = criteria
+            .sources
+            .iter()
+            .map(|s| {
+                GameStore::from_key(s)
+                    .map(|store| game_text::store_name(lang, store))
+                    .unwrap_or_else(|| s.clone())
+            })
+            .collect();
+        criteria
+    }
 }
 
 /// Lê a configuração. Texto quebrado ou grande demais vira lista vazia; uma coleção ilegível (de uma versão mais
@@ -31,7 +52,13 @@ pub fn parse(json: &str) -> Vec<SmartCollection> {
     match serde_json::from_str::<Vec<serde_json::Value>>(json) {
         Ok(items) => items
             .into_iter()
-            .filter_map(|v| serde_json::from_value(v).ok())
+            .filter_map(|v| match serde_json::from_value::<SmartCollection>(v) {
+                Ok(c) if !c.id.is_empty() && name_problem(&c.name, &[], None).is_none() => Some(c),
+                _ => {
+                    tracing::warn!("coleção automática inválida ignorada");
+                    None
+                }
+            })
             .collect(),
         Err(e) => {
             tracing::warn!("coleções automáticas ilegíveis: {e}");
@@ -70,15 +97,33 @@ pub fn create(
     list: &mut Vec<SmartCollection>,
     name: &str,
     criteria: LibraryCriteria,
+    filter: LibraryFilter,
 ) -> Result<String, NameProblem> {
     if let Some(p) = name_problem(name, list, None) {
         return Err(p);
     }
     let id = uuid::Uuid::new_v4().simple().to_string();
+    let mut criteria = criteria;
+    criteria.sources = criteria
+        .sources
+        .iter()
+        .map(|s| {
+            GameStore::ALL
+                .into_iter()
+                .find(|store| {
+                    [Lang::PtBr, Lang::EnUs]
+                        .into_iter()
+                        .any(|lang| game_text::store_name(lang, *store).eq_ignore_ascii_case(s))
+                })
+                .map(|store| store.key().to_owned())
+                .unwrap_or_else(|| s.clone())
+        })
+        .collect();
     list.push(SmartCollection {
         id: id.clone(),
         name: clean_name(name),
         criteria,
+        filter,
     });
     Ok(id)
 }
@@ -87,6 +132,42 @@ pub fn create(
 mod tests {
     use super::*;
     use crate::library::{InstallFilter, LibrarySort, PlayStatus};
+
+    #[test]
+    fn saved_route_preserves_intersection_and_sources_survive_language_changes() {
+        use crate::library::{Game, query};
+        let mut list = Vec::new();
+        let criteria = LibraryCriteria::default()
+            .toggle_source(&game_text::store_name(Lang::PtBr, GameStore::Manual));
+        create(&mut list, "Adicionados", criteria, LibraryFilter::All).unwrap();
+        let saved = parse(&to_json(&list)).remove(0);
+        assert!(
+            saved
+                .criteria_in(Lang::EnUs)
+                .has_source(&game_text::store_name(Lang::EnUs, GameStore::Manual))
+        );
+
+        let criteria = LibraryCriteria::default().toggle_source("Epic Games");
+        create(
+            &mut list,
+            "Interseção",
+            criteria,
+            LibraryFilter::Store(GameStore::Steam),
+        )
+        .unwrap();
+        let saved = parse(&to_json(&list)).remove(1);
+        let games = vec![
+            Game {
+                store: Some(GameStore::Steam),
+                ..Default::default()
+            },
+            Game {
+                store: Some(GameStore::Epic),
+                ..Default::default()
+            },
+        ];
+        assert!(query::apply(&games, saved.filter, &saved.criteria_in(Lang::PtBr)).is_empty());
+    }
 
     #[test]
     fn saves_and_reads_back_the_criteria() {
@@ -98,13 +179,32 @@ mod tests {
         .toggle_genre("RPG")
         .toggle_status(PlayStatus::Playing);
         let mut list = Vec::new();
-        let id = create(&mut list, "  RPGs  jogando ", criteria.clone()).unwrap();
+        let id = create(
+            &mut list,
+            "  RPGs  jogando ",
+            criteria.clone(),
+            LibraryFilter::All,
+        )
+        .unwrap();
         assert_eq!(list[0].name, "RPGs jogando");
         assert_eq!(
-            create(&mut list, "rpgs JOGANDO", LibraryCriteria::default()),
+            create(
+                &mut list,
+                "rpgs JOGANDO",
+                LibraryCriteria::default(),
+                LibraryFilter::All
+            ),
             Err(NameProblem::Duplicate)
         );
-        assert_eq!(create(&mut list, " ", LibraryCriteria::default()), Err(NameProblem::Empty));
+        assert_eq!(
+            create(
+                &mut list,
+                " ",
+                LibraryCriteria::default(),
+                LibraryFilter::All
+            ),
+            Err(NameProblem::Empty)
+        );
 
         let back = parse(&to_json(&list));
         assert_eq!(back.len(), 1);
