@@ -5,7 +5,7 @@ use super::layer::{Flow, MenuItem, MenuLayer};
 use super::library::Criteria;
 use super::{Ctx, Effect};
 use crate::model::PanelRow;
-use tako_core::library::{GameStore, LibraryFilter, PlayStatus, collections, query};
+use tako_core::library::{Game, GameStore, LibraryFilter, PlayStatus, collections, query};
 use tako_core::presentation::{game_text, library_text};
 
 pub fn toggle_favorite(ctx: &mut Ctx, id: &str) {
@@ -81,6 +81,41 @@ pub fn confirm_exit(ctx: &Ctx) -> MenuLayer {
         ]
     })
     .text(ctx.t("exit.text"))
+}
+
+/// O app da loja não está instalado (SRC-003): baixar pela página oficial ou tentar mesmo assim (a leitura
+/// pode ter errado, por exemplo com o app instalado depois dela).
+pub fn client_missing(ctx: &Ctx, game: &Game, notice: String) -> MenuLayer {
+    let id = game.id.clone();
+    let download = tako_sources::report::client_download(game.store());
+    MenuLayer::dialog(ctx.t("game.client_missing"), move |ctx| {
+        let id = id.clone();
+        let mut v = Vec::new();
+        if let Some(url) = download {
+            v.push(
+                MenuItem::new(PanelRow::button("download", ctx.t("game.client_download"))).on(
+                    move |ctx| {
+                        ctx.effect(Effect::OpenUrl(url.into()));
+                        Flow::Close
+                    },
+                ),
+            );
+        }
+        v.push(
+            MenuItem::new(PanelRow::button("anyway", ctx.t("game.client_try_anyway"))).on(
+                move |ctx| {
+                    ctx.effect(Effect::Launch(id.clone()));
+                    Flow::Close
+                },
+            ),
+        );
+        v.push(
+            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
+        );
+        v
+    })
+    .overline(game.title.to_uppercase())
+    .text(notice)
 }
 
 /// Outro jogo está aberto: termine antes de abrir este (o C# pedia o mesmo).
@@ -573,6 +608,52 @@ mod tests {
             .find(|i| i.row.key == key)
             .unwrap_or_else(|| panic!("sem a linha {key}"));
         (item.accept.unwrap())(ctx)
+    }
+
+    #[test]
+    fn playing_without_the_store_app_offers_the_official_download() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let game = Game {
+            id: "epic:corrida".into(),
+            title: "Corrida".into(),
+            store: Some(GameStore::Epic),
+            launch_target: Some("com.epicgames.launcher://apps/x?action=launch".into()),
+            is_installed: true,
+            ..Default::default()
+        };
+        *ctx.found.lock().unwrap() = vec![game.clone()];
+        ctx.library.refresh();
+        let report = |installed: bool| tako_sources::report::LibrarySourceReport {
+            store: GameStore::Epic,
+            enabled: true,
+            game_count: 1,
+            client_installed: installed,
+            notice: (!installed).then(|| "Epic Games Launcher não encontrado".into()),
+        };
+
+        ctx.sources = vec![report(false)];
+        let super::super::Nav::Layer(dialog) =
+            super::super::details::primary_action(&mut ctx, &game.id)
+        else {
+            panic!("aviso de app ausente");
+        };
+        assert!(ctx.effects.is_empty());
+        let o = dialog.render(&ctx);
+        assert_eq!(o.title, "Falta o app da loja");
+        let keys: Vec<_> = o.rows.iter().map(|r| r.key.as_str()).collect();
+        assert_eq!(keys, ["download", "anyway", "cancel"]);
+        let warning = client_missing(&ctx, &game, String::new());
+        accept(&mut ctx, &warning, "download");
+        assert!(
+            matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u.starts_with("https://store.epicgames.com"))
+        );
+
+        // Com o app instalado, Jogar abre direto.
+        ctx.effects.clear();
+        ctx.sources = vec![report(true)];
+        super::super::details::primary_action(&mut ctx, &game.id);
+        assert!(matches!(&ctx.effects[..], [Effect::Launch(id)] if id == &game.id));
     }
 
     #[test]
