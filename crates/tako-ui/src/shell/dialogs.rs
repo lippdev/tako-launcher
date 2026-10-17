@@ -226,6 +226,15 @@ pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
                 }),
             );
         }
+        if let Some(uri) = super::details::repair_uri(g) {
+            v.push(
+                MenuItem::new(PanelRow::button("repair", ctx.t("options.repair")).icon("check"))
+                    .on(move |ctx| {
+                        ctx.effect(Effect::OpenUrl(uri.clone()));
+                        Flow::Close
+                    }),
+            );
+        }
         let i = id.clone();
         v.push(
             MenuItem::new(PanelRow::button("art", ctx.t("options.change_art")).icon("image"))
@@ -654,6 +663,38 @@ mod tests {
         ctx.sources = vec![report(true)];
         super::super::details::primary_action(&mut ctx, &game.id);
         assert!(matches!(&ctx.effects[..], [Effect::Launch(id)] if id == &game.id));
+    }
+
+    #[test]
+    fn steam_games_can_ask_the_store_to_repair_their_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let steam = Game {
+            id: "steam:570".into(),
+            title: "Dota".into(),
+            store: Some(GameStore::Steam),
+            steam_app_id: Some(570),
+            launch_target: Some("steam://rungameid/570".into()),
+            is_installed: true,
+            ..Default::default()
+        };
+        let epic = Game {
+            id: "epic:x".into(),
+            store: Some(GameStore::Epic),
+            is_installed: true,
+            ..Default::default()
+        };
+        *ctx.found.lock().unwrap() = vec![steam.clone(), epic.clone()];
+        ctx.library.refresh();
+
+        let menu = game_options(&ctx, &steam.id);
+        assert!(matches!(accept(&mut ctx, &menu, "repair"), Flow::Close));
+        assert!(matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u == "steam://validate/570"));
+        let keys: Vec<_> = (game_options(&ctx, &epic.id).build)(&ctx)
+            .into_iter()
+            .map(|i| i.row.key)
+            .collect();
+        assert!(!keys.iter().any(|k| k == "repair"));
     }
 
     #[test]
