@@ -246,6 +246,8 @@ pub struct Game {
     pub tracking: Option<GameTrackingStrategy>,
     /// Id do produto na loja quando difere do `id` (Epic: CatalogItemId; Xbox: StoreId).
     pub store_product_id: Option<String>,
+    /// Endereço que abre a instalação no cliente da loja, nos jogos da conta que não estão instalados (SRC-005).
+    pub install_uri: Option<String>,
     /// Sistema da ROM ("snes", "ps2"); `None` = PC.
     pub platform: Option<String>,
     pub rom_path: Option<String>,

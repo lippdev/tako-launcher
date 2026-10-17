@@ -2,11 +2,14 @@
 //! e do `goggame-<id>.info` na pasta. Abre pelo Galaxy quando instalado; senão, pelo executável
 //! (jogos do GOG não têm DRM).
 
+pub mod owned;
+
 use crate::fs::StoreFs;
 use crate::registry::RegistryReader;
 use crate::{LibraryScan, LibrarySource};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tako_core::i18n::t;
 use tako_core::library::{Game, GameStore};
@@ -214,6 +217,8 @@ pub fn to_game(entry: &GogRegistryEntry, l: &GogLaunch, added_at: Option<DateTim
 
 pub struct GogLibrarySource {
     registry: Arc<dyn RegistryReader>,
+    /// `galaxy-2.0.db`, de onde vêm os jogos da conta que não estão instalados.
+    galaxy_db: Option<PathBuf>,
     pub fs: StoreFs,
 }
 
@@ -221,8 +226,14 @@ impl GogLibrarySource {
     pub fn new(registry: Arc<dyn RegistryReader>) -> Self {
         GogLibrarySource {
             registry,
+            galaxy_db: None,
             fs: StoreFs::real(),
         }
+    }
+
+    pub fn with_galaxy_db(mut self, db: Option<PathBuf>) -> Self {
+        self.galaxy_db = db;
+        self
     }
 
     /// `GalaxyClient.exe` quando o GOG Galaxy está instalado.
@@ -283,9 +294,16 @@ impl LibrarySource for GogLibrarySource {
                 games.push(to_game(&entry, &l, crate::install_dates::of(&entry.path)));
             }
         }
-        crate::text::sort_by_title(&mut games);
         // Sem Galaxy os jogos abrem direto; o aviso só explica por que nuvem e conquistas não sincronizam.
         let notice = (galaxy.is_none() && !games.is_empty()).then(|| t("sources.gog.no_galaxy"));
+        // Os da conta que faltam instalar (SRC-005): só com o Galaxy, que é quem instala.
+        if galaxy.is_some()
+            && let Some(db) = &self.galaxy_db
+        {
+            let missing = owned::not_installed(&owned::load(db), &games);
+            games.extend(missing);
+        }
+        crate::text::sort_by_title(&mut games);
         LibraryScan {
             games,
             client_installed: galaxy.is_some(),
@@ -506,5 +524,27 @@ mod tests {
             scan.games[0].launch_target.as_deref(),
             Some(format!(r"{GALAXY}\GalaxyClient.exe").as_str())
         );
+    }
+
+    #[test]
+    fn source_adds_owned_games_from_galaxy_only_when_galaxy_is_installed() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("galaxy-2.0.db");
+        owned::tests::galaxy_db(&db);
+        let reg = registry()
+            .with(&format!(r"{GALAXY_KEY}\paths"), "client", GALAXY)
+            .with(GALAXY_KEY, "clientExecutable", "GalaxyClient.exe");
+        let scan = source(reg, true).with_galaxy_db(Some(db.clone())).scan();
+        let games: Vec<_> = scan
+            .games
+            .iter()
+            .map(|g| (g.id.as_str(), g.is_installed))
+            .collect();
+        // A Cidade Submersa está instalada: aparece uma vez só, instalada.
+        assert_eq!(games, [("gog:1400000001", true), ("gog:1207658924", false)]);
+        assert_eq!(scan.notice, None);
+
+        let without_galaxy = source(registry(), false).with_galaxy_db(Some(db)).scan();
+        assert!(without_galaxy.games.iter().all(|g| g.is_installed));
     }
 }

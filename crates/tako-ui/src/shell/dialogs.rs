@@ -955,6 +955,36 @@ mod tests {
     }
 
     #[test]
+    fn installing_from_other_stores_opens_the_address_the_source_gave() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let mut game = Game {
+            id: "gog:1207658924".into(),
+            title: "Tabuleiro".into(),
+            store: Some(GameStore::Gog),
+            is_installed: false,
+            install_uri: Some("goggalaxy://openGameView/1207658924".into()),
+            ..Default::default()
+        };
+        *ctx.found.lock().unwrap() = vec![game.clone()];
+        ctx.library.refresh();
+
+        super::super::details::primary_action(&mut ctx, &game.id);
+        assert!(
+            matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u == "goggalaxy://openGameView/1207658924")
+        );
+        assert!(ctx.check_installs());
+
+        game.is_installed = true;
+        game.install_uri = None;
+        game.launch_target = Some(r"C:\GOG Galaxy\GalaxyClient.exe".into());
+        *ctx.found.lock().unwrap() = vec![game];
+        ctx.library.refresh();
+        assert!(!ctx.check_installs());
+        assert_eq!(ctx.toast.as_ref().unwrap().0, "Tabuleiro foi instalado");
+    }
+
+    #[test]
     fn broken_games_are_found_filtered_and_offer_edit_or_remove() {
         let dir = tempfile::tempdir().unwrap();
         let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);

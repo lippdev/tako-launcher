@@ -21,7 +21,12 @@ const LEGENDARY_LIBRARY: &str = r#"{
   "library": [
     { "app_name": "Fennec", "title": "Jogo Fictício Epic", "runner": "legendary",
       "art_square": "https://cdn.example/fennec_tall.jpg", "art_cover": "https://cdn.example/fennec_wide.jpg",
-      "is_installed": true, "install": {} }
+      "is_installed": true, "install": {} },
+    { "app_name": "Quail", "title": "Codorna Fictícia", "runner": "legendary", "namespace": "quailns",
+      "is_installed": false, "install": { "is_dlc": false, "platform": "Windows" } },
+    { "app_name": "QuailDlc", "title": "Codorna - Expansão", "runner": "legendary",
+      "is_installed": false, "install": { "is_dlc": true } },
+    { "app_name": "Gone", "title": "Apagado", "runner": "legendary", "is_installed": true, "install": null }
   ],
   "__timestamp.library": "2026-01-01T00:00:00.000Z"
 }"#;
@@ -39,6 +44,10 @@ const GOG_LIBRARY: &str = r#"{
     { "app_name": "1207658924", "title": "Tabuleiro Fictício", "runner": "gog",
       "art_square": "https://images.gog.example/tab.jpg", "art_cover": "https://images.gog.example/tab_wide.jpg",
       "is_installed": false, "install": {} },
+    { "app_name": "gog-redist", "title": "Galaxy Common Redistributables", "runner": "gog",
+      "is_installed": true, "install": { "is_dlc": true } },
+    { "app_name": "1207658930", "title": "Xadrez Fictício", "runner": "gog",
+      "is_installed": false, "install": { "is_dlc": false } },
     "item quebrado"
   ]
 }"#;
@@ -47,7 +56,9 @@ const NILE_INSTALLED: &str = r#"[{ "id": "amzn1.adg.product.0000-1111", "version
 
 const NILE_LIBRARY: &str = r#"{ "library": [
   { "app_name": "amzn1.adg.product.0000-1111", "title": "Corrida Fictícia", "runner": "nile",
-    "art_square": "https://m.media.example/icon.png", "is_installed": true, "install": {} }
+    "art_square": "https://m.media.example/icon.png", "is_installed": true, "install": {} },
+  { "app_name": "amzn1.adg.product.2222-3333", "title": "Voo Fictício", "runner": "nile",
+    "is_installed": false, "install": {} }
 ] }"#;
 
 const SIDELOAD: &str = r#"{ "games": [
@@ -110,7 +121,11 @@ fn by_id<'a>(games: &'a [Game], id: &str) -> &'a Game {
 fn scans_every_runner_and_skips_dlc_missing_and_bad_names() {
     let (_tmp, root) = fake_heroic();
     let games = scan_root(&root);
-    let mut ids: Vec<&str> = games.iter().map(|g| g.id.as_str()).collect();
+    let mut ids: Vec<&str> = games
+        .iter()
+        .filter(|g| g.is_installed)
+        .map(|g| g.id.as_str())
+        .collect();
     ids.sort();
     assert_eq!(
         ids,
@@ -201,6 +216,43 @@ fn source_merges_roots_without_duplicates() {
     let (_tmp, root) = fake_heroic();
     let scan = HeroicSource::new(vec![root.clone(), root]).scan();
     assert!(scan.client_installed);
-    assert_eq!(scan.games.len(), 4);
-    assert_eq!(scan.games[0].title, "Corrida Fictícia");
+    assert_eq!(scan.games.len(), 8); // 4 instalados + 4 da conta
+    assert_eq!(scan.games[0].title, "Apagado");
+}
+
+#[test]
+fn owned_games_that_are_not_installed_come_from_the_library_cache() {
+    let (_tmp, root) = fake_heroic();
+    let games = scan_root(&root);
+    let mut owned: Vec<(&str, &str)> = games
+        .iter()
+        .filter(|g| !g.is_installed)
+        .map(|g| (g.id.as_str(), g.install_uri.as_deref().unwrap()))
+        .collect();
+    owned.sort();
+    // Sem DLC nem o gog-redist; o "Gone" foi apagado por fora do Heroic e volta a ser instalável.
+    assert_eq!(
+        owned,
+        [
+            ("heroic:gog:1207658930", "heroic://launch/gog/1207658930"),
+            ("heroic:legendary:Gone", "heroic://launch/legendary/Gone"),
+            ("heroic:legendary:Quail", "heroic://launch/legendary/Quail"),
+            (
+                "heroic:nile:amzn1.adg.product.2222-3333",
+                "heroic://launch/nile/amzn1.adg.product.2222-3333"
+            ),
+        ]
+    );
+    let quail = by_id(&games, "heroic:legendary:Quail");
+    assert_eq!(quail.title, "Codorna Fictícia");
+    assert_eq!(quail.launch_target, None);
+    assert!(!quail.can_play());
+    // O instalado não aparece duas vezes.
+    assert_eq!(
+        games
+            .iter()
+            .filter(|g| g.id == "heroic:legendary:Fennec")
+            .count(),
+        1
+    );
 }

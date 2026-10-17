@@ -87,8 +87,12 @@ pub(crate) fn repair_uri(g: &Game) -> Option<String> {
     }
 }
 
-/// Onde instalar um jogo que não está instalado (só a Steam tem um caminho oficial direto).
+/// Onde instalar um jogo que não está instalado: o endereço que a fonte deu (Epic, GOG, Amazon, Heroic) ou o
+/// da Steam.
 fn install_uri(g: &Game) -> Option<String> {
+    if let Some(uri) = &g.install_uri {
+        return Some(uri.clone());
+    }
     match (g.store(), g.steam_app_id) {
         (GameStore::Steam, Some(id)) => Some(format!("steam://install/{id}")),
         _ => None,
