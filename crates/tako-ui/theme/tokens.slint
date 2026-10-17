@@ -63,4 +63,105 @@ export global Ui {
 
     // Textos que o tema mostra por conta própria (o resto vem pronto do Tako).
     in property <string> text-search: "Buscar jogos";
+
+    // ── Modo desktop (Tako Design System — Desktop). Fora da API de tema: só `desktop.slint` usa.
+    // Valores em px reais da janela (1600×900); "Reduzir transparência" troca o vidro pelo tema sólido.
+    in property <bool> reduce-transparency: false;
+
+    out property <color> desk-canvas: #0b0d12;
+    out property <color> settings-bg: #1c1c1e;
+    out property <color> settings-surface: #2c2c2e;
+    out property <color> settings-separator: #ffffff17;
+    out property <color> settings-control: #ffffff1f;
+    out property <color> settings-control-hover: #ffffff2e;
+    out property <color> art-scrim-left: #0b0d12b3;
+    out property <color> art-scrim-bottom: #0b0d12a6;
+    out property <color> art-scrim-strong: #0b0d12f0;
+    out property <color> glass-panel: reduce-transparency ? #14161cfa : #12141a73;
+    out property <color> glass-panel-dense: reduce-transparency ? #14161cfa : #12141a9e;
+    out property <color> glass-highlight: reduce-transparency ? #ffffff00 : #ffffff14;
+    out property <color> glass-specular: reduce-transparency ? #ffffff26 : #ffffff4d;
+    out property <color> glass-edge: #ffffff1a;
+    out property <color> glass-control: reduce-transparency ? #262932 : #ffffff14;
+    out property <color> glass-hover: reduce-transparency ? #30333d : #ffffff12;
+    out property <color> glass-selected: reduce-transparency ? #3a3e49 : #ffffff1a;
+    out property <color> glass-pressed: reduce-transparency ? #444855 : #ffffff3d;
+    out property <color> glass-item-highlight: #ffffff26;
+    out property <color> glass-item-edge: #ffffff38;
+    out property <color> glass-edge-strong: #ffffff40;
+    out property <color> glass-solid: #14161cfa;
+    out property <color> primary-top: #ffffff;
+    out property <color> primary-bottom: #d9dbe1;
+    out property <color> on-primary: #11141a;
+    // Vibrância: sobre vidro o texto secundário fica mais claro que no fundo opaco da tela cheia.
+    out property <color> desk-on-muted: #ffffffcc;
+    out property <color> desk-on-subtle: #ffffffa6;
+    out property <color> keycap-bg: #ffffff14;
+    out property <color> divider: #ffffff1f;
+    out property <color> brand-red: #e3161e;
+    out property <color> splash-bg: #000000;
+    out property <color> splash-track: #1c1112;
+    out property <color> splash-muted: #a3999a;
+    out property <color> medal-gold: #f0cf6a;
+    out property <color> medal-silver: #c9d0da;
+    out property <color> medal-bronze: #d39a6a;
+    out property <color> focus-ring: #ffffff59;
+    out property <color> focus-fill: #ffffff24;
+    out property <color> focus-glow: #ffffff1f;
+    out property <color> shadow-float-color: #00000047;
+    out property <length> shadow-float-y: 12px;
+    out property <length> shadow-float-blur: 36px;
+    out property <color> shadow-layer-color: #00000080;
+    out property <length> shadow-layer-y: 24px;
+    out property <length> shadow-layer-blur: 48px;
+
+    out property <string> font-heading: "Poppins";
+    out property <string> font-desk: "Plus Jakarta Sans";
+    out property <string> font-wordmark: "Source Sans 3";
+    out property <length> desk-display: 56px * text-scale;
+    out property <length> desk-headline: 28px * text-scale;
+    out property <length> desk-title: 20px * text-scale;
+    out property <length> desk-body: 15px * text-scale;
+    out property <length> desk-label-lg: 17px * text-scale;
+    out property <length> desk-label: 15px * text-scale;
+    out property <length> desk-label-sm: 13px * text-scale;
+    out property <length> desk-overline: 12px * text-scale;
+    out property <length> desk-keycap: 12px * text-scale;
+    out property <length> desk-wordmark: 22px;
+
+    out property <length> space-4: 4px;
+    out property <length> space-8: 8px;
+    out property <length> space-12: 12px;
+    out property <length> space-16: 16px;
+    out property <length> space-20: 20px;
+    out property <length> space-24: 24px;
+    out property <length> space-28: 28px;
+    out property <length> space-36: 36px;
+    out property <length> radius-thumb: 8px;
+    out property <length> radius-control: 14px;
+    out property <length> radius-row: 14px;
+    out property <length> radius-card: 20px;
+    out property <length> topbar-height: 64px;
+    out property <length> list-width: 344px;
+    out property <length> list-width-narrow: 300px;
+    out property <length> list-row-height: 52px;
+    out property <length> control-height: 44px;
+    out property <length> primary-height: 56px;
+    out property <length> round-button: 52px;
+    out property <length> card-height: 248px;
+    out property <length> focus-ring-width: 4px;
+    out property <length> settings-row-height: 56px;
+    out property <length> thumb-size: 40px;
+    out property <length> glass-light-width: 560px;
+    out property <length> glass-light-height: 380px;
+    out property <length> glass-highlight-height: 150px;
+
+    // Tempo: o hover fica com "Reduzir animações" (é só cor); o resto zera.
+    out property <duration> tempo-hover: 180ms;
+    out property <duration> tempo-pulso: reduce-motion ? 0ms : 1600ms;
+    out property <duration> tempo-carrossel: reduce-motion ? 0ms : 8000ms;
+    // Escala: com "Reduzir animações" tudo fica em 1.
+    out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;
+    out property <float> escala-entrada: reduce-motion ? 1 : 0.98;
+    out property <float> escala-menu: reduce-motion ? 1 : 0.96;
 }

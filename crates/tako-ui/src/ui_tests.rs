@@ -358,3 +358,70 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
     .join()
     .unwrap();
 }
+
+/// Captura da janela desktop para conferir com as prévias do design: `TAKO_SNAP_OUT=<pasta>` (obrigatório),
+/// `TAKO_SNAP_ART=<imagem>` (arte do jogo em foco) e `TAKO_SNAP_PAGE=settings` (opcional).
+/// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
+#[test]
+#[ignore = "ferramenta manual de captura"]
+fn desktop_snapshot() {
+    let Ok(out_dir) = std::env::var("TAKO_SNAP_OUT") else {
+        return;
+    };
+    std::thread::spawn(move || {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        let art = std::env::var("TAKO_SNAP_ART").ok().map(|p| {
+            let img = image::open(p).unwrap().to_rgba8();
+            let buf = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(
+                img.as_raw(),
+                img.width(),
+                img.height(),
+            );
+            slint::Image::from_rgba8(buf)
+        });
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("settings") {
+            shell.open_route("settings");
+        }
+        ui.show().unwrap();
+        for (w, h) in [(1600u32, 900u32), (960, 600)] {
+            window.set_size(slint::PhysicalSize::new(w, h));
+            let out = shell.render(Instant::now());
+            for (name, value) in &out.props {
+                let mut value = value.clone();
+                if let (Some(art), "desk-game", Value::Struct(s)) = (&art, *name, &mut value) {
+                    s.set_field("art".into(), Value::Image(art.clone()));
+                }
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w as usize);
+            });
+            let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+            image::RgbImage::from_raw(w, h, raw)
+                .unwrap()
+                .save(format!("{out_dir}/desktop-{w}x{h}.png"))
+                .unwrap();
+        }
+        ui.hide().unwrap();
+    })
+    .join()
+    .unwrap();
+}

@@ -2,6 +2,8 @@
 // API de tema (os temas valem só para a tela cheia); usa os tokens do tema padrão numa escala de mesa. Como na tela
 // cheia, o Tako calcula o estado e a seleção; aqui só se desenha e se avisa cliques, teclas e textos.
 
+// Títulos em Poppins (`Ui.font-heading`) e o resto em Plus Jakarta Sans (`Ui.font-desk`), as duas OFL. A tela cheia
+// mantém Inter e Source Sans 3; a Central reaproveitada aqui continua com as fontes dela.
 import "fonts/Inter-Regular.ttf";
 import "fonts/Inter-Medium.ttf";
 import "fonts/Inter-SemiBold.ttf";
@@ -11,6 +13,12 @@ import "fonts/SourceSans3-Light.ttf";
 import "fonts/SourceSans3-Regular.ttf";
 import "fonts/SourceSans3-Semibold.ttf";
 import "fonts/SourceSans3-Bold.ttf";
+import "fonts/Poppins-Regular.ttf";
+import "fonts/Poppins-Medium.ttf";
+import "fonts/Poppins-SemiBold.ttf";
+import "fonts/Poppins-Bold.ttf";
+import "fonts/Poppins-ExtraBold.ttf";
+import "fonts/PlusJakartaSans-Variable.ttf";
 
 import { Ui } from "tokens.slint";
 import { ControlCenter } from "main.slint";
@@ -82,7 +90,7 @@ component TopBar inherits Rectangle {
     in property <string> big-picture-label;
     callback clicked(string, int);
     height: 76 * Ui.u;
-    background: Ui.canvas;
+    background: Ui.desk-canvas;
     Rectangle { y: parent.height - 1px; height: 1px; background: Ui.surface-1; }
     HorizontalLayout {
         padding-left: 28 * Ui.u;
@@ -373,7 +381,7 @@ component Hero inherits Rectangle {
         source: game.art;
         image-fit: cover;
     }
-    Rectangle { background: @linear-gradient(20deg, #000000CC 0%, #00000066 40%, #00000000 70%); }
+    Rectangle { background: @linear-gradient(20deg, Ui.art-scrim-left 0%, Ui.art-scrim-bottom 40%, transparent 70%); }
     VerticalLayout {
         x: 36 * Ui.u;
         y: parent.height - self.height - 32 * Ui.u;
@@ -390,7 +398,7 @@ component Hero inherits Rectangle {
         if game.logo.width == 0: Text {
             text: game.title;
             color: Ui.on-accent;
-            font-family: Ui.font-title;
+            font-family: Ui.font-heading;
             font-size: Ui.headline-lg;
             font-weight: 700;
             wrap: word-wrap;
@@ -520,7 +528,7 @@ component DeskLibrary inherits Rectangle {
                 if !game.has-game: VerticalLayout {
                     alignment: center;
                     spacing: 12 * Ui.u;
-                    Text { text: empty-title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; horizontal-alignment: center; wrap: word-wrap; }
+                    Text { text: empty-title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-heading; font-weight: 600; horizontal-alignment: center; wrap: word-wrap; }
                     if empty-text != "": Text { text: empty-text; color: Ui.on-accent-muted; font-size: Ui.body-md; horizontal-alignment: center; wrap: word-wrap; }
                     if empty-action != "": HorizontalLayout {
                         alignment: center;
@@ -800,7 +808,7 @@ component DeskSettings inherits Rectangle {
             width: 300 * Ui.u;
             spacing: 6 * Ui.u;
             alignment: start;
-            Text { text: title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; height: 64 * Ui.u; }
+            Text { text: title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-heading; font-weight: 600; height: 64 * Ui.u; }
             for c[i] in categories: Rectangle {
                 height: 52 * Ui.u;
                 border-radius: Ui.radius-md;
@@ -876,8 +884,9 @@ component DeskOverlay inherits Rectangle {
             background: Ui.accent-deep.mix(Ui.canvas, 0.35);
             border-width: 1px;
             border-color: Ui.surface-1;
-            drop-shadow-blur: 40px;
-            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: Ui.shadow-layer-y;
+            drop-shadow-blur: Ui.shadow-layer-blur;
+            drop-shadow-color: Ui.shadow-layer-color;
             VerticalLayout {
                 padding: 32 * Ui.u;
                 spacing: 10 * Ui.u;
@@ -949,8 +958,9 @@ component DeskOverlay inherits Rectangle {
             background: Ui.accent-deep.mix(Ui.canvas, 0.25);
             border-width: 1px;
             border-color: Ui.surface-1;
-            drop-shadow-blur: 24px;
-            drop-shadow-color: #000000AA;
+            drop-shadow-offset-y: Ui.shadow-layer-y;
+            drop-shadow-blur: Ui.shadow-layer-blur;
+            drop-shadow-color: Ui.shadow-layer-color;
             clip: true;
             TouchArea { }
             ml := VerticalLayout {
@@ -1005,8 +1015,9 @@ component DeskOverlay inherits Rectangle {
             background: Ui.accent-deep.mix(Ui.canvas, 0.35);
             border-width: 1px;
             border-color: Ui.surface-1;
-            drop-shadow-blur: 40px;
-            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: Ui.shadow-layer-y;
+            drop-shadow-blur: Ui.shadow-layer-blur;
+            drop-shadow-color: Ui.shadow-layer-color;
             kl := VerticalLayout {
                 padding: 32 * Ui.u;
                 spacing: 14 * Ui.u;
@@ -1131,8 +1142,8 @@ export component Desktop inherits Window {
     preferred-height: 800px;
     min-width: 960px;
     min-height: 600px;
-    background: Ui.canvas;
-    default-font-family: Ui.font-text;
+    background: Ui.desk-canvas;
+    default-font-family: Ui.font-desk;
 
     init => {
         // Escala de mesa dos tokens (o palco da tela cheia tem 1080 unidades de altura).
@@ -1257,8 +1268,9 @@ export component Desktop inherits Window {
         width: tt.preferred-width + 48 * Ui.u;
         border-radius: self.height / 2;
         background: Ui.surface-solid;
-        drop-shadow-blur: 20px;
-        drop-shadow-color: #00000066;
+        drop-shadow-offset-y: Ui.shadow-float-y;
+        drop-shadow-blur: Ui.shadow-float-blur;
+        drop-shadow-color: Ui.shadow-float-color;
         tt := Text { text: toast; color: Ui.on-surface-solid; font-size: Ui.label-md; font-weight: 600; }
     }
 }
