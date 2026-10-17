@@ -637,7 +637,9 @@ impl App {
                 }
                 for c in fired {
                     let mut s = app.shell.borrow_mut();
-                    match cmd_of(c) {
+                    let command = cmd_of(c);
+                    crate::navigation_feedback::play(&s.ctx, command);
+                    match command {
                         Cmd::PrevSection => s.section(false),
                         Cmd::NextSection => s.section(true),
                         c => s.handle(c),
