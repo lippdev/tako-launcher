@@ -309,23 +309,3 @@ jobs:
           installers-regex: 'Tako-Setup-x64\.exe$'
           fork-user: lippdev
           token: ${{ env.WINGET_TOKEN }}
- | sort -t. -k4 -rn | tail -n +8 \
-            | while read -r tag; do gh release delete "$tag" --cleanup-tag --yes; done
-
-  # PR de atualização no microsoft/winget-pkgs para releases estáveis. Desligado até existir o segredo WINGET_TOKEN.
-  winget:
-    needs: [resolve, publish]
-    if: needs.publish.result == 'success' && needs.resolve.outputs.prerelease == 'false'
-    runs-on: ubuntu-latest
-    env:
-      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-    steps:
-      - name: Submit to winget-pkgs
-        if: env.WINGET_TOKEN != ''
-        uses: vedantmgoyal9/winget-releaser@v2
-        with:
-          identifier: lippdev.Tako
-          release-tag: ${{ needs.resolve.outputs.tag }}
-          installers-regex: 'Tako-Setup-x64\.exe$'
-          fork-user: lippdev
-          token: ${{ env.WINGET_TOKEN }}
