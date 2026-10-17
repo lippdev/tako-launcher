@@ -133,6 +133,10 @@ confirm = "Sair"
 
 [session]
 other_running = "{game} ainda está aberto"
+closing = "Fechando {game}…"
+closing_wait = "Esperando o jogo fechar."
+closing_stuck = "O jogo ainda não fechou. Ele pode estar perguntando se você quer salvar: volte ao jogo para responder, ou force o encerramento (o que não foi salvo se perde)."
+force_close = "Forçar encerramento"
 end_and_play = "Encerrar e jogar este"
 opening = "Abrindo {game}"
 welcome_back = "Bem-vindo de volta · {game}"

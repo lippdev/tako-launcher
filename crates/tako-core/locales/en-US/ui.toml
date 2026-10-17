@@ -133,6 +133,10 @@ confirm = "Exit"
 
 [session]
 other_running = "{game} is still open"
+closing = "Closing {game}…"
+closing_wait = "Waiting for the game to close."
+closing_stuck = "The game hasn't closed yet. It may be asking whether to save: go back to the game to answer, or force it to close (anything unsaved is lost)."
+force_close = "Force close"
 end_and_play = "Close it and play this one"
 opening = "Opening {game}"
 welcome_back = "Welcome back · {game}"

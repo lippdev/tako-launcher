@@ -3,6 +3,7 @@
 
 pub mod add_game;
 pub mod art;
+pub mod closing_game;
 pub mod control_center;
 pub mod ctx;
 pub mod details;
@@ -184,6 +185,21 @@ impl Shell {
 
     pub fn close_control_center(&mut self) {
         self.cc = None;
+        self.ctx.dirty = true;
+    }
+
+    /// Encerrar jogo: "Fechando o jogo…" até o acompanhamento confirmar o fim (sem a Central por cima).
+    pub fn begin_closing_game(&mut self) {
+        self.cc = None;
+        self.layers.retain(|l| !l.ends_with_game());
+        let layer = closing_game::ClosingGame::new(&mut self.ctx);
+        self.layers.push(Box::new(layer));
+        self.ctx.dirty = true;
+    }
+
+    /// O jogo terminou: fecha as camadas que dependiam dele.
+    pub fn close_game_layers(&mut self) {
+        self.layers.retain(|l| !l.ends_with_game());
         self.ctx.dirty = true;
     }
 

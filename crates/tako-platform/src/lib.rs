@@ -32,6 +32,18 @@ pub fn global_hotkey(
     }
 }
 
+/// Windows: o executável não tem console (o Tako não abre janela de terminal). Para `--version` e `--bench`
+/// rodados num terminal, a saída vai para o console de quem chamou. Nos outros SOs não faz nada.
+pub fn attach_parent_console() {
+    #[cfg(target_os = "windows")]
+    // SAFETY: só liga o processo ao console do processo pai, se houver; sem console, falha sem efeito.
+    unsafe {
+        let _ = ::windows::Win32::System::Console::AttachConsole(
+            ::windows::Win32::System::Console::ATTACH_PARENT_PROCESS,
+        );
+    }
+}
+
 /// Chamar no início do `main`. No glibc o limiar de `mmap` sobe sozinho depois de cada bloco grande liberado
 /// (até 32 MB); daí os buffers de decodificação das artes (vários MB, um por imagem) passam a vir do heap, que
 /// fragmenta e não devolve a memória ao SO (medido: ~70 MB a mais em repouso na home). Fixar o limiar em 1 MB

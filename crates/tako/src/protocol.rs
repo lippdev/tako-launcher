@@ -22,6 +22,8 @@ pub enum UiMsg {
     Resume,
     /// Central › Encerrar jogo.
     EndGame,
+    /// "Fechando o jogo…" › Forçar encerramento.
+    ForceEndGame,
     /// Central › Ponteiro.
     Pointer {
         hide: bool,

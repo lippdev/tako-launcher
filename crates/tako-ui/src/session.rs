@@ -320,12 +320,25 @@ impl Running {
         }
     }
 
+    /// O jogo não fechou com o pedido: encerra os processos dele à força.
+    pub fn force_close(&mut self, platform: &Platform) -> Result<(), String> {
+        self.tracker.exit_grace = chrono::TimeDelta::seconds(1);
+        self.tracker.close_requested = true;
+        platform
+            .processes
+            .force_close(&self.game_pids())
+            .map_err(|e| e.to_string())
+    }
+
     pub fn game_pids(&self) -> Vec<u32> {
         self.tracker.game_process_ids().to_vec()
     }
 
-    /// Pede para o jogo fechar (Central › Encerrar jogo).
-    pub fn request_close(&self, platform: &Platform) -> Result<(), String> {
+    /// Pede para o jogo fechar (Central › Encerrar jogo). Daí em diante o fim conta assim que os processos somem
+    /// (sem a folga da troca de launcher para jogo).
+    pub fn request_close(&mut self, platform: &Platform) -> Result<(), String> {
+        self.tracker.exit_grace = chrono::TimeDelta::seconds(1);
+        self.tracker.close_requested = true;
         platform
             .processes
             .request_close(&self.game_pids())

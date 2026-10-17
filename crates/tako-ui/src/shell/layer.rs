@@ -46,6 +46,10 @@ pub trait Layer {
         self.handle(Cmd::Accept, ctx)
     }
     fn hover(&mut self, _zone: &str, _index: usize) {}
+    /// A camada só faz sentido com o jogo aberto: sai quando ele termina.
+    fn ends_with_game(&self) -> bool {
+        false
+    }
 }
 
 pub type Action = Rc<dyn Fn(&mut Ctx) -> Flow>;

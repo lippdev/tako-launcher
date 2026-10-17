@@ -25,6 +25,8 @@ pub trait ProcessLauncher: Send + Sync {
     fn snapshot(&self) -> Vec<ProcessEntry>;
     /// Pede para fechar (como o X da janela); não mata à força.
     fn request_close(&self, pids: &[u32]) -> DeviceResult<()>;
+    /// Encerra à força (o jogo não respondeu ao pedido de fechar).
+    fn force_close(&self, pids: &[u32]) -> DeviceResult<()>;
     /// `RunningAppID` da Steam (registro no Windows, `registry.vdf` no Linux e no macOS). 0 = nenhum.
     fn steam_running_app_id(&self) -> u32;
     /// Abre uma pasta no gerenciador de arquivos.

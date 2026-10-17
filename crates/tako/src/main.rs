@@ -3,6 +3,10 @@
 //! `tako` (versão publicada) = supervisor, que abre `tako --ui`; `tako --no-supervisor` = só a interface.
 //! `--simulate` usa a biblioteca de demonstração e funções de plataforma em memória.
 
+// Sem janela de terminal no Windows (supervisor e interface rodam em segundo plano). Builds de desenvolvimento
+// mantêm o console para os logs.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod bench;
 mod hosts;
 mod protocol;
@@ -81,6 +85,9 @@ fn main() {
     tako_platform::tune_allocator();
     let all: Vec<String> = std::env::args().collect();
     let has = |f: &str| args::has(&all, f);
+    if has("--bench") || has("--bench-supervisor") || has("--version") {
+        tako_platform::attach_parent_console();
+    }
     if has("--bench") {
         std::process::exit(bench::run(started, value(&all, "--data-dir")));
     }

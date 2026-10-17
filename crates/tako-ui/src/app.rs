@@ -173,6 +173,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         art,
         controller_mouse: false,
         welcome_back: None,
+        redraw_at: None,
         move_window: None,
         dirty: true,
         pressed_buttons: 0,
@@ -568,6 +569,13 @@ impl App {
                     bridge::set(&app.ui.borrow(), "clock", clock.to_value());
                     last_clock = clock;
                 }
+                {
+                    let mut s = app.shell.borrow_mut();
+                    if s.ctx.redraw_at.is_some_and(|t| Instant::now() >= t) {
+                        s.ctx.redraw_at = None;
+                        s.ctx.dirty = true;
+                    }
+                }
                 let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {
                     app.shell.borrow_mut().ctx.dirty = true;
@@ -621,6 +629,7 @@ pub fn raise_current() {
 /// "Bem-vindo de volta" com o tempo jogado e o foco no jogo (o tempo já foi gravado por quem chama).
 pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration) {
     shell.ctx.running = None;
+    shell.close_game_layers();
     shell.focus_game(id);
     let title = shell
         .ctx
@@ -672,6 +681,9 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
         if effect == Effect::Rescan || effect == Effect::ReloadLibrary {
             rescan(shell);
             continue;
+        }
+        if effect == Effect::EndGame {
+            shell.borrow_mut().begin_closing_game();
         }
         let action = {
             let mut s = shell.borrow_mut();

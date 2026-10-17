@@ -338,6 +338,9 @@ impl ProcessLauncher for FakeProcesses {
         lock(&self.running).retain(|p| !pids.contains(&p.pid));
         Ok(())
     }
+    fn force_close(&self, pids: &[u32]) -> DeviceResult<()> {
+        self.request_close(pids)
+    }
     fn steam_running_app_id(&self) -> u32 {
         *lock(&self.steam_app)
     }

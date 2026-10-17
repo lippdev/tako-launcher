@@ -112,6 +112,10 @@ impl ProcessLauncher for MacProcesses {
         run::terminate(pids)
     }
 
+    fn force_close(&self, pids: &[u32]) -> DeviceResult<()> {
+        run::kill(pids)
+    }
+
     fn steam_running_app_id(&self) -> u32 {
         run::home().map_or(0, |h| {
             run::steam_app_id(&[h.join("Library/Application Support/Steam/registry.vdf")])

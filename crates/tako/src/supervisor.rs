@@ -38,6 +38,8 @@ pub struct Supervisor {
     watch: UiWatch,
     started: Instant,
     running: Option<Running>,
+    /// Encerrar jogo foi pedido: confere o fim a cada volta (0,5 s), a interface mostra "Fechando o jogo…".
+    closing: bool,
     pads: Option<Pads>,
     chord: ButtonChordDetector,
     key: tako_core::input::shortcut::KeyShortcut,
@@ -55,6 +57,7 @@ impl Supervisor {
             watch: UiWatch::new(SupervisorOptions::default()),
             started: Instant::now(),
             running: None,
+            closing: false,
             pads: None,
             chord: ButtonChordDetector::new(chord::parse(chord_value.as_deref())),
             key: tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
@@ -200,7 +203,12 @@ impl Supervisor {
                 let _ = ui.child.kill();
             }
             // Jogo rodando com a interface aberta (Início durante o jogo).
-            if self.running.is_some() && last_poll.elapsed() >= Running::POLL {
+            let every = if self.closing {
+                Duration::from_millis(500)
+            } else {
+                Running::POLL
+            };
+            if self.running.is_some() && last_poll.elapsed() >= every {
                 last_poll = Instant::now();
                 if let Some(played) = self.running.as_mut().and_then(|r| r.poll(&self.platform)) {
                     let id = self.finish_game();
@@ -229,6 +237,14 @@ impl Supervisor {
             }
             UiMsg::Track { req } => match Running::new(req) {
                 Ok(mut r) => {
+                    tracing::info!(
+                        "acompanhando {} ({:?}, pasta: {}, steam: {:?}, pid: {:?})",
+                        r.req.game_id,
+                        r.req.strategy,
+                        r.req.folder.is_some(),
+                        r.req.steam_app_id,
+                        r.req.root_pid
+                    );
                     r.begin(&self.platform);
                     self.running = Some(r);
                 }
@@ -236,10 +252,20 @@ impl Supervisor {
             },
             UiMsg::Resume => {}
             UiMsg::EndGame => {
-                if let Some(r) = &self.running
-                    && let Err(e) = r.request_close(&self.platform)
-                {
-                    tracing::warn!("encerrar o jogo: {e}");
+                tracing::info!("encerrar o jogo pedido pela interface");
+                if let Some(r) = self.running.as_mut() {
+                    self.closing = true;
+                    if let Err(e) = r.request_close(&self.platform) {
+                        tracing::warn!("encerrar o jogo: {e}");
+                    }
+                }
+            }
+            UiMsg::ForceEndGame => {
+                if let Some(r) = self.running.as_mut() {
+                    self.closing = true;
+                    if let Err(e) = r.force_close(&self.platform) {
+                        tracing::warn!("forçar o encerramento do jogo: {e}");
+                    }
                 }
             }
             UiMsg::Pointer { hide, mouse } => {
@@ -256,7 +282,9 @@ impl Supervisor {
         let Some(mut r) = self.running.take() else {
             return String::new();
         };
+        self.closing = false;
         r.finish(&self.platform, &self.paths);
+        tracing::info!("jogo terminou: {}", r.req.game_id);
         r.req.game_id.clone()
     }
 

@@ -172,6 +172,27 @@ impl ProcessLauncher for WindowsProcesses {
         Ok(())
     }
 
+    fn force_close(&self, pids: &[u32]) -> DeviceResult<()> {
+        let mut failed = Vec::new();
+        for &pid in pids.iter().filter(|&&p| p > 4) {
+            // SAFETY: o handle aberto aqui é fechado logo depois; só encerra o processo pedido. Sem handle, o
+            // processo já saiu entre a leitura e o pedido: nada a fazer.
+            unsafe {
+                if let Ok(h) = OpenProcess(PROCESS_TERMINATE, false, pid) {
+                    if let Err(e) = TerminateProcess(h, 1) {
+                        failed.push(format!("{pid}: {e}"));
+                    }
+                    let _ = CloseHandle(h);
+                }
+            }
+        }
+        if failed.is_empty() {
+            Ok(())
+        } else {
+            Err(DeviceError::Failed(failed.join("; ")))
+        }
+    }
+
     fn steam_running_app_id(&self) -> u32 {
         windows_registry::CURRENT_USER
             .open(r"Software\Valve\Steam")

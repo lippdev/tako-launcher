@@ -72,6 +72,7 @@ impl Host for SupervisedHost {
                 return HostAction::Close;
             }
             Effect::EndGame => self.send(&UiMsg::EndGame),
+            Effect::ForceEndGame => self.send(&UiMsg::ForceEndGame),
             Effect::GoHomeKeepingGame => {}
             Effect::PointerChanged => self.send(&UiMsg::Pointer {
                 hide: ctx.platform.cursor.is_hidden(),
@@ -135,8 +136,15 @@ impl Host for LocalHost {
             }
             Effect::ResumeGame => return HostAction::Hide,
             Effect::EndGame => {
-                if let Some(r) = &self.running
+                if let Some(r) = self.running.as_mut()
                     && let Err(e) = r.request_close(&ctx.platform)
+                {
+                    ctx.toast(e);
+                }
+            }
+            Effect::ForceEndGame => {
+                if let Some(r) = self.running.as_mut()
+                    && let Err(e) = r.force_close(&ctx.platform)
                 {
                     ctx.toast(e);
                 }
