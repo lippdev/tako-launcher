@@ -188,6 +188,7 @@ fn main() {
         running,
         control_center: has("--control-center"),
         safe_mode: has(args::SAFE_MODE),
+        started: Some(started),
     };
     let host: Rc<RefCell<dyn Host>> = if supervised {
         Rc::new(RefCell::new(hosts::SupervisedHost::new()))

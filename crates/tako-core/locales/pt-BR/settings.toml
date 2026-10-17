@@ -240,6 +240,22 @@ reload_theme = "Recarregar tema"
 reload_theme_desc = "Lê de novo os arquivos do tema em uso"
 reload_theme_value = "Recarregar"
 
+performance = "Desempenho do Tako"
+performance_desc = "Memória, CPU e tempo de abertura do próprio Tako, atualizados a cada segundo"
+performance_value = "Ver"
+
+[settings.performance]
+title = "Desempenho do Tako"
+ui = "Interface"
+supervisor = "Supervisor"
+supervisor_desc = "Fica aberto durante o jogo para restaurar a tela e o áudio"
+memory = "Memória"
+cpu = "CPU"
+measuring = "Medindo…"
+unknown = "Indisponível"
+opened = "Tempo até a primeira tela"
+opened_desc = "Desta abertura da interface, do início do processo até a tela aparecer"
+
 [settings.about]
 title = "Sobre"
 subtitle = "Versão, licença e código-fonte do Tako."

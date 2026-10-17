@@ -50,6 +50,10 @@ pub trait Layer {
     fn ends_with_game(&self) -> bool {
         false
     }
+    /// Mostra medidas que mudam sem entrada (painel de desempenho): redesenhada a cada segundo.
+    fn live(&self) -> bool {
+        false
+    }
 }
 
 pub type Action = Rc<dyn Fn(&mut Ctx) -> Flow>;

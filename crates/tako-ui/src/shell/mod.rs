@@ -18,6 +18,7 @@ pub mod launch_splash;
 pub mod layer;
 pub mod library;
 mod links;
+pub mod performance;
 pub mod settings;
 pub mod sidebar;
 pub mod smart;
@@ -133,6 +134,11 @@ impl Shell {
 
     pub fn has_layers(&self) -> bool {
         !self.layers.is_empty()
+    }
+
+    /// A camada de cima mostra valores que mudam sozinhos (`Layer::live`): o app redesenha a cada segundo.
+    pub fn live(&self) -> bool {
+        self.layers.last().is_some_and(|l| l.live())
     }
 
     pub fn push_layer(&mut self, layer: Box<dyn Layer>) {

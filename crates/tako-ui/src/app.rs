@@ -36,6 +36,8 @@ pub struct UiOptions {
     /// Abrir direto na Central rápida.
     pub control_center: bool,
     pub safe_mode: bool,
+    /// Início do processo (o `main`), para o tempo até a primeira tela (PERF-001).
+    pub started: Option<Instant>,
 }
 
 /// O que fazer com a janela depois de um pedido.
@@ -335,6 +337,7 @@ impl App {
     pub fn new(ctx: Ctx, opts: &UiOptions, host: Rc<RefCell<dyn Host>>) -> Result<App, String> {
         let builtin =
             theme::install_builtin(&ctx.paths.themes()).map_err(|e| format!("tema padrão: {e}"))?;
+        crate::shell::performance::mark_start(opts.started.unwrap_or_else(Instant::now));
         let mut ctx = ctx;
         ctx.safe_mode = opts.safe_mode;
         let (def, dir) = load_theme(&ctx, &builtin)?;
@@ -568,6 +571,7 @@ impl App {
         let mut last_clock = String::new();
         let mut next_battery = Duration::ZERO;
         let mut next_install_check = Duration::ZERO;
+        let mut next_live = Duration::ZERO;
         let timer = slint::Timer::default();
         timer.start(
             slint::TimerMode::Repeated,
@@ -669,6 +673,10 @@ impl App {
                         s.ctx.redraw_at = None;
                         s.ctx.dirty = true;
                     }
+                    if now >= next_live && s.live() {
+                        next_live = now + Duration::from_secs(1);
+                        s.ctx.dirty = true;
+                    }
                 }
                 let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {
@@ -692,6 +700,12 @@ impl App {
         // Como o WPF (sem borda, maximizado). Builds de desenvolvimento abrem em janela; TAKO_WINDOWED força janela.
         ui.window()
             .set_fullscreen(!cfg!(debug_assertions) && std::env::var_os("TAKO_WINDOWED").is_none());
+        // Quem já observa os quadros (o benchmark) fica com o aviso; aqui é só a primeira tela.
+        let _ = ui.window().set_rendering_notifier(|state, _| {
+            if let slint::RenderingState::AfterRendering = state {
+                crate::shell::performance::first_frame_drawn();
+            }
+        });
         ui.show().map_err(|e| e.to_string())?;
         drop(ui);
         rescan(&self.shell);
