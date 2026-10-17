@@ -38,6 +38,11 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] Argumentos chegam ao `.app` (`open -a ... --args`).
 - [ ] Com um jogo da Steam rodando, o Tako detecta o `RunningAppID`.
 - [ ] Encerrar jogo fecha o jogo sem matar o Tako; "Abrir pasta" abre o Finder.
+- [ ] Variáveis de ambiente do jogo (SESSION-004): num executável, o jogo recebe as variáveis; num `.app` fechado, elas
+  chegam por `open --env` (com o app já aberto, não chegam). Numa URI, o jogo abre sem elas e o log avisa.
+- [ ] Comando antes de jogar (por `sh -c`, ex.: `say antes; sleep 2`): o jogo só abre depois que ele termina; comando
+  que sai com erro ou passa do limite mostra o aviso e o jogo abre do mesmo jeito. Comando depois de jogar roda ao
+  fechar o jogo.
 
 ## Abrir com o sistema
 

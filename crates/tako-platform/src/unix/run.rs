@@ -4,6 +4,7 @@ use crate::Autostart;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::Duration;
 use tako_core::devices::{DeviceError, DeviceResult};
 
 fn io_error(what: &str, e: io::Error) -> DeviceError {
@@ -139,6 +140,50 @@ pub fn set_marker(path: &Path, on: bool) {
     }
 }
 
+/// Comando do usuário antes ou depois do jogo (SESSION-004), por `sh -c`, com a espera e os erros do Windows:
+/// `wait` é o limite para terminar; falha ou fim do prazo é erro, e o comando continua rodando.
+pub fn user_command(command: &str, wait: Option<Duration>) -> DeviceResult<()> {
+    use std::os::unix::process::CommandExt;
+    let failed = |e: io::Error| DeviceError::Failed(format!("comando \"{command}\": {e}"));
+    let mut child = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(failed)?;
+    // Quem fica rodando é esperado numa thread, senão vira zumbi.
+    let reap = |mut child: std::process::Child| {
+        std::thread::spawn(move || child.wait());
+    };
+    let Some(limit) = wait else {
+        reap(child);
+        return Ok(());
+    };
+    let started = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => return Ok(()),
+            Ok(Some(status)) => {
+                return Err(DeviceError::Failed(format!(
+                    "comando \"{command}\" saiu com {status}"
+                )));
+            }
+            Ok(None) if started.elapsed() >= limit => {
+                reap(child);
+                return Err(DeviceError::Failed(format!(
+                    "comando \"{command}\" não terminou em {} s",
+                    limit.as_secs()
+                )));
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(e) => return Err(failed(e)),
+        }
+    }
+}
+
 /// Abrir com o sistema = um arquivo numa pasta conhecida (`.desktop` ou LaunchAgent).
 pub struct FileAutostart {
     pub path: Option<PathBuf>,
@@ -199,5 +244,22 @@ mod tests {
         assert!(!has_tool("tako-no-such-tool"));
         let pid = spawn(Command::new("sh").args(["-c", "sleep 30"])).unwrap();
         terminate(&[pid, 0, 1, u32::MAX]).unwrap();
+    }
+
+    #[test]
+    fn user_commands_report_failure_and_timeouts() {
+        let wait = Some(Duration::from_secs(10));
+        assert!(user_command("exit 0", wait).is_ok());
+        let failed = user_command("exit 3", wait).unwrap_err().to_string();
+        assert!(failed.contains("saiu com"), "{failed}");
+        let slow = user_command("sleep 5", Some(Duration::from_millis(300)));
+        assert!(slow.unwrap_err().to_string().contains("não terminou"));
+        assert!(user_command("exit 3", None).is_ok());
+        // `sh -c`: redirecionamento e variáveis do shell funcionam como no terminal.
+        let out = std::env::temp_dir().join(format!("tako-command-{}.txt", std::process::id()));
+        let cmd = format!("X=ok; echo \"$X\" > '{}'", out.display());
+        user_command(&cmd, wait).unwrap();
+        assert_eq!(std::fs::read_to_string(&out).unwrap().trim(), "ok");
+        let _ = std::fs::remove_file(out);
     }
 }

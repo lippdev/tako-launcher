@@ -4,12 +4,17 @@ use crate::unix::{run, text};
 use chrono::DateTime;
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 use tako_core::devices::{DeviceError, DeviceResult, ProcessEntry, ProcessLauncher};
 
 pub struct MacProcesses;
 
-fn open(args: &[&str], extra: Vec<String>) -> DeviceResult<Option<u32>> {
+fn open(args: &[&str], extra: Vec<String>, env: &[(String, String)]) -> DeviceResult<Option<u32>> {
     let mut c = Command::new("open");
+    // `--env NOME=VALOR` (open(1)): variável para o app aberto, se ele ainda não estiver rodando.
+    for (k, v) in env {
+        c.arg("--env").arg(format!("{k}={v}"));
+    }
     c.args(args);
     if !extra.is_empty() {
         c.arg("--args").args(extra);
@@ -49,6 +54,52 @@ fn pid_info(pid: i32) -> Option<ProcessEntry> {
     })
 }
 
+/// Abre um jogo; `env` vai para o processo do jogo (executável ou `.app`). URIs passam pelo app da loja, que já está
+/// aberto ou abre do jeito dele: ali as variáveis não chegam (como no Windows).
+fn start(
+    target: &str,
+    arguments: Option<&str>,
+    working_dir: Option<&str>,
+    env: &[(String, String)],
+) -> DeviceResult<Option<u32>> {
+    let target = target.trim();
+    if target.is_empty() {
+        return Err(DeviceError::NotFound("alvo vazio".into()));
+    }
+    let args = arguments.map(text::split_args).unwrap_or_default();
+    if text::is_uri(target) {
+        if !env.is_empty() {
+            tracing::warn!("variáveis de ambiente só valem para executáveis: {target}");
+        }
+        return open(&[target], Vec::new(), &[]);
+    }
+    let path = Path::new(target);
+    if !path.exists() {
+        return Err(DeviceError::NotFound(target.into()));
+    }
+    if path.extension().is_some_and(|e| e == "app") {
+        return open(&["-a", target], args, env);
+    }
+    use std::os::unix::fs::PermissionsExt;
+    let executable = path.is_file()
+        && std::fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0);
+    if !executable {
+        return open(&[target], args, env);
+    }
+    let mut cmd = Command::new(path);
+    cmd.args(args);
+    if let Some(dir) = working_dir
+        .filter(|d| !d.trim().is_empty())
+        .map(Path::new)
+        .or_else(|| path.parent())
+        .filter(|d| d.is_dir())
+    {
+        cmd.current_dir(dir);
+    }
+    cmd.envs(env.iter().map(|(k, v)| (k, v)));
+    run::spawn(&mut cmd).map(Some)
+}
+
 impl ProcessLauncher for MacProcesses {
     fn launch(
         &self,
@@ -56,38 +107,21 @@ impl ProcessLauncher for MacProcesses {
         arguments: Option<&str>,
         working_dir: Option<&str>,
     ) -> DeviceResult<Option<u32>> {
-        let target = target.trim();
-        if target.is_empty() {
-            return Err(DeviceError::NotFound("alvo vazio".into()));
-        }
-        let args = arguments.map(text::split_args).unwrap_or_default();
-        if text::is_uri(target) {
-            return open(&[target], Vec::new());
-        }
-        let path = Path::new(target);
-        if !path.exists() {
-            return Err(DeviceError::NotFound(target.into()));
-        }
-        if path.extension().is_some_and(|e| e == "app") {
-            return open(&["-a", target], args);
-        }
-        use std::os::unix::fs::PermissionsExt;
-        let executable = path.is_file()
-            && std::fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0);
-        if !executable {
-            return open(&[target], args);
-        }
-        let mut cmd = Command::new(path);
-        cmd.args(args);
-        if let Some(dir) = working_dir
-            .filter(|d| !d.trim().is_empty())
-            .map(Path::new)
-            .or_else(|| path.parent())
-            .filter(|d| d.is_dir())
-        {
-            cmd.current_dir(dir);
-        }
-        run::spawn(&mut cmd).map(Some)
+        start(target, arguments, working_dir, &[])
+    }
+
+    fn launch_with_env(
+        &self,
+        target: &str,
+        arguments: Option<&str>,
+        working_dir: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        start(target, arguments, working_dir, env)
+    }
+
+    fn run_command(&self, command: &str, wait: Option<Duration>) -> DeviceResult<()> {
+        run::user_command(command, wait)
     }
 
     fn snapshot(&self) -> Vec<ProcessEntry> {
@@ -126,6 +160,35 @@ impl ProcessLauncher for MacProcesses {
         if !Path::new(path).is_dir() {
             return Err(DeviceError::NotFound(path.into()));
         }
-        open(&[path], Vec::new()).map(drop)
+        open(&[path], Vec::new(), &[]).map(drop)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn environment_reaches_the_game_and_commands_run_through_sh() {
+        let p = MacProcesses;
+        let out = std::env::temp_dir().join(format!("tako-env-{}.txt", std::process::id()));
+        let env = [("TAKO_TESTE".to_owned(), "valor com espaço".to_owned())];
+        let script = format!("-c 'echo \"$TAKO_TESTE\" > {}'", out.display());
+        p.launch_with_env("/bin/sh", Some(&script), None, &env)
+            .unwrap()
+            .unwrap();
+        let mut text = String::new();
+        for _ in 0..50 {
+            text = std::fs::read_to_string(&out).unwrap_or_default();
+            if !text.is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let _ = std::fs::remove_file(&out);
+        assert_eq!(text.trim(), "valor com espaço");
+        let failed = p.run_command("exit 3", Some(Duration::from_secs(10)));
+        assert!(failed.unwrap_err().to_string().contains("saiu com"));
+        assert!(p.run_command("true", Some(Duration::from_secs(10))).is_ok());
     }
 }

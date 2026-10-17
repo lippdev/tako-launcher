@@ -51,6 +51,12 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Com um jogo da Steam rodando, o Tako detecta o `RunningAppID` (Steam nativa e Flatpak).
 - [ ] Encerrar jogo fecha o jogo (SIGTERM) sem matar o Tako.
 - [ ] "Abrir pasta" abre o gerenciador de arquivos.
+- [ ] Variáveis de ambiente do jogo (SESSION-004): num executável ou script, o jogo recebe as variáveis (ex.: `MANGOHUD=1`
+  liga o MangoHud). Num `.desktop` ou numa URI, o jogo abre sem elas e o log avisa "variáveis de ambiente só valem
+  para executáveis".
+- [ ] Comando antes de jogar (por `sh -c`, ex.: `notify-send antes; sleep 2`): o jogo só abre depois que ele termina;
+  comando que sai com erro ou passa do limite mostra o aviso e o jogo abre do mesmo jeito. Comando depois de jogar
+  roda ao fechar o jogo.
 
 ## Abrir com o sistema
 
