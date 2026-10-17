@@ -140,3 +140,4 @@ Precisa de dois controles (ex.: um Xbox e um DualSense).
    View + Y abre no controle do Padrão (cada um a sua). A combinação sem View nem Guia é recusada.
 5. "Renomear perfil…" e "Excluir perfil": os controles do perfil excluído voltam ao Padrão.
 6. Feche e abra o Tako: perfis, escolha de cada controle e combinações continuam. O teclado (Enter, Esc) não muda.
+7. Dois controles do mesmo modelo têm o mesmo GUID no SDL: os dois usam o mesmo perfil (esperado).
