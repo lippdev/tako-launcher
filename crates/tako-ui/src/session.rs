@@ -14,7 +14,7 @@ use tako_core::session::audio::AudioOutputChoice;
 use tako_core::session::restore::{Env, PendingEnvironmentStore, SessionEnvironmentGuard};
 use tako_core::session::screen::{GameScreenOutcome, GameScreenSession};
 use tako_core::session::settings::{
-    EffectiveSessionSettings, GameSettingsOverride, GlobalSessionSettings, resolve,
+    EffectiveSessionSettings, GameSettingsOverride, GlobalSessionSettings, MonitorPresets, resolve,
 };
 use tako_core::session::tracking::{GameRunStatus, GameRunTracker, TrackingPlan, plan};
 use tako_platform::Platform;
@@ -57,6 +57,7 @@ pub fn global_settings(ctx: &Ctx) -> GlobalSessionSettings {
         game_screen_id: s.string(keys::GAME_SCREEN_ID),
         game_screen_mode: s.get(keys::GAME_SCREEN_MODE).and_then(DisplayMode::parse),
         game_screen_hdr: s.bool(keys::GAME_SCREEN_HDR, false),
+        monitor_presets: MonitorPresets::parse(&s.string(keys::GAME_SCREEN_PRESETS)),
         game_audio: (!audio_id.trim().is_empty()).then(|| {
             let name = s.string(keys::GAME_AUDIO_NAME);
             AudioOutputChoice::new(&audio_id, if name.is_empty() { &audio_id } else { &name })

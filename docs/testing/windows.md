@@ -114,6 +114,16 @@ Precisa de duas telas (ex.: monitor e TV).
 4. Desconecte o monitor: a linha mostra "Monitor (desconectada)" e abrir o jogo avisa que a tela não está conectada.
 5. Outro jogo, sem tela própria, continua indo para a TV com a resolução do Tako.
 
+Preset por monitor:
+
+6. Configurações › Tela de jogo: com a TV, escolha 4K 120 Hz e ligue o HDR. Troque a tela para o monitor: resolução
+   e HDR voltam ao padrão ("manter a atual", sem HDR). Escolha 1080p 60 Hz. Volte à TV: 4K 120 Hz e HDR voltam; volte
+   ao monitor: 1080p 60 Hz volta. Feche e abra o Tako: continua assim.
+7. Deixe a TV como tela de jogo. No jogo do passo 2, com o monitor como tela própria e "Resolução e taxa" em Padrão: a
+   linha mostra "Padrão: 1920 × 1080 · 60 Hz" (o preset do monitor) e o HDR "Padrão: Desligado". Abra o jogo: o
+   monitor fica em 1080p 60 Hz. Escolhendo "manter a atual" no jogo, a resolução não muda.
+8. VRR (G-Sync/FreeSync) não entra no preset: o Windows não tem API pública para ligá-lo por tela.
+
 ## 15. Tema por endereço (THEME-004)
 
 Precisa de internet e de um repositório no GitHub com uma release que tenha um `.takotheme` (pode ser um de teste).

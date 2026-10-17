@@ -121,6 +121,97 @@ pub struct GlobalSessionSettings {
     pub game_screen_mode: Option<DisplayMode>,
     pub game_screen_hdr: bool,
     pub game_audio: Option<AudioOutputChoice>,
+    /// O que o Tako lembra de cada monitor (PERF-002).
+    pub monitor_presets: MonitorPresets,
+}
+
+impl GlobalSessionSettings {
+    /// Resolução e HDR que valem numa tela quando o jogo não escolhe: na tela de jogo do Tako, os de
+    /// Configurações; em outra, o preset dela (sem preset, mantém a resolução atual).
+    pub fn screen_defaults(&self, display_id: &str) -> (Option<DisplayMode>, bool) {
+        let display_id = display_id.trim();
+        if self.game_screen_id.trim().eq_ignore_ascii_case(display_id) {
+            return (self.game_screen_mode, self.game_screen_hdr);
+        }
+        match self.monitor_presets.get(display_id) {
+            Some(p) => (p.mode, p.hdr),
+            None => (None, self.game_screen_hdr),
+        }
+    }
+}
+
+/// Resolução (com a taxa) e HDR escolhidos para um monitor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MonitorPreset {
+    /// `None` = manter a resolução atual.
+    pub mode: Option<DisplayMode>,
+    pub hdr: bool,
+}
+
+/// Presets por monitor, gravados como JSON numa configuração:
+/// `{"<id da tela>": {"mode": "1920x1080@60", "hdr": true}}`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct MonitorPresets(Vec<(String, MonitorPreset)>);
+
+#[derive(Deserialize)]
+struct StoredPreset {
+    #[serde(default)]
+    mode: String,
+    #[serde(default)]
+    hdr: bool,
+}
+
+impl MonitorPresets {
+    /// Bem mais telas do que alguém conecta: o resto de um valor estranho é ignorado.
+    const MAX: usize = 32;
+
+    /// Valor quebrado volta ao padrão (sem presets); uma tela ilegível é ignorada e uma resolução ilegível
+    /// vira "manter a atual".
+    pub fn parse(text: &str) -> MonitorPresets {
+        let map: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(text).unwrap_or_default();
+        let mut presets = MonitorPresets::default();
+        for (id, value) in map.into_iter().take(Self::MAX) {
+            if let Ok(p) = serde_json::from_value::<StoredPreset>(value) {
+                let mode = DisplayMode::parse(&p.mode);
+                presets.set(&id, MonitorPreset { mode, hdr: p.hdr });
+            }
+        }
+        presets
+    }
+
+    pub fn to_text(&self) -> String {
+        let map: serde_json::Map<String, serde_json::Value> = self
+            .0
+            .iter()
+            .map(|(id, p)| {
+                let mode = p.mode.map(|m| m.key()).unwrap_or_default();
+                (
+                    id.clone(),
+                    serde_json::json!({ "mode": mode, "hdr": p.hdr }),
+                )
+            })
+            .collect();
+        serde_json::Value::Object(map).to_string()
+    }
+
+    /// O id da tela não diferencia maiúsculas (o Windows não diferencia).
+    pub fn get(&self, display_id: &str) -> Option<MonitorPreset> {
+        let id = display_id.trim();
+        self.0
+            .iter()
+            .find(|(i, _)| i.eq_ignore_ascii_case(id))
+            .map(|(_, p)| *p)
+    }
+
+    pub fn set(&mut self, display_id: &str, preset: MonitorPreset) {
+        let id = display_id.trim();
+        if id.is_empty() {
+            return;
+        }
+        self.0.retain(|(i, _)| !i.eq_ignore_ascii_case(id));
+        self.0.push((id.to_owned(), preset));
+    }
 }
 
 /// Por que o jogo pediu a tela de jogo e ela não pode ser usada.
@@ -183,13 +274,8 @@ pub fn resolve(
             // Só é problema quando o próprio jogo pediu; desligada no global e sem tela é o normal.
             problem = (asked == Some(true)).then_some(GameScreenProblem::NoScreenChosen);
         } else {
-            // A resolução do Tako é da tela de jogo dele: em outra tela, sem escolha do jogo, mantém a atual.
-            let default_mode = global
-                .game_screen_id
-                .trim()
-                .eq_ignore_ascii_case(display_id)
-                .then_some(global.game_screen_mode)
-                .flatten();
+            // A resolução do Tako é da tela de jogo dele: em outra tela, sem escolha do jogo, vale o preset dela.
+            let (default_mode, default_hdr) = global.screen_defaults(display_id);
             let mode = match game.screen_mode.as_deref() {
                 None => default_mode,
                 Some(GameSettingsOverride::KEEP_CURRENT_MODE) => None,
@@ -199,7 +285,7 @@ pub fn resolve(
             screen = Some(GameScreenSettings {
                 display_id: display_id.to_owned(),
                 mode,
-                enable_hdr: game.hdr.unwrap_or(global.game_screen_hdr),
+                enable_hdr: game.hdr.unwrap_or(default_hdr),
             });
         }
     }
@@ -299,6 +385,7 @@ mod tests {
             game_screen_mode: Some(TV_4K),
             game_screen_hdr: true,
             game_audio: Some(AudioOutputChoice::new("{tv}", "TV (HDMI)")),
+            monitor_presets: MonitorPresets::default(),
         }
     }
 
@@ -434,6 +521,85 @@ mod tests {
         });
         assert_eq!(resolve(&global(), Some(&off)).game_screen, None);
         assert!(with(|o| o.screen_id = Some(" ".into())).is_default());
+    }
+
+    #[test]
+    fn own_screen_without_a_mode_uses_the_monitor_preset() {
+        const DESK: &str = r"\\.\DISPLAY1";
+        let qhd = DisplayMode::new(2560, 1440, 144);
+        let mut g = global();
+        g.monitor_presets.set(
+            DESK,
+            MonitorPreset {
+                mode: Some(qhd),
+                hdr: false,
+            },
+        );
+        let desk = with(|o| o.screen_id = Some(r"\\.\display1".into()));
+        let s = resolve(&g, Some(&desk)).game_screen.unwrap();
+        assert_eq!((s.mode, s.enable_hdr), (Some(qhd), false));
+        // A escolha do jogo vence o preset; "manter a atual" continua valendo.
+        let chosen = with(|o| {
+            o.screen_id = Some(DESK.into());
+            o.screen_mode = Some("1920x1080@60".into());
+            o.hdr = Some(true);
+        });
+        let s = resolve(&g, Some(&chosen)).game_screen.unwrap();
+        assert_eq!(
+            (s.mode, s.enable_hdr),
+            (Some(DisplayMode::new(1920, 1080, 60)), true)
+        );
+        let keep = with(|o| {
+            o.screen_id = Some(DESK.into());
+            o.screen_mode = Some(GameSettingsOverride::KEEP_CURRENT_MODE.into());
+        });
+        assert_eq!(resolve(&g, Some(&keep)).game_screen.unwrap().mode, None);
+        // Resolução ilegível volta ao preset.
+        let bad = with(|o| {
+            o.screen_id = Some(DESK.into());
+            o.screen_mode = Some("lixo".into());
+        });
+        assert_eq!(resolve(&g, Some(&bad)).game_screen.unwrap().mode, Some(qhd));
+        // Na tela de jogo do Tako vale o que está em Configurações, mesmo com um preset antigo dela.
+        g.monitor_presets
+            .set(r"\\.\DISPLAY2", MonitorPreset::default());
+        let s = resolve(&g, None).game_screen.unwrap();
+        assert_eq!((s.mode, s.enable_hdr), (Some(TV_4K), true));
+    }
+
+    #[test]
+    fn monitor_presets_survive_a_round_trip_and_broken_values() {
+        let mut p = MonitorPresets::default();
+        let tv = MonitorPreset {
+            mode: Some(TV_4K),
+            hdr: true,
+        };
+        p.set(r"\\.\DISPLAY2", tv);
+        p.set("HDMI-1", MonitorPreset::default());
+        // Mesmo monitor com outra caixa: substitui.
+        p.set(r"\\.\display2", tv);
+        let back = MonitorPresets::parse(&p.to_text());
+        assert_eq!(back, MonitorPresets::parse(&p.to_text()));
+        assert_eq!(back.get(r"\\.\DISPLAY2"), Some(tv));
+        assert_eq!(back.get("hdmi-1"), Some(MonitorPreset::default()));
+        assert_eq!(back.get("DP-3"), None);
+        for broken in ["", "lixo", "[1,2]", "{\"x\": 3}", "{\"\": {\"hdr\": true}}"] {
+            let p = MonitorPresets::parse(broken);
+            assert_eq!(p, MonitorPresets::default(), "{broken}");
+        }
+        // Uma tela quebrada não leva as outras; resolução ilegível vira "manter a atual".
+        let p = MonitorPresets::parse(
+            r#"{"A": {"mode": "lixo", "hdr": true}, "B": {"hdr": "sim"}, "C": {}}"#,
+        );
+        assert_eq!(
+            p.get("a"),
+            Some(MonitorPreset {
+                mode: None,
+                hdr: true
+            })
+        );
+        assert_eq!(p.get("B"), None);
+        assert_eq!(p.get("C"), Some(MonitorPreset::default()));
     }
 
     #[test]
