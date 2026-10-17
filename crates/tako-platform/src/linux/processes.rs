@@ -3,6 +3,7 @@
 use crate::unix::{run, text};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 use tako_core::devices::{DeviceError, DeviceResult, ProcessEntry, ProcessLauncher};
 
 pub struct LinuxProcesses;
@@ -28,6 +29,55 @@ fn command_for(target: &Path, args: Vec<String>) -> Command {
     cmd
 }
 
+/// Variáveis de ambiente só chegam a quem o Tako abre direto; URI e `.desktop` passam por outro programa (como no
+/// Windows, onde atalhos e URIs abrem sem elas).
+fn warn_env_ignored(env: &[(String, String)], target: &str) {
+    if !env.is_empty() {
+        tracing::warn!("variáveis de ambiente só valem para executáveis: {target}");
+    }
+}
+
+fn start(
+    target: &str,
+    arguments: Option<&str>,
+    working_dir: Option<&str>,
+    env: &[(String, String)],
+) -> DeviceResult<Option<u32>> {
+    let target = target.trim();
+    if target.is_empty() {
+        return Err(DeviceError::NotFound("alvo vazio".into()));
+    }
+    if text::is_uri(target) {
+        warn_env_ignored(env, target);
+        return open_with_system(target);
+    }
+    let path = Path::new(target);
+    if !path.exists() {
+        return Err(DeviceError::NotFound(target.into()));
+    }
+    let args = arguments.map(text::split_args).unwrap_or_default();
+    if path.extension().is_some_and(|e| e == "desktop") {
+        warn_env_ignored(env, target);
+        if run::has_tool("gio") {
+            let mut c = Command::new("gio");
+            c.arg("launch").arg(path).args(args);
+            return run::spawn(&mut c).map(|_| None);
+        }
+        return open_with_system(target);
+    }
+    let mut cmd = command_for(path, args);
+    if let Some(dir) = working_dir
+        .filter(|d| !d.trim().is_empty())
+        .map(PathBuf::from)
+        .or_else(|| path.parent().map(Path::to_path_buf))
+        .filter(|d| d.is_dir())
+    {
+        cmd.current_dir(dir);
+    }
+    cmd.envs(env.iter().map(|(k, v)| (k, v)));
+    run::spawn(&mut cmd).map(Some)
+}
+
 impl ProcessLauncher for LinuxProcesses {
     fn launch(
         &self,
@@ -35,36 +85,21 @@ impl ProcessLauncher for LinuxProcesses {
         arguments: Option<&str>,
         working_dir: Option<&str>,
     ) -> DeviceResult<Option<u32>> {
-        let target = target.trim();
-        if target.is_empty() {
-            return Err(DeviceError::NotFound("alvo vazio".into()));
-        }
-        if text::is_uri(target) {
-            return open_with_system(target);
-        }
-        let path = Path::new(target);
-        if !path.exists() {
-            return Err(DeviceError::NotFound(target.into()));
-        }
-        let args = arguments.map(text::split_args).unwrap_or_default();
-        if path.extension().is_some_and(|e| e == "desktop") {
-            if run::has_tool("gio") {
-                let mut c = Command::new("gio");
-                c.arg("launch").arg(path).args(args);
-                return run::spawn(&mut c).map(|_| None);
-            }
-            return open_with_system(target);
-        }
-        let mut cmd = command_for(path, args);
-        if let Some(dir) = working_dir
-            .filter(|d| !d.trim().is_empty())
-            .map(PathBuf::from)
-            .or_else(|| path.parent().map(Path::to_path_buf))
-            .filter(|d| d.is_dir())
-        {
-            cmd.current_dir(dir);
-        }
-        run::spawn(&mut cmd).map(Some)
+        start(target, arguments, working_dir, &[])
+    }
+
+    fn launch_with_env(
+        &self,
+        target: &str,
+        arguments: Option<&str>,
+        working_dir: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        start(target, arguments, working_dir, env)
+    }
+
+    fn run_command(&self, command: &str, wait: Option<Duration>) -> DeviceResult<()> {
+        run::user_command(command, wait)
     }
 
     fn snapshot(&self) -> Vec<ProcessEntry> {
@@ -137,5 +172,29 @@ mod tests {
             Err(DeviceError::NotFound(_))
         ));
         assert!(p.launch("  ", None, None).is_err());
+    }
+
+    #[test]
+    fn environment_reaches_the_game_and_commands_run_through_sh() {
+        let p = LinuxProcesses;
+        let out = std::env::temp_dir().join(format!("tako-env-{}.txt", std::process::id()));
+        let env = [("TAKO_TESTE".to_owned(), "valor com espaço".to_owned())];
+        let script = format!("-c 'echo \"$TAKO_TESTE\" > {}'", out.display());
+        p.launch_with_env("/bin/sh", Some(&script), None, &env)
+            .unwrap()
+            .unwrap();
+        let mut text = String::new();
+        for _ in 0..50 {
+            text = std::fs::read_to_string(&out).unwrap_or_default();
+            if !text.is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let _ = std::fs::remove_file(&out);
+        assert_eq!(text.trim(), "valor com espaço");
+        let failed = p.run_command("exit 3", Some(Duration::from_secs(10)));
+        assert!(failed.unwrap_err().to_string().contains("saiu com"));
+        assert!(p.run_command("true", Some(Duration::from_secs(10))).is_ok());
     }
 }
