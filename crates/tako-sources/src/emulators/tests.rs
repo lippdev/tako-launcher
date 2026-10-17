@@ -204,6 +204,31 @@ fn imports_from_retroarch_standalone_esde_and_user_folders() {
 }
 
 #[test]
+fn the_same_file_by_two_paths_is_one_game() {
+    // `x/../Meus` faz o papel do `/var` → `/private/var` e do `ROMs` x `roms` do macOS: outro caminho, mesmo arquivo.
+    let tmp = tempfile::tempdir().unwrap();
+    let h = tmp.path();
+    write(&h.join("bin/retroarch"), b"");
+    write(
+        &h.join(".config/retroarch/retroarch.cfg"),
+        b"libretro_directory = \"~/cores\"\n",
+    );
+    write(&h.join("cores/snes9x_libretro.so"), b"");
+    write(&h.join("Meus/snes/Chrono Trigger (USA).sfc"), b"rom");
+    fs::create_dir_all(h.join("x")).unwrap();
+    let folder = |path: PathBuf| RomFolder { path, system: None };
+    let source = EmulatorSource {
+        env: Some(linux(h)),
+        config: Config {
+            rom_folders: vec![folder(h.join("Meus")), folder(h.join("x/../Meus"))],
+            ..Default::default()
+        },
+        fs: Fs::real(),
+    };
+    assert_eq!(titles(&source.scan().games), ["Chrono Trigger"]);
+}
+
+#[test]
 fn nothing_installed_says_so() {
     let tmp = tempfile::tempdir().unwrap();
     let source = EmulatorSource {

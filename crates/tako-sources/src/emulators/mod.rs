@@ -56,6 +56,7 @@ const SKIP_DIRS: [&str; 8] = [
 type ListFn = Arc<dyn Fn(&Path) -> Vec<PathBuf> + Send + Sync>;
 type ReadFn = Arc<dyn Fn(&Path, u64) -> Option<Vec<u8>> + Send + Sync>;
 type SizeFn = Arc<dyn Fn(&Path) -> Option<u64> + Send + Sync>;
+type CanonicalFn = Arc<dyn Fn(&Path) -> Option<PathBuf> + Send + Sync>;
 
 /// Acesso ao disco atrás de funções (os testes usam pastas temporárias ou caminhos de outro SO).
 #[derive(Clone)]
@@ -67,6 +68,8 @@ pub struct Fs {
     /// Até `limit` bytes do arquivo.
     pub read: ReadFn,
     pub size: SizeFn,
+    /// Caminho canônico, se o arquivo existe (atalhos e maiúsculas resolvidos pelo SO).
+    pub canonical: CanonicalFn,
 }
 
 impl Fs {
@@ -86,6 +89,7 @@ impl Fs {
                     .filter(|m| m.is_file())
                     .map(|m| m.len())
             }),
+            canonical: Arc::new(|p| std::fs::canonicalize(p).ok()),
         }
     }
 
@@ -731,7 +735,10 @@ pub fn build(
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut unique: Vec<Found> = Vec::new();
     for f in found {
-        let key = esde::key_of(&f.path);
+        // O mesmo arquivo chega por caminhos diferentes: `~/roms` e `~/ROMs` são a mesma pasta no macOS e no
+        // Windows, e o `/var` do macOS é atalho para `/private/var`. O caminho canônico decide; sem ele (arquivo
+        // dentro de zip, por exemplo), vale o caminho como veio.
+        let key = esde::key_of(&(fs.canonical)(&f.path).unwrap_or_else(|| f.path.clone()));
         match seen.get(&key) {
             Some(&i) => {
                 let u = &mut unique[i];
