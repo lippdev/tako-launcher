@@ -19,6 +19,7 @@ pub fn store_name(lang: Lang, store: GameStore) -> String {
         GameStore::Amazon => "Amazon Games".into(),
         GameStore::Heroic => "Heroic".into(),
         GameStore::Lutris => "Lutris".into(),
+        GameStore::Emulators => tr(lang, "presentation.store.emulators", &[]),
         GameStore::Manual => tr(lang, "presentation.store.manual", &[]),
     }
 }
@@ -47,11 +48,17 @@ fn gendered(lang: Lang, key: &str, name: &str, masculine: bool) -> String {
 
 /// "da Steam", "do GOG" (para "jogos da Steam"); em inglês, "from Steam".
 pub fn store_of(lang: Lang, store: GameStore) -> String {
+    if store == GameStore::Emulators {
+        return tr(lang, "presentation.store_of.emulators", &[]);
+    }
     gendered(lang, "store_of", &store_name(lang, store), masculine(store))
 }
 
 /// "pela Steam", "pelo GOG" (para "Abrindo pelo EA app"); em inglês, "via Steam".
 pub fn store_via(lang: Lang, store: GameStore) -> String {
+    if store == GameStore::Emulators {
+        return tr(lang, "presentation.store_via.emulators", &[]);
+    }
     gendered(
         lang,
         "store_via",

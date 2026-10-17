@@ -1,10 +1,15 @@
-//! Lojas de cada SO lidas para a biblioteca (PRD §6: as do Windows, Steam nos três, Heroic e Lutris no Linux).
+//! Lojas de cada SO lidas para a biblioteca (PRD §6: as do Windows, Steam nos três, Heroic e Lutris no Linux,
+//! emuladores nos três).
 
 use tako_core::library::{Game, GameStore};
 use tako_sources::LibrarySource;
+use tako_sources::emulators::{Config, EmulatorSource};
 use tako_sources::report::{LibrarySourceReport, LibrarySources};
 
-pub fn all_sources(steam_owned: Option<std::path::PathBuf>) -> Vec<Box<dyn LibrarySource>> {
+pub fn all_sources(
+    steam_owned: Option<std::path::PathBuf>,
+    emulators: Config,
+) -> Vec<Box<dyn LibrarySource>> {
     let mut v: Vec<Box<dyn LibrarySource>> = vec![tako_sources::steam_source(steam_owned)];
     #[cfg(windows)]
     v.extend(tako_sources::windows_sources(std::sync::Arc::new(
@@ -12,7 +17,19 @@ pub fn all_sources(steam_owned: Option<std::path::PathBuf>) -> Vec<Box<dyn Libra
     )));
     #[cfg(unix)]
     v.extend(tako_sources::unix_sources());
+    // Emuladores e ROMs (SRC-001), nos três SOs, antes dos adicionados à mão.
+    v.push(Box::new(EmulatorSource::new(emulators)));
     v
+}
+
+/// Configuração dos emuladores gravada em Configurações › Biblioteca › Emuladores e ROMs.
+pub fn emulator_config(settings: &crate::shell::Settings) -> Config {
+    use tako_sources::emulators::keys;
+    Config::parse(
+        settings.get(keys::ROM_FOLDERS),
+        settings.get(keys::PATHS),
+        settings.get(keys::BY_SYSTEM),
+    )
 }
 
 /// `DisabledStores` = nomes separados por vírgula (como nas alphas).
@@ -26,8 +43,9 @@ pub fn is_disabled(disabled: &str, store: GameStore) -> bool {
 pub fn scan(
     disabled: &str,
     steam_owned: Option<std::path::PathBuf>,
+    emulators: Config,
 ) -> (Vec<Game>, Vec<LibrarySourceReport>) {
-    let mut sources = LibrarySources::new(all_sources(steam_owned));
+    let mut sources = LibrarySources::new(all_sources(steam_owned, emulators));
     let games = sources.discover(|s| !is_disabled(disabled, s));
     let reports = sources.reports().values().cloned().collect();
     (games, reports)
@@ -35,7 +53,7 @@ pub fn scan(
 
 /// Lojas que este SO lê (Configurações › Lojas).
 pub fn stores() -> Vec<GameStore> {
-    LibrarySources::new(all_sources(None)).stores()
+    LibrarySources::new(all_sources(None, Config::default())).stores()
 }
 
 #[cfg(test)]

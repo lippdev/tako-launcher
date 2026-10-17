@@ -38,6 +38,7 @@ pub fn store_icon(store: GameStore) -> &'static str {
         GameStore::BattleNet => "store-battlenet",
         GameStore::Amazon => "store-amazon",
         GameStore::Heroic | GameStore::Lutris => "grid",
+        GameStore::Emulators => "gamepad",
         GameStore::Manual => "folder",
     }
 }

@@ -3,6 +3,8 @@
 
 #[path = "settings_controls.rs"]
 mod controls;
+#[path = "settings_emulators.rs"]
+pub(crate) mod emulators;
 #[path = "settings_library.rs"]
 pub(crate) mod library;
 #[path = "settings_metadata.rs"]

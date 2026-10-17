@@ -48,8 +48,6 @@ pub fn play_label(ctx: &Ctx, g: &Game) -> String {
         ctx.t("game.resume")
     } else if g.is_upcoming() {
         ctx.t("game.upcoming")
-    } else if g.is_rom() {
-        ctx.t("game.rom_soon")
     } else if !g.is_installed {
         if g.store() == tako_core::library::GameStore::Manual {
             ctx.t("game.missing_file")

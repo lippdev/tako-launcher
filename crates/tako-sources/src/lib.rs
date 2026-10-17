@@ -10,6 +10,7 @@ use tako_core::library::{Game, GameStore};
 pub mod amazon;
 pub mod battlenet;
 pub mod ea;
+pub mod emulators;
 pub mod epic;
 pub mod fs;
 pub mod gog;

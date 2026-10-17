@@ -20,11 +20,13 @@ pub enum GameStore {
     Heroic,
     /// Lutris (Linux).
     Lutris,
+    /// ROMs abertas por emuladores (SRC-001): RetroArch, ES-DE, emuladores avulsos e as pastas do usuário.
+    Emulators,
     Manual,
 }
 
 impl GameStore {
-    pub const ALL: [GameStore; 11] = [
+    pub const ALL: [GameStore; 12] = [
         GameStore::Steam,
         GameStore::Epic,
         GameStore::Gog,
@@ -35,6 +37,7 @@ impl GameStore {
         GameStore::Amazon,
         GameStore::Heroic,
         GameStore::Lutris,
+        GameStore::Emulators,
         GameStore::Manual,
     ];
 
@@ -51,6 +54,7 @@ impl GameStore {
             GameStore::Amazon => "Amazon",
             GameStore::Heroic => "Heroic",
             GameStore::Lutris => "Lutris",
+            GameStore::Emulators => "Emulators",
             GameStore::Manual => "Manual",
         }
     }
@@ -74,6 +78,7 @@ impl GameStore {
             GameStore::Amazon => "amazon",
             GameStore::Heroic => "heroic",
             GameStore::Lutris => "lutris",
+            GameStore::Emulators => "emulator",
             GameStore::Manual => "manual",
         }
     }
@@ -199,7 +204,7 @@ pub mod media {
 pub struct Game {
     /// `steam:<appid>`, `epic:<AppName>`, `gog:<id>`, `xbox:<PackageFamily>`, `ubisoft:<installId>`,
     /// `ea:<contentId>`, `battlenet:<uid>`, `amazon:<productId>`, `heroic:<runner>:<appName>`,
-    /// `lutris:<slug>`, `manual:<guid>`.
+    /// `lutris:<slug>`, `emulator:<hash do caminho da ROM>`, `manual:<guid>`.
     pub id: String,
     pub title: String,
     pub store: Option<GameStore>,
@@ -282,8 +287,9 @@ impl Game {
         self.upcoming_release.is_some()
     }
 
+    /// ROMs também: abrem pelo emulador do sistema (SRC-001).
     pub fn can_play(&self) -> bool {
-        self.is_installed && !self.is_upcoming() && !self.is_rom()
+        self.is_installed && !self.is_upcoming()
     }
 
     pub fn shown_cover(&self) -> Option<&str> {
@@ -345,13 +351,15 @@ mod tests {
     }
 
     #[test]
-    fn rom_and_upcoming_cannot_play() {
+    fn roms_play_and_upcoming_cannot() {
         let mut g = Game {
             is_installed: true,
             ..Default::default()
         };
         assert!(g.can_play());
         g.rom_path = Some("/roms/a.sfc".into());
+        assert!(g.can_play());
+        g.upcoming_release = chrono::NaiveDate::from_ymd_opt(2030, 1, 1);
         assert!(!g.can_play());
     }
 

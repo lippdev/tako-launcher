@@ -1,5 +1,8 @@
 [presentation]
 store.manual = "Adicionado"
+store.emulators = "Emuladores"
+store_of.emulators = "dos emuladores"
+store_via.emulators = "pelo emulador"
 store_of.masculine = "do {store}"
 store_of.feminine = "da {store}"
 store_via.masculine = "pelo {store}"

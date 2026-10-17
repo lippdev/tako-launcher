@@ -137,6 +137,7 @@ text = "Tako closes and you go back to the desktop."
 confirm = "Exit"
 
 [session]
+no_emulator = "No emulator on this PC opens this system: set one up in Settings › Library › Emulators and ROMs"
 other_running = "{game} is still open"
 launching = "Opening"
 launching_slow = "Still opening. The store may be updating or verifying the game; it shows up here as soon as it opens."

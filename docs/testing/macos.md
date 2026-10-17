@@ -49,3 +49,9 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] Configurações › Tela e áudio › Testar: o Tako vai para a tela de jogo, pergunta "Você consegue ver esta tela?" e as telas voltam com ou sem resposta (15 s).
 - [ ] Com um jogo aberto, segurar Select + Y (Create + △) abre a Central. Não há atalho de teclado durante o jogo neste SO.
 - [ ] Aparência › Tema › "Tako Alto contraste" troca na hora e continua em tela cheia.
+
+## Emuladores e ROMs (SRC-001)
+
+- [ ] RetroArch, Dolphin, PCSX2, DuckStation e PPSSPP em `/Applications` (ou `~/Applications`): aparecem como "Encontrado" em Biblioteca › Emuladores e ROMs.
+- [ ] As playlists do RetroArch (`~/Library/Application Support/RetroArch`) e as pastas de jogos dos outros entram na loja Emuladores.
+- [ ] Abrir um jogo de cada: tela cheia, direto no jogo, e o Tako acompanha até fechar (o macOS pode pedir permissão para o emulador ler a pasta das ROMs: anotar).

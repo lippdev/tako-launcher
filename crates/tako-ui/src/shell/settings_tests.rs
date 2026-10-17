@@ -546,3 +546,58 @@ fn each_controller_gets_its_own_profile() {
         tako_core::input::profiles::Profiles::load(|k| ctx.settings.get(k).map(str::to_owned));
     assert_eq!(again, ctx.profiles);
 }
+
+#[test]
+fn emulators_panel_keeps_folders_executables_and_the_emulator_of_each_system() {
+    use tako_sources::emulators::emulator::Emulator;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (dir, mut ctx) = ctx();
+    let cache = emulators::Cache::default();
+    let rows = |ctx: &Ctx| emulators::rows(ctx, &cache);
+    // A loja aparece com a entrada para o painel.
+    let lib = rows_of(&ctx, "library");
+    assert!(matches!(
+        accept(&mut ctx, &find(&lib, "settings.library.emulators")),
+        Flow::Push(_)
+    ));
+    // Pasta nova: uma subpasta por sistema; muda para SNES pelo diálogo e depois remove.
+    let roms = dir.path().join("ROMs");
+    emulators::add_folder_path(&mut ctx, roms.clone());
+    assert!(ctx.effects.iter().any(|e| matches!(e, Effect::Rescan)));
+    let folder = find(&rows(&ctx), "folder-0");
+    assert_eq!(folder.row.value, "Uma subpasta por sistema");
+    let mut dialog = emulators::folder_options(&ctx, 0);
+    let items = dialog.render(&ctx).rows;
+    // O foco começa em "Remover" e pula o título.
+    let snes = items.iter().position(|r| r.key == "snes").unwrap();
+    let downs = items[1..=snes]
+        .iter()
+        .filter(|r| r.kind != "header")
+        .count();
+    for _ in 0..downs {
+        dialog.handle(Cmd::Down, &mut ctx);
+    }
+    dialog.handle(Cmd::Accept, &mut ctx);
+    assert_eq!(find(&rows(&ctx), "folder-0").row.value, "Super Nintendo");
+    // Executável escolhido à mão: vale e libera o emulador dos sistemas dele.
+    let exe = dir.path().join("Dolphin.exe");
+    std::fs::write(&exe, b"").unwrap();
+    emulators::set_exe(&mut ctx, Emulator::Dolphin, exe.clone());
+    let r = rows(&ctx);
+    assert_eq!(find(&r, "emulator-dolphin").row.value, "Encontrado");
+    let gc = find(&r, "system-gc");
+    assert_eq!(gc.row.value, "Automático (Dolphin)");
+    accept(&mut ctx, &gc);
+    assert_eq!(find(&rows(&ctx), "system-gc").row.value, "Dolphin");
+    let saved = crate::sources::emulator_config(&ctx.settings);
+    assert_eq!(saved.by_system.get("gc"), Some(&Emulator::Dolphin));
+    assert_eq!(saved.paths.get(&Emulator::Dolphin), Some(&exe));
+    // Remover a pasta.
+    let mut dialog = emulators::folder_options(&ctx, 0);
+    dialog.handle(Cmd::Accept, &mut ctx);
+    assert!(
+        crate::sources::emulator_config(&ctx.settings)
+            .rom_folders
+            .is_empty()
+    );
+}
