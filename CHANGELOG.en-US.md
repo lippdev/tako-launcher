@@ -2,6 +2,13 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.6]
+### What's new
+- **Desktop mode:** Tako now opens in a mouse and keyboard window, with the library as a list, the game highlight with Play, favorite and more actions, search, filter and sort, All, Favorites and Collections tabs, and Settings inside the window.
+- **Full screen as the "Big Picture":** the controller and TV interface is still there. Switch with the Full screen button or F11, and come back from the Control Center or Settings › General. Themes apply in full screen.
+- With a controller connected, Tako asks whether you want full screen when it opens (you can stop it from asking). Opened with `--big-picture`, from Xbox mode (AnyFSE) or from Console Mode, it goes straight to full screen.
+- On the desktop, the window stays minimized during a game and comes back when it closes.
+
 ## [0.2.0-alpha.5]
 ### What's new
 - **First-run wizard:** language, detected stores and cover providers, with a controller or the keyboard.

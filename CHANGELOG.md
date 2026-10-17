@@ -2,6 +2,13 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.6]
+### Novidades
+- **Modo desktop:** o Tako agora abre numa janela para mouse e teclado, com a biblioteca em lista, o destaque do jogo com Jogar, favoritar e mais ações, busca, filtrar e ordenar, abas Todos, Favoritos e Coleções, e as Configurações dentro da janela.
+- **Tela cheia como "Big Picture":** a interface para controle e TV continua lá. Troque pelo botão Tela cheia ou F11, e volte pela Central ou por Configurações › Geral. Os temas valem na tela cheia.
+- Com um controle conectado, o Tako pergunta se você quer a tela cheia ao abrir (dá para não perguntar de novo). Aberto com `--big-picture`, pelo modo Xbox (AnyFSE) ou pelo Console Mode, vai direto para a tela cheia.
+- No desktop, a janela fica minimizada durante o jogo e volta quando ele fecha.
+
 ## [0.2.0-alpha.5]
 ### Novidades
 - **Assistente da primeira execução:** idioma, lojas encontradas e provedores de capas, com controle ou teclado.
