@@ -172,6 +172,12 @@ impl Shell {
         self.ctx.dirty = true;
     }
 
+    /// A Central por cima do jogo (interface aberta pelo atalho durante o jogo).
+    pub fn open_control_center_over_game(&mut self) {
+        self.cc = Some(control_center::ControlCenter::over_game());
+        self.ctx.dirty = true;
+    }
+
     pub fn control_center_open(&self) -> bool {
         self.cc.is_some()
     }
@@ -524,7 +530,10 @@ impl Shell {
         }
         match &self.cc {
             Some(cc) => cc.render(&self.ctx, &mut out),
-            None => out.set("control-center", false),
+            None => {
+                out.set("control-center", false);
+                out.set("transparent-background", false);
+            }
         }
         let overlays: Vec<_> = self.layers.iter().map(|l| l.render(&self.ctx)).collect();
         out.set("overlays", overlays);

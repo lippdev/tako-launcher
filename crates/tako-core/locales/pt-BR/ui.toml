@@ -156,6 +156,7 @@ screen_failed = "Não foi possível usar a tela de jogo"
 
 [cc]
 home = "Início"
+more = "Mais opções"
 back_to_game = "Voltar ao jogo"
 audio = "Áudio"
 screen = "Tela"

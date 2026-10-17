@@ -26,6 +26,8 @@ const ICONS: [Icon; 6] = [
 
 pub struct ControlCenter {
     icon: usize,
+    /// Aberta por cima do jogo: janela transparente com só a barra; "Mais opções" mostra o Tako inteiro.
+    over_game: bool,
     /// Painel aberto e a linha em foco.
     panel: Option<usize>,
 }
@@ -41,7 +43,16 @@ impl ControlCenter {
         // O foco abre no jogo (o cartão maior no PS5; aqui, o ícone do jogo).
         ControlCenter {
             icon: 1,
+            over_game: false,
             panel: None,
+        }
+    }
+
+    /// Aberta pelo atalho com o jogo na frente (a interface nasce só para ela).
+    pub fn over_game() -> Self {
+        ControlCenter {
+            over_game: true,
+            ..Self::new()
         }
     }
 
@@ -258,6 +269,9 @@ impl ControlCenter {
         let icons: Vec<PanelRow> = ICONS
             .iter()
             .map(|i| match i {
+                Icon::Home if self.over_game => {
+                    PanelRow::button("home", ctx.t("cc.more")).icon("grid")
+                }
                 Icon::Home => PanelRow::button("home", ctx.t("cc.home")).icon("home"),
                 Icon::Game => PanelRow::button("game", ctx.t("cc.back_to_game")).icon("play"),
                 Icon::Audio => PanelRow::button("audio", ctx.t("cc.audio")).icon("volume"),
@@ -269,6 +283,7 @@ impl ControlCenter {
             })
             .collect();
         out.set("control-center", true);
+        out.set("transparent-background", self.over_game);
         out.set("cc-icons", icons);
         out.set("cc-icon-focus", self.icon as i32);
         out.set(

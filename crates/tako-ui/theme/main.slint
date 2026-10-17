@@ -923,7 +923,8 @@ component OverlayView inherits Rectangle {
     }
 }
 
-// Central rápida durante o jogo (DESIGN.md › Menu rápido), reduzida às funções do Tako.
+// Central rápida durante o jogo (DESIGN.md › Menu rápido), reduzida às funções do Tako. `overlay`: aberta por cima do
+// jogo (janela transparente, só a barra no alto, o jogo aparece atrás); senão cobre o Tako aberto.
 component ControlCenter inherits Rectangle {
     in property <[PanelRow]> icons;
     in property <int> icon-focus;
@@ -932,28 +933,34 @@ component ControlCenter inherits Rectangle {
     in property <int> panel-focus;
     in property <string> game-title;
     in property <string> game-meta;
+    in property <bool> overlay;
     callback clicked(string, int);
     callback hovered(string, int);
-    property <length> icon-step: 108 * Ui.u;
+    property <length> icon-step: 132 * Ui.u;
     property <length> bar-x: (self.width - icons.length * icon-step) / 2;
-    background: @linear-gradient(180deg, #000000D9 0%, #00000080 55%, #00000033 100%);
+    property <length> bar-y: 40 * Ui.u;
+    background: overlay
+        ? @linear-gradient(180deg, #000000CC 0%, #00000080 14%, #00000000 30%)
+        : @linear-gradient(180deg, #000000D9 0%, #00000080 55%, #00000033 100%);
+    // Jogo aberto, à esquerda da barra.
     VerticalLayout {
         x: Ui.safe-x;
-        y: root.height - Ui.hint-bar - self.preferred-height - 20 * Ui.u;
-        width: root.width / 2;
-        spacing: 4 * Ui.u;
+        y: bar-y + (84 * Ui.u - self.preferred-height) / 2;
+        width: max(0, bar-x - Ui.safe-x - 24 * Ui.u);
+        height: self.preferred-height;
+        spacing: 2 * Ui.u;
+        Text { text: game-meta; color: Ui.on-accent-muted; font-size: Ui.label-sm; font-weight: 600; font-family: Ui.font-text; overflow: elide; }
         Text { text: game-title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; overflow: elide; }
-        Text { text: game-meta; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; }
     }
-    for ic[i] in icons: VerticalLayout {
+    for ic[i] in icons: Rectangle {
         x: bar-x + i * icon-step;
-        y: 40 * Ui.u;
+        y: bar-y;
         width: icon-step;
-        spacing: 10 * Ui.u;
+        height: 84 * Ui.u + 44 * Ui.u;
         Rectangle {
+            y: 0;
             width: 84 * Ui.u;
             height: 84 * Ui.u;
-            x: (icon-step - self.width) / 2;
             border-radius: self.height / 2;
             background: i == icon-focus && panel-focus < 0 ? Ui.surface-solid : (i == panel-for ? Ui.surface-2 : Ui.surface-1);
             Icon {
@@ -966,7 +973,10 @@ component ControlCenter inherits Rectangle {
                 changed has-hover => { if (self.has-hover) { root.hovered("icon", i); } }
             }
         }
+        // O rótulo passa da largura do ícone (ex.: "Voltar ao jogo") sem ser cortado.
         Text {
+            y: 84 * Ui.u + 10 * Ui.u;
+            width: 320 * Ui.u;
             text: i == icon-focus || i == panel-for ? ic.title : "";
             color: Ui.on-accent;
             font-size: Ui.label-sm;
@@ -1093,8 +1103,12 @@ export component App inherits Window {
 
     property <length> content-x: sidebar-visible && page != "details" ? (sidebar-focus >= 0 ? 400 * Ui.u : 120 * Ui.u) : 0;
 
+    // Central por cima do jogo: só a barra dela; o jogo aparece pela janela transparente.
+    property <bool> over-game: control-center && transparent-background;
+
     Rectangle {
         x: content-x;
+        visible: !over-game;
         width: root.width - content-x;
         animate x, width { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
         if page == "home": HomePage {
@@ -1174,6 +1188,7 @@ export component App inherits Window {
         panel-focus: cc-panel-focus;
         game-title: cc-game-title;
         game-meta: cc-game-meta;
+        overlay: over-game;
         clicked(z, i) => { root.clicked("cc-" + z, i); }
         hovered(z, i) => { root.hovered("cc-" + z, i); }
     }
@@ -1186,6 +1201,7 @@ export component App inherits Window {
     }
 
     HintBar {
+        visible: !over-game;
         y: root.height - self.height;
         width: root.width;
         hints: hints;

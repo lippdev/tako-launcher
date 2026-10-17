@@ -156,6 +156,7 @@ screen_failed = "Couldn't use the game screen"
 
 [cc]
 home = "Home"
+more = "More options"
 back_to_game = "Back to game"
 audio = "Audio"
 screen = "Screen"

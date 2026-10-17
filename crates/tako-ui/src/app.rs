@@ -269,7 +269,7 @@ impl App {
             });
         }
         if opts.control_center {
-            shell.open_control_center();
+            shell.open_control_center_over_game();
         }
         if let Some((id, played)) = &opts.after_game {
             if let Err(e) = shell.ctx.library.record_session(id, *played) {
