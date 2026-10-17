@@ -2,7 +2,24 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
-## [Unreleased]
+## [0.2.0-alpha.5]
+### What's new
+- **First-run wizard:** language, detected stores and cover providers, with a controller or the keyboard.
+- **Organizing:** your own tags (applied in bulk and usable as a filter), smart collections that update themselves from the filters, and how much space each game and each drive takes, with sort by size.
+- **Local profiles:** several people on the same PC, each with their own library, favorites, play time and settings, and a "Who's playing?" question when Tako opens.
+- **Stores:** games you own but haven't installed (Steam, Epic and GOG; Amazon on Linux and macOS), with Install through the store and a notice when it finishes. Non-Steam games added to Steam. Emulators and ROMs (RetroArch, ES-DE, Dolphin, PCSX2, DuckStation, PPSSPP, Ryujinx, Cemu, RPCS3 and ROM folders), each opening in the right emulator.
+- **Covers for the whole library:** cover, background, logo and icon on their own, and "Review covers" lists only the doubtful ones.
+- **When playing:** a notice when the store app is missing, with a link to its official page; "Repair files" for Steam games; a warning when a game closes right after opening, never opens or exits with an error, with the code and what it usually means; environment variables and commands before and after playing, with your permission.
+- **Screens:** each game can open on another screen with its own resolution and HDR, and Tako remembers the resolution and HDR of each monitor.
+- **Controllers:** choose the button for each Tako action, with one profile per controller and the Control Center shortcut among them. With HidHide (optional), the game stops seeing the controller while the Control Center is open (Windows).
+- **Accessibility:** text size, navigation sounds with their own volume, and "Reduce motion" now also covers opening a game.
+- **`tako://` links** open a screen or a game from outside Tako (shortcuts, Stream Deck), on Windows and Linux.
+- **Themes:** install a theme from its GitHub repository address and update it later; theme API documentation and `tako theme check` for authors.
+- **Windows:** Windows 11 Xbox mode through AnyFSE, with the steps in Settings › General.
+- **Tako performance** in Settings › System: memory, CPU and startup time.
+- **Nightly builds:** one build a day from develop, for those who opt in under Settings › General.
+
+## [0.2.0-alpha.4]
 ### Fixes
 - The portable build (and the installed one) no longer offers an update to the version that is already open.
 - Moving the mouse over cards no longer scrolls the row or the page; the mouse only highlights, scrolling stays with the controller and keyboard.

@@ -2,7 +2,24 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
-## [Unreleased]
+## [0.2.0-alpha.5]
+### Novidades
+- **Assistente da primeira execução:** idioma, lojas encontradas e provedores de capas, com controle ou teclado.
+- **Organização:** tags próprias (aplicadas em lote e usadas como filtro), coleções automáticas que se atualizam sozinhas a partir dos filtros, e quanto cada jogo e cada disco ocupam, com ordenar por tamanho.
+- **Perfis locais:** várias pessoas no mesmo PC, cada uma com biblioteca, favoritos, tempo de jogo e configurações próprios, e a pergunta "Quem está jogando?" ao abrir.
+- **Lojas:** jogos que você tem e não instalou (Steam, Epic e GOG; Amazon no Linux e no macOS), com Instalar pela loja e aviso quando termina. Jogos não Steam adicionados à Steam. Emuladores e ROMs (RetroArch, ES-DE, Dolphin, PCSX2, DuckStation, PPSSPP, Ryujinx, Cemu, RPCS3 e pastas de ROMs), cada um abrindo no emulador certo.
+- **Capas da biblioteca inteira:** capa, fundo, logo e ícone sozinhos, e "Revisar capas" mostra só o que ficou em dúvida.
+- **Ao jogar:** aviso quando falta o app da loja, com link para a página oficial; "Reparar arquivos" nos jogos da Steam; aviso quando o jogo fecha logo ao abrir, não abre ou fecha com erro, com o código e o que ele costuma significar; variáveis de ambiente e comandos antes e depois de jogar, com a sua permissão.
+- **Tela:** cada jogo pode abrir em outra tela, com resolução e HDR próprios, e o Tako lembra a resolução e o HDR de cada monitor.
+- **Controles:** escolha os botões de cada ação do Tako, com um perfil por controle e o atalho da Central entre eles. Com o HidHide (opcional), o jogo deixa de ver o controle enquanto a Central está aberta (Windows).
+- **Acessibilidade:** tamanho do texto, sons de navegação com volume próprio, e "Reduzir animações" agora vale também para a abertura do jogo.
+- **Links `tako://`** abrem uma tela ou um jogo de fora do Tako (atalhos, Stream Deck), no Windows e no Linux.
+- **Temas:** instalar um tema pelo endereço do repositório no GitHub e atualizá-lo depois; documentação da API de temas e `tako theme check` para autores.
+- **Windows:** modo Xbox do Windows 11 pelo AnyFSE, com os passos em Configurações › Geral.
+- **Desempenho do Tako** em Configurações › Sistema: memória, CPU e tempo de abertura.
+- **Versões noturnas:** uma build por dia da develop, para quem escolher em Configurações › Geral.
+
+## [0.2.0-alpha.4]
 ### Correções
 - O portable (e o instalado) não pede mais atualização para a versão que já está aberta.
 - Passar o mouse sobre os cards não faz mais a fileira nem a página rolarem; o mouse só destaca, e quem rola é o controle ou o teclado.

@@ -305,49 +305,49 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [ ] **PLAT-003 (Windows):** Tako como app inicial da experiência de tela cheia do Xbox, onde a Microsoft permitir (exige SCCD assinado pela Microsoft; ver `docs/spikes/MVP-007-fse.md`).
 - [ ] **PLAT-004 (macOS):** assinatura Developer ID e notarização.
 - [ ] **PLAT-005 (Windows):** assinatura de código (SignPath) e winget.
-- [ ] **PLAT-006:** abrir com o sistema e iniciar direto em tela cheia, em cada SO.
-- [ ] **PLAT-008:** canal Nightly: build automática da `develop` todo dia em que houver mudança, publicada como pré-release `nightly` (sem changelog manual, notas pelos commits) e escolhida no atualizador como "Versões noturnas", separada de alpha e beta.
-- [ ] **PLAT-007 (Windows):** integração com o [AnyFSE](https://github.com/ashpynov/AnyFSE), projeto da comunidade que põe um launcher de terceiros como app inicial do Xbox mode (tela cheia de jogos do Windows 11), enquanto o caminho oficial (PLAT-003) depende da Microsoft. Escopo: o Tako funciona como alvo do AnyFSE (abre em tela cheia, sem janela de desktop, volta certo de um jogo), o Tako detecta o AnyFSE instalado e ensina a configuração, e um roteiro de teste em `docs/testing/windows.md`. O AnyFSE pede Modo de Desenvolvedor (ver `docs/spikes/MVP-007-fse.md`); o Tako não liga isso sozinho.
+- [x] **PLAT-006:** abrir com o sistema e iniciar direto em tela cheia, em cada SO.
+- [x] **PLAT-008:** canal Nightly: build automática da `develop` todo dia em que houver mudança, publicada como pré-release `nightly` (sem changelog manual, notas pelos commits) e escolhida no atualizador como "Versões noturnas", separada de alpha e beta.
+- [x] **PLAT-007 (Windows):** integração com o [AnyFSE](https://github.com/ashpynov/AnyFSE), projeto da comunidade que põe um launcher de terceiros como app inicial do Xbox mode (tela cheia de jogos do Windows 11), enquanto o caminho oficial (PLAT-003) depende da Microsoft. Escopo: o Tako funciona como alvo do AnyFSE (abre em tela cheia, sem janela de desktop, volta certo de um jogo), o Tako detecta o AnyFSE instalado e ensina a configuração, e um roteiro de teste em `docs/testing/windows.md`. O AnyFSE pede Modo de Desenvolvedor (ver `docs/spikes/MVP-007-fse.md`); o Tako não liga isso sozinho.
 
 ### Épico SRC — Mais fontes (P1)
 
-- [ ] **SRC-001:** emuladores (RetroArch e standalone), bibliotecas de ROMs do usuário e sistemas, nos três SOs. Inclui importar direto dos principais emuladores e frontends os jogos que eles já conhecem (playlists do RetroArch, listas do ES-DE, bibliotecas do Dolphin, PCSX2, DuckStation, PPSSPP, Ryujinx e afins), com o comando certo para abrir cada jogo no emulador.
+- [x] **SRC-001:** emuladores (RetroArch e standalone), bibliotecas de ROMs do usuário e sistemas, nos três SOs. Inclui importar direto dos principais emuladores e frontends os jogos que eles já conhecem (playlists do RetroArch, listas do ES-DE, bibliotecas do Dolphin, PCSX2, DuckStation, PPSSPP, Ryujinx e afins), com o comando certo para abrir cada jogo no emulador.
 - [ ] **SRC-002 (Linux):** Bottles e itch.io.
-- [ ] **SRC-003:** detectar cliente de loja ausente e oferecer abri-lo ou instalá-lo pelo caminho oficial.
-- [ ] **SRC-005:** jogos que o usuário possui mas não instalou, e instalar pelo Tako: listar a biblioteca de cada loja (Steam, Epic, GOG e outras, pela conta do usuário ou pelo cliente da loja) com o selo "Não instalado", e o botão Instalar abre a instalação no cliente da loja (por exemplo `steam://install/<appid>`). Quando a instalação termina, o jogo vira instalado sem precisar reiniciar. Pedido do mantenedor no primeiro teste.
-- [ ] **SRC-004:** jogos não Steam adicionados à Steam (atalhos), nos três SOs.
+- [x] **SRC-003:** detectar cliente de loja ausente e oferecer abri-lo ou instalá-lo pelo caminho oficial.
+- [ ] **SRC-005:** jogos que o usuário possui mas não instalou, e instalar pelo Tako: listar a biblioteca de cada loja (Steam, Epic, GOG e outras, pela conta do usuário ou pelo cliente da loja) com o selo "Não instalado", e o botão Instalar abre a instalação no cliente da loja (por exemplo `steam://install/<appid>`). Quando a instalação termina, o jogo vira instalado sem precisar reiniciar. Pedido do mantenedor no primeiro teste. _Estado: Steam (Web API com a chave do usuário), Epic e GOG lidos do cliente da loja, e Amazon no Linux e no macOS pelo Heroic, entregues (0.2.0-alpha.5); faltam Ubisoft, EA e Amazon no Windows, que não guardam a lista de forma legível offline (motivos no #107)._
+- [x] **SRC-004:** jogos não Steam adicionados à Steam (atalhos), nos três SOs.
 
 ### Épico UX (P1)
 
-- [ ] **UX-001:** acessibilidade: tamanho de texto, redução de animações, alto contraste, sons de navegação com volume próprio.
+- [x] **UX-001:** acessibilidade: tamanho de texto, redução de animações, alto contraste, sons de navegação com volume próprio.
 - [ ] **UX-002:** arte animada e trailers (libmpv opcional, desligado durante o jogo).
-- [ ] **UX-003:** assistente da primeira execução (idioma, lojas detectadas, provedores de metadados; oferece o driver opcional do INPUT-005).
+- [x] **UX-003:** assistente da primeira execução (idioma, lojas detectadas, provedores de metadados; oferece o driver opcional do INPUT-005).
 - [ ] **UX-004:** perfis locais (vários usuários na mesma máquina).
 
 ### Épico THEME (P2)
 
-- [ ] **THEME-001:** documentação pública da API de temas.
+- [x] **THEME-001:** documentação pública da API de temas.
 - [ ] **THEME-002:** pré-visualização antes de aplicar.
 - [ ] **THEME-003:** edição de cores, fontes e fundo pelo próprio Tako.
-- [ ] **THEME-004:** instalar tema por URL de repositório, com atualização opcional.
+- [x] **THEME-004:** instalar tema por URL de repositório, com atualização opcional.
 - [ ] **THEME-005:** galeria comunitária de temas.
 - [ ] **THEME-006:** criar o próprio tema pelo Tako, sem editar arquivos: partir do tema padrão (ou de um instalado), escolher cores, fonte e fundo com prévia ao vivo, dar nome, salvar como tema instalado e exportar como `.takotheme` para compartilhar. Base: os `tokens.toml` (temas que só trocam a paleta) e THEME-002/003.
 - [ ] **THEME-007:** música de fundo e sons de navegação por tema (o tema traz os arquivos; volume próprio e opção de desligar; nunca toca durante o jogo).
 - [ ] **THEME-008:** cinco temas oficiais bem diferentes entre si (layout, navegação e identidade, não só cores), começando por uma lista de propostas para escolher.
-- [ ] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil.
+- [x] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil. _Estado: estudado (`docs/spikes/AI-001-THEME-010-estudo.md`): só as cores convertem, então não segue._
 
 ### Épico LIB — Organização da biblioteca (P2)
 
 - [x] **LIB-001:** status de cada jogo (jogando, zerado, pausado, abandonado, quero jogar), mudado pelos detalhes ou pelo menu do card, com filtro no painel.
-- [ ] **LIB-002:** tags próprias do usuário: criar, aplicar a vários jogos de uma vez e filtrar.
-- [ ] **LIB-003:** coleções automáticas: salvar uma combinação de filtros (gênero, fonte, tempo jogado, status, tag) como coleção que se atualiza sozinha.
+- [x] **LIB-002:** tags próprias do usuário: criar, aplicar a vários jogos de uma vez e filtrar.
+- [x] **LIB-003:** coleções automáticas: salvar uma combinação de filtros (gênero, fonte, tempo jogado, status, tag) como coleção que se atualiza sozinha.
 - [x] **LIB-004:** jogos quebrados: verificar em segundo plano executáveis e pastas que sumiram, listar esses jogos e oferecer corrigir o caminho ou remover. Hoje só os detalhes avisam, um jogo por vez.
-- [ ] **LIB-005:** armazenamento: quanto cada jogo ocupa, total por disco, e ordenar por tamanho.
+- [x] **LIB-005:** armazenamento: quanto cada jogo ocupa, total por disco, e ordenar por tamanho.
 
 ### Épico ART — Capas e arte (P2)
 
-- [ ] **ART-001:** casar a biblioteca inteira com as capas certas sozinho, como o Plex faz com filmes: reconhece o nome do jogo, escolhe capa, fundo, logo e ícone, e o usuário só corrige o que ficou errado. Refs: Steam ROM Manager, BoilR, SteamGridDB Decky, Steam Art Manager.
-- [ ] **ART-002:** aplicar uma imagem do site do SteamGridDB num jogo com um clique (protocolo próprio, como o SGDBoop).
+- [x] **ART-001:** casar a biblioteca inteira com as capas certas sozinho, como o Plex faz com filmes: reconhece o nome do jogo, escolhe capa, fundo, logo e ícone, e o usuário só corrige o que ficou errado. Refs: Steam ROM Manager, BoilR, SteamGridDB Decky, Steam Art Manager.
+- [ ] **ART-002:** aplicar uma imagem do site do SteamGridDB num jogo com um clique (protocolo próprio, como o SGDBoop). _Estado: fora da rodada de 17/10; a API do botão do SteamGridDB usa um token de aplicativo, não a chave do usuário. Código no PR #94 (fechado)._
 - [ ] **ART-003:** biblioteca de capas online: o usuário escolhe capas personalizadas de uma galeria e envia as suas, além das do SteamGridDB.
 
 ### Épico BRAND — Identidade (P2)
@@ -357,30 +357,30 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 
 ### Épico PERF (P2)
 
-- [ ] **PERF-001:** painel de diagnóstico do próprio Tako (memória, CPU, tempo de abertura).
-- [ ] **PERF-002:** presets de tela por jogo e por monitor, incluindo HDR e VRR onde o SO expõe.
+- [x] **PERF-001:** painel de diagnóstico do próprio Tako (memória, CPU, tempo de abertura).
+- [ ] **PERF-002:** presets de tela por jogo e por monitor, incluindo HDR e VRR onde o SO expõe. _Estado: tela, resolução e HDR por jogo e por monitor entregues (0.2.0-alpha.5); falta o VRR, que não tem API pública no Windows._
 
 ### Épico INPUT — Controles (P2)
 
-- [ ] **INPUT-001:** personalizar os controles do próprio Tako: remapear cada ação (aceitar, voltar, menu, seções, atalho da Central) por controle, com perfis.
+- [x] **INPUT-001:** personalizar os controles do próprio Tako: remapear cada ação (aceitar, voltar, menu, seções, atalho da Central) por controle, com perfis.
 - [x] **INPUT-003:** bateria dos controles sem fio na barra superior e na Central, com aviso de bateria fraca.
 - [x] **INPUT-004:** reconexão assistida: quando o controle cai, o Tako avisa, não perde o foco e volta a navegar assim que um controle reconecta (ou outro assume).
-- [ ] **INPUT-002:** remapear controles para os jogos, como a Entrada Steam: perfis por jogo, botões, analógicos, gatilhos e mouse/teclado. Precisa de um controle virtual no SO (uinput no Linux; no Windows o ViGEmBus foi descontinuado, então é preciso escolher outro driver). Começa por um estudo.
-- [ ] **INPUT-005:** isolar o controle do jogo enquanto a Central está aberta (Windows). Jogos que leem por XInput (ex.: Resident Evil 2) continuam recebendo o controle sem estar em foco. Driver HidHide, **opcional**: o Tako esconde o controle do jogo ao abrir a Central e devolve ao voltar. A instalação é oferecida no assistente da primeira execução (UX-003) e em Configurações; sem o driver, tudo segue como hoje. Visto no teste manual de 2026-10-16.
+- [ ] **INPUT-002:** remapear controles para os jogos, como a Entrada Steam: perfis por jogo, botões, analógicos, gatilhos e mouse/teclado. Precisa de um controle virtual no SO (uinput no Linux; no Windows o ViGEmBus foi descontinuado, então é preciso escolher outro driver). Começa por um estudo. _Estado: estudo em `docs/spikes/SESSION-001-INPUT-002.md`; a implementação depende de ADR e dos experimentos listados._
+- [x] **INPUT-005:** isolar o controle do jogo enquanto a Central está aberta (Windows). Jogos que leem por XInput (ex.: Resident Evil 2) continuam recebendo o controle sem estar em foco. Driver HidHide, **opcional**: o Tako esconde o controle do jogo ao abrir a Central e devolve ao voltar. A instalação é oferecida no assistente da primeira execução (UX-003) e em Configurações; sem o driver, tudo segue como hoje. Visto no teste manual de 2026-10-16. _Estado: falta confirmar em hardware se o jogo já aberto deixa de ver o controle (`docs/testing/windows.md` §17)._
 
 ### Épico SESSION — Sessões de jogo (P2)
 
-- [ ] **SESSION-001:** retomada rápida, como o Quick Resume do Xbox Series: suspender o jogo aberto (sem fechar) ao abrir outro e voltar exatamente onde estava. No PC fica na memória, não sobrevive a reiniciar o computador. Não funciona com jogos online nem com anti-cheat, que precisam ficar de fora. Começa por um estudo.
+- [ ] **SESSION-001:** retomada rápida, como o Quick Resume do Xbox Series: suspender o jogo aberto (sem fechar) ao abrir outro e voltar exatamente onde estava. No PC fica na memória, não sobrevive a reiniciar o computador. Não funciona com jogos online nem com anti-cheat, que precisam ficar de fora. Começa por um estudo. _Estado: estudo em `docs/spikes/SESSION-001-INPUT-002.md`; a implementação depende de ADR e dos experimentos listados._
 - [x] **SESSION-002:** histórico de sessões: data, hora e duração de cada vez que o jogo rodou (hoje só o total e a última vez), nos detalhes do jogo.
-- [ ] **SESSION-003:** jogo que fechou sozinho em poucos segundos ou com código de erro gera um aviso com o que se sabe (código, log do Tako, sugestão), em vez de voltar em silêncio.
-- [ ] **SESSION-004:** por jogo, variáveis de ambiente e comandos antes e depois de jogar (argumentos e pasta de trabalho já existem), com consentimento. Base do EXT-001.
+- [x] **SESSION-003:** jogo que fechou sozinho em poucos segundos ou com código de erro gera um aviso com o que se sabe (código, log do Tako, sugestão), em vez de voltar em silêncio. _Estado: o código de saída só existe quando o Tako abre o executável direto; jogos abertos pela loja ficam com o aviso por tempo._
+- [x] **SESSION-004:** por jogo, variáveis de ambiente e comandos antes e depois de jogar (argumentos e pasta de trabalho já existem), com consentimento. Base do EXT-001.
 - [ ] **SESSION-005 (Linux):** escolher Proton ou Wine (versão e prefixo) para jogos de Windows adicionados à mão.
-- [ ] **SESSION-006:** "Reparar jogo": abrir a verificação de arquivos da loja dona do jogo (Steam, Epic, GOG, etc.) quando ela oferece.
+- [x] **SESSION-006:** "Reparar jogo": abrir a verificação de arquivos da loja dona do jogo (Steam, Epic, GOG, etc.) quando ela oferece. _Estado: só a Steam oferece a verificação de fora do app (`steam://validate`)._
 
 ### Épico VOICE e AI — Busca por voz e IA (P3)
 
-- [ ] **VOICE-001:** procurar jogos falando ("abrir Hades", "jogos de corrida"), com reconhecimento de fala local (sem mandar áudio para fora) e nos dois idiomas.
-- [ ] **AI-001:** estudo de um assistente de IA para organizar e gerenciar a biblioteca (coleções, limpeza, recomendações, configurações por jogo). Downloads pelo assistente seguem a mesma regra do épico DL.
+- [ ] **VOICE-001:** procurar jogos falando ("abrir Hades", "jogos de corrida"), com reconhecimento de fala local (sem mandar áudio para fora) e nos dois idiomas. _Estado: fora da rodada de 17/10; precisa de ADR (motor, modelo, dependências) e design. Levantamento na issue #102._
+- [x] **AI-001:** estudo de um assistente de IA para organizar e gerenciar a biblioteca (coleções, limpeza, recomendações, configurações por jogo). Downloads pelo assistente seguem a mesma regra do épico DL. _Estado: estudo em `docs/spikes/AI-001-THEME-010-estudo.md`; três decisões ficam com o mantenedor._
 
 ### Épico DATA — Dados de melhoria (P3)
 
@@ -402,7 +402,7 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 - [ ] **EXT-001:** eventos de sessão (`GameStarting`, `GameStarted`, `GameExited`) e ferramentas externas por jogo (pré e pós-execução), com consentimento.
 - [ ] **EXT-002:** API local de integração (a mesma base que o Console Mode usará no sentido inverso).
 - [x] **EXT-004:** Discord Rich Presence: mostrar o jogo aberto no Discord, desligado por padrão.
-- [ ] **EXT-005:** links `tako://` para abrir um jogo ou uma tela do Tako de fora (atalhos, Stream Deck, ART-002).
+- [ ] **EXT-005:** links `tako://` para abrir um jogo ou uma tela do Tako de fora (atalhos, Stream Deck, ART-002). _Estado: Windows e Linux entregues (0.2.0-alpha.5); falta o macOS, onde o toolkit ainda não repassa os eventos `OpenURLs`._
 - [ ] **EXT-003:** plugins de metadados e de fontes, sem acesso privilegiado.
 
 ### Épico STREAM (P3)
