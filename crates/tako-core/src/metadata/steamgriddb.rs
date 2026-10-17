@@ -352,6 +352,81 @@ pub fn data(json: &str) -> Option<Value> {
     root.get_mut("data").map(Value::take)
 }
 
+/// API do botão "BOOP" do site (a mesma do SGDBoop): a v2 não acha uma imagem pelo número dela.
+pub const BOOP_URL: &str = "https://www.steamgriddb.com/api/sgdboop/";
+
+/// A imagem que o usuário escolheu no site (ART-002).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoopImage {
+    /// App da Steam do jogo da imagem.
+    pub steam_app: Option<u32>,
+    /// Jogo no SteamGridDB, quando o site não dá um app da Steam (`nonsteam-<id>`).
+    pub game: Option<String>,
+    pub kind: ArtKind,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoopProblem {
+    /// Grade horizontal: o Tako só usa capa vertical.
+    Horizontal,
+    Unexpected,
+}
+
+pub fn boop_url(asset: &crate::links::SteamGridDbAsset) -> String {
+    let mode = if asset.nonsteam { "?nonsteam=1" } else { "" };
+    format!("{BOOP_URL}{}/{}{mode}", asset.kind, asset.id)
+}
+
+/// Só imagens do próprio SteamGridDB, por https: a resposta não escolhe outro servidor.
+fn steamgriddb_https(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let host = rest.split('/').next().unwrap_or_default();
+    rest.len() > host.len() + 1
+        && (host == "steamgriddb.com" || host.ends_with(".steamgriddb.com"))
+        && host
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+        && !url.chars().any(|c| c.is_control() || c.is_whitespace())
+}
+
+/// Resposta do botão: `app,orientação,url,tipo,hash` por linha (separadas por `\r`); vale a primeira.
+pub fn parse_boop(text: &str) -> Result<BoopImage, BoopProblem> {
+    let line = text
+        .split(['\r', '\n'])
+        .find(|l| !l.trim().is_empty())
+        .ok_or(BoopProblem::Unexpected)?;
+    let f: Vec<&str> = line.split(',').map(str::trim).collect();
+    let [app, orientation, url, kind, ..] = f[..] else {
+        return Err(BoopProblem::Unexpected);
+    };
+    if url.len() > 1024 || !steamgriddb_https(url) {
+        return Err(BoopProblem::Unexpected);
+    }
+    let kind = match kind {
+        "grid" if orientation == "p" => ArtKind::Cover,
+        "grid" => return Err(BoopProblem::Horizontal),
+        "hero" => ArtKind::Hero,
+        "logo" => ArtKind::Logo,
+        "icon" => ArtKind::Icon,
+        _ => return Err(BoopProblem::Unexpected),
+    };
+    let digits = |s: &str| !s.is_empty() && s.len() <= 12 && s.bytes().all(|b| b.is_ascii_digit());
+    let (steam_app, game) = match app.strip_prefix("nonsteam-") {
+        Some(id) if digits(id) => (None, Some(id.to_owned())),
+        None if digits(app) => (app.parse().ok(), None),
+        _ => (None, None),
+    };
+    Ok(BoopImage {
+        steam_app,
+        game,
+        kind,
+        url: url.to_owned(),
+    })
+}
+
 /// Cliente da API v2 (`GET {BASE_URL}{caminho}`, `Authorization: Bearer`). No máximo 2 por segundo.
 pub struct SteamGridDbClient {
     http: Arc<dyn Http>,
@@ -414,7 +489,7 @@ impl SteamGridDbClient {
             return Ok(Some(hit));
         }
         let _one_at_a_time = self.queue.lock().unwrap_or_else(|e| e.into_inner());
-        let result = self.send(path, key.api_key.trim());
+        let result = self.send(&format!("{BASE_URL}{path}"), key.api_key.trim(), false);
         *self.last_failure.lock().unwrap_or_else(|e| e.into_inner()) =
             result.as_ref().err().map(|e| e.failure);
         let Some(json) = result? else {
@@ -428,7 +503,12 @@ impl SteamGridDbClient {
         Ok(Some(d))
     }
 
-    fn send(&self, path: &str, api_key: &str) -> Result<Option<String>, SteamGridDbError> {
+    fn send(
+        &self,
+        url: &str,
+        api_key: &str,
+        boop: bool,
+    ) -> Result<Option<String>, SteamGridDbError> {
         let mut attempt = 0;
         loop {
             attempt += 1;
@@ -436,9 +516,12 @@ impl SteamGridDbClient {
             if !wait.is_zero() {
                 self.clock.sleep(wait);
             }
-            let req = HttpRequest::get(format!("{BASE_URL}{path}"))
+            let mut req = HttpRequest::get(url)
                 .header("Authorization", format!("Bearer {api_key}"))
                 .header("Accept", "application/json");
+            if boop {
+                req = req.header("X-BOOP-API-VER", "3");
+            }
             self.network.fetch_add(1, Ordering::SeqCst);
             let r = self
                 .http
@@ -463,6 +546,25 @@ impl SteamGridDbClient {
                 }
             }
         }
+    }
+
+    /// A resposta crua do botão "BOOP" para uma imagem (`Ok(None)` = o site não a conhece), sem cache.
+    pub fn boop(
+        &self,
+        asset: &crate::links::SteamGridDbAsset,
+    ) -> Result<Option<String>, SteamGridDbError> {
+        let key = self.settings();
+        if !key.has_key() {
+            return Err(err(
+                SteamGridDbFailure::NotConfigured,
+                "SteamGridDB sem chave",
+            ));
+        }
+        let _one_at_a_time = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+        let result = self.send(&boop_url(asset), key.api_key.trim(), true);
+        *self.last_failure.lock().unwrap_or_else(|e| e.into_inner()) =
+            result.as_ref().err().map(|e| e.failure);
+        result
     }
 
     /// Botão "Testar": uma busca mínima com a chave informada, sem cache.
@@ -823,5 +925,107 @@ mod tests {
             p.client().last_failure(),
             Some(SteamGridDbFailure::Unauthorized)
         );
+    }
+}
+
+#[cfg(test)]
+mod boop_tests {
+    use super::*;
+    use crate::links::SteamGridDbAsset;
+    use crate::metadata::test_support::{FakeHttp, TestClock, now};
+
+    const ASSET: SteamGridDbAsset = SteamGridDbAsset {
+        kind: "grid",
+        id: 80000,
+        nonsteam: true,
+    };
+
+    #[test]
+    fn boop_asks_for_one_image_with_the_users_own_key() {
+        let http = Arc::new(FakeHttp::with_fallback(404, ""));
+        http.push(
+            200,
+            "570,p,https://cdn2.steamgriddb.com/grid/a.png,grid,abc\r",
+        );
+        let settings = SteamGridDbSettings {
+            enabled: false,
+            api_key: "0123456789abcdef0123456789abcdef".into(),
+            auto_fill: false,
+            animated: false,
+        };
+        let client = SteamGridDbClient::new(
+            http.clone(),
+            Arc::new(move || settings.clone()),
+            Arc::new(TestClock::at(now())),
+            None,
+        );
+        let text = client.boop(&ASSET).unwrap().unwrap();
+        assert_eq!(parse_boop(&text).unwrap().steam_app, Some(570));
+        let sent = http.sent();
+        assert_eq!(
+            sent[0].url,
+            "https://www.steamgriddb.com/api/sgdboop/grid/80000?nonsteam=1"
+        );
+        assert_eq!(
+            sent[0].header("Authorization"),
+            Some("Bearer 0123456789abcdef0123456789abcdef")
+        );
+        assert_eq!(sent[0].header("X-BOOP-API-VER"), Some("3"));
+        assert_eq!(client.boop(&ASSET), Ok(None));
+        http.push(401, "");
+        assert_eq!(
+            client.boop(&ASSET).unwrap_err().failure,
+            SteamGridDbFailure::Unauthorized
+        );
+        let none = SteamGridDbClient::new(
+            http,
+            Arc::new(SteamGridDbSettings::default),
+            Arc::new(TestClock::at(now())),
+            None,
+        );
+        assert_eq!(
+            none.boop(&ASSET).unwrap_err().failure,
+            SteamGridDbFailure::NotConfigured
+        );
+    }
+
+    #[test]
+    fn boop_answers_map_to_kinds_and_only_trust_steamgriddb_https() {
+        let ok =
+            parse_boop("nonsteam-5249,,https://cdn2.steamgriddb.com/logo/b.png,logo,h\r").unwrap();
+        assert_eq!(
+            ok,
+            BoopImage {
+                steam_app: None,
+                game: Some("5249".into()),
+                kind: ArtKind::Logo,
+                url: "https://cdn2.steamgriddb.com/logo/b.png".into(),
+            }
+        );
+        assert_eq!(
+            parse_boop("570,l,https://cdn2.steamgriddb.com/grid/c.png,grid,h"),
+            Err(BoopProblem::Horizontal)
+        );
+        for (body, kind) in [("hero", ArtKind::Hero), ("icon", ArtKind::Icon)] {
+            let line = format!("1,,https://cdn2.steamgriddb.com/{body}/x.png,{body},h");
+            assert_eq!(parse_boop(&line).unwrap().kind, kind);
+        }
+        for bad in [
+            "",
+            "\r\r",
+            "570,p",
+            "570,p,http://cdn2.steamgriddb.com/grid/a.png,grid,h",
+            "570,p,https://evil.example/grid/a.png,grid,h",
+            "570,p,https://steamgriddb.com.evil.example/a.png,grid,h",
+            "570,p,https://user@cdn2.steamgriddb.com/a.png,grid,h",
+            "570,p,https://cdn2.steamgriddb.com:8080/a.png,grid,h",
+            "570,p,https://cdn2.steamgriddb.com/,grid,h",
+            "570,p,https://cdn2.steamgriddb.com/a b.png,grid,h",
+            "570,p,https://cdn2.steamgriddb.com/a.png,video,h",
+        ] {
+            assert_eq!(parse_boop(bad), Err(BoopProblem::Unexpected), "{bad:?}");
+        }
+        let odd = parse_boop("abc,p,https://cdn2.steamgriddb.com/grid/a.png,grid,h").unwrap();
+        assert_eq!((odd.steam_app, odd.game), (None, None));
     }
 }

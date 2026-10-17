@@ -112,10 +112,7 @@ pub mod args {
         while let Some(a) = it.next() {
             if a.eq_ignore_ascii_case(PIPE) || a == "--open-url" {
                 it.next(); // e o valor
-            } else if a
-                .get(..7)
-                .is_some_and(|s| s.eq_ignore_ascii_case("tako://"))
-            {
+            } else if crate::links::is_link(a) {
                 // O link é usado uma vez; reiniciar a UI não pode repetir Jogar.
             } else if ![UI, SAFE_MODE, NO_SUPERVISOR]
                 .iter()
@@ -151,6 +148,7 @@ mod tests {
             "--data-dir",
             "dados",
             "tako://home",
+            "SGDB://boop/grid/1",
         ]
         .map(str::to_owned);
         assert_eq!(args::passthrough(&all), ["--data-dir", "dados"]);

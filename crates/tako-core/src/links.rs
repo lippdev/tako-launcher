@@ -3,18 +3,41 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Link {
     Screen(&'static str),
-    Game { id: String, play: bool },
+    Game {
+        id: String,
+        play: bool,
+    },
+    /// Imagem do site do SteamGridDB (ART-002): só o tipo e o número dela; o endereço vem da API.
+    SteamGridDb(SteamGridDbAsset),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SteamGridDbAsset {
+    /// "grid", "hero", "logo" ou "icon", como o site manda.
+    pub kind: &'static str,
+    pub id: u64,
+    /// O site pediu para um jogo fora da Steam (`/nonsteam` do SGDBoop).
+    pub nonsteam: bool,
 }
 
 pub const MAX_URL: usize = 2048;
+
+/// Esquemas aceitos: o do Tako e o do botão "BOOP" do SteamGridDB (o mesmo do SGDBoop).
+pub const SCHEMES: [&str; 2] = ["tako://", "sgdb://"];
 
 pub fn parse(url: &str) -> Option<Link> {
     if url.len() > MAX_URL || url.chars().any(char::is_control) {
         return None;
     }
     let (scheme, target) = url.split_once("://")?;
+    if scheme.eq_ignore_ascii_case("sgdb") {
+        return steamgriddb(target.strip_prefix("boop/")?);
+    }
     if !scheme.eq_ignore_ascii_case("tako") {
         return None;
+    }
+    if let Some(rest) = target.strip_prefix("steamgriddb/") {
+        return steamgriddb(rest);
     }
     match target {
         "home" | "home/" => Some(Link::Screen("home")),
@@ -55,19 +78,45 @@ pub fn parse(url: &str) -> Option<Link> {
     }
 }
 
+/// `<tipo>/<número>[/nonsteam]`. Um só tipo e um só número: o site manda um botão por imagem.
+fn steamgriddb(target: &str) -> Option<Link> {
+    let mut parts = target.trim_end_matches('/').split('/');
+    let first = parts.next()?;
+    let kind = ["grid", "hero", "logo", "icon"]
+        .into_iter()
+        .find(|k| first.eq_ignore_ascii_case(k))?;
+    let id = parts.next()?;
+    if id.is_empty() || id.len() > 12 || !id.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let nonsteam = match parts.next() {
+        None => false,
+        Some(m) if m.eq_ignore_ascii_case("nonsteam") => true,
+        Some(_) => return None,
+    };
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(Link::SteamGridDb(SteamGridDbAsset {
+        kind,
+        id: id.parse().ok()?,
+        nonsteam,
+    }))
+}
+
+pub fn is_link(arg: &str) -> bool {
+    SCHEMES.iter().any(|s| {
+        arg.get(..s.len())
+            .is_some_and(|p| p.eq_ignore_ascii_case(s))
+    })
+}
+
 /// Um argumento de protocolo é um único valor, inclusive quando chamado pelo navegador.
 pub fn argument(args: &[String]) -> Option<&str> {
     args.windows(2)
         .find(|w| w[0] == "--open-url")
         .map(|w| w[1].as_str())
-        .or_else(|| {
-            args.iter()
-                .find(|a| {
-                    a.get(..7)
-                        .is_some_and(|s| s.eq_ignore_ascii_case("tako://"))
-                })
-                .map(String::as_str)
-        })
+        .or_else(|| args.iter().find(|a| is_link(a)).map(String::as_str))
 }
 
 #[cfg(test)]
@@ -94,6 +143,33 @@ mod tests {
                 play: true
             })
         );
+    }
+
+    #[test]
+    fn steamgriddb_boop_buttons_and_the_tako_form_name_one_image() {
+        let asset =
+            |kind, id, nonsteam| Some(Link::SteamGridDb(SteamGridDbAsset { kind, id, nonsteam }));
+        assert_eq!(parse("sgdb://boop/grid/80000"), asset("grid", 80000, false));
+        assert_eq!(parse("SGDB://boop/hero/12/"), asset("hero", 12, false));
+        assert_eq!(parse("sgdb://boop/logo/7/nonsteam"), asset("logo", 7, true));
+        assert_eq!(parse("tako://steamgriddb/icon/5"), asset("icon", 5, false));
+        for url in [
+            "sgdb://boop/grid/",
+            "sgdb://boop/grid/1,2",
+            "sgdb://boop/grid,hero/1",
+            "sgdb://boop/video/1",
+            "sgdb://boop/grid/-1",
+            "sgdb://boop/grid/1/x",
+            "sgdb://boop/grid/1/nonsteam/2",
+            "sgdb://boop/grid/9999999999999",
+            "sgdb://grid/1",
+            "sgdb://boop/grid/1?u=https://x",
+            "tako://steamgriddb/grid/abc",
+        ] {
+            assert!(parse(url).is_none(), "{url:?}");
+        }
+        let args = ["tako".to_owned(), "sgdb://boop/grid/1".to_owned()];
+        assert_eq!(argument(&args), Some("sgdb://boop/grid/1"));
     }
 
     #[test]

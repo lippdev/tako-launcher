@@ -25,6 +25,10 @@ impl Shell {
                     self.apply_nav(nav);
                 }
             }
+            Link::SteamGridDb(asset) => {
+                super::steamgriddb_link::open(&mut self.ctx, asset);
+                self.after_action();
+            }
         }
         self.ctx.dirty = true;
     }

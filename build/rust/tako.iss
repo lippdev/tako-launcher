@@ -94,6 +94,11 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 Root: HKCU; Subkey: "Software\Classes\tako"; ValueType: string; ValueData: "URL:Tako"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\tako"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\tako\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExe}"" --open-url ""%1"""
+; Botão "BOOP" do SteamGridDB (ART-002): o Tako só assume sgdb:// se ninguém tiver (ex.: SGDBoop) ou se já for dele.
+; Sem uninsdeletekey: a desinstalação só apaga se ainda apontar para o Tako (SgdbIsOurs).
+Root: HKCU; Subkey: "Software\Classes\sgdb"; ValueType: string; ValueData: "URL:SteamGridDB (Tako)"; Check: SgdbIsFreeOrOurs
+Root: HKCU; Subkey: "Software\Classes\sgdb"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Check: SgdbIsFreeOrOurs
+Root: HKCU; Subkey: "Software\Classes\sgdb\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExe}"" --open-url ""%1"""; Check: SgdbIsFreeOrOurs
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
@@ -104,6 +109,28 @@ Filename: "{app}\{#AppExe}"; Flags: nowait; Check: RelaunchAfterSilentUpdate
 function RelaunchAfterSilentUpdate: Boolean;
 begin
   Result := WizardSilent and (ExpandConstant('{param:NOLAUNCH|0}') = '0');
+end;
+
+const
+  SgdbKey = 'Software\Classes\sgdb';
+
+function SgdbIsOurs: Boolean;
+var
+  Command: String;
+begin
+  Result := RegQueryStringValue(HKCU, SgdbKey + '\shell\open\command', '', Command) and
+    (Pos(Lowercase(ExpandConstant('{app}\{#AppExe}')), Lowercase(Command)) > 0);
+end;
+
+function SgdbIsFreeOrOurs: Boolean;
+begin
+  Result := (not RegKeyExists(HKCU, SgdbKey)) or SgdbIsOurs;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if (CurUninstallStep = usUninstall) and SgdbIsOurs then
+    RegDeleteKeyIncludingSubkeys(HKCU, SgdbKey);
 end;
 
 [UninstallDelete]

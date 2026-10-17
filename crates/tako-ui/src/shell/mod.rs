@@ -22,6 +22,7 @@ pub mod settings;
 pub mod sidebar;
 pub mod smart;
 pub mod source_ids;
+mod steamgriddb_link;
 pub mod tiles;
 
 pub use ctx::{Ctx, Effect, InputKind, RunningGame, Settings};

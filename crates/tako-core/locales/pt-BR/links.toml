@@ -1,2 +1,7 @@
 [links]
 missing_game = "Este jogo não está na biblioteca."
+steamgriddb.loading = "Buscando a imagem no SteamGridDB…"
+steamgriddb.missing = "O SteamGridDB não encontrou esta imagem."
+steamgriddb.horizontal = "O Tako usa capas verticais. Escolha uma capa de 600×900 no SteamGridDB."
+steamgriddb.unexpected = "O SteamGridDB respondeu algo que o Tako não entendeu. Tente de novo pelo seletor de imagens."
+steamgriddb.pick = "Aplicar {kind} em…"
