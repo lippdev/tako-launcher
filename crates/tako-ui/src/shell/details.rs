@@ -73,6 +73,15 @@ fn client_missing(ctx: &Ctx, g: &Game) -> Option<String> {
     tako_sources::report::client_missing(g, report)
 }
 
+/// Verificação de arquivos da loja dona do jogo (SESSION-006). Só a Steam tem um caminho oficial para pedir
+/// isso de fora; nas outras lojas a verificação fica dentro do app delas.
+pub(crate) fn repair_uri(g: &Game) -> Option<String> {
+    match (g.store(), g.steam_app_id) {
+        (GameStore::Steam, Some(id)) if g.is_installed => Some(format!("steam://validate/{id}")),
+        _ => None,
+    }
+}
+
 /// Onde instalar um jogo que não está instalado (só a Steam tem um caminho oficial direto).
 fn install_uri(g: &Game) -> Option<String> {
     match (g.store(), g.steam_app_id) {
