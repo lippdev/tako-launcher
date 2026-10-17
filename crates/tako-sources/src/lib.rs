@@ -43,7 +43,9 @@ pub fn windows_sources(
     let r = || registry.clone();
     vec![
         Box::new(epic::EpicLibrarySource::new(r(), &program_data)),
-        Box::new(gog::GogLibrarySource::new(r())),
+        Box::new(gog::GogLibrarySource::new(r()).with_galaxy_db(Some(
+            std::path::Path::new(&program_data).join(r"GOG.com\Galaxy\storage\galaxy-2.0.db"),
+        ))),
         Box::new(xbox::XboxLibrarySource::new(Box::new(
             xbox::windows::WindowsXboxSystem::new(r()),
         ))),

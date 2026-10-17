@@ -2,6 +2,8 @@
 //! `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests` e a lista `LauncherInstalled.dat`, lidos sem
 //! a Epic aberta. Abre sempre pelo protocolo oficial (login e DRM ficam com a Epic).
 
+pub mod owned;
+
 use crate::fs::StoreFs;
 use crate::registry::RegistryReader;
 use crate::{LibraryScan, LibrarySource};
@@ -150,15 +152,15 @@ impl EpicLibrarySource {
         }
     }
 
-    fn manifests_folder(&self) -> PathBuf {
+    /// `Data` da Epic: manifests dos instalados e o cache do catálogo.
+    fn data_folder(&self) -> PathBuf {
         match self.registry.get_string(LAUNCHER_KEY, "AppDataPath") {
-            Some(d) if !d.trim().is_empty() => PathBuf::from(d).join("Manifests"),
+            Some(d) if !d.trim().is_empty() => PathBuf::from(d),
             _ => self
                 .program_data
                 .join("Epic")
                 .join("EpicGamesLauncher")
-                .join("Data")
-                .join("Manifests"),
+                .join("Data"),
         }
     }
 
@@ -182,7 +184,10 @@ impl LibrarySource for EpicLibrarySource {
 
     fn scan(&self) -> LibraryScan {
         let client = self.registry.get_string(PROTOCOL_KEY, "").is_some();
-        let Ok(dir) = std::fs::read_dir(self.manifests_folder()) else {
+        let data = self.data_folder();
+        let owned = owned::load(&data.join("Catalog").join("catcache.bin"));
+        let dir = std::fs::read_dir(data.join("Manifests"));
+        if dir.is_err() && owned.is_empty() {
             return if client {
                 LibraryScan {
                     client_installed: true,
@@ -191,8 +196,10 @@ impl LibrarySource for EpicLibrarySource {
             } else {
                 LibraryScan::missing(t("sources.epic.missing"))
             };
-        };
+        }
         let mut files: Vec<PathBuf> = dir
+            .into_iter()
+            .flatten()
             .flatten()
             .map(|e| e.path())
             .filter(|p| {
@@ -222,6 +229,9 @@ impl LibrarySource for EpicLibrarySource {
                 games.push(to_game(&install, crate::install_dates::of(&file)));
             }
         }
+        // Os da conta que faltam instalar (SRC-005).
+        let missing = owned::not_installed(&owned, &games);
+        games.extend(missing);
         crate::text::sort_by_title(&mut games);
         LibraryScan {
             games,
@@ -369,6 +379,48 @@ mod tests {
         assert_eq!(
             nothing.notice.as_deref(),
             Some("Epic Games Launcher não encontrado neste PC")
+        );
+    }
+
+    #[test]
+    fn source_adds_owned_games_that_are_not_installed() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path().join("Epic/EpicGamesLauncher/Data");
+        std::fs::create_dir_all(data.join("Manifests")).unwrap();
+        std::fs::create_dir_all(data.join("Catalog")).unwrap();
+        std::fs::write(
+            data.join("Manifests/0A1B2C3D.item"),
+            manifest("0A1B2C3D.item"),
+        )
+        .unwrap();
+        std::fs::write(
+            data.join("Catalog/catcache.bin"),
+            owned::tests::catcache(owned::tests::CATALOG),
+        )
+        .unwrap();
+        let reg = MemoryRegistry::default().with(PROTOCOL_KEY, "", "epic");
+        let scan = source(reg.clone(), dir.path().to_path_buf(), &[FAROL]).scan();
+        let games: Vec<_> = scan
+            .games
+            .iter()
+            .map(|g| (g.id.as_str(), g.is_installed))
+            .collect();
+        assert_eq!(games, [("epic:Farol", true), ("epic:MareAlta", false)]);
+        assert!(scan.games[1].install_uri.is_some());
+
+        // Sem nenhum instalado (nem a pasta de manifests), a conta aparece do mesmo jeito.
+        std::fs::remove_dir_all(data.join("Manifests")).unwrap();
+        let scan = source(reg.clone(), dir.path().to_path_buf(), &[]).scan();
+        assert_eq!(scan.games.len(), 2);
+        assert!(scan.games.iter().all(|g| !g.is_installed));
+
+        // Cache quebrado: só fica o que está instalado.
+        std::fs::write(data.join("Catalog/catcache.bin"), "{ quebrado").unwrap();
+        assert!(
+            source(reg, dir.path().to_path_buf(), &[])
+                .scan()
+                .games
+                .is_empty()
         );
     }
 }

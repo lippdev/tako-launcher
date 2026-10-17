@@ -67,6 +67,14 @@ pub struct CachedInfo {
     pub art_cover: Option<String>,
     pub is_installed: bool,
     pub folder_name: Option<String>,
+    pub install: Option<CachedInstall>,
+}
+
+/// `install` de um item do cache: só o que diz se é DLC.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(default)]
+pub struct CachedInstall {
+    pub is_dlc: bool,
 }
 
 /// `legendaryConfig/legendary/installed.json`: objeto `appName -> instalação`.
@@ -283,7 +291,14 @@ pub fn scan_root(root: &Path) -> Vec<Game> {
     ];
 
     let mut games = Vec::new();
-    for (installs, cache) in groups {
+    let runners = [
+        Runner::Legendary,
+        Runner::Gog,
+        Runner::Nile,
+        Runner::Sideload,
+    ];
+    for (runner, (installs, cache)) in runners.into_iter().zip(groups) {
+        let before = games.len();
         for install in installs {
             if !valid_app_name(&install.app_name) {
                 continue;
@@ -298,6 +313,34 @@ pub fn scan_root(root: &Path) -> Vec<Game> {
             }
             let cached = cache.get(&install.app_name);
             games.push(to_game(root, install, cached));
+        }
+        // Os da conta que não estão instalados (SRC-005): o resto do cache, fora as DLCs (o GOG põe ali também o
+        // `gog-redist`, marcado como DLC). O protocolo do Heroic pergunta se instala quando o jogo não está
+        // instalado (`protocol.ts`, `handleLaunch`).
+        let installed: HashSet<String> = games[before..].iter().map(|g| g.id.clone()).collect();
+        let mut owned: Vec<&CachedInfo> = cache
+            .values()
+            .filter(|c| {
+                !c.install.as_ref().is_some_and(|i| i.is_dlc) && valid_app_name(&c.app_name)
+            })
+            .collect();
+        owned.sort_by(|a, b| a.app_name.cmp(&b.app_name));
+        for cached in owned {
+            let install = HeroicInstall {
+                runner,
+                app_name: cached.app_name.clone(),
+                title: None,
+                install_path: None,
+                art_square: None,
+                art_cover: None,
+            };
+            let mut game = to_game(root, install, Some(cached));
+            if installed.contains(&game.id) {
+                continue;
+            }
+            game.is_installed = false;
+            game.install_uri = game.launch_target.take();
+            games.push(game);
         }
     }
     games
