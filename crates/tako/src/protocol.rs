@@ -33,6 +33,11 @@ pub enum UiMsg {
     Closing {
         reason: String,
     },
+    /// A interface abriu ou trocou de modo (ADR-0027): o supervisor reabre nele e, no desktop, não esconde o
+    /// controle do jogo.
+    Mode {
+        big_picture: bool,
+    },
 }
 
 /// Supervisor → interface.

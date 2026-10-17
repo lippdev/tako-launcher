@@ -78,6 +78,8 @@ pub struct Supervisor {
     profiles: Profiles,
     key: tako_core::input::shortcut::KeyShortcut,
     initial_link: Option<String>,
+    /// Modo da interface (ADR-0027): `None` até ela avisar (abre no desktop e pergunta), `Some(true)` = tela cheia.
+    big_picture: Option<bool>,
 }
 
 impl Supervisor {
@@ -85,6 +87,7 @@ impl Supervisor {
         let (profiles, key) = shortcuts(&paths);
         Supervisor {
             initial_link: tako_core::links::argument(all_args).map(str::to_owned),
+            big_picture: initial_mode(all_args),
             paths,
             platform,
             passthrough: args::passthrough(&all_args[1..]),
@@ -161,6 +164,16 @@ impl Supervisor {
         if launch.control_center {
             a.push("--control-center".into());
         }
+        if let Some(big) = self.big_picture {
+            a.push(
+                if big {
+                    args::BIG_PICTURE
+                } else {
+                    args::DESKTOP
+                }
+                .into(),
+            );
+        }
         let mut child = Command::new(exe)
             .args(&a)
             .env("TAKO_SUPERVISOR_PID", std::process::id().to_string())
@@ -222,8 +235,10 @@ impl Supervisor {
             ..Default::default()
         };
         loop {
-            // Interface por cima do jogo: o jogo deixa de ver o controle até ela fechar (INPUT-005).
-            let hidden = self.running.is_some() && self.hide_pads();
+            // Interface por cima do jogo: o jogo deixa de ver o controle até ela fechar (INPUT-005). No desktop a
+            // janela não é do controle (ADR-0027): o jogo continua com ele.
+            let hidden =
+                self.running.is_some() && self.big_picture != Some(false) && self.hide_pads();
             let mut ui = match self.spawn_ui(safe, &launch) {
                 Ok(u) => u,
                 Err(e) => {
@@ -392,6 +407,13 @@ impl Supervisor {
                 }
             }
             UiMsg::Closing { reason } => ui.closing = Some(reason),
+            UiMsg::Mode { big_picture } => {
+                tracing::info!(
+                    "interface no modo {}",
+                    if big_picture { "tela cheia" } else { "desktop" }
+                );
+                self.big_picture = Some(big_picture);
+            }
         }
     }
 
@@ -494,6 +516,13 @@ impl Supervisor {
             }
         }
     }
+}
+
+/// Modo pedido na linha de comando: `--big-picture` (modo Xbox/AnyFSE) e `--console-session` (Console Mode) vão
+/// direto para a tela cheia; sem eles a interface decide (desktop, com a pergunta do controle).
+fn initial_mode(all_args: &[String]) -> Option<bool> {
+    (args::has(all_args, args::BIG_PICTURE) || args::has(all_args, args::CONSOLE_SESSION))
+        .then_some(true)
 }
 
 /// Perfis de botões e atalho de teclado da Central, gravados nas configurações do perfil local em uso (UX-004).
