@@ -261,6 +261,9 @@ pub struct Game {
     pub play_time: Duration,
     /// Ids das coleções que têm este jogo.
     pub collections: BTreeSet<String>,
+    /// Tags do usuário (LIB-002), guardadas com o estado do jogo.
+    #[serde(default)]
+    pub tags: BTreeSet<String>,
 }
 
 impl Game {

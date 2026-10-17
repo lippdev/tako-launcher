@@ -36,6 +36,7 @@ impl library::LibraryStore for SqlLibrary {
                             last_played_at: s.last_played_at,
                             play_minutes: s.play_minutes,
                             sessions: s.sessions.clone(),
+                            tags: s.tags.clone(),
                         },
                     )
                 })
@@ -82,6 +83,7 @@ fn to_state(s: GameStateRow) -> GameStateRecord {
         last_played_at: s.last_played_at,
         play_minutes: s.play_minutes,
         sessions: s.sessions,
+        tags: s.tags,
     }
 }
 

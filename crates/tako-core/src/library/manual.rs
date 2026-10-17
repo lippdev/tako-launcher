@@ -3,6 +3,7 @@
 use super::{Game, GameStore, GameTrackingStrategy, PlayStatus};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
@@ -37,6 +38,9 @@ pub struct GameStateRecord {
     /// Histórico (SESSION-002), da mais antiga para a mais recente; só as últimas `MAX_SESSIONS`.
     #[serde(default)]
     pub sessions: Vec<PlaySession>,
+    /// Tags do usuário (LIB-002).
+    #[serde(default)]
+    pub tags: BTreeSet<String>,
 }
 
 /// Uma vez que o jogo rodou pelo launcher.

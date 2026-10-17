@@ -1,0 +1,8 @@
+[tags]
+title = "Tags"
+text = "Rótulos livres para organizar e filtrar a biblioteca. Marque para aplicar; desmarque para tirar."
+new = "Nova tag"
+name_rule = "Até 40 caracteres. Uma tag que já existe é só aplicada."
+bulk_header = "EM LOTE"
+tag_shown = "Marcar os jogos mostrados"
+tag_shown_desc = "Aplica ou tira uma tag de todos os jogos que esta lista mostra com os filtros atuais."

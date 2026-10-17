@@ -8,7 +8,7 @@ use crate::library::{GameTrackingStrategy, PlaySession, PlayStatus};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 pub const IMPORTED_SUFFIX: &str = ".importado";
@@ -43,6 +43,8 @@ pub struct GameStateRow {
     pub play_minutes: f64,
     /// Linhas de `play_sessions`, da mais antiga para a mais recente.
     pub sessions: Vec<PlaySession>,
+    /// Linhas de `game_tags` (LIB-002).
+    pub tags: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -78,7 +80,7 @@ impl LibraryStore {
         let conn = self.db.open()?;
         let tx = conn.unchecked_transaction()?;
         tx.execute_batch(
-            "DELETE FROM manual_games; DELETE FROM game_state; DELETE FROM play_sessions;",
+            "DELETE FROM manual_games; DELETE FROM game_state; DELETE FROM play_sessions; DELETE FROM game_tags;",
         )?;
         write(&tx, data, "INSERT OR REPLACE")?;
         tx.commit()?;
@@ -141,6 +143,7 @@ fn read_legacy_json(path: &Path) -> Result<LibraryData> {
                     last_played_at: s.last_played_at.as_deref().and_then(parse_date),
                     play_minutes: s.play_minutes,
                     sessions: Vec::new(),
+                    tags: BTreeSet::new(),
                 };
                 (id, row)
             })
@@ -216,7 +219,13 @@ fn write(conn: &Connection, data: &LibraryData, verb: &str) -> Result<()> {
     ))?;
     let mut session = conn
         .prepare("INSERT INTO play_sessions (game_id, started_at, seconds) VALUES (?1, ?2, ?3);")?;
+    let mut tag = conn.prepare(&format!(
+        "{verb} INTO game_tags (game_id, tag) VALUES (?1, ?2);"
+    ))?;
     for (id, s) in &data.state {
+        for t in &s.tags {
+            tag.execute(params![id, t])?;
+        }
         state.execute(params![
             id,
             s.is_favorite,
@@ -279,6 +288,7 @@ fn read_state(conn: &Connection) -> Result<HashMap<String, GameStateRow>> {
                 .and_then(parse_date),
             play_minutes: r.get(3)?,
             sessions: Vec::new(),
+            tags: BTreeSet::new(),
         };
         Ok((r.get(0)?, row))
     })?;
@@ -292,6 +302,13 @@ fn read_state(conn: &Connection) -> Result<HashMap<String, GameStateRow>> {
                 started_at: parse_date_or_epoch(&r.get::<_, String>(1)?),
                 duration: std::time::Duration::from_secs(r.get::<_, i64>(2)?.max(0) as u64),
             });
+        }
+    }
+    let mut stmt = conn.prepare("SELECT game_id, tag FROM game_tags;")?;
+    let mut rows = stmt.query([])?;
+    while let Some(r) = rows.next()? {
+        if let Some(s) = state.get_mut(&r.get::<_, String>(0)?) {
+            s.tags.insert(r.get(1)?);
         }
     }
     Ok(state)
@@ -346,6 +363,7 @@ mod tests {
                 started_at: added(),
                 duration: std::time::Duration::from_secs(90),
             }],
+            tags: ["Coop".to_string(), "Sofá".to_string()].into(),
         };
         data.state.insert("steam:570".into(), state.clone());
         store.save(&data).unwrap();
