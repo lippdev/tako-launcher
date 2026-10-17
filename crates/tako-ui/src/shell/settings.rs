@@ -218,7 +218,7 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
     } else {
         ctx.update_status.clone()
     };
-    let mut v = vec![
+    let v = vec![
         MenuItem::new(
             PanelRow::toggle(
                 "startup",
@@ -278,9 +278,13 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
             |p| p.nightly = !p.nightly,
         ),
     ];
-    // Logo depois de "Abrir o Tako ao entrar no sistema".
+    // Logo depois de "Abrir o Tako ao entrar no sistema" (só no Windows; fora dele `v` não muda).
     #[cfg(windows)]
-    v.insert(1, xbox_mode_row(ctx));
+    let v = {
+        let mut v = v;
+        v.insert(1, xbox_mode_row(ctx));
+        v
+    };
     v
 }
 
