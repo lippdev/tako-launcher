@@ -113,3 +113,15 @@ Precisa de duas telas (ex.: monitor e TV).
 3. Abra o jogo: só o monitor fica ligado, com a resolução e o HDR escolhidos; a TV desliga. Ao fechar, tudo volta.
 4. Desconecte o monitor: a linha mostra "Monitor (desconectada)" e abrir o jogo avisa que a tela não está conectada.
 5. Outro jogo, sem tela própria, continua indo para a TV com a resolução do Tako.
+
+## 15. Tema por endereço (THEME-004)
+
+Precisa de internet e de um repositório no GitHub com uma release que tenha um `.takotheme` (pode ser um de teste).
+
+1. Configurações › Aparência › Tema › "Instalar por endereço…": digite o endereço (ex.: `https://github.com/autor/tema`).
+   Aparece "Baixando o tema…" e depois "instalado"; o tema entra na lista com o endereço na descrição.
+2. Endereço errado (`gitlab.com/x/y`, repositório sem release ou release sem `.takotheme`): aparece o motivo, nada é
+   instalado.
+3. "Atualizar temas" (só aparece com tema por endereço): sem release nova, "já estão na última versão". Publique uma
+   release nova no repositório e repita: o tema é atualizado e, se estiver em uso, a tela muda na hora.
+4. Remova o tema: "Atualizar temas" some.

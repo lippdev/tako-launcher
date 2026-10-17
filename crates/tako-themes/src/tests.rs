@@ -434,3 +434,33 @@ fn crash_loop_falls_back_to_the_default_theme() {
     assert!(!record_fault(&root, at(123)));
     assert!(record_fault(&root, at(124)));
 }
+
+#[test]
+fn theme_from_a_repository_remembers_where_it_came_from() {
+    let w = Work::new();
+    let repo = remote::Repo::parse("autor/tema").unwrap();
+    let pkg = w.zip(&[
+        ("theme.toml", TOML.as_bytes()),
+        ("main.slint", SLINT.as_bytes()),
+    ]);
+    let theme =
+        remote::install_downloaded(&pkg, &w.root(), &repo, "v1.0", &Limits::default()).unwrap();
+    assert_eq!(theme.id(), "Autor_TemaTeste");
+    let sources = remote::sources(&w.root());
+    assert_eq!(
+        sources.get("Autor_TemaTeste"),
+        Some(&remote::Source {
+            repo: "https://github.com/autor/tema".into(),
+            tag: "v1.0".into(),
+        })
+    );
+    // O arquivo de origens não aparece como tema.
+    assert_eq!(InstalledTheme::scan(&w.root()).len(), 1);
+    // Pacote ruim não instala nem grava origem.
+    let bad = w.zip(&[("leiame.txt", b"x")]);
+    assert!(remote::install_downloaded(&bad, &w.root(), &repo, "v2", &Limits::default()).is_err());
+    assert_eq!(remote::sources(&w.root())["Autor_TemaTeste"].tag, "v1.0");
+    // Remover o tema esquece a origem.
+    uninstall(&w.root(), "Autor_TemaTeste").unwrap();
+    assert!(remote::sources(&w.root()).is_empty());
+}

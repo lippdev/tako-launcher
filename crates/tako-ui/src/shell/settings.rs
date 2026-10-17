@@ -305,9 +305,97 @@ fn theme_name(ctx: &Ctx) -> String {
         .unwrap_or_else(|| ctx.t("settings.appearance.builtin"))
 }
 
+/// Temas instalados (lidos do disco no máximo a cada 30 s; instalar ou atualizar esquece a leitura).
+pub(crate) const THEMES_CACHE: &str = "themes";
+
+fn installed_themes(ctx: &Ctx) -> Vec<tako_themes::InstalledTheme> {
+    let root = ctx.paths.themes();
+    cached(THEMES_CACHE, Duration::from_secs(30), || {
+        tako_themes::InstalledTheme::scan(&root)
+    })
+}
+
+/// "Instalar por endereço" (THEME-004): o endereço do repositório no GitHub; baixa fora da interface.
+fn install_from_url(ctx: &Ctx) -> Flow {
+    Flow::Push(Box::new(
+        super::keyboard::KeyboardLayer::new(
+            ctx,
+            ctx.t("settings.appearance.install_url"),
+            "",
+            |ctx, text| {
+                let text = text.to_owned();
+                let root = ctx.paths.themes();
+                ctx.toast(ctx.t("settings.appearance.downloading"));
+                crate::tasks::run(
+                    ctx,
+                    move || tako_themes::remote::install_from(&text, &root),
+                    |ctx, result| {
+                        forget(THEMES_CACHE);
+                        match result {
+                            Ok(t) => {
+                                let name = t
+                                    .manifest
+                                    .as_ref()
+                                    .map(|m| m.name.clone())
+                                    .unwrap_or_else(|_| t.id());
+                                ctx.toast(ctx.tf("effects.theme_installed", &[("name", &name)]));
+                            }
+                            Err(e) => ctx.toast(e.to_string()),
+                        }
+                    },
+                );
+                Flow::Close
+            },
+        )
+        .hint(ctx.t("settings.appearance.install_url_hint")),
+    ))
+}
+
+/// "Atualizar temas": baixa a release nova de cada tema instalado por endereço.
+fn update_themes(ctx: &mut Ctx) -> Flow {
+    let root = ctx.paths.themes();
+    ctx.toast(ctx.t("settings.appearance.checking"));
+    crate::tasks::run(
+        ctx,
+        move || tako_themes::remote::update_all(&root),
+        |ctx, results| {
+            use tako_themes::remote::UpdateOutcome;
+            forget(THEMES_CACHE);
+            let updated = results
+                .iter()
+                .filter(|(_, o)| matches!(o, UpdateOutcome::Updated(_)))
+                .count();
+            let failed: Vec<String> = results
+                .iter()
+                .filter_map(|(id, o)| match o {
+                    UpdateOutcome::Failed(e) => Some(format!("{id}: {e}")),
+                    _ => None,
+                })
+                .collect();
+            let mut text = if updated == 0 {
+                ctx.t("settings.appearance.themes_up_to_date")
+            } else {
+                i18n::tn("settings.appearance.themes_updated", updated as i64, &[])
+            };
+            if !failed.is_empty() {
+                text = format!("{text} · {}", failed.join(" · "));
+            }
+            ctx.toast(text);
+            // O tema em uso mudou: aplica a versão nova.
+            if updated > 0
+                && let Some(id) = tako_themes::selected(&ctx.paths.themes())
+            {
+                ctx.effect(Effect::ApplyTheme(id));
+            }
+        },
+    );
+    Flow::Stay
+}
+
 fn themes_panel(ctx: &Ctx) -> MenuLayer {
-    let installed = Rc::new(tako_themes::InstalledTheme::scan(&ctx.paths.themes()));
-    MenuLayer::panel(ctx.t("settings.appearance.theme"), move |ctx| {
+    MenuLayer::panel(ctx.t("settings.appearance.theme"), |ctx| {
+        let installed = installed_themes(ctx);
+        let sources = tako_themes::remote::sources(&ctx.paths.themes());
         let selected = tako_themes::selected(&ctx.paths.themes());
         let mut v = vec![
             MenuItem::new(
@@ -345,6 +433,11 @@ fn themes_panel(ctx: &Ctx) -> MenuLayer {
             } else {
                 desc
             };
+            // Instalado por endereço: mostra de onde veio.
+            let desc = match sources.get(&id) {
+                Some(s) if ok => format!("{desc} · {}", s.repo.trim_start_matches("https://")),
+                _ => desc,
+            };
             let on = selected.as_deref() == Some(id.as_str());
             v.push(
                 MenuItem::new(
@@ -361,6 +454,24 @@ fn themes_panel(ctx: &Ctx) -> MenuLayer {
             )
             .on(effect(Effect::InstallTheme)),
         );
+        v.push(
+            MenuItem::new(
+                PanelRow::action("install-url", ctx.t("settings.appearance.install_url"))
+                    .desc(ctx.t("settings.appearance.install_url_desc"))
+                    .icon("link"),
+            )
+            .on(|ctx| install_from_url(ctx)),
+        );
+        if !sources.is_empty() {
+            v.push(
+                MenuItem::new(
+                    PanelRow::action("update-themes", ctx.t("settings.appearance.update_themes"))
+                        .desc(ctx.t("settings.appearance.update_themes_desc"))
+                        .value(ctx.t("settings.appearance.update_themes_value")),
+                )
+                .on(update_themes),
+            );
+        }
         v
     })
 }
