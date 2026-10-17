@@ -152,6 +152,12 @@ ended_quick_text = "O jogo fechou sozinho em poucos segundos. Costuma ser uma de
 never_started = "{game} não abriu"
 never_started_text = "O Tako esperou 2 minutos e o jogo não apareceu. A loja pode ter mostrado um aviso, pedido login ou uma atualização: confira na loja, tente de novo ou salve o relatório de diagnóstico."
 try_again = "Tentar de novo"
+commands_title = "Permitir os comandos deste jogo?"
+commands_text = "Eles rodam no seu computador com as suas permissões. Confira se reconhece cada um."
+commands_before = "Antes de jogar: {command}"
+commands_after = "Depois de jogar: {command}"
+commands_allow = "Permitir e jogar"
+before_failed = "O comando antes do jogo falhou: {error}"
 save_report = "Salvar relatório de diagnóstico"
 welcome_back_played = "Bem-vindo de volta · {game} · {time}"
 

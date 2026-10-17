@@ -129,6 +129,7 @@ fn csharp_v6_database_opens_without_data_loss() {
             show_fps: Some(true),
             extra_arguments: Some("-dx11".into()),
             working_directory: None,
+            ..Default::default()
         }
     );
     let only_fps = gs.load("steam:730").unwrap();

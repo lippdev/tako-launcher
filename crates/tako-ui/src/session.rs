@@ -36,6 +36,9 @@ pub struct TrackRequest {
     /// Mostrar o jogo no Discord (EXT-004).
     #[serde(default)]
     pub discord: bool,
+    /// Comando permitido para quando o jogo terminar (SESSION-004).
+    #[serde(default)]
+    pub after_command: Option<String>,
 }
 
 /// Resultado de abrir um jogo.
@@ -133,16 +136,32 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         tracing::warn!("áudio do jogo: {e}");
     }
 
+    // Comandos só rodam com a permissão do usuário (a tela pergunta antes de chamar esta função).
+    let before_failed = eff
+        .before_command
+        .as_deref()
+        .filter(|_| eff.commands_approved)
+        .and_then(|c| {
+            p.processes
+                .run_command(c, Some(tako_core::session::settings::BEFORE_COMMAND_WAIT))
+                .err()
+        });
     let args = eff.arguments(game.launch_arguments.as_deref());
     let cwd = eff
         .working_directory
         .clone()
         .or(game.working_directory.clone());
-    let pid = match p.processes.launch(
+    let launched = p.processes.launch_with_env(
         &target,
         (!args.is_empty()).then_some(args.as_str()),
         cwd.as_deref(),
-    ) {
+        &eff.environment,
+    );
+    if let Some(e) = before_failed {
+        tracing::warn!("comando antes do jogo: {e}");
+        ctx.toast(ctx.tf("session.before_failed", &[("error", &e.to_string())]));
+    }
+    let pid = match launched {
         Ok(pid) => pid,
         Err(e) => {
             restore_now(&ctx.platform, &ctx.paths, recorded);
@@ -170,6 +189,7 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         controller_mouse: ctx.settings.bool(keys::CONTROLLER_MOUSE, false),
         restore: recorded,
         discord: crate::discord::available() && ctx.settings.bool(keys::DISCORD_PRESENCE, false),
+        after_command: eff.after_command.clone().filter(|_| eff.commands_approved),
     };
     Ok(Started::Tracking(req))
 }
@@ -307,6 +327,12 @@ impl Running {
     /// Fim da sessão: solta o ponteiro e restaura telas, áudio e cursor.
     pub fn finish(&mut self, platform: &Platform, paths: &DataPaths) {
         self.presence = None;
+        // Uma vez só, mesmo se `finish` for chamado de novo.
+        if let Some(c) = self.req.after_command.take()
+            && let Err(e) = platform.processes.run_command(&c, None)
+        {
+            tracing::warn!("comando depois do jogo: {e}");
+        }
         let _ = self.mouse.reset(platform.pointer.as_ref());
         restore_now(platform, paths, self.req.restore);
     }

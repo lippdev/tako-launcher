@@ -152,6 +152,12 @@ ended_quick_text = "The game closed by itself within a few seconds. This is usua
 never_started = "{game} didn't open"
 never_started_text = "Tako waited 2 minutes and the game never showed up. The store may have shown a notice, asked you to sign in or started an update: check the store, try again or save the diagnostics report."
 try_again = "Try again"
+commands_title = "Allow this game's commands?"
+commands_text = "They run on your computer with your permissions. Make sure you recognize each one."
+commands_before = "Before playing: {command}"
+commands_after = "After playing: {command}"
+commands_allow = "Allow and play"
+before_failed = "The command before the game failed: {error}"
 save_report = "Save diagnostics report"
 welcome_back_played = "Welcome back · {game} · {time}"
 
