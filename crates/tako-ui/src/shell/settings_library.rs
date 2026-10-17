@@ -75,6 +75,98 @@ fn store_row(ctx: &Ctx, store: GameStore) -> MenuItem {
     })
 }
 
+/// Chave da Web API da Steam, lida do cofre uma vez (o do Linux é um serviço D-Bus).
+fn steam_key(ctx: &Ctx) -> Option<String> {
+    super::cached(STEAM_KEY_CACHE, std::time::Duration::MAX, || {
+        ctx.platform.secrets.get(crate::steam_owned::SECRET)
+    })
+}
+
+const STEAM_KEY_CACHE: &str = "settings.steam_key";
+
+/// Jogos da conta Steam não instalados (SRC-005): a chave da Web API do próprio usuário.
+fn steam_account_row(ctx: &Ctx) -> MenuItem {
+    let value = ctx.t(if steam_key(ctx).is_some() {
+        "settings.library.steam_owned_on"
+    } else {
+        "settings.library.steam_owned_off"
+    });
+    MenuItem::new(
+        PanelRow::action("steam-owned", ctx.t("settings.library.steam_owned"))
+            .desc(ctx.t("settings.library.steam_owned_desc"))
+            .value(value),
+    )
+    .on(|ctx| Flow::Push(Box::new(steam_account_panel(ctx))))
+}
+
+fn steam_account_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("settings.library.steam_owned"), |ctx| {
+        let has_key = steam_key(ctx).is_some();
+        let mut v = vec![
+            MenuItem::new(
+                PanelRow::new("key", "text", ctx.t("settings.library.steam_key")).value(
+                    if has_key {
+                        "••••••••".into()
+                    } else {
+                        ctx.t("settings.metadata.not_set")
+                    },
+                ),
+            )
+            .on(|ctx| {
+                let k = KeyboardLayer::new(
+                    ctx,
+                    ctx.t("settings.library.steam_key"),
+                    "",
+                    |ctx, text| {
+                        let key = tako_core::metadata::clean_key(text);
+                        if !key.is_empty() {
+                            match ctx.platform.secrets.set(crate::steam_owned::SECRET, &key) {
+                                Ok(()) => {
+                                    super::forget(STEAM_KEY_CACHE);
+                                    // Chave nova: a lista é buscada de novo na próxima leitura.
+                                    let _ =
+                                        std::fs::remove_file(crate::steam_owned::cache(&ctx.paths));
+                                    ctx.effect(Effect::Rescan);
+                                }
+                                Err(e) => ctx.toast(e),
+                            }
+                        }
+                        Flow::Close
+                    },
+                );
+                Flow::Push(Box::new(
+                    k.secret().hint(ctx.t("settings.metadata.keep_secret")),
+                ))
+            }),
+            MenuItem::new(
+                PanelRow::action("site", ctx.t("settings.library.steam_key_site"))
+                    .value("steamcommunity.com"),
+            )
+            .on(effect(Effect::OpenUrl(
+                tako_sources::steam::owned::KEY_PAGE.into(),
+            ))),
+        ];
+        if has_key {
+            v.push(
+                MenuItem::new(
+                    PanelRow::button("remove", ctx.t("settings.library.steam_key_remove")).danger(),
+                )
+                .on(|ctx| {
+                    if let Err(e) = ctx.platform.secrets.delete(crate::steam_owned::SECRET) {
+                        ctx.toast(e);
+                    }
+                    super::forget(STEAM_KEY_CACHE);
+                    let _ = std::fs::remove_file(crate::steam_owned::cache(&ctx.paths));
+                    ctx.effect(Effect::ReloadLibrary);
+                    Flow::Stay
+                }),
+            );
+        }
+        v
+    })
+    .text(ctx.t("settings.library.steam_owned_steps"))
+}
+
 /// Loja ligada sem o app (SRC-003): logo abaixo dela, baixar pela página oficial.
 fn download_row(ctx: &Ctx, store: GameStore) -> Option<MenuItem> {
     let url = tako_sources::report::client_download(store)?;
@@ -105,6 +197,19 @@ pub(crate) fn store_rows(ctx: &Ctx) -> Vec<MenuItem> {
     v
 }
 
+/// As lojas e, logo abaixo da Steam ligada, a conta Steam (jogos não instalados).
+fn store_rows_with_accounts(ctx: &Ctx) -> Vec<MenuItem> {
+    let steam_on = !crate::sources::is_disabled(
+        &ctx.settings.string(keys::DISABLED_STORES),
+        GameStore::Steam,
+    );
+    let mut v = store_rows(ctx);
+    if steam_on && let Some(i) = v.iter().position(|r| r.row.key == "store:Steam") {
+        v.insert(i + 1, steam_account_row(ctx));
+    }
+    v
+}
+
 pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     let mut rescan = action(ctx, "settings.library.rescan");
     if ctx.scanning {
@@ -115,7 +220,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(rescan).on(effect(Effect::Rescan)),
         MenuItem::new(PanelRow::header(ctx.t("settings.library.stores_header"))),
     ];
-    v.extend(store_rows(ctx));
+    v.extend(store_rows_with_accounts(ctx));
     if cfg!(windows) {
         v.push(
             MenuItem::new(action(ctx, "settings.library.playnite"))

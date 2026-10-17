@@ -897,6 +897,34 @@ mod tests {
     }
 
     #[test]
+    fn installing_from_steam_waits_for_the_game_and_says_when_it_is_ready() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let mut game = Game {
+            id: "steam:1145360".into(),
+            title: "Hades".into(),
+            store: Some(GameStore::Steam),
+            steam_app_id: Some(1145360),
+            is_installed: false,
+            ..Default::default()
+        };
+        *ctx.found.lock().unwrap() = vec![game.clone()];
+        ctx.library.refresh();
+
+        super::super::details::primary_action(&mut ctx, &game.id);
+        assert!(matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u == "steam://install/1145360"));
+        assert_eq!(ctx.installing.len(), 1);
+        assert!(ctx.check_installs());
+
+        game.is_installed = true;
+        game.launch_target = Some("steam://rungameid/1145360".into());
+        *ctx.found.lock().unwrap() = vec![game];
+        ctx.library.refresh();
+        assert!(!ctx.check_installs());
+        assert_eq!(ctx.toast.as_ref().unwrap().0, "Hades foi instalado");
+    }
+
+    #[test]
     fn broken_games_are_found_filtered_and_offer_edit_or_remove() {
         let dir = tempfile::tempdir().unwrap();
         let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);

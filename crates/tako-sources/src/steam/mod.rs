@@ -3,6 +3,7 @@
 //! e tempo jogado / última vez em `userdata/<conta>/config/localconfig.vdf` (da conta usada por último).
 //! Jogos não Steam adicionados à Steam ficam em [`shortcuts`].
 
+pub mod owned;
 pub mod shortcuts;
 pub mod vdf;
 
@@ -135,7 +136,7 @@ fn read_manifest(
 
 /// Tempo jogado e última vez por jogo, da conta cujo `localconfig.vdf` mudou por último.
 /// `userdata/<conta>/config` da conta usada por último (a do `localconfig.vdf` mais recente).
-fn last_user_config(steam_root: &Path) -> Option<PathBuf> {
+pub(crate) fn last_user_config(steam_root: &Path) -> Option<PathBuf> {
     let users = std::fs::read_dir(steam_root.join("userdata")).ok()?;
     users
         .flatten()
@@ -253,11 +254,21 @@ pub fn size_label(bytes: u64) -> Option<String> {
 #[derive(Debug, Clone)]
 pub struct SteamLibrarySource {
     root: Option<PathBuf>,
+    /// Cache dos jogos da conta (SRC-005); `None` = só os instalados.
+    owned_cache: Option<PathBuf>,
 }
 
 impl SteamLibrarySource {
     pub fn new(root: Option<PathBuf>) -> Self {
-        SteamLibrarySource { root }
+        SteamLibrarySource {
+            root,
+            owned_cache: None,
+        }
+    }
+
+    pub fn with_owned_cache(mut self, cache: Option<PathBuf>) -> Self {
+        self.owned_cache = cache;
+        self
     }
 }
 
@@ -269,15 +280,19 @@ impl LibrarySource for SteamLibrarySource {
     fn scan(&self) -> LibraryScan {
         match &self.root {
             None => LibraryScan::missing(t("sources.steam.missing")),
-            Some(root) => LibraryScan {
-                games: scan(root)
-                    .iter()
-                    .map(to_game)
-                    .chain(last_user_config(root).map_or_else(Vec::new, |c| shortcuts::scan(&c)))
-                    .collect(),
-                client_installed: true,
-                notice: None,
-            },
+            Some(root) => {
+                let mut games: Vec<Game> = scan(root).iter().map(to_game).collect();
+                if let Some(cache) = &self.owned_cache {
+                    let owned = owned::not_installed(&owned::load(cache), &games);
+                    games.extend(owned);
+                }
+                games.extend(last_user_config(root).map_or_else(Vec::new, |c| shortcuts::scan(&c)));
+                LibraryScan {
+                    games,
+                    client_installed: true,
+                    notice: None,
+                }
+            }
         }
     }
 }
