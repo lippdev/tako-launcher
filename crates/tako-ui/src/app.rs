@@ -19,6 +19,7 @@ use tako_core::library::{CollectionLibrary, Game, GameLibrary, system_clock};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{self as db, TakoDatabase};
 use tako_core::presentation::color::AccentPalette;
+use tako_core::session::GameEnd;
 use tako_platform::Platform;
 
 /// Como a interface foi aberta.
@@ -27,7 +28,7 @@ pub struct UiOptions {
     /// Sem lojas nem funções do SO (testes, demonstração e CI).
     pub simulate: bool,
     /// Voltou de um jogo: foco nele e "Bem-vindo de volta".
-    pub after_game: Option<(String, Duration)>,
+    pub after_game: Option<(String, Duration, GameEnd)>,
     /// Um jogo continua rodando (aberta pela Central ou "Início" durante o jogo): id e título.
     pub running: Option<(String, String)>,
     /// Abrir direto na Central rápida.
@@ -288,11 +289,11 @@ impl App {
         if opts.control_center {
             shell.open_control_center_over_game();
         }
-        if let Some((id, played)) = &opts.after_game {
+        if let Some((id, played, end)) = &opts.after_game {
             if let Err(e) = shell.ctx.library.record_session(id, *played) {
                 tracing::warn!("tempo de jogo de {id}: {e}");
             }
-            shell.ctx.welcome_back = Some((id.clone(), *played));
+            shell.ctx.welcome_back = Some((id.clone(), *played, *end));
         } else if !opts.control_center {
             crate::shell::first_run::open_if_needed(&mut shell);
         }
@@ -674,11 +675,18 @@ pub fn game_shown() {
     });
 }
 
-/// "Bem-vindo de volta" com o tempo jogado e o foco no jogo (o tempo já foi gravado por quem chama).
-pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration) {
+/// "Bem-vindo de volta" com o tempo jogado e o foco no jogo (o tempo já foi gravado por quem chama). Se o jogo
+/// fechou logo ao abrir ou nem abriu, um aviso no lugar (SESSION-003).
+pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration, end: GameEnd) {
     shell.ctx.running = None;
     shell.close_game_layers();
     shell.focus_game(id);
+    if end != GameEnd::Normal {
+        tracing::warn!("{id} terminou fora do normal: {} ({played:?})", end.key());
+        let dialog = crate::shell::dialogs::game_ended_badly(&shell.ctx, id, end);
+        shell.push_layer(Box::new(dialog));
+        return;
+    }
     let title = shell
         .ctx
         .library
@@ -770,8 +778,8 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
             })
         });
     }
-    if let Some((id, played)) = s.ctx.welcome_back.take() {
-        welcome_back(&mut s, &id, played);
+    if let Some((id, played, end)) = s.ctx.welcome_back.take() {
+        welcome_back(&mut s, &id, played, end);
     }
     if let Some(b) = s.ctx.move_window.take() {
         let w = ui.window();
@@ -893,5 +901,41 @@ mod tests {
         let found = Mutex::new(bench);
         assert!(scan_into(&found, "", true).is_empty());
         assert_eq!(found.lock().unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn a_game_that_closed_right_away_shows_a_warning_instead_of_welcome_back() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        i18n::set_lang(Lang::PtBr);
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        let mut shell = Shell::new(ctx);
+        let game = shell.ctx.library.games()[0].clone();
+
+        welcome_back(&mut shell, &game.id, Duration::from_secs(3), GameEnd::Quick);
+        assert!(shell.ctx.toast.is_none());
+        assert!(shell.has_layers());
+        use crate::shell::Layer;
+        let warning = crate::shell::dialogs::game_ended_badly(&shell.ctx, &game.id, GameEnd::Quick);
+        let title = warning.render(&shell.ctx).title;
+        assert_eq!(title, format!("{} fechou logo depois de abrir", game.title));
+
+        shell.close_layers();
+        welcome_back(
+            &mut shell,
+            &game.id,
+            Duration::from_secs(600),
+            GameEnd::Normal,
+        );
+        assert!(!shell.has_layers());
+        assert!(
+            shell
+                .ctx
+                .toast
+                .as_ref()
+                .unwrap()
+                .0
+                .starts_with("Bem-vindo de volta")
+        );
     }
 }

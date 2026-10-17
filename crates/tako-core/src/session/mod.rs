@@ -10,4 +10,4 @@ pub mod state;
 pub mod tracking;
 
 pub use state::{SessionState, SessionStateMachine, SessionTransition};
-pub use tracking::{GameRunStatus, GameRunTracker, TrackingPlan};
+pub use tracking::{GameEnd, GameRunStatus, GameRunTracker, TrackingPlan};

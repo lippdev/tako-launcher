@@ -347,6 +347,54 @@ impl GameRunTracker {
     }
 }
 
+/// Como o jogo terminou, para avisar quando algo deu errado (SESSION-003). As lojas abrem os jogos por fora,
+/// então o código de saída quase nunca está disponível: o que se sabe com segurança é o tempo e se o Tako
+/// pediu para fechar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GameEnd {
+    #[default]
+    Normal,
+    /// Fechou sozinho em menos de [`GameEnd::QUICK`]: caiu ou desistiu ao abrir.
+    Quick,
+    /// Não apareceu dentro do prazo.
+    NeverStarted,
+}
+
+impl GameEnd {
+    pub const QUICK: std::time::Duration = std::time::Duration::from_secs(10);
+
+    pub fn of(
+        status: GameRunStatus,
+        close_requested: bool,
+        played: std::time::Duration,
+    ) -> GameEnd {
+        match status {
+            _ if close_requested => GameEnd::Normal,
+            GameRunStatus::TimedOut => GameEnd::NeverStarted,
+            GameRunStatus::Exited if played < Self::QUICK => GameEnd::Quick,
+            _ => GameEnd::Normal,
+        }
+    }
+
+    /// Para passar entre o supervisor e a interface (argumento e mensagem).
+    pub fn key(self) -> &'static str {
+        match self {
+            GameEnd::Normal => "normal",
+            GameEnd::Quick => "quick",
+            GameEnd::NeverStarted => "never_started",
+        }
+    }
+
+    /// Valor desconhecido é `Normal`: na dúvida, não assusta ninguém.
+    pub fn from_key(key: &str) -> GameEnd {
+        match key {
+            "quick" => GameEnd::Quick,
+            "never_started" => GameEnd::NeverStarted,
+            _ => GameEnd::Normal,
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -700,5 +748,36 @@ mod tests {
             never.update(&[], secs(120), Some(0)),
             GameRunStatus::TimedOut
         );
+    }
+
+    #[test]
+    fn game_end_flags_quick_exits_and_games_that_never_started() {
+        use std::time::Duration;
+        let s = Duration::from_secs;
+        assert_eq!(
+            GameEnd::of(GameRunStatus::Exited, false, s(3)),
+            GameEnd::Quick
+        );
+        assert_eq!(
+            GameEnd::of(GameRunStatus::Exited, false, s(600)),
+            GameEnd::Normal
+        );
+        // O Tako pediu para fechar (Central › Encerrar): fechar rápido é o esperado.
+        assert_eq!(
+            GameEnd::of(GameRunStatus::Exited, true, s(3)),
+            GameEnd::Normal
+        );
+        assert_eq!(
+            GameEnd::of(GameRunStatus::TimedOut, false, s(0)),
+            GameEnd::NeverStarted
+        );
+        assert_eq!(
+            GameEnd::of(GameRunStatus::TimedOut, true, s(0)),
+            GameEnd::Normal
+        );
+        for e in [GameEnd::Normal, GameEnd::Quick, GameEnd::NeverStarted] {
+            assert_eq!(GameEnd::from_key(e.key()), e);
+        }
+        assert_eq!(GameEnd::from_key("lixo"), GameEnd::Normal);
     }
 }

@@ -119,6 +119,39 @@ pub fn client_missing(ctx: &Ctx, game: &Game, notice: String) -> MenuLayer {
     .text(notice)
 }
 
+/// O jogo fechou sozinho logo ao abrir, ou nem abriu (SESSION-003): o que se sabe e o que tentar.
+pub fn game_ended_badly(ctx: &Ctx, id: &str, end: tako_core::session::GameEnd) -> MenuLayer {
+    use tako_core::session::GameEnd;
+    let title = ctx
+        .library
+        .find(id)
+        .map(|g| g.title.clone())
+        .unwrap_or_default();
+    let (head, text) = match end {
+        GameEnd::NeverStarted => ("session.never_started", "session.never_started_text"),
+        _ => ("session.ended_quick", "session.ended_quick_text"),
+    };
+    let id = id.to_owned();
+    MenuLayer::dialog(ctx.tf(head, &[("game", &title)]), move |ctx| {
+        let id = id.clone();
+        vec![
+            MenuItem::new(PanelRow::button("again", ctx.t("session.try_again")).icon("play")).on(
+                move |ctx| {
+                    ctx.effect(Effect::Launch(id.clone()));
+                    Flow::Close
+                },
+            ),
+            MenuItem::new(PanelRow::button("report", ctx.t("session.save_report")).icon("info"))
+                .on(|ctx| {
+                    ctx.effect(Effect::SaveDiagnostics);
+                    Flow::Close
+                }),
+            MenuItem::new(PanelRow::button("ok", ctx.t("common.ok"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(ctx.t(text))
+}
+
 /// Outro jogo está aberto: termine antes de abrir este (o C# pedia o mesmo).
 pub fn other_game_running(ctx: &Ctx, id: &str) -> MenuLayer {
     let running = ctx

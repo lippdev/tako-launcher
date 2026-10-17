@@ -17,6 +17,7 @@ use std::io::BufReader;
 use std::rc::Rc;
 use std::time::Duration;
 use tako_core::paths::DataPaths;
+use tako_core::session::GameEnd;
 use tako_core::supervision::{ProcessRole, args};
 use tako_platform::Platform;
 use tako_ui::app::{App, Host, UiOptions, build_ctx};
@@ -154,6 +155,7 @@ fn main() {
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0),
             ),
+            GameEnd::from_key(&value(&all, "--game-end").unwrap_or_default()),
         )
     });
     let running =
@@ -181,11 +183,12 @@ fn main() {
         // Mensagens do supervisor (o jogo em segundo plano terminou).
         std::thread::spawn(|| {
             protocol::read_lines::<protocol::SupMsg>(BufReader::new(std::io::stdin()), |m| {
-                let (game_id, played_secs) = match m {
+                let (game_id, played_secs, end) = match m {
                     protocol::SupMsg::GameEnded {
                         game_id,
                         played_secs,
-                    } => (game_id, played_secs),
+                        end,
+                    } => (game_id, played_secs, GameEnd::from_key(&end)),
                     protocol::SupMsg::Activate => {
                         let _ = slint::invoke_from_event_loop(tako_ui::app::raise_current);
                         return;
@@ -201,7 +204,7 @@ fn main() {
                         let played = Duration::from_secs(played_secs);
                         let _ = s.ctx.library.record_session(&game_id, played);
                         s.ctx.running = None;
-                        s.ctx.welcome_back = Some((game_id, played));
+                        s.ctx.welcome_back = Some((game_id, played, end));
                         s.ctx.dirty = true;
                     }
                 });

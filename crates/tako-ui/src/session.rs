@@ -325,6 +325,11 @@ impl Running {
         }
     }
 
+    /// Como terminou, depois que [`Self::poll`] devolveu o tempo jogado (SESSION-003).
+    pub fn end(&self, played: Duration) -> tako_core::session::GameEnd {
+        tako_core::session::GameEnd::of(self.tracker.status, self.tracker.close_requested, played)
+    }
+
     /// O jogo não fechou com o pedido: encerra os processos dele à força.
     pub fn force_close(&mut self, platform: &Platform) -> Result<(), String> {
         self.tracker.exit_grace = chrono::TimeDelta::seconds(1);
