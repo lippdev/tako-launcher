@@ -601,3 +601,33 @@ fn emulators_panel_keeps_folders_executables_and_the_emulator_of_each_system() {
             .is_empty()
     );
 }
+
+#[test]
+fn hiding_the_controller_offers_the_driver_or_the_option() {
+    use std::sync::Arc;
+    use tako_core::devices::controller_hiding::{HIDHIDE_URL, SETTING};
+    use tako_core::devices::fake::FakeHiding;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    // Fora do Windows (e no simulado): nem aparece.
+    let has = |ctx: &Ctx, key: &str| rows_of(ctx, "controls").iter().any(|r| r.row.key == key);
+    assert!(!has(&ctx, "settings.controls.hidhide"));
+    assert!(!has(&ctx, "settings.controls.hide_pads"));
+    // Sem o driver: oferece a página oficial (não baixa nada).
+    ctx.platform.controller_hiding = Arc::new(FakeHiding::new(false));
+    let offer = find(&rows_of(&ctx, "controls"), "settings.controls.hidhide");
+    accept(&mut ctx, &offer);
+    assert!(
+        ctx.effects
+            .iter()
+            .any(|e| matches!(e, Effect::OpenUrl(u) if u == HIDHIDE_URL))
+    );
+    // Com o driver: a opção, ligada por padrão.
+    ctx.platform.controller_hiding = Arc::new(FakeHiding::new(true));
+    let rows = rows_of(&ctx, "controls");
+    assert!(!has(&ctx, "settings.controls.hidhide"));
+    let option = find(&rows, "settings.controls.hide_pads");
+    assert!(option.row.on);
+    accept(&mut ctx, &option);
+    assert!(!ctx.settings.bool(SETTING, true));
+}

@@ -177,6 +177,18 @@ impl Pads {
         v
     }
 
+    /// `(vendor, product)` do USB de cada controle conectado (para esconder do jogo: INPUT-005).
+    pub fn ids(&self) -> Vec<(u16, u16)> {
+        let mut v: Vec<_> = self
+            .pads
+            .values()
+            .filter_map(|p| Some((p.pad.vendor_id()?, p.pad.product_id()?)))
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
+
     /// Botões de cada controle (`(guid, botões)`), para traduzir pelo perfil de cada um.
     pub fn buttons(&self) -> impl Iterator<Item = (&str, GamepadButtons)> {
         self.pads

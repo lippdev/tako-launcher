@@ -28,5 +28,6 @@ pub fn platform(data_root: &std::path::Path) -> Platform {
             path: run::home().map(|h| h.join(format!("Library/LaunchAgents/{LAUNCH_AGENT}.plist"))),
             content: text::launch_agent_plist(LAUNCH_AGENT, &exe),
         }),
+        controller_hiding: Arc::new(tako_core::devices::NoHiding),
     }
 }

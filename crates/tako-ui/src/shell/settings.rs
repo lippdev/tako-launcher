@@ -2,7 +2,7 @@
 //! de categoria; → ou A entram nas linhas; B nas linhas volta à categoria e B na coluna sai.
 
 #[path = "settings_controls.rs"]
-mod controls;
+pub(crate) mod controls;
 #[path = "settings_emulators.rs"]
 pub(crate) mod emulators;
 #[path = "settings_library.rs"]

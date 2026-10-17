@@ -4,12 +4,14 @@
 //! as implementações por SO ficam em `tako-platform`, e [`fake`] tem versões em memória para testes.
 
 pub mod audio;
+pub mod controller_hiding;
 pub mod display;
 pub mod fake;
 pub mod pointer;
 pub mod process;
 
 pub use audio::{AudioDevice, AudioOutputs, AudioState};
+pub use controller_hiding::{ControllerHiding, NoHiding};
 pub use display::{
     ConnectedDisplay, DisplayMode, DisplayTopology, Displays, HdrStatus, MonitorState, ScreenBounds,
 };

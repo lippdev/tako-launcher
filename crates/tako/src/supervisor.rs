@@ -180,6 +180,32 @@ impl Supervisor {
         })
     }
 
+    /// Esconde os controles do jogo, se o driver existir e a opção estiver ligada. `true` = há o que devolver.
+    fn hide_pads(&self) -> bool {
+        use tako_core::devices::controller_hiding::SETTING;
+        let on = profile_settings(&self.paths)
+            .get(SETTING)
+            .ok()
+            .flatten()
+            .and_then(|v| tako_core::persistence::parse_bool(&v))
+            .unwrap_or(true);
+        let hiding = &self.platform.controller_hiding;
+        let ids = self.pads.as_ref().map(Pads::ids).unwrap_or_default();
+        if !on || ids.is_empty() || !hiding.available() {
+            return false;
+        }
+        if let Err(e) = hiding.hide(&ids) {
+            tracing::warn!("não foi possível esconder o controle do jogo: {e}");
+        }
+        hiding.is_hidden()
+    }
+
+    fn reveal_pads(&self) {
+        if let Err(e) = self.platform.controller_hiding.reveal() {
+            tracing::warn!("não foi possível devolver o controle ao jogo: {e}");
+        }
+    }
+
     /// Laço principal; devolve o código de saída do processo.
     pub fn run(mut self, safe_mode: bool) -> i32 {
         session::recover_after_crash(&self.platform, &self.paths);
@@ -193,6 +219,8 @@ impl Supervisor {
             ..Default::default()
         };
         loop {
+            // Interface por cima do jogo: o jogo deixa de ver o controle até ela fechar (INPUT-005).
+            let hidden = self.running.is_some() && self.hide_pads();
             let mut ui = match self.spawn_ui(safe, &launch) {
                 Ok(u) => u,
                 Err(e) => {
@@ -202,6 +230,9 @@ impl Supervisor {
             };
             launch = Launch::default();
             let code = self.watch_ui(&mut ui);
+            if hidden {
+                self.reveal_pads();
+            }
             // "Abrindo…" só vale para a interface que abriu o jogo.
             self.launching = false;
             if let Some(reason) = &ui.closing
@@ -463,11 +494,16 @@ impl Supervisor {
 
 /// Perfis de botões e atalho de teclado da Central, gravados nas configurações do perfil local em uso (UX-004).
 fn shortcuts(machine: &DataPaths) -> (Profiles, tako_core::input::shortcut::KeyShortcut) {
-    let paths = tako_core::profiles::Profiles::load(&machine.machine).paths(machine);
-    let settings = SettingsStore::new(TakoDatabase::new(paths.database()));
+    let settings = profile_settings(machine);
     let key = settings.get("ControlCenterKey").ok().flatten();
     (
         Profiles::load(|k| settings.get(k).ok().flatten()),
         tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
     )
+}
+
+/// Configurações do perfil local em uso (UX-004): as da interface ficam por perfil, não na pasta da máquina.
+fn profile_settings(machine: &DataPaths) -> SettingsStore {
+    let paths = tako_core::profiles::Profiles::load(&machine.machine).paths(machine);
+    SettingsStore::new(TakoDatabase::new(paths.database()))
 }

@@ -142,6 +142,27 @@ Precisa de dois controles (ex.: um Xbox e um DualSense).
 6. Feche e abra o Tako: perfis, escolha de cada controle e combinações continuam. O teclado (Enter, Esc) não muda.
 7. Dois controles do mesmo modelo têm o mesmo GUID no SDL: os dois usam o mesmo perfil (esperado).
 
+## 17. Esconder o controle do jogo com a Central aberta (INPUT-005)
+
+Precisa de um jogo que lê o controle sem estar em foco (ex.: Resident Evil 2) e, para os passos 2 a 5, do HidHide
+instalado (https://github.com/nefarius/HidHide/releases, reinicie o PC depois).
+
+1. Sem o HidHide: Configurações › Controles mostra "Driver opcional: esconder o controle do jogo"; A abre a página
+   oficial no navegador. Numa instalação nova, a mesma linha aparece no passo 3 do assistente. Abra a Central durante
+   o jogo: tudo como antes (o jogo anda junto).
+2. Com o HidHide: a linha vira a opção "Esconder o controle do jogo com a Central aberta", ligada.
+3. Abra o jogo, mexa no controle (o jogo responde), abra a Central e navegue: **o jogo não deve se mexer**. Volte ao
+   jogo: o controle volta a funcionar nele.
+4. Confira no HidHide Configuration Client: com a Central aberta, o controle aparece marcado e o `tako.exe` na lista de
+   aplicativos; depois de voltar ao jogo, os dois somem (o que você tinha configurado antes continua lá).
+5. Com a Central aberta, finalize o `tako.exe` pelo Gerenciador de Tarefas e abra o Tako de novo: o controle volta a
+   aparecer para os outros programas.
+6. Desligue a opção: a Central volta a se comportar como no passo 1.
+
+Anote no PR: o passo 3 funciona com o controle já aberto pelo jogo, ou só depois de reconectar o controle? (O HidHide
+documenta que mudanças valem para quem abre o controle depois; e controles Xbox por XInput podem continuar visíveis.)
+Teste com um DualSense e com um controle Xbox.
+
 ## 18. Emuladores e ROMs (SRC-001)
 
 Precisa de pelo menos o RetroArch (com um núcleo, ex.: Snes9x) e de algumas ROMs; melhor ainda com um emulador

@@ -4,15 +4,15 @@
 //! As camadas só recebem `Cmd`; a captura e o teste leem `ctx.pressed_buttons` a cada desenho e pedem
 //! desenho contínuo pelo `ctx.live_pad` enquanto estão abertas.
 
-use super::{Ctx, Flow, MenuItem, action, described};
+use super::{Ctx, Flow, MenuItem, action, described, toggle};
 use crate::gamepad::PadFamily;
 use crate::model::{Hint, Overlay, PanelRow};
-use crate::shell::MenuLayer;
 use crate::shell::ctx::{InputKind, button_glyph, keys};
 use crate::shell::keyboard::KeyboardLayer;
-use crate::shell::{Cmd, Layer};
+use crate::shell::{Cmd, Effect, Layer, MenuLayer};
 use std::cell::{Cell, RefCell};
 use std::time::Instant;
+use tako_core::devices::controller_hiding;
 use tako_core::input::profiles::{self, Profile, Profiles};
 use tako_core::input::shortcut::{
     ChordCapture, ChordCaptureState, GamepadFamily, KeyModifiers, KeyShortcut, check_chord,
@@ -96,6 +96,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     ];
     profile_rows(ctx, &mut v);
     button_rows(ctx, &mut v);
+    v.extend(hide_pads_row(ctx));
     v.extend([
         MenuItem::new(PanelRow::header(ctx.t("settings.controls.keyboard_header"))),
         MenuItem::new(
@@ -394,6 +395,30 @@ fn cycle_button(ctx: &mut Ctx, command: AppCommand, dir: i32) -> Flow {
         .join(" · ");
     ctx.toast(moved);
     Flow::Stay
+}
+
+/// Esconder o controle do jogo com a Central aberta (INPUT-005): a opção, com o driver HidHide instalado, ou a
+/// oferta dele (abre a página oficial; o Tako não baixa nem executa o instalador). Só no Windows.
+pub(crate) fn hide_pads_row(ctx: &Ctx) -> Option<MenuItem> {
+    let hiding = &ctx.platform.controller_hiding;
+    if !hiding.supported() {
+        return None;
+    }
+    if hiding.available() {
+        return Some(toggle(
+            ctx,
+            "settings.controls.hide_pads",
+            controller_hiding::SETTING,
+            true,
+        ));
+    }
+    Some(
+        MenuItem::new(action(ctx, "settings.controls.hidhide")).on(|ctx| {
+            ctx.effect(Effect::OpenUrl(controller_hiding::HIDHIDE_URL.into()));
+            ctx.toast(ctx.t("settings.controls.hidhide_opened"));
+            Flow::Stay
+        }),
+    )
 }
 
 /// "Aperte as teclas que quer usar" (port do `ShortcutCaptureViewModel` de teclado): a primeira tecla de verdade

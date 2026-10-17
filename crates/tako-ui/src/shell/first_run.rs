@@ -1,4 +1,5 @@
-//! Assistente da primeira execução (UX-003): idioma, lojas e provedores de metadados, em três diálogos.
+//! Assistente da primeira execução (UX-003): idioma, lojas e provedores de metadados (com o driver opcional do
+//! INPUT-005 no Windows), em três diálogos.
 //! Aparece uma vez numa instalação nova; tudo dá para mudar depois em Configurações.
 
 use super::ctx::keys;
@@ -108,7 +109,14 @@ fn stores(ctx: &Ctx) -> MenuLayer {
     .on_back(|ctx| Flow::Replace(Box::new(welcome(ctx))))
 }
 
-/// Passo 3: provedores de capas e descrições (os mesmos painéis de Configurações).
+/// Passo 3: provedores de capas e descrições (os mesmos painéis de Configurações) e, no Windows, o driver opcional
+/// que esconde o controle do jogo com a Central aberta (INPUT-005).
+fn providers_rows(ctx: &Ctx) -> Vec<MenuItem> {
+    let mut v = metadata::provider_rows(ctx);
+    v.extend(super::settings::controls::hide_pads_row(ctx));
+    v
+}
+
 fn providers(ctx: &Ctx) -> MenuLayer {
     step(
         ctx,
@@ -116,12 +124,12 @@ fn providers(ctx: &Ctx) -> MenuLayer {
         "first_run.metadata",
         "first_run.metadata_text",
         |ctx| {
-            let mut v = metadata::provider_rows(ctx);
+            let mut v = providers_rows(ctx);
             v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
             v
         },
     )
-    .focus_at(metadata::provider_rows(ctx).len())
+    .focus_at(providers_rows(ctx).len())
     .on_back(|ctx| Flow::Replace(Box::new(stores(ctx))))
 }
 
@@ -216,5 +224,22 @@ mod tests {
         let mut w = welcome(&ctx);
         assert!(matches!(w.handle(Cmd::Back, &mut ctx), Flow::Close));
         assert!(ctx.settings.bool(keys::FIRST_RUN_DONE, false));
+    }
+
+    #[test]
+    fn offers_the_optional_controller_driver_where_it_exists() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = fresh();
+        assert!(
+            !keys_of(&providers(&ctx), &ctx).contains(&"settings.controls.hidhide".to_string())
+        );
+        ctx.platform.controller_hiding =
+            std::sync::Arc::new(tako_core::devices::fake::FakeHiding::new(false));
+        let p = providers(&ctx);
+        let rows = keys_of(&p, &ctx);
+        let at = rows.iter().position(|k| k == "settings.controls.hidhide");
+        assert_eq!(at, Some(rows.len() - 2));
+        // O foco continua em "Concluir".
+        assert_eq!(p.render(&ctx).sel, rows.len() as i32 - 1);
     }
 }

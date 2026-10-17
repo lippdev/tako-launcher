@@ -24,6 +24,7 @@ pub fn platform(data_root: &std::path::Path) -> Platform {
         processes: Arc::new(processes::LinuxProcesses),
         secrets: Arc::new(crate::secrets::OsSecrets),
         autostart: Arc::new(autostart()),
+        controller_hiding: Arc::new(tako_core::devices::NoHiding),
     }
 }
 
