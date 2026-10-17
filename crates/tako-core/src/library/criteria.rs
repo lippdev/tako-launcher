@@ -38,6 +38,8 @@ pub struct LibraryFacts {
     pub added_at: Option<DateTime<Utc>>,
     /// Ids das coleções do usuário com o jogo (só os jogos do Tako têm).
     pub collections: BTreeSet<String>,
+    /// Tags do usuário (LIB-002; só os jogos do Tako têm).
+    pub tags: BTreeSet<String>,
     pub play_status: Option<PlayStatus>,
 }
 
@@ -56,6 +58,7 @@ impl LibraryFacts {
             score: game.metacritic_score,
             added_at: game.added_at,
             collections: game.collections.clone(),
+            tags: game.tags.clone(),
             play_status: game.play_status,
         }
     }
@@ -76,6 +79,8 @@ pub struct LibraryCriteria {
     pub genres: BTreeSet<String>,
     /// Ids de coleções do usuário (UX-003): o jogo precisa estar em alguma das marcadas.
     pub collections: BTreeSet<String>,
+    /// Tags marcadas (LIB-002): o jogo precisa ter alguma delas.
+    pub tags: BTreeSet<String>,
     /// Status marcados (LIB-001): o jogo precisa ter algum deles.
     pub statuses: BTreeSet<PlayStatus>,
     pub sort: LibrarySort,
@@ -117,6 +122,7 @@ impl LibraryCriteria {
             + self.sources.len()
             + self.genres.len()
             + self.collections.len()
+            + self.tags.len()
             + self.statuses.len()
     }
 
@@ -134,6 +140,17 @@ impl LibraryCriteria {
 
     pub fn has_collection(&self, id: &str) -> bool {
         has(&self.collections, id)
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        has(&self.tags, tag)
+    }
+
+    pub fn toggle_tag(&self, tag: &str) -> Self {
+        Self {
+            tags: toggle(&self.tags, tag),
+            ..self.clone()
+        }
     }
 
     pub fn matches(&self, game: &LibraryFacts) -> bool {
@@ -154,6 +171,7 @@ impl LibraryCriteria {
             && (self.genres.is_empty() || game.genres.iter().any(|g| self.has_genre(g)))
             && (self.collections.is_empty()
                 || game.collections.iter().any(|c| self.has_collection(c)))
+            && (self.tags.is_empty() || game.tags.iter().any(|t| self.has_tag(t)))
             && (self.statuses.is_empty()
                 || game.play_status.is_some_and(|s| self.statuses.contains(&s)))
             && query.matches(&normalize(&game.title))
@@ -270,6 +288,22 @@ mod tests {
             .toggle_status(PlayStatus::Playing)
             .toggle_status(PlayStatus::Paused);
         assert!(c.matches(&facts(None)));
+    }
+
+    #[test]
+    fn tag_filter_keeps_games_with_any_marked_tag() {
+        let facts = |tags: &[&str]| LibraryFacts {
+            tags: tags.iter().map(|t| t.to_string()).collect(),
+            ..Default::default()
+        };
+        let c = LibraryCriteria::default()
+            .toggle_tag("Coop")
+            .toggle_tag("Sofá");
+        assert_eq!(c.active_filter_count(), 2);
+        assert!(c.matches(&facts(&["sofá"])));
+        assert!(!c.matches(&facts(&["Solo"])));
+        assert!(!c.matches(&facts(&[])));
+        assert!(c.toggle_tag("coop").toggle_tag("Sofá").matches(&facts(&[])));
     }
 
     #[test]

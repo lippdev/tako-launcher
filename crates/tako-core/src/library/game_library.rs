@@ -148,6 +148,32 @@ impl GameLibrary {
         self.update_state(id, |s| s.play_status = status)
     }
 
+    /// Liga (`on`) ou tira uma tag de vários jogos de uma vez (LIB-002), gravando uma vez só. Nome vazio não faz
+    /// nada; um nome igual a uma tag existente (sem caixa nem acento) usa a grafia dela.
+    pub fn set_tag(&mut self, ids: &[String], tag: &str, on: bool) -> Result<(), LibraryError> {
+        if let Some(missing) = ids.iter().find(|id| self.find(id).is_none()) {
+            return Err(LibraryError::NotFound(missing.clone()));
+        }
+        let tag = super::tags::canonical(tag, &self.games);
+        if tag.is_empty() {
+            return Ok(());
+        }
+        for id in ids {
+            let state = self.data.state.entry(id.clone()).or_default();
+            if on {
+                state.tags.insert(tag.clone());
+            } else {
+                state.tags.remove(&tag);
+            }
+            let tags = state.tags.clone();
+            if let Ok(game) = self.find_mut(id) {
+                game.tags = tags;
+            }
+        }
+        self.version += 1;
+        self.save()
+    }
+
     /// Registra o fim de uma sessão: o jogo vai para o topo de "Jogados recentemente" e a sessão entra no
     /// histórico (duração zero é só a abertura, sem sessão).
     pub fn record_session(&mut self, id: &str, duration: Duration) -> Result<(), LibraryError> {
@@ -265,6 +291,7 @@ impl GameLibrary {
             if let Some(state) = self.data.state.get(&game.id) {
                 game.is_favorite = state.is_favorite;
                 game.play_status = state.play_status;
+                game.tags = state.tags.clone();
                 if game.last_played_at.is_none() || state.last_played_at > game.last_played_at {
                     game.last_played_at = state.last_played_at;
                 }
@@ -335,6 +362,33 @@ mod tests {
         );
         assert_eq!(
             library.record_launch("nao-existe"),
+            Err(LibraryError::NotFound("nao-existe".into()))
+        );
+    }
+
+    #[test]
+    fn tags_apply_to_many_games_and_survive_a_rescan() {
+        let now = Arc::new(Mutex::new(sample::now()));
+        let mut library = GameLibrary::in_memory(sample::games(), clock(&now));
+        let ids = vec!["gow3".to_string(), "ds2".to_string()];
+        let version = library.version();
+
+        library.set_tag(&ids, " Sofá ", true).unwrap();
+        library.set_tag(&ids[..1], "sofa", true).unwrap(); // mesma tag, outra grafia
+        assert!(library.version() > version);
+        assert_eq!(
+            library.find("gow3").unwrap().tags,
+            ["Sofá".to_string()].into()
+        );
+        library.refresh();
+        assert!(library.find("ds2").unwrap().tags.contains("Sofá"));
+
+        library.set_tag(&ids[1..], "SOFÁ", false).unwrap();
+        assert!(library.find("ds2").unwrap().tags.is_empty());
+        assert!(library.find("gow3").unwrap().tags.contains("Sofá"));
+        library.set_tag(&ids, "  ", true).unwrap();
+        assert_eq!(
+            library.set_tag(&["nao-existe".to_string()], "x", true),
             Err(LibraryError::NotFound("nao-existe".into()))
         );
     }

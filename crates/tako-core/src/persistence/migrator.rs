@@ -92,6 +92,15 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
             seconds INTEGER NOT NULL
         );",
     ),
+    // Tags do usuário (LIB-002), por jogo de qualquer loja.
+    (
+        10,
+        "CREATE TABLE IF NOT EXISTS game_tags (
+            game_id TEXT NOT NULL,
+            tag TEXT NOT NULL,
+            PRIMARY KEY (game_id, tag)
+        );",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).

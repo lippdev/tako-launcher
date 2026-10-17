@@ -113,6 +113,7 @@ fn change(source: &tako_sources::playnite::library::PlayniteGame, store: GameSto
             .map(|c| c.sessions.clone())
             .unwrap_or_default();
         let play_status = current.as_ref().and_then(|c| c.play_status);
+        let tags = current.as_ref().map(|c| c.tags.clone()).unwrap_or_default();
         let current = current.map(|c| PlayniteState {
             is_favorite: c.is_favorite,
             last_played_at: c.last_played_at,
@@ -125,6 +126,7 @@ fn change(source: &tako_sources::playnite::library::PlayniteGame, store: GameSto
             last_played_at: s.last_played_at,
             play_minutes: s.play_minutes,
             sessions,
+            tags,
         }
     })
 }

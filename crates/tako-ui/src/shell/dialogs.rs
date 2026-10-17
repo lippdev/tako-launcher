@@ -5,7 +5,8 @@ use super::layer::{Flow, MenuItem, MenuLayer};
 use super::library::Criteria;
 use super::{Ctx, Effect};
 use crate::model::PanelRow;
-use tako_core::library::{Game, GameStore, LibraryFilter, PlayStatus, collections, query};
+use tako_core::i18n::tn;
+use tako_core::library::{Game, GameStore, LibraryFilter, PlayStatus, collections, query, tags};
 use tako_core::presentation::{game_text, library_text};
 
 pub fn toggle_favorite(ctx: &mut Ctx, id: &str) {
@@ -188,6 +189,13 @@ pub fn quick_actions(ctx: &Ctx, id: &str) -> MenuLayer {
                 PanelRow::button("collections", ctx.t("dialog.add_to_collection")).icon("grid"),
             )
             .on(move |ctx| Flow::Replace(Box::new(choose_collections(ctx, &c)))),
+            MenuItem::new(PanelRow::button("tags", ctx.t("tags.title")).icon("check")).on({
+                let id = id.clone();
+                move |ctx| {
+                    let title = ctx.library.find(&id).map(|g| g.title.clone());
+                    Flow::Replace(Box::new(choose_tags(ctx, vec![id.clone()], title)))
+                }
+            }),
             MenuItem::new(
                 PanelRow::button("settings", ctx.t("details.game_settings")).icon("gear"),
             )
@@ -427,6 +435,64 @@ pub fn new_collection(ctx: &Ctx, add_game: Option<String>) -> KeyboardLayer {
     })
 }
 
+/// Tags de um ou de vários jogos (LIB-002). Marcada = todos os jogos têm; A liga em todos ou tira de todos.
+/// `overline`: o nome do jogo (um só) ou `None` para "N jogos".
+pub fn choose_tags(ctx: &Ctx, ids: Vec<String>, overline: Option<String>) -> MenuLayer {
+    let ids = std::rc::Rc::new(ids);
+    let overline = overline.unwrap_or_else(|| tn("common.games", ids.len() as i64, &[]));
+    let panel_ids = ids.clone();
+    MenuLayer::panel(ctx.t("tags.title"), move |ctx| {
+        let ids = panel_ids.clone();
+        let games: Vec<_> = ids.iter().filter_map(|id| ctx.library.find(id)).collect();
+        let mut v: Vec<MenuItem> = tags::all(ctx.library.games())
+            .into_iter()
+            .map(|f| {
+                let have = games.iter().filter(|g| g.tags.contains(&f.name)).count();
+                let all = have == games.len() && have > 0;
+                let mut row = PanelRow::check(f.name.clone(), f.name.clone(), all);
+                if games.len() > 1 && have > 0 {
+                    row = row.value(format!("{have}/{}", games.len()));
+                }
+                let (ids, name) = (ids.clone(), f.name.clone());
+                MenuItem::new(row).on(move |ctx| {
+                    if let Err(e) = ctx.library.set_tag(&ids, &name, !all) {
+                        ctx.toast(e.to_string());
+                    }
+                    ctx.dirty = true;
+                    Flow::Stay
+                })
+            })
+            .collect();
+        let new_ids = ids.clone();
+        v.push(
+            MenuItem::new(PanelRow::action("new", ctx.t("tags.new")).icon("more"))
+                .on(move |ctx| Flow::Push(Box::new(new_tag(ctx, new_ids.as_ref().clone())))),
+        );
+        v.push(MenuItem::new(PanelRow::button("done", ctx.t("common.done"))).on(|_| Flow::Close));
+        v
+    })
+    .overline(overline.to_uppercase())
+    .text(ctx.t("tags.text"))
+}
+
+/// Nome de uma tag nova pelo teclado virtual; já entra nos jogos de quem abriu.
+fn new_tag(ctx: &Ctx, ids: Vec<String>) -> KeyboardLayer {
+    KeyboardLayer::new(ctx, ctx.t("tags.new"), "", move |ctx, name| {
+        match ctx.library.set_tag(&ids, name, true) {
+            Ok(()) => {
+                ctx.dirty = true;
+                Flow::Close
+            }
+            Err(e) => {
+                ctx.toast(e.to_string());
+                Flow::Stay
+            }
+        }
+    })
+    .hint(ctx.t("tags.name_rule"))
+    .check(|ctx, name| tags::name_problem(name).map(|p| p.message(ctx.lang())))
+}
+
 /// Painel de filtros da biblioteca (mostrar, ordenar, coleção, status, fonte, gênero).
 pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> MenuLayer {
     MenuLayer::panel(ctx.t("filters.title"), move |ctx| {
@@ -525,6 +591,28 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
             .iter()
             .filter(|g| route.matches(g))
             .collect();
+        let all_tags = tags::all(games.iter().copied());
+        if !all_tags.is_empty() {
+            v.push(MenuItem::new(PanelRow::header(ctx.t("tags.title"))));
+            for f in all_tags {
+                let (cr, name) = (criteria.clone(), f.name.clone());
+                v.push(
+                    MenuItem::new(
+                        PanelRow::check(
+                            format!("tag:{}", f.name),
+                            f.name.clone(),
+                            c.has_tag(&f.name),
+                        )
+                        .value(f.count.to_string()),
+                    )
+                    .on(move |_| {
+                        let next = cr.borrow().toggle_tag(&name);
+                        *cr.borrow_mut() = next;
+                        Flow::Stay
+                    }),
+                );
+            }
+        }
         v.push(MenuItem::new(PanelRow::header(ctx.t("filters.status"))));
         for s in PlayStatus::ALL {
             let cr = criteria.clone();
@@ -594,6 +682,22 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                     *cr.borrow_mut() = next;
                     Flow::Stay
                 }),
+            );
+        }
+        // Tag em lote (LIB-002): os jogos que a página mostra com estes filtros.
+        let shown: Vec<String> = query::apply(ctx.library.games(), route, &c)
+            .into_iter()
+            .map(|g| g.id.clone())
+            .collect();
+        if !shown.is_empty() {
+            v.push(MenuItem::new(PanelRow::header(ctx.t("tags.bulk_header"))));
+            v.push(
+                MenuItem::new(
+                    PanelRow::action("tag-shown", ctx.t("tags.tag_shown"))
+                        .desc(ctx.t("tags.tag_shown_desc"))
+                        .value(tn("common.games", shown.len() as i64, &[])),
+                )
+                .on(move |ctx| Flow::Push(Box::new(choose_tags(ctx, shown.clone(), None)))),
             );
         }
         v
@@ -789,5 +893,63 @@ mod tests {
             ctx.library.find(&id).unwrap().play_status,
             Some(PlayStatus::Beaten)
         );
+    }
+
+    #[test]
+    fn tags_apply_to_one_or_many_games_filter_and_persist() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let ids: Vec<String> = ["A", "B"]
+            .into_iter()
+            .map(|t| {
+                let r = ManualGameRecord::create(t, "/nao/existe.sh", chrono::Utc::now());
+                let id = r.id.clone();
+                ctx.library.add_manual(r).unwrap();
+                id
+            })
+            .collect();
+
+        // Um jogo pelo menu do card; a tag nova entra pelo teclado (aqui direto na biblioteca).
+        let menu = quick_actions(&ctx, &ids[0]);
+        let Flow::Replace(_) = accept(&mut ctx, &menu, "tags") else {
+            panic!("painel de tags");
+        };
+        ctx.library.set_tag(&ids[..1], "Coop", true).unwrap();
+
+        // Os dois de uma vez: marcada só quando todos têm; A aplica em todos e depois tira de todos.
+        let both = choose_tags(&ctx, ids.clone(), None);
+        let row = |ctx: &Ctx| both.render(ctx).rows[0].clone();
+        assert!(!row(&ctx).on);
+        assert_eq!(row(&ctx).value, "1/2");
+        accept(&mut ctx, &both, "Coop");
+        assert!(row(&ctx).on);
+        assert!(
+            ids.iter()
+                .all(|id| ctx.library.find(id).unwrap().tags.contains("Coop"))
+        );
+
+        let criteria: Criteria = Default::default();
+        let filters = library_filters(&ctx, criteria.clone(), LibraryFilter::All);
+        accept(&mut ctx, &filters, "tag:Coop");
+        assert!(criteria.borrow().has_tag("Coop"));
+        let Flow::Push(_) = accept(&mut ctx, &filters, "tag-shown") else {
+            panic!("tag em lote");
+        };
+
+        accept(&mut ctx, &both, "Coop");
+        assert!(
+            ids.iter()
+                .all(|id| ctx.library.find(id).unwrap().tags.is_empty())
+        );
+        ctx.library.set_tag(&ids[1..], "Sofá", true).unwrap();
+
+        // Reabrir o banco mantém as tags.
+        drop(ctx);
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            false,
+        );
+        assert!(ctx.library.find(&ids[1]).unwrap().tags.contains("Sofá"));
     }
 }
