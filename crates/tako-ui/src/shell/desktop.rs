@@ -564,6 +564,10 @@ impl Page for DesktopLibrary {
                 } else {
                     g.note.clone().unwrap_or_default()
                 };
+                let (art_blur, art_lum) = g
+                    .shown_hero()
+                    .and_then(crate::images::glass)
+                    .unwrap_or_default();
                 (
                     DeskGameView {
                         has_game: true,
@@ -571,6 +575,8 @@ impl Page for DesktopLibrary {
                         overline: overline.to_uppercase(),
                         description: g.description.clone(),
                         art: tiles::image(g.shown_hero(), tiles::HERO),
+                        art_blur,
+                        art_lum,
                         logo: tiles::image(g.shown_logo(), tiles::LOGO),
                         accent: parse_color(&g.accent),
                         hint,

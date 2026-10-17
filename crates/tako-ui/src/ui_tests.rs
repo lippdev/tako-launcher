@@ -377,14 +377,18 @@ fn desktop_snapshot() {
             .unwrap_or_else(|e| panic!("{e}"))
             .create()
             .unwrap();
-        let art = std::env::var("TAKO_SNAP_ART").ok().map(|p| {
-            let img = image::open(p).unwrap().to_rgba8();
-            let buf = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(
+        let to_image = |img: &image::RgbaImage| {
+            slint::Image::from_rgba8(slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(
                 img.as_raw(),
                 img.width(),
                 img.height(),
-            );
-            slint::Image::from_rgba8(buf)
+            ))
+        };
+        let art = std::env::var("TAKO_SNAP_ART").ok().map(|p| {
+            let img = image::open(p).unwrap();
+            let (blur, lum) = crate::images::glass_copy(&img);
+            let lum: Vec<Value> = lum.into_iter().map(|l| Value::Number(l.into())).collect();
+            (to_image(&img.to_rgba8()), to_image(&blur), crate::values::model(lum))
         });
         let mut ctx = crate::app::build_ctx(
             DataPaths::at(dir.path().join("data")),
@@ -404,8 +408,12 @@ fn desktop_snapshot() {
             let out = shell.render(Instant::now());
             for (name, value) in &out.props {
                 let mut value = value.clone();
-                if let (Some(art), "desk-game", Value::Struct(s)) = (&art, *name, &mut value) {
+                if let (Some((art, blur, lum)), "desk-game", Value::Struct(s)) =
+                    (&art, *name, &mut value)
+                {
                     s.set_field("art".into(), Value::Image(art.clone()));
+                    s.set_field("art-blur".into(), Value::Image(blur.clone()));
+                    s.set_field("art-lum".into(), lum.clone());
                 }
                 crate::bridge::set(&ui, name, value);
             }

@@ -29,8 +29,115 @@ export { Ui }
 
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
 struct DeskGame { id: string, title: string, thumb: image, accent: color, favorite: bool, running: bool, installed: bool }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, logo: image, accent: color, hint: string }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string }
 struct DeskStat { label: string, value: string }
+
+// O que fica atrás do vidro: a arte do jogo em foco e a cópia desfocada dela (feita uma vez pelo Tako), no mesmo
+// retângulo da janela. Cada painel de vidro desenha o pedaço da cópia que fica atrás dele.
+global DeskArt {
+    in-out property <image> blur;
+    // Luminância média da cópia numa grade de 16 × 9 (linhas de cima para baixo).
+    in-out property <[float]> lum;
+    in-out property <bool> has-art;
+    // Largura / altura da arte (a cópia desfocada tem a mesma proporção).
+    in-out property <float> aspect: 16 / 9;
+    in-out property <length> win-w;
+    in-out property <length> win-h;
+    out property <color> accent: Ui.accent;
+    out property <color> accent-deep: Ui.accent-deep;
+    // Retângulo da arte na janela: na altura da janela, puxada para a direita para não ficar atrás do título.
+    out property <length> h: win-h;
+    out property <length> w: win-h * aspect;
+    out property <length> x: w >= win-w - 200px ? 200px : win-w - w;
+    out property <length> y: 0;
+    // A cópia desfocada cobre também a faixa à esquerda da arte (a borda já é borrada; esticar não aparece).
+    out property <length> bx: min(x, 0);
+    out property <length> bw: w + x - bx;
+    // Configurações: sem jogo em foco, as mesmas formas em superfícies opacas sobre o cinza.
+    in-out property <bool> gray;
+
+    // Luminância da cópia num ponto da janela (fora da arte: o fundo escuro).
+    public pure function lum-at(px: length, py: length) -> float {
+        if (!has-art || w <= 0 || h <= 0 || px < x || py < y || px >= x + w || py >= y + h) { return 0; }
+        return lum[floor((py - y) / h * 9) * 16 + floor((px - x) / w * 16)];
+    }
+}
+
+// Liquid Glass: a cópia desfocada da arte atrás do painel, a tinta grafite (densa sobre arte clara), a luz da cor do
+// jogo a partir do canto superior esquerdo, o brilho de cima, o contorno e o reflexo na borda. Sem cópia pronta, a
+// tinta sólida; com "Reduzir transparência", tudo opaco. Nas Configurações, `settings-surface` sem vidro.
+component Vidro inherits Rectangle {
+    in property <length> radius: Ui.radius-card;
+    // Camada (diálogo, menu, painel lateral, aviso): tinta densa, contorno forte e sombra de camada.
+    in property <bool> layer;
+    property <length> ax: self.absolute-position.x;
+    property <length> ay: self.absolute-position.y;
+    // Tinta adaptativa: densa quando a arte embaixo do painel é clara (limite 0,18, o mesmo do AccentPalette).
+    property <bool> bright: (DeskArt.lum-at(ax + self.width / 2, ay + self.height / 2)
+        + DeskArt.lum-at(ax + self.width / 4, ay + self.height / 4)
+        + DeskArt.lum-at(ax + self.width * 3 / 4, ay + self.height / 4)
+        + DeskArt.lum-at(ax + self.width / 4, ay + self.height * 3 / 4)
+        + DeskArt.lum-at(ax + self.width * 3 / 4, ay + self.height * 3 / 4)) / 5 > 0.18;
+    property <bool> lens: !DeskArt.gray && !Ui.reduce-transparency;
+    border-radius: radius;
+    background: DeskArt.gray ? Ui.settings-surface : Ui.glass-solid;
+    drop-shadow-offset-y: layer ? Ui.shadow-layer-y : Ui.shadow-float-y;
+    drop-shadow-blur: layer ? Ui.shadow-layer-blur : Ui.shadow-float-blur;
+    drop-shadow-color: layer ? Ui.shadow-layer-color : Ui.shadow-float-color;
+    animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    Rectangle {
+        border-radius: root.radius;
+        clip: true;
+        if lens && !DeskArt.has-art: Rectangle {
+            x: -ax;
+            y: -ay;
+            width: DeskArt.win-w;
+            height: DeskArt.win-h;
+            background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
+        }
+        if lens && DeskArt.has-art: Image {
+            x: DeskArt.bx - ax;
+            y: DeskArt.y - ay;
+            width: DeskArt.bw;
+            height: DeskArt.h;
+            source: DeskArt.blur;
+            image-fit: fill;
+            opacity: DeskArt.blur.width > 0 ? 1 : 0;
+            animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        }
+        if !DeskArt.gray: Rectangle {
+            background: layer || bright ? Ui.glass-panel-dense : Ui.glass-panel;
+            animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        }
+        // Luz ambiente: 16% da cor do jogo a partir do canto superior esquerdo, em tamanho fixo.
+        if lens: Rectangle {
+            x: -Ui.glass-light-width;
+            y: -Ui.glass-light-height;
+            width: Ui.glass-light-width * 2;
+            height: Ui.glass-light-height * 2;
+            background: @radial-gradient(circle, DeskArt.accent.with-alpha(0.16) 0%, DeskArt.accent.with-alpha(0) 75%);
+        }
+        // Volume da lente: brilho de cima, 150 px fixos para barra, painel e cartão parecerem o mesmo material.
+        if !DeskArt.gray: Rectangle {
+            y: 0;
+            height: min(Ui.glass-highlight-height, parent.height);
+            background: @linear-gradient(180deg, Ui.glass-highlight 0%, Ui.glass-highlight.with-alpha(0) 100%);
+        }
+    }
+    // Contorno de 1px por dentro e o reflexo especular (forte no canto superior esquerdo, fraco no inferior direito).
+    Rectangle {
+        border-radius: root.radius;
+        border-width: 1px;
+        border-color: DeskArt.gray ? Ui.settings-separator : (layer ? Ui.glass-edge-strong : Ui.glass-edge);
+    }
+    if !DeskArt.gray: Rectangle {
+        border-radius: root.radius;
+        border-width: 1px;
+        border-color: @linear-gradient(170deg, Ui.glass-specular 0%, Ui.glass-specular.with-alpha(0.1) 18%,
+            Ui.glass-specular.with-alpha(0) 40%, Ui.glass-specular.with-alpha(0) 80%, Ui.glass-specular.with-alpha(0.05) 100%);
+    }
+    @children
+}
 
 // Anel de foco do teclado (o mouse não mostra), por dentro do elemento.
 component FocusRing inherits Rectangle {
@@ -81,63 +188,6 @@ component DeskButton inherits Rectangle {
         enabled: root.enabled;
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
-    }
-}
-
-// Barra de cima: marca, Biblioteca e Configurações à esquerda; o botão da tela cheia à direita.
-component TopBar inherits Rectangle {
-    in property <[DeskNav]> items;
-    in property <string> big-picture-label;
-    callback clicked(string, int);
-    height: 76 * Ui.u;
-    background: Ui.desk-canvas;
-    Rectangle { y: parent.height - 1px; height: 1px; background: Ui.surface-1; }
-    HorizontalLayout {
-        padding-left: 28 * Ui.u;
-        padding-right: 28 * Ui.u;
-        spacing: 8 * Ui.u;
-        alignment: start;
-        Image {
-            source: @image-url("tako-mark.png");
-            width: 34 * Ui.u;
-            height: 34 * Ui.u;
-            y: (parent.height - self.height) / 2;
-            image-fit: contain;
-        }
-        Rectangle { width: 20 * Ui.u; }
-        for it[i] in items: Rectangle {
-            y: (parent.height - self.height) / 2;
-            height: 48 * Ui.u;
-            width: nl.preferred-width;
-            border-radius: Ui.radius-md;
-            background: it.selected ? Ui.surface-1 : (nta.has-hover ? Ui.surface-1.with-alpha(0.06) : transparent);
-            animate background { duration: Ui.focus-time; }
-            nl := HorizontalLayout {
-                padding-left: 18 * Ui.u;
-                padding-right: 18 * Ui.u;
-                spacing: 10 * Ui.u;
-                Icon { name: it.icon; size: 22 * Ui.u; y: (parent.height - self.height) / 2; tint: it.selected ? Ui.on-accent : Ui.on-accent-muted; }
-                Text {
-                    text: it.label;
-                    color: it.selected ? Ui.on-accent : Ui.on-accent-muted;
-                    font-size: Ui.label-md;
-                    font-weight: 600;
-                    vertical-alignment: center;
-                }
-            }
-            nta := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.clicked("desk-nav", i); }
-            }
-        }
-        Rectangle { horizontal-stretch: 1; }
-        DeskButton {
-            y: (parent.height - self.height) / 2;
-            height: 48 * Ui.u;
-            label: big-picture-label;
-            icon: "tv";
-            clicked => { root.clicked("desk-nav", 2); }
-        }
     }
 }
 
@@ -202,6 +252,76 @@ component SearchBox inherits Rectangle {
                     accepted => { root.leave(); }
                 }
             }
+        }
+    }
+}
+
+// Barra de cima: marca, Biblioteca e Configurações à esquerda; o botão da tela cheia à direita.
+component TopBar inherits Vidro {
+    in property <[DeskNav]> items;
+    in property <string> big-picture-label;
+    in property <bool> show-search;
+    in property <string> search;
+    in property <string> search-hint;
+    callback clicked(string, int);
+    callback edited(string, string);
+    callback leave();
+    public function focus-search() { sb.focus-input(); }
+    height: Ui.topbar-height;
+    HorizontalLayout {
+        padding-left: 28 * Ui.u;
+        padding-right: 28 * Ui.u;
+        spacing: 8 * Ui.u;
+        alignment: start;
+        Image {
+            source: @image-url("tako-mark.png");
+            width: 34 * Ui.u;
+            height: 34 * Ui.u;
+            y: (parent.height - self.height) / 2;
+            image-fit: contain;
+        }
+        Rectangle { width: 20 * Ui.u; }
+        for it[i] in items: Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 48 * Ui.u;
+            width: nl.preferred-width;
+            border-radius: Ui.radius-md;
+            background: it.selected ? Ui.surface-1 : (nta.has-hover ? Ui.surface-1.with-alpha(0.06) : transparent);
+            animate background { duration: Ui.focus-time; }
+            nl := HorizontalLayout {
+                padding-left: 18 * Ui.u;
+                padding-right: 18 * Ui.u;
+                spacing: 10 * Ui.u;
+                Icon { name: it.icon; size: 22 * Ui.u; y: (parent.height - self.height) / 2; tint: it.selected ? Ui.on-accent : Ui.on-accent-muted; }
+                Text {
+                    text: it.label;
+                    color: it.selected ? Ui.on-accent : Ui.on-accent-muted;
+                    font-size: Ui.label-md;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+            }
+            nta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked("desk-nav", i); }
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        sb := SearchBox {
+            visible: show-search;
+            y: (parent.height - self.height) / 2;
+            width: show-search ? clamp(root.width * 0.22, 240px, 380px) : 0;
+            text: search;
+            hint: search-hint;
+            edited(t) => { root.edited("search", t); }
+            leave => { root.leave(); }
+        }
+        DeskButton {
+            y: (parent.height - self.height) / 2;
+            height: 48 * Ui.u;
+            label: big-picture-label;
+            icon: "tv";
+            clicked => { root.clicked("desk-nav", 2); }
         }
     }
 }
@@ -406,13 +526,12 @@ component Hero inherits Rectangle {
     }
 }
 
-// Biblioteca: cabeçalho (abas, busca, filtros), lista à esquerda e destaque à direita.
+// Biblioteca (TelaBiblioteca): o painel de vidro da lista à esquerda e, à direita, ancorados embaixo sobre a arte, o
+// destaque do jogo e a fileira de cartões. A busca fica na barra superior.
 component DeskLibrary inherits Rectangle {
     in property <[string]> tabs;
     in property <int> tab;
     in property <[DeskNav]> collections;
-    in property <string> search;
-    in property <string> search-hint;
     in property <string> filter-label;
     in property <int> filter-count;
     in property <bool> filtered;
@@ -432,83 +551,63 @@ component DeskLibrary inherits Rectangle {
     in property <string> empty-title;
     in property <string> empty-text;
     in property <string> empty-action;
+    in property <bool> small;
     callback clicked(string, int);
-    callback edited(string, string);
     callback scrolled(int);
     callback menu(length, length);
     callback focus-main();
-    public function focus-search() { sb.focus-input(); }
-    property <length> pad: 36 * Ui.u;
-    property <length> list-w: clamp(self.width * 0.28, 300px, 420px);
-    VerticalLayout {
-        padding-left: pad;
-        padding-right: pad;
-        padding-top: 18 * Ui.u;
-        spacing: 14 * Ui.u;
-        HorizontalLayout {
-            height: 64 * Ui.u;
-            spacing: 14 * Ui.u;
-            Tabs {
-                tabs: tabs;
-                current: tab;
-                focus-index: focus-visible && zone == "tabs" ? zone-index : -1;
-                clicked(i) => { root.clicked("tab", i); }
-            }
-            Rectangle { horizontal-stretch: 1; }
-            if filtered: DeskButton {
-                y: (parent.height - self.height) / 2;
-                height: 52 * Ui.u;
-                label: clear-label;
-                icon: "close";
-                clicked => { root.clicked("clear", 0); }
-            }
-            sb := SearchBox {
-                y: (parent.height - self.height) / 2;
-                width: clamp(root.width * 0.26, 220px, 380px);
-                text: search;
-                hint: search-hint;
-                edited(t) => { root.edited("search", t); }
-                leave => { root.focus-main(); }
-            }
-            Rectangle {
-                y: (parent.height - self.height) / 2;
-                height: 52 * Ui.u;
-                width: fb.width;
-                fb := DeskButton {
-                    height: parent.height;
-                    label: filter-label;
-                    icon: "filter";
-                    clicked => { root.clicked("filter", 0); }
-                }
-                if filter-count > 0: Rectangle {
-                    x: parent.width - self.width / 2 - 4px;
-                    y: -self.height / 2 + 4px;
-                    width: 22 * Ui.u;
-                    height: 22 * Ui.u;
-                    border-radius: self.height / 2;
-                    background: Ui.surface-solid;
-                    Text { text: filter-count; color: Ui.on-surface-solid; font-size: 13 * Ui.u; font-weight: 700; }
-                }
-            }
-        }
-        if tab == 2 && collections.length > 0: Chips {
-            height: 44 * Ui.u;
-            items: collections;
-            focus-index: focus-visible && zone == "collections" ? zone-index : -1;
-            clicked(i) => { root.clicked("collection", i); }
-        }
-        HorizontalLayout {
-            vertical-stretch: 1;
-            spacing: 28 * Ui.u;
+    property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
+    HorizontalLayout {
+        spacing: small ? Ui.space-20 : Ui.space-28;
+        Vidro {
+            width: list-w;
             VerticalLayout {
-                width: list-w;
-                spacing: 6 * Ui.u;
-                Text {
-                    text: games.length > 0 ? count : "";
-                    color: Ui.on-accent-subtle;
-                    font-size: Ui.label-sm;
-                    height: 26 * Ui.u;
-                    vertical-alignment: center;
+                padding-top: Ui.space-16;
+                padding-left: Ui.space-12;
+                padding-right: Ui.space-12;
+                padding-bottom: Ui.space-12;
+                spacing: 6px;
+                Tabs {
+                    height: 40px;
+                    tabs: tabs;
+                    current: tab;
+                    focus-index: focus-visible && zone == "tabs" ? zone-index : -1;
+                    clicked(i) => { root.clicked("tab", i); }
+                }
+                if tab == 2 && collections.length > 0: Chips {
+                    height: 44 * Ui.u;
+                    items: collections;
+                    focus-index: focus-visible && zone == "collections" ? zone-index : -1;
+                    clicked(i) => { root.clicked("collection", i); }
+                }
+                HorizontalLayout {
+                    height: 36px;
+                    spacing: Ui.space-8;
+                    Text {
+                        text: games.length > 0 ? count : "";
+                        color: Ui.desk-on-subtle;
+                        font-size: Ui.desk-label-sm;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    if filtered: DeskButton {
+                        y: (parent.height - self.height) / 2;
+                        height: 30px;
+                        icon: "close";
+                        clicked => { root.clicked("clear", 0); }
+                    }
+                    Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        height: 30px;
+                        width: fb.width;
+                        fb := DeskButton {
+                            height: parent.height;
+                            icon: "filter";
+                            clicked => { root.clicked("filter", 0); }
+                        }
+                    }
                 }
                 GameList {
                     vertical-stretch: 1;
@@ -523,93 +622,84 @@ component DeskLibrary inherits Rectangle {
                     scrolled(f) => { root.scrolled(f); }
                 }
             }
-            Rectangle {
-                horizontal-stretch: 1;
-                if !game.has-game: VerticalLayout {
-                    alignment: center;
-                    spacing: 12 * Ui.u;
-                    Text { text: empty-title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-heading; font-weight: 600; horizontal-alignment: center; wrap: word-wrap; }
-                    if empty-text != "": Text { text: empty-text; color: Ui.on-accent-muted; font-size: Ui.body-md; horizontal-alignment: center; wrap: word-wrap; }
-                    if empty-action != "": HorizontalLayout {
-                        alignment: center;
-                        padding-top: 12 * Ui.u;
-                        DeskButton { label: empty-action; icon: "folder"; primary: true; clicked => { root.clicked("add-game", 0); } }
+        }
+        if !game.has-game: VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 12px;
+            Text { text: empty-title; color: Ui.on-accent; font-size: Ui.desk-headline; font-family: Ui.font-heading; font-weight: 700; horizontal-alignment: center; wrap: word-wrap; }
+            if empty-text != "": Text { text: empty-text; color: Ui.desk-on-muted; font-size: Ui.desk-body; horizontal-alignment: center; wrap: word-wrap; }
+            if empty-action != "": HorizontalLayout {
+                alignment: center;
+                padding-top: Ui.space-12;
+                DeskButton { label: empty-action; icon: "folder"; primary: true; clicked => { root.clicked("add-game", 0); } }
+            }
+        }
+        if game.has-game: VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: end;
+            spacing: small ? Ui.space-16 : Ui.space-28;
+            VerticalLayout {
+                spacing: small ? 10px : 14px;
+                alignment: end;
+                if game.overline != "": Overline { text: game.overline; }
+                Text {
+                    text: game.title;
+                    color: Ui.on-accent;
+                    font-family: Ui.font-heading;
+                    font-size: small ? 40px * Ui.text-scale : Ui.desk-display;
+                    font-weight: 700;
+                    letter-spacing: -0.025 * self.font-size;
+                    wrap: word-wrap;
+                    overflow: elide;
+                    max-height: 2.1 * self.font-size;
+                }
+                HorizontalLayout {
+                    spacing: Ui.space-12;
+                    alignment: start;
+                    for a[i] in actions: DeskButton {
+                        label: a.key == "favorite" || a.key == "more" ? "" : a.title;
+                        icon: a.key == "more" ? "dots" : a.icon;
+                        primary: a.style == "primary";
+                        danger: a.style == "danger";
+                        on: a.on;
+                        enabled: a.enabled;
+                        min-w: a.style == "primary" ? 232px : 0;
+                        focused: focus-visible && zone == "actions" && zone-index == i;
+                        clicked => {
+                            root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
+                            root.clicked("action", i);
+                        }
                     }
                 }
-                if game.has-game: dfl := Flickable {
-                    viewport-height: col.preferred-height + 40 * Ui.u;
-                    col := VerticalLayout {
-                        width: dfl.width;
-                        spacing: 22 * Ui.u;
-                        Hero {
-                            height: clamp(dfl.width * 0.5, 240px, max(240px, dfl.height * 0.62));
-                            game: game;
-                        }
-                        HorizontalLayout {
-                            spacing: 12 * Ui.u;
-                            for a[i] in actions: DeskButton {
-                                label: a.key == "favorite" || a.key == "more" ? "" : a.title;
-                                icon: a.key == "more" ? "dots" : a.icon;
-                                primary: a.style == "primary";
-                                danger: a.style == "danger";
-                                on: a.on;
-                                enabled: a.enabled;
-                                min-w: a.style == "primary" ? 220 * Ui.u : 0;
-                                focused: focus-visible && zone == "actions" && zone-index == i;
-                                clicked => {
-                                    root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
-                                    root.clicked("action", i);
-                                }
-                            }
-                            Rectangle { horizontal-stretch: 1; }
-                            for s[i] in stats: HorizontalLayout {
-                                spacing: 22 * Ui.u;
-                                if i > 0: Rectangle { width: 1px; background: Ui.surface-1; }
-                                VerticalLayout {
-                                    alignment: center;
-                                    spacing: 2 * Ui.u;
-                                    Text { text: s.label; color: Ui.on-accent-subtle; font-size: Ui.label-sm; }
-                                    Text { text: s.value; color: Ui.on-accent; font-size: Ui.label-lg; font-weight: 700; overflow: elide; }
-                                }
-                            }
-                        }
-                        if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.label-md; wrap: word-wrap; }
-                        HorizontalLayout {
-                            spacing: 28 * Ui.u;
-                            alignment: stretch;
-                            if game.description != "": VerticalLayout {
-                                horizontal-stretch: 3;
-                                spacing: 10 * Ui.u;
-                                alignment: start;
-                                Text { text: about-label; color: Ui.on-accent; font-size: Ui.title-md; font-weight: 700; }
-                                Text { text: game.description; color: Ui.on-accent-muted; font-size: Ui.body-md; wrap: word-wrap; }
-                            }
-                            VerticalLayout {
-                                horizontal-stretch: 2;
-                                min-width: 300px;
-                                spacing: 10 * Ui.u;
-                                alignment: start;
-                                Text { text: details-label; color: Ui.on-accent; font-size: Ui.title-md; font-weight: 700; }
-                                Rectangle {
-                                    border-radius: Ui.radius-lg;
-                                    background: Ui.surface-1.with-alpha(0.05);
-                                    height: dl.preferred-height;
-                                    dl := VerticalLayout {
-                                        padding: 20 * Ui.u;
-                                        spacing: 0;
-                                        for d[i] in details: VerticalLayout {
-                                            if i > 0: Rectangle { height: 1px; background: Ui.surface-1.with-alpha(0.08); }
-                                            HorizontalLayout {
-                                                padding-top: 10 * Ui.u;
-                                                padding-bottom: 10 * Ui.u;
-                                                spacing: 18 * Ui.u;
-                                                Text { text: d.label; width: 130 * Ui.u; color: Ui.on-accent-subtle; font-size: Ui.label-sm; }
-                                                Text { text: d.value; color: Ui.on-accent; font-size: Ui.label-sm; horizontal-stretch: 1; wrap: word-wrap; }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
+            }
+            HorizontalLayout {
+                height: small ? 190px : Ui.card-height;
+                spacing: Ui.space-20;
+                if game.description != "": Vidro {
+                    horizontal-stretch: 1.45;
+                    VerticalLayout {
+                        padding: Ui.space-24;
+                        padding-bottom: Ui.space-20;
+                        spacing: Ui.space-16;
+                        alignment: start;
+                        Text { text: about-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
+                        Text { text: game.description; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; }
+                    }
+                }
+                Vidro {
+                    horizontal-stretch: 1.1;
+                    VerticalLayout {
+                        padding: Ui.space-24;
+                        padding-bottom: Ui.space-20;
+                        spacing: Ui.space-12;
+                        alignment: start;
+                        Text { text: details-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
+                        for d[i] in details: HorizontalLayout {
+                            spacing: Ui.space-16;
+                            Text { text: d.label; min-width: 104px; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
+                            Text { text: d.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; horizontal-stretch: 1; overflow: elide; }
                         }
                     }
                 }
@@ -1069,6 +1159,72 @@ component DeskOverlay inherits Rectangle {
     }
 }
 
+// Fundo da janela. Na biblioteca, a arte do jogo em foco, nítida, na altura da janela; nas bordas (atrás da lista e à
+// direita) ela se funde com a cópia desfocada misturada a 45% do accent, como uma luz da cor do jogo; escurecida só
+// atrás do título e embaixo dos cartões. Sem arte, um degradê do accent. Nas Configurações, o cinza `settings-bg`.
+component ArtLayer inherits Rectangle {
+    in property <image> art;
+    // Máscara das bordas em faixas (o Slint não tem máscara): opaca até 12%, some em 30%, volta de 62% a 92%.
+    property <int> strips: 128;
+    pure function edge(t: float) -> float {
+        return t < 0.12 ? 1 : (t < 0.30 ? (0.30 - t) / 0.18 : (t < 0.62 ? 0 : (t < 0.92 ? (t - 0.62) / 0.30 : 1)));
+    }
+    background: DeskArt.gray ? Ui.settings-bg : Ui.desk-canvas;
+    animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    Rectangle {
+        opacity: DeskArt.gray ? 0 : 1;
+        animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        if !DeskArt.has-art: Rectangle {
+            background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
+            // Brilho suave no alto à direita (EstadoSemArte).
+            Rectangle {
+                x: parent.width * 0.55;
+                y: -parent.height * 0.35;
+                width: parent.width * 0.7;
+                height: parent.width * 0.7;
+                background: @radial-gradient(circle, Ui.on-accent.with-alpha(0.08) 0%, Ui.on-accent.with-alpha(0) 70%);
+            }
+        }
+        if DeskArt.has-art: Rectangle {
+            Image {
+                x: DeskArt.x;
+                y: DeskArt.y;
+                width: DeskArt.w;
+                height: DeskArt.h;
+                source: root.art;
+                image-fit: fill;
+            }
+            if DeskArt.blur.width > 0: Rectangle {
+                for i in strips: Rectangle {
+                    // Faixas em px inteiros e sem sobreposição: nada de costura entre elas.
+                    x: round(i * root.width / strips / 1px) * 1px;
+                    width: round((i + 1) * root.width / strips / 1px) * 1px - self.x;
+                    clip: true;
+                    opacity: root.edge((i + 0.5) / strips);
+                    visible: self.opacity > 0;
+                    Image {
+                        x: DeskArt.bx - parent.x;
+                        y: DeskArt.y;
+                        width: DeskArt.bw;
+                        height: DeskArt.h;
+                        source: DeskArt.blur;
+                        image-fit: fill;
+                    }
+                    Rectangle { background: DeskArt.accent.with-alpha(0.45); }
+                }
+            }
+        }
+        // Escurecimento: leve atrás da lista (a arte aparece pelo vidro), 70% atrás do título, nada à direita.
+        Rectangle {
+            background: @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
+                Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
+        }
+        Rectangle {
+            background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%);
+        }
+    }
+}
+
 export component Desktop inherits Window {
     in property <bool> control-center;
     in property <[PanelRow]> cc-icons;
@@ -1145,17 +1301,36 @@ export component Desktop inherits Window {
     background: Ui.desk-canvas;
     default-font-family: Ui.font-desk;
 
+    // Janela abaixo de 1280 de largura: margens, cartões e título encolhem (JanelaPequena).
+    property <bool> small: self.width < 1280px;
+
     init => {
         // Escala de mesa dos tokens (o palco da tela cheia tem 1080 unidades de altura).
         Ui.u = 0.75px;
+        root.sync-art();
         fs.focus();
     }
+    function sync-art() {
+        DeskArt.win-w = root.width;
+        DeskArt.win-h = root.height;
+        DeskArt.gray = page != "desk-library";
+        DeskArt.has-art = desk-game.has-game && desk-game.art.width > 0;
+        DeskArt.blur = desk-game.art-blur;
+        DeskArt.lum = desk-game.art-lum;
+        if (desk-game.art.height > 0) {
+            DeskArt.aspect = desk-game.art.width / desk-game.art.height;
+        }
+    }
+    changed width => { root.sync-art(); }
+    changed height => { root.sync-art(); }
+    changed page => { root.sync-art(); }
+    changed desk-game => { root.sync-art(); }
 
     // Teclado: o Tako decide o que cada tecla faz; Ctrl+F vai para a busca.
     fs := FocusScope {
         key-pressed(e) => {
             if (e.modifiers.control && !e.modifiers.alt && (e.text == "f" || e.text == "F") && page == "desk-library" && overlays.length == 0) {
-                lib.focus-search();
+                bar.focus-search();
                 return accept;
             }
             if (root.key(e.text, e.repeat, e.modifiers.control, e.modifiers.shift, e.modifiers.alt)) { return accept; }
@@ -1167,10 +1342,22 @@ export component Desktop inherits Window {
         }
     }
 
+    ArtLayer { art: desk-game.art; }
+
     VerticalLayout {
-        TopBar {
+        padding-left: small ? Ui.space-20 : Ui.space-36;
+        padding-right: small ? Ui.space-20 : Ui.space-36;
+        padding-top: small ? 10px : Ui.space-12;
+        padding-bottom: small ? Ui.space-16 : Ui.space-28;
+        spacing: small ? 14px : Ui.space-20;
+        bar := TopBar {
             items: desk-nav;
             big-picture-label: desk-big-picture-label;
+            show-search: page == "desk-library";
+            search: desk-search;
+            search-hint: desk-search-hint;
+            edited(z, t) => { root.edited(z, t); }
+            leave => { fs.focus(); }
             clicked(z, i) => {
                 fs.focus();
                 root.clicked(z, i);
@@ -1183,8 +1370,7 @@ export component Desktop inherits Window {
                 tabs: desk-tabs;
                 tab: desk-tab;
                 collections: desk-collections;
-                search: desk-search;
-                search-hint: desk-search-hint;
+                small: root.small;
                 filter-label: desk-filter-label;
                 filter-count: desk-filter-count;
                 filtered: desk-filtered;
@@ -1205,7 +1391,6 @@ export component Desktop inherits Window {
                 empty-text: desk-empty-text;
                 empty-action: desk-empty-action;
                 clicked(z, i) => { root.clicked(z, i); }
-                edited(z, t) => { root.edited(z, t); }
                 scrolled(f) => { root.scrolled(f); }
                 menu(x, y) => {
                     root.menu-x = x;

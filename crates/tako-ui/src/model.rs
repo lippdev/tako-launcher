@@ -222,6 +222,9 @@ theme_struct! {
         pub overline: String,
         pub description: String,
         pub art: Image,
+        // Cópia de vidro da arte (desfocada e saturada) e a luminância dela em `images::GLASS_GRID`.
+        pub art_blur: Image,
+        pub art_lum: Vec<f32>,
         pub logo: Image,
         pub accent: Color,
         pub hint: String,

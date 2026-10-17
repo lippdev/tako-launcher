@@ -18,7 +18,18 @@ struct Request {
     uri: String,
     max_w: u32,
     max_h: u32,
+    /// Cópia de vidro da arte (`glass`): desfocada, saturada e com a grade de luminância.
+    glass: bool,
 }
+
+/// Grade de luminância da cópia de vidro (colunas × linhas sobre a arte inteira).
+pub const GLASS_GRID: (u32, u32) = (16, 9);
+/// Altura da cópia de vidro. Pequena de propósito: desfocada, não precisa de mais, e o desfoque fica barato.
+const GLASS_HEIGHT: u32 = 240;
+/// `glass-blur` (28px) na escala da cópia, para uma arte mostrada na altura de uma janela de ~900px.
+const GLASS_SIGMA: f32 = 28.0 * GLASS_HEIGHT as f32 / 900.0;
+/// `glass-saturate` (140%).
+const GLASS_SATURATE: f32 = 1.4;
 
 /// Teto do LRU. Cabe a home inteira (capas de 300x450 ≈ 0,5 MB, fundo ≈ 5–8 MB) com folga para voltar
 /// rápido; o que está na tela nunca sai (ver `Lru::evict`), então o teto vale para o que está fora dela.
@@ -88,6 +99,8 @@ impl Lru {
 
 struct State {
     lru: Lru,
+    /// Grade de luminância de cada cópia de vidro (pela mesma chave do LRU); poucos bytes por arte.
+    lum: HashMap<String, Vec<f32>>,
     pending: HashSet<String>,
     failed: HashSet<String>,
     tx: Option<Sender<Request>>,
@@ -97,6 +110,7 @@ struct State {
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State {
         lru: Lru::new(LIMIT),
+        lum: HashMap::new(),
         pending: HashSet::new(),
         failed: HashSet::new(),
         tx: None,
@@ -125,10 +139,27 @@ pub fn init(resolver: Resolver, workers: usize, on_ready: impl Fn() + 'static) {
 
 /// Imagem pronta, ou `None` (e o pedido entra na fila). `max_w`/`max_h` em pixels físicos.
 pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
+    request(uri, max_w, max_h, false)
+}
+
+/// Cópia de vidro da arte do desktop (Liquid Glass sem desfoque em tempo real): desfocada e saturada uma vez,
+/// em thread de fundo, com a luminância média em `GLASS_GRID` (linhas de cima para baixo). `None` até ficar pronta.
+pub fn glass(uri: &str) -> Option<(Image, Vec<f32>)> {
+    let img = request(uri, 0, GLASS_HEIGHT, true)?;
+    let key = format!("glass|{uri}");
+    let lum = STATE.with(|s| s.borrow().lum.get(&key).cloned())?;
+    Some((img, lum))
+}
+
+fn request(uri: &str, max_w: u32, max_h: u32, glass: bool) -> Option<Image> {
     if uri.is_empty() {
         return None;
     }
-    let key = format!("{max_w}x{max_h}|{uri}");
+    let key = if glass {
+        format!("glass|{uri}")
+    } else {
+        format!("{max_w}x{max_h}|{uri}")
+    };
     STATE.with(|s| {
         let mut s = s.borrow_mut();
         if let Some(img) = s.lru.get(&key) {
@@ -142,6 +173,7 @@ pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
             uri: uri.to_owned(),
             max_w,
             max_h,
+            glass,
         };
         if let Some(tx) = &s.tx
             && tx.send(request).is_ok()
@@ -168,6 +200,7 @@ pub fn clear() {
         s.lru.map.clear();
         s.lru.order.clear();
         s.lru.bytes = 0;
+        s.lum.clear();
     });
 }
 
@@ -187,8 +220,11 @@ fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
                 let mut s = s.borrow_mut();
                 s.pending.remove(&key);
                 match buf {
-                    Some(buf) => {
+                    Some((buf, lum)) => {
                         let bytes = (buf.width() * buf.height() * 4) as usize;
+                        if let Some(lum) = lum {
+                            s.lum.insert(key.clone(), lum);
+                        }
                         s.lru.insert(key, Image::from_rgba8(buf), bytes);
                     }
                     None => {
@@ -211,8 +247,10 @@ fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
     }
 }
 
+type Loaded = (SharedPixelBuffer<Rgba8Pixel>, Option<Vec<f32>>);
+
 /// Lê e decodifica; nada aqui pode derrubar a UI (arquivos e downloads são dados não confiáveis).
-fn load(req: &Request, resolver: &Resolver) -> Option<SharedPixelBuffer<Rgba8Pixel>> {
+fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
     let path = local_path(&req.uri).or_else(|| resolver(&req.uri))?;
     let meta = std::fs::metadata(&path).ok()?;
     if meta.len() > 64 * 1024 * 1024 {
@@ -229,6 +267,11 @@ fn load(req: &Request, resolver: &Resolver) -> Option<SharedPixelBuffer<Rgba8Pix
     let mut reader = reader;
     reader.limits(decoder_limits);
     let img = reader.decode().ok()?;
+    if req.glass {
+        let (rgba, lum) = glass_copy(&img);
+        let buf = SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height());
+        return Some((buf, Some(lum)));
+    }
     let img = if img.width() > req.max_w || img.height() > req.max_h {
         img.resize(
             req.max_w.max(1),
@@ -239,11 +282,45 @@ fn load(req: &Request, resolver: &Resolver) -> Option<SharedPixelBuffer<Rgba8Pix
         img
     };
     let rgba = img.to_rgba8();
-    Some(SharedPixelBuffer::clone_from_slice(
-        rgba.as_raw(),
-        rgba.width(),
-        rgba.height(),
+    Some((
+        SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height()),
+        None,
     ))
+}
+
+/// Reduz, satura e desfoca a arte; mede a luminância relativa (WCAG) de cada célula da grade.
+pub(crate) fn glass_copy(img: &image::DynamicImage) -> (image::RgbaImage, Vec<f32>) {
+    let h = GLASS_HEIGHT.min(img.height().max(1));
+    let w = (u64::from(img.width()) * u64::from(h) / u64::from(img.height().max(1))).max(1) as u32;
+    let mut small = img.resize_exact(w, h, image::imageops::FilterType::Triangle).to_rgba8();
+    for p in small.pixels_mut() {
+        let [r, g, b, _] = p.0.map(f32::from);
+        let gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let sat = |c: f32| (gray + (c - gray) * GLASS_SATURATE).clamp(0.0, 255.0) as u8;
+        p.0 = [sat(r), sat(g), sat(b), 255];
+    }
+    let blurred = image::imageops::fast_blur(&small, GLASS_SIGMA);
+    let (cols, rows) = GLASS_GRID;
+    let mut lum = Vec::with_capacity((cols * rows) as usize);
+    for row in 0..rows {
+        for col in 0..cols {
+            let (x0, x1) = (col * w / cols, ((col + 1) * w / cols).max(col * w / cols + 1).min(w));
+            let (y0, y1) = (row * h / rows, ((row + 1) * h / rows).max(row * h / rows + 1).min(h));
+            let (mut sum, mut n) = ([0u64; 3], 0u64);
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let p = blurred.get_pixel(x, y).0;
+                    for c in 0..3 {
+                        sum[c] += u64::from(p[c]);
+                    }
+                    n += 1;
+                }
+            }
+            let avg = |c: usize| (sum[c] / n.max(1)) as u8;
+            lum.push(tako_core::presentation::Rgb::new(avg(0), avg(1), avg(2)).luminance() as f32);
+        }
+    }
+    (blurred, lum)
 }
 
 /// `file:///c:/x.png`, `file:///home/x.png` ou caminho simples.
@@ -298,6 +375,25 @@ mod tests {
             );
         }
         assert_eq!(local_path("C:/x.png"), Some(PathBuf::from("C:/x.png")));
+    }
+
+    #[test]
+    fn glass_copy_is_small_blurred_and_measures_light_and_dark_art() {
+        // Metade de cima branca, de baixo preta: a linha de cima da grade passa do limite da tinta densa (0,18).
+        let art = image::RgbaImage::from_fn(800, 450, |_, y| {
+            if y < 225 {
+                image::Rgba([255, 255, 255, 255])
+            } else {
+                image::Rgba([0, 0, 0, 255])
+            }
+        });
+        let (copy, lum) = glass_copy(&image::DynamicImage::ImageRgba8(art));
+        assert_eq!((copy.width(), copy.height()), (426, GLASS_HEIGHT));
+        assert_eq!(lum.len(), (GLASS_GRID.0 * GLASS_GRID.1) as usize);
+        assert!(lum[0] > 0.18 && lum[lum.len() - 1] < 0.18);
+        // Desfocada: a borda entre o branco e o preto vira um degradê.
+        let mid = copy.get_pixel(200, GLASS_HEIGHT / 2).0[0];
+        assert!(mid > 20 && mid < 235, "{mid}");
     }
 
     #[test]
