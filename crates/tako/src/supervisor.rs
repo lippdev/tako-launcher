@@ -17,9 +17,38 @@ use tako_platform::Platform;
 use tako_ui::gamepad::Pads;
 use tako_ui::session::{self, Running};
 
+#[cfg(test)]
+mod link_tests {
+    use super::*;
+
+    #[test]
+    fn activation_is_bounded_validated_and_consumed_once() {
+        let dir = std::env::temp_dir().join(format!("tako-links-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let paths = DataPaths::at(&dir);
+        let supervisor = Supervisor::new(paths, Platform::simulated(), &["tako".into()]);
+        let file = dir.join(crate::ACTIVATE_FILE);
+        for url in ["", "tako://settings", "tako://game/steam:570"] {
+            std::fs::write(&file, url).unwrap();
+            assert_eq!(supervisor.activation_requested().as_deref(), Some(url));
+            assert!(supervisor.activation_requested().is_none());
+        }
+        for url in [
+            "https://example.com".to_owned(),
+            "x".repeat(tako_core::links::MAX_URL + 1),
+        ] {
+            std::fs::write(&file, url).unwrap();
+            assert!(supervisor.activation_requested().is_none());
+            assert!(!file.exists());
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
 /// Como abrir a próxima interface.
 #[derive(Default, Clone)]
 struct Launch {
+    link: Option<String>,
     after_game: Option<(String, Duration, GameEnd)>,
     control_center: bool,
 }
@@ -46,6 +75,7 @@ pub struct Supervisor {
     pads: Option<Pads>,
     chord: ButtonChordDetector,
     key: tako_core::input::shortcut::KeyShortcut,
+    initial_link: Option<String>,
 }
 
 impl Supervisor {
@@ -54,6 +84,7 @@ impl Supervisor {
         let chord_value = settings.get("ControlCenterChord").ok().flatten();
         let key = settings.get("ControlCenterKey").ok().flatten();
         Supervisor {
+            initial_link: tako_core::links::argument(all_args).map(str::to_owned),
             paths,
             platform,
             passthrough: args::passthrough(&all_args[1..]),
@@ -69,8 +100,22 @@ impl Supervisor {
     }
 
     /// Outro Tako foi aberto (ver `ACTIVATE_FILE`)? Consome o pedido.
-    fn activation_requested(&self) -> bool {
-        std::fs::remove_file(self.paths.root.join(crate::ACTIVATE_FILE)).is_ok()
+    fn activation_requested(&self) -> Option<String> {
+        use std::io::Read;
+        let path = self.paths.root.join(crate::ACTIVATE_FILE);
+        let file = std::fs::File::open(&path).ok()?;
+        let mut url = String::new();
+        let read = file
+            .take(tako_core::links::MAX_URL as u64 + 1)
+            .read_to_string(&mut url);
+        if let Err(e) = std::fs::remove_file(path) {
+            tracing::warn!("consumir ativação: {e}");
+        }
+        if read.is_err() || (!url.is_empty() && tako_core::links::parse(&url).is_none()) {
+            tracing::warn!("pedido de ativação inválido ignorado");
+            return None;
+        }
+        Some(url)
     }
 
     fn now(&self) -> Duration {
@@ -85,6 +130,9 @@ impl Supervisor {
             tako_core::supervision::UiLaunchMode::Normal
         };
         let mut a = args::for_ui("stdio", mode, &self.passthrough);
+        if let Some(url) = &launch.link {
+            a.extend(["--open-url".into(), url.clone()]);
+        }
         if let Some((id, played, end)) = &launch.after_game {
             a.extend([
                 "--after-game".into(),
@@ -139,7 +187,10 @@ impl Supervisor {
             self.watch.begin(safe_mode),
             tako_core::supervision::UiLaunchMode::SafeMode
         );
-        let mut launch = Launch::default();
+        let mut launch = Launch {
+            link: self.initial_link.take(),
+            ..Default::default()
+        };
         loop {
             let mut ui = match self.spawn_ui(safe, &launch) {
                 Ok(u) => u,
@@ -201,10 +252,15 @@ impl Supervisor {
                 }
                 return status.code().unwrap_or(-1);
             }
-            if self.activation_requested()
+            if let Some(url) = self.activation_requested()
                 && let Some(stdin) = ui.stdin.as_mut()
             {
-                let _ = protocol::write(stdin, &SupMsg::Activate);
+                let msg = if url.is_empty() {
+                    SupMsg::Activate
+                } else {
+                    SupMsg::OpenLink { url }
+                };
+                let _ = protocol::write(stdin, &msg);
             }
             if let Some(reason) = self.watch.check(self.now()) {
                 tracing::warn!("interface sem resposta ({reason:?}); encerrando");
@@ -361,12 +417,14 @@ impl Supervisor {
                 last_buttons = pad.buttons;
             }
             // Atalho do controle, do teclado ou o Tako aberto de novo: a interface volta por cima do jogo.
+            let activation = self.activation_requested();
             if self.chord.update(GamepadButtons(pad.buttons), now)
                 || pressed.swap(false, std::sync::atomic::Ordering::Relaxed)
-                || self.activation_requested()
+                || activation.is_some()
             {
                 return Launch {
-                    control_center: true,
+                    control_center: activation.as_ref().is_none_or(String::is_empty),
+                    link: activation.filter(|s| !s.is_empty()),
                     ..Default::default()
                 };
             }
@@ -380,6 +438,7 @@ impl Supervisor {
                     return Launch {
                         after_game: Some((id, played, end)),
                         control_center: false,
+                        link: None,
                     };
                 }
             }

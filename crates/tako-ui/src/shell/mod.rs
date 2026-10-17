@@ -17,6 +17,7 @@ pub mod keys;
 pub mod launch_splash;
 pub mod layer;
 pub mod library;
+mod links;
 pub mod settings;
 pub mod sidebar;
 pub mod source_ids;
@@ -95,6 +96,7 @@ pub trait Page {
 pub const TOAST_TIME: Duration = Duration::from_millis(2600);
 
 pub struct Shell {
+    pub(crate) pending_link: Option<tako_core::links::Link>,
     pub ctx: Ctx,
     pages: Vec<Box<dyn Page>>,
     layers: Vec<Box<dyn Layer>>,
@@ -106,6 +108,7 @@ pub struct Shell {
 impl Shell {
     pub fn new(ctx: Ctx) -> Shell {
         let mut shell = Shell {
+            pending_link: None,
             ctx,
             pages: vec![Box::new(home::HomePage::new())],
             layers: Vec::new(),

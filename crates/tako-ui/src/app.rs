@@ -26,6 +26,7 @@ use tako_platform::Platform;
 /// Como a interface foi aberta.
 #[derive(Debug, Clone, Default)]
 pub struct UiOptions {
+    pub link: Option<tako_core::links::Link>,
     /// Sem lojas nem funções do SO (testes, demonstração e CI).
     pub simulate: bool,
     /// Voltou de um jogo: foco nele e "Bem-vindo de volta".
@@ -244,6 +245,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
                     s.ctx.sync_collections();
                     s.ctx.sources = reports;
                     s.ctx.scanning = false;
+                    s.apply_pending_link();
                     s.ctx.dirty = true;
                 }
             });
@@ -339,6 +341,7 @@ impl App {
         let ui = def.create().map_err(|e| e.to_string())?;
         theme::apply_tokens(&ui, dir.as_deref());
         let mut shell = Shell::new(ctx);
+        shell.pending_link = opts.link.clone();
         if let Some((id, title)) = &opts.running {
             shell.ctx.running = Some(crate::shell::RunningGame {
                 id: id.clone(),
@@ -711,6 +714,16 @@ pub fn raise_current() {
         use slint::winit_030::WinitWindowAccessor;
         window.with_winit_window(|w| w.focus_window());
     });
+}
+
+/// Um segundo processo encaminhou um link à interface já aberta.
+pub fn open_current_link(url: &str) {
+    if let Some(link) = tako_core::links::parse(url) {
+        if let Some(shell) = crate::tasks::shell() {
+            shell.borrow_mut().open_link(link);
+        }
+        raise_current();
+    }
 }
 
 /// Quanto dura o fade de "Abrindo…" para o jogo (o mesmo do tema).

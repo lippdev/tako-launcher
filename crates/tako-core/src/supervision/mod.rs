@@ -110,8 +110,13 @@ pub mod args {
         let mut out = Vec::new();
         let mut it = args.iter();
         while let Some(a) = it.next() {
-            if a.eq_ignore_ascii_case(PIPE) {
+            if a.eq_ignore_ascii_case(PIPE) || a == "--open-url" {
                 it.next(); // e o valor
+            } else if a
+                .get(..7)
+                .is_some_and(|s| s.eq_ignore_ascii_case("tako://"))
+            {
+                // O link é usado uma vez; reiniciar a UI não pode repetir Jogar.
             } else if ![UI, SAFE_MODE, NO_SUPERVISOR]
                 .iter()
                 .any(|f| a.eq_ignore_ascii_case(f))
@@ -137,6 +142,19 @@ pub mod args {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_link_is_not_replayed_when_the_ui_restarts() {
+        let all = [
+            "--open-url",
+            "tako://play/steam:570",
+            "--data-dir",
+            "dados",
+            "tako://home",
+        ]
+        .map(str::to_owned);
+        assert_eq!(args::passthrough(&all), ["--data-dir", "dados"]);
+    }
 
     fn v(a: &[&str]) -> Vec<String> {
         a.iter().map(|s| s.to_string()).collect()
