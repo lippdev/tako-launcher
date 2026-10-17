@@ -28,7 +28,9 @@ scripts/bancada.sh status                            # quem está com a trava
 ```
 
 - **Todo** comando `cargo` (inclusive `check`) passa pela bancada. Editar código, ler e usar o git não precisam.
-- As worktrees dividem o mesmo `target/` (o disco é curto). Por isso a regra acima não tem exceção.
+- As worktrees dividem o mesmo `target/` (o disco é curto). Por isso a regra acima não tem exceção: o cargo
+  decide o que recompilar pela data dos arquivos, então a bancada, quando a worktree muda, marca os arquivos da
+  worktree atual como novos e os crates do Tako recompilam com o código dela.
 - Comandos longos (CI) rodam em segundo plano no terminal do agente: a espera pode passar de 10 minutos.
 - Segure a trava o mínimo. Nada de abrir o Tako e deixar aberto.
 - Trava com mais de 90 minutos é considerada abandonada e liberada sozinha.
