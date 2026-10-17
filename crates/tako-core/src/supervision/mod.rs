@@ -79,6 +79,12 @@ pub mod args {
     /// Abre a UI direto, sem supervisor (diagnóstico).
     pub const NO_SUPERVISOR: &str = "--no-supervisor";
     pub const SAFE_MODE: &str = "--safe-mode";
+    /// Abre direto na tela cheia, sem perguntar (modo Xbox pelo AnyFSE, atalhos do usuário). ADR-0027.
+    pub const BIG_PICTURE: &str = "--big-picture";
+    /// Aberto pelo Console Mode (ADR-0025, CMI-004): também vai direto para a tela cheia.
+    pub const CONSOLE_SESSION: &str = "--console-session";
+    /// Abre no modo desktop sem a pergunta do controle (interface reaberta pelo supervisor). ADR-0027.
+    pub const DESKTOP: &str = "--desktop";
     /// `0` desliga e `1` liga o supervisor, em qualquer build.
     pub const ENV_VAR: &str = "TAKO_SUPERVISOR";
 
@@ -117,9 +123,17 @@ pub mod args {
                 .is_some_and(|s| s.eq_ignore_ascii_case("tako://"))
             {
                 // O link é usado uma vez; reiniciar a UI não pode repetir Jogar.
-            } else if ![UI, SAFE_MODE, NO_SUPERVISOR]
-                .iter()
-                .any(|f| a.eq_ignore_ascii_case(f))
+            } else if ![
+                UI,
+                SAFE_MODE,
+                NO_SUPERVISOR,
+                // O modo da interface é do supervisor, que acompanha as trocas (ADR-0027).
+                BIG_PICTURE,
+                CONSOLE_SESSION,
+                DESKTOP,
+            ]
+            .iter()
+            .any(|f| a.eq_ignore_ascii_case(f))
             {
                 out.push(a.clone());
             }
@@ -204,6 +218,14 @@ mod tests {
         assert_eq!(args::pipe_name(&v(&["--supervisor-pipe", ""])), None);
         let p = args::passthrough(&v(&["--ui", "--supervisor-pipe", "x", "--extra"]));
         assert_eq!(p, v(&["--extra"]));
+        // O supervisor repõe o modo em uso; o da linha de comando não volta depois de uma troca.
+        let p = args::passthrough(&v(&[
+            "--big-picture",
+            "--desktop",
+            "--console-session",
+            "-x",
+        ]));
+        assert_eq!(p, v(&["-x"]));
     }
 
     #[test]

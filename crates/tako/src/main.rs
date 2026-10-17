@@ -191,6 +191,8 @@ fn main() {
     });
     let running =
         value(&all, "--running").map(|id| (id, value(&all, "--running-title").unwrap_or_default()));
+    // Desktop por padrão; `--big-picture` (modo Xbox/AnyFSE), `--console-session` ou o supervisor decidem (ADR-0027).
+    let start = tako_ui::mode::start(&all);
     let opts = UiOptions {
         link,
         simulate,
@@ -199,6 +201,8 @@ fn main() {
         control_center: has("--control-center"),
         safe_mode: has(args::SAFE_MODE),
         started: Some(started),
+        mode: start.mode,
+        ask_big_picture: start.ask,
     };
     let host: Rc<RefCell<dyn Host>> = if supervised {
         Rc::new(RefCell::new(hosts::SupervisedHost::new()))

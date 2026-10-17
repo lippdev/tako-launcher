@@ -1,6 +1,6 @@
 //! Supervisor (ADR-0026): processo leve, sem janela, que abre a interface, a reinicia se cair ou travar e,
-//! durante o jogo, fica sozinho: acompanha o jogo, ouve o atalho da Central, move o ponteiro pelo controle
-//! (quando ligado) e no fim restaura tela, áudio e cursor e reabre a interface no jogo.
+//! durante o jogo, acompanha a sessão e restaura tela, áudio e cursor. Na tela cheia fica sozinho e ouve
+//! os atalhos da Central; no desktop conversa com a interface minimizada (ADR-0027).
 
 use crate::protocol::{self, SupMsg, UiMsg};
 use std::io::BufReader;
@@ -43,6 +43,82 @@ mod link_tests {
         }
         std::fs::remove_dir_all(&dir).unwrap();
     }
+
+    #[test]
+    fn ui_reopens_in_the_current_mode_without_replaying_startup_flags() {
+        let dir = std::env::temp_dir().join(format!("tako-modes-{}", std::process::id()));
+        for (flag, expected) in [
+            (None, None),
+            (Some(args::DESKTOP), Some(false)),
+            (Some(args::BIG_PICTURE), Some(true)),
+            (Some(args::CONSOLE_SESSION), Some(true)),
+        ] {
+            let mut all = vec!["tako".into()];
+            if let Some(flag) = flag {
+                all.push(flag.into());
+            }
+            let mut supervisor = Supervisor::new(DataPaths::at(&dir), Platform::simulated(), &all);
+            assert_eq!(supervisor.big_picture, expected);
+            for big in [false, true, false] {
+                supervisor.big_picture = Some(big);
+                let a = supervisor.ui_args(false, &Launch::default());
+                let start = tako_ui::mode::start(&a);
+                assert_eq!(start.mode == tako_ui::mode::UiMode::BigPicture, big);
+                assert!(!start.ask);
+                assert!(!args::has(&a, args::CONSOLE_SESSION));
+                assert_eq!(
+                    a.iter()
+                        .filter(|s| [args::DESKTOP, args::BIG_PICTURE].contains(&s.as_str()))
+                        .count(),
+                    1
+                );
+            }
+        }
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn finishing_with_the_ui_alive_restores_and_clears_the_launch() {
+        let dir = std::env::temp_dir().join(format!("tako-return-{}", std::process::id()));
+        let paths = DataPaths::at(&dir);
+        let platform = Platform::simulated();
+        let mut ctx = tako_ui::app::build_ctx(paths.clone(), platform.clone(), true);
+        ctx.library.refresh();
+        let id = ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.is_installed)
+            .unwrap()
+            .id
+            .clone();
+        ctx.settings
+            .set_bool(tako_ui::shell::ctx::keys::HIDE_CURSOR, true);
+        let session::Started::Tracking(req) = session::start(&mut ctx, &id).unwrap() else {
+            panic!("sem acompanhamento")
+        };
+        let mut supervisor = Supervisor::new(paths, platform, &["tako".into()]);
+        let mut running = Running::new(req).unwrap();
+        running.begin(&supervisor.platform);
+        assert!(supervisor.platform.cursor.is_hidden());
+        supervisor.running = Some(running);
+        supervisor.launching = true;
+        supervisor.closing = true;
+        let played = Duration::from_secs(120);
+        let (got, end) = supervisor.finish_game(played);
+        assert_eq!(got, id);
+        assert_eq!(end, GameEnd::Normal);
+        assert!(supervisor.running.is_none());
+        assert!(!supervisor.launching && !supervisor.closing);
+        assert!(!supervisor.platform.cursor.is_hidden());
+        assert!(!ctx.paths.session_environment().exists());
+        assert_eq!(
+            supervisor.finish_game(played).0,
+            "",
+            "restaurar novamente é inofensivo"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
 
 /// Como abrir a próxima interface.
@@ -78,6 +154,8 @@ pub struct Supervisor {
     profiles: Profiles,
     key: tako_core::input::shortcut::KeyShortcut,
     initial_link: Option<String>,
+    /// Modo da interface (ADR-0027): `None` até ela avisar (abre no desktop e pergunta), `Some(true)` = tela cheia.
+    big_picture: Option<bool>,
 }
 
 impl Supervisor {
@@ -85,6 +163,7 @@ impl Supervisor {
         let (profiles, key) = shortcuts(&paths);
         Supervisor {
             initial_link: tako_core::links::argument(all_args).map(str::to_owned),
+            big_picture: initial_mode(all_args),
             paths,
             platform,
             passthrough: args::passthrough(&all_args[1..]),
@@ -125,6 +204,30 @@ impl Supervisor {
 
     fn spawn_ui(&mut self, safe: bool, launch: &Launch) -> Result<UiProc, String> {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let a = self.ui_args(safe, launch);
+        let mut child = Command::new(exe)
+            .args(&a)
+            .env("TAKO_SUPERVISOR_PID", std::process::id().to_string())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let stdout = child.stdout.take().ok_or("sem saída da interface")?;
+        let (tx, rx) = channel();
+        std::thread::spawn(move || {
+            protocol::read_lines::<UiMsg>(BufReader::new(stdout), |m| drop(tx.send(m)))
+        });
+        self.watch.started(child.id(), self.now());
+        let stdin = child.stdin.take();
+        Ok(UiProc {
+            child,
+            stdin,
+            rx,
+            closing: None,
+        })
+    }
+
+    fn ui_args(&self, safe: bool, launch: &Launch) -> Vec<String> {
         let mode = if safe {
             tako_core::supervision::UiLaunchMode::SafeMode
         } else {
@@ -161,26 +264,17 @@ impl Supervisor {
         if launch.control_center {
             a.push("--control-center".into());
         }
-        let mut child = Command::new(exe)
-            .args(&a)
-            .env("TAKO_SUPERVISOR_PID", std::process::id().to_string())
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        let stdout = child.stdout.take().ok_or("sem saída da interface")?;
-        let (tx, rx) = channel();
-        std::thread::spawn(move || {
-            protocol::read_lines::<UiMsg>(BufReader::new(stdout), |m| drop(tx.send(m)))
-        });
-        self.watch.started(child.id(), self.now());
-        let stdin = child.stdin.take();
-        Ok(UiProc {
-            child,
-            stdin,
-            rx,
-            closing: None,
-        })
+        if let Some(big) = self.big_picture {
+            a.push(
+                if big {
+                    args::BIG_PICTURE
+                } else {
+                    args::DESKTOP
+                }
+                .into(),
+            );
+        }
+        a
     }
 
     /// Esconde os controles do jogo, se o driver existir e a opção estiver ligada. `true` = há o que devolver.
@@ -222,8 +316,10 @@ impl Supervisor {
             ..Default::default()
         };
         loop {
-            // Interface por cima do jogo: o jogo deixa de ver o controle até ela fechar (INPUT-005).
-            let hidden = self.running.is_some() && self.hide_pads();
+            // Interface por cima do jogo: o jogo deixa de ver o controle até ela fechar (INPUT-005). No desktop a
+            // janela não é do controle (ADR-0027): o jogo continua com ele.
+            let hidden =
+                self.running.is_some() && self.big_picture != Some(false) && self.hide_pads();
             let mut ui = match self.spawn_ui(safe, &launch) {
                 Ok(u) => u,
                 Err(e) => {
@@ -392,6 +488,13 @@ impl Supervisor {
                 }
             }
             UiMsg::Closing { reason } => ui.closing = Some(reason),
+            UiMsg::Mode { big_picture } => {
+                tracing::info!(
+                    "interface no modo {}",
+                    if big_picture { "tela cheia" } else { "desktop" }
+                );
+                self.big_picture = Some(big_picture);
+            }
         }
     }
 
@@ -401,6 +504,7 @@ impl Supervisor {
             return (String::new(), GameEnd::Normal);
         };
         self.closing = false;
+        self.launching = false;
         let end = r.end(&self.platform, played);
         r.finish(&self.platform, &self.paths);
         tracing::info!("jogo terminou: {} ({})", r.req.game_id, end.key());
@@ -493,6 +597,18 @@ impl Supervisor {
                 return Launch::default();
             }
         }
+    }
+}
+
+/// Modo pedido na linha de comando: `--big-picture` (modo Xbox/AnyFSE) e `--console-session` (Console Mode) vão
+/// direto para a tela cheia; sem eles a interface decide (desktop, com a pergunta do controle).
+fn initial_mode(all_args: &[String]) -> Option<bool> {
+    if args::has(all_args, args::BIG_PICTURE) || args::has(all_args, args::CONSOLE_SESSION) {
+        Some(true)
+    } else if args::has(all_args, args::DESKTOP) {
+        Some(false)
+    } else {
+        None
     }
 }
 

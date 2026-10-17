@@ -30,6 +30,8 @@ pub trait Layer {
     }
     fn text(&mut self, _text: &str, _ctx: &mut Ctx) {}
     fn erase(&mut self, _ctx: &mut Ctx) {}
+    /// O campo de texto do modo desktop foi editado (texto inteiro: colar, apagar uma seleção).
+    fn replace_text(&mut self, _text: &str, _ctx: &mut Ctx) {}
     /// Tecla física crua (`text` do Slint) com os modificadores, antes de virar comando: `Some` = a camada tratou
     /// (captura do atalho de teclado).
     fn key(
@@ -92,6 +94,8 @@ pub type Builder = Rc<dyn Fn(&Ctx) -> Vec<MenuItem>>;
 pub enum MenuKind {
     Dialog,
     Panel,
+    /// Menu junto do ponteiro (modo desktop: ⋯ e botão direito).
+    Menu,
 }
 
 pub struct MenuLayer {
@@ -138,6 +142,10 @@ impl MenuLayer {
         build: impl Fn(&Ctx) -> Vec<MenuItem> + 'static,
     ) -> Self {
         Self::new(MenuKind::Panel, title, build)
+    }
+
+    pub fn menu(title: impl Into<String>, build: impl Fn(&Ctx) -> Vec<MenuItem> + 'static) -> Self {
+        Self::new(MenuKind::Menu, title, build)
     }
 
     pub fn text(mut self, t: impl Into<String>) -> Self {
@@ -243,10 +251,10 @@ impl Layer for MenuLayer {
         let items = self.items(ctx);
         let focus = self.current(&items).map(|i| i as i32).unwrap_or(-1);
         Overlay {
-            kind: if self.kind == MenuKind::Panel {
-                "panel"
-            } else {
-                "dialog"
+            kind: match self.kind {
+                MenuKind::Panel => "panel",
+                MenuKind::Dialog => "dialog",
+                MenuKind::Menu => "menu",
             }
             .into(),
             title: self.title.clone(),
@@ -284,6 +292,25 @@ impl Layer for MenuLayer {
             return self.handle(Cmd::Back, ctx);
         }
         self.focus = index;
+        // ‹ › do modo desktop numa linha que se ajusta (volume, valores que ciclam).
+        if zone == "row-dec" || zone == "row-inc" {
+            // Sem ajuste, a linha só tem o "próximo valor" do A.
+            let adjustable = self
+                .items(ctx)
+                .get(index)
+                .is_some_and(|i| i.adjust.is_some());
+            if !adjustable {
+                return self.handle(Cmd::Accept, ctx);
+            }
+            return self.handle(
+                if zone == "row-dec" {
+                    Cmd::Left
+                } else {
+                    Cmd::Right
+                },
+                ctx,
+            );
+        }
         self.handle(Cmd::Accept, ctx)
     }
 

@@ -12,15 +12,18 @@ enum Icon {
     Audio,
     Screen,
     Pointer,
+    /// Ir para o modo desktop (ADR-0027); o jogo continua.
+    Desktop,
     End,
 }
 
-const ICONS: [Icon; 6] = [
+const ICONS: [Icon; 7] = [
     Icon::Home,
     Icon::Game,
     Icon::Audio,
     Icon::Screen,
     Icon::Pointer,
+    Icon::Desktop,
     Icon::End,
 ];
 
@@ -113,7 +116,7 @@ impl ControlCenter {
                 PanelRow::button("end", ctx.t("cc.end_confirm")).danger(),
                 PanelRow::button("cancel", ctx.t("common.cancel")),
             ],
-            Icon::Home | Icon::Game => Vec::new(),
+            Icon::Home | Icon::Game | Icon::Desktop => Vec::new(),
         }
     }
 
@@ -135,6 +138,12 @@ impl ControlCenter {
                 Icon::Game => {
                     if cmd == Cmd::Accept {
                         ctx.effect(Effect::ResumeGame);
+                        return true;
+                    }
+                }
+                Icon::Desktop => {
+                    if cmd == Cmd::Accept {
+                        ctx.effect(Effect::SwitchMode(crate::mode::UiMode::Desktop));
                         return true;
                     }
                 }
@@ -277,6 +286,9 @@ impl ControlCenter {
                 Icon::Audio => PanelRow::button("audio", ctx.t("cc.audio")).icon("volume"),
                 Icon::Screen => PanelRow::button("screen", ctx.t("cc.screen")).icon("monitor"),
                 Icon::Pointer => PanelRow::button("pointer", ctx.t("cc.pointer")).icon("pointer"),
+                Icon::Desktop => {
+                    PanelRow::button("desktop", ctx.t("desktop.mode.cc")).icon("monitor")
+                }
                 Icon::End => PanelRow::button("end", ctx.t("cc.end"))
                     .icon("power")
                     .danger(),

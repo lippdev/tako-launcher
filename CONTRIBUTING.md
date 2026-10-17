@@ -67,7 +67,7 @@ Vale para o Tako em Rust (PRD v0.2, §4 e §5). O código C#/WPF continua com as
 1. Crates (PRD §5.1): `tako` → `tako-ui` → `tako-core`; `tako-sources`, `tako-platform` e `tako-themes` dependem de `tako-core`, nunca o contrário. `tako-core` não conhece UI nem SO.
 2. Os contratos das funções de plataforma ficam em `tako_core::devices` (com versões em memória para testes); as implementações por SO ficam em `tako-platform`, atrás de `#[cfg(target_os = "...")]`. Código de SO só existe em `tako-platform` e `tako-sources`.
 3. `unsafe` só em `tako-platform`, e cada bloco com `// SAFETY:` explicando por que é seguro.
-4. A interface não restaura tela nem áudio: o supervisor restaura e sobrevive à queda da interface (ADR-0026). Durante o jogo, o processo da interface termina.
+4. A interface não restaura tela nem áudio: o supervisor restaura e sobrevive à queda da interface (ADR-0026). Durante o jogo, a interface termina na tela cheia; no desktop permanece minimizada (ADR-0027).
 5. Sessão: transições idempotentes; restaurar duas vezes não desfaz nada a mais. Transição inválida não mexe no sistema.
 6. Temas são dados: só apresentação, sem rede, disco ou processos; validados antes de carregar e com volta ao tema padrão (PRD §7).
 7. Biblioteca 100% offline. Proibido: executar arquivos baixados, desativar antivírus/anti-cheat, injetar qualquer coisa em jogos.

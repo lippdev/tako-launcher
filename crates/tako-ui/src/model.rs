@@ -200,3 +200,30 @@ theme_struct! {
         pub preview_text: String,
     }
 }
+
+theme_struct! {
+    /// Linha da lista de jogos do modo desktop (`theme/desktop.slint`, fora da API de tema).
+    pub struct DeskGame {
+        pub id: String,
+        pub title: String,
+        pub thumb: Image,
+        pub accent: Color,
+        pub favorite: bool,
+        pub running: bool,
+        pub installed: bool,
+    }
+}
+
+theme_struct! {
+    /// Destaque do jogo selecionado no modo desktop.
+    pub struct DeskGameView {
+        pub has_game: bool,
+        pub title: String,
+        pub overline: String,
+        pub description: String,
+        pub art: Image,
+        pub logo: Image,
+        pub accent: Color,
+        pub hint: String,
+    }
+}

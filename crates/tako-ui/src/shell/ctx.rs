@@ -52,6 +52,8 @@ pub enum Effect {
     /// Mudou algo que exige reler a biblioteca (lojas ligadas/desligadas).
     ReloadLibrary,
     ExitToDesktop,
+    /// Trocar entre o modo desktop e a tela cheia (ADR-0027).
+    SwitchMode(crate::mode::UiMode),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -271,6 +273,12 @@ pub struct Ctx {
     pub metadata: Option<std::rc::Rc<crate::metadata::Metadata>>,
     /// Versão da biblioteca da última verificação de jogos quebrados (LIB-004).
     pub broken_checked: Option<u64>,
+    /// A interface está no modo desktop (ADR-0027); `false` = tela cheia.
+    pub desktop: bool,
+    /// Primeira linha visível da lista do desktop (o tema avisa), para pedir só as miniaturas perto dela.
+    pub list_first: usize,
+    /// O último foco veio do teclado ou do controle: o desktop mostra o anel de foco (o mouse esconde).
+    pub focus_visible: bool,
 }
 
 pub type ArtPins = std::collections::BTreeMap<tako_core::library::ArtKind, String>;

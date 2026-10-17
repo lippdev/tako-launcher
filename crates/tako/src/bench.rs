@@ -92,6 +92,8 @@ pub fn run(started: Instant, data_dir: Option<String>) -> i32 {
         ctx,
         &UiOptions {
             simulate: true,
+            // As metas de memória e de quadros (PERF-001) são medidas na tela cheia.
+            mode: tako_ui::mode::UiMode::BigPicture,
             ..Default::default()
         },
         host,

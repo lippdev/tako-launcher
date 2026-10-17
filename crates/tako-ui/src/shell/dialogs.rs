@@ -288,7 +288,47 @@ pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
         .map(|g| g.title.clone())
         .unwrap_or_default();
     let id = id.to_owned();
-    MenuLayer::dialog(title, move |ctx| {
+    MenuLayer::dialog(title, move |ctx| option_items(ctx, &id))
+}
+
+/// ⋯ do modo desktop (ADR-0027): as Opções do jogo com coleções, tags e as configurações deste jogo, num menu
+/// junto do ponteiro.
+pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
+    let title = ctx
+        .library
+        .find(id)
+        .map(|g| g.title.clone())
+        .unwrap_or_default();
+    let id = id.to_owned();
+    MenuLayer::menu(title, move |ctx| {
+        let mut v = option_items(ctx, &id);
+        let (c, t, s) = (id.clone(), id.clone(), id.clone());
+        let extra = [
+            MenuItem::new(
+                PanelRow::button("collections", ctx.t("dialog.add_to_collection")).icon("grid"),
+            )
+            .on(move |ctx| Flow::Replace(Box::new(choose_collections(ctx, &c)))),
+            MenuItem::new(PanelRow::button("tags", ctx.t("tags.title")).icon("check")).on(
+                move |ctx| {
+                    let title = ctx.library.find(&t).map(|g| g.title.clone());
+                    Flow::Replace(Box::new(choose_tags(ctx, vec![t.clone()], title)))
+                },
+            ),
+            MenuItem::new(
+                PanelRow::button("settings", ctx.t("details.game_settings")).icon("gear"),
+            )
+            .on(move |ctx| Flow::Replace(game_settings(ctx, &s))),
+        ];
+        let at = v.len().min(1);
+        v.splice(at..at, extra);
+        v
+    })
+}
+
+/// Linhas das Opções do jogo (vazio se o jogo sumiu).
+fn option_items(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
+    {
+        let id = id.to_owned();
         let Some(g) = ctx.library.find(&id) else {
             return Vec::new();
         };
@@ -356,7 +396,7 @@ pub fn game_options(ctx: &Ctx, id: &str) -> MenuLayer {
             );
         }
         v
-    })
+    }
 }
 
 /// Jogo quebrado (LIB-004): o arquivo ou a pasta sumiu; corrigir pelo "Editar" ou remover da biblioteca.

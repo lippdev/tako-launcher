@@ -14,11 +14,11 @@ pub enum UiMsg {
     Heartbeat {
         seq: u64,
     },
-    /// O jogo abriu; a interface vai fechar e o supervisor acompanha.
+    /// O jogo abriu; o supervisor acompanha. A interface desktop permanece minimizada (ADR-0027).
     Track {
         req: TrackRequest,
     },
-    /// Voltar ao jogo (a interface fecha).
+    /// Voltar ao jogo (a interface minimiza no desktop ou fecha na tela cheia).
     Resume,
     /// Central › Encerrar jogo.
     EndGame,
@@ -32,6 +32,11 @@ pub enum UiMsg {
     /// A interface vai sair de propósito: `update` = o supervisor também sai.
     Closing {
         reason: String,
+    },
+    /// A interface abriu ou trocou de modo (ADR-0027): o supervisor reabre nele e, no desktop, não esconde o
+    /// controle do jogo.
+    Mode {
+        big_picture: bool,
     },
 }
 
@@ -55,7 +60,7 @@ pub enum SupMsg {
     OpenLink {
         url: String,
     },
-    /// A janela do jogo apareceu: a interface sai de "Abrindo…" (some aos poucos e fecha).
+    /// A janela do jogo apareceu: sai de "Abrindo…" e minimiza no desktop ou fecha na tela cheia.
     GameShown,
 }
 
@@ -111,6 +116,41 @@ mod tests {
                 UiMsg::Resume
             ]
         );
+    }
+
+    #[test]
+    fn desktop_lifecycle_and_central_messages_round_trip() {
+        let messages = [
+            UiMsg::Mode { big_picture: false },
+            UiMsg::Mode { big_picture: true },
+            UiMsg::Resume,
+            UiMsg::EndGame,
+            UiMsg::ForceEndGame,
+        ];
+        let mut buf = Vec::new();
+        for msg in &messages {
+            write(&mut buf, msg).unwrap();
+        }
+        let mut got = Vec::new();
+        read_lines::<UiMsg>(buf.as_slice(), |m| got.push(m));
+        assert_eq!(got, messages);
+        let messages = [
+            SupMsg::GameShown,
+            SupMsg::Activate,
+            SupMsg::GameEnded {
+                game_id: "manual:teste".into(),
+                played_secs: 120,
+                end: "normal".into(),
+                exit_code: Some(0),
+            },
+        ];
+        let mut buf = Vec::new();
+        for msg in &messages {
+            write(&mut buf, msg).unwrap();
+        }
+        let mut got = Vec::new();
+        read_lines::<SupMsg>(buf.as_slice(), |m| got.push(m));
+        assert_eq!(got, messages);
     }
 
     #[test]

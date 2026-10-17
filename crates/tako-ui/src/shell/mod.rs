@@ -7,6 +7,7 @@ pub(crate) mod art_review;
 pub mod closing_game;
 pub mod control_center;
 pub mod ctx;
+pub mod desktop;
 pub mod details;
 pub mod dialogs;
 pub mod edit_game;
@@ -95,6 +96,21 @@ pub trait Page {
     /// Voltou a ser a página do topo (depois de B numa página empilhada ou depois do jogo).
     fn resumed(&mut self, _ctx: &mut Ctx) {}
     fn focus_game(&mut self, _id: &str, _ctx: &Ctx) {}
+    /// Tecla crua antes de virar comando (modo desktop: Tab entre as zonas); `Some` = tratou.
+    fn key(
+        &mut self,
+        _text: &str,
+        _mods: tako_core::input::shortcut::KeyModifiers,
+        _ctx: &mut Ctx,
+    ) -> Option<Nav> {
+        None
+    }
+    /// Campo de texto do modo desktop editado (a busca da biblioteca).
+    fn edited(&mut self, _zone: &str, _text: &str, _ctx: &mut Ctx) {}
+    /// A página é a biblioteca desktop (testes e o tema leem o estado dela).
+    fn desktop(&self) -> Option<&desktop::DesktopLibrary> {
+        None
+    }
 }
 
 pub const TOAST_TIME: Duration = Duration::from_millis(2600);
@@ -107,6 +123,8 @@ pub struct Shell {
     sidebar: sidebar::Sidebar,
     /// Central rápida aberta (durante um jogo).
     cc: Option<control_center::ControlCenter>,
+    /// Modo desktop aberto sem argumento: perguntar pela tela cheia se um controle aparecer logo (ADR-0027).
+    pub ask_big_picture: bool,
 }
 
 impl Shell {
@@ -118,9 +136,79 @@ impl Shell {
             layers: Vec::new(),
             sidebar: sidebar::Sidebar::default(),
             cc: None,
+            ask_big_picture: false,
         };
         shell.ctx.dirty = true;
         shell
+    }
+
+    /// Passa a apresentar no modo desktop (ADR-0027): a biblioteca desktop, com o jogo em foco selecionado.
+    pub fn enter_desktop(&mut self) {
+        let focus = self.focused_game();
+        self.ctx.desktop = true;
+        self.cc = None;
+        self.layers.clear();
+        self.sidebar.focus = None;
+        self.ctx.pointer = false;
+        let mut page = desktop::DesktopLibrary::new();
+        if let Some(id) = focus {
+            page.focus_game(&id, &self.ctx);
+        }
+        self.pages = vec![Box::new(page)];
+        self.ctx.dirty = true;
+    }
+
+    /// Passa a apresentar na tela cheia: a Início, com o jogo selecionado no desktop em foco.
+    pub fn enter_big_picture(&mut self) {
+        let focus = self.focused_game();
+        self.ctx.desktop = false;
+        self.ask_big_picture = false;
+        self.layers.clear();
+        self.pages = vec![Box::new(home::HomePage::new())];
+        self.sidebar.focus = None;
+        if let Some(id) = focus {
+            self.focus_game(&id);
+        }
+        self.ctx.dirty = true;
+    }
+
+    /// A biblioteca do modo desktop (sempre a página de baixo no desktop).
+    pub fn desktop_library(&self) -> Option<&desktop::DesktopLibrary> {
+        if !self.ctx.desktop {
+            return None;
+        }
+        self.pages.first()?.desktop()
+    }
+
+    /// Barra superior do desktop: Biblioteca, Configurações e Tela cheia.
+    fn desktop_nav(&mut self, index: usize) {
+        self.layers.clear();
+        match index {
+            0 => self.pages.truncate(1),
+            1 if self.page().kind() != "settings" => {
+                self.pages.truncate(1);
+                self.pages.push(Box::new(settings::SettingsPage::new()));
+            }
+            2 => self
+                .ctx
+                .effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
+            _ => {}
+        }
+        self.ctx.dirty = true;
+    }
+
+    /// Campo de texto do desktop editado: a camada de cima (`overlay-…`) ou a página.
+    pub fn edited(&mut self, zone: &str, text: &str) {
+        self.ctx.dirty = true;
+        if zone.starts_with("overlay-") {
+            if let Some(top) = self.layers.last_mut() {
+                top.replace_text(text, &mut self.ctx);
+            }
+            return;
+        }
+        let Shell { pages, ctx, .. } = self;
+        let n = pages.len();
+        pages[n - 1].edited(zone, text, ctx);
     }
 
     pub fn page(&self) -> &dyn Page {
@@ -160,6 +248,11 @@ impl Shell {
 
     /// Abre uma página de rota (barra lateral), limpando o histórico.
     pub fn open_route(&mut self, route: &str) {
+        // No desktop as rotas são as da barra de cima (links e atalhos da tela cheia caem aqui).
+        if self.ctx.desktop {
+            self.desktop_nav(usize::from(route == "settings"));
+            return;
+        }
         let page: Box<dyn Page> = match route {
             "home" => Box::new(home::HomePage::new()),
             "settings" => Box::new(settings::SettingsPage::new()),
@@ -222,7 +315,10 @@ impl Shell {
 
     /// O jogo terminou: fecha as camadas que dependiam dele.
     pub fn close_game_layers(&mut self) {
+        self.cc = None;
         self.ctx.launching = false;
+        self.ctx.leaving = false;
+        self.ctx.launch_on_top_until = None;
         self.layers.retain(|l| !l.ends_with_game());
         self.ctx.dirty = true;
     }
@@ -230,6 +326,7 @@ impl Shell {
     pub fn handle(&mut self, cmd: Cmd) {
         self.ctx.dirty = true;
         self.ctx.pointer = false;
+        self.ctx.focus_visible = true;
         if let Some(cc) = self.cc.as_mut() {
             if cc.handle(cmd, &mut self.ctx) {
                 self.cc = None;
@@ -269,8 +366,32 @@ impl Shell {
         if self.cc.is_some() {
             return false;
         }
+        // F11 no desktop: tela cheia (ADR-0027).
+        if self.ctx.desktop
+            && text == keys::F11
+            && mods == tako_core::input::shortcut::KeyModifiers::NONE
+        {
+            self.ctx
+                .effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture));
+            return true;
+        }
         let Some(mut top) = self.layers.pop() else {
-            return false;
+            if !self.ctx.desktop {
+                return false;
+            }
+            let nav = {
+                let Shell { pages, ctx, .. } = self;
+                let n = pages.len();
+                pages[n - 1].key(text, mods, ctx)
+            };
+            return match nav {
+                Some(nav) => {
+                    self.ctx.dirty = true;
+                    self.apply_nav(nav);
+                    true
+                }
+                None => false,
+            };
         };
         match top.key(text, mods, &mut self.ctx) {
             Some(flow) => {
@@ -295,6 +416,7 @@ impl Shell {
     pub fn click(&mut self, zone: &str, index: usize) {
         self.ctx.dirty = true;
         self.ctx.pointer = false;
+        self.ctx.focus_visible = false;
         if let Some(cc) = self.cc.as_mut() {
             if let Some(z) = zone.strip_prefix("cc-")
                 && cc.click(z, index, &mut self.ctx)
@@ -318,6 +440,10 @@ impl Shell {
             self.handle_sidebar(Cmd::Accept);
             return;
         }
+        if zone == "desk-nav" {
+            self.desktop_nav(index);
+            return;
+        }
         self.sidebar.focus = None;
         let nav = {
             let Shell { pages, ctx, .. } = self;
@@ -337,7 +463,8 @@ impl Shell {
                 if self.sidebar.focus.is_some() {
                     self.sidebar.focus = Some(index);
                 }
-            } else if self.sidebar.focus.is_none() {
+            } else if self.sidebar.focus.is_none() && !self.ctx.desktop {
+                // No desktop o mouse por cima só destaca (no tema); a seleção é do clique.
                 let Shell { pages, ctx, .. } = self;
                 let n = pages.len();
                 pages[n - 1].hover(zone, index, ctx);
@@ -345,6 +472,7 @@ impl Shell {
         }
         // O foco segue o mouse, mas a fileira/página não rola por isso (ver `Ui.pointer` no tema).
         self.ctx.pointer = true;
+        self.ctx.focus_visible = false;
         self.ctx.dirty = true;
     }
 
@@ -380,7 +508,13 @@ impl Shell {
         }
         if let Some(id) = self.ctx.open_details.take() {
             self.layers.clear();
-            self.pages.push(Box::new(details::DetailsPage::new(&id)));
+            if self.ctx.desktop {
+                // O desktop mostra os detalhes no destaque da biblioteca.
+                self.pages.truncate(1);
+                self.focus_game(&id);
+            } else {
+                self.pages.push(Box::new(details::DetailsPage::new(&id)));
+            }
         }
         if std::mem::take(&mut self.ctx.leave_details) && self.page().kind() == "details" {
             self.layers.clear();
@@ -420,14 +554,14 @@ impl Shell {
                     let Shell { pages, ctx, .. } = self;
                     let n = pages.len();
                     pages[n - 1].resumed(ctx);
-                } else {
+                } else if !self.ctx.desktop {
                     self.sidebar.focus =
                         Some(self.sidebar.index_of(&self.ctx, &self.page().route()));
                 }
             }
             Nav::Layer(l) => self.layers.push(l),
             Nav::Sidebar => {
-                if self.pages.len() == 1 {
+                if self.pages.len() == 1 && !self.ctx.desktop {
                     self.sidebar.focus =
                         Some(self.sidebar.index_of(&self.ctx, &self.page().route()));
                 }
@@ -505,7 +639,12 @@ impl Shell {
 
     /// Seções com LB/RB valem em qualquer página de rota (a de Configurações usa para categorias).
     pub fn section(&mut self, forward: bool) {
-        if self.layers.is_empty() && self.cc.is_none() && self.page().kind() != "settings" {
+        // No desktop as seções são as abas da biblioteca e as categorias das Configurações (a página trata).
+        if self.layers.is_empty()
+            && self.cc.is_none()
+            && !self.ctx.desktop
+            && self.page().kind() != "settings"
+        {
             self.cycle_section(forward);
         } else {
             self.handle(if forward {
@@ -615,7 +754,31 @@ impl Shell {
             },
         );
         out.set("see-all-label", self.ctx.t("home.see_all"));
+        if self.ctx.desktop {
+            self.render_desktop_bar(&mut out);
+        }
         out
+    }
+
+    /// Barra de cima do desktop: Biblioteca, Configurações e o botão da tela cheia.
+    fn render_desktop_bar(&self, out: &mut Out) {
+        let kind = self.page().kind();
+        let item = |id: &str, label: &str, icon: &str, selected: bool| crate::model::NavItem {
+            id: id.into(),
+            label: self.ctx.t(label),
+            icon: icon.into(),
+            selected,
+            ..Default::default()
+        };
+        out.set(
+            "desk-nav",
+            vec![
+                item("library", "desktop.library", "grid", kind == "desk-library"),
+                item("settings", "desktop.settings", "gear", kind == "settings"),
+            ],
+        );
+        out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
+        out.set("desk-focus-visible", self.ctx.focus_visible);
     }
 
     /// Jogo em foco, para a cor e o fundo da tela.
