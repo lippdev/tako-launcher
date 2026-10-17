@@ -17,10 +17,11 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$MAIN/target}"
 say() { echo "bancada: $*" >&2; }
 
 acquire() {
-  local who="$1" waited=0
+  local who="$1" waited=0 since
   until mkdir "$LOCK" 2>/dev/null; do
-    if [ -f "$LOCK/owner" ] && [ $(($(date +%s) - $(stat -c %Y "$LOCK/owner"))) -gt $STALE_SECS ]; then
-      say "trava velha ($(cat "$LOCK/owner")), liberando"
+    # A trava pode ser liberada entre o mkdir e o stat: arquivo sumido é só tentar de novo.
+    if since="$(stat -c %Y "$LOCK/owner" 2>/dev/null)" && [ $(($(date +%s) - since)) -gt $STALE_SECS ]; then
+      say "trava velha ($(cat "$LOCK/owner" 2>/dev/null)), liberando"
       rm -rf "$LOCK"
       continue
     fi
@@ -30,6 +31,22 @@ acquire() {
   done
   echo "$who desde $(date +%H:%M:%S): ${*:2}" >"$LOCK/owner"
   trap 'rm -rf "$LOCK"' EXIT INT TERM
+  own_target
+}
+
+# O cargo decide o que recompilar pela data dos arquivos, não pelo caminho: no target/ dividido, a worktree Y
+# reaproveita o que a X compilou se os arquivos da Y forem mais antigos que essa compilação. Vale para o código,
+# para os build scripts (o do tako-core embute os catálogos e o do tako-ui o tema padrão, por caminho absoluto) e
+# para os include_str!. Quando a worktree muda, os arquivos dela passam a ter a data de agora e o cargo recompila
+# os crates do Tako (as dependências de fora continuam no cache).
+own_target() {
+  local here last mark="$CARGO_TARGET_DIR/.bancada-worktree"
+  here="$(git rev-parse --show-toplevel)"
+  last="$(cat "$mark" 2>/dev/null)"
+  [ "$last" = "$here" ] && return
+  say "o target/ estava com ${last:-?}; marcando os arquivos de $here como novos"
+  (cd "$here" && git ls-files -z | xargs -0 touch -c --) || return 1
+  mkdir -p "$CARGO_TARGET_DIR" && echo "$here" >"$mark"
 }
 
 ci() {
