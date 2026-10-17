@@ -63,6 +63,12 @@ pub fn items(ctx: &Ctx) -> Vec<NavItem> {
     let mut fav = item("library:favorites", ctx.t("nav.favorites"), "star");
     fav.count = count(&|g| g.is_favorite).to_string();
     out.push(fav);
+    // Coleções automáticas (LIB-003), com quantos jogos mostram agora.
+    for c in super::smart::list(ctx) {
+        let mut it = item(&super::smart::route_of(&c.id), c.name.clone(), "grid");
+        it.count = super::smart::count(ctx, &c).to_string();
+        out.push(it);
+    }
     let mut first = true;
     for store in GameStore::ALL {
         let n = count(&|g| g.store() == store);

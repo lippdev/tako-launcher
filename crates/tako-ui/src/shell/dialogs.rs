@@ -552,6 +552,29 @@ fn new_tag(ctx: &Ctx, ids: Vec<String>) -> KeyboardLayer {
     .check(|ctx, name| tags::name_problem(name).map(|p| p.message(ctx.lang())))
 }
 
+/// Os critérios com a rota da página dentro (Instalados, Favoritos, uma loja), para valerem fora dela.
+fn with_route(c: &LibraryCriteria, route: LibraryFilter, ctx: &Ctx) -> LibraryCriteria {
+    match route {
+        LibraryFilter::All => c.clone(),
+        LibraryFilter::Installed => LibraryCriteria {
+            install: tako_core::library::InstallFilter::Installed,
+            ..c.clone()
+        },
+        LibraryFilter::Favorites => LibraryCriteria {
+            favorites_only: true,
+            ..c.clone()
+        },
+        LibraryFilter::Store(s) => {
+            let name = game_text::store_name(ctx.lang(), s);
+            if c.has_source(&name) {
+                c.clone()
+            } else {
+                c.toggle_source(&name)
+            }
+        }
+    }
+}
+
 /// Painel de filtros da biblioteca (mostrar, ordenar, coleção, status, fonte, gênero).
 pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> MenuLayer {
     MenuLayer::panel(ctx.t("filters.title"), move |ctx| {
@@ -741,6 +764,20 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                     *cr.borrow_mut() = next;
                     Flow::Stay
                 }),
+            );
+        }
+        // Coleção automática (LIB-003): estes filtros, a rota da página e a ordenação, com um nome.
+        if c.has_filters() || c.has_search() || route != LibraryFilter::All {
+            if !c.has_filters() {
+                v.push(MenuItem::new(PanelRow::header(ctx.t("filters.filters"))));
+            }
+            let saved = with_route(&c, route, ctx);
+            v.push(
+                MenuItem::new(
+                    PanelRow::action("save-smart", ctx.t("smart.save"))
+                        .desc(ctx.t("smart.save_desc")),
+                )
+                .on(move |ctx| Flow::Push(Box::new(super::smart::save_as(ctx, saved.clone())))),
             );
         }
         // Tag em lote (LIB-002): os jogos que a página mostra com estes filtros.

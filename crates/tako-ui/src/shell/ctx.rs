@@ -144,6 +144,7 @@ pub mod keys {
     pub const SAFE_MODE: &str = "SafeMode";
     pub const DISCORD_PRESENCE: &str = "DiscordRichPresence";
     pub const FIRST_RUN_DONE: &str = "FirstRunCompleted";
+    pub const SMART_COLLECTIONS: &str = "SmartCollections";
 }
 
 pub struct Ctx {

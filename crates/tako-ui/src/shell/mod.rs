@@ -19,6 +19,7 @@ pub mod layer;
 pub mod library;
 pub mod settings;
 pub mod sidebar;
+pub mod smart;
 pub mod source_ids;
 pub mod tiles;
 
@@ -151,7 +152,7 @@ impl Shell {
         let page: Box<dyn Page> = match route {
             "home" => Box::new(home::HomePage::new()),
             "settings" => Box::new(settings::SettingsPage::new()),
-            r if r.starts_with("library:") => Box::new(library::LibraryPage::for_route(r)),
+            r if r.starts_with("library:") => Box::new(library::LibraryPage::open(r, &self.ctx)),
             _ => return,
         };
         self.pages = vec![page];

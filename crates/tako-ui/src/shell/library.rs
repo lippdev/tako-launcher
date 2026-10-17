@@ -36,6 +36,8 @@ pub struct LibraryPage {
     /// `None` = cabeçalho (chips).
     focus: Option<usize>,
     chip: usize,
+    /// Nome da coleção automática desta página (LIB-003); `None` = rota fixa.
+    name: Option<String>,
 }
 
 pub fn filter_of(route: &str) -> LibraryFilter {
@@ -55,6 +57,17 @@ impl LibraryPage {
         Self::with_criteria(route, LibraryCriteria::default())
     }
 
+    /// Página de uma rota da barra lateral; a de uma coleção automática já vem com os critérios dela.
+    pub fn open(route: &str, ctx: &Ctx) -> LibraryPage {
+        match super::smart::find(ctx, route) {
+            Some(c) => LibraryPage {
+                name: Some(c.name),
+                ..Self::with_criteria(route, c.criteria)
+            },
+            None => Self::for_route(route),
+        }
+    }
+
     pub fn with_criteria(route: &str, criteria: LibraryCriteria) -> LibraryPage {
         LibraryPage {
             route: route.into(),
@@ -62,6 +75,7 @@ impl LibraryPage {
             criteria: Rc::new(RefCell::new(criteria)),
             focus: Some(0),
             chip: 0,
+            name: None,
         }
     }
 
@@ -89,6 +103,9 @@ impl LibraryPage {
     }
 
     fn title(&self, ctx: &Ctx) -> String {
+        if let Some(name) = &self.name {
+            return name.clone();
+        }
         match self.filter {
             LibraryFilter::All => ctx.t("nav.all"),
             LibraryFilter::Installed => ctx.t("nav.installed"),

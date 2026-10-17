@@ -27,7 +27,9 @@ impl LibraryFilter {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum LibrarySort {
     #[default]
     RecentlyPlayed,

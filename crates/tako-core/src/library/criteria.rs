@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 /// Filtro de instalação do painel de filtros.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub enum InstallFilter {
     #[default]
     Any,
@@ -67,7 +67,8 @@ impl LibraryFacts {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct LibraryCriteria {
     /// Texto da busca (sem acento e sem diferenciar maiúsculas; ver [`super::search_text`]).
     pub search: String,
