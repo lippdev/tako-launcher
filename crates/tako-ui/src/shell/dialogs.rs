@@ -119,7 +119,8 @@ pub fn client_missing(ctx: &Ctx, game: &Game, notice: String) -> MenuLayer {
     .text(notice)
 }
 
-/// O jogo fechou sozinho logo ao abrir, ou nem abriu (SESSION-003): o que se sabe e o que tentar.
+/// O jogo fechou sozinho logo ao abrir ou com código de erro, ou nem abriu (SESSION-003): o que se sabe (o código,
+/// quando há) e o que tentar.
 pub fn game_ended_badly(ctx: &Ctx, id: &str, end: tako_core::session::GameEnd) -> MenuLayer {
     use tako_core::session::GameEnd;
     let title = ctx
@@ -129,7 +130,17 @@ pub fn game_ended_badly(ctx: &Ctx, id: &str, end: tako_core::session::GameEnd) -
         .unwrap_or_default();
     let (head, text) = match end {
         GameEnd::NeverStarted => ("session.never_started", "session.never_started_text"),
+        GameEnd::Failed(_) => ("session.ended_error", "session.ended_error_text"),
         _ => ("session.ended_quick", "session.ended_quick_text"),
+    };
+    // O código vem antes da sugestão: é o que mais ajuda a achar a causa.
+    let text = match end.exit_code() {
+        Some(code) => format!(
+            "{}.\n\n{}",
+            tako_core::session::tracking::exit_code_text(code),
+            ctx.t(text)
+        ),
+        None => ctx.t(text),
     };
     let id = id.to_owned();
     MenuLayer::dialog(ctx.tf(head, &[("game", &title)]), move |ctx| {
@@ -149,7 +160,7 @@ pub fn game_ended_badly(ctx: &Ctx, id: &str, end: tako_core::session::GameEnd) -
             MenuItem::new(PanelRow::button("ok", ctx.t("common.ok"))).on(|_| Flow::Close),
         ]
     })
-    .text(ctx.t(text))
+    .text(text)
 }
 
 /// Comandos deste jogo que o usuário ainda não permitiu (SESSION-004): mostra o texto exato antes de rodar.

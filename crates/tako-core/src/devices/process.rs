@@ -54,6 +54,16 @@ pub trait ProcessLauncher: Send + Sync {
             "comandos antes e depois do jogo".into(),
         ))
     }
+    /// Segura o processo raiz do jogo para ler o código de saída no fim (SESSION-003). No Windows, qualquer
+    /// processo ainda aberto; no Linux e no macOS só o filho, que o próprio `launch` já guarda. Padrão: nada.
+    fn watch_exit(&self, pid: u32) {
+        let _ = pid;
+    }
+    /// Código de saída do processo guardado, se ele já terminou (aí o processo é solto; lido uma vez só).
+    fn exit_code(&self, pid: u32) -> Option<u32> {
+        let _ = pid;
+        None
+    }
     fn snapshot(&self) -> Vec<ProcessEntry>;
     /// Pede para fechar (como o X da janela); não mata à força.
     fn request_close(&self, pids: &[u32]) -> DeviceResult<()>;

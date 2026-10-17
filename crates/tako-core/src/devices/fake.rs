@@ -307,12 +307,20 @@ pub struct FakeProcesses {
     pub env: Mutex<Vec<(String, String)>>,
     /// Comandos rodados por `run_command`.
     pub commands: Mutex<Vec<String>>,
+    /// Códigos de saída dos processos que terminaram com [`FakeProcesses::exit_with`].
+    pub exit_codes: Mutex<Vec<(u32, u32)>>,
     next_pid: Mutex<u32>,
 }
 
 impl FakeProcesses {
     pub fn exit(&self, pid: u32) {
         lock(&self.running).retain(|p| p.pid != pid);
+    }
+
+    /// Termina com um código de saída (o Tako abriu o executável direto).
+    pub fn exit_with(&self, pid: u32, code: u32) {
+        self.exit(pid);
+        lock(&self.exit_codes).push((pid, code));
     }
 }
 
@@ -351,6 +359,11 @@ impl ProcessLauncher for FakeProcesses {
     }
     fn snapshot(&self) -> Vec<ProcessEntry> {
         lock(&self.running).clone()
+    }
+    fn exit_code(&self, pid: u32) -> Option<u32> {
+        let mut codes = lock(&self.exit_codes);
+        let i = codes.iter().position(|(p, _)| *p == pid)?;
+        Some(codes.remove(i).1)
     }
     fn request_close(&self, pids: &[u32]) -> DeviceResult<()> {
         lock(&self.running).retain(|p| !pids.contains(&p.pid));

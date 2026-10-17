@@ -119,6 +119,7 @@ mod tests {
         ctx.running = Some(crate::shell::RunningGame {
             id: "game".into(),
             title: "Jogo".into(),
+            pid: None,
         });
         assert!(!allowed(&ctx));
         ctx.running = None;

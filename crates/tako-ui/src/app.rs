@@ -356,6 +356,7 @@ impl App {
             shell.ctx.running = Some(crate::shell::RunningGame {
                 id: id.clone(),
                 title: title.clone(),
+                pid: None,
             });
         }
         if opts.control_center {
@@ -802,7 +803,14 @@ pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration, end: GameEnd)
     shell.close_game_layers();
     shell.focus_game(id);
     if end != GameEnd::Normal {
-        tracing::warn!("{id} terminou fora do normal: {} ({played:?})", end.key());
+        let code = end
+            .exit_code()
+            .map(|c| format!(", código {c:#X}"))
+            .unwrap_or_default();
+        tracing::warn!(
+            "{id} terminou fora do normal: {} ({played:?}{code})",
+            end.key()
+        );
         let dialog = crate::shell::dialogs::game_ended_badly(&shell.ctx, id, end);
         shell.push_layer(Box::new(dialog));
         return;
@@ -1057,11 +1065,17 @@ mod tests {
         let mut shell = Shell::new(ctx);
         let game = shell.ctx.library.games()[0].clone();
 
-        welcome_back(&mut shell, &game.id, Duration::from_secs(3), GameEnd::Quick);
+        welcome_back(
+            &mut shell,
+            &game.id,
+            Duration::from_secs(3),
+            GameEnd::Quick(None),
+        );
         assert!(shell.ctx.toast.is_none());
         assert!(shell.has_layers());
         use crate::shell::Layer;
-        let warning = crate::shell::dialogs::game_ended_badly(&shell.ctx, &game.id, GameEnd::Quick);
+        let warning =
+            crate::shell::dialogs::game_ended_badly(&shell.ctx, &game.id, GameEnd::Quick(None));
         let title = warning.render(&shell.ctx).title;
         assert_eq!(title, format!("{} fechou logo depois de abrir", game.title));
 
@@ -1082,5 +1096,87 @@ mod tests {
                 .0
                 .starts_with("Bem-vindo de volta")
         );
+    }
+
+    #[test]
+    fn the_warning_shows_the_exit_code_and_errors_warn_even_after_ten_seconds() {
+        use crate::shell::Layer;
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        i18n::set_lang(Lang::PtBr);
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        let mut shell = Shell::new(ctx);
+        let game = shell.ctx.library.games()[0].clone();
+        let dialog = |shell: &Shell, end| {
+            crate::shell::dialogs::game_ended_badly(&shell.ctx, &game.id, end).render(&shell.ctx)
+        };
+
+        let quick = dialog(&shell, GameEnd::Quick(Some(0xC000_0135)));
+        assert_eq!(
+            quick.title,
+            format!("{} fechou logo depois de abrir", game.title)
+        );
+        assert!(
+            quick
+                .text
+                .starts_with("Código de saída 0xC0000135 (3221225781): uma DLL"),
+            "{}",
+            quick.text
+        );
+        assert!(
+            quick
+                .text
+                .contains("O jogo fechou sozinho em poucos segundos")
+        );
+
+        // Depois dos 10 s, só avisa com código de erro.
+        welcome_back(
+            &mut shell,
+            &game.id,
+            Duration::from_secs(600),
+            GameEnd::Failed(0xC000_0005),
+        );
+        assert!(shell.has_layers());
+        assert!(shell.ctx.toast.is_none());
+        let failed = dialog(&shell, GameEnd::Failed(0xC000_0005));
+        assert_eq!(failed.title, format!("{} fechou com um erro", game.title));
+        assert!(
+            failed.text.contains("0xC0000005 (3221225477)"),
+            "{}",
+            failed.text
+        );
+        assert!(failed.text.contains("memória"), "{}", failed.text);
+
+        // Sem código (jogo aberto pela loja): o texto de antes, sem número.
+        let store = dialog(&shell, GameEnd::Quick(None));
+        assert!(!store.text.contains("Código"), "{}", store.text);
+    }
+
+    #[test]
+    fn the_interface_fills_in_the_exit_code_of_the_game_it_opened() {
+        use std::sync::Arc;
+        use tako_core::devices::fake::FakeProcesses;
+        let dir = tempfile::tempdir().unwrap();
+        let fake = Arc::new(FakeProcesses::default());
+        let platform = Platform {
+            processes: fake.clone(),
+            ..Platform::simulated()
+        };
+        let ctx = build_ctx(DataPaths::at(dir.path()), platform, true);
+        let fill = crate::session::with_local_exit_code;
+        fake.exit_with(1234, 3);
+        // O supervisor (Linux e macOS) não tinha o código; a interface, que abriu o jogo, tem.
+        assert_eq!(
+            fill(&ctx, Some(1234), GameEnd::Quick(None)),
+            GameEnd::Quick(Some(3))
+        );
+        // O do supervisor vale; sem processo, nada muda.
+        fake.exit_with(1234, 3);
+        assert_eq!(
+            fill(&ctx, Some(1234), GameEnd::Quick(Some(7))),
+            GameEnd::Quick(Some(7))
+        );
+        assert_eq!(fill(&ctx, None, GameEnd::Quick(None)), GameEnd::Quick(None));
+        assert_eq!(fill(&ctx, Some(1), GameEnd::Normal), GameEnd::Normal);
     }
 }

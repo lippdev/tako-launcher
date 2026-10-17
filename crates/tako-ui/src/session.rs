@@ -265,6 +265,22 @@ pub fn recover_after_crash(platform: &Platform, paths: &DataPaths) {
     }
 }
 
+/// No Linux e no macOS só quem abriu o jogo recebe o código de saída, e quem abriu foi a interface: com ela
+/// ainda aberta (o jogo caiu ao abrir), completa o aviso do supervisor com o código. No Windows o supervisor já
+/// manda o código; aqui só solta o processo guardado.
+pub fn with_local_exit_code(
+    ctx: &Ctx,
+    pid: Option<u32>,
+    end: tako_core::session::GameEnd,
+) -> tako_core::session::GameEnd {
+    use tako_core::session::GameEnd;
+    let local = pid.and_then(|p| ctx.platform.processes.exit_code(p));
+    match end {
+        GameEnd::Quick(None) => GameEnd::Quick(local),
+        other => other,
+    }
+}
+
 /// Acompanhamento do jogo (no supervisor ou na própria interface sem supervisor).
 pub struct Running {
     pub req: TrackRequest,
@@ -301,6 +317,10 @@ impl Running {
     /// Cursor e presença no Discord da sessão. Ficam com quem acompanha o jogo: no X11 o cursor escondido (e no
     /// Discord a atividade) some quando a conexão de quem pediu fecha.
     pub fn begin(&mut self, platform: &Platform) {
+        // Segura o processo raiz para ler o código de saída no fim (SESSION-003).
+        if let Some(pid) = self.req.root_pid {
+            platform.processes.watch_exit(pid);
+        }
         if self.req.discord {
             self.presence = crate::discord::Presence::start(&self.req.title, self.req.launched_at);
         }
@@ -383,9 +403,19 @@ impl Running {
         }
     }
 
-    /// Como terminou, depois que [`Self::poll`] devolveu o tempo jogado (SESSION-003).
-    pub fn end(&self, played: Duration) -> tako_core::session::GameEnd {
-        tako_core::session::GameEnd::of(self.tracker.status, self.tracker.close_requested, played)
+    /// Como terminou, depois que [`Self::poll`] devolveu o tempo jogado (SESSION-003). O código de saída é o do
+    /// processo raiz, quando o Tako abriu o executável direto (jogo aberto pela loja não tem).
+    pub fn end(&self, platform: &Platform, played: Duration) -> tako_core::session::GameEnd {
+        let code = self
+            .req
+            .root_pid
+            .and_then(|pid| platform.processes.exit_code(pid));
+        tako_core::session::GameEnd::of(
+            self.tracker.status,
+            self.tracker.close_requested,
+            played,
+            code,
+        )
     }
 
     /// O jogo não fechou com o pedido: encerra os processos dele à força.
@@ -443,6 +473,7 @@ impl Running {
 mod tests {
     use super::*;
     use crate::app::build_ctx;
+    use tako_core::session::GameEnd;
 
     #[test]
     fn starts_tracks_and_restores() {
@@ -470,9 +501,50 @@ mod tests {
         let pid = req.root_pid.unwrap();
         platform.processes.request_close(&[pid]).unwrap();
         running.tracker.exit_grace = chrono::TimeDelta::zero();
-        assert!(running.poll(&platform).is_some());
+        let played = running.poll(&platform).unwrap();
+        // Sem código (o processo simulado não deixou): só o tempo decide.
+        assert_eq!(running.end(&platform, played), GameEnd::Quick(None));
         restore_now(&platform, &ctx.paths, req.restore);
         assert!(!platform.cursor.is_hidden());
         assert!(!ctx.paths.session_environment().exists());
+    }
+
+    #[test]
+    fn the_end_carries_the_exit_code_of_the_game_tako_opened() {
+        use std::sync::Arc;
+        use tako_core::devices::fake::FakeProcesses;
+        let dir = tempfile::tempdir().unwrap();
+        let fake = Arc::new(FakeProcesses::default());
+        let platform = Platform {
+            processes: fake.clone(),
+            ..Platform::simulated()
+        };
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), platform.clone(), true);
+        ctx.library.refresh();
+        let id = ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.is_installed)
+            .unwrap()
+            .id
+            .clone();
+        for (played, code, expected) in [
+            (3, 0xC000_0135, GameEnd::Quick(Some(0xC000_0135))),
+            (600, 0xC000_0005, GameEnd::Failed(0xC000_0005)),
+            (600, 0, GameEnd::Normal),
+        ] {
+            let Started::Tracking(req) = start(&mut ctx, &id).unwrap() else {
+                panic!("deveria acompanhar")
+            };
+            let mut running = Running::new(req.clone()).unwrap();
+            running.begin(&platform);
+            fake.exit_with(req.root_pid.unwrap(), code);
+            running.tracker.exit_grace = chrono::TimeDelta::zero();
+            assert!(running.poll(&platform).is_some());
+            let end = running.end(&platform, Duration::from_secs(played));
+            assert_eq!(end, expected, "{played} s, {code:#X}");
+            restore_now(&platform, &ctx.paths, req.restore);
+        }
     }
 }

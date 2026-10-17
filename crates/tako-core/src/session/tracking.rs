@@ -347,17 +347,19 @@ impl GameRunTracker {
     }
 }
 
-/// Como o jogo terminou, para avisar quando algo deu errado (SESSION-003). As lojas abrem os jogos por fora,
-/// então o código de saída quase nunca está disponível: o que se sabe com segurança é o tempo e se o Tako
-/// pediu para fechar.
+/// Como o jogo terminou, para avisar quando algo deu errado (SESSION-003). O código de saída só existe quando o
+/// Tako abriu o executável direto e ficou com o processo; as lojas (URI) abrem os jogos por fora, e aí o que se
+/// sabe é o tempo e se o Tako pediu para fechar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GameEnd {
     #[default]
     Normal,
-    /// Fechou sozinho em menos de [`GameEnd::QUICK`]: caiu ou desistiu ao abrir.
-    Quick,
+    /// Fechou sozinho em menos de [`GameEnd::QUICK`]: caiu ou desistiu ao abrir. Com o código, se houver.
+    Quick(Option<u32>),
     /// Não apareceu dentro do prazo.
     NeverStarted,
+    /// Fechou sozinho depois de [`GameEnd::QUICK`] com um código de erro (diferente de 0).
+    Failed(u32),
 }
 
 impl GameEnd {
@@ -367,31 +369,77 @@ impl GameEnd {
         status: GameRunStatus,
         close_requested: bool,
         played: std::time::Duration,
+        exit_code: Option<u32>,
     ) -> GameEnd {
         match status {
+            // Fechar à força dá código de erro: o Tako pediu, então é o esperado.
             _ if close_requested => GameEnd::Normal,
             GameRunStatus::TimedOut => GameEnd::NeverStarted,
-            GameRunStatus::Exited if played < Self::QUICK => GameEnd::Quick,
+            GameRunStatus::Exited if played < Self::QUICK => GameEnd::Quick(exit_code),
+            GameRunStatus::Exited => match exit_code {
+                Some(code) if code != 0 => GameEnd::Failed(code),
+                _ => GameEnd::Normal,
+            },
             _ => GameEnd::Normal,
         }
     }
 
-    /// Para passar entre o supervisor e a interface (argumento e mensagem).
+    /// Para passar entre o supervisor e a interface (argumento e mensagem), junto com [`GameEnd::exit_code`].
     pub fn key(self) -> &'static str {
         match self {
             GameEnd::Normal => "normal",
-            GameEnd::Quick => "quick",
+            GameEnd::Quick(_) => "quick",
             GameEnd::NeverStarted => "never_started",
+            GameEnd::Failed(_) => "failed",
         }
     }
 
-    /// Valor desconhecido é `Normal`: na dúvida, não assusta ninguém.
-    pub fn from_key(key: &str) -> GameEnd {
-        match key {
-            "quick" => GameEnd::Quick,
-            "never_started" => GameEnd::NeverStarted,
+    pub fn exit_code(self) -> Option<u32> {
+        match self {
+            GameEnd::Quick(code) => code,
+            GameEnd::Failed(code) => Some(code),
+            _ => None,
+        }
+    }
+
+    /// Valor desconhecido é `Normal`: na dúvida, não assusta ninguém. Sem código (supervisor antigo), "failed"
+    /// também é `Normal`.
+    pub fn from_key(key: &str, exit_code: Option<u32>) -> GameEnd {
+        match (key, exit_code) {
+            ("quick", code) => GameEnd::Quick(code),
+            ("never_started", _) => GameEnd::NeverStarted,
+            ("failed", Some(code)) if code != 0 => GameEnd::Failed(code),
             _ => GameEnd::Normal,
         }
+    }
+}
+
+/// O código de saída em hex e decimal, com o que ele costuma querer dizer (os códigos de exceção do Windows):
+/// "0xC0000135 (3221225781): uma DLL que o jogo precisa não foi encontrada…".
+pub fn exit_code_text(code: u32) -> String {
+    exit_code_text_in(crate::i18n::lang(), code)
+}
+
+pub fn exit_code_text_in(lang: crate::i18n::Lang, code: u32) -> String {
+    use crate::i18n::t_in;
+    let explain = match code {
+        0xC000_0135 => Some("dll_not_found"),
+        0xC000_0139 => Some("entry_point"),
+        0xC000_0142 => Some("dll_init"),
+        0xC000_0005 => Some("access_violation"),
+        0xC000_007B => Some("bad_image"),
+        0xC000_001D => Some("illegal_instruction"),
+        0xC000_00FD => Some("stack_overflow"),
+        0xC000_0374 => Some("heap_corruption"),
+        0xC000_0409 => Some("fail_fast"),
+        0xC000_0017 => Some("no_memory"),
+        _ => None,
+    };
+    let code_text =
+        t_in(lang, "session.exit.code").replace("{code}", &format!("{code:#X} ({code})"));
+    match explain {
+        Some(k) => format!("{code_text}: {}", t_in(lang, &format!("session.exit.{k}"))),
+        None => code_text,
     }
 }
 
@@ -751,33 +799,92 @@ mod tests {
     }
 
     #[test]
-    fn game_end_flags_quick_exits_and_games_that_never_started() {
+    fn game_end_flags_quick_exits_errors_and_games_that_never_started() {
         use std::time::Duration;
         let s = Duration::from_secs;
+        let of = GameEnd::of;
         assert_eq!(
-            GameEnd::of(GameRunStatus::Exited, false, s(3)),
-            GameEnd::Quick
+            of(GameRunStatus::Exited, false, s(3), None),
+            GameEnd::Quick(None)
         );
         assert_eq!(
-            GameEnd::of(GameRunStatus::Exited, false, s(600)),
+            of(GameRunStatus::Exited, false, s(3), Some(0xC000_0135)),
+            GameEnd::Quick(Some(0xC000_0135))
+        );
+        assert_eq!(
+            of(GameRunStatus::Exited, false, s(600), None),
             GameEnd::Normal
         );
-        // O Tako pediu para fechar (Central › Encerrar): fechar rápido é o esperado.
         assert_eq!(
-            GameEnd::of(GameRunStatus::Exited, true, s(3)),
+            of(GameRunStatus::Exited, false, s(600), Some(0)),
+            GameEnd::Normal
+        );
+        // Código de erro avisa mesmo depois dos 10 s.
+        assert_eq!(
+            of(GameRunStatus::Exited, false, s(600), Some(0xC000_0005)),
+            GameEnd::Failed(0xC000_0005)
+        );
+        // O Tako pediu para fechar (Central › Encerrar): fechar rápido ou com erro é o esperado.
+        assert_eq!(of(GameRunStatus::Exited, true, s(3), None), GameEnd::Normal);
+        assert_eq!(
+            of(GameRunStatus::Exited, true, s(600), Some(1)),
             GameEnd::Normal
         );
         assert_eq!(
-            GameEnd::of(GameRunStatus::TimedOut, false, s(0)),
+            of(GameRunStatus::TimedOut, false, s(0), None),
             GameEnd::NeverStarted
         );
         assert_eq!(
-            GameEnd::of(GameRunStatus::TimedOut, true, s(0)),
+            of(GameRunStatus::TimedOut, true, s(0), None),
             GameEnd::Normal
         );
-        for e in [GameEnd::Normal, GameEnd::Quick, GameEnd::NeverStarted] {
-            assert_eq!(GameEnd::from_key(e.key()), e);
+        for e in [
+            GameEnd::Normal,
+            GameEnd::Quick(None),
+            GameEnd::Quick(Some(1)),
+            GameEnd::NeverStarted,
+            GameEnd::Failed(0xC000_007B),
+        ] {
+            assert_eq!(GameEnd::from_key(e.key(), e.exit_code()), e);
         }
-        assert_eq!(GameEnd::from_key("lixo"), GameEnd::Normal);
+        assert_eq!(GameEnd::from_key("lixo", Some(1)), GameEnd::Normal);
+        // Supervisor antigo: sem código, "failed" não assusta.
+        assert_eq!(GameEnd::from_key("failed", None), GameEnd::Normal);
+        assert_eq!(GameEnd::from_key("failed", Some(0)), GameEnd::Normal);
+    }
+
+    #[test]
+    fn exit_code_text_shows_hex_decimal_and_what_it_means() {
+        use crate::i18n::Lang;
+        let pt = |code| exit_code_text_in(Lang::PtBr, code);
+        let dll = pt(0xC000_0135);
+        assert!(
+            dll.starts_with("Código de saída 0xC0000135 (3221225781): "),
+            "{dll}"
+        );
+        assert!(dll.contains("DLL"), "{dll}");
+        assert!(pt(0xC000_0005).contains("memória"));
+        assert!(pt(0xC000_007B).contains("32"));
+        // Código sem explicação: só o número.
+        assert_eq!(pt(1), "Código de saída 0x1 (1)");
+        for code in [
+            0xC000_0135u32,
+            0xC000_0139,
+            0xC000_0142,
+            0xC000_0005,
+            0xC000_007B,
+            0xC000_001D,
+            0xC000_00FD,
+            0xC000_0374,
+            0xC000_0409,
+            0xC000_0017,
+        ] {
+            for lang in [Lang::PtBr, Lang::EnUs] {
+                assert!(
+                    !exit_code_text_in(lang, code).contains("session."),
+                    "{code:#X}"
+                );
+            }
+        }
     }
 }

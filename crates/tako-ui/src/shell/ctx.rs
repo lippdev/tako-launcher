@@ -66,6 +66,8 @@ pub enum InputKind {
 pub struct RunningGame {
     pub id: String,
     pub title: String,
+    /// Processo raiz, quando o Tako abriu o executável direto (o código de saída dele, no fim).
+    pub pid: Option<u32>,
 }
 
 pub use tako_sources::report::LibrarySourceReport as SourceReport;
