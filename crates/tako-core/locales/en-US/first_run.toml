@@ -1,0 +1,12 @@
+[first_run]
+step = "GETTING STARTED · {n} OF {total}"
+welcome = "Welcome to Tako"
+welcome_text = "Three quick steps to get your library ready. You can change everything later in Settings. First, the language:"
+stores = "Stores"
+stores_text = "Tako reads the installed games from these stores. Turn off the ones you don't use."
+metadata = "Covers and descriptions"
+metadata_text = "These services fill in covers, logos and descriptions. They are optional: without them, Tako uses what the stores provide."
+next = "Continue"
+skip = "Skip for now"
+finish = "Finish"
+done_toast = "All set. Have fun!"

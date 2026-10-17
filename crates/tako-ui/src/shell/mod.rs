@@ -9,6 +9,7 @@ pub mod ctx;
 pub mod details;
 pub mod dialogs;
 pub mod edit_game;
+pub mod first_run;
 pub mod game_settings;
 pub mod home;
 pub mod keyboard;

@@ -81,6 +81,11 @@ impl Settings {
         Settings { store, values }
     }
 
+    /// Nenhuma configuração gravada (instalação nova).
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
     pub fn get(&self, key: &str) -> Option<&str> {
         self.values.get(key).map(String::as_str)
     }
@@ -138,6 +143,7 @@ pub mod keys {
     pub const CONTROLLER_MOUSE: &str = "ControllerMouseDuringGame";
     pub const SAFE_MODE: &str = "SafeMode";
     pub const DISCORD_PRESENCE: &str = "DiscordRichPresence";
+    pub const FIRST_RUN_DONE: &str = "FirstRunCompleted";
 }
 
 pub struct Ctx {

@@ -4,7 +4,7 @@
 #[path = "settings_controls.rs"]
 mod controls;
 #[path = "settings_library.rs"]
-mod library;
+pub(crate) mod library;
 #[path = "settings_metadata.rs"]
 pub(crate) mod metadata;
 #[path = "settings_screen.rs"]
@@ -149,7 +149,7 @@ fn effect(e: Effect) -> impl Fn(&mut Ctx) -> Flow {
 
 // ---------------------------------------------------------------- Geral
 
-fn lang_name(lang: Lang) -> &'static str {
+pub(crate) fn lang_name(lang: Lang) -> &'static str {
     match lang {
         Lang::PtBr => "Português (Brasil)",
         Lang::EnUs => "English (US)",

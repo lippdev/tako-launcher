@@ -74,6 +74,11 @@ fn store_row(ctx: &Ctx, store: GameStore) -> MenuItem {
     })
 }
 
+/// Uma linha liga/desliga por loja deste SO (também no assistente da primeira execução).
+pub(crate) fn store_rows(ctx: &Ctx) -> Vec<MenuItem> {
+    stores().iter().map(|s| store_row(ctx, *s)).collect()
+}
+
 pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     let mut rescan = action(ctx, "settings.library.rescan");
     if ctx.scanning {
@@ -84,7 +89,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(rescan).on(effect(Effect::Rescan)),
         MenuItem::new(PanelRow::header(ctx.t("settings.library.stores_header"))),
     ];
-    v.extend(stores().iter().map(|s| store_row(ctx, *s)));
+    v.extend(store_rows(ctx));
     if cfg!(windows) {
         v.push(
             MenuItem::new(action(ctx, "settings.library.playnite"))

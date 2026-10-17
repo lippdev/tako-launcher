@@ -96,20 +96,15 @@ fn http() -> Arc<UreqHttp> {
     Arc::new(UreqHttp::new(Duration::from_secs(15)))
 }
 
-pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
+/// IGDB, ScreenScraper e SteamGridDB, cada um abrindo o seu painel (também no assistente da primeira execução).
+pub(crate) fn provider_rows(ctx: &Ctx) -> Vec<MenuItem> {
     let p = providers(ctx);
     let ss_summary = if software().is_available() {
         summary(ctx, p.ss.enabled, p.ss.is_active())
     } else {
         ctx.t("settings.metadata.unavailable")
     };
-    let art = ctx.art.clone();
-    let cache_size = cached("settings.art_bytes", Duration::from_secs(5), move || {
-        art.disk_bytes()
-    });
-    let sgdb_active = p.sgdb.is_active();
     vec![
-        MenuItem::new(PanelRow::header(ctx.t("settings.metadata.sources_header"))),
         MenuItem::new(described(ctx, "settings.metadata.igdb").value(summary(
             ctx,
             p.igdb.enabled,
@@ -122,10 +117,25 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             described(ctx, "settings.metadata.steamgriddb").value(summary(
                 ctx,
                 p.sgdb.enabled,
-                sgdb_active,
+                p.sgdb.is_active(),
             )),
         )
         .on(|ctx| Flow::Push(Box::new(steamgriddb_panel(ctx)))),
+    ]
+}
+
+pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
+    let p = providers(ctx);
+    let art = ctx.art.clone();
+    let cache_size = cached("settings.art_bytes", Duration::from_secs(5), move || {
+        art.disk_bytes()
+    });
+    let sgdb_active = p.sgdb.is_active();
+    let mut v = vec![MenuItem::new(PanelRow::header(
+        ctx.t("settings.metadata.sources_header"),
+    ))];
+    v.extend(provider_rows(ctx));
+    v.extend([
         MenuItem::new(PanelRow::header(ctx.t("settings.metadata.covers_header"))),
         MenuItem::new(
             PanelRow::toggle(
@@ -159,7 +169,8 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             .on(effect(Effect::RefreshMetadata(None))),
         MenuItem::new(described(ctx, "settings.metadata.clear").value(format_bytes(cache_size)))
             .on(|ctx| Flow::Push(Box::new(confirm_clear(ctx)))),
-    ]
+    ]);
+    v
 }
 
 fn confirm_clear(ctx: &Ctx) -> MenuLayer {

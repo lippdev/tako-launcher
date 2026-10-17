@@ -293,6 +293,8 @@ impl App {
                 tracing::warn!("tempo de jogo de {id}: {e}");
             }
             shell.ctx.welcome_back = Some((id.clone(), *played));
+        } else if !opts.control_center {
+            crate::shell::first_run::open_if_needed(&mut shell);
         }
         let shell = Rc::new(RefCell::new(shell));
         crate::tasks::attach(&shell);
