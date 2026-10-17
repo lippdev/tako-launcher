@@ -212,7 +212,7 @@ fn every_row_has_text() {
                 }
             }
         }
-        overlays.push(controls::ChordLayer::new().render(&ctx));
+        overlays.push(controls::ChordLayer::new(&ctx).render(&ctx));
         overlays.push(controls::TestLayer.render(&ctx));
         for o in overlays {
             for text in [&o.title, &o.text, &o.overline] {
@@ -295,7 +295,7 @@ fn chord_capture_saves_the_held_buttons() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();
     ctx.input = crate::shell::InputKind::Gamepad;
-    let mut layer = controls::ChordLayer::new();
+    let mut layer = controls::ChordLayer::new(&ctx);
     layer.render(&ctx); // nada segurado: espera
     ctx.pressed_buttons = (B::VIEW | B::X).0;
     layer.render(&ctx);
@@ -408,4 +408,141 @@ fn themes_installed_from_an_address_offer_updates() {
     )
     .unwrap();
     assert!(rows(&ctx).iter().any(|r| r.key == "update-themes"));
+}
+
+#[test]
+fn tako_buttons_can_be_swapped_and_the_hints_follow() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.input = crate::shell::ctx::InputKind::Gamepad;
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "button-accept").row.value, "A");
+    assert!(!find(&rows, "buttons-reset").row.enabled);
+    // Aceitar passa ao B; Voltar fica com o A.
+    accept(&mut ctx, &find(&rows, "button-accept"));
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "button-accept").row.value, "B");
+    assert_eq!(find(&rows, "button-back").row.value, "A");
+    assert_eq!(ctx.glyph(Cmd::Accept), "B");
+    assert_eq!(ctx.glyph(Cmd::Back), "A");
+    assert_eq!(ctx.glyph(Cmd::Guide), "⌂");
+    // O aviso diz o que mudou.
+    let toast = ctx.toast.clone().unwrap().0;
+    assert!(
+        toast.contains("Aceitar B") && toast.contains("Voltar A"),
+        "{toast}"
+    );
+    ctx.pad = crate::gamepad::PadFamily::PlayStation;
+    assert_eq!(ctx.glyph(Cmd::Accept), "○");
+    // Restaurar volta ao padrão.
+    let reset = find(&rows_of(&ctx, "controls"), "buttons-reset");
+    assert!(reset.row.enabled);
+    accept(&mut ctx, &reset);
+    assert_eq!(
+        ctx.profile().buttons,
+        tako_core::input::ButtonMap::default()
+    );
+    assert_eq!(ctx.glyph(Cmd::Accept), "✕");
+}
+
+#[test]
+fn each_controller_gets_its_own_profile() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    const PAD1: &str = "030000005e0400000b0b000000000000";
+    const PAD2: &str = "050000004c050000e60c000000000000";
+    ctx.input = crate::shell::ctx::InputKind::Gamepad;
+    ctx.pads = vec![
+        (PAD1.into(), "Xbox Wireless".into()),
+        (PAD2.into(), "DualSense".into()),
+    ];
+    ctx.pads_connected = 2;
+    (ctx.pad_guid, ctx.pad_name) = (PAD1.into(), "Xbox Wireless".into());
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "pad-0").row.value, "Padrão");
+    assert!(!find(&rows, "profile-rename").row.enabled);
+    assert!(!find(&rows, "profile-delete").row.enabled);
+
+    // Novo perfil: vale para o controle em uso.
+    let Flow::Push(mut layer) = accept(&mut ctx, &find(&rows, "profile-new")) else {
+        panic!("sem teclado");
+    };
+    assert!(
+        matches!(layer.handle(Cmd::Menu, &mut ctx), Flow::Stay),
+        "nome vazio"
+    );
+    layer.text("Arcade", &mut ctx);
+    assert!(matches!(layer.handle(Cmd::Menu, &mut ctx), Flow::Close));
+    assert_eq!(ctx.profile().name, "Arcade");
+    // Os botões e a combinação mudam só no perfil Arcade.
+    let rows = rows_of(&ctx, "controls");
+    accept(&mut ctx, &find(&rows, "button-accept"));
+    assert_eq!(ctx.glyph(Cmd::Accept), "B");
+    let mut chord_layer = controls::ChordLayer::new(&ctx);
+    chord_layer.render(&ctx);
+    ctx.pressed_buttons = (B::GUIDE | B::X).0;
+    chord_layer.render(&ctx);
+    std::thread::sleep(std::time::Duration::from_millis(1050));
+    chord_layer.render(&ctx);
+    ctx.pressed_buttons = 0;
+    chord_layer.render(&ctx);
+    assert!(matches!(
+        chord_layer.handle(Cmd::Accept, &mut ctx),
+        Flow::Close
+    ));
+    assert_eq!(ctx.profile().chord, B::GUIDE | B::X);
+    // O "Aperte A para salvar" segue o botão de aceitar do perfil.
+    let accept_text = ctx.tf(
+        "settings.controls.press_save",
+        &[("accept", ctx.pad_glyph(Cmd::Accept))],
+    );
+    assert_eq!(accept_text, "Aperte B para salvar");
+
+    // O outro controle continua no padrão.
+    let input = ctx.profiles.read([(PAD2, B::B), (PAD1, B::B)]);
+    assert_eq!(input.buttons, B::A | B::B);
+    assert!(ctx.profiles.read([(PAD1, B::GUIDE | B::X)]).central);
+    assert!(!ctx.profiles.read([(PAD2, B::GUIDE | B::X)]).central);
+    (ctx.pad_guid, ctx.pad_name) = (PAD2.into(), "DualSense".into());
+    assert_eq!(ctx.glyph(Cmd::Accept), "A");
+    assert_eq!(ctx.profile().chord, chord::DEFAULT);
+
+    // Escolher o perfil do DualSense pela linha dele.
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "pad-1").row.value, "Padrão");
+    accept(&mut ctx, &find(&rows, "pad-1"));
+    assert_eq!(ctx.profile().name, "Arcade");
+    assert!(
+        ctx.toast
+            .clone()
+            .unwrap()
+            .0
+            .contains("DualSense: perfil Arcade")
+    );
+
+    // Renomear e excluir.
+    let rows = rows_of(&ctx, "controls");
+    let Flow::Push(mut layer) = accept(&mut ctx, &find(&rows, "profile-rename")) else {
+        panic!("sem teclado");
+    };
+    layer.erase(&mut ctx);
+    layer.text("o", &mut ctx);
+    assert!(matches!(layer.handle(Cmd::Menu, &mut ctx), Flow::Close));
+    assert_eq!(ctx.profile().name, "Arcado");
+    let rows = rows_of(&ctx, "controls");
+    let Flow::Push(dialog) = accept(&mut ctx, &find(&rows, "profile-delete")) else {
+        panic!("sem confirmação");
+    };
+    let mut dialog = dialog;
+    let delete = dialog.render(&ctx).rows;
+    assert_eq!(delete[0].key, "delete");
+    dialog.handle(Cmd::Accept, &mut ctx);
+    assert!(ctx.profile().is_default());
+    (ctx.pad_guid, ctx.pad_name) = (PAD1.into(), "Xbox Wireless".into());
+    assert!(ctx.profile().is_default());
+    assert_eq!(ctx.profiles.all().len(), 1);
+    // Gravado nas configurações: relido, dá o mesmo.
+    let again =
+        tako_core::input::profiles::Profiles::load(|k| ctx.settings.get(k).map(str::to_owned));
+    assert_eq!(again, ctx.profiles);
 }

@@ -14,8 +14,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
+use tako_core::input::profiles::Profiles;
 use tako_core::input::shortcut::{ButtonChordDetector, KeyModifiers, chord};
-use tako_core::input::{AppCommand, GamepadButtons, GamepadInterpreter, GamepadSnapshot};
+use tako_core::input::{AppCommand, GamepadInterpreter, GamepadSnapshot};
 use tako_core::library::{CollectionLibrary, Game, GameLibrary, system_clock};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{self as db, TakoDatabase};
@@ -145,6 +146,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         tracing::error!("coleções: {e}");
     }
     let art = crate::art::cache(&paths);
+    let profiles = Profiles::load(|k| settings.get(k).map(str::to_owned));
     let mut ctx = Ctx {
         paths,
         library,
@@ -156,6 +158,9 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         version: crate::version().to_owned(),
         pad: Default::default(),
         pad_name: String::new(),
+        pad_guid: String::new(),
+        pads: Vec::new(),
+        profiles,
         pads_connected: 0,
         pad_lost: false,
         pad_battery: None,
@@ -555,14 +560,8 @@ impl App {
             .map_err(|e| tracing::warn!("controles indisponíveis: {e}"))
             .ok();
         let mut interp = GamepadInterpreter::new();
-        let chord_value = self
-            .shell
-            .borrow()
-            .ctx
-            .settings
-            .get(crate::shell::ctx::keys::CONTROL_CENTER_CHORD)
-            .map(str::to_owned);
-        let mut chord = ButtonChordDetector::new(chord::parse(chord_value.as_deref()));
+        // A combinação vem do perfil de cada controle (INPUT-001); o detector só conta o tempo segurado.
+        let mut chord = ButtonChordDetector::new(chord::DEFAULT);
         let started = Instant::now();
         let app = self.clone();
         let mut last_clock = String::new();
@@ -579,7 +578,10 @@ impl App {
                 let mut chord_fired = false;
                 if let Some(p) = pads.as_mut() {
                     for ev in p.poll() {
-                        app.shell.borrow_mut().ctx.pad_event(ev, p.count());
+                        let mut s = app.shell.borrow_mut();
+                        s.ctx.pad_event(ev, p.count());
+                        s.ctx.pads = p.connected();
+                        drop(s);
                         // O que já estiver apertado no controle que voltou (ou no outro) só vale depois de solto.
                         interp.reset();
                         next_battery = now;
@@ -608,19 +610,21 @@ impl App {
                             (pad_state.buttons, (pad_state.left_x, pad_state.left_y));
                         s.ctx.dirty |= s.ctx.live_pad.take();
                     }
-                    let pressed = GamepadButtons(pad_state.buttons);
-                    chord_fired = chord.update(pressed, now);
+                    // Cada controle pelo seu perfil (INPUT-001): botões e combinação da Central.
+                    let input = app.shell.borrow().ctx.profiles.read(p.buttons());
+                    chord_fired = chord.update_held(input.central, now);
                     let snap = GamepadSnapshot::new(
-                        pressed,
+                        input.buttons,
                         pad_state.left_x as f64,
                         -pad_state.left_y as f64,
                     );
-                    fired = interp.update(snap, now, chord.suppressed(pressed));
+                    fired = interp.update(snap, now, input.ignore);
                     if !fired.is_empty() {
                         let mut s = app.shell.borrow_mut();
                         s.ctx.input = InputKind::Gamepad;
                         s.ctx.pad = p.family();
                         s.ctx.pad_name = p.name().to_owned();
+                        s.ctx.pad_guid = p.guid().to_owned();
                     }
                 }
                 if chord_fired {
@@ -995,6 +999,7 @@ mod tests {
             crate::gamepad::PadEvent::Connected {
                 name: "Outro".into(),
                 family: Default::default(),
+                guid: String::new(),
             },
             1,
         );

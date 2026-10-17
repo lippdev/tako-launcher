@@ -5,6 +5,7 @@
 
 pub mod controller_mouse;
 pub mod controller_test;
+pub mod profiles;
 pub mod shortcut;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -122,6 +123,113 @@ const BUTTON_MAP: [(GamepadButtons, AppCommand); 7] = [
     (GamepadButtons::START, AppCommand::Menu),
     // Guia e View não são comandos sozinhos: a Central abre pela combinação segurada.
 ];
+
+/// Botões dos comandos do Tako, remapeáveis (INPUT-001). É sempre uma permutação dos botões do padrão: cada
+/// comando tem um botão e nenhum botão faz dois comandos, então ninguém fica sem "aceitar" ou "voltar".
+/// View e Guia ficam de fora porque são da Central (a combinação precisa de um deles).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ButtonMap([(GamepadButtons, AppCommand); 7]);
+
+impl Default for ButtonMap {
+    fn default() -> Self {
+        ButtonMap(BUTTON_MAP)
+    }
+}
+
+impl ButtonMap {
+    /// Comandos remapeáveis, na ordem da tela e do valor gravado.
+    pub fn commands() -> impl Iterator<Item = AppCommand> {
+        BUTTON_MAP.into_iter().map(|(_, c)| c)
+    }
+
+    fn buttons() -> impl Iterator<Item = GamepadButtons> {
+        BUTTON_MAP.into_iter().map(|(b, _)| b)
+    }
+
+    pub fn button(&self, command: AppCommand) -> Option<GamepadButtons> {
+        self.0.iter().find(|(_, c)| *c == command).map(|(b, _)| *b)
+    }
+
+    pub fn pairs(&self) -> impl Iterator<Item = (GamepadButtons, AppCommand)> + '_ {
+        self.0.iter().copied()
+    }
+
+    /// Põe `button` no comando; o comando que usava esse botão fica com o botão antigo deste (troca).
+    pub fn assign(&mut self, command: AppCommand, button: GamepadButtons) {
+        let (Some(old), Some(other)) = (
+            self.button(command),
+            self.0.iter().position(|(b, _)| *b == button),
+        ) else {
+            return;
+        };
+        if let Some(mine) = self.0.iter().position(|(_, c)| *c == command) {
+            self.0[other].0 = old;
+            self.0[mine].0 = button;
+        }
+    }
+
+    /// Próximo botão para o comando (`dir` = 1 ou -1), trocando com quem o usava.
+    pub fn cycle(&mut self, command: AppCommand, dir: i32) {
+        let all: Vec<_> = Self::buttons().collect();
+        let Some(i) = self
+            .button(command)
+            .and_then(|b| all.iter().position(|x| *x == b))
+        else {
+            return;
+        };
+        let next = all[(i as i32 + dir).rem_euclid(all.len() as i32) as usize];
+        self.assign(command, next);
+    }
+
+    /// Botões apertados num controle com este mapa, como se fossem do mapa padrão: o resto do Tako (o
+    /// intérprete, as dicas) só conhece o padrão. Direcional, View e Guia passam como estão.
+    pub fn to_default(&self, pressed: GamepadButtons) -> GamepadButtons {
+        let mapped = Self::buttons().fold(GamepadButtons::NONE, |a, b| a | b);
+        let mut out = pressed & !mapped;
+        for (button, command) in self.pairs() {
+            if pressed.contains(button)
+                && let Some(default) = ButtonMap::default().button(command)
+            {
+                out |= default;
+            }
+        }
+        out
+    }
+
+    /// Valor das configurações: o botão de cada comando, na ordem de [`ButtonMap::commands`].
+    pub fn serialize(&self) -> String {
+        Self::commands()
+            .filter_map(|c| self.button(c))
+            .map(|b| b.0.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    /// Inválido (vazio, faltando, repetido ou com botão de fora) volta ao padrão.
+    pub fn parse(text: Option<&str>) -> ButtonMap {
+        let Some(text) = text.filter(|t| !t.trim().is_empty()) else {
+            return ButtonMap::default();
+        };
+        let values: Vec<_> = text
+            .split(',')
+            .map(|v| v.trim().parse::<u32>().ok().map(GamepadButtons))
+            .collect();
+        let mut map = BUTTON_MAP;
+        let valid = values.len() == map.len()
+            && values.iter().enumerate().all(|(i, v)| {
+                v.is_some_and(|b| {
+                    Self::buttons().any(|x| x == b) && !values[..i].contains(&Some(b))
+                })
+            });
+        if !valid {
+            return ButtonMap::default();
+        }
+        for (slot, b) in map.iter_mut().zip(values.into_iter().flatten()) {
+            slot.0 = b;
+        }
+        ButtonMap(map)
+    }
+}
 
 /// Converte leituras do controle em comandos: dispara na borda de pressão e repete direções mantidas
 /// (380 ms de atraso, depois a cada 110 ms).
@@ -308,6 +416,52 @@ mod tests {
     }
     fn upd(p: &mut GamepadInterpreter, s: GamepadSnapshot, t: Duration) -> Vec<AppCommand> {
         p.update(s, t, B::NONE)
+    }
+
+    #[test]
+    fn button_map_swaps_so_every_command_keeps_a_button() {
+        let mut map = ButtonMap::default();
+        assert_eq!(map.serialize(), "4096,8192,16384,32768,256,512,16");
+        // Aceitar no B: voltar fica com o A.
+        map.assign(AppCommand::Accept, B::B);
+        assert_eq!(map.button(AppCommand::Accept), Some(B::B));
+        assert_eq!(map.button(AppCommand::Back), Some(B::A));
+        // View é da Central: não entra.
+        map.assign(AppCommand::Menu, B::VIEW);
+        assert_eq!(map.button(AppCommand::Menu), Some(B::START));
+        // Ciclo: do Menu (último) volta ao primeiro botão, que era do Voltar.
+        map.cycle(AppCommand::Menu, 1);
+        assert_eq!(map.button(AppCommand::Menu), Some(B::A));
+        assert_eq!(map.button(AppCommand::Back), Some(B::START));
+        map.cycle(AppCommand::Menu, -1);
+        assert_eq!(map.button(AppCommand::Menu), Some(B::START));
+
+        let saved = map.serialize();
+        assert_eq!(ButtonMap::parse(Some(&saved)), map);
+        for bad in [
+            "",
+            "lixo",
+            "4096,8192",
+            "4096,4096,16384,32768,256,512,16",
+            "32,8192,16384,32768,256,512,16",
+            "4096,8192,16384,32768,256,512,16,1",
+        ] {
+            assert_eq!(ButtonMap::parse(Some(bad)), ButtonMap::default(), "{bad}");
+        }
+        assert_eq!(ButtonMap::parse(None), ButtonMap::default());
+    }
+
+    #[test]
+    fn mapped_buttons_reach_the_interpreter_as_the_default_ones() {
+        let mut map = ButtonMap::default();
+        map.assign(AppCommand::Accept, B::B);
+        assert_eq!(map.to_default(B::B | B::DPAD_UP), B::A | B::DPAD_UP);
+        assert_eq!(map.to_default(B::A | B::VIEW), B::B | B::VIEW);
+        let mut pad = GamepadInterpreter::new();
+        let s = pressed(map.to_default(B::B));
+        assert_eq!(upd(&mut pad, s, ms(0)), [AppCommand::Accept]);
+        let s = pressed(map.to_default(B::A));
+        assert_eq!(upd(&mut pad, s, ms(10)), [AppCommand::Back]);
     }
 
     // GamepadInterpreterTests

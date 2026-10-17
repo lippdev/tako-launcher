@@ -7,6 +7,8 @@ use crate::model::Hint;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
+use tako_core::input::profiles::{Profile, Profiles};
+use tako_core::input::{AppCommand, GamepadButtons};
 use tako_core::library::{CollectionLibrary, GameLibrary};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{GameChoicesStore, GameSettingsStore, SettingsStore};
@@ -120,6 +122,38 @@ impl Settings {
     }
 }
 
+/// Glifo de um botão do controle na família dele.
+pub fn button_glyph(pad: PadFamily, b: GamepadButtons) -> &'static str {
+    type B = GamepadButtons;
+    match (pad, b) {
+        (PadFamily::PlayStation, B::A) => "✕",
+        (PadFamily::PlayStation, B::B) => "○",
+        (PadFamily::PlayStation, B::X) => "□",
+        (PadFamily::PlayStation, B::Y) => "△",
+        (PadFamily::PlayStation, B::LEFT_SHOULDER) => "L1",
+        (PadFamily::PlayStation, B::RIGHT_SHOULDER) => "R1",
+        (PadFamily::PlayStation, B::START) => "Options",
+        (PadFamily::PlayStation, B::GUIDE) => "PS",
+        // Nintendo: A e B (e X e Y) trocados de lugar (o SDL entrega por posição).
+        (PadFamily::Nintendo, B::A) => "B",
+        (PadFamily::Nintendo, B::B) => "A",
+        (PadFamily::Nintendo, B::X) => "Y",
+        (PadFamily::Nintendo, B::Y) => "X",
+        (PadFamily::Nintendo, B::LEFT_SHOULDER) => "L",
+        (PadFamily::Nintendo, B::RIGHT_SHOULDER) => "R",
+        (PadFamily::Nintendo, B::START) => "+",
+        (_, B::A) => "A",
+        (_, B::B) => "B",
+        (_, B::X) => "X",
+        (_, B::Y) => "Y",
+        (_, B::LEFT_SHOULDER) => "LB",
+        (_, B::RIGHT_SHOULDER) => "RB",
+        (_, B::START) => "☰",
+        (_, B::GUIDE) => "⌂",
+        _ => "",
+    }
+}
+
 /// Nomes das configurações (iguais aos das alphas C#, para a migração).
 pub mod keys {
     pub const DYNAMIC_COLOR: &str = "DynamicColor";
@@ -136,7 +170,7 @@ pub mod keys {
     pub const GAME_AUDIO_ID: &str = "GameAudioDeviceId";
     pub const GAME_AUDIO_NAME: &str = "GameAudioDeviceName";
     pub const DISABLED_STORES: &str = "DisabledStores";
-    pub const CONTROL_CENTER_CHORD: &str = "ControlCenterChord";
+    pub const CONTROL_CENTER_CHORD: &str = tako_core::input::profiles::keys::CHORD;
     pub const CONTROL_CENTER_KEY: &str = "ControlCenterKey";
     pub const LANGUAGE: &str = "Language";
     pub const HIDE_CURSOR: &str = "HideCursorDuringGame";
@@ -158,6 +192,12 @@ pub struct Ctx {
     pub version: String,
     pub pad: PadFamily,
     pub pad_name: String,
+    /// GUID do SDL do controle em uso (escolhe o perfil de botões).
+    pub pad_guid: String,
+    /// Controles conectados agora: `(guid, nome)`.
+    pub pads: Vec<(String, String)>,
+    /// Perfis de botões (INPUT-001), lidos das configurações; mudam só por [`Ctx::save_profiles`].
+    pub profiles: Profiles,
     pub pads_connected: usize,
     /// O controle em uso caiu e nenhum outro ficou: o aviso "Controle desconectado" fica na tela.
     pub pad_lost: bool,
@@ -265,9 +305,10 @@ impl Ctx {
     /// fluxo da sobreposição segue como está.
     pub fn pad_event(&mut self, ev: PadEvent, count: usize) {
         match ev {
-            PadEvent::Connected { name, family } => {
+            PadEvent::Connected { name, family, guid } => {
                 self.pad = family;
                 self.pad_name = name;
+                self.pad_guid = guid;
                 self.input = InputKind::Gamepad;
                 if std::mem::take(&mut self.pad_lost) {
                     self.toast(self.t("status.pad_connected"));
@@ -374,34 +415,40 @@ impl Ctx {
                 _ => "",
             };
         }
-        match (self.pad, cmd) {
-            (PadFamily::PlayStation, Cmd::Accept) => "✕",
-            (PadFamily::PlayStation, Cmd::Back) => "○",
-            (PadFamily::PlayStation, Cmd::Favorite) => "□",
-            (PadFamily::PlayStation, Cmd::Search) => "△",
-            (PadFamily::PlayStation, Cmd::PrevSection) => "L1",
-            (PadFamily::PlayStation, Cmd::NextSection) => "R1",
-            (PadFamily::PlayStation, Cmd::Menu) => "Options",
-            (PadFamily::PlayStation, Cmd::Guide) => "PS",
-            // Nintendo: A e B trocados de lugar (o SDL entrega por posição).
-            (PadFamily::Nintendo, Cmd::Accept) => "B",
-            (PadFamily::Nintendo, Cmd::Back) => "A",
-            (PadFamily::Nintendo, Cmd::Favorite) => "Y",
-            (PadFamily::Nintendo, Cmd::Search) => "X",
-            (PadFamily::Nintendo, Cmd::PrevSection) => "L",
-            (PadFamily::Nintendo, Cmd::NextSection) => "R",
-            (PadFamily::Nintendo, Cmd::Menu) => "+",
-            (PadFamily::Nintendo, Cmd::Guide) => "⌂",
-            (_, Cmd::Accept) => "A",
-            (_, Cmd::Back) => "B",
-            (_, Cmd::Favorite) => "X",
-            (_, Cmd::Search) => "Y",
-            (_, Cmd::PrevSection) => "LB",
-            (_, Cmd::NextSection) => "RB",
-            (_, Cmd::Menu) => "☰",
-            (_, Cmd::Guide) => "⌂",
-            _ => "",
+        self.pad_glyph(cmd)
+    }
+
+    /// Glifo do comando no controle, mesmo com o teclado em uso (textos que falam do controle).
+    pub fn pad_glyph(&self, cmd: Cmd) -> &'static str {
+        let command = match cmd {
+            Cmd::Accept => AppCommand::Accept,
+            Cmd::Back => AppCommand::Back,
+            Cmd::Favorite => AppCommand::Favorite,
+            Cmd::Search => AppCommand::Search,
+            Cmd::PrevSection => AppCommand::PreviousSection,
+            Cmd::NextSection => AppCommand::NextSection,
+            Cmd::Menu => AppCommand::Menu,
+            Cmd::Guide => return button_glyph(self.pad, GamepadButtons::GUIDE),
+            _ => return "",
+        };
+        // Os botões do perfil do controle em uso (INPUT-001).
+        self.profile()
+            .buttons
+            .button(command)
+            .map_or("", |b| button_glyph(self.pad, b))
+    }
+
+    /// Perfil de botões do controle em uso (sem controle, o padrão).
+    pub fn profile(&self) -> &Profile {
+        self.profiles.of(&self.pad_guid)
+    }
+
+    pub fn save_profiles(&mut self, profiles: Profiles) {
+        for (key, value) in profiles.save() {
+            self.settings.set(key, &value);
         }
+        self.profiles = profiles;
+        self.dirty = true;
     }
 
     pub fn hint(&self, cmd: Cmd, label: &str) -> Hint {

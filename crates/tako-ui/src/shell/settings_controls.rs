@@ -1,5 +1,5 @@
-//! Configurações › Controles: atalhos da Central de Controle (combinação do controle e tecla) e o teste
-//! de controle ao vivo.
+//! Configurações › Controles: atalhos da Central de Controle (combinação do controle e tecla), os botões das
+//! ações do Tako (INPUT-001) e o teste de controle ao vivo.
 //!
 //! As camadas só recebem `Cmd`; a captura e o teste leem `ctx.pressed_buttons` a cada desenho e pedem
 //! desenho contínuo pelo `ctx.live_pad` enquanto estão abertas.
@@ -7,15 +7,18 @@
 use super::{Ctx, Flow, MenuItem, action, described};
 use crate::gamepad::PadFamily;
 use crate::model::{Hint, Overlay, PanelRow};
-use crate::shell::ctx::{InputKind, keys};
+use crate::shell::MenuLayer;
+use crate::shell::ctx::{InputKind, button_glyph, keys};
+use crate::shell::keyboard::KeyboardLayer;
 use crate::shell::{Cmd, Layer};
 use std::cell::{Cell, RefCell};
 use std::time::Instant;
+use tako_core::input::profiles::{self, Profile, Profiles};
 use tako_core::input::shortcut::{
     ChordCapture, ChordCaptureState, GamepadFamily, KeyModifiers, KeyShortcut, check_chord,
     check_keyboard, chord,
 };
-use tako_core::input::{GamepadButtons, GamepadSnapshot, controller_test};
+use tako_core::input::{AppCommand, ButtonMap, GamepadButtons, GamepadSnapshot, controller_test};
 
 pub(crate) fn family(ctx: &Ctx) -> GamepadFamily {
     match ctx.pad {
@@ -25,12 +28,27 @@ pub(crate) fn family(ctx: &Ctx) -> GamepadFamily {
 }
 
 fn chord_label(ctx: &Ctx) -> String {
-    let b = chord::parse(ctx.settings.get(keys::CONTROL_CENTER_CHORD));
-    chord::format(b, family(ctx))
+    chord::format(ctx.profile().chord, family(ctx))
 }
 
 fn key_label(ctx: &Ctx) -> String {
     KeyShortcut::parse(ctx.settings.get(keys::CONTROL_CENTER_KEY)).display()
+}
+
+/// Nome do perfil para mostrar (o padrão não tem nome gravado).
+fn profile_name(ctx: &Ctx, p: &Profile) -> String {
+    if p.is_default() {
+        ctx.t("settings.controls.profile_default")
+    } else {
+        p.name.clone()
+    }
+}
+
+/// Muda os perfis e grava.
+fn edit_profiles(ctx: &mut Ctx, change: impl FnOnce(&mut Profiles)) {
+    let mut p = ctx.profiles.clone();
+    change(&mut p);
+    ctx.save_profiles(p);
 }
 
 pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
@@ -46,21 +64,12 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             ("key", &KeyShortcut::default().display()),
         ],
     );
-    vec![
+    let mut v = vec![
         MenuItem::new(
             PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
                 .desc(ctx.t("settings.controls.controller_desc")),
         ),
         MenuItem::new(PanelRow::header(ctx.t("settings.controls.center_header"))),
-        MenuItem::new(described(ctx, "settings.controls.chord").value(chord_label(ctx))).on(
-            |ctx| {
-                if ctx.pads_connected == 0 && ctx.pad_name.is_empty() {
-                    ctx.toast(ctx.t("settings.controls.connect_pad"));
-                    return Flow::Stay;
-                }
-                Flow::Push(Box::new(ChordLayer::new()))
-            },
-        ),
         MenuItem::new(described(ctx, "settings.controls.key").value(key_label(ctx)))
             .on(|_| Flow::Push(Box::new(KeyLayer::default()))),
         MenuItem::new(
@@ -69,10 +78,12 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                 .value(ctx.t("settings.controls.reset_value")),
         )
         .on(|ctx| {
-            ctx.settings.set(
-                keys::CONTROL_CENTER_CHORD,
-                &chord::serialize(chord::DEFAULT),
-            );
+            let id = ctx.profile().id;
+            edit_profiles(ctx, |p| {
+                if let Some(p) = p.get_mut(id) {
+                    p.chord = chord::DEFAULT;
+                }
+            });
             ctx.settings.set(
                 keys::CONTROL_CENTER_KEY,
                 &KeyShortcut::default().serialize(),
@@ -82,12 +93,307 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         }),
         MenuItem::new(action(ctx, "settings.controls.test"))
             .on(|_| Flow::Push(Box::new(TestLayer))),
+    ];
+    profile_rows(ctx, &mut v);
+    button_rows(ctx, &mut v);
+    v.extend([
         MenuItem::new(PanelRow::header(ctx.t("settings.controls.keyboard_header"))),
         MenuItem::new(
             PanelRow::info("keys", ctx.t("settings.controls.keys"), "")
                 .desc(ctx.t("settings.controls.keys_desc")),
         ),
-    ]
+    ]);
+    v
+}
+
+/// Perfis (INPUT-001): o perfil de cada controle conhecido e criar, renomear e excluir o do controle em uso.
+fn profile_rows(ctx: &Ctx, v: &mut Vec<MenuItem>) {
+    v.push(MenuItem::new(PanelRow::header(
+        ctx.t("settings.controls.profiles_header"),
+    )));
+    // Os conectados e os que já ganharam perfil (o nome gravado é só para mostrar).
+    let mut pads: Vec<(String, String)> = ctx.pads.clone();
+    for c in ctx.profiles.controllers() {
+        if !pads.iter().any(|(g, _)| g.eq_ignore_ascii_case(&c.guid)) {
+            pads.push((c.guid.clone(), c.name.clone()));
+        }
+    }
+    if pads.is_empty() {
+        v.push(MenuItem::new(PanelRow::info(
+            "profile-no-pad",
+            ctx.t("settings.controls.profile_no_pad"),
+            "",
+        )));
+    }
+    for (i, (guid, name)) in pads.into_iter().enumerate() {
+        let profile = ctx.profiles.of(&guid);
+        let connected = ctx.pads.iter().any(|(g, _)| *g == guid);
+        let desc = if guid.eq_ignore_ascii_case(&ctx.pad_guid) {
+            ctx.t("settings.controls.profile_in_use")
+        } else if connected {
+            String::new()
+        } else {
+            ctx.t("settings.controls.profile_offline")
+        };
+        let label = if name.is_empty() {
+            ctx.t("settings.controls.no_pad")
+        } else {
+            name.clone()
+        };
+        let (g1, n1) = (guid.clone(), name.clone());
+        v.push(
+            MenuItem::new(
+                PanelRow::choice(format!("pad-{i}"), label, profile_name(ctx, profile)).desc(desc),
+            )
+            .on(move |ctx| cycle_profile(ctx, &g1, &n1, 1))
+            .on_adjust(move |ctx, d| cycle_profile(ctx, &guid, &name, d)),
+        );
+    }
+    let current = ctx.profile();
+    let custom = !current.is_default();
+    let name = profile_name(ctx, current);
+    v.push(
+        MenuItem::new(
+            PanelRow::action("profile-new", ctx.t("settings.controls.profile_new"))
+                .desc(ctx.tf("settings.controls.profile_new_desc", &[("name", &name)])),
+        )
+        .on(|ctx| Flow::Push(Box::new(new_profile(ctx)))),
+    );
+    v.push(
+        MenuItem::new(
+            PanelRow::action("profile-rename", ctx.t("settings.controls.profile_rename"))
+                .value(if custom { name.clone() } else { String::new() })
+                .enabled(custom),
+        )
+        .on(|ctx| Flow::Push(Box::new(rename_profile(ctx)))),
+    );
+    v.push(
+        MenuItem::new(
+            PanelRow::action("profile-delete", ctx.t("settings.controls.profile_delete"))
+                .desc(ctx.tf("settings.controls.profile_delete_desc", &[("name", &name)]))
+                .enabled(custom),
+        )
+        .on(|ctx| Flow::Push(Box::new(confirm_delete(ctx)))),
+    );
+}
+
+/// Os botões e a combinação da Central do perfil do controle em uso.
+fn button_rows(ctx: &Ctx, v: &mut Vec<MenuItem>) {
+    let profile = ctx.profile();
+    v.push(MenuItem::new(PanelRow::header(ctx.tf(
+        "settings.controls.buttons_header",
+        &[("name", &profile_name(ctx, profile))],
+    ))));
+    // Um botão por ação do Tako: A ou →/← passa ao próximo botão, trocando com a ação que o usava.
+    for command in ButtonMap::commands() {
+        let value = profile
+            .buttons
+            .button(command)
+            .map_or("", |b| button_glyph(ctx.pad, b));
+        v.push(
+            MenuItem::new(PanelRow::choice(
+                format!("button-{}", action_key(command)),
+                ctx.t(&format!("settings.controls.action.{}", action_key(command))),
+                value,
+            ))
+            .on(move |ctx| cycle_button(ctx, command, 1))
+            .on_adjust(move |ctx, d| cycle_button(ctx, command, d)),
+        );
+    }
+    // A combinação da Central também é do perfil (precisa de View ou Guia, como antes).
+    v.push(
+        MenuItem::new(
+            PanelRow::action("chord", ctx.t("settings.controls.chord"))
+                .desc(ctx.tf(
+                    "settings.controls.chord_desc",
+                    &[("accept", ctx.pad_glyph(Cmd::Accept))],
+                ))
+                .value(chord_label(ctx)),
+        )
+        .on(|ctx| {
+            if ctx.pads_connected == 0 && ctx.pad_name.is_empty() {
+                ctx.toast(ctx.t("settings.controls.connect_pad"));
+                return Flow::Stay;
+            }
+            Flow::Push(Box::new(ChordLayer::new(ctx)))
+        }),
+    );
+    let default = ButtonMap::default();
+    let glyph = |c| default.button(c).map_or("", |b| button_glyph(ctx.pad, b));
+    let reset_desc = ctx.tf(
+        "settings.controls.buttons_reset_desc",
+        &[
+            ("accept", glyph(AppCommand::Accept)),
+            ("back", glyph(AppCommand::Back)),
+            ("favorite", glyph(AppCommand::Favorite)),
+            ("search", glyph(AppCommand::Search)),
+            ("previous", glyph(AppCommand::PreviousSection)),
+            ("next", glyph(AppCommand::NextSection)),
+            ("menu", glyph(AppCommand::Menu)),
+        ],
+    );
+    v.push(
+        MenuItem::new(
+            PanelRow::action("buttons-reset", ctx.t("settings.controls.buttons_reset"))
+                .desc(reset_desc)
+                .value(ctx.t("settings.controls.reset_value"))
+                .enabled(profile.buttons != default),
+        )
+        .on(|ctx| {
+            let id = ctx.profile().id;
+            edit_profiles(ctx, |p| {
+                if let Some(p) = p.get_mut(id) {
+                    p.buttons = ButtonMap::default();
+                }
+            });
+            ctx.toast(ctx.t("settings.controls.buttons_reset_done"));
+            Flow::Stay
+        }),
+    );
+}
+
+fn action_key(command: AppCommand) -> &'static str {
+    match command {
+        AppCommand::Accept => "accept",
+        AppCommand::Back => "back",
+        AppCommand::Favorite => "favorite",
+        AppCommand::Search => "search",
+        AppCommand::PreviousSection => "previous",
+        AppCommand::NextSection => "next",
+        AppCommand::Menu => "menu",
+        _ => "",
+    }
+}
+
+/// Próximo perfil para o controle (`dir` = 1 ou -1).
+fn cycle_profile(ctx: &mut Ctx, guid: &str, name: &str, dir: i32) -> Flow {
+    let ids: Vec<u32> = ctx.profiles.all().iter().map(|p| p.id).collect();
+    let now = ctx.profiles.of(guid).id;
+    let i = ids.iter().position(|id| *id == now).unwrap_or(0) as i32;
+    let next = ids[(i + dir).rem_euclid(ids.len() as i32) as usize];
+    edit_profiles(ctx, |p| p.assign(guid, name, next));
+    let label = profile_name(ctx, ctx.profiles.of(guid));
+    let pad = if name.is_empty() {
+        ctx.t("settings.controls.no_pad")
+    } else {
+        name.to_owned()
+    };
+    ctx.toast(ctx.tf(
+        "settings.controls.profile_assigned",
+        &[("pad", &pad), ("profile", &label)],
+    ));
+    Flow::Stay
+}
+
+fn name_rule(ctx: &Ctx, name: &str) -> Option<String> {
+    profiles::clean_name(name)
+        .is_none()
+        .then(|| ctx.t("settings.controls.profile_name_rule"))
+}
+
+/// "Novo perfil": copia o perfil do controle em uso e passa a valer para ele.
+fn new_profile(ctx: &Ctx) -> KeyboardLayer {
+    KeyboardLayer::new(
+        ctx,
+        ctx.t("settings.controls.profile_new_title"),
+        "",
+        |ctx, name| {
+            let from = ctx.profile().id;
+            let (guid, pad) = (ctx.pad_guid.clone(), ctx.pad_name.clone());
+            let mut p = ctx.profiles.clone();
+            let Some(id) = p.create(name, from) else {
+                let max = profiles::MAX_PROFILES.to_string();
+                ctx.toast(ctx.tf("settings.controls.profile_limit", &[("max", &max)]));
+                return Flow::Stay;
+            };
+            p.assign(&guid, &pad, id);
+            ctx.save_profiles(p);
+            let name = ctx
+                .profiles
+                .get(id)
+                .map(|p| p.name.clone())
+                .unwrap_or_default();
+            ctx.toast(ctx.tf("settings.controls.profile_created", &[("name", &name)]));
+            Flow::Close
+        },
+    )
+    .check(name_rule)
+}
+
+fn rename_profile(ctx: &Ctx) -> KeyboardLayer {
+    let current = ctx.profile();
+    let id = current.id;
+    KeyboardLayer::new(
+        ctx,
+        ctx.t("settings.controls.profile_rename"),
+        &current.name,
+        move |ctx, name| {
+            let mut p = ctx.profiles.clone();
+            if !p.rename(id, name) {
+                return Flow::Stay;
+            }
+            ctx.save_profiles(p);
+            let name = ctx
+                .profiles
+                .get(id)
+                .map(|p| p.name.clone())
+                .unwrap_or_default();
+            ctx.toast(ctx.tf("settings.controls.profile_renamed", &[("name", &name)]));
+            Flow::Close
+        },
+    )
+    .check(name_rule)
+}
+
+fn confirm_delete(ctx: &Ctx) -> MenuLayer {
+    let current = ctx.profile();
+    let (id, name) = (current.id, current.name.clone());
+    MenuLayer::dialog(
+        ctx.tf("settings.controls.profile_delete_title", &[("name", &name)]),
+        move |ctx| {
+            let name = name.clone();
+            vec![
+                MenuItem::new(
+                    PanelRow::button("delete", ctx.t("settings.controls.profile_delete")).danger(),
+                )
+                .on(move |ctx| {
+                    edit_profiles(ctx, |p| {
+                        p.delete(id);
+                    });
+                    ctx.toast(ctx.tf("settings.controls.profile_deleted", &[("name", &name)]));
+                    Flow::Close
+                }),
+                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                    .on(|_| Flow::Close),
+            ]
+        },
+    )
+    .text(ctx.t("settings.controls.profile_delete_text"))
+}
+
+/// Troca o botão da ação e avisa com quem trocou (o botão que o usuário aperta pode ter mudado de função).
+fn cycle_button(ctx: &mut Ctx, command: AppCommand, dir: i32) -> Flow {
+    let id = ctx.profile().id;
+    let before = ctx.profile().buttons;
+    edit_profiles(ctx, |p| {
+        if let Some(p) = p.get_mut(id) {
+            p.buttons.cycle(command, dir);
+        }
+    });
+    let map = ctx.profile().buttons;
+    let moved = ButtonMap::commands()
+        .filter(|c| map.button(*c) != before.button(*c))
+        .map(|c| {
+            let glyph = map.button(c).map_or("", |b| button_glyph(ctx.pad, b));
+            format!(
+                "{} {glyph}",
+                ctx.t(&format!("settings.controls.action.{}", action_key(c)))
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" · ");
+    ctx.toast(moved);
+    Flow::Stay
 }
 
 /// "Aperte as teclas que quer usar" (port do `ShortcutCaptureViewModel` de teclado): a primeira tecla de verdade
@@ -187,8 +493,10 @@ impl Layer for KeyLayer {
     }
 }
 
-/// "Segure os botões que quer usar": vale o conjunto segurado por 1 s; A salva, B cancela.
+/// "Segure os botões que quer usar": vale o conjunto segurado por 1 s; aceitar salva, voltar cancela. Grava no
+/// perfil do controle em uso quando a tela abriu.
 pub(crate) struct ChordLayer {
+    profile: u32,
     cap: RefCell<ChordCapture>,
     started: Instant,
     /// Depois de capturar, A só salva quando tudo foi solto (o A segurado da combinação não conta).
@@ -196,12 +504,25 @@ pub(crate) struct ChordLayer {
 }
 
 impl ChordLayer {
-    pub fn new() -> Self {
+    pub fn new(ctx: &Ctx) -> Self {
+        let mut cap = ChordCapture::new();
+        let back = ctx.profile().buttons.button(AppCommand::Back);
+        cap.cancel = back.unwrap_or(GamepadButtons::B);
         ChordLayer {
-            cap: RefCell::new(ChordCapture::new()),
+            profile: ctx.profile().id,
+            cap: RefCell::new(cap),
             started: Instant::now(),
             released: Cell::new(false),
         }
+    }
+
+    /// Combinação atual do perfil desta tela.
+    fn label(&self, ctx: &Ctx) -> String {
+        let p = ctx
+            .profiles
+            .get(self.profile)
+            .unwrap_or(ctx.profiles.standard());
+        chord::format(p.chord, family(ctx))
     }
 
     fn state(&self) -> ChordCaptureState {
@@ -235,8 +556,12 @@ impl Layer for ChordLayer {
                     self.released.set(false);
                     return Flow::Stay;
                 }
-                ctx.settings
-                    .set(keys::CONTROL_CENTER_CHORD, &chord::serialize(buttons));
+                let id = self.profile;
+                edit_profiles(ctx, |p| {
+                    if let Some(p) = p.get_mut(id) {
+                        p.chord = buttons;
+                    }
+                });
                 let label = chord::format(buttons, family(ctx));
                 ctx.toast(match check.warning {
                     Some(w) => ctx.tf("settings.controls.saved_warning", &[("warning", &w)]),
@@ -248,7 +573,7 @@ impl Layer for ChordLayer {
             (Holding, Cmd::Back) if !keyboard => Flow::Stay,
             (Captured, Cmd::Back) if !self.released.get() && !keyboard => Flow::Stay,
             (_, Cmd::Back) | (Cancelled, _) => {
-                ctx.toast(ctx.tf("settings.controls.kept", &[("shortcut", &chord_label(ctx))]));
+                ctx.toast(ctx.tf("settings.controls.kept", &[("shortcut", &self.label(ctx))]));
                 Flow::Close
             }
             _ => Flow::Stay,
@@ -263,7 +588,7 @@ impl Layer for ChordLayer {
         let mut rows = vec![PanelRow::info(
             "current",
             ctx.t("settings.controls.current"),
-            chord_label(ctx),
+            self.label(ctx),
         )];
         let holding = if cap.holding.is_empty() {
             ctx.t("settings.controls.nothing_pressed")
@@ -274,11 +599,12 @@ impl Layer for ChordLayer {
             ChordCaptureState::Captured => {
                 let check = check_chord(cap.result, fam);
                 let note = check.error.or(check.warning).unwrap_or_else(|| {
-                    ctx.t(if self.released.get() {
-                        "settings.controls.press_save"
+                    if self.released.get() {
+                        let accept = ctx.pad_glyph(Cmd::Accept);
+                        ctx.tf("settings.controls.press_save", &[("accept", accept)])
                     } else {
-                        "settings.controls.release"
-                    })
+                        ctx.t("settings.controls.release")
+                    }
                 });
                 rows.push(
                     PanelRow::info(
@@ -305,7 +631,7 @@ impl Layer for ChordLayer {
                 &[
                     ("view", &chord::name(GamepadButtons::VIEW, fam)),
                     ("guide", &chord::name(GamepadButtons::GUIDE, fam)),
-                    ("b", &chord::name(GamepadButtons::B, fam)),
+                    ("b", &chord::name(cap.cancel, fam)),
                 ],
             ),
             rows,
@@ -357,7 +683,10 @@ impl Layer for TestLayer {
             kind: "dialog".into(),
             title: ctx.t("settings.controls.test"),
             overline: pad.to_uppercase(),
-            text: ctx.t("settings.controls.test_text"),
+            text: ctx.tf(
+                "settings.controls.test_text",
+                &[("menu", ctx.pad_glyph(Cmd::Menu))],
+            ),
             rows: vec![
                 PanelRow::info("state", ctx.t("settings.controls.test_now"), "")
                     .desc(controller_test::describe(snap)),
