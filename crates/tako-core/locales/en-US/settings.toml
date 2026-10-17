@@ -270,6 +270,22 @@ reload_theme = "Reload theme"
 reload_theme_desc = "Reads the files of the current theme again"
 reload_theme_value = "Reload"
 
+performance = "Tako performance"
+performance_desc = "Tako's own memory, CPU and startup time, updated every second"
+performance_value = "View"
+
+[settings.performance]
+title = "Tako performance"
+ui = "Interface"
+supervisor = "Supervisor"
+supervisor_desc = "Stays open during the game to restore the screen and audio"
+memory = "Memory"
+cpu = "CPU"
+measuring = "Measuring…"
+unknown = "Unavailable"
+opened = "Time to first screen"
+opened_desc = "This time the interface opened, from process start until the screen showed up"
+
 [settings.about]
 title = "About"
 subtitle = "Tako's version, license and source code."

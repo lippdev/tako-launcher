@@ -10,6 +10,7 @@ use tako_core::devices::{
 };
 
 pub mod secrets;
+pub mod usage;
 
 /// Atalho de teclado global durante o jogo; o retorno mantém o atalho registrado até ser solto. `None` = sem
 /// atalho (tecla sem equivalente, atalho em uso por outro app ou SO sem suporte).

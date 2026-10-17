@@ -627,6 +627,8 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             ctx.effect(Effect::OpenFolder(ctx.paths.logs().display().to_string()));
             Flow::Stay
         }),
+        MenuItem::new(action(ctx, "settings.system.performance"))
+            .on(|ctx| Flow::Push(Box::new(super::performance::panel(ctx)))),
         MenuItem::new(PanelRow::header(ctx.t("settings.system.recovery_header"))),
     ];
     v.push(if ctx.safe_mode {
