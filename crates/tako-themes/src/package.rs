@@ -63,7 +63,7 @@ pub(crate) struct Package {
 }
 
 /// Valida um `.takotheme` ou uma pasta de tema sem gravar nada. Não compila o `.slint`
-/// (isso é do `tako theme check`, no `tako-ui`).
+/// (isso é do `tako theme check`, em `tako_ui::theme::check`).
 pub fn validate_package(path: &Path) -> Result<ThemeManifest, Vec<Problem>> {
     validate_package_with(path, &Limits::default())
 }

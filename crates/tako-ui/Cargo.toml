@@ -22,10 +22,10 @@ image.workspace = true
 chrono.workspace = true
 rfd.workspace = true
 spin_on = "0.1"
+tempfile.workspace = true
 
 [dev-dependencies]
 slint = { workspace = true, features = ["renderer-software"] }
-tempfile.workspace = true
 
 [lints]
 workspace = true
