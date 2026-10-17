@@ -10,6 +10,7 @@ pub mod gamepad;
 pub mod images;
 pub mod metadata;
 pub mod model;
+mod navigation_feedback;
 pub mod playnite;
 pub mod screen_test;
 pub mod session;

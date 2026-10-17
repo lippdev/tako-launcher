@@ -434,6 +434,7 @@ impl App {
     }
 
     fn on_cmd(&self, cmd: Cmd) {
+        crate::navigation_feedback::play(&self.shell.borrow().ctx, cmd);
         {
             let mut s = self.shell.borrow_mut();
             match cmd {
@@ -498,6 +499,7 @@ impl App {
         {
             let app = self.clone();
             let _ = ui.set_callback("clicked", move |args| {
+                crate::navigation_feedback::play(&app.shell.borrow().ctx, Cmd::Accept);
                 app.shell
                     .borrow_mut()
                     .click(&arg_str(args, 0), arg_num(args, 1));
@@ -635,7 +637,9 @@ impl App {
                 }
                 for c in fired {
                     let mut s = app.shell.borrow_mut();
-                    match cmd_of(c) {
+                    let command = cmd_of(c);
+                    crate::navigation_feedback::play(&s.ctx, command);
+                    match command {
                         Cmd::PrevSection => s.section(false),
                         Cmd::NextSection => s.section(true),
                         c => s.handle(c),
@@ -726,8 +730,14 @@ pub fn open_current_link(url: &str) {
     }
 }
 
-/// Quanto dura o fade de "Abrindo…" para o jogo (o mesmo do tema).
-const LEAVE_FADE: Duration = Duration::from_millis(450);
+/// Quanto dura o fade de "Abrindo…" para o jogo (o mesmo `Ui.leave-time` do tema): nada com "Reduzir animações".
+fn leave_fade(settings: &crate::shell::Settings) -> Duration {
+    if settings.bool(crate::shell::ctx::keys::REDUCED_MOTION, false) {
+        Duration::ZERO
+    } else {
+        Duration::from_millis(450)
+    }
+}
 
 /// O supervisor viu a janela do jogo: com "Abrindo…" na tela, a interface some aos poucos e fecha. Se o usuário
 /// já voltou ao Tako (B), fica aberta.
@@ -736,16 +746,17 @@ pub fn game_shown() {
         let Some(app) = c.borrow().clone() else {
             return;
         };
-        {
+        let fade = {
             let mut s = app.shell.borrow_mut();
             if !s.ctx.launching {
                 return;
             }
             s.ctx.leaving = true;
             s.ctx.dirty = true;
-        }
+            leave_fade(&s.ctx.settings)
+        };
         app.redraw();
-        slint::Timer::single_shot(LEAVE_FADE, || {
+        slint::Timer::single_shot(fade, || {
             CURRENT.with(|c| {
                 if let Some(app) = c.borrow().clone() {
                     app.apply(HostAction::Close);
@@ -839,6 +850,7 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
 /// Desenha se algo mudou: propriedades da página, cor do jogo em foco e colunas da grade.
 pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     let mut s = shell.borrow_mut();
+    crate::navigation_feedback::sync(&s.ctx);
     if !s.ctx.dirty {
         return;
     }
@@ -893,6 +905,12 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     bridge::set_global(
         ui,
         "Ui",
+        "text-scale",
+        (crate::navigation_feedback::text_size(&s.ctx.settings) as f32 / 100.).to_value(),
+    );
+    bridge::set_global(
+        ui,
+        "Ui",
         "reduce-motion",
         s.ctx
             .settings
@@ -914,6 +932,23 @@ mod tests {
     impl Host for NoHost {
         fn handle(&mut self, _: &Effect, _: &mut Ctx) -> HostAction {
             HostAction::Stay
+        }
+    }
+
+    #[test]
+    fn reduced_motion_removes_the_leave_fade_and_every_theme_animation_follows_it() {
+        let mut settings = crate::shell::Settings::new(None);
+        assert_eq!(leave_fade(&settings), Duration::from_millis(450));
+        settings.set(crate::shell::ctx::keys::REDUCED_MOTION, "true");
+        assert_eq!(leave_fade(&settings), Duration::ZERO);
+        // Duração fixa num `animate` escaparia de "Reduzir animações": todas vêm dos tokens `Ui.*-time`.
+        for file in [
+            include_str!("../theme/main.slint"),
+            include_str!("../theme/widgets.slint"),
+        ] {
+            for line in file.lines().filter(|l| l.contains("animate ")) {
+                assert!(line.contains("duration: Ui."), "{line}");
+            }
         }
     }
 

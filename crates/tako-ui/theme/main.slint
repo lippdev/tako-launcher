@@ -714,7 +714,7 @@ component OverlayView inherits Rectangle {
     // transparente e o jogo aparece por trás).
     if ov.kind == "splash": Rectangle {
         opacity: leaving ? 0 : 1;
-        animate opacity { duration: 450ms; easing: ease-in-out; }
+        animate opacity { duration: Ui.leave-time; easing: ease-in-out; }
         background: @linear-gradient(160deg, Ui.accent 0%, Ui.accent-deep 100%);
         if art.width > 0: Image {
             width: parent.width;

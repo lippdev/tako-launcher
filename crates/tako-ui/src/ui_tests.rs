@@ -110,31 +110,35 @@ fn principal_screens_bind_and_render_in_the_slint_software_backend() {
         let game = shell.ctx.library.games()[0].id.clone();
         for lang in [Lang::PtBr, Lang::EnUs] {
             i18n::set_lang(lang);
-            for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-                window.set_size(slint::PhysicalSize::new(width, height));
-                for route in ["home", "library:all", "settings", "details"] {
-                    shell.open_route(if route == "details" {
-                        "library:all"
-                    } else {
-                        route
-                    });
-                    if route == "details" {
-                        shell.ctx.open_details = Some(game.clone());
-                        shell.after_action();
+            for scale in [1.0, 1.25] {
+                ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+                    .unwrap();
+                for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
+                    window.set_size(slint::PhysicalSize::new(width, height));
+                    for route in ["home", "library:all", "settings", "details"] {
+                        shell.open_route(if route == "details" {
+                            "library:all"
+                        } else {
+                            route
+                        });
+                        if route == "details" {
+                            shell.ctx.open_details = Some(game.clone());
+                            shell.after_action();
+                        }
+                        for (name, value) in shell.render(Instant::now()).props {
+                            ui.set_property(name, value)
+                                .unwrap_or_else(|e| panic!("{route}/{name}: {e}"));
+                        }
+                        let mut pixels = vec![Rgb8Pixel::default(); (width * height) as usize];
+                        ui.window().request_redraw();
+                        assert!(window.draw_if_needed(|renderer| {
+                            renderer.render(&mut pixels, width as usize);
+                        }));
+                        assert!(
+                            pixels.iter().any(|p| p.r != 0 || p.g != 0 || p.b != 0),
+                            "tela vazia: {route}/{width}/{lang:?}"
+                        );
                     }
-                    for (name, value) in shell.render(Instant::now()).props {
-                        ui.set_property(name, value)
-                            .unwrap_or_else(|e| panic!("{route}/{name}: {e}"));
-                    }
-                    let mut pixels = vec![Rgb8Pixel::default(); (width * height) as usize];
-                    ui.window().request_redraw();
-                    assert!(window.draw_if_needed(|renderer| {
-                        renderer.render(&mut pixels, width as usize);
-                    }));
-                    assert!(
-                        pixels.iter().any(|p| p.r != 0 || p.g != 0 || p.b != 0),
-                        "tela vazia: {route}/{width}/{lang:?}"
-                    );
                 }
             }
         }
