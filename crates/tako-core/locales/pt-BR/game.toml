@@ -1,7 +1,11 @@
 [game_settings]
 screen = "TELA"
 use_screen = "Usar a tela de jogo"
-screen_note = "A tela é a escolhida em Configurações › Tela de jogo."
+screen_note = "A tela é a escolhida em Configurações › Tela de jogo, ou a deste jogo logo abaixo."
+which_screen = "Tela deste jogo"
+which_screen_desc = "Outra tela só para este jogo (por exemplo, o monitor da mesa em vez da TV). A resolução e o HDR abaixo valem para ela."
+no_screen = "nenhuma"
+disconnected = "{screen} (desconectada)"
 mode = "Resolução e taxa"
 hdr = "HDR"
 sound = "SOM"

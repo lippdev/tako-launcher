@@ -6,6 +6,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct GameSettingsOverride {
     pub use_game_screen: Option<bool>,
+    /// Tela deste jogo (PERF-002), no lugar da tela de jogo do Tako. A resolução e o HDR do jogo valem para ela.
+    #[serde(default)]
+    pub screen_id: Option<String>,
+    /// Nome da tela escolhida, para mostrar quando ela estiver desconectada.
+    #[serde(default)]
+    pub screen_name: Option<String>,
     /// Chave do modo (`1920x1080@60`) ou [`GameSettingsOverride::KEEP_CURRENT_MODE`].
     pub screen_mode: Option<String>,
     pub hdr: Option<bool>,
@@ -69,6 +75,7 @@ impl GameSettingsOverride {
     pub fn changed_count(&self) -> usize {
         [
             self.use_game_screen.is_some(),
+            normalize_arguments(self.screen_id.as_deref()).is_some(),
             self.screen_mode.is_some(),
             self.hdr.is_some(),
             self.audio_device_id.is_some(),
@@ -163,20 +170,34 @@ pub fn resolve(
     let game = game.unwrap_or(&none);
     let mut screen = None;
     let mut problem = None;
-    if game.use_game_screen.unwrap_or(global.game_screen_enabled) {
-        if global.game_screen_id.trim().is_empty() {
+    let own_screen = game
+        .screen_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let display_id = own_screen.unwrap_or(global.game_screen_id.trim());
+    // Escolher uma tela para o jogo já é pedir para usá-la.
+    let asked = game.use_game_screen.or(own_screen.map(|_| true));
+    if asked.unwrap_or(global.game_screen_enabled) {
+        if display_id.is_empty() {
             // Só é problema quando o próprio jogo pediu; desligada no global e sem tela é o normal.
-            problem =
-                (game.use_game_screen == Some(true)).then_some(GameScreenProblem::NoScreenChosen);
+            problem = (asked == Some(true)).then_some(GameScreenProblem::NoScreenChosen);
         } else {
+            // A resolução do Tako é da tela de jogo dele: em outra tela, sem escolha do jogo, mantém a atual.
+            let default_mode = global
+                .game_screen_id
+                .trim()
+                .eq_ignore_ascii_case(display_id)
+                .then_some(global.game_screen_mode)
+                .flatten();
             let mode = match game.screen_mode.as_deref() {
-                None => global.game_screen_mode,
+                None => default_mode,
                 Some(GameSettingsOverride::KEEP_CURRENT_MODE) => None,
                 // Valor ilegível volta ao padrão.
-                Some(key) => DisplayMode::parse(key).or(global.game_screen_mode),
+                Some(key) => DisplayMode::parse(key).or(default_mode),
             };
             screen = Some(GameScreenSettings {
-                display_id: global.game_screen_id.clone(),
+                display_id: display_id.to_owned(),
                 mode,
                 enable_hdr: game.hdr.unwrap_or(global.game_screen_hdr),
             });
@@ -374,6 +395,45 @@ mod tests {
             (not_asked.game_screen, not_asked.game_screen_problem),
             (None, None)
         );
+    }
+
+    #[test]
+    fn game_can_pick_its_own_screen_with_its_own_mode() {
+        const DESK: &str = r"\\.\DISPLAY1";
+        let desk = with(|o| o.screen_id = Some(DESK.into()));
+        assert_eq!(desk.changed_count(), 1);
+        // Vale mesmo com a tela de jogo desligada e sem tela escolhida no Tako.
+        let none = GlobalSessionSettings {
+            game_screen_enabled: false,
+            game_screen_id: String::new(),
+            ..global()
+        };
+        for g in [global(), none] {
+            let s = resolve(&g, Some(&desk)).game_screen.unwrap();
+            assert_eq!(s.display_id, DESK);
+            // A resolução do Tako é da TV: na outra tela, mantém a atual.
+            assert_eq!(s.mode, None);
+            assert!(s.enable_hdr);
+        }
+        let with_mode = with(|o| {
+            o.screen_id = Some(DESK.into());
+            o.screen_mode = Some("2560x1440@144".into());
+        });
+        let s = resolve(&global(), Some(&with_mode)).game_screen.unwrap();
+        assert_eq!(s.mode, Some(DisplayMode::new(2560, 1440, 144)));
+        // A tela do Tako escolhida para o jogo leva a resolução dela.
+        let same = with(|o| o.screen_id = Some(r"\\.\display2".into()));
+        assert_eq!(
+            resolve(&global(), Some(&same)).game_screen.unwrap().mode,
+            Some(TV_4K)
+        );
+        // Escolheu a tela, mas desligou o uso: não usa.
+        let off = with(|o| {
+            o.screen_id = Some(DESK.into());
+            o.use_game_screen = Some(false);
+        });
+        assert_eq!(resolve(&global(), Some(&off)).game_screen, None);
+        assert!(with(|o| o.screen_id = Some(" ".into())).is_default());
     }
 
     #[test]

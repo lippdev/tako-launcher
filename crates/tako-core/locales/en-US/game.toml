@@ -1,7 +1,11 @@
 [game_settings]
 screen = "SCREEN"
 use_screen = "Use the game screen"
-screen_note = "The screen is the one chosen in Settings › Game screen."
+screen_note = "The screen is the one chosen in Settings › Game screen, or this game's own one below."
+which_screen = "Screen for this game"
+which_screen_desc = "Another screen just for this game (for example, the desk monitor instead of the TV). The resolution and HDR below apply to it."
+no_screen = "none"
+disconnected = "{screen} (disconnected)"
 mode = "Resolution and refresh rate"
 hdr = "HDR"
 sound = "SOUND"

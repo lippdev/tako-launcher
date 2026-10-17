@@ -22,7 +22,7 @@ impl GameSettingsStore {
             .query_row(
                 "SELECT use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
                         extra_arguments, working_directory, environment, before_command, after_command,
-                        approved_commands
+                        approved_commands, screen_id, screen_name
                  FROM game_settings WHERE game_id = ?1;",
                 [game_id],
                 |r| {
@@ -42,6 +42,8 @@ impl GameSettingsStore {
                         before_command: r.get(10)?,
                         after_command: r.get(11)?,
                         approved_commands: r.get(12)?,
+                        screen_id: r.get(13)?,
+                        screen_name: r.get(14)?,
                     })
                 },
             )
@@ -64,8 +66,9 @@ impl GameSettingsStore {
         conn.execute(
             "INSERT OR REPLACE INTO game_settings
                 (game_id, use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
-                 extra_arguments, working_directory, environment, before_command, after_command, approved_commands)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14);",
+                 extra_arguments, working_directory, environment, before_command, after_command, approved_commands,
+                 screen_id, screen_name)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16);",
             params![
                 game_id,
                 settings.use_game_screen,
@@ -81,6 +84,8 @@ impl GameSettingsStore {
                 normalize(settings.before_command.as_deref()),
                 normalize(settings.after_command.as_deref()),
                 settings.approved_commands,
+                normalize(settings.screen_id.as_deref()),
+                settings.screen_name,
             ],
         )?;
         Ok(())
@@ -104,6 +109,8 @@ mod tests {
         let store = GameSettingsStore::new(TakoDatabase::new(&path));
         let settings = GameSettingsOverride {
             use_game_screen: Some(true),
+            screen_id: Some(r"\\.\DISPLAY1".into()),
+            screen_name: Some("Monitor".into()),
             screen_mode: Some(GameSettingsOverride::KEEP_CURRENT_MODE.into()),
             hdr: Some(false),
             audio_device_id: Some("{fone}".into()),
