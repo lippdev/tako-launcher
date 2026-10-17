@@ -177,6 +177,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         art,
         controller_mouse: false,
         welcome_back: None,
+        installing: Vec::new(),
         redraw_at: None,
         launching: false,
         leaving: false,
@@ -199,7 +200,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
 
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar.
 pub fn rescan(shell: &Rc<RefCell<Shell>>) {
-    let (found, disabled, simulate) = {
+    let (found, disabled, simulate, steam_key, steam_cache) = {
         let mut s = shell.borrow_mut();
         if s.ctx.scanning {
             return;
@@ -211,12 +212,22 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
                 .settings
                 .string(crate::shell::ctx::keys::DISABLED_STORES),
             s.ctx.simulated(),
+            s.ctx.platform.secrets.get(crate::steam_owned::SECRET),
+            crate::steam_owned::cache(&s.ctx.paths),
         )
     };
     std::thread::Builder::new()
         .name("tako-scan".into())
         .spawn(move || {
-            let reports = scan_into(&found, &disabled, simulate);
+            // Jogos da conta Steam (SRC-005): só com a chave; sem ela, nem o cache antigo entra.
+            let steam_owned = steam_key.map(|key| {
+                if !simulate && let Err(e) = crate::steam_owned::refresh(&key, &steam_cache, false)
+                {
+                    tracing::warn!("jogos da conta Steam: {e}");
+                }
+                steam_cache
+            });
+            let reports = scan_into(&found, &disabled, simulate, steam_owned);
             let to_measure: Vec<(String, String)> = found
                 .lock()
                 .map(|f| {
@@ -247,11 +258,12 @@ fn scan_into(
     found: &Mutex<Vec<Game>>,
     disabled: &str,
     simulate: bool,
+    steam_owned: Option<PathBuf>,
 ) -> Vec<tako_sources::report::LibrarySourceReport> {
     if simulate {
         return Vec::new();
     }
-    let (games, reports) = crate::sources::scan(disabled);
+    let (games, reports) = crate::sources::scan(disabled, steam_owned);
     if let Ok(mut f) = found.lock() {
         *f = games;
     }
@@ -550,6 +562,7 @@ impl App {
         let app = self.clone();
         let mut last_clock = String::new();
         let mut next_battery = Duration::ZERO;
+        let mut next_install_check = Duration::ZERO;
         let timer = slint::Timer::default();
         timer.start(
             slint::TimerMode::Repeated,
@@ -623,6 +636,13 @@ impl App {
                         Cmd::PrevSection => s.section(false),
                         Cmd::NextSection => s.section(true),
                         c => s.handle(c),
+                    }
+                }
+                // Instalando pela loja (SRC-005): relê a biblioteca a cada 30 s até o jogo aparecer instalado.
+                if now >= next_install_check {
+                    next_install_check = now + Duration::from_secs(30);
+                    if app.shell.borrow_mut().ctx.check_installs() {
+                        rescan(&app.shell);
                     }
                 }
                 let action = {
@@ -946,7 +966,7 @@ mod tests {
             })
             .collect();
         let found = Mutex::new(bench);
-        assert!(scan_into(&found, "", true).is_empty());
+        assert!(scan_into(&found, "", true, None).is_empty());
         assert_eq!(found.lock().unwrap().len(), 1000);
     }
 

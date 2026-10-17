@@ -15,6 +15,7 @@ pub mod screen_test;
 pub mod session;
 pub mod shell;
 pub mod sources;
+pub mod steam_owned;
 pub mod tasks;
 pub mod theme;
 pub mod values;

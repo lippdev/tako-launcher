@@ -27,8 +27,9 @@ pub mod windows_path;
 pub mod xbox;
 
 /// Steam: em todos os SOs (raiz achada por [`steam::find_root`]).
-pub fn steam_source() -> Box<dyn LibrarySource> {
-    Box::new(steam::SteamLibrarySource::new(steam::find_root()))
+/// `owned_cache`: cache dos jogos da conta não instalados (SRC-005), quando o usuário deu a chave da Web API.
+pub fn steam_source(owned_cache: Option<std::path::PathBuf>) -> Box<dyn LibrarySource> {
+    Box::new(steam::SteamLibrarySource::new(steam::find_root()).with_owned_cache(owned_cache))
 }
 
 /// Lojas só do Windows, na ordem da barra lateral (a Steam vem de [`steam_source`]).

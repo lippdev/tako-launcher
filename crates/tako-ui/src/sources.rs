@@ -4,8 +4,8 @@ use tako_core::library::{Game, GameStore};
 use tako_sources::LibrarySource;
 use tako_sources::report::{LibrarySourceReport, LibrarySources};
 
-pub fn all_sources() -> Vec<Box<dyn LibrarySource>> {
-    let mut v: Vec<Box<dyn LibrarySource>> = vec![tako_sources::steam_source()];
+pub fn all_sources(steam_owned: Option<std::path::PathBuf>) -> Vec<Box<dyn LibrarySource>> {
+    let mut v: Vec<Box<dyn LibrarySource>> = vec![tako_sources::steam_source(steam_owned)];
     #[cfg(windows)]
     v.extend(tako_sources::windows_sources(std::sync::Arc::new(
         tako_sources::registry_windows::WindowsRegistry,
@@ -23,8 +23,11 @@ pub fn is_disabled(disabled: &str, store: GameStore) -> bool {
 }
 
 /// Lê as lojas ligadas (bloqueante: rodar fora da thread da UI).
-pub fn scan(disabled: &str) -> (Vec<Game>, Vec<LibrarySourceReport>) {
-    let mut sources = LibrarySources::new(all_sources());
+pub fn scan(
+    disabled: &str,
+    steam_owned: Option<std::path::PathBuf>,
+) -> (Vec<Game>, Vec<LibrarySourceReport>) {
+    let mut sources = LibrarySources::new(all_sources(steam_owned));
     let games = sources.discover(|s| !is_disabled(disabled, s));
     let reports = sources.reports().values().cloned().collect();
     (games, reports)
@@ -32,7 +35,7 @@ pub fn scan(disabled: &str) -> (Vec<Game>, Vec<LibrarySourceReport>) {
 
 /// Lojas que este SO lê (Configurações › Lojas).
 pub fn stores() -> Vec<GameStore> {
-    LibrarySources::new(all_sources()).stores()
+    LibrarySources::new(all_sources(None)).stores()
 }
 
 #[cfg(test)]

@@ -119,7 +119,8 @@ impl LibrarySources {
                 LibrarySourceReport {
                     store,
                     enabled,
-                    game_count: games.len() - before,
+                    // "N jogos instalados": os da conta que não estão instalados (SRC-005) não contam.
+                    game_count: games[before..].iter().filter(|g| g.is_installed).count(),
                     client_installed: scan.client_installed,
                     notice: if enabled { scan.notice } else { None },
                 },

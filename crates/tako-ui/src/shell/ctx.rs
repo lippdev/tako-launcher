@@ -5,7 +5,7 @@ use super::Cmd;
 use crate::gamepad::{PadEvent, PadFamily};
 use crate::model::Hint;
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
 use tako_core::library::{CollectionLibrary, GameLibrary};
 use tako_core::paths::DataPaths;
@@ -190,6 +190,8 @@ pub struct Ctx {
     pub controller_mouse: bool,
     /// O jogo terminou: foco nele e "Bem-vindo de volta" no próximo desenho (id, tempo jogado).
     pub welcome_back: Option<(String, std::time::Duration, tako_core::session::GameEnd)>,
+    /// Jogos mandados instalar pela loja e até quando esperar por eles (SRC-005).
+    pub installing: Vec<(String, Instant)>,
     /// Desenhar de novo neste instante mesmo sem entrada (camadas que mudam com o tempo).
     pub redraw_at: Option<Instant>,
     /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).
@@ -330,6 +332,30 @@ impl Ctx {
 
     pub fn effect(&mut self, e: Effect) {
         self.effects.push(e);
+    }
+
+    /// Quanto tempo esperar uma instalação pela loja antes de parar de reler a biblioteca.
+    pub const INSTALL_WAIT: Duration = Duration::from_secs(2 * 60 * 60);
+
+    /// Avisa os jogos que terminaram de instalar e larga os que passaram do prazo; `true` = ainda há o que esperar.
+    pub fn check_installs(&mut self) -> bool {
+        let now = Instant::now();
+        let mut done = Vec::new();
+        let library = &self.library;
+        self.installing
+            .retain(|(id, until)| match library.find(id) {
+                Some(g) if g.is_installed => {
+                    done.push(g.title.clone());
+                    false
+                }
+                Some(_) => now < *until,
+                None => false,
+            });
+        for title in done {
+            let text = self.tf("game.installed_now", &[("game", &title)]);
+            self.toast(text);
+        }
+        !self.installing.is_empty()
     }
 
     /// Glifo do botão para a entrada em uso (controle Xbox, PlayStation, Nintendo ou teclado).

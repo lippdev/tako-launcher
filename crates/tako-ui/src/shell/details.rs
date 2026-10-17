@@ -59,6 +59,9 @@ pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
         ctx.toast(tiles::play_label(ctx, &g));
     } else if let Some(uri) = install_uri(&g) {
         ctx.effect(Effect::OpenUrl(uri));
+        ctx.installing.retain(|(i, _)| i != &g.id);
+        ctx.installing
+            .push((g.id.clone(), std::time::Instant::now() + Ctx::INSTALL_WAIT));
     } else {
         ctx.toast(ctx.t(if g.store() == GameStore::Manual {
             "game.missing_file"
