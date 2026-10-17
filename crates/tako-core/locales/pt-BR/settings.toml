@@ -13,6 +13,8 @@ autoupdate = "Atualizar automaticamente"
 autoupdate_desc = "Procura e baixa a versão nova em segundo plano; instala ao reiniciar ou ao sair do Tako"
 prerelease = "Receber versões de teste"
 prerelease_desc = "Versões alpha e beta chegam antes, mas podem ter falhas"
+nightly = "Receber versões noturnas"
+nightly_desc = "Uma build por dia com tudo que entrou no desenvolvimento, sem revisão. Para quem quer testar"
 
 [settings.library]
 title = "Biblioteca e lojas"

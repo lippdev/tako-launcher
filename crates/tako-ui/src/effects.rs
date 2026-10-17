@@ -82,7 +82,7 @@ pub fn check_updates(ctx: &mut Ctx, explicit: bool) {
             let found = updates::check(
                 &agent,
                 &updates::SemVer::current(),
-                prefs.prereleases,
+                prefs.channel(),
                 pkg,
                 arch,
             )

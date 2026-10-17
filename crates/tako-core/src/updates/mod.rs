@@ -14,7 +14,7 @@ pub use apply::{UpdateApplyPlan, installer_args, mac_bundle_of, portable_swap_sc
 pub use download::{
     STALL_TIMEOUT, UpdateError, agent, check, download, download_dir, fetch_highlight, verify_file,
 };
-pub use feed::{Arch, Asset, Package, UpdateInfo};
+pub use feed::{Arch, Asset, Channel, Package, UpdateInfo};
 pub use semver::SemVer;
 
 /// Preferências salvas em `updates.json` (mesmos nomes do C#, para a migração).
@@ -25,6 +25,8 @@ pub struct UpdatePreferences {
     pub auto_update: bool,
     /// Receber versões de teste (alpha/beta) numa versão estável.
     pub prereleases: bool,
+    /// Receber as builds noturnas da develop (PLAT-008). Inclui as de teste.
+    pub nightly: bool,
 }
 
 impl Default for UpdatePreferences {
@@ -32,11 +34,22 @@ impl Default for UpdatePreferences {
         UpdatePreferences {
             auto_update: true,
             prereleases: false,
+            nightly: false,
         }
     }
 }
 
 impl UpdatePreferences {
+    pub fn channel(&self) -> Channel {
+        if self.nightly {
+            Channel::Nightly
+        } else if self.prereleases {
+            Channel::Testing
+        } else {
+            Channel::Stable
+        }
+    }
+
     /// Arquivo ausente ou inválido vira o padrão.
     pub fn load(path: &Path) -> UpdatePreferences {
         std::fs::read_to_string(path)
@@ -72,5 +85,8 @@ mod tests {
         assert_eq!(UpdatePreferences::load(&path), UpdatePreferences::default());
         std::fs::write(&path, r#"{"Prereleases":true}"#).unwrap();
         assert!(UpdatePreferences::load(&path).auto_update);
+        assert_eq!(UpdatePreferences::load(&path).channel(), Channel::Testing);
+        std::fs::write(&path, r#"{"Nightly":true}"#).unwrap();
+        assert_eq!(UpdatePreferences::load(&path).channel(), Channel::Nightly);
     }
 }

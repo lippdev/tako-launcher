@@ -6,9 +6,12 @@
 #   Run workflow, develop alpha ou beta: X.Y.Z vem de "base_version" ou do topo do changelog (o patch sobe se X.Y.Z já
 #                         saiu como estável) e o N de -alpha.N/-beta.N é o próximo depois das tags existentes.
 #   Run workflow, main    canal "stable": refaz a estável do topo do changelog (útil se o push falhou no meio).
+#   Agendado (nightly)    develop: X.Y.Z como na alpha e -nightly.AAAAMMDD (PLAT-008). Não publica se a develop não
+#                         mudou desde a última noturna ou se a de hoje já saiu. Notas pelos commits, sem changelog.
 #   Outra branch          só sem "publish" (compila e guarda os arquivos como artefato, para testar o pipeline).
 #
-# Entrada (variáveis de ambiente): EVENT_NAME, REF, CHANNEL (stable|alpha|beta), BASE_VERSION, PUBLISH (true|false).
+# Entrada (variáveis de ambiente): EVENT_NAME, REF, CHANNEL (stable|alpha|beta|nightly), BASE_VERSION, PUBLISH
+# (true|false) e TODAY (AAAAMMDD, para testes; padrão: hoje em UTC).
 # Saída: build, publish, version, prerelease, tag e reason em $GITHUB_OUTPUT (ou na tela) e as notas em
 # $NOTES_FILE (padrão release-notes.md): inglês do CHANGELOG.en-US.md + link para o português.
 set -euo pipefail
@@ -28,7 +31,8 @@ out() { if [[ -n "${GITHUB_OUTPUT:-}" ]]; then echo "$1=$2" >>"$GITHUB_OUTPUT"; 
 fail() { echo "::error::$1" >&2; exit 1; }
 skip() {
   echo "::notice::$1"
-  out build false; out publish false; out version ""; out prerelease false; out tag ""; out reason "$1"
+  out build false; out publish false; out version ""; out prerelease false; out tag ""; out sha ""; out channel ""
+  out reason "$1"
   exit 0
 }
 
@@ -49,6 +53,26 @@ top_version() { grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?\]' 
 
 tag_exists() { [[ -n "$(git tag -l "v$1")" ]]; }
 
+# X.Y.Z das pré-releases: base_version ou o topo do changelog (o patch sobe se X.Y.Z já saiu como estável).
+prerelease_base() {
+  if [[ -n "$BASE_VERSION" ]]; then
+    local b="${BASE_VERSION#v}"
+    [[ "$b" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "base_version inválida: '$BASE_VERSION' (use X.Y.Z)."
+    tag_exists "$b" && fail "A estável v$b já saiu; escolha uma base_version maior."
+    echo "$b"
+    return
+  fi
+  local top
+  top="$(top_version "$PT")"
+  [[ -n "$top" ]] || fail "CHANGELOG.md não tem nenhuma seção ## [X.Y.Z]; informe base_version."
+  local b="${top%%-*}"
+  if tag_exists "$b"; then
+    IFS=. read -r major minor patch <<<"$b"
+    b="$major.$minor.$((patch + 1))"
+  fi
+  echo "$b"
+}
+
 semver_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
 branch="${REF#refs/heads/}"
 [[ "$PUBLISH" == "true" || "$EVENT_NAME" == "push" ]] && publish=true || publish=false
@@ -68,19 +92,7 @@ case "$CHANNEL" in
     ;;
   alpha | beta)
     if [[ "$publish" == "true" && "$branch" != "develop" ]]; then fail "Alpha e beta só saem da develop (rodando em $branch)."; fi
-    if [[ -n "$BASE_VERSION" ]]; then
-      base="${BASE_VERSION#v}"
-      [[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "base_version inválida: '$BASE_VERSION' (use X.Y.Z)."
-      tag_exists "$base" && fail "A estável v$base já saiu; escolha uma base_version maior."
-    else
-      top="$(top_version "$PT")"
-      [[ -n "$top" ]] || fail "CHANGELOG.md não tem nenhuma seção ## [X.Y.Z]; informe base_version."
-      base="${top%%-*}"
-      if tag_exists "$base"; then
-        IFS=. read -r major minor patch <<<"$base"
-        base="$major.$minor.$((patch + 1))"
-      fi
-    fi
+    base="$(prerelease_base)"
     # alpha < beta < rc no SemVer: uma alpha depois de uma beta da mesma base ficaria "mais velha" e o app não a oferece.
     if [[ "$CHANNEL" == "alpha" && -n "$(git tag -l "v$base-beta.*" "v$base-rc.*")" ]]; then
       fail "v$base já tem beta/rc; uma alpha nova seria mais antiga. Use beta ou outra base_version."
@@ -88,7 +100,17 @@ case "$CHANNEL" in
     last="$(git tag -l "v$base-$CHANNEL.*" | sed -nE "s/^v$base-$CHANNEL\.([0-9]+)$/\1/p" | sort -n | tail -1)"
     version="$base-$CHANNEL.$(( ${last:-0} + 1 ))"
     ;;
-  *) fail "Canal inválido: $CHANNEL (use stable, alpha ou beta)." ;;
+  nightly)
+    if [[ "$publish" == "true" && "$branch" != "develop" ]]; then fail "A noturna só sai da develop (rodando em $branch)."; fi
+    base="$(prerelease_base)"
+    previous="$(git tag -l 'v*-nightly.*' --sort=-creatordate | head -1)"
+    if [[ -n "$previous" && "$(git rev-list -n1 "$previous")" == "$(git rev-parse HEAD)" ]]; then
+      skip "A develop não mudou desde $previous; nenhuma noturna hoje."
+    fi
+    version="$base-nightly.${TODAY:-$(date -u +%Y%m%d)}"
+    tag_exists "$version" && skip "A noturna v$version já saiu hoje."
+    ;;
+  *) fail "Canal inválido: $CHANNEL (use stable, alpha, beta ou nightly)." ;;
 esac
 
 [[ "$version" =~ $semver_re ]] || fail "Versão inválida: $version"
@@ -101,8 +123,21 @@ notes_for() {
   if [[ -z "$text" && "$version" == *-* ]]; then text="$(section "$1" Unreleased)"; fi
   printf '%s' "$text"
 }
-en_notes="$(notes_for "$EN")"
-pt_notes="$(notes_for "$PT")"
+# Noturna: os commits desde a anterior (as últimas 30 na primeira), sem merges.
+nightly_notes() {
+  local range=HEAD
+  [[ -n "${previous:-}" ]] && range="$previous..HEAD"
+  echo "Nightly build of \`develop\` at $(git rev-parse --short HEAD). Unreviewed: for testers."
+  echo
+  git log --no-merges --format='- %s' -n 30 "$range"
+}
+if [[ "$CHANNEL" == "nightly" ]]; then
+  en_notes="$(nightly_notes)"
+  pt_notes="$en_notes"
+else
+  en_notes="$(notes_for "$EN")"
+  pt_notes="$(notes_for "$PT")"
+fi
 if [[ -z "$en_notes" || -z "$pt_notes" ]]; then
   msg="Os dois changelogs precisam de notas para $version (seção ## [$version]"
   [[ "$version" == *-* ]] && msg="$msg ou ## [Unreleased]"
@@ -122,5 +157,7 @@ out publish "$publish"
 out version "$version"
 out prerelease "$prerelease"
 out tag "v$version"
+out sha "$(git rev-parse HEAD)"
+out channel "$CHANNEL"
 out reason ""
 echo "Versão: $version (pré-release: $prerelease, publicar: $publish)"
