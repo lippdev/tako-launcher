@@ -74,9 +74,34 @@ fn store_row(ctx: &Ctx, store: GameStore) -> MenuItem {
     })
 }
 
-/// Uma linha liga/desliga por loja deste SO (também no assistente da primeira execução).
+/// Loja ligada sem o app (SRC-003): logo abaixo dela, baixar pela página oficial.
+fn download_row(ctx: &Ctx, store: GameStore) -> Option<MenuItem> {
+    let url = tako_sources::report::client_download(store)?;
+    ctx.sources
+        .iter()
+        .find(|r| r.store == store && r.enabled && !r.client_installed)?;
+    let label = ctx.tf(
+        "settings.library.client_download",
+        &[("store", &tako_sources::report::store_of(store))],
+    );
+    Some(
+        MenuItem::new(PanelRow::action(format!("client:{}", store.key()), label).icon("download"))
+            .on(move |ctx| {
+                ctx.effect(Effect::OpenUrl(url.into()));
+                Flow::Stay
+            }),
+    )
+}
+
+/// Uma linha liga/desliga por loja deste SO (também no assistente da primeira execução), seguida do atalho
+/// para baixar o app quando ele falta.
 pub(crate) fn store_rows(ctx: &Ctx) -> Vec<MenuItem> {
-    stores().iter().map(|s| store_row(ctx, *s)).collect()
+    let mut v = Vec::new();
+    for s in stores() {
+        v.push(store_row(ctx, *s));
+        v.extend(download_row(ctx, *s));
+    }
+    v
 }
 
 pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {

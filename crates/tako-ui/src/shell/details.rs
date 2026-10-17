@@ -47,6 +47,10 @@ pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
         return Nav::Layer(Box::new(dialogs::other_game_running(ctx, &g.id)));
     } else if g.is_broken {
         return Nav::Layer(Box::new(dialogs::broken_game(ctx, &g.id)));
+    } else if g.can_play()
+        && let Some(notice) = client_missing(ctx, &g)
+    {
+        return Nav::Layer(Box::new(dialogs::client_missing(ctx, &g, notice)));
     } else if g.can_play() {
         ctx.effect(Effect::Launch(g.id.clone()));
     } else if g.is_upcoming() || g.is_rom() {
@@ -61,6 +65,12 @@ pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
         }));
     }
     Nav::Stay
+}
+
+/// O jogo precisa do app da loja e a última leitura não o achou (SRC-003): o aviso da loja.
+fn client_missing(ctx: &Ctx, g: &Game) -> Option<String> {
+    let report = ctx.sources.iter().find(|r| r.store == g.store());
+    tako_sources::report::client_missing(g, report)
 }
 
 /// Onde instalar um jogo que não está instalado (só a Steam tem um caminho oficial direto).

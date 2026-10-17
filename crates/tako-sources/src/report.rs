@@ -41,6 +41,23 @@ pub fn store_of(store: GameStore) -> String {
     t(&format!("sources.store_of.{}", store.key()))
 }
 
+/// Página oficial para baixar o app da loja (SRC-003). Só endereços da própria loja: o Tako não baixa nem
+/// instala nada sozinho.
+pub fn client_download(store: GameStore) -> Option<&'static str> {
+    match store {
+        GameStore::Steam => Some("https://store.steampowered.com/about/"),
+        GameStore::Epic => Some("https://store.epicgames.com/download"),
+        GameStore::Gog => Some("https://www.gog.com/galaxy"),
+        GameStore::Ubisoft => Some("https://ubisoftconnect.com/"),
+        GameStore::Ea => Some("https://www.ea.com/ea-app"),
+        GameStore::BattleNet => Some("https://download.battle.net/"),
+        GameStore::Amazon => Some("https://gaming.amazon.com/"),
+        // App Xbox na Microsoft Store.
+        GameStore::Xbox => Some("ms-windows-store://pdp/?productid=9MV0B5HZVK9Z"),
+        _ => None,
+    }
+}
+
 /// Aviso de cliente ausente ou desatualizado ao falhar a abertura (port de `LibraryText.ClientMissing`):
 /// só nas lojas que precisam do cliente para abrir o jogo.
 pub fn client_missing(game: &Game, report: Option<&LibrarySourceReport>) -> Option<String> {
