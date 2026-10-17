@@ -321,7 +321,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 
 - [ ] **UX-001:** acessibilidade: tamanho de texto, redução de animações, alto contraste, sons de navegação com volume próprio.
 - [ ] **UX-002:** arte animada e trailers (libmpv opcional, desligado durante o jogo).
-- [ ] **UX-003:** assistente da primeira execução (idioma, lojas detectadas, provedores de metadados).
+- [ ] **UX-003:** assistente da primeira execução (idioma, lojas detectadas, provedores de metadados; oferece o driver opcional do INPUT-005).
 - [ ] **UX-004:** perfis locais (vários usuários na mesma máquina).
 
 ### Épico THEME (P2)
@@ -366,6 +366,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [ ] **INPUT-003:** bateria dos controles sem fio na barra superior e na Central, com aviso de bateria fraca.
 - [ ] **INPUT-004:** reconexão assistida: quando o controle cai, o Tako avisa, não perde o foco e volta a navegar assim que um controle reconecta (ou outro assume).
 - [ ] **INPUT-002:** remapear controles para os jogos, como a Entrada Steam: perfis por jogo, botões, analógicos, gatilhos e mouse/teclado. Precisa de um controle virtual no SO (uinput no Linux; no Windows o ViGEmBus foi descontinuado, então é preciso escolher outro driver). Começa por um estudo.
+- [ ] **INPUT-005:** isolar o controle do jogo enquanto a Central está aberta (Windows). Jogos que leem por XInput (ex.: Resident Evil 2) continuam recebendo o controle sem estar em foco. Driver HidHide, **opcional**: o Tako esconde o controle do jogo ao abrir a Central e devolve ao voltar. A instalação é oferecida no assistente da primeira execução (UX-003) e em Configurações; sem o driver, tudo segue como hoje. Visto no teste manual de 2026-10-16.
 
 ### Épico SESSION — Sessões de jogo (P2)
 
