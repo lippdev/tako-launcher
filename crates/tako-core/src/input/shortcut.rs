@@ -146,6 +146,12 @@ impl ButtonChordDetector {
         self.chord
     }
 
+    /// A combinação está segurada e ainda não disparou: quem espera eventos precisa voltar a chamar
+    /// [`update`](Self::update) antes de [`chord::HOLD_TIME`] mesmo sem evento novo do controle.
+    pub fn holding(&self) -> bool {
+        self.since.is_some() && !self.fired
+    }
+
     /// Combinação nova: só vale depois de soltar tudo.
     pub fn set_chord(&mut self, value: B) {
         self.chord = value & chord::KNOWN;

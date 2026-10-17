@@ -38,6 +38,10 @@ pub struct Supervisor {
     watch: UiWatch,
     started: Instant,
     running: Option<Running>,
+    /// Encerrar jogo foi pedido: confere o fim a cada volta (0,5 s), a interface mostra "Fechando o jogo…".
+    closing: bool,
+    /// O jogo abriu com a interface em "Abrindo…": avisar quando a janela dele aparecer.
+    launching: bool,
     pads: Option<Pads>,
     chord: ButtonChordDetector,
     key: tako_core::input::shortcut::KeyShortcut,
@@ -55,6 +59,8 @@ impl Supervisor {
             watch: UiWatch::new(SupervisorOptions::default()),
             started: Instant::now(),
             running: None,
+            closing: false,
+            launching: false,
             pads: None,
             chord: ButtonChordDetector::new(chord::parse(chord_value.as_deref())),
             key: tako_core::input::shortcut::KeyShortcut::parse(key.as_deref()),
@@ -141,6 +147,8 @@ impl Supervisor {
             };
             launch = Launch::default();
             let code = self.watch_ui(&mut ui);
+            // "Abrindo…" só vale para a interface que abriu o jogo.
+            self.launching = false;
             if let Some(reason) = &ui.closing
                 && reason == "update"
             {
@@ -200,7 +208,12 @@ impl Supervisor {
                 let _ = ui.child.kill();
             }
             // Jogo rodando com a interface aberta (Início durante o jogo).
-            if self.running.is_some() && last_poll.elapsed() >= Running::POLL {
+            let every = if self.closing || self.launching {
+                Duration::from_millis(500)
+            } else {
+                Running::POLL
+            };
+            if self.running.is_some() && last_poll.elapsed() >= every {
                 last_poll = Instant::now();
                 if let Some(played) = self.running.as_mut().and_then(|r| r.poll(&self.platform)) {
                     let id = self.finish_game();
@@ -212,6 +225,17 @@ impl Supervisor {
                                 played_secs: played.as_secs(),
                             },
                         );
+                    }
+                } else if self.launching
+                    && self
+                        .running
+                        .as_mut()
+                        .is_some_and(|r| r.window_shown(&self.platform))
+                {
+                    self.launching = false;
+                    tracing::info!("janela do jogo na tela");
+                    if let Some(stdin) = ui.stdin.as_mut() {
+                        let _ = protocol::write(stdin, &SupMsg::GameShown);
                     }
                 }
             }
@@ -229,17 +253,36 @@ impl Supervisor {
             }
             UiMsg::Track { req } => match Running::new(req) {
                 Ok(mut r) => {
+                    tracing::info!(
+                        "acompanhando {} ({:?}, pasta: {}, steam: {:?}, pid: {:?})",
+                        r.req.game_id,
+                        r.req.strategy,
+                        r.req.folder.is_some(),
+                        r.req.steam_app_id,
+                        r.req.root_pid
+                    );
                     r.begin(&self.platform);
                     self.running = Some(r);
+                    self.launching = true;
                 }
                 Err(e) => tracing::warn!("acompanhar o jogo: {e}"),
             },
             UiMsg::Resume => {}
             UiMsg::EndGame => {
-                if let Some(r) = &self.running
-                    && let Err(e) = r.request_close(&self.platform)
-                {
-                    tracing::warn!("encerrar o jogo: {e}");
+                tracing::info!("encerrar o jogo pedido pela interface");
+                if let Some(r) = self.running.as_mut() {
+                    self.closing = true;
+                    if let Err(e) = r.request_close(&self.platform) {
+                        tracing::warn!("encerrar o jogo: {e}");
+                    }
+                }
+            }
+            UiMsg::ForceEndGame => {
+                if let Some(r) = self.running.as_mut() {
+                    self.closing = true;
+                    if let Err(e) = r.force_close(&self.platform) {
+                        tracing::warn!("forçar o encerramento do jogo: {e}");
+                    }
                 }
             }
             UiMsg::Pointer { hide, mouse } => {
@@ -256,7 +299,9 @@ impl Supervisor {
         let Some(mut r) = self.running.take() else {
             return String::new();
         };
+        self.closing = false;
         r.finish(&self.platform, &self.paths);
+        tracing::info!("jogo terminou: {}", r.req.game_id);
         r.req.game_id.clone()
     }
 
@@ -282,13 +327,18 @@ impl Supervisor {
         };
         let mut last_poll = Instant::now();
         let mut last = Instant::now();
+        let mut last_buttons = 0;
         loop {
             let mouse = self
                 .running
                 .as_ref()
                 .is_some_and(|r| r.req.controller_mouse);
+            // Segurando o atalho do controle não chega evento novo: sem acordar antes, ele só disparava depois
+            // dos 2 s da espera (e nada, se soltasse antes).
             let wait = if mouse {
                 Duration::from_millis(16)
+            } else if self.chord.holding() {
+                Duration::from_millis(50)
             } else {
                 Running::POLL
             };
@@ -301,6 +351,10 @@ impl Supervisor {
             let dt = last.elapsed().as_secs_f64();
             last = Instant::now();
             let pad = self.pads.as_ref().map(|p| p.state()).unwrap_or_default();
+            if pad.buttons != last_buttons {
+                tracing::debug!("controle durante o jogo: botões {:#x}", pad.buttons);
+                last_buttons = pad.buttons;
+            }
             // Atalho do controle, do teclado ou o Tako aberto de novo: a interface volta por cima do jogo.
             if self.chord.update(GamepadButtons(pad.buttons), now)
                 || pressed.swap(false, std::sync::atomic::Ordering::Relaxed)

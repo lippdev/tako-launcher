@@ -64,6 +64,15 @@ pub fn spawn(cmd: &mut Command) -> DeviceResult<u32> {
 
 /// SIGTERM: pede para fechar, como o X da janela.
 pub fn terminate(pids: &[u32]) -> DeviceResult<()> {
+    signal(pids, libc::SIGTERM)
+}
+
+/// SIGKILL: encerra à força (o jogo não respondeu ao SIGTERM).
+pub fn kill(pids: &[u32]) -> DeviceResult<()> {
+    signal(pids, libc::SIGKILL)
+}
+
+fn signal(pids: &[u32], sig: libc::c_int) -> DeviceResult<()> {
     let mut failed = Vec::new();
     for &pid in pids {
         let Ok(p) = libc::pid_t::try_from(pid) else {
@@ -73,7 +82,7 @@ pub fn terminate(pids: &[u32]) -> DeviceResult<()> {
             continue;
         }
         // SAFETY: `kill` só recebe números; pid > 1 evita sinalizar grupos ou o init.
-        if unsafe { libc::kill(p, libc::SIGTERM) } != 0 {
+        if unsafe { libc::kill(p, sig) } != 0 {
             let e = io::Error::last_os_error();
             if e.raw_os_error() != Some(libc::ESRCH) {
                 failed.push(format!("{pid}: {e}"));

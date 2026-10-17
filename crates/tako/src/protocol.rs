@@ -22,6 +22,8 @@ pub enum UiMsg {
     Resume,
     /// Central › Encerrar jogo.
     EndGame,
+    /// "Fechando o jogo…" › Forçar encerramento.
+    ForceEndGame,
     /// Central › Ponteiro.
     Pointer {
         hide: bool,
@@ -41,6 +43,8 @@ pub enum SupMsg {
     GameEnded { game_id: String, played_secs: u64 },
     /// Alguém abriu o Tako de novo: trazer a janela para a frente.
     Activate,
+    /// A janela do jogo apareceu: a interface sai de "Abrindo…" (some aos poucos e fecha).
+    GameShown,
 }
 
 pub fn write<T: Serialize>(out: &mut impl Write, msg: &T) -> std::io::Result<()> {

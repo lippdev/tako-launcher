@@ -220,10 +220,14 @@ pub struct Running {
     mouse: tako_core::input::controller_mouse::ControllerMouse,
     screen_height: u32,
     presence: Option<crate::discord::Presence>,
+    /// Desde quando o jogo mostra uma janela que não cobre a tela (ver [`Running::window_shown`]).
+    windowed_since: Option<std::time::Instant>,
 }
 
 impl Running {
     pub const POLL: Duration = Duration::from_secs(2);
+    /// Jogo em janela: quanto esperar antes de sair de "Abrindo…".
+    pub const WINDOWED_GRACE: Duration = Duration::from_secs(4);
 
     pub fn new(req: TrackRequest) -> Result<Running, String> {
         let plan = TrackingPlan {
@@ -238,6 +242,7 @@ impl Running {
             mouse: Default::default(),
             screen_height: 1080,
             presence: None,
+            windowed_since: None,
         })
     }
 
@@ -320,12 +325,50 @@ impl Running {
         }
     }
 
+    /// O jogo não fechou com o pedido: encerra os processos dele à força.
+    pub fn force_close(&mut self, platform: &Platform) -> Result<(), String> {
+        self.tracker.exit_grace = chrono::TimeDelta::seconds(1);
+        self.tracker.close_requested = true;
+        platform
+            .processes
+            .force_close(&self.game_pids())
+            .map_err(|e| e.to_string())
+    }
+
+    /// A janela do jogo já está na tela (a interface sai de "Abrindo…"): cobrindo o monitor, ou em janela há
+    /// [`Self::WINDOWED_GRACE`] (muitos jogos abrem uma janela pequena antes de ir para tela cheia). Acompanhado só
+    /// pela Steam (sem processos), vale a confirmação dela.
+    pub fn window_shown(&mut self, platform: &Platform) -> bool {
+        use tako_core::devices::GameWindow;
+        let pids = self.game_pids();
+        if pids.is_empty() {
+            return self.req.strategy == GameTrackingStrategy::SteamApp
+                && self.tracker.steam_confirmed;
+        }
+        match platform.processes.game_window(&pids) {
+            GameWindow::Fullscreen => true,
+            GameWindow::Windowed => {
+                self.windowed_since
+                    .get_or_insert_with(std::time::Instant::now)
+                    .elapsed()
+                    >= Self::WINDOWED_GRACE
+            }
+            GameWindow::None => {
+                self.windowed_since = None;
+                false
+            }
+        }
+    }
+
     pub fn game_pids(&self) -> Vec<u32> {
         self.tracker.game_process_ids().to_vec()
     }
 
-    /// Pede para o jogo fechar (Central › Encerrar jogo).
-    pub fn request_close(&self, platform: &Platform) -> Result<(), String> {
+    /// Pede para o jogo fechar (Central › Encerrar jogo). Daí em diante o fim conta assim que os processos somem
+    /// (sem a folga da troca de launcher para jogo).
+    pub fn request_close(&mut self, platform: &Platform) -> Result<(), String> {
+        self.tracker.exit_grace = chrono::TimeDelta::seconds(1);
+        self.tracker.close_requested = true;
         platform
             .processes
             .request_close(&self.game_pids())

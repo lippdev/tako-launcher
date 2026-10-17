@@ -47,6 +47,8 @@ pub enum HostAction {
     Show,
     /// Recarrega o tema (troca em tempo de execução).
     ReloadTheme,
+    /// O jogo abriu com acompanhamento: "Abrindo…" até a janela dele aparecer.
+    Launching,
 }
 
 /// O que o app (binário) faz com os pedidos da interface que saem dela: abrir jogos, sair, atualizar.
@@ -173,6 +175,11 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         art,
         controller_mouse: false,
         welcome_back: None,
+        redraw_at: None,
+        launching: false,
+        leaving: false,
+        launch_on_top_until: None,
+        window_on_top: false,
         move_window: None,
         dirty: true,
         pressed_buttons: 0,
@@ -269,7 +276,7 @@ impl App {
             });
         }
         if opts.control_center {
-            shell.open_control_center();
+            shell.open_control_center_over_game();
         }
         if let Some((id, played)) = &opts.after_game {
             if let Err(e) = shell.ctx.library.record_session(id, *played) {
@@ -320,6 +327,7 @@ impl App {
                 self.shell.borrow_mut().ctx.dirty = true;
             }
             HostAction::ReloadTheme => self.reload_theme(),
+            HostAction::Launching => self.shell.borrow_mut().begin_launch_splash(),
         }
     }
 
@@ -568,6 +576,13 @@ impl App {
                     bridge::set(&app.ui.borrow(), "clock", clock.to_value());
                     last_clock = clock;
                 }
+                {
+                    let mut s = app.shell.borrow_mut();
+                    if s.ctx.redraw_at.is_some_and(|t| Instant::now() >= t) {
+                        s.ctx.redraw_at = None;
+                        s.ctx.dirty = true;
+                    }
+                }
                 let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {
                     app.shell.borrow_mut().ctx.dirty = true;
@@ -618,9 +633,39 @@ pub fn raise_current() {
     });
 }
 
+/// Quanto dura o fade de "Abrindo…" para o jogo (o mesmo do tema).
+const LEAVE_FADE: Duration = Duration::from_millis(450);
+
+/// O supervisor viu a janela do jogo: com "Abrindo…" na tela, a interface some aos poucos e fecha. Se o usuário
+/// já voltou ao Tako (B), fica aberta.
+pub fn game_shown() {
+    CURRENT.with(|c| {
+        let Some(app) = c.borrow().clone() else {
+            return;
+        };
+        {
+            let mut s = app.shell.borrow_mut();
+            if !s.ctx.launching {
+                return;
+            }
+            s.ctx.leaving = true;
+            s.ctx.dirty = true;
+        }
+        app.redraw();
+        slint::Timer::single_shot(LEAVE_FADE, || {
+            CURRENT.with(|c| {
+                if let Some(app) = c.borrow().clone() {
+                    app.apply(HostAction::Close);
+                }
+            });
+        });
+    });
+}
+
 /// "Bem-vindo de volta" com o tempo jogado e o foco no jogo (o tempo já foi gravado por quem chama).
 pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration) {
     shell.ctx.running = None;
+    shell.close_game_layers();
     shell.focus_game(id);
     let title = shell
         .ctx
@@ -673,6 +718,9 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
             rescan(shell);
             continue;
         }
+        if effect == Effect::EndGame {
+            shell.borrow_mut().begin_closing_game();
+        }
         let action = {
             let mut s = shell.borrow_mut();
             let a = match crate::effects::common(&effect, &mut s) {
@@ -695,6 +743,21 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         return;
     }
     s.ctx.dirty = false;
+    let on_top = s.ctx.launching
+        && s.ctx
+            .launch_on_top_until
+            .is_some_and(|t| Instant::now() < t);
+    if on_top != s.ctx.window_on_top {
+        s.ctx.window_on_top = on_top;
+        use slint::winit_030::{WinitWindowAccessor, winit::window::WindowLevel};
+        ui.window().with_winit_window(|w| {
+            w.set_window_level(if on_top {
+                WindowLevel::AlwaysOnTop
+            } else {
+                WindowLevel::Normal
+            })
+        });
+    }
     if let Some((id, played)) = s.ctx.welcome_back.take() {
         welcome_back(&mut s, &id, played);
     }

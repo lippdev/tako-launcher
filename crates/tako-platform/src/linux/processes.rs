@@ -95,6 +95,10 @@ impl ProcessLauncher for LinuxProcesses {
         run::terminate(pids)
     }
 
+    fn force_close(&self, pids: &[u32]) -> DeviceResult<()> {
+        run::kill(pids)
+    }
+
     fn steam_running_app_id(&self) -> u32 {
         let Some(home) = run::home() else {
             return 0;

@@ -156,6 +156,9 @@ pub struct GameRunTracker {
     pub last_seen_at: Option<DateTime<Utc>>,
     /// A Steam já confirmou este jogo rodando: daí em diante ela decide o fim.
     pub steam_confirmed: bool,
+    /// O Tako pediu para o jogo fechar: o fim vale assim que um dos sinais (processos ou Steam) disser que
+    /// acabou. A Steam leva alguns segundos para zerar o `RunningAppID` e "Fechando o jogo…" ficava esperando.
+    pub close_requested: bool,
 }
 
 // Tolerância de relógio ao comparar o início de um filho com a hora em que o jogo foi aberto.
@@ -198,6 +201,7 @@ impl GameRunTracker {
             first_seen_at: None,
             last_seen_at: None,
             steam_confirmed: false,
+            close_requested: false,
         };
         if let Some(root) = root_pid {
             // O processo foi iniciado agora: o jogo já conta como rodando.
@@ -291,6 +295,13 @@ impl GameRunTracker {
         };
         let steam_says = running == app;
         self.steam_confirmed |= steam_says;
+        let watches_processes = matches!(
+            self.plan.strategy,
+            GameTrackingStrategy::InstallFolder | GameTrackingStrategy::Process
+        );
+        if self.close_requested && watches_processes {
+            return steam_says && !self.current.is_empty();
+        }
         if self.steam_confirmed {
             steam_says
         } else {
@@ -644,6 +655,23 @@ mod tests {
             GameRunStatus::Exited
         );
         assert_eq!(t.play_time(), TimeDelta::seconds(1790));
+    }
+
+    #[test]
+    fn after_a_close_request_the_end_does_not_wait_for_steam() {
+        let mut t = GameRunTracker::new(folder_plan(Some(APP_ID)), launched(), None).unwrap();
+        t.exit_grace = TimeDelta::seconds(1);
+        let playing = vec![proc(20, Some(&format!(r"{FOLDER}\Hades.exe")))];
+        t.update(&playing, secs(10), Some(APP_ID));
+        t.update(&playing, secs(20), Some(APP_ID));
+        t.close_requested = true;
+        // O processo saiu, mas a Steam ainda diz que o jogo roda.
+        assert_eq!(
+            t.update(&[], secs(20), Some(APP_ID)),
+            GameRunStatus::Running
+        );
+        assert_eq!(t.update(&[], secs(21), Some(APP_ID)), GameRunStatus::Exited);
+        assert_eq!(t.play_time(), TimeDelta::seconds(10));
     }
 
     #[test]

@@ -3,6 +3,7 @@
 
 pub mod add_game;
 pub mod art;
+pub mod closing_game;
 pub mod control_center;
 pub mod ctx;
 pub mod details;
@@ -12,6 +13,7 @@ pub mod game_settings;
 pub mod home;
 pub mod keyboard;
 pub mod keys;
+pub mod launch_splash;
 pub mod layer;
 pub mod library;
 pub mod settings;
@@ -172,12 +174,43 @@ impl Shell {
         self.ctx.dirty = true;
     }
 
+    /// A Central por cima do jogo (interface aberta pelo atalho durante o jogo).
+    pub fn open_control_center_over_game(&mut self) {
+        self.cc = Some(control_center::ControlCenter::over_game());
+        self.ctx.dirty = true;
+    }
+
     pub fn control_center_open(&self) -> bool {
         self.cc.is_some()
     }
 
     pub fn close_control_center(&mut self) {
         self.cc = None;
+        self.ctx.dirty = true;
+    }
+
+    /// Encerrar jogo: "Fechando o jogo…" até o acompanhamento confirmar o fim (sem a Central por cima).
+    pub fn begin_closing_game(&mut self) {
+        self.cc = None;
+        self.layers.retain(|l| !l.ends_with_game());
+        let layer = closing_game::ClosingGame::new(&mut self.ctx);
+        self.layers.push(Box::new(layer));
+        self.ctx.dirty = true;
+    }
+
+    /// Jogar: "Abrindo…" com a arte do jogo até a janela dele aparecer.
+    pub fn begin_launch_splash(&mut self) {
+        self.cc = None;
+        self.layers.retain(|l| !l.ends_with_game());
+        let layer = launch_splash::LaunchSplash::new(&mut self.ctx);
+        self.layers.push(Box::new(layer));
+        self.ctx.dirty = true;
+    }
+
+    /// O jogo terminou: fecha as camadas que dependiam dele.
+    pub fn close_game_layers(&mut self) {
+        self.ctx.launching = false;
+        self.layers.retain(|l| !l.ends_with_game());
         self.ctx.dirty = true;
     }
 
@@ -524,7 +557,15 @@ impl Shell {
         }
         match &self.cc {
             Some(cc) => cc.render(&self.ctx, &mut out),
-            None => out.set("control-center", false),
+            None => {
+                out.set("control-center", false);
+                out.set("transparent-background", false);
+            }
+        }
+        // A janela do jogo apareceu: tudo some aos poucos e o jogo aparece pela janela transparente.
+        out.set("leaving", self.ctx.leaving);
+        if self.ctx.leaving {
+            out.set("transparent-background", true);
         }
         let overlays: Vec<_> = self.layers.iter().map(|l| l.render(&self.ctx)).collect();
         out.set("overlays", overlays);
