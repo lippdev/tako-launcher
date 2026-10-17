@@ -605,6 +605,14 @@ impl MetadataProvider for SteamGridDbProvider {
             release_date: game.year.and_then(|y| NaiveDate::from_ymd_opt(y, 1, 1)),
             cover_url: best(ArtKind::Cover).map(|c| c.url),
             background_url: best(ArtKind::Hero).map(|c| c.url),
+            // Logo e ícone também (ART-001): o resto da biblioteca fica com os quatro tipos sem o usuário escolher.
+            media: [
+                (crate::library::media::LOGO, ArtKind::Logo),
+                (crate::library::media::ICON, ArtKind::Icon),
+            ]
+            .into_iter()
+            .filter_map(|(key, kind)| best(kind).map(|c| (key.to_owned(), c.url)))
+            .collect(),
             ..GameMetadata::new(sources::STEAMGRIDDB)
         })
     }
@@ -781,6 +789,11 @@ mod tests {
         http.push(200, r#"{"success":true,"data":{"id":5249,"name":"Lanterna Distante","release_date":1717200000}}"#);
         http.push(200, GRIDS);
         http.push(200, r#"{"success":true,"data":[]}"#);
+        http.push(
+            200,
+            r#"{"success":true,"data":[{"id":9,"score":1,"style":"official","width":800,"height":300,"nsfw":false,"humor":false,"mime":"image/png","url":"https://cdn2.steamgriddb.com/logo/l.png","thumb":"https://cdn2.steamgriddb.com/thumb/l.png","author":{"name":"Ana"}}]}"#,
+        );
+        http.push(200, r#"{"success":true,"data":[]}"#);
         let settings = SteamGridDbSettings {
             enabled: true,
             api_key: "0123456789abcdef0123456789abcdef".into(),
@@ -806,6 +819,11 @@ mod tests {
         let m = p.fetch("5249").unwrap();
         assert!(m.cover_url.unwrap().ends_with("a.png"));
         assert_eq!(m.background_url, None);
+        assert_eq!(
+            m.media.get(crate::library::media::LOGO).map(String::as_str),
+            Some("https://cdn2.steamgriddb.com/logo/l.png")
+        );
+        assert!(!m.media.contains_key(crate::library::media::ICON));
         let sent = http.sent();
         assert_eq!(
             sent[0].url,
@@ -816,7 +834,7 @@ mod tests {
             Some("Bearer 0123456789abcdef0123456789abcdef")
         );
         assert_eq!(p.find_exact(&lookup).as_deref(), Some("5249"));
-        assert_eq!(p.client().network_requests(), 4);
+        assert_eq!(p.client().network_requests(), 6);
         http.push(401, "{}");
         assert!(p.search_term("outro").is_empty());
         assert_eq!(

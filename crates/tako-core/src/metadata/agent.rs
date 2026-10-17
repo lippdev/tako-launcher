@@ -211,11 +211,12 @@ impl MetadataAgent {
                 continue;
             }
             let none = pinned.get(p.name()).is_some_and(String::is_empty);
-            let has_art = parts
-                .iter()
-                .any(|x| x.cover_url.is_some() || x.steam_app_id.is_some());
-            if none || (p.art_fallback().is_some() && has_art && !pinned.contains_key(p.name())) {
-                // "Nenhum" escolhido, ou fonte de artes para um jogo que já tem capa.
+            if none
+                || (p.art_fallback().is_some()
+                    && full_art(&parts)
+                    && !pinned.contains_key(p.name()))
+            {
+                // "Nenhum" escolhido, ou fonte de artes para um jogo que já tem os quatro tipos.
                 consulted.push(p.name().to_owned());
                 continue;
             }
@@ -318,6 +319,18 @@ fn learn(ids: &mut BTreeMap<String, String>, m: &GameMetadata) {
     }
 }
 
+/// As fontes já trazem capa, fundo, logo e ícone (ART-001)? A Steam traz os quatro pelo appid; sem isso, a fonte de
+/// artes (SteamGridDB) completa o que faltar.
+fn full_art(parts: &[GameMetadata]) -> bool {
+    use crate::library::media::{ICON, LOGO};
+    let any = |f: &dyn Fn(&GameMetadata) -> bool| parts.iter().any(f);
+    any(&|x| x.steam_app_id.is_some())
+        || (any(&|x| x.cover_url.is_some())
+            && any(&|x| x.background_url.is_some())
+            && any(&|x| x.media.contains_key(LOGO))
+            && any(&|x| x.media.contains_key(ICON)))
+}
+
 /// (metadados, falha passageira).
 fn consult(
     p: &dyn MetadataProvider,
@@ -330,18 +343,22 @@ fn consult(
         ..MetadataLookup::for_game(game)
     };
     let mut id = ids.get(p.name()).cloned().or_else(|| p.find_exact(&lookup));
+    let mut by_title = false;
     if id.is_none() && title_search {
         let results = search_provider(p, &lookup);
-        id = results
-            .iter()
-            .find(|r| r.is_exact)
+        let exact = results.iter().find(|r| r.is_exact);
+        by_title = exact.is_none();
+        id = exact
             .or_else(|| title_matcher::best(&game.title, &results))
             .map(|r| r.id.clone());
     }
     let Some(id) = id else {
         return (None, false); // sem correspondência nesta fonte
     };
-    let m = p.fetch(&id);
+    let m = p.fetch(&id).map(|m| GameMetadata {
+        matched_by_title: by_title,
+        ..m
+    });
     let transient = m.is_none();
     (m, transient)
 }
@@ -670,6 +687,67 @@ pub(crate) mod tests {
             .unwrap();
         assert_eq!(third.id_in("IGDB"), None);
         assert!(!third.parts.iter().any(|p| p.source == "IGDB"));
+    }
+
+    #[test]
+    fn steamgriddb_completes_logo_and_icon_without_replacing_the_cover() {
+        let igdb = Arc::new(
+            FakeProvider::with("IGDB", Box::new(|id| Some(part("IGDB", id)))).results(vec![
+                MetadataMatch::new("IGDB", "7", "Lanterna Distante Remaster"),
+            ]),
+        );
+        let mut sgdb = FakeProvider::with(
+            "SteamGridDB",
+            Box::new(|id| {
+                Some(GameMetadata {
+                    source_ids: [("SteamGridDB".to_owned(), id.to_owned())].into(),
+                    cover_url: Some("https://cdn2.steamgriddb.com/grid/a.png".into()),
+                    media: [
+                        (
+                            "logo".to_owned(),
+                            "https://cdn2.steamgriddb.com/logo/l.png".to_owned(),
+                        ),
+                        (
+                            "icon".to_owned(),
+                            "https://cdn2.steamgriddb.com/icon/i.png".to_owned(),
+                        ),
+                    ]
+                    .into(),
+                    ..GameMetadata::new("SteamGridDB")
+                })
+            }),
+        );
+        sgdb.art = Some(AtomicBool::new(true));
+        sgdb.exact_fixed = Some("5249".into());
+        let sgdb = Arc::new(sgdb);
+        let a = agent(vec![igdb, sgdb.clone()], Arc::new(TestClock::at(now())));
+        let g = Game {
+            id: "manual:1".into(),
+            title: "Lanterna Distante".into(),
+            store: Some(GameStore::Manual),
+            ..Default::default()
+        };
+        let m = a.update(&g, None, false, NONE).metadata.unwrap();
+        assert_eq!(sgdb.fetched(), ["5249"]);
+        assert_eq!(
+            m.cover_url.as_deref(),
+            Some("https://images.igdb.com/c.jpg")
+        );
+        assert_eq!(
+            m.media.get("logo").map(String::as_str),
+            Some("https://cdn2.steamgriddb.com/logo/l.png")
+        );
+        assert!(m.media.contains_key("icon"));
+        // A IGDB achou pelo nome (sem id da loja): a revisão de capas mostra para conferir.
+        let igdb_part = m.parts.iter().find(|p| p.source == "IGDB").unwrap();
+        assert!(igdb_part.matched_by_title);
+        assert!(
+            !m.parts
+                .iter()
+                .find(|p| p.source == "SteamGridDB")
+                .unwrap()
+                .matched_by_title
+        );
     }
 
     #[test]

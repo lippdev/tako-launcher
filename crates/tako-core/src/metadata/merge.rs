@@ -204,6 +204,8 @@ pub fn combine(
         }),
         players: general.iter().find_map(|p| p.players.clone()),
         media,
+        // Só as partes dizem como cada fonte achou o jogo.
+        matched_by_title: false,
     }
 }
 
