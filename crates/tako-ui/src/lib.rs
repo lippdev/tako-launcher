@@ -9,6 +9,7 @@ pub mod effects;
 pub mod gamepad;
 pub mod images;
 pub mod metadata;
+pub mod mode;
 pub mod model;
 mod navigation_feedback;
 pub mod playnite;

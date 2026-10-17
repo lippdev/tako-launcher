@@ -106,6 +106,20 @@ impl std::fmt::Display for ThemeError {
 
 /// Compila `entry` com a biblioteca `@tako` apontando para o tema padrão. O tema precisa exportar `App`.
 pub fn compile(entry: &Path, builtin: &Path) -> Result<ComponentDefinition, ThemeError> {
+    compile_named(entry, builtin, "App")
+}
+
+/// Janela do modo desktop (ADR-0027): `desktop.slint` do tema padrão, fora da API de tema (temas valem só para a
+/// tela cheia).
+pub fn compile_desktop(builtin: &Path) -> Result<ComponentDefinition, ThemeError> {
+    compile_named(&builtin.join("desktop.slint"), builtin, "Desktop")
+}
+
+fn compile_named(
+    entry: &Path,
+    builtin: &Path,
+    component: &str,
+) -> Result<ComponentDefinition, ThemeError> {
     let mut compiler = Compiler::default();
     compiler.set_library_paths(HashMap::from([(LIBRARY.to_owned(), builtin.to_path_buf())]));
     let result = spin_on::spin_on(compiler.build_from_path(entry));
@@ -117,8 +131,8 @@ pub fn compile(entry: &Path, builtin: &Path) -> Result<ComponentDefinition, Them
     if !errors.is_empty() {
         return Err(ThemeError { messages: errors });
     }
-    result.component("App").ok_or_else(|| ThemeError {
-        messages: vec!["o tema não exporta o componente App".into()],
+    result.component(component).ok_or_else(|| ThemeError {
+        messages: vec![format!("o tema não exporta o componente {component}")],
     })
 }
 
@@ -183,6 +197,28 @@ mod tests {
         let props: Vec<String> = def.properties().map(|(n, _)| n).collect();
         for p in ["page", "library-tiles", "overlays", "hints", "sidebar"] {
             assert!(props.iter().any(|x| x == p), "falta a propriedade {p}");
+        }
+    }
+
+    #[test]
+    fn desktop_window_compiles_with_the_properties_the_tako_sets() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = install_builtin(tmp.path()).unwrap();
+        let def = compile_desktop(&dir).unwrap_or_else(|e| panic!("{e}"));
+        let props: Vec<String> = def.properties().map(|(n, _)| n).collect();
+        for p in [
+            "page",
+            "overlays",
+            "desk-games",
+            "desk-game",
+            "desk-actions",
+            "settings-rows",
+        ] {
+            assert!(props.iter().any(|x| x == p), "falta a propriedade {p}");
+        }
+        let callbacks: Vec<String> = def.callbacks().collect();
+        for c in ["clicked", "edited", "scrolled", "key"] {
+            assert!(callbacks.iter().any(|x| x == c), "falta o callback {c}");
         }
     }
 

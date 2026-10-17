@@ -221,7 +221,22 @@ impl Layer for KeyboardLayer {
         self.set_text(t, ctx);
     }
 
+    fn replace_text(&mut self, text: &str, ctx: &mut Ctx) {
+        // Campo do modo desktop: o texto inteiro, com as mesmas regras de quem digita tecla a tecla.
+        let t = if self.free_text {
+            text.chars().filter(|c| !c.is_control()).take(512).collect()
+        } else {
+            vk::type_text("", text)
+        };
+        self.set_text(t, ctx);
+    }
+
     fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Flow {
+        match zone {
+            "done" => return self.done(ctx),
+            "cancel" => return Flow::Close,
+            _ => {}
+        }
         if zone == "key" {
             self.hover(zone, index);
             return self.press(ctx);

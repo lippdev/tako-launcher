@@ -13,6 +13,8 @@ pub const TAB: char = '\u{0009}';
 pub const ENTER: char = '\u{000a}';
 pub const ESCAPE: char = '\u{001b}';
 pub const DELETE: char = '\u{007f}';
+/// F11 (texto da tecla no Slint): tela cheia no modo desktop.
+pub const F11: &str = "\u{F70E}";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyAction {

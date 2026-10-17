@@ -220,7 +220,8 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
     } else {
         ctx.update_status.clone()
     };
-    let v = vec![
+    let mut v = mode_rows(ctx);
+    v.extend([
         MenuItem::new(
             PanelRow::action("profiles", ctx.t("profiles.title"))
                 .desc(ctx.t("profiles.desc"))
@@ -285,15 +286,49 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
             |p| p.nightly,
             |p| p.nightly = !p.nightly,
         ),
-    ];
-    // Logo depois de "Abrir o Tako ao entrar no sistema" (só no Windows; fora dele `v` não muda).
+    ]);
+    // Antes de "Abrir o Tako ao entrar no sistema" (só no Windows).
     #[cfg(windows)]
-    let v = {
-        let mut v = v;
-        v.insert(1, xbox_mode_row(ctx));
-        v
-    };
+    {
+        let at = v
+            .iter()
+            .position(|i| i.row.key == "startup")
+            .unwrap_or(v.len());
+        v.insert(at, xbox_mode_row(ctx));
+    }
     v
+}
+
+/// Modo (ADR-0027): trocar entre o desktop e a tela cheia e a pergunta do controle ao abrir.
+fn mode_rows(ctx: &Ctx) -> Vec<MenuItem> {
+    use crate::mode::{ASK_SETTING, UiMode};
+    let (text, to) = if ctx.desktop {
+        ("desktop.mode.go_big_picture", UiMode::BigPicture)
+    } else {
+        ("desktop.mode.go_desktop", UiMode::Desktop)
+    };
+    vec![
+        MenuItem::new(PanelRow::header(ctx.t("desktop.mode.header"))),
+        MenuItem::new(
+            PanelRow::action("mode", ctx.t(text))
+                .desc(ctx.t(&format!("{text}_desc")))
+                .value(ctx.t("desktop.mode.go_value")),
+        )
+        .on(effect(Effect::SwitchMode(to))),
+        MenuItem::new(
+            PanelRow::toggle(
+                "ask-big-picture",
+                ctx.t("desktop.mode.ask"),
+                ctx.settings.bool(ASK_SETTING, true),
+            )
+            .desc(ctx.t("desktop.mode.ask_desc")),
+        )
+        .on(|ctx| {
+            ctx.settings.toggle(ASK_SETTING, true);
+            Flow::Stay
+        }),
+        MenuItem::new(PanelRow::header(ctx.t("desktop.mode.general_header"))),
+    ]
 }
 
 // ---------------------------------------------------------------- Aparência
@@ -892,6 +927,35 @@ impl Page for SettingsPage {
             ),
             ctx.hint(Cmd::PrevSection, &ctx.t("hint.category")),
         ]
+    }
+
+    fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Nav {
+        match zone {
+            // ‹ › do modo desktop numa linha que se ajusta.
+            "row-dec" | "row-inc" => {
+                self.row = Some(index);
+                let adjustable = self
+                    .items(ctx)
+                    .get(index)
+                    .is_some_and(|i| i.adjust.is_some());
+                let cmd = match (adjustable, zone) {
+                    // Sem ajuste, a linha só tem o "próximo valor" do A.
+                    (false, _) => Cmd::Accept,
+                    (true, "row-dec") => Cmd::Left,
+                    _ => Cmd::Right,
+                };
+                self.handle(cmd, ctx)
+            }
+            // No desktop a categoria só troca as linhas; o foco não pula para elas.
+            "category" if ctx.desktop => {
+                self.hover(zone, index, ctx);
+                Nav::Stay
+            }
+            _ => {
+                self.hover(zone, index, ctx);
+                self.handle(Cmd::Accept, ctx)
+            }
+        }
     }
 
     fn hover(&mut self, zone: &str, index: usize, _ctx: &Ctx) {
