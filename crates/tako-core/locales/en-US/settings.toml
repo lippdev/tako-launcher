@@ -172,7 +172,7 @@ mouse_desc = "During play, the stick moves the pointer and the triggers click (l
 
 [settings.controls]
 title = "Controllers"
-subtitle = "Controller in use and Control Center shortcuts."
+subtitle = "Controller in use, Control Center shortcuts and Tako's buttons."
 controller = "Controller in use"
 controller_desc = "Xbox and PlayStation controllers (DualSense and DualShock 4) work with no setup"
 no_pad = "No controller"
@@ -212,6 +212,17 @@ new = "New combination"
 release = "Release the buttons"
 press_save = "Press A to save"
 save = "Save"
+buttons_header = "Tako's buttons"
+buttons_reset = "Restore default buttons"
+buttons_reset_desc = "A accepts, B goes back, X favorites, Y searches, LB and RB change section, ☰ opens the menu"
+buttons_reset_done = "Default buttons restored"
+action.accept = "Accept"
+action.back = "Back"
+action.favorite = "Favorite"
+action.search = "Search"
+action.previous = "Previous section"
+action.next = "Next section"
+action.menu = "Menu"
 
 [settings.system]
 title = "System"

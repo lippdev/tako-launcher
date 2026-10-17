@@ -1,5 +1,5 @@
-//! Configurações › Controles: atalhos da Central de Controle (combinação do controle e tecla) e o teste
-//! de controle ao vivo.
+//! Configurações › Controles: atalhos da Central de Controle (combinação do controle e tecla), os botões das
+//! ações do Tako (INPUT-001) e o teste de controle ao vivo.
 //!
 //! As camadas só recebem `Cmd`; a captura e o teste leem `ctx.pressed_buttons` a cada desenho e pedem
 //! desenho contínuo pelo `ctx.live_pad` enquanto estão abertas.
@@ -7,7 +7,7 @@
 use super::{Ctx, Flow, MenuItem, action, described};
 use crate::gamepad::PadFamily;
 use crate::model::{Hint, Overlay, PanelRow};
-use crate::shell::ctx::{InputKind, keys};
+use crate::shell::ctx::{InputKind, button_glyph, keys};
 use crate::shell::{Cmd, Layer};
 use std::cell::{Cell, RefCell};
 use std::time::Instant;
@@ -15,7 +15,7 @@ use tako_core::input::shortcut::{
     ChordCapture, ChordCaptureState, GamepadFamily, KeyModifiers, KeyShortcut, check_chord,
     check_keyboard, chord,
 };
-use tako_core::input::{GamepadButtons, GamepadSnapshot, controller_test};
+use tako_core::input::{AppCommand, ButtonMap, GamepadButtons, GamepadSnapshot, controller_test};
 
 pub(crate) fn family(ctx: &Ctx) -> GamepadFamily {
     match ctx.pad {
@@ -46,7 +46,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             ("key", &KeyShortcut::default().display()),
         ],
     );
-    vec![
+    let mut v = vec![
         MenuItem::new(
             PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
                 .desc(ctx.t("settings.controls.controller_desc")),
@@ -82,12 +82,79 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         }),
         MenuItem::new(action(ctx, "settings.controls.test"))
             .on(|_| Flow::Push(Box::new(TestLayer))),
+        MenuItem::new(PanelRow::header(ctx.t("settings.controls.buttons_header"))),
+    ];
+    // Um botão por ação do Tako (INPUT-001): A ou →/← passa ao próximo botão, trocando com a ação que o usava.
+    for command in ButtonMap::commands() {
+        let value = ctx
+            .button_map()
+            .button(command)
+            .map_or("", |b| button_glyph(ctx.pad, b));
+        v.push(
+            MenuItem::new(PanelRow::choice(
+                format!("button-{}", action_key(command)),
+                ctx.t(&format!("settings.controls.action.{}", action_key(command))),
+                value,
+            ))
+            .on(move |ctx| cycle_button(ctx, command, 1))
+            .on_adjust(move |ctx, d| cycle_button(ctx, command, d)),
+        );
+    }
+    v.push(
+        MenuItem::new(
+            PanelRow::action("buttons-reset", ctx.t("settings.controls.buttons_reset"))
+                .desc(ctx.t("settings.controls.buttons_reset_desc"))
+                .value(ctx.t("settings.controls.reset_value"))
+                .enabled(ctx.button_map() != ButtonMap::default()),
+        )
+        .on(|ctx| {
+            ctx.settings.set(keys::BUTTON_MAP, "");
+            ctx.toast(ctx.t("settings.controls.buttons_reset_done"));
+            Flow::Stay
+        }),
+    );
+    v.extend([
         MenuItem::new(PanelRow::header(ctx.t("settings.controls.keyboard_header"))),
         MenuItem::new(
             PanelRow::info("keys", ctx.t("settings.controls.keys"), "")
                 .desc(ctx.t("settings.controls.keys_desc")),
         ),
-    ]
+    ]);
+    v
+}
+
+fn action_key(command: AppCommand) -> &'static str {
+    match command {
+        AppCommand::Accept => "accept",
+        AppCommand::Back => "back",
+        AppCommand::Favorite => "favorite",
+        AppCommand::Search => "search",
+        AppCommand::PreviousSection => "previous",
+        AppCommand::NextSection => "next",
+        AppCommand::Menu => "menu",
+        _ => "",
+    }
+}
+
+/// Troca o botão da ação e avisa com quem trocou (o botão que o usuário aperta pode ter mudado de função).
+fn cycle_button(ctx: &mut Ctx, command: AppCommand, dir: i32) -> Flow {
+    let mut map = ctx.button_map();
+    let before = map;
+    map.cycle(command, dir);
+    ctx.settings.set(keys::BUTTON_MAP, &map.serialize());
+    let moved = ButtonMap::commands()
+        .filter(|c| map.button(*c) != before.button(*c))
+        .map(|c| {
+            let glyph = map.button(c).map_or("", |b| button_glyph(ctx.pad, b));
+            format!(
+                "{} {glyph}",
+                ctx.t(&format!("settings.controls.action.{}", action_key(c)))
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" · ");
+    ctx.toast(moved);
+    Flow::Stay
 }
 
 /// "Aperte as teclas que quer usar" (port do `ShortcutCaptureViewModel` de teclado): a primeira tecla de verdade

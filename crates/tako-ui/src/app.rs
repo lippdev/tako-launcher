@@ -613,6 +613,8 @@ impl App {
                         pad_state.left_x as f64,
                         -pad_state.left_y as f64,
                     );
+                    // Os botões mudam em Configurações › Controles e valem na hora.
+                    interp.set_map(app.shell.borrow().ctx.button_map());
                     fired = interp.update(snap, now, chord.suppressed(pressed));
                     if !fired.is_empty() {
                         let mut s = app.shell.borrow_mut();

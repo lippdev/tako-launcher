@@ -125,3 +125,11 @@ Precisa de internet e de um repositório no GitHub com uma release que tenha um 
 3. "Atualizar temas" (só aparece com tema por endereço): sem release nova, "já estão na última versão". Publique uma
    release nova no repositório e repita: o tema é atualizado e, se estiver em uso, a tela muda na hora.
 4. Remova o tema: "Atualizar temas" some.
+
+## 16. Botões do Tako (INPUT-001)
+
+1. Configurações › Controles › "Botões do Tako": Aceitar mostra A. Aperte A na linha: Aceitar passa a B, Voltar a A, e
+   o aviso diz as duas trocas.
+2. Navegue pelo Tako: B aceita e A volta, e as dicas da barra de baixo mostram os botões novos (com um DualSense, ○ e ✕).
+3. Feche e abra o Tako: a troca continua. A combinação da Central (View + Y) segue funcionando, inclusive durante o jogo.
+4. "Restaurar botões padrão" volta tudo; o teclado (Enter, Esc) não muda em nenhum momento.

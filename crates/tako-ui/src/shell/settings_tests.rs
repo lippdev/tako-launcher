@@ -387,3 +387,35 @@ fn themes_installed_from_an_address_offer_updates() {
     .unwrap();
     assert!(rows(&ctx).iter().any(|r| r.key == "update-themes"));
 }
+
+#[test]
+fn tako_buttons_can_be_swapped_and_the_hints_follow() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.input = crate::shell::ctx::InputKind::Gamepad;
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "button-accept").row.value, "A");
+    assert!(!find(&rows, "buttons-reset").row.enabled);
+    // Aceitar passa ao B; Voltar fica com o A.
+    accept(&mut ctx, &find(&rows, "button-accept"));
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "button-accept").row.value, "B");
+    assert_eq!(find(&rows, "button-back").row.value, "A");
+    assert_eq!(ctx.glyph(Cmd::Accept), "B");
+    assert_eq!(ctx.glyph(Cmd::Back), "A");
+    assert_eq!(ctx.glyph(Cmd::Guide), "⌂");
+    // O aviso diz o que mudou.
+    let toast = ctx.toast.clone().unwrap().0;
+    assert!(
+        toast.contains("Aceitar B") && toast.contains("Voltar A"),
+        "{toast}"
+    );
+    ctx.pad = crate::gamepad::PadFamily::PlayStation;
+    assert_eq!(ctx.glyph(Cmd::Accept), "○");
+    // Restaurar volta ao padrão.
+    let reset = find(&rows_of(&ctx, "controls"), "buttons-reset");
+    assert!(reset.row.enabled);
+    accept(&mut ctx, &reset);
+    assert_eq!(ctx.button_map(), tako_core::input::ButtonMap::default());
+    assert_eq!(ctx.glyph(Cmd::Accept), "✕");
+}

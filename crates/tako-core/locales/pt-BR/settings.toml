@@ -172,7 +172,7 @@ mouse_desc = "Durante o jogo, o analógico move o ponteiro e os gatilhos clicam 
 
 [settings.controls]
 title = "Controles"
-subtitle = "Controle em uso e atalhos da Central de Controle."
+subtitle = "Controle em uso, atalhos da Central de Controle e botões do Tako."
 controller = "Controle em uso"
 controller_desc = "Controles Xbox e PlayStation (DualSense e DualShock 4) funcionam sem configurar nada"
 no_pad = "Nenhum controle"
@@ -212,6 +212,17 @@ new = "Nova combinação"
 release = "Solte os botões"
 press_save = "Aperte A para salvar"
 save = "Salvar"
+buttons_header = "Botões do Tako"
+buttons_reset = "Restaurar botões padrão"
+buttons_reset_desc = "A aceita, B volta, X favorita, Y busca, LB e RB trocam de seção, ☰ abre o menu"
+buttons_reset_done = "Botões padrão restaurados"
+action.accept = "Aceitar"
+action.back = "Voltar"
+action.favorite = "Favoritar"
+action.search = "Buscar"
+action.previous = "Seção anterior"
+action.next = "Próxima seção"
+action.menu = "Menu"
 
 [settings.system]
 title = "Sistema"
