@@ -5017,11 +5017,13 @@ name = "tako-themes"
 version = "0.2.0-alpha.1"
 dependencies = [
  "serde",
+ "serde_json",
  "tako-core",
  "tempfile",
  "thiserror 2.0.21",
  "toml",
  "tracing",
+ "ureq",
  "zip",
 ]
 

@@ -4,6 +4,7 @@
 
 mod manifest;
 mod package;
+pub mod remote;
 
 use std::fmt;
 use std::fs;
@@ -163,6 +164,7 @@ pub fn uninstall(themes_root: &Path, id: &str) -> io::Result<()> {
     if selected(themes_root).is_some_and(|s| s.eq_ignore_ascii_case(id)) {
         select(themes_root, None)?;
     }
+    remote::forget(themes_root, id);
     Ok(())
 }
 

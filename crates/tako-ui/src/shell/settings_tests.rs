@@ -364,3 +364,26 @@ fn storage_lists_the_largest_games_and_sorts_by_size() {
     let sorted = query::apply(ctx.library.games(), LibraryFilter::All, &by_size);
     assert_eq!(sorted[0].id, biggest);
 }
+
+#[test]
+fn themes_installed_from_an_address_offer_updates() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let rows = |ctx: &Ctx| {
+        let layer = themes_panel(ctx);
+        layer.render(ctx).rows
+    };
+    let keys: Vec<String> = rows(&ctx).into_iter().map(|r| r.key).collect();
+    assert!(keys.contains(&"install-url".to_owned()));
+    // Sem tema por endereço, nada a atualizar.
+    assert!(!keys.contains(&"update-themes".to_owned()));
+    assert!(matches!(install_from_url(&ctx), Flow::Push(_)));
+    let root = ctx.paths.themes();
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join(".sources.json"),
+        r#"{"Autor_Tema":{"repo":"https://github.com/autor/tema","tag":"v1"}}"#,
+    )
+    .unwrap();
+    assert!(rows(&ctx).iter().any(|r| r.key == "update-themes"));
+}

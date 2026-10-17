@@ -307,6 +307,7 @@ fn install_theme(ctx: &mut Ctx) {
         },
         |ctx, path| match tako_themes::install(&path, &ctx.paths.themes()) {
             Ok(t) => {
+                crate::shell::settings::forget(crate::shell::settings::THEMES_CACHE);
                 let name = t
                     .manifest
                     .as_ref()
