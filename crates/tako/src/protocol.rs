@@ -40,7 +40,13 @@ pub enum UiMsg {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SupMsg {
     /// O jogo em segundo plano terminou (a interface estava aberta).
-    GameEnded { game_id: String, played_secs: u64 },
+    GameEnded {
+        game_id: String,
+        played_secs: u64,
+        /// [`tako_core::session::GameEnd::key`]; ausente (supervisor antigo) = normal.
+        #[serde(default)]
+        end: String,
+    },
     /// Alguém abriu o Tako de novo: trazer a janela para a frente.
     Activate,
     /// A janela do jogo apareceu: a interface sai de "Abrindo…" (some aos poucos e fecha).

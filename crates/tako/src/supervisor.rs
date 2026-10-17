@@ -11,6 +11,7 @@ use tako_core::input::GamepadButtons;
 use tako_core::input::shortcut::{ButtonChordDetector, chord};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{SettingsStore, TakoDatabase};
+use tako_core::session::GameEnd;
 use tako_core::supervision::{SupervisorAction, SupervisorOptions, UiHeartbeat, UiWatch, args};
 use tako_platform::Platform;
 use tako_ui::gamepad::Pads;
@@ -19,7 +20,7 @@ use tako_ui::session::{self, Running};
 /// Como abrir a próxima interface.
 #[derive(Default, Clone)]
 struct Launch {
-    after_game: Option<(String, Duration)>,
+    after_game: Option<(String, Duration, GameEnd)>,
     control_center: bool,
 }
 
@@ -84,12 +85,14 @@ impl Supervisor {
             tako_core::supervision::UiLaunchMode::Normal
         };
         let mut a = args::for_ui("stdio", mode, &self.passthrough);
-        if let Some((id, played)) = &launch.after_game {
+        if let Some((id, played, end)) = &launch.after_game {
             a.extend([
                 "--after-game".into(),
                 id.clone(),
                 "--played".into(),
                 played.as_secs().to_string(),
+                "--game-end".into(),
+                end.key().into(),
             ]);
         }
         if let Some(r) = &self.running {
@@ -216,13 +219,14 @@ impl Supervisor {
             if self.running.is_some() && last_poll.elapsed() >= every {
                 last_poll = Instant::now();
                 if let Some(played) = self.running.as_mut().and_then(|r| r.poll(&self.platform)) {
-                    let id = self.finish_game();
+                    let (id, end) = self.finish_game(played);
                     if let Some(stdin) = ui.stdin.as_mut() {
                         let _ = protocol::write(
                             stdin,
                             &SupMsg::GameEnded {
                                 game_id: id,
                                 played_secs: played.as_secs(),
+                                end: end.key().into(),
                             },
                         );
                     }
@@ -295,14 +299,15 @@ impl Supervisor {
     }
 
     /// Restaura tudo e esquece o jogo. Devolve o id.
-    fn finish_game(&mut self) -> String {
+    fn finish_game(&mut self, played: Duration) -> (String, GameEnd) {
         let Some(mut r) = self.running.take() else {
-            return String::new();
+            return (String::new(), GameEnd::Normal);
         };
         self.closing = false;
+        let end = r.end(played);
         r.finish(&self.platform, &self.paths);
-        tracing::info!("jogo terminou: {}", r.req.game_id);
-        r.req.game_id.clone()
+        tracing::info!("jogo terminou: {} ({})", r.req.game_id, end.key());
+        (r.req.game_id.clone(), end)
     }
 
     /// Sem interface, durante o jogo. Sem polling ativo: espera eventos do controle por até 2 s (16 ms só com o
@@ -371,9 +376,9 @@ impl Supervisor {
             if last_poll.elapsed() >= Running::POLL {
                 last_poll = Instant::now();
                 if let Some(played) = self.running.as_mut().and_then(|r| r.poll(&self.platform)) {
-                    let id = self.finish_game();
+                    let (id, end) = self.finish_game(played);
                     return Launch {
-                        after_game: Some((id, played)),
+                        after_game: Some((id, played, end)),
                         control_center: false,
                     };
                 }

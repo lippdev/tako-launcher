@@ -147,6 +147,12 @@ force_close = "Forçar encerramento"
 end_and_play = "Encerrar e jogar este"
 opening = "Abrindo {game}"
 welcome_back = "Bem-vindo de volta · {game}"
+ended_quick = "{game} fechou logo depois de abrir"
+ended_quick_text = "O jogo fechou sozinho em poucos segundos. Costuma ser uma dependência faltando (DirectX, Visual C++), arquivos corrompidos ou o jogo pedindo para abrir pela loja. Tente de novo, use Reparar arquivos nas opções do jogo ou salve o relatório de diagnóstico para pedir ajuda."
+never_started = "{game} não abriu"
+never_started_text = "O Tako esperou 2 minutos e o jogo não apareceu. A loja pode ter mostrado um aviso, pedido login ou uma atualização: confira na loja, tente de novo ou salve o relatório de diagnóstico."
+try_again = "Tentar de novo"
+save_report = "Salvar relatório de diagnóstico"
 welcome_back_played = "Bem-vindo de volta · {game} · {time}"
 
 [search]

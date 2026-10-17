@@ -147,6 +147,12 @@ force_close = "Force close"
 end_and_play = "Close it and play this one"
 opening = "Opening {game}"
 welcome_back = "Welcome back · {game}"
+ended_quick = "{game} closed right after opening"
+ended_quick_text = "The game closed by itself within a few seconds. This is usually a missing dependency (DirectX, Visual C++), corrupted files or the game asking to be opened from its store. Try again, use Repair files in the game options or save the diagnostics report to ask for help."
+never_started = "{game} didn't open"
+never_started_text = "Tako waited 2 minutes and the game never showed up. The store may have shown a notice, asked you to sign in or started an update: check the store, try again or save the diagnostics report."
+try_again = "Try again"
+save_report = "Save diagnostics report"
 welcome_back_played = "Welcome back · {game} · {time}"
 
 [search]

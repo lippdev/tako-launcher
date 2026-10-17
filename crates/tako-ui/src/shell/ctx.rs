@@ -189,7 +189,7 @@ pub struct Ctx {
     /// Mover o ponteiro com o analógico durante a sessão (o supervisor executa).
     pub controller_mouse: bool,
     /// O jogo terminou: foco nele e "Bem-vindo de volta" no próximo desenho (id, tempo jogado).
-    pub welcome_back: Option<(String, std::time::Duration)>,
+    pub welcome_back: Option<(String, std::time::Duration, tako_core::session::GameEnd)>,
     /// Desenhar de novo neste instante mesmo sem entrada (camadas que mudam com o tempo).
     pub redraw_at: Option<Instant>,
     /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).

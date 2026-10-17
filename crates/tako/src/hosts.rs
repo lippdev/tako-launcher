@@ -188,6 +188,7 @@ impl Host for LocalHost {
         let Some(played) = running.poll(&ctx.platform) else {
             return HostAction::Stay;
         };
+        let end = running.end(played);
         running.finish(&ctx.platform, &ctx.paths);
         let id = running.req.game_id.clone();
         self.running = None;
@@ -196,7 +197,7 @@ impl Host for LocalHost {
         }
         ctx.running = None;
         ctx.open_details = None;
-        ctx.welcome_back = Some((id, played));
+        ctx.welcome_back = Some((id, played, end));
         HostAction::Show
     }
 }
