@@ -143,6 +143,9 @@ impl Supervisor {
                 "--game-end".into(),
                 end.key().into(),
             ]);
+            if let Some(code) = end.exit_code() {
+                a.extend(["--exit-code".into(), code.to_string()]);
+            }
         }
         if let Some(r) = &self.running {
             a.extend([
@@ -320,6 +323,7 @@ impl Supervisor {
                                 game_id: id,
                                 played_secs: played.as_secs(),
                                 end: end.key().into(),
+                                exit_code: end.exit_code(),
                             },
                         );
                     }
@@ -397,7 +401,7 @@ impl Supervisor {
             return (String::new(), GameEnd::Normal);
         };
         self.closing = false;
-        let end = r.end(played);
+        let end = r.end(&self.platform, played);
         r.finish(&self.platform, &self.paths);
         tracing::info!("jogo terminou: {} ({})", r.req.game_id, end.key());
         (r.req.game_id.clone(), end)

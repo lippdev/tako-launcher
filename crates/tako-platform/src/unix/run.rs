@@ -59,8 +59,45 @@ pub fn spawn(cmd: &mut Command) -> DeviceResult<u32> {
         .spawn()
         .map_err(|e| io_error(&what, e))?;
     let pid = child.id();
-    std::thread::spawn(move || child.wait());
+    std::thread::spawn(move || match child.wait() {
+        Ok(status) => remember_exit(pid, status),
+        Err(e) => tracing::debug!("esperar {pid}: {e}"),
+    });
     Ok(pid)
+}
+
+/// Códigos de saída dos filhos que terminaram (SESSION-003): só quem criou o processo recebe o código.
+static EXITED: std::sync::Mutex<Vec<(u32, u32)>> = std::sync::Mutex::new(Vec::new());
+/// Os mais antigos saem (ninguém perguntou por eles: `xdg-open`, `open`, jogos de antes).
+const MAX_EXITED: usize = 32;
+
+fn remember_exit(pid: u32, status: std::process::ExitStatus) {
+    use std::os::unix::process::ExitStatusExt;
+    // Morto por sinal: 128 + sinal, como no shell (139 = SIGSEGV).
+    let Some(code) = status
+        .code()
+        .or_else(|| status.signal().map(|s| 128 + s))
+        .and_then(|c| u32::try_from(c).ok())
+    else {
+        return;
+    };
+    let mut exited = EXITED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    exited.retain(|(p, _)| *p != pid);
+    if exited.len() >= MAX_EXITED {
+        exited.remove(0);
+    }
+    exited.push((pid, code));
+}
+
+/// Código de saída de um filho aberto por [`spawn`], se ele já terminou; cada código é lido uma vez.
+pub fn exit_code(pid: u32) -> Option<u32> {
+    let mut exited = EXITED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let i = exited.iter().position(|(p, _)| *p == pid)?;
+    Some(exited.remove(i).1)
 }
 
 /// SIGTERM: pede para fechar, como o X da janela.
@@ -261,5 +298,26 @@ mod tests {
         user_command(&cmd, wait).unwrap();
         assert_eq!(std::fs::read_to_string(&out).unwrap().trim(), "ok");
         let _ = std::fs::remove_file(out);
+    }
+
+    #[test]
+    fn keeps_the_exit_code_of_its_children() {
+        let wait_code = |pid| {
+            for _ in 0..100 {
+                if let Some(c) = exit_code(pid) {
+                    return Some(c);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            None
+        };
+        let pid = spawn(Command::new("sh").args(["-c", "exit 3"])).unwrap();
+        assert_eq!(wait_code(pid), Some(3));
+        // Lido uma vez só.
+        assert_eq!(exit_code(pid), None);
+        // Morto por sinal: 128 + sinal.
+        let pid = spawn(Command::new("sh").args(["-c", "sleep 30"])).unwrap();
+        kill(&[pid]).unwrap();
+        assert_eq!(wait_code(pid), Some(128 + 9));
     }
 }

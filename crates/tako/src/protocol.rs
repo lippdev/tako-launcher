@@ -46,6 +46,9 @@ pub enum SupMsg {
         /// [`tako_core::session::GameEnd::key`]; ausente (supervisor antigo) = normal.
         #[serde(default)]
         end: String,
+        /// Código de saída do jogo, quando o Tako abriu o executável direto; ausente (supervisor antigo) = sem.
+        #[serde(default)]
+        exit_code: Option<u32>,
     },
     /// Alguém abriu o Tako de novo: trazer a janela para a frente.
     Activate,
@@ -106,6 +109,34 @@ mod tests {
                     mouse: false
                 },
                 UiMsg::Resume
+            ]
+        );
+    }
+
+    #[test]
+    fn game_ended_carries_the_exit_code_and_old_supervisors_still_work() {
+        let msg = SupMsg::GameEnded {
+            game_id: "g".into(),
+            played_secs: 3,
+            end: "quick".into(),
+            exit_code: Some(0xC000_0135),
+        };
+        let mut buf = Vec::new();
+        write(&mut buf, &msg).unwrap();
+        // Supervisor antigo: sem `exit_code` (nem `end`).
+        buf.extend_from_slice(b"{\"type\":\"game_ended\",\"game_id\":\"g\",\"played_secs\":3}\n");
+        let mut got = Vec::new();
+        read_lines::<SupMsg>(buf.as_slice(), |m| got.push(m));
+        assert_eq!(
+            got,
+            vec![
+                msg,
+                SupMsg::GameEnded {
+                    game_id: "g".into(),
+                    played_secs: 3,
+                    end: String::new(),
+                    exit_code: None,
+                }
             ]
         );
     }

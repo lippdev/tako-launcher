@@ -124,6 +124,10 @@ impl ProcessLauncher for MacProcesses {
         run::user_command(command, wait)
     }
 
+    fn exit_code(&self, pid: u32) -> Option<u32> {
+        run::exit_code(pid)
+    }
+
     fn snapshot(&self) -> Vec<ProcessEntry> {
         // SAFETY: com buffer nulo, devolve só quantos PIDs existem.
         let n = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };

@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, PoisonError};
 use tako_core::devices::{DeviceError, DeviceResult, GameWindow, ProcessEntry, ProcessLauncher};
-use windows::Win32::Foundation::{CloseHandle, FILETIME, HWND, LPARAM, WPARAM};
+use windows::Win32::Foundation::{CloseHandle, FILETIME, HANDLE, HWND, LPARAM, WPARAM};
 use windows::Win32::System::Diagnostics::ToolHelp::*;
 use windows::Win32::System::Threading::*;
 use windows::Win32::UI::Shell::{SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW};
@@ -52,6 +52,37 @@ fn query(pid: u32) -> ProcessInfo {
 #[derive(Default)]
 pub struct WindowsProcesses {
     cache: Mutex<HashMap<u32, ProcessInfo>>,
+    /// Processos raiz dos jogos (SESSION-003): com um handle aberto, o Windows guarda o código de saída depois
+    /// que o processo termina. Guardados como número porque `HANDLE` não é `Send`.
+    held: Mutex<Vec<(u32, isize)>>,
+}
+
+/// Bem mais jogos do que se abre numa sessão do Tako; passando disso, solta os mais antigos.
+const MAX_HELD: usize = 16;
+/// `STILL_ACTIVE`: o processo ainda está rodando.
+const STILL_ACTIVE: u32 = 259;
+
+fn close_raw(h: isize) {
+    // SAFETY: o handle foi aberto por este módulo e sai da lista antes de fechar (fecha uma vez só).
+    unsafe {
+        let _ = CloseHandle(HANDLE(h as *mut _));
+    }
+}
+
+impl WindowsProcesses {
+    /// Guarda o handle do processo (fica com ele; fecha se o processo já estava guardado).
+    fn hold(&self, pid: u32, h: HANDLE) {
+        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        if held.iter().any(|(p, _)| *p == pid) {
+            close_raw(h.0 as isize);
+            return;
+        }
+        if held.len() >= MAX_HELD {
+            let (_, old) = held.remove(0);
+            close_raw(old);
+        }
+        held.push((pid, h.0 as isize));
+    }
 }
 
 struct CloseTargets<'a> {
@@ -105,12 +136,13 @@ impl ProcessLauncher for WindowsProcesses {
         if info.hProcess.is_invalid() {
             return Ok(None);
         }
-        // SAFETY: handle devolvido pelo `SEE_MASK_NOCLOSEPROCESS`, fechado aqui.
-        let pid = unsafe {
-            let pid = GetProcessId(info.hProcess);
-            let _ = CloseHandle(info.hProcess);
-            pid
-        };
+        // SAFETY: handle devolvido pelo `SEE_MASK_NOCLOSEPROCESS`; fica guardado para o código de saída.
+        let pid = unsafe { GetProcessId(info.hProcess) };
+        if pid == 0 {
+            close_raw(info.hProcess.0 as isize);
+        } else {
+            self.hold(pid, info.hProcess);
+        }
         Ok((pid != 0).then_some(pid))
     }
 
@@ -143,7 +175,11 @@ impl ProcessLauncher for WindowsProcesses {
         cmd.envs(env.iter().map(|(k, v)| (k, v)));
         const ERROR_ELEVATION_REQUIRED: i32 = 740;
         match cmd.spawn() {
-            Ok(child) => Ok(Some(child.id())),
+            Ok(child) => {
+                // O handle do `Child` ainda está aberto: o processo existe, mesmo que já tenha saído.
+                self.watch_exit(child.id());
+                Ok(Some(child.id()))
+            }
             Err(e) if e.raw_os_error() == Some(ERROR_ELEVATION_REQUIRED) => {
                 tracing::warn!("{target} pede administrador; abrindo sem as variáveis de ambiente");
                 self.launch(target, arguments, working_dir)
@@ -185,6 +221,42 @@ impl ProcessLauncher for WindowsProcesses {
                 Err(e) => return Err(DeviceError::Failed(format!("comando \"{command}\": {e}"))),
             }
         }
+    }
+
+    fn watch_exit(&self, pid: u32) {
+        let known = self
+            .held
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .any(|(p, _)| *p == pid);
+        if known {
+            return;
+        }
+        // SAFETY: só consulta; o handle fica guardado e é fechado em `exit_code` ou ao passar de `MAX_HELD`.
+        match unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) } {
+            Ok(h) => self.hold(pid, h),
+            Err(e) => tracing::debug!("sem o código de saída de {pid}: {e}"),
+        }
+    }
+
+    fn exit_code(&self, pid: u32) -> Option<u32> {
+        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        let i = held.iter().position(|(p, _)| *p == pid)?;
+        let mut code = 0u32;
+        // SAFETY: handle aberto por este módulo com `PROCESS_QUERY_LIMITED_INFORMATION`.
+        let read = unsafe { GetExitCodeProcess(HANDLE(held[i].1 as *mut _), &mut code) };
+        let code = match read {
+            // Ainda rodando: continua guardado.
+            Ok(()) if code == STILL_ACTIVE => return None,
+            Ok(()) => Some(code),
+            Err(e) => {
+                tracing::debug!("código de saída de {pid}: {e}");
+                None
+            }
+        };
+        close_raw(held.remove(i).1);
+        code
     }
 
     fn snapshot(&self) -> Vec<ProcessEntry> {
@@ -341,6 +413,48 @@ impl ProcessLauncher for WindowsProcesses {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn keeps_the_exit_code_of_the_game_it_opened() {
+        let p = WindowsProcesses::default();
+        let cmd =
+            std::env::var("ComSpec").unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".into());
+        let env = [("TAKO_TEST".to_owned(), "1".to_owned())];
+        // 0xC0000135 (DLL ausente) em decimal com sinal, como o `exit` do cmd recebe.
+        let pid = p
+            .launch_with_env(&cmd, Some("/c exit -1073741515"), None, &env)
+            .unwrap()
+            .unwrap();
+        let mut code = None;
+        for _ in 0..100 {
+            code = p.exit_code(pid);
+            if code.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert_eq!(code, Some(0xC000_0135));
+        // Lido uma vez só; processo que o Tako não guardou não tem código.
+        assert_eq!(p.exit_code(pid), None);
+        assert_eq!(p.exit_code(u32::MAX), None);
+        // Um processo aberto por outro (o supervisor segura o do jogo pelo PID).
+        let child = std::process::Command::new(&cmd)
+            .args(["/c", "exit 7"])
+            .spawn()
+            .unwrap();
+        p.watch_exit(child.id());
+        let pid = child.id();
+        drop(child);
+        let mut code = None;
+        for _ in 0..100 {
+            code = p.exit_code(pid);
+            if code.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert_eq!(code, Some(7));
+    }
 
     #[test]
     fn user_commands_report_failure_and_timeouts() {

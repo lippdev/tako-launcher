@@ -193,3 +193,17 @@ avulso (DuckStation, PCSX2, Dolphin, PPSSPP, Ryujinx, Cemu ou RPCS3) já configu
 7. Uma ROM de um sistema sem emulador (ex.: Wii U sem o Cemu) não aparece e entra no aviso da loja.
 8. Adicionar jogo › uma ROM solta (ex.: `.sfc`): escolha o sistema; o botão vira "Jogar" e abre no emulador do
    sistema. Sem emulador para ele, aparece o aviso "Nenhum emulador deste PC abre este sistema".
+
+## 19. Código de saída do jogo (SESSION-003)
+
+Precisa de um executável que feche com erro. Crie `C:\TakoTeste\dll.bat` com `exit /b -1073741515` e
+`C:\TakoTeste\erro.bat` com `timeout /t 15 >nul` e `exit /b -1073741819` na linha seguinte.
+
+1. Adicionar jogo › `dll.bat`. Abra: o aviso "… fechou logo depois de abrir" começa com "Código de saída 0xC0000135
+   (3221225781): uma DLL que o jogo precisa não foi encontrada…", seguido da sugestão de antes.
+2. Adicionar jogo › `erro.bat`. Abra e espere os 15 s: o aviso "… fechou com um erro" mostra `0xC0000005` e a
+   explicação de violação de acesso (passou dos 10 s e avisa mesmo assim).
+3. Repita o passo 2 encerrando pela Central (Encerrar jogo) antes dos 15 s: volta com "Bem-vindo de volta", sem aviso.
+4. Um jogo de verdade que feche normalmente depois de jogar: "Bem-vindo de volta", sem aviso.
+5. Um jogo aberto pela loja (Steam, Epic) que feche sozinho em poucos segundos: o aviso de antes, sem código.
+6. Em `logs\`, a linha "terminou fora do normal" traz o código em hex.

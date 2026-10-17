@@ -102,6 +102,10 @@ impl ProcessLauncher for LinuxProcesses {
         run::user_command(command, wait)
     }
 
+    fn exit_code(&self, pid: u32) -> Option<u32> {
+        run::exit_code(pid)
+    }
+
     fn snapshot(&self) -> Vec<ProcessEntry> {
         let boot = run::read_limited(Path::new("/proc/stat"), 1 << 20)
             .and_then(|s| text::parse_boot_time(&s));

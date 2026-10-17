@@ -183,7 +183,10 @@ fn main() {
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0),
             ),
-            GameEnd::from_key(&value(&all, "--game-end").unwrap_or_default()),
+            GameEnd::from_key(
+                &value(&all, "--game-end").unwrap_or_default(),
+                value(&all, "--exit-code").and_then(|s| s.parse().ok()),
+            ),
         )
     });
     let running =
@@ -218,7 +221,8 @@ fn main() {
                         game_id,
                         played_secs,
                         end,
-                    } => (game_id, played_secs, GameEnd::from_key(&end)),
+                        exit_code,
+                    } => (game_id, played_secs, GameEnd::from_key(&end, exit_code)),
                     protocol::SupMsg::Activate => {
                         let _ = slint::invoke_from_event_loop(tako_ui::app::raise_current);
                         return;
@@ -238,6 +242,8 @@ fn main() {
                     if let Some(shell) = tako_ui::tasks::shell() {
                         let mut s = shell.borrow_mut();
                         let played = Duration::from_secs(played_secs);
+                        let pid = s.ctx.running.as_ref().and_then(|r| r.pid);
+                        let end = tako_ui::session::with_local_exit_code(&s.ctx, pid, end);
                         let _ = s.ctx.library.record_session(&game_id, played);
                         s.ctx.running = None;
                         s.ctx.welcome_back = Some((game_id, played, end));

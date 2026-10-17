@@ -66,6 +66,7 @@ impl Host for SupervisedHost {
                     ctx.running = Some(RunningGame {
                         id: req.game_id.clone(),
                         title: req.title.clone(),
+                        pid: req.root_pid,
                     });
                     self.send(&UiMsg::Track { req });
                     if self.lost {
@@ -139,6 +140,7 @@ impl Host for LocalHost {
                             ctx.running = Some(RunningGame {
                                 id: req.game_id.clone(),
                                 title: req.title.clone(),
+                                pid: req.root_pid,
                             });
                             ctx.controller_mouse = req.controller_mouse;
                             self.running = Some(r);
@@ -194,7 +196,7 @@ impl Host for LocalHost {
         let Some(played) = running.poll(&ctx.platform) else {
             return HostAction::Stay;
         };
-        let end = running.end(played);
+        let end = running.end(&ctx.platform, played);
         running.finish(&ctx.platform, &ctx.paths);
         let id = running.req.game_id.clone();
         self.running = None;
