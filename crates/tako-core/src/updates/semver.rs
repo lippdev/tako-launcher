@@ -17,6 +17,11 @@ impl SemVer {
         !self.pre.is_empty()
     }
 
+    /// Build noturna da develop (`0.2.1-nightly.20261017`, PLAT-008).
+    pub fn is_nightly(&self) -> bool {
+        self.pre.first().is_some_and(|p| p == "nightly")
+    }
+
     /// Como `find`, mas sem versão no texto vira 0.0.0.
     pub fn parse(text: &str) -> SemVer {
         SemVer::find(text).unwrap_or(SemVer {

@@ -6,17 +6,21 @@ name: Release
 #  - Actions > Release > Run workflow na develop, canal alpha ou beta: a pré-release sai com o próximo número
 #    (0.2.0-alpha.3, 0.2.0-beta.1...). Notas da seção da versão ou, sem ela, da [Unreleased].
 #  - Run workflow em outra branch, com "publish" desmarcado: só compila e guarda os arquivos como artefato.
+#  - Todo dia (agendado) ou Run workflow com o canal nightly: noturna da develop (PLAT-008), só se ela mudou. Ficam as
+#    7 noturnas mais novas. O agendamento do GitHub só roda o arquivo da branch padrão: vale depois de chegar na main.
 # Saídas: Windows (instalador e portable; só x64), Linux (deb, AppImage, tar.gz; x64 e arm64) e macOS (dmg e zip;
 # Apple Silicon e Intel). A versão C#/WPF tem o próprio workflow manual (release-wpf.yml) até o corte (MIG-043).
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "30 5 * * *"
   workflow_dispatch:
     inputs:
       channel:
-        description: "Channel: alpha or beta (from develop), stable (from main)."
+        description: "Channel: alpha, beta or nightly (from develop), stable (from main)."
         type: choice
-        options: [alpha, beta, stable]
+        options: [alpha, beta, nightly, stable]
         default: alpha
       base_version:
         description: "Optional X.Y.Z for alpha/beta. Empty = top of CHANGELOG.md (next patch if it already shipped)."
@@ -42,20 +46,24 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.version.outputs.sha }}
+      channel: ${{ steps.version.outputs.channel }}
     steps:
       - name: Checkout (with tags)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # O agendamento roda na branch padrão; a noturna é da develop.
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
 
       - name: Resolve version
         id: version
         env:
           EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-          CHANNEL: ${{ github.event_name == 'push' && 'stable' || github.event.inputs.channel }}
+          REF: ${{ github.event_name == 'schedule' && 'refs/heads/develop' || github.ref }}
+          CHANNEL: ${{ github.event_name == 'push' && 'stable' || github.event_name == 'schedule' && 'nightly' || github.event.inputs.channel }}
           BASE_VERSION: ${{ github.event.inputs.base_version }}
-          PUBLISH: ${{ github.event.inputs.publish }}
+          PUBLISH: ${{ github.event_name == 'schedule' || github.event.inputs.publish }}
         run: build/resolve-release.sh
 
       - name: Summary
@@ -92,6 +100,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-windows-${{ matrix.arch }}
@@ -174,6 +184,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
       - name: Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -259,7 +271,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.resolve.outputs.tag }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.resolve.outputs.sha }}
           name: Tako ${{ needs.resolve.outputs.version }}
           prerelease: ${{ needs.resolve.outputs.prerelease }}
           make_latest: ${{ needs.resolve.outputs.prerelease == 'false' }}
@@ -269,6 +281,36 @@ jobs:
           files: dist/Tako-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the 7 newest nightlies
+        if: needs.resolve.outputs.channel == 'nightly'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release list --limit 200 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9.]+-nightly\.[0-9]+$' | sort -t. -k4 -rn | tail -n +8 \
+            | while read -r tag; do gh release delete "$tag" --cleanup-tag --yes; done
+
+  # PR de atualização no microsoft/winget-pkgs para releases estáveis. Desligado até existir o segredo WINGET_TOKEN.
+  winget:
+    needs: [resolve, publish]
+    if: needs.publish.result == 'success' && needs.resolve.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      - name: Submit to winget-pkgs
+        if: env.WINGET_TOKEN != ''
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: lippdev.Tako
+          release-tag: ${{ needs.resolve.outputs.tag }}
+          installers-regex: 'Tako-Setup-x64\.exe$'
+          fork-user: lippdev
+          token: ${{ env.WINGET_TOKEN }}
+ | sort -t. -k4 -rn | tail -n +8 \
+            | while read -r tag; do gh release delete "$tag" --cleanup-tag --yes; done
 
   # PR de atualização no microsoft/winget-pkgs para releases estáveis. Desligado até existir o segredo WINGET_TOKEN.
   winget:

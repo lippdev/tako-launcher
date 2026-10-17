@@ -145,9 +145,27 @@ struct ReleaseAsset {
     digest: Option<String>,
 }
 
+/// Que versões o usuário quer receber.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Channel {
+    Stable,
+    /// Alpha e beta.
+    Testing,
+    /// As builds noturnas da develop, além das de teste (PLAT-008).
+    Nightly,
+}
+
 /// Versões de teste entram quando o usuário optou ou quando já roda uma; desligar nunca rebaixa.
 pub fn include_prereleases(current_is_prerelease: bool, opted_in: bool) -> bool {
     current_is_prerelease || opted_in
+}
+
+/// A release entra neste canal? A noturna só para quem escolheu: quem roda alpha ou beta não a recebe sem pedir.
+fn allowed(version: &SemVer, prerelease: bool, current: &SemVer, channel: Channel) -> bool {
+    if version.is_nightly() {
+        return channel == Channel::Nightly;
+    }
+    !prerelease || include_prereleases(current.is_prerelease(), channel != Channel::Stable)
 }
 
 /// Release publicada mais nova acima da atual, com o arquivo do pacote, ou `None`.
@@ -155,15 +173,14 @@ pub fn include_prereleases(current_is_prerelease: bool, opted_in: bool) -> bool 
 pub fn pick(
     releases_json: &str,
     current: &SemVer,
-    opted_into_prereleases: bool,
+    channel: Channel,
     package: Package,
     arch: Arch,
 ) -> Option<UpdateInfo> {
     let releases: Vec<Release> = serde_json::from_str(releases_json).ok()?;
-    let allow_pre = include_prereleases(current.is_prerelease(), opted_into_prereleases);
     let mut best: Option<(SemVer, UpdateInfo)> = None;
     for r in releases {
-        if r.draft || (r.prerelease && !allow_pre) {
+        if r.draft {
             continue;
         }
         let tag = r.tag_name.unwrap_or_default();
@@ -171,7 +188,10 @@ pub fn pick(
         let Some(version) = SemVer::find(&tag).or_else(|| SemVer::find(&name)) else {
             continue;
         };
-        if version <= *current || best.as_ref().is_some_and(|(b, _)| version <= *b) {
+        if !allowed(&version, r.prerelease, current, channel)
+            || version <= *current
+            || best.as_ref().is_some_and(|(b, _)| version <= *b)
+        {
             continue;
         }
         let asset = r
@@ -304,7 +324,52 @@ mod tests {
         } else {
             Package::WindowsPortable
         };
-        pick(json, &SemVer::parse(current), opted, p, Arch::X64)
+        let channel = if opted {
+            Channel::Testing
+        } else {
+            Channel::Stable
+        };
+        pick(json, &SemVer::parse(current), channel, p, Arch::X64)
+    }
+
+    #[test]
+    fn nightlies_only_reach_the_nightly_channel() {
+        let f = feed(&[
+            ("v0.2.1-nightly.20261017", true, false, true),
+            ("v0.2.1-nightly.20261016", true, false, true),
+            ("v0.2.0-beta.1", true, false, true),
+            ("v0.1.0", false, false, true),
+        ]);
+        let pick_on = |current: &str, channel| {
+            pick(
+                &f,
+                &SemVer::parse(current),
+                channel,
+                Package::WindowsSetup,
+                Arch::X64,
+            )
+            .map(|u| u.version)
+        };
+        assert_eq!(pick_on("0.1.0", Channel::Stable), None);
+        assert_eq!(
+            pick_on("0.1.0", Channel::Testing).as_deref(),
+            Some("0.2.0-beta.1")
+        );
+        // Quem roda uma beta continua sem noturnas até escolher.
+        assert_eq!(
+            pick_on("0.2.0-alpha.1", Channel::Stable).as_deref(),
+            Some("0.2.0-beta.1")
+        );
+        assert_eq!(
+            pick_on("0.1.0", Channel::Nightly).as_deref(),
+            Some("0.2.1-nightly.20261017")
+        );
+        assert_eq!(
+            pick_on("0.2.1-nightly.20261016", Channel::Nightly).as_deref(),
+            Some("0.2.1-nightly.20261017")
+        );
+        // Saiu do canal noturno: nada mais velho é oferecido.
+        assert_eq!(pick_on("0.2.1-nightly.20261016", Channel::Testing), None);
     }
 
     #[test]
@@ -387,7 +452,7 @@ mod tests {
     fn chooses_the_asset_per_os_arch_and_package() {
         let f = releases(&[("v0.2.0", false, false, true)], ALL_ASSETS);
         let name = |p: Package, a: Arch| {
-            pick(&f, &SemVer::parse("0.1.0"), false, p, a)
+            pick(&f, &SemVer::parse("0.1.0"), Channel::Stable, p, a)
                 .and_then(|u| u.asset)
                 .map(|a| a.name)
         };
@@ -417,7 +482,7 @@ mod tests {
         assert_eq!(name(MacApp, Arm64).as_deref(), Some("Tako-macOS-arm64.zip"));
         assert_eq!(name(MacApp, X64).as_deref(), Some("Tako-macOS-x64.zip"));
         // .deb: a release aparece, mas só como página (gerenciador de pacotes).
-        let deb = pick(&f, &SemVer::parse("0.1.0"), false, LinuxDeb, X64).unwrap();
+        let deb = pick(&f, &SemVer::parse("0.1.0"), Channel::Stable, LinuxDeb, X64).unwrap();
         assert!(!deb.can_install());
     }
 

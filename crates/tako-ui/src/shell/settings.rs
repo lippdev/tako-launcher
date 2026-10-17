@@ -236,6 +236,12 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
             |p| p.prereleases,
             |p| p.prereleases = !p.prereleases,
         ),
+        update_toggle(
+            ctx,
+            "settings.general.nightly",
+            |p| p.nightly,
+            |p| p.nightly = !p.nightly,
+        ),
     ]
 }
 

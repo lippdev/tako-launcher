@@ -60,7 +60,7 @@ pub fn agent() -> ureq::Agent {
 pub fn check(
     agent: &ureq::Agent,
     current: &SemVer,
-    opted_into_prereleases: bool,
+    channel: feed::Channel,
     package: Package,
     arch: Arch,
 ) -> Result<Option<UpdateInfo>, UpdateError> {
@@ -75,13 +75,7 @@ pub fn check(
         .with_config()
         .limit(MAX_FEED_BYTES)
         .read_to_string()?;
-    Ok(feed::pick(
-        &json,
-        current,
-        opted_into_prereleases,
-        package,
-        arch,
-    ))
+    Ok(feed::pick(&json, current, channel, package, arch))
 }
 
 /// Primeiro item da versão no changelog do idioma; sem ele, `None` (o aviso usa as notas da release).
