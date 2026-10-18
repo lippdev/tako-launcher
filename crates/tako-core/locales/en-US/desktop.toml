@@ -37,6 +37,7 @@ settings_found = "{n} settings found"
 theme_big_picture = "Themes apply to full screen. Desktop mode uses Tako's own look."
 
 [desktop.menu]
+view_profile = "View profile"
 brand = "Tako: open menu"
 settings = "Settings"
 settings_key = "Ctrl + ,"

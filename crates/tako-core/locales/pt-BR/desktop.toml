@@ -37,6 +37,7 @@ settings_found = "{n} configurações encontradas"
 theme_big_picture = "O tema vale para a tela cheia. O modo desktop usa o visual do Tako."
 
 [desktop.menu]
+view_profile = "Ver perfil"
 brand = "Tako: abrir menu"
 settings = "Configurações"
 settings_key = "Ctrl + ,"

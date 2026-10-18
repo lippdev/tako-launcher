@@ -148,6 +148,7 @@ component Vidro inherits Rectangle {
     in property <length> radius: Ui.radius-card;
     // Camada (diálogo, menu, painel lateral, aviso): tinta densa, contorno forte e sombra de camada.
     in property <bool> layer;
+    in property <bool> edge: true;
     // Tinta densa sempre (perigo, Sessões), além da escolha automática sobre arte clara.
     in property <bool> dense;
     property <length> ax: self.absolute-position.x;
@@ -230,17 +231,17 @@ component Vidro inherits Rectangle {
         // Volume da lente: brilho de cima, 150 px fixos para barra, painel e cartão parecerem o mesmo material.
         if !DeskArt.gray: Rectangle {
             y: 0;
-            height: min(Ui.glass-highlight-height, parent.height);
+            height: Ui.glass-highlight-height;
             background: @linear-gradient(180deg, Ui.glass-highlight 0%, Ui.glass-highlight.with-alpha(0) 100%);
         }
     }
     // Contorno de 1px por dentro e o reflexo especular (forte no canto superior esquerdo, fraco no inferior direito).
-    Rectangle {
+    if edge: Rectangle {
         border-radius: root.radius;
         border-width: 1px;
         border-color: DeskArt.gray ? Ui.settings-separator : (layer ? Ui.glass-edge-strong : Ui.glass-edge);
     }
-    if !DeskArt.gray: Rectangle {
+    if edge && !DeskArt.gray: Rectangle {
         border-radius: root.radius;
         border-width: 1px;
         border-color: @linear-gradient(170deg, Ui.glass-specular 0%, Ui.glass-specular.with-alpha(0.1) 18%,
@@ -445,35 +446,78 @@ component SearchBox inherits Rectangle {
     }
 }
 
-// Barra superior (BarraSuperior): marca que abre o menu do Tako, guias das áreas em caixa alta, busca e Tela cheia,
-// numa só peça de vidro. Configurações fica no menu da marca.
+// Controles da janela integrados à barra superior, 46 × 64.
+component WindowButton inherits Rectangle {
+    in property <string> kind;
+    in property <string> label;
+    in property <bool> active: true;
+    in property <bool> native-hover;
+    in property <bool> native-pressed;
+    callback clicked();
+    width: Ui.window-control-width;
+    height: Ui.topbar-height;
+    background: ta.pressed || native-pressed ? (kind == "close" ? Ui.window-close-hover.with-alpha(0.9) : Ui.glass-pressed)
+        : (ta.has-hover || native-hover) ? (kind == "close" ? Ui.window-close-hover : Ui.glass-hover) : transparent;
+    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    accessible-role: button;
+    accessible-label: label;
+    Path {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 10px;
+        height: 10px;
+        viewbox-width: 10;
+        viewbox-height: 10;
+        commands: kind == "min" ? "M 0 5 H 10"
+            : kind == "max" ? "M 0.5 0.5 H 9.5 V 9.5 H 0.5 Z"
+            : kind == "restore" ? "M 2.5 0.5 H 9.5 V 7.5 M 0.5 2.5 H 7.5 V 9.5 H 0.5 Z"
+            : "M 0 0 L 10 10 M 10 0 L 0 10";
+        stroke: (ta.has-hover || native-hover) ? Ui.on-accent : (active ? Ui.desk-on-muted : Ui.on-accent-subtle);
+        stroke-width: 1px;
+        fill: transparent;
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+}
+
+// BarraSuperior é também a barra da janela: marca, guias, perfil, Tela cheia e controles nativos.
 component TopBar inherits Vidro {
     in property <[DeskNav]> items;
     in property <string> big-picture-label;
     in property <string> brand-label;
     in property <bool> brand-open;
-    in property <bool> show-search;
-    in property <string> search;
-    in property <string> search-hint;
-    in property <string> search-key;
-    in property <string> search-esc;
+    in property <string> profile-name;
+    in property <string> profile-initial;
+    in property <bool> maximized;
+    in property <int> native-hover;
+    in property <int> native-pressed;
+    in property <bool> active: true;
+    in property <[string]> labels;
+    in property <string> update-label;
+    out property <length> profile-x: profile.absolute-position.x;
+    out property <length> drag-start: drag.absolute-position.x;
+    out property <length> drag-end: drag.absolute-position.x + drag.width;
+    callback action(string);
     in property <bool> small;
-    // Foco do teclado na barra: -1 fora dela; 0 marca, 1… guias, depois a busca e Tela cheia.
+    // Foco do teclado na barra: -1 fora dela; 0 marca, 1… guias, depois perfil e Tela cheia.
     in property <int> focus-index: -1;
     callback clicked(string, int);
-    callback edited(string, string);
-    callback leave();
     // Onde abrir o menu da marca: 8 abaixo da barra, alinhado à marca.
     callback brand-menu(length, length);
-    public function focus-search() { sb.focus-input(); }
     height: Ui.topbar-height;
+    radius: 0px;
+    edge: false;
+    drop-shadow-blur: 0px;
+    drop-shadow-offset-y: 0px;
+    drop-shadow-color: transparent;
+    Rectangle { y: parent.height - 1px; height: 1px; background: Ui.glass-edge; }
+
     HorizontalLayout {
-        padding-left: small ? 6px : Ui.space-12;
-        padding-right: small ? Ui.space-8 : Ui.space-12;
+        padding-left: (small ? Ui.space-20 : Ui.space-36) - Ui.space-8;
+        padding-right: 0px;
         spacing: small ? Ui.space-8 : Ui.space-12;
         brand := Rectangle {
             y: (parent.height - self.height) / 2;
-            height: Ui.control-height;
+            height: 48px;
             width: bl.preferred-width;
             border-radius: self.height / 2;
             background: bta.has-hover || brand-open ? Ui.glass-hover : transparent;
@@ -502,7 +546,7 @@ component TopBar inherits Vidro {
             bta := TouchArea {
                 mouse-cursor: pointer;
                 clicked => {
-                    root.brand-menu(brand.absolute-position.x, root.absolute-position.y + root.height + Ui.space-8);
+                    root.brand-menu(brand.absolute-position.x + Ui.space-8, root.absolute-position.y + root.height + Ui.space-8);
                     root.clicked("desk-brand", 0);
                 }
             }
@@ -537,24 +581,68 @@ component TopBar inherits Vidro {
                 }
             }
         }
-        Rectangle { horizontal-stretch: 1; }
-        sb := SearchBox {
-            visible: show-search;
-            y: (parent.height - self.height) / 2;
-            width: !show-search ? 0 : (small ? 190px : clamp(root.width * 0.2, 240px, 380px));
-            text: search;
-            hint: search-hint;
-            key-label: small ? "" : search-key;
-            esc-label: search-esc;
-            focused: focus-index == 1 + items.length;
-            edited(t) => { root.edited("search", t); }
-            leave => { root.leave(); }
+        drag := Rectangle {
+            horizontal-stretch: 1;
+            TouchArea {
+                pointer-event(ev) => {
+                    if ev.button == PointerEventButton.left && ev.kind == PointerEventKind.down { root.action("drag"); }
+                    if ev.button == PointerEventButton.right && ev.kind == PointerEventKind.up {
+                        root.action("menu:" + (self.absolute-position.x + self.mouse-x) / 1px + "," + self.mouse-y / 1px);
+                    }
+                }
+                double-clicked => { root.action("max"); }
+            }
         }
-        // Tela cheia: dentro do vidro é preenchimento (`glass-control`), com o raio da busca; só o ícone na janela pequena.
+        if update-label != "": Rectangle {
+            width: ul.preferred-width + 26px + 8px;
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: parent.width - 8px;
+                height: 24px;
+                border-radius: self.height / 2;
+                background: uta.has-hover ? Ui.glass-hover : Ui.glass-control;
+                border-width: 1px;
+                border-color: Ui.glass-edge;
+                animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                accessible-role: button;
+                accessible-label: update-label;
+                Rectangle { x: 10px; y: (parent.height - self.height) / 2; width: 6px; height: 6px; border-radius: 3px; background: Ui.success; }
+                ul := Text { x: 22px; text: update-label; color: Ui.on-accent; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                uta := TouchArea { mouse-cursor: pointer; clicked => { root.action("update"); } }
+            }
+        }
+        profile := Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 40px;
+            width: pl.preferred-width;
+            border-radius: Ui.radius-control;
+            background: pta.pressed ? Ui.glass-pressed : pta.has-hover ? Ui.glass-hover : Ui.glass-control;
+            accessible-role: button;
+            accessible-label: profile-name;
+            if focus-index == 1 + items.length: FocusRing { radius: Ui.radius-control; }
+            pl := HorizontalLayout {
+                padding-left: 6px; padding-right: 10px; spacing: 8px;
+                Rectangle {
+                    width: 28px; height: 28px; y: (parent.height - self.height) / 2;
+                    border-radius: 14px; background: Ui.glass-hover;
+                    Text { text: profile-initial; color: Ui.on-accent; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                if !small: Text { text: profile-name; max-width: 160px; overflow: elide; font-size: 14px; font-weight: 600; color: Ui.on-accent; vertical-alignment: center; }
+                DeskIcon { name: "chevron-down"; size: 12px; y: (parent.height - self.height) / 2; }
+            }
+            pta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.brand-menu(profile.absolute-position.x, root.height + Ui.space-8);
+                    root.clicked("desk-profile-menu", 0);
+                }
+            }
+        }
+        // Tela cheia: botão de 40 com gamepad de 22, inclusive na janela grande.
         Rectangle {
             y: (parent.height - self.height) / 2;
-            height: Ui.control-height;
-            width: small ? self.height : fl.preferred-width;
+            height: 40px;
+            width: 40px;
             border-radius: Ui.radius-control;
             background: fta.pressed ? Ui.glass-pressed : (fta.has-hover ? Ui.glass-hover : Ui.glass-control);
             border-width: 1px;
@@ -563,19 +651,18 @@ component TopBar inherits Vidro {
             accessible-role: button;
             accessible-label: big-picture-label;
             if focus-index == 2 + items.length: FocusRing { radius: Ui.radius-control; }
-            fl := HorizontalLayout {
-                padding-left: small ? 0 : 18px;
-                padding-right: small ? 0 : 18px;
-                spacing: 10px;
-                alignment: center;
-                DeskIcon { name: "tv"; size: 20px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
-                if !small: Text { text: big-picture-label; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
-            }
+            DeskIcon { name: "gamepad"; size: 22px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
             fta := TouchArea {
                 mouse-cursor: pointer;
                 clicked => { root.clicked("desk-nav", 2); }
             }
-            Tip { text: small ? big-picture-label : ""; hovering: fta.has-hover; }
+            Tip { text: big-picture-label + " (F11)"; hovering: fta.has-hover; }
+        }
+        HorizontalLayout {
+            spacing: 0px;
+            WindowButton { kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
+            WindowButton { native-hover: root.native-hover == 1; native-pressed: root.native-pressed == 1; kind: maximized ? "restore" : "max"; active: root.active; label: maximized ? labels[2] : labels[1]; clicked => { root.action("max"); } }
+            WindowButton { native-hover: root.native-hover == 2; native-pressed: root.native-pressed == 2; kind: "close"; active: root.active; label: labels[3]; clicked => { root.action("close"); } }
         }
     }
 }
@@ -3864,6 +3951,7 @@ component DeskOverlay inherits Rectangle {
     in property <bool> focus-visible;
     in property <length> menu-x;
     in property <length> menu-y;
+    in property <bool> bar-menu;
     in property <image> art;
     in property <bool> leaving;
     in property <string> cancel-label;
@@ -4582,7 +4670,7 @@ component DeskOverlay inherits Rectangle {
             x: clamp(select ? menu-x - self.width : menu-x, 12px, root.width - self.width - 12px);
             y: select && menu-y + self.height > root.height - 12px
                 ? max(12px, menu-y - 6px - 36px - 6px - self.height)
-                : clamp(menu-y, 12px, root.height - self.height - 12px);
+                : clamp(menu-y, bar-menu ? Ui.space-8 : 12px, root.height - self.height - 12px);
             TouchArea { }
             // Até 8 opções visíveis no select; o resto rola.
             mf := Flickable {
@@ -5730,85 +5818,6 @@ component ArtLayer inherits Rectangle {
     }
 }
 
-// BarraDaJanela: a barra da própria janela, no lugar da moldura do Windows (referência: Discord). Logo, faixa de
-// arrastar (duplo clique maximiza) e Minimizar · Maximizar/Restaurar · Fechar de 46 × 32, por cima da arte.
-component WindowButton inherits Rectangle {
-    in property <string> kind;
-    in property <string> label;
-    in property <bool> active: true;
-    callback clicked();
-    width: 46px;
-    height: Ui.titlebar-height;
-    background: ta.pressed ? (kind == "close" ? Ui.window-close-hover.with-alpha(0.9) : Ui.glass-pressed)
-        : ta.has-hover ? (kind == "close" ? Ui.window-close-hover : Ui.glass-hover) : transparent;
-    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-    accessible-role: button;
-    accessible-label: label;
-    Path {
-        width: 10px;
-        height: 10px;
-        viewbox-width: 10;
-        viewbox-height: 10;
-        commands: kind == "min" ? "M 0 5 H 10"
-            : kind == "max" ? "M 0.5 0.5 H 9.5 V 9.5 H 0.5 Z"
-            : kind == "restore" ? "M 2.5 0.5 H 9.5 V 7.5 M 0.5 2.5 H 7.5 V 9.5 H 0.5 Z"
-            : "M 0 0 L 10 10 M 10 0 L 0 10";
-        stroke: ta.has-hover ? Ui.on-accent : (active ? Ui.desk-on-muted : Ui.on-accent-subtle);
-        stroke-width: 1px;
-        fill: transparent;
-    }
-    ta := TouchArea { clicked => { root.clicked(); } }
-}
-
-component DeskTitleBar inherits Rectangle {
-    in property <bool> maximized;
-    // Janela sem foco: ícones em on-accent-subtle.
-    in property <bool> active: true;
-    // Minimizar, Maximizar, Restaurar, Fechar.
-    in property <[string]> labels;
-    // "Atualização pronta" (vazio = sem atualização): pílula antes dos botões; clique reinicia.
-    in property <string> update-label;
-    callback action(string);
-    height: Ui.titlebar-height;
-    background: @linear-gradient(180deg, Ui.art-scrim-strong 0%, Ui.art-scrim-strong.with-alpha(0) 100%);
-    TouchArea {
-        pointer-event(ev) => {
-            if (ev.button == PointerEventButton.left && ev.kind == PointerEventKind.down) {
-                root.action("drag");
-            }
-            // Clique direito: o menu de sistema do Windows, no ponto do clique.
-            if (ev.button == PointerEventButton.right && ev.kind == PointerEventKind.up) {
-                root.action("menu:" + self.mouse-x / 1px + "," + self.mouse-y / 1px);
-            }
-        }
-        double-clicked => { root.action("max"); }
-    }
-    HorizontalLayout {
-        alignment: end;
-        if update-label != "": Rectangle {
-            width: ul.preferred-width + 26px + 8px;
-            Rectangle {
-                y: (parent.height - self.height) / 2;
-                width: parent.width - 8px;
-                height: 24px;
-                border-radius: self.height / 2;
-                background: uta.has-hover ? Ui.glass-hover : Ui.glass-control;
-                border-width: 1px;
-                border-color: Ui.glass-edge;
-                animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                accessible-role: button;
-                accessible-label: update-label;
-                Rectangle { x: 10px; width: 6px; height: 6px; border-radius: 3px; background: Ui.success; }
-                ul := Text { x: 22px; text: update-label; color: Ui.on-accent; font-size: 12px; font-weight: 600; vertical-alignment: center; }
-                uta := TouchArea { mouse-cursor: pointer; clicked => { root.action("update"); } }
-            }
-        }
-        WindowButton { kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
-        WindowButton { kind: maximized ? "restore" : "max"; active: root.active; label: maximized ? labels[2] : labels[1]; clicked => { root.action("max"); } }
-        WindowButton { kind: "close"; active: root.active; label: labels[3]; clicked => { root.action("close"); } }
-    }
-}
-
 export component Desktop inherits Window {
     in property <bool> control-center;
     in property <[PanelRow]> cc-icons;
@@ -5919,7 +5928,13 @@ export component Desktop inherits Window {
     icon: @image-url("tako-mark.png");
     // Sem a moldura do sistema: a BarraDaJanela desenha logo e botões.
     no-frame: true;
+    in property <string> desk-profile-name;
+    in property <string> desk-profile-initial;
+    out property <float> window-drag-start: bar.drag-start / 1px;
+    out property <float> window-drag-end: bar.drag-end / 1px;
     in property <bool> window-maximized;
+    in property <int> window-native-hover;
+    in property <int> window-native-pressed;
     in property <bool> window-active: true;
     in property <string> desk-update-label;
     in property <[string]> desk-window-labels: ["", "", "", ""];
@@ -5984,15 +5999,10 @@ export component Desktop inherits Window {
     }
     changed desk-game => { root.sync-art(); }
 
-    changed desk-search-focus => { bar.focus-search(); }
 
     // Teclado: o Tako decide o que cada tecla faz; Ctrl+K (ou Ctrl+F) vai para a busca e Ctrl+, para as Configurações.
     fs := FocusScope {
         key-pressed(e) => {
-            if (e.modifiers.control && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && (page == "desk-library" || page == "settings") && overlays.length == 0) {
-                bar.focus-search();
-                return accept;
-            }
             if (e.modifiers.control && !e.modifiers.alt && e.text == "," && overlays.length == 0) {
                 root.clicked("desk-nav", 1);
                 return accept;
@@ -6012,17 +6022,9 @@ export component Desktop inherits Window {
     changed desk-intro => { DeskIntro.on = !desk-intro; }
     property <float> intro-art: DeskIntro.on ? 1 : 0;
     animate intro-art { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-    property <float> intro-bar: DeskIntro.on ? 1 : 0;
-    animate intro-bar { duration: Ui.page-time; delay: Ui.intro-delay(1); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     ArtLayer {
         art: art-shown;
         opacity: intro-art;
-    }
-    // Faixa leve abaixo da BarraDaJanela: a barra superior mantém 4,5:1 mesmo com a arte clara em cima.
-    if page == "desk-library" || page == "desk-profile": Rectangle {
-        height: Ui.titlebar-height + 160px;
-        y: 0;
-        background: @linear-gradient(180deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 100%);
     }
     // Perfil: escurecimento de cima para baixo mais forte que o da biblioteca (os blocos ficam sobre a parte escura).
     if page == "desk-profile": Rectangle {
@@ -6038,33 +6040,9 @@ export component Desktop inherits Window {
     VerticalLayout {
         padding-left: small ? Ui.space-20 : Ui.space-36;
         padding-right: small ? Ui.space-20 : Ui.space-36;
-        padding-top: Ui.titlebar-height + (small ? 10px : Ui.space-12);
+        padding-top: Ui.topbar-height + Ui.space-20;
         padding-bottom: small ? Ui.space-16 : Ui.space-28;
         spacing: small ? 14px : Ui.space-20;
-        bar := TopBar {
-            opacity: intro-bar;
-            items: desk-nav;
-            big-picture-label: desk-big-picture-label;
-            brand-label: desk-brand-label;
-            brand-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "menu" && overlays[overlays.length - 1].title == "";
-            show-search: page == "desk-library" || page == "settings";
-            search: page == "settings" ? settings-search : desk-search;
-            search-hint: page == "settings" ? desk-settings-search-hint : desk-search-hint;
-            search-key: desk-search-key;
-            search-esc: desk-search-esc;
-            small: root.small;
-            focus-index: desk-focus-visible && desk-zone == "bar" && (page == "desk-library" || page == "desk-profile") ? desk-zone-index : -1;
-            brand-menu(x, y) => {
-                root.menu-x = x;
-                root.menu-y = y;
-            }
-            edited(z, t) => { root.edited(z, t); }
-            leave => { fs.focus(); }
-            clicked(z, i) => {
-                fs.focus();
-                root.clicked(z, i);
-            }
-        }
         Rectangle {
             vertical-stretch: 1;
             lib := DeskLibrary {
@@ -6170,16 +6148,19 @@ export component Desktop inherits Window {
 
     // As camadas ficam na área do app, abaixo da BarraDaJanela (que continua usável).
     for ov[i] in overlays: DeskOverlay {
-        y: Ui.titlebar-height;
-        height: root.height - Ui.titlebar-height;
+        y: Ui.topbar-height;
+        height: root.height - Ui.topbar-height;
         ov: ov;
         cancel-label: desk-cancel-label;
         ok-label: desk-ok-label;
         close-label: desk-window-labels[3];
         top-most: i == overlays.length - 1;
         focus-visible: desk-focus-visible;
-        menu-x: menu-x;
-        menu-y: menu-y - Ui.titlebar-height;
+        property <bool> brand-menu: ov.kind == "menu" && ov.rows[0].key == "settings" && ov.title == "";
+        property <bool> profile-menu: ov.kind == "menu" && ov.rows[0].key == "view-profile";
+        bar-menu: brand-menu || profile-menu;
+        menu-x: brand-menu ? (small ? Ui.space-20 : Ui.space-36) : profile-menu ? bar.profile-x : root.menu-x;
+        menu-y: bar-menu ? Ui.space-8 : root.menu-y - Ui.topbar-height;
         art: desk-game.art;
         leaving: leaving;
         clicked(z, idx) => {
@@ -6254,14 +6235,37 @@ export component Desktop inherits Window {
             }
         }
     }
-    // Por cima de tudo: a janela sempre pode ser movida, minimizada e fechada.
-    DeskTitleBar {
-        y: 0;
+    bar := TopBar {
+        y: 0px;
         width: root.width;
-        maximized: root.window-maximized;
-        active: root.window-active;
-        update-label: root.desk-update-label;
-        labels: root.desk-window-labels;
+        profile-name: desk-profile-name;
+        profile-initial: desk-profile-initial;
+        maximized: window-maximized;
+        native-hover: window-native-hover;
+        native-pressed: window-native-pressed;
+        active: window-active;
+        labels: desk-window-labels;
+        update-label: desk-update-label;
         action(a) => { root.window-action(a); }
+        items: desk-nav;
+        big-picture-label: desk-big-picture-label;
+        brand-label: desk-brand-label;
+        brand-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "menu" && overlays[overlays.length - 1].rows[0].key == "settings" && overlays[overlays.length - 1].title == "";
+        small: root.small;
+        focus-index: desk-focus-visible && desk-zone == "bar" && (page == "desk-library" || page == "desk-profile") ? desk-zone-index : -1;
+        brand-menu(x, y) => {
+            root.menu-x = x;
+            root.menu-y = y;
+        }
+        clicked(z, i) => {
+            fs.focus();
+            root.clicked(z, i);
+        }
+    }
+    Rectangle {
+        border-radius: window-maximized ? 0px : 8px;
+        border-width: 1px;
+        border-color: #ffffff26;
+        background: transparent;
     }
 }

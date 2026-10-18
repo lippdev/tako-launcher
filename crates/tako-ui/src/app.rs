@@ -801,6 +801,8 @@ impl App {
                     }
                     let ui = app.ui.borrow();
                     let window = ui.window();
+                    #[cfg(windows)]
+                    crate::window_chrome::install(&ui);
                     let active = window.with_winit_window(|w| w.has_focus()).unwrap_or(true);
                     bridge::set(&ui, "window-maximized", window.is_maximized().to_value());
                     bridge::set(&ui, "window-active", active.to_value());

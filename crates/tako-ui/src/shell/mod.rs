@@ -475,6 +475,11 @@ impl Shell {
             }
             return;
         }
+        if self.ctx.desktop && zone == "desk-profile-menu" {
+            self.layers.push(Box::new(desktop::profile_menu()));
+            self.ctx.dirty = true;
+            return;
+        }
         if zone == "desk-brand" {
             self.layers.push(Box::new(desktop::brand_menu()));
             self.ctx.dirty = true;
@@ -838,6 +843,14 @@ impl Shell {
                 String::new()
             },
         );
+        let name = profiles::active_name(&self.ctx);
+        let initial = name
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().collect::<String>())
+            .unwrap_or_default();
+        out.set("desk-profile-initial", initial);
+        out.set("desk-profile-name", name);
         out.set("desk-brand-label", self.ctx.t("desktop.menu.brand"));
         out.set("desk-search-key", self.ctx.t("desktop.search_key"));
         out.set("desk-search-esc", self.ctx.t("desktop.search_esc"));

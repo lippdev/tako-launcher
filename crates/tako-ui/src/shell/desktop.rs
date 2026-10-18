@@ -139,10 +139,10 @@ const COVER: (u32, u32) = (344, 516);
 // shortcut: fileira sem virtualização horizontal, corta em 24 capas; virtualizar se pedirem a fileira inteira.
 const ROW_COVERS: usize = 24;
 
-/// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, busca, Tela cheia.
+/// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, menu do perfil, Tela cheia.
 const BAR_ITEMS: usize = 5;
 const BAR_PROFILE: usize = 2;
-const BAR_SEARCH: usize = 3;
+const BAR_ACCOUNT: usize = 3;
 
 /// Rota que abre a biblioteca numa coleção (`desk:collection:m:<id>` ou `s:<id>`, a chave do SeletorDeColecao).
 pub const COLLECTION_ROUTE: &str = "desk:collection:";
@@ -1093,10 +1093,7 @@ impl Page for DesktopLibrary {
             (Zone::Bar, Cmd::Accept) => match self.index {
                 0 => return Nav::Layer(Box::new(brand_menu())),
                 BAR_PROFILE => return Nav::Push(Box::new(super::profile::ProfilePage::new())),
-                BAR_SEARCH => {
-                    self.search_focus += 1;
-                    self.zone = Zone::List;
-                }
+                BAR_ACCOUNT => return Nav::Layer(Box::new(profile_menu())),
                 4 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
                 _ => self.zone = Zone::List,
             },
@@ -1847,6 +1844,28 @@ fn group_menu() -> super::layer::MenuLayer {
     })
 }
 
+/// Perfil da barra: abre a página e reutiliza os fluxos persistidos de perfis locais.
+pub fn profile_menu() -> super::layer::MenuLayer {
+    use super::layer::{Flow, MenuItem, MenuLayer};
+    MenuLayer::menu(String::new(), |ctx| {
+        vec![
+            MenuItem::new(
+                PanelRow::button("view-profile", ctx.t("desktop.menu.view_profile")).icon("user"),
+            )
+            .on(|ctx| {
+                ctx.open_route = Some(super::profile::ROUTE.into());
+                Flow::CloseAll
+            }),
+            MenuItem::new(
+                PanelRow::button("switch", ctx.t("desktop.menu.switch_profile")).icon("user"),
+            )
+            .on(|ctx| Flow::Replace(Box::new(super::profiles::panel(ctx)))),
+            MenuItem::new(PanelRow::button("edit", ctx.t("profile.edit")).icon("edit"))
+                .on(|ctx| Flow::Replace(Box::new(super::profiles::manage_active(ctx)))),
+        ]
+    })
+}
+
 /// Menu da marca (MenuDoTako), como o menu "Steam": Configurações e as ações da conta e do app, fora das guias.
 pub fn brand_menu() -> super::layer::MenuLayer {
     use super::layer::{Flow, MenuItem, MenuLayer};
@@ -2043,7 +2062,7 @@ mod tests {
         assert_eq!(rows[4].kind, "separator");
         assert!(!rows[4].is_focusable());
 
-        // Teclado: subir das abas chega à barra; Enter na busca pede o foco do campo.
+        // Teclado: subir das abas chega à barra; Enter no perfil abre seu menu.
         shell.handle(Cmd::Up);
         shell.handle(Cmd::Up);
         while page(&shell).zone() != Zone::Tabs {
@@ -2055,8 +2074,30 @@ mod tests {
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Accept);
-        assert_eq!(page(&shell).search_focus, 1);
-        assert_eq!(page(&shell).zone(), Zone::List);
+        assert!(shell.has_layers());
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+    }
+
+    #[test]
+    fn profile_menu_opens_real_profile_routes_and_editors() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let rows = crate::shell::layer::Layer::render(&profile_menu(), &shell.ctx).rows;
+        assert_eq!(
+            rows.iter().map(|r| r.title.as_str()).collect::<Vec<_>>(),
+            ["Ver perfil", "Trocar perfil…", "Editar perfil"]
+        );
+        shell.click("desk-profile-menu", 0);
+        shell.click("overlay-row", 0);
+        assert_eq!(shell.page().kind(), super::super::profile::KIND);
+        assert!(!shell.has_layers());
+        for action in [1, 2] {
+            shell.click("desk-profile-menu", 0);
+            shell.click("overlay-row", action);
+            assert!(shell.has_layers());
+            shell.close_layers();
+        }
     }
 
     #[test]

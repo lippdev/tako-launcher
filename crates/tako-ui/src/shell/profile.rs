@@ -59,7 +59,7 @@ pub enum Zone {
 const ACTIONS: usize = 2;
 /// Blocos da Visão geral: Tempo jogado, Mais jogado, Jogos na biblioteca.
 const TILES: usize = 3;
-/// Barra de cima: marca, Biblioteca, Perfil, busca (escondida aqui) e Tela cheia.
+/// Barra de cima: marca, Biblioteca, Perfil, menu do perfil e Tela cheia.
 const BAR_BIG_PICTURE: usize = 4;
 
 /// Segunda-feira da semana de `day`.
@@ -344,6 +344,7 @@ impl ProfilePage {
             Zone::Bar => match self.index {
                 0 => return Nav::Layer(Box::new(desktop::brand_menu())),
                 1 => return Nav::Back,
+                3 => return Nav::Layer(Box::new(desktop::profile_menu())),
                 BAR_BIG_PICTURE => {
                     ctx.effect(super::Effect::SwitchMode(crate::mode::UiMode::BigPicture))
                 }
@@ -476,10 +477,6 @@ impl Page for ProfilePage {
                 self.open_tab(TABS[n]);
             }
             _ => {}
-        }
-        if self.zone == Zone::Bar && self.index == 3 {
-            // A busca fica escondida no Perfil: ← → pulam por ela.
-            self.index = if cmd == Cmd::Left { 2 } else { BAR_BIG_PICTURE };
         }
         Nav::Stay
     }

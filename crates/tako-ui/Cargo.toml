@@ -25,6 +25,9 @@ rfd.workspace = true
 spin_on = "0.1"
 tempfile.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = ["Win32_Graphics_Dwm"] }
+
 [dev-dependencies]
 slint = { workspace = true, features = ["renderer-software"] }
 
