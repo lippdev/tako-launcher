@@ -2,6 +2,16 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.11]
+### What's new
+- **Lighter and smoother:** Tako uses much less memory (each image lives once on the graphics card and the background loads at the window's size), the game list scrolls without stutter and the app keeps up with 120 Hz or faster monitors.
+- **Compact game list:** shorter rows without the store icon; the selected game's store shows in the top-right corner. Selecting a game no longer shifts anything in the row.
+- **Add a game:** a "+" button next to the game count and "Add game…" in the Tako menu.
+- **More about the game:** scroll over the highlight (or press Page Down) to see a second screen with the full description, every detail, sessions and images. Scrolling up, Page Up or Esc go back.
+- **Staged opening:** when Tako opens, the screen appears in parts, smoothly. "Reduce motion" turns it off.
+- **Game switching without flashing:** the glass and colors change together with the art.
+- The window bar no longer repeats the logo, and the top bar logo is sharper and reacts to the mouse.
+
 ## [0.2.0-alpha.10]
 ### What's new
 - **First run:** the subtitle shows in full, the "How do you want to open Tako?" step fits small windows and the last step has "Review covers". With no games found, it offers "Add a game by hand" and "Search again".
