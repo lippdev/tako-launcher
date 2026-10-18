@@ -34,7 +34,7 @@ fn store_icon(store: GameStore) -> &'static str {
 pub const ROUTE: &str = "desk:library";
 
 /// Miniatura da lista (CapaDoJogo: o quadrado do topo da capa 2:3, mostrado a 40 × 40; 2× para telas densas).
-const THUMB: (u32, u32) = (80, 120);
+pub(crate) const THUMB: (u32, u32) = (80, 120);
 /// Linhas em volta da primeira visível que pedem miniatura.
 const NEAR: usize = 60;
 
@@ -139,9 +139,13 @@ const COVER: (u32, u32) = (344, 516);
 // shortcut: fileira sem virtualização horizontal, corta em 24 capas; virtualizar se pedirem a fileira inteira.
 const ROW_COVERS: usize = 24;
 
-/// Itens da barra superior na ordem do Tab: marca, guia Biblioteca, busca, Tela cheia.
-const BAR_ITEMS: usize = 4;
-const BAR_SEARCH: usize = 2;
+/// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, busca, Tela cheia.
+const BAR_ITEMS: usize = 5;
+const BAR_PROFILE: usize = 2;
+const BAR_SEARCH: usize = 3;
+
+/// Rota que abre a biblioteca numa coleção (`desk:collection:m:<id>` ou `s:<id>`, a chave do SeletorDeColecao).
+pub const COLLECTION_ROUTE: &str = "desk:collection:";
 
 /// Coleção escolhida na aba Coleções: do usuário ou automática (LIB-003).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -362,6 +366,15 @@ impl DesktopLibrary {
         if let Some(id) = ids.get(index) {
             self.selected = Some(id.clone());
         }
+        self.zone = Zone::List;
+    }
+
+    /// Abre a aba Coleções na coleção `key` (o Perfil › Coleções manda para cá).
+    pub fn open_collection(&mut self, key: &str, ctx: &mut Ctx) {
+        ctx.settings.set(COLLECTION_KEY, key);
+        self.pick = None;
+        self.selected = None;
+        self.open_tab(Tab::Collections, ctx);
         self.zone = Zone::List;
     }
 
@@ -711,7 +724,7 @@ impl DesktopLibrary {
 }
 
 /// "Hoje", "Ontem" ou o dia e o mês, para a última sessão e o cartão de Sessões.
-fn day(ctx: &Ctx, at: chrono::DateTime<chrono::Local>) -> String {
+pub(crate) fn day(ctx: &Ctx, at: chrono::DateTime<chrono::Local>) -> String {
     let today = chrono::Local::now().date_naive();
     let d = at.date_naive();
     if d == today {
@@ -1075,11 +1088,12 @@ impl Page for DesktopLibrary {
             (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
             (Zone::Bar, Cmd::Accept) => match self.index {
                 0 => return Nav::Layer(Box::new(brand_menu())),
+                BAR_PROFILE => return Nav::Push(Box::new(super::profile::ProfilePage::new())),
                 BAR_SEARCH => {
                     self.search_focus += 1;
                     self.zone = Zone::List;
                 }
-                3 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
+                4 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
                 _ => self.zone = Zone::List,
             },
             (Zone::Tabs, Cmd::Up) => {
@@ -1747,6 +1761,10 @@ impl Page for DesktopLibrary {
         Some(self)
     }
 
+    fn desktop_mut(&mut self) -> Option<&mut DesktopLibrary> {
+        Some(self)
+    }
+
     fn focus_game(&mut self, id: &str, ctx: &Ctx) {
         // Se o jogo não aparece na aba atual (filtro, coleção), volta para Todos sem a busca.
         if !self.ids(ctx).iter().any(|i| i == id) {
@@ -1997,6 +2015,7 @@ mod tests {
         }
         shell.handle(Cmd::Up);
         assert_eq!(page(&shell).zone(), Zone::Bar);
+        shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Accept);

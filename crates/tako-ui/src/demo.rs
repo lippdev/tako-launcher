@@ -51,6 +51,56 @@ pub fn games() -> Vec<Game> {
         .collect()
 }
 
+/// Sessões e coleções de demonstração para a captura da TelaPerfil: alguns jogos nos últimos dias.
+#[cfg(test)]
+pub fn sessions(ctx: &mut crate::shell::Ctx) {
+    use tako_core::library::{GameStateRecord, PlaySession};
+    type StateChange = Box<dyn FnOnce(Option<GameStateRecord>) -> GameStateRecord>;
+    let ids: Vec<String> = ctx.library.games().iter().map(|g| g.id.clone()).collect();
+    let now = Utc::now();
+    // (jogo, dias atrás, horas atrás no dia, minutos)
+    let plan: [(usize, i64, i64, u64); 8] = [
+        (2, 0, 1, 122),
+        (1, 0, 5, 80),
+        (0, 1, 3, 40),
+        (2, 2, 2, 95),
+        (3, 3, 4, 20),
+        (2, 4, 1, 120),
+        (1, 5, 2, 50),
+        (0, 9, 2, 75),
+    ];
+    let state: Vec<(String, StateChange)> = ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| {
+            let list: Vec<PlaySession> = plan
+                .iter()
+                .rev()
+                .filter(|p| p.0 == i)
+                .map(|&(_, d, h, m)| PlaySession {
+                    started_at: now - Days::days(d) - Days::hours(h),
+                    duration: Duration::from_secs(m * 60),
+                })
+                .collect();
+            let change: StateChange = Box::new(move |s: Option<GameStateRecord>| GameStateRecord {
+                sessions: list,
+                ..s.unwrap_or_default()
+            });
+            (id.clone(), change)
+        })
+        .collect();
+    ctx.library.import(Vec::new(), state).unwrap();
+    for (name, games) in [("Roguelikes", &[2, 7, 9][..]), ("Sofá", &[0, 1, 3, 4][..])] {
+        if let Ok(c) = ctx.collections.create(name, Some(&ids[games[0]])) {
+            let cid = c.id.clone();
+            for g in &games[1..] {
+                let _ = ctx.collections.toggle(&cid, &ids[*g]);
+            }
+        }
+    }
+    ctx.sync_collections();
+}
+
 #[derive(Default)]
 pub struct MemoryCollections(Vec<CollectionInfo>);
 

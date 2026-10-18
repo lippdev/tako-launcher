@@ -21,6 +21,7 @@ pub mod layer;
 pub mod library;
 mod links;
 pub mod performance;
+pub mod profile;
 pub mod profiles;
 pub mod settings;
 pub mod sidebar;
@@ -111,6 +112,9 @@ pub trait Page {
     fn desktop(&self) -> Option<&desktop::DesktopLibrary> {
         None
     }
+    fn desktop_mut(&mut self) -> Option<&mut desktop::DesktopLibrary> {
+        None
+    }
 }
 
 pub const TOAST_TIME: Duration = Duration::from_millis(2600);
@@ -180,7 +184,7 @@ impl Shell {
         self.pages.first()?.desktop()
     }
 
-    /// Barra superior do desktop: Biblioteca, Configurações e Tela cheia.
+    /// Barra superior do desktop: Biblioteca, Configurações, Tela cheia e Perfil (3).
     fn desktop_nav(&mut self, index: usize) {
         self.layers.clear();
         match index {
@@ -192,6 +196,10 @@ impl Shell {
             2 => self
                 .ctx
                 .effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
+            3 if self.page().kind() != profile::KIND => {
+                self.pages.truncate(1);
+                self.pages.push(Box::new(profile::ProfilePage::new()));
+            }
             _ => {}
         }
         self.ctx.dirty = true;
@@ -250,7 +258,19 @@ impl Shell {
     pub fn open_route(&mut self, route: &str) {
         // No desktop as rotas são as da barra de cima (links e atalhos da tela cheia caem aqui).
         if self.ctx.desktop {
-            self.desktop_nav(usize::from(route == "settings"));
+            if let Some(key) = route.strip_prefix(desktop::COLLECTION_ROUTE) {
+                self.desktop_nav(0);
+                let Shell { pages, ctx, .. } = self;
+                if let Some(lib) = pages[0].desktop_mut() {
+                    lib.open_collection(key, ctx);
+                }
+                return;
+            }
+            self.desktop_nav(match route {
+                "settings" => 1,
+                profile::ROUTE => 3,
+                _ => 0,
+            });
             return;
         }
         let page: Box<dyn Page> = match route {
@@ -777,7 +797,7 @@ impl Shell {
         out
     }
 
-    /// Barra de cima do desktop: as guias das áreas (Biblioteca; Loja e Perfil quando existirem), a busca e o botão
+    /// Barra de cima do desktop: as guias das áreas (Biblioteca e Perfil; Loja quando existir), a busca e o botão
     /// da tela cheia. Configurações fica no menu da marca.
     fn render_desktop_bar(&self, out: &mut Out) {
         let kind = self.page().kind();
@@ -790,12 +810,10 @@ impl Shell {
         };
         out.set(
             "desk-nav",
-            vec![item(
-                "library",
-                "desktop.library",
-                "grid",
-                kind == "desk-library",
-            )],
+            vec![
+                item("library", "desktop.library", "grid", kind == "desk-library"),
+                item("profile", "profile.tab", "user", kind == profile::KIND),
+            ],
         );
         out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
         out.set(
