@@ -3428,12 +3428,13 @@ component DeskRow inherits Rectangle {
 component PopupButton inherits Rectangle {
     in property <PanelRow> data;
     in property <bool> focused;
+    in property <length> custom-height;
     callback clicked();
     // "Continuar" e "Concluir" dos assistentes também são a ação principal aqui.
     property <bool> primary: data.style == "primary" || data.key == "next" || data.key == "done";
     in property <length> min-w;
-    height: Ui.control-height;
-    width: max(min-w, primary ? 110px : 0, pl.preferred-width);
+    height: custom-height > 0 ? custom-height : Ui.control-height;
+    preferred-width: max(min-w, primary ? 110px : 0, pl.preferred-width);
     border-radius: self.height / 2;
     background: primary
         ? @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%)
@@ -4341,11 +4342,30 @@ component DeskOverlay inherits Rectangle {
                             wrap: word-wrap;
                         }
                         Rectangle { vertical-stretch: 1; }
-                        PopupButton { width: 380px; data: ov.rows[3]; clicked => { root.clicked("use", 0); } }
-                        HorizontalLayout {
+                        // Regra .dk-stack: botão principal na largura toda em cima (52) e as duas secundárias embaixo lado a lado com a mesma largura (44, 10 entre elas).
+                        VerticalLayout {
                             spacing: 10px;
-                            PopupButton { horizontal-stretch: 1; data: ov.rows[4]; clicked => { root.clicked("original", 0); } }
-                            PopupButton { horizontal-stretch: 1; data: ov.rows[5]; clicked => { root.clicked("cancel", 0); } }
+                            PopupButton {
+                                width: parent.width;
+                                custom-height: 52px;
+                                data: ov.rows[3];
+                                clicked => { root.clicked("use", 0); }
+                            }
+                            HorizontalLayout {
+                                spacing: 10px;
+                                PopupButton {
+                                    horizontal-stretch: 1;
+                                    custom-height: 44px;
+                                    data: ov.rows[4];
+                                    clicked => { root.clicked("original", 0); }
+                                }
+                                PopupButton {
+                                    horizontal-stretch: 1;
+                                    custom-height: 44px;
+                                    data: ov.rows[5];
+                                    clicked => { root.clicked("cancel", 0); }
+                                }
+                            }
                         }
                     }
                 }
