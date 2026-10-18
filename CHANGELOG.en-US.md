@@ -2,6 +2,16 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.10]
+### What's new
+- **First run:** the subtitle shows in full, the "How do you want to open Tako?" step fits small windows and the last step has "Review covers". With no games found, it offers "Add a game by hand" and "Search again".
+- **Categories:** when no game has a status, the screen explains how to mark one and offers "Group by Store".
+- **Playing:** the highlight shows how long the current session has been open.
+- **This game's settings:** what you changed shows Tako's default under it, and "Use all of Tako's settings" asks before discarding the changes.
+- **Controls:** low battery shows in yellow, and "Restore shortcuts" asks first.
+- **Toasts:** they stay 4 seconds, or 8 when they offer "Undo", and stay readable over any art.
+- **Game that closed on its own:** the dialog shows the cover, how long after opening it closed and "Repair files" when the store allows it.
+
 ## [0.2.0-alpha.9]
 ### What's new
 - **Game logo in the highlight:** the game title becomes its official logo (from Steam, or SteamGridDB when missing). Without a logo, with low contrast over the art or if you prefer, the name comes back as text. Choose in Settings › Appearance › "Game titles", or per game in the Logo tab of Change images.
