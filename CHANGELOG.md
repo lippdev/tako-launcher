@@ -2,6 +2,16 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.11]
+### Novidades
+- **Mais leve e mais fluido:** o Tako usa bem menos memória (cada imagem fica uma vez só na placa de vídeo e o fundo é carregado no tamanho da janela), a lista de jogos rola sem travar e o app acompanha monitores de 120 Hz ou mais.
+- **Lista de jogos mais compacta:** linhas mais baixas, sem o ícone da loja; a loja do jogo escolhido aparece no canto superior direito. Escolher um jogo não desloca mais nada na linha.
+- **Adicionar jogo:** botão "+" ao lado da contagem de jogos e "Adicionar jogo…" no menu do Tako.
+- **Mais sobre o jogo:** role sobre o destaque (ou aperte Page Down) para ver uma segunda tela com a descrição inteira, todos os detalhes, as sessões e as imagens. Role para cima, Page Up ou Esc voltam.
+- **Abertura em etapas:** ao abrir, a tela aparece por partes, de forma suave. "Reduzir animações" desliga.
+- **Troca de jogo sem piscar:** o vidro e as cores mudam junto com a arte.
+- A barra da janela não repete mais o logo, e o logo da barra superior está mais nítido e reage ao mouse.
+
 ## [0.2.0-alpha.10]
 ### Novidades
 - **Primeira abertura:** o subtítulo aparece inteiro, o passo "Como você quer abrir o Tako?" cabe em janelas pequenas e o último passo tem "Revisar capas". Sem nenhum jogo encontrado, oferece "Adicionar jogo à mão" e "Procurar de novo".
