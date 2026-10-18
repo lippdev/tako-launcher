@@ -286,7 +286,7 @@ fn enabled_row(ctx: &Ctx, text: &str, on: bool, flip: fn(&mut Providers)) -> Men
     })
 }
 
-fn igdb_panel(ctx: &Ctx) -> MenuLayer {
+pub(crate) fn igdb_panel(ctx: &Ctx) -> MenuLayer {
     let status: Status = Rc::default();
     MenuLayer::panel(ctx.t("settings.metadata.igdb"), move |ctx| {
         let p = providers(ctx).igdb;

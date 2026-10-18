@@ -428,7 +428,18 @@ fn desktop_snapshot() {
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("settings") => shell.open_route("settings"),
-            Ok("first-run") => {
+            Ok("onb-covers") => {
+                // A comparação precisa de um jogo com capa: a arte da captura vira a capa do primeiro.
+                if let Ok(p) = std::env::var("TAKO_SNAP_ART") {
+                    if let Some(g) = shell.ctx.found.lock().unwrap().first_mut() {
+                        g.cover_uri = Some(format!("file://{p}"));
+                    }
+                    shell.ctx.library.refresh();
+                }
+                let layer = crate::shell::first_run::covers(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("first-run" | "onb-stores") => {
                 let layer = crate::shell::first_run::welcome(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
