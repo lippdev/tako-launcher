@@ -449,6 +449,45 @@ fn desktop_snapshot() {
                 let layer = crate::shell::art::picker(&shell.ctx, &id);
                 shell.push_layer(layer);
             }
+            // FilaDeCapas: achados só pelo nome, com nomes mais e menos parecidos, nas Configurações › Capas e metadados.
+            Ok("covers") => {
+                use tako_core::metadata::GameMetadata;
+                let games: Vec<_> = shell.ctx.library.games().iter().take(7).cloned().collect();
+                let variants = [
+                    "{} Remastered",
+                    "Outro Jogo Totalmente Diferente",
+                    "{}: Edition",
+                    "{} 2",
+                    "{} Remake",
+                    "{}!",
+                    "Algo Quase Igual a {}",
+                ];
+                for (g, v) in games.iter().zip(variants) {
+                    let part = GameMetadata {
+                        source_ids: [("IGDB".to_owned(), "77".to_owned())].into(),
+                        title: Some(v.replace("{}", &g.title)),
+                        matched_by_title: true,
+                        cover_url: Some("https://x/c.png".into()),
+                        ..GameMetadata::new("IGDB")
+                    };
+                    let cached = GameMetadata {
+                        parts: vec![part],
+                        ..GameMetadata::new("IGDB")
+                    };
+                    crate::metadata::cache(&shell.ctx)
+                        .write(&g.id, &cached)
+                        .unwrap();
+                }
+                shell.open_route("settings");
+                shell.click("category", 2);
+                // A fila é conferida numa thread: espera ela terminar.
+                for _ in 0..40 {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    if crate::shell::art_review::pending(&shell.ctx).is_some() {
+                        break;
+                    }
+                }
+            }
             // EtiquetasDoJogo: etiquetas nos primeiros jogos e o editor do primeiro (`TAKO_SNAP_TYPE=<texto>` digita).
             Ok("tags") => {
                 let ids: Vec<String> = (0..3)

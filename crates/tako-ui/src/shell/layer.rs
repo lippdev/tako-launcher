@@ -109,6 +109,9 @@ pub struct MenuItem {
     pub options: Option<Options>,
     /// No desktop, o controle deslizante (arrastar, trilha, roda, Home/End) vai direto a um valor.
     pub slide: Option<Slide>,
+    /// Desktop: linha da fila de capas (duas ações dentro da linha: `accept` e `alt`).
+    pub cover: Option<crate::model::CoverRow>,
+    pub alt: Option<Action>,
 }
 
 impl MenuItem {
@@ -127,7 +130,18 @@ impl MenuItem {
             adjust: None,
             options: None,
             slide: None,
+            cover: None,
+            alt: None,
         }
+    }
+    pub fn cover(
+        mut self,
+        c: crate::model::CoverRow,
+        alt: impl Fn(&mut Ctx) -> Flow + 'static,
+    ) -> Self {
+        self.cover = Some(c);
+        self.alt = Some(Rc::new(alt));
+        self
     }
     pub fn on_slide(mut self, f: impl Fn(&mut Ctx, i32, bool) -> Flow + 'static) -> Self {
         self.slide = Some(Rc::new(f));

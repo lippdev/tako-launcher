@@ -176,6 +176,13 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(described(ctx, "settings.metadata.clear").value(format_bytes(cache_size)))
             .on(|ctx| Flow::Push(Box::new(confirm_clear(ctx)))),
     ]);
+    if ctx.desktop {
+        // FilaDeCapas: a fila no topo, no lugar da linha que abria o painel.
+        v.retain(|i| i.row.key != "review");
+        let mut queue = crate::shell::art_review::queue_rows(ctx);
+        queue.extend(v);
+        v = queue;
+    }
     v
 }
 

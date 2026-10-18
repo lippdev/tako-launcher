@@ -1102,10 +1102,13 @@ impl Page for SettingsPage {
                 icon: c.icon.into(),
                 selected: i == self.cat && self.query.is_empty(),
                 // Na busca, `count` diz quantas linhas da categoria combinam ("0" apaga a categoria).
-                count: if self.query.is_empty() {
-                    String::new()
-                } else {
+                count: if !self.query.is_empty() {
                     self.matches_in(ctx, i).to_string()
+                } else if ctx.desktop && c.id == "metadata" {
+                    // FilaDeCapas: quantos jogos esperam revisão, no item da categoria.
+                    super::art_review::pending(ctx).map_or_else(String::new, |n| n.to_string())
+                } else {
+                    String::new()
                 },
                 ..Default::default()
             })
@@ -1142,6 +1145,13 @@ impl Page for SettingsPage {
                 ctx.tf("desktop.settings_found", &[("n", &n.to_string())]),
             );
         }
+        if ctx.desktop {
+            let covers: Vec<crate::model::CoverRow> = items
+                .iter()
+                .map(|i| i.cover.clone().unwrap_or_default())
+                .collect();
+            out.set("settings-covers", covers);
+        }
         let rows: Vec<PanelRow> = items.into_iter().map(|i| i.shown(ctx)).collect();
         out.set("settings-rows", rows);
         out.set(
@@ -1173,6 +1183,16 @@ impl Page for SettingsPage {
                     .items(ctx)
                     .get(index)
                     .and_then(|i| i.slide_zone(z, ctx));
+                flow.map_or(Nav::Stay, |f| Self::run(f, ctx))
+            }
+            // FilaDeCapas: as ações dentro da linha (0 = Aceitar, 1 = Escolher outra).
+            z if z.starts_with("row-act:") => {
+                self.row = Some(index);
+                let item = self.items(ctx).into_iter().nth(index);
+                let flow = item.and_then(|i| {
+                    let f = if z.ends_with('1') { i.alt } else { i.accept };
+                    f.map(|f| f(ctx))
+                });
                 flow.map_or(Nav::Stay, |f| Self::run(f, ctx))
             }
             // No desktop a categoria só troca as linhas; o foco não pula para elas (e sai da busca).

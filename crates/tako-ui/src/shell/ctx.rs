@@ -219,6 +219,8 @@ pub struct Ctx {
     pub pads_connected: usize,
     /// O controle em uso caiu e nenhum outro ficou: o aviso "Controle desconectado" fica na tela.
     pub pad_lost: bool,
+    /// Fila de revisão de capas do desktop (FilaDeCapas).
+    pub art_review: super::art_review::Queue,
     /// Bateria (%) do controle sem fio em uso; `None` = com fio, desconhecida ou sem controle.
     pub pad_battery: Option<i32>,
     pub input: InputKind,
