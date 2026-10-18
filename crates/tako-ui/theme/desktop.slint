@@ -3125,11 +3125,15 @@ component EmuLogo inherits Rectangle {
     in property <length> size: 24px;
     width: size;
     height: size;
-    property <bool> has-logo: name == "emu-retroarch" || name == "emu-dolphin" || name == "emu-pcsx2" || name == "emu-duckstation";
+    property <bool> has-logo: name == "emu-retroarch" || name == "emu-dolphin" || name == "emu-pcsx2" || name == "emu-duckstation" || name == "emu-ppsspp" || name == "emu-ryujinx" || name == "emu-cemu" || name == "emu-rpcs3";
     if name == "emu-retroarch": Image { width: size; height: size; source: @image-url("emulators/retroarch.png"); image-fit: contain; }
     if name == "emu-dolphin": Image { width: size; height: size; source: @image-url("emulators/dolphin.png"); image-fit: contain; }
     if name == "emu-pcsx2": Image { width: size; height: size; source: @image-url("emulators/pcsx2.png"); image-fit: contain; }
     if name == "emu-duckstation": Image { width: size; height: size; source: @image-url("emulators/duckstation.png"); image-fit: contain; }
+    if name == "emu-ppsspp": Image { width: size; height: size; source: @image-url("emulators/ppsspp.png"); image-fit: contain; }
+    if name == "emu-ryujinx": Image { width: size; height: size; source: @image-url("emulators/ryujinx.png"); image-fit: contain; }
+    if name == "emu-cemu": Image { width: size; height: size; source: @image-url("emulators/cemu.png"); image-fit: contain; }
+    if name == "emu-rpcs3": Image { width: size; height: size; source: @image-url("emulators/rpcs3.png"); image-fit: contain; }
     if !has-logo: Rectangle {
         border-radius: 7px;
         background: Ui.glass-control;

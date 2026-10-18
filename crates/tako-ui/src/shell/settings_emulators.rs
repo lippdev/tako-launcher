@@ -128,7 +128,13 @@ pub(crate) fn rows(ctx: &Ctx, cache: &Cache) -> Vec<MenuItem> {
             MenuItem::new(
                 PanelRow::action(format!("emulator-{}", emu.key()), emu.name())
                     .value(value)
-                    .desc(desc),
+                    .desc(desc)
+                    // Logo oficial do emulador, como no onboarding (só o desktop desenha `emu-*`).
+                    .icon(&if ctx.desktop {
+                        format!("emu-{}", emu.key())
+                    } else {
+                        String::new()
+                    }),
             )
             .on(move |ctx| {
                 if config(ctx).paths.contains_key(&emu) {
