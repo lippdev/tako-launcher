@@ -60,3 +60,9 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] RetroArch, Dolphin, PCSX2, DuckStation e PPSSPP em `/Applications` (ou `~/Applications`): aparecem como "Encontrado" em Biblioteca › Emuladores e ROMs.
 - [ ] As playlists do RetroArch (`~/Library/Application Support/RetroArch`) e as pastas de jogos dos outros entram na loja Emuladores.
 - [ ] Abrir um jogo de cada: tela cheia, direto no jogo, e o Tako acompanha até fechar (o macOS pode pedir permissão para o emulador ler a pasta das ROMs: anotar).
+
+## Jogos não instalados: instalando e espaço livre (SRC-005)
+
+- [ ] Instalar em um jogo da conta Steam abre `steam://install/<appid>`; em até 3 s o jogo aparece "instalando" com a porcentagem e, ao terminar, vira instalado sozinho.
+- [ ] Cancelar a instalação na Steam: o jogo volta a "não instalado". Pausar: a porcentagem para.
+- [ ] O espaço livre mostrado é o do volume da Steam (`~/Library/Application Support/Steam`) e bate com o do Finder (Obter Informações do disco). No APFS o volume do sistema aparece como `/`.
