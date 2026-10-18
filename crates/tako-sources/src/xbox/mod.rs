@@ -97,6 +97,11 @@ pub fn to_game(g: &XboxInstalledGame) -> Game {
             .map(file_uri)
             .or_else(|| cover.clone()),
         has_fallback_art: cover.is_some(),
+        // O logo quadrado do pacote também é o ícone do jogo: o AUMID não tem .exe para extrair.
+        media: cover
+            .iter()
+            .map(|c| (tako_core::library::media::ICON.to_owned(), c.clone()))
+            .collect(),
         cover_uri: cover,
         is_installed: true,
         added_at: g.installed_at,
@@ -605,6 +610,7 @@ mod tests {
         assert!(game.can_play());
         assert!(game.has_fallback_art);
         assert_eq!(game.cover_uri, game.hero_uri);
+        assert_eq!(game.media.get("icon"), game.cover_uri.as_ref());
         assert_eq!(
             game.cover_uri.as_deref(),
             Some("file:///C:/XboxGames/Contoso%20Racing/Content/cover.png")
