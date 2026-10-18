@@ -727,8 +727,24 @@ impl App {
                     "max" => {
                         let max = !window.is_maximized();
                         window.set_maximized(max);
-                        // shortcut: Win+↑/↓ não atualiza o ícone até o próximo clique; ler o estado no redesenho resolveria.
                         let _ = ui.set_property("window-maximized", Value::Bool(max));
+                    }
+                    "update" => {
+                        drop(ui);
+                        app.shell.borrow_mut().ctx.effect(Effect::InstallUpdate);
+                        app.redraw();
+                    }
+                    menu if menu.starts_with("menu:") => {
+                        use slint::winit_030::WinitWindowAccessor;
+                        let mut xy = menu["menu:".len()..]
+                            .split(',')
+                            .map(|n| n.parse::<f64>().unwrap_or(0.));
+                        let (x, y) = (xy.next().unwrap_or(0.), xy.next().unwrap_or(0.));
+                        window.with_winit_window(|w| {
+                            w.show_window_menu(slint::winit_030::winit::dpi::LogicalPosition::new(
+                                x, y,
+                            ));
+                        });
                     }
                     "close" => {
                         drop(ui);
@@ -744,6 +760,27 @@ impl App {
                 }
                 Value::Void
             });
+        }
+        {
+            // Win+↑/↓, o encaixe e a troca de foco mudam a janela por fora do Tako: a BarraDaJanela lê o estado.
+            let app = self.clone();
+            let timer = slint::Timer::default();
+            timer.start(
+                slint::TimerMode::Repeated,
+                Duration::from_millis(250),
+                move || {
+                    use slint::winit_030::WinitWindowAccessor;
+                    if !app.shell.borrow().ctx.desktop {
+                        return;
+                    }
+                    let ui = app.ui.borrow();
+                    let window = ui.window();
+                    let active = window.with_winit_window(|w| w.has_focus()).unwrap_or(true);
+                    bridge::set(&ui, "window-maximized", window.is_maximized().to_value());
+                    bridge::set(&ui, "window-active", active.to_value());
+                },
+            );
+            WINDOW_STATE.with(|t| *t.borrow_mut() = Some(timer));
         }
         let _ = ui.set_callback("key-released", |_| Value::Void);
         // Fechar a janela pelo sistema (Alt+F4, botão da janela) é o mesmo que "Sair para o desktop".
@@ -958,6 +995,8 @@ impl App {
 }
 
 thread_local! {
+    /// Lê maximizada e em foco para a BarraDaJanela (desktop).
+    static WINDOW_STATE: RefCell<Option<slint::Timer>> = const { RefCell::new(None) };
     /// O app rodando nesta thread (a da interface), para pedidos que chegam de fora (outro Tako aberto).
     static CURRENT: RefCell<Option<App>> = const { RefCell::new(None) };
 }

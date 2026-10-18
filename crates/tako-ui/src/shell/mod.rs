@@ -804,6 +804,14 @@ impl Shell {
                 .map(|k| self.ctx.t(&format!("desktop.window.{k}")))
                 .to_vec(),
         );
+        out.set(
+            "desk-update-label",
+            if self.ctx.update_ready.is_some() {
+                self.ctx.t("desktop.window.update_ready")
+            } else {
+                String::new()
+            },
+        );
         out.set("desk-brand-label", self.ctx.t("desktop.menu.brand"));
         out.set("desk-search-key", self.ctx.t("desktop.search_key"));
         out.set("desk-search-esc", self.ctx.t("desktop.search_esc"));

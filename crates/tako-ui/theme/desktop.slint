@@ -3864,6 +3864,7 @@ component ArtLayer inherits Rectangle {
 component WindowButton inherits Rectangle {
     in property <string> kind;
     in property <string> label;
+    in property <bool> active: true;
     callback clicked();
     width: 46px;
     height: Ui.titlebar-height;
@@ -3881,7 +3882,7 @@ component WindowButton inherits Rectangle {
             : kind == "max" ? "M 0.5 0.5 H 9.5 V 9.5 H 0.5 Z"
             : kind == "restore" ? "M 2.5 0.5 H 9.5 V 7.5 M 0.5 2.5 H 7.5 V 9.5 H 0.5 Z"
             : "M 0 0 L 10 10 M 10 0 L 0 10";
-        stroke: ta.has-hover ? Ui.on-accent : Ui.desk-on-muted;
+        stroke: ta.has-hover ? Ui.on-accent : (active ? Ui.desk-on-muted : Ui.on-accent-subtle);
         stroke-width: 1px;
         fill: transparent;
     }
@@ -3890,8 +3891,12 @@ component WindowButton inherits Rectangle {
 
 component DeskTitleBar inherits Rectangle {
     in property <bool> maximized;
+    // Janela sem foco: ícones em on-accent-subtle e logo a 55%.
+    in property <bool> active: true;
     // Minimizar, Maximizar, Restaurar, Fechar.
     in property <[string]> labels;
+    // "Atualização pronta" (vazio = sem atualização): pílula antes dos botões; clique reinicia.
+    in property <string> update-label;
     callback action(string);
     height: Ui.titlebar-height;
     background: @linear-gradient(180deg, Ui.art-scrim-strong 0%, Ui.art-scrim-strong.with-alpha(0) 100%);
@@ -3899,6 +3904,10 @@ component DeskTitleBar inherits Rectangle {
         pointer-event(ev) => {
             if (ev.button == PointerEventButton.left && ev.kind == PointerEventKind.down) {
                 root.action("drag");
+            }
+            // Clique direito: o menu de sistema do Windows, no ponto do clique.
+            if (ev.button == PointerEventButton.right && ev.kind == PointerEventKind.up) {
+                root.action("menu:" + self.mouse-x / 1px + "," + self.mouse-y / 1px);
             }
         }
         double-clicked => { root.action("max"); }
@@ -3908,14 +3917,34 @@ component DeskTitleBar inherits Rectangle {
         y: (parent.height - self.height) / 2;
         width: 47px;
         height: 18px;
-        source: @image-url("tako-logo.png");
+        // Cópia em 2× (94 × 36): reduzir o PNG de 495 direto para 47 serrilhava o logo.
+        source: @image-url("tako-logo-bar.png");
         image-fit: contain;
+        opacity: active ? 1 : 0.55;
     }
     HorizontalLayout {
         alignment: end;
-        WindowButton { kind: "min"; label: labels[0]; clicked => { root.action("min"); } }
-        WindowButton { kind: maximized ? "restore" : "max"; label: maximized ? labels[2] : labels[1]; clicked => { root.action("max"); } }
-        WindowButton { kind: "close"; label: labels[3]; clicked => { root.action("close"); } }
+        if update-label != "": Rectangle {
+            width: ul.preferred-width + 26px + 8px;
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: parent.width - 8px;
+                height: 24px;
+                border-radius: self.height / 2;
+                background: uta.has-hover ? Ui.glass-hover : Ui.glass-control;
+                border-width: 1px;
+                border-color: Ui.glass-edge;
+                animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                accessible-role: button;
+                accessible-label: update-label;
+                Rectangle { x: 10px; width: 6px; height: 6px; border-radius: 3px; background: Ui.success; }
+                ul := Text { x: 22px; text: update-label; color: Ui.on-accent; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                uta := TouchArea { mouse-cursor: pointer; clicked => { root.action("update"); } }
+            }
+        }
+        WindowButton { kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
+        WindowButton { kind: maximized ? "restore" : "max"; active: root.active; label: maximized ? labels[2] : labels[1]; clicked => { root.action("max"); } }
+        WindowButton { kind: "close"; active: root.active; label: labels[3]; clicked => { root.action("close"); } }
     }
 }
 
@@ -4022,6 +4051,8 @@ export component Desktop inherits Window {
     // Sem a moldura do sistema: a BarraDaJanela desenha logo e botões.
     no-frame: true;
     in property <bool> window-maximized;
+    in property <bool> window-active: true;
+    in property <string> desk-update-label;
     in property <[string]> desk-window-labels: ["", "", "", ""];
     callback window-action(string);
     preferred-width: 1280px;
@@ -4318,6 +4349,8 @@ export component Desktop inherits Window {
         y: 0;
         width: root.width;
         maximized: root.window-maximized;
+        active: root.window-active;
+        update-label: root.desk-update-label;
         labels: root.desk-window-labels;
         action(a) => { root.window-action(a); }
     }

@@ -138,6 +138,7 @@ see_all = "See all"
 summary = "{n} sessions · {avg} on average"
 
 [desktop.window]
+update_ready = "Update ready"
 minimize = "Minimize"
 maximize = "Maximize"
 restore = "Restore"

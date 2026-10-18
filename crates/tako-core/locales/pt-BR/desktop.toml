@@ -138,6 +138,7 @@ see_all = "Ver todas"
 summary = "{n} sessões · média de {avg}"
 
 [desktop.window]
+update_ready = "Atualização pronta"
 minimize = "Minimizar"
 maximize = "Maximizar"
 restore = "Restaurar"
