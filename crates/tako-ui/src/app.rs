@@ -216,6 +216,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         metadata: None,
         broken_checked: None,
         desktop: false,
+        art_height: 2160,
         list_first: 0,
         focus_visible: false,
     };
@@ -389,6 +390,10 @@ impl App {
         let (def, dir) = load_mode(&ctx, &builtin, mode)?;
         let ui = def.create().map_err(|e| e.to_string())?;
         theme::apply_tokens(&ui, dir.as_deref());
+        // Entrada do app (só na abertura, não na volta da tela cheia): começa apagado e acende depois do 1º quadro.
+        if mode == UiMode::Desktop {
+            bridge::set(&ui, "desk-intro", Value::Bool(true));
+        }
         let mut shell = Shell::new(ctx);
         if mode == UiMode::Desktop {
             shell.enter_desktop();
@@ -457,7 +462,14 @@ impl App {
     pub fn redraw(&self) {
         let action = pump_effects(&self.shell, &self.host);
         self.apply(action);
-        render(&self.shell, &self.ui.borrow());
+        // Minimizada (PRD §8; no desktop, durante o jogo): nada muda no tema, então nada anima nem redesenha (o
+        // femtovg desenha mesmo com a janela escondida). `dirty` fica para a volta; o fim do jogo ainda passa, porque
+        // é o `render` que restaura a janela.
+        let ui = self.ui.borrow();
+        if ui.window().is_minimized() && self.shell.borrow().ctx.welcome_back.is_none() {
+            return;
+        }
+        render(&self.shell, &ui);
     }
 
     pub fn apply(&self, action: HostAction) {
@@ -983,9 +995,20 @@ impl App {
         ui.window()
             .set_fullscreen(self.mode.get() == UiMode::BigPicture && big_picture_fullscreen());
         // Quem já observa os quadros (o benchmark) fica com o aviso; aqui é só a primeira tela.
-        let _ = ui.window().set_rendering_notifier(|state, _| {
+        let weak = ui.as_weak();
+        let mut intro = self.mode.get() == UiMode::Desktop;
+        let _ = ui.window().set_rendering_notifier(move |state, _| {
             if let slint::RenderingState::AfterRendering = state {
                 crate::shell::performance::first_frame_drawn();
+                // O primeiro quadro saiu apagado: a entrada começa no próximo (fora do desenho).
+                if std::mem::take(&mut intro) {
+                    let weak = weak.clone();
+                    slint::Timer::single_shot(Duration::ZERO, move || {
+                        if let Some(ui) = weak.upgrade() {
+                            bridge::set(&ui, "desk-intro", Value::Bool(false));
+                        }
+                    });
+                }
             }
         });
         ui.show().map_err(|e| e.to_string())?;
@@ -1214,6 +1237,10 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         ));
         w.set_fullscreen(full);
     }
+    let size = ui.window().size();
+    if size.width > 0 && size.height > 0 {
+        s.ctx.art_height = crate::shell::tiles::art_height(size.width, size.height);
+    }
     if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
         s.ctx.grid_columns = (n as usize).max(1);
     }
@@ -1263,7 +1290,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
             .to_value(),
     );
     let art = game
-        .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::HERO))
+        .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::hero(&s.ctx)))
         .unwrap_or_default();
     bridge::set(ui, "backdrop", art.to_value());
     images::frame_done();

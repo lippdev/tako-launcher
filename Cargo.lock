@@ -5033,6 +5033,7 @@ name = "tako-ui"
 version = "0.2.0-alpha.1"
 dependencies = [
  "chrono",
+ "i-slint-core",
  "image",
  "rfd",
  "sdl3",

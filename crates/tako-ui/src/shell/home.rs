@@ -324,7 +324,7 @@ impl Page for HomePage {
                 overline: overline.to_uppercase(),
                 meta: meta.join(" · "),
                 description: g.description.clone(),
-                art: tiles::image(g.shown_hero(), tiles::HERO),
+                art: tiles::image(g.shown_hero(), tiles::hero(ctx)),
                 logo: tiles::image(g.shown_logo(), tiles::LOGO),
                 play_label: tiles::play_label(ctx, g),
                 running: ctx.running.as_ref().is_some_and(|r| r.id == g.id),

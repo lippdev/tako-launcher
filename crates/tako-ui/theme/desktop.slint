@@ -35,9 +35,10 @@ export { Ui }
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, store-icon: string, store-name: string }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
+struct DeskMore { on: bool, labels: [string], description: string, details: [DeskInfo], sessions-summary: string, sessions: [DeskInfo], shots: [image] }
 
 // Ícone do desktop: cor opaca com a transparência no elemento inteiro (com a cor translúcida no traço, o femtovg
 // somava a transparência onde os traços se cruzam e o ícone parecia ter contorno) e pontas e cantos redondos,
@@ -90,8 +91,18 @@ export global DeskText {
     in-out property <string> max: "Volume máximo";
 }
 
+// Entrada do app: falso enquanto o primeiro quadro não sai (o Tako liga `desk-intro` só na abertura); ao virar
+// verdadeiro, cada parte entra no seu passo (`Ui.intro-delay`). Fica verdadeiro no resto do tempo.
+global DeskIntro {
+    in-out property <bool> on: true;
+}
+
 global DeskArt {
     in-out property <image> blur;
+    // Troca de jogo: a cópia do jogo anterior fica embaixo e a nova (`blur`) entra por cima junto com a arte, para o
+    // vidro e as bordas não trocarem antes do fundo (TrocaDeJogo › luz ambiente, vidro, accent).
+    in-out property <image> blur-old;
+    in-out property <bool> blur-in: true;
     // Largura do select que abriu a lista (SeletorDeColecao: a lista tem a largura dele); 0 = pela lista.
     in-out property <length> anchor-w;
     // Luminância média da cópia numa grade de 16 × 9 (linhas de cima para baixo).
@@ -101,8 +112,9 @@ global DeskArt {
     in-out property <float> aspect: 16 / 9;
     in-out property <length> win-w;
     in-out property <length> win-h;
-    out property <color> accent: Ui.accent;
-    out property <color> accent-deep: Ui.accent-deep;
+    // A cor do jogo cuja arte está na tela (o Desktop troca junto com a arte; quem pinta com ela anima em `art-fade`).
+    in-out property <color> accent: Ui.accent;
+    in-out property <color> accent-deep: Ui.accent-deep;
     // Retângulo da arte na janela (FundoDoJogo, padrão 3840 × 1240): cobre a altura com o centro da arte a 62% da
     // largura, sem sobra nas bordas; numa janela mais larga que a arte, cobre a largura e ancora a 30% do topo.
     out property <bool> small: win-w < 1280px;
@@ -157,6 +169,16 @@ component Vidro inherits Rectangle {
             width: DeskArt.win-w;
             height: DeskArt.win-h;
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
+            animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        }
+        // Troca de jogo: a cópia anterior embaixo e a nova entrando por cima junto com a arte.
+        if lens && DeskArt.has-art: Image {
+            x: DeskArt.bx - ax;
+            y: DeskArt.y - ay;
+            width: DeskArt.bw;
+            height: DeskArt.h;
+            source: DeskArt.blur-old;
+            image-fit: fill;
         }
         if lens && DeskArt.has-art: Image {
             x: DeskArt.bx - ax;
@@ -165,8 +187,8 @@ component Vidro inherits Rectangle {
             height: DeskArt.h;
             source: DeskArt.blur;
             image-fit: fill;
-            opacity: DeskArt.blur.width > 0 ? 1 : 0;
-            animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            opacity: DeskArt.blur.width > 0 && DeskArt.blur-in ? 1 : 0;
+            animate opacity { duration: Ui.art-fade(DeskArt.blur-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // O vidro desfoca o que está atrás dele: a arte já com a luz da cor do jogo e os escurecimentos da janela.
         if lens && DeskArt.has-art: Rectangle {
@@ -174,7 +196,10 @@ component Vidro inherits Rectangle {
             y: -ay;
             width: DeskArt.win-w;
             height: DeskArt.win-h;
-            Rectangle { background: DeskArt.accent.with-alpha(0.22); }
+            Rectangle {
+                background: DeskArt.accent.with-alpha(0.22);
+                animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            }
             Rectangle {
                 background: DeskArt.small
                     ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
@@ -195,6 +220,7 @@ component Vidro inherits Rectangle {
             width: Ui.glass-light-width * 2;
             height: Ui.glass-light-height * 2;
             background: @radial-gradient(circle, DeskArt.accent.with-alpha(0.16) 0%, DeskArt.accent.with-alpha(0) 75%);
+            animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // Volume da lente: brilho de cima, 150 px fixos para barra, painel e cartão parecerem o mesmo material.
         if !DeskArt.gray: Rectangle {
@@ -455,11 +481,16 @@ component TopBar inherits Vidro {
                 padding-right: 10px;
                 spacing: 4px;
                 Image {
-                    source: @image-url("tako-logo.png");
+                    // Cópia em 2× (198 × 92) da logo horizontal: a exibida em 46px de altura ficava serrilhada.
+                    source: @image-url("tako-logo-brand.png");
                     height: small ? 38px : 46px;
-                    width: self.height * 495 / 192;
+                    width: self.height * 1842 / 854;
                     y: (parent.height - self.height) / 2;
                     image-fit: contain;
+                    // Hover: leve aumento e brilho; com "Reduzir animações" a escala fica em 1.
+                    opacity: bta.has-hover ? 1 : 0.9;
+                    transform-scale: bta.has-hover && !Ui.reduce-motion ? 1.04 : 1;
+                    animate transform-scale, opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
                 }
                 DeskIcon { name: "chevron-down"; size: 12px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
             }
@@ -668,6 +699,7 @@ component GameRow inherits Rectangle {
     in property <bool> selected;
     in property <bool> focused;
     in property <bool> selecting;
+    in property <length> thumb: Ui.thumb-size;
     callback clicked();
     callback toggle();
     callback range();
@@ -720,7 +752,7 @@ component GameRow inherits Rectangle {
         Rectangle {
             y: (parent.height - self.height) / 2;
             // 40 na linha comum, 32 na linha compacta da janela pequena.
-            width: min(Ui.thumb-size, root.height - 10px);
+            width: root.thumb;
             height: self.width;
             border-radius: Ui.radius-thumb;
             clip: true;
@@ -745,13 +777,10 @@ component GameRow inherits Rectangle {
             border-radius: 4px;
             background: Ui.success;
         }
+        // Vaga fixa do ▶: a linha escolhida não empurra nada (FIX-004). A loja fica no destaque.
         Rectangle {
-            width: 18px;
-            accessible-role: image;
-            accessible-label: data.store-name;
-            DeskIcon { name: data.store-icon; size: 16px; tint: picked ? Ui.desk-on-muted : Ui.desk-on-subtle; }
-        }
-        if selected && !selecting: Rectangle {
+            width: 36px;
+            if selected && !selecting: Rectangle {
             y: (parent.height - self.height) / 2;
             width: 36px;
             height: 36px;
@@ -766,8 +795,8 @@ component GameRow inherits Rectangle {
                 mouse-cursor: pointer;
                 clicked => { root.play(); }
             }
+            }
         }
-        if !selected || selecting: Rectangle { width: 2px; }
     }
     // Nome longo corta com reticências; o inteiro fica na dica.
     Tip { text: data.title.character-count > 26 ? data.title : ""; hovering: ta.has-hover; }
@@ -785,9 +814,11 @@ component GameList inherits Rectangle {
     callback scrolled(int);
     // Janela pequena (JanelaPequena): linhas compactas de 42 com miniatura de 32.
     in property <bool> compact;
-    property <length> row-h: (compact ? 42px : Ui.list-row-height) + (Ui.text-scale - 1) * 32px + 6px;
+    property <length> row-h: (compact ? 42px : Ui.game-row-height) + (Ui.text-scale - 1) * 32px + 6px;
     property <int> first: max(0, floor(-fl.viewport-y / row-h));
-    property <int> shown: min(ceil(fl.height / row-h) + 2, max(0, games.length - first));
+    // Vagas fixas: a linha `r` fica sempre na vaga `mod(r, slots)`. Rolar uma linha troca só a vaga que saiu de cima
+    // (ela entra embaixo); as outras guardam dados, textos, miniatura e a seleção, sem refazer nada por quadro.
+    property <int> slots: min(ceil(fl.height / row-h) + 2, games.length);
     changed first => { root.scrolled(first); }
     changed selected => {
         if (selected >= 0) {
@@ -801,22 +832,30 @@ component GameList inherits Rectangle {
     // Sem `clip` aqui: o Flickable já recorta as linhas e a barra de rolagem fica fora, na borda do painel.
     fl := Flickable {
         viewport-height: games.length * row-h;
-        for i in shown: GameRow {
+        for k in slots: GameRow {
+            // `want` muda em todas as vagas a cada linha rolada; `r` só na que trocou de linha (o `changed` corta a
+            // propagação), então só ela refaz `data` e o que depende dele.
+            property <int> want: first + mod(k - first, slots);
+            property <int> r;
+            init => { r = want; }
+            changed want => { r = want; }
+            visible: r < games.length;
             x: 0;
-            y: (first + i) * row-h;
+            y: r * row-h;
             width: fl.width;
             height: row-h - 6px;
-            data: games[first + i];
-            selected: first + i == root.selected;
-            focused: key-focus && first + i == root.selected;
+            thumb: compact ? 32px : Ui.thumb-size;
+            data: games[r];
+            selected: r == root.selected;
+            focused: key-focus && r == root.selected;
             selecting: root.selecting;
-            clicked => { root.clicked("game", first + i); }
-            toggle => { root.clicked("game-toggle", first + i); }
-            range => { root.clicked("game-range", first + i); }
-            play => { root.clicked("game-play", first + i); }
+            clicked => { root.clicked("game", r); }
+            toggle => { root.clicked("game-toggle", r); }
+            range => { root.clicked("game-range", r); }
+            play => { root.clicked("game-play", r); }
             menu(x, y) => {
                 root.menu(x, y);
-                root.clicked("game-menu", first + i);
+                root.clicked("game-menu", r);
             }
         }
     }
@@ -1278,6 +1317,27 @@ component Badge inherits Rectangle {
     }
 }
 
+// Loja de origem do jogo escolhido: cápsula de vidro com o logo e o nome.
+component StorePill inherits Rectangle {
+    in property <string> icon;
+    in property <string> text;
+    height: 28px;
+    width: sl.preferred-width;
+    border-radius: self.height / 2;
+    background: Ui.glass-control;
+    border-width: 1px;
+    border-color: Ui.glass-edge-strong;
+    accessible-role: image;
+    accessible-label: text;
+    sl := HorizontalLayout {
+        padding-left: Ui.space-12;
+        padding-right: Ui.space-12;
+        spacing: 7px;
+        DeskIcon { name: icon; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+    }
+}
+
 // Faixa de estado do jogo: cápsula de vidro com itens separados por divisórias (ícone de 26, rótulo em caixa alta e
 // valor). Só os itens que o Tako tem; na janela pequena, os três primeiros.
 component StatusStrip inherits Vidro {
@@ -1616,8 +1676,19 @@ component CardRow inherits Rectangle {
     property <length> details-w: unit * s-details;
     // Altura que o conteúdo pede (Detalhes com seis linhas), para a fileira crescer em vez de cortar.
     out property <length> content-h: dc.min-height;
+    // Entrada do app: os cartões acendem um a um depois das ações, subindo `intro-rise`.
+    property <float> intro-about: DeskIntro.on ? 1 : 0;
+    animate intro-about { duration: Ui.page-time; delay: Ui.intro-delay(5); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-trailer: DeskIntro.on ? 1 : 0;
+    animate intro-trailer { duration: Ui.page-time; delay: Ui.intro-delay(6); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-details: DeskIntro.on ? 1 : 0;
+    animate intro-details { duration: Ui.page-time; delay: Ui.intro-delay(7); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-sessions: DeskIntro.on ? 1 : 0;
+    animate intro-sessions { duration: Ui.page-time; delay: Ui.intro-delay(8); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     if show-about: AboutCard {
         x: 0;
+        y: (1 - intro-about) * Ui.intro-rise;
+        opacity: intro-about;
         height: root.height;
         width: unit * s-about;
         title: about-label;
@@ -1631,6 +1702,8 @@ component CardRow inherits Rectangle {
     }
     if show-trailer: TrailerCard {
         x: about-w;
+        y: (1 - intro-trailer) * Ui.intro-rise;
+        opacity: intro-trailer;
         height: root.height;
         width: unit * 0.9;
         art: game.art;
@@ -1639,6 +1712,8 @@ component CardRow inherits Rectangle {
     }
     dc := DetailsCard {
         x: about-w + trailer-w;
+        y: (1 - intro-details) * Ui.intro-rise;
+        opacity: intro-details;
         height: root.height;
         width: details-w;
         title: details-label;
@@ -1647,6 +1722,8 @@ component CardRow inherits Rectangle {
     }
     if show-sessions: SessionsCard {
         x: about-w + trailer-w + details-w + Ui.space-20;
+        y: (1 - intro-sessions) * Ui.intro-rise;
+        opacity: intro-sessions;
         height: root.height;
         width: unit * 1.1;
         labels: card-labels;
@@ -1677,6 +1754,12 @@ component GameStage inherits VerticalLayout {
     callback clicked(string, int);
     callback menu(length, length);
     property <bool> show-about: game.description != "";
+    // Entrada do app: etiqueta e título, depois faixa e ações, subindo `intro-rise` (o logo só acende: o layout dele
+    // já usa o `y`).
+    property <float> intro-title: DeskIntro.on ? 1 : 0;
+    animate intro-title { duration: Ui.page-time; delay: Ui.intro-delay(3); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-actions: DeskIntro.on ? 1 : 0;
+    animate intro-actions { duration: Ui.page-time; delay: Ui.intro-delay(4); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     // Troca de jogo (TrocaDeJogo): título, faixa e cartões do jogo anterior apagam em 120 (`curva-saida`), o novo
     // entra em 200 (`curva-entrada`); a arte faz o crossfade dela. Mudança no mesmo jogo troca na hora.
     property <bool> text-in: true;
@@ -1725,7 +1808,12 @@ component GameStage inherits VerticalLayout {
         animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         if game.overline != "": HorizontalLayout {
             alignment: start;
-            Badge { text: game.overline; live: game.running; }
+            Badge {
+                text: game.overline;
+                live: game.running;
+                y: (1 - intro-title) * Ui.intro-rise;
+                opacity: intro-title;
+            }
         }
         // TituloDoJogo: o logo do jogo numa caixa de 520 × 180 (380 × 130 na janela pequena), ancorado embaixo à
         // esquerda, nunca ampliado acima do tamanho dele; a etiqueta fica 20 acima.
@@ -1739,6 +1827,7 @@ component GameStage inherits VerticalLayout {
             property <float> fit: min(1, min(box-w / src-w, box-h / src-h));
             Image {
                 source: game.logo;
+                opacity: intro-title;
                 width: parent.src-w * parent.fit;
                 height: parent.src-h * parent.fit;
                 image-fit: contain;
@@ -1762,6 +1851,8 @@ component GameStage inherits VerticalLayout {
                 property <length> base: title-measure.font-size;
                 property <length> fit: base * 1.7 * (small ? 520px : 620px) / max(1px, title-measure.preferred-width);
                 text: game.title;
+                y: (1 - intro-title) * Ui.intro-rise;
+                opacity: intro-title;
                 color: Ui.on-accent;
                 font-family: Ui.font-heading;
                 font-size: max(min(base, fit), 36px * Ui.text-scale);
@@ -1779,7 +1870,12 @@ component GameStage inherits VerticalLayout {
         }
         if stats.length > 0: HorizontalLayout {
             alignment: start;
-            StatusStrip { items: stats; small: small; }
+            StatusStrip {
+                items: stats;
+                small: small;
+                y: (1 - intro-actions) * Ui.intro-rise;
+                opacity: intro-actions;
+            }
         }
         HorizontalLayout {
             spacing: Ui.space-12;
@@ -1787,6 +1883,8 @@ component GameStage inherits VerticalLayout {
             padding-top: 6px;
             for a[i] in actions: HorizontalLayout {
                 if a.style == "primary": PlayButton {
+                    y: (1 - intro-actions) * Ui.intro-rise;
+                    opacity: intro-actions;
                     label: a.title;
                     icon: a.icon;
                     enabled: a.enabled;
@@ -1795,7 +1893,8 @@ component GameStage inherits VerticalLayout {
                     clicked => { root.clicked("action", i); }
                 }
                 if a.style != "primary": GlassButton {
-                    y: (parent.height - self.height) / 2;
+                    y: (parent.height - self.height) / 2 + (1 - intro-actions) * Ui.intro-rise;
+                    opacity: intro-actions;
                     icon: a.icon;
                     label: a.title;
                     show-label: a.style == "danger";
@@ -1810,7 +1909,7 @@ component GameStage inherits VerticalLayout {
                 }
             }
         }
-        if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
+        if game.hint != "": Text { text: game.hint; opacity: intro-actions; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
     }
     // Com quatro cartões (Sobre, Trailer, Detalhes, Sessões) a fileira passa da largura e rola na horizontal.
     // 248 (190 na janela pequena), crescendo se o conteúdo pedir mais: nada passa da borda do cartão.
@@ -1855,6 +1954,274 @@ component GameStage inherits VerticalLayout {
     }
 }
 
+// Linha de rótulo e valor da fase 2 (como no CartaoDetalhes), 36 de altura mínima; o valor quebra em linhas.
+component MoreRow inherits Rectangle {
+    in property <DeskInfo> info;
+    in property <bool> first;
+    in property <length> label-w;
+    min-height: 36px;
+    if !first: Rectangle { y: 0; height: 1px; background: Ui.divider; }
+    HorizontalLayout {
+        padding-top: Ui.space-8;
+        padding-bottom: Ui.space-8;
+        spacing: Ui.space-12;
+        if info.icon != "": DeskIcon { name: info.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
+        if info.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
+        Text { text: info.label; width: root.label-w; color: info.icon != "" ? Ui.desk-on-subtle : Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: info.icon != "" ? 500 : 700; vertical-alignment: center; overflow: elide; }
+        if info.detail != "": Text { text: info.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+        Text { text: info.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; horizontal-alignment: info.icon != "" ? left : right; }
+    }
+}
+
+// Cartão de vidro da fase 2: título `title` e o conteúdo embaixo, 24 por dentro (16 na janela pequena).
+component MoreCard inherits Vidro {
+    in property <string> title;
+    in property <bool> small;
+    VerticalLayout {
+        padding: small ? Ui.space-16 : Ui.space-24;
+        padding-bottom: small ? Ui.space-16 : Ui.space-20;
+        spacing: Ui.space-12;
+        CardTitle { text: title; }
+        @children
+    }
+}
+
+// DestaqueFases › fase 2: o que o Tako sabe do jogo além da primeira tela (Sobre inteiro, todos os Detalhes, o
+// histórico de sessões e a captura/trailer quando existem). Duas colunas (uma na janela pequena); rola por dentro
+// quando passa da altura (`offset`, posto pela roda em GamePhases). Seção sem dado não aparece.
+component GameMore inherits Rectangle {
+    in property <DeskMore> more;
+    in property <bool> trailer;
+    in property <bool> small;
+    in property <length> offset;
+    out property <length> scroll-max: max(0px, content-h - view.height);
+    callback clicked(string, int);
+    property <bool> one-col: small || root.width < 820px;
+    property <length> gap: small ? Ui.space-16 : Ui.space-20;
+    property <length> left-w: one-col ? root.width : (root.width - gap) * 0.58;
+    property <length> content-h: one-col ? lc.preferred-height + gap + rc.preferred-height : max(lc.preferred-height, rc.preferred-height);
+    property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
+    // "⌃ Voltar": volta para a fase 1 (como a roda para cima no topo, Page Up e Esc).
+    back := Vidro {
+        x: (root.width - self.width) / 2;
+        y: 0;
+        height: 32px;
+        width: bl.preferred-width;
+        radius: 16px;
+        accessible-role: button;
+        accessible-label: more.labels[1];
+        if bta.has-hover: Rectangle { border-radius: 16px; background: Ui.glass-hover; }
+        bl := HorizontalLayout {
+            padding-left: Ui.space-12;
+            padding-right: Ui.space-16;
+            spacing: 6px;
+            DeskIcon { name: "chevron-up"; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+            Text { text: more.labels[1]; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+        }
+        bta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.clicked("game-more", 0); }
+        }
+    }
+    view := Rectangle {
+        y: back.height + Ui.space-12;
+        height: root.height - self.y;
+        clip: true;
+        Rectangle {
+            y: -root.offset;
+            height: root.content-h;
+            lc := VerticalLayout {
+                x: 0;
+                y: 0;
+                width: root.left-w;
+                height: self.preferred-height;
+                spacing: root.gap;
+                if more.description != "": MoreCard {
+                    title: more.labels[2];
+                    small: small;
+                    Text { text: more.description; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; horizontal-stretch: 1; }
+                }
+                // Imagens: a captura de tela que a fonte de metadados trouxe e o trailer, quando existem.
+                if more.shots.length > 0 || trailer: MoreCard {
+                    title: more.labels[5];
+                    small: small;
+                    HorizontalLayout {
+                        spacing: Ui.space-12;
+                        alignment: start;
+                        for shot in more.shots: Rectangle {
+                            width: small ? 192px : 256px;
+                            height: self.width * 9 / 16;
+                            border-radius: Ui.radius-thumb;
+                            clip: true;
+                            background: Ui.glass-control;
+                            Image { width: parent.width; height: parent.height; source: shot; image-fit: cover; }
+                            Rectangle { border-radius: Ui.radius-thumb; border-width: 1px; border-color: Ui.glass-edge; }
+                        }
+                        if trailer: GlassButton {
+                            y: (parent.height - self.height) / 2;
+                            height: 40px;
+                            show-label: true;
+                            icon: "play";
+                            label: more.labels[6];
+                            clicked => { root.clicked("trailer", 0); }
+                        }
+                    }
+                }
+            }
+            rc := VerticalLayout {
+                x: root.one-col ? 0 : root.left-w + root.gap;
+                y: root.one-col ? lc.preferred-height + root.gap : 0;
+                width: root.one-col ? root.width : root.width - root.left-w - root.gap;
+                height: self.preferred-height;
+                spacing: root.gap;
+                MoreCard {
+                    title: more.labels[3];
+                    small: small;
+                    VerticalLayout {
+                        spacing: 0;
+                        for r[i] in more.details: MoreRow { info: r; first: i == 0; label-w: root.label-w; }
+                    }
+                }
+                if more.sessions.length > 0: MoreCard {
+                    title: more.labels[4];
+                    small: small;
+                    dense: true;
+                    VerticalLayout {
+                        spacing: 0;
+                        Text { text: more.sessions-summary; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
+                        for r[i] in more.sessions: MoreRow { info: r; first: i == 0; label-w: 72px * Ui.text-scale; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// DestaqueFases: o destaque em duas fases. Um gesto da roda (ou do trackpad) para baixo troca para a fase 2 inteira;
+// para cima no topo dela, volta. Uma troca por gesto: a roda fica travada até o gesto parar (300 sem eventos, 500 no
+// mínimo). A fase nova entra 24 de baixo/cima em `tempo-fase` (`curva-entrada`); a atual apaga em `tempo-fase-sai`.
+// Quem decide a fase é o Tako (`more.on`): Page Down/Up, Esc e a troca de jogo também passam por ele.
+component GamePhases inherits Rectangle {
+    in property <DeskMore> more;
+    in property <bool> trailer;
+    in property <bool> small;
+    callback clicked(string, int);
+    property <bool> on: more.on;
+    // A fase 2 guarda o último conteúdo enquanto apaga (o Tako para de mandar a captura ao voltar).
+    property <DeskMore> shown;
+    init => {
+        if (more.on) {
+            shown = more;
+        }
+    }
+    changed more => {
+        if (more.on) {
+            shown = more;
+        }
+    }
+    // Trava da roda: `busy` depois de trocar de fase; `scrolled` depois de rolar a fase 2 (não troca no mesmo gesto).
+    property <bool> busy;
+    property <bool> scrolled;
+    property <int> ticks;
+    property <int> quiet;
+    property <length> offset;
+    changed on => {
+        offset = 0;
+        busy = true;
+        ticks = 0;
+        quiet = 0;
+    }
+    Timer {
+        interval: 100ms;
+        running: root.busy || root.scrolled;
+        triggered => {
+            root.ticks += 1;
+            root.quiet += 1;
+            if (root.quiet >= 3 && (!root.busy || root.ticks >= 5)) {
+                root.busy = false;
+                root.scrolled = false;
+            }
+        }
+    }
+    // Embaixo de tudo: os botões não tratam a roda e ela chega aqui; a lista de jogos fica fora deste retângulo.
+    TouchArea {
+        scroll-event(e) => {
+            if (abs(e.delta-y) <= abs(e.delta-x) || abs(e.delta-y) < 2px) {
+                return reject;
+            }
+            root.quiet = 0;
+            if (root.busy) {
+                return accept;
+            }
+            if (!root.on) {
+                if (e.delta-y < 0) {
+                    root.busy = true;
+                    root.ticks = 0;
+                    root.clicked("game-more", 1);
+                }
+                return accept;
+            }
+            if ((e.delta-y < 0 && root.offset < more2.scroll-max) || (e.delta-y > 0 && root.offset > 0)) {
+                if (!root.scrolled) {
+                    root.ticks = 0;
+                }
+                root.scrolled = true;
+                root.offset = max(0px, min(more2.scroll-max, root.offset - e.delta-y));
+                return accept;
+            }
+            if (e.delta-y > 0 && !root.scrolled) {
+                root.busy = true;
+                root.ticks = 0;
+                root.clicked("game-more", 0);
+            }
+            accept
+        }
+    }
+    Rectangle {
+        y: on ? -24px : 0;
+        animate y { duration: Ui.tempo-fase; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        opacity: on ? 0 : 1;
+        animate opacity { duration: Ui.phase-fade(!on); easing: !on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
+        visible: self.opacity > 0.01;
+        @children
+        // "Mais sobre o jogo ⌄": no respiro embaixo do destaque, no centro; abre a fase 2. Na janela pequena o
+        // respiro não cabe a dica: lá a fase 2 abre pela roda e pelo Page Down.
+        if !small: Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: parent.height + 2px;
+            height: 24px;
+            width: hl.preferred-width;
+            border-radius: self.height / 2;
+            background: hta.has-hover ? Ui.glass-hover : transparent;
+            accessible-role: button;
+            accessible-label: more.labels[0];
+            hl := HorizontalLayout {
+                padding-left: Ui.space-12;
+                padding-right: Ui.space-8;
+                spacing: 4px;
+                Text { text: more.labels[0]; color: Ui.desk-on-muted; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
+                DeskIcon { name: "chevron-down"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+            }
+            hta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked("game-more", 1); }
+            }
+        }
+    }
+    more2 := GameMore {
+        y: on ? 0 : 24px;
+        animate y { duration: Ui.tempo-fase; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        opacity: on ? 1 : 0;
+        animate opacity { duration: Ui.phase-fade(on); easing: on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
+        visible: self.opacity > 0.01;
+        more: shown;
+        trailer: trailer;
+        small: small;
+        offset: root.offset;
+        clicked(z, i) => { root.clicked(z, i); }
+    }
+}
+
 // Ícones da linha de contagem: inverter a ordem e filtrar (com a quantidade de filtros).
 component SortFilter inherits HorizontalLayout {
     in property <bool> reversed;
@@ -1884,6 +2251,8 @@ component DeskLibrary inherits Rectangle {
     in property <[DeskGame]> games;
     in property <int> selected;
     in property <DeskGameView> game;
+    // DestaqueFases: a fase 2 do destaque (e se ela está aberta).
+    in property <DeskMore> more;
     in property <[PanelRow]> actions;
     in property <[DeskInfo]> stats;
     in property <[DeskInfo]> details;
@@ -1927,6 +2296,11 @@ component DeskLibrary inherits Rectangle {
     callback focus-main();
     property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
     property <bool> wide: view != "list";
+    // Entrada do app: o painel da lista (ou os controles da grade) e depois as capas.
+    property <float> intro-list: DeskIntro.on ? 1 : 0;
+    animate intro-list { duration: Ui.page-time; delay: Ui.intro-delay(2); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-covers: DeskIntro.on ? 1 : 0;
+    animate intro-covers { duration: Ui.page-time; delay: Ui.intro-delay(3); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     // Troca de modo (TrocaDeModo): o modo atual sai em 120 (`curva-saida`) e o novo entra em 140 (`curva-entrada`).
     // Troca de aba (TrocaDeTela › abas internas): a pílula desliza e a lista troca só por opacidade, 80 e 120.
     property <bool> mode-in: true;
@@ -1964,6 +2338,8 @@ component DeskLibrary inherits Rectangle {
         spacing: small ? Ui.space-20 : Ui.space-28;
         Vidro {
             width: list-w;
+            y: (1 - intro-list) * Ui.intro-rise;
+            opacity: intro-list;
             VerticalLayout {
                 padding-top: Ui.space-16;
                 padding-left: Ui.space-12;
@@ -1998,6 +2374,12 @@ component DeskLibrary inherits Rectangle {
                     }
                     IconBtn {
                         y: (parent.height - self.height) / 2;
+                        icon: "plus";
+                        label: view-labels[6];
+                        clicked => { root.clicked("add-game", 0); }
+                    }
+                    IconBtn {
+                        y: (parent.height - self.height) / 2;
                         icon: "grid";
                         label: view-labels[5];
                         clicked => {
@@ -2019,11 +2401,11 @@ component DeskLibrary inherits Rectangle {
                         alignment: start;
                         spacing: 6px;
                         for i in 8: HorizontalLayout {
-                            height: Ui.list-row-height;
+                            height: Ui.game-row-height;
                             padding-left: Ui.space-8;
                             spacing: 14px;
-                            Skeleton { width: Ui.thumb-size; height: Ui.thumb-size; y: 6px; }
-                            Skeleton { width: 110px + mod(i * 37, 80) * 1px; height: 14px; y: 19px; radius: 7px; }
+                            Skeleton { width: Ui.thumb-size; height: Ui.thumb-size; y: 2px; }
+                            Skeleton { width: 110px + mod(i * 37, 80) * 1px; height: 14px; y: 15px; radius: 7px; }
                             Rectangle { horizontal-stretch: 1; }
                         }
                     }
@@ -2064,8 +2446,15 @@ component DeskLibrary inherits Rectangle {
             }
         }
         if !game.has-game: Rectangle { horizontal-stretch: 1; }
-        if game.has-game: GameStage {
+        if game.has-game: phases := GamePhases {
             horizontal-stretch: 1;
+            more: more;
+            trailer: game.trailer;
+            small: small;
+            clicked(z, i) => { root.clicked(z, i); }
+          GameStage {
+            width: phases.width;
+            height: phases.height;
             game-in: game;
             actions: actions;
             stats: stats;
@@ -2081,7 +2470,20 @@ component DeskLibrary inherits Rectangle {
             small: small;
             clicked(z, i) => { root.clicked(z, i); }
             menu(x, y) => { root.menu(x, y); }
+          }
         }
+    }
+
+    // Loja do jogo escolhido, no canto superior direito do destaque.
+    if !wide && game.has-game && game.store-name != "": HorizontalLayout {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: 28px;
+        alignment: end;
+        opacity: mode-in ? 1 : 0;
+        animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
+        StorePill { icon: game.store-icon; text: game.store-name; }
     }
 
     if wide: VerticalLayout {
@@ -2089,6 +2491,7 @@ component DeskLibrary inherits Rectangle {
         animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         spacing: Ui.space-20;
         HorizontalLayout {
+            opacity: intro-list;
             height: 46px;
             spacing: Ui.space-12;
             Vidro {
@@ -2176,6 +2579,7 @@ component DeskLibrary inherits Rectangle {
             }
         }
         Rectangle {
+            opacity: intro-covers;
             vertical-stretch: 1;
             if games.length == 0 && view == "grid": EmptyList {
                 title: empty-title;
@@ -3842,11 +4246,25 @@ component ArtLayer inherits Rectangle {
     property <image> top-src;
     property <image> bottom-src;
     property <bool> top-in: true;
-    init => { top-src = art; }
-    changed art => {
-        bottom-src = top-src;
+    // Opacidade da de cima; a cópia desfocada dela (`DeskArt.blur`) entra no vidro e nas bordas no mesmo passo.
+    property <float> top-alpha: top-in ? 1 : 0;
+    animate top-alpha { duration: Ui.art-fade(top-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    // A cópia que acompanha a arte de cima (vira a de baixo na próxima troca).
+    property <image> blur-top;
+    init => {
         top-src = art;
+        blur-top = DeskArt.blur;
+    }
+    changed art => {
+        // Troca interrompida: fica embaixo a que mais aparece no quadro (a de cima só se já passou da metade).
+        if (top-alpha >= 0.5) {
+            bottom-src = top-src;
+            DeskArt.blur-old = blur-top;
+        }
+        top-src = art;
+        blur-top = DeskArt.blur;
         top-in = false;
+        DeskArt.blur-in = false;
         top-timer.running = true;
     }
     top-timer := Timer {
@@ -3855,6 +4273,7 @@ component ArtLayer inherits Rectangle {
         triggered => {
             self.running = false;
             top-in = true;
+            DeskArt.blur-in = true;
         }
     }
     // Máscara das bordas em faixas (o Slint não tem máscara): opaca até 12%, some em 30%, volta de 62% a 92%.
@@ -3869,6 +4288,7 @@ component ArtLayer inherits Rectangle {
         animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         if !DeskArt.has-art: Rectangle {
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
+            animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             // Brilho suave no alto à direita (EstadoSemArte).
             Rectangle {
                 x: parent.width * 0.55;
@@ -3899,8 +4319,7 @@ component ArtLayer inherits Rectangle {
                 y: DeskArt.y - (self.height - DeskArt.h) / 2;
                 source: root.top-src;
                 image-fit: fill;
-                opacity: root.top-in ? 1 : 0;
-                animate opacity { duration: Ui.art-fade(root.top-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                opacity: root.top-alpha;
                 // O desfoque sai: a cópia desfocada da mesma arte por cima, de 1 a 0 (o Slint não anima `blur`).
                 if DeskArt.blur.width > 0: Image {
                     width: parent.width;
@@ -3925,10 +4344,22 @@ component ArtLayer inherits Rectangle {
                         y: DeskArt.y;
                         width: DeskArt.bw;
                         height: DeskArt.h;
-                        source: DeskArt.blur;
+                        source: DeskArt.blur-old;
                         image-fit: fill;
                     }
-                    Rectangle { background: DeskArt.accent.with-alpha(0.45); }
+                    Image {
+                        x: DeskArt.bx - parent.x;
+                        y: DeskArt.y;
+                        width: DeskArt.bw;
+                        height: DeskArt.h;
+                        source: DeskArt.blur;
+                        image-fit: fill;
+                        opacity: root.top-alpha;
+                    }
+                    Rectangle {
+                        background: DeskArt.accent.with-alpha(0.45);
+                        animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                    }
                 }
             }
         }
@@ -3978,7 +4409,7 @@ component WindowButton inherits Rectangle {
 
 component DeskTitleBar inherits Rectangle {
     in property <bool> maximized;
-    // Janela sem foco: ícones em on-accent-subtle e logo a 55%.
+    // Janela sem foco: ícones em on-accent-subtle.
     in property <bool> active: true;
     // Minimizar, Maximizar, Restaurar, Fechar.
     in property <[string]> labels;
@@ -3998,16 +4429,6 @@ component DeskTitleBar inherits Rectangle {
             }
         }
         double-clicked => { root.action("max"); }
-    }
-    Image {
-        x: 14px;
-        y: (parent.height - self.height) / 2;
-        width: 47px;
-        height: 18px;
-        // Cópia em 2× (94 × 36): reduzir o PNG de 495 direto para 47 serrilhava o logo.
-        source: @image-url("tako-logo-bar.png");
-        image-fit: contain;
-        opacity: active ? 1 : 0.55;
     }
     HorizontalLayout {
         alignment: end;
@@ -4078,6 +4499,7 @@ export component Desktop inherits Window {
     in property <[DeskGame]> desk-games;
     in property <int> desk-selected: -1;
     in property <DeskGameView> desk-game;
+    in property <DeskMore> desk-more;
     in property <[PanelRow]> desk-actions;
     in property <[DeskInfo]> desk-stats;
     in property <[DeskInfo]> desk-details;
@@ -4171,6 +4593,8 @@ export component Desktop inherits Window {
             DeskArt.has-art = desk-game.has-game && desk-game.art.width > 0;
             DeskArt.blur = desk-game.art-blur;
             DeskArt.lum = desk-game.art-lum;
+            DeskArt.accent = Ui.accent;
+            DeskArt.accent-deep = Ui.accent-deep;
             if (desk-game.art.height > 0) {
                 DeskArt.aspect = desk-game.art.width / desk-game.art.height;
             }
@@ -4178,6 +4602,9 @@ export component Desktop inherits Window {
         }
     }
     property <image> art-shown;
+    // A cor do jogo muda junto com a arte (enquanto a nova carrega, fica a do jogo que está na tela).
+    property <color> accent-now: Ui.accent;
+    changed accent-now => { root.sync-art(); }
     changed width => { root.sync-art(); }
     changed height => { root.sync-art(); }
     changed page => {
@@ -4221,7 +4648,18 @@ export component Desktop inherits Window {
         }
     }
 
-    ArtLayer { art: art-shown; }
+    // Entrada do app (só na abertura): o Tako liga `desk-intro` antes do primeiro quadro (tudo apagado) e desliga
+    // depois dele; aí a arte acende em `tempo-cor` e a barra 70 depois, só por opacidade (a barra não se move).
+    in property <bool> desk-intro;
+    changed desk-intro => { DeskIntro.on = !desk-intro; }
+    property <float> intro-art: DeskIntro.on ? 1 : 0;
+    animate intro-art { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    property <float> intro-bar: DeskIntro.on ? 1 : 0;
+    animate intro-bar { duration: Ui.page-time; delay: Ui.intro-delay(1); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    ArtLayer {
+        art: art-shown;
+        opacity: intro-art;
+    }
     // Faixa leve abaixo da BarraDaJanela: a barra superior mantém 4,5:1 mesmo com a arte clara em cima.
     if page == "desk-library": Rectangle {
         height: Ui.titlebar-height + 160px;
@@ -4241,6 +4679,7 @@ export component Desktop inherits Window {
         padding-bottom: small ? Ui.space-16 : Ui.space-28;
         spacing: small ? 14px : Ui.space-20;
         bar := TopBar {
+            opacity: intro-bar;
             items: desk-nav;
             big-picture-label: desk-big-picture-label;
             brand-label: desk-brand-label;
@@ -4280,6 +4719,7 @@ export component Desktop inherits Window {
                 games: page == "desk-library" ? desk-games : [];
                 selected: desk-selected;
                 game: desk-game;
+                more: desk-more;
                 actions: desk-actions;
                 stats: desk-stats;
                 details: desk-details;
