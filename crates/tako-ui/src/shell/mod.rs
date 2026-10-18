@@ -113,6 +113,8 @@ pub trait Page {
     }
 }
 
+/// Abrindo o jogo há mais que isso: "Ainda abrindo…" e "Cancelar" (JogarEAbrir).
+pub const LAUNCH_SLOW: Duration = Duration::from_secs(20);
 pub const TOAST_TIME: Duration = Duration::from_millis(2600);
 
 pub struct Shell {
@@ -467,6 +469,11 @@ impl Shell {
     }
 
     pub fn hover(&mut self, zone: &str, index: usize) {
+        if zone == "toast" {
+            self.ctx.toast_hovered(index.min(3), Instant::now());
+            self.ctx.dirty = true;
+            return;
+        }
         if let Some(rest) = zone.strip_prefix("overlay-") {
             if let Some(top) = self.layers.last_mut() {
                 top.hover(rest, index);
@@ -875,5 +882,25 @@ mod tests {
         shell.hover("row-0", 5);
         shell.click("row-0", 5);
         assert!(!shell.ctx.pointer);
+    }
+
+    #[test]
+    fn hovered_toast_does_not_expire_and_restarts_on_leave() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        let mut shell = Shell::new(ctx);
+        shell.ctx.toast("oi");
+        let late = Instant::now() + Duration::from_secs(60);
+        assert!(shell.ctx.toast_expired(late));
+        shell.hover("toast", 1);
+        assert!(!shell.ctx.toast_expired(late));
+        // Sair da pílula reinicia a contagem.
+        shell.hover("toast", 0);
+        assert!(!shell.ctx.toast_expired(Instant::now()));
+        assert!(shell.ctx.toast_expired(late));
     }
 }

@@ -637,6 +637,10 @@ impl DesktopLibrary {
     /// AcoesDoJogo: Jogar, favoritar, ⋯ e a engrenagem; com o jogo aberto, Voltar ao jogo, Encerrar e ⋯.
     fn actions(&self, ctx: &Ctx, g: &Game) -> Vec<Action> {
         if ctx.running.as_ref().is_some_and(|r| r.id == g.id) {
+            // Abrindo: só o anel; o cancelar aparece depois de `LAUNCH_SLOW`.
+            if ctx.launching && !ctx.launch_slow(std::time::Instant::now()) {
+                return vec![Action::Play, Action::More];
+            }
             vec![Action::Play, Action::End, Action::More]
         } else {
             vec![
@@ -1366,24 +1370,22 @@ impl Page for DesktopLibrary {
         // Seleção múltipla: só os marcados que continuam na lista contam.
         self.checked.retain(|id| ids.contains(id));
         let checked = self.checked.len();
+        let bulk = (checked > 0).then(|| {
+            ctx.tf(
+                "desktop.bulk.count",
+                &[
+                    ("n", &checked.to_string()),
+                    ("total", &ids.len().to_string()),
+                ],
+            )
+        });
+        let total = library_text::game_count(lang, ids.len());
         out.set(
             "desk-count",
-            if checked > 0 {
-                ctx.tf(
-                    "desktop.bulk.count",
-                    &[
-                        ("n", &checked.to_string()),
-                        ("total", &ids.len().to_string()),
-                    ],
-                )
-            } else {
-                format!(
-                    "{} · {}",
-                    library_text::game_count(lang, ids.len()),
-                    library_text::sort_label(lang, c.sort)
-                )
-            },
+            bulk.clone()
+                .unwrap_or_else(|| format!("{total} · {}", library_text::sort_label(lang, c.sort))),
         );
+        out.set("desk-count-short", bulk.unwrap_or(total));
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
@@ -1561,9 +1563,20 @@ impl Page for DesktopLibrary {
                         .into_iter()
                         .map(|a| match a {
                             Action::Play if running && ctx.launching => {
-                                PanelRow::button("play", ctx.t("desktop.opening"))
-                                    .icon("play")
-                                    .enabled(false)
+                                // Botão travado com o anel girando (JogarEAbrir).
+                                let slow = ctx.launch_slow(std::time::Instant::now());
+                                let mut row = PanelRow::button(
+                                    "play",
+                                    ctx.t(if slow {
+                                        "desktop.opening_slow"
+                                    } else {
+                                        "desktop.opening"
+                                    }),
+                                )
+                                .icon("ring")
+                                .enabled(false);
+                                row.style = "primary".into();
+                                row
                             }
                             Action::Play => {
                                 let (label, icon) = if running {
@@ -1603,6 +1616,12 @@ impl Page for DesktopLibrary {
                             Action::Settings => {
                                 PanelRow::button("settings", ctx.t("details.game_settings"))
                                     .icon("gear")
+                            }
+                            // Abrindo há tempo demais: o mesmo encerrar, com o nome de cancelar.
+                            Action::End if ctx.launching => {
+                                PanelRow::button("end", ctx.t("common.cancel"))
+                                    .icon("close")
+                                    .danger()
                             }
                             Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
                                 .icon("power")

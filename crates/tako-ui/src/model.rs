@@ -9,7 +9,7 @@ theme_struct! {
 
 theme_struct! {
     /// Linha de painel, configuração ou diálogo. `kind`: toggle, choice, action, info, header, radio, check,
-    /// slider, text, button. `style`: "", "primary" ou "danger".
+    /// slider, text, button. `style`: "", "primary", "danger" ou "link".
     pub struct PanelRow {
         pub key: String,
         pub kind: String,
@@ -96,6 +96,11 @@ impl PanelRow {
     }
     pub fn danger(mut self) -> Self {
         self.style = "danger".into();
+        self
+    }
+    /// Ação de texto à esquerda do rodapé do popup do desktop ("Agora não", "Salvar relatório"); a tela cheia ignora.
+    pub fn link(mut self) -> Self {
+        self.style = "link".into();
         self
     }
     pub fn enabled(mut self, e: bool) -> Self {
@@ -188,6 +193,10 @@ theme_struct! {
         pub rows: Vec<PanelRow>,
         pub sel: i32,
         pub wide: bool,
+        // Desktop: as ações vão para o rodapé do popup (link à esquerda, principal por último).
+        pub footer: bool,
+        // Desktop: popup só com título, texto e ações (tamanho S, 440).
+        pub compact: bool,
         pub image: Image,
         pub keys: Vec<Key>,
         pub key_cols: i32,

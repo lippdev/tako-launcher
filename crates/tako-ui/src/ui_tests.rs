@@ -449,6 +449,36 @@ fn desktop_snapshot() {
                 let layer = crate::shell::art::picker(&shell.ctx, &id);
                 shell.push_layer(layer);
             }
+            // Confirmação destrutiva, erro do jogo, aviso e abrindo (PadraoPopup, ErroDoJogo, Aviso, JogarEAbrir).
+            Ok("exit") => {
+                let layer = crate::shell::dialogs::confirm_exit(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("failed") => {
+                let id = shell.ctx.library.games()[0].id.clone();
+                let layer = crate::shell::dialogs::game_ended_badly(
+                    &shell.ctx,
+                    &id,
+                    tako_core::session::GameEnd::Failed(3),
+                    Some(std::time::Duration::from_secs(12)),
+                );
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("toast") => shell.ctx.toast("Cupom copiado"),
+            Ok("opening") | Ok("opening-slow") => {
+                let g = shell.ctx.library.games()[0].clone();
+                shell.ctx.running = Some(crate::shell::ctx::RunningGame {
+                    id: g.id,
+                    title: g.title,
+                    pid: None,
+                    started: None,
+                });
+                shell.ctx.launching = true;
+                if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("opening-slow") {
+                    shell.ctx.launch_since =
+                        Some(Instant::now() - std::time::Duration::from_secs(30));
+                }
+            }
             Ok("ask") => {
                 shell.ctx.pads_connected = 1;
                 shell.ask_big_picture = true;
@@ -481,6 +511,16 @@ fn desktop_snapshot() {
             let out = shell.render(Instant::now());
             for (name, value) in &out.props {
                 let mut value = value.clone();
+                // `TAKO_SNAP_LOADING=1`: biblioteca lendo (EstadoCarregando).
+                if std::env::var("TAKO_SNAP_LOADING").is_ok() {
+                    match (*name, &mut value) {
+                        ("desk-loading", v) => *v = Value::Bool(true),
+                        ("desk-game", Value::Struct(s)) => {
+                            s.set_field("has-game".into(), Value::Bool(false));
+                        }
+                        _ => {}
+                    }
+                }
                 if let (Some((art, blur, lum)), "desk-game", Value::Struct(s)) =
                     (art, *name, &mut value)
                 {

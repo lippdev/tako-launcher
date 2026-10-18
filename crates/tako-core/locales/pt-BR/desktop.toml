@@ -15,6 +15,7 @@ no_collections_text = "Crie uma pelo menu ⋯ de um jogo (Adicionar à coleção
 pick_collection = "Escolha uma coleção acima."
 more = "Mais ações"
 end_game = "Encerrar jogo"
+opening_slow = "Ainda abrindo…"
 opening = "Abrindo…"
 size = "Tamanho"
 last_played = "Última vez"

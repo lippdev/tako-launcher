@@ -15,6 +15,7 @@ no_collections_text = "Create one from a game's ⋯ menu (Add to collection) or 
 pick_collection = "Pick a collection above."
 more = "More actions"
 end_game = "End game"
+opening_slow = "Still opening…"
 opening = "Opening…"
 size = "Size"
 last_played = "Last played"

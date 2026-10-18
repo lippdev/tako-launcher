@@ -132,7 +132,8 @@ fn ready_dialog(ctx: &Ctx, version: &str) -> MenuLayer {
                 ctx.effect(Effect::InstallUpdate);
                 Flow::Close
             }),
-            MenuItem::new(PanelRow::button("later", ctx.t("updates.later"))).on(|_| Flow::Close),
+            MenuItem::new(PanelRow::button("later", ctx.t("updates.later")).link())
+                .on(|_| Flow::Close),
         ]
     })
 }
