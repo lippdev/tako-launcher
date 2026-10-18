@@ -68,6 +68,7 @@ impl Host for SupervisedHost {
                         id: req.game_id.clone(),
                         title: req.title.clone(),
                         pid: req.root_pid,
+                        started: Some(std::time::Instant::now()),
                     });
                     self.send(&UiMsg::Track { req });
                     if self.lost {
@@ -155,6 +156,7 @@ impl Host for LocalHost {
                                 id: req.game_id.clone(),
                                 title: req.title.clone(),
                                 pid: req.root_pid,
+                                started: Some(std::time::Instant::now()),
                             });
                             ctx.controller_mouse = req.controller_mouse;
                             self.running = Some(r);

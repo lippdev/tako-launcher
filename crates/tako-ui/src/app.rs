@@ -399,6 +399,7 @@ impl App {
                 id: id.clone(),
                 title: title.clone(),
                 pid: None,
+                started: None,
             });
         }
         if opts.control_center {
@@ -1349,6 +1350,7 @@ mod tests {
                 id: id.clone(),
                 title: "Teste".into(),
                 pid: Some(1234),
+                started: None,
             });
             app.apply(HostAction::Launching);
             app.game_shown();

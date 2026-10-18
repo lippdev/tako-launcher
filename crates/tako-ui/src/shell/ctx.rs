@@ -70,6 +70,8 @@ pub struct RunningGame {
     pub title: String,
     /// Processo raiz, quando o Tako abriu o executável direto (o código de saída dele, no fim).
     pub pid: Option<u32>,
+    /// Quando o Tako abriu o jogo ("Sessão atual 42 min"); `None` se a interface reabriu com o jogo já rodando.
+    pub started: Option<std::time::Instant>,
 }
 
 pub use tako_sources::report::LibrarySourceReport as SourceReport;

@@ -721,10 +721,15 @@ fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
     let last = ctx.library.sessions(&g.id).last().map(|s| s.started_at);
     let session = if running {
+        // "Sessão atual 42 min" (EstadoJogando); sem o início conhecido, "jogando agora".
+        let started = ctx.running.as_ref().and_then(|r| r.started);
         DeskInfo {
             icon: "calendar".into(),
             label: ctx.t("desktop.strip.current_session"),
-            value: ctx.t("desktop.strip.playing_now"),
+            value: started.map_or_else(
+                || ctx.t("desktop.strip.playing_now"),
+                |t| game_text::play_time(lang, t.elapsed().max(std::time::Duration::from_secs(60))),
+            ),
             dot: true,
             ..Default::default()
         }
