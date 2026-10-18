@@ -587,6 +587,26 @@ component IconBtn inherits Rectangle {
     Tip { text: label; hovering: ita.has-hover; }
 }
 
+// Logo da loja de origem como SVG pintado com `colorize`: como Path, o femtovg somava a suavização onde os
+// sub-caminhos do logo se sobrepõem e o ícone parecia ter contorno. Outros nomes caem no Icon comum.
+component StoreIcon inherits Rectangle {
+    in property <string> name;
+    in property <color> tint;
+    in property <length> size: 16px;
+    width: size;
+    height: size;
+    if name == "store-steam": Image { width: size; height: size; source: @image-url("stores/steam.svg"); colorize: tint; }
+    if name == "store-epic": Image { width: size; height: size; source: @image-url("stores/epic.svg"); colorize: tint; }
+    if name == "store-gog": Image { width: size; height: size; source: @image-url("stores/gog.svg"); colorize: tint; }
+    if name == "store-ubisoft": Image { width: size; height: size; source: @image-url("stores/ubisoft.svg"); colorize: tint; }
+    if name == "store-ea": Image { width: size; height: size; source: @image-url("stores/ea.svg"); colorize: tint; }
+    if name == "store-battlenet": Image { width: size; height: size; source: @image-url("stores/battlenet.svg"); colorize: tint; }
+    if name == "store-amazon": Image { width: size; height: size; source: @image-url("stores/amazon.svg"); colorize: tint; }
+    if name == "store-xbox": Image { width: size; height: size; source: @image-url("stores/xbox.svg"); colorize: tint; }
+    if name == "store-manual": Image { width: size; height: size; source: @image-url("stores/manual.svg"); colorize: tint; }
+    if name != "store-steam" && name != "store-epic" && name != "store-gog" && name != "store-ubisoft" && name != "store-ea" && name != "store-battlenet" && name != "store-amazon" && name != "store-xbox" && name != "store-manual": Icon { name: name; size: size; tint: tint; }
+}
+
 // Linha da lista (ListaDeJogos): miniatura quadrada, nome, loja de origem e, na escolhida, o ▶ redondo. Na seleção
 // múltipla, a caixa redonda à esquerda; Ctrl e Shift no clique marcam.
 component GameRow inherits Rectangle {
@@ -673,7 +693,7 @@ component GameRow inherits Rectangle {
             width: 18px;
             accessible-role: image;
             accessible-label: data.store-name;
-            Icon { name: data.store-icon; size: 16px; tint: picked ? Ui.desk-on-muted : Ui.desk-on-subtle; }
+            StoreIcon { name: data.store-icon; size: 16px; tint: picked ? Ui.desk-on-muted : Ui.desk-on-subtle; }
         }
         if selected && !selecting: Rectangle {
             y: (parent.height - self.height) / 2;
@@ -987,7 +1007,7 @@ component CoverCard inherits Rectangle {
             overflow: elide;
             vertical-alignment: center;
         }
-        Icon { name: data.store-icon; size: 16px; tint: Ui.desk-on-muted; y: 3px; }
+        StoreIcon { name: data.store-icon; size: 16px; tint: Ui.desk-on-muted; y: 3px; }
     }
     cta := TouchArea {
         y: 0;

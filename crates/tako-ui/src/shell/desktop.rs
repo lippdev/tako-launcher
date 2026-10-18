@@ -20,6 +20,7 @@ use tako_core::presentation::{game_text, library_text};
 fn store_icon(store: GameStore) -> &'static str {
     match store {
         GameStore::Xbox => "store-xbox",
+        GameStore::Manual => "store-manual",
         s => sidebar::store_icon(s),
     }
 }
