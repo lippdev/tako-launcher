@@ -165,7 +165,11 @@ struct Run {
 /// existir, é só trocar o `images::get`. `load: false` = linha fora da área visível (não pede nada).
 fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
     let uri = g.shown_icon();
-    let icon = tiles::image(uri.filter(|_| load), ICON);
+    // 56 px já recortado e com contorno no cache: serve à tela normal e à de alta densidade.
+    let icon = uri
+        .filter(|_| load)
+        .and_then(|u| crate::images::icon(u, ICON.0))
+        .unwrap_or_default();
     // Enquanto o ícone carrega, não pisca a inicial; ela só aparece sem ícone ou se a carga falhou.
     let waiting = uri.is_some_and(|u| !load || crate::images::is_pending(u));
     let initial = if icon.size().width > 0 || waiting {
