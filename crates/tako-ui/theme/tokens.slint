@@ -160,6 +160,16 @@ export global Ui {
     out property <duration> tempo-hover: 180ms;
     out property <duration> tempo-pulso: reduce-motion ? 0ms : 1600ms;
     out property <duration> tempo-carrossel: reduce-motion ? 0ms : 8000ms;
+    // Troca de jogo no destaque: o texto apaga em 120 e o novo acende em 200.
+    out property <duration> tempo-texto-sai: reduce-motion ? 0ms : 120ms;
+    out property <duration> tempo-texto-entra: reduce-motion ? 0ms : 200ms;
+    public pure function text-fade(entering: bool) -> duration {
+        return entering ? tempo-texto-entra : tempo-texto-sai;
+    }
+    // Entra em `page-time`; ao preparar a entrada (antes de mover), troca na hora.
+    public pure function enter(entering: bool) -> duration {
+        return entering ? page-time : 0ms;
+    }
     // Escala: com "Reduzir animações" tudo fica em 1.
     out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;
     out property <float> escala-entrada: reduce-motion ? 1 : 0.98;

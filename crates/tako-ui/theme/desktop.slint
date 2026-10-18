@@ -425,6 +425,11 @@ component TopBar inherits Vidro {
 component Selected inherits Rectangle {
     in property <length> radius: Ui.radius-row;
     in property <bool> lifted;
+    // A seleção não "voa" entre linhas: a nova acende em `tempo-foco`.
+    property <bool> lit;
+    init => { lit = true; }
+    opacity: lit ? 1 : 0;
+    animate opacity { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     border-radius: radius;
     background: Ui.glass-selected;
     drop-shadow-offset-y: lifted ? 6px : 0;
@@ -1211,6 +1216,8 @@ component GlassButton inherits Vidro {
     callback clicked();
     dense: danger;
     radius: self.height / 2;
+    // Pressionar responde na hora (pointer-down), sem animação.
+    transform-scale: gta.pressed ? Ui.escala-pressionado : 1;
     height: show-label ? Ui.control-height + 8px : (small ? 46px : Ui.round-button);
     width: show-label ? gl.preferred-width : self.height;
     accessible-role: button;
@@ -1487,6 +1494,21 @@ component GameStage inherits VerticalLayout {
     callback clicked(string, int);
     callback menu(length, length);
     property <bool> show-about: game.description != "";
+    // Troca de jogo: o texto apaga em 120 e o novo acende em 200 (a arte faz o crossfade dela).
+    property <string> game-key: game.title;
+    property <bool> text-in: true;
+    changed game-key => {
+        text-in = false;
+        text-timer.running = true;
+    }
+    text-timer := Timer {
+        interval: max(1ms, Ui.tempo-texto-sai);
+        running: false;
+        triggered => {
+            self.running = false;
+            text-in = true;
+        }
+    }
     property <bool> show-trailer: game.trailer && !small;
     property <bool> show-sessions: sessions.length > 0 && !small;
     alignment: end;
@@ -1494,6 +1516,8 @@ component GameStage inherits VerticalLayout {
     VerticalLayout {
         spacing: small ? 10px : 14px;
         alignment: end;
+        opacity: text-in ? 1 : 0.2;
+        animate opacity { duration: Ui.text-fade(text-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         if game.overline != "": HorizontalLayout {
             alignment: start;
             Badge { text: game.overline; live: game.running; }
@@ -2266,6 +2290,11 @@ component PopupFooter inherits HorizontalLayout {
 // no lugar da lista (CategoriaDeConfiguracao); à direita, ancorado no topo, o cabeçalho da categoria e os grupos de
 // linhas, até 860 de largura.
 component DeskSettings inherits Rectangle {
+    // Troca de página: o conteúdo entra 16 px em `tempo-pagina`; barra e painel não se mexem de lugar.
+    property <bool> shown;
+    init => { shown = true; }
+    opacity: shown ? 1 : 0;
+    animate opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     in property <string> count;
     in property <[DeskNav]> categories;
     in property <int> category-focus;
@@ -2496,6 +2525,10 @@ component ModeCard inherits Rectangle {
 // as camadas de jogo usam o desenho da tela cheia, na escala da mesa.
 component DeskOverlay inherits Rectangle {
     in property <Overlay> ov;
+    // Entrada: o vidro "materializa" (opacidade e escala 0,98 → 1) em `tempo-pagina`; o menu nasce de 0,96 em
+    // `tempo-foco`; o painel lateral desliza da direita.
+    property <bool> shown;
+    init => { shown = true; }
     in property <bool> top-most;
     in property <bool> focus-visible;
     in property <length> menu-x;
@@ -2520,10 +2553,14 @@ component DeskOverlay inherits Rectangle {
     }
     // Diálogo (e qualquer camada sem desenho próprio): cabeçalho com o X, o corpo em grupos e as ações no rodapé.
     if generic && ov.tab2 != 1: Rectangle {
-        background: Ui.desk-canvas.with-alpha(0.6);
+        background: Ui.desk-canvas.with-alpha(shown ? 0.6 : 0);
+        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         TouchArea { }
         Vidro {
             layer: true;
+            opacity: shown ? 1 : 0;
+            transform-scale: shown ? 1 : Ui.escala-entrada;
+            animate opacity, transform-scale { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             width: min(parent.width - 80px, ov.wide ? 640px : 480px);
             height: min(dlg.preferred-height, parent.height - 80px);
             dlg := VerticalLayout {
@@ -2670,8 +2707,25 @@ component DeskOverlay inherits Rectangle {
                 }
             }
         }
+        // Passos do onboarding: a coluna entra 24 px da direita em `tempo-pagina` a cada passo.
+        property <string> step-key: ov.title;
+        property <bool> step-in: true;
+        changed step-key => {
+            step-in = false;
+            step-timer.running = true;
+        }
+        step-timer := Timer {
+            interval: 1ms;
+            running: false;
+            triggered => {
+                self.running = false;
+                step-in = true;
+            }
+        }
         VerticalLayout {
-            x: 120px;
+            x: 120px + (step-in && shown ? 0 : 24px);
+            opacity: step-in && shown ? 1 : 0;
+            animate x, opacity { duration: Ui.enter(step-in); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             y: (parent.height - self.height) / 2;
             width: min(ov.tab == 3 ? 760px : 520px, parent.width - 200px);
             height: self.preferred-height;
@@ -2767,7 +2821,9 @@ component DeskOverlay inherits Rectangle {
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
             layer: true;
-            x: parent.width - self.width - Ui.space-36;
+            x: parent.width - self.width - Ui.space-36 + (shown ? 0 : 48px);
+            opacity: shown ? 1 : 0;
+            animate x, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             y: Ui.space-36;
             width: min(parent.width - 120px, ov.wide ? 580px : 440px);
             height: min(parent.height - 2 * Ui.space-36, pl.preferred-height);
@@ -2820,6 +2876,9 @@ component DeskOverlay inherits Rectangle {
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
             layer: true;
+            opacity: shown ? 1 : 0;
+            transform-scale: shown ? 1 : Ui.escala-menu;
+            animate opacity, transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             radius: Ui.radius-control;
             width: ov.title == "" ? 280px : 260px;
             height: min(ml.preferred-height, root.height - 40px);
@@ -2881,10 +2940,14 @@ component DeskOverlay inherits Rectangle {
     // Campo de texto (CampoDeTexto): diálogo de 480 com o teclado do computador, colar e seleção; Enter confirma, Esc
     // cancela.
     if ov.kind == "keyboard": Rectangle {
-        background: Ui.desk-canvas.with-alpha(0.6);
+        background: Ui.desk-canvas.with-alpha(shown ? 0.6 : 0);
+        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         TouchArea { }
         Vidro {
             layer: true;
+            opacity: shown ? 1 : 0;
+            transform-scale: shown ? 1 : Ui.escala-entrada;
+            animate opacity, transform-scale { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             width: min(parent.width - 80px, 480px);
             height: kl.preferred-height;
             kl := VerticalLayout {
@@ -2946,6 +3009,17 @@ component DeskOverlay inherits Rectangle {
 // atrás do título e embaixo dos cartões. Sem arte, um degradê do accent. Nas Configurações, o cinza `settings-bg`.
 component ArtLayer inherits Rectangle {
     in property <image> art;
+    property <image> art-a: art;
+    property <image> art-b;
+    property <bool> front-a: true;
+    changed art => {
+        if (front-a) {
+            art-b = art;
+        } else {
+            art-a = art;
+        }
+        front-a = !front-a;
+    }
     // Máscara das bordas em faixas (o Slint não tem máscara): opaca até 12%, some em 30%, volta de 62% a 92%.
     property <int> strips: 128;
     pure function edge(t: float) -> float {
@@ -2968,13 +3042,26 @@ component ArtLayer inherits Rectangle {
             }
         }
         if DeskArt.has-art: Rectangle {
+            // Troca de jogo: a arte faz crossfade em `color-time` (duas camadas que se alternam).
             Image {
                 x: DeskArt.x;
                 y: DeskArt.y;
                 width: DeskArt.w;
                 height: DeskArt.h;
-                source: root.art;
+                source: root.art-a;
                 image-fit: fill;
+                opacity: root.front-a ? 1 : 0;
+                animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            }
+            Image {
+                x: DeskArt.x;
+                y: DeskArt.y;
+                width: DeskArt.w;
+                height: DeskArt.h;
+                source: root.art-b;
+                image-fit: fill;
+                opacity: root.front-a ? 0 : 1;
+                animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             }
             if DeskArt.blur.width > 0: Rectangle {
                 for i in strips: Rectangle {
@@ -3131,7 +3218,23 @@ export component Desktop inherits Window {
     }
     changed width => { root.sync-art(); }
     changed height => { root.sync-art(); }
-    changed page => { root.sync-art(); }
+    changed page => {
+        root.sync-art();
+        if (page == "desk-library") {
+            lib-in = false;
+            lib-timer.running = true;
+        }
+    }
+    // Volta para a biblioteca: o conteúdo entra 16 px em `tempo-pagina`.
+    property <bool> lib-in: true;
+    lib-timer := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            lib-in = true;
+        }
+    }
     changed desk-game => { root.sync-art(); }
 
     changed desk-search-focus => { bar.focus-search(); }
@@ -3196,6 +3299,9 @@ export component Desktop inherits Window {
             vertical-stretch: 1;
             lib := DeskLibrary {
                 visible: page == "desk-library";
+                x: lib-in ? 0 : 16px;
+                opacity: lib-in ? 1 : 0;
+                animate x, opacity { duration: Ui.enter(lib-in); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
                 tabs: desk-tabs;
                 tab: desk-tab;
                 collections: desk-collections;
@@ -3294,10 +3400,14 @@ export component Desktop inherits Window {
 
     // Aviso (toast): pílula de vidro de camada a 28 do rodapé; some sozinha e não rouba o foco.
     if toast != "": Vidro {
+        property <bool> shown;
+        init => { shown = true; }
         layer: true;
         radius: self.height / 2;
         x: (root.width - self.width) / 2;
-        y: root.height - self.height - Ui.space-28;
+        y: root.height - self.height - Ui.space-28 + (shown ? 0 : 16px);
+        opacity: shown ? 1 : 0;
+        animate y, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         height: Ui.control-height;
         width: tl.preferred-width;
         tl := HorizontalLayout {
