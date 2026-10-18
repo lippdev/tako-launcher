@@ -115,6 +115,11 @@ pub fn compile_desktop(builtin: &Path) -> Result<ComponentDefinition, ThemeError
     compile_named(&builtin.join("desktop.slint"), builtin, "Desktop")
 }
 
+/// Janela de abertura (TelaCarregamento): `splash.slint`, pequena para compilar rápido antes do resto.
+pub fn compile_splash(builtin: &Path) -> Result<ComponentDefinition, ThemeError> {
+    compile_named(&builtin.join("splash.slint"), builtin, "Splash")
+}
+
 fn compile_named(
     entry: &Path,
     builtin: &Path,

@@ -492,6 +492,12 @@ impl Layer for MenuLayer {
             tab: self.steps.1 as i32,
             // Onboarding em tela inteira: marca, nota e as capas da parede ao fundo.
             tab2: i32::from(self.full),
+            // Onboarding: o "n de 5" vira "‹ Voltar" no hover.
+            tabs2: if self.full {
+                vec![ctx.t("first_run.full.back")]
+            } else {
+                Vec::new()
+            },
             input_hint: self.note.clone(),
             image: self.image.clone(),
             thumbs: if self.full {

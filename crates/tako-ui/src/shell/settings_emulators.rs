@@ -11,12 +11,12 @@ use std::rc::Rc;
 use tako_sources::emulators::emulator::{Emulator, Env};
 use tako_sources::emulators::{Config, Fs, Installed, RomFolder, systems};
 
-fn config(ctx: &Ctx) -> Config {
+pub(crate) fn config(ctx: &Ctx) -> Config {
     crate::sources::emulator_config(&ctx.settings)
 }
 
 /// Grava e relê a biblioteca (os jogos dos emuladores mudam).
-fn save(ctx: &mut Ctx, c: &Config) {
+pub(crate) fn save(ctx: &mut Ctx, c: &Config) {
     for (k, v) in c.save() {
         ctx.settings.set(k, &v);
     }
@@ -28,7 +28,7 @@ fn save(ctx: &mut Ctx, c: &Config) {
 /// (não a cada desenho).
 pub(crate) type Cache = Rc<RefCell<Option<(Config, Installed)>>>;
 
-fn installed(cache: &Cache, ctx: &Ctx) -> Installed {
+pub(crate) fn installed(cache: &Cache, ctx: &Ctx) -> Installed {
     let now = config(ctx);
     let mut c = cache.borrow_mut();
     match c.as_ref() {
@@ -214,12 +214,28 @@ pub(crate) fn rows(ctx: &Ctx, cache: &Cache) -> Vec<MenuItem> {
     v
 }
 
-fn add_folder(ctx: &mut Ctx) {
+pub(crate) fn add_folder(ctx: &mut Ctx) {
     let title = ctx.t("settings.emulators.add_folder");
     crate::shell::add_game::pick(
         ctx,
         move || rfd::FileDialog::new().set_title(&title).pick_folder(),
         add_folder_path,
+    );
+}
+
+/// Troca a pasta `index` por outra escolhida (onboarding: "Trocar"); o sistema da pasta volta ao automático.
+pub(crate) fn replace_folder(ctx: &mut Ctx, index: usize) {
+    let title = ctx.t("settings.emulators.add_folder");
+    crate::shell::add_game::pick(
+        ctx,
+        move || rfd::FileDialog::new().set_title(&title).pick_folder(),
+        move |ctx, path| {
+            let mut c = config(ctx);
+            if let Some(f) = c.rom_folders.get_mut(index) {
+                *f = RomFolder { path, system: None };
+                save(ctx, &c);
+            }
+        },
     );
 }
 
