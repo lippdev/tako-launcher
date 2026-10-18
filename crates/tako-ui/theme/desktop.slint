@@ -2593,7 +2593,7 @@ component DeskRow inherits Rectangle {
         }
         if data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && !(data.kind == "action" && DeskArt.gray): Text {
             text: data.value;
-            color: data.emphasized ? Ui.on-accent : Ui.desk-on-muted;
+            color: data.style == "warning" ? Ui.warning : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted);
             font-size: Ui.desk-label-sm;
             font-weight: data.emphasized ? 600 : 500;
             vertical-alignment: center;
