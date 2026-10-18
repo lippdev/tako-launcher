@@ -669,3 +669,21 @@ fn each_monitor_gets_back_its_own_resolution_and_hdr() {
     assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "");
     assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
 }
+
+#[test]
+fn desktop_search_finds_rows_in_every_category_and_a_category_click_leaves_it() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    let mut page = SettingsPage::new();
+    page.edited("search", "transparencia", &mut ctx);
+    let rows = page.items(&ctx);
+    // Sem acento e sem maiúsculas: acha "Reduzir transparência" (em Aparência) sob o nome da categoria.
+    assert_eq!(rows[0].row.kind, "header");
+    assert!(rows.iter().any(|i| i.row.key == "settings.appearance.transparency"));
+    let appearance = page.cats.iter().position(|c| c.id == "appearance").unwrap();
+    assert!(page.matches_in(&ctx, appearance) > 0);
+    page.click("category", 0, &mut ctx);
+    assert!(page.query.is_empty());
+}

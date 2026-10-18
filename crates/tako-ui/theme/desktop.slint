@@ -2330,6 +2330,8 @@ component DeskSettings inherits Rectangle {
                     }
                 }
                 for c[i] in categories: Rectangle {
+                    // Na busca, a categoria sem nada que combine fica apagada.
+                    opacity: c.count == "0" ? 0.4 : 1;
                     height: Ui.list-row-height + (Ui.text-scale - 1) * 32px;
                     border-radius: Ui.radius-row;
                     background: !c.selected && cta.has-hover ? Ui.glass-hover : transparent;
@@ -3168,6 +3170,8 @@ export component Desktop inherits Window {
     // Configurações (as mesmas propriedades da tela cheia).
     in property <string> settings-title;
     in property <string> settings-count;
+    in property <string> settings-search;
+    in property <string> desk-settings-search-hint;
     in property <[DeskNav]> settings-categories;
     in property <int> settings-category-focus;
     in property <string> settings-heading;
@@ -3242,7 +3246,7 @@ export component Desktop inherits Window {
     // Teclado: o Tako decide o que cada tecla faz; Ctrl+K (ou Ctrl+F) vai para a busca e Ctrl+, para as Configurações.
     fs := FocusScope {
         key-pressed(e) => {
-            if (e.modifiers.control && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && page == "desk-library" && overlays.length == 0) {
+            if (e.modifiers.control && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && (page == "desk-library" || page == "settings") && overlays.length == 0) {
                 bar.focus-search();
                 return accept;
             }
@@ -3277,9 +3281,9 @@ export component Desktop inherits Window {
             big-picture-label: desk-big-picture-label;
             brand-label: desk-brand-label;
             brand-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "menu" && overlays[overlays.length - 1].title == "";
-            show-search: page == "desk-library";
-            search: desk-search;
-            search-hint: desk-search-hint;
+            show-search: page == "desk-library" || page == "settings";
+            search: page == "settings" ? settings-search : desk-search;
+            search-hint: page == "settings" ? desk-settings-search-hint : desk-search-hint;
             search-key: desk-search-key;
             search-esc: desk-search-esc;
             small: root.small;

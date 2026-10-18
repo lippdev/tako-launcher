@@ -789,6 +789,8 @@ pub struct SettingsPage {
     cat: usize,
     /// `None` = coluna de categorias.
     row: Option<usize>,
+    /// Busca de configurações do desktop: as linhas de todas as categorias que combinam com o texto.
+    query: String,
 }
 
 impl Default for SettingsPage {
@@ -803,6 +805,7 @@ impl SettingsPage {
             cats: categories(),
             cat: 0,
             row: None,
+            query: String::new(),
         }
     }
 
@@ -813,7 +816,42 @@ impl SettingsPage {
     }
 
     fn items(&self, ctx: &Ctx) -> Vec<MenuItem> {
-        (self.cats[self.cat].rows)(ctx)
+        if self.query.trim().is_empty() {
+            return (self.cats[self.cat].rows)(ctx);
+        }
+        // Busca: as linhas que combinam, agrupadas sob o nome da categoria (cabeçalhos da categoria não contam).
+        let mut v = Vec::new();
+        for c in &self.cats {
+            let found: Vec<MenuItem> = (c.rows)(ctx)
+                .into_iter()
+                .filter(|i| {
+                    i.row.kind != "header"
+                        && tako_core::library::search_text::matches(
+                            &format!("{} {} {}", i.row.title, i.row.description, i.row.value),
+                            &self.query,
+                        )
+                })
+                .collect();
+            if !found.is_empty() {
+                v.push(MenuItem::new(PanelRow::header(ctx.t(&format!("settings.{}.title", c.id)))));
+                v.extend(found);
+            }
+        }
+        v
+    }
+
+    /// Quantas linhas combinam com a busca em cada categoria (as sem nada ficam apagadas no painel).
+    fn matches_in(&self, ctx: &Ctx, cat: usize) -> usize {
+        (self.cats[cat].rows)(ctx)
+            .iter()
+            .filter(|i| {
+                i.row.kind != "header"
+                    && tako_core::library::search_text::matches(
+                        &format!("{} {} {}", i.row.title, i.row.description, i.row.value),
+                        &self.query,
+                    )
+            })
+            .count()
     }
 
     fn step(items: &[MenuItem], from: usize, d: i32) -> usize {
@@ -906,6 +944,13 @@ impl Page for SettingsPage {
         Nav::Stay
     }
 
+    fn edited(&mut self, zone: &str, text: &str, _ctx: &mut Ctx) {
+        if zone == "search" {
+            self.query = text.to_owned();
+            self.row = None;
+        }
+    }
+
     fn render(&mut self, ctx: &Ctx, out: &mut Out) {
         let items = self.items(ctx);
         if let Some(r) = self.row
@@ -922,7 +967,13 @@ impl Page for SettingsPage {
                 id: c.id.into(),
                 label: ctx.t(&format!("settings.{}.title", c.id)),
                 icon: c.icon.into(),
-                selected: i == self.cat,
+                selected: i == self.cat && self.query.is_empty(),
+                // Na busca, `count` diz quantas linhas da categoria combinam ("0" apaga a categoria).
+                count: if self.query.is_empty() {
+                    String::new()
+                } else {
+                    self.matches_in(ctx, i).to_string()
+                },
                 ..Default::default()
             })
             .collect();
@@ -933,14 +984,24 @@ impl Page for SettingsPage {
                 "settings-count",
                 ctx.tf("desktop.settings_count", &[("n", &self.cats.len().to_string())]),
             );
+            out.set("settings-search", self.query.clone());
         }
         out.set("settings-category-focus", self.cat as i32);
         let id = self.cats[self.cat].id;
-        out.set("settings-heading", ctx.t(&format!("settings.{id}.title")));
-        out.set(
-            "settings-subtitle",
-            ctx.t(&format!("settings.{id}.subtitle")),
-        );
+        if self.query.trim().is_empty() {
+            out.set("settings-heading", ctx.t(&format!("settings.{id}.title")));
+            out.set(
+                "settings-subtitle",
+                ctx.t(&format!("settings.{id}.subtitle")),
+            );
+        } else {
+            out.set("settings-heading", format!("“{}”", self.query.trim()));
+            let n = self.items(ctx).iter().filter(|i| i.row.kind != "header").count();
+            out.set(
+                "settings-subtitle",
+                ctx.tf("desktop.settings_found", &[("n", &n.to_string())]),
+            );
+        }
         let rows: Vec<PanelRow> = items.into_iter().map(|i| i.row).collect();
         out.set("settings-rows", rows);
         out.set(
@@ -981,8 +1042,9 @@ impl Page for SettingsPage {
                 };
                 self.handle(cmd, ctx)
             }
-            // No desktop a categoria só troca as linhas; o foco não pula para elas.
+            // No desktop a categoria só troca as linhas; o foco não pula para elas (e sai da busca).
             "category" if ctx.desktop => {
+                self.query.clear();
                 self.hover(zone, index, ctx);
                 Nav::Stay
             }
