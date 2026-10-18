@@ -787,7 +787,9 @@ component GameList inherits Rectangle {
     in property <bool> compact;
     property <length> row-h: (compact ? 42px : Ui.list-row-height) + (Ui.text-scale - 1) * 32px + 6px;
     property <int> first: max(0, floor(-fl.viewport-y / row-h));
-    property <int> shown: min(ceil(fl.height / row-h) + 2, max(0, games.length - first));
+    // Vagas fixas: a linha `r` fica sempre na vaga `mod(r, slots)`. Rolar uma linha troca só a vaga que saiu de cima
+    // (ela entra embaixo); as outras guardam dados, textos, miniatura e a seleção, sem refazer nada por quadro.
+    property <int> slots: min(ceil(fl.height / row-h) + 2, games.length);
     changed first => { root.scrolled(first); }
     changed selected => {
         if (selected >= 0) {
@@ -801,22 +803,29 @@ component GameList inherits Rectangle {
     // Sem `clip` aqui: o Flickable já recorta as linhas e a barra de rolagem fica fora, na borda do painel.
     fl := Flickable {
         viewport-height: games.length * row-h;
-        for i in shown: GameRow {
+        for k in slots: GameRow {
+            // `want` muda em todas as vagas a cada linha rolada; `r` só na que trocou de linha (o `changed` corta a
+            // propagação), então só ela refaz `data` e o que depende dele.
+            property <int> want: first + mod(k - first, slots);
+            property <int> r;
+            init => { r = want; }
+            changed want => { r = want; }
+            visible: r < games.length;
             x: 0;
-            y: (first + i) * row-h;
+            y: r * row-h;
             width: fl.width;
             height: row-h - 6px;
-            data: games[first + i];
-            selected: first + i == root.selected;
-            focused: key-focus && first + i == root.selected;
+            data: games[r];
+            selected: r == root.selected;
+            focused: key-focus && r == root.selected;
             selecting: root.selecting;
-            clicked => { root.clicked("game", first + i); }
-            toggle => { root.clicked("game-toggle", first + i); }
-            range => { root.clicked("game-range", first + i); }
-            play => { root.clicked("game-play", first + i); }
+            clicked => { root.clicked("game", r); }
+            toggle => { root.clicked("game-toggle", r); }
+            range => { root.clicked("game-range", r); }
+            play => { root.clicked("game-play", r); }
             menu(x, y) => {
                 root.menu(x, y);
-                root.clicked("game-menu", first + i);
+                root.clicked("game-menu", r);
             }
         }
     }
