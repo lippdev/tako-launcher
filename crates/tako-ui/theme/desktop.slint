@@ -2900,7 +2900,8 @@ component DeskRow inherits Rectangle {
     // FilaDeCapas: a linha da fila (capa atual, proposta, confiança e as ações dentro dela).
     in property <CoverRow> cv;
     property <bool> is-cover: data.kind == "cover";
-    out property <length> row-h: is-header ? 40px : (is-cover ? 120px : max(loose ? Ui.control-height : Ui.settings-row-height, lay.preferred-height));
+    // A linha da fila cresce com o motivo (texto essencial: quebra em vez de cortar).
+    out property <length> row-h: is-header ? 40px : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : Ui.settings-row-height, lay.preferred-height));
     callback clicked();
     // Ação dentro da linha: 0 = Aceitar, 1 = Escolher outra.
     callback act(int);
@@ -2951,7 +2952,9 @@ component DeskRow inherits Rectangle {
             root.clicked();
         }
     }
-    if is-cover: HorizontalLayout {
+    // Sem `if`: o `row-h` precisa ler a altura dela (elemento dentro de `if` não é visível de fora).
+    covl := HorizontalLayout {
+        visible: is-cover;
         padding-left: 18px;
         padding-right: 14px;
         padding-top: 14px;

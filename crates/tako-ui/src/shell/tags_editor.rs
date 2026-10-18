@@ -158,7 +158,8 @@ impl Layer for TagsLayer {
         let (lines, count) = wrap(&chips);
         Overlay {
             kind: "tags".into(),
-            title: ctx.t("tags.title"),
+            // No desktop o nome é "Etiquetas" (EtiquetasDoJogo); a tela cheia segue com o texto dela.
+            title: ctx.t("desktop.info.tags"),
             overline: self.overline.to_uppercase(),
             text: ctx.t("tags.text_desktop"),
             sel: self.sel.min(rows.len().saturating_sub(1)) as i32,
