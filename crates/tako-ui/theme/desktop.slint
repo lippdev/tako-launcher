@@ -2112,25 +2112,32 @@ component MoreRow inherits Rectangle {
     }
 }
 
-// Cartão de vidro da fase 2: título `title` e o conteúdo embaixo, 24 por dentro (16 na janela pequena).
-component MoreCard inherits Vidro {
+// Cartão de vidro denso fixo da fase 2: título `title` e o conteúdo embaixo, 24 por dentro (16 na janela pequena).
+// Rolagem sem lag: vidro denso fixo (glass-panel-dense + contorno glass-edge), sem desfoque ao vivo e sem sombra.
+component MoreCard inherits Rectangle {
     in property <string> title;
     in property <bool> small;
+    border-radius: Ui.radius-card;
+    background: Ui.glass-panel-dense;
+    border-width: 1px;
+    border-color: Ui.glass-edge;
     VerticalLayout {
         padding: small ? Ui.space-16 : Ui.space-24;
         padding-bottom: small ? Ui.space-16 : Ui.space-20;
         spacing: Ui.space-12;
-        CardTitle { text: title; }
+        if title != "": CardTitle { text: title; }
         @children
     }
 }
 
-// DestaqueFases › fase 2: o que o Tako sabe do jogo além da primeira tela (Sobre inteiro, todos os Detalhes, o
-// histórico de sessões e a captura/trailer quando existem). Duas colunas (uma na janela pequena); rola por dentro
-// quando passa da altura (`offset`, posto pela roda em GamePhases). Seção sem dado não aparece.
+// DestaqueFases › fase 2: o que o Tako sabe do jogo além da primeira tela.
+// Duas colunas (58% e 42%, 20 entre elas; uma coluna abaixo de 820 ou na janela pequena).
+// Sem repetir a fase 1: Sobre e Sessões saem da fase 2. O Trailer fica no topo da coluna larga.
+// Rolagem sem lag: cartões em vidro denso fixo sem desfoque ao vivo e sem sombra; 40 px de esmaecido embaixo.
 component GameMore inherits Rectangle {
     in property <DeskMore> more;
     in property <bool> trailer;
+    in property <image> art;
     in property <bool> small;
     in property <length> offset;
     out property <length> scroll-max: max(0px, content-h - view.height);
@@ -2138,7 +2145,10 @@ component GameMore inherits Rectangle {
     property <bool> one-col: small || root.width < 820px;
     property <length> gap: small ? Ui.space-16 : Ui.space-20;
     property <length> left-w: one-col ? root.width : (root.width - gap) * 0.58;
-    property <length> content-h: one-col ? lc.preferred-height + gap + rc.preferred-height : max(lc.preferred-height, rc.preferred-height);
+    property <length> right-w: one-col ? root.width : root.width - left-w - gap;
+    property <length> content-h: one-col
+        ? (lc.preferred-height > 0 && rc.preferred-height > 0 ? lc.preferred-height + gap + rc.preferred-height : lc.preferred-height + rc.preferred-height)
+        : max(lc.preferred-height, rc.preferred-height);
     property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
     // "⌃ Voltar": volta para a fase 1 (como a roda para cima no topo, Page Up e Esc).
     back := Vidro {
@@ -2169,19 +2179,56 @@ component GameMore inherits Rectangle {
         Rectangle {
             y: -root.offset;
             height: root.content-h;
+            // Coluna larga (58%): Trailer (16:9, raio 12, botão "Assistir trailer") e Requisitos (se houvesse fonte).
             lc := VerticalLayout {
                 x: 0;
                 y: 0;
                 width: root.left-w;
                 height: self.preferred-height;
                 spacing: root.gap;
-                if more.description != "": MoreCard {
-                    title: more.labels[2];
+                if trailer: MoreCard {
+                    title: more.labels[6];
                     small: small;
-                    Text { text: more.description; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; horizontal-stretch: 1; }
+                    Rectangle {
+                        height: (root.left-w - (small ? Ui.space-16 : Ui.space-24) * 2) * 9 / 16;
+                        border-radius: 12px;
+                        clip: true;
+                        background: Ui.glass-control;
+                        Image { width: parent.width; height: parent.height; source: root.art; image-fit: cover; }
+                        Rectangle { background: @linear-gradient(0deg, Ui.desk-canvas.with-alpha(0.85) 0%, Ui.desk-canvas.with-alpha(0) 55%); }
+                        Rectangle { border-radius: 12px; border-width: 1px; border-color: Ui.glass-edge; }
+                        GlassButton {
+                            x: 14px;
+                            y: parent.height - self.height - 14px;
+                            height: 40px;
+                            show-label: true;
+                            icon: "play";
+                            label: more.labels[6];
+                            clicked => { root.clicked("trailer", 0); }
+                        }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.clicked("trailer", 0); }
+                        }
+                    }
                 }
-                // Imagens: a captura de tela que a fonte de metadados trouxe e o trailer, quando existem.
-                if more.shots.length > 0 || trailer: MoreCard {
+            }
+            // Coluna estreita (42%): Detalhes completos e Imagens (miniaturas de 256 × 144, 192 × 108, raio 8).
+            rc := VerticalLayout {
+                x: root.one-col ? 0 : root.left-w + root.gap;
+                y: root.one-col ? (lc.preferred-height > 0 ? lc.preferred-height + root.gap : 0) : 0;
+                width: root.right-w;
+                height: self.preferred-height;
+                spacing: root.gap;
+                if more.details.length > 0: MoreCard {
+                    title: more.labels[3];
+                    small: small;
+                    VerticalLayout {
+                        spacing: 0;
+                        for r[i] in more.details: MoreRow { info: r; first: i == 0; label-w: root.label-w; }
+                    }
+                }
+                if more.shots.length > 0: MoreCard {
                     title: more.labels[5];
                     small: small;
                     HorizontalLayout {
@@ -2190,48 +2237,22 @@ component GameMore inherits Rectangle {
                         for shot in more.shots: Rectangle {
                             width: small ? 192px : 256px;
                             height: self.width * 9 / 16;
-                            border-radius: Ui.radius-thumb;
+                            border-radius: 8px;
                             clip: true;
                             background: Ui.glass-control;
                             Image { width: parent.width; height: parent.height; source: shot; image-fit: cover; }
-                            Rectangle { border-radius: Ui.radius-thumb; border-width: 1px; border-color: Ui.glass-edge; }
-                        }
-                        if trailer: GlassButton {
-                            y: (parent.height - self.height) / 2;
-                            height: 40px;
-                            show-label: true;
-                            icon: "play";
-                            label: more.labels[6];
-                            clicked => { root.clicked("trailer", 0); }
+                            Rectangle { border-radius: 8px; border-width: 1px; border-color: Ui.glass-edge; }
                         }
                     }
                 }
             }
-            rc := VerticalLayout {
-                x: root.one-col ? 0 : root.left-w + root.gap;
-                y: root.one-col ? lc.preferred-height + root.gap : 0;
-                width: root.one-col ? root.width : root.width - root.left-w - root.gap;
-                height: self.preferred-height;
-                spacing: root.gap;
-                MoreCard {
-                    title: more.labels[3];
-                    small: small;
-                    VerticalLayout {
-                        spacing: 0;
-                        for r[i] in more.details: MoreRow { info: r; first: i == 0; label-w: root.label-w; }
-                    }
-                }
-                if more.sessions.length > 0: MoreCard {
-                    title: more.labels[4];
-                    small: small;
-                    dense: true;
-                    VerticalLayout {
-                        spacing: 0;
-                        Text { text: more.sessions-summary; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
-                        for r[i] in more.sessions: MoreRow { info: r; first: i == 0; label-w: 72px * Ui.text-scale; }
-                    }
-                }
-            }
+        }
+        // 40 px de esmaecido embaixo mostram que a rolagem continua.
+        if root.scroll-max > 0 && root.offset < root.scroll-max - 4px: Rectangle {
+            y: parent.height - 40px;
+            height: 40px;
+            width: parent.width;
+            background: @linear-gradient(180deg, transparent 0%, Ui.desk-canvas.with-alpha(0.85) 100%);
         }
     }
 }
@@ -2243,6 +2264,7 @@ component GameMore inherits Rectangle {
 component GamePhases inherits Rectangle {
     in property <DeskMore> more;
     in property <bool> trailer;
+    in property <image> art;
     in property <bool> small;
     callback clicked(string, int);
     property <bool> on: more.on;
@@ -2355,6 +2377,7 @@ component GamePhases inherits Rectangle {
         visible: self.opacity > 0.01;
         more: shown;
         trailer: trailer;
+        art: root.art;
         small: small;
         offset: root.offset;
         clicked(z, i) => { root.clicked(z, i); }
@@ -2678,6 +2701,7 @@ component DeskLibrary inherits Rectangle {
             horizontal-stretch: 1;
             more: more;
             trailer: game.trailer;
+            art: game.art;
             small: small;
             clicked(z, i) => { root.clicked(z, i); }
           GameStage {
