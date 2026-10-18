@@ -2,6 +2,19 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.8]
+### Novidades
+- **Janela própria:** o Tako desenha a barra da janela sobre a arte do jogo, com o logo e os botões Minimizar, Maximizar e Fechar (arraste pela barra; duplo clique maximiza).
+- **Escolhas viram listas:** no modo desktop, toda escolha entre várias opções (idioma, tela, resolução, áudio, perfis, filtros, ordenação) abre uma lista junto do botão, com ✓ na atual. Chaves só ligam e desligam.
+- **Coleções:** a aba Coleções escolhe a coleção numa lista com quantos jogos cada uma tem, "Nova coleção…" e "Organizar coleções", e lembra a última.
+- **Trocar imagens:** a escolha de capa, fundo, logo e ícone virou um popup grande com a grade na largura toda, uma prévia e os botões Usar, Voltar à original e Cancelar; clicar só escolhe.
+- **Animações:** troca de página, de aba, de modo (lista, grade, categorias), de jogo, popups, painéis, menus e avisos agora animam como no design, e "Reduzir animações" continua desligando tudo.
+- **Troca de jogo sem piscar:** a arte nova entra por cima da antiga, assentando devagar; a antiga fica até o fim.
+- **Arte de fundo:** cobre a janela inteira em qualquer tamanho, sem esticar e sem faixas, no padrão de fundo da Steam (3840 × 1240).
+- **Primeira abertura:** a tela das lojas mostra o que o Tako achou e tem "Procurar jogos" e "Escolher pastas…"; Capas e Modo ganharam Voltar.
+- Cartões Sobre e Detalhes cabem em qualquer janela, títulos longos quebram em duas linhas e encolhem, a janela pequena usa linhas compactas e as Configurações ocupam a largura certa em telas grandes.
+- Painéis laterais abrem abaixo da barra, a barra de rolagem da lista encosta na borda e os ícones (lojas, lista, grade) não ficam mais com contorno.
+
 ## [0.2.0-alpha.7]
 ### Novidades
 - **Novo visual do modo desktop:** a arte do jogo em foco ocupa a janela inteira e a barra, a lista e os cartões flutuam sobre ela em vidro. Sem arte, o fundo pega a cor do jogo. Títulos em Poppins e textos em Plus Jakarta Sans.

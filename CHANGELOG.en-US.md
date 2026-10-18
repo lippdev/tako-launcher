@@ -2,6 +2,19 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.8]
+### What's new
+- **Own window bar:** Tako draws the window bar over the game art, with the logo and Minimize, Maximize and Close (drag by the bar; double click maximizes).
+- **Choices become lists:** in desktop mode, every choice between several options (language, display, resolution, audio, profiles, filters, sorting) opens a list next to the button, with ✓ on the current one. Switches only turn things on and off.
+- **Collections:** the Collections tab picks the collection from a list with each one's game count, "New collection…" and "Manage collections", and remembers the last one.
+- **Change images:** picking cover, background, logo and icon is now a large popup with a full-width grid, a preview and Use, Back to original and Cancel; clicking only picks.
+- **Animations:** page, tab, mode (list, grid, categories) and game changes, popups, panels, menus and toasts now animate as designed, and "Reduce motion" still turns everything off.
+- **Game switching without flashing:** the new art fades in over the old one and settles slowly; the old one stays until the end.
+- **Background art:** covers the whole window at any size, without stretching or bars, following Steam's background format (3840 × 1240).
+- **First run:** the stores screen shows what Tako found and offers "Find games" and "Choose folders…"; Covers and Mode got a Back button.
+- About and Details cards fit any window, long titles wrap to two lines and shrink, the small window uses compact rows and Settings use the right width on large screens.
+- Side panels open below the bar, the list scrollbar sits on the edge and icons (stores, list, grid) no longer look outlined.
+
 ## [0.2.0-alpha.7]
 ### What's new
 - **New desktop mode look:** the focused game's art fills the whole window and the bar, list and cards float over it in glass. Without art, the background takes the game's color. Titles in Poppins and text in Plus Jakarta Sans.
