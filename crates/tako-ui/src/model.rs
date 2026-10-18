@@ -211,10 +211,29 @@ theme_struct! {
         pub id: String,
         pub title: String,
         pub thumb: Image,
+        // Capa 2:3 maior, só na grade e nas categorias, perto da área visível.
+        pub cover: Image,
         pub accent: Color,
         pub favorite: bool,
         pub running: bool,
         pub installed: bool,
+        // Loja de origem (ícone e nome, para a dica e o rótulo acessível).
+        pub store_icon: String,
+        pub store_name: String,
+        // Marcado na seleção múltipla.
+        pub checked: bool,
+        // Posição na lista que o tema avisa nos cliques (nas categorias, na lista achatada das fileiras).
+        pub index: i32,
+    }
+}
+
+theme_struct! {
+    /// Fileira da BibliotecaCategorias: título, quantos jogos, ícone e as capas.
+    pub struct DeskCategory {
+        pub title: String,
+        pub count: String,
+        pub icon: String,
+        pub games: Vec<DeskGame>,
     }
 }
 

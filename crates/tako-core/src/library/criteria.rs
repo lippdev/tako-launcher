@@ -136,6 +136,8 @@ pub struct LibraryCriteria {
     /// Status marcados (LIB-001): o jogo precisa ter algum deles.
     pub statuses: BTreeSet<PlayStatus>,
     pub sort: LibrarySort,
+    /// Ordem invertida (⇅ no modo desktop): a mesma ordenação, de trás para a frente.
+    pub reversed: bool,
 }
 
 /// `OrdinalIgnoreCase` do C#.

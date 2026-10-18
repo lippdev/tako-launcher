@@ -28,7 +28,8 @@ import { Overlay, Overline, OverlayView } from "overlay.slint";
 export { Ui }
 
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
-struct DeskGame { id: string, title: string, thumb: image, accent: color, favorite: bool, running: bool, installed: bool }
+struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
+struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
 struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string }
 struct DeskStat { label: string, value: string }
 
@@ -416,68 +417,222 @@ component TopBar inherits Vidro {
     }
 }
 
-// Linha da lista de jogos: miniatura, nome, favorito e "jogando".
+// Segunda camada de vidro: o item escolhido (jogo, aba, categoria, opção) dentro de um painel. Reflexo em cima,
+// contorno claro e, nas linhas da lista, uma sombra curta.
+component Selected inherits Rectangle {
+    in property <length> radius: Ui.radius-row;
+    in property <bool> lifted;
+    border-radius: radius;
+    background: Ui.glass-selected;
+    drop-shadow-offset-y: lifted ? 6px : 0;
+    drop-shadow-blur: lifted ? 16px : 0;
+    drop-shadow-color: lifted ? Ui.shadow-float-color : transparent;
+    Rectangle {
+        border-radius: root.radius;
+        background: @linear-gradient(180deg, Ui.glass-item-highlight 0%, Ui.glass-item-highlight.with-alpha(0.04) 60%, Ui.glass-item-highlight.with-alpha(0) 100%);
+    }
+    Rectangle {
+        border-radius: root.radius;
+        border-width: 1px;
+        border-color: Ui.glass-item-edge;
+    }
+    // Brilho de 1px no topo.
+    Rectangle {
+        x: root.radius / 2;
+        y: 1px;
+        width: parent.width - root.radius;
+        height: 1px;
+        background: Ui.on-accent.with-alpha(0.2);
+    }
+}
+
+// Abas da biblioteca (Todos · Favoritos · Coleções) como seletor segmentado: um trilho com as opções de largura
+// igual; a escolhida na segunda camada de vidro. Nas Grade e Categorias, o mesmo trilho fica num bloco solto.
+component Tabs inherits Rectangle {
+    in property <[string]> tabs;
+    in property <int> current;
+    in property <int> focus-index: -1;
+    callback clicked(int);
+    height: 40px;
+    border-radius: Ui.radius-control;
+    background: Ui.glass-control;
+    border-width: 1px;
+    border-color: Ui.glass-edge;
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 2px;
+        for t[i] in tabs: Rectangle {
+            horizontal-stretch: 1;
+            border-radius: 11px;
+            background: i != current && tta.has-hover ? Ui.glass-hover : transparent;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: tab;
+            accessible-label: t;
+            if i == current: Selected { radius: 11px; }
+            if i == focus-index: FocusRing { radius: 11px; }
+            Text {
+                text: t;
+                color: i == current ? Ui.on-accent : Ui.desk-on-muted;
+                font-size: 14px * Ui.text-scale;
+                font-weight: i == current ? 600 : 500;
+                overflow: elide;
+            }
+            tta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked(i); }
+            }
+        }
+    }
+}
+
+// Ícone discreto da linha de contagem (ordenar, filtrar, modo de exibição): alvo de 30, sem botão; hover clareia.
+component IconBtn inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <string> badge;
+    in property <bool> on;
+    in property <bool> focused;
+    callback clicked();
+    height: 30px;
+    width: badge != "" ? il.preferred-width : self.height;
+    border-radius: Ui.radius-thumb;
+    background: ita.has-hover ? Ui.glass-hover : transparent;
+    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    accessible-role: button;
+    accessible-label: label;
+    if focused: FocusRing { radius: Ui.radius-thumb; }
+    il := HorizontalLayout {
+        padding-left: badge != "" ? 7px : 0;
+        padding-right: badge != "" ? 8px : 0;
+        spacing: 5px;
+        alignment: center;
+        Icon { name: icon; size: 17px; tint: on || ita.has-hover ? Ui.on-accent : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+        if badge != "": Text { text: badge; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 700; vertical-alignment: center; }
+    }
+    ita := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Linha da lista (ListaDeJogos): miniatura quadrada, nome, loja de origem e, na escolhida, o ▶ redondo. Na seleção
+// múltipla, a caixa redonda à esquerda; Ctrl e Shift no clique marcam.
 component GameRow inherits Rectangle {
     in property <DeskGame> data;
     in property <bool> selected;
     in property <bool> focused;
+    in property <bool> selecting;
     callback clicked();
+    callback toggle();
+    callback range();
     callback play();
     callback menu(length, length);
-    border-radius: Ui.radius-md;
-    background: selected ? Ui.surface-1 : (ta.has-hover ? Ui.surface-1.with-alpha(0.06) : transparent);
+    property <bool> picked: selecting ? data.checked : selected;
+    border-radius: Ui.radius-row;
+    background: !picked && ta.has-hover ? Ui.glass-hover : transparent;
+    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    accessible-role: list-item;
+    accessible-label: data.title + " · " + data.store-name;
+    if picked: Selected { lifted: true; }
     if focused: FocusRing { }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if (ev.button == PointerEventButton.right && ev.kind == PointerEventKind.up) {
+                root.menu(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+            }
+            if (ev.button == PointerEventButton.left && ev.kind == PointerEventKind.up) {
+                if (ev.modifiers.control || ev.modifiers.meta) {
+                    root.toggle();
+                } else if (ev.modifiers.shift) {
+                    root.range();
+                } else {
+                    root.clicked();
+                }
+            }
+        }
+        double-clicked => { root.play(); }
+    }
     HorizontalLayout {
-        padding-left: 10 * Ui.u;
-        padding-right: 14 * Ui.u;
-        spacing: 16 * Ui.u;
+        padding-left: Ui.space-8;
+        padding-right: 6px;
+        spacing: 14px;
+        if selecting: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            background: data.checked ? Ui.primary-top : Ui.glass-control;
+            border-width: data.checked ? 0 : 1px;
+            border-color: Ui.glass-edge-strong;
+            if data.checked: Icon { name: "tick"; size: 16px; tint: Ui.on-primary; }
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.toggle(); }
+            }
+        }
         Rectangle {
             y: (parent.height - self.height) / 2;
-            width: 36 * Ui.u;
-            height: 54 * Ui.u;
-            border-radius: 4 * Ui.u;
+            width: Ui.thumb-size;
+            height: Ui.thumb-size;
+            border-radius: Ui.radius-thumb;
             clip: true;
             background: @linear-gradient(160deg, data.accent 0%, data.accent.darker(0.5) 100%);
             Image { width: parent.width; height: parent.height; source: data.thumb; image-fit: cover; }
         }
         Text {
             text: data.title;
-            color: selected || data.installed ? Ui.on-accent : Ui.on-accent-muted;
-            font-size: Ui.label-md;
-            font-weight: selected ? 600 : 500;
+            color: data.installed ? Ui.on-accent : Ui.desk-on-muted;
+            font-size: Ui.desk-label;
+            font-weight: picked ? 600 : 500;
             vertical-alignment: center;
             horizontal-stretch: 1;
             overflow: elide;
         }
-        if data.favorite: Icon { name: "starfill"; size: 18 * Ui.u; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
         if data.running: Rectangle {
             y: (parent.height - self.height) / 2;
-            width: 10 * Ui.u;
-            height: 10 * Ui.u;
-            border-radius: self.height / 2;
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
             background: Ui.success;
         }
-    }
-    ta := TouchArea {
-        clicked => { root.clicked(); }
-        double-clicked => { root.play(); }
-        pointer-event(ev) => {
-            if (ev.button == PointerEventButton.right && ev.kind == PointerEventKind.up) {
-                root.menu(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+        Rectangle {
+            width: 18px;
+            accessible-role: image;
+            accessible-label: data.store-name;
+            Icon { name: data.store-icon; size: 16px; tint: picked ? Ui.desk-on-muted : Ui.desk-on-subtle; }
+        }
+        if selected && !selecting: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: pta.has-hover ? Ui.glass-edge-strong : Ui.glass-pressed;
+            border-width: 1px;
+            border-color: Ui.glass-edge-strong;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: button;
+            Icon { name: "play"; size: 18px; tint: Ui.on-accent; }
+            pta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.play(); }
             }
         }
+        if !selected || selecting: Rectangle { width: 2px; }
     }
 }
 
-// Lista virtualizada: só as linhas visíveis existem; rola com a roda do mouse e segue a seleção do teclado.
+// Lista virtualizada: só as linhas visíveis existem; rola com a roda do mouse e segue a seleção do teclado. As linhas
+// crescem com o "Tamanho do texto".
 component GameList inherits Rectangle {
     in property <[DeskGame]> games;
     in property <int> selected;
     in property <bool> key-focus;
+    in property <bool> selecting;
     callback clicked(string, int);
     callback menu(length, length);
     callback scrolled(int);
-    property <length> row-h: 72 * Ui.u;
+    property <length> row-h: Ui.list-row-height + (Ui.text-scale - 1) * 32px + 6px;
     property <int> first: max(0, floor(-fl.viewport-y / row-h));
     property <int> shown: min(ceil(fl.height / row-h) + 2, max(0, games.length - first));
     changed first => { root.scrolled(first); }
@@ -495,13 +650,16 @@ component GameList inherits Rectangle {
         viewport-height: games.length * row-h;
         for i in shown: GameRow {
             x: 0;
-            y: (first + i) * row-h + 4 * Ui.u;
-            width: fl.width - 10 * Ui.u;
-            height: row-h - 8 * Ui.u;
+            y: (first + i) * row-h;
+            width: fl.width;
+            height: row-h - 6px;
             data: games[first + i];
             selected: first + i == root.selected;
             focused: key-focus && first + i == root.selected;
+            selecting: root.selecting;
             clicked => { root.clicked("game", first + i); }
+            toggle => { root.clicked("game-toggle", first + i); }
+            range => { root.clicked("game-range", first + i); }
             play => { root.clicked("game-play", first + i); }
             menu(x, y) => {
                 root.menu(x, y);
@@ -511,127 +669,533 @@ component GameList inherits Rectangle {
     }
     // Barra de rolagem fina (só quando a lista passa da altura).
     if games.length * row-h > fl.height: Rectangle {
-        x: parent.width - 4px;
-        width: 4px;
-        border-radius: 2px;
+        x: parent.width - 3px;
+        width: 3px;
+        border-radius: 1.5px;
         y: -fl.viewport-y / (games.length * row-h) * fl.height;
         height: max(24px, fl.height * fl.height / (games.length * row-h));
-        background: Ui.surface-2;
+        background: Ui.glass-pressed;
     }
 }
 
-// Abas da biblioteca: texto com um traço embaixo da escolhida.
-component Tabs inherits HorizontalLayout {
-    in property <[string]> tabs;
-    in property <int> current;
-    in property <int> focus-index: -1;
-    callback clicked(int);
-    spacing: 34 * Ui.u;
-    alignment: start;
-    for t[i] in tabs: Rectangle {
-        width: tl.preferred-width;
-        if i == focus-index: FocusRing { radius: Ui.radius-sm; }
-        tl := Text {
-            text: t;
-            y: (parent.height - self.height) / 2;
-            color: i == current ? Ui.on-accent : (tta.has-hover ? Ui.on-accent-muted : Ui.on-accent-subtle);
-            font-size: Ui.label-lg;
-            font-weight: 600;
-        }
-        Rectangle {
-            y: parent.height - 3px;
-            height: 3px;
-            border-radius: 1.5px;
-            background: i == current ? Ui.on-accent : transparent;
-        }
-        tta := TouchArea {
-            mouse-cursor: pointer;
-            clicked => { root.clicked(i); }
-        }
-    }
-}
-
-// Coleções na aba Coleções: pílulas com quantos jogos cada uma mostra.
-component Chips inherits HorizontalLayout {
+// Coleções na aba Coleções (ChipsDeColecao): pílulas com quantos jogos cada uma mostra; a escolhida na segunda
+// camada de vidro. Rolam na horizontal quando não cabem.
+component Chips inherits Flickable {
     in property <[DeskNav]> items;
     in property <int> focus-index: -1;
     callback clicked(int);
-    spacing: 10 * Ui.u;
-    alignment: start;
-    for c[i] in items: Rectangle {
-        height: 44 * Ui.u;
-        width: cl.preferred-width;
-        border-radius: self.height / 2;
-        background: c.selected ? Ui.surface-solid : (cta.has-hover ? Ui.surface-1 : Ui.surface-1.with-alpha(0.07));
-        if i == focus-index: FocusRing { radius: parent.height / 2; }
-        cl := HorizontalLayout {
-            padding-left: 18 * Ui.u;
-            padding-right: 18 * Ui.u;
-            spacing: 8 * Ui.u;
-            Icon { name: c.icon; size: 18 * Ui.u; y: (parent.height - self.height) / 2; tint: c.selected ? Ui.on-surface-solid : Ui.on-accent-muted; }
-            Text { text: c.label; color: c.selected ? Ui.on-surface-solid : Ui.on-accent; font-size: Ui.label-sm; font-weight: 600; vertical-alignment: center; }
-            Text { text: c.count; color: c.selected ? Ui.on-surface-solid-muted : Ui.on-accent-subtle; font-size: Ui.label-sm; vertical-alignment: center; }
-        }
-        cta := TouchArea {
-            mouse-cursor: pointer;
-            clicked => { root.clicked(i); }
+    height: 32px;
+    viewport-width: cl.preferred-width;
+    interactive: cl.preferred-width > self.width;
+    cl := HorizontalLayout {
+        spacing: Ui.space-8;
+        alignment: start;
+        for c[i] in items: Rectangle {
+            height: 32px;
+            width: ct.preferred-width;
+            border-radius: self.height / 2;
+            background: !c.selected && cta.has-hover ? Ui.glass-hover : (c.selected ? transparent : Ui.glass-control);
+            border-width: c.selected ? 0 : 1px;
+            border-color: Ui.glass-edge;
+            accessible-role: button;
+            accessible-label: c.label;
+            if c.selected: Selected { radius: parent.height / 2; }
+            if i == focus-index: FocusRing { radius: parent.height / 2; }
+            ct := HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: 6px;
+                Text { text: c.label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
+                Text { text: "· " + c.count; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
+            }
+            cta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked(i); }
+            }
         }
     }
 }
 
-// Destaque do jogo: arte de fundo com o logo (ou o nome) embaixo à esquerda.
-component Hero inherits Rectangle {
-    in property <DeskGameView> game;
-    border-radius: Ui.radius-lg;
-    clip: true;
-    background: @linear-gradient(160deg, game.accent 0%, game.accent.darker(0.6) 100%);
-    if game.art.width > 0: Image {
-        width: parent.width;
-        height: parent.height;
-        source: game.art;
-        image-fit: cover;
+// ListaVazia: nunca um painel em branco; o polvo, o porquê e a saída.
+component EmptyList inherits VerticalLayout {
+    in property <string> title;
+    in property <string> text;
+    in property <string> action;
+    callback clicked();
+    alignment: center;
+    spacing: 10px;
+    padding-left: Ui.space-20;
+    padding-right: Ui.space-20;
+    padding-bottom: Ui.space-36;
+    HorizontalLayout {
+        alignment: center;
+        Image { source: @image-url("tako-mark.png"); width: 72px; height: 72px; opacity: 0.85; accessible-role: none; }
     }
-    Rectangle { background: @linear-gradient(20deg, Ui.art-scrim-left 0%, Ui.art-scrim-bottom 40%, transparent 70%); }
-    VerticalLayout {
-        x: 36 * Ui.u;
-        y: parent.height - self.height - 32 * Ui.u;
-        width: parent.width * 0.6;
-        height: self.preferred-height;
-        spacing: 8 * Ui.u;
-        if game.overline != "": Overline { text: game.overline; }
-        if game.logo.width > 0: Image {
-            source: game.logo;
-            height: min(150 * Ui.u, root.height * 0.32);
-            image-fit: contain;
-            horizontal-alignment: left;
+    Text { text: title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-label-lg; font-weight: 700; horizontal-alignment: center; wrap: word-wrap; }
+    if text != "": Text { text: text; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; horizontal-alignment: center; wrap: word-wrap; }
+    if action != "": HorizontalLayout {
+        alignment: center;
+        padding-top: 6px;
+        Rectangle {
+            height: Ui.control-height;
+            width: al.preferred-width;
+            border-radius: self.height / 2;
+            background: ata.pressed ? Ui.glass-pressed : (ata.has-hover ? Ui.glass-hover : Ui.glass-control);
+            border-width: 1px;
+            border-color: Ui.glass-edge;
+            accessible-role: button;
+            accessible-label: action;
+            al := HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                Text { text: action; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; vertical-alignment: center; }
+            }
+            ata := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked(); }
+            }
         }
-        if game.logo.width == 0: Text {
+    }
+}
+
+// Blocos de espera (EstadoCarregando) no tamanho do que vai chegar; pulsam devagar, parados com "Reduzir animações".
+component Skeleton inherits Rectangle {
+    in property <length> radius: Ui.radius-thumb;
+    border-radius: radius;
+    background: Ui.glass-control;
+    opacity: Ui.reduce-motion ? 0.8 : 0.55 + 0.45 * abs(sin(animation-tick() / Ui.tempo-pulso * 180deg));
+}
+
+// Barra de ações da seleção múltipla: pílula de vidro de camada no pé do painel da lista.
+component BulkBar inherits Vidro {
+    in property <[PanelRow]> actions;
+    callback clicked(int);
+    layer: true;
+    radius: 26px;
+    height: 52px;
+    HorizontalLayout {
+        padding-left: Ui.space-8;
+        padding-right: Ui.space-8;
+        spacing: 2px;
+        alignment: space-between;
+        for a[i] in actions: HorizontalLayout {
+            if i == actions.length - 1: Rectangle { width: 1px; height: 22px; y: 15px; background: Ui.divider; }
+            Rectangle {
+                y: (52px - self.height) / 2;
+                height: 36px;
+                width: i < 2 ? bl.preferred-width : self.height;
+                border-radius: self.height / 2;
+                background: bta.has-hover ? Ui.glass-hover : transparent;
+                animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                accessible-role: button;
+                accessible-label: a.title;
+                bl := HorizontalLayout {
+                    padding-left: i < 2 ? 10px : 0;
+                    padding-right: i < 2 ? 10px : 0;
+                    spacing: 8px;
+                    alignment: center;
+                    Icon { name: a.icon; size: 18px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+                    if i < 2: Text { text: a.title; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+                }
+                bta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.clicked(i); }
+                }
+            }
+        }
+    }
+}
+
+// Capa 2:3 da grade e das categorias (o CartaoDeJogo da tela cheia na escala de mesa): jogando no canto de cima à
+// direita, favorito à esquerda, não instalado a 45%. Foco: cresce 4%, foco suave e o ▶ no meio; hover só clareia.
+component CoverCard inherits Rectangle {
+    in property <DeskGame> data;
+    in property <bool> focused;
+    callback clicked();
+    callback toggle();
+    callback range();
+    callback play();
+    callback menu(length, length);
+    property <length> cover-h: self.width * 1.5;
+    property <length> grow: focused ? self.width * 0.02 : 0;
+    accessible-role: button;
+    accessible-label: data.title + " · " + data.store-name;
+    Rectangle {
+        x: -grow;
+        y: -grow;
+        width: root.width + 2 * grow;
+        height: root.cover-h + 2 * grow;
+        animate x, y, width, height { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        border-radius: Ui.radius-card;
+        clip: true;
+        background: @linear-gradient(160deg, data.accent 0%, data.accent.darker(0.6) 100%);
+        opacity: data.installed ? 1 : 0.45;
+        if data.cover.width == 0: Text {
+            x: 14px;
+            width: parent.width - 28px;
+            text: data.title;
+            color: Ui.on-accent;
+            font-size: 19px * Ui.text-scale;
+            font-weight: 800;
+            letter-spacing: -0.01 * self.font-size;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        Image { width: parent.width; height: parent.height; source: data.cover; image-fit: cover; }
+        Rectangle { background: cta.has-hover && !focused ? Ui.glass-hover : transparent; }
+        if data.checked: Rectangle { border-radius: Ui.radius-card; border-width: 3px; border-color: Ui.primary-top; }
+    }
+    if focused: Rectangle {
+        x: -grow;
+        y: -grow;
+        width: root.width + 2 * grow;
+        height: root.cover-h + 2 * grow;
+        FocusRing { radius: Ui.radius-card; background: transparent; }
+        Rectangle {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: Ui.primary-top;
+            drop-shadow-offset-y: Ui.shadow-float-y;
+            drop-shadow-blur: Ui.shadow-float-blur;
+            drop-shadow-color: Ui.shadow-float-color;
+            Icon { name: "play"; size: 22px; tint: Ui.on-primary; }
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.play(); }
+            }
+        }
+    }
+    if data.favorite: Rectangle {
+        x: 8px;
+        y: 8px;
+        width: 26px;
+        height: 26px;
+        border-radius: 13px;
+        background: Ui.glass-panel-dense;
+        Icon { name: "starfill"; size: 14px; tint: Ui.warning; }
+    }
+    if data.running: Rectangle {
+        x: root.width - 20px;
+        y: 8px;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        background: Ui.success;
+        border-width: 2px;
+        border-color: Ui.desk-canvas;
+    }
+    HorizontalLayout {
+        y: root.cover-h + 10px;
+        height: 22px;
+        spacing: Ui.space-8;
+        Text {
+            text: data.title;
+            color: data.installed ? Ui.on-accent : Ui.desk-on-muted;
+            font-size: Ui.desk-label;
+            font-weight: 500;
+            horizontal-stretch: 1;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+        Icon { name: data.store-icon; size: 16px; tint: Ui.desk-on-subtle; y: 3px; }
+    }
+    cta := TouchArea {
+        y: 0;
+        height: root.cover-h;
+        mouse-cursor: pointer;
+        pointer-event(ev) => {
+            if (ev.button == PointerEventButton.right && ev.kind == PointerEventKind.up) {
+                root.menu(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+            }
+            if (ev.button == PointerEventButton.left && ev.kind == PointerEventKind.up) {
+                if (ev.modifiers.control || ev.modifiers.meta) {
+                    root.toggle();
+                } else if (ev.modifiers.shift) {
+                    root.range();
+                } else {
+                    root.clicked();
+                }
+            }
+        }
+        double-clicked => { root.play(); }
+    }
+}
+
+// BibliotecaGrade: capas 2:3 de 172 × 258, 22 entre colunas, quantas couberem (mínimo 4); virtualizada por linhas.
+component CoverGrid inherits Rectangle {
+    in property <[DeskGame]> games;
+    in property <int> selected;
+    in property <bool> key-focus;
+    in property <int> columns: 4;
+    callback clicked(string, int);
+    callback menu(length, length);
+    callback scrolled(int);
+    property <length> cell-w: (self.width - (columns - 1) * 22px) / columns;
+    property <length> row-h: cell-w * 1.5 + 54px;
+    property <int> rows: ceil(games.length / columns);
+    property <int> first-row: max(0, floor(-fl.viewport-y / row-h));
+    property <int> shown-rows: min(ceil(fl.height / row-h) + 1, max(0, rows - first-row));
+    changed first-row => { root.scrolled(first-row * columns); }
+    changed selected => {
+        if (selected >= 0) {
+            if (floor(selected / columns) * row-h + fl.viewport-y < 0) {
+                fl.viewport-y = -floor(selected / columns) * row-h;
+            } else if ((floor(selected / columns) + 1) * row-h + fl.viewport-y > fl.height) {
+                fl.viewport-y = -((floor(selected / columns) + 1) * row-h - fl.height);
+            }
+        }
+    }
+    clip: true;
+    fl := Flickable {
+        viewport-height: rows * row-h;
+        for i in shown-rows * columns: CoverCard {
+            property <int> idx: first-row * columns + i;
+            visible: idx < games.length;
+            x: mod(i, columns) * (cell-w + 22px);
+            y: (first-row + floor(i / columns)) * row-h + 8px;
+            width: cell-w;
+            height: row-h - 8px;
+            data: games[idx];
+            focused: key-focus && idx == root.selected;
+            clicked => { root.clicked("cover", idx); }
+            toggle => { root.clicked("game-toggle", idx); }
+            range => { root.clicked("game-range", idx); }
+            play => { root.clicked("cover-play", idx); }
+            menu(x, y) => {
+                root.menu(x, y);
+                root.clicked("cover-menu", idx);
+            }
+        }
+    }
+}
+
+// BibliotecaCategorias: fileiras de capas agrupadas, com o nome, quantos jogos e "Ver todos ›"; virtualizadas na
+// vertical; cada fileira rola na horizontal (roda com Shift ou ‹ › nas pontas).
+component CategoryRows inherits Rectangle {
+    in property <[DeskCategory]> rows;
+    in property <string> see-all;
+    in property <bool> key-focus;
+    in property <int> focus-row;
+    in property <int> focus-col;
+    callback clicked(string, int);
+    callback menu(length, length);
+    callback scrolled(int);
+    property <length> cell-w: 150px;
+    property <length> row-h: cell-w * 1.5 + 112px;
+    property <int> first: max(0, floor(-fl.viewport-y / row-h));
+    property <int> shown: min(ceil(fl.height / row-h) + 1, max(0, rows.length - first));
+    changed first => { root.scrolled(first); }
+    changed focus-row => {
+        if (key-focus) {
+            if (focus-row * row-h + fl.viewport-y < 0) {
+                fl.viewport-y = -focus-row * row-h;
+            } else if ((focus-row + 1) * row-h + fl.viewport-y > fl.height) {
+                fl.viewport-y = -((focus-row + 1) * row-h - fl.height);
+            }
+        }
+    }
+    clip: true;
+    fl := Flickable {
+        viewport-height: rows.length * row-h;
+        for i in shown: Rectangle {
+            property <DeskCategory> cat: rows[first + i];
+            y: (first + i) * row-h;
+            height: row-h;
+            HorizontalLayout {
+                y: 0;
+                height: 40px;
+                spacing: 12px;
+                Text { text: cat.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; vertical-alignment: center; }
+                Text { text: cat.count; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; vertical-alignment: center; }
+                Rectangle { horizontal-stretch: 1; }
+                Rectangle {
+                    width: sl.preferred-width;
+                    border-radius: Ui.radius-thumb;
+                    background: sta.has-hover ? Ui.glass-hover : transparent;
+                    accessible-role: button;
+                    accessible-label: see-all + " · " + cat.title;
+                    sl := HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 4px;
+                        spacing: 4px;
+                        Text { text: see-all; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; vertical-alignment: center; }
+                        Icon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                    }
+                    sta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.clicked("cat-all", first + i); }
+                    }
+                }
+            }
+            hf := Flickable {
+                y: 48px;
+                height: row-h - 48px;
+                viewport-width: cat.games.length * (cell-w + 20px);
+                interactive: self.viewport-width > self.width;
+                for g[j] in cat.games: CoverCard {
+                    x: j * (cell-w + 20px) + 4px;
+                    y: 6px;
+                    width: cell-w;
+                    height: cell-w * 1.5 + 40px;
+                    data: g;
+                    focused: key-focus && first + i == focus-row && j == focus-col;
+                    clicked => { root.clicked("cat-cover", g.index); }
+                    play => { root.clicked("cat-cover-play", g.index); }
+                    menu(x, y) => {
+                        root.menu(x, y);
+                        root.clicked("cat-cover-menu", g.index);
+                    }
+                }
+            }
+            // ‹ › nas pontas da fileira quando ela passa da largura (nada só por arrastar).
+            if hf.viewport-width > hf.width: Rectangle {
+                x: 0;
+                y: 48px + cell-w * 0.75 - 18px;
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                visible: hf.viewport-x < 0;
+                background: Ui.glass-panel-dense;
+                border-width: 1px;
+                border-color: Ui.glass-edge-strong;
+                Icon { name: "chevron-left"; size: 16px; tint: Ui.on-accent; }
+                TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { hf.viewport-x = min(0, hf.viewport-x + hf.width * 0.8); }
+                }
+            }
+            if hf.viewport-width > hf.width: Rectangle {
+                x: parent.width - 36px;
+                y: 48px + cell-w * 0.75 - 18px;
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                visible: hf.viewport-x > hf.width - hf.viewport-width;
+                background: Ui.glass-panel-dense;
+                border-width: 1px;
+                border-color: Ui.glass-edge-strong;
+                Icon { name: "chevron"; size: 16px; tint: Ui.on-accent; }
+                TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { hf.viewport-x = max(hf.width - hf.viewport-width, hf.viewport-x - hf.width * 0.8); }
+                }
+            }
+        }
+    }
+}
+
+// Destaque do jogo selecionado e a fileira de cartões, ancorados embaixo sobre a arte.
+component GameStage inherits VerticalLayout {
+    in property <DeskGameView> game;
+    in property <[PanelRow]> actions;
+    in property <[DeskStat]> details;
+    in property <string> about-label;
+    in property <string> details-label;
+    in property <string> zone;
+    in property <int> zone-index;
+    in property <bool> focus-visible;
+    in property <bool> small;
+    callback clicked(string, int);
+    callback menu(length, length);
+    alignment: end;
+    spacing: small ? Ui.space-16 : Ui.space-28;
+    VerticalLayout {
+        spacing: small ? 10px : 14px;
+        alignment: end;
+        if game.overline != "": Overline { text: game.overline; }
+        Text {
             text: game.title;
             color: Ui.on-accent;
             font-family: Ui.font-heading;
-            font-size: Ui.headline-lg;
+            font-size: small ? 40px * Ui.text-scale : Ui.desk-display;
             font-weight: 700;
+            letter-spacing: -0.025 * self.font-size;
             wrap: word-wrap;
+            overflow: elide;
+            max-height: 2.1 * self.font-size;
+        }
+        HorizontalLayout {
+            spacing: Ui.space-12;
+            alignment: start;
+            for a[i] in actions: DeskButton {
+                label: a.key == "favorite" || a.key == "more" ? "" : a.title;
+                icon: a.key == "more" ? "dots" : a.icon;
+                primary: a.style == "primary";
+                danger: a.style == "danger";
+                on: a.on;
+                enabled: a.enabled;
+                min-w: a.style == "primary" ? 232px : 0;
+                focused: focus-visible && zone == "actions" && zone-index == i;
+                clicked => {
+                    root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
+                    root.clicked("action", i);
+                }
+            }
+        }
+        if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
+    }
+    HorizontalLayout {
+        height: small ? 190px : Ui.card-height;
+        spacing: Ui.space-20;
+        if game.description != "": Vidro {
+            horizontal-stretch: 1.45;
+            VerticalLayout {
+                padding: Ui.space-24;
+                padding-bottom: Ui.space-20;
+                spacing: Ui.space-16;
+                alignment: start;
+                Text { text: about-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
+                Text { text: game.description; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; }
+            }
+        }
+        Vidro {
+            horizontal-stretch: 1.1;
+            VerticalLayout {
+                padding: Ui.space-24;
+                padding-bottom: Ui.space-20;
+                spacing: Ui.space-12;
+                alignment: start;
+                Text { text: details-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
+                for d[i] in details: HorizontalLayout {
+                    spacing: Ui.space-16;
+                    Text { text: d.label; min-width: 104px; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
+                    Text { text: d.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; horizontal-stretch: 1; overflow: elide; }
+                }
+            }
         }
     }
 }
 
-// Biblioteca (TelaBiblioteca): o painel de vidro da lista à esquerda e, à direita, ancorados embaixo sobre a arte, o
-// destaque do jogo e a fileira de cartões. A busca fica na barra superior.
+// Ícones da linha de contagem: inverter a ordem e filtrar (com a quantidade de filtros).
+component SortFilter inherits HorizontalLayout {
+    in property <bool> reversed;
+    in property <int> filter-count;
+    in property <[string]> labels;
+    callback clicked(string);
+    spacing: 2px;
+    IconBtn { icon: "sort"; label: labels[3]; on: reversed; clicked => { root.clicked("reverse"); } }
+    IconBtn {
+        icon: "filter";
+        label: labels[4];
+        on: filter-count > 0;
+        badge: filter-count > 0 ? filter-count : "";
+        clicked => { root.clicked("filter"); }
+    }
+}
+
+// Biblioteca (TelaBiblioteca). Lista: o painel de vidro da lista à esquerda e o destaque à direita. Grade e
+// Categorias: os controles em blocos de vidro soltos no topo e as capas na largura toda. A busca fica na barra.
 component DeskLibrary inherits Rectangle {
     in property <[string]> tabs;
     in property <int> tab;
     in property <[DeskNav]> collections;
-    in property <string> filter-label;
     in property <int> filter-count;
-    in property <bool> filtered;
-    in property <string> clear-label;
     in property <string> count;
     in property <[DeskGame]> games;
     in property <int> selected;
     in property <DeskGameView> game;
     in property <[PanelRow]> actions;
-    in property <[DeskStat]> stats;
     in property <[DeskStat]> details;
     in property <string> about-label;
     in property <string> details-label;
@@ -641,13 +1205,32 @@ component DeskLibrary inherits Rectangle {
     in property <string> empty-title;
     in property <string> empty-text;
     in property <string> empty-action;
+    in property <string> empty-zone;
     in property <bool> small;
+    in property <bool> selecting;
+    in property <bool> reversed;
+    in property <string> view: "list";
+    in property <string> group-label;
+    in property <[PanelRow]> bulk;
+    in property <bool> loading;
+    in property <string> loading-label;
+    // Lista, Grade, Categorias, Inverter ordem, Filtrar e ordenar, Modo de exibição (dicas e rótulos acessíveis).
+    in property <[string]> view-labels;
+    in property <[DeskCategory]> categories;
+    in property <int> cat-focus-row;
+    in property <int> cat-focus-col;
+    in property <string> see-all;
+    in property <string> cat-empty;
+    // Colunas da grade: capas de 172 com 22 entre elas, no mínimo 4.
+    out property <int> columns: max(4, floor((self.width + 22px) / (170px + 22px)));
     callback clicked(string, int);
     callback scrolled(int);
     callback menu(length, length);
     callback focus-main();
     property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
-    HorizontalLayout {
+    property <bool> wide: view != "list";
+
+    if !wide: HorizontalLayout {
         spacing: small ? Ui.space-20 : Ui.space-28;
         Vidro {
             width: list-w;
@@ -658,140 +1241,242 @@ component DeskLibrary inherits Rectangle {
                 padding-bottom: Ui.space-12;
                 spacing: 6px;
                 Tabs {
-                    height: 40px;
                     tabs: tabs;
                     current: tab;
                     focus-index: focus-visible && zone == "tabs" ? zone-index : -1;
                     clicked(i) => { root.clicked("tab", i); }
                 }
                 if tab == 2 && collections.length > 0: Chips {
-                    height: 44 * Ui.u;
                     items: collections;
                     focus-index: focus-visible && zone == "collections" ? zone-index : -1;
                     clicked(i) => { root.clicked("collection", i); }
                 }
                 HorizontalLayout {
                     height: 36px;
-                    spacing: Ui.space-8;
+                    padding-left: Ui.space-12;
+                    padding-right: 4px;
+                    spacing: 2px;
                     Text {
-                        text: games.length > 0 ? count : "";
-                        color: Ui.desk-on-subtle;
+                        text: loading ? loading-label : count;
+                        color: selecting ? Ui.on-accent : Ui.desk-on-subtle;
                         font-size: Ui.desk-label-sm;
-                        font-weight: 500;
+                        font-weight: selecting ? 700 : 500;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
                         overflow: elide;
                     }
-                    if filtered: DeskButton {
+                    IconBtn {
                         y: (parent.height - self.height) / 2;
-                        height: 30px;
-                        icon: "close";
-                        clicked => { root.clicked("clear", 0); }
-                    }
-                    Rectangle {
-                        y: (parent.height - self.height) / 2;
-                        height: 30px;
-                        width: fb.width;
-                        fb := DeskButton {
-                            height: parent.height;
-                            icon: "filter";
-                            clicked => { root.clicked("filter", 0); }
-                        }
-                    }
-                }
-                GameList {
-                    vertical-stretch: 1;
-                    games: games;
-                    selected: selected;
-                    key-focus: focus-visible && zone == "list";
-                    clicked(z, i) => {
-                        root.focus-main();
-                        root.clicked(z, i);
-                    }
-                    menu(x, y) => { root.menu(x, y); }
-                    scrolled(f) => { root.scrolled(f); }
-                }
-            }
-        }
-        if !game.has-game: VerticalLayout {
-            horizontal-stretch: 1;
-            alignment: center;
-            spacing: 12px;
-            Text { text: empty-title; color: Ui.on-accent; font-size: Ui.desk-headline; font-family: Ui.font-heading; font-weight: 700; horizontal-alignment: center; wrap: word-wrap; }
-            if empty-text != "": Text { text: empty-text; color: Ui.desk-on-muted; font-size: Ui.desk-body; horizontal-alignment: center; wrap: word-wrap; }
-            if empty-action != "": HorizontalLayout {
-                alignment: center;
-                padding-top: Ui.space-12;
-                DeskButton { label: empty-action; icon: "folder"; primary: true; clicked => { root.clicked("add-game", 0); } }
-            }
-        }
-        if game.has-game: VerticalLayout {
-            horizontal-stretch: 1;
-            alignment: end;
-            spacing: small ? Ui.space-16 : Ui.space-28;
-            VerticalLayout {
-                spacing: small ? 10px : 14px;
-                alignment: end;
-                if game.overline != "": Overline { text: game.overline; }
-                Text {
-                    text: game.title;
-                    color: Ui.on-accent;
-                    font-family: Ui.font-heading;
-                    font-size: small ? 40px * Ui.text-scale : Ui.desk-display;
-                    font-weight: 700;
-                    letter-spacing: -0.025 * self.font-size;
-                    wrap: word-wrap;
-                    overflow: elide;
-                    max-height: 2.1 * self.font-size;
-                }
-                HorizontalLayout {
-                    spacing: Ui.space-12;
-                    alignment: start;
-                    for a[i] in actions: DeskButton {
-                        label: a.key == "favorite" || a.key == "more" ? "" : a.title;
-                        icon: a.key == "more" ? "dots" : a.icon;
-                        primary: a.style == "primary";
-                        danger: a.style == "danger";
-                        on: a.on;
-                        enabled: a.enabled;
-                        min-w: a.style == "primary" ? 232px : 0;
-                        focused: focus-visible && zone == "actions" && zone-index == i;
+                        icon: "grid";
+                        label: view-labels[5];
                         clicked => {
                             root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
-                            root.clicked("action", i);
+                            root.clicked("view-menu", 0);
+                        }
+                    }
+                    SortFilter {
+                        y: (parent.height - self.height) / 2;
+                        reversed: reversed;
+                        filter-count: filter-count;
+                        labels: view-labels;
+                        clicked(z) => { root.clicked(z, 0); }
+                    }
+                }
+                Rectangle {
+                    vertical-stretch: 1;
+                    if loading: VerticalLayout {
+                        alignment: start;
+                        spacing: 6px;
+                        for i in 8: HorizontalLayout {
+                            height: Ui.list-row-height;
+                            padding-left: Ui.space-8;
+                            spacing: 14px;
+                            Skeleton { width: Ui.thumb-size; height: Ui.thumb-size; y: 6px; }
+                            Skeleton { width: 110px + mod(i * 37, 80) * 1px; height: 14px; y: 19px; radius: 7px; }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                    }
+                    if !loading && games.length == 0: EmptyList {
+                        title: empty-title;
+                        text: empty-text;
+                        action: empty-action;
+                        clicked => { root.clicked(empty-zone, 0); }
+                    }
+                    if !loading && games.length > 0: GameList {
+                        height: parent.height - (selecting ? 60px : 0);
+                        games: games;
+                        selected: selected;
+                        selecting: selecting;
+                        key-focus: focus-visible && zone == "list";
+                        clicked(z, i) => {
+                            root.focus-main();
+                            root.clicked(z, i);
+                        }
+                        menu(x, y) => { root.menu(x, y); }
+                        scrolled(f) => { root.scrolled(f); }
+                    }
+                    if selecting: BulkBar {
+                        x: 0;
+                        y: parent.height - self.height;
+                        width: parent.width;
+                        actions: bulk;
+                        clicked(i) => {
+                            root.menu(self.absolute-position.x + self.width - 260px, self.absolute-position.y - 120px);
+                            root.clicked("bulk", i);
                         }
                     }
                 }
-                if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
             }
-            HorizontalLayout {
-                height: small ? 190px : Ui.card-height;
-                spacing: Ui.space-20;
-                if game.description != "": Vidro {
-                    horizontal-stretch: 1.45;
-                    VerticalLayout {
-                        padding: Ui.space-24;
-                        padding-bottom: Ui.space-20;
-                        spacing: Ui.space-16;
-                        alignment: start;
-                        Text { text: about-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
-                        Text { text: game.description; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; }
+        }
+        if !game.has-game: Rectangle { horizontal-stretch: 1; }
+        if game.has-game: GameStage {
+            horizontal-stretch: 1;
+            game: game;
+            actions: actions;
+            details: details;
+            about-label: about-label;
+            details-label: details-label;
+            zone: zone;
+            zone-index: zone-index;
+            focus-visible: focus-visible;
+            small: small;
+            clicked(z, i) => { root.clicked(z, i); }
+            menu(x, y) => { root.menu(x, y); }
+        }
+    }
+
+    if wide: VerticalLayout {
+        spacing: Ui.space-20;
+        HorizontalLayout {
+            height: 46px;
+            spacing: Ui.space-12;
+            Vidro {
+                width: 330px;
+                Tabs {
+                    x: 3px;
+                    y: 3px;
+                    width: parent.width - 6px;
+                    tabs: tabs;
+                    current: tab;
+                    focus-index: focus-visible && zone == "tabs" ? zone-index : -1;
+                    clicked(i) => { root.clicked("tab", i); }
+                }
+            }
+            if view == "grid": Text {
+                text: count;
+                color: selecting ? Ui.on-accent : Ui.desk-on-muted;
+                font-size: Ui.desk-label;
+                font-weight: selecting ? 700 : 500;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            if view == "categories": Vidro {
+                width: gl.preferred-width;
+                radius: 23px;
+                accessible-role: button;
+                accessible-label: group-label;
+                gl := HorizontalLayout {
+                    padding-left: 18px;
+                    padding-right: 14px;
+                    spacing: 6px;
+                    Text { text: group-label; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; vertical-alignment: center; }
+                    Icon { name: "updown"; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                }
+                TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.menu(parent.absolute-position.x, parent.absolute-position.y + parent.height + 6px);
+                        root.clicked("group-by", 0);
                     }
                 }
-                Vidro {
-                    horizontal-stretch: 1.1;
-                    VerticalLayout {
-                        padding: Ui.space-24;
-                        padding-bottom: Ui.space-20;
-                        spacing: Ui.space-12;
-                        alignment: start;
-                        Text { text: details-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
-                        for d[i] in details: HorizontalLayout {
-                            spacing: Ui.space-16;
-                            Text { text: d.label; min-width: 104px; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
-                            Text { text: d.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; horizontal-stretch: 1; overflow: elide; }
+            }
+            if tab == 2 && collections.length > 0: Chips {
+                y: 7px;
+                horizontal-stretch: 1;
+                items: collections;
+                focus-index: focus-visible && zone == "collections" ? zone-index : -1;
+                clicked(i) => { root.clicked("collection", i); }
+            }
+            if tab != 2 || collections.length == 0: Rectangle { horizontal-stretch: 1; }
+            Vidro {
+                width: sf.preferred-width + 16px;
+                sf := SortFilter {
+                    x: 8px;
+                    y: 8px;
+                    reversed: reversed;
+                    filter-count: filter-count;
+                    labels: view-labels;
+                    clicked(z) => { root.clicked(z, 0); }
+                }
+            }
+            // Modo de exibição: três ícones, o escolhido na segunda camada de vidro.
+            Vidro {
+                width: 3 * 38px + 2 * 2px + 10px;
+                HorizontalLayout {
+                    padding: 5px;
+                    spacing: 2px;
+                    for v[i] in ["list", "grid", "categories"]: Rectangle {
+                        width: 38px;
+                        border-radius: 10px;
+                        background: v != view && vta.has-hover ? Ui.glass-hover : transparent;
+                        accessible-role: button;
+                        accessible-label: view-labels[i];
+                        if v == view: Selected { radius: 10px; }
+                        Icon { name: i == 0 ? "list" : (i == 1 ? "grid" : "layers"); size: 18px; tint: v == view ? Ui.on-accent : Ui.desk-on-muted; }
+                        vta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.clicked("view", i); }
                         }
                     }
+                }
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            if games.length == 0 && view == "grid": EmptyList {
+                title: empty-title;
+                text: empty-text;
+                action: empty-action;
+                clicked => { root.clicked(empty-zone, 0); }
+            }
+            grid := CoverGrid {
+                visible: view == "grid";
+                columns: root.columns;
+                games: view == "grid" ? games : [];
+                selected: selected;
+                key-focus: focus-visible && zone == "list";
+                clicked(z, i) => {
+                    root.focus-main();
+                    root.clicked(z, i);
+                }
+                menu(x, y) => { root.menu(x, y); }
+                scrolled(f) => { root.scrolled(f); }
+            }
+            if view == "categories" && categories.length == 0: EmptyList {
+                title: cat-empty;
+                clicked => { }
+            }
+            if view == "categories": CategoryRows {
+                rows: categories;
+                see-all: see-all;
+                key-focus: focus-visible && zone == "list";
+                focus-row: cat-focus-row;
+                focus-col: cat-focus-col;
+                clicked(z, i) => {
+                    root.focus-main();
+                    root.clicked(z, i);
+                }
+                menu(x, y) => { root.menu(x, y); }
+                scrolled(f) => { root.scrolled(f); }
+            }
+            if selecting && view == "grid": BulkBar {
+                x: (parent.width - self.width) / 2;
+                y: parent.height - self.height - 8px;
+                width: 420px;
+                actions: bulk;
+                clicked(i) => {
+                    root.menu(self.absolute-position.x + self.width - 260px, self.absolute-position.y - 120px);
+                    root.clicked("bulk", i);
                 }
             }
         }
@@ -1370,6 +2055,22 @@ export component Desktop inherits Window {
     in property <string> desk-empty-title;
     in property <string> desk-empty-text;
     in property <string> desk-empty-action;
+    in property <string> desk-empty-zone;
+    in property <bool> desk-selecting;
+    in property <bool> desk-reversed;
+    in property <string> desk-view: "list";
+    in property <string> desk-group-label;
+    in property <[PanelRow]> desk-bulk;
+    in property <bool> desk-loading;
+    in property <string> desk-loading-label;
+    in property <[string]> desk-view-labels;
+    in property <[DeskCategory]> desk-categories;
+    in property <int> desk-cat-focus-row;
+    in property <int> desk-cat-focus-col;
+    in property <string> desk-see-all;
+    in property <string> desk-cat-empty;
+    // Colunas da grade, para as setas andarem por elas (o Tako lê como na tela cheia).
+    out property <int> library-columns: lib.columns;
 
     // Configurações (as mesmas propriedades da tela cheia).
     in property <string> settings-title;
@@ -1449,6 +2150,11 @@ export component Desktop inherits Window {
     }
 
     ArtLayer { art: desk-game.art; }
+    // Grade e Categorias: as capas são o conteúdo e a arte é só ambiente, com escurecimento mais forte.
+    if page == "desk-library" && desk-view != "list": Rectangle {
+        background: @linear-gradient(180deg, Ui.art-scrim-strong.with-alpha(0.35) 0%, Ui.art-scrim-strong.with-alpha(0.7) 22%,
+            Ui.art-scrim-strong.with-alpha(0.88) 45%, Ui.art-scrim-strong 100%);
+    }
 
     VerticalLayout {
         padding-left: small ? Ui.space-20 : Ui.space-36;
@@ -1487,16 +2193,12 @@ export component Desktop inherits Window {
                 tab: desk-tab;
                 collections: desk-collections;
                 small: root.small;
-                filter-label: desk-filter-label;
                 filter-count: desk-filter-count;
-                filtered: desk-filtered;
-                clear-label: desk-clear-label;
                 count: desk-count;
                 games: page == "desk-library" ? desk-games : [];
                 selected: desk-selected;
                 game: desk-game;
                 actions: desk-actions;
-                stats: desk-stats;
                 details: desk-details;
                 about-label: desk-about-label;
                 details-label: desk-details-label;
@@ -1506,6 +2208,20 @@ export component Desktop inherits Window {
                 empty-title: desk-empty-title;
                 empty-text: desk-empty-text;
                 empty-action: desk-empty-action;
+                empty-zone: desk-empty-zone;
+                selecting: desk-selecting;
+                reversed: desk-reversed;
+                view: desk-view;
+                group-label: desk-group-label;
+                bulk: desk-bulk;
+                loading: desk-loading;
+                loading-label: desk-loading-label;
+                view-labels: desk-view-labels;
+                categories: page == "desk-library" ? desk-categories : [];
+                cat-focus-row: desk-cat-focus-row;
+                cat-focus-col: desk-cat-focus-col;
+                see-all: desk-see-all;
+                cat-empty: desk-cat-empty;
                 clicked(z, i) => { root.clicked(z, i); }
                 scrolled(f) => { root.scrolled(f); }
                 menu(x, y) => {

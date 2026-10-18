@@ -521,6 +521,100 @@ pub fn choose_collections(ctx: &Ctx, id: &str) -> MenuLayer {
     .overline(title.to_uppercase())
 }
 
+/// Coleções de vários jogos (SelecaoMultipla). Marcada = todos estão nela; clicar põe todos ou tira todos.
+pub fn choose_collections_many(ctx: &Ctx, ids: Vec<String>) -> MenuLayer {
+    let ids = std::rc::Rc::new(ids);
+    let overline = tn("common.games", ids.len() as i64, &[]);
+    MenuLayer::panel(ctx.t("collections.title"), move |ctx| {
+        let ids = ids.clone();
+        let mut v: Vec<MenuItem> = ctx
+            .collections
+            .collections()
+            .iter()
+            .map(|c| {
+                let all = ids.iter().all(|id| c.contains(id));
+                let (cid, name, ids) = (c.id.clone(), c.name.clone(), ids.clone());
+                MenuItem::new(PanelRow::check(c.id.clone(), c.name.clone(), all)).on(move |ctx| {
+                    let inside = ctx.collections.find(&cid).map(|c| ids.iter().filter(|id| c.contains(id)).cloned().collect::<Vec<_>>()).unwrap_or_default();
+                    let change: Vec<&String> = if all {
+                        ids.iter().collect()
+                    } else {
+                        ids.iter().filter(|id| !inside.contains(id)).collect()
+                    };
+                    for id in change {
+                        if let Err(e) = ctx.collections.toggle(&cid, id) {
+                            ctx.toast(e.to_string());
+                        }
+                    }
+                    ctx.sync_collections();
+                    let n = ids.len().to_string();
+                    let key = if all { "desktop.bulk.removed_from" } else { "desktop.bulk.added_to" };
+                    ctx.toast(ctx.tf(key, &[("n", &n), ("collection", &name)]));
+                    Flow::Stay
+                })
+            })
+            .collect();
+        v.push(MenuItem::new(PanelRow::button("done", ctx.t("common.done"))).on(|_| Flow::Close));
+        v
+    })
+    .overline(overline.to_uppercase())
+}
+
+/// ⋯ da seleção múltipla: marcar como zerado e apagar da biblioteca (só os adicionados à mão, com confirmação).
+pub fn bulk_more(ids: Vec<String>) -> MenuLayer {
+    MenuLayer::menu(String::new(), move |ctx| {
+        let done = ids.clone();
+        let mut v = vec![
+            MenuItem::new(PanelRow::button("beaten", ctx.t("desktop.bulk.beaten")).icon("check")).on(
+                move |ctx| {
+                    for id in &done {
+                        if let Err(e) = ctx.library.set_status(id, Some(PlayStatus::Beaten)) {
+                            tracing::error!("status: {e}");
+                        }
+                    }
+                    ctx.toast(status_text(ctx, Some(PlayStatus::Beaten)));
+                    Flow::Close
+                },
+            ),
+        ];
+        let manual: Vec<String> = ids
+            .iter()
+            .filter(|id| ctx.library.find(id).is_some_and(|g| g.store() == GameStore::Manual))
+            .cloned()
+            .collect();
+        if !manual.is_empty() {
+            v.push(
+                MenuItem::new(PanelRow::button("remove", ctx.t("options.remove")).danger()).on(
+                    move |ctx| Flow::Replace(Box::new(confirm_remove_many(ctx, manual.clone()))),
+                ),
+            );
+        }
+        v
+    })
+}
+
+/// "Apagar 3 jogos da biblioteca?": confirmação destrutiva com o número.
+fn confirm_remove_many(ctx: &Ctx, ids: Vec<String>) -> MenuLayer {
+    let n = ids.len().to_string();
+    MenuLayer::dialog(ctx.tf("desktop.bulk.remove_title", &[("n", &n)]), move |ctx| {
+        let ids = ids.clone();
+        vec![
+            MenuItem::new(PanelRow::button("remove", ctx.t("options.remove")).danger()).on(
+                move |ctx| {
+                    for id in &ids {
+                        if let Err(e) = ctx.library.remove_manual(id) {
+                            ctx.toast(e.to_string());
+                        }
+                    }
+                    ctx.toast(ctx.t("options.removed"));
+                    Flow::Close
+                },
+            ),
+            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
+        ]
+    })
+}
+
 /// Nome de uma coleção nova pelo teclado virtual (até 40 caracteres, sem repetir).
 pub fn new_collection(ctx: &Ctx, add_game: Option<String>) -> KeyboardLayer {
     KeyboardLayer::new(

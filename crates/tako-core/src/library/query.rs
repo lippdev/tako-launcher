@@ -149,6 +149,9 @@ pub fn apply_by<T>(
         };
         primary.then_with(|| ka.cmp(kb))
     });
+    if criteria.reversed {
+        rows.reverse();
+    }
     rows.into_iter().map(|(item, _, _)| item).collect()
 }
 
@@ -275,6 +278,19 @@ mod tests {
             assert_eq!(result.len(), expected, "{store:?}");
             assert!(result.iter().all(|g| g.store() == store));
         }
+    }
+
+    #[test]
+    fn reversed_order_is_the_same_sort_back_to_front() {
+        let games = sample::games();
+        let forward = ids(&apply(&games, LibraryFilter::All, &by_sort(LibrarySort::Name)));
+        let reversed = LibraryCriteria {
+            reversed: true,
+            ..by_sort(LibrarySort::Name)
+        };
+        let mut back = ids(&apply(&games, LibraryFilter::All, &reversed));
+        back.reverse();
+        assert_eq!(back, forward);
     }
 
     #[test]
