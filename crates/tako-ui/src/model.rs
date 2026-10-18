@@ -303,6 +303,27 @@ theme_struct! {
 }
 
 theme_struct! {
+    /// Trecho da grade com a seção de não instalados: capas soltas, a divisória NÃO INSTALADOS ou uma loja com as
+    /// capas dela. `*_before` dizem quantas linhas de capas e cabeçalhos vêm antes (o tema soma as alturas).
+    pub struct DeskBlock {
+        // "covers" | "section" | "group"
+        pub kind: String,
+        pub title: String,
+        pub count: String,
+        pub label: String,
+        pub icon: String,
+        pub open: bool,
+        pub games: Vec<DeskGame>,
+        // Índice (na lista de jogos) da primeira capa, para o `scrolled`; e a ordem do grupo, para o clique.
+        pub first: i32,
+        pub index: i32,
+        pub rows_before: i32,
+        pub sections_before: i32,
+        pub groups_before: i32,
+    }
+}
+
+theme_struct! {
     /// Fileira da BibliotecaCategorias: título, quantos jogos, ícone e as capas.
     pub struct DeskCategory {
         pub title: String,

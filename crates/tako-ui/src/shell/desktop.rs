@@ -9,7 +9,7 @@ use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles,
 };
 use crate::model::{
-    DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, Hint, NavItem, PanelRow,
+    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, Hint, NavItem, PanelRow,
 };
 use crate::values::parse_color;
 use std::cell::RefCell;
@@ -242,6 +242,24 @@ fn entries(ctx: &Ctx, games: &[&Game]) -> Vec<Entry> {
         }
     }
     out
+}
+
+/// A grade em linhas de posições da lista: cada cabeçalho tem a sua e as capas quebram a cada `cols`.
+fn grid_rows(list: &[Entry], cols: usize) -> Vec<Vec<usize>> {
+    let mut rows: Vec<Vec<usize>> = Vec::new();
+    for (i, e) in list.iter().enumerate() {
+        match rows.last_mut() {
+            Some(last)
+                if matches!(e, Entry::Game(_))
+                    && last.len() < cols
+                    && matches!(list[last[0]], Entry::Game(_)) =>
+            {
+                last.push(i)
+            }
+            _ => rows.push(vec![i]),
+        }
+    }
+    rows
 }
 
 /// A vaga vizinha que aceita foco (a divisória não aceita).
@@ -1253,6 +1271,7 @@ impl Page for DesktopLibrary {
         let ids: Vec<String> = games.iter().map(|g| g.id.clone()).collect();
         let list = entries(ctx, &games);
         let cur = self.current(&ids);
+        let to_install_cur = cur.is_some_and(|i| to_install(games[i]));
         let picks = Self::picks(ctx);
         match (self.zone, cmd) {
             (_, Cmd::PrevSection) | (_, Cmd::NextSection) => {
@@ -1273,26 +1292,52 @@ impl Page for DesktopLibrary {
                     set_group(ctx, store, open);
                 }
             }
-            // Grade: as setas andam pelas capas (a coluna vem do tema); Enter abre o jogo no destaque.
+            // Grade: as setas andam pelas capas e cabeçalhos (a coluna vem do tema); Enter instala o que falta
+            // instalar e abre os outros no destaque.
             (Zone::List, Cmd::Left | Cmd::Right | Cmd::Up | Cmd::Down | Cmd::Accept)
                 if View::of(ctx) == View::Grid =>
             {
-                let cols = ctx.grid_columns.max(1) as i32;
-                let i = cur.unwrap_or(0) as i32;
-                let to = match cmd {
-                    Cmd::Left => i - 1,
-                    Cmd::Right => i + 1,
-                    Cmd::Up => i - cols,
-                    Cmd::Down => i + cols,
+                let at = self.focus_pos(&list, cur);
+                match cmd {
+                    Cmd::Left | Cmd::Right => match neighbor(&list, at, cmd == Cmd::Right) {
+                        Some(i) => self.focus(list[i], &ids),
+                        None if cmd == Cmd::Left => self.cycle(false),
+                        None => {}
+                    },
+                    Cmd::Up | Cmd::Down => {
+                        let rows = grid_rows(&list, ctx.grid_columns.max(1));
+                        let here = at.and_then(|a| rows.iter().position(|r| r.contains(&a)));
+                        let col = at
+                            .zip(here)
+                            .and_then(|(a, r)| rows[r].iter().position(|i| *i == a))
+                            .unwrap_or(0);
+                        let step = |r: usize| {
+                            let next = if cmd == Cmd::Down {
+                                r.checked_add(1)
+                            } else {
+                                r.checked_sub(1)
+                            };
+                            next.filter(|n| *n < rows.len())
+                        };
+                        // A divisória não recebe foco: a linha dela é pulada.
+                        let mut target = here.map_or(Some(0), step);
+                        while target.is_some_and(|t| list[rows[t][0]] == Entry::Section) {
+                            target = step(target.unwrap_or_default());
+                        }
+                        match target {
+                            Some(t) => {
+                                let row = &rows[t];
+                                self.focus(list[row[col.min(row.len() - 1)]], &ids);
+                            }
+                            None if cmd == Cmd::Up => self.cycle(false),
+                            None => {}
+                        }
+                    }
+                    _ if to_install_cur => return self.run(Action::Play, ctx),
                     _ => {
                         self.set_view(View::List, ctx);
                         return Nav::Stay;
                     }
-                };
-                if to < 0 {
-                    self.cycle(false);
-                } else if let Some(id) = ids.get(to as usize) {
-                    self.selected = Some(id.clone());
                 }
             }
             // Categorias: ←→ dentro da fileira, ↑↓ trocam de fileira mantendo a coluna mais próxima.
@@ -1647,12 +1692,7 @@ impl Page for DesktopLibrary {
         {
             self.group_focus = None;
         }
-        // Grade: ainda sem seção (vem no commit da grade).
-        let list: Vec<Entry> = if View::of(ctx) == View::Grid {
-            (0..games.len()).map(Entry::Game).collect()
-        } else {
-            entries(ctx, &games)
-        };
+        let list = entries(ctx, &games);
         out.set(
             "desk-tabs",
             vec![
@@ -1864,6 +1904,125 @@ impl Page for DesktopLibrary {
                 .collect()
         };
         out.set("desk-games", rows);
+        // Grade: a mesma lista em trechos (capas soltas, divisória, uma loja com as capas). O tema soma as alturas
+        // pelas contagens `*_before` e só desenha as linhas visíveis de cada trecho.
+        let cols = ctx.grid_columns.max(1);
+        let focus = self
+            .focus_pos(&list, cur)
+            .map(|p| list[p])
+            .filter(|_| view != View::Categories);
+        let mut blocks: Vec<DeskBlock> = Vec::new();
+        let mut focus_at: Vec<i32> = Vec::new();
+        let (mut covered, mut sections, mut headers) = (0i32, 0i32, 0i32);
+        let mut at = 0;
+        while view != View::Categories && at < list.len() {
+            let games_after = |from: usize| {
+                list[from..]
+                    .iter()
+                    .take_while(|e| matches!(e, Entry::Game(_)))
+                    .count()
+            };
+            let (mut block, own, used) = match list[at] {
+                Entry::Section => (
+                    DeskBlock {
+                        kind: "section".into(),
+                        title: ctx.t("desktop.group.not_installed").to_uppercase(),
+                        count: stores
+                            .iter()
+                            .map(|r| r.end - r.start)
+                            .sum::<usize>()
+                            .to_string(),
+                        ..Default::default()
+                    },
+                    0,
+                    1,
+                ),
+                Entry::Group(store) => {
+                    let order = stores
+                        .iter()
+                        .position(|r| r.store == store)
+                        .unwrap_or_default();
+                    let n = stores.get(order).map_or(0, |r| r.end - r.start);
+                    let name = game_text::store_name(lang, store);
+                    (
+                        DeskBlock {
+                            kind: "group".into(),
+                            label: ctx.tf(
+                                "desktop.group_label",
+                                &[("store", &name), ("count", &n.to_string())],
+                            ),
+                            title: name,
+                            count: n.to_string(),
+                            icon: store_icon(store).into(),
+                            open: !group_closed(ctx, store),
+                            index: order as i32,
+                            ..Default::default()
+                        },
+                        1,
+                        1 + games_after(at + 1),
+                    )
+                }
+                Entry::Game(_) => (
+                    DeskBlock {
+                        kind: "covers".into(),
+                        ..Default::default()
+                    },
+                    0,
+                    games_after(at),
+                ),
+            };
+            let first = at + usize::from(block.kind != "covers");
+            let idx: Vec<usize> = list[first..at + used]
+                .iter()
+                .filter_map(|e| match e {
+                    Entry::Game(i) => Some(*i),
+                    _ => None,
+                })
+                .collect();
+            block.first = idx.first().map_or(0, |i| *i as i32);
+            block.rows_before = covered;
+            block.sections_before = sections;
+            block.groups_before = headers;
+            // Onde está o foco, em linhas e cabeçalhos antes dele (para o tema rolar até lá).
+            match focus {
+                Some(Entry::Group(s))
+                    if block.kind == "group" && stores[block.index as usize].store == s =>
+                {
+                    focus_at = vec![covered, sections, headers, 1];
+                }
+                Some(Entry::Game(g)) => {
+                    if let Some(k) = idx.iter().position(|i| *i == g) {
+                        focus_at = vec![covered + (k / cols) as i32, sections, headers + own, 0];
+                    }
+                }
+                _ => {}
+            }
+            block.games = idx
+                .iter()
+                .map(|i| row(*i, games[*i], near.contains(i), true))
+                .collect();
+            covered += idx.len().div_ceil(cols) as i32;
+            sections += i32::from(block.kind == "section");
+            headers += i32::from(block.kind == "group");
+            blocks.push(block);
+            at += used;
+        }
+        out.set("desk-blocks", blocks);
+        out.set("desk-grid-extent", vec![covered, sections, headers]);
+        out.set("desk-grid-focus", focus_at);
+        out.set(
+            "desk-focus-id",
+            match focus {
+                Some(Entry::Game(i)) => games[i].id.clone(),
+                _ => String::new(),
+            },
+        );
+        out.set(
+            "desk-focus-group",
+            self.group_focus
+                .and_then(|s| stores.iter().position(|r| r.store == s))
+                .map_or(-1, |p| p as i32),
+        );
         // Categorias: as fileiras perto da área visível pedem capa (o `scrolled` avisa a primeira fileira).
         let mut cats: Vec<DeskCategory> = Vec::new();
         self.cat_rows.clear();
@@ -2720,14 +2879,24 @@ mod tests {
         fn flag(&self, field: &str) -> bool {
             matches!(self.0.get_field(field), Some(Value::Bool(true)))
         }
+        fn number(&self, field: &str) -> i32 {
+            match self.0.get_field(field) {
+                Some(Value::Number(n)) => *n as i32,
+                _ => 0,
+            }
+        }
     }
 
     fn rows(shell: &mut Shell) -> Vec<Row> {
+        model(shell, "desk-games")
+    }
+
+    fn model(shell: &mut Shell, prop: &str) -> Vec<Row> {
         let out = shell.render(std::time::Instant::now());
         out.props
             .iter()
             .find_map(|(n, v)| match (*n, v) {
-                ("desk-games", Value::Model(m)) => Some(m.clone()),
+                (name, Value::Model(m)) if name == prop => Some(m.clone()),
                 _ => None,
             })
             .map(|m| {
@@ -2829,6 +2998,91 @@ mod tests {
         let only = rows(&mut shell);
         assert_eq!(only[0].text("kind"), "group");
         assert!(only.iter().all(|r| r.text("kind") != "section"));
+    }
+
+    #[test]
+    fn a_broken_progress_from_the_store_never_reaches_the_ring_as_garbage() {
+        use tako_core::library::InstallProgress;
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let mut bad = crate::demo::not_installed();
+        bad.truncate(3);
+        for (g, f) in bad.iter_mut().zip([f32::NAN, 7.0, -3.0]) {
+            g.installing = Some(InstallProgress { fraction: Some(f) });
+        }
+        shell.ctx.found.lock().unwrap().extend(bad);
+        shell.ctx.library.refresh();
+        let rows = rows(&mut shell);
+        let got: Vec<(f32, String)> = rows
+            .iter()
+            .filter(|r| r.flag("installing"))
+            .map(|r| {
+                let p = match r.0.get_field("progress") {
+                    Some(Value::Number(n)) => *n as f32,
+                    _ => f32::NAN,
+                };
+                (p, r.text("percent"))
+            })
+            .collect();
+        assert_eq!(got.len(), 3);
+        // Sem número válido o anel gira (negativo, sem %); fora de 0..1 trava nas pontas.
+        assert!(got.contains(&(-1.0, String::new())));
+        assert!(got.contains(&(1.0, "100%".into())));
+        assert!(got.contains(&(0.0, "0%".into())));
+    }
+
+    #[test]
+    fn the_grid_has_one_block_per_store_and_the_arrows_walk_covers_and_headers() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell_with_store_games();
+        shell.ctx.grid_columns = 4;
+        shell.click("view", 1);
+        let blocks = model(&mut shell, "desk-blocks");
+        let kinds: Vec<String> = blocks.iter().map(|b| b.text("kind")).collect();
+        assert_eq!(kinds[..3], ["covers", "section", "group"]);
+        // 10 instalados em 4 colunas = 3 linhas; a divisória vem depois delas, o primeiro grupo depois da divisória.
+        assert_eq!(blocks[1].number("rows-before"), 3);
+        assert_eq!(blocks[2].number("rows-before"), 3);
+        assert_eq!(blocks[2].number("sections-before"), 1);
+        assert_eq!(blocks[3].number("groups-before"), 1);
+        // Do último instalado, ↓ cai no cabeçalho da Steam (a divisória não recebe foco); ↓ de novo, na primeira capa.
+        let installed = page(&shell)
+            .games(&shell.ctx)
+            .iter()
+            .filter(|g| !to_install(g))
+            .count();
+        shell.click("game", installed - 1);
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).group_focus, Some(GameStore::Steam));
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).group_focus, None);
+        let focused = shell.focused_game().unwrap();
+        assert!(
+            shell
+                .ctx
+                .library
+                .find(&focused)
+                .is_some_and(|g| !g.is_installed)
+        );
+        // Enter numa capa que falta instalar abre a instalação na loja; o jogo não vai para o destaque da lista.
+        shell.handle(Cmd::Accept);
+        assert!(
+            shell
+                .ctx
+                .effects
+                .iter()
+                .any(|e| matches!(e, Effect::OpenUrl(u) if u.starts_with("demo://install/")))
+        );
+        assert_eq!(View::of(&shell.ctx), View::Grid);
+        // ↑ volta ao cabeçalho; Enter fecha o grupo e o trecho fica sem capas.
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).group_focus, Some(GameStore::Steam));
+        shell.handle(Cmd::Accept);
+        let closed = model(&mut shell, "desk-blocks");
+        assert_eq!(closed[2].text("count"), "7");
+        assert!(!closed[2].flag("open"));
     }
 
     /// A fase 2 do destaque está aberta no último desenho.

@@ -747,6 +747,10 @@ fn desktop_snapshot() {
             .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
             .collect();
         let apply = |shell: &mut Shell, art: Option<&(slint::Image, slint::Image, Value)>| {
+            // Como o app: a grade conta linhas por coluna, e as colunas vêm da largura da janela.
+            if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
+                shell.ctx.grid_columns = (n as usize).max(1);
+            }
             let out = shell.render(Instant::now());
             for (name, value) in &out.props {
                 let mut value = value.clone();
