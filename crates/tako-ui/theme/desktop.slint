@@ -90,6 +90,12 @@ export global DeskText {
     in-out property <string> max: "Volume máximo";
 }
 
+// Entrada do app: falso enquanto o primeiro quadro não sai (o Tako liga `desk-intro` só na abertura); ao virar
+// verdadeiro, cada parte entra no seu passo (`Ui.intro-delay`). Fica verdadeiro no resto do tempo.
+global DeskIntro {
+    in-out property <bool> on: true;
+}
+
 global DeskArt {
     in-out property <image> blur;
     // Troca de jogo: a cópia do jogo anterior fica embaixo e a nova (`blur`) entra por cima junto com a arte, para o
@@ -1635,8 +1641,19 @@ component CardRow inherits Rectangle {
     property <length> details-w: unit * s-details;
     // Altura que o conteúdo pede (Detalhes com seis linhas), para a fileira crescer em vez de cortar.
     out property <length> content-h: dc.min-height;
+    // Entrada do app: os cartões acendem um a um depois das ações, subindo `intro-rise`.
+    property <float> intro-about: DeskIntro.on ? 1 : 0;
+    animate intro-about { duration: Ui.page-time; delay: Ui.intro-delay(5); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-trailer: DeskIntro.on ? 1 : 0;
+    animate intro-trailer { duration: Ui.page-time; delay: Ui.intro-delay(6); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-details: DeskIntro.on ? 1 : 0;
+    animate intro-details { duration: Ui.page-time; delay: Ui.intro-delay(7); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-sessions: DeskIntro.on ? 1 : 0;
+    animate intro-sessions { duration: Ui.page-time; delay: Ui.intro-delay(8); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     if show-about: AboutCard {
         x: 0;
+        y: (1 - intro-about) * Ui.intro-rise;
+        opacity: intro-about;
         height: root.height;
         width: unit * s-about;
         title: about-label;
@@ -1650,6 +1667,8 @@ component CardRow inherits Rectangle {
     }
     if show-trailer: TrailerCard {
         x: about-w;
+        y: (1 - intro-trailer) * Ui.intro-rise;
+        opacity: intro-trailer;
         height: root.height;
         width: unit * 0.9;
         art: game.art;
@@ -1658,6 +1677,8 @@ component CardRow inherits Rectangle {
     }
     dc := DetailsCard {
         x: about-w + trailer-w;
+        y: (1 - intro-details) * Ui.intro-rise;
+        opacity: intro-details;
         height: root.height;
         width: details-w;
         title: details-label;
@@ -1666,6 +1687,8 @@ component CardRow inherits Rectangle {
     }
     if show-sessions: SessionsCard {
         x: about-w + trailer-w + details-w + Ui.space-20;
+        y: (1 - intro-sessions) * Ui.intro-rise;
+        opacity: intro-sessions;
         height: root.height;
         width: unit * 1.1;
         labels: card-labels;
@@ -1696,6 +1719,12 @@ component GameStage inherits VerticalLayout {
     callback clicked(string, int);
     callback menu(length, length);
     property <bool> show-about: game.description != "";
+    // Entrada do app: etiqueta e título, depois faixa e ações, subindo `intro-rise` (o logo só acende: o layout dele
+    // já usa o `y`).
+    property <float> intro-title: DeskIntro.on ? 1 : 0;
+    animate intro-title { duration: Ui.page-time; delay: Ui.intro-delay(3); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-actions: DeskIntro.on ? 1 : 0;
+    animate intro-actions { duration: Ui.page-time; delay: Ui.intro-delay(4); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     // Troca de jogo (TrocaDeJogo): título, faixa e cartões do jogo anterior apagam em 120 (`curva-saida`), o novo
     // entra em 200 (`curva-entrada`); a arte faz o crossfade dela. Mudança no mesmo jogo troca na hora.
     property <bool> text-in: true;
@@ -1744,7 +1773,12 @@ component GameStage inherits VerticalLayout {
         animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         if game.overline != "": HorizontalLayout {
             alignment: start;
-            Badge { text: game.overline; live: game.running; }
+            Badge {
+                text: game.overline;
+                live: game.running;
+                y: (1 - intro-title) * Ui.intro-rise;
+                opacity: intro-title;
+            }
         }
         // TituloDoJogo: o logo do jogo numa caixa de 520 × 180 (380 × 130 na janela pequena), ancorado embaixo à
         // esquerda, nunca ampliado acima do tamanho dele; a etiqueta fica 20 acima.
@@ -1758,6 +1792,7 @@ component GameStage inherits VerticalLayout {
             property <float> fit: min(1, min(box-w / src-w, box-h / src-h));
             Image {
                 source: game.logo;
+                opacity: intro-title;
                 width: parent.src-w * parent.fit;
                 height: parent.src-h * parent.fit;
                 image-fit: contain;
@@ -1781,6 +1816,8 @@ component GameStage inherits VerticalLayout {
                 property <length> base: title-measure.font-size;
                 property <length> fit: base * 1.7 * (small ? 520px : 620px) / max(1px, title-measure.preferred-width);
                 text: game.title;
+                y: (1 - intro-title) * Ui.intro-rise;
+                opacity: intro-title;
                 color: Ui.on-accent;
                 font-family: Ui.font-heading;
                 font-size: max(min(base, fit), 36px * Ui.text-scale);
@@ -1798,7 +1835,12 @@ component GameStage inherits VerticalLayout {
         }
         if stats.length > 0: HorizontalLayout {
             alignment: start;
-            StatusStrip { items: stats; small: small; }
+            StatusStrip {
+                items: stats;
+                small: small;
+                y: (1 - intro-actions) * Ui.intro-rise;
+                opacity: intro-actions;
+            }
         }
         HorizontalLayout {
             spacing: Ui.space-12;
@@ -1806,6 +1848,8 @@ component GameStage inherits VerticalLayout {
             padding-top: 6px;
             for a[i] in actions: HorizontalLayout {
                 if a.style == "primary": PlayButton {
+                    y: (1 - intro-actions) * Ui.intro-rise;
+                    opacity: intro-actions;
                     label: a.title;
                     icon: a.icon;
                     enabled: a.enabled;
@@ -1814,7 +1858,8 @@ component GameStage inherits VerticalLayout {
                     clicked => { root.clicked("action", i); }
                 }
                 if a.style != "primary": GlassButton {
-                    y: (parent.height - self.height) / 2;
+                    y: (parent.height - self.height) / 2 + (1 - intro-actions) * Ui.intro-rise;
+                    opacity: intro-actions;
                     icon: a.icon;
                     label: a.title;
                     show-label: a.style == "danger";
@@ -1829,7 +1874,7 @@ component GameStage inherits VerticalLayout {
                 }
             }
         }
-        if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
+        if game.hint != "": Text { text: game.hint; opacity: intro-actions; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
     }
     // Com quatro cartões (Sobre, Trailer, Detalhes, Sessões) a fileira passa da largura e rola na horizontal.
     // 248 (190 na janela pequena), crescendo se o conteúdo pedir mais: nada passa da borda do cartão.
@@ -1946,6 +1991,11 @@ component DeskLibrary inherits Rectangle {
     callback focus-main();
     property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
     property <bool> wide: view != "list";
+    // Entrada do app: o painel da lista (ou os controles da grade) e depois as capas.
+    property <float> intro-list: DeskIntro.on ? 1 : 0;
+    animate intro-list { duration: Ui.page-time; delay: Ui.intro-delay(2); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    property <float> intro-covers: DeskIntro.on ? 1 : 0;
+    animate intro-covers { duration: Ui.page-time; delay: Ui.intro-delay(3); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     // Troca de modo (TrocaDeModo): o modo atual sai em 120 (`curva-saida`) e o novo entra em 140 (`curva-entrada`).
     // Troca de aba (TrocaDeTela › abas internas): a pílula desliza e a lista troca só por opacidade, 80 e 120.
     property <bool> mode-in: true;
@@ -1983,6 +2033,8 @@ component DeskLibrary inherits Rectangle {
         spacing: small ? Ui.space-20 : Ui.space-28;
         Vidro {
             width: list-w;
+            y: (1 - intro-list) * Ui.intro-rise;
+            opacity: intro-list;
             VerticalLayout {
                 padding-top: Ui.space-16;
                 padding-left: Ui.space-12;
@@ -2108,6 +2160,7 @@ component DeskLibrary inherits Rectangle {
         animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         spacing: Ui.space-20;
         HorizontalLayout {
+            opacity: intro-list;
             height: 46px;
             spacing: Ui.space-12;
             Vidro {
@@ -2195,6 +2248,7 @@ component DeskLibrary inherits Rectangle {
             }
         }
         Rectangle {
+            opacity: intro-covers;
             vertical-stretch: 1;
             if games.length == 0 && view == "grid": EmptyList {
                 title: empty-title;
@@ -4272,7 +4326,18 @@ export component Desktop inherits Window {
         }
     }
 
-    ArtLayer { art: art-shown; }
+    // Entrada do app (só na abertura): o Tako liga `desk-intro` antes do primeiro quadro (tudo apagado) e desliga
+    // depois dele; aí a arte acende em `tempo-cor` e a barra 70 depois, só por opacidade (a barra não se move).
+    in property <bool> desk-intro;
+    changed desk-intro => { DeskIntro.on = !desk-intro; }
+    property <float> intro-art: DeskIntro.on ? 1 : 0;
+    animate intro-art { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    property <float> intro-bar: DeskIntro.on ? 1 : 0;
+    animate intro-bar { duration: Ui.page-time; delay: Ui.intro-delay(1); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    ArtLayer {
+        art: art-shown;
+        opacity: intro-art;
+    }
     // Faixa leve abaixo da BarraDaJanela: a barra superior mantém 4,5:1 mesmo com a arte clara em cima.
     if page == "desk-library": Rectangle {
         height: Ui.titlebar-height + 160px;
@@ -4292,6 +4357,7 @@ export component Desktop inherits Window {
         padding-bottom: small ? Ui.space-16 : Ui.space-28;
         spacing: small ? 14px : Ui.space-20;
         bar := TopBar {
+            opacity: intro-bar;
             items: desk-nav;
             big-picture-label: desk-big-picture-label;
             brand-label: desk-brand-label;

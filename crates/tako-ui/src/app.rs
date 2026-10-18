@@ -389,6 +389,10 @@ impl App {
         let (def, dir) = load_mode(&ctx, &builtin, mode)?;
         let ui = def.create().map_err(|e| e.to_string())?;
         theme::apply_tokens(&ui, dir.as_deref());
+        // Entrada do app (só na abertura, não na volta da tela cheia): começa apagado e acende depois do 1º quadro.
+        if mode == UiMode::Desktop {
+            bridge::set(&ui, "desk-intro", Value::Bool(true));
+        }
         let mut shell = Shell::new(ctx);
         if mode == UiMode::Desktop {
             shell.enter_desktop();
@@ -983,9 +987,20 @@ impl App {
         ui.window()
             .set_fullscreen(self.mode.get() == UiMode::BigPicture && big_picture_fullscreen());
         // Quem já observa os quadros (o benchmark) fica com o aviso; aqui é só a primeira tela.
-        let _ = ui.window().set_rendering_notifier(|state, _| {
+        let weak = ui.as_weak();
+        let mut intro = self.mode.get() == UiMode::Desktop;
+        let _ = ui.window().set_rendering_notifier(move |state, _| {
             if let slint::RenderingState::AfterRendering = state {
                 crate::shell::performance::first_frame_drawn();
+                // O primeiro quadro saiu apagado: a entrada começa no próximo (fora do desenho).
+                if std::mem::take(&mut intro) {
+                    let weak = weak.clone();
+                    slint::Timer::single_shot(Duration::ZERO, move || {
+                        if let Some(ui) = weak.upgrade() {
+                            bridge::set(&ui, "desk-intro", Value::Bool(false));
+                        }
+                    });
+                }
             }
         });
         ui.show().map_err(|e| e.to_string())?;

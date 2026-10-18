@@ -199,6 +199,12 @@ export global Ui {
     public pure function art-unblur-delay(entering: bool) -> duration {
         return entering && !reduce-motion ? 120ms : 0ms;
     }
+    // Entrada do app (só na abertura): arte, barra, lista, título, faixa e ações e cartões acendem um a um, 70 depois
+    // da parte anterior, cada um em `tempo-pagina` subindo `intro-rise`. Com "Reduzir animações", tudo de uma vez.
+    public pure function intro-delay(step: int) -> duration {
+        return reduce-motion ? 0ms : step * 70ms;
+    }
+    out property <length> intro-rise: 12px;
     // Escala: com "Reduzir animações" tudo fica em 1.
     out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;
     out property <float> escala-entrada: reduce-motion ? 1 : 0.98;
