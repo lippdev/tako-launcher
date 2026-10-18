@@ -92,6 +92,8 @@ export global DeskText {
 
 global DeskArt {
     in-out property <image> blur;
+    // Largura do select que abriu a lista (SeletorDeColecao: a lista tem a largura dele); 0 = pela lista.
+    in-out property <length> anchor-w;
     // Luminância média da cópia numa grade de 16 × 9 (linhas de cima para baixo).
     in-out property <[float]> lum;
     in-out property <bool> has-art;
@@ -859,46 +861,10 @@ component CollectionSelect inherits Rectangle {
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => {
+            // A lista do SeletorDeColecao tem a largura do select.
+            DeskArt.anchor-w = root.width;
             root.menu(root.absolute-position.x + root.width, root.absolute-position.y + root.height + 6px);
             root.clicked();
-        }
-    }
-}
-
-// Coleções na aba Coleções (ChipsDeColecao): pílulas com quantos jogos cada uma mostra; a escolhida na segunda
-// camada de vidro. Rolam na horizontal quando não cabem.
-component Chips inherits Flickable {
-    in property <[DeskNav]> items;
-    in property <int> focus-index: -1;
-    callback clicked(int);
-    height: 32px;
-    viewport-width: cl.preferred-width;
-    interactive: cl.preferred-width > self.width;
-    cl := HorizontalLayout {
-        spacing: Ui.space-8;
-        alignment: start;
-        for c[i] in items: Rectangle {
-            height: 32px;
-            width: ct.preferred-width;
-            border-radius: self.height / 2;
-            background: !c.selected && cta.has-hover ? Ui.glass-hover : (c.selected ? transparent : Ui.glass-control);
-            border-width: c.selected ? 0 : 1px;
-            border-color: Ui.glass-edge;
-            accessible-role: button;
-            accessible-label: c.label;
-            if c.selected: Selected { radius: parent.height / 2; }
-            if i == focus-index: FocusRing { radius: parent.height / 2; }
-            ct := HorizontalLayout {
-                padding-left: 14px;
-                padding-right: 14px;
-                spacing: 6px;
-                Text { text: c.label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
-                Text { text: "· " + c.count; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
-            }
-            cta := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.clicked(i); }
-            }
         }
     }
 }
@@ -2459,6 +2425,7 @@ component DeskRow inherits Rectangle {
         mouse-cursor: data.enabled ? pointer : default;
         clicked => {
             if (data.kind == "choice") {
+                DeskArt.anchor-w = 0;
                 root.anchor(root.absolute-position.x + root.width - 14px, root.absolute-position.y + (root.height + (DeskArt.gray ? 36px : 32px)) / 2 + 6px);
             }
             root.clicked();
@@ -3647,7 +3614,7 @@ component DeskOverlay inherits Rectangle {
             radius: Ui.radius-control;
             // Select (`wide`): nasce embaixo da pílula, alinhado à direita dela; vira para cima se não couber.
             property <bool> select: ov.wide;
-            width: select ? clamp(ml.preferred-width, 200px, 340px) : (ov.title == "" ? 280px : 260px);
+            width: select ? clamp(max(ml.preferred-width, DeskArt.anchor-w), 200px, max(340px, DeskArt.anchor-w)) : (ov.title == "" ? 280px : 260px);
             height: min(ml.preferred-height, select ? 8 * 38px + 12px : root.height - 40px);
             x: clamp(select ? menu-x - self.width : menu-x, 12px, root.width - self.width - 12px);
             y: select && menu-y + self.height > root.height - 12px

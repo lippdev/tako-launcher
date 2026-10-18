@@ -363,7 +363,9 @@ impl DesktopLibrary {
                     })
                 })
                 .collect();
-            v.push(MenuItem::new(PanelRow::separator()));
+            if !v.is_empty() {
+                v.push(MenuItem::new(PanelRow::separator()));
+            }
             v.push(
                 MenuItem::new(PanelRow::button(
                     "new",
@@ -1155,6 +1157,9 @@ impl Page for DesktopLibrary {
             }
             "clear" => self.clear(),
             "add-game" => ctx.effect(Effect::AddGame),
+            "new-collection" => {
+                return Nav::Layer(Box::new(dialogs::new_collection(ctx, None)));
+            }
             _ => {}
         }
         Nav::Stay
@@ -1487,8 +1492,8 @@ impl Page for DesktopLibrary {
             (
                 ctx.t("desktop.no_collections"),
                 ctx.t("desktop.no_collections_text"),
-                none(),
-                none(),
+                format!("{}…", ctx.t("collections.new")),
+                "new-collection".to_owned(),
             )
         } else if self.tab == Tab::Collections && self.pick.is_none() {
             (ctx.t("desktop.pick_collection"), none(), none(), none())
