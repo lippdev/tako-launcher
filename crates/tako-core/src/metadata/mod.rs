@@ -182,7 +182,13 @@ impl GameMetadata {
         }
         fill(&mut game.players, &self.players);
         if !self.media.is_empty() {
+            // O ícone que a loja ou o .exe trouxe vale mais que o achado pelos provedores (UX-005).
+            let store_icon = game.media.remove(crate::library::media::ICON);
             game.media = self.media.clone();
+            if let Some(icon) = store_icon {
+                game.media
+                    .insert(crate::library::media::ICON.to_owned(), icon);
+            }
         }
         // Logo e ícone da Steam pelo appid quando nenhuma fonte trouxe (ART-001): a tela mostra o nome se a
         // Steam não tiver a imagem.
@@ -520,6 +526,36 @@ mod tests {
         assert_eq!(g.genres, ["Ação", "Aventura"]);
         assert_eq!(g.metacritic_score, Some(91));
         assert_eq!(g.cover_uri.as_deref(), Some("steam-art://1030300/cover"));
+    }
+
+    #[test]
+    fn the_icon_from_the_store_wins_over_the_one_from_providers_and_steam_art_fills_the_gap() {
+        use crate::library::media::{ICON, LOGO};
+        let provider = GameMetadata {
+            steam_app_id: Some(570),
+            media: [
+                (ICON.into(), "https://sgdb/i.png".into()),
+                (LOGO.into(), "https://sgdb/l.png".into()),
+            ]
+            .into(),
+            ..GameMetadata::new("SteamGridDB")
+        };
+        let mut g = game(GameStore::Steam);
+        g.media.insert(ICON.into(), "file:///loja.ico".into());
+        provider.apply_to(&mut g);
+        assert_eq!(g.media[ICON], "file:///loja.ico");
+        assert_eq!(g.media[LOGO], "https://sgdb/l.png");
+        // Sem ícone da loja, vale o dos provedores; sem nenhum, o da Steam pelo appid.
+        let mut g = game(GameStore::Steam);
+        provider.apply_to(&mut g);
+        assert_eq!(g.media[ICON], "https://sgdb/i.png");
+        let mut g = game(GameStore::Steam);
+        GameMetadata {
+            steam_app_id: Some(570),
+            ..GameMetadata::new("Steam")
+        }
+        .apply_to(&mut g);
+        assert_eq!(g.media[ICON], "steam-art://570/icon");
     }
 
     #[test]

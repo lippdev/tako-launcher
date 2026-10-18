@@ -7,7 +7,7 @@
 use super::{ACCENT, escape_data};
 use serde::Deserialize;
 use std::path::Path;
-use tako_core::library::{Game, GameStore};
+use tako_core::library::{Game, GameStore, media};
 
 /// O cache traz descrições e imagens de cada item: bibliotecas grandes passam dos 16 MB das outras lojas.
 const MAX_CATCACHE: u64 = 64 << 20;
@@ -19,6 +19,8 @@ pub struct EpicOwned {
     pub title: String,
     pub namespace: String,
     pub catalog_item_id: String,
+    /// Imagem quadrada do catálogo (`keyImages`), para o ícone do jogo.
+    pub icon: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -35,6 +37,45 @@ struct Item {
     #[serde(default)]
     release_info: Vec<Release>,
     main_game_item: Option<serde_json::Value>,
+    // Solto de propósito: imagem fora do formato só perde o ícone, nunca o jogo.
+    #[serde(default)]
+    key_images: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+struct KeyImage {
+    #[serde(default, rename = "type")]
+    kind: String,
+    #[serde(default)]
+    url: String,
+    #[serde(default)]
+    width: u32,
+    #[serde(default)]
+    height: u32,
+}
+
+/// Menor lado aceito: o ícone aparece com até 56 px na tela de alta densidade.
+const MIN_ICON: u32 = 64;
+
+/// Ícone do jogo: a imagem quadrada do catálogo (`Thumbnail`, depois `DieselGameBoxLogo`, depois qualquer outra
+/// quadrada). Só `https`, e o endereço vira nome de arquivo no cache de artes, então não pode ser enorme.
+fn square_icon(images: &serde_json::Value) -> Option<String> {
+    let rank = |k: &str| {
+        ["Thumbnail", "DieselGameBoxLogo"]
+            .iter()
+            .position(|t| *t == k)
+    };
+    let images: Vec<KeyImage> = images
+        .as_array()?
+        .iter()
+        .filter_map(|v| KeyImage::deserialize(v).ok())
+        .collect();
+    images
+        .iter()
+        .filter(|i| i.width >= MIN_ICON && i.width == i.height)
+        .filter(|i| i.url.starts_with("https://") && i.url.len() <= 2048)
+        .min_by_key(|i| rank(&i.kind).unwrap_or(usize::MAX))
+        .map(|i| i.url.clone())
 }
 
 #[derive(Deserialize)]
@@ -106,6 +147,7 @@ pub fn parse(bytes: &[u8]) -> Option<Vec<EpicOwned>> {
             title: item.title.trim().to_owned(),
             namespace: item.namespace.trim().to_owned(),
             catalog_item_id: item.id.trim().to_owned(),
+            icon: square_icon(&item.key_images),
         });
     }
     Some(out)
@@ -150,7 +192,27 @@ pub fn to_game(o: &EpicOwned) -> Game {
         is_installed: false,
         store_product_id: Some(o.catalog_item_id.clone()),
         install_uri: Some(install_uri(o)),
+        media: o
+            .icon
+            .iter()
+            .map(|i| (media::ICON.to_owned(), i.clone()))
+            .collect(),
         ..Default::default()
+    }
+}
+
+/// Ícone do catálogo também nos jogos instalados (os manifests não trazem imagens).
+pub fn add_icons(games: &mut [Game], owned: &[EpicOwned]) {
+    for game in games {
+        if let Some(icon) = owned
+            .iter()
+            .find(|o| game.id == format!("epic:{}", o.app_name))
+            .and_then(|o| o.icon.as_ref())
+        {
+            game.media
+                .entry(media::ICON.to_owned())
+                .or_insert_with(|| icon.clone());
+        }
     }
 }
 
@@ -194,12 +256,18 @@ pub(crate) mod tests {
 
     pub(crate) const CATALOG: &str = r#"[
       {"id":"a1b2c3d4e5f60718293a4b5c6d7e8f90","namespace":"farolns","title":"Farol do Fim do Mundo",
-       "description":"Um farol.","keyImages":[{"type":"DieselGameBoxTall","url":"https://cdn1.epicgames.com/x.jpg","height":1600,"width":1200}],
+       "description":"Um farol.","keyImages":[{"type":"DieselGameBoxTall","url":"https://cdn1.epicgames.com/x.jpg","height":1600,"width":1200},
+         {"type":"DieselGameBoxLogo","url":"https://cdn1.epicgames.com/logo.png","height":512,"width":512},
+         {"type":"Thumbnail","url":"https://cdn1.epicgames.com/thumb.jpg","height":256,"width":256}],
        "categories":[{"path":"games"},{"path":"applications"}],
        "releaseInfo":[{"id":"r1","appId":"Farol","platform":["Windows"],"dateAdded":"2021-05-04T15:00:00.000Z"}]},
       {"id":"7e57ab1e0000000000000000000000ab","namespace":"mariscons","title":" Maré Alta ",
        "categories":[{"path":"games"},{"path":"applications"}],
-       "releaseInfo":[{"id":"r2","appId":"MareAlta","platform":["Windows","Mac"]}]},
+       "releaseInfo":[{"id":"r2","appId":"MareAlta","platform":["Windows","Mac"]}],
+       "keyImages":[{"type":"Thumbnail","url":"http://inseguro/x.jpg","height":256,"width":256},
+         {"type":"OfferImageWide","url":"https://cdn1.epicgames.com/w.jpg","height":600,"width":1200},
+         {"type":"OfferImageTall","url":"https://cdn1.epicgames.com/p.jpg","height":32,"width":32},
+         {"type":"x","url":"https://cdn1.epicgames.com/q.jpg","height":-1,"width":"nada"}]},
       {"id":"d1c0000000000000000000000000000d","namespace":"farolns","title":"Farol - Trilha Sonora",
        "categories":[{"path":"addons"},{"path":"addons/durable"}],
        "releaseInfo":[{"id":"r3","appId":"FarolOst"}],
@@ -222,9 +290,30 @@ pub(crate) mod tests {
                 title: "Farol do Fim do Mundo".into(),
                 namespace: "farolns".into(),
                 catalog_item_id: "a1b2c3d4e5f60718293a4b5c6d7e8f90".into(),
+                // Thumbnail quadrado antes da logo quadrada.
+                icon: Some("https://cdn1.epicgames.com/thumb.jpg".into()),
             }
         );
         assert_eq!(owned[1].title, "Maré Alta");
+        // Sem quadrado válido (http, pequeno demais, número fora do formato): sem ícone.
+        assert_eq!(owned[1].icon, None);
+        // keyImages que não é lista: o jogo continua, sem ícone.
+        let odd = parse(&catcache(
+            r#"[{"id":"a","namespace":"n","title":"T","categories":[{"path":"games"}],
+                 "releaseInfo":[{"appId":"T"}],"keyImages":"quebrado"}]"#,
+        ))
+        .unwrap();
+        assert_eq!((odd.len(), odd[0].icon.clone()), (1, None));
+        let mut installed = [Game {
+            id: "epic:Farol".into(),
+            ..Default::default()
+        }];
+        add_icons(&mut installed, &owned);
+        assert_eq!(
+            installed[0].media["icon"],
+            "https://cdn1.epicgames.com/thumb.jpg"
+        );
+        assert_eq!(to_game(&owned[0]).media["icon"], installed[0].media["icon"]);
     }
 
     #[test]
