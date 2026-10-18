@@ -561,6 +561,17 @@ fn desktop_snapshot() {
             Ok("settings") => shell.open_route("settings"),
             Ok("grid") => shell.click("view", 1),
             Ok("categories") => shell.click("view", 2),
+            Ok("update-ready") | Ok("update-downloading") => {
+                crate::app_updates::snapshot(
+                    &mut shell.ctx,
+                    std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("update-downloading"),
+                );
+                shell.after_action();
+            }
+            Ok("update-menu") => {
+                shell.ctx.app_update.check = crate::app_updates::Check::Searching;
+                shell.click("desk-brand", 0);
+            }
             // `TAKO_SNAP_PAGE=profile` (ou `profile-sessions`, `profile-collections`): a TelaPerfil com sessões
             // de demonstração na semana.
             Ok(p) if p.starts_with("profile") => {

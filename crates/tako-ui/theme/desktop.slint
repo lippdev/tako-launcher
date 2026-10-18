@@ -4128,7 +4128,7 @@ component DeskOverlay inherits Rectangle {
     callback edited(string, string);
     callback hovered(string, int);
     property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
-        && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress";
+        && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress" && ov.kind != "update";
     property <bool> has-buttons: ov.rows.length > 0 && ov.rows[ov.rows.length - 1].kind == "button";
     if ov.kind == "splash" || ov.kind == "launch" || ov.kind == "progress": OverlayView {
         ov: ov;
@@ -4137,6 +4137,109 @@ component DeskOverlay inherits Rectangle {
         leaving: leaving;
         clicked(z, i) => { root.clicked(z, i); }
         hovered(z, i) => { root.hovered(z, i); }
+    }
+    // AtualizacaoDoApp: Baixando (`ov.tab2 == 1`, barra em `ov.tab`/1000) e Pronta. `ov.overline` = versão nova (600),
+    // `tabs2` = [resto da linha de versão, ajuda do rodapé, tempo restante]; `ov.tabs` = novidades; `ov.input` = jogo aberto.
+    if ov.kind == "update": Rectangle {
+        background: ov.secret ? transparent : #00000030;
+        TouchArea { clicked => { root.clicked("outside", 0); } }
+        Vidro {
+            layer: true;
+            dense: true;
+            width: min(500px, root.width - 32px);
+            height: min(update-layout.preferred-height, root.height - 32px);
+            x: (root.width - self.width) / 2;
+            y: (root.height - self.height) / 2;
+            radius: Ui.radius-card;
+            TouchArea { }
+            update-scroll := Flickable {
+                viewport-height: update-layout.preferred-height;
+                update-layout := VerticalLayout {
+                    width: update-scroll.width;
+                    padding: 24px;
+                    spacing: 18px;
+                    HorizontalLayout {
+                        spacing: 14px;
+                        Rectangle {
+                            width: 48px; height: 48px; border-radius: 14px; background: Ui.glass-control;
+                            border-width: 1px; border-color: Ui.glass-edge-strong;
+                            DeskIcon { name: ov.tab2 == 1 ? "download" : "refresh"; size: 24px; x: 11px; y: 11px; }
+                        }
+                        VerticalLayout {
+                            spacing: 6px; alignment: start;
+                            Text { text: ov.title; color: Ui.on-accent; font-size: 20px * Ui.text-scale; font-weight: 700; overflow: elide; }
+                            HorizontalLayout {
+                                spacing: 4px; alignment: start;
+                                Text { text: ov.overline; color: Ui.on-accent; font-size: 13px * Ui.text-scale; font-weight: 600; }
+                                Text { text: ov.tabs2.length > 0 ? ov.tabs2[0] : ""; color: Ui.on-accent-muted; font-size: 13px * Ui.text-scale; font-weight: 500; overflow: elide; }
+                            }
+                        }
+                        Rectangle {
+                            width: 32px; height: 32px; border-radius: 16px; background: Ui.glass-control;
+                            accessible-role: button; accessible-label: root.close-label;
+                            if focus-visible && ov.sel == 2: FocusRing { radius: 16px; }
+                            DeskIcon { name: "close"; size: 14px; x: 9px; y: 9px; tint: Ui.on-accent-muted; }
+                            TouchArea { mouse-cursor: pointer; clicked => { root.clicked("outside", 0); } }
+                        }
+                    }
+                    if ov.tab2 == 1: VerticalLayout {
+                        spacing: 8px;
+                        Rectangle {
+                            height: 6px; background: #ffffff1f; border-radius: 3px; clip: true;
+                            Rectangle { width: parent.width * ov.tab / 1000; background: Ui.on-accent; border-radius: 3px; }
+                        }
+                        HorizontalLayout {
+                            Text { text: ov.text; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; horizontal-stretch: 1; }
+                            Text { text: ov.tabs2.length > 2 ? ov.tabs2[2] : ""; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; }
+                        }
+                    }
+                    if ov.tabs.length > 0: Rectangle {
+                        height: notes-layout.preferred-height + 28px;
+                        border-radius: Ui.radius-control; background: #ffffff0a;
+                        border-width: 1px; border-color: Ui.glass-edge;
+                        notes-layout := VerticalLayout {
+                            padding: 14px; padding-left: 16px; padding-right: 16px;
+                            spacing: 10px;
+                            Text { text: ov.input-hint.to-uppercase(); color: Ui.desk-on-subtle; font-size: Ui.desk-overline; font-weight: 700; letter-spacing: 0.04 * self.font-size; }
+                            VerticalLayout {
+                                spacing: 6px;
+                                for note in ov.tabs: Text { text: "•  " + note; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 500; overflow: elide; }
+                            }
+                            Rectangle {
+                                height: 24px;
+                                Text { text: ov.preview-text; color: Ui.on-accent-muted; font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; horizontal-alignment: left; width: parent.width; }
+                                TouchArea { mouse-cursor: pointer; clicked => { root.clicked("notes", 0); } }
+                            }
+                        }
+                    }
+                    if ov.input != "": Rectangle {
+                        height: warn-layout.preferred-height + 20px;
+                        border-radius: Ui.radius-control;
+                        background: Ui.warning.with-alpha(0.14);
+                        border-width: 1px; border-color: Ui.warning.with-alpha(0.4);
+                        accessible-role: text; accessible-label: ov.input;
+                        warn-layout := HorizontalLayout {
+                            padding: 10px; padding-left: 12px; padding-right: 12px; spacing: 10px;
+                            DeskIcon { name: "alert"; size: 18px; tint: Ui.warning; y: 1px; }
+                            Text { text: ov.input; color: Ui.on-accent; font-size: 13px * Ui.text-scale; font-weight: 500; wrap: word-wrap; horizontal-stretch: 1; }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 12px; alignment: end;
+                        Text {
+                            text: ov.tabs2.length > 1 ? ov.tabs2[1] : "";
+                            color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500;
+                            wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1;
+                        }
+                        for r[i] in ov.rows: PopupButton {
+                            data: r; height: 44px;
+                            focused: focus-visible && top-most && ov.sel == i;
+                            clicked => { root.clicked("row", i); }
+                        }
+                    }
+                }
+            }
+        }
     }
     // SeletorDeImagens: popup grande (40 × 48 das bordas, até 1440) com cabeçalho e X, Capa · Fundo · Logo · Ícone,
     // Fonte em select, Estilo e "Escolher do computador…"; a grade na largura toda e a prévia fixa de 380. Clicar
@@ -4875,7 +4978,7 @@ component DeskOverlay inherits Rectangle {
                         x: 10px;
                     }
                     for r[i] in ov.rows: Rectangle {
-                        height: r.kind == "separator" ? 9px : 36px;
+                        height: r.kind == "separator" ? 9px : (r.description != "" ? 54px : 36px);
                         border-radius: 10px;
                         background: r.kind != "separator" && mta.has-hover && r.enabled ? Ui.glass-hover : transparent;
                         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -4887,16 +4990,17 @@ component DeskOverlay inherits Rectangle {
                             padding-right: 10px;
                             spacing: 10px;
                             // No select, a coluna do ✓ (16) marca a atual, em peso 600.
-                            if !ov.wide: DeskIcon { name: r.icon; size: 18px; tint: r.style == "danger" ? Ui.error : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                            if r.key == "updates" && !r.enabled: Ring { size: 18px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+                            if !ov.wide && (r.key != "updates" || r.enabled): DeskIcon { name: r.icon; size: 18px; tint: r.style == "success" ? Ui.success : (r.style == "warning" ? Ui.warning : (r.style == "danger" ? Ui.error : Ui.desk-on-muted)); y: (parent.height - self.height) / 2; }
                             if ov.wide: Rectangle { width: 18px; DeskIcon { name: r.icon; size: 16px; tint: Ui.on-accent; } }
-                            Text {
-                                text: r.title;
-                                color: r.style == "danger" ? Ui.error : Ui.on-accent;
-                                font-size: ov.wide ? 14px * Ui.text-scale : Ui.desk-label;
-                                font-weight: r.emphasized ? 600 : 500;
-                                vertical-alignment: center;
-                                horizontal-stretch: 1;
-                                overflow: elide;
+                            VerticalLayout {
+                                horizontal-stretch: 1; spacing: 2px; alignment: center;
+                                Text {
+                                    text: r.title; color: r.style == "danger" ? Ui.error : Ui.on-accent;
+                                    font-size: ov.wide ? 14px * Ui.text-scale : Ui.desk-label;
+                                    font-weight: r.emphasized ? 600 : 500; overflow: elide;
+                                }
+                                if r.description != "": Text { text: r.description; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; overflow: elide; }
                             }
                             if r.value != "": Text {
                                 text: r.value;

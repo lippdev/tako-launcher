@@ -2030,12 +2030,9 @@ pub fn brand_menu() -> super::layer::MenuLayer {
                 Flow::CloseAll
             }),
             MenuItem::new(PanelRow::separator()),
-            MenuItem::new(
-                PanelRow::button("updates", ctx.t("desktop.menu.check_updates")).icon("info"),
-            )
-            .on(|ctx| {
+            MenuItem::new(crate::app_updates::menu_row(ctx)).on(|ctx| {
                 ctx.effect(Effect::CheckUpdates);
-                Flow::CloseAll
+                Flow::Stay
             }),
             MenuItem::new(PanelRow::separator()),
             MenuItem::new(
@@ -2049,6 +2046,7 @@ pub fn brand_menu() -> super::layer::MenuLayer {
             }),
         ]
     })
+    .overline(crate::app_updates::BRAND_MENU)
 }
 
 pub fn ask_big_picture(shell: &mut super::Shell, since_start: std::time::Duration) {

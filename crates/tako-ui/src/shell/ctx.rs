@@ -240,6 +240,7 @@ pub struct Ctx {
     /// Texto da última verificação de atualização (Configurações › Geral).
     pub update_status: String,
     pub update_ready: Option<String>,
+    pub app_update: crate::app_updates::State,
     pub safe_mode: bool,
     pub scanning: bool,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
@@ -329,6 +330,7 @@ impl Ctx {
     }
 
     pub fn toast(&mut self, text: impl Into<String>) {
+        self.app_update.toast_label.clear();
         self.toast = Some((text.into(), Instant::now()));
         self.toast_undo = None;
         self.toast_hover = [false; 2];
@@ -371,6 +373,9 @@ impl Ctx {
 
     /// Quanto o aviso fica. Desktop: 4 s, e 8 s com "Desfazer" (dá tempo de clicar); tela cheia: `TOAST_TIME`.
     pub fn toast_time(&self) -> std::time::Duration {
+        if self.desktop && !self.app_update.toast_label.is_empty() {
+            return std::time::Duration::from_secs(4);
+        }
         match (self.desktop, self.toast_undo.is_some()) {
             (true, true) => std::time::Duration::from_secs(8),
             (true, false) => std::time::Duration::from_secs(4),

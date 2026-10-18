@@ -187,6 +187,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         sources: Vec::new(),
         update_status: String::new(),
         update_ready: None,
+        app_update: Default::default(),
         safe_mode: false,
         scanning: false,
         grid_columns: 7,
@@ -757,7 +758,8 @@ impl App {
                     }
                     "update" => {
                         drop(ui);
-                        app.shell.borrow_mut().ctx.effect(Effect::InstallUpdate);
+                        crate::app_updates::open(&mut app.shell.borrow_mut().ctx);
+                        app.shell.borrow_mut().after_action();
                         app.redraw();
                     }
                     menu if menu.starts_with("menu:") => {
@@ -968,6 +970,7 @@ impl App {
                 }
                 let action = {
                     let mut s = app.shell.borrow_mut();
+                    crate::app_updates::tick(&mut s.ctx, Instant::now());
                     app.host.borrow_mut().tick(&mut s.ctx, &pad_state, now)
                 };
                 app.apply(action);

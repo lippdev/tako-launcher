@@ -98,6 +98,7 @@ pub struct Asset {
     pub url: String,
     pub name: String,
     pub digest: String,
+    pub size: u64,
 }
 
 /// Atualização encontrada. Sem arquivo confiável (hash), só a página é oferecida.
@@ -137,6 +138,8 @@ struct Release {
 
 #[derive(Deserialize)]
 struct ReleaseAsset {
+    #[serde(default)]
+    size: u64,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -208,6 +211,7 @@ pub fn pick(
                     url: a.browser_download_url.clone()?,
                     name: a.name.clone()?,
                     digest,
+                    size: a.size,
                 })
             })
             .filter(|_| package.self_updates());

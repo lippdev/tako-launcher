@@ -14,7 +14,7 @@ use super::SemVer;
 use super::feed::{self, Arch, Package, RELEASES_URL, REPOSITORY, UpdateInfo};
 use crate::i18n::{Lang, t};
 
-const CHECK_TIMEOUT: Duration = Duration::from_secs(15);
+const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 /// Sem tempo total: o limite é por falta de dados, para não cortar downloads lentos que ainda progridem.
 pub const STALL_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_FEED_BYTES: u64 = 4 * 1024 * 1024;
@@ -269,6 +269,7 @@ mod tests {
             page_url: String::new(),
             // URL inválida: se tentasse baixar, falharia.
             asset: Some(feed::Asset {
+                size: 0,
                 url: "http://invalid.invalid/x".into(),
                 name: "Tako-Portable-x64.exe".into(),
                 digest: format!("sha256:{hex}"),

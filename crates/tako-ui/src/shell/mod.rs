@@ -558,6 +558,10 @@ impl Shell {
     /// Pedidos que camadas, efeitos e tarefas em segundo plano fazem às páginas (abrir um diálogo, abrir os
     /// detalhes, sair dos detalhes de um jogo removido).
     pub(crate) fn after_action(&mut self) {
+        if std::mem::take(&mut self.ctx.app_update.close_menu) {
+            self.layers
+                .retain(|l| l.render(&self.ctx).overline != crate::app_updates::BRAND_MENU);
+        }
         if let Some(l) = self.ctx.pending_layer.take() {
             self.layers.push(l);
         }
@@ -779,6 +783,16 @@ impl Shell {
             out.set("transparent-background", true);
         }
         let overlays: Vec<_> = self.layers.iter().map(|l| l.render(&self.ctx)).collect();
+        let update_menu_open = overlays
+            .iter()
+            .any(|o| o.overline == crate::app_updates::BRAND_MENU);
+        if self.ctx.app_update.menu_open
+            && !update_menu_open
+            && self.ctx.app_update.check == crate::app_updates::Check::Failed
+        {
+            self.ctx.app_update.check = crate::app_updates::Check::Idle;
+        }
+        self.ctx.app_update.menu_open = update_menu_open;
         out.set("overlays", overlays);
         out.set("hints", self.hints());
         out.set(
@@ -870,7 +884,9 @@ impl Shell {
         out.set("desk-cancel-label", self.ctx.t("common.cancel"));
         out.set(
             "desk-toast-undo",
-            if self.ctx.toast_undo.is_some() {
+            if !self.ctx.app_update.toast_label.is_empty() {
+                self.ctx.app_update.toast_label.clone()
+            } else if self.ctx.toast_undo.is_some() {
                 self.ctx.t("desktop.undo")
             } else {
                 String::new()

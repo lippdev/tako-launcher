@@ -1,6 +1,7 @@
 //! Interface do Tako (MIG-029): tema Slint carregado em tempo de execução (PRD §7), estado e foco em Rust.
 
 pub mod app;
+pub(crate) mod app_updates;
 pub mod art;
 pub mod bridge;
 pub mod demo;

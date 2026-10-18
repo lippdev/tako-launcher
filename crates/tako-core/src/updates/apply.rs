@@ -57,10 +57,14 @@ impl UpdateApplyPlan {
                     )),
                 })
             }
-            Package::LinuxAppImage => Some(sh(format!(
-                "chmod +x {new}\nmv -f {new} {dst}\n{}",
-                relaunch_line(relaunch, &format!("{dst} >/dev/null 2>&1 &"))
-            ))),
+            Package::LinuxAppImage => {
+                let backup = q(&target.with_extension("update-old"));
+                let failed = q(&downloaded.with_file_name("failed"));
+                Some(sh(format!(
+                    "chmod +x {new} && cp -p {dst} {backup} && mv -f {new} {dst}\nif [ $? -ne 0 ]; then [ ! -f {backup} ] || mv -f {backup} {dst}; touch {failed}; else rm -f {backup}; fi\n{}",
+                    relaunch_line(relaunch, &format!("{dst} >/dev/null 2>&1 &"))
+                )))
+            }
             // A pasta do .tar.gz guarda o `Tako_Data` do portátil: copia por cima em vez de trocar a pasta.
             Package::LinuxTarGz => Some(sh(format!(
                 "staging=\"$(mktemp -d)\"\ntar -xzf {new} -C \"$staging\" || exit 1\n\
@@ -71,10 +75,12 @@ impl UpdateApplyPlan {
             // O zip traz `Tako.app`; o antigo só sai depois que o novo está no lugar.
             Package::MacApp => {
                 let old = q(&target.with_extension("app.old"));
+                let failed = q(&downloaded.with_file_name("failed"));
                 Some(sh(format!(
                     "staging=\"$(mktemp -d)\"\nditto -x -k {new} \"$staging\" || exit 1\n\
                      set -- \"$staging\"/*.app\n[ -d \"$1\" ] || exit 1\n\
-                     rm -rf {old}\nmv {dst} {old} && mv \"$1\" {dst} && rm -rf {old} \"$staging\" {new}\n{}",
+                     rm -rf {old}\nmv {dst} {old} && mv \"$1\" {dst} && rm -rf {old} \"$staging\" {new} \\\n\
+                     || {{ [ -d {dst} ] || mv {old} {dst}; touch {failed}; }}\n{}",
                     relaunch_line(relaunch, &format!("open {dst}"))
                 )))
             }
@@ -115,7 +121,7 @@ pub fn portable_swap_script(
         ));
     }
     s.push_str(&format!(
-        "move /y \"{downloaded}\" \"{executable}\" >nul\r\n"
+        "copy /y \"{executable}\" \"{executable}.update-old\" >nul\r\nif errorlevel 1 goto failed\r\nmove /y \"{downloaded}\" \"{executable}\" >nul\r\nif errorlevel 1 (copy /y \"{executable}.update-old\" \"{executable}\" >nul & goto failed)\r\ndel \"{executable}.update-old\" >nul 2>&1\r\ngoto done\r\n:failed\r\ntype nul > \"%~dp0failed\"\r\n:done\r\n"
     ));
     if relaunch {
         s.push_str(&format!("start \"\" \"{executable}\"\r\n"));
@@ -182,12 +188,17 @@ mod tests {
         assert!(lines[2].contains("goto wait0"));
         assert!(lines[4].contains("PID eq 77"));
         assert!(lines[4].contains("goto wait1"));
+        // Copia a versão atual antes de trocar; se a troca falha, restaura e deixa `failed` para o Tako avisar.
+        assert!(
+            lines[5].starts_with(r#"copy /y "D:\Jogos\Tako.exe" "D:\Jogos\Tako.exe.update-old""#)
+        );
         assert_eq!(
-            lines[5],
+            lines[7],
             r#"move /y "C:\Temp\TakoUpdate\Tako-Portable-x64.exe" "D:\Jogos\Tako.exe" >nul"#
         );
-        assert_eq!(lines[6], r#"start "" "D:\Jogos\Tako.exe""#);
-        assert_eq!(lines.len(), 7);
+        assert!(lines[8].contains(r#"copy /y "D:\Jogos\Tako.exe.update-old" "D:\Jogos\Tako.exe""#));
+        assert!(script.contains("type nul > \"%~dp0failed\""));
+        assert_eq!(lines.last().unwrap(), &r#"start "" "D:\Jogos\Tako.exe""#);
         assert!(!portable_swap_script("a.exe", "b.exe", &[1], false).contains("start"));
     }
 
