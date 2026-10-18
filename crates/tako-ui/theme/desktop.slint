@@ -2120,11 +2120,12 @@ component GamePhases inherits Rectangle {
         animate opacity { duration: Ui.phase-fade(!on); easing: !on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         visible: self.opacity > 0.01;
         @children
-        // "Mais sobre o jogo ⌄": no respiro embaixo do destaque, no centro; abre a fase 2.
-        Rectangle {
+        // "Mais sobre o jogo ⌄": no respiro embaixo do destaque, no centro; abre a fase 2. Na janela pequena o
+        // respiro não cabe a dica: lá a fase 2 abre pela roda e pelo Page Down.
+        if !small: Rectangle {
             x: (parent.width - self.width) / 2;
-            y: parent.height + (small ? 0px : 2px);
-            height: small ? 16px : 24px;
+            y: parent.height + 2px;
+            height: 24px;
             width: hl.preferred-width;
             border-radius: self.height / 2;
             background: hta.has-hover ? Ui.glass-hover : transparent;

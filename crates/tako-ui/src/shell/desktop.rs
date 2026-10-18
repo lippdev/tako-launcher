@@ -1509,6 +1509,10 @@ impl Page for DesktopLibrary {
             self.more = None;
         }
         let more_on = self.more.is_some();
+        // Na fase 2 os botões de ação ficam escondidos: o foco do teclado não pode ficar neles (Enter jogaria).
+        if more_on && self.zone == Zone::Actions {
+            self.zone = Zone::List;
+        }
         let game = hero.and_then(|id| ctx.library.find(&id));
         out.set(
             "desk-more",
@@ -2190,6 +2194,18 @@ mod tests {
         shell.click("game-more", 1);
         shell.click("game-more", 0);
         assert!(!more_on(&mut shell));
+        // Com o foco nos botões de ação (escondidos na fase 2), abrir a fase 2 leva o foco para a lista.
+        for _ in 0..8 {
+            if page(&shell).zone() == Zone::Actions {
+                break;
+            }
+            shell.key("\u{0009}", KeyModifiers::NONE);
+        }
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert!(more_on(&mut shell));
+        assert_eq!(page(&shell).zone(), Zone::List);
+        shell.key("\u{F72C}", KeyModifiers::NONE);
         // Fora da Lista não há destaque nem fase 2.
         shell.click("game-more", 1);
         shell.click("view", 1);
