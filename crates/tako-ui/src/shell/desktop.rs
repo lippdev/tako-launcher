@@ -1352,6 +1352,7 @@ impl Page for DesktopLibrary {
                             String::new()
                         },
                         trailer: g.media.contains_key(tako_core::library::media::VIDEO),
+                        art_loading: g.shown_hero().is_some_and(crate::images::is_pending),
                     },
                     actions,
                     strip(ctx, g),

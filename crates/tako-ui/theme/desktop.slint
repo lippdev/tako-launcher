@@ -34,7 +34,7 @@ export { Ui }
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
 
@@ -3421,13 +3421,19 @@ export component Desktop inherits Window {
         DeskArt.win-w = root.width;
         DeskArt.win-h = root.height;
         DeskArt.gray = page != "desk-library";
-        DeskArt.has-art = desk-game.has-game && desk-game.art.width > 0;
-        DeskArt.blur = desk-game.art-blur;
-        DeskArt.lum = desk-game.art-lum;
-        if (desk-game.art.height > 0) {
-            DeskArt.aspect = desk-game.art.width / desk-game.art.height;
+        // Troca de jogo: enquanto a arte nova carrega, fica a anterior (senão o fundo pisca sem arte e o vidro
+        // fica sólido); quando chega, a arte faz um crossfade só.
+        if (!desk-game.art-loading) {
+            DeskArt.has-art = desk-game.has-game && desk-game.art.width > 0;
+            DeskArt.blur = desk-game.art-blur;
+            DeskArt.lum = desk-game.art-lum;
+            if (desk-game.art.height > 0) {
+                DeskArt.aspect = desk-game.art.width / desk-game.art.height;
+            }
+            root.art-shown = desk-game.art;
         }
     }
+    property <image> art-shown;
     changed width => { root.sync-art(); }
     changed height => { root.sync-art(); }
     changed page => {
@@ -3471,7 +3477,7 @@ export component Desktop inherits Window {
         }
     }
 
-    ArtLayer { art: desk-game.art; }
+    ArtLayer { art: art-shown; }
     // Grade e Categorias: as capas são o conteúdo e a arte é só ambiente, com escurecimento mais forte.
     if page == "desk-library" && desk-view != "list": Rectangle {
         background: @linear-gradient(180deg, Ui.art-scrim-strong.with-alpha(0.35) 0%, Ui.art-scrim-strong.with-alpha(0.7) 22%,

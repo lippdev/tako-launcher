@@ -185,6 +185,12 @@ fn request(uri: &str, max_w: u32, max_h: u32, glass: bool) -> Option<Image> {
     })
 }
 
+/// A imagem (em qualquer tamanho, ou a cópia de vidro) ainda está a caminho.
+pub fn is_pending(uri: &str) -> bool {
+    let tail = format!("|{uri}");
+    STATE.with(|s| s.borrow().pending.iter().any(|k| k.ends_with(&tail)))
+}
+
 /// Chamar depois de montar cada quadro (todas as `get` da tela já feitas).
 pub fn frame_done() {
     STATE.with(|s| s.borrow_mut().lru.frame_done());

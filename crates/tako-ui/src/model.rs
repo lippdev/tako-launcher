@@ -275,5 +275,7 @@ theme_struct! {
         pub genres_more: String,
         // Tem trailer (a mídia `video` do jogo).
         pub trailer: bool,
+        // A arte (ou a cópia de vidro) ainda carrega: a janela segura a do jogo anterior para não piscar.
+        pub art_loading: bool,
     }
 }
