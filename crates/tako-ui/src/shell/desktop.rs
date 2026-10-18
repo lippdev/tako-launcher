@@ -33,8 +33,10 @@ pub(super) fn store_icon(store: GameStore) -> &'static str {
 /// Rota da biblioteca desktop.
 pub const ROUTE: &str = "desk:library";
 
-/// Miniatura da lista (CapaDoJogo: o quadrado do topo da capa 2:3, mostrado a 40 × 40; 2× para telas densas).
+/// Miniatura de capa do perfil (o quadrado do topo da capa 2:3, a 40 × 40; 2× para telas densas).
 pub(crate) const THUMB: (u32, u32) = (80, 120);
+/// Ícone da linha da lista (28 na tela, 2× para telas densas).
+const ICON: (u32, u32) = (56, 56);
 /// Linhas em volta da primeira visível que pedem miniatura.
 const NEAR: usize = 60;
 
@@ -159,6 +161,26 @@ struct Run {
 
 /// Entra na seção NÃO INSTALADOS: jogo de uma loja que ainda não está no computador. ROM ou arquivo que sumiu e
 /// lançamento futuro não têm o que instalar e ficam onde estavam.
+/// Ícone da linha e, se não houver, a inicial do nome. Ponto único da carga: quando o cache de ícones já recortados
+/// existir, é só trocar o `images::get`. `load: false` = linha fora da área visível (não pede nada).
+fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
+    let uri = g.shown_icon();
+    let icon = tiles::image(uri.filter(|_| load), ICON);
+    // Enquanto o ícone carrega, não pisca a inicial; ela só aparece sem ícone ou se a carga falhou.
+    let waiting = uri.is_some_and(|u| !load || crate::images::is_pending(u));
+    let initial = if icon.size().width > 0 || waiting {
+        String::new()
+    } else {
+        g.title
+            .trim()
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().collect())
+            .unwrap_or_default()
+    };
+    (icon, initial)
+}
+
 fn to_install(g: &Game) -> bool {
     !g.is_installed
         && !g.is_upcoming()
@@ -1842,10 +1864,12 @@ impl Page for DesktopLibrary {
                     ctx.tf("desktop.install_game", &title),
                 )
             };
+            let (icon, initial) = row_icon(g, near && !cover);
             DeskGame {
                 id: g.id.clone(),
                 title: g.title.clone(),
-                thumb: tiles::image(g.shown_cover().filter(|_| near && !cover), THUMB),
+                icon,
+                initial,
                 cover: tiles::image(g.shown_cover().filter(|_| near && cover), COVER),
                 accent: parse_color(&g.accent),
                 favorite: g.is_favorite,
@@ -2625,6 +2649,23 @@ mod tests {
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         (dir, shell)
+    }
+
+    #[test]
+    fn a_row_without_icon_shows_the_title_initial() {
+        let game = |title: &str| Game {
+            title: title.into(),
+            ..Default::default()
+        };
+        assert_eq!(row_icon(&game("  ori"), true).1, "O");
+        assert_eq!(row_icon(&game(""), true).1, "");
+        // Com ícone na lista, mas fora da área visível: espera a carga, sem piscar a inicial.
+        let mut far = game("Celeste");
+        far.pinned_art.insert(
+            tako_core::library::ArtKind::Icon,
+            "steam-art://1/icon".into(),
+        );
+        assert_eq!(row_icon(&far, false).1, "");
     }
 
     fn page(shell: &Shell) -> &DesktopLibrary {
