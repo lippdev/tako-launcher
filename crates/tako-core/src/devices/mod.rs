@@ -13,7 +13,8 @@ pub mod process;
 pub use audio::{AudioDevice, AudioOutputs, AudioState};
 pub use controller_hiding::{ControllerHiding, NoHiding};
 pub use display::{
-    ConnectedDisplay, DisplayMode, DisplayTopology, Displays, HdrStatus, MonitorState, ScreenBounds,
+    ConnectedDisplay, DisplayMode, DisplayTopology, Displays, HdrStatus, MonitorState,
+    ScreenBounds, VrrStatus,
 };
 pub use pointer::{CursorControl, MouseButton, PointerInjector};
 pub use process::{GameWindow, ProcessEntry, ProcessLauncher};

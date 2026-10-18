@@ -32,6 +32,7 @@ impl FakeDisplays {
             }),
             current_mode: Some(DisplayMode::new(1920, 1080, 144)),
             hdr: HdrStatus::Unsupported,
+            vrr: VrrStatus::Unsupported,
         };
         let tv = ConnectedDisplay {
             id: "DISPLAY2".into(),
@@ -41,6 +42,7 @@ impl FakeDisplays {
             bounds: None,
             current_mode: None,
             hdr: HdrStatus::Off,
+            vrr: VrrStatus::Off,
         };
         let modes = vec![
             (
@@ -124,6 +126,22 @@ impl Displays for FakeDisplays {
             HdrStatus::On
         } else {
             HdrStatus::Off
+        };
+        Ok(())
+    }
+    fn set_vrr(&self, id: &str, enabled: bool) -> DeviceResult<()> {
+        let mut s = lock(&self.state);
+        let d =
+            s.0.iter_mut()
+                .find(|d| d.id == id)
+                .ok_or_else(|| DeviceError::NotFound(id.into()))?;
+        if d.vrr == VrrStatus::Unsupported {
+            return Err(DeviceError::Unsupported("VRR".into()));
+        }
+        d.vrr = if enabled {
+            VrrStatus::On
+        } else {
+            VrrStatus::Off
         };
         Ok(())
     }

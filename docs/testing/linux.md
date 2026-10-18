@@ -19,6 +19,13 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] GNOME: depois de restaurar, nada foi gravado em `~/.config/monitors.xml` (método temporário).
 - [ ] KDE com escala 125%: trocar o modo mantém a escala.
 - [ ] KDE Plasma 6 com tela HDR: ligar e desligar o HDR.
+- [ ] VRR (PERF-002), com uma tela FreeSync/Adaptive Sync:
+  - [ ] KDE: com `kscreen-doctor output.<tela>.vrrpolicy.never`, Configurações › Tela de jogo mostra "Ligar o VRR" disponível. Ligue e abra um jogo: `kscreen-doctor -j` mostra `"vrrPolicy": 2` durante o jogo e `0` depois de fechar. Com a política já em automático antes, o Tako não muda nada ao fechar.
+  - [ ] KDE com uma tela sem VRR: o JSON não traz `vrrPolicy` e a linha aparece desligada com "Esta tela não informa VRR".
+  - [ ] Sway/Hyprland: `wlr-randr --json` traz `adaptive_sync`; com ele `false`, ligar o VRR para o jogo deixa `true` durante o jogo e `false` depois. Sem o campo (wlr-randr antigo), a linha fica indisponível.
+  - [ ] X11: a linha aparece indisponível com o motivo (o VRR é do driver, `Option "VariableRefresh"`); `xrandr --prop` mostra `vrr_capable` só para conferência.
+  - [ ] GNOME: a linha aparece indisponível com o motivo (ainda não implementado).
+  - [ ] Configurações deste jogo › "VRR" em Ligado/Desligado vence o padrão da tela.
 - [ ] gamescope: a tela aparece com o tamanho da sessão e as opções de troca ficam indisponíveis.
 - [ ] Compositor sem suporte: as opções de tela somem, sem erro na tela.
 

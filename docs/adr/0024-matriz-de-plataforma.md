@@ -37,6 +37,7 @@ Legenda: **Sim** = implementado e testado na lógica; **a validar** = implementa
 | Tela principal | Sim | a validar | a validar | a validar | Não existe | Não | a validar (a da origem) |
 | Rotação na restauração | Sim | a validar | a validar | a validar | a validar | Não | Não |
 | HDR | Sim | Não | a validar (Plasma 6) | Não | Não | Não | Não |
+| VRR (PERF-002) | Não: sem API pública | Não: é do driver (`VariableRefresh`) | a validar (`vrrpolicy`) | Não (ainda) | a validar (`--adaptive-sync`) | Não | Não: sem API pública |
 | Capturar e restaurar telas | Sim | a validar | a validar | a validar | a validar | Não precisa | a validar |
 | Saída padrão, volume e mudo | Sim (`IPolicyConfig`) | a validar (`pactl`/`wpctl`) | igual ao X11 | igual ao X11 | igual ao X11 | a validar | a validar (CoreAudio) |
 | Esconder o cursor sobre o jogo | Sim | a validar (XFixes) | Não: só sobre a janela do Tako | Não: idem | Não: idem | a validar (XFixes no Xwayland) | a validar com o jogo na frente |

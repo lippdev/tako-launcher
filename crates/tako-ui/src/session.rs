@@ -57,6 +57,7 @@ pub fn global_settings(ctx: &Ctx) -> GlobalSessionSettings {
         game_screen_id: s.string(keys::GAME_SCREEN_ID),
         game_screen_mode: s.get(keys::GAME_SCREEN_MODE).and_then(DisplayMode::parse),
         game_screen_hdr: s.bool(keys::GAME_SCREEN_HDR, false),
+        game_screen_vrr: s.bool(keys::GAME_SCREEN_VRR, false),
         monitor_presets: MonitorPresets::parse(&s.string(keys::GAME_SCREEN_PRESETS)),
         game_audio: (!audio_id.trim().is_empty()).then(|| {
             let name = s.string(keys::GAME_AUDIO_NAME);
