@@ -475,6 +475,10 @@ fn desktop_snapshot() {
             && !t.is_empty()
         {
             ctx.settings.set(crate::navigation_feedback::TEXT_SIZE, &t);
+            // O app passa a escala ao tema fora do `render`: aqui vai direto.
+            let scale = crate::navigation_feedback::text_size(&ctx.settings) as f64 / 100.;
+            ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+                .unwrap();
         }
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();

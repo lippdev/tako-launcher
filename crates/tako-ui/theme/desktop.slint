@@ -3420,6 +3420,8 @@ component OnbLink inherits Rectangle {
 component OnbRadio inherits Rectangle {
     in property <PanelRow> data;
     in property <bool> focused;
+    // Janela baixa: 10 em cima e embaixo.
+    in property <bool> compact;
     callback clicked();
     height: rl.preferred-height;
     border-radius: Ui.radius-row;
@@ -3434,8 +3436,8 @@ component OnbRadio inherits Rectangle {
     rl := HorizontalLayout {
         padding-left: 16px;
         padding-right: 16px;
-        padding-top: 14px;
-        padding-bottom: 14px;
+        padding-top: compact ? 10px : 14px;
+        padding-bottom: compact ? 10px : 14px;
         spacing: 14px;
         Rectangle {
             width: 22px;
@@ -3583,8 +3585,9 @@ component ModeCard inherits Rectangle {
             border-radius: 8px;
             clip: true;
             background: @linear-gradient(160deg, tiles.length > 0 ? tiles[0].accent : Ui.accent 0%, #0b0d12 100%);
-            Rectangle { x: 10px; y: root.compact ? 8px : parent.height - 98px; width: parent.width * 0.46; height: 12px; border-radius: 3px; background: #ffffffe6; }
-            Rectangle { x: 10px; y: root.compact ? 24px : parent.height - 81px; width: parent.width * 0.26; height: 9px; border-radius: 5px; background: #ffffff; }
+            // Janela baixa: só a fileira de capas cabe na TV.
+            if !root.compact: Rectangle { x: 10px; y: parent.height - 98px; width: parent.width * 0.46; height: 12px; border-radius: 3px; background: #ffffffe6; }
+            if !root.compact: Rectangle { x: 10px; y: parent.height - 81px; width: parent.width * 0.26; height: 9px; border-radius: 5px; background: #ffffff; }
             for k in 5: Rectangle {
                 x: 10px + k * (parent.width - 20px + 6px) / 5;
                 y: parent.height - self.height - 8px;
@@ -4207,6 +4210,7 @@ component DeskOverlay inherits Rectangle {
                         OnbCover { tile: ov.thumbs[r.value.to-float()]; art: true; caption: r.description; }
                     }
                     if r.kind == "radio": OnbRadio {
+                        compact: low;
                         data: r;
                         focused: focus-visible && top-most && i == ov.sel;
                         clicked => { root.clicked("row", i); }
@@ -4285,7 +4289,8 @@ component DeskOverlay inherits Rectangle {
                     }
                 }
             }
-            if ov.input-hint != "": Text { text: ov.input-hint; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
+            // Janela baixa com texto grande: a nota cede o espaço para as ações caberem.
+            if ov.input-hint != "" && !(low && Ui.text-scale > 1.1): Text { text: ov.input-hint; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
         }
     }
 
