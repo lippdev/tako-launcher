@@ -187,6 +187,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         sources: Vec::new(),
         update_status: String::new(),
         update_ready: None,
+        free_space: None,
         app_update: Default::default(),
         safe_mode: false,
         scanning: false,
