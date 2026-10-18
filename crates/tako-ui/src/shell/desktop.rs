@@ -721,10 +721,15 @@ fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
     let last = ctx.library.sessions(&g.id).last().map(|s| s.started_at);
     let session = if running {
+        // "Sessão atual 42 min" (EstadoJogando); sem o início conhecido, "jogando agora".
+        let started = ctx.running.as_ref().and_then(|r| r.started);
         DeskInfo {
             icon: "calendar".into(),
             label: ctx.t("desktop.strip.current_session"),
-            value: ctx.t("desktop.strip.playing_now"),
+            value: started.map_or_else(
+                || ctx.t("desktop.strip.playing_now"),
+                |t| game_text::play_time(lang, t.elapsed().max(std::time::Duration::from_secs(60))),
+            ),
             dot: true,
             ..Default::default()
         }
@@ -1198,6 +1203,7 @@ impl Page for DesktopLibrary {
             }
             "clear" => self.clear(),
             "add-game" => ctx.effect(Effect::AddGame),
+            "group-store" => ctx.settings.set(GROUP_KEY, GroupBy::Store.key()),
             "new-collection" => {
                 return Nav::Layer(Box::new(dialogs::new_collection(ctx, None)));
             }
@@ -1368,6 +1374,24 @@ impl Page for DesktopLibrary {
         out.set("desk-cat-focus-row", self.cat_focus.0 as i32);
         out.set("desk-cat-focus-col", self.cat_focus.1 as i32);
         out.set("desk-see-all", ctx.t("desktop.group.see_all"));
+        // Há jogos, mas nenhum cabe no agrupamento (ex.: nenhum com status): diz por quê e oferece agrupar por loja.
+        let stuck = !games.is_empty() && GroupBy::of(ctx) != GroupBy::Store;
+        out.set(
+            "desk-cat-empty-text",
+            if stuck && GroupBy::of(ctx) == GroupBy::Status {
+                ctx.t("desktop.group.empty_text")
+            } else {
+                String::new()
+            },
+        );
+        out.set(
+            "desk-cat-empty-action",
+            if stuck {
+                ctx.t("desktop.group.by_store")
+            } else {
+                String::new()
+            },
+        );
         out.set(
             "desk-cat-empty",
             ctx.tf(

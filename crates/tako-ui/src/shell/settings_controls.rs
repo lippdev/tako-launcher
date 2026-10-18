@@ -75,9 +75,18 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             ),
             _ => ctx.t("settings.controls.controller"),
         };
-        PanelRow::info("controller", pad, battery)
+        let row = PanelRow::info("controller", pad, battery)
             .desc(desc)
-            .icon("gamepad")
+            .icon("gamepad");
+        // Bateria fraca: a porcentagem em `warning`.
+        if ctx.pad_battery.is_some_and(|p| p < 20) {
+            PanelRow {
+                style: "warning".into(),
+                ..row
+            }
+        } else {
+            row
+        }
     } else {
         PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
             .desc(ctx.t("settings.controls.controller_desc"))
@@ -87,24 +96,34 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(PanelRow::header(ctx.t("settings.controls.center_header"))),
         MenuItem::new(described(ctx, "settings.controls.key").value(key_label(ctx)))
             .on(|_| Flow::Push(Box::new(KeyLayer::default()))),
-        MenuItem::new(
-            PanelRow::action("reset", ctx.t("settings.controls.reset"))
+        MenuItem::new({
+            let row = PanelRow::action("reset", ctx.t("settings.controls.reset"))
                 .desc(defaults)
-                .value(ctx.t("settings.controls.reset_value")),
-        )
+                .value(ctx.t("settings.controls.reset_value"));
+            if ctx.desktop { row.danger() } else { row }
+        })
         .on(|ctx| {
-            let id = ctx.profile().id;
-            edit_profiles(ctx, |p| {
-                if let Some(p) = p.get_mut(id) {
-                    p.chord = chord::DEFAULT;
-                }
-            });
-            ctx.settings.set(
-                keys::CONTROL_CENTER_KEY,
-                &KeyShortcut::default().serialize(),
-            );
-            ctx.toast(ctx.t("settings.controls.reset_done"));
-            Flow::Stay
+            if !ctx.desktop {
+                return reset_shortcuts(ctx);
+            }
+            // TelaControles: restaurar os atalhos pergunta antes.
+            Flow::Push(Box::new(
+                MenuLayer::dialog(ctx.t("settings.controls.reset_title"), |ctx| {
+                    vec![
+                        MenuItem::new(
+                            PanelRow::button("reset", ctx.t("settings.controls.reset_value"))
+                                .danger(),
+                        )
+                        .on(|ctx| {
+                            let _ = reset_shortcuts(ctx);
+                            Flow::Close
+                        }),
+                        MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                            .on(|_| Flow::Close),
+                    ]
+                })
+                .text(ctx.t("settings.controls.reset_text")),
+            ))
         }),
         MenuItem::new(action(ctx, "settings.controls.test"))
             .on(|_| Flow::Push(Box::new(TestLayer))),
@@ -783,4 +802,19 @@ impl Layer for TestLayer {
     fn click(&mut self, _zone: &str, _index: usize, _ctx: &mut Ctx) -> Flow {
         Flow::Close
     }
+}
+/// Volta o atalho da Central (controle e teclado) ao padrão do Tako.
+fn reset_shortcuts(ctx: &mut Ctx) -> Flow {
+    let id = ctx.profile().id;
+    edit_profiles(ctx, |p| {
+        if let Some(p) = p.get_mut(id) {
+            p.chord = chord::DEFAULT;
+        }
+    });
+    ctx.settings.set(
+        keys::CONTROL_CENTER_KEY,
+        &KeyShortcut::default().serialize(),
+    );
+    ctx.toast(ctx.t("settings.controls.reset_done"));
+    Flow::Stay
 }

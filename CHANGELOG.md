@@ -2,6 +2,16 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.10]
+### Novidades
+- **Primeira abertura:** o subtítulo aparece inteiro, o passo "Como você quer abrir o Tako?" cabe em janelas pequenas e o último passo tem "Revisar capas". Sem nenhum jogo encontrado, oferece "Adicionar jogo à mão" e "Procurar de novo".
+- **Categorias:** quando nenhum jogo tem status, a tela explica como marcar e oferece "Agrupar por Loja".
+- **Jogando:** o destaque mostra há quanto tempo a sessão atual está aberta.
+- **Configurações deste jogo:** o que você mudou mostra o padrão do Tako embaixo, e "Usar tudo do Tako" pergunta antes de apagar as mudanças.
+- **Controles:** a bateria fraca aparece em amarelo, e "Restaurar atalhos" pergunta antes.
+- **Avisos:** ficam 4 segundos, ou 8 quando têm "Desfazer", e ficam legíveis sobre qualquer arte.
+- **Jogo que fechou sozinho:** o aviso mostra a capa, depois de quanto tempo ele fechou e "Reparar arquivos" quando a loja permite.
+
 ## [0.2.0-alpha.9]
 ### Novidades
 - **Logo do jogo no destaque:** o título do jogo vira o logo oficial (da Steam, ou do SteamGridDB quando falta). Sem logo, com pouco contraste sobre a arte ou se você preferir, volta o nome em texto. Escolha em Configurações › Aparência › "Título dos jogos", ou jogo a jogo na aba Logo de Trocar imagens.

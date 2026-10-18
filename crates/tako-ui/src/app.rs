@@ -399,6 +399,7 @@ impl App {
                 id: id.clone(),
                 title: title.clone(),
                 pid: None,
+                started: None,
             });
         }
         if opts.control_center {
@@ -1099,7 +1100,7 @@ pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration, end: GameEnd)
             "{id} terminou fora do normal: {} ({played:?}{code})",
             end.key()
         );
-        let dialog = crate::shell::dialogs::game_ended_badly(&shell.ctx, id, end);
+        let dialog = crate::shell::dialogs::game_ended_badly(&shell.ctx, id, end, Some(played));
         shell.push_layer(Box::new(dialog));
         return;
     }
@@ -1349,6 +1350,7 @@ mod tests {
                 id: id.clone(),
                 title: "Teste".into(),
                 pid: Some(1234),
+                started: None,
             });
             app.apply(HostAction::Launching);
             app.game_shown();
@@ -1499,8 +1501,12 @@ mod tests {
         assert!(shell.ctx.toast.is_none());
         assert!(shell.has_layers());
         use crate::shell::Layer;
-        let warning =
-            crate::shell::dialogs::game_ended_badly(&shell.ctx, &game.id, GameEnd::Quick(None));
+        let warning = crate::shell::dialogs::game_ended_badly(
+            &shell.ctx,
+            &game.id,
+            GameEnd::Quick(None),
+            None,
+        );
         let title = warning.render(&shell.ctx).title;
         assert_eq!(title, format!("{} fechou logo depois de abrir", game.title));
 
@@ -1533,7 +1539,8 @@ mod tests {
         let mut shell = Shell::new(ctx);
         let game = shell.ctx.library.games()[0].clone();
         let dialog = |shell: &Shell, end| {
-            crate::shell::dialogs::game_ended_badly(&shell.ctx, &game.id, end).render(&shell.ctx)
+            crate::shell::dialogs::game_ended_badly(&shell.ctx, &game.id, end, None)
+                .render(&shell.ctx)
         };
 
         let quick = dialog(&shell, GameEnd::Quick(Some(0xC000_0135)));

@@ -120,6 +120,7 @@ mod tests {
             id: "game".into(),
             title: "Jogo".into(),
             pid: None,
+            started: None,
         });
         assert!(!allowed(&ctx));
         ctx.running = None;

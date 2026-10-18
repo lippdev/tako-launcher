@@ -121,13 +121,15 @@ pub fn client_missing(ctx: &Ctx, game: &Game, notice: String) -> MenuLayer {
 
 /// O jogo fechou sozinho logo ao abrir ou com código de erro, ou nem abriu (SESSION-003): o que se sabe (o código,
 /// quando há) e o que tentar.
-pub fn game_ended_badly(ctx: &Ctx, id: &str, end: tako_core::session::GameEnd) -> MenuLayer {
+pub fn game_ended_badly(
+    ctx: &Ctx,
+    id: &str,
+    end: tako_core::session::GameEnd,
+    played: Option<std::time::Duration>,
+) -> MenuLayer {
     use tako_core::session::GameEnd;
-    let title = ctx
-        .library
-        .find(id)
-        .map(|g| g.title.clone())
-        .unwrap_or_default();
+    let game = ctx.library.find(id).cloned();
+    let title = game.as_ref().map(|g| g.title.clone()).unwrap_or_default();
     let (head, text) = match end {
         GameEnd::NeverStarted => ("session.never_started", "session.never_started_text"),
         GameEnd::Failed(_) => ("session.ended_error", "session.ended_error_text"),
@@ -142,25 +144,65 @@ pub fn game_ended_badly(ctx: &Ctx, id: &str, end: tako_core::session::GameEnd) -
         ),
         None => ctx.t(text),
     };
+    // Desktop (ErroDoJogo): depois de quanto tempo, antes da causa.
+    let text = match played.filter(|p| ctx.desktop && !p.is_zero()) {
+        Some(p) => format!(
+            "{}\n\n{text}",
+            ctx.tf(
+                "session.closed_after",
+                &[(
+                    "time",
+                    &tako_core::presentation::game_text::session_played(ctx.lang(), p),
+                )]
+            )
+        ),
+        None => text,
+    };
+    // Reparar arquivos só quando a loja oferece (SESSION-006).
+    let repair = game
+        .as_ref()
+        .filter(|_| ctx.desktop)
+        .and_then(super::details::repair_uri);
+    let cover = game
+        .as_ref()
+        .filter(|_| ctx.desktop)
+        .map(|g| super::tiles::image(g.shown_cover(), (80, 120)));
     let id = id.to_owned();
-    MenuLayer::dialog(ctx.tf(head, &[("game", &title)]), move |ctx| {
+    let layer = MenuLayer::dialog(ctx.tf(head, &[("game", &title)]), move |ctx| {
         let id = id.clone();
-        vec![
+        let mut v = vec![
             MenuItem::new(PanelRow::button("again", ctx.t("session.try_again")).icon("play")).on(
                 move |ctx| {
                     ctx.effect(Effect::Launch(id.clone()));
                     Flow::Close
                 },
             ),
+        ];
+        if let Some(uri) = repair.clone() {
+            v.push(
+                MenuItem::new(PanelRow::button("repair", ctx.t("session.repair")).icon("gear")).on(
+                    move |ctx| {
+                        ctx.effect(Effect::OpenUrl(uri.clone()));
+                        Flow::Close
+                    },
+                ),
+            );
+        }
+        v.extend([
             MenuItem::new(PanelRow::button("report", ctx.t("session.save_report")).icon("info"))
                 .on(|ctx| {
                     ctx.effect(Effect::SaveDiagnostics);
                     Flow::Close
                 }),
             MenuItem::new(PanelRow::button("ok", ctx.t("common.ok"))).on(|_| Flow::Close),
-        ]
+        ]);
+        v
     })
-    .text(text)
+    .text(text);
+    match cover {
+        Some(c) => layer.image(c),
+        None => layer,
+    }
 }
 
 /// Comandos deste jogo que o usuário ainda não permitiu (SESSION-004): mostra o texto exato antes de rodar.

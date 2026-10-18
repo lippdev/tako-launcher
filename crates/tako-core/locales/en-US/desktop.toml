@@ -86,6 +86,8 @@ installed = "Installed"
 not_installed = "Not installed"
 see_all = "See all"
 empty = "No games to group by {group}"
+empty_text = "Mark Playing, Beaten and other statuses from a game's ⋯ menu, or see the library grouped another way."
+by_store = "Group by Store"
 
 [desktop.bulk]
 count = "{n} selected of {total}"

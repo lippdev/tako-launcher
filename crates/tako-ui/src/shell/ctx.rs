@@ -70,6 +70,8 @@ pub struct RunningGame {
     pub title: String,
     /// Processo raiz, quando o Tako abriu o executável direto (o código de saída dele, no fim).
     pub pid: Option<u32>,
+    /// Quando o Tako abriu o jogo ("Sessão atual 42 min"); `None` se a interface reabriu com o jogo já rodando.
+    pub started: Option<std::time::Instant>,
 }
 
 pub use tako_sources::report::LibrarySourceReport as SourceReport;
@@ -331,7 +333,16 @@ impl Ctx {
             && self
                 .toast
                 .as_ref()
-                .is_some_and(|(_, at)| now.duration_since(*at) >= super::TOAST_TIME)
+                .is_some_and(|(_, at)| now.duration_since(*at) >= self.toast_time())
+    }
+
+    /// Quanto o aviso fica. Desktop: 4 s, e 8 s com "Desfazer" (dá tempo de clicar); tela cheia: `TOAST_TIME`.
+    pub fn toast_time(&self) -> std::time::Duration {
+        match (self.desktop, self.toast_undo.is_some()) {
+            (true, true) => std::time::Duration::from_secs(8),
+            (true, false) => std::time::Duration::from_secs(4),
+            _ => super::TOAST_TIME,
+        }
     }
 
     /// Controle entrou ou saiu. Fora do jogo avisa, sem mexer no foco nem nas camadas; durante o jogo o
