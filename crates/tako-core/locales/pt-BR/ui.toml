@@ -222,6 +222,11 @@ choose_first = "Escolha a tela de jogo primeiro"
 failed = "Tela de jogo: {reason}"
 confirmed = "Tela de jogo confirmada · os jogos abrem nela sem perguntar"
 not_confirmed = "Você não confirmou a imagem; as telas voltaram ao normal"
+keep_title = "Manter esta configuração?"
+keep_text = "O Tako está na {screen} com a configuração nova. Se não aparecer nada, espere: tudo volta sozinho."
+keep_yes = "Manter"
+keep_no = "Voltar ({seconds} s)"
+reverted = "A configuração anterior da tela de jogo voltou"
 
 [playnite]
 not_found = "Biblioteca do Playnite não encontrada neste PC"

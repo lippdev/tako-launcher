@@ -222,6 +222,11 @@ choose_first = "Choose the game screen first"
 failed = "Game screen: {reason}"
 confirmed = "Game screen confirmed · games open on it without asking"
 not_confirmed = "You didn't confirm the picture; the screens are back to normal"
+keep_title = "Keep this setting?"
+keep_text = "Tako is on {screen} with the new setting. If nothing shows up, wait: everything goes back on its own."
+keep_yes = "Keep"
+keep_no = "Revert ({seconds} s)"
+reverted = "The previous game screen setting is back"
 
 [playnite]
 not_found = "Playnite library not found on this PC"

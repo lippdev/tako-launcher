@@ -190,7 +190,9 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                     .into_iter()
                     .map(|d| {
                         Pick::new(d.name.clone()).set(move |ctx| {
+                            let before = crate::screen_test::snapshot(ctx);
                             pick_display(ctx, &d);
+                            crate::screen_test::confirm(ctx, before);
                             Flow::Stay
                         })
                     })
@@ -258,7 +260,9 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                         let label =
                             m.map_or_else(|| ctx.t("settings.screen.keep_mode"), |m| m.to_string());
                         Pick::new(label).set(move |ctx| {
+                            let before = crate::screen_test::snapshot(ctx);
                             pick_mode(ctx, m);
+                            crate::screen_test::confirm(ctx, before);
                             Flow::Stay
                         })
                     })
