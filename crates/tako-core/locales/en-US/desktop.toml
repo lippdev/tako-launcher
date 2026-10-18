@@ -1,4 +1,6 @@
 [desktop]
+collection_auto = "Auto"
+collections_manage = "Manage collections"
 library = "Library"
 settings = "Settings"
 big_picture = "Full screen"
@@ -134,3 +136,9 @@ tags = "Tags"
 title = "Sessions"
 see_all = "See all"
 summary = "{n} sessions · {avg} on average"
+
+[desktop.window]
+minimize = "Minimize"
+maximize = "Maximize"
+restore = "Restore"
+close = "Close"

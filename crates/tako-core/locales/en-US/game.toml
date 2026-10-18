@@ -92,6 +92,12 @@ auto_done = "{source} matches on its own again"
 save_failed = "Couldn't save right now; check the logs"
 
 [art_picker]
+preview = "Preview"
+source = "Source"
+use = "Use this image"
+original = "Back to original"
+from_pc = "Choose from computer…"
+current = "Current"
 title = "Images for {game}"
 apply = "Apply"
 kind = "Type"

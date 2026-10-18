@@ -798,6 +798,12 @@ impl Shell {
             )],
         );
         out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
+        out.set(
+            "desk-window-labels",
+            ["minimize", "maximize", "restore", "close"]
+                .map(|k| self.ctx.t(&format!("desktop.window.{k}")))
+                .to_vec(),
+        );
         out.set("desk-brand-label", self.ctx.t("desktop.menu.brand"));
         out.set("desk-search-key", self.ctx.t("desktop.search_key"));
         out.set("desk-search-esc", self.ctx.t("desktop.search_esc"));

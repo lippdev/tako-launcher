@@ -28,8 +28,8 @@ fn store_icon(store: GameStore) -> &'static str {
 /// Rota da biblioteca desktop.
 pub const ROUTE: &str = "desk:library";
 
-/// Miniatura da lista (2:3, pequena: a lista inteira cabe no cache).
-const THUMB: (u32, u32) = (64, 96);
+/// Miniatura da lista (CapaDoJogo: o quadrado do topo da capa 2:3, mostrado a 40 × 40; 2× para telas densas).
+const THUMB: (u32, u32) = (80, 120);
 /// Linhas em volta da primeira visível que pedem miniatura.
 const NEAR: usize = 60;
 
@@ -145,6 +145,18 @@ enum Pick {
     Smart(String),
 }
 
+/// Última coleção da aba Coleções (SeletorDeColecao: voltar à aba reabre a última).
+const COLLECTION_KEY: &str = "DesktopCollection";
+
+impl Pick {
+    fn key(&self) -> String {
+        match self {
+            Pick::Manual(id) => format!("m:{id}"),
+            Pick::Smart(id) => format!("s:{id}"),
+        }
+    }
+}
+
 /// Onde está o foco do teclado.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Zone {
@@ -169,6 +181,8 @@ enum Action {
 pub struct DesktopLibrary {
     tab: Tab,
     pick: Option<Pick>,
+    /// Coleção escolhida no select (SeletorDeColecao): a camada do select deixa aqui e a página aplica.
+    pick_request: Rc<RefCell<Option<Pick>>>,
     /// Busca e filtros do usuário, por cima da aba (o painel de filtros é o mesmo da tela cheia).
     pub criteria: Criteria,
     selected: Option<String>,
@@ -197,6 +211,7 @@ impl DesktopLibrary {
         DesktopLibrary {
             tab: Tab::All,
             pick: None,
+            pick_request: Rc::default(),
             criteria: Rc::new(RefCell::new(LibraryCriteria::default())),
             selected: None,
             zone: Zone::List,
@@ -303,8 +318,72 @@ impl DesktopLibrary {
     pub fn open_tab(&mut self, tab: Tab, ctx: &Ctx) {
         self.tab = tab;
         if tab == Tab::Collections && self.pick.is_none() {
-            self.pick = Self::picks(ctx).into_iter().next().map(|(p, ..)| p);
+            let saved = ctx.settings.string(COLLECTION_KEY);
+            let picks = Self::picks(ctx);
+            self.pick = picks
+                .iter()
+                .find(|(p, ..)| p.key() == saved)
+                .or(picks.first())
+                .map(|(p, ..)| p.clone());
         }
+    }
+
+    /// SeletorDeColecao: as coleções com a quantidade (e "Auto" nas automáticas) e ✓ na atual; depois "Nova
+    /// coleção…" e "Organizar coleções".
+    fn collection_select(&self, ctx: &Ctx) -> super::layer::MenuLayer {
+        use super::layer::{Flow, MenuItem, MenuLayer};
+        let request = self.pick_request.clone();
+        let current = self.pick.clone();
+        let focus = Self::picks(ctx)
+            .iter()
+            .position(|(p, ..)| Some(p) == current.as_ref())
+            .unwrap_or(0);
+        MenuLayer::menu(String::new(), move |ctx| {
+            let mut v: Vec<MenuItem> = Self::picks(ctx)
+                .into_iter()
+                .enumerate()
+                .map(|(i, (p, name, n))| {
+                    let note = if matches!(p, Pick::Smart(_)) {
+                        format!("{n} · {}", ctx.t("desktop.collection_auto"))
+                    } else {
+                        n.to_string()
+                    };
+                    let on = current.as_ref() == Some(&p);
+                    let request = request.clone();
+                    MenuItem::new(
+                        PanelRow::button(format!("pick-{i}"), name)
+                            .icon(if on { "tick" } else { "" })
+                            .value(note)
+                            .emphasized(on),
+                    )
+                    .on(move |ctx| {
+                        ctx.settings.set(COLLECTION_KEY, &p.key());
+                        *request.borrow_mut() = Some(p.clone());
+                        Flow::Close
+                    })
+                })
+                .collect();
+            v.push(MenuItem::new(PanelRow::separator()));
+            v.push(
+                MenuItem::new(PanelRow::button(
+                    "new",
+                    format!("{}…", ctx.t("collections.new")),
+                ))
+                .on(|ctx| Flow::Replace(Box::new(super::dialogs::new_collection(ctx, None)))),
+            );
+            v.push(
+                MenuItem::new(PanelRow::button(
+                    "manage",
+                    ctx.t("desktop.collections_manage"),
+                ))
+                .on(|ctx| {
+                    Flow::Replace(Box::new(super::settings::library::collections_panel(ctx)))
+                }),
+            );
+            v
+        })
+        .wide()
+        .focus_at(focus)
     }
 
     // ── Seleção múltipla (SelecaoMultipla) ──
@@ -951,11 +1030,13 @@ impl Page for DesktopLibrary {
             }
             "collection" => {
                 if let Some((p, ..)) = Self::picks(ctx).into_iter().nth(index) {
+                    ctx.settings.set(COLLECTION_KEY, &p.key());
                     self.pick = Some(p);
                     self.selected = None;
                 }
                 self.zone = Zone::List;
             }
+            "collection-select" => return Nav::Layer(Box::new(self.collection_select(ctx))),
             "game" => {
                 self.checked.clear();
                 self.anchor = Some(index);
@@ -1088,6 +1169,10 @@ impl Page for DesktopLibrary {
     }
 
     fn render(&mut self, ctx: &Ctx, out: &mut Out) {
+        if let Some(p) = self.pick_request.borrow_mut().take() {
+            self.pick = Some(p);
+            self.selected = None;
+        }
         let lang = ctx.lang();
         let games = self.games(ctx);
         let ids: Vec<String> = games.iter().map(|g| g.id.clone()).collect();
@@ -1124,7 +1209,13 @@ impl Page for DesktopLibrary {
                 selected: self.pick.as_ref() == Some(p),
             })
             .collect();
+        let current = chips
+            .iter()
+            .find(|c| c.selected)
+            .cloned()
+            .unwrap_or_default();
         out.set("desk-collections", chips);
+        out.set("desk-collection", current);
         let c = self.criteria.borrow().clone();
         out.set("desk-search", c.search.clone());
         out.set("desk-search-hint", ctx.t("desktop.search"));

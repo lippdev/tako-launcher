@@ -48,6 +48,8 @@ pub struct ArtPicker {
     filter: Rc<RefCell<SteamGridDbFilter>>,
     /// Páginas carregadas (ou carregando), na ordem.
     pages: Pages,
+    /// Desktop (SeletorDeImagens): clicar escolhe e "Usar" aplica; a tela cheia aplica no A.
+    desktop: bool,
 }
 
 pub fn picker(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
@@ -80,6 +82,7 @@ pub fn picker(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
         on_sources: false,
         filter: Rc::new(RefCell::new(filter)),
         pages: Rc::default(),
+        desktop: ctx.desktop,
     };
     p.source = p.first_source();
     p.load();
@@ -396,6 +399,27 @@ pub fn apply(ctx: &mut Ctx, id: &str, c: &ArtCandidate) {
     );
 }
 
+impl ArtPicker {
+    /// Fonte (o rótulo do select), Estilo (só no SteamGridDB), do computador, Usar, Voltar à original, Cancelar e
+    /// "Atual" (etiqueta da imagem em uso) e "Prévia", nessa ordem de chaves.
+    fn desktop_rows(&self, ctx: &Ctx, can_use: bool) -> Vec<PanelRow> {
+        vec![
+            PanelRow::info("source", ctx.t("art_picker.source"), ""),
+            PanelRow::button("style", ctx.t("art_picker.style"))
+                .enabled(self.source() == STEAMGRIDDB),
+            PanelRow::button("file", ctx.t("art_picker.from_pc")),
+            PanelRow {
+                style: "primary".into(),
+                ..PanelRow::button("use", ctx.t("art_picker.use")).enabled(can_use)
+            },
+            PanelRow::button("original", ctx.t("art_picker.original")),
+            PanelRow::button("cancel", ctx.t("common.cancel")),
+            PanelRow::info("current", ctx.t("art_picker.current"), ""),
+            PanelRow::info("preview", ctx.t("art_picker.preview"), ""),
+        ]
+    }
+}
+
 impl Layer for ArtPicker {
     fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Flow {
         let n = self.items().len();
@@ -486,6 +510,22 @@ impl Layer for ArtPicker {
             sel: if self.on_sources { -1 } else { sel as i32 },
             preview: crate::shell::tiles::image(focused.map(|c| c.url.as_str()), PREVIEW),
             preview_text,
+            // Desktop: os botões e rótulos do SeletorDeImagens (a tela cheia usa as dicas) e a capa do jogo.
+            rows: if ctx.desktop {
+                self.desktop_rows(ctx, focused.is_some())
+            } else {
+                Vec::new()
+            },
+            image: if ctx.desktop {
+                crate::shell::tiles::image(
+                    ctx.library
+                        .find(&self.game.id)
+                        .and_then(|g| g.shown_cover()),
+                    (80, 120),
+                )
+            } else {
+                slint::Image::default()
+            },
             ..Default::default()
         }
     }
@@ -513,6 +553,17 @@ impl Layer for ArtPicker {
 
     fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Flow {
         match zone {
+            // Desktop: escolher só marca e mostra na prévia; "Usar" aplica.
+            "thumb" if self.desktop => {
+                self.on_sources = false;
+                self.sel = index;
+                self.more();
+            }
+            "use" => return self.handle(Cmd::Accept, ctx),
+            "original" => return self.handle(Cmd::Menu, ctx),
+            "file" => return self.handle(Cmd::Search, ctx),
+            "style" => return self.handle(Cmd::Favorite, ctx),
+            "cancel" | "outside" => return Flow::Close,
             "tab" => self.set_kind(index),
             "tab2" => {
                 self.set_source(index);
@@ -531,7 +582,12 @@ impl Layer for ArtPicker {
     }
 
     fn hover(&mut self, zone: &str, index: usize) {
-        if zone == "thumb" {
+        // Desktop: a grade rolou até o fim; o hover não troca a escolha.
+        if zone == "more" {
+            self.more();
+            return;
+        }
+        if zone == "thumb" && !self.desktop {
             self.on_sources = false;
             self.sel = index;
             self.more();

@@ -710,6 +710,41 @@ impl App {
                 Value::Void
             });
         }
+        {
+            // BarraDaJanela (só o desktop tem): a janela não tem moldura do sistema.
+            let app = self.clone();
+            let _ = ui.set_callback("window-action", move |args| {
+                let ui = app.ui.borrow();
+                let window = ui.window();
+                match arg_str(args, 0).as_str() {
+                    "drag" => {
+                        use slint::winit_030::WinitWindowAccessor;
+                        window.with_winit_window(|w| {
+                            let _ = w.drag_window();
+                        });
+                    }
+                    "min" => window.set_minimized(true),
+                    "max" => {
+                        let max = !window.is_maximized();
+                        window.set_maximized(max);
+                        // shortcut: Win+↑/↓ não atualiza o ícone até o próximo clique; ler o estado no redesenho resolveria.
+                        let _ = ui.set_property("window-maximized", Value::Bool(max));
+                    }
+                    "close" => {
+                        drop(ui);
+                        {
+                            let mut s = app.shell.borrow_mut();
+                            app.host
+                                .borrow_mut()
+                                .handle(&Effect::ExitToDesktop, &mut s.ctx);
+                        }
+                        let _ = slint::quit_event_loop();
+                    }
+                    _ => {}
+                }
+                Value::Void
+            });
+        }
         let _ = ui.set_callback("key-released", |_| Value::Void);
         // Fechar a janela pelo sistema (Alt+F4, botão da janela) é o mesmo que "Sair para o desktop".
         let app = self.clone();

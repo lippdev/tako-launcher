@@ -142,6 +142,9 @@ export global Ui {
     out property <length> radius-row: 14px;
     out property <length> radius-card: 20px;
     out property <length> topbar-height: 64px;
+    // BarraDaJanela: a barra da própria janela (sem moldura do Windows), por cima da arte.
+    out property <length> titlebar-height: 32px;
+    out property <color> window-close-hover: #c42b1c;
     out property <length> list-width: 344px;
     out property <length> list-width-narrow: 300px;
     out property <length> list-row-height: 52px;
@@ -181,6 +184,17 @@ export global Ui {
     // Aviso: entra em `tempo-pagina`, sai em `tempo-saida`.
     public pure function toast-fade(entering: bool) -> duration {
         return entering ? page-time : leave-time;
+    }
+    // Troca de jogo (TrocaDeJogo): a arte nova entra por cima em 700, assenta 1,04 → 1 em 900 e o desfoque sai em
+    // 500. Ao preparar a entrada (antes de começar), troca na hora.
+    public pure function art-fade(entering: bool) -> duration {
+        return entering && !reduce-motion ? 700ms : 0ms;
+    }
+    public pure function art-settle(entering: bool) -> duration {
+        return entering && !reduce-motion ? 900ms : 0ms;
+    }
+    public pure function art-unblur(entering: bool) -> duration {
+        return entering && !reduce-motion ? 500ms : 0ms;
     }
     // Escala: com "Reduzir animações" tudo fica em 1.
     out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;

@@ -423,6 +423,11 @@ fn desktop_snapshot() {
                 let layer = crate::shell::first_run::ready(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("art") => {
+                let id = shell.ctx.library.games()[0].id.clone();
+                let layer = crate::shell::art::picker(&shell.ctx, &id);
+                shell.push_layer(layer);
+            }
             Ok("ask") => {
                 shell.ctx.pads_connected = 1;
                 shell.ask_big_picture = true;

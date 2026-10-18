@@ -92,6 +92,12 @@ auto_done = "{source} volta a casar sozinho"
 save_failed = "Não foi possível salvar agora; veja os registros"
 
 [art_picker]
+preview = "Prévia"
+source = "Fonte"
+use = "Usar esta imagem"
+original = "Voltar à original"
+from_pc = "Escolher do computador…"
+current = "Atual"
 title = "Imagens de {game}"
 apply = "Aplicar"
 kind = "Tipo"
