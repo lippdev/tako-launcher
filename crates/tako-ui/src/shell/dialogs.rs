@@ -1561,21 +1561,14 @@ mod tests {
     fn the_chosen_store_decides_where_install_opens() {
         let dir = tempfile::tempdir().unwrap();
         let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
-        let mut game = store_game("steam:7", GameStore::Steam, "steam://install/7");
-        game.install_offers = vec![
-            tako_core::library::InstallOffer {
-                store: GameStore::Steam,
-                install_uri: "steam://install/7".into(),
-                size: Some(9 << 30),
-            },
-            tako_core::library::InstallOffer {
-                store: GameStore::Gog,
-                install_uri: "goggalaxy://openGameView/7".into(),
-                size: None,
-            },
-        ];
-        *ctx.found.lock().unwrap() = vec![game];
+        // O mesmo jogo na Steam e na GOG: a biblioteca monta as duas ofertas (Steam primeiro).
+        let mut steam = store_game("steam:7", GameStore::Steam, "steam://install/7");
+        steam.title = "Jogo".into();
+        let mut gog = store_game("gog:7", GameStore::Gog, "goggalaxy://openGameView/7");
+        gog.title = "Jogo".into();
+        *ctx.found.lock().unwrap() = vec![steam, gog];
         ctx.library.refresh();
+        assert_eq!(ctx.library.find("steam:7").map(|g| g.install_offers.len()), Some(2));
 
         let picked = InstallPick::default();
         let menu = install_from(&ctx, "steam:7", picked.clone());
