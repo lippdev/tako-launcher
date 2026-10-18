@@ -2967,13 +2967,14 @@ component DeskOverlay inherits Rectangle {
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
             layer: true;
-            x: parent.width - self.width - Ui.space-36 + (shown ? 0 : 48px);
+            // Mesma margem direita do conteúdo (20 na janela pequena).
+            x: parent.width - self.width - (parent.width < 1280px ? Ui.space-20 : Ui.space-36) + (shown ? 0 : 48px);
             opacity: shown ? 1 : 0;
             animate x, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            // O largo (Configurações deste jogo) fica abaixo da barra superior: 84 do topo, 28 de baixo, 480 de largura.
-            y: ov.wide ? 84px : Ui.space-36;
+            // Abaixo da barra superior, alinhado com o conteúdo: 84 do topo e 28 de baixo (480 de largura no largo).
+            y: 84px;
             width: min(parent.width - 120px, ov.wide ? 480px : 440px);
-            height: min(parent.height - (ov.wide ? 84px + Ui.space-28 : 2 * Ui.space-36), pl.preferred-height);
+            height: min(parent.height - 84px - Ui.space-28, pl.preferred-height);
             TouchArea { }
             pl := VerticalLayout {
                 padding: 22px;
