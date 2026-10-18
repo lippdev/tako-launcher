@@ -622,7 +622,10 @@ mod tests {
         {
             downloading(dir.path(), 100 + i as u32, 1026, bytes);
         }
-        let fractions: Vec<_> = scan(dir.path())
+        // A ordem de leitura da pasta muda com o SO: ordena pelo appid.
+        let mut apps = scan(dir.path());
+        apps.sort_by_key(|a| a.app_id);
+        let fractions: Vec<_> = apps
             .iter()
             .map(|a| a.installing.unwrap().fraction)
             .collect();
