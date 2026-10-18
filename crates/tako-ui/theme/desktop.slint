@@ -4391,7 +4391,9 @@ export component Desktop inherits Window {
             toast-shown = toast;
         }
     }
+    // Aviso: vidro de camada denso (legível sobre qualquer arte).
     if toast-shown != "": Vidro {
+        dense: true;
         property <bool> shown;
         Timer {
             interval: 1ms;
