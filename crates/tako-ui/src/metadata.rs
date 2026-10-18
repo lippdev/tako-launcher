@@ -187,7 +187,13 @@ fn load_choices(ctx: &mut Ctx) {
 fn install_enrich(ctx: &mut Ctx) {
     let cache = cache(ctx);
     let pins = ctx.art_pins.clone();
+    let exe_icons = ctx.paths.cache().join("exe-icons");
     let enrich = move |g: &mut Game| {
+        // Jogo adicionado à mão não passa pela leitura das lojas: o ícone do .exe vem aqui, antes dos metadados
+        // (que não o trocam). Já extraído, é só conferir o arquivo.
+        if g.store() == tako_core::library::GameStore::Manual {
+            crate::sources::fill_exe_icon(g, &exe_icons, tako_platform::exe_icon::icon_file);
+        }
         if let Some(m) = cache.read(&g.id) {
             m.apply_to(g);
         }
