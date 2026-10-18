@@ -65,69 +65,97 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             ("key", &KeyShortcut::default().display()),
         ],
     );
-    // No desktop (TelaControles) o controle conectado vira a linha dele, com a bateria à direita.
-    let controller = if ctx.desktop && !ctx.pad_name.is_empty() {
-        let battery = ctx.pad_battery.map(|p| format!("{p}%")).unwrap_or_default();
-        let desc = match ctx.pad_battery {
-            Some(p) if p < 20 => ctx.tf(
-                "status.battery_low",
-                &[("pad", &ctx.pad_name), ("percent", &p.to_string())],
-            ),
-            _ => ctx.t("settings.controls.controller"),
-        };
-        let row = PanelRow::info("controller", pad, battery)
-            .desc(desc)
-            .icon("gamepad");
-        // Bateria fraca: a porcentagem em `warning`.
-        if ctx.pad_battery.is_some_and(|p| p < 20) {
-            PanelRow {
-                style: "warning".into(),
-                ..row
-            }
-        } else {
-            row
+    // No desktop (TelaControles) cada controle conectado vira uma linha, com a bateria à direita.
+    // A bateria só é lida do controle em uso; os outros ficam sem número.
+    let controllers: Vec<MenuItem> = if ctx.desktop && !ctx.pad_name.is_empty() {
+        let mut pads = ctx.pads.clone();
+        if pads.is_empty() {
+            pads.push((ctx.pad_guid.clone(), ctx.pad_name.clone()));
         }
+        pads.iter()
+            .map(|(guid, name)| {
+                let in_use = pads.len() == 1 || guid.eq_ignore_ascii_case(&ctx.pad_guid);
+                let level = ctx.pad_battery.filter(|_| in_use);
+                let name = if name.is_empty() { &pad } else { name };
+                let desc = match level {
+                    Some(p) if p < 20 => ctx.tf(
+                        "status.battery_low",
+                        &[("pad", name), ("percent", &p.to_string())],
+                    ),
+                    _ if in_use => ctx.t("settings.controls.controller"),
+                    _ => String::new(),
+                };
+                let row = PanelRow::info(
+                    "controller",
+                    name.clone(),
+                    level.map(|p| format!("{p}%")).unwrap_or_default(),
+                )
+                .desc(desc)
+                .icon("gamepad");
+                // Bateria fraca: a porcentagem em `warning`.
+                MenuItem::new(if level.is_some_and(|p| p < 20) {
+                    PanelRow {
+                        style: "warning".into(),
+                        ..row
+                    }
+                } else {
+                    row
+                })
+            })
+            .collect()
     } else {
-        PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
-            .desc(ctx.t("settings.controls.controller_desc"))
+        vec![MenuItem::new(
+            PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
+                .desc(ctx.t("settings.controls.controller_desc")),
+        )]
     };
-    let mut v = vec![
-        MenuItem::new(controller),
-        MenuItem::new(PanelRow::header(ctx.t("settings.controls.center_header"))),
+    let mut v = controllers;
+    v.push(MenuItem::new(PanelRow::header(
+        ctx.t("settings.controls.center_header"),
+    )));
+    v.push(
         MenuItem::new(described(ctx, "settings.controls.key").value(key_label(ctx)))
             .on(|_| Flow::Push(Box::new(KeyLayer::default()))),
-        MenuItem::new({
-            let row = PanelRow::action("reset", ctx.t("settings.controls.reset"))
-                .desc(defaults)
-                .value(ctx.t("settings.controls.reset_value"));
-            if ctx.desktop { row.danger() } else { row }
-        })
-        .on(|ctx| {
-            if !ctx.desktop {
-                return reset_shortcuts(ctx);
-            }
-            // TelaControles: restaurar os atalhos pergunta antes.
-            Flow::Push(Box::new(
-                MenuLayer::dialog(ctx.t("settings.controls.reset_title"), |ctx| {
-                    vec![
-                        MenuItem::new(
-                            PanelRow::button("reset", ctx.t("settings.controls.reset_value"))
-                                .danger(),
-                        )
-                        .on(|ctx| {
-                            let _ = reset_shortcuts(ctx);
-                            Flow::Close
-                        }),
-                        MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
-                            .on(|_| Flow::Close),
-                    ]
-                })
-                .text(ctx.t("settings.controls.reset_text")),
-            ))
-        }),
-        MenuItem::new(action(ctx, "settings.controls.test"))
-            .on(|_| Flow::Push(Box::new(TestLayer))),
-    ];
+    );
+    let reset = MenuItem::new({
+        let row = PanelRow::action("reset", ctx.t("settings.controls.reset"))
+            .desc(defaults)
+            .value(ctx.t("settings.controls.reset_value"));
+        if ctx.desktop { row.danger() } else { row }
+    })
+    .on(|ctx| {
+        if !ctx.desktop {
+            return reset_shortcuts(ctx);
+        }
+        // TelaControles: restaurar os atalhos pergunta antes.
+        Flow::Push(Box::new(
+            MenuLayer::dialog(ctx.t("settings.controls.reset_title"), |ctx| {
+                vec![
+                    MenuItem::new(
+                        PanelRow::button("reset", ctx.t("settings.controls.reset_value")).danger(),
+                    )
+                    .on(|ctx| {
+                        let _ = reset_shortcuts(ctx);
+                        Flow::Close
+                    }),
+                    MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                        .on(|_| Flow::Close),
+                ]
+            })
+            .text(ctx.t("settings.controls.reset_text")),
+        ))
+    });
+    let test = MenuItem::new(action(ctx, "settings.controls.test"))
+        .on(|_| Flow::Push(Box::new(TestLayer)));
+    // TelaControles: grupo "Teste" com testar e restaurar; na tela cheia ficam como sempre.
+    if ctx.desktop {
+        v.push(MenuItem::new(PanelRow::header(
+            ctx.t("settings.controls.test_header"),
+        )));
+        v.extend([test, reset]);
+    } else {
+        v.extend([reset, test]);
+    }
     profile_rows(ctx, &mut v);
     button_rows(ctx, &mut v);
     v.extend(hide_pads_row(ctx));

@@ -445,6 +445,31 @@ fn tako_buttons_can_be_swapped_and_the_hints_follow() {
     assert_eq!(ctx.glyph(Cmd::Accept), "✕");
 }
 
+/// TelaControles no desktop: uma linha por controle (bateria só no em uso) e o grupo "Teste".
+#[test]
+fn desktop_lists_every_connected_controller_and_a_test_group() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    ctx.pads = vec![
+        ("a".into(), "Xbox Wireless".into()),
+        ("b".into(), "DualSense".into()),
+    ];
+    (ctx.pad_guid, ctx.pad_name, ctx.pad_battery) = ("b".into(), "DualSense".into(), Some(15));
+    let rows = rows_of(&ctx, "controls");
+    let pads: Vec<_> = rows.iter().filter(|r| r.row.key == "controller").collect();
+    assert_eq!(pads.len(), 2);
+    assert_eq!(pads[0].row.value, "");
+    let in_use = &pads[1].row;
+    assert_eq!(
+        (in_use.value.as_str(), in_use.style.as_str()),
+        ("15%", "warning")
+    );
+    let pos = |k: &str| rows.iter().position(|r| r.row.key == k).unwrap();
+    assert_eq!(rows[pos("settings.controls.test") - 1].row.kind, "header");
+    assert!(pos("settings.controls.test") < pos("reset"));
+}
+
 #[test]
 fn each_controller_gets_its_own_profile() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
