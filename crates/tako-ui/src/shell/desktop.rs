@@ -22,7 +22,7 @@ use tako_core::library::{
 use tako_core::presentation::{game_text, library_text};
 
 /// Ícone da loja de origem na linha (ListaDeJogos › Loja de origem): o Xbox tem o logo próprio aqui.
-fn store_icon(store: GameStore) -> &'static str {
+pub(super) fn store_icon(store: GameStore) -> &'static str {
     match store {
         GameStore::Xbox => "store-xbox",
         GameStore::Manual => "store-manual",
@@ -348,6 +348,8 @@ pub struct DesktopLibrary {
     more: Option<String>,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
+    /// "Instalar pela": a loja escolhida por jogo (posição em `install_offers`); o menu deixa aqui e a página lê.
+    install_pick: dialogs::InstallPick,
 }
 
 /// Page Up e Page Down como o Slint manda.
@@ -383,6 +385,7 @@ impl DesktopLibrary {
             hero_wait: None,
             more: None,
             group_focus: None,
+            install_pick: Rc::default(),
         }
     }
 
@@ -930,6 +933,11 @@ impl DesktopLibrary {
         }
     }
 
+    /// A loja escolhida no "Instalar pela" para este jogo (a primeira oferta se ele nunca escolheu).
+    fn pick_of(&self, id: &str) -> usize {
+        self.install_pick.borrow().get(id).copied().unwrap_or(0)
+    }
+
     fn run(&mut self, action: Action, ctx: &mut Ctx) -> Nav {
         let Some(id) = self.selected(ctx) else {
             return Nav::Stay;
@@ -941,7 +949,7 @@ impl DesktopLibrary {
                 if ctx.launching {
                     return Nav::Stay;
                 }
-                details::primary_action(ctx, &id)
+                details::primary_action_with(ctx, &id, self.pick_of(&id))
             }
             Action::Favorite => {
                 dialogs::toggle_favorite(ctx, &id);
@@ -1625,6 +1633,15 @@ impl Page for DesktopLibrary {
                 self.select_index(ctx, index);
                 return self.run(Action::More, ctx);
             }
+            "install-more" => {
+                if let Some(id) = self.selected(ctx) {
+                    return Nav::Layer(Box::new(dialogs::install_from(
+                        ctx,
+                        &id,
+                        self.install_pick.clone(),
+                    )));
+                }
+            }
             "action" => {
                 let action = self
                     .selected(ctx)
@@ -2148,6 +2165,7 @@ impl Page for DesktopLibrary {
                 } else {
                     game_text::status(lang, g)
                 };
+                let install = details::install_stage(ctx, g, self.pick_of(&g.id));
                 let actions: Vec<PanelRow> =
                     self.actions(ctx, g)
                         .into_iter()
@@ -2169,21 +2187,22 @@ impl Page for DesktopLibrary {
                                 row
                             }
                             Action::Play => {
-                                let (label, icon) = if running {
-                                    (ctx.t("game.resume"), "gamepad")
-                                } else if !g.is_installed
-                                    && !g.is_upcoming()
-                                    && g.store() != GameStore::Manual
-                                {
-                                    let via = game_text::store_via(lang, g.store());
-                                    (
-                                        ctx.tf("desktop.install_via", &[("via", &via)]),
-                                        store_icon(g.store()),
-                                    )
-                                } else {
-                                    (tiles::play_label(ctx, g), "play")
+                                let mut row = match (running, &install) {
+                                    (false, Some(i)) => {
+                                        // Instalar: loja e tamanho na linha de baixo da pílula, ⌄ se houver mais de uma loja.
+                                        let icon = if i.installing { "ring" } else { "download" };
+                                        let mut row = PanelRow::button("play", i.label.clone())
+                                            .icon(icon)
+                                            .enabled(!i.installing)
+                                            .desc(i.sub.clone());
+                                        row.on = i.split;
+                                        row
+                                    }
+                                    (true, _) => PanelRow::button("play", ctx.t("game.resume"))
+                                        .icon("gamepad"),
+                                    _ => PanelRow::button("play", tiles::play_label(ctx, g))
+                                        .icon("play"),
                                 };
-                                let mut row = PanelRow::button("play", label).icon(icon);
                                 row.style = "primary".into();
                                 row
                             }
@@ -2246,6 +2265,12 @@ impl Page for DesktopLibrary {
                         title_pending,
                         accent: parse_color(&g.accent),
                         hint,
+                        install_note: install
+                            .as_ref()
+                            .filter(|_| !running)
+                            .map(|i| i.note.clone())
+                            .unwrap_or_default(),
+                        install_warn: install.as_ref().is_some_and(|i| i.warn),
                         running,
                         about_more,
                         genres: g.genres.iter().take(4).cloned().collect(),
@@ -2287,6 +2312,7 @@ impl Page for DesktopLibrary {
             ],
         );
         out.set("desk-about-label", ctx.t("desktop.about"));
+        out.set("desk-install-more-label", ctx.t("desktop.install.more"));
         out.set("desk-details-label", ctx.t("desktop.details"));
         out.set(
             "desk-zone",

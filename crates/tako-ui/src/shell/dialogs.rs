@@ -9,6 +9,42 @@ use tako_core::i18n::tn;
 use tako_core::library::{Game, GameStore, LibraryFilter, PlayStatus, collections, query, tags};
 use tako_core::presentation::{game_text, library_text};
 
+/// A loja escolhida em "Instalar pela" por jogo (posição em `install_offers`); o menu grava e o destaque lê.
+pub type InstallPick = std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, usize>>>;
+
+/// "Instalar pela": uma linha por loja com o tamanho e o ✓ na escolhida. Escolher só marca a loja; o clique em
+/// Instalar abre o cliente dela.
+pub fn install_from(ctx: &Ctx, id: &str, picked: InstallPick) -> MenuLayer {
+    let id = id.to_owned();
+    MenuLayer::menu(ctx.t("desktop.install.pick_title"), move |ctx| {
+        let Some(g) = ctx.library.find(&id) else {
+            return Vec::new();
+        };
+        let lang = ctx.lang();
+        let current = picked.borrow().get(&id).copied().unwrap_or(0);
+        super::details::install_offers(g)
+            .iter()
+            .enumerate()
+            .map(|(i, o)| {
+                let mut row =
+                    PanelRow::button(format!("offer-{i}"), game_text::store_name(lang, o.store))
+                        .icon(super::desktop::store_icon(o.store))
+                        .emphasized(i == current);
+                row.style = "offer".into();
+                row.on = i == current;
+                if let Some(size) = super::details::offer_size(g, o) {
+                    row.value = super::details::size_text(size);
+                }
+                let (id, picked) = (id.clone(), picked.clone());
+                MenuItem::new(row).on(move |_| {
+                    picked.borrow_mut().insert(id.clone(), i);
+                    Flow::Close
+                })
+            })
+            .collect()
+    })
+}
+
 pub fn toggle_favorite(ctx: &mut Ctx, id: &str) {
     match ctx.library.toggle_favorite(id) {
         Ok(()) => {
@@ -1439,6 +1475,51 @@ mod tests {
         ctx.library.refresh();
         assert!(!ctx.check_installs());
         assert_eq!(ctx.toast.as_ref().unwrap().0, "Tabuleiro foi instalado");
+    }
+
+    fn store_game(id: &str, store: GameStore, uri: &str) -> Game {
+        Game {
+            id: id.into(),
+            title: id.into(),
+            store: Some(store),
+            is_installed: false,
+            install_uri: Some(uri.into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn the_chosen_store_decides_where_install_opens() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let mut game = store_game("steam:7", GameStore::Steam, "steam://install/7");
+        game.install_offers = vec![
+            tako_core::library::InstallOffer {
+                store: GameStore::Steam,
+                install_uri: "steam://install/7".into(),
+                size: Some(9 << 30),
+            },
+            tako_core::library::InstallOffer {
+                store: GameStore::Gog,
+                install_uri: "goggalaxy://openGameView/7".into(),
+                size: None,
+            },
+        ];
+        *ctx.found.lock().unwrap() = vec![game];
+        ctx.library.refresh();
+
+        let picked = InstallPick::default();
+        let menu = install_from(&ctx, "steam:7", picked.clone());
+        drop(menu);
+        picked.borrow_mut().insert("steam:7".into(), 1);
+        super::super::details::primary_action_with(&mut ctx, "steam:7", 1);
+        assert!(
+            matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u == "goggalaxy://openGameView/7")
+        );
+        // Posição fora da lista (a oferta sumiu depois de uma releitura): volta para a primeira.
+        ctx.effects.clear();
+        super::super::details::primary_action_with(&mut ctx, "steam:7", 9);
+        assert!(matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u == "steam://install/7"));
     }
 
     #[test]
