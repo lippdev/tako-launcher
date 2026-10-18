@@ -3127,10 +3127,33 @@ component DeskOverlay inherits Rectangle {
                             }
                         }
                     }
-                    if ov.rows[1].enabled: PopupButton {
-                        y: (parent.height - self.height) / 2;
-                        data: ov.rows[1];
-                        clicked => { root.clicked("style", 0); }
+                    // Estilo (SteamGridDB): select; a lista é a mesma do CampoDeSelecao, junto da pílula.
+                    if ov.rows[1].enabled: Rectangle {
+                        y: 4px;
+                        height: 32px;
+                        width: clamp(stl.preferred-width, 160px, 280px);
+                        border-radius: self.height / 2;
+                        background: stta.has-hover ? Ui.glass-hover : Ui.glass-control;
+                        border-width: 1px;
+                        border-color: Ui.glass-edge;
+                        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                        accessible-role: combobox;
+                        accessible-label: ov.rows[1].title + ": " + ov.rows[1].value;
+                        stl := HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 12px;
+                            spacing: 8px;
+                            Text { text: ov.rows[1].title + ": " + ov.rows[1].value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                            DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                        }
+                        stta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                DeskArt.anchor-w = parent.width;
+                                root.menu(parent.absolute-position.x + parent.width, parent.absolute-position.y + parent.height + 6px);
+                                root.clicked("style", 0);
+                            }
+                        }
                     }
                     Rectangle { horizontal-stretch: 1; }
                     PopupButton {
@@ -3156,6 +3179,9 @@ component DeskOverlay inherits Rectangle {
                     grid := Flickable {
                         horizontal-stretch: 1;
                         property <int> cols: ov.tab == 1 ? 2 : (ov.tab == 3 ? 8 : max(2, floor((self.width + 16px) / (132px + 16px))));
+                        // As setas do teclado andam pelas mesmas colunas que aparecem.
+                        changed cols => { root.hovered("cols", self.cols); }
+                        init => { root.hovered("cols", self.cols); }
                         // 4 de folga nas bordas: o anel da escolhida (2 + 2) não é cortado.
                         property <length> cell-w: (self.width - 8px - (cols - 1) * 16px) / cols;
                         property <length> cell-h: cell-w * ratio;

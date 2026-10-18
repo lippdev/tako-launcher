@@ -50,6 +50,8 @@ pub struct ArtPicker {
     pages: Pages,
     /// Desktop (SeletorDeImagens): clicar escolhe e "Usar" aplica; a tela cheia aplica no A.
     desktop: bool,
+    /// Colunas da grade para as setas: na tela cheia `COLS`; no desktop, as que o tema conta pela largura.
+    cols: usize,
 }
 
 pub fn picker(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
@@ -83,6 +85,7 @@ pub fn picker(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
         filter: Rc::new(RefCell::new(filter)),
         pages: Rc::default(),
         desktop: ctx.desktop,
+        cols: COLS,
     };
     p.source = p.first_source();
     p.load();
@@ -405,8 +408,12 @@ impl ArtPicker {
     fn desktop_rows(&self, ctx: &Ctx, can_use: bool) -> Vec<PanelRow> {
         vec![
             PanelRow::info("source", ctx.t("art_picker.source"), ""),
-            PanelRow::button("style", ctx.t("art_picker.style"))
-                .enabled(self.source() == STEAMGRIDDB),
+            PanelRow::choice(
+                "style",
+                ctx.t("art_picker.style"),
+                style_label(self.filter.borrow().style.as_deref()),
+            )
+            .enabled(self.source() == STEAMGRIDDB),
             PanelRow::button("file", ctx.t("art_picker.from_pc")),
             PanelRow {
                 style: "primary".into(),
@@ -430,13 +437,15 @@ impl Layer for ArtPicker {
             Cmd::NextSection => self.set_kind(self.kind + 1),
             Cmd::Left if self.on_sources => self.set_source(self.source.saturating_sub(1)),
             Cmd::Right if self.on_sources => self.set_source(self.source + 1),
-            Cmd::Left if !self.sel.is_multiple_of(COLS) => self.sel -= 1,
-            Cmd::Right if self.sel + 1 < n && !(self.sel + 1).is_multiple_of(COLS) => self.sel += 1,
-            Cmd::Up if !self.on_sources && self.sel >= COLS => self.sel -= COLS,
+            Cmd::Left if !self.sel.is_multiple_of(self.cols) => self.sel -= 1,
+            Cmd::Right if self.sel + 1 < n && !(self.sel + 1).is_multiple_of(self.cols) => {
+                self.sel += 1
+            }
+            Cmd::Up if !self.on_sources && self.sel >= self.cols => self.sel -= self.cols,
             Cmd::Up => self.on_sources = true,
             Cmd::Down if self.on_sources => self.on_sources = false,
-            Cmd::Down if self.sel + COLS < n => self.sel += COLS,
-            Cmd::Down if self.sel / COLS < n.saturating_sub(1) / COLS => self.sel = n - 1,
+            Cmd::Down if self.sel + self.cols < n => self.sel += self.cols,
+            Cmd::Down if self.sel / self.cols < n.saturating_sub(1) / self.cols => self.sel = n - 1,
             Cmd::Accept if self.on_sources && self.source() == FILE_SOURCE => self.browse(ctx),
             Cmd::Accept if self.on_sources => self.on_sources = false,
             Cmd::Accept => {
@@ -506,7 +515,7 @@ impl Layer for ArtPicker {
             tabs2: self.sources.iter().map(|s| source_label(s)).collect(),
             tab2: self.source as i32,
             thumbs,
-            thumb_cols: COLS as i32,
+            thumb_cols: self.cols as i32,
             sel: if self.on_sources { -1 } else { sel as i32 },
             preview: crate::shell::tiles::image(focused.map(|c| c.url.as_str()), PREVIEW),
             preview_text,
@@ -562,7 +571,15 @@ impl Layer for ArtPicker {
             "use" => return self.handle(Cmd::Accept, ctx),
             "original" => return self.handle(Cmd::Menu, ctx),
             "file" => return self.handle(Cmd::Search, ctx),
+            // Desktop: Estilo é um select junto da pílula (a primeira linha dos filtros).
+            "style" if self.desktop => {
+                let item = self.filters(ctx).items(ctx).into_iter().next();
+                if let Some(select) = item.and_then(|i| i.select(ctx)) {
+                    return Flow::Push(select);
+                }
+            }
             "style" => return self.handle(Cmd::Favorite, ctx),
+            "cols" => self.cols = index.max(1),
             "cancel" | "outside" => return Flow::Close,
             "tab" => self.set_kind(index),
             "tab2" => {
@@ -585,6 +602,10 @@ impl Layer for ArtPicker {
         // Desktop: a grade rolou até o fim; o hover não troca a escolha.
         if zone == "more" {
             self.more();
+            return;
+        }
+        if zone == "cols" {
+            self.cols = index.max(1);
             return;
         }
         if zone == "thumb" && !self.desktop {

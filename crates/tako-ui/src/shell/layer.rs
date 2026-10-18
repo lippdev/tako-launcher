@@ -341,7 +341,7 @@ impl MenuLayer {
         self
     }
 
-    fn items(&self, ctx: &Ctx) -> Vec<MenuItem> {
+    pub(crate) fn items(&self, ctx: &Ctx) -> Vec<MenuItem> {
         (self.build)(ctx)
     }
 
