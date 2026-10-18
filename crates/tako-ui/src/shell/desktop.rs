@@ -358,11 +358,13 @@ impl DesktopLibrary {
                 let fav = ids
                     .iter()
                     .any(|id| ctx.library.find(id).is_some_and(|g| !g.is_favorite));
+                let mut changed = Vec::new();
                 for id in &ids {
-                    if ctx.library.find(id).is_some_and(|g| g.is_favorite != fav)
-                        && let Err(e) = ctx.library.toggle_favorite(id)
-                    {
-                        tracing::error!("favoritar: {e}");
+                    if ctx.library.find(id).is_some_and(|g| g.is_favorite != fav) {
+                        match ctx.library.toggle_favorite(id) {
+                            Ok(()) => changed.push((id.clone(), !fav)),
+                            Err(e) => tracing::error!("favoritar: {e}"),
+                        }
                     }
                 }
                 let n = ids.len().to_string();
@@ -371,7 +373,17 @@ impl DesktopLibrary {
                 } else {
                     "desktop.bulk.unfavorited"
                 };
-                ctx.toast(ctx.tf(key, &[("n", &n)]));
+                // Desfazer volta cada jogo ao que era antes.
+                let before: Vec<(String, bool)> = changed;
+                ctx.toast_with_undo(ctx.tf(key, &[("n", &n)]), move |ctx| {
+                    for (id, was) in &before {
+                        if ctx.library.find(id).is_some_and(|g| g.is_favorite != *was)
+                            && let Err(e) = ctx.library.toggle_favorite(id)
+                        {
+                            tracing::error!("favoritar: {e}");
+                        }
+                    }
+                });
                 Nav::Stay
             }
             _ => Nav::Layer(Box::new(dialogs::bulk_more(ids))),
@@ -1632,11 +1644,23 @@ mod tests {
         shell.click("game-toggle", 1);
         shell.click("game-range", 3);
         assert_eq!(page(&shell).checked_ids(&shell.ctx), ids[1..=3].to_vec());
+        let fav_of = |shell: &Shell| -> Vec<bool> {
+            ids[1..=3]
+                .iter()
+                .map(|id| shell.ctx.library.find(id).unwrap().is_favorite)
+                .collect()
+        };
+        let before = fav_of(&shell);
         // Favoritar em massa: algum fora dos favoritos → todos ficam favoritos.
         shell.click("bulk", 2);
         assert!(ids[1..=3]
             .iter()
             .all(|id| shell.ctx.library.find(id).unwrap().is_favorite));
+        // "Desfazer" do aviso volta os favoritos ao que eram.
+        shell.click("toast-undo", 0);
+        assert_eq!(fav_of(&shell), before);
+        assert!(shell.ctx.toast_undo.is_none());
+        shell.click("bulk", 2);
         // O destaque continua no último jogo clicado sem modificador.
         assert_eq!(shell.focused_game().as_deref(), Some(ids[0].as_str()));
         // Esc sai da seleção antes de qualquer outra coisa; Ctrl + A marca a lista inteira.

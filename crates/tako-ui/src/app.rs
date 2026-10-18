@@ -192,6 +192,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pending_layer: None,
         open_details: None,
         open_route: None,
+        toast_undo: None,
         leave_details: false,
         queued_launch: None,
         found,

@@ -215,6 +215,8 @@ pub struct Ctx {
     pub pad_battery: Option<i32>,
     pub input: InputKind,
     pub toast: Option<(String, Instant)>,
+    /// "Desfazer" do aviso atual (ações em lote do desktop); some junto com o aviso.
+    pub toast_undo: Option<std::rc::Rc<dyn Fn(&mut Ctx)>>,
     pub effects: Vec<Effect>,
     pub running: Option<RunningGame>,
     pub sources: Vec<SourceReport>,
@@ -307,7 +309,14 @@ impl Ctx {
 
     pub fn toast(&mut self, text: impl Into<String>) {
         self.toast = Some((text.into(), Instant::now()));
+        self.toast_undo = None;
         self.dirty = true;
+    }
+
+    /// Aviso com "Desfazer": `undo` volta o que a ação mudou.
+    pub fn toast_with_undo(&mut self, text: impl Into<String>, undo: impl Fn(&mut Ctx) + 'static) {
+        self.toast(text);
+        self.toast_undo = Some(std::rc::Rc::new(undo));
     }
 
     /// O aviso atual já passou do tempo (o de controle desconectado fica até um controle voltar).

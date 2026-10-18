@@ -3121,6 +3121,7 @@ export component Desktop inherits Window {
     in property <string> desk-search-key;
     in property <string> desk-search-esc;
     in property <string> desk-cancel-label;
+    in property <string> desk-toast-undo;
     in property <string> desk-ok-label;
     in property <int> desk-search-focus;
     in property <bool> desk-focus-visible;
@@ -3422,6 +3423,21 @@ export component Desktop inherits Window {
             spacing: 10px;
             Icon { name: "check"; size: 18px; tint: Ui.success; y: (parent.height - self.height) / 2; }
             Text { text: toast; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+            // "Desfazer" das ações em lote: texto clicável à direita, sem roubar o foco.
+            if desk-toast-undo != "": Rectangle {
+                width: ut.preferred-width + 16px;
+                y: 6px;
+                height: parent.height - 12px;
+                border-radius: Ui.radius-thumb;
+                background: uta.has-hover ? Ui.glass-hover : transparent;
+                accessible-role: button;
+                accessible-label: desk-toast-undo;
+                ut := Text { text: desk-toast-undo; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 700; }
+                uta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.clicked("toast-undo", 0); }
+                }
+            }
         }
     }
 }

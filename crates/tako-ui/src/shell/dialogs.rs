@@ -536,12 +536,12 @@ pub fn choose_collections_many(ctx: &Ctx, ids: Vec<String>) -> MenuLayer {
                 let (cid, name, ids) = (c.id.clone(), c.name.clone(), ids.clone());
                 MenuItem::new(PanelRow::check(c.id.clone(), c.name.clone(), all)).on(move |ctx| {
                     let inside = ctx.collections.find(&cid).map(|c| ids.iter().filter(|id| c.contains(id)).cloned().collect::<Vec<_>>()).unwrap_or_default();
-                    let change: Vec<&String> = if all {
-                        ids.iter().collect()
+                    let change: Vec<String> = if all {
+                        ids.iter().cloned().collect()
                     } else {
-                        ids.iter().filter(|id| !inside.contains(id)).collect()
+                        ids.iter().filter(|id| !inside.contains(id)).cloned().collect()
                     };
-                    for id in change {
+                    for id in &change {
                         if let Err(e) = ctx.collections.toggle(&cid, id) {
                             ctx.toast(e.to_string());
                         }
@@ -549,7 +549,16 @@ pub fn choose_collections_many(ctx: &Ctx, ids: Vec<String>) -> MenuLayer {
                     ctx.sync_collections();
                     let n = ids.len().to_string();
                     let key = if all { "desktop.bulk.removed_from" } else { "desktop.bulk.added_to" };
-                    ctx.toast(ctx.tf(key, &[("n", &n), ("collection", &name)]));
+                    // Desfazer troca de volta só os jogos que esta ação mudou.
+                    let cid = cid.clone();
+                    ctx.toast_with_undo(ctx.tf(key, &[("n", &n), ("collection", &name)]), move |ctx| {
+                        for id in &change {
+                            if let Err(e) = ctx.collections.toggle(&cid, id) {
+                                tracing::error!("coleção: {e}");
+                            }
+                        }
+                        ctx.sync_collections();
+                    });
                     Flow::Stay
                 })
             })

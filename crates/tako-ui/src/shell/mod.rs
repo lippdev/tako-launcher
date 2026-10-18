@@ -444,6 +444,14 @@ impl Shell {
             self.desktop_nav(index);
             return;
         }
+        if zone == "toast-undo" {
+            if let Some(undo) = self.ctx.toast_undo.take() {
+                undo(&mut self.ctx);
+                self.ctx.toast = None;
+                self.ctx.dirty = true;
+            }
+            return;
+        }
         if zone == "desk-brand" {
             self.layers.push(Box::new(desktop::brand_menu()));
             self.ctx.dirty = true;
@@ -689,6 +697,7 @@ impl Shell {
         self.ctx.check_broken();
         if self.ctx.toast_expired(now) {
             self.ctx.toast = None;
+            self.ctx.toast_undo = None;
         }
         let kind = self.page().kind();
         out.set("page", kind);
@@ -794,6 +803,14 @@ impl Shell {
         out.set("desk-search-esc", self.ctx.t("desktop.search_esc"));
         out.set("desk-settings-search-hint", self.ctx.t("desktop.settings_search"));
         out.set("desk-cancel-label", self.ctx.t("common.cancel"));
+        out.set(
+            "desk-toast-undo",
+            if self.ctx.toast_undo.is_some() {
+                self.ctx.t("desktop.undo")
+            } else {
+                String::new()
+            },
+        );
         out.set("desk-ok-label", self.ctx.t("common.ok"));
         out.set("desk-focus-visible", self.ctx.focus_visible);
     }
