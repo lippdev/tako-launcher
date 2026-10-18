@@ -193,6 +193,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         open_details: None,
         open_route: None,
         toast_undo: None,
+        toast_hover: [false; 2],
         leave_details: false,
         queued_launch: None,
         found,
@@ -202,6 +203,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         installing: Vec::new(),
         redraw_at: None,
         launching: false,
+        launch_since: None,
         leaving: false,
         launch_on_top_until: None,
         window_on_top: false,
@@ -501,6 +503,9 @@ impl App {
                 // "Abrindo…" no botão Jogar até a janela do jogo aparecer.
                 let mut s = self.shell.borrow_mut();
                 s.ctx.launching = true;
+                let since = Instant::now();
+                s.ctx.launch_since = Some(since);
+                s.ctx.redraw_at = Some(since + crate::shell::LAUNCH_SLOW);
                 s.ctx.dirty = true;
             }
             HostAction::Launching => self.shell.borrow_mut().begin_launch_splash(),

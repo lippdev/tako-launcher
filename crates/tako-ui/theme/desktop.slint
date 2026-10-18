@@ -761,7 +761,7 @@ component GameRow inherits Rectangle {
             // O quadrado do topo da capa (CapaDoJogo), não o meio.
             Image { width: parent.width; height: parent.height; source: data.thumb; image-fit: cover; vertical-alignment: top; }
         }
-        Text {
+        nt := Text {
             text: data.title;
             color: data.installed ? Ui.on-accent : Ui.desk-on-muted;
             font-size: Ui.desk-label;
@@ -798,8 +798,8 @@ component GameRow inherits Rectangle {
             }
         }
     }
-    // Nome longo corta com reticências; o inteiro fica na dica.
-    Tip { text: data.title.character-count > 26 ? data.title : ""; hovering: ta.has-hover; }
+    // Nome cortado com reticências (largura medida, não um número de letras): o inteiro fica na dica.
+    Tip { text: nt.preferred-width > nt.width ? data.title : ""; hovering: ta.has-hover; }
 }
 
 // Lista virtualizada: só as linhas visíveis existem; rola com a roda do mouse e segue a seleção do teclado. As linhas
@@ -1379,6 +1379,30 @@ component StatusStrip inherits Vidro {
 }
 
 // Pílula principal (Jogar, Voltar ao jogo, Instalar): branca, a única por tela. Responde no pressionar (0,97).
+// Anel de progresso (JogarEAbrir): trilha fraca e um arco girando; com "reduzir animações" fica parado.
+component Ring inherits Rectangle {
+    in property <length> size: 22px;
+    in property <color> tint: Ui.on-primary;
+    width: size;
+    height: size;
+    Rectangle {
+        border-radius: parent.width / 2;
+        border-width: 2px;
+        border-color: tint.with-alpha(0.25);
+    }
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: "M 12 2 A 10 10 0 0 1 22 12";
+        stroke: tint;
+        stroke-width: 2px;
+        fill: transparent;
+        transform-rotation: Ui.reduce-motion ? 0deg : animation-tick() / 900ms * 360deg;
+    }
+}
+
 component PlayButton inherits Rectangle {
     in property <string> label;
     in property <string> icon;
@@ -1412,7 +1436,8 @@ component PlayButton inherits Rectangle {
         padding-right: 32px;
         spacing: Ui.space-12;
         alignment: center;
-        DeskIcon { name: icon; size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
+        if icon == "ring": Ring { size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
+        if icon != "ring": DeskIcon { name: icon; size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
         Text { text: label; color: Ui.on-primary; font-size: 19px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
     }
     pta := TouchArea {
@@ -1580,7 +1605,13 @@ component DetailsCard inherits Vidro {
                     horizontal-stretch: 1;
                     spacing: Ui.space-8;
                     if r.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-                    Text { text: r.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                    // Valor cortado com "…": o inteiro aparece na dica ao passar o mouse.
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        vt := Text { width: parent.width; height: parent.height; text: r.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; overflow: elide; }
+                        vta := TouchArea { }
+                        Tip { text: vt.preferred-width > vt.width ? r.value : ""; hovering: vta.has-hover; }
+                    }
                 }
                 if r.chips.length > 0: HorizontalLayout {
                     horizontal-stretch: 1;
@@ -1730,6 +1761,35 @@ component CardRow inherits Rectangle {
         summary: sessions-summary;
         rows: sessions;
         see-all => { root.clicked("sessions", 0); }
+    }
+}
+
+// EstadoCarregando: o destaque e os cartões já com a forma final (etiqueta, título, faixa, botões e três cartões), em
+// blocos de espera que crescem com o tamanho do texto, para o layout não pular quando os dados chegam.
+component LoadingStage inherits VerticalLayout {
+    in property <bool> small;
+    alignment: end;
+    spacing: small ? Ui.space-16 : Ui.space-28;
+    VerticalLayout {
+        spacing: small ? 10px : 14px;
+        alignment: end;
+        HorizontalLayout { alignment: start; Skeleton { width: 120px * Ui.text-scale; height: 26px; radius: 13px; } }
+        HorizontalLayout { alignment: start; Skeleton { width: (small ? 360px : 480px) * Ui.text-scale; height: (small ? 40px * Ui.text-scale : Ui.desk-display) * 1.1; radius: 10px; } }
+        HorizontalLayout { alignment: start; Skeleton { width: 420px * Ui.text-scale; height: 62px; radius: 31px; } }
+        HorizontalLayout {
+            alignment: start;
+            spacing: Ui.space-12;
+            padding-top: 6px;
+            Skeleton { width: max(small ? 180px : 232px, 140px * Ui.text-scale); height: small ? 50px : Ui.primary-height; radius: self.height / 2; }
+            for i in 3: Skeleton { width: small ? 46px : Ui.round-button; height: small ? 46px : Ui.round-button; radius: self.height / 2; }
+        }
+    }
+    HorizontalLayout {
+        height: small ? 190px : Ui.card-height;
+        spacing: Ui.space-20;
+        Skeleton { horizontal-stretch: 1.45; radius: Ui.radius-card; }
+        Skeleton { horizontal-stretch: small ? 1.2 : 1.1; radius: Ui.radius-card; }
+        Skeleton { horizontal-stretch: small ? 1 : 0.9; radius: Ui.radius-card; }
     }
 }
 
@@ -2252,6 +2312,8 @@ component DeskLibrary inherits Rectangle {
     in property <DeskNav> collection;
     in property <int> filter-count;
     in property <string> count;
+    // Janela pequena: só a contagem, sem o nome da ordenação (os quatro ícones ocupam o resto da linha).
+    in property <string> count-short;
     in property <[DeskGame]> games;
     in property <int> selected;
     in property <DeskGameView> game;
@@ -2368,7 +2430,7 @@ component DeskLibrary inherits Rectangle {
                     padding-right: 4px;
                     spacing: 2px;
                     Text {
-                        text: loading ? loading-label : count;
+                        text: loading ? loading-label : (small ? count-short : count);
                         color: selecting ? Ui.on-accent : Ui.desk-on-subtle;
                         font-size: Ui.desk-label-sm;
                         font-weight: selecting ? 700 : 500;
@@ -2449,7 +2511,8 @@ component DeskLibrary inherits Rectangle {
                 }
             }
         }
-        if !game.has-game: Rectangle { horizontal-stretch: 1; }
+        if !game.has-game && !loading: Rectangle { horizontal-stretch: 1; }
+        if !game.has-game && loading: LoadingStage { horizontal-stretch: 1; small: small; }
         if game.has-game: phases := GamePhases {
             horizontal-stretch: 1;
             more: more;
@@ -3062,7 +3125,7 @@ component RowScroll inherits Rectangle {
     in property <int> sel;
     in property <bool> key-focus;
     in property <bool> footer;
-    // Diálogo: as ações ficam na ordem do Tako, empilhadas em largura total; um grupo de uma linha só fica solto.
+    // Diálogo sem rodapé (mais de três ações): as ações ficam na ordem do Tako, empilhadas em largura total; um grupo de uma linha só fica solto.
     in property <bool> inline-buttons;
     in property <bool> bare;
     in property <bool> side-panel;
@@ -3136,6 +3199,25 @@ component CloseButton inherits Rectangle {
     accessible-label: label;
     DeskIcon { name: "close"; size: 18px; tint: Ui.on-accent; }
     cta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Ação de texto do rodapé do popup (PadraoPopup): sem caixa, à esquerda.
+component FooterLink inherits Rectangle {
+    in property <string> title;
+    in property <bool> focused;
+    callback clicked();
+    height: Ui.control-height;
+    width: sk.preferred-width + 16px;
+    border-radius: Ui.radius-thumb;
+    background: ska.has-hover ? Ui.glass-hover : transparent;
+    accessible-role: button;
+    accessible-label: title;
+    if focused: FocusRing { radius: Ui.radius-thumb; }
+    sk := Text { text: title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
+    ska := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
@@ -3736,7 +3818,7 @@ component DeskOverlay inherits Rectangle {
     }
     // Diálogo (e qualquer camada sem desenho próprio): cabeçalho com o X, o corpo em grupos e as ações no rodapé.
     if generic && ov.tab2 != 1: Rectangle {
-        background: Ui.desk-canvas.with-alpha(shown ? 0.6 : 0);
+        background: Ui.desk-canvas.with-alpha(shown ? 0.55 : 0);
         animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         TouchArea { }
         Vidro {
@@ -3745,7 +3827,7 @@ component DeskOverlay inherits Rectangle {
             // Empilhar (TrocaDePopup): a camada de baixo recua para 0,98; a de cima a escurece com o scrim dela.
             transform-scale: shown && top-most ? 1 : Ui.escala-entrada;
             animate opacity, transform-scale { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            width: min(parent.width - 80px, ov.wide ? 640px : 480px);
+            width: min(parent.width - 80px, ov.wide ? 680px : (ov.compact ? 440px : 540px));
             height: min(dlg.preferred-height, parent.height - 80px);
             dlg := VerticalLayout {
                 padding: Ui.space-24;
@@ -3779,8 +3861,8 @@ component DeskOverlay inherits Rectangle {
                     min-height: min(self.content-h, 80px);
                     preferred-height: self.content-h;
                     vertical-stretch: 1;
-                    inline-buttons: ov.tabs.length == 0;
-                    footer: ov.tabs.length > 0;
+                    inline-buttons: ov.tabs.length == 0 && !ov.footer;
+                    footer: ov.tabs.length > 0 || ov.footer;
                     content-key: ov.title;
                     rows: ov.rows;
                     sel: top-most ? ov.sel : -1;
@@ -3788,31 +3870,26 @@ component DeskOverlay inherits Rectangle {
                     clicked(z, i) => { root.clicked(z, i); }
                     anchor(x, y) => { root.menu(x, y); }
                 }
-                if ov.tabs.length > 0: HorizontalLayout {
+                // Rodapé (PadraoPopup): ação de texto à esquerda ("Pular" nos passos, estilo "link"); à direita as outras,
+                // com a principal por último (nos passos, a ordem já vem pronta; nos demais, a lista vem na ordem do Tako).
+                if ov.tabs.length > 0 || ov.footer: HorizontalLayout {
                     padding-top: 4px;
                     for r[i] in ov.rows: HorizontalLayout {
-                        visible: r.kind == "button" && r.key == "skip";
-                        if r.kind == "button" && r.key == "skip": Rectangle {
-                            height: Ui.control-height;
-                            width: sk.preferred-width + 16px;
-                            border-radius: Ui.radius-thumb;
-                            background: ska.has-hover ? Ui.glass-hover : transparent;
-                            accessible-role: button;
-                            accessible-label: r.title;
-                            if focus-visible && top-most && i == ov.sel: FocusRing { radius: Ui.radius-thumb; }
-                            sk := Text { text: r.title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
-                            ska := TouchArea {
-                                mouse-cursor: pointer;
-                                clicked => { root.clicked("row", i); }
-                            }
+                        visible: r.kind == "button" && (r.key == "skip" || r.style == "link");
+                        if r.kind == "button" && (r.key == "skip" || r.style == "link"): FooterLink {
+                            title: r.title;
+                            focused: focus-visible && top-most && i == ov.sel;
+                            clicked => { root.clicked("row", i); }
                         }
                     }
                     Rectangle { horizontal-stretch: 1; }
-                    for r[i] in ov.rows: HorizontalLayout {
-                        visible: r.kind == "button" && r.key != "skip";
+                    for k in ov.rows.length: HorizontalLayout {
+                        property <int> i: ov.footer ? ov.rows.length - 1 - k : k;
+                        property <bool> mine: ov.rows[i].kind == "button" && ov.rows[i].key != "skip" && ov.rows[i].style != "link";
+                        visible: mine;
                         padding-left: self.visible ? 10px : 0;
-                        if r.kind == "button" && r.key != "skip": PopupButton {
-                            data: r;
+                        if mine: PopupButton {
+                            data: ov.rows[i];
                             focused: focus-visible && top-most && i == ov.sel;
                             clicked => { root.clicked("row", i); }
                         }
@@ -4500,6 +4577,7 @@ export component Desktop inherits Window {
     in property <bool> desk-filtered;
     in property <string> desk-clear-label;
     in property <string> desk-count;
+    in property <string> desk-count-short;
     in property <[DeskGame]> desk-games;
     in property <int> desk-selected: -1;
     in property <DeskGameView> desk-game;
@@ -4720,6 +4798,7 @@ export component Desktop inherits Window {
                 small: root.small;
                 filter-count: desk-filter-count;
                 count: desk-count;
+                count-short: desk-count-short;
                 games: page == "desk-library" ? desk-games : [];
                 selected: desk-selected;
                 game: desk-game;
@@ -4858,6 +4937,8 @@ export component Desktop inherits Window {
         animate opacity { duration: Ui.toast-fade(toast-on); easing: toast-on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         height: Ui.control-height;
         width: tl.preferred-width;
+        // Ponteiro por cima pausa o tempo do aviso (PainelEAviso); o "Desfazer" tem a própria zona.
+        TouchArea { changed has-hover => { root.hovered("toast", self.has-hover ? 1 : 0); } }
         tl := HorizontalLayout {
             padding-left: Ui.space-20;
             padding-right: Ui.space-20;
@@ -4876,6 +4957,7 @@ export component Desktop inherits Window {
                 ut := Text { text: desk-toast-undo; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 700; }
                 uta := TouchArea {
                     mouse-cursor: pointer;
+                    changed has-hover => { root.hovered("toast", self.has-hover ? 3 : 2); }
                     clicked => { root.clicked("toast-undo", 0); }
                 }
             }

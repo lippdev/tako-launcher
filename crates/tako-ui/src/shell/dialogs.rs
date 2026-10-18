@@ -188,14 +188,22 @@ pub fn game_ended_badly(
                 ),
             );
         }
-        v.extend([
-            MenuItem::new(PanelRow::button("report", ctx.t("session.save_report")).icon("info"))
-                .on(|ctx| {
-                    ctx.effect(Effect::SaveDiagnostics);
-                    Flow::Close
-                }),
-            MenuItem::new(PanelRow::button("ok", ctx.t("common.ok"))).on(|_| Flow::Close),
-        ]);
+        // Desktop (ErroDoJogo): o relatório é o link à esquerda e o X fecha; sem "OK".
+        let report = PanelRow::button("report", ctx.t("session.save_report"));
+        v.push(
+            MenuItem::new(if ctx.desktop {
+                report.link()
+            } else {
+                report.icon("info")
+            })
+            .on(|ctx| {
+                ctx.effect(Effect::SaveDiagnostics);
+                Flow::Close
+            }),
+        );
+        if !ctx.desktop {
+            v.push(MenuItem::new(PanelRow::button("ok", ctx.t("common.ok"))).on(|_| Flow::Close));
+        }
         v
     })
     .text(text);

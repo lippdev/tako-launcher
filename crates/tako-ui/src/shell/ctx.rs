@@ -2,6 +2,7 @@
 //! pede ao resto do app (efeitos).
 
 use super::Cmd;
+use super::LAUNCH_SLOW;
 use crate::gamepad::{PadEvent, PadFamily};
 use crate::model::Hint;
 use std::collections::HashMap;
@@ -225,6 +226,8 @@ pub struct Ctx {
     pub toast: Option<(String, Instant)>,
     /// "Desfazer" do aviso atual (ações em lote do desktop); some junto com o aviso.
     pub toast_undo: Option<Undo>,
+    /// Ponteiro sobre o aviso (pílula, "Desfazer"): o tempo fica parado.
+    pub toast_hover: [bool; 2],
     pub effects: Vec<Effect>,
     pub running: Option<RunningGame>,
     pub sources: Vec<SourceReport>,
@@ -259,6 +262,8 @@ pub struct Ctx {
     pub redraw_at: Option<Instant>,
     /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).
     pub launching: bool,
+    /// Desde quando o jogo está abrindo: depois de `LAUNCH_SLOW` o botão vira "Ainda abrindo…" com "Cancelar".
+    pub launch_since: Option<Instant>,
     /// Saindo para o jogo: a interface some aos poucos antes de fechar.
     pub leaving: bool,
     /// Até quando a janela fica por cima de tudo em "Abrindo…" (esconde as janelas de inicialização do jogo).
@@ -320,6 +325,7 @@ impl Ctx {
     pub fn toast(&mut self, text: impl Into<String>) {
         self.toast = Some((text.into(), Instant::now()));
         self.toast_undo = None;
+        self.toast_hover = [false; 2];
         self.dirty = true;
     }
 
@@ -329,13 +335,32 @@ impl Ctx {
         self.toast_undo = Some(std::rc::Rc::new(undo));
     }
 
+    /// Abrindo há tempo demais (JogarEAbrir): "Ainda abrindo…" e a ação de cancelar.
+    pub fn launch_slow(&self, now: Instant) -> bool {
+        self.launching
+            && self
+                .launch_since
+                .is_some_and(|t| now.duration_since(t) >= LAUNCH_SLOW)
+    }
+
     /// O aviso atual já passou do tempo (o de controle desconectado fica até um controle voltar).
     pub fn toast_expired(&self, now: Instant) -> bool {
         !(self.pad_lost && self.input == InputKind::Gamepad)
+            && !self.toast_hover.contains(&true)
             && self
                 .toast
                 .as_ref()
                 .is_some_and(|(_, at)| now.duration_since(*at) >= self.toast_time())
+    }
+
+    /// Ponteiro entrou ou saiu do aviso (`zone` 0/1 = pílula, 2/3 = "Desfazer"). Ao sair, o tempo recomeça.
+    pub fn toast_hovered(&mut self, zone: usize, now: Instant) {
+        self.toast_hover[zone / 2] = zone % 2 == 1;
+        if zone.is_multiple_of(2)
+            && let Some((_, at)) = &mut self.toast
+        {
+            *at = now;
+        }
     }
 
     /// Quanto o aviso fica. Desktop: 4 s, e 8 s com "Desfazer" (dá tempo de clicar); tela cheia: `TOAST_TIME`.
