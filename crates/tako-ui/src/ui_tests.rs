@@ -403,6 +403,12 @@ fn desktop_snapshot() {
         );
         i18n::set_lang(Lang::PtBr);
         ctx.library.refresh();
+        // `TAKO_SNAP_TEXT=125`: tamanho do texto (ListaTexto125).
+        if let Ok(t) = std::env::var("TAKO_SNAP_TEXT")
+            && !t.is_empty()
+        {
+            ctx.settings.set(crate::navigation_feedback::TEXT_SIZE, &t);
+        }
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {

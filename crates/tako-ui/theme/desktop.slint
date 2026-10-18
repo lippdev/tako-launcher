@@ -2594,12 +2594,15 @@ component RowScroll inherits Rectangle {
 // Botão redondo de fechar dos popups e painéis (o X; Esc faz o mesmo).
 component CloseButton inherits Rectangle {
     in property <length> size: 32px;
+    // Nome para leitores de tela ("Fechar"): botão só de ícone.
+    in property <string> label;
     callback clicked();
     width: size;
     height: size;
     border-radius: size / 2;
     background: cta.has-hover ? Ui.glass-hover : Ui.glass-control;
     accessible-role: button;
+    accessible-label: label;
     DeskIcon { name: "close"; size: 18px; tint: Ui.on-accent; }
     cta := TouchArea {
         mouse-cursor: pointer;
@@ -2922,6 +2925,7 @@ component DeskOverlay inherits Rectangle {
     in property <bool> leaving;
     in property <string> cancel-label;
     in property <string> ok-label;
+    in property <string> close-label;
     callback clicked(string, int);
     callback menu(length, length);
     callback edited(string, string);
@@ -2976,7 +2980,7 @@ component DeskOverlay inherits Rectangle {
                         Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: 22px * Ui.text-scale; font-weight: 700; overflow: elide; }
                         if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; }
                     }
-                    CloseButton { y: 4px; size: 40px; clicked => { root.clicked("cancel", 0); } }
+                    CloseButton { label: close-label; y: 4px; size: 40px; clicked => { root.clicked("cancel", 0); } }
                 }
                 HorizontalLayout {
                     height: 40px;
@@ -3195,7 +3199,7 @@ component DeskOverlay inherits Rectangle {
                         Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
                         if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
                     }
-                    CloseButton { clicked => { root.clicked("outside", 0); } }
+                    CloseButton { label: close-label; clicked => { root.clicked("outside", 0); } }
                 }
                 // Assistente (com passos): ações no rodapé, "Pular" como texto à esquerda. Outros diálogos: ações
                 // empilhadas em largura total, na ordem do Tako.
@@ -3487,7 +3491,7 @@ component DeskOverlay inherits Rectangle {
                         // No largo, o jogo e as mudanças vão embaixo do título.
                         if ov.overline != "" && ov.wide: Text { text: ov.overline; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; }
                     }
-                    CloseButton { size: 40px; clicked => { root.clicked("outside", 0); } }
+                    CloseButton { label: close-label; size: 40px; clicked => { root.clicked("outside", 0); } }
                 }
                 if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
                 RowScroll {
@@ -3609,7 +3613,7 @@ component DeskOverlay inherits Rectangle {
                 spacing: 14px;
                 HorizontalLayout {
                     Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; horizontal-stretch: 1; }
-                    CloseButton { clicked => { root.clicked("cancel", 0); } }
+                    CloseButton { label: close-label; clicked => { root.clicked("cancel", 0); } }
                 }
                 Rectangle {
                     height: Ui.control-height;
@@ -4150,6 +4154,7 @@ export component Desktop inherits Window {
         ov: ov;
         cancel-label: desk-cancel-label;
         ok-label: desk-ok-label;
+        close-label: desk-window-labels[3];
         top-most: i == overlays.length - 1;
         focus-visible: desk-focus-visible;
         menu-x: menu-x;
