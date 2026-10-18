@@ -111,6 +111,10 @@ pub struct MenuLayer {
     pub accept_label: Option<String>,
     /// Indicador de passos de um assistente (nomes e o atual); o desktop desenha, a tela cheia usa a etiqueta.
     pub steps: (Vec<String>, usize),
+    /// Onboarding do desktop em tela inteira (TelaOnboarding): coluna à esquerda, parede de capas ao fundo e uma
+    /// nota de rodapé.
+    pub full: bool,
+    pub note: String,
 }
 
 impl MenuLayer {
@@ -130,6 +134,8 @@ impl MenuLayer {
             on_back: None,
             accept_label: None,
             steps: (Vec::new(), 0),
+            full: false,
+            note: String::new(),
         }
     }
 
@@ -158,6 +164,13 @@ impl MenuLayer {
 
     pub fn overline(mut self, t: impl Into<String>) -> Self {
         self.overline = t.into();
+        self
+    }
+
+    /// Em tela inteira no desktop (onboarding), com a nota de rodapé.
+    pub fn full(mut self, note: impl Into<String>) -> Self {
+        self.full = true;
+        self.note = note.into();
         self
     }
 
@@ -273,6 +286,10 @@ impl Layer for MenuLayer {
             wide: self.wide,
             tabs: self.steps.0.clone(),
             tab: self.steps.1 as i32,
+            // Onboarding em tela inteira: marca, nota e as capas da parede ao fundo.
+            tab2: i32::from(self.full),
+            input_hint: self.note.clone(),
+            thumbs: if self.full { super::first_run::wall(ctx) } else { Vec::new() },
             ..Default::default()
         }
     }

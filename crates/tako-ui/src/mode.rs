@@ -32,6 +32,21 @@ pub fn start(all: &[String]) -> Start {
     }
 }
 
+/// Configuração "Abrir em" (onboarding, Configurações › Geral › Modo): `desktop` ou `big-picture`.
+pub const OPEN_IN: &str = "OpenIn";
+pub const OPEN_IN_BIG_PICTURE: &str = "big-picture";
+pub const OPEN_IN_DESKTOP: &str = "desktop";
+
+/// O modo de abertura com a preferência "Abrir em": só a abertura sem argumentos (`plain`) segue a preferência;
+/// `--big-picture`, o Console Mode e o supervisor continuam decidindo.
+pub fn preferred(mode: UiMode, plain: bool, settings: &crate::shell::Settings) -> UiMode {
+    if mode == UiMode::Desktop && plain && settings.get(OPEN_IN) == Some(OPEN_IN_BIG_PICTURE) {
+        UiMode::BigPicture
+    } else {
+        mode
+    }
+}
+
 /// Configuração: `false` = "Não perguntar de novo" na pergunta do controle.
 pub const ASK_SETTING: &str = "AskBigPictureWithController";
 
@@ -45,6 +60,16 @@ mod tests {
 
     fn v(a: &[&str]) -> Vec<String> {
         a.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn open_in_full_screen_only_changes_the_plain_start() {
+        let mut settings = crate::shell::Settings::new(None);
+        assert_eq!(preferred(UiMode::Desktop, true, &settings), UiMode::Desktop);
+        settings.set(OPEN_IN, OPEN_IN_BIG_PICTURE);
+        assert_eq!(preferred(UiMode::Desktop, true, &settings), UiMode::BigPicture);
+        // O supervisor reabrindo no desktop (`--desktop`) não é a abertura sem argumentos.
+        assert_eq!(preferred(UiMode::Desktop, false, &settings), UiMode::Desktop);
     }
 
     #[test]

@@ -307,7 +307,7 @@ fn mode_rows(ctx: &Ctx) -> Vec<MenuItem> {
     } else {
         ("desktop.mode.go_desktop", UiMode::Desktop)
     };
-    vec![
+    let mut v = vec![
         MenuItem::new(PanelRow::header(ctx.t("desktop.mode.header"))),
         MenuItem::new(
             PanelRow::action("mode", ctx.t(text))
@@ -327,8 +327,25 @@ fn mode_rows(ctx: &Ctx) -> Vec<MenuItem> {
             ctx.settings.toggle(ASK_SETTING, true);
             Flow::Stay
         }),
-        MenuItem::new(PanelRow::header(ctx.t("desktop.mode.general_header"))),
-    ]
+    ];
+    // "Abrir em" (OnboardingModo): o modo da abertura sem argumentos. Só no desktop; a tela cheia não muda.
+    if ctx.desktop {
+        use crate::mode::{OPEN_IN, OPEN_IN_BIG_PICTURE, OPEN_IN_DESKTOP};
+        let big = ctx.settings.get(OPEN_IN) == Some(OPEN_IN_BIG_PICTURE);
+        v.push(
+            MenuItem::new(PanelRow::choice(
+                "open-in",
+                ctx.t("desktop.mode.open_in"),
+                ctx.t(if big { "first_run.full.mode_full" } else { "first_run.full.mode_window" }),
+            ))
+            .on(move |ctx| {
+                ctx.settings.set(OPEN_IN, if big { OPEN_IN_DESKTOP } else { OPEN_IN_BIG_PICTURE });
+                Flow::Stay
+            }),
+        );
+    }
+    v.push(MenuItem::new(PanelRow::header(ctx.t("desktop.mode.general_header"))));
+    v
 }
 
 // ---------------------------------------------------------------- Aparência

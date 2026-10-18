@@ -383,11 +383,13 @@ impl App {
         crate::shell::performance::mark_start(opts.started.unwrap_or_else(Instant::now));
         let mut ctx = ctx;
         ctx.safe_mode = opts.safe_mode;
-        let (def, dir) = load_mode(&ctx, &builtin, opts.mode)?;
+        // "Abrir em: tela cheia" (onboarding, Configurações › Geral) vale para a abertura sem argumentos.
+        let mode = crate::mode::preferred(opts.mode, opts.ask_big_picture, &ctx.settings);
+        let (def, dir) = load_mode(&ctx, &builtin, mode)?;
         let ui = def.create().map_err(|e| e.to_string())?;
         theme::apply_tokens(&ui, dir.as_deref());
         let mut shell = Shell::new(ctx);
-        if opts.mode == UiMode::Desktop {
+        if mode == UiMode::Desktop {
             shell.enter_desktop();
         }
         shell.pending_link = opts.link.clone();
@@ -399,7 +401,7 @@ impl App {
             });
         }
         if opts.control_center {
-            if opts.mode == UiMode::BigPicture {
+            if mode == UiMode::BigPicture {
                 shell.open_control_center_over_game();
             } else {
                 shell.open_control_center();
@@ -423,19 +425,19 @@ impl App {
             shell.push_layer(Box::new(who));
         }
         shell.ask_big_picture = opts.ask_big_picture
-            && opts.mode == UiMode::Desktop
+            && mode == UiMode::Desktop
             && plain_start
             && shell.ctx.settings.bool(crate::mode::ASK_SETTING, true);
         let shell = Rc::new(RefCell::new(shell));
         crate::tasks::attach(&shell);
         crate::metadata::start_metadata(&shell);
-        host.borrow_mut().mode_changed(opts.mode);
+        host.borrow_mut().mode_changed(mode);
         let app = App {
             ui: Rc::new(RefCell::new(ui)),
             shell,
             host,
             builtin,
-            mode: Rc::new(std::cell::Cell::new(opts.mode)),
+            mode: Rc::new(std::cell::Cell::new(mode)),
         };
         app.wire_ui();
         app.start_input();

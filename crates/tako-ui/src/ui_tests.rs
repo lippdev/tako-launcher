@@ -405,6 +405,14 @@ fn desktop_snapshot() {
                 let layer = crate::shell::first_run::welcome(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("onb-mode") => {
+                let layer = crate::shell::first_run::mode(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("onb-ready") => {
+                let layer = crate::shell::first_run::ready(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
             Ok("ask") => {
                 shell.ctx.pads_connected = 1;
                 shell.ask_big_picture = true;

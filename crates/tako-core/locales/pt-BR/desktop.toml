@@ -55,6 +55,7 @@ go_desktop_desc = "Janela para mouse e teclado, para organizar a biblioteca e co
 go_big_picture = "Ir para a tela cheia"
 go_big_picture_desc = "A interface para controle e TV. Atalho no desktop: F11"
 go_value = "Trocar"
+open_in = "Abrir em"
 ask = "Perguntar pela tela cheia ao achar um controle"
 ask_desc = "Ao abrir o Tako no desktop com um controle conectado"
 cc = "Modo desktop"

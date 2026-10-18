@@ -10,6 +10,8 @@ use crate::model::PanelRow;
 use tako_core::i18n::{self, Lang};
 
 const STEPS: usize = 3;
+/// No desktop o onboarding é em tela inteira e tem mais dois passos: Modo (abrir em janela ou em tela cheia) e Pronto.
+const DESKTOP_STEPS: usize = 5;
 
 /// Instalação nova: nunca concluiu o assistente, nada gravado nas configurações e biblioteca vazia. Quem atualiza
 /// de uma alpha não vê o assistente; marca como concluído para ele não aparecer depois.
@@ -48,12 +50,30 @@ fn step(
     text: &str,
     build: impl Fn(&Ctx) -> Vec<MenuItem> + 'static,
 ) -> MenuLayer {
-    MenuLayer::dialog(ctx.t(title), build)
+    if ctx.desktop {
+        // TelaOnboarding: "n de 5", título grande e a nota de rodapé de cada passo.
+        let total = DESKTOP_STEPS.to_string();
+        // "Pular configuração" em todo passo (fica no topo da tela).
+        let build = move |ctx: &Ctx| {
+            let mut v: Vec<MenuItem> = build(ctx)
+                .into_iter()
+                .filter(|i| i.row.key != "skip")
+                .collect();
+            v.push(MenuItem::new(PanelRow::button("skip", ctx.t("first_run.full.skip"))).on(finish));
+            v
+        };
+        return MenuLayer::dialog(ctx.t(&format!("first_run.full.{title}")), build)
+            .overline(ctx.tf("first_run.count", &[("n", &n.to_string()), ("total", &total)]))
+            .text(ctx.t(&format!("first_run.full.{text}")))
+            .steps((1..=DESKTOP_STEPS).map(|i| i.to_string()).collect(), n - 1)
+            .full(ctx.t(&format!("first_run.full.{title}_note")));
+    }
+    MenuLayer::dialog(ctx.t(&format!("first_run.{title}")), build)
         .overline(ctx.tf(
             "first_run.step",
             &[("n", &n.to_string()), ("total", &STEPS.to_string())],
         ))
-        .text(ctx.t(text))
+        .text(ctx.t(&format!("first_run.{text}")))
         .steps(
             vec![
                 ctx.t("first_run.welcome_short"),
@@ -65,13 +85,30 @@ fn step(
         .wide()
 }
 
+/// Capas da parede ao fundo do onboarding: os jogos que já estão na biblioteca (ambiente, sem foco nem clique).
+pub fn wall(ctx: &Ctx) -> Vec<crate::model::Tile> {
+    ctx.library
+        .games()
+        .iter()
+        .take(15)
+        .map(|g| crate::model::Tile {
+            id: g.id.clone(),
+            title: g.title.clone(),
+            cover: super::tiles::image(g.shown_cover(), super::tiles::COVER),
+            accent: crate::values::parse_color(&g.accent),
+            installed: g.is_installed,
+            ..Default::default()
+        })
+        .collect()
+}
+
 /// Passo 1: idioma. O diálogo é refeito ao trocar, para o próprio texto mudar de idioma.
 pub fn welcome(ctx: &Ctx) -> MenuLayer {
     step(
         ctx,
         1,
-        "first_run.welcome",
-        "first_run.welcome_text",
+        "welcome",
+        "welcome_text",
         |ctx| {
             let mut v: Vec<MenuItem> = [Lang::PtBr, Lang::EnUs]
                 .into_iter()
@@ -104,7 +141,7 @@ pub fn welcome(ctx: &Ctx) -> MenuLayer {
 
 /// Passo 2: lojas que este sistema lê, com o que a leitura achou em cada uma.
 fn stores(ctx: &Ctx) -> MenuLayer {
-    step(ctx, 2, "first_run.stores", "first_run.stores_text", |ctx| {
+    step(ctx, 2, "stores", "stores_text", |ctx| {
         let mut v = library::store_rows(ctx);
         v.push(
             MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
@@ -129,16 +166,124 @@ fn providers(ctx: &Ctx) -> MenuLayer {
     step(
         ctx,
         3,
-        "first_run.metadata",
-        "first_run.metadata_text",
+        "metadata",
+        "metadata_text",
         |ctx| {
             let mut v = providers_rows(ctx);
-            v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
+            if ctx.desktop {
+                v.push(
+                    MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
+                        .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
+                );
+            } else {
+                v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
+            }
             v
         },
     )
     .focus_at(providers_rows(ctx).len())
     .on_back(|ctx| Flow::Replace(Box::new(stores(ctx))))
+}
+
+/// Passo 4 (desktop): abrir o Tako em janela ou em tela cheia. Já vem marcado pelo que está em uso: com um controle
+/// conectado, tela cheia.
+pub(crate) fn mode(ctx: &Ctx) -> MenuLayer {
+    use crate::mode::{OPEN_IN, OPEN_IN_BIG_PICTURE, OPEN_IN_DESKTOP};
+    step(ctx, 4, "mode", "mode_text", |ctx| {
+        let current = ctx.settings.get(OPEN_IN).map(str::to_owned).unwrap_or_else(|| {
+            if ctx.pads_connected > 0 {
+                OPEN_IN_BIG_PICTURE.into()
+            } else {
+                OPEN_IN_DESKTOP.into()
+            }
+        });
+        let mut v: Vec<MenuItem> = [(OPEN_IN_DESKTOP, "window"), (OPEN_IN_BIG_PICTURE, "full")]
+            .into_iter()
+            .map(|(value, key)| {
+                MenuItem::new(
+                    PanelRow::radio(value, ctx.t(&format!("first_run.full.mode_{key}")), current == value)
+                        .desc(ctx.t(&format!("first_run.full.mode_{key}_desc")))
+                        .icon(if key == "window" { "monitor" } else { "tv" }),
+                )
+                .on(move |ctx| {
+                    ctx.settings.set(OPEN_IN, value);
+                    Flow::Stay
+                })
+            })
+            .collect();
+        v.push(
+            MenuItem::new(PanelRow::button("next", ctx.t("first_run.next"))).on(move |ctx| {
+                if ctx.settings.get(OPEN_IN).is_none() {
+                    let value = current.clone();
+                    ctx.settings.set(OPEN_IN, &value);
+                }
+                Flow::Replace(Box::new(ready(ctx)))
+            }),
+        );
+        v
+    })
+    .focus_at(2)
+    .on_back(|ctx| Flow::Replace(Box::new(providers(ctx))))
+}
+
+/// Passo 5 (desktop): o número de verdade e o caminho para a biblioteca.
+pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
+    use tako_core::library::GameStore;
+    let total = ctx.library.games().len();
+    let title = if total == 0 {
+        ctx.t("first_run.full.ready_none")
+    } else {
+        ctx.tf("first_run.full.ready", &[("n", &total.to_string())])
+    };
+    MenuLayer::dialog(title, |ctx| {
+        let lang = ctx.lang();
+        let mut v: Vec<MenuItem> = GameStore::ALL
+            .into_iter()
+            .filter_map(|store| {
+                let n = ctx.library.games().iter().filter(|g| g.store() == store).count();
+                (n > 0).then(|| {
+                    MenuItem::new(
+                        PanelRow::info(
+                            "store",
+                            tako_core::presentation::game_text::store_name(lang, store),
+                            tako_core::presentation::library_text::game_count(lang, n),
+                        )
+                        .icon(super::sidebar::store_icon(store)),
+                    )
+                })
+            })
+            .collect();
+        let big = ctx.settings.get(crate::mode::OPEN_IN) == Some(crate::mode::OPEN_IN_BIG_PICTURE);
+        v.push(
+            MenuItem::new(
+                PanelRow::action(
+                    "change-mode",
+                    ctx.t(if big { "first_run.full.opens_full" } else { "first_run.full.opens_window" }),
+                )
+                .icon(if big { "tv" } else { "pointer" })
+                .value(ctx.t("first_run.full.change")),
+            )
+            .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
+        );
+        v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.full.open_library"))).on(finish));
+        v
+    })
+    .overline(ctx.tf(
+        "first_run.count",
+        &[("n", &DESKTOP_STEPS.to_string()), ("total", &DESKTOP_STEPS.to_string())],
+    ))
+    .text(ctx.t(if total == 0 { "first_run.full.ready_none_text" } else { "first_run.full.ready_text" }))
+    .steps((1..=DESKTOP_STEPS).map(|i| i.to_string()).collect(), DESKTOP_STEPS - 1)
+    .full(ctx.t("first_run.full.ready_note"))
+    // Foco em "Abrir a biblioteca": depois das lojas e da linha do modo.
+    .focus_at(
+        GameStore::ALL
+            .into_iter()
+            .filter(|s| ctx.library.games().iter().any(|g| g.store() == *s))
+            .count()
+            + 1,
+    )
+    .on_back(|ctx| Flow::Replace(Box::new(mode(ctx))))
 }
 
 #[cfg(test)]
@@ -162,6 +307,43 @@ mod tests {
             .iter()
             .map(|r| r.key.to_string())
             .collect()
+    }
+
+    #[test]
+    fn the_desktop_onboarding_has_five_steps_and_saves_how_to_open() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = fresh();
+        ctx.desktop = true;
+        let accept = |layer: &MenuLayer, ctx: &mut Ctx, key: &str| {
+            let item = (layer.build)(ctx).into_iter().find(|i| i.row.key == key).unwrap();
+            (item.accept.unwrap())(ctx)
+        };
+        let next = |flow: Flow| match flow {
+            Flow::Replace(l) => l,
+            _ => panic!("o passo não avançou"),
+        };
+        let welcome = welcome(&ctx);
+        let o = welcome.render(&ctx);
+        assert_eq!((o.tab2, o.tabs.len(), o.tab), (1, 5, 0));
+        assert!(keys_of(&welcome, &ctx).contains(&"skip".to_owned()));
+        let stores = next(accept(&welcome, &mut ctx, "next"));
+        assert_eq!(stores.render(&ctx).tab, 1);
+        // Capas → Modo (no desktop o terceiro passo não termina).
+        let providers = providers(&ctx);
+        let mode_layer = next(accept(&providers, &mut ctx, "next"));
+        assert_eq!(mode_layer.render(&ctx).tab, 3);
+        // Sem controle, "Em janela" já vem marcado; escolher tela cheia grava a preferência.
+        let mode = mode(&ctx);
+        assert!(mode.render(&ctx).rows.iter().any(|r| r.key == crate::mode::OPEN_IN_DESKTOP && r.on));
+        let _ = accept(&mode, &mut ctx, crate::mode::OPEN_IN_BIG_PICTURE);
+        assert_eq!(ctx.settings.get(crate::mode::OPEN_IN), Some(crate::mode::OPEN_IN_BIG_PICTURE));
+        let ready = next(accept(&mode, &mut ctx, "next"));
+        let o = ready.render(&ctx);
+        assert_eq!(o.tab, 4);
+        assert!(o.rows.iter().any(|r| r.key == "done"));
+        // Na tela cheia continua o assistente de três passos.
+        ctx.desktop = false;
+        assert_eq!(super::welcome(&ctx).render(&ctx).tabs.len(), 3);
     }
 
     #[test]

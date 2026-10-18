@@ -55,6 +55,7 @@ go_desktop_desc = "A window for mouse and keyboard, to organize the library and 
 go_big_picture = "Go to full screen"
 go_big_picture_desc = "The interface for controllers and TVs. Shortcut on the desktop: F11"
 go_value = "Switch"
+open_in = "Open in"
 ask = "Offer full screen when a controller is found"
 ask_desc = "When Tako opens on the desktop with a controller connected"
 cc = "Desktop mode"
