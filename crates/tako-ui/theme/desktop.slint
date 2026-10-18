@@ -360,7 +360,7 @@ component DeskButton inherits Rectangle {
     }
 }
 
-// Campo de busca da barra (CampoDeBusca): o texto vai inteiro para o Tako a cada mudança. Esc limpa (ou sai do
+// Campo de busca do conteúdo (CampoDeBusca): o texto vai inteiro para o Tako a cada mudança. Esc limpa (ou sai do
 // campo); ↓ e Enter voltam à lista. O atalho aparece num keycap (Ctrl + K; "Esc" com o campo em foco).
 component SearchBox inherits Rectangle {
     in property <string> text;
@@ -370,6 +370,8 @@ component SearchBox inherits Rectangle {
     in property <bool> focused;
     callback edited(string);
     callback leave();
+    in property <int> focus-request;
+    changed focus-request => { if (self.visible && focus-request > 0) { ti.focus(); } }
     public function focus-input() { ti.focus(); }
     height: Ui.control-height;
     border-radius: Ui.radius-control;
@@ -2399,6 +2401,13 @@ component SortFilter inherits HorizontalLayout {
 // Biblioteca (TelaBiblioteca). Lista: o painel de vidro da lista à esquerda e o destaque à direita. Grade e
 // Categorias: os controles em blocos de vidro soltos no topo e as capas na largura toda. A busca fica na barra.
 component DeskLibrary inherits Rectangle {
+    in property <string> search;
+    in property <string> search-hint;
+    in property <string> search-key;
+    in property <string> search-esc;
+    in property <int> search-focus;
+    callback edited(string);
+
     in property <[string]> tabs;
     in property <int> tab;
     in property <[DeskNav]> collections;
@@ -2476,6 +2485,7 @@ component DeskLibrary inherits Rectangle {
             self.running = false;
             view = view-in;
             mode-in = true;
+            root.focus-main();
         }
     }
     changed tab => {
@@ -2510,6 +2520,16 @@ component DeskLibrary inherits Rectangle {
                     current: tab;
                     focus-index: focus-visible && zone == "tabs" ? zone-index : -1;
                     clicked(i) => { root.clicked("tab", i); }
+                }
+                SearchBox {
+                    height: 40px;
+                    text: search;
+                    hint: search-hint;
+                    key-label: search-key;
+                    esc-label: search-esc;
+                    focus-request: root.wide ? 0 : search-focus;
+                    edited(t) => { root.edited(t); }
+                    leave => { root.clicked("search-leave", 0); root.focus-main(); }
                 }
                 if tab == 2 && collections.length > 0: CollectionSelect {
                     current: collection;
@@ -2655,7 +2675,7 @@ component DeskLibrary inherits Rectangle {
             height: 46px;
             spacing: Ui.space-12;
             Vidro {
-                width: 330px;
+                width: small ? 240px : 330px;
                 Tabs {
                     x: 3px;
                     y: 3px;
@@ -2667,7 +2687,8 @@ component DeskLibrary inherits Rectangle {
                 }
             }
             if view == "grid": Text {
-                text: count;
+                width: small ? 64px : self.preferred-width;
+                text: small ? count-short : count;
                 color: selecting ? Ui.on-accent : Ui.desk-on-muted;
                 font-size: Ui.desk-label;
                 font-weight: selecting ? 700 : 500;
@@ -2675,7 +2696,7 @@ component DeskLibrary inherits Rectangle {
                 overflow: elide;
             }
             if view == "categories": Vidro {
-                width: gl.preferred-width;
+                width: small ? 56px : gl.preferred-width;
                 radius: 23px;
                 accessible-role: button;
                 accessible-label: group-label;
@@ -2683,8 +2704,8 @@ component DeskLibrary inherits Rectangle {
                     padding-left: 18px;
                     padding-right: 14px;
                     spacing: 6px;
-                    Text { text: group-prefix; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
-                    Text { text: group-label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+                    if !small: Text { text: group-prefix; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
+                    if !small: Text { text: group-label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
                     DeskIcon { name: "updown"; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                 }
                 TouchArea {
@@ -2695,16 +2716,7 @@ component DeskLibrary inherits Rectangle {
                     }
                 }
             }
-            if tab == 2 && collections.length > 0: CollectionSelect {
-                y: 3px;
-                width: 280px;
-                current: collection;
-                focused: focus-visible && zone == "collections";
-                clicked => { root.clicked("collection-select", 0); }
-                menu(x, y) => { root.menu(x, y); }
-            }
-            if tab == 2 && collections.length > 0: Rectangle { horizontal-stretch: 1; }
-            if tab != 2 || collections.length == 0: Rectangle { horizontal-stretch: 1; }
+            Rectangle { horizontal-stretch: 1; }
             Vidro {
                 width: sf.preferred-width + 16px;
                 sf := SortFilter {
@@ -2737,6 +2749,14 @@ component DeskLibrary inherits Rectangle {
                     }
                 }
             }
+        }
+        if tab == 2 && collections.length > 0: CollectionSelect {
+            width: 280px;
+            height: 40px;
+            current: collection;
+            focused: focus-visible && zone == "collections";
+            clicked => { root.clicked("collection-select", 0); }
+            menu(x, y) => { root.menu(x, y); }
         }
         Rectangle {
             opacity: intro-covers;
@@ -2794,6 +2814,19 @@ component DeskLibrary inherits Rectangle {
                 }
             }
         }
+    }
+    SearchBox {
+        visible: wide;
+        x: (parent.width - self.width) / 2;
+        y: 1px;
+        width: small ? 280px : 420px;
+        text: search;
+        hint: search-hint;
+        key-label: search-key;
+        esc-label: search-esc;
+        focus-request: root.wide ? search-focus : 0;
+        edited(t) => { root.edited(t); }
+        leave => { root.clicked("search-leave", 0); root.focus-main(); }
     }
 }
 
@@ -3492,6 +3525,13 @@ component PopupFooter inherits HorizontalLayout {
 // no lugar da lista (CategoriaDeConfiguracao); à direita, ancorado no topo, o cabeçalho da categoria e os grupos de
 // linhas, até 860 de largura.
 component DeskSettings inherits Rectangle {
+    in property <string> search;
+    in property <string> search-hint;
+    in property <string> search-key;
+    in property <string> search-esc;
+    in property <int> search-focus;
+    callback edited(string);
+    callback focus-main();
     // Troca de página: o conteúdo entra 16 px em `tempo-pagina`; barra e painel não se mexem de lugar.
     property <bool> shown;
     // Entrada: ligar no `init` não anima (o Slint aplica antes do primeiro quadro); o Timer liga logo depois.
@@ -3545,8 +3585,17 @@ component DeskSettings inherits Rectangle {
                 padding-left: Ui.space-12;
                 padding-right: Ui.space-12;
                 padding-bottom: Ui.space-12;
-                spacing: 6px;
-                HorizontalLayout {
+                spacing: small ? 4px : 6px;
+                SearchBox {
+                    text: search;
+                    hint: search-hint;
+                    key-label: search-key;
+                    esc-label: search-esc;
+                    focus-request: search-focus;
+                    edited(t) => { root.edited(t); }
+                    leave => { root.focus-main(); }
+                }
+                if !small: HorizontalLayout {
                     padding-left: Ui.space-12;
                     Text {
                     height: 36px;
@@ -5981,6 +6030,7 @@ export component Desktop inherits Window {
     changed width => { root.sync-art(); }
     changed height => { root.sync-art(); }
     changed page => {
+        floating-search = false;
         root.sync-art();
         if (page == "desk-library") {
             lib-in = false;
@@ -5999,10 +6049,26 @@ export component Desktop inherits Window {
     }
     changed desk-game => { root.sync-art(); }
 
+    property <int> content-search-focus;
+    property <bool> floating-search;
+    public function focus-content-search() {
+        floating-search = page != "desk-library" && page != "settings";
+        search-timer.running = true;
+    }
+    search-timer := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => { self.running = false; content-search-focus += 1; }
+    }
+    changed desk-search-focus => { root.focus-content-search(); }
 
     // Teclado: o Tako decide o que cada tecla faz; Ctrl+K (ou Ctrl+F) vai para a busca e Ctrl+, para as Configurações.
     fs := FocusScope {
         key-pressed(e) => {
+            if (e.modifiers.control && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && (page == "desk-library" || page == "settings" || page == "desk-profile") && overlays.length == 0) {
+                root.focus-content-search();
+                return accept;
+            }
             if (e.modifiers.control && !e.modifiers.alt && e.text == "," && overlays.length == 0) {
                 root.clicked("desk-nav", 1);
                 return accept;
@@ -6050,6 +6116,12 @@ export component Desktop inherits Window {
                 x: lib-in ? 0 : 16px;
                 opacity: lib-in ? 1 : 0;
                 animate x, opacity { duration: Ui.enter(lib-in); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+                search: desk-search;
+                search-hint: desk-search-hint;
+                search-key: desk-search-key;
+                search-esc: desk-search-esc;
+                search-focus: page == "desk-library" ? content-search-focus : 0;
+                edited(t) => { root.edited("search", t); }
                 tabs: desk-tabs;
                 tab: desk-tab;
                 collections: desk-collections;
@@ -6110,7 +6182,15 @@ export component Desktop inherits Window {
                     root.clicked(z, i);
                 }
             }
-            if page == "settings": DeskSettings {
+            settings := DeskSettings {
+                visible: page == "settings";
+                search: settings-search;
+                search-hint: desk-settings-search-hint;
+                search-key: desk-search-key;
+                search-esc: desk-search-esc;
+                search-focus: page == "settings" ? content-search-focus : 0;
+                edited(t) => { root.edited("search", t); }
+                focus-main => { fs.focus(); }
                 count: settings-count;
                 categories: settings-categories;
                 category-focus: settings-category-focus;
@@ -6131,6 +6211,20 @@ export component Desktop inherits Window {
                 }
             }
         }
+    }
+
+    SearchBox {
+        visible: floating-search && page == "desk-profile";
+        x: (parent.width - self.width) / 2;
+        y: Ui.topbar-height + Ui.space-20;
+        width: root.small ? 280px : 420px;
+        text: desk-search;
+        hint: desk-search-hint;
+        key-label: desk-search-key;
+        esc-label: desk-search-esc;
+        focus-request: content-search-focus;
+        edited(t) => { root.edited("search", t); }
+        leave => { floating-search = false; fs.focus(); }
     }
 
     if control-center: ControlCenter {

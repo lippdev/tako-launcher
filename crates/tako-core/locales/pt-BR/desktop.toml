@@ -1,4 +1,5 @@
 [desktop]
+profile_search = "Buscar no perfil"
 collection_auto = "Auto"
 collections_manage = "Organizar coleções"
 library = "Biblioteca"

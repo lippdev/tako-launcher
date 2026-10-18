@@ -1303,6 +1303,7 @@ impl Page for DesktopLibrary {
                     self.route_filter(),
                 )));
             }
+            "search-leave" => self.zone = Zone::List,
             "clear" => self.clear(),
             "add-game" => ctx.effect(Effect::AddGame),
             "group-store" => ctx.settings.set(GROUP_KEY, GroupBy::Store.key()),
