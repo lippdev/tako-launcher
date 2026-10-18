@@ -2,6 +2,19 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.13]
+### What's new
+- **New first run:** a loading screen with the octopus assembling while Tako looks for your games; stores found, emulators with each one's systems and games and the ROM folder, covers with a before and after and the choice between fetching from IGDB or using only what the stores have, how to open Tako and a final summary with each store and emulator.
+- **Profile:** a new tab in the top bar, with this week's play time in bars, most played games, sessions by day and collections as cards. The background is the art of the month's most played game.
+- **Tags:** the editor shows the game's tags as chips with ×, suggests existing ones (with how many games each has) and creates a new one right from the field.
+- **Review covers:** the queue shows the current and proposed covers side by side, the confidence as a percentage, "Accept" and "Choose another" on each row, "Accept all N" for high confidence and "Undo" after accepting.
+- **Controls:** every connected controller is listed, and the tests are grouped together.
+- **Dialogs:** actions sit in a footer, with the main one on the right.
+- **Opening a game:** the button shows a spinning ring; if it takes long, "Still opening…" and "Cancel" appear.
+- **Toasts:** they stay put while the mouse is over them.
+- **Loading:** the library shows placeholder blocks in the highlight and the cards too.
+- Cut text shows in full on hover, and the game count fits the small window.
+
 ## [0.2.0-alpha.12]
 ### Fixes
 - **Game logo:** games with a logo no longer show the name as text before switching to the logo. While the logo loads, the title space stays reserved, and the logo fades in when it arrives.

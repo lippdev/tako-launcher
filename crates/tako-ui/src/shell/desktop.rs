@@ -34,7 +34,7 @@ fn store_icon(store: GameStore) -> &'static str {
 pub const ROUTE: &str = "desk:library";
 
 /// Miniatura da lista (CapaDoJogo: o quadrado do topo da capa 2:3, mostrado a 40 × 40; 2× para telas densas).
-const THUMB: (u32, u32) = (80, 120);
+pub(crate) const THUMB: (u32, u32) = (80, 120);
 /// Linhas em volta da primeira visível que pedem miniatura.
 const NEAR: usize = 60;
 
@@ -139,9 +139,13 @@ const COVER: (u32, u32) = (344, 516);
 // shortcut: fileira sem virtualização horizontal, corta em 24 capas; virtualizar se pedirem a fileira inteira.
 const ROW_COVERS: usize = 24;
 
-/// Itens da barra superior na ordem do Tab: marca, guia Biblioteca, busca, Tela cheia.
-const BAR_ITEMS: usize = 4;
-const BAR_SEARCH: usize = 2;
+/// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, busca, Tela cheia.
+const BAR_ITEMS: usize = 5;
+const BAR_PROFILE: usize = 2;
+const BAR_SEARCH: usize = 3;
+
+/// Rota que abre a biblioteca numa coleção (`desk:collection:m:<id>` ou `s:<id>`, a chave do SeletorDeColecao).
+pub const COLLECTION_ROUTE: &str = "desk:collection:";
 
 /// Coleção escolhida na aba Coleções: do usuário ou automática (LIB-003).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -365,6 +369,15 @@ impl DesktopLibrary {
         self.zone = Zone::List;
     }
 
+    /// Abre a aba Coleções na coleção `key` (o Perfil › Coleções manda para cá).
+    pub fn open_collection(&mut self, key: &str, ctx: &mut Ctx) {
+        ctx.settings.set(COLLECTION_KEY, key);
+        self.pick = None;
+        self.selected = None;
+        self.open_tab(Tab::Collections, ctx);
+        self.zone = Zone::List;
+    }
+
     pub fn open_tab(&mut self, tab: Tab, ctx: &Ctx) {
         self.tab = tab;
         if tab == Tab::Collections && self.pick.is_none() {
@@ -484,7 +497,7 @@ impl DesktopLibrary {
         }
         match action {
             0 => Nav::Layer(Box::new(dialogs::choose_collections_many(ctx, ids))),
-            1 => Nav::Layer(Box::new(dialogs::choose_tags(ctx, ids, None))),
+            1 => Nav::Layer(dialogs::tags_layer(ctx, ids, None)),
             2 => {
                 // Algum fora dos favoritos: favorita todos; senão tira todos.
                 let fav = ids
@@ -637,6 +650,10 @@ impl DesktopLibrary {
     /// AcoesDoJogo: Jogar, favoritar, ⋯ e a engrenagem; com o jogo aberto, Voltar ao jogo, Encerrar e ⋯.
     fn actions(&self, ctx: &Ctx, g: &Game) -> Vec<Action> {
         if ctx.running.as_ref().is_some_and(|r| r.id == g.id) {
+            // Abrindo: só o anel; o cancelar aparece depois de `LAUNCH_SLOW`.
+            if ctx.launching && !ctx.launch_slow(std::time::Instant::now()) {
+                return vec![Action::Play, Action::More];
+            }
             vec![Action::Play, Action::End, Action::More]
         } else {
             vec![
@@ -711,7 +728,7 @@ impl DesktopLibrary {
 }
 
 /// "Hoje", "Ontem" ou o dia e o mês, para a última sessão e o cartão de Sessões.
-fn day(ctx: &Ctx, at: chrono::DateTime<chrono::Local>) -> String {
+pub(crate) fn day(ctx: &Ctx, at: chrono::DateTime<chrono::Local>) -> String {
     let today = chrono::Local::now().date_naive();
     let d = at.date_naive();
     if d == today {
@@ -1075,11 +1092,12 @@ impl Page for DesktopLibrary {
             (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
             (Zone::Bar, Cmd::Accept) => match self.index {
                 0 => return Nav::Layer(Box::new(brand_menu())),
+                BAR_PROFILE => return Nav::Push(Box::new(super::profile::ProfilePage::new())),
                 BAR_SEARCH => {
                     self.search_focus += 1;
                     self.zone = Zone::List;
                 }
-                3 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
+                4 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
                 _ => self.zone = Zone::List,
             },
             (Zone::Tabs, Cmd::Up) => {
@@ -1366,24 +1384,22 @@ impl Page for DesktopLibrary {
         // Seleção múltipla: só os marcados que continuam na lista contam.
         self.checked.retain(|id| ids.contains(id));
         let checked = self.checked.len();
+        let bulk = (checked > 0).then(|| {
+            ctx.tf(
+                "desktop.bulk.count",
+                &[
+                    ("n", &checked.to_string()),
+                    ("total", &ids.len().to_string()),
+                ],
+            )
+        });
+        let total = library_text::game_count(lang, ids.len());
         out.set(
             "desk-count",
-            if checked > 0 {
-                ctx.tf(
-                    "desktop.bulk.count",
-                    &[
-                        ("n", &checked.to_string()),
-                        ("total", &ids.len().to_string()),
-                    ],
-                )
-            } else {
-                format!(
-                    "{} · {}",
-                    library_text::game_count(lang, ids.len()),
-                    library_text::sort_label(lang, c.sort)
-                )
-            },
+            bulk.clone()
+                .unwrap_or_else(|| format!("{total} · {}", library_text::sort_label(lang, c.sort))),
         );
+        out.set("desk-count-short", bulk.unwrap_or(total));
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
@@ -1561,9 +1577,20 @@ impl Page for DesktopLibrary {
                         .into_iter()
                         .map(|a| match a {
                             Action::Play if running && ctx.launching => {
-                                PanelRow::button("play", ctx.t("desktop.opening"))
-                                    .icon("play")
-                                    .enabled(false)
+                                // Botão travado com o anel girando (JogarEAbrir).
+                                let slow = ctx.launch_slow(std::time::Instant::now());
+                                let mut row = PanelRow::button(
+                                    "play",
+                                    ctx.t(if slow {
+                                        "desktop.opening_slow"
+                                    } else {
+                                        "desktop.opening"
+                                    }),
+                                )
+                                .icon("ring")
+                                .enabled(false);
+                                row.style = "primary".into();
+                                row
                             }
                             Action::Play => {
                                 let (label, icon) = if running {
@@ -1603,6 +1630,12 @@ impl Page for DesktopLibrary {
                             Action::Settings => {
                                 PanelRow::button("settings", ctx.t("details.game_settings"))
                                     .icon("gear")
+                            }
+                            // Abrindo há tempo demais: o mesmo encerrar, com o nome de cancelar.
+                            Action::End if ctx.launching => {
+                                PanelRow::button("end", ctx.t("common.cancel"))
+                                    .icon("close")
+                                    .danger()
                             }
                             Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
                                 .icon("power")
@@ -1746,6 +1779,10 @@ impl Page for DesktopLibrary {
     }
 
     fn desktop(&self) -> Option<&DesktopLibrary> {
+        Some(self)
+    }
+
+    fn desktop_mut(&mut self) -> Option<&mut DesktopLibrary> {
         Some(self)
     }
 
@@ -2014,6 +2051,7 @@ mod tests {
         }
         shell.handle(Cmd::Up);
         assert_eq!(page(&shell).zone(), Zone::Bar);
+        shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Accept);

@@ -371,6 +371,58 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
 /// Captura da janela desktop para conferir com as prévias do design: `TAKO_SNAP_OUT=<pasta>` (obrigatório),
 /// `TAKO_SNAP_ART=<imagem>` (arte do jogo em foco), `TAKO_SNAP_PAGE=settings` e `TAKO_SNAP_CLICK` (opcionais).
 /// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
+/// TelaCarregamento: `TAKO_SNAP_OUT=<pasta>` grava `splash-<progresso>.png` (440 × 600) para cada valor de
+/// `TAKO_SNAP_PROGRESS` (padrão `-1,0.42,1`; negativo = barra indeterminada), depois dos tentáculos assentarem.
+#[test]
+#[ignore = "ferramenta manual de captura"]
+fn splash_snapshot() {
+    let Ok(out_dir) = std::env::var("TAKO_SNAP_OUT") else {
+        return;
+    };
+    std::thread::spawn(move || {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_splash(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        i18n::set_lang(Lang::PtBr);
+        ui.show().unwrap();
+        let (w, h) = (440, 600);
+        window.set_size(slint::PhysicalSize::new(w, h));
+        let progress = std::env::var("TAKO_SNAP_PROGRESS").unwrap_or_else(|_| "-1,0.42,1".into());
+        for p in progress.split(',').filter_map(|p| p.parse::<f32>().ok()) {
+            let state = if p < 0.0 {
+                crate::splash::state(true, 0)
+            } else if p >= 1.0 {
+                crate::splash::state(false, 1000)
+            } else {
+                crate::splash::state(true, (p * 1000.0) as u32)
+            };
+            crate::splash::set(&ui, state);
+            let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+            for _ in 0..30 {
+                slint::platform::update_timers_and_animations();
+                ui.window().request_redraw();
+                window.draw_if_needed(|r| {
+                    r.render(&mut pixels, w as usize);
+                });
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+            image::RgbImage::from_raw(w, h, raw)
+                .unwrap()
+                .save(format!("{out_dir}/splash-{p}.png"))
+                .unwrap();
+        }
+        ui.hide().unwrap();
+    })
+    .join()
+    .unwrap();
+}
+
 #[test]
 #[ignore = "ferramenta manual de captura"]
 fn desktop_snapshot() {
@@ -423,12 +475,38 @@ fn desktop_snapshot() {
             && !t.is_empty()
         {
             ctx.settings.set(crate::navigation_feedback::TEXT_SIZE, &t);
+            // O app passa a escala ao tema fora do `render`: aqui vai direto.
+            let scale = crate::navigation_feedback::text_size(&ctx.settings) as f64 / 100.;
+            ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+                .unwrap();
         }
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("settings") => shell.open_route("settings"),
-            Ok("first-run") => {
+            // `TAKO_SNAP_PAGE=profile` (ou `profile-sessions`, `profile-collections`): a TelaPerfil com sessões
+            // de demonstração na semana.
+            Ok(p) if p.starts_with("profile") => {
+                crate::demo::sessions(&mut shell.ctx);
+                shell.open_route(crate::shell::profile::ROUTE);
+                match p {
+                    "profile-sessions" => shell.click("profile-tab", 1),
+                    "profile-collections" => shell.click("profile-tab", 2),
+                    _ => {}
+                }
+            }
+            Ok("onb-covers") => {
+                // A comparação precisa de um jogo com capa: a arte da captura vira a capa do primeiro.
+                if let Ok(p) = std::env::var("TAKO_SNAP_ART") {
+                    if let Some(g) = shell.ctx.found.lock().unwrap().first_mut() {
+                        g.cover_uri = Some(format!("file://{p}"));
+                    }
+                    shell.ctx.library.refresh();
+                }
+                let layer = crate::shell::first_run::covers(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("first-run" | "onb-stores") => {
                 let layer = crate::shell::first_run::welcome(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
@@ -449,6 +527,95 @@ fn desktop_snapshot() {
                 let layer = crate::shell::art::picker(&shell.ctx, &id);
                 shell.push_layer(layer);
             }
+            // Confirmação destrutiva, erro do jogo, aviso e abrindo (PadraoPopup, ErroDoJogo, Aviso, JogarEAbrir).
+            Ok("exit") => {
+                let layer = crate::shell::dialogs::confirm_exit(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("failed") => {
+                let id = shell.ctx.library.games()[0].id.clone();
+                let layer = crate::shell::dialogs::game_ended_badly(
+                    &shell.ctx,
+                    &id,
+                    tako_core::session::GameEnd::Failed(3),
+                    Some(std::time::Duration::from_secs(12)),
+                );
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("toast") => shell.ctx.toast("Cupom copiado"),
+            Ok("opening") | Ok("opening-slow") => {
+                let g = shell.ctx.library.games()[0].clone();
+                shell.ctx.running = Some(crate::shell::ctx::RunningGame {
+                    id: g.id,
+                    title: g.title,
+                    pid: None,
+                    started: None,
+                });
+                shell.ctx.launching = true;
+                if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("opening-slow") {
+                    shell.ctx.launch_since =
+                        Some(Instant::now() - std::time::Duration::from_secs(30));
+                }
+            }
+            // FilaDeCapas: achados só pelo nome, com nomes mais e menos parecidos, nas Configurações › Capas e metadados.
+            Ok("covers") => {
+                use tako_core::metadata::GameMetadata;
+                let games: Vec<_> = shell.ctx.library.games().iter().take(7).cloned().collect();
+                let variants = [
+                    "{} Remastered",
+                    "Outro Jogo Totalmente Diferente",
+                    "{}: Edition",
+                    "{} 2",
+                    "{} Remake",
+                    "{}!",
+                    "Algo Quase Igual a {}",
+                ];
+                for (g, v) in games.iter().zip(variants) {
+                    let part = GameMetadata {
+                        source_ids: [("IGDB".to_owned(), "77".to_owned())].into(),
+                        title: Some(v.replace("{}", &g.title)),
+                        matched_by_title: true,
+                        cover_url: Some("https://x/c.png".into()),
+                        ..GameMetadata::new("IGDB")
+                    };
+                    let cached = GameMetadata {
+                        parts: vec![part],
+                        ..GameMetadata::new("IGDB")
+                    };
+                    crate::metadata::cache(&shell.ctx)
+                        .write(&g.id, &cached)
+                        .unwrap();
+                }
+                shell.open_route("settings");
+                shell.click("category", 2);
+                // A fila é conferida numa thread: espera ela terminar.
+                for _ in 0..40 {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    if crate::shell::art_review::pending(&shell.ctx).is_some() {
+                        break;
+                    }
+                }
+            }
+            // EtiquetasDoJogo: etiquetas nos primeiros jogos e o editor do primeiro (`TAKO_SNAP_TYPE=<texto>` digita).
+            Ok("tags") => {
+                let ids: Vec<String> = (0..3)
+                    .map(|i| shell.ctx.library.games()[i].id.clone())
+                    .collect();
+                for (tag, n) in [
+                    ("Zerado", 3),
+                    ("Co-op", 2),
+                    ("Com mods", 1),
+                    ("Para zerar depois", 1),
+                ] {
+                    shell.ctx.library.set_tag(&ids[..n], tag, true).unwrap();
+                }
+                shell.ctx.library.set_tag(&ids[..1], "Sofá", true).unwrap();
+                let layer = crate::shell::dialogs::tags_layer(&shell.ctx, ids[..1].to_vec(), None);
+                shell.push_layer(layer);
+                if let Ok(t) = std::env::var("TAKO_SNAP_TYPE") {
+                    shell.edited("overlay-input", &t);
+                }
+            }
             Ok("ask") => {
                 shell.ctx.pads_connected = 1;
                 shell.ask_big_picture = true;
@@ -464,6 +631,13 @@ fn desktop_snapshot() {
             if let Some((zone, i)) = click.split_once(':') {
                 shell.click(zone, i.parse().unwrap_or(0));
             }
+        }
+        if let Some(t) = std::env::var("TAKO_SNAP_TEXT")
+            .ok()
+            .and_then(|t| t.parse::<f64>().ok())
+        {
+            ui.set_global_property("Ui", "text-scale", Value::Number(t / 100.))
+                .unwrap();
         }
         // Entrada do app: apagado desde o primeiro quadro, como na abertura.
         if switch.as_deref() == Some("intro") {
@@ -481,6 +655,16 @@ fn desktop_snapshot() {
             let out = shell.render(Instant::now());
             for (name, value) in &out.props {
                 let mut value = value.clone();
+                // `TAKO_SNAP_LOADING=1`: biblioteca lendo (EstadoCarregando).
+                if std::env::var("TAKO_SNAP_LOADING").is_ok() {
+                    match (*name, &mut value) {
+                        ("desk-loading", v) => *v = Value::Bool(true),
+                        ("desk-game", Value::Struct(s)) => {
+                            s.set_field("has-game".into(), Value::Bool(false));
+                        }
+                        _ => {}
+                    }
+                }
                 if let (Some((art, blur, lum)), "desk-game", Value::Struct(s)) =
                     (art, *name, &mut value)
                 {

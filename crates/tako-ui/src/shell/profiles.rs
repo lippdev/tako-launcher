@@ -143,6 +143,11 @@ pub fn panel(ctx: &Ctx) -> MenuLayer {
     .text(ctx.t("profiles.text"))
 }
 
+/// Editar perfil (TelaPerfil): o diálogo do perfil em uso.
+pub fn manage_active(ctx: &Ctx) -> MenuLayer {
+    manage(ctx, &load(ctx).active)
+}
+
 /// Um perfil: usar, renomear ou apagar (o principal e o em uso não se apagam).
 fn manage(ctx: &Ctx, id: &str) -> MenuLayer {
     let p = load(ctx);

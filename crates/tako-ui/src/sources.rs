@@ -44,9 +44,10 @@ pub fn scan(
     disabled: &str,
     steam_owned: Option<std::path::PathBuf>,
     emulators: Config,
+    progress: impl FnMut(usize, usize),
 ) -> (Vec<Game>, Vec<LibrarySourceReport>) {
     let mut sources = LibrarySources::new(all_sources(steam_owned, emulators));
-    let games = sources.discover(|s| !is_disabled(disabled, s));
+    let games = sources.discover_with(|s| !is_disabled(disabled, s), progress);
     let reports = sources.reports().values().cloned().collect();
     (games, reports)
 }

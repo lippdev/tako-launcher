@@ -9,7 +9,7 @@ theme_struct! {
 
 theme_struct! {
     /// Linha de painel, configuração ou diálogo. `kind`: toggle, choice, action, info, header, radio, check,
-    /// slider, text, button. `style`: "", "primary" ou "danger".
+    /// slider, text, button. `style`: "", "primary", "danger" ou "link".
     pub struct PanelRow {
         pub key: String,
         pub kind: String,
@@ -96,6 +96,11 @@ impl PanelRow {
     }
     pub fn danger(mut self) -> Self {
         self.style = "danger".into();
+        self
+    }
+    /// Ação de texto à esquerda do rodapé do popup do desktop ("Agora não", "Salvar relatório"); a tela cheia ignora.
+    pub fn link(mut self) -> Self {
+        self.style = "link".into();
         self
     }
     pub fn enabled(mut self, e: bool) -> Self {
@@ -188,6 +193,10 @@ theme_struct! {
         pub rows: Vec<PanelRow>,
         pub sel: i32,
         pub wide: bool,
+        // Desktop: as ações vão para o rodapé do popup (link à esquerda, principal por último).
+        pub footer: bool,
+        // Desktop: popup só com título, texto e ações (tamanho S, 440).
+        pub compact: bool,
         pub image: Image,
         pub keys: Vec<Key>,
         pub key_cols: i32,
@@ -239,6 +248,25 @@ theme_struct! {
         pub dot: bool,
         // Etiquetas do usuário (LIB-002), como chips.
         pub chips: Vec<String>,
+    }
+}
+
+theme_struct! {
+    /// Linha da fila de capas (FilaDeCapas), em paralelo às linhas das Configurações (só o desktop).
+    pub struct CoverRow {
+        pub current: Image,
+        pub has_current: bool,
+        pub proposed: Image,
+        pub has_proposed: bool,
+        // Texto no lugar da capa atual ("Sem capa").
+        pub current_label: String,
+        // Barrinhas preenchidas: 3 alta, 2 média, 1 baixa, 0 sem proposta.
+        pub level: i32,
+        // "Confiança média · 71%" e o motivo, em português.
+        pub confidence: String,
+        pub reason: String,
+        pub accept: String,
+        pub other: String,
     }
 }
 
@@ -300,5 +328,89 @@ theme_struct! {
         pub show_logo: bool,
         // O logo ainda carrega: o título fica vazio (nem o nome em texto) até ele chegar.
         pub title_pending: bool,
+    }
+}
+
+theme_struct! {
+    /// TelaPerfil: uma barra do gráfico da semana (segunda a domingo).
+    pub struct DeskBar {
+        pub label: String,
+        // Só hoje tem o valor escrito.
+        pub value: String,
+        // Altura da barra, de 0 a 1 (o dia com mais tempo = 1).
+        pub fraction: f32,
+        pub today: bool,
+        // Dia que ainda não chegou (tracejado).
+        pub future: bool,
+    }
+}
+
+theme_struct! {
+    /// TelaPerfil: linha com capa (mais jogados, sessões, capas das coleções) ou cabeçalho de dia (`header`).
+    pub struct DeskEntry {
+        pub id: String,
+        pub title: String,
+        pub detail: String,
+        // Texto à direita antes do valor ("42 h no jogo").
+        pub note: String,
+        pub value: String,
+        pub thumb: Image,
+        pub accent: Color,
+        // Trilho proporcional (mais jogados), de 0 a 1.
+        pub fraction: f32,
+        // Ponto verde (jogando agora).
+        pub dot: bool,
+        pub header: bool,
+        // Guia Sessões: o índice da linha sem os cabeçalhos de dia (o que o tema manda no clique).
+        pub row: i32,
+    }
+}
+
+theme_struct! {
+    /// PerfilColecoes: um cartão de coleção (do usuário ou automática).
+    pub struct DeskCard {
+        pub title: String,
+        pub count: String,
+        pub auto: bool,
+        pub covers: Vec<DeskEntry>,
+    }
+}
+
+theme_struct! {
+    /// TelaPerfil inteira (Visão geral, Sessões e Coleções).
+    pub struct DeskProfile {
+        pub name: String,
+        pub initial: String,
+        // Linha de estado: "Perfil principal", "Jogando … · 42 min" (com `dot`), "Jogou por último hoje".
+        pub line: Vec<DeskInfo>,
+        pub playing: bool,
+        pub tabs: Vec<String>,
+        pub tab: i32,
+        // Ações em ícone: ícone e nome (o nome aparece no hover e no foco).
+        pub actions: Vec<DeskInfo>,
+        // Blocos: rótulo e valor (Tempo jogado, Mais jogado, Jogos na biblioteca).
+        pub tiles: Vec<DeskInfo>,
+        pub week_label: String,
+        pub week_total: String,
+        pub week: Vec<DeskBar>,
+        // Leitura do gráfico para o leitor de tela ("segunda 40 min, …").
+        pub week_text: String,
+        pub top: Vec<DeskEntry>,
+        pub fan: Vec<DeskEntry>,
+        pub recent_title: String,
+        pub see_all: String,
+        pub recent: Vec<DeskEntry>,
+        pub empty: String,
+        pub periods: Vec<String>,
+        pub period: i32,
+        pub summary: String,
+        pub sessions: Vec<DeskEntry>,
+        pub cards_summary: String,
+        pub cards: Vec<DeskCard>,
+        pub auto_label: String,
+        pub new_label: String,
+        pub new_text: String,
+        pub zone: String,
+        pub index: i32,
     }
 }

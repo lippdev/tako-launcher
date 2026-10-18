@@ -21,11 +21,13 @@ pub mod layer;
 pub mod library;
 mod links;
 pub mod performance;
+pub mod profile;
 pub mod profiles;
 pub mod settings;
 pub mod sidebar;
 pub mod smart;
 pub mod source_ids;
+pub mod tags_editor;
 pub mod tiles;
 
 pub use ctx::{Ctx, Effect, InputKind, RunningGame, Settings};
@@ -111,8 +113,13 @@ pub trait Page {
     fn desktop(&self) -> Option<&desktop::DesktopLibrary> {
         None
     }
+    fn desktop_mut(&mut self) -> Option<&mut desktop::DesktopLibrary> {
+        None
+    }
 }
 
+/// Abrindo o jogo há mais que isso: "Ainda abrindo…" e "Cancelar" (JogarEAbrir).
+pub const LAUNCH_SLOW: Duration = Duration::from_secs(20);
 pub const TOAST_TIME: Duration = Duration::from_millis(2600);
 
 pub struct Shell {
@@ -180,7 +187,7 @@ impl Shell {
         self.pages.first()?.desktop()
     }
 
-    /// Barra superior do desktop: Biblioteca, Configurações e Tela cheia.
+    /// Barra superior do desktop: Biblioteca, Configurações, Tela cheia e Perfil (3).
     fn desktop_nav(&mut self, index: usize) {
         self.layers.clear();
         match index {
@@ -192,6 +199,10 @@ impl Shell {
             2 => self
                 .ctx
                 .effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
+            3 if self.page().kind() != profile::KIND => {
+                self.pages.truncate(1);
+                self.pages.push(Box::new(profile::ProfilePage::new()));
+            }
             _ => {}
         }
         self.ctx.dirty = true;
@@ -250,7 +261,19 @@ impl Shell {
     pub fn open_route(&mut self, route: &str) {
         // No desktop as rotas são as da barra de cima (links e atalhos da tela cheia caem aqui).
         if self.ctx.desktop {
-            self.desktop_nav(usize::from(route == "settings"));
+            if let Some(key) = route.strip_prefix(desktop::COLLECTION_ROUTE) {
+                self.desktop_nav(0);
+                let Shell { pages, ctx, .. } = self;
+                if let Some(lib) = pages[0].desktop_mut() {
+                    lib.open_collection(key, ctx);
+                }
+                return;
+            }
+            self.desktop_nav(match route {
+                "settings" => 1,
+                profile::ROUTE => 3,
+                _ => 0,
+            });
             return;
         }
         let page: Box<dyn Page> = match route {
@@ -467,6 +490,11 @@ impl Shell {
     }
 
     pub fn hover(&mut self, zone: &str, index: usize) {
+        if zone == "toast" {
+            self.ctx.toast_hovered(index.min(3), Instant::now());
+            self.ctx.dirty = true;
+            return;
+        }
         if let Some(rest) = zone.strip_prefix("overlay-") {
             if let Some(top) = self.layers.last_mut() {
                 top.hover(rest, index);
@@ -777,7 +805,7 @@ impl Shell {
         out
     }
 
-    /// Barra de cima do desktop: as guias das áreas (Biblioteca; Loja e Perfil quando existirem), a busca e o botão
+    /// Barra de cima do desktop: as guias das áreas (Biblioteca e Perfil; Loja quando existir), a busca e o botão
     /// da tela cheia. Configurações fica no menu da marca.
     fn render_desktop_bar(&self, out: &mut Out) {
         let kind = self.page().kind();
@@ -790,12 +818,10 @@ impl Shell {
         };
         out.set(
             "desk-nav",
-            vec![item(
-                "library",
-                "desktop.library",
-                "grid",
-                kind == "desk-library",
-            )],
+            vec![
+                item("library", "desktop.library", "grid", kind == "desk-library"),
+                item("profile", "profile.tab", "user", kind == profile::KIND),
+            ],
         );
         out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
         out.set(
@@ -875,5 +901,25 @@ mod tests {
         shell.hover("row-0", 5);
         shell.click("row-0", 5);
         assert!(!shell.ctx.pointer);
+    }
+
+    #[test]
+    fn hovered_toast_does_not_expire_and_restarts_on_leave() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        let mut shell = Shell::new(ctx);
+        shell.ctx.toast("oi");
+        let late = Instant::now() + Duration::from_secs(60);
+        assert!(shell.ctx.toast_expired(late));
+        shell.hover("toast", 1);
+        assert!(!shell.ctx.toast_expired(late));
+        // Sair da pílula reinicia a contagem.
+        shell.hover("toast", 0);
+        assert!(!shell.ctx.toast_expired(Instant::now()));
+        assert!(shell.ctx.toast_expired(late));
     }
 }

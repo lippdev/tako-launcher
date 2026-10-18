@@ -109,6 +109,33 @@ pub struct MenuItem {
     pub options: Option<Options>,
     /// No desktop, o controle deslizante (arrastar, trilha, roda, Home/End) vai direto a um valor.
     pub slide: Option<Slide>,
+    /// Desktop: linha da fila de capas (duas ações dentro da linha: `accept` e `alt`).
+    pub cover: Option<crate::model::CoverRow>,
+    pub alt: Option<Action>,
+}
+
+/// Rodapé do popup (PadraoPopup): de 1 a 3 ações, todas no fim da lista; mais que isso segue empilhado.
+pub(crate) fn footer_fits(rows: &[PanelRow]) -> bool {
+    let n = rows.iter().filter(|r| r.kind == "button").count();
+    let tail = rows.len() - n;
+    (1..=3).contains(&n) && rows[tail..].iter().all(|r| r.kind == "button")
+}
+
+/// A principal é a primeira ação (ordem do Tako) que não é link; só uma por popup. Destrutivo nunca vira a pílula
+/// branca: a ação fica em `error` no vidro (PadraoPopup).
+pub(crate) fn mark_primary(rows: &mut [PanelRow]) {
+    if rows
+        .iter()
+        .any(|r| r.style == "primary" || r.style == "danger")
+    {
+        return;
+    }
+    if let Some(r) = rows
+        .iter_mut()
+        .find(|r| r.kind == "button" && r.style != "link")
+    {
+        r.style = "primary".into();
+    }
 }
 
 impl MenuItem {
@@ -127,7 +154,18 @@ impl MenuItem {
             adjust: None,
             options: None,
             slide: None,
+            cover: None,
+            alt: None,
         }
+    }
+    pub fn cover(
+        mut self,
+        c: crate::model::CoverRow,
+        alt: impl Fn(&mut Ctx) -> Flow + 'static,
+    ) -> Self {
+        self.cover = Some(c);
+        self.alt = Some(Rc::new(alt));
+        self
     }
     pub fn on_slide(mut self, f: impl Fn(&mut Ctx, i32, bool) -> Flow + 'static) -> Self {
         self.slide = Some(Rc::new(f));
@@ -423,6 +461,15 @@ impl Layer for MenuLayer {
     fn render(&self, ctx: &Ctx) -> Overlay {
         let items = self.items(ctx);
         let focus = self.current(&items).map(|i| i as i32).unwrap_or(-1);
+        let mut rows: Vec<PanelRow> = items.into_iter().map(|i| i.shown(ctx)).collect();
+        let footer = ctx.desktop
+            && matches!(self.kind, MenuKind::Dialog)
+            && !self.full
+            && self.steps.0.is_empty()
+            && footer_fits(&rows);
+        if footer {
+            mark_primary(&mut rows);
+        }
         Overlay {
             kind: match self.kind {
                 MenuKind::Panel => "panel",
@@ -433,13 +480,24 @@ impl Layer for MenuLayer {
             title: self.title.clone(),
             overline: self.overline.clone(),
             text: self.text.clone(),
-            rows: items.into_iter().map(|i| i.shown(ctx)).collect(),
+            footer,
+            // Confirmação curta (S, 440): só título, uma ou duas frases e as ações.
+            compact: footer
+                && rows.iter().all(|r| r.kind == "button")
+                && self.text.chars().count() <= 100,
+            rows,
             sel: focus,
             wide: self.wide,
             tabs: self.steps.0.clone(),
             tab: self.steps.1 as i32,
             // Onboarding em tela inteira: marca, nota e as capas da parede ao fundo.
             tab2: i32::from(self.full),
+            // Onboarding: o "n de 5" vira "‹ Voltar" no hover.
+            tabs2: if self.full {
+                vec![ctx.t("first_run.full.back")]
+            } else {
+                Vec::new()
+            },
             input_hint: self.note.clone(),
             image: self.image.clone(),
             thumbs: if self.full {
@@ -491,5 +549,34 @@ impl Layer for MenuLayer {
         if zone == "row" {
             self.focus = index;
         }
+    }
+}
+
+#[cfg(test)]
+mod footer_tests {
+    use super::*;
+
+    fn b(key: &str) -> PanelRow {
+        PanelRow::button(key, key)
+    }
+
+    #[test]
+    fn footer_takes_up_to_three_trailing_actions() {
+        assert!(footer_fits(&[PanelRow::info("a", "a", "b"), b("ok")]));
+        assert!(footer_fits(&[b("a"), b("b"), b("c")]));
+        assert!(!footer_fits(&[b("a"), b("b"), b("c"), b("d")]));
+        assert!(!footer_fits(&[b("a"), PanelRow::info("a", "a", "b")]));
+        assert!(!footer_fits(&[]));
+    }
+
+    #[test]
+    fn primary_is_the_first_non_link_and_never_beside_a_destructive_action() {
+        let mut rows = vec![b("later").link(), b("now"), b("other")];
+        mark_primary(&mut rows);
+        assert_eq!(rows[1].style, "primary");
+        assert_eq!(rows[2].style, "");
+        let mut rows = vec![b("delete").danger(), b("cancel")];
+        mark_primary(&mut rows);
+        assert!(rows.iter().all(|r| r.style != "primary"));
     }
 }

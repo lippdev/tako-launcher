@@ -8,6 +8,9 @@ use super::settings::{library, metadata};
 use super::{Ctx, Shell};
 use crate::model::PanelRow;
 use tako_core::i18n::{self, Lang};
+use tako_core::library::Game;
+use tako_sources::emulators::emulator::Emulator;
+use tako_sources::emulators::{Installed, systems};
 
 const STEPS: usize = 3;
 /// No desktop o onboarding é em tela inteira e tem mais dois passos: Modo (abrir em janela ou em tela cheia) e Pronto.
@@ -90,12 +93,23 @@ fn step(
         .wide()
 }
 
+const WALL: usize = 15;
+
+/// Jogo da comparação do passo das capas: o primeiro da parede que já tem capa (posição na parede).
+fn compare_game(ctx: &Ctx) -> Option<usize> {
+    ctx.library
+        .games()
+        .iter()
+        .take(WALL)
+        .position(|g| g.shown_cover().is_some())
+}
+
 /// Capas da parede ao fundo do onboarding: os jogos que já estão na biblioteca (ambiente, sem foco nem clique).
 pub fn wall(ctx: &Ctx) -> Vec<crate::model::Tile> {
     ctx.library
         .games()
         .iter()
-        .take(15)
+        .take(WALL)
         .map(|g| crate::model::Tile {
             id: g.id.clone(),
             title: g.title.clone(),
@@ -235,14 +249,172 @@ fn desktop_stores(ctx: &Ctx) -> MenuLayer {
     .on_back(finish)
 }
 
-/// Passo 2 (desktop): emuladores e pastas de ROMs (os mesmos controles de Configurações › Emuladores e ROMs).
+/// Jogos de cada emulador achado: vale o executável que a leitura gravou no jogo (o que de fato abre a ROM).
+fn by_emulator<'a>(games: &'a [Game], found: &Installed) -> Vec<(Emulator, Vec<&'a Game>)> {
+    found
+        .programs
+        .iter()
+        .map(|(&e, p)| {
+            let target = p.target.to_string_lossy();
+            let mine = games
+                .iter()
+                .filter(|g| g.is_rom())
+                .filter(|g| match &p.flatpak {
+                    // Flatpak: o executável é o mesmo para todos; o id vai nos argumentos.
+                    Some(id) => g
+                        .launch_arguments
+                        .as_deref()
+                        .is_some_and(|a| a.contains(id)),
+                    None => g.launch_target.as_deref() == Some(&*target),
+                })
+                .collect();
+            (e, mine)
+        })
+        .collect()
+}
+
+/// Nome do sistema da ROM ("Super Nintendo"), pela chave gravada no jogo.
+fn system_name(g: &Game) -> Option<&'static str> {
+    let p = g.platform.as_deref()?;
+    systems::SYSTEMS
+        .iter()
+        .find(|s| systems::platform_key(s.id) == p)
+        .map(|s| s.name)
+}
+
+/// Logo oficial do emulador (os que o tema tem) ou as iniciais num selo.
+fn emulator_icon(e: Emulator) -> String {
+    format!("emu-{}", e.key())
+}
+
+/// Passo 2 (desktop, OnboardingEmuladores): os emuladores deste PC com os sistemas e quantos jogos cada um abre, a
+/// pasta de ROMs, **Continuar**, **Adicionar emulador…** e "Não uso emuladores".
 pub(crate) fn emulators(ctx: &Ctx) -> MenuLayer {
-    let cache = super::settings::emulators::Cache::default();
+    use super::settings::emulators as emu;
+    let cache = emu::Cache::default();
     step(ctx, 2, "emulators", "emulators_text", move |ctx| {
-        let mut v = super::settings::emulators::rows(ctx, &cache);
+        let lang = ctx.lang();
+        let found = emu::installed(&cache, ctx);
+        let games = ctx.library.games();
+        let mut v: Vec<MenuItem> = by_emulator(games, &found)
+            .into_iter()
+            .map(|(e, mine)| {
+                let mut names: Vec<&str> = mine.iter().filter_map(|g| system_name(g)).collect();
+                names.sort_unstable();
+                names.dedup();
+                let desc = if mine.is_empty() {
+                    ctx.t("first_run.full.emu_no_games")
+                } else {
+                    let count = tako_core::presentation::library_text::game_count(lang, mine.len());
+                    if names.is_empty() {
+                        count
+                    } else {
+                        format!("{} · {count}", names.join(", "))
+                    }
+                };
+                let mut row = PanelRow::info(format!("emu:{}", e.key()), e.name(), "")
+                    .desc(desc)
+                    .icon(&emulator_icon(e))
+                    .emphasized(true);
+                row.on = true;
+                MenuItem::new(row)
+            })
+            .collect();
+        // Os não instalados completam até quatro linhas, apagados: mostram o que o Tako sabe abrir.
+        let missing = Emulator::ALL
+            .into_iter()
+            .filter(|e| !found.programs.contains_key(e))
+            .take(4usize.saturating_sub(v.len()));
+        v.extend(missing.map(|e| {
+            MenuItem::new(
+                PanelRow::info(format!("emu:{}", e.key()), e.name(), "")
+                    .desc(ctx.t("first_run.full.stores_missing"))
+                    .icon(&emulator_icon(e))
+                    .enabled(false)
+                    .emphasized(true),
+            )
+        }));
+        // Pasta de ROMs em linha própria, com quantos jogos e sistemas achou.
+        let folders = emu::config(ctx).rom_folders;
+        for (i, f) in folders.iter().enumerate() {
+            let inside: Vec<&Game> = games
+                .iter()
+                .filter(|g| {
+                    g.rom_path
+                        .as_deref()
+                        .is_some_and(|p| std::path::Path::new(p).starts_with(&f.path))
+                })
+                .collect();
+            let mut names: Vec<&str> = inside.iter().filter_map(|g| system_name(g)).collect();
+            names.sort_unstable();
+            names.dedup();
+            let desc = format!(
+                "{} · {}",
+                f.path.to_string_lossy(),
+                ctx.tf(
+                    "first_run.full.roms_found",
+                    &[
+                        (
+                            "games",
+                            &tako_core::presentation::library_text::game_count(lang, inside.len()),
+                        ),
+                        (
+                            "systems",
+                            &i18n::tn("first_run.full.systems", names.len() as i64, &[]),
+                        ),
+                    ],
+                ),
+            );
+            v.push(
+                MenuItem::new(
+                    PanelRow {
+                        style: "card".into(),
+                        ..PanelRow::action(format!("roms:{i}"), ctx.t("first_run.full.roms"))
+                    }
+                    .desc(desc)
+                    .icon("folder")
+                    .value(ctx.t("first_run.full.change")),
+                )
+                .on(move |ctx| {
+                    emu::replace_folder(ctx, i);
+                    Flow::Stay
+                }),
+            );
+        }
+        if folders.is_empty() {
+            v.push(
+                MenuItem::new(
+                    PanelRow {
+                        style: "card".into(),
+                        ..PanelRow::action("roms", ctx.t("first_run.full.roms"))
+                    }
+                    .desc(ctx.t("first_run.full.roms_none"))
+                    .icon("folder")
+                    .value(ctx.t("first_run.full.roms_choose")),
+                )
+                .on(|ctx| {
+                    emu::add_folder(ctx);
+                    Flow::Stay
+                }),
+            );
+        }
         v.push(
             MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
                 .on(|ctx| Flow::Replace(Box::new(providers(ctx)))),
+        );
+        v.push(
+            MenuItem::new(PanelRow::button(
+                "add-emulator",
+                ctx.t("first_run.full.add_emulator"),
+            ))
+            .on(|ctx| Flow::Push(Box::new(emu::panel(ctx)))),
+        );
+        v.push(
+            MenuItem::new(PanelRow {
+                style: "link".into(),
+                ..PanelRow::button("no-emulators", ctx.t("first_run.full.no_emulators"))
+            })
+            .on(|ctx| Flow::Replace(Box::new(providers(ctx)))),
         );
         v
     })
@@ -258,35 +430,136 @@ fn providers_rows(ctx: &Ctx) -> Vec<MenuItem> {
 }
 
 fn providers(ctx: &Ctx) -> MenuLayer {
+    if ctx.desktop {
+        return covers(ctx);
+    }
     step(ctx, 3, "metadata", "metadata_text", |ctx| {
         let mut v = providers_rows(ctx);
-        if ctx.desktop {
-            v.push(
-                MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
-                    .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
-            );
-            v.push(
-                MenuItem::new(PanelRow::button("back", ctx.t("first_run.full.back"))).on(|ctx| {
-                    if super::settings::emulators::anything_found(ctx) {
-                        Flow::Replace(Box::new(emulators(ctx)))
-                    } else {
-                        Flow::Replace(Box::new(stores(ctx)))
-                    }
-                }),
-            );
-        } else {
-            v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
-        }
+        v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
         v
     })
     .focus_at(providers_rows(ctx).len())
-    .on_back(|ctx| {
-        if ctx.desktop && super::settings::emulators::anything_found(ctx) {
-            Flow::Replace(Box::new(emulators(ctx)))
-        } else {
-            Flow::Replace(Box::new(stores(ctx)))
+    .on_back(|ctx| Flow::Replace(Box::new(stores(ctx))))
+}
+
+/// Voltar das capas: aos emuladores quando o passo existe; senão às lojas.
+fn before_covers(ctx: &mut Ctx) -> Flow {
+    if super::settings::emulators::anything_found(ctx) {
+        Flow::Replace(Box::new(emulators(ctx)))
+    } else {
+        Flow::Replace(Box::new(stores(ctx)))
+    }
+}
+
+/// Internet para a IGDB: 0 = ainda não sabe, 1 = com conexão, 2 = sem.
+static ONLINE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// Confere uma vez, numa thread, se a IGDB responde (OnboardingCapas avisa quando não).
+fn check_online() {
+    use std::sync::atomic::Ordering;
+    if ONLINE
+        .compare_exchange(0, 3, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+    let _ = std::thread::Builder::new()
+        .name("tako-online".into())
+        .spawn(|| {
+            use std::net::ToSocketAddrs;
+            let ok = ("api.igdb.com", 443)
+                .to_socket_addrs()
+                .ok()
+                .and_then(|mut a| a.next())
+                .is_some_and(|a| {
+                    std::net::TcpStream::connect_timeout(&a, std::time::Duration::from_secs(4))
+                        .is_ok()
+                });
+            ONLINE.store(if ok { 1 } else { 2 }, Ordering::SeqCst);
+            let _ = slint::invoke_from_event_loop(|| {
+                if let Some(shell) = crate::tasks::shell() {
+                    shell.borrow_mut().ctx.dirty = true;
+                }
+            });
+        });
+}
+
+/// Liga ou desliga a IGDB (a escolha do passo das capas).
+fn choose_igdb(ctx: &mut Ctx, on: bool) -> Flow {
+    metadata::update(ctx, |p| p.igdb.enabled = on);
+    // Sem a chave da Twitch a IGDB não responde: abre o painel para colar.
+    if on && !metadata::providers(ctx).igdb.has_key() {
+        return Flow::Push(Box::new(metadata::igdb_panel(ctx)));
+    }
+    Flow::Stay
+}
+
+/// Passo 3 (desktop, OnboardingCapas): a capa de um jogo de verdade sem arte e com arte, e as duas opções
+/// (EscolhaDoOnboarding em linha): buscar na IGDB ou usar só o que as lojas têm. ←→ trocam.
+pub(crate) fn covers(ctx: &Ctx) -> MenuLayer {
+    check_online();
+    step(ctx, 3, "metadata", "metadata_text", |ctx| {
+        let igdb = metadata::providers(ctx).igdb;
+        let mut v = Vec::new();
+        // Comparação: o primeiro jogo da parede que já tem capa (índice na parede, para o tema achar a cor e a capa).
+        if let Some(i) = compare_game(ctx) {
+            v.push(MenuItem::new(
+                PanelRow::new("compare", "compare", ctx.t("first_run.full.cover_none"))
+                    .desc(ctx.t("first_run.full.cover_with"))
+                    .value(i.to_string()),
+            ));
         }
+        let games = ctx.library.games().len();
+        let mut igdb_desc = if igdb.has_key() {
+            ctx.tf(
+                "first_run.full.igdb_desc",
+                &[(
+                    "games",
+                    &tako_core::presentation::library_text::game_count(ctx.lang(), games),
+                )],
+            )
+        } else {
+            ctx.t("first_run.full.igdb_key_desc")
+        };
+        if igdb.enabled && ONLINE.load(std::sync::atomic::Ordering::SeqCst) == 2 {
+            igdb_desc = ctx.t("first_run.full.igdb_offline");
+        }
+        let toggle = |ctx: &mut Ctx, _: i32| {
+            let on = !metadata::providers(ctx).igdb.enabled;
+            choose_igdb(ctx, on)
+        };
+        v.push(
+            MenuItem::new(
+                PanelRow::radio("igdb", ctx.t("first_run.full.igdb"), igdb.enabled).desc(igdb_desc),
+            )
+            .on(|ctx| choose_igdb(ctx, true))
+            .on_adjust(toggle),
+        );
+        v.push(
+            MenuItem::new(
+                PanelRow::radio(
+                    "stores-only",
+                    ctx.t("first_run.full.stores_only"),
+                    !igdb.enabled,
+                )
+                .desc(ctx.t("first_run.full.stores_only_desc")),
+            )
+            .on(|ctx| choose_igdb(ctx, false))
+            .on_adjust(toggle),
+        );
+        v.push(
+            MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
+                .on(|ctx| Flow::Replace(Box::new(mode(ctx))))
+                .on_adjust(toggle),
+        );
+        v.push(
+            MenuItem::new(PanelRow::button("back", ctx.t("first_run.full.back"))).on(before_covers),
+        );
+        v
     })
+    // Foco em "Continuar" (depois da comparação, se houver, e das duas opções).
+    .focus_at(usize::from(compare_game(ctx).is_some()) + 2)
+    .on_back(before_covers)
 }
 
 /// Passo 4 (desktop): abrir o Tako em janela ou em tela cheia. Já vem marcado pelo que está em uso: com um controle
@@ -305,6 +578,21 @@ pub(crate) fn mode(ctx: &Ctx) -> MenuLayer {
                     OPEN_IN_DESKTOP.into()
                 }
             });
+        // ←→ trocam a opção (também com o foco em Continuar); Enter continua.
+        let shown = current.clone();
+        let swap = move |ctx: &mut Ctx, _: i32| {
+            let now = ctx
+                .settings
+                .get(OPEN_IN)
+                .map_or_else(|| shown.clone(), str::to_owned);
+            let other = if now == OPEN_IN_DESKTOP {
+                OPEN_IN_BIG_PICTURE
+            } else {
+                OPEN_IN_DESKTOP
+            };
+            ctx.settings.set(OPEN_IN, other);
+            Flow::Stay
+        };
         let mut v: Vec<MenuItem> = [(OPEN_IN_DESKTOP, "window"), (OPEN_IN_BIG_PICTURE, "full")]
             .into_iter()
             .map(|(value, key)| {
@@ -322,16 +610,19 @@ pub(crate) fn mode(ctx: &Ctx) -> MenuLayer {
                     ctx.settings.set(OPEN_IN, value);
                     Flow::Stay
                 })
+                .on_adjust(swap.clone())
             })
             .collect();
         v.push(
-            MenuItem::new(PanelRow::button("next", ctx.t("first_run.next"))).on(move |ctx| {
-                if ctx.settings.get(OPEN_IN).is_none() {
-                    let value = current.clone();
-                    ctx.settings.set(OPEN_IN, &value);
-                }
-                Flow::Replace(Box::new(ready(ctx)))
-            }),
+            MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
+                .on(move |ctx| {
+                    if ctx.settings.get(OPEN_IN).is_none() {
+                        let value = current.clone();
+                        ctx.settings.set(OPEN_IN, &value);
+                    }
+                    Flow::Replace(Box::new(ready(ctx)))
+                })
+                .on_adjust(swap),
         );
         v.push(
             MenuItem::new(PanelRow::button("back", ctx.t("first_run.full.back")))
@@ -343,53 +634,91 @@ pub(crate) fn mode(ctx: &Ctx) -> MenuLayer {
     .on_back(|ctx| Flow::Replace(Box::new(providers(ctx))))
 }
 
-/// Passo 5 (desktop): o número de verdade e o caminho para a biblioteca.
-pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
+/// Linhas do resumo (LojaEncontrada, variante resumo): cada loja e cada emulador com quantos jogos trouxe.
+fn summary_rows(ctx: &Ctx, found: &Installed) -> Vec<MenuItem> {
     use tako_core::library::GameStore;
+    use tako_core::presentation::{game_text, library_text};
+    let lang = ctx.lang();
+    let games = ctx.library.games();
+    let row = |key: String, title: String, icon: &str, n: usize| {
+        MenuItem::new(
+            PanelRow::info(key, title, library_text::game_count(lang, n))
+                .icon(icon)
+                // O número de verdade em destaque.
+                .emphasized(true),
+        )
+    };
+    let mut v = Vec::new();
+    for store in GameStore::ALL {
+        let n = games.iter().filter(|g| g.store() == store).count();
+        if n == 0 {
+            continue;
+        }
+        if store != GameStore::Emulators {
+            let name = game_text::store_name(lang, store);
+            v.push(row(
+                format!("store:{}", store.key()),
+                name,
+                super::sidebar::store_icon(store),
+                n,
+            ));
+            continue;
+        }
+        // Emuladores: um por um, com o logo; o que nenhum emulador achado reconhece fica numa linha só.
+        let mut counted = 0;
+        for (e, mine) in by_emulator(games, found) {
+            if !mine.is_empty() {
+                counted += mine.len();
+                v.push(row(
+                    format!("emu:{}", e.key()),
+                    e.name().into(),
+                    &emulator_icon(e),
+                    mine.len(),
+                ));
+            }
+        }
+        if n > counted {
+            v.push(row(
+                "store:emulators".into(),
+                game_text::store_name(lang, store),
+                super::sidebar::store_icon(store),
+                n - counted,
+            ));
+        }
+    }
+    v
+}
+
+/// Passo 5 (desktop, OnboardingPronto): o número de verdade, lojas e emuladores com a quantidade de cada um, a
+/// escolha do passo do modo ("Abre em janela" · Trocar) e o caminho para a biblioteca.
+pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
     let total = ctx.library.games().len();
     let title = if total == 0 {
         ctx.t("first_run.full.ready_none")
     } else {
         ctx.tf("first_run.full.ready", &[("n", &total.to_string())])
     };
-    MenuLayer::dialog(title, |ctx| {
-        let lang = ctx.lang();
-        let mut v: Vec<MenuItem> = GameStore::ALL
-            .into_iter()
-            .filter_map(|store| {
-                let n = ctx
-                    .library
-                    .games()
-                    .iter()
-                    .filter(|g| g.store() == store)
-                    .count();
-                (n > 0).then(|| {
-                    MenuItem::new(
-                        PanelRow::info(
-                            "store",
-                            tako_core::presentation::game_text::store_name(lang, store),
-                            tako_core::presentation::library_text::game_count(lang, n),
-                        )
-                        .icon(super::sidebar::store_icon(store))
-                        // O número de verdade em destaque.
-                        .emphasized(true),
-                    )
-                })
-            })
-            .collect();
+    let cache = super::settings::emulators::Cache::default();
+    let found = super::settings::emulators::installed(&cache, ctx);
+    let summary = summary_rows(ctx, &found).len();
+    MenuLayer::dialog(title, move |ctx| {
+        let found = super::settings::emulators::installed(&cache, ctx);
+        let mut v = summary_rows(ctx, &found);
         let big = ctx.settings.get(crate::mode::OPEN_IN) == Some(crate::mode::OPEN_IN_BIG_PICTURE);
+        // Linha da escolha: "Abre em **janela**" e o link "Trocar" (volta ao passo do modo).
         v.push(
             MenuItem::new(
-                PanelRow::action(
-                    "change-mode",
-                    ctx.t(if big {
-                        "first_run.full.opens_full"
-                    } else {
-                        "first_run.full.opens_window"
-                    }),
-                )
-                .icon(if big { "tv" } else { "pointer" })
-                .value(ctx.t("first_run.full.change")),
+                PanelRow {
+                    style: "line".into(),
+                    ..PanelRow::button("change-mode", ctx.t("first_run.full.opens_in"))
+                }
+                .value(ctx.t(if big {
+                    "first_run.full.opens_full"
+                } else {
+                    "first_run.full.opens_window"
+                }))
+                .desc(ctx.t("first_run.full.change"))
+                .icon(if big { "tv" } else { "pointer" }),
             )
             .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
         );
@@ -417,10 +746,10 @@ pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
                 }),
             );
             v.push(
-                MenuItem::new(PanelRow::button(
-                    "open",
-                    ctx.t("first_run.full.open_library"),
-                ))
+                MenuItem::new(PanelRow {
+                    style: "link".into(),
+                    ..PanelRow::button("open", ctx.t("first_run.full.open_library"))
+                })
                 .on(finish),
             );
         } else {
@@ -433,10 +762,10 @@ pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
             );
             // "Revisar capas": termina o onboarding e abre a FilaDeCapas.
             v.push(
-                MenuItem::new(PanelRow::button(
-                    "review",
-                    ctx.t("first_run.full.review_covers"),
-                ))
+                MenuItem::new(PanelRow {
+                    style: "link".into(),
+                    ..PanelRow::button("review", ctx.t("first_run.full.review_covers"))
+                })
                 .on(|ctx| {
                     let _ = finish(ctx);
                     Flow::Replace(Box::new(super::art_review::panel(ctx)))
@@ -462,14 +791,8 @@ pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
         DESKTOP_STEPS - 1,
     )
     .full(ctx.t("first_run.full.ready_note"))
-    // Foco em "Abrir a biblioteca": depois das lojas e da linha do modo.
-    .focus_at(
-        GameStore::ALL
-            .into_iter()
-            .filter(|s| ctx.library.games().iter().any(|g| g.store() == *s))
-            .count()
-            + 1,
-    )
+    // Foco na ação principal: depois do resumo e da linha do modo.
+    .focus_at(summary + 1)
     .on_back(|ctx| Flow::Replace(Box::new(mode(ctx))))
 }
 
@@ -494,6 +817,113 @@ mod tests {
             .iter()
             .map(|r| r.key.to_string())
             .collect()
+    }
+
+    #[test]
+    fn each_emulator_counts_the_roms_it_really_opens() {
+        use tako_sources::emulators::emulator::Program;
+        let mut found = Installed::default();
+        found
+            .programs
+            .insert(Emulator::Dolphin, Program::exe("/emu/dolphin".into()));
+        let mut flat = Program::exe("/usr/bin/flatpak".into());
+        flat.flatpak = Some("org.DolphinEmu.dolphin-emu".into());
+        let rom = |target: &str, args: &str, platform: &str| Game {
+            rom_path: Some("/roms/x".into()),
+            launch_target: Some(target.into()),
+            launch_arguments: Some(args.into()),
+            platform: Some(platform.into()),
+            ..Default::default()
+        };
+        let games = vec![
+            rom("/emu/dolphin", "-e x", "gamecube"),
+            rom("/emu/dolphin", "-e y", "wii"),
+            rom("/emu/pcsx2", "x", "ps2"),
+            // Jogo de PC com o mesmo executável não conta: só ROMs.
+            Game {
+                launch_target: Some("/emu/dolphin".into()),
+                ..Default::default()
+            },
+        ];
+        let counts = by_emulator(&games, &found);
+        assert_eq!(counts.len(), 1);
+        assert_eq!(counts[0].0, Emulator::Dolphin);
+        assert_eq!(counts[0].1.len(), 2);
+        assert_eq!(system_name(counts[0].1[0]), Some("GameCube"));
+        // Flatpak: o id nos argumentos decide.
+        found.programs.insert(Emulator::Dolphin, flat);
+        let games = vec![rom(
+            "/usr/bin/flatpak",
+            "run org.DolphinEmu.dolphin-emu -e x",
+            "gamecube",
+        )];
+        assert_eq!(by_emulator(&games, &found)[0].1.len(), 1);
+    }
+
+    #[test]
+    fn covers_and_mode_choices_switch_with_the_arrows_and_continue_with_enter() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = fresh();
+        ctx.desktop = true;
+        let on = |layer: &MenuLayer, ctx: &Ctx, key: &str| {
+            layer.render(ctx).rows.iter().any(|r| r.key == key && r.on)
+        };
+        // Capas: sem a IGDB ligada, "Usar só o que as lojas têm" vem marcada; o foco começa em Continuar.
+        let mut c = covers(&ctx);
+        assert!(on(&c, &ctx, "stores-only"));
+        let sel = c.render(&ctx).sel as usize;
+        assert_eq!(keys_of(&c, &ctx)[sel], "next");
+        // → liga a IGDB; sem a chave da Twitch, abre o painel dela.
+        assert!(matches!(c.handle(Cmd::Right, &mut ctx), Flow::Push(_)));
+        assert!(on(&c, &ctx, "igdb"));
+        // Sem conexão, a opção avisa.
+        ONLINE.store(2, std::sync::atomic::Ordering::SeqCst);
+        let desc = |c: &MenuLayer, ctx: &Ctx| {
+            c.render(ctx)
+                .rows
+                .iter()
+                .find(|r| r.key == "igdb")
+                .map(|r| r.description.to_string())
+        };
+        assert_eq!(desc(&c, &ctx), Some(ctx.t("first_run.full.igdb_offline")));
+        assert!(matches!(c.handle(Cmd::Left, &mut ctx), Flow::Stay));
+        assert!(on(&c, &ctx, "stores-only"));
+        ONLINE.store(0, std::sync::atomic::Ordering::SeqCst);
+
+        // Modo: ←→ trocam a opção com o foco em Continuar; Enter segue para o Pronto.
+        let mut m = mode(&ctx);
+        assert!(on(&m, &ctx, crate::mode::OPEN_IN_DESKTOP));
+        m.handle(Cmd::Right, &mut ctx);
+        assert!(on(&m, &ctx, crate::mode::OPEN_IN_BIG_PICTURE));
+        m.handle(Cmd::Left, &mut ctx);
+        assert!(on(&m, &ctx, crate::mode::OPEN_IN_DESKTOP));
+        let Flow::Replace(r) = m.handle(Cmd::Accept, &mut ctx) else {
+            panic!("Enter continua")
+        };
+        assert_eq!(r.render(&ctx).tab, 4);
+    }
+
+    #[test]
+    fn emulators_step_offers_the_rom_folder_and_a_way_out() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = fresh();
+        ctx.desktop = true;
+        let e = emulators(&ctx);
+        let keys = keys_of(&e, &ctx);
+        // Sem pasta: a linha da pasta de ROMs oferece escolher uma.
+        assert!(keys.contains(&"roms".to_owned()));
+        assert!(keys.contains(&"add-emulator".to_owned()));
+        // Linhas de emulador, no máximo quatro quando nenhum está instalado.
+        assert!(keys.iter().filter(|k| k.starts_with("emu:")).count() <= Emulator::ALL.len());
+        // "Não uso emuladores" pula para as capas.
+        let item = (e.build)(&ctx)
+            .into_iter()
+            .find(|i| i.row.key == "no-emulators")
+            .unwrap();
+        let Flow::Replace(next) = (item.accept.unwrap())(&mut ctx) else {
+            panic!("pular")
+        };
+        assert_eq!(next.render(&ctx).tab, 2);
     }
 
     #[test]
