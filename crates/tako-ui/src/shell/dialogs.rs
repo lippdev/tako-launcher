@@ -1568,7 +1568,10 @@ mod tests {
         gog.title = "Jogo".into();
         *ctx.found.lock().unwrap() = vec![steam, gog];
         ctx.library.refresh();
-        assert_eq!(ctx.library.find("steam:7").map(|g| g.install_offers.len()), Some(2));
+        assert_eq!(
+            ctx.library.find("steam:7").map(|g| g.install_offers.len()),
+            Some(2)
+        );
 
         let picked = InstallPick::default();
         let menu = install_from(&ctx, "steam:7", picked.clone());
