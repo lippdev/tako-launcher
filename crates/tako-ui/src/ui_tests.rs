@@ -472,6 +472,23 @@ fn desktop_snapshot() {
                 }
                 crate::bridge::set(&ui, name, value);
             }
+            // As entradas animam (Timer de 1 ms e `page-time`): a captura espera elas terminarem
+            // (`TAKO_SNAP_WAIT=<ms>` fotografa no meio delas).
+            let wait: u64 = std::env::var("TAKO_SNAP_WAIT")
+                .ok()
+                .and_then(|w| w.parse().ok())
+                .unwrap_or(800);
+            // Desenha a cada passo: o que está dentro de um `if` só nasce (e liga o Timer dele) ao ser desenhado.
+            let mut scratch = vec![Rgb8Pixel::default(); (w * h) as usize];
+            for _ in 0..wait / 50 {
+                slint::platform::update_timers_and_animations();
+                ui.window().request_redraw();
+                window.draw_if_needed(|r| {
+                    r.render(&mut scratch, w as usize);
+                });
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            slint::platform::update_timers_and_animations();
             let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
             ui.window().request_redraw();
             window.draw_if_needed(|r| {

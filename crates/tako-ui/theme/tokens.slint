@@ -170,6 +170,18 @@ export global Ui {
     public pure function enter(entering: bool) -> duration {
         return entering ? page-time : 0ms;
     }
+    // Troca de modo (TrocaDeModo): sai em 120, entra em 140.
+    public pure function mode-fade(entering: bool) -> duration {
+        return entering ? page-time / 2 : tempo-texto-sai;
+    }
+    // Troca de aba ou de categoria (TrocaDeTela › abas internas): sai em 80, entra em 120.
+    public pure function list-fade(entering: bool) -> duration {
+        return entering ? focus-time * 0.75 : focus-time / 2;
+    }
+    // Aviso: entra em `tempo-pagina`, sai em `tempo-saida`.
+    public pure function toast-fade(entering: bool) -> duration {
+        return entering ? page-time : leave-time;
+    }
     // Escala: com "Reduzir animações" tudo fica em 1.
     out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;
     out property <float> escala-entrada: reduce-motion ? 1 : 0.98;

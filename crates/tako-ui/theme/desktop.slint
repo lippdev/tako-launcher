@@ -239,7 +239,15 @@ component Tip inherits Rectangle {
     // Abaixo do dono, centralizada; não captura o mouse.
     if show: Rectangle {
         property <bool> lit;
-        init => { lit = true; }
+        // Entrada: ligar no `init` não anima (o Slint aplica antes do primeiro quadro); o Timer liga logo depois.
+        Timer {
+            interval: 1ms;
+            running: true;
+            triggered => {
+                self.running = false;
+                lit = true;
+            }
+        }
         opacity: lit ? 1 : 0;
         animate opacity { duration: Ui.tempo-texto-sai; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         x: (root.width - self.width) / 2;
@@ -523,7 +531,15 @@ component Selected inherits Rectangle {
     in property <bool> lifted;
     // A seleção não "voa" entre linhas: a nova acende em `tempo-foco`.
     property <bool> lit;
-    init => { lit = true; }
+    // Entrada: ligar no `init` não anima (o Slint aplica antes do primeiro quadro); o Timer liga logo depois.
+    Timer {
+        interval: 1ms;
+        running: true;
+        triggered => {
+            self.running = false;
+            lit = true;
+        }
+    }
     opacity: lit ? 1 : 0;
     animate opacity { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     border-radius: radius;
@@ -559,6 +575,16 @@ component Tabs inherits Rectangle {
     callback clicked(int);
     // Sem trilho (como nas prévias): só a escolhida tem contorno, o da segunda camada de vidro.
     height: 40px;
+    // A pílula da escolhida desliza para a nova aba em `tempo-foco` (TrocaDeTela › abas internas).
+    property <length> tab-w: (root.width - 6px - 2px * (tabs.length - 1)) / max(1, tabs.length);
+    if current >= 0 && current < tabs.length: Selected {
+        x: 3px + current * (tab-w + 2px);
+        y: 3px;
+        width: tab-w;
+        height: root.height - 6px;
+        radius: 11px;
+        animate x { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    }
     HorizontalLayout {
         padding: 3px;
         spacing: 2px;
@@ -569,7 +595,6 @@ component Tabs inherits Rectangle {
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: tab;
             accessible-label: t;
-            if i == current: Selected { radius: 11px; }
             if i == focus-index: FocusRing { radius: 11px; }
             Text {
                 text: t;
@@ -1632,7 +1657,9 @@ component CardRow inherits Rectangle {
 // Destaque do jogo selecionado e a fileira de cartões, ancorados embaixo sobre a arte (Destaque, AcoesDoJogo,
 // CartaoSobre, CartaoTrailer, CartaoDetalhes, CartaoSessoes). Com quatro cartões, a fileira rola na horizontal.
 component GameStage inherits VerticalLayout {
-    in property <DeskGameView> game;
+    // O jogo que chega; `game` é o que está na tela (o anterior fica até o texto apagar).
+    in property <DeskGameView> game-in;
+    property <DeskGameView> game;
     in property <[PanelRow]> actions;
     in property <[DeskInfo]> stats;
     in property <[DeskInfo]> details;
@@ -1648,18 +1675,24 @@ component GameStage inherits VerticalLayout {
     callback clicked(string, int);
     callback menu(length, length);
     property <bool> show-about: game.description != "";
-    // Troca de jogo: o texto apaga em 120 e o novo acende em 200 (a arte faz o crossfade dela).
-    property <string> game-key: game.title;
+    // Troca de jogo (TrocaDeJogo): título, faixa e cartões do jogo anterior apagam em 120 (`curva-saida`), o novo
+    // entra em 200 (`curva-entrada`); a arte faz o crossfade dela. Mudança no mesmo jogo troca na hora.
     property <bool> text-in: true;
-    changed game-key => {
-        text-in = false;
-        text-timer.running = true;
+    init => { game = game-in; }
+    changed game-in => {
+        if (game-in.title == game.title) {
+            game = game-in;
+        } else {
+            text-in = false;
+            text-timer.running = true;
+        }
     }
     text-timer := Timer {
         interval: max(1ms, Ui.tempo-texto-sai);
         running: false;
         triggered => {
             self.running = false;
+            game = game-in;
             text-in = true;
         }
     }
@@ -1671,8 +1704,8 @@ component GameStage inherits VerticalLayout {
     VerticalLayout {
         spacing: small ? 10px : 14px;
         alignment: end;
-        opacity: text-in ? 1 : 0.2;
-        animate opacity { duration: Ui.text-fade(text-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        opacity: text-in ? 1 : 0;
+        animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         if game.overline != "": HorizontalLayout {
             alignment: start;
             Badge { text: game.overline; live: game.running; }
@@ -1744,6 +1777,8 @@ component GameStage inherits VerticalLayout {
     // Com quatro cartões (Sobre, Trailer, Detalhes, Sessões) a fileira passa da largura e rola na horizontal.
     // 248 (190 na janela pequena), crescendo se o conteúdo pedir mais: nada passa da borda do cartão.
     if !(show-trailer && show-sessions): CardRow {
+        opacity: text-in ? 1 : 0;
+        animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         height: max(small ? 190px : Ui.card-height, self.content-h);
         game: game;
         details: details;
@@ -1759,6 +1794,8 @@ component GameStage inherits VerticalLayout {
         clicked(z, i) => { root.clicked(z, i); }
     }
     if show-trailer && show-sessions: cards := Flickable {
+        opacity: text-in ? 1 : 0;
+        animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         height: Ui.card-height;
         viewport-width: 360px + 240px + 320px + 320px + 3 * Ui.space-20;
         CardRow {
@@ -1826,7 +1863,9 @@ component DeskLibrary inherits Rectangle {
     in property <bool> small;
     in property <bool> selecting;
     in property <bool> reversed;
-    in property <string> view: "list";
+    // O modo pedido; `view` é o que está na tela (o anterior fica até sair).
+    in property <string> view-in: "list";
+    property <string> view: "list";
     in property <string> group-label;
     in property <string> group-prefix;
     in property <[PanelRow]> bulk;
@@ -1847,8 +1886,40 @@ component DeskLibrary inherits Rectangle {
     callback focus-main();
     property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
     property <bool> wide: view != "list";
+    // Troca de modo (TrocaDeModo): o modo atual sai em 120 (`curva-saida`) e o novo entra em 140 (`curva-entrada`).
+    // Troca de aba (TrocaDeTela › abas internas): a pílula desliza e a lista troca só por opacidade, 80 e 120.
+    property <bool> mode-in: true;
+    property <bool> list-in: true;
+    init => { view = view-in; }
+    changed view-in => {
+        mode-in = false;
+        mode-timer.running = true;
+    }
+    mode-timer := Timer {
+        interval: max(1ms, Ui.tempo-texto-sai);
+        running: false;
+        triggered => {
+            self.running = false;
+            view = view-in;
+            mode-in = true;
+        }
+    }
+    changed tab => {
+        list-in = false;
+        list-timer.running = true;
+    }
+    list-timer := Timer {
+        interval: max(1ms, Ui.focus-time / 2);
+        running: false;
+        triggered => {
+            self.running = false;
+            list-in = true;
+        }
+    }
 
     if !wide: HorizontalLayout {
+        opacity: mode-in ? 1 : 0;
+        animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         spacing: small ? Ui.space-20 : Ui.space-28;
         Vidro {
             width: list-w;
@@ -1921,6 +1992,8 @@ component DeskLibrary inherits Rectangle {
                         clicked => { root.clicked(empty-zone, 0); }
                     }
                     if !loading && games.length > 0: GameList {
+                        opacity: list-in ? 1 : 0;
+                        animate opacity { duration: Ui.list-fade(list-in); easing: list-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
                         height: parent.height - (selecting ? 60px : 0);
                         bar-out: Ui.space-12;
                         games: games;
@@ -1950,7 +2023,7 @@ component DeskLibrary inherits Rectangle {
         if !game.has-game: Rectangle { horizontal-stretch: 1; }
         if game.has-game: GameStage {
             horizontal-stretch: 1;
-            game: game;
+            game-in: game;
             actions: actions;
             stats: stats;
             details: details;
@@ -1969,6 +2042,8 @@ component DeskLibrary inherits Rectangle {
     }
 
     if wide: VerticalLayout {
+        opacity: mode-in ? 1 : 0;
+        animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         spacing: Ui.space-20;
         HorizontalLayout {
             height: 46px;
@@ -2064,6 +2139,8 @@ component DeskLibrary inherits Rectangle {
                 clicked => { root.clicked(empty-zone, 0); }
             }
             grid := CoverGrid {
+                opacity: list-in ? 1 : 0;
+                animate opacity { duration: Ui.list-fade(list-in); easing: list-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
                 visible: view == "grid";
                 columns: root.columns;
                 games: view == "grid" ? games : [];
@@ -2081,6 +2158,8 @@ component DeskLibrary inherits Rectangle {
                 clicked => { }
             }
             if view == "categories": CategoryRows {
+                opacity: list-in ? 1 : 0;
+                animate opacity { duration: Ui.list-fade(list-in); easing: list-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
                 rows: categories;
                 see-all: see-all;
                 key-focus: focus-visible && zone == "list";
@@ -2495,9 +2574,34 @@ component PopupFooter inherits HorizontalLayout {
 component DeskSettings inherits Rectangle {
     // Troca de página: o conteúdo entra 16 px em `tempo-pagina`; barra e painel não se mexem de lugar.
     property <bool> shown;
-    init => { shown = true; }
+    // Entrada: ligar no `init` não anima (o Slint aplica antes do primeiro quadro); o Timer liga logo depois.
+    Timer {
+        interval: 1ms;
+        running: true;
+        triggered => {
+            self.running = false;
+            shown = true;
+        }
+    }
+    // Entra como página (TrocaDeTela): de 16 px ao lado, em `tempo-pagina`.
     opacity: shown ? 1 : 0;
-    animate opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    x: shown ? 0 : 16px;
+    animate opacity, x { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    // Troca de categoria (abas internas): as linhas saem em 80 e as novas entram em 120, só opacidade.
+    property <bool> rows-in: true;
+    // Pela categoria, não pelo título: digitar na busca não pisca as linhas.
+    changed category-focus => {
+        rows-in = false;
+        rows-timer.running = true;
+    }
+    rows-timer := Timer {
+        interval: max(1ms, Ui.focus-time / 2);
+        running: false;
+        triggered => {
+            self.running = false;
+            rows-in = true;
+        }
+    }
     in property <string> count;
     in property <[DeskNav]> categories;
     in property <int> category-focus;
@@ -2573,6 +2677,8 @@ component DeskSettings inherits Rectangle {
             VerticalLayout {
                 max-width: 860px;
                 horizontal-stretch: 1;
+                opacity: rows-in ? 1 : 0;
+                animate opacity { duration: Ui.list-fade(rows-in); easing: rows-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
                 // Ancorado no topo: numa janela alta a sobra fica embaixo das linhas.
                 alignment: start;
                 spacing: Ui.space-12;
@@ -2740,7 +2846,15 @@ component DeskOverlay inherits Rectangle {
     // Entrada: o vidro "materializa" (opacidade e escala 0,98 → 1) em `tempo-pagina`; o menu nasce de 0,96 em
     // `tempo-foco`; o painel lateral desliza da direita.
     property <bool> shown;
-    init => { shown = true; }
+    // Entrada: ligar no `init` não anima (o Slint aplica antes do primeiro quadro); o Timer liga logo depois.
+    Timer {
+        interval: 1ms;
+        running: true;
+        triggered => {
+            self.running = false;
+            shown = true;
+        }
+    }
     in property <bool> top-most;
     in property <bool> focus-visible;
     in property <length> menu-x;
@@ -2772,7 +2886,8 @@ component DeskOverlay inherits Rectangle {
         Vidro {
             layer: true;
             opacity: shown ? 1 : 0;
-            transform-scale: shown ? 1 : Ui.escala-entrada;
+            // Empilhar (TrocaDePopup): a camada de baixo recua para 0,98; a de cima a escurece com o scrim dela.
+            transform-scale: shown && top-most ? 1 : Ui.escala-entrada;
             animate opacity, transform-scale { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             width: min(parent.width - 80px, ov.wide ? 640px : 480px);
             height: min(dlg.preferred-height, parent.height - 80px);
@@ -2921,10 +3036,15 @@ component DeskOverlay inherits Rectangle {
                 }
             }
         }
-        // Passos do onboarding: a coluna entra 24 px da direita em `tempo-pagina` a cada passo.
+        // Passos do onboarding (PassosDoOnboardingMovimento): avançar entra 24 px da direita, voltar da esquerda, em
+        // `tempo-pagina`.
         property <string> step-key: ov.title;
         property <bool> step-in: true;
+        property <int> last-step: ov.tab;
+        property <int> step-dir: 1;
         changed step-key => {
+            step-dir = ov.tab >= last-step ? 1 : -1;
+            last-step = ov.tab;
             step-in = false;
             step-timer.running = true;
         }
@@ -2937,7 +3057,7 @@ component DeskOverlay inherits Rectangle {
             }
         }
         VerticalLayout {
-            x: 120px + (step-in && shown ? 0 : 24px);
+            x: 120px + (step-in && shown ? 0 : 24px * step-dir);
             opacity: step-in && shown ? 1 : 0;
             animate x, opacity { duration: Ui.enter(step-in); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             // Centralizada, mas nunca embaixo da marca do topo.
@@ -2966,12 +3086,20 @@ component DeskOverlay inherits Rectangle {
                 }
                 HorizontalLayout {
                     spacing: 4px;
+                    // O traço do passo feito cresce em `tempo-pagina`.
                     for d[i] in ov.tabs: Rectangle {
                         y: 9px;
                         width: 24px;
                         height: 3px;
                         border-radius: 1.5px;
-                        background: i <= ov.tab ? Ui.on-accent : Ui.on-accent.with-alpha(0.15);
+                        background: Ui.on-accent.with-alpha(0.15);
+                        Rectangle {
+                            x: 0;
+                            width: i <= ov.tab ? parent.width : 0;
+                            border-radius: 1.5px;
+                            background: Ui.on-accent;
+                            animate width { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+                        }
                     }
                 }
             }
@@ -3033,8 +3161,9 @@ component DeskOverlay inherits Rectangle {
     }
     // Painel lateral: flutua à direita a 36 das bordas, sem escurecer a janela; clique fora ou Esc fecha.
     if ov.kind == "panel": Rectangle {
-        // O painel largo (Configurações deste jogo) escurece levemente o fundo; o comum não escurece.
-        background: ov.wide ? Ui.desk-canvas.with-alpha(0.25) : transparent;
+        // Scrim de 0 a 25% junto com a entrada do painel (PainelEAviso).
+        background: Ui.desk-canvas.with-alpha(shown ? 0.25 : 0);
+        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
             layer: true;
@@ -3101,6 +3230,8 @@ component DeskOverlay inherits Rectangle {
             layer: true;
             opacity: shown ? 1 : 0;
             transform-scale: shown ? 1 : Ui.escala-menu;
+            // Nasce do ponto que abriu: do canto do ponteiro/botão, ou do canto direito da pílula no select.
+            transform-origin: { x: select ? self.width : clamp(menu-x - self.x, 0, self.width), y: menu-y > self.y ? self.height : 0 };
             animate opacity, transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             radius: Ui.radius-control;
             // Select (`wide`): nasce embaixo da pílula, alinhado à direita dela; vira para cima se não couber.
@@ -3576,7 +3707,7 @@ export component Desktop inherits Window {
                 empty-zone: desk-empty-zone;
                 selecting: desk-selecting;
                 reversed: desk-reversed;
-                view: desk-view;
+                view-in: desk-view;
                 group-label: desk-group-label;
                 group-prefix: desk-group-prefix;
                 bulk: desk-bulk;
@@ -3655,16 +3786,34 @@ export component Desktop inherits Window {
         }
     }
 
-    // Aviso (toast): pílula de vidro de camada a 28 do rodapé; some sozinha e não rouba o foco.
-    if toast != "": Vidro {
+    // Aviso (toast, PainelEAviso): entra subindo 12 em `tempo-pagina`; sai só por opacidade em `tempo-saida` (o texto
+    // fica até sumir). Não rouba o foco.
+    property <string> toast-shown;
+    property <bool> toast-on: toast != "";
+    changed toast => {
+        if (toast != "") {
+            toast-shown = toast;
+        }
+    }
+    if toast-shown != "": Vidro {
         property <bool> shown;
-        init => { shown = true; }
+        Timer {
+            interval: 1ms;
+            running: true;
+            triggered => {
+                self.running = false;
+                shown = true;
+            }
+        }
         layer: true;
         radius: self.height / 2;
         x: (root.width - self.width) / 2;
-        y: root.height - self.height - Ui.space-28 + (shown ? 0 : 16px);
-        opacity: shown ? 1 : 0;
-        animate y, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        // Depois de sumir, não recebe cliques (o "Desfazer" escondido não pode ser clicado).
+        visible: self.opacity > 0;
+        y: root.height - self.height - Ui.space-28 + (shown ? 0 : 12px);
+        opacity: shown && toast-on ? 1 : 0;
+        animate y { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        animate opacity { duration: Ui.toast-fade(toast-on); easing: toast-on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         height: Ui.control-height;
         width: tl.preferred-width;
         tl := HorizontalLayout {
@@ -3672,7 +3821,7 @@ export component Desktop inherits Window {
             padding-right: Ui.space-20;
             spacing: 10px;
             DeskIcon { name: "check"; size: 18px; tint: Ui.success; y: (parent.height - self.height) / 2; }
-            Text { text: toast; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+            Text { text: toast-shown; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
             // "Desfazer" das ações em lote: texto clicável à direita, sem roubar o foco.
             if desk-toast-undo != "": Rectangle {
                 width: ut.preferred-width + 16px;
