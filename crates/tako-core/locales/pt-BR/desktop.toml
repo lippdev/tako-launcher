@@ -1,4 +1,6 @@
 [desktop]
+define_status = "Definir status"
+status_all = "Todos"
 remove_filter = "Remover filtro {filter}"
 profile_search = "Buscar no perfil"
 collection_auto = "Auto"

@@ -35,12 +35,19 @@ fn status_text(ctx: &Ctx, status: Option<PlayStatus>) -> String {
 fn status_item(ctx: &Ctx, id: &str) -> MenuItem {
     let status = ctx.library.find(id).and_then(|g| g.play_status);
     let id = id.to_owned();
-    MenuItem::new(PanelRow::button("status", status_text(ctx, status)).icon("check"))
-        .on(move |ctx| Flow::Replace(Box::new(choose_status(ctx, &id))))
+    let row = if ctx.desktop {
+        PanelRow::button("status", ctx.t("game.status")).value("›")
+    } else {
+        PanelRow::button("status", status_text(ctx, status)).icon("check")
+    };
+    MenuItem::new(row).on(move |ctx| Flow::Replace(Box::new(choose_status(ctx, &id))))
 }
 
 /// Escolha do status do jogo: "Sem status" e os cinco status; fecha ao escolher.
 pub fn choose_status(ctx: &Ctx, id: &str) -> MenuLayer {
+    if ctx.desktop {
+        return desktop_status(vec![id.to_owned()]);
+    }
     let title = ctx
         .library
         .find(id)
@@ -69,6 +76,54 @@ pub fn choose_status(ctx: &Ctx, id: &str) -> MenuLayer {
             .collect()
     })
     .overline(title.to_uppercase())
+}
+
+const DESKTOP_STATUSES: [PlayStatus; 5] = [
+    PlayStatus::Playing,
+    PlayStatus::Wishlist,
+    PlayStatus::Paused,
+    PlayStatus::Beaten,
+    PlayStatus::Abandoned,
+];
+
+/// Lista ancorada no select do destaque, no menu de contexto ou na seleção múltipla.
+fn desktop_status(ids: Vec<String>) -> MenuLayer {
+    MenuLayer::menu("", move |ctx| {
+        let mut rows = Vec::new();
+        for status in DESKTOP_STATUSES.into_iter().map(Some).chain([None]) {
+            if status.is_none() {
+                rows.push(MenuItem::new(PanelRow::separator()));
+            }
+            let current = !ids.is_empty()
+                && ids.iter().all(|id| {
+                    ctx.library
+                        .find(id)
+                        .is_some_and(|g| g.play_status == status)
+                });
+            let mut row = PanelRow::button(
+                status.map_or("none", PlayStatus::key),
+                library_text::status_label(ctx.lang(), status),
+            )
+            .icon(if current { "tick" } else { "" })
+            .emphasized(current);
+            row.style = "play-status".into();
+            row.value = status.map_or("none", PlayStatus::key).into();
+            let ids = ids.clone();
+            rows.push(MenuItem::new(row).on(move |ctx| {
+                for id in &ids {
+                    if let Err(e) = ctx.library.set_status(id, status) {
+                        tracing::error!("status: {e}");
+                        ctx.toast(e.to_string());
+                        return Flow::Stay;
+                    }
+                }
+                ctx.toast(status_text(ctx, status));
+                Flow::Close
+            }));
+        }
+        rows
+    })
+    .wide()
 }
 
 pub fn confirm_exit(ctx: &Ctx) -> MenuLayer {
@@ -642,18 +697,26 @@ pub fn choose_collections_many(ctx: &Ctx, ids: Vec<String>) -> MenuLayer {
 pub fn bulk_more(ids: Vec<String>) -> MenuLayer {
     MenuLayer::menu(String::new(), move |ctx| {
         let done = ids.clone();
-        let mut v = vec![
-            MenuItem::new(PanelRow::button("beaten", ctx.t("desktop.bulk.beaten")).icon("check"))
-                .on(move |ctx| {
-                    for id in &done {
-                        if let Err(e) = ctx.library.set_status(id, Some(PlayStatus::Beaten)) {
-                            tracing::error!("status: {e}");
-                        }
-                    }
-                    ctx.toast(status_text(ctx, Some(PlayStatus::Beaten)));
-                    Flow::Close
-                }),
-        ];
+        let status_ids = ids.clone();
+        let mut v = Vec::new();
+        if ctx.desktop {
+            v.push(
+                MenuItem::new(PanelRow::button("status", ctx.t("desktop.define_status")))
+                    .on(move |_| Flow::Replace(Box::new(desktop_status(status_ids.clone())))),
+            );
+        }
+        v.extend([MenuItem::new(
+            PanelRow::button("beaten", ctx.t("desktop.bulk.beaten")).icon("check"),
+        )
+        .on(move |ctx| {
+            for id in &done {
+                if let Err(e) = ctx.library.set_status(id, Some(PlayStatus::Beaten)) {
+                    tracing::error!("status: {e}");
+                }
+            }
+            ctx.toast(status_text(ctx, Some(PlayStatus::Beaten)));
+            Flow::Close
+        })]);
         let manual: Vec<String> = ids
             .iter()
             .filter(|id| {
@@ -802,6 +865,57 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
         let lang = ctx.lang();
         let c = criteria.borrow().clone();
         let mut v = vec![MenuItem::new(PanelRow::header(ctx.t("filters.show")))];
+        if ctx.desktop {
+            let value = if c.no_status {
+                library_text::status_label(lang, None)
+            } else if c.statuses.len() == 1 {
+                library_text::status_label(lang, c.statuses.first().copied())
+            } else {
+                ctx.t("desktop.status_all")
+            };
+            let cr = criteria.clone();
+            v.push(
+                MenuItem::new(PanelRow::choice("status", ctx.t("game.status"), value)).options(
+                    move |ctx| {
+                        let c = cr.borrow();
+                        let current = if c.no_status {
+                            6
+                        } else if c.statuses.len() == 1 {
+                            DESKTOP_STATUSES
+                                .iter()
+                                .position(|s| c.statuses.contains(s))
+                                .map_or(0, |i| i + 1)
+                        } else {
+                            0
+                        };
+                        let picks = (0..7)
+                            .map(|i| {
+                                let label = match i {
+                                    0 => ctx.t("desktop.status_all"),
+                                    6 => library_text::status_label(ctx.lang(), None),
+                                    _ => library_text::status_label(
+                                        ctx.lang(),
+                                        Some(DESKTOP_STATUSES[i - 1]),
+                                    ),
+                                };
+                                let cr = cr.clone();
+                                Pick::new(label).set(move |ctx| {
+                                    let mut c = cr.borrow_mut();
+                                    c.statuses.clear();
+                                    c.no_status = i == 6;
+                                    if (1..=5).contains(&i) {
+                                        c.statuses.insert(DESKTOP_STATUSES[i - 1]);
+                                    }
+                                    ctx.dirty = true;
+                                    Flow::Stay
+                                })
+                            })
+                            .collect();
+                        (picks, current)
+                    },
+                ),
+            );
+        }
         let cr = criteria.clone();
         v.push(
             MenuItem::new(PanelRow::choice(
@@ -1027,8 +1141,10 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                 );
             }
         }
-        v.push(MenuItem::new(PanelRow::header(ctx.t("filters.status"))));
-        for s in PlayStatus::ALL {
+        if !ctx.desktop {
+            v.push(MenuItem::new(PanelRow::header(ctx.t("filters.status"))));
+        }
+        for s in PlayStatus::ALL.into_iter().filter(|_| !ctx.desktop) {
             let cr = criteria.clone();
             let n = games.iter().filter(|g| g.play_status == Some(s)).count();
             v.push(

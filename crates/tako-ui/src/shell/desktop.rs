@@ -195,6 +195,7 @@ pub struct DesktopLibrary {
     /// Busca e filtros do usuário, por cima da aba (o painel de filtros é o mesmo da tela cheia).
     pub criteria: Criteria,
     selected: Option<String>,
+    selection_index: usize,
     zone: Zone,
     /// Aba, coleção ou ação com o foco do teclado (conforme a zona).
     index: usize,
@@ -235,6 +236,7 @@ impl DesktopLibrary {
             pick_request: Rc::default(),
             criteria: Rc::new(RefCell::new(LibraryCriteria::default())),
             selected: None,
+            selection_index: 0,
             zone: Zone::List,
             index: 0,
             search_focus: 0,
@@ -355,6 +357,12 @@ impl DesktopLibrary {
                 library_text::status_label(ctx.lang(), Some(*status)),
             );
         }
+        if c.no_status {
+            add(
+                "no-status".into(),
+                library_text::status_label(ctx.lang(), None),
+            );
+        }
         if c.install != InstallFilter::Any {
             add(
                 "install".into(),
@@ -402,6 +410,7 @@ impl DesktopLibrary {
         };
         let mut c = self.criteria.borrow_mut();
         match row.key.as_str() {
+            "no-status" => c.no_status = false,
             "install" => c.install = InstallFilter::Any,
             "favorites" => c.favorites_only = false,
             "played" => c.played_only = false,
@@ -439,7 +448,15 @@ impl DesktopLibrary {
         self.selected
             .as_ref()
             .and_then(|s| ids.iter().position(|i| i == s))
-            .or((!ids.is_empty()).then_some(0))
+            .or_else(|| {
+                (!ids.is_empty()).then(|| {
+                    if self.selected.is_some() {
+                        self.selection_index.min(ids.len() - 1)
+                    } else {
+                        0
+                    }
+                })
+            })
     }
 
     pub fn selected(&self, ctx: &Ctx) -> Option<String> {
@@ -1411,6 +1428,11 @@ impl Page for DesktopLibrary {
                     self.route_filter(),
                 )));
             }
+            "status" => {
+                if let Some(id) = self.selected(ctx) {
+                    return Nav::Layer(Box::new(dialogs::choose_status(ctx, &id)));
+                }
+            }
             "search-leave" => self.zone = Zone::List,
             "remove-filter" => self.remove_filter(ctx, index),
             "clear-filters" => {
@@ -1447,6 +1469,7 @@ impl Page for DesktopLibrary {
         let games = self.games(ctx);
         let ids: Vec<String> = games.iter().map(|g| g.id.clone()).collect();
         let cur = self.current(&ids);
+        self.selection_index = cur.unwrap_or(0);
         out.set(
             "desk-tabs",
             vec![
@@ -1808,6 +1831,11 @@ impl Page for DesktopLibrary {
                         art_loading: g.shown_hero().is_some_and(crate::images::is_pending),
                         store_icon: store_icon(g.store()).into(),
                         store_name: game_text::store_name(lang, g.store()),
+                        play_status: g.play_status.map_or("", PlayStatus::key).into(),
+                        play_status_label: g.play_status.map_or_else(
+                            || ctx.t("desktop.define_status"),
+                            |s| library_text::status_label(lang, Some(s)),
+                        ),
                     },
                     actions,
                     strip(ctx, g),
@@ -2551,6 +2579,7 @@ mod tests {
             played_only: true,
             broken_only: true,
             play_time: tako_core::library::criteria::PlayTimeFilter::Unplayed,
+            no_status: true,
             statuses: [PlayStatus::Playing].into(),
             sources: ["Steam".into()].into(),
             genres: ["Ação".into()].into(),

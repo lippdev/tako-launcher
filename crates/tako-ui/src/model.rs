@@ -326,6 +326,8 @@ theme_struct! {
         pub art_loading: bool,
         pub store_icon: String,
         pub store_name: String,
+        pub play_status: String,
+        pub play_status_label: String,
         // TituloDoJogo: o título é o logo (senão, o nome em texto).
         pub show_logo: bool,
         // O logo ainda carrega: o título fica vazio (nem o nome em texto) até ele chegar.

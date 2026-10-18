@@ -135,6 +135,8 @@ pub struct LibraryCriteria {
     pub tags: BTreeSet<String>,
     /// Status marcados (LIB-001): o jogo precisa ter algum deles.
     pub statuses: BTreeSet<PlayStatus>,
+    /// Inclui jogos sem status no filtro (o select do desktop usa esta opção sozinha).
+    pub no_status: bool,
     pub sort: LibrarySort,
     /// Ordem invertida (⇅ no modo desktop): a mesma ordenação, de trás para a frente.
     pub reversed: bool,
@@ -179,6 +181,7 @@ impl LibraryCriteria {
             + self.collections.len()
             + self.tags.len()
             + self.statuses.len()
+            + usize::from(self.no_status)
     }
 
     pub fn has_filters(&self) -> bool {
@@ -228,7 +231,8 @@ impl LibraryCriteria {
             && (self.collections.is_empty()
                 || game.collections.iter().any(|c| self.has_collection(c)))
             && (self.tags.is_empty() || game.tags.iter().any(|t| self.has_tag(t)))
-            && (self.statuses.is_empty()
+            && ((self.statuses.is_empty() && !self.no_status)
+                || (self.no_status && game.play_status.is_none())
                 || game.play_status.is_some_and(|s| self.statuses.contains(&s)))
             && query.matches(&normalize(&game.title))
     }
@@ -350,6 +354,29 @@ mod tests {
         assert!(!cleared.has_filters());
         assert_eq!(cleared.search, "god");
         assert_eq!(cleared.sort, LibrarySort::Rating);
+    }
+
+    #[test]
+    fn no_status_filter_is_counted_serialized_and_cleared() {
+        let c = LibraryCriteria {
+            no_status: true,
+            ..Default::default()
+        };
+        let facts = |status| LibraryFacts {
+            play_status: status,
+            ..Default::default()
+        };
+        assert_eq!(c.active_filter_count(), 1);
+        assert!(c.matches(&facts(None)));
+        assert!(!c.matches(&facts(Some(PlayStatus::Playing))));
+        assert!(c.clear_filters().matches(&facts(Some(PlayStatus::Playing))));
+        let restored: LibraryCriteria =
+            serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();
+        assert_eq!(c, restored);
+        assert!(
+            c.toggle_status(PlayStatus::Playing)
+                .matches(&facts(Some(PlayStatus::Playing)))
+        );
     }
 
     #[test]

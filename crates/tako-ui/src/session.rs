@@ -199,6 +199,17 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
             );
         }
     };
+    if ctx.desktop
+        && matches!(
+            game.play_status,
+            None | Some(tako_core::library::PlayStatus::Wishlist)
+        )
+        && let Err(e) = ctx
+            .library
+            .set_status(&game.id, Some(tako_core::library::PlayStatus::Playing))
+    {
+        tracing::error!("status ao jogar: {e}");
+    }
     let _ = ctx.library.record_launch(&game.id);
     let tp = plan(&game, pid.is_some());
     if tp.strategy == GameTrackingStrategy::None {
@@ -474,6 +485,45 @@ mod tests {
     use super::*;
     use crate::app::build_ctx;
     use tako_core::session::GameEnd;
+
+    #[test]
+    fn successful_desktop_launch_marks_unset_or_wishlist_status_and_preserves_user_choices() {
+        use tako_core::library::PlayStatus;
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        ctx.library.refresh();
+        let id = ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.is_installed)
+            .unwrap()
+            .id
+            .clone();
+        ctx.desktop = true;
+        for before in [
+            None,
+            Some(PlayStatus::Wishlist),
+            Some(PlayStatus::Paused),
+            Some(PlayStatus::Beaten),
+            Some(PlayStatus::Abandoned),
+        ] {
+            ctx.library.set_status(&id, before).unwrap();
+            let started = start(&mut ctx, &id).unwrap();
+            let expected = match before {
+                None | Some(PlayStatus::Wishlist) => Some(PlayStatus::Playing),
+                other => other,
+            };
+            assert_eq!(ctx.library.find(&id).unwrap().play_status, expected);
+            if let Started::Tracking(req) = started {
+                restore_now(&ctx.platform, &ctx.paths, req.restore);
+            }
+        }
+        ctx.desktop = false;
+        ctx.library.set_status(&id, None).unwrap();
+        start(&mut ctx, &id).unwrap();
+        assert_eq!(ctx.library.find(&id).unwrap().play_status, None);
+    }
 
     #[test]
     fn starts_tracks_and_restores() {
