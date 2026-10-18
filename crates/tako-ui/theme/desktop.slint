@@ -1695,17 +1695,32 @@ component GameStage inherits VerticalLayout {
         triggered => {
             self.running = false;
             game = game-in;
+            text-rise = false;
             text-in = true;
+            rise-timer.running = true;
+        }
+    }
+    // O texto novo entra subindo 8: começa 8 abaixo (sem animar) e sobe em 200.
+    property <bool> text-rise: true;
+    rise-timer := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            text-rise = true;
         }
     }
     property <bool> show-trailer: game.trailer && !small;
     // Sessões só com espaço para Detalhes ficar com pelo menos ~340 (ícone, rótulo de 104 e um valor de 24 letras).
     property <bool> show-sessions: sessions.length > 0 && !small && DeskArt.win-w >= 1600px;
     alignment: end;
-    spacing: small ? Ui.space-16 : Ui.space-28;
+    // Os 8 da subida do texto saem do espaço até os cartões.
+    spacing: (small ? Ui.space-16 : Ui.space-28) - 8px;
     VerticalLayout {
         spacing: small ? 10px : 14px;
         alignment: end;
+        padding-bottom: text-rise ? 8px : 0px;
+        animate padding-bottom { duration: Ui.text-fade(text-rise) * (text-rise ? 1 : 0); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         opacity: text-in ? 1 : 0;
         animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         if game.overline != "": HorizontalLayout {
@@ -3829,13 +3844,15 @@ component ArtLayer inherits Rectangle {
                 source: root.bottom-src;
                 image-fit: fill;
             }
-            // A nova, por cima: 1,04 → 1 a partir do centro.
+            // A nova, por cima: 1,04 → 1 a partir do centro, vindo 18 da direita.
             property <float> grow: root.top-in ? 1 : 1.04;
             animate grow { duration: Ui.art-settle(root.top-in); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+            property <length> shift: root.top-in ? 0 : 18px;
+            animate shift { duration: Ui.art-settle(root.top-in); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             Image {
                 width: DeskArt.w * parent.grow;
                 height: DeskArt.h * parent.grow;
-                x: DeskArt.x - (self.width - DeskArt.w) / 2;
+                x: DeskArt.x - (self.width - DeskArt.w) / 2 + parent.shift;
                 y: DeskArt.y - (self.height - DeskArt.h) / 2;
                 source: root.top-src;
                 image-fit: fill;
@@ -3848,7 +3865,8 @@ component ArtLayer inherits Rectangle {
                     source: DeskArt.blur;
                     image-fit: fill;
                     opacity: root.top-in ? 0 : 1;
-                    animate opacity { duration: Ui.art-unblur(root.top-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                    // Sai de 120 a 620: a imagem nítida já está aparecendo quando o desfoque começa a sair.
+                    animate opacity { duration: Ui.art-unblur(root.top-in); delay: Ui.art-unblur-delay(root.top-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                 }
             }
             if DeskArt.blur.width > 0: Rectangle {

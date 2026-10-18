@@ -4,7 +4,9 @@
 //! da biblioteca da tela cheia (`query`, `dialogs`, `details::primary_action`); aqui só muda a apresentação.
 
 use super::library::Criteria;
-use super::{Cmd, Ctx, Effect, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles};
+use super::{
+    Cmd, Ctx, Effect, InputKind, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles,
+};
 use crate::model::{DeskCategory, DeskGame, DeskGameView, DeskInfo, Hint, NavItem, PanelRow};
 use crate::values::parse_color;
 use std::cell::RefCell;
@@ -198,7 +200,13 @@ pub struct DesktopLibrary {
     /// capa com o foco do teclado (fileira, coluna).
     cat_rows: Vec<Vec<String>>,
     cat_focus: (usize, usize),
+    /// TrocaDeJogo: o jogo no destaque e a seleção do teclado esperando parar (id, desde quando).
+    hero: Option<String>,
+    hero_wait: Option<(String, std::time::Instant)>,
 }
+
+/// Teclado rápido: só a seleção anda; arte e texto trocam quando ela para por este tempo.
+const HERO_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
 
 impl Default for DesktopLibrary {
     fn default() -> Self {
@@ -221,7 +229,37 @@ impl DesktopLibrary {
             anchor: None,
             cat_rows: Vec::new(),
             cat_focus: (0, 0),
+            hero: None,
+            hero_wait: None,
         }
+    }
+
+    /// O jogo do destaque: com o teclado, o anterior fica até a seleção parar por `HERO_SETTLE`; com o controle, um
+    /// clique (`select_index` limpa `hero`) ou na primeira vez, na hora.
+    fn hero_id(&mut self, ctx: &Ctx, selected: Option<String>) -> Option<String> {
+        let now = std::time::Instant::now();
+        let waiting = match &self.hero_wait {
+            Some((id, since)) if Some(id) == selected.as_ref() => now - *since < HERO_SETTLE,
+            _ => true,
+        };
+        if selected == self.hero
+            || self.hero.is_none()
+            || ctx.input != InputKind::Keyboard
+            || !waiting
+        {
+            self.hero = selected;
+            self.hero_wait = None;
+            return self.hero.clone();
+        }
+        if self.hero_wait.as_ref().map(|(id, _)| id) != selected.as_ref() {
+            self.hero_wait = selected.map(|id| (id, now));
+            slint::Timer::single_shot(HERO_SETTLE, || {
+                if let Some(shell) = crate::tasks::shell() {
+                    shell.borrow_mut().ctx.dirty = true;
+                }
+            });
+        }
+        self.hero.clone()
     }
 
     pub fn tab(&self) -> Tab {
@@ -308,6 +346,8 @@ impl DesktopLibrary {
     }
 
     fn select_index(&mut self, ctx: &Ctx, index: usize) {
+        // Clique: o destaque troca na hora, sem a espera do teclado.
+        self.hero = None;
         let ids = self.ids(ctx);
         if let Some(id) = ids.get(index) {
             self.selected = Some(id.clone());
@@ -1350,7 +1390,8 @@ impl Page for DesktopLibrary {
             ],
         );
         out.set("desk-selected", cur.map(|i| i as i32).unwrap_or(-1));
-        let game = cur.and_then(|i| ctx.library.find(&ids[i]));
+        let hero = self.hero_id(ctx, cur.map(|i| ids[i].clone()));
+        let game = hero.and_then(|id| ctx.library.find(&id));
         let mut sessions = (String::new(), Vec::new());
         let (view, actions, stats, details) = match game {
             Some(g) => {
@@ -1791,6 +1832,23 @@ mod tests {
         assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
         // A faixa não inventa Nuvem nem Conquistas.
         assert_eq!(strip(&shell.ctx, &g).len(), 2);
+    }
+
+    #[test]
+    fn fast_keyboard_keeps_the_hero_until_the_selection_settles() {
+        let (_dir, mut shell) = shell();
+        let mut p = DesktopLibrary::new();
+        let (a, b) = (Some("a".to_owned()), Some("b".to_owned()));
+        shell.ctx.input = InputKind::Keyboard;
+        assert_eq!(p.hero_id(&shell.ctx, a.clone()), a);
+        // Seleção andou agora: o destaque fica no anterior.
+        assert_eq!(p.hero_id(&shell.ctx, b.clone()), a);
+        // Parou por 150 ms: troca.
+        p.hero_wait = Some(("b".into(), std::time::Instant::now() - HERO_SETTLE));
+        assert_eq!(p.hero_id(&shell.ctx, b.clone()), b);
+        // Clique (mesmo depois de usar o teclado): na hora.
+        p.hero = None;
+        assert_eq!(p.hero_id(&shell.ctx, a.clone()), a);
     }
 
     #[test]
