@@ -89,8 +89,15 @@ fn mode_label(key: &str) -> String {
 }
 
 /// Linha que muda ao toque: em negrito quando o jogo muda o valor do Tako.
-fn row(key: &str, title: String, value: String, overridden: bool) -> PanelRow {
-    PanelRow::choice(key, title, value).emphasized(overridden)
+/// Linha de uma escolha do jogo. `default` só quando o jogo mudou a escolha: o valor fica em destaque e o padrão do
+/// Tako ("Padrão: …") aparece embaixo (ConfiguracoesDoJogo).
+fn row(ctx: &Ctx, key: &str, title: String, value: String, default: Option<String>) -> PanelRow {
+    let row = PanelRow::choice(key, title, value).emphasized(default.is_some());
+    // Só no desktop: a tela cheia não muda.
+    match default.filter(|_| ctx.desktop) {
+        Some(d) => row.desc(d),
+        None => row,
+    }
 }
 
 /// A tela que o jogo usa: a dele (PERF-002) ou a tela de jogo do Tako (vazio sem nenhuma).
@@ -378,10 +385,11 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     v.push(
         MenuItem::new(
             row(
+                ctx,
                 "screen",
                 ctx.t("game_settings.use_screen"),
                 screen_value,
-                c.use_game_screen.is_some(),
+                c.use_game_screen.is_some().then(|| screen_default.clone()),
             )
             .desc(ctx.t("game_settings.screen_note")),
         )
@@ -423,10 +431,23 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     v.push(
         MenuItem::new(
             row(
+                ctx,
                 "which_screen",
                 ctx.t("game_settings.which_screen"),
                 screen_value,
-                normalize_arguments(c.screen_id.as_deref()).is_some(),
+                normalize_arguments(c.screen_id.as_deref())
+                    .is_some()
+                    .then(|| {
+                        let name = s.string(keys::GAME_SCREEN_NAME);
+                        default_of(
+                            ctx,
+                            &if name.is_empty() {
+                                ctx.t("game_settings.no_screen")
+                            } else {
+                                name
+                            },
+                        )
+                    }),
             )
             .desc(ctx.t("game_settings.which_screen_desc")),
         )
@@ -479,10 +500,11 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     let (a, b) = (i(), i());
     v.push(
         MenuItem::new(row(
+            ctx,
             "mode",
             ctx.t("game_settings.mode"),
             mode_value,
-            c.screen_mode.is_some(),
+            c.screen_mode.is_some().then(|| default_mode_label.clone()),
         ))
         .on(move |ctx| cycle_mode(ctx, &a, 1))
         .on_adjust(move |ctx, d| cycle_mode(ctx, &b, d))
@@ -530,10 +552,11 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     };
     v.push(
         MenuItem::new(row(
+            ctx,
             "hdr",
             ctx.t("game_settings.hdr"),
             hdr_value,
-            c.hdr.is_some(),
+            c.hdr.is_some().then(|| hdr_default.clone()),
         ))
         .on(move |ctx| toggle_hdr(ctx, 1, &a))
         .on_adjust(move |ctx, d| toggle_hdr(ctx, d, &b))
@@ -565,10 +588,11 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     let (a, b) = (i(), i());
     v.push(
         MenuItem::new(row(
+            ctx,
             "audio",
             ctx.t("game_settings.audio"),
             audio_value,
-            c.audio_device_id.is_some(),
+            c.audio_device_id.is_some().then(|| audio_default.clone()),
         ))
         .on(move |ctx| cycle_audio(ctx, &a, 1))
         .on_adjust(move |ctx, d| cycle_audio(ctx, &b, d))
@@ -612,10 +636,12 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     v.push(
         MenuItem::new(
             row(
+                ctx,
                 "args",
                 ctx.t("game_settings.arguments"),
                 args.clone().unwrap_or_else(|| ctx.t("game_settings.none")),
-                args.is_some(),
+                args.is_some()
+                    .then(|| default_of(ctx, &ctx.t("game_settings.none"))),
             )
             .desc(ctx.t("game_settings.launch_note")),
         )
@@ -625,12 +651,15 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     let a = i();
     v.push(
         MenuItem::new(row(
+            ctx,
             "folder",
             ctx.t("game_settings.folder"),
             folder
                 .clone()
                 .unwrap_or_else(|| ctx.t("game_settings.exe_folder")),
-            folder.is_some(),
+            folder
+                .is_some()
+                .then(|| default_of(ctx, &ctx.t("game_settings.exe_folder"))),
         ))
         .on(move |ctx| edit_folder(ctx, &a)),
     );
@@ -638,6 +667,7 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     let a = i();
     v.push(
         MenuItem::new(row(
+            ctx,
             "env",
             ctx.t("game_settings.environment"),
             if env.is_empty() {
@@ -645,7 +675,7 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
             } else {
                 tako_core::i18n::tn("game_settings.environment_count", env.len() as i64, &[])
             },
-            !env.is_empty(),
+            (!env.is_empty()).then(|| default_of(ctx, &ctx.t("game_settings.none"))),
         ))
         .on(move |ctx| {
             edit_text(
@@ -678,10 +708,13 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
         let a = i();
         v.push(
             MenuItem::new(row(
+                ctx,
                 key,
                 ctx.t(text),
                 value.clone().unwrap_or_else(|| ctx.t("game_settings.none")),
-                value.is_some(),
+                value
+                    .is_some()
+                    .then(|| default_of(ctx, &ctx.t("game_settings.none"))),
             ))
             .on(move |ctx| edit_text(ctx, &a, text, hint, get, set)),
         );
@@ -698,14 +731,36 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     };
     let a = i();
     v.push(
-        MenuItem::new(
-            PanelRow::action("reset", ctx.t("game_settings.reset"))
+        MenuItem::new({
+            let row = PanelRow::action("reset", ctx.t("game_settings.reset"))
                 .value(changes)
-                .enabled(n > 0),
-        )
+                .enabled(n > 0);
+            if ctx.desktop { row.danger() } else { row }
+        })
         .on(move |ctx| {
-            change(ctx, &a, |o| *o = Override::default());
-            Flow::Stay
+            // Desfaz todas as mudanças do jogo: pergunta antes (ConfiguracoesDoJogo).
+            if !ctx.desktop {
+                change(ctx, &a, |o| *o = Override::default());
+                return Flow::Stay;
+            }
+            let id = a.clone();
+            Flow::Push(Box::new(
+                MenuLayer::dialog(ctx.t("game_settings.reset_title"), move |ctx| {
+                    let id = id.clone();
+                    vec![
+                        MenuItem::new(
+                            PanelRow::button("reset", ctx.t("game_settings.reset")).danger(),
+                        )
+                        .on(move |ctx| {
+                            change(ctx, &id, |o| *o = Override::default());
+                            Flow::Close
+                        }),
+                        MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                            .on(|_| Flow::Close),
+                    ]
+                })
+                .text(ctx.t("game_settings.reset_text")),
+            ))
         }),
     );
     v
@@ -765,6 +820,12 @@ mod tests {
         layer.handle(Cmd::Down, &mut ctx);
         layer.handle(Cmd::Right, &mut ctx);
         assert_eq!(value(&layer.render(&ctx), "hdr"), ("Ligado".into(), true));
+        // No desktop, a mudança mostra o padrão do Tako embaixo.
+        ctx.desktop = true;
+        let o = layer.render(&ctx);
+        ctx.desktop = false;
+        let hdr = o.rows.iter().find(|r| r.key == "hdr").unwrap();
+        assert_eq!(hdr.description, "Padrão: Desligado");
 
         // Gravado: um contexto novo lê do banco.
         let fresh = crate::app::build_ctx(DataPaths::at(dir.path()), Platform::simulated(), false);
