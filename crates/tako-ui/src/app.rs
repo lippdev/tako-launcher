@@ -1165,6 +1165,15 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     bridge::set_global(
         ui,
         "Ui",
+        "reduce-transparency",
+        s.ctx
+            .settings
+            .bool(crate::shell::ctx::keys::REDUCED_TRANSPARENCY, false)
+            .to_value(),
+    );
+    bridge::set_global(
+        ui,
+        "Ui",
         "reduce-motion",
         s.ctx
             .settings

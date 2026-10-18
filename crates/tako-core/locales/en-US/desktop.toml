@@ -27,6 +27,8 @@ install_via = "Install {via}"
 about_more = "More"
 trailer = "Trailer"
 search_esc = "Esc"
+settings_count = "Settings · {n} categories"
+settings_search = "Search settings"
 theme_big_picture = "Themes apply to full screen. Desktop mode uses Tako's own look."
 
 [desktop.menu]

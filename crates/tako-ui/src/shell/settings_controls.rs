@@ -64,11 +64,23 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             ("key", &KeyShortcut::default().display()),
         ],
     );
+    // No desktop (TelaControles) o controle conectado vira a linha dele, com a bateria à direita.
+    let controller = if ctx.desktop && !ctx.pad_name.is_empty() {
+        let battery = ctx.pad_battery.map(|p| format!("{p}%")).unwrap_or_default();
+        let desc = match ctx.pad_battery {
+            Some(p) if p < 20 => ctx.tf(
+                "status.battery_low",
+                &[("pad", &ctx.pad_name), ("percent", &p.to_string())],
+            ),
+            _ => ctx.t("settings.controls.controller"),
+        };
+        PanelRow::info("controller", pad, battery).desc(desc).icon("gamepad")
+    } else {
+        PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
+            .desc(ctx.t("settings.controls.controller_desc"))
+    };
     let mut v = vec![
-        MenuItem::new(
-            PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
-                .desc(ctx.t("settings.controls.controller_desc")),
-        ),
+        MenuItem::new(controller),
         MenuItem::new(PanelRow::header(ctx.t("settings.controls.center_header"))),
         MenuItem::new(described(ctx, "settings.controls.key").value(key_label(ctx)))
             .on(|_| Flow::Push(Box::new(KeyLayer::default()))),

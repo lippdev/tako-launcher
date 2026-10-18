@@ -164,6 +164,8 @@ pub fn button_glyph(pad: PadFamily, b: GamepadButtons) -> &'static str {
 pub mod keys {
     pub const DYNAMIC_COLOR: &str = "DynamicColor";
     pub const REDUCED_MOTION: &str = "ReducedMotion";
+    /// Modo desktop: sem vidro (tema `solido`), para quem prefere superfícies opacas.
+    pub const REDUCED_TRANSPARENCY: &str = "ReducedTransparency";
     pub const RESTORE_ENVIRONMENT: &str = "RestoreEnvironmentAfterGame";
     pub const DEVELOPER: &str = "DeveloperOptions";
     pub const GAME_SCREEN_ENABLED: &str = "GameScreenEnabled";

@@ -1971,6 +1971,8 @@ component DeskRow inherits Rectangle {
     callback inc();
     property <bool> is-header: data.kind == "header";
     property <color> group-bg: DeskArt.gray ? Ui.settings-surface : Ui.glass-control;
+    // Grupos das Configurações usam o raio dos cartões; nos painéis de vidro, o dos controles.
+    property <length> group-r: DeskArt.gray ? Ui.radius-card : Ui.radius-control;
     property <color> fg: data.style == "danger" ? Ui.error : Ui.on-accent;
     height: row-h;
     opacity: data.enabled || is-header ? 1 : 0.45;
@@ -1980,10 +1982,10 @@ component DeskRow inherits Rectangle {
         if last: Rectangle { y: parent.height - 1px; height: 1px; background: Ui.divider; }
     }
     if !is-header && !loose && !bare: Rectangle {
-        border-top-left-radius: first ? Ui.radius-control : 0;
-        border-top-right-radius: first ? Ui.radius-control : 0;
-        border-bottom-left-radius: last ? Ui.radius-control : 0;
-        border-bottom-right-radius: last ? Ui.radius-control : 0;
+        border-top-left-radius: first ? group-r : 0;
+        border-top-right-radius: first ? group-r : 0;
+        border-bottom-left-radius: last ? group-r : 0;
+        border-bottom-right-radius: last ? group-r : 0;
         background: ta.has-hover && data.enabled ? (DeskArt.gray ? Ui.settings-control-hover.mix(Ui.settings-surface, 0.5) : Ui.glass-hover.mix(Ui.glass-control, 0.5)) : group-bg;
         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         // Divisória entre linhas do mesmo grupo, recuada 18 da esquerda.
@@ -2056,6 +2058,26 @@ component DeskRow inherits Rectangle {
             }
         }
         if data.kind == "toggle": DeskToggle { on: data.on; y: (parent.height - self.height) / 2; }
+        // Bateria do controle (28 × 12), sempre com o número; abaixo de 20% em `warning`.
+        if data.key == "controller" && data.value != "": battery := Rectangle {
+            width: 32px;
+            property <float> level: clamp(data.value.to-float() / 100, 0, 1);
+            Rectangle {
+                width: 28px;
+                height: 12px;
+                border-radius: 3px;
+                border-width: 1.5px;
+                border-color: level < 0.2 ? Ui.warning : Ui.desk-on-muted;
+                Rectangle {
+                    x: 2px;
+                    width: (parent.width - 4px) * battery.level;
+                    height: parent.height - 4px;
+                    border-radius: 1.5px;
+                    background: battery.level < 0.2 ? Ui.warning : Ui.on-accent;
+                }
+            }
+            Rectangle { x: 29px; width: 2px; height: 5px; border-radius: 1px; background: Ui.desk-on-muted; }
+        }
         if adjustable: AdjustButton { label: "‹"; y: (parent.height - self.height) / 2; clicked => { root.dec(); } }
         if data.kind == "slider": Rectangle {
             y: (parent.height - self.height) / 2;
@@ -2070,7 +2092,22 @@ component DeskRow inherits Rectangle {
                 background: Ui.on-accent;
             }
         }
-        if data.value != "" && data.kind != "toggle" && data.kind != "slider": Text {
+        // Nas Configurações a escolha é um menu em pílula ("Português (Brasil) ⌃⌄").
+        if data.kind == "choice" && DeskArt.gray: Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 36px;
+            width: ml.preferred-width;
+            border-radius: self.height / 2;
+            background: ta.has-hover ? Ui.settings-control-hover : Ui.settings-control;
+            ml := HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 12px;
+                spacing: 6px;
+                Text { text: data.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+                Rectangle { width: 14px; Icon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
+            }
+        }
+        if data.value != "" && data.kind != "toggle" && data.kind != "slider" && !(data.kind == "choice" && DeskArt.gray): Text {
             text: data.value;
             color: data.emphasized ? Ui.on-accent : Ui.desk-on-muted;
             font-size: Ui.desk-label-sm;
@@ -2081,7 +2118,7 @@ component DeskRow inherits Rectangle {
             overflow: elide;
         }
         if adjustable: AdjustButton { label: "›"; y: (parent.height - self.height) / 2; clicked => { root.inc(); } }
-        if (data.kind == "action" || data.kind == "button" || data.kind == "choice") && !adjustable: Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
+        if (data.kind == "action" || data.kind == "button" || (data.kind == "choice" && !DeskArt.gray)) && !adjustable: Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
 }
 
@@ -2225,9 +2262,11 @@ component PopupFooter inherits HorizontalLayout {
     }
 }
 
-// Configurações: os mesmos painéis da tela cheia, com categorias à esquerda e as linhas à direita.
+// Configurações (TelaConfiguracoes): a mesma estrutura da biblioteca sobre o cinza. À esquerda, o painel de categorias
+// no lugar da lista (CategoriaDeConfiguracao); à direita, ancorado no topo, o cabeçalho da categoria e os grupos de
+// linhas, até 860 de largura.
 component DeskSettings inherits Rectangle {
-    in property <string> title;
+    in property <string> count;
     in property <[DeskNav]> categories;
     in property <int> category-focus;
     in property <string> heading;
@@ -2235,54 +2274,96 @@ component DeskSettings inherits Rectangle {
     in property <[PanelRow]> rows;
     in property <int> row-focus;
     in property <bool> focus-visible;
+    in property <bool> small;
     callback clicked(string, int);
+    property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
     HorizontalLayout {
-        padding-left: 36 * Ui.u;
-        padding-right: 36 * Ui.u;
-        padding-top: 28 * Ui.u;
-        spacing: 40 * Ui.u;
-        VerticalLayout {
-            width: 300 * Ui.u;
-            spacing: 6 * Ui.u;
-            alignment: start;
-            Text { text: title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-heading; font-weight: 600; height: 64 * Ui.u; }
-            for c[i] in categories: Rectangle {
-                height: 52 * Ui.u;
-                border-radius: Ui.radius-md;
-                background: c.selected ? Ui.surface-1 : (cta.has-hover ? Ui.surface-1.with-alpha(0.06) : transparent);
-                if focus-visible && row-focus < 0 && i == category-focus: FocusRing { }
+        spacing: small ? Ui.space-20 : Ui.space-28;
+        alignment: start;
+        Vidro {
+            width: list-w;
+            height: cl.preferred-height;
+            cl := VerticalLayout {
+                padding-top: Ui.space-16;
+                padding-left: Ui.space-12;
+                padding-right: Ui.space-12;
+                padding-bottom: Ui.space-12;
+                spacing: 6px;
                 HorizontalLayout {
-                    padding-left: 16 * Ui.u;
-                    spacing: 14 * Ui.u;
-                    Icon { name: c.icon; size: 22 * Ui.u; y: (parent.height - self.height) / 2; tint: c.selected ? Ui.on-accent : Ui.on-accent-muted; }
+                    padding-left: Ui.space-12;
                     Text {
-                        text: c.label;
-                        color: c.selected ? Ui.on-accent : Ui.on-accent-muted;
-                        font-size: Ui.label-md;
-                        font-weight: 600;
-                        vertical-alignment: center;
+                    height: 36px;
+                    text: count;
+                    color: Ui.desk-on-subtle;
+                    font-size: Ui.desk-label-sm;
+                    font-weight: 500;
+                    vertical-alignment: center;
                     }
                 }
-                cta := TouchArea {
-                    mouse-cursor: pointer;
-                    clicked => { root.clicked("category", i); }
+                for c[i] in categories: Rectangle {
+                    height: Ui.list-row-height + (Ui.text-scale - 1) * 32px;
+                    border-radius: Ui.radius-row;
+                    background: !c.selected && cta.has-hover ? Ui.glass-hover : transparent;
+                    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                    accessible-role: tab;
+                    accessible-label: c.label;
+                    if c.selected: Selected { lifted: true; }
+                    if focus-visible && row-focus < 0 && i == category-focus: FocusRing { }
+                    HorizontalLayout {
+                        padding-left: Ui.space-8;
+                        spacing: 14px;
+                        // Ícone sem fundo no lugar da miniatura do jogo, para os nomes alinharem como na lista.
+                        Rectangle {
+                            width: Ui.thumb-size;
+                            Icon { name: c.icon; size: 22px; tint: c.selected ? Ui.on-accent : Ui.desk-on-muted; }
+                        }
+                        Text {
+                            text: c.label;
+                            color: Ui.on-accent;
+                            font-size: Ui.desk-label;
+                            font-weight: c.selected ? 600 : 500;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                    cta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.clicked("category", i); }
+                    }
                 }
             }
         }
-        VerticalLayout {
+        HorizontalLayout {
             horizontal-stretch: 1;
-            spacing: 6 * Ui.u;
-            Text { text: heading; color: Ui.on-accent; font-size: Ui.title-md; font-weight: 700; height: 40 * Ui.u; vertical-alignment: bottom; }
-            Text { text: subtitle; color: Ui.on-accent-muted; font-size: Ui.body-md; wrap: word-wrap; }
-            Rectangle { height: 12 * Ui.u; }
-            RowScroll {
-                vertical-stretch: 1;
-                content-key: heading;
-                rows: rows;
-                sel: row-focus;
-                key-focus: focus-visible;
-                clicked(z, i) => { root.clicked(z, i); }
+            VerticalLayout {
+                max-width: 860px;
+                horizontal-stretch: 1;
+                spacing: Ui.space-12;
+                HorizontalLayout {
+                    padding-top: 4px;
+                    padding-bottom: 10px;
+                    padding-left: 8px;
+                    spacing: 18px;
+                    Rectangle {
+                        width: 34px;
+                        Icon { name: categories[category-focus].icon; size: 34px; tint: Ui.on-accent; }
+                    }
+                    VerticalLayout {
+                        spacing: 6px;
+                        Text { text: heading; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-headline; font-weight: 700; letter-spacing: -0.01 * self.font-size; }
+                        Text { text: subtitle; color: Ui.desk-on-muted; font-size: Ui.desk-label; wrap: word-wrap; }
+                    }
+                }
+                RowScroll {
+                    vertical-stretch: 1;
+                    content-key: heading;
+                    rows: rows;
+                    sel: row-focus;
+                    key-focus: focus-visible;
+                    clicked(z, i) => { root.clicked(z, i); }
+                }
             }
+            Rectangle { horizontal-stretch: 0.0001; }
         }
     }
 }
@@ -2999,6 +3080,7 @@ export component Desktop inherits Window {
 
     // Configurações (as mesmas propriedades da tela cheia).
     in property <string> settings-title;
+    in property <string> settings-count;
     in property <[DeskNav]> settings-categories;
     in property <int> settings-category-focus;
     in property <string> settings-heading;
@@ -3160,7 +3242,7 @@ export component Desktop inherits Window {
                 focus-main => { fs.focus(); }
             }
             if page == "settings": DeskSettings {
-                title: settings-title;
+                count: settings-count;
                 categories: settings-categories;
                 category-focus: settings-category-focus;
                 heading: settings-heading;
@@ -3168,6 +3250,7 @@ export component Desktop inherits Window {
                 rows: settings-rows;
                 row-focus: settings-row-focus;
                 focus-visible: desk-focus-visible;
+                small: root.small;
                 clicked(z, i) => {
                     fs.focus();
                     root.clicked(z, i);

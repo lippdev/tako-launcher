@@ -136,6 +136,8 @@ dynamic = "Cor dinâmica"
 dynamic_desc = "A tela assume a cor da arte do jogo em foco"
 motion = "Reduzir animações"
 motion_desc = "Tira as transições de cor, de rolagem e da barra lateral"
+transparency = "Reduzir transparência"
+transparency_desc = "No modo desktop, painéis e botões ficam opacos, sem o vidro sobre a arte"
 
 [settings.screen]
 title = "Tela e áudio"

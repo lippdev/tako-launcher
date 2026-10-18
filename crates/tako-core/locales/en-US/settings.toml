@@ -136,6 +136,8 @@ dynamic = "Dynamic color"
 dynamic_desc = "The screen takes on the color of the focused game's art"
 motion = "Reduce motion"
 motion_desc = "Removes color, scrolling and sidebar transitions"
+transparency = "Reduce transparency"
+transparency_desc = "In desktop mode, panels and buttons become opaque, with no glass over the art"
 
 [settings.screen]
 title = "Display and audio"

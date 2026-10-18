@@ -582,6 +582,17 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             false,
         ),
     ]
+    .into_iter()
+    // "Reduzir transparência" só existe no desktop (a tela cheia não tem vidro).
+    .chain(ctx.desktop.then(|| {
+        toggle(
+            ctx,
+            "settings.appearance.transparency",
+            keys::REDUCED_TRANSPARENCY,
+            false,
+        )
+    }))
+    .collect()
 }
 
 fn change_text_size(ctx: &mut Ctx, direction: i32) -> Flow {
@@ -916,6 +927,13 @@ impl Page for SettingsPage {
             })
             .collect();
         out.set("settings-categories", cats);
+        // Só o desktop tem o cabeçalho do painel de categorias (a API de tema da tela cheia não muda).
+        if ctx.desktop {
+            out.set(
+                "settings-count",
+                ctx.tf("desktop.settings_count", &[("n", &self.cats.len().to_string())]),
+            );
+        }
         out.set("settings-category-focus", self.cat as i32);
         let id = self.cats[self.cat].id;
         out.set("settings-heading", ctx.t(&format!("settings.{id}.title")));

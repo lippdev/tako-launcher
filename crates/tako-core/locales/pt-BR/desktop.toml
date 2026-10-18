@@ -27,6 +27,8 @@ install_via = "Instalar {via}"
 about_more = "Mais"
 trailer = "Trailer"
 search_esc = "Esc"
+settings_count = "Configurações · {n} categorias"
+settings_search = "Buscar configuração"
 theme_big_picture = "O tema vale para a tela cheia. O modo desktop usa o visual do Tako."
 
 [desktop.menu]
