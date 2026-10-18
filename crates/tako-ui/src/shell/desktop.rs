@@ -1521,6 +1521,14 @@ impl Page for DesktopLibrary {
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
+        out.set(
+            "desk-sidebar-unified",
+            ctx.settings.bool(super::ctx::keys::SIDEBAR_UNIFIED, false),
+        );
+        out.set(
+            "desk-sidebar-narrow",
+            ctx.settings.string(super::ctx::keys::SIDEBAR_WIDTH) == "narrow",
+        );
         // "Agrupar por **Status**": o nome do agrupamento em destaque.
         out.set("desk-group-prefix", ctx.t("desktop.group.by_prefix"));
         out.set(

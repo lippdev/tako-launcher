@@ -536,6 +536,15 @@ fn desktop_snapshot() {
         );
         i18n::set_lang(Lang::PtBr);
         ctx.library.refresh();
+        // `TAKO_SNAP_UNIFIED=1` liga a barra lateral unida; `TAKO_SNAP_NARROW=1`, a largura Estreita.
+        if std::env::var("TAKO_SNAP_UNIFIED").is_ok_and(|v| v == "1") {
+            ctx.settings
+                .set_bool(crate::shell::ctx::keys::SIDEBAR_UNIFIED, true);
+        }
+        if std::env::var("TAKO_SNAP_NARROW").is_ok_and(|v| v == "1") {
+            ctx.settings
+                .set(crate::shell::ctx::keys::SIDEBAR_WIDTH, "narrow");
+        }
         // `TAKO_SNAP_TEXT=125`: tamanho do texto (ListaTexto125).
         if let Ok(t) = std::env::var("TAKO_SNAP_TEXT")
             && !t.is_empty()

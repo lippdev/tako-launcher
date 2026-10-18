@@ -142,6 +142,13 @@ motion = "Reduzir animações"
 motion_desc = "Tira as transições de cor, de rolagem e da barra lateral"
 transparency = "Reduzir transparência"
 transparency_desc = "No modo desktop, painéis e botões ficam opacos, sem o vidro sobre a arte"
+layout_header = "Layout"
+sidebar_unified = "Barra lateral unida à barra de cima"
+sidebar_unified_desc = "A lista encosta na barra de cima e na borda esquerda e vira uma peça só com ela, sem linhas. Desligado: a lista flutua."
+sidebar_width = "Largura da barra lateral"
+sidebar_width_desc = "Vale para os dois layouts"
+sidebar_normal = "Normal"
+sidebar_narrow = "Estreita"
 
 [settings.screen]
 title = "Tela e áudio"

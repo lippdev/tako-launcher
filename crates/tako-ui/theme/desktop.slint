@@ -151,24 +151,48 @@ component Vidro inherits Rectangle {
     in property <bool> edge: true;
     // Tinta densa sempre (perigo, Sessões), além da escolha automática sobre arte clara.
     in property <bool> dense;
+    // Sem vidro próprio (BarraLateralUnida): quem está sobre o vidro em L não pinta fundo, desfoque nem brilho.
+    in property <bool> bare;
+    // Moldura em L (barra + coluna num vidro só): `cut-x` é a largura da coluna e `cut-y` a altura da barra; com
+    // `cut-x` > 0 o vidro (do tamanho da janela) pinta só a barra e a coluna, na mesma camada, sem emenda.
+    in property <length> cut-x;
+    in property <length> cut-y;
     property <length> ax: self.absolute-position.x;
     property <length> ay: self.absolute-position.y;
     // Tinta adaptativa: densa quando a arte embaixo do painel é clara (limite 0,18, o mesmo do AccentPalette).
-    property <bool> bright: (DeskArt.lum-at(ax + self.width / 2, ay + self.height / 2)
+    property <bool> bright: cut-x > 0 ? (DeskArt.lum-at(ax + cut-x / 2, ay + cut-y + (self.height - cut-y) / 4)
+        + DeskArt.lum-at(ax + cut-x / 2, ay + cut-y + (self.height - cut-y) * 3 / 4)
+        + DeskArt.lum-at(ax + self.width / 4, ay + cut-y / 2)
+        + DeskArt.lum-at(ax + self.width / 2, ay + cut-y / 2)
+        + DeskArt.lum-at(ax + self.width * 3 / 4, ay + cut-y / 2)) / 5 > 0.18
+        : (DeskArt.lum-at(ax + self.width / 2, ay + self.height / 2)
         + DeskArt.lum-at(ax + self.width / 4, ay + self.height / 4)
         + DeskArt.lum-at(ax + self.width * 3 / 4, ay + self.height / 4)
         + DeskArt.lum-at(ax + self.width / 4, ay + self.height * 3 / 4)
         + DeskArt.lum-at(ax + self.width * 3 / 4, ay + self.height * 3 / 4)) / 5 > 0.18;
     property <bool> lens: !DeskArt.gray && !Ui.reduce-transparency;
+    property <brush> base-fill: DeskArt.gray ? Ui.settings-surface : Ui.glass-solid;
     border-radius: radius;
-    background: DeskArt.gray ? Ui.settings-surface : Ui.glass-solid;
+    background: bare || cut-x > 0 ? transparent : base-fill;
     drop-shadow-offset-y: layer ? Ui.shadow-layer-y : Ui.shadow-float-y;
-    drop-shadow-blur: layer ? Ui.shadow-layer-blur : Ui.shadow-float-blur;
-    drop-shadow-color: layer ? Ui.shadow-layer-color : Ui.shadow-float-color;
+    drop-shadow-blur: bare || cut-x > 0 ? 0px : (layer ? Ui.shadow-layer-blur : Ui.shadow-float-blur);
+    drop-shadow-color: bare || cut-x > 0 ? transparent : (layer ? Ui.shadow-layer-color : Ui.shadow-float-color);
     animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-    Rectangle {
+    // Em L, duas faixas (a barra e a coluna) mostram a mesma pilha de camadas, alinhada pela janela.
+    for part in cut-x > 0 ? 2 : 1: Rectangle {
+        x: 0;
+        y: part == 0 ? 0 : cut-y;
+        width: part == 0 || cut-x <= 0 ? root.width : cut-x;
+        height: cut-x <= 0 ? root.height : (part == 0 ? cut-y : root.height - cut-y);
         border-radius: root.radius;
         clip: true;
+        visible: !root.bare;
+        background: cut-x > 0 ? root.base-fill : transparent;
+      Rectangle {
+        x: 0;
+        y: -parent.y;
+        width: root.width;
+        height: root.height;
         if lens && !DeskArt.has-art: Rectangle {
             x: -ax;
             y: -ay;
@@ -234,6 +258,7 @@ component Vidro inherits Rectangle {
             height: Ui.glass-highlight-height;
             background: @linear-gradient(180deg, Ui.glass-highlight 0%, Ui.glass-highlight.with-alpha(0) 100%);
         }
+    }
     }
     // Contorno de 1px por dentro e o reflexo especular (forte no canto superior esquerdo, fraco no inferior direito).
     if edge: Rectangle {
@@ -511,7 +536,8 @@ component TopBar inherits Vidro {
     drop-shadow-blur: 0px;
     drop-shadow-offset-y: 0px;
     drop-shadow-color: transparent;
-    Rectangle { y: parent.height - 1px; height: 1px; background: Ui.glass-edge; }
+    // Barra lateral unida (`bare`): sem a linha de baixo, a barra e a coluna são um vidro só.
+    Rectangle { visible: !root.bare; y: parent.height - 1px; height: 1px; background: Ui.glass-edge; }
 
     HorizontalLayout {
         padding-left: (small ? Ui.space-20 : Ui.space-36) - Ui.space-8;
@@ -2466,8 +2492,18 @@ component DeskLibrary inherits Rectangle {
     callback scrolled(int);
     callback menu(length, length);
     callback focus-main();
-    property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
-    property <bool> wide: view != "list";
+    // BarraLateralUnida: a lista vira uma coluna colada na borda esquerda, de baixo da barra até o rodapé, com `col-w`
+    // de largura (Normal 380, Estreita 336, contada da borda da janela). `narrow` vale para os dois layouts.
+    in property <bool> unified;
+    in property <bool> narrow;
+    in property <length> col-w: 380px;
+    // As margens da janela ao redor desta área (as mesmas do padding do Desktop).
+    property <length> pad-x: small ? Ui.space-20 : Ui.space-36;
+    property <length> gap: small ? Ui.space-20 : Ui.space-28;
+    property <length> pad-b: small ? Ui.space-16 : Ui.space-28;
+    property <length> list-w: narrow || root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
+    out property <bool> wide: view != "list";
+    property <bool> docked: unified && !wide;
     // Entrada do app: o painel da lista (ou os controles da grade) e depois as capas.
     property <float> intro-list: DeskIntro.on ? 1 : 0;
     animate intro-list { duration: Ui.page-time; delay: Ui.intro-delay(2); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -2508,17 +2544,24 @@ component DeskLibrary inherits Rectangle {
     if !wide: HorizontalLayout {
         opacity: mode-in ? 1 : 0;
         animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
-        spacing: small ? Ui.space-20 : Ui.space-28;
-        Vidro {
-            width: list-w;
-            y: (1 - intro-list) * Ui.intro-rise;
+        spacing: gap;
+        // Unida: o conteúdo começa 28 depois da coluna, que sai da área e vai até as bordas da janela.
+        Rectangle {
+            width: docked ? col-w + Ui.space-28 - pad-x - gap : list-w;
+          Vidro {
+            bare: docked;
+            edge: !docked;
+            x: docked ? -pad-x - root.x : 0;
+            y: (docked ? -Ui.space-20 : 0) + (1 - intro-list) * Ui.intro-rise;
+            width: docked ? col-w : parent.width;
+            height: docked ? root.height + Ui.space-20 + pad-b : parent.height;
             opacity: intro-list;
             VerticalLayout {
-                padding-top: Ui.space-16;
-                padding-left: Ui.space-12;
-                padding-right: Ui.space-12;
-                padding-bottom: Ui.space-12;
-                spacing: 6px;
+                padding-top: docked ? Ui.space-28 : Ui.space-16;
+                padding-left: docked ? Ui.space-20 : Ui.space-12;
+                padding-right: docked ? 18px : Ui.space-12;
+                padding-bottom: docked ? Ui.space-16 : Ui.space-12;
+                spacing: docked ? 12px : 6px;
                 Tabs {
                     tabs: tabs;
                     current: tab;
@@ -2669,7 +2712,7 @@ component DeskLibrary inherits Rectangle {
                         opacity: list-in ? 1 : 0;
                         animate opacity { duration: Ui.list-fade(list-in); easing: list-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
                         height: parent.height - (selecting ? 60px : 0);
-                        bar-out: Ui.space-12;
+                        bar-out: docked ? 18px : Ui.space-12;
                         compact: small;
                         games: games;
                         selected: selected;
@@ -2694,6 +2737,7 @@ component DeskLibrary inherits Rectangle {
                     }
                 }
             }
+          }
         }
         if !game.has-game && !loading: Rectangle { horizontal-stretch: 1; }
         if !game.has-game && loading: LoadingStage { horizontal-stretch: 1; small: small; }
@@ -6022,6 +6066,10 @@ export component Desktop inherits Window {
     in property <bool> desk-selecting;
     in property <bool> desk-reversed;
     in property <string> desk-view: "list";
+    // BarraLateralUnida (Aparência › Layout): a lista vira uma coluna colada à barra de cima; `desk-sidebar-narrow` =
+    // "Largura da barra lateral: Estreita" (vale para os dois layouts).
+    in property <bool> desk-sidebar-unified;
+    in property <bool> desk-sidebar-narrow;
     in property <string> desk-group-label;
     in property <string> desk-group-prefix;
     in property <[PanelRow]> desk-bulk;
@@ -6196,6 +6244,22 @@ export component Desktop inherits Window {
             Ui.art-scrim-strong.with-alpha(0.88) 45%, Ui.art-scrim-strong 100%);
     }
 
+    // Só a biblioteca em Lista tem coluna; Grade, Categorias e as outras telas ficam como sempre.
+    property <bool> unified: desk-sidebar-unified && page == "desk-library" && !lib.wide;
+    property <length> col-w: desk-sidebar-narrow ? 336px : 380px;
+    // Um vidro só em L (barra + coluna) atrás das duas, que ficam sem vidro próprio: duas camadas deixariam uma
+    // linha na emenda.
+    if unified: Vidro {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        radius: 0px;
+        edge: false;
+        cut-x: col-w;
+        cut-y: Ui.topbar-height;
+    }
+
     VerticalLayout {
         padding-left: small ? Ui.space-20 : Ui.space-36;
         padding-right: small ? Ui.space-20 : Ui.space-36;
@@ -6247,6 +6311,9 @@ export component Desktop inherits Window {
                 selecting: desk-selecting;
                 reversed: desk-reversed;
                 view-in: desk-view;
+                unified: desk-sidebar-unified;
+                narrow: desk-sidebar-narrow;
+                col-w: col-w;
                 group-label: desk-group-label;
                 group-prefix: desk-group-prefix;
                 bulk: desk-bulk;
@@ -6427,6 +6494,7 @@ export component Desktop inherits Window {
     bar := TopBar {
         y: 0px;
         width: root.width;
+        bare: unified;
         profile-name: desk-profile-name;
         profile-initial: desk-profile-initial;
         maximized: window-maximized;

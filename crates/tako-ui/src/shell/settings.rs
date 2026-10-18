@@ -669,7 +669,51 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
         )
     }))
     .chain(ctx.desktop.then(|| title_row(ctx)))
+    // Layout: BarraLateralUnida e a largura da barra lateral (só no desktop).
+    .chain(
+        ctx.desktop
+            .then(|| MenuItem::new(PanelRow::header(ctx.t("settings.appearance.layout_header")))),
+    )
+    .chain(ctx.desktop.then(|| {
+        toggle(
+            ctx,
+            "settings.appearance.sidebar_unified",
+            keys::SIDEBAR_UNIFIED,
+            false,
+        )
+    }))
+    .chain(ctx.desktop.then(|| sidebar_width_row(ctx)))
     .collect()
+}
+
+/// Largura da barra lateral: Normal (padrão) ou Estreita; vale para a lista flutuante e para a unida.
+fn sidebar_width_row(ctx: &Ctx) -> MenuItem {
+    const MODES: [(&str, &str); 2] = [("", "sidebar_normal"), ("narrow", "sidebar_narrow")];
+    let narrow = ctx.settings.string(keys::SIDEBAR_WIDTH) == "narrow";
+    MenuItem::new(
+        PanelRow::choice(
+            "sidebar-width",
+            ctx.t("settings.appearance.sidebar_width"),
+            ctx.t(&format!(
+                "settings.appearance.{}",
+                MODES[usize::from(narrow)].1
+            )),
+        )
+        .desc(ctx.t("settings.appearance.sidebar_width_desc")),
+    )
+    .options(|ctx| {
+        let narrow = ctx.settings.string(keys::SIDEBAR_WIDTH) == "narrow";
+        let picks = MODES
+            .iter()
+            .map(|(value, label)| {
+                Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                    ctx.settings.set(keys::SIDEBAR_WIDTH, value);
+                    Flow::Stay
+                })
+            })
+            .collect();
+        (picks, usize::from(narrow))
+    })
 }
 
 /// TituloDoJogo: "Logo do jogo quando houver" (padrão) ou "Sempre o nome em texto".
