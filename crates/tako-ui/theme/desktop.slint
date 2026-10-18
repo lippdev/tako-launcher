@@ -27,6 +27,7 @@ import "fonts/PlusJakartaSans-ExtraBold.ttf";
 import { Ui } from "tokens.slint";
 import { ControlCenter } from "main.slint";
 import { PanelRow, Icon, Toggle } from "widgets.slint";
+import { Icons } from "icons.slint";
 import { Overlay, Overline, OverlayView } from "overlay.slint";
 
 export { Ui }
@@ -37,6 +38,38 @@ struct DeskCategory { title: string, count: string, icon: string, games: [DeskGa
 struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
+
+// Ícone do desktop: cor opaca com a transparência no elemento inteiro (com a cor translúcida no traço, o femtovg
+// somava a transparência onde os traços se cruzam e o ícone parecia ter contorno) e pontas e cantos redondos,
+// como os SVG das prévias. A tela cheia continua com o `Icon` dela.
+component DeskIcon inherits Rectangle {
+    in property <string> name;
+    in property <color> tint: Ui.on-accent;
+    in property <length> size: 20px;
+    width: size;
+    height: size;
+    opacity: tint.to-hsv().alpha;
+    if Icons.stroke(name) != "": Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: Icons.stroke(name);
+        stroke: tint.with-alpha(1);
+        stroke-width: 1.8 * size / 24;
+        stroke-line-cap: round;
+        stroke-line-join: round;
+        fill: transparent;
+    }
+    if Icons.fill(name) != "": Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: Icons.fill(name);
+        fill: tint.with-alpha(1);
+    }
+}
 
 // O que fica atrás do vidro: a arte do jogo em foco e a cópia desfocada dela (feita uma vez pelo Tako), no mesmo
 // retângulo da janela. Cada painel de vidro desenha o pedaço da cópia que fica atrás dele.
@@ -252,7 +285,7 @@ component DeskButton inherits Rectangle {
         padding-right: square ? 0 : 24 * Ui.u;
         spacing: 10 * Ui.u;
         alignment: center;
-        if icon != "": Icon { name: icon; tint: fg; size: 24 * Ui.u; y: (parent.height - self.height) / 2; }
+        if icon != "": DeskIcon { name: icon; tint: fg; size: 24 * Ui.u; y: (parent.height - self.height) / 2; }
         if label != "": Text {
             text: label;
             color: fg;
@@ -293,7 +326,7 @@ component SearchBox inherits Rectangle {
         padding-left: Ui.space-16;
         padding-right: Ui.space-8;
         spacing: Ui.space-12;
-        Icon { name: "search"; size: 20px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+        DeskIcon { name: "search"; size: 20px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
         Rectangle {
             horizontal-stretch: 1;
             if ti.text == "": Text {
@@ -401,7 +434,7 @@ component TopBar inherits Vidro {
                     y: (parent.height - self.height) / 2;
                     image-fit: contain;
                 }
-                Icon { name: "chevron-down"; size: 12px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                DeskIcon { name: "chevron-down"; size: 12px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
             }
             bta := TouchArea {
                 mouse-cursor: pointer;
@@ -471,7 +504,7 @@ component TopBar inherits Vidro {
                 padding-right: small ? 0 : 18px;
                 spacing: 10px;
                 alignment: center;
-                Icon { name: "tv"; size: 20px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+                DeskIcon { name: "tv"; size: 20px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
                 if !small: Text { text: big-picture-label; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
             }
             fta := TouchArea {
@@ -574,7 +607,7 @@ component IconBtn inherits Rectangle {
         padding-right: badge != "" ? 8px : 0;
         spacing: 5px;
         alignment: center;
-        Icon { name: icon; size: 17px; tint: on || ita.has-hover ? Ui.on-accent : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+        DeskIcon { name: icon; size: 17px; tint: on || ita.has-hover ? Ui.on-accent : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
         if badge != "": Text { text: badge; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 700; vertical-alignment: center; }
     }
     ita := TouchArea {
@@ -601,7 +634,7 @@ component StoreIcon inherits Rectangle {
     if name == "store-amazon": Image { width: size; height: size; source: @image-url("stores/amazon.svg"); colorize: tint; }
     if name == "store-xbox": Image { width: size; height: size; source: @image-url("stores/xbox.svg"); colorize: tint; }
     if name == "store-manual": Image { width: size; height: size; source: @image-url("stores/manual.svg"); colorize: tint; }
-    if name != "store-steam" && name != "store-epic" && name != "store-gog" && name != "store-ubisoft" && name != "store-ea" && name != "store-battlenet" && name != "store-amazon" && name != "store-xbox" && name != "store-manual": Icon { name: name; size: size; tint: tint; }
+    if name != "store-steam" && name != "store-epic" && name != "store-gog" && name != "store-ubisoft" && name != "store-ea" && name != "store-battlenet" && name != "store-amazon" && name != "store-xbox" && name != "store-manual": DeskIcon { name: name; size: size; tint: tint; }
 }
 
 // Linha da lista (ListaDeJogos): miniatura quadrada, nome, loja de origem e, na escolhida, o ▶ redondo. Na seleção
@@ -654,7 +687,7 @@ component GameRow inherits Rectangle {
             background: data.checked ? Ui.primary-top : Ui.glass-control;
             border-width: data.checked ? 0 : 1px;
             border-color: Ui.glass-edge-strong;
-            if data.checked: Icon { name: "tick"; size: 16px; tint: Ui.on-primary; }
+            if data.checked: DeskIcon { name: "tick"; size: 16px; tint: Ui.on-primary; }
             TouchArea {
                 mouse-cursor: pointer;
                 clicked => { root.toggle(); }
@@ -702,7 +735,7 @@ component GameRow inherits Rectangle {
             border-color: Ui.glass-edge-strong;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: button;
-            Icon { name: "play"; size: 18px; tint: Ui.on-accent; }
+            DeskIcon { name: "play"; size: 18px; tint: Ui.on-accent; }
             pta := TouchArea {
                 mouse-cursor: pointer;
                 clicked => { root.play(); }
@@ -888,7 +921,7 @@ component BulkBar inherits Vidro {
                     padding-right: i < 2 ? 10px : 0;
                     spacing: 8px;
                     alignment: center;
-                    Icon { name: a.icon; size: 18px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+                    DeskIcon { name: a.icon; size: 18px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
                     if i < 2: Text { text: a.title; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
                 }
                 bta := TouchArea {
@@ -966,7 +999,7 @@ component CoverCard inherits Rectangle {
             drop-shadow-offset-y: Ui.shadow-float-y;
             drop-shadow-blur: Ui.shadow-float-blur;
             drop-shadow-color: Ui.shadow-float-color;
-            Icon { name: "play"; size: 22px; tint: Ui.on-primary; }
+            DeskIcon { name: "play"; size: 22px; tint: Ui.on-primary; }
             TouchArea {
                 mouse-cursor: pointer;
                 clicked => { root.play(); }
@@ -980,7 +1013,7 @@ component CoverCard inherits Rectangle {
         height: 28px;
         border-radius: 14px;
         background: Ui.desk-canvas.with-alpha(0.6);
-        Icon { name: "starfill"; size: 16px; tint: Ui.warning; }
+        DeskIcon { name: "starfill"; size: 16px; tint: Ui.warning; }
     }
     if data.running: Rectangle {
         x: root.width - 25px;
@@ -1127,7 +1160,7 @@ component CategoryRows inherits Rectangle {
                         padding-right: 4px;
                         spacing: 4px;
                         Text { text: see-all; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; vertical-alignment: center; }
-                        Icon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                        DeskIcon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                     }
                     sta := TouchArea {
                         mouse-cursor: pointer;
@@ -1166,7 +1199,7 @@ component CategoryRows inherits Rectangle {
                 background: Ui.glass-panel-dense;
                 border-width: 1px;
                 border-color: Ui.glass-edge-strong;
-                Icon { name: "chevron-left"; size: 16px; tint: Ui.on-accent; }
+                DeskIcon { name: "chevron-left"; size: 16px; tint: Ui.on-accent; }
                 TouchArea {
                     mouse-cursor: pointer;
                     clicked => { hf.viewport-x = min(0, hf.viewport-x + hf.width * 0.8); }
@@ -1182,7 +1215,7 @@ component CategoryRows inherits Rectangle {
                 background: Ui.glass-panel-dense;
                 border-width: 1px;
                 border-color: Ui.glass-edge-strong;
-                Icon { name: "chevron"; size: 16px; tint: Ui.on-accent; }
+                DeskIcon { name: "chevron"; size: 16px; tint: Ui.on-accent; }
                 TouchArea {
                     mouse-cursor: pointer;
                     clicked => { hf.viewport-x = max(hf.width - hf.viewport-width, hf.viewport-x - hf.width * 0.8); }
@@ -1237,7 +1270,7 @@ component StatusStrip inherits Vidro {
                 padding-right: small ? 0 : 3px;
                 Rectangle { width: 1px; height: 30px; y: 16px; background: Ui.divider; }
             }
-            Icon { name: it.icon; size: 26px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+            DeskIcon { name: it.icon; size: 26px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
             VerticalLayout {
                 alignment: center;
                 spacing: 5px;
@@ -1292,7 +1325,7 @@ component PlayButton inherits Rectangle {
         padding-right: 32px;
         spacing: Ui.space-12;
         alignment: center;
-        Icon { name: icon; size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
+        DeskIcon { name: icon; size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
         Text { text: label; color: Ui.on-primary; font-size: 19px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
     }
     pta := TouchArea {
@@ -1332,7 +1365,7 @@ component GlassButton inherits Vidro {
         padding-right: show-label ? 20px : 0;
         spacing: 10px;
         alignment: center;
-        Icon {
+        DeskIcon {
             name: icon;
             size: 22px;
             tint: danger ? Ui.error : (on ? Ui.warning : Ui.on-accent);
@@ -1454,7 +1487,7 @@ component DetailsCard inherits Vidro {
             if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
             HorizontalLayout {
                 spacing: Ui.space-12;
-                Icon { name: r.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
+                DeskIcon { name: r.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
                 Text { text: r.label; width: root.label-w; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; overflow: elide; }
                 if r.chips.length == 0: HorizontalLayout {
                     horizontal-stretch: 1;
@@ -1507,7 +1540,7 @@ component SessionsCard inherits Vidro {
                     spacing: 4px;
                     alignment: center;
                     Text { text: labels[1]; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
-                    Icon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                    DeskIcon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                 }
                 sta := TouchArea {
                     mouse-cursor: pointer;
@@ -1971,7 +2004,7 @@ component DeskLibrary inherits Rectangle {
                     spacing: 6px;
                     Text { text: group-prefix; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
                     Text { text: group-label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
-                    Icon { name: "updown"; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                    DeskIcon { name: "updown"; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                 }
                 TouchArea {
                     mouse-cursor: pointer;
@@ -2013,7 +2046,7 @@ component DeskLibrary inherits Rectangle {
                         accessible-role: button;
                         accessible-label: view-labels[i];
                         if v == view: Selected { radius: 10px; }
-                        Icon { name: i == 0 ? "list" : (i == 1 ? "grid" : "layers"); size: 18px; tint: v == view ? Ui.on-accent : Ui.desk-on-muted; }
+                        DeskIcon { name: i == 0 ? "list" : (i == 1 ? "grid" : "layers"); size: 18px; tint: v == view ? Ui.on-accent : Ui.desk-on-muted; }
                         vta := TouchArea {
                             mouse-cursor: pointer;
                             clicked => { root.clicked("view", i); }
@@ -2206,7 +2239,7 @@ component DeskRow inherits Rectangle {
         }
         if data.icon != "": Rectangle {
             width: 22px;
-            Icon { name: data.icon; size: 22px; tint: data.style == "danger" ? Ui.error : Ui.desk-on-muted; }
+            DeskIcon { name: data.icon; size: 22px; tint: data.style == "danger" ? Ui.error : Ui.desk-on-muted; }
         }
         if data.image.width > 0: Rectangle {
             width: 36px;
@@ -2284,7 +2317,7 @@ component DeskRow inherits Rectangle {
                 padding-right: 12px;
                 spacing: 12px;
                 Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
-                Rectangle { width: 14px; Icon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
+                Rectangle { width: 14px; DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
             }
         }
         // Nas Configurações a ação é um botão em pílula com o nome dela ("Trocar", "Procurar").
@@ -2338,7 +2371,7 @@ component PopupButton inherits Rectangle {
         padding-right: 18px;
         spacing: 8px;
         alignment: center;
-        if data.icon != "": Icon { name: data.icon; size: 18px; tint: primary ? Ui.on-primary : (data.style == "danger" ? Ui.error : Ui.on-accent); y: (parent.height - self.height) / 2; }
+        if data.icon != "": DeskIcon { name: data.icon; size: 18px; tint: primary ? Ui.on-primary : (data.style == "danger" ? Ui.error : Ui.on-accent); y: (parent.height - self.height) / 2; }
         Text {
             text: data.title;
             color: primary ? Ui.on-primary : (data.style == "danger" ? Ui.error : Ui.on-accent);
@@ -2431,7 +2464,7 @@ component CloseButton inherits Rectangle {
     border-radius: size / 2;
     background: cta.has-hover ? Ui.glass-hover : Ui.glass-control;
     accessible-role: button;
-    Icon { name: "close"; size: 18px; tint: Ui.on-accent; }
+    DeskIcon { name: "close"; size: 18px; tint: Ui.on-accent; }
     cta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
@@ -2517,7 +2550,7 @@ component DeskSettings inherits Rectangle {
                         // Ícone sem fundo no lugar da miniatura do jogo, para os nomes alinharem como na lista.
                         Rectangle {
                             width: Ui.thumb-size;
-                            Icon { name: c.icon; size: 22px; tint: c.selected ? Ui.on-accent : Ui.desk-on-muted; }
+                            DeskIcon { name: c.icon; size: 22px; tint: c.selected ? Ui.on-accent : Ui.desk-on-muted; }
                         }
                         Text {
                             text: c.label;
@@ -2552,7 +2585,7 @@ component DeskSettings inherits Rectangle {
                     spacing: 18px;
                     Rectangle {
                         width: 34px;
-                        Icon { name: categories[category-focus].icon; size: 34px; tint: Ui.on-accent; }
+                        DeskIcon { name: categories[category-focus].icon; size: 34px; tint: Ui.on-accent; }
                     }
                     VerticalLayout {
                         alignment: center;
@@ -2595,7 +2628,7 @@ component Stepper inherits HorizontalLayout {
                 padding-left: 12px;
                 padding-right: 12px;
                 spacing: 6px;
-                if i < current: Icon { name: "tick"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                if i < current: DeskIcon { name: "tick"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                 Text {
                     text: name;
                     color: i == current ? Ui.on-accent : (i < current ? Ui.desk-on-muted : Ui.desk-on-subtle);
@@ -2682,7 +2715,7 @@ component ModeCard inherits Rectangle {
         background: data.on ? Ui.primary-top : Ui.desk-canvas.with-alpha(0.5);
         border-width: data.on ? 0 : 2px;
         border-color: Ui.desk-on-muted;
-        if data.on: Icon { name: "tick"; size: 14px; tint: Ui.on-primary; }
+        if data.on: DeskIcon { name: "tick"; size: 14px; tint: Ui.on-primary; }
     }
     VerticalLayout {
         x: 18px;
@@ -3109,8 +3142,8 @@ component DeskOverlay inherits Rectangle {
                             padding-right: 10px;
                             spacing: 10px;
                             // No select, a coluna do ✓ (16) marca a atual, em peso 600.
-                            if !ov.wide: Icon { name: r.icon; size: 18px; tint: r.style == "danger" ? Ui.error : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
-                            if ov.wide: Rectangle { width: 18px; Icon { name: r.icon; size: 16px; tint: Ui.on-accent; } }
+                            if !ov.wide: DeskIcon { name: r.icon; size: 18px; tint: r.style == "danger" ? Ui.error : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                            if ov.wide: Rectangle { width: 18px; DeskIcon { name: r.icon; size: 16px; tint: Ui.on-accent; } }
                             Text {
                                 text: r.title;
                                 color: r.style == "danger" ? Ui.error : Ui.on-accent;
@@ -3638,7 +3671,7 @@ export component Desktop inherits Window {
             padding-left: Ui.space-20;
             padding-right: Ui.space-20;
             spacing: 10px;
-            Icon { name: "check"; size: 18px; tint: Ui.success; y: (parent.height - self.height) / 2; }
+            DeskIcon { name: "check"; size: 18px; tint: Ui.success; y: (parent.height - self.height) / 2; }
             Text { text: toast; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
             // "Desfazer" das ações em lote: texto clicável à direita, sem roubar o foco.
             if desk-toast-undo != "": Rectangle {
