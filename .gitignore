@@ -19,4 +19,4 @@ Tako_Data/
 
 # Rust
 /target/
-.claude/worktrees/
+.claude/
