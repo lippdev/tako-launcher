@@ -782,7 +782,7 @@ fn details_rows(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         add(5, "star", "desktop.info.critic", score.to_string());
     }
     let genres: Vec<&str> = g.genres.iter().take(2).map(String::as_str).collect();
-    add(2, "tag", "details.genres", genres.join(" · "));
+    add(2, "tag", "details.genres", genres.join(" - "));
     if let Some(dev) = &g.developer {
         let first = dev.split([',', ';']).next().unwrap_or(dev).trim();
         add(3, "user", "details.developer", first.to_owned());
@@ -1865,7 +1865,7 @@ mod tests {
                 .any(|r| r.dot || r.label == shell.ctx.t("details.status"))
         );
         assert!(!rows.iter().any(|r| r.value == "Hades"));
-        assert!(rows.iter().any(|r| r.value == "Roguelike · Ação"));
+        assert!(rows.iter().any(|r| r.value == "Roguelike - Ação"));
         assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
         // A faixa não inventa Nuvem nem Conquistas.
         assert_eq!(strip(&shell.ctx, &g).len(), 2);

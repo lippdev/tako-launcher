@@ -1444,7 +1444,7 @@ component AboutCard inherits Vidro {
                 for g[i] in genres: HorizontalLayout {
                     visible: !small || i < 2;
                     spacing: Ui.space-8;
-                    if i > 0: Text { text: "·"; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+                    if i > 0: Text { text: "-"; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
                     Text { text: g; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; max-width: 150px; overflow: elide; }
                 }
                 if genres-more != "" && !small: Text { text: genres-more; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
