@@ -3583,7 +3583,8 @@ component DeskOverlay inherits Rectangle {
             }
             if ov.tab != 3: RowScroll {
                 preferred-height: self.content-h;
-                max-height: root.height < 760px ? max(96px, root.height - 470px) : min(340px, root.height - 560px);
+                // Até seis linhas inteiras (lojas e a linha do modo) numa janela de 900; o resto rola.
+                max-height: root.height < 760px ? max(96px, root.height - 470px) : min(400px, root.height - 480px);
                 footer: true;
                 bare: true;
                 content-key: ov.title;

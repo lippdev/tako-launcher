@@ -370,7 +370,9 @@ pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
                             tako_core::presentation::game_text::store_name(lang, store),
                             tako_core::presentation::library_text::game_count(lang, n),
                         )
-                        .icon(super::sidebar::store_icon(store)),
+                        .icon(super::sidebar::store_icon(store))
+                        // O número de verdade em destaque.
+                        .emphasized(true),
                     )
                 })
             })
@@ -391,13 +393,56 @@ pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
             )
             .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
         );
-        v.push(
-            MenuItem::new(PanelRow::button(
-                "done",
-                ctx.t("first_run.full.open_library"),
-            ))
-            .on(finish),
-        );
+        if ctx.library.games().is_empty() {
+            // Nenhum jogo: adicionar à mão é a ação principal; "Procurar de novo" refaz a busca nas lojas.
+            v.push(
+                MenuItem::new(PanelRow {
+                    style: "primary".into(),
+                    ..PanelRow::button("add", ctx.t("first_run.full.add_game"))
+                })
+                .on(|ctx| {
+                    let flow = finish(ctx);
+                    ctx.effect(super::Effect::AddGame);
+                    flow
+                }),
+            );
+            v.push(
+                MenuItem::new(PanelRow::button(
+                    "rescan",
+                    ctx.t("first_run.full.search_again"),
+                ))
+                .on(|ctx| {
+                    ctx.effect(super::Effect::Rescan);
+                    Flow::Stay
+                }),
+            );
+            v.push(
+                MenuItem::new(PanelRow::button(
+                    "open",
+                    ctx.t("first_run.full.open_library"),
+                ))
+                .on(finish),
+            );
+        } else {
+            v.push(
+                MenuItem::new(PanelRow::button(
+                    "done",
+                    ctx.t("first_run.full.open_library"),
+                ))
+                .on(finish),
+            );
+            // "Revisar capas": termina o onboarding e abre a FilaDeCapas.
+            v.push(
+                MenuItem::new(PanelRow::button(
+                    "review",
+                    ctx.t("first_run.full.review_covers"),
+                ))
+                .on(|ctx| {
+                    let _ = finish(ctx);
+                    Flow::Replace(Box::new(super::art_review::panel(ctx)))
+                }),
+            );
+        }
         v
     })
     .overline(ctx.tf(
