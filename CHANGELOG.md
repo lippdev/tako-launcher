@@ -2,6 +2,20 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.7]
+### Novidades
+- **Novo visual do modo desktop:** a arte do jogo em foco ocupa a janela inteira e a barra, a lista e os cartões flutuam sobre ela em vidro. Sem arte, o fundo pega a cor do jogo. Títulos em Poppins e textos em Plus Jakarta Sans.
+- **Barra superior:** o logo do Tako abre um menu com Configurações (Ctrl + ,), Trocar perfil, Ir para a tela cheia, Procurar atualizações e Sair do Tako. A busca fica na barra e abre com Ctrl + K (Ctrl + F continua).
+- **Lista de jogos:** abas em seletor, ícone da loja de cada jogo, ▶ na linha escolhida, inverter a ordem e filtrar na linha da contagem, e o polvo quando não há o que mostrar.
+- **Grade e Categorias:** além da lista, a biblioteca pode aparecer como grade de capas ou em fileiras agrupadas por status, coleção, etiqueta, gênero, loja ou instalação, com "Ver todos". A escolha fica salva no perfil.
+- **Seleção de vários jogos:** Ctrl ou Shift + clique e Ctrl + A marcam jogos para pôr numa coleção, etiquetar, favoritar, marcar como zerado ou apagar os adicionados à mão de uma vez.
+- **Destaque do jogo:** etiqueta de estado, faixa com a última sessão e o tempo de jogo, Jogar em destaque (Voltar ao jogo enquanto ele roda, Instalar pela loja quando não está instalado) e botões para favoritar, mais ações e as Configurações deste jogo. Cartões Sobre o jogo (com "Mais"), Detalhes, Sessões e Trailer, quando o jogo tem.
+- **Diálogos, painéis, menus e avisos** no mesmo vidro, com transições curtas que somem com "Reduzir animações".
+- **Primeira abertura em tela inteira:** idioma, lojas, capas, como abrir o Tako (em janela ou em tela cheia) e o resumo dos jogos encontrados. A escolha vira "Abrir em", em Configurações › Geral.
+- **Configurações** com a mesma estrutura da biblioteca, sobre o cinza; a bateria do controle aparece em Controles.
+- **Reduzir transparência** em Configurações › Aparência deixa painéis e botões opacos no modo desktop.
+- A tela cheia não muda.
+
 ## [0.2.0-alpha.6]
 ### Novidades
 - **Modo desktop:** o Tako agora abre numa janela para mouse e teclado, com a biblioteca em lista, o destaque do jogo com Jogar, favoritar e mais ações, busca, filtrar e ordenar, abas Todos, Favoritos e Coleções, e as Configurações dentro da janela.

@@ -2,6 +2,20 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.7]
+### What's new
+- **New desktop mode look:** the focused game's art fills the whole window and the bar, list and cards float over it in glass. Without art, the background takes the game's color. Titles in Poppins and text in Plus Jakarta Sans.
+- **Top bar:** the Tako logo opens a menu with Settings (Ctrl + ,), Switch profile, Go to full screen, Check for updates and Quit Tako. Search lives in the bar and opens with Ctrl + K (Ctrl + F still works).
+- **Game list:** tabs as a segmented control, each game's store icon, ▶ on the chosen row, reverse order and filter on the count line, and the octopus when there's nothing to show.
+- **Grid and Categories:** besides the list, the library can show as a cover grid or as rows grouped by status, collection, tag, genre, store or installation, with "See all". The choice is saved per profile.
+- **Select several games:** Ctrl or Shift + click and Ctrl + A mark games to add to a collection, tag, favorite, mark as beaten or remove hand-added ones at once.
+- **Game highlight:** status label, a strip with the last session and play time, a prominent Play (Back to game while it runs, Install via the store when it isn't installed) and buttons to favorite, more actions and this game's settings. About (with "More"), Details, Sessions and Trailer cards, when the game has one.
+- **Dialogs, panels, menus and toasts** in the same glass, with short transitions that go away with "Reduce motion".
+- **Full-screen first run:** language, stores, covers, how to open Tako (in a window or full screen) and a summary of the games found. The choice becomes "Open in", in Settings › General.
+- **Settings** with the same structure as the library, over gray; the controller battery shows in Controls.
+- **Reduce transparency** in Settings › Appearance makes panels and buttons opaque in desktop mode.
+- Full screen is unchanged.
+
 ## [0.2.0-alpha.6]
 ### What's new
 - **Desktop mode:** Tako now opens in a mouse and keyboard window, with the library as a list, the game highlight with Play, favorite and more actions, search, filter and sort, All, Favorites and Collections tabs, and Settings inside the window.
