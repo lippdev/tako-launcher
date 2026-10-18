@@ -1085,6 +1085,12 @@ impl App {
                         next_live = now + Duration::from_secs(1);
                         s.ctx.dirty = true;
                     }
+                    // A grade do desktop soma linhas por coluna (seção NÃO INSTALADOS): mudou a largura, mudou a conta.
+                    if let Ok(Value::Number(n)) = app.ui.borrow().get_property("library-columns")
+                        && (n as usize).max(1) != s.ctx.grid_columns
+                    {
+                        s.ctx.dirty = true;
+                    }
                 }
                 let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {

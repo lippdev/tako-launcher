@@ -51,6 +51,53 @@ pub fn games() -> Vec<Game> {
         .collect()
 }
 
+/// Jogos da conta que ainda não estão no computador, de três lojas e um baixando (SRC-005): capturas e testes da
+/// seção NÃO INSTALADOS.
+#[cfg(test)]
+pub fn not_installed() -> Vec<Game> {
+    use tako_core::library::InstallProgress;
+    let rows: [(&str, &str, GameStore, Option<f32>); 14] = [
+        ("Hollow Knight: Silksong", "#2B4F6B", GameStore::Steam, None),
+        ("Disco Elysium", "#6B2B3A", GameStore::Steam, Some(0.42)),
+        ("Tunic", "#2B6B6B", GameStore::Steam, None),
+        ("Inscryption", "#6B5A2B", GameStore::Steam, None),
+        ("Terraria", "#2F6B3A", GameStore::Steam, None),
+        ("Cuphead", "#6B602B", GameStore::Steam, None),
+        ("Vampire Survivors", "#5A2B6B", GameStore::Steam, None),
+        ("Alan Wake 2", "#2B3A6B", GameStore::Epic, None),
+        ("Control", "#6B2B2B", GameStore::Epic, None),
+        ("Fortnite", "#2B5A6B", GameStore::Epic, None),
+        ("Rocket League", "#3A6B2B", GameStore::Epic, None),
+        ("The Witcher 3: Wild Hunt", "#6B3A2B", GameStore::Gog, None),
+        (
+            "Heroes of Might and Magic 3",
+            "#4A6B2B",
+            GameStore::Gog,
+            None,
+        ),
+        (
+            "Disco Elysium: The Final Cut",
+            "#6B2B5A",
+            GameStore::Gog,
+            None,
+        ),
+    ];
+    rows.iter()
+        .enumerate()
+        .map(|(i, (title, accent, store, progress))| Game {
+            id: format!("{}:ni{i}", store.id_prefix()),
+            title: (*title).into(),
+            store: Some(*store),
+            accent: (*accent).into(),
+            is_installed: false,
+            install_uri: Some(format!("demo://install/{i}")),
+            installing: progress.map(|f| InstallProgress { fraction: Some(f) }),
+            install_size: Some((3 + i as u64) << 30),
+            ..Default::default()
+        })
+        .collect()
+}
+
 /// Sessões e coleções de demonstração para a captura da TelaPerfil: alguns jogos nos últimos dias.
 #[cfg(test)]
 pub fn sessions(ctx: &mut crate::shell::Ctx) {
