@@ -40,6 +40,23 @@ fn installed(cache: &Cache, ctx: &Ctx) -> Installed {
     }
 }
 
+/// O onboarding mostra o passo dos emuladores só quando há algo: um emulador achado, uma pasta de ROMs ou jogos
+/// de emuladores na biblioteca.
+pub(crate) fn anything_found(ctx: &Ctx) -> bool {
+    let cfg = config(ctx);
+    if !cfg.rom_folders.is_empty()
+        || ctx
+            .library
+            .games()
+            .iter()
+            .any(|g| g.store() == tako_core::library::GameStore::Emulators)
+    {
+        return true;
+    }
+    let found = Installed::detect(&Env::current(), &cfg, &Fs::real());
+    !found.programs.is_empty() || found.retroarch.is_some()
+}
+
 pub(crate) fn panel(ctx: &Ctx) -> MenuLayer {
     let cache: Cache = Rc::default();
     MenuLayer::panel(ctx.t("settings.emulators.title"), move |ctx| {

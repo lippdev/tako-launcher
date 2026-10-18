@@ -102,8 +102,12 @@ pub fn wall(ctx: &Ctx) -> Vec<crate::model::Tile> {
         .collect()
 }
 
-/// Passo 1: idioma. O diálogo é refeito ao trocar, para o próprio texto mudar de idioma.
+/// Passo 1: idioma. O diálogo é refeito ao trocar, para o próprio texto mudar de idioma. No desktop o onboarding em
+/// tela inteira começa pelas lojas (uma pergunta por tela; o idioma segue o sistema e fica em Configurações › Geral).
 pub fn welcome(ctx: &Ctx) -> MenuLayer {
+    if ctx.desktop {
+        return stores(ctx);
+    }
     step(
         ctx,
         1,
@@ -139,19 +143,44 @@ pub fn welcome(ctx: &Ctx) -> MenuLayer {
     .on_back(finish)
 }
 
-/// Passo 2: lojas que este sistema lê, com o que a leitura achou em cada uma.
+/// Passo 2 (no desktop, 1): lojas que este sistema lê, com o que a leitura achou em cada uma.
 fn stores(ctx: &Ctx) -> MenuLayer {
-    step(ctx, 2, "stores", "stores_text", |ctx| {
+    let n = if ctx.desktop { 1 } else { 2 };
+    let layer = step(ctx, n, "stores", "stores_text", |ctx| {
         let mut v = library::store_rows(ctx);
+        v.push(
+            MenuItem::new(PanelRow::button("next", ctx.t("first_run.next"))).on(|ctx| {
+                // Desktop: emuladores só quando há algum; senão direto para as capas.
+                if ctx.desktop && super::settings::emulators::anything_found(ctx) {
+                    Flow::Replace(Box::new(emulators(ctx)))
+                } else {
+                    Flow::Replace(Box::new(providers(ctx)))
+                }
+            }),
+        );
+        v
+    })
+    // Foco em "Continuar": A seguido não desliga a primeira loja sem querer.
+    .focus_at(library::store_rows(ctx).len());
+    if ctx.desktop {
+        layer.on_back(finish)
+    } else {
+        layer.on_back(|ctx| Flow::Replace(Box::new(welcome(ctx))))
+    }
+}
+
+/// Passo 2 (desktop): emuladores e pastas de ROMs (os mesmos controles de Configurações › Emuladores e ROMs).
+pub(crate) fn emulators(ctx: &Ctx) -> MenuLayer {
+    let cache = super::settings::emulators::Cache::default();
+    step(ctx, 2, "emulators", "emulators_text", move |ctx| {
+        let mut v = super::settings::emulators::rows(ctx, &cache);
         v.push(
             MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
                 .on(|ctx| Flow::Replace(Box::new(providers(ctx)))),
         );
         v
     })
-    // Foco em "Continuar": A seguido não desliga a primeira loja sem querer.
-    .focus_at(library::store_rows(ctx).len())
-    .on_back(|ctx| Flow::Replace(Box::new(welcome(ctx))))
+    .on_back(|ctx| Flow::Replace(Box::new(stores(ctx))))
 }
 
 /// Passo 3: provedores de capas e descrições (os mesmos painéis de Configurações) e, no Windows, o driver opcional
@@ -182,7 +211,13 @@ fn providers(ctx: &Ctx) -> MenuLayer {
         },
     )
     .focus_at(providers_rows(ctx).len())
-    .on_back(|ctx| Flow::Replace(Box::new(stores(ctx))))
+    .on_back(|ctx| {
+        if ctx.desktop && super::settings::emulators::anything_found(ctx) {
+            Flow::Replace(Box::new(emulators(ctx)))
+        } else {
+            Flow::Replace(Box::new(stores(ctx)))
+        }
+    })
 }
 
 /// Passo 4 (desktop): abrir o Tako em janela ou em tela cheia. Já vem marcado pelo que está em uso: com um controle
@@ -322,12 +357,20 @@ mod tests {
             Flow::Replace(l) => l,
             _ => panic!("o passo não avançou"),
         };
-        let welcome = welcome(&ctx);
-        let o = welcome.render(&ctx);
+        // No desktop o primeiro passo já são as lojas; com jogos de emuladores, o segundo são os emuladores.
+        let first = welcome(&ctx);
+        let o = first.render(&ctx);
         assert_eq!((o.tab2, o.tabs.len(), o.tab), (1, 5, 0));
-        assert!(keys_of(&welcome, &ctx).contains(&"skip".to_owned()));
-        let stores = next(accept(&welcome, &mut ctx, "next"));
-        assert_eq!(stores.render(&ctx).tab, 1);
+        assert_eq!(o.title, ctx.t("first_run.full.stores"));
+        assert!(keys_of(&first, &ctx).contains(&"skip".to_owned()));
+        // Emuladores só aparecem quando há algum neste PC; senão o passo é pulado e vai direto para as capas.
+        let second = next(accept(&first, &mut ctx, "next")).render(&ctx);
+        if super::super::settings::emulators::anything_found(&ctx) {
+            assert_eq!((second.tab, second.title), (1, ctx.t("first_run.full.emulators")));
+        } else {
+            assert_eq!((second.tab, second.title), (2, ctx.t("first_run.full.metadata")));
+        }
+        assert_eq!(emulators(&ctx).render(&ctx).tab, 1);
         // Capas → Modo (no desktop o terceiro passo não termina).
         let providers = providers(&ctx);
         let mode_layer = next(accept(&providers, &mut ctx, "next"));

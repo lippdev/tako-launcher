@@ -405,6 +405,10 @@ fn desktop_snapshot() {
                 let layer = crate::shell::first_run::welcome(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("onb-emu") => {
+                let layer = crate::shell::first_run::emulators(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
             Ok("onb-mode") => {
                 let layer = crate::shell::first_run::mode(&shell.ctx);
                 shell.push_layer(Box::new(layer));

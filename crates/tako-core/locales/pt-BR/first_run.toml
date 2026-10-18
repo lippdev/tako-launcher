@@ -14,6 +14,9 @@ done_toast = "Tudo pronto. Bom jogo!"
 count = "{n} de {total}"
 
 [first_run.full]
+emulators = "Jogos de emuladores."
+emulators_text = "O Tako acha os emuladores e as pastas de ROMs e abre cada jogo no emulador certo. Cada sistema vira uma coleção na biblioteca."
+emulators_note = "O Tako não baixa ROMs nem BIOS. Dá para mudar depois em Configurações › Biblioteca e lojas › Emuladores e ROMs."
 welcome = "Boas-vindas ao Tako."
 welcome_text = "Cinco passos rápidos para deixar a biblioteca pronta. Tudo dá para mudar depois em Configurações. Primeiro, o idioma:"
 welcome_note = "O idioma também fica em Configurações › Geral."

@@ -14,6 +14,9 @@ done_toast = "All set. Have fun!"
 count = "{n} of {total}"
 
 [first_run.full]
+emulators = "Emulator games."
+emulators_text = "Tako finds your emulators and ROM folders and opens each game in the right emulator. Each system becomes a collection in the library."
+emulators_note = "Tako doesn't download ROMs or BIOS files. You can change this later in Settings › Library and stores › Emulators and ROMs."
 welcome = "Welcome to Tako."
 welcome_text = "Five quick steps to get your library ready. You can change everything later in Settings. First, the language:"
 welcome_note = "The language is also in Settings › General."

@@ -2728,7 +2728,8 @@ component DeskOverlay inherits Rectangle {
             x: 120px + (step-in && shown ? 0 : 24px);
             opacity: step-in && shown ? 1 : 0;
             animate x, opacity { duration: Ui.enter(step-in); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            y: (parent.height - self.height) / 2;
+            // Centralizada, mas nunca embaixo da marca do topo.
+            y: max(104px, (parent.height - self.height) / 2);
             width: min(ov.tab == 3 ? 760px : 520px, parent.width - 200px);
             height: self.preferred-height;
             spacing: 18px;
@@ -2766,7 +2767,8 @@ component DeskOverlay inherits Rectangle {
                 text: ov.title;
                 color: Ui.on-accent;
                 font-family: Ui.font-heading;
-                font-size: Ui.desk-display;
+                // Janela baixa: o título cai para 40, como no destaque da janela pequena.
+                font-size: root.height < 760px ? 40px * Ui.text-scale : Ui.desk-display;
                 font-weight: 800;
                 letter-spacing: -0.025 * self.font-size;
                 wrap: word-wrap;
@@ -2788,7 +2790,7 @@ component DeskOverlay inherits Rectangle {
             }
             if ov.tab != 3: RowScroll {
                 preferred-height: self.content-h;
-                max-height: 340px;
+                max-height: root.height < 760px ? max(96px, root.height - 470px) : min(340px, root.height - 560px);
                 footer: true;
                 bare: true;
                 content-key: ov.title;
