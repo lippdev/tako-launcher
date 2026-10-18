@@ -681,7 +681,10 @@ fn desktop_search_finds_rows_in_every_category_and_a_category_click_leaves_it() 
     let rows = page.items(&ctx);
     // Sem acento e sem maiúsculas: acha "Reduzir transparência" (em Aparência) sob o nome da categoria.
     assert_eq!(rows[0].row.kind, "header");
-    assert!(rows.iter().any(|i| i.row.key == "settings.appearance.transparency"));
+    assert!(
+        rows.iter()
+            .any(|i| i.row.key == "settings.appearance.transparency")
+    );
     let appearance = page.cats.iter().position(|c| c.id == "appearance").unwrap();
     assert!(page.matches_in(&ctx, appearance) > 0);
     page.click("category", 0, &mut ctx);

@@ -336,15 +336,28 @@ fn mode_rows(ctx: &Ctx) -> Vec<MenuItem> {
             MenuItem::new(PanelRow::choice(
                 "open-in",
                 ctx.t("desktop.mode.open_in"),
-                ctx.t(if big { "first_run.full.mode_full" } else { "first_run.full.mode_window" }),
+                ctx.t(if big {
+                    "first_run.full.mode_full"
+                } else {
+                    "first_run.full.mode_window"
+                }),
             ))
             .on(move |ctx| {
-                ctx.settings.set(OPEN_IN, if big { OPEN_IN_DESKTOP } else { OPEN_IN_BIG_PICTURE });
+                ctx.settings.set(
+                    OPEN_IN,
+                    if big {
+                        OPEN_IN_DESKTOP
+                    } else {
+                        OPEN_IN_BIG_PICTURE
+                    },
+                );
                 Flow::Stay
             }),
         );
     }
-    v.push(MenuItem::new(PanelRow::header(ctx.t("desktop.mode.general_header"))));
+    v.push(MenuItem::new(PanelRow::header(
+        ctx.t("desktop.mode.general_header"),
+    )));
     v
 }
 
@@ -833,7 +846,9 @@ impl SettingsPage {
                 })
                 .collect();
             if !found.is_empty() {
-                v.push(MenuItem::new(PanelRow::header(ctx.t(&format!("settings.{}.title", c.id)))));
+                v.push(MenuItem::new(PanelRow::header(
+                    ctx.t(&format!("settings.{}.title", c.id)),
+                )));
                 v.extend(found);
             }
         }
@@ -982,7 +997,10 @@ impl Page for SettingsPage {
         if ctx.desktop {
             out.set(
                 "settings-count",
-                ctx.tf("desktop.settings_count", &[("n", &self.cats.len().to_string())]),
+                ctx.tf(
+                    "desktop.settings_count",
+                    &[("n", &self.cats.len().to_string())],
+                ),
             );
             out.set("settings-search", self.query.clone());
         }
@@ -996,7 +1014,11 @@ impl Page for SettingsPage {
             );
         } else {
             out.set("settings-heading", format!("“{}”", self.query.trim()));
-            let n = self.items(ctx).iter().filter(|i| i.row.kind != "header").count();
+            let n = self
+                .items(ctx)
+                .iter()
+                .filter(|i| i.row.kind != "header")
+                .count();
             out.set(
                 "settings-subtitle",
                 ctx.tf("desktop.settings_found", &[("n", &n.to_string())]),

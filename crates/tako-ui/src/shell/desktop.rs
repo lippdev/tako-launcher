@@ -11,8 +11,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tako_core::input::shortcut::KeyModifiers;
 use tako_core::library::{
-    Game, GameStore, InstallFilter, LibraryCriteria, LibraryFacts, LibraryFilter, PlayStatus, query,
-    smart::SmartCollection, tags,
+    Game, GameStore, InstallFilter, LibraryCriteria, LibraryFacts, LibraryFilter, PlayStatus,
+    query, smart::SmartCollection, tags,
 };
 use tako_core::presentation::{game_text, library_text};
 
@@ -417,7 +417,9 @@ impl DesktopLibrary {
                     PlayStatus::Abandoned,
                 ] {
                     let title = library_text::status_label(lang, Some(s));
-                    push(title, "check", SeeAll::Status(s), &|g| g.play_status == Some(s));
+                    push(title, "check", SeeAll::Status(s), &|g| {
+                        g.play_status == Some(s)
+                    });
                 }
             }
             GroupBy::Collection => {
@@ -429,12 +431,16 @@ impl DesktopLibrary {
             GroupBy::Tag => {
                 for t in tags::all(ctx.library.games()) {
                     let name = t.name.clone();
-                    push(t.name, "tag", SeeAll::Tag(name.clone()), &|g| g.tags.contains(&name));
+                    push(t.name, "tag", SeeAll::Tag(name.clone()), &|g| {
+                        g.tags.contains(&name)
+                    });
                 }
             }
             GroupBy::Genre => {
-                let mut genres: Vec<String> =
-                    games.iter().flat_map(|g| g.genres.iter().cloned()).collect();
+                let mut genres: Vec<String> = games
+                    .iter()
+                    .flat_map(|g| g.genres.iter().cloned())
+                    .collect();
                 genres.sort();
                 genres.dedup();
                 for genre in genres {
@@ -501,7 +507,12 @@ impl DesktopLibrary {
         if ctx.running.as_ref().is_some_and(|r| r.id == g.id) {
             vec![Action::Play, Action::End, Action::More]
         } else {
-            vec![Action::Play, Action::Favorite, Action::More, Action::Settings]
+            vec![
+                Action::Play,
+                Action::Favorite,
+                Action::More,
+                Action::Settings,
+            ]
         }
     }
 
@@ -683,7 +694,12 @@ fn details_rows(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         },
     ));
     while rows.len() > 6 {
-        if let Some(worst) = rows.iter().enumerate().max_by_key(|(_, (p, _))| *p).map(|(i, _)| i) {
+        if let Some(worst) = rows
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, (p, _))| *p)
+            .map(|(i, _)| i)
+        {
             rows.remove(worst);
         }
     }
@@ -699,7 +715,10 @@ fn about(description: &str) -> (String, bool) {
     }
     let cut: String = clean.chars().take(LIMIT).collect();
     let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(head, _)| head);
-    (format!("{}…", cut.trim_end_matches([',', '.', ';', ':'])), true)
+    (
+        format!("{}…", cut.trim_end_matches([',', '.', ';', ':'])),
+        true,
+    )
 }
 
 /// CartaoSessoes: as 4 últimas sessões (dia, horário, duração) e o resumo; a sessão aberta tem o ponto verde.
@@ -803,7 +822,11 @@ impl Page for DesktopLibrary {
                     }
                     _ => (r, c),
                 };
-                if let Some(id) = self.cat_rows.get(self.cat_focus.0).and_then(|row| row.get(self.cat_focus.1)) {
+                if let Some(id) = self
+                    .cat_rows
+                    .get(self.cat_focus.0)
+                    .and_then(|row| row.get(self.cat_focus.1))
+                {
                     self.selected = Some(id.clone());
                 }
             }
@@ -902,7 +925,10 @@ impl Page for DesktopLibrary {
     fn key(&mut self, text: &str, mods: KeyModifiers, ctx: &mut Ctx) -> Option<Nav> {
         let c = text.chars().next()?;
         // Ctrl + A: marca a lista filtrada inteira (SelecaoMultipla).
-        if mods == KeyModifiers::CTRL && c.eq_ignore_ascii_case(&'a') && View::of(ctx) != View::Categories {
+        if mods == KeyModifiers::CTRL
+            && c.eq_ignore_ascii_case(&'a')
+            && View::of(ctx) != View::Categories
+        {
             self.checked = self.ids(ctx).into_iter().collect();
             return Some(Nav::Stay);
         }
@@ -976,7 +1002,10 @@ impl Page for DesktopLibrary {
             }
             "cat-all" => {
                 let games = self.games(ctx);
-                let see = Self::groups(ctx, &games).into_iter().nth(index).map(|g| g.see);
+                let see = Self::groups(ctx, &games)
+                    .into_iter()
+                    .nth(index)
+                    .map(|g| g.see);
                 if let Some(see) = see {
                     self.see_all(see, ctx);
                 }
@@ -984,22 +1013,28 @@ impl Page for DesktopLibrary {
             "rescan" => ctx.effect(Effect::Rescan),
             // Cartões do destaque: o texto inteiro do Sobre, o trailer e o histórico de sessões.
             "about-more" | "trailer" | "sessions" => {
-                let Some(g) = self.selected(ctx).and_then(|id| ctx.library.find(&id).cloned()) else {
+                let Some(g) = self
+                    .selected(ctx)
+                    .and_then(|id| ctx.library.find(&id).cloned())
+                else {
                     return Nav::Stay;
                 };
                 match zone {
                     "about-more" => {
                         let text = g.description.clone();
-                        let layer = super::layer::MenuLayer::dialog(ctx.t("desktop.about"), |ctx| {
-                            vec![super::layer::MenuItem::new(PanelRow::button(
-                                "close",
-                                ctx.t("common.close"),
-                            ))
-                            .on(|_| super::layer::Flow::Close)]
-                        })
-                        .text(text)
-                        .overline(g.title.to_uppercase())
-                        .wide();
+                        let layer =
+                            super::layer::MenuLayer::dialog(ctx.t("desktop.about"), |ctx| {
+                                vec![
+                                    super::layer::MenuItem::new(PanelRow::button(
+                                        "close",
+                                        ctx.t("common.close"),
+                                    ))
+                                    .on(|_| super::layer::Flow::Close),
+                                ]
+                            })
+                            .text(text)
+                            .overline(g.title.to_uppercase())
+                            .wide();
                         return Nav::Layer(Box::new(layer));
                     }
                     "trailer" => {
@@ -1105,7 +1140,10 @@ impl Page for DesktopLibrary {
             if checked > 0 {
                 ctx.tf(
                     "desktop.bulk.count",
-                    &[("n", &checked.to_string()), ("total", &ids.len().to_string())],
+                    &[
+                        ("n", &checked.to_string()),
+                        ("total", &ids.len().to_string()),
+                    ],
                 )
             } else {
                 format!(
@@ -1122,7 +1160,10 @@ impl Page for DesktopLibrary {
             "desk-group-label",
             ctx.tf(
                 "desktop.group.by",
-                &[("group", &ctx.t(&format!("desktop.group.{}", GroupBy::of(ctx).key())))],
+                &[(
+                    "group",
+                    &ctx.t(&format!("desktop.group.{}", GroupBy::of(ctx).key())),
+                )],
             ),
         );
         out.set(
@@ -1135,7 +1176,10 @@ impl Page for DesktopLibrary {
                 PanelRow::button("exit", ctx.t("desktop.bulk.exit")).icon("close"),
             ],
         );
-        out.set("desk-loading", ctx.scanning && ctx.library.games().is_empty());
+        out.set(
+            "desk-loading",
+            ctx.scanning && ctx.library.games().is_empty(),
+        );
         // Miniaturas e capas só perto da área visível (o tema avisa a primeira linha pelo `scrolled`).
         let first = ctx.list_first;
         let near = first.saturating_sub(NEAR / 3)..first + NEAR;
@@ -1182,7 +1226,8 @@ impl Page for DesktopLibrary {
                         .collect(),
                 });
                 flat += shown.len();
-                self.cat_rows.push(shown.iter().map(|g| g.id.clone()).collect());
+                self.cat_rows
+                    .push(shown.iter().map(|g| g.id.clone()).collect());
             }
         }
         out.set("desk-categories", cats);
@@ -1193,7 +1238,10 @@ impl Page for DesktopLibrary {
             "desk-cat-empty",
             ctx.tf(
                 "desktop.group.empty",
-                &[("group", &ctx.t(&format!("desktop.group.{}", GroupBy::of(ctx).key())))],
+                &[(
+                    "group",
+                    &ctx.t(&format!("desktop.group.{}", GroupBy::of(ctx).key())),
+                )],
             ),
         );
         out.set("desk-loading-label", ctx.t("desktop.empty.loading"));
@@ -1222,50 +1270,59 @@ impl Page for DesktopLibrary {
                 } else {
                     game_text::status(lang, g)
                 };
-                let actions: Vec<PanelRow> = self
-                    .actions(ctx, g)
-                    .into_iter()
-                    .map(|a| match a {
-                        Action::Play if running && ctx.launching => {
-                            PanelRow::button("play", ctx.t("desktop.opening"))
-                                .icon("play")
-                                .enabled(false)
-                        }
-                        Action::Play => {
-                            let (label, icon) = if running {
-                                (ctx.t("game.resume"), "gamepad")
-                            } else if !g.is_installed && !g.is_upcoming() && g.store() != GameStore::Manual {
-                                let via = game_text::store_via(lang, g.store());
-                                (ctx.tf("desktop.install_via", &[("via", &via)]), store_icon(g.store()))
-                            } else {
-                                (tiles::play_label(ctx, g), "play")
-                            };
-                            let mut row = PanelRow::button("play", label).icon(icon);
-                            row.style = "primary".into();
-                            row
-                        }
-                        Action::Favorite => {
-                            let mut row = PanelRow::button(
-                                "favorite",
-                                ctx.t(if g.is_favorite {
-                                    "details.unfavorite"
+                let actions: Vec<PanelRow> =
+                    self.actions(ctx, g)
+                        .into_iter()
+                        .map(|a| match a {
+                            Action::Play if running && ctx.launching => {
+                                PanelRow::button("play", ctx.t("desktop.opening"))
+                                    .icon("play")
+                                    .enabled(false)
+                            }
+                            Action::Play => {
+                                let (label, icon) = if running {
+                                    (ctx.t("game.resume"), "gamepad")
+                                } else if !g.is_installed
+                                    && !g.is_upcoming()
+                                    && g.store() != GameStore::Manual
+                                {
+                                    let via = game_text::store_via(lang, g.store());
+                                    (
+                                        ctx.tf("desktop.install_via", &[("via", &via)]),
+                                        store_icon(g.store()),
+                                    )
                                 } else {
-                                    "details.favorite"
-                                }),
-                            )
-                            .icon(if g.is_favorite { "starfill" } else { "star" });
-                            row.on = g.is_favorite;
-                            row
-                        }
-                        Action::More => PanelRow::button("more", ctx.t("desktop.more")).icon("dots"),
-                        Action::Settings => {
-                            PanelRow::button("settings", ctx.t("details.game_settings")).icon("gear")
-                        }
-                        Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
-                            .icon("power")
-                            .danger(),
-                    })
-                    .collect();
+                                    (tiles::play_label(ctx, g), "play")
+                                };
+                                let mut row = PanelRow::button("play", label).icon(icon);
+                                row.style = "primary".into();
+                                row
+                            }
+                            Action::Favorite => {
+                                let mut row = PanelRow::button(
+                                    "favorite",
+                                    ctx.t(if g.is_favorite {
+                                        "details.unfavorite"
+                                    } else {
+                                        "details.favorite"
+                                    }),
+                                )
+                                .icon(if g.is_favorite { "starfill" } else { "star" });
+                                row.on = g.is_favorite;
+                                row
+                            }
+                            Action::More => {
+                                PanelRow::button("more", ctx.t("desktop.more")).icon("dots")
+                            }
+                            Action::Settings => {
+                                PanelRow::button("settings", ctx.t("details.game_settings"))
+                                    .icon("gear")
+                            }
+                            Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
+                                .icon("power")
+                                .danger(),
+                        })
+                        .collect();
                 let hint = if g.is_broken {
                     ctx.t("game.broken_text")
                 } else {
@@ -1416,20 +1473,24 @@ fn view_menu() -> super::layer::MenuLayer {
     use super::layer::{Flow, MenuItem, MenuLayer};
     MenuLayer::menu(String::new(), |ctx| {
         let current = View::of(ctx);
-        [(View::List, "list"), (View::Grid, "grid"), (View::Categories, "layers")]
-            .into_iter()
-            .map(|(v, icon)| {
-                let mut row =
-                    PanelRow::button(v.key(), ctx.t(&format!("desktop.view.{}", v.key()))).icon(icon);
-                if v == current {
-                    row.value = "✓".into();
-                }
-                MenuItem::new(row).on(move |ctx| {
-                    ctx.settings.set(VIEW_KEY, v.key());
-                    Flow::Close
-                })
+        [
+            (View::List, "list"),
+            (View::Grid, "grid"),
+            (View::Categories, "layers"),
+        ]
+        .into_iter()
+        .map(|(v, icon)| {
+            let mut row =
+                PanelRow::button(v.key(), ctx.t(&format!("desktop.view.{}", v.key()))).icon(icon);
+            if v == current {
+                row.value = "✓".into();
+            }
+            MenuItem::new(row).on(move |ctx| {
+                ctx.settings.set(VIEW_KEY, v.key());
+                Flow::Close
             })
-            .collect()
+        })
+        .collect()
     })
 }
 
@@ -1441,7 +1502,8 @@ fn group_menu() -> super::layer::MenuLayer {
         GROUPS
             .into_iter()
             .map(|g| {
-                let mut row = PanelRow::button(g.key(), ctx.t(&format!("desktop.group.{}", g.key())));
+                let mut row =
+                    PanelRow::button(g.key(), ctx.t(&format!("desktop.group.{}", g.key())));
                 if g == current {
                     row.value = "✓".into();
                 }
@@ -1626,7 +1688,10 @@ mod tests {
         g.tags = ["Co-op".to_owned()].into();
         let rows = details_rows(&shell.ctx, &g);
         assert_eq!(rows.len(), 6);
-        assert!(rows.iter().any(|r| r.dot || r.label == shell.ctx.t("details.status")));
+        assert!(
+            rows.iter()
+                .any(|r| r.dot || r.label == shell.ctx.t("details.status"))
+        );
         assert!(!rows.iter().any(|r| r.value == "Hades"));
         assert!(rows.iter().any(|r| r.value == "Roguelike · Ação"));
         assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
@@ -1653,9 +1718,11 @@ mod tests {
         let before = fav_of(&shell);
         // Favoritar em massa: algum fora dos favoritos → todos ficam favoritos.
         shell.click("bulk", 2);
-        assert!(ids[1..=3]
-            .iter()
-            .all(|id| shell.ctx.library.find(id).unwrap().is_favorite));
+        assert!(
+            ids[1..=3]
+                .iter()
+                .all(|id| shell.ctx.library.find(id).unwrap().is_favorite)
+        );
         // "Desfazer" do aviso volta os favoritos ao que eram.
         shell.click("toast-undo", 0);
         assert_eq!(fav_of(&shell), before);
@@ -1692,14 +1759,19 @@ mod tests {
         shell.click("view", 2);
         shell.render(std::time::Instant::now());
         let rows = page(&shell).cat_rows.clone();
-        assert_eq!(rows.iter().map(Vec::len).sum::<usize>(), ids.len().min(rows.len() * ROW_COVERS));
+        assert_eq!(
+            rows.iter().map(Vec::len).sum::<usize>(),
+            ids.len().min(rows.len() * ROW_COVERS)
+        );
         let first_store = shell.ctx.library.find(&rows[0][0]).unwrap().store();
         shell.click("cat-all", 0);
         assert_eq!(View::of(&shell.ctx), View::Grid);
-        assert!(page(&shell)
-            .games(&shell.ctx)
-            .iter()
-            .all(|g| g.store() == first_store));
+        assert!(
+            page(&shell)
+                .games(&shell.ctx)
+                .iter()
+                .all(|g| g.store() == first_store)
+        );
         // Inverter a ordem: a mesma lista de trás para a frente.
         page(&shell).criteria.borrow_mut().sources.clear();
         shell.click("reverse", 0);

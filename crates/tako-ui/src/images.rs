@@ -292,7 +292,9 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
 pub(crate) fn glass_copy(img: &image::DynamicImage) -> (image::RgbaImage, Vec<f32>) {
     let h = GLASS_HEIGHT.min(img.height().max(1));
     let w = (u64::from(img.width()) * u64::from(h) / u64::from(img.height().max(1))).max(1) as u32;
-    let mut small = img.resize_exact(w, h, image::imageops::FilterType::Triangle).to_rgba8();
+    let mut small = img
+        .resize_exact(w, h, image::imageops::FilterType::Triangle)
+        .to_rgba8();
     for p in small.pixels_mut() {
         let [r, g, b, _] = p.0.map(f32::from);
         let gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -304,8 +306,14 @@ pub(crate) fn glass_copy(img: &image::DynamicImage) -> (image::RgbaImage, Vec<f3
     let mut lum = Vec::with_capacity((cols * rows) as usize);
     for row in 0..rows {
         for col in 0..cols {
-            let (x0, x1) = (col * w / cols, ((col + 1) * w / cols).max(col * w / cols + 1).min(w));
-            let (y0, y1) = (row * h / rows, ((row + 1) * h / rows).max(row * h / rows + 1).min(h));
+            let (x0, x1) = (
+                col * w / cols,
+                ((col + 1) * w / cols).max(col * w / cols + 1).min(w),
+            );
+            let (y0, y1) = (
+                row * h / rows,
+                ((row + 1) * h / rows).max(row * h / rows + 1).min(h),
+            );
             let (mut sum, mut n) = ([0u64; 3], 0u64);
             for y in y0..y1 {
                 for x in x0..x1 {

@@ -74,7 +74,9 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             ),
             _ => ctx.t("settings.controls.controller"),
         };
-        PanelRow::info("controller", pad, battery).desc(desc).icon("gamepad")
+        PanelRow::info("controller", pad, battery)
+            .desc(desc)
+            .icon("gamepad")
     } else {
         PanelRow::info("controller", ctx.t("settings.controls.controller"), pad)
             .desc(ctx.t("settings.controls.controller_desc"))

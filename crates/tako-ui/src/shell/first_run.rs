@@ -59,11 +59,16 @@ fn step(
                 .into_iter()
                 .filter(|i| i.row.key != "skip")
                 .collect();
-            v.push(MenuItem::new(PanelRow::button("skip", ctx.t("first_run.full.skip"))).on(finish));
+            v.push(
+                MenuItem::new(PanelRow::button("skip", ctx.t("first_run.full.skip"))).on(finish),
+            );
             v
         };
         return MenuLayer::dialog(ctx.t(&format!("first_run.full.{title}")), build)
-            .overline(ctx.tf("first_run.count", &[("n", &n.to_string()), ("total", &total)]))
+            .overline(ctx.tf(
+                "first_run.count",
+                &[("n", &n.to_string()), ("total", &total)],
+            ))
             .text(ctx.t(&format!("first_run.full.{text}")))
             .steps((1..=DESKTOP_STEPS).map(|i| i.to_string()).collect(), n - 1)
             .full(ctx.t(&format!("first_run.full.{title}_note")));
@@ -108,37 +113,31 @@ pub fn welcome(ctx: &Ctx) -> MenuLayer {
     if ctx.desktop {
         return stores(ctx);
     }
-    step(
-        ctx,
-        1,
-        "welcome",
-        "welcome_text",
-        |ctx| {
-            let mut v: Vec<MenuItem> = [Lang::PtBr, Lang::EnUs]
-                .into_iter()
-                .enumerate()
-                .map(|(i, lang)| {
-                    MenuItem::new(PanelRow::radio(
-                        lang.code(),
-                        super::settings::lang_name(lang),
-                        ctx.lang() == lang,
-                    ))
-                    .on(move |ctx| {
-                        ctx.settings.set(keys::LANGUAGE, lang.code());
-                        i18n::set_lang(lang);
-                        ctx.dirty = true;
-                        Flow::Replace(Box::new(welcome(ctx).focus_at(i)))
-                    })
+    step(ctx, 1, "welcome", "welcome_text", |ctx| {
+        let mut v: Vec<MenuItem> = [Lang::PtBr, Lang::EnUs]
+            .into_iter()
+            .enumerate()
+            .map(|(i, lang)| {
+                MenuItem::new(PanelRow::radio(
+                    lang.code(),
+                    super::settings::lang_name(lang),
+                    ctx.lang() == lang,
+                ))
+                .on(move |ctx| {
+                    ctx.settings.set(keys::LANGUAGE, lang.code());
+                    i18n::set_lang(lang);
+                    ctx.dirty = true;
+                    Flow::Replace(Box::new(welcome(ctx).focus_at(i)))
                 })
-                .collect();
-            v.push(
-                MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
-                    .on(|ctx| Flow::Replace(Box::new(stores(ctx)))),
-            );
-            v.push(MenuItem::new(PanelRow::button("skip", ctx.t("first_run.skip"))).on(finish));
-            v
-        },
-    )
+            })
+            .collect();
+        v.push(
+            MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
+                .on(|ctx| Flow::Replace(Box::new(stores(ctx)))),
+        );
+        v.push(MenuItem::new(PanelRow::button("skip", ctx.t("first_run.skip"))).on(finish));
+        v
+    })
     .focus_at(2)
     .on_back(finish)
 }
@@ -192,24 +191,18 @@ fn providers_rows(ctx: &Ctx) -> Vec<MenuItem> {
 }
 
 fn providers(ctx: &Ctx) -> MenuLayer {
-    step(
-        ctx,
-        3,
-        "metadata",
-        "metadata_text",
-        |ctx| {
-            let mut v = providers_rows(ctx);
-            if ctx.desktop {
-                v.push(
-                    MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
-                        .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
-                );
-            } else {
-                v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
-            }
-            v
-        },
-    )
+    step(ctx, 3, "metadata", "metadata_text", |ctx| {
+        let mut v = providers_rows(ctx);
+        if ctx.desktop {
+            v.push(
+                MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
+                    .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
+            );
+        } else {
+            v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
+        }
+        v
+    })
     .focus_at(providers_rows(ctx).len())
     .on_back(|ctx| {
         if ctx.desktop && super::settings::emulators::anything_found(ctx) {
@@ -225,20 +218,28 @@ fn providers(ctx: &Ctx) -> MenuLayer {
 pub(crate) fn mode(ctx: &Ctx) -> MenuLayer {
     use crate::mode::{OPEN_IN, OPEN_IN_BIG_PICTURE, OPEN_IN_DESKTOP};
     step(ctx, 4, "mode", "mode_text", |ctx| {
-        let current = ctx.settings.get(OPEN_IN).map(str::to_owned).unwrap_or_else(|| {
-            if ctx.pads_connected > 0 {
-                OPEN_IN_BIG_PICTURE.into()
-            } else {
-                OPEN_IN_DESKTOP.into()
-            }
-        });
+        let current = ctx
+            .settings
+            .get(OPEN_IN)
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                if ctx.pads_connected > 0 {
+                    OPEN_IN_BIG_PICTURE.into()
+                } else {
+                    OPEN_IN_DESKTOP.into()
+                }
+            });
         let mut v: Vec<MenuItem> = [(OPEN_IN_DESKTOP, "window"), (OPEN_IN_BIG_PICTURE, "full")]
             .into_iter()
             .map(|(value, key)| {
                 MenuItem::new(
-                    PanelRow::radio(value, ctx.t(&format!("first_run.full.mode_{key}")), current == value)
-                        .desc(ctx.t(&format!("first_run.full.mode_{key}_desc")))
-                        .icon(if key == "window" { "monitor" } else { "tv" }),
+                    PanelRow::radio(
+                        value,
+                        ctx.t(&format!("first_run.full.mode_{key}")),
+                        current == value,
+                    )
+                    .desc(ctx.t(&format!("first_run.full.mode_{key}_desc")))
+                    .icon(if key == "window" { "monitor" } else { "tv" }),
                 )
                 .on(move |ctx| {
                     ctx.settings.set(OPEN_IN, value);
@@ -275,7 +276,12 @@ pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
         let mut v: Vec<MenuItem> = GameStore::ALL
             .into_iter()
             .filter_map(|store| {
-                let n = ctx.library.games().iter().filter(|g| g.store() == store).count();
+                let n = ctx
+                    .library
+                    .games()
+                    .iter()
+                    .filter(|g| g.store() == store)
+                    .count();
                 (n > 0).then(|| {
                     MenuItem::new(
                         PanelRow::info(
@@ -293,22 +299,42 @@ pub(crate) fn ready(ctx: &Ctx) -> MenuLayer {
             MenuItem::new(
                 PanelRow::action(
                     "change-mode",
-                    ctx.t(if big { "first_run.full.opens_full" } else { "first_run.full.opens_window" }),
+                    ctx.t(if big {
+                        "first_run.full.opens_full"
+                    } else {
+                        "first_run.full.opens_window"
+                    }),
                 )
                 .icon(if big { "tv" } else { "pointer" })
                 .value(ctx.t("first_run.full.change")),
             )
             .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
         );
-        v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.full.open_library"))).on(finish));
+        v.push(
+            MenuItem::new(PanelRow::button(
+                "done",
+                ctx.t("first_run.full.open_library"),
+            ))
+            .on(finish),
+        );
         v
     })
     .overline(ctx.tf(
         "first_run.count",
-        &[("n", &DESKTOP_STEPS.to_string()), ("total", &DESKTOP_STEPS.to_string())],
+        &[
+            ("n", &DESKTOP_STEPS.to_string()),
+            ("total", &DESKTOP_STEPS.to_string()),
+        ],
     ))
-    .text(ctx.t(if total == 0 { "first_run.full.ready_none_text" } else { "first_run.full.ready_text" }))
-    .steps((1..=DESKTOP_STEPS).map(|i| i.to_string()).collect(), DESKTOP_STEPS - 1)
+    .text(ctx.t(if total == 0 {
+        "first_run.full.ready_none_text"
+    } else {
+        "first_run.full.ready_text"
+    }))
+    .steps(
+        (1..=DESKTOP_STEPS).map(|i| i.to_string()).collect(),
+        DESKTOP_STEPS - 1,
+    )
     .full(ctx.t("first_run.full.ready_note"))
     // Foco em "Abrir a biblioteca": depois das lojas e da linha do modo.
     .focus_at(
@@ -350,7 +376,10 @@ mod tests {
         let (_d, mut ctx) = fresh();
         ctx.desktop = true;
         let accept = |layer: &MenuLayer, ctx: &mut Ctx, key: &str| {
-            let item = (layer.build)(ctx).into_iter().find(|i| i.row.key == key).unwrap();
+            let item = (layer.build)(ctx)
+                .into_iter()
+                .find(|i| i.row.key == key)
+                .unwrap();
             (item.accept.unwrap())(ctx)
         };
         let next = |flow: Flow| match flow {
@@ -366,9 +395,15 @@ mod tests {
         // Emuladores só aparecem quando há algum neste PC; senão o passo é pulado e vai direto para as capas.
         let second = next(accept(&first, &mut ctx, "next")).render(&ctx);
         if super::super::settings::emulators::anything_found(&ctx) {
-            assert_eq!((second.tab, second.title), (1, ctx.t("first_run.full.emulators")));
+            assert_eq!(
+                (second.tab, second.title),
+                (1, ctx.t("first_run.full.emulators"))
+            );
         } else {
-            assert_eq!((second.tab, second.title), (2, ctx.t("first_run.full.metadata")));
+            assert_eq!(
+                (second.tab, second.title),
+                (2, ctx.t("first_run.full.metadata"))
+            );
         }
         assert_eq!(emulators(&ctx).render(&ctx).tab, 1);
         // Capas → Modo (no desktop o terceiro passo não termina).
@@ -377,9 +412,17 @@ mod tests {
         assert_eq!(mode_layer.render(&ctx).tab, 3);
         // Sem controle, "Em janela" já vem marcado; escolher tela cheia grava a preferência.
         let mode = mode(&ctx);
-        assert!(mode.render(&ctx).rows.iter().any(|r| r.key == crate::mode::OPEN_IN_DESKTOP && r.on));
+        assert!(
+            mode.render(&ctx)
+                .rows
+                .iter()
+                .any(|r| r.key == crate::mode::OPEN_IN_DESKTOP && r.on)
+        );
         let _ = accept(&mode, &mut ctx, crate::mode::OPEN_IN_BIG_PICTURE);
-        assert_eq!(ctx.settings.get(crate::mode::OPEN_IN), Some(crate::mode::OPEN_IN_BIG_PICTURE));
+        assert_eq!(
+            ctx.settings.get(crate::mode::OPEN_IN),
+            Some(crate::mode::OPEN_IN_BIG_PICTURE)
+        );
         let ready = next(accept(&mode, &mut ctx, "next"));
         let o = ready.render(&ctx);
         assert_eq!(o.tab, 4);

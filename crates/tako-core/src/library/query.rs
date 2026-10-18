@@ -283,7 +283,11 @@ mod tests {
     #[test]
     fn reversed_order_is_the_same_sort_back_to_front() {
         let games = sample::games();
-        let forward = ids(&apply(&games, LibraryFilter::All, &by_sort(LibrarySort::Name)));
+        let forward = ids(&apply(
+            &games,
+            LibraryFilter::All,
+            &by_sort(LibrarySort::Name),
+        ));
         let reversed = LibraryCriteria {
             reversed: true,
             ..by_sort(LibrarySort::Name)

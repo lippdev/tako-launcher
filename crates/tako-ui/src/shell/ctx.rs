@@ -191,6 +191,9 @@ pub mod keys {
     pub const SMART_COLLECTIONS: &str = "SmartCollections";
 }
 
+/// O que o "Desfazer" de um aviso faz.
+pub type Undo = std::rc::Rc<dyn Fn(&mut Ctx)>;
+
 pub struct Ctx {
     pub paths: DataPaths,
     pub library: GameLibrary,
@@ -216,7 +219,7 @@ pub struct Ctx {
     pub input: InputKind,
     pub toast: Option<(String, Instant)>,
     /// "Desfazer" do aviso atual (ações em lote do desktop); some junto com o aviso.
-    pub toast_undo: Option<std::rc::Rc<dyn Fn(&mut Ctx)>>,
+    pub toast_undo: Option<Undo>,
     pub effects: Vec<Effect>,
     pub running: Option<RunningGame>,
     pub sources: Vec<SourceReport>,

@@ -801,7 +801,10 @@ impl Shell {
         out.set("desk-brand-label", self.ctx.t("desktop.menu.brand"));
         out.set("desk-search-key", self.ctx.t("desktop.search_key"));
         out.set("desk-search-esc", self.ctx.t("desktop.search_esc"));
-        out.set("desk-settings-search-hint", self.ctx.t("desktop.settings_search"));
+        out.set(
+            "desk-settings-search-hint",
+            self.ctx.t("desktop.settings_search"),
+        );
         out.set("desk-cancel-label", self.ctx.t("common.cancel"));
         out.set(
             "desk-toast-undo",

@@ -378,17 +378,23 @@ fn desktop_snapshot() {
             .create()
             .unwrap();
         let to_image = |img: &image::RgbaImage| {
-            slint::Image::from_rgba8(slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(
-                img.as_raw(),
-                img.width(),
-                img.height(),
-            ))
+            slint::Image::from_rgba8(
+                slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(
+                    img.as_raw(),
+                    img.width(),
+                    img.height(),
+                ),
+            )
         };
         let art = std::env::var("TAKO_SNAP_ART").ok().map(|p| {
             let img = image::open(p).unwrap();
             let (blur, lum) = crate::images::glass_copy(&img);
             let lum: Vec<Value> = lum.into_iter().map(|l| Value::Number(l.into())).collect();
-            (to_image(&img.to_rgba8()), to_image(&blur), crate::values::model(lum))
+            (
+                to_image(&img.to_rgba8()),
+                to_image(&blur),
+                crate::values::model(lum),
+            )
         });
         let mut ctx = crate::app::build_ctx(
             DataPaths::at(dir.path().join("data")),
@@ -425,7 +431,10 @@ fn desktop_snapshot() {
             _ => {}
         }
         // `TAKO_SNAP_CLICK=zona:índice,…`: cliques antes da captura (ex.: `desk-brand:0`, `game:3`).
-        for click in std::env::var("TAKO_SNAP_CLICK").unwrap_or_default().split(',') {
+        for click in std::env::var("TAKO_SNAP_CLICK")
+            .unwrap_or_default()
+            .split(',')
+        {
             if let Some((zone, i)) = click.split_once(':') {
                 shell.click(zone, i.parse().unwrap_or(0));
             }

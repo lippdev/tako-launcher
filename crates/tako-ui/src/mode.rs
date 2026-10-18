@@ -67,9 +67,15 @@ mod tests {
         let mut settings = crate::shell::Settings::new(None);
         assert_eq!(preferred(UiMode::Desktop, true, &settings), UiMode::Desktop);
         settings.set(OPEN_IN, OPEN_IN_BIG_PICTURE);
-        assert_eq!(preferred(UiMode::Desktop, true, &settings), UiMode::BigPicture);
+        assert_eq!(
+            preferred(UiMode::Desktop, true, &settings),
+            UiMode::BigPicture
+        );
         // O supervisor reabrindo no desktop (`--desktop`) não é a abertura sem argumentos.
-        assert_eq!(preferred(UiMode::Desktop, false, &settings), UiMode::Desktop);
+        assert_eq!(
+            preferred(UiMode::Desktop, false, &settings),
+            UiMode::Desktop
+        );
     }
 
     #[test]

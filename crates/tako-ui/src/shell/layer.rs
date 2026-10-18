@@ -289,7 +289,11 @@ impl Layer for MenuLayer {
             // Onboarding em tela inteira: marca, nota e as capas da parede ao fundo.
             tab2: i32::from(self.full),
             input_hint: self.note.clone(),
-            thumbs: if self.full { super::first_run::wall(ctx) } else { Vec::new() },
+            thumbs: if self.full {
+                super::first_run::wall(ctx)
+            } else {
+                Vec::new()
+            },
             ..Default::default()
         }
     }
