@@ -186,6 +186,29 @@ fn request(uri: &str, max_w: u32, max_h: u32, glass: bool) -> Option<Image> {
 }
 
 /// A imagem (em qualquer tamanho, ou a cópia de vidro) ainda está a caminho.
+/// Luminância relativa (WCAG) média dos pixels visíveis de uma imagem já decodificada (o logo do jogo), medida
+/// uma vez por URI. `None` se a imagem não tem pixels legíveis ou é toda transparente.
+pub fn mean_luminance(uri: &str, img: &Image) -> Option<f32> {
+    thread_local! {
+        static SEEN: RefCell<HashMap<String, Option<f32>>> = RefCell::new(HashMap::new());
+    }
+    if let Some(known) = SEEN.with(|s| s.borrow().get(uri).copied()) {
+        return known;
+    }
+    let buf = img.to_rgba8()?;
+    let (mut sum, mut weight) = (0.0f64, 0.0f64);
+    for p in buf.as_slice() {
+        let a = f64::from(p.a) / 255.0;
+        if a > 0.5 {
+            sum += a * tako_core::presentation::Rgb::new(p.r, p.g, p.b).luminance();
+            weight += a;
+        }
+    }
+    let lum = (weight > 0.0).then(|| (sum / weight) as f32);
+    SEEN.with(|s| s.borrow_mut().insert(uri.to_owned(), lum));
+    lum
+}
+
 pub fn is_pending(uri: &str) -> bool {
     let tail = format!("|{uri}");
     STATE.with(|s| s.borrow().pending.iter().any(|k| k.ends_with(&tail)))

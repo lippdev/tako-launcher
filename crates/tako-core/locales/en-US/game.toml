@@ -92,6 +92,11 @@ auto_done = "{source} matches on its own again"
 save_failed = "Couldn't save right now; check the logs"
 
 [art_picker]
+title_mode = "This game's title"
+title_default = "Use the default"
+title_logo = "Logo"
+title_text = "Name as text"
+low_contrast = "The logo is hard to see over this game's art (contrast below 3:1); by default Tako shows the name as text."
 preview = "Preview"
 source = "Source"
 use = "Use this image"

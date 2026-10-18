@@ -35,7 +35,7 @@ export { Ui }
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
 
@@ -1727,9 +1727,28 @@ component GameStage inherits VerticalLayout {
             alignment: start;
             Badge { text: game.overline; live: game.running; }
         }
+        // TituloDoJogo: o logo do jogo numa caixa de 520 × 180 (380 × 130 na janela pequena), ancorado embaixo à
+        // esquerda, nunca ampliado acima do tamanho dele; a etiqueta fica 20 acima.
+        if game.show-logo: HorizontalLayout {
+            alignment: start;
+            padding-top: 20px - (small ? 10px : 14px);
+            property <length> box-w: small ? 380px : 520px;
+            property <length> box-h: small ? 130px : 180px;
+            property <length> src-w: max(1px, game.logo.width * 1px);
+            property <length> src-h: max(1px, game.logo.height * 1px);
+            property <float> fit: min(1, min(box-w / src-w, box-h / src-h));
+            Image {
+                source: game.logo;
+                width: parent.src-w * parent.fit;
+                height: parent.src-h * parent.fit;
+                image-fit: contain;
+                accessible-role: image;
+                accessible-label: game.title;
+            }
+        }
         // Título em até duas linhas, até 620 de largura (520 na janela pequena), crescendo para cima: um título longo
         // encolhe (até 36) para caber em duas.
-        HorizontalLayout {
+        if !game.show-logo: HorizontalLayout {
             title-measure := Text {
                 visible: false;
                 width: 0;
@@ -3276,6 +3295,18 @@ component DeskOverlay inherits Rectangle {
                             }
                         }
                         Text { text: ov.preview-text; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
+                        // Aba Logo (TituloDoJogo): "Título deste jogo" e o aviso de pouco contraste.
+                        if ov.tab == 2 && ov.rows.length > 9: DeskRow {
+                            data: ov.rows[8];
+                            clicked => { root.clicked("title-mode", 0); }
+                            anchor(x, y) => { root.menu(x, y); }
+                        }
+                        if ov.tab == 2 && ov.rows.length > 9 && ov.rows[9].value != "": Text {
+                            text: ov.rows[9].value;
+                            color: Ui.warning;
+                            font-size: Ui.desk-label-sm;
+                            wrap: word-wrap;
+                        }
                         Rectangle { vertical-stretch: 1; }
                         PopupButton { width: 380px; data: ov.rows[3]; clicked => { root.clicked("use", 0); } }
                         HorizontalLayout {

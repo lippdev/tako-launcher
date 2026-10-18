@@ -423,7 +423,69 @@ impl ArtPicker {
             PanelRow::button("cancel", ctx.t("common.cancel")),
             PanelRow::info("current", ctx.t("art_picker.current"), ""),
             PanelRow::info("preview", ctx.t("art_picker.preview"), ""),
+            // Aba Logo (TituloDoJogo): o título deste jogo e o aviso de pouco contraste com a arte.
+            PanelRow::choice(
+                "title-mode",
+                ctx.t("art_picker.title_mode"),
+                ctx.t(&format!("art_picker.title_{}", self.title_key(ctx))),
+            ),
+            PanelRow::info(
+                "contrast",
+                "",
+                if self.low_contrast(ctx) {
+                    ctx.t("art_picker.low_contrast")
+                } else {
+                    String::new()
+                },
+            ),
         ]
+    }
+
+    /// "default", "logo" ou "text": o que vale para o título deste jogo.
+    fn title_key(&self, ctx: &Ctx) -> &'static str {
+        match super::desktop::title_mode(ctx, &self.game.id).as_str() {
+            "logo" => "logo",
+            "text" => "text",
+            _ => "default",
+        }
+    }
+
+    /// O logo atual do jogo fica abaixo de 3:1 sobre a arte dele.
+    fn low_contrast(&self, ctx: &Ctx) -> bool {
+        let Some(g) = ctx.library.find(&self.game.id) else {
+            return false;
+        };
+        let logo = crate::shell::tiles::image(g.shown_logo(), crate::shell::tiles::LOGO);
+        let lum = g
+            .shown_hero()
+            .and_then(crate::images::glass)
+            .map(|(_, lum)| lum)
+            .unwrap_or_default();
+        super::desktop::logo_contrast(g, &logo, &lum).is_some_and(|c| c < 3.0)
+    }
+
+    /// Select "Título deste jogo": usar o padrão, logo ou nome em texto (fica nas configurações, por jogo).
+    fn title_select(&self, ctx: &Ctx) -> Option<Box<dyn Layer>> {
+        const MODES: [(&str, &str); 3] = [("", "default"), ("logo", "logo"), ("text", "text")];
+        let key = format!("{}:{}", super::ctx::keys::TITLE_LOGO, self.game.id);
+        let current = self.title_key(ctx);
+        let item = MenuItem::new(PanelRow::choice("title-mode", "", "")).options(move |ctx| {
+            let picks = MODES
+                .iter()
+                .map(|(value, label)| {
+                    let key = key.clone();
+                    Pick::new(ctx.t(&format!("art_picker.title_{label}"))).set(move |ctx| {
+                        ctx.settings.set(&key, value);
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (
+                picks,
+                MODES.iter().position(|m| m.1 == current).unwrap_or(0),
+            )
+        });
+        item.select(ctx)
     }
 }
 
@@ -580,6 +642,11 @@ impl Layer for ArtPicker {
             }
             "style" => return self.handle(Cmd::Favorite, ctx),
             "cols" => self.cols = index.max(1),
+            "title-mode" => {
+                if let Some(select) = self.title_select(ctx) {
+                    return Flow::Push(select);
+                }
+            }
             "cancel" | "outside" => return Flow::Close,
             "tab" => self.set_kind(index),
             "tab2" => {

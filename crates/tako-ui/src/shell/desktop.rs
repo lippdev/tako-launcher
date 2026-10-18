@@ -3,6 +3,7 @@
 //! botão direito abre as ações); o teclado anda pelas zonas com Tab e pelas linhas com as setas. As regras são as
 //! da biblioteca da tela cheia (`query`, `dialogs`, `details::primary_action`); aqui só muda a apresentação.
 
+use super::ctx::keys::TITLE_LOGO;
 use super::library::Criteria;
 use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles,
@@ -1467,6 +1468,8 @@ impl Page for DesktopLibrary {
                     .and_then(crate::images::glass)
                     .unwrap_or_default();
                 let (description, about_more) = about(&g.description);
+                let logo = tiles::image(g.shown_logo(), tiles::LOGO);
+                let show_logo = show_logo(ctx, g, &logo, &art_lum);
                 sessions = sessions_rows(ctx, g);
                 (
                     DeskGameView {
@@ -1477,7 +1480,8 @@ impl Page for DesktopLibrary {
                         art: tiles::image(g.shown_hero(), tiles::HERO),
                         art_blur,
                         art_lum,
-                        logo: tiles::image(g.shown_logo(), tiles::LOGO),
+                        logo,
+                        show_logo,
                         accent: parse_color(&g.accent),
                         hint,
                         running,
@@ -1743,6 +1747,39 @@ pub fn question(ctx: &Ctx) -> super::layer::MenuLayer {
     .text(ctx.t("desktop.ask.text"))
 }
 
+/// TituloDoJogo: o que vale para o jogo — "logo", "text" ou "" (usar o padrão das Configurações).
+pub(crate) fn title_mode(ctx: &Ctx, id: &str) -> String {
+    ctx.settings.string(&format!("{TITLE_LOGO}:{id}"))
+}
+
+/// O título vira o logo quando há logo, a pessoa não pediu texto e o contraste médio dele com a arte embaixo é de
+/// pelo menos 3:1. "Logo" escolhido no jogo vale mesmo com pouco contraste (a aba Logo avisa).
+fn show_logo(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool {
+    let wanted = match title_mode(ctx, &g.id).as_str() {
+        "logo" => return logo.size().width > 0,
+        "text" => false,
+        _ => ctx.settings.string(TITLE_LOGO) != "text",
+    };
+    wanted && logo.size().width > 0 && logo_contrast(g, logo, art_lum).is_none_or(|c| c >= 3.0)
+}
+
+/// Contraste (WCAG) entre o logo e a arte atrás do título; `None` sem como medir (sem arte: o fundo é o degradê).
+pub(crate) fn logo_contrast(g: &Game, logo: &slint::Image, art_lum: &[f32]) -> Option<f64> {
+    let (cols, rows) = crate::images::GLASS_GRID;
+    if art_lum.len() != (cols * rows) as usize {
+        return None;
+    }
+    // shortcut: o título fica nas colunas 4–7 e linhas 3–4 da grade numa janela 16:9 (centro da arte a 62%); numa
+    // janela muito diferente o recorte desloca um pouco. Medir pela posição real exigiria a geometria do tema.
+    let cells: Vec<f32> = (3..5)
+        .flat_map(|r| (4..8).map(move |c| art_lum[(r * cols + c) as usize]))
+        .collect();
+    let art = f64::from(cells.iter().sum::<f32>() / cells.len() as f32);
+    let logo = f64::from(crate::images::mean_luminance(g.shown_logo()?, logo)?);
+    let (hi, lo) = if logo > art { (logo, art) } else { (art, logo) };
+    Some((hi + 0.05) / (lo + 0.05))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1832,6 +1869,33 @@ mod tests {
         assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
         // A faixa não inventa Nuvem nem Conquistas.
         assert_eq!(strip(&shell.ctx, &g).len(), 2);
+    }
+
+    #[test]
+    fn the_title_is_the_logo_only_with_enough_contrast_or_when_chosen() {
+        use slint::{Rgba8Pixel, SharedPixelBuffer};
+        let (_dir, mut shell) = shell();
+        let mut g = Game {
+            id: "g".into(),
+            ..Game::default()
+        };
+        g.media.insert(
+            tako_core::library::media::LOGO.into(),
+            "test://white-logo".into(),
+        );
+        let white = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(&[255u8; 16], 2, 2);
+        let logo = slint::Image::from_rgba8(white);
+        let (cols, rows) = crate::images::GLASS_GRID;
+        let dark = vec![0.02; (cols * rows) as usize];
+        let light = vec![0.9; (cols * rows) as usize];
+        assert!(show_logo(&shell.ctx, &g, &logo, &dark));
+        assert!(!show_logo(&shell.ctx, &g, &logo, &light));
+        assert!(!show_logo(&shell.ctx, &g, &slint::Image::default(), &dark));
+        shell.ctx.settings.set(TITLE_LOGO, "text");
+        assert!(!show_logo(&shell.ctx, &g, &logo, &dark));
+        // "Logo" escolhido no jogo vale mesmo com pouco contraste.
+        shell.ctx.settings.set(&format!("{TITLE_LOGO}:g"), "logo");
+        assert!(show_logo(&shell.ctx, &g, &logo, &light));
     }
 
     #[test]

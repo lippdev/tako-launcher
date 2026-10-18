@@ -480,6 +480,15 @@ fn desktop_snapshot() {
                             s.set_field(field.into(), Value::String(text.into()));
                         }
                     }
+                    // `TAKO_SNAP_LOGO=<png>`: o título vira esse logo (TituloDoJogo).
+                    if let Some(p) = std::env::var("TAKO_SNAP_LOGO")
+                        .ok()
+                        .filter(|p| !p.is_empty())
+                    {
+                        let logo = to_image(&image::open(p).unwrap().to_rgba8());
+                        s.set_field("logo".into(), Value::Image(logo));
+                        s.set_field("show-logo".into(), Value::Bool(true));
+                    }
                 }
                 crate::bridge::set(&ui, name, value);
             }

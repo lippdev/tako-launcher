@@ -114,6 +114,10 @@ sgdb_steps = "1. Entre em steamgriddb.com com a sua conta da Steam. 2. Em Prefer
 [settings.appearance]
 title = "Aparência"
 subtitle = "Tema, cores e animações."
+game_title = "Título dos jogos"
+game_title_desc = "No destaque da biblioteca, o logo oficial do jogo no lugar do nome"
+title_logo = "Logo do jogo quando houver"
+title_text = "Sempre o nome em texto"
 theme = "Tema"
 theme_desc = "Escolha o tema do Tako ou instale um novo"
 builtin = "Tako (padrão)"

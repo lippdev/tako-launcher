@@ -166,6 +166,9 @@ pub mod keys {
     pub const REDUCED_MOTION: &str = "ReducedMotion";
     /// Modo desktop: sem vidro (tema `solido`), para quem prefere superfícies opacas.
     pub const REDUCED_TRANSPARENCY: &str = "ReducedTransparency";
+    /// TituloDoJogo (desktop): "text" = sempre o nome em texto; qualquer outro valor = logo quando houver. Por jogo,
+    /// `TITLE_LOGO` + ":" + id guarda "logo", "text" ou nada (usar o padrão).
+    pub const TITLE_LOGO: &str = "DesktopTitleLogo";
     pub const RESTORE_ENVIRONMENT: &str = "RestoreEnvironmentAfterGame";
     pub const DEVELOPER: &str = "DeveloperOptions";
     pub const GAME_SCREEN_ENABLED: &str = "GameScreenEnabled";

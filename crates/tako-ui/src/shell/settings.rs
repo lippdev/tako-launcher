@@ -668,7 +668,38 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             false,
         )
     }))
+    .chain(ctx.desktop.then(|| title_row(ctx)))
     .collect()
+}
+
+/// TituloDoJogo: "Logo do jogo quando houver" (padrão) ou "Sempre o nome em texto".
+fn title_row(ctx: &Ctx) -> MenuItem {
+    const MODES: [(&str, &str); 2] = [("", "title_logo"), ("text", "title_text")];
+    let text = ctx.settings.string(keys::TITLE_LOGO) == "text";
+    MenuItem::new(
+        PanelRow::choice(
+            "title",
+            ctx.t("settings.appearance.game_title"),
+            ctx.t(&format!(
+                "settings.appearance.{}",
+                MODES[usize::from(text)].1
+            )),
+        )
+        .desc(ctx.t("settings.appearance.game_title_desc")),
+    )
+    .options(|ctx| {
+        let text = ctx.settings.string(keys::TITLE_LOGO) == "text";
+        let picks = MODES
+            .iter()
+            .map(|(value, label)| {
+                Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                    ctx.settings.set(keys::TITLE_LOGO, value);
+                    Flow::Stay
+                })
+            })
+            .collect();
+        (picks, usize::from(text))
+    })
 }
 
 fn change_text_size(ctx: &mut Ctx, direction: i32) -> Flow {

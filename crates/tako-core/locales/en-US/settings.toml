@@ -114,6 +114,10 @@ sgdb_steps = "1. Sign in to steamgriddb.com with your Steam account. 2. Under Pr
 [settings.appearance]
 title = "Appearance"
 subtitle = "Theme, colors and animations."
+game_title = "Game titles"
+game_title_desc = "In the library highlight, the game's official logo instead of its name"
+title_logo = "Game logo when available"
+title_text = "Always the name as text"
 theme = "Theme"
 theme_desc = "Pick Tako's theme or install a new one"
 builtin = "Tako (default)"

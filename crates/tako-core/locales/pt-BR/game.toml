@@ -92,6 +92,11 @@ auto_done = "{source} volta a casar sozinho"
 save_failed = "Não foi possível salvar agora; veja os registros"
 
 [art_picker]
+title_mode = "Título deste jogo"
+title_default = "Usar o padrão"
+title_logo = "Logo"
+title_text = "Nome em texto"
+low_contrast = "O logo fica pouco visível sobre a arte deste jogo (contraste abaixo de 3:1); no padrão, o Tako mostra o nome em texto."
 preview = "Prévia"
 source = "Fonte"
 use = "Usar esta imagem"
