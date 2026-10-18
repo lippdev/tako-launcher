@@ -1412,6 +1412,7 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.view.reverse"),
                 ctx.t("desktop.filter_sort"),
                 ctx.t("desktop.view.menu"),
+                ctx.t("desktop.add_game"),
             ],
         );
         out.set("desk-selected", cur.map(|i| i as i32).unwrap_or(-1));
@@ -1518,6 +1519,8 @@ impl Page for DesktopLibrary {
                         },
                         trailer: g.media.contains_key(tako_core::library::media::VIDEO),
                         art_loading: g.shown_hero().is_some_and(crate::images::is_pending),
+                        store_icon: store_icon(g.store()).into(),
+                        store_name: game_text::store_name(lang, g.store()),
                     },
                     actions,
                     strip(ctx, g),
@@ -1698,6 +1701,13 @@ pub fn brand_menu() -> super::layer::MenuLayer {
             )
             .on(|ctx| Flow::Replace(Box::new(super::profiles::panel(ctx)))),
             MenuItem::new(
+                PanelRow::button("add-game", ctx.t("desktop.menu.add_game")).icon("plus"),
+            )
+            .on(|ctx| {
+                ctx.effect(Effect::AddGame);
+                Flow::CloseAll
+            }),
+            MenuItem::new(
                 PanelRow::button("big-picture", ctx.t("desktop.menu.big_picture"))
                     .icon("tv")
                     .value(ctx.t("desktop.menu.big_picture_key")),
@@ -1839,15 +1849,19 @@ mod tests {
         assert_eq!(shell.page().kind(), "settings");
         shell.click("desk-nav", 0);
         shell.click("desk-brand", 0);
+        // "Adicionar jogo…" vem depois de "Trocar perfil…".
         shell.click("overlay-row", 2);
+        assert_eq!(shell.ctx.effects.pop(), Some(Effect::AddGame));
+        shell.click("desk-brand", 0);
+        shell.click("overlay-row", 3);
         assert_eq!(
             shell.ctx.effects.pop(),
             Some(Effect::SwitchMode(crate::mode::UiMode::BigPicture))
         );
         // Separadores não recebem foco: ↓ pula de "Tela cheia" para "Procurar atualizações".
         let rows = crate::shell::layer::Layer::render(&brand_menu(), &shell.ctx).rows;
-        assert_eq!(rows[3].kind, "separator");
-        assert!(!rows[3].is_focusable());
+        assert_eq!(rows[4].kind, "separator");
+        assert!(!rows[4].is_focusable());
 
         // Teclado: subir das abas chega à barra; Enter na busca pede o foco do campo.
         shell.handle(Cmd::Up);
