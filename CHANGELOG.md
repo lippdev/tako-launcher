@@ -2,6 +2,10 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.12]
+### Correções
+- **Logo do jogo:** jogos com logo não mostram mais o nome em texto antes de trocar para o logo. Enquanto o logo carrega, o espaço do título fica reservado, e o logo aparece suavemente quando chega.
+
 ## [0.2.0-alpha.11]
 ### Novidades
 - **Mais leve e mais fluido:** o Tako usa bem menos memória (cada imagem fica uma vez só na placa de vídeo e o fundo é carregado no tamanho da janela), a lista de jogos rola sem travar e o app acompanha monitores de 120 Hz ou mais.
