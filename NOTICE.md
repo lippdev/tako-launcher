@@ -142,3 +142,10 @@ O Tako não distribui dados nem imagens de jogos: eles são baixados em tempo de
   banco de dados comunitário, usado só para ROMs quando o usuário informa a própria conta e a versão do Tako traz as
   credenciais do software (ADR-0022). Obrigado aos colaboradores do ScreenScraper. Os créditos aparecem em
   Configurações › Dados de ROMs (ScreenScraper).
+
+## Logos de emuladores
+
+`crates/tako-ui/theme/emulators/` traz os logos oficiais dos emuladores, reduzidos para 56 × 56, só para identificar
+cada programa na tela. Cada logo é marca do respectivo projeto, que não endossa o Tako. Fontes: RetroArch, Dolphin,
+PCSX2, DuckStation e PPSSPP dos repositórios oficiais de cada projeto; Cemu de `cemu-project/Cemu`; RPCS3 e Ryujinx
+(Ryubing) dos ícones oficiais publicados no Flathub (`net.rpcs3.RPCS3`, `io.github.ryubing.Ryujinx`).

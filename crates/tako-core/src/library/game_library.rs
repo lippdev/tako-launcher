@@ -503,4 +503,39 @@ mod tests {
         reopened.remove_manual(&id).unwrap();
         assert!(reopened.find(&id).is_none() && reopened.find_manual(&id).is_none());
     }
+
+    #[test]
+    fn play_status_is_saved_and_survives_a_reload() {
+        let now = Arc::new(Mutex::new(sample::now()));
+        let store = Arc::new(Mutex::new(MemoryLibraryStore::default()));
+        struct Shared(Arc<Mutex<MemoryLibraryStore>>);
+        impl LibraryStore for Shared {
+            fn load(&mut self) -> LibraryData {
+                self.0.lock().unwrap().load()
+            }
+            fn save(&mut self, data: &LibraryData) -> Result<(), String> {
+                self.0.lock().unwrap().save(data)
+            }
+        }
+        let open = || {
+            let mut lib = GameLibrary::new(
+                Box::new(|| vec![store_game("steam:1", "Steam", GameStore::Steam, Some(1))]),
+                Box::new(Shared(Arc::clone(&store))),
+                clock(&now),
+            );
+            lib.load();
+            lib
+        };
+        let mut library = open();
+        assert_eq!(library.find("steam:1").unwrap().play_status, None);
+        library
+            .set_status("steam:1", Some(PlayStatus::Paused))
+            .unwrap();
+        assert_eq!(
+            open().find("steam:1").unwrap().play_status,
+            Some(PlayStatus::Paused)
+        );
+        library.set_status("steam:1", None).unwrap();
+        assert_eq!(open().find("steam:1").unwrap().play_status, None);
+    }
 }

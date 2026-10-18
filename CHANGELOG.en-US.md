@@ -2,6 +2,19 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.14]
+### What's new
+- **One top bar:** Tako's bar is now the window's own bar, edge to edge, with Minimize, Maximize and Close on the right. On Windows, the empty part of the bar drags the window, double-click maximizes and Maximize shows the snap layouts.
+- **Profile at the top:** avatar and name in a pill, like Steam, with View profile, Switch profile… and Edit profile. Full screen is now a button with just the controller icon.
+- **Search where the content is:** in the list panel, under the tabs; centered in the Grid and Categories bar; at the top of the Settings panel. In Store and Profile, Ctrl + K opens a floating search.
+- **Joined sidebar:** an option in Settings › Appearance that attaches the list to the top bar as a single piece of glass, in Normal or Narrow width.
+- **Game status:** Playing, Want to play, Paused, Beaten or Abandoned, from a picker in the corner of the highlight, the game menu and multi-select. Playing for the first time sets Playing, and you can filter by status.
+- **Active filters:** shown as fixed chips under the count, each with ✕, and "Clear" when there is more than one.
+- **Highlight:** the card row is now About, Details and Sessions, and the Metacritic score joins the numbers strip when the game has one. The trailer moved to the second phase, which no longer repeats the first one and scrolls more smoothly.
+- **Updates:** "Check for updates…" answers right in the menu (checking, up to date, or an error with Try again). The new dialog shows the download, the release's highlights and "Restart now". If installing fails, Tako goes back to the previous version and tells you.
+- **Emulators:** every one has its official logo, also in the Settings emulators screen.
+- Stacked buttons: the main action sits on top and the two below split the width evenly.
+
 ## [0.2.0-alpha.13]
 ### What's new
 - **New first run:** a loading screen with the octopus assembling while Tako looks for your games; stores found, emulators with each one's systems and games and the ROM folder, covers with a before and after and the choice between fetching from IGDB or using only what the stores have, how to open Tako and a final summary with each store and emulator.

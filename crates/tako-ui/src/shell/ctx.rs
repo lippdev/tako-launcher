@@ -172,6 +172,10 @@ pub mod keys {
     /// TituloDoJogo (desktop): "text" = sempre o nome em texto; qualquer outro valor = logo quando houver. Por jogo,
     /// `TITLE_LOGO` + ":" + id guarda "logo", "text" ou nada (usar o padrão).
     pub const TITLE_LOGO: &str = "DesktopTitleLogo";
+    /// BarraLateralUnida (desktop, por perfil): a lista encosta na barra de cima e na borda esquerda. Padrão: desligada.
+    pub const SIDEBAR_UNIFIED: &str = "layout.sidebar_unida";
+    /// "Largura da barra lateral" (desktop, por perfil): "narrow" = Estreita; qualquer outro valor = Normal.
+    pub const SIDEBAR_WIDTH: &str = "layout.sidebar_largura";
     pub const RESTORE_ENVIRONMENT: &str = "RestoreEnvironmentAfterGame";
     pub const DEVELOPER: &str = "DeveloperOptions";
     pub const GAME_SCREEN_ENABLED: &str = "GameScreenEnabled";
@@ -236,6 +240,7 @@ pub struct Ctx {
     /// Texto da última verificação de atualização (Configurações › Geral).
     pub update_status: String,
     pub update_ready: Option<String>,
+    pub app_update: crate::app_updates::State,
     pub safe_mode: bool,
     pub scanning: bool,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
@@ -325,6 +330,7 @@ impl Ctx {
     }
 
     pub fn toast(&mut self, text: impl Into<String>) {
+        self.app_update.toast_label.clear();
         self.toast = Some((text.into(), Instant::now()));
         self.toast_undo = None;
         self.toast_hover = [false; 2];
@@ -367,6 +373,9 @@ impl Ctx {
 
     /// Quanto o aviso fica. Desktop: 4 s, e 8 s com "Desfazer" (dá tempo de clicar); tela cheia: `TOAST_TIME`.
     pub fn toast_time(&self) -> std::time::Duration {
+        if self.desktop && !self.app_update.toast_label.is_empty() {
+            return std::time::Duration::from_secs(4);
+        }
         match (self.desktop, self.toast_undo.is_some()) {
             (true, true) => std::time::Duration::from_secs(8),
             (true, false) => std::time::Duration::from_secs(4),

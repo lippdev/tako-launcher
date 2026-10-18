@@ -1,4 +1,8 @@
 [desktop]
+define_status = "Definir status"
+status_all = "Todos"
+remove_filter = "Remover filtro {filter}"
+profile_search = "Buscar no perfil"
 collection_auto = "Auto"
 collections_manage = "Organizar coleções"
 library = "Biblioteca"
@@ -37,6 +41,7 @@ settings_found = "{n} configurações encontradas"
 theme_big_picture = "O tema vale para a tela cheia. O modo desktop usa o visual do Tako."
 
 [desktop.menu]
+view_profile = "Ver perfil"
 brand = "Tako: abrir menu"
 settings = "Configurações"
 settings_key = "Ctrl + ,"
@@ -131,6 +136,12 @@ current_session = "Sessão atual"
 playing_now = "jogando agora"
 never_played = "Nunca jogado"
 not_played = "Ainda não jogado"
+metacritic = "Metacritic"
+metacritic_universal = "Aclamação universal"
+metacritic_favorable = "Geralmente favorável"
+metacritic_mixed = "Críticas mistas"
+metacritic_unfavorable = "Geralmente desfavorável"
+metacritic_overwhelming = "Aversão esmagadora"
 
 [desktop.info]
 critic = "Crítica"

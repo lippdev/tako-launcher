@@ -1,6 +1,7 @@
 //! Interface do Tako (MIG-029): tema Slint carregado em tempo de execução (PRD §7), estado e foco em Rust.
 
 pub mod app;
+pub(crate) mod app_updates;
 pub mod art;
 pub mod bridge;
 pub mod demo;
@@ -34,3 +35,6 @@ pub fn version() -> &'static str {
 /// O idioma é global: testes que dependem dele (ou o trocam) rodam um por vez.
 #[cfg(test)]
 pub(crate) static LANG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(any(windows, test))]
+mod window_chrome;

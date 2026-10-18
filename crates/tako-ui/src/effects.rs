@@ -31,7 +31,15 @@ pub fn common(effect: &Effect, shell: &mut Shell) -> Option<HostAction> {
         }
         Effect::SaveDiagnostics => save_report(ctx),
         Effect::CheckUpdates => check_updates(ctx, true),
-        Effect::InstallUpdate => return Some(install_update(ctx)),
+        Effect::InstallUpdate => return Some(install_update(ctx, true)),
+        Effect::ExitToDesktop
+            if ctx.desktop
+                && ctx.update_ready.is_some()
+                && ctx.running.is_none()
+                && !ctx.app_update.installing =>
+        {
+            return Some(install_update(ctx, false));
+        }
         Effect::ApplyTheme(_) => return Some(HostAction::ReloadTheme),
         Effect::SwitchMode(mode) => return Some(HostAction::SwitchMode(*mode)),
         Effect::TestGameScreen => crate::screen_test::start(ctx),
@@ -73,8 +81,12 @@ pub fn check_updates(ctx: &mut Ctx, explicit: bool) {
     let Some(arch) = feed::Arch::current() else {
         return;
     };
-    let prefs = UpdatePreferences::load(&ctx.paths.updates());
     let pkg = package(&ctx.paths);
+    if ctx.desktop {
+        crate::app_updates::check(ctx, explicit, pkg, arch);
+        return;
+    }
+    let prefs = UpdatePreferences::load(&ctx.paths.updates());
     ctx.update_status = ctx.t("updates.checking");
     tasks::run(
         ctx,
@@ -139,7 +151,7 @@ fn ready_dialog(ctx: &Ctx, version: &str) -> MenuLayer {
 }
 
 /// Roda o plano de troca (instalador ou script) e fecha o Tako; o script espera o Tako sair.
-fn install_update(ctx: &mut Ctx) -> HostAction {
+fn install_update(ctx: &mut Ctx, relaunch: bool) -> HostAction {
     let Some(file) = ctx.update_ready.clone() else {
         return HostAction::Stay;
     };
@@ -162,7 +174,7 @@ fn install_update(ctx: &mut Ctx) -> HostAction {
         wait.push(parent);
     }
     let Some(plan) =
-        updates::UpdateApplyPlan::build(pkg, std::path::Path::new(&file), &target, &wait, true)
+        updates::UpdateApplyPlan::build(pkg, std::path::Path::new(&file), &target, &wait, relaunch)
     else {
         return HostAction::Stay;
     };
@@ -177,6 +189,7 @@ fn install_update(ctx: &mut Ctx) -> HostAction {
         .spawn()
     {
         Ok(_) => {
+            ctx.app_update.installing = true;
             ctx.effect(Effect::ExitToDesktop);
             HostAction::Stay
         }

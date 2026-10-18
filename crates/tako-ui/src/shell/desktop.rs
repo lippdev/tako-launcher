@@ -139,10 +139,10 @@ const COVER: (u32, u32) = (344, 516);
 // shortcut: fileira sem virtualização horizontal, corta em 24 capas; virtualizar se pedirem a fileira inteira.
 const ROW_COVERS: usize = 24;
 
-/// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, busca, Tela cheia.
+/// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, menu do perfil, Tela cheia.
 const BAR_ITEMS: usize = 5;
 const BAR_PROFILE: usize = 2;
-const BAR_SEARCH: usize = 3;
+const BAR_ACCOUNT: usize = 3;
 
 /// Rota que abre a biblioteca numa coleção (`desk:collection:m:<id>` ou `s:<id>`, a chave do SeletorDeColecao).
 pub const COLLECTION_ROUTE: &str = "desk:collection:";
@@ -195,6 +195,7 @@ pub struct DesktopLibrary {
     /// Busca e filtros do usuário, por cima da aba (o painel de filtros é o mesmo da tela cheia).
     pub criteria: Criteria,
     selected: Option<String>,
+    selection_index: usize,
     zone: Zone,
     /// Aba, coleção ou ação com o foco do teclado (conforme a zona).
     index: usize,
@@ -235,6 +236,7 @@ impl DesktopLibrary {
             pick_request: Rc::default(),
             criteria: Rc::new(RefCell::new(LibraryCriteria::default())),
             selected: None,
+            selection_index: 0,
             zone: Zone::List,
             index: 0,
             search_focus: 0,
@@ -342,6 +344,101 @@ impl DesktopLibrary {
         }
     }
 
+    fn active_filters(&self, ctx: &Ctx) -> Vec<PanelRow> {
+        let c = self.criteria.borrow();
+        let mut rows = Vec::new();
+        let mut add = |id: String, label: String| {
+            let remove = ctx.tf("desktop.remove_filter", &[("filter", &label)]);
+            rows.push(PanelRow::button(id, label).desc(remove));
+        };
+        for status in &c.statuses {
+            add(
+                format!("status:{}", status.key()),
+                library_text::status_label(ctx.lang(), Some(*status)),
+            );
+        }
+        if c.no_status {
+            add(
+                "no-status".into(),
+                library_text::status_label(ctx.lang(), None),
+            );
+        }
+        if c.install != InstallFilter::Any {
+            add(
+                "install".into(),
+                library_text::install_label(ctx.lang(), c.install),
+            );
+        }
+        for (on, id, key) in [
+            (c.favorites_only, "favorites", "filters.favorites_only"),
+            (c.played_only, "played", "filters.played"),
+            (c.broken_only, "broken", "filters.broken"),
+        ] {
+            if on {
+                add(id.into(), ctx.t(key));
+            }
+        }
+        if c.play_time != tako_core::library::criteria::PlayTimeFilter::Any {
+            add("play-time".into(), ctx.t(c.play_time.key()));
+        }
+        for (kind, values) in [
+            ("source", &c.sources),
+            ("genre", &c.genres),
+            ("tag", &c.tags),
+            ("collection", &c.collections),
+        ] {
+            for value in values {
+                let label = if kind == "collection" {
+                    ctx.collections
+                        .collections()
+                        .iter()
+                        .find(|col| col.id == *value)
+                        .map(|col| col.name.clone())
+                        .unwrap_or_else(|| value.clone())
+                } else {
+                    value.clone()
+                };
+                add(format!("{kind}:{value}"), label);
+            }
+        }
+        rows
+    }
+
+    fn remove_filter(&mut self, ctx: &Ctx, index: usize) {
+        let Some(row) = self.active_filters(ctx).get(index).cloned() else {
+            return;
+        };
+        let mut c = self.criteria.borrow_mut();
+        match row.key.as_str() {
+            "no-status" => c.no_status = false,
+            "install" => c.install = InstallFilter::Any,
+            "favorites" => c.favorites_only = false,
+            "played" => c.played_only = false,
+            "broken" => c.broken_only = false,
+            "play-time" => c.play_time = tako_core::library::criteria::PlayTimeFilter::Any,
+            id => {
+                if let Some((kind, value)) = id.split_once(':') {
+                    match kind {
+                        "status" => c.statuses.retain(|s| s.key() != value),
+                        "source" => {
+                            c.sources.remove(value);
+                        }
+                        "genre" => {
+                            c.genres.remove(value);
+                        }
+                        "tag" => {
+                            c.tags.remove(value);
+                        }
+                        "collection" => {
+                            c.collections.remove(value);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     fn ids(&self, ctx: &Ctx) -> Vec<String> {
         self.games(ctx).into_iter().map(|g| g.id.clone()).collect()
     }
@@ -351,7 +448,15 @@ impl DesktopLibrary {
         self.selected
             .as_ref()
             .and_then(|s| ids.iter().position(|i| i == s))
-            .or((!ids.is_empty()).then_some(0))
+            .or_else(|| {
+                (!ids.is_empty()).then(|| {
+                    if self.selected.is_some() {
+                        self.selection_index.min(ids.len() - 1)
+                    } else {
+                        0
+                    }
+                })
+            })
     }
 
     pub fn selected(&self, ctx: &Ctx) -> Option<String> {
@@ -784,7 +889,24 @@ fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         },
         ..Default::default()
     };
-    vec![session, time]
+    let mut items = vec![session, time];
+    if let Some(score) = g.metacritic_score {
+        let band = match score {
+            90..=i32::MAX => "desktop.strip.metacritic_universal",
+            75..=89 => "desktop.strip.metacritic_favorable",
+            50..=74 => "desktop.strip.metacritic_mixed",
+            20..=49 => "desktop.strip.metacritic_unfavorable",
+            _ => "desktop.strip.metacritic_overwhelming",
+        };
+        items.push(DeskInfo {
+            icon: "metacritic".into(),
+            label: ctx.t("desktop.strip.metacritic"),
+            value: ctx.t(band),
+            score,
+            ..Default::default()
+        });
+    }
+    items
 }
 
 /// CartaoDetalhes: uma linha com ícone por informação que o jogo tem, até 6, as de menor prioridade saem primeiro.
@@ -900,7 +1022,7 @@ fn sessions_rows(ctx: &Ctx, g: &Game) -> (String, Vec<DeskInfo>) {
             ..Default::default()
         });
     }
-    for s in all.iter().rev().take(4 - rows.len()) {
+    for s in all.iter().rev().take(3 - rows.len()) {
         let start = s.started_at.with_timezone(&chrono::Local);
         let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
         rows.push(DeskInfo {
@@ -1093,10 +1215,7 @@ impl Page for DesktopLibrary {
             (Zone::Bar, Cmd::Accept) => match self.index {
                 0 => return Nav::Layer(Box::new(brand_menu())),
                 BAR_PROFILE => return Nav::Push(Box::new(super::profile::ProfilePage::new())),
-                BAR_SEARCH => {
-                    self.search_focus += 1;
-                    self.zone = Zone::List;
-                }
+                BAR_ACCOUNT => return Nav::Layer(Box::new(profile_menu())),
                 4 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
                 _ => self.zone = Zone::List,
             },
@@ -1277,7 +1396,10 @@ impl Page for DesktopLibrary {
                             ctx.effect(Effect::OpenUrl(url.clone()));
                         }
                     }
-                    _ => return Nav::Layer(Box::new(dialogs::sessions(ctx, &g.id))),
+                    _ => {
+                        ctx.open_route = Some("desk:profile:sessions".into());
+                        return Nav::Stay;
+                    }
                 }
             }
             "game-play" => {
@@ -1305,6 +1427,19 @@ impl Page for DesktopLibrary {
                     self.criteria.clone(),
                     self.route_filter(),
                 )));
+            }
+            "status" => {
+                if let Some(id) = self.selected(ctx) {
+                    return Nav::Layer(Box::new(dialogs::choose_status(ctx, &id)));
+                }
+            }
+            "search-leave" => self.zone = Zone::List,
+            "remove-filter" => self.remove_filter(ctx, index),
+            "clear-filters" => {
+                let mut c = self.criteria.borrow_mut();
+                let reversed = c.reversed;
+                *c = c.clear_filters();
+                c.reversed = reversed;
             }
             "clear" => self.clear(),
             "add-game" => ctx.effect(Effect::AddGame),
@@ -1334,6 +1469,7 @@ impl Page for DesktopLibrary {
         let games = self.games(ctx);
         let ids: Vec<String> = games.iter().map(|g| g.id.clone()).collect();
         let cur = self.current(&ids);
+        self.selection_index = cur.unwrap_or(0);
         out.set(
             "desk-tabs",
             vec![
@@ -1378,6 +1514,11 @@ impl Page for DesktopLibrary {
         out.set("desk-search-hint", ctx.t("desktop.search"));
         out.set("desk-filter-label", ctx.t("desktop.filter_sort"));
         out.set("desk-filter-count", c.active_filter_count() as i32);
+        let filters = self.active_filters(ctx);
+        out.set(
+            "desk-filter-chips",
+            filters.chunks(2).map(|r| r.to_vec()).collect::<Vec<_>>(),
+        );
         out.set("desk-clear-label", ctx.t("desktop.clear"));
         out.set("desk-filtered", c.has_search() || c.has_filters());
         let view = View::of(ctx);
@@ -1403,6 +1544,14 @@ impl Page for DesktopLibrary {
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
+        out.set(
+            "desk-sidebar-unified",
+            ctx.settings.bool(super::ctx::keys::SIDEBAR_UNIFIED, false),
+        );
+        out.set(
+            "desk-sidebar-narrow",
+            ctx.settings.string(super::ctx::keys::SIDEBAR_WIDTH) == "narrow",
+        );
         // "Agrupar por **Status**": o nome do agrupamento em destaque.
         out.set("desk-group-prefix", ctx.t("desktop.group.by_prefix"));
         out.set(
@@ -1682,6 +1831,11 @@ impl Page for DesktopLibrary {
                         art_loading: g.shown_hero().is_some_and(crate::images::is_pending),
                         store_icon: store_icon(g.store()).into(),
                         store_name: game_text::store_name(lang, g.store()),
+                        play_status: g.play_status.map_or("", PlayStatus::key).into(),
+                        play_status_label: g.play_status.map_or_else(
+                            || ctx.t("desktop.define_status"),
+                            |s| library_text::status_label(lang, Some(s)),
+                        ),
                     },
                     actions,
                     strip(ctx, g),
@@ -1847,6 +2001,28 @@ fn group_menu() -> super::layer::MenuLayer {
     })
 }
 
+/// Perfil da barra: abre a página e reutiliza os fluxos persistidos de perfis locais.
+pub fn profile_menu() -> super::layer::MenuLayer {
+    use super::layer::{Flow, MenuItem, MenuLayer};
+    MenuLayer::menu(String::new(), |ctx| {
+        vec![
+            MenuItem::new(
+                PanelRow::button("view-profile", ctx.t("desktop.menu.view_profile")).icon("user"),
+            )
+            .on(|ctx| {
+                ctx.open_route = Some(super::profile::ROUTE.into());
+                Flow::CloseAll
+            }),
+            MenuItem::new(
+                PanelRow::button("switch", ctx.t("desktop.menu.switch_profile")).icon("user"),
+            )
+            .on(|ctx| Flow::Replace(Box::new(super::profiles::panel(ctx)))),
+            MenuItem::new(PanelRow::button("edit", ctx.t("profile.edit")).icon("edit"))
+                .on(|ctx| Flow::Replace(Box::new(super::profiles::manage_active(ctx)))),
+        ]
+    })
+}
+
 /// Menu da marca (MenuDoTako), como o menu "Steam": Configurações e as ações da conta e do app, fora das guias.
 pub fn brand_menu() -> super::layer::MenuLayer {
     use super::layer::{Flow, MenuItem, MenuLayer};
@@ -1882,12 +2058,9 @@ pub fn brand_menu() -> super::layer::MenuLayer {
                 Flow::CloseAll
             }),
             MenuItem::new(PanelRow::separator()),
-            MenuItem::new(
-                PanelRow::button("updates", ctx.t("desktop.menu.check_updates")).icon("info"),
-            )
-            .on(|ctx| {
+            MenuItem::new(crate::app_updates::menu_row(ctx)).on(|ctx| {
                 ctx.effect(Effect::CheckUpdates);
-                Flow::CloseAll
+                Flow::Stay
             }),
             MenuItem::new(PanelRow::separator()),
             MenuItem::new(
@@ -1901,6 +2074,7 @@ pub fn brand_menu() -> super::layer::MenuLayer {
             }),
         ]
     })
+    .overline(crate::app_updates::BRAND_MENU)
 }
 
 pub fn ask_big_picture(shell: &mut super::Shell, since_start: std::time::Duration) {
@@ -2043,7 +2217,7 @@ mod tests {
         assert_eq!(rows[4].kind, "separator");
         assert!(!rows[4].is_focusable());
 
-        // Teclado: subir das abas chega à barra; Enter na busca pede o foco do campo.
+        // Teclado: subir das abas chega à barra; Enter no perfil abre seu menu.
         shell.handle(Cmd::Up);
         shell.handle(Cmd::Up);
         while page(&shell).zone() != Zone::Tabs {
@@ -2055,8 +2229,30 @@ mod tests {
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Accept);
-        assert_eq!(page(&shell).search_focus, 1);
-        assert_eq!(page(&shell).zone(), Zone::List);
+        assert!(shell.has_layers());
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+    }
+
+    #[test]
+    fn profile_menu_opens_real_profile_routes_and_editors() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let rows = crate::shell::layer::Layer::render(&profile_menu(), &shell.ctx).rows;
+        assert_eq!(
+            rows.iter().map(|r| r.title.as_str()).collect::<Vec<_>>(),
+            ["Ver perfil", "Trocar perfil…", "Editar perfil"]
+        );
+        shell.click("desk-profile-menu", 0);
+        shell.click("overlay-row", 0);
+        assert_eq!(shell.page().kind(), super::super::profile::KIND);
+        assert!(!shell.has_layers());
+        for action in [1, 2] {
+            shell.click("desk-profile-menu", 0);
+            shell.click("overlay-row", action);
+            assert!(shell.has_layers());
+            shell.close_layers();
+        }
     }
 
     #[test]
@@ -2086,8 +2282,12 @@ mod tests {
         assert!(!rows.iter().any(|r| r.value == "Hades"));
         assert!(rows.iter().any(|r| r.value == "Roguelike - Ação"));
         assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
-        // A faixa não inventa Nuvem nem Conquistas.
-        assert_eq!(strip(&shell.ctx, &g).len(), 2);
+        // A faixa não inventa Nuvem nem Conquistas; o Metacritic entra por último quando o jogo tem nota.
+        let items = strip(&shell.ctx, &g);
+        assert_eq!(items.len(), 2 + usize::from(g.metacritic_score.is_some()));
+        let mut sem_nota = g.clone();
+        sem_nota.metacritic_score = None;
+        assert_eq!(strip(&shell.ctx, &sem_nota).len(), 2);
     }
 
     #[test]
@@ -2361,6 +2561,47 @@ mod tests {
             shell.focused_game(),
             Some(page(&shell).ids(&shell.ctx)[3].clone())
         );
+    }
+
+    #[test]
+    fn fixed_filter_chips_remove_each_criterion_without_touching_search_or_sort() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        let mut page = DesktopLibrary::new();
+        *page.criteria.borrow_mut() = LibraryCriteria {
+            search: "hades".into(),
+            install: InstallFilter::Installed,
+            favorites_only: true,
+            played_only: true,
+            broken_only: true,
+            play_time: tako_core::library::criteria::PlayTimeFilter::Unplayed,
+            no_status: true,
+            statuses: [PlayStatus::Playing].into(),
+            sources: ["Steam".into()].into(),
+            genres: ["Ação".into()].into(),
+            tags: ["Sofá".into()].into(),
+            collections: ["collection-id".into()].into(),
+            reversed: true,
+            ..Default::default()
+        };
+        let sort = page.criteria.borrow().sort;
+        while page.criteria.borrow().has_filters() {
+            let count = page.criteria.borrow().active_filter_count();
+            assert_eq!(page.active_filters(&ctx).len(), count);
+            page.remove_filter(&ctx, usize::MAX);
+            assert_eq!(page.criteria.borrow().active_filter_count(), count);
+            page.remove_filter(&ctx, 0);
+            assert_eq!(page.criteria.borrow().active_filter_count(), count - 1);
+            let c = page.criteria.borrow();
+            assert_eq!(c.search, "hades");
+            assert_eq!(c.sort, sort);
+            assert!(c.reversed);
+        }
+        assert!(page.active_filters(&ctx).is_empty());
     }
 
     #[test]

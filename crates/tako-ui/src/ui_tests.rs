@@ -186,6 +186,72 @@ fn solid_panel_text_meets_wcag_aa_contrast() {
 }
 
 #[test]
+fn desktop_search_shortcuts_focus_the_visible_field_and_leave_returns_to_content() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        use slint::platform::WindowEvent;
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap()
+            .create()
+            .unwrap();
+        window.set_size(slint::PhysicalSize::new(1600, 900));
+        ui.show().unwrap();
+        let edits = Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let captured = edits.clone();
+        ui.set_callback("edited", move |args| {
+            if let Value::String(text) = &args[1] {
+                captured.borrow_mut().push(text.to_string());
+            }
+            Value::Void
+        })
+        .unwrap();
+        let key = |text: &str| {
+            window.dispatch_event(WindowEvent::KeyPressed { text: text.into() });
+            window.dispatch_event(WindowEvent::KeyReleased { text: text.into() });
+        };
+        for (page, view) in [
+            ("desk-library", "list"),
+            ("desk-library", "grid"),
+            ("desk-library", "categories"),
+            ("settings", "list"),
+            ("desk-profile", "list"),
+        ] {
+            ui.set_property("page", Value::String(page.into())).unwrap();
+            ui.set_property("desk-view", Value::String(view.into()))
+                .unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            slint::platform::update_timers_and_animations();
+            for shortcut in ["k", "f"] {
+                window.dispatch_event(WindowEvent::KeyPressed {
+                    text: "\u{11}".into(),
+                });
+                key(shortcut);
+                window.dispatch_event(WindowEvent::KeyReleased {
+                    text: "\u{11}".into(),
+                });
+                std::thread::sleep(std::time::Duration::from_millis(3));
+                slint::platform::update_timers_and_animations();
+                edits.borrow_mut().clear();
+                key("z");
+                assert_eq!(edits.borrow().len(), 1, "{page}/{view}: Ctrl+{shortcut}");
+                key("\u{1b}"); // clear
+                assert_eq!(edits.borrow().last().unwrap(), "");
+                key("\n"); // leave
+                let n = edits.borrow().len();
+                key("x");
+                assert_eq!(edits.borrow().len(), n, "Enter leaves {page}/{view}");
+            }
+        }
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
 fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question() {
     let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     std::thread::spawn(|| {
@@ -470,6 +536,15 @@ fn desktop_snapshot() {
         );
         i18n::set_lang(Lang::PtBr);
         ctx.library.refresh();
+        // `TAKO_SNAP_UNIFIED=1` liga a barra lateral unida; `TAKO_SNAP_NARROW=1`, a largura Estreita.
+        if std::env::var("TAKO_SNAP_UNIFIED").is_ok_and(|v| v == "1") {
+            ctx.settings
+                .set_bool(crate::shell::ctx::keys::SIDEBAR_UNIFIED, true);
+        }
+        if std::env::var("TAKO_SNAP_NARROW").is_ok_and(|v| v == "1") {
+            ctx.settings
+                .set(crate::shell::ctx::keys::SIDEBAR_WIDTH, "narrow");
+        }
         // `TAKO_SNAP_TEXT=125`: tamanho do texto (ListaTexto125).
         if let Ok(t) = std::env::var("TAKO_SNAP_TEXT")
             && !t.is_empty()
@@ -484,6 +559,19 @@ fn desktop_snapshot() {
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("settings") => shell.open_route("settings"),
+            Ok("grid") => shell.click("view", 1),
+            Ok("categories") => shell.click("view", 2),
+            Ok("update-ready") | Ok("update-downloading") => {
+                crate::app_updates::snapshot(
+                    &mut shell.ctx,
+                    std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("update-downloading"),
+                );
+                shell.after_action();
+            }
+            Ok("update-menu") => {
+                shell.ctx.app_update.check = crate::app_updates::Check::Searching;
+                shell.click("desk-brand", 0);
+            }
             // `TAKO_SNAP_PAGE=profile` (ou `profile-sessions`, `profile-collections`): a TelaPerfil com sessões
             // de demonstração na semana.
             Ok(p) if p.starts_with("profile") => {

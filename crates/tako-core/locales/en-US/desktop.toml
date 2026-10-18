@@ -1,4 +1,8 @@
 [desktop]
+define_status = "Set status"
+status_all = "All"
+remove_filter = "Remove filter {filter}"
+profile_search = "Search profile"
 collection_auto = "Auto"
 collections_manage = "Manage collections"
 library = "Library"
@@ -37,6 +41,7 @@ settings_found = "{n} settings found"
 theme_big_picture = "Themes apply to full screen. Desktop mode uses Tako's own look."
 
 [desktop.menu]
+view_profile = "View profile"
 brand = "Tako: open menu"
 settings = "Settings"
 settings_key = "Ctrl + ,"
@@ -131,6 +136,12 @@ current_session = "Current session"
 playing_now = "playing now"
 never_played = "Never played"
 not_played = "Not played yet"
+metacritic = "Metacritic"
+metacritic_universal = "Universal acclaim"
+metacritic_favorable = "Generally favorable"
+metacritic_mixed = "Mixed or average"
+metacritic_unfavorable = "Generally unfavorable"
+metacritic_overwhelming = "Overwhelming dislike"
 
 [desktop.info]
 critic = "Critics"

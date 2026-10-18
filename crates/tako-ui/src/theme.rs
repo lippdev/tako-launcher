@@ -218,11 +218,15 @@ mod tests {
             "desk-game",
             "desk-actions",
             "settings-rows",
+            "desk-profile-name",
+            "desk-profile-initial",
+            "window-drag-start",
+            "window-drag-end",
         ] {
             assert!(props.iter().any(|x| x == p), "falta a propriedade {p}");
         }
         let callbacks: Vec<String> = def.callbacks().collect();
-        for c in ["clicked", "edited", "scrolled", "key"] {
+        for c in ["clicked", "edited", "scrolled", "key", "window-action"] {
             assert!(callbacks.iter().any(|x| x == c), "falta o callback {c}");
         }
     }

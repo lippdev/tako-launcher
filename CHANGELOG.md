@@ -2,6 +2,19 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.14]
+### Novidades
+- **Barra de cima única:** a barra do Tako agora é a própria barra da janela, de borda a borda, com Minimizar, Maximizar e Fechar na ponta direita. No Windows, o vazio da barra arrasta a janela, o duplo clique maximiza e o Maximizar mostra os layouts de encaixe.
+- **Perfil no topo:** avatar e nome numa pílula, como na Steam, com Ver perfil, Trocar perfil… e Editar perfil. A Tela cheia virou um botão só com o ícone de controle.
+- **Busca no lugar do conteúdo:** no painel da lista, embaixo das abas; centralizada na barra da Grade e das Categorias; no topo do painel das Configurações. Na Loja e no Perfil, Ctrl + K abre a busca flutuante.
+- **Barra lateral unida:** opção em Configurações › Aparência que cola a lista na barra de cima, num vidro só, com largura Normal ou Estreita.
+- **Status do jogo:** Jogando, Quero jogar, Pausado, Zerado ou Abandonado, num seletor no canto do destaque, no menu do jogo e na seleção de vários. Jogar pela primeira vez marca Jogando, e dá para filtrar por status.
+- **Filtros ativos:** aparecem como chips fixos embaixo da contagem, cada um com ✕, e "Limpar" quando há mais de um.
+- **Destaque:** a fileira de cartões agora é Sobre, Detalhes e Sessões, e a nota do Metacritic entra na faixa de números quando o jogo tem. O trailer foi para a segunda fase, que não repete o que a primeira já mostra e rola mais leve.
+- **Atualizações:** "Procurar atualizações…" responde no próprio menu (procurando, em dia ou erro com Tentar de novo). O diálogo novo mostra o download, as novidades da versão e "Reiniciar agora". Se a instalação falhar, o Tako volta para a versão anterior e avisa.
+- **Emuladores:** todos têm o logo oficial, também na tela de emuladores das Configurações.
+- Botões em coluna: a ação principal fica em cima e as duas de baixo dividem a largura igualmente.
+
 ## [0.2.0-alpha.13]
 ### Novidades
 - **Primeira abertura nova:** tela de carregamento com o polvo se montando enquanto o Tako procura seus jogos; lojas encontradas, emuladores com os sistemas e jogos de cada um e a pasta de ROMs, capas com o antes e depois e a escolha entre buscar na IGDB ou usar só o que as lojas têm, como abrir o Tako e o resumo final com cada loja e emulador.

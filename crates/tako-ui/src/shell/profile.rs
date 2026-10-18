@@ -59,7 +59,7 @@ pub enum Zone {
 const ACTIONS: usize = 2;
 /// Blocos da Visão geral: Tempo jogado, Mais jogado, Jogos na biblioteca.
 const TILES: usize = 3;
-/// Barra de cima: marca, Biblioteca, Perfil, busca (escondida aqui) e Tela cheia.
+/// Barra de cima: marca, Biblioteca, Perfil, menu do perfil e Tela cheia.
 const BAR_BIG_PICTURE: usize = 4;
 
 /// Segunda-feira da semana de `day`.
@@ -229,6 +229,7 @@ fn collections(ctx: &Ctx) -> Vec<(String, String, bool, Vec<&Game>)> {
 }
 
 pub struct ProfilePage {
+    query: String,
     tab: Tab,
     period: Period,
     zone: Zone,
@@ -244,6 +245,7 @@ impl Default for ProfilePage {
 impl ProfilePage {
     pub fn new() -> Self {
         ProfilePage {
+            query: String::new(),
             tab: Tab::Overview,
             period: Period::Week,
             zone: Zone::Tabs,
@@ -259,10 +261,32 @@ impl ProfilePage {
         self.zone
     }
 
-    fn open_tab(&mut self, tab: Tab) {
+    pub fn open_tab(&mut self, tab: Tab) {
         self.tab = tab;
         self.zone = Zone::Tabs;
         self.index = TABS.iter().position(|t| *t == tab).unwrap_or(0);
+    }
+
+    fn matches(&self, title: &str) -> bool {
+        tako_core::library::search_text::matches(title, &self.query)
+    }
+
+    fn sessions<'a>(&self, ctx: &'a Ctx) -> Vec<(&'a Game, &'a PlaySession)> {
+        all_sessions(ctx)
+            .into_iter()
+            .filter(|(g, _)| self.matches(&g.title))
+            .collect()
+    }
+
+    fn live(&self, ctx: &Ctx) -> Option<DeskEntry> {
+        running_row(ctx).filter(|r| self.matches(&r.title))
+    }
+
+    fn collections<'a>(&self, ctx: &'a Ctx) -> Vec<(String, String, bool, Vec<&'a Game>)> {
+        collections(ctx)
+            .into_iter()
+            .filter(|(_, name, _, _)| self.matches(name))
+            .collect()
     }
 
     /// Sessões da guia Sessões, no período escolhido.
@@ -273,7 +297,7 @@ impl ProfilePage {
             Period::Month => today.with_day(1),
             Period::All => None,
         };
-        all_sessions(ctx)
+        self.sessions(ctx)
             .into_iter()
             .filter(|(_, s)| since.is_none_or(|d| local_day(s) >= d))
             .collect()
@@ -283,16 +307,16 @@ impl ProfilePage {
     fn list_len(&self, ctx: &Ctx) -> usize {
         match self.tab {
             Tab::Overview => {
-                all_sessions(ctx)
+                self.sessions(ctx)
                     .len()
                     .min(RECENT - usize::from(ctx.running.is_some()))
-                    + usize::from(running_row(ctx).is_some())
+                    + usize::from(self.live(ctx).is_some())
             }
             Tab::Sessions => {
                 self.period_sessions(ctx).len().min(MAX_ROWS)
-                    + usize::from(running_row(ctx).is_some())
+                    + usize::from(self.live(ctx).is_some())
             }
-            Tab::Collections => collections(ctx).len() + 1,
+            Tab::Collections => self.collections(ctx).len() + 1,
         }
     }
 
@@ -344,6 +368,7 @@ impl ProfilePage {
             Zone::Bar => match self.index {
                 0 => return Nav::Layer(Box::new(desktop::brand_menu())),
                 1 => return Nav::Back,
+                3 => return Nav::Layer(Box::new(desktop::profile_menu())),
                 BAR_BIG_PICTURE => {
                     ctx.effect(super::Effect::SwitchMode(crate::mode::UiMode::BigPicture))
                 }
@@ -379,13 +404,13 @@ impl ProfilePage {
     fn open_row(&mut self, index: usize, ctx: &mut Ctx) -> Nav {
         match self.tab {
             Tab::Overview | Tab::Sessions => {
-                let running = running_row(ctx).map(|r| r.id);
+                let running = self.live(ctx).map(|r| r.id);
                 let id = if index == 0 && running.is_some() {
                     running
                 } else {
                     let i = index - usize::from(running.is_some());
                     let list = if self.tab == Tab::Overview {
-                        all_sessions(ctx)
+                        self.sessions(ctx)
                     } else {
                         self.period_sessions(ctx)
                     };
@@ -393,7 +418,7 @@ impl ProfilePage {
                 };
                 ctx.open_details = id;
             }
-            Tab::Collections => match collections(ctx).into_iter().nth(index) {
+            Tab::Collections => match self.collections(ctx).into_iter().nth(index) {
                 Some((key, ..)) => {
                     ctx.open_route = Some(format!("{}{key}", desktop::COLLECTION_ROUTE));
                 }
@@ -477,10 +502,6 @@ impl Page for ProfilePage {
             }
             _ => {}
         }
-        if self.zone == Zone::Bar && self.index == 3 {
-            // A busca fica escondida no Perfil: ← → pulam por ela.
-            self.index = if cmd == Cmd::Left { 2 } else { BAR_BIG_PICTURE };
-        }
         Nav::Stay
     }
 
@@ -523,7 +544,18 @@ impl Page for ProfilePage {
         Nav::Stay
     }
 
+    fn edited(&mut self, zone: &str, text: &str, ctx: &mut Ctx) {
+        if zone == "search" {
+            self.query = text.chars().take(128).collect();
+            self.index = 0;
+            self.zone = Zone::List;
+            ctx.dirty = true;
+        }
+    }
+
     fn render(&mut self, ctx: &Ctx, out: &mut Out) {
+        out.set("desk-search", self.query.clone());
+        out.set("desk-search-hint", ctx.t("desktop.profile_search"));
         let lang = ctx.lang();
         let today = Local::now().date_naive();
         let sessions = all_sessions(ctx);
@@ -659,12 +691,12 @@ impl Page for ProfilePage {
             },
         ];
 
-        let live = running_row(ctx);
+        let live = self.live(ctx);
         let recent: Vec<DeskEntry> = live
             .clone()
             .into_iter()
             .chain(
-                sessions
+                self.sessions(ctx)
                     .iter()
                     .take(RECENT - usize::from(live.is_some()))
                     .map(|(g, s)| session_row(ctx, g, s, true)),
@@ -717,7 +749,7 @@ impl Page for ProfilePage {
         );
 
         // Guia Coleções: cartões com o mosaico de até 4 capas.
-        let cols = collections(ctx);
+        let cols = self.collections(ctx);
         let in_cols: std::collections::BTreeSet<&str> = cols
             .iter()
             .filter(|c| !c.2)
@@ -922,6 +954,34 @@ mod tests {
         assert_eq!(top_since(played.clone(), d(3)), Some("b"));
         // Sem sessões no período, nenhum (o fundo cai para o último jogo jogado).
         assert_eq!(top_since(played, d(25)), None);
+    }
+
+    #[test]
+    fn search_filters_sessions_and_collections_without_changing_totals() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        ctx.library.refresh();
+        let id = ctx.library.games()[0].id.clone();
+        let title = ctx.library.games()[0].title.clone();
+        ctx.library
+            .record_session(&id, Duration::from_secs(600))
+            .unwrap();
+        ctx.collections.create("Sofá", Some(&id)).unwrap();
+        let mut page = ProfilePage::new();
+        page.edited("search", &title, &mut ctx);
+        assert!(page.sessions(&ctx).iter().all(|(g, _)| g.title == title));
+        page.edited("search", "sofa", &mut ctx);
+        assert_eq!(page.collections(&ctx).len(), 1);
+        page.edited("search", "inexistente 987654321", &mut ctx);
+        assert!(page.sessions(&ctx).is_empty());
+        assert!(page.collections(&ctx).is_empty());
+        assert_eq!(all_sessions(&ctx).len(), 1);
+        page.edited("search", "", &mut ctx);
+        assert_eq!(page.sessions(&ctx).len(), 1);
     }
 
     #[test]

@@ -14,6 +14,7 @@ pub mod hotkey;
 mod pointer;
 mod process;
 pub mod version_info;
+pub mod window_chrome;
 
 pub fn platform(data_root: &std::path::Path) -> Platform {
     let pointer = Arc::new(pointer::WindowsPointer::new(data_root));
