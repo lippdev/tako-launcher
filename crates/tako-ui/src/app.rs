@@ -216,6 +216,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         metadata: None,
         broken_checked: None,
         desktop: false,
+        art_height: 2160,
         list_first: 0,
         focus_visible: false,
     };
@@ -1214,6 +1215,10 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         ));
         w.set_fullscreen(full);
     }
+    let size = ui.window().size();
+    if size.width > 0 && size.height > 0 {
+        s.ctx.art_height = crate::shell::tiles::art_height(size.width, size.height);
+    }
     if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
         s.ctx.grid_columns = (n as usize).max(1);
     }
@@ -1263,7 +1268,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
             .to_value(),
     );
     let art = game
-        .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::HERO))
+        .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::hero(&s.ctx)))
         .unwrap_or_default();
     bridge::set(ui, "backdrop", art.to_value());
     images::frame_done();

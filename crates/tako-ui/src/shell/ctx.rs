@@ -289,6 +289,8 @@ pub struct Ctx {
     pub broken_checked: Option<u64>,
     /// A interface está no modo desktop (ADR-0027); `false` = tela cheia.
     pub desktop: bool,
+    /// Altura (px físicos) em que a arte de fundo é decodificada: a da janela, em degraus (`tiles::art_height`).
+    pub art_height: u32,
     /// Primeira linha visível da lista do desktop (o tema avisa), para pedir só as miniaturas perto dela.
     pub list_first: usize,
     /// O último foco veio do teclado ou do controle: o desktop mostra o anel de foco (o mouse esconde).

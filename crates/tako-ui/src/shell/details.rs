@@ -228,7 +228,7 @@ impl Page for DetailsPage {
                 overline: overline.to_uppercase(),
                 meta: meta.join(" · "),
                 description: g.description.clone(),
-                art: tiles::image(g.shown_hero(), tiles::HERO),
+                art: tiles::image(g.shown_hero(), tiles::hero(ctx)),
                 cover: tiles::image(g.shown_cover(), tiles::COVER),
                 logo: tiles::image(g.shown_logo(), tiles::LOGO),
                 hint,

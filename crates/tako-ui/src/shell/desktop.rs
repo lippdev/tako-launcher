@@ -1501,7 +1501,7 @@ impl Page for DesktopLibrary {
                         title: g.title.clone(),
                         overline: badge.to_uppercase(),
                         description,
-                        art: tiles::image(g.shown_hero(), tiles::HERO),
+                        art: tiles::image(g.shown_hero(), tiles::hero(ctx)),
                         art_blur,
                         art_lum,
                         logo,
