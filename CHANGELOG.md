@@ -2,6 +2,19 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.13]
+### Novidades
+- **Primeira abertura nova:** tela de carregamento com o polvo se montando enquanto o Tako procura seus jogos; lojas encontradas, emuladores com os sistemas e jogos de cada um e a pasta de ROMs, capas com o antes e depois e a escolha entre buscar na IGDB ou usar só o que as lojas têm, como abrir o Tako e o resumo final com cada loja e emulador.
+- **Perfil:** nova guia na barra de cima, com o tempo jogado na semana em barras, os jogos mais jogados, as sessões por dia e as coleções em cartões. O fundo é a arte do jogo mais jogado do mês.
+- **Etiquetas:** o editor mostra as etiquetas do jogo como chips com ×, sugere as que já existem (com quantos jogos cada uma tem) e cria uma nova direto do campo.
+- **Revisar capas:** a fila mostra a capa atual e a proposta lado a lado, a confiança em porcentagem, "Aceitar" e "Escolher outra" em cada linha, "Aceitar as N" para as de confiança alta e "Desfazer" depois de aceitar.
+- **Controles:** todos os controles conectados aparecem, e os testes ficam juntos num grupo.
+- **Diálogos:** as ações ficam num rodapé, com a principal à direita.
+- **Abrindo o jogo:** o botão mostra um anel girando; se demorar, aparecem "Ainda abrindo…" e "Cancelar".
+- **Avisos:** ficam parados enquanto o mouse está em cima.
+- **Carregando:** a biblioteca mostra blocos de espera também no destaque e nos cartões.
+- Textos cortados mostram o texto inteiro ao passar o mouse, e a contagem de jogos cabe na janela pequena.
+
 ## [0.2.0-alpha.12]
 ### Correções
 - **Logo do jogo:** jogos com logo não mostram mais o nome em texto antes de trocar para o logo. Enquanto o logo carrega, o espaço do título fica reservado, e o logo aparece suavemente quando chega.
