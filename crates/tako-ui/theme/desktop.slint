@@ -524,11 +524,8 @@ component Tabs inherits Rectangle {
     in property <int> current;
     in property <int> focus-index: -1;
     callback clicked(int);
+    // Sem trilho (como nas prévias): só a escolhida tem contorno, o da segunda camada de vidro.
     height: 40px;
-    border-radius: Ui.radius-control;
-    background: Ui.glass-control;
-    border-width: 1px;
-    border-color: Ui.glass-edge;
     HorizontalLayout {
         padding: 3px;
         spacing: 2px;
