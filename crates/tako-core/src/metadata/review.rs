@@ -15,6 +15,30 @@ pub struct Doubt {
     pub found: String,
     /// `title_matcher::score` entre os dois nomes (menor = mais duvidoso).
     pub score: f64,
+    /// Capa que essa fonte propõe (a atual do jogo não muda até aceitar).
+    pub cover: Option<String>,
+}
+
+/// Quanto confiar no casamento pelo nome (FilaDeCapas): o texto e as três barras seguem o nível.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Confidence {
+    High,
+    Medium,
+    Low,
+}
+
+impl Doubt {
+    pub fn percent(&self) -> u8 {
+        (self.score.clamp(0., 1.) * 100.).round() as u8
+    }
+
+    pub fn confidence(&self) -> Confidence {
+        match self.percent() {
+            85.. => Confidence::High,
+            60.. => Confidence::Medium,
+            _ => Confidence::Low,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -64,6 +88,7 @@ pub fn review(game: &Game, cached: Option<&GameMetadata>) -> Review {
                 id,
                 found,
                 score,
+                cover: p.cover_url.clone(),
             })
         })
         .min_by(|a, b| a.score.total_cmp(&b.score));
@@ -135,6 +160,17 @@ mod tests {
         let d = review(&g, Some(&other)).doubt.unwrap();
         assert_eq!((d.source.as_str(), d.id.as_str()), ("SteamGridDB", "7"));
         assert!(d.score < 0.8);
+        assert_eq!(d.percent(), (d.score * 100.).round() as u8);
+        let at = |score| Doubt { score, ..d.clone() }.confidence();
+        assert_eq!(
+            [at(0.95), at(0.85), at(0.71), at(0.38)],
+            [
+                Confidence::High,
+                Confidence::High,
+                Confidence::Medium,
+                Confidence::Low
+            ]
+        );
 
         let no_cover = review(&Game::default(), None);
         assert!(no_cover.needs_attention());

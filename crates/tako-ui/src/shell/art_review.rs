@@ -5,14 +5,14 @@
 use super::layer::{Flow, MenuItem, MenuLayer};
 use super::{Ctx, Effect};
 use crate::metadata::{Pending, spawn};
-use crate::model::PanelRow;
+use crate::model::{CoverRow, PanelRow};
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 use tako_core::library::Game;
 use tako_core::metadata::agent::MetadataAgent;
 use tako_core::metadata::art::kind_label;
-use tako_core::metadata::review::{Review, review};
+use tako_core::metadata::review::{Confidence, Doubt, Review, review};
 
 type Found = Vec<(Game, Review)>;
 
@@ -58,6 +58,209 @@ struct State {
     pending: Pending<(usize, Found)>,
     /// Jogos já tratados aqui: saem da lista sem esperar a nova consulta.
     done: HashSet<String>,
+}
+
+/// Quantas linhas da fila o desktop desenha de uma vez (as Configurações não viram lista virtual).
+const SHOWN: usize = 30;
+
+/// Fila de capas do desktop (FilaDeCapas): lida uma vez numa thread, fica no `Ctx` (a lista não some ao trocar de
+/// categoria) e cada jogo tratado sai dela na hora.
+#[derive(Default)]
+pub struct Queue {
+    found: RefCell<Option<Pending<(usize, Found)>>>,
+    done: RefCell<HashSet<String>>,
+}
+
+impl Queue {
+    /// `(total de jogos, o que falta revisar)`; `None` enquanto a biblioteca é conferida.
+    fn left(&self, ctx: &Ctx) -> Option<(usize, Found)> {
+        let (total, found) = self
+            .found
+            .borrow_mut()
+            .get_or_insert_with(|| compute(ctx))
+            .get()?;
+        let done = self.done.borrow();
+        Some((
+            total,
+            found
+                .into_iter()
+                .filter(|(g, _)| !done.contains(&g.id))
+                .collect(),
+        ))
+    }
+
+    /// "Buscar de novo": conferir tudo outra vez e esquecer o que já foi tratado.
+    pub fn reset(&self) {
+        *self.found.borrow_mut() = None;
+        self.done.borrow_mut().clear();
+    }
+}
+
+/// Quantos jogos esperam revisão (para a contagem no item da categoria); `None` sem nenhum ou ainda conferindo.
+pub fn pending(ctx: &Ctx) -> Option<usize> {
+    ctx.art_review
+        .left(ctx)
+        .map(|(_, f)| f.len())
+        .filter(|n| *n > 0)
+}
+
+/// Os que o "Aceitar as N" troca de uma vez: só confiança alta.
+fn high_confidence(found: &[(Game, Review)]) -> Vec<&(Game, Review)> {
+    found
+        .iter()
+        .filter(|(_, r)| {
+            r.doubt
+                .as_ref()
+                .is_some_and(|d| d.confidence() == Confidence::High)
+        })
+        .collect()
+}
+
+/// Aceita a correspondência (fixa o id da fonte) e devolve o id fixado antes, para o Desfazer.
+fn accept(ctx: &mut Ctx, game: &Game, d: &Doubt) -> Option<String> {
+    let before = ctx
+        .pinned_ids
+        .get(&game.id)
+        .and_then(|p| p.get(&d.source))
+        .cloned();
+    super::source_ids::pin(ctx, game, &d.source, Some(&d.id), &d.found);
+    ctx.art_review.done.borrow_mut().insert(game.id.clone());
+    before
+}
+
+/// Aceita e avisa com "Desfazer": o desfazer volta o id de antes e a linha volta para a fila.
+fn accept_with_undo(ctx: &mut Ctx, picks: Vec<(Game, Doubt)>) {
+    let undo: Vec<(Game, String, Option<String>)> = picks
+        .iter()
+        .map(|(g, d)| (g.clone(), d.source.clone(), accept(ctx, g, d)))
+        .collect();
+    let text = match undo.as_slice() {
+        [(g, ..)] => ctx.tf("art_review.accepted", &[("game", &g.title)]),
+        many => ctx.tf(
+            "art_review.accepted_many",
+            &[("n", &many.len().to_string())],
+        ),
+    };
+    ctx.toast_with_undo(text, move |ctx| {
+        for (game, source, before) in &undo {
+            super::source_ids::pin(ctx, game, source, before.as_deref(), "");
+            ctx.art_review.done.borrow_mut().remove(&game.id);
+        }
+    });
+}
+
+fn confidence_label(ctx: &Ctx, d: &Doubt) -> String {
+    let key = match d.confidence() {
+        Confidence::High => "art_review.conf_high",
+        Confidence::Medium => "art_review.conf_medium",
+        Confidence::Low => "art_review.conf_low",
+    };
+    ctx.tf(key, &[("percent", &d.percent().to_string())])
+}
+
+/// Desktop (FilaDeCapas): "Aceitar as N" de confiança alta e uma linha por jogo, com a capa atual, a proposta, a
+/// confiança escrita e as ações ali mesmo.
+pub fn queue_rows(ctx: &Ctx) -> Vec<MenuItem> {
+    let mut v = vec![MenuItem::new(PanelRow::header(ctx.t("art_review.title")))];
+    // Conferindo a biblioteca (uma vez, em segundo plano): sem seção até terminar.
+    let Some((total, found)) = ctx.art_review.left(ctx) else {
+        return Vec::new();
+    };
+    if found.is_empty() {
+        v.push(MenuItem::new(PanelRow::info(
+            "review-ok",
+            ctx.tf("art_review.all_good", &[("total", &total.to_string())]),
+            "",
+        )));
+        return v;
+    }
+    let high: Vec<(Game, Doubt)> = high_confidence(&found)
+        .into_iter()
+        .filter_map(|(g, r)| Some((g.clone(), r.doubt.clone()?)))
+        .collect();
+    if !high.is_empty() {
+        let n = high.len().to_string();
+        v.push(
+            MenuItem::new(
+                PanelRow::action("accept-all", ctx.tf("art_review.high_title", &[("n", &n)]))
+                    .desc(ctx.t("art_review.high_desc"))
+                    .value(ctx.tf("art_review.accept_all", &[("n", &n)])),
+            )
+            .on(move |ctx| {
+                accept_with_undo(ctx, high.clone());
+                Flow::Stay
+            }),
+        );
+    }
+    v.push(MenuItem::new(PanelRow::header(ctx.tf(
+        "art_review.to_review",
+        &[("n", &found.len().to_string())],
+    ))));
+    for (game, r) in found.iter().take(SHOWN) {
+        v.push(queue_row(ctx, game, r));
+    }
+    if found.len() > SHOWN {
+        v.push(MenuItem::new(PanelRow::info(
+            "review-more",
+            ctx.tf(
+                "art_review.more",
+                &[
+                    ("shown", &SHOWN.to_string()),
+                    ("n", &found.len().to_string()),
+                ],
+            ),
+            "",
+        )));
+    }
+    v
+}
+
+fn queue_row(ctx: &Ctx, game: &Game, r: &Review) -> MenuItem {
+    let cover = game.shown_cover();
+    let proposed = r.doubt.as_ref().and_then(|d| d.cover.as_deref());
+    let info = CoverRow {
+        current: crate::shell::tiles::image(cover, (96, 144)),
+        has_current: cover.is_some(),
+        proposed: crate::shell::tiles::image(proposed, (128, 192)),
+        has_proposed: proposed.is_some(),
+        current_label: ctx.t("art_review.no_cover"),
+        level: r.doubt.as_ref().map_or(0, |d| match d.confidence() {
+            Confidence::High => 3,
+            Confidence::Medium => 2,
+            Confidence::Low => 1,
+        }),
+        confidence: r
+            .doubt
+            .as_ref()
+            .map_or_else(String::new, |d| confidence_label(ctx, d)),
+        reason: describe(ctx, r),
+        accept: if r.doubt.is_some() {
+            ctx.t("art_review.accept")
+        } else {
+            String::new()
+        },
+        other: ctx.t("art_review.other"),
+    };
+    let row = PanelRow::new(game.id.clone(), "cover", game.title.clone()).desc(
+        tako_core::presentation::game_text::store_name(ctx.lang(), game.store()),
+    );
+    let id = game.id.clone();
+    let pick = move |ctx: &mut Ctx| {
+        ctx.art_review.done.borrow_mut().insert(id.clone());
+        Flow::Push(super::art::picker(ctx, &id))
+    };
+    let item = MenuItem::new(row).cover(info, pick.clone());
+    match r.doubt.clone() {
+        // Enter na linha aceita; sem proposta, escolhe a imagem.
+        Some(d) => {
+            let game = game.clone();
+            item.on(move |ctx| {
+                accept_with_undo(ctx, vec![(game.clone(), d.clone())]);
+                Flow::Stay
+            })
+        }
+        None => item.on(pick),
+    }
 }
 
 /// Configurações › Metadados › Revisar capas.
@@ -221,5 +424,78 @@ mod tests {
         // O jogo tratado sai da lista sem esperar a nova consulta.
         let rows = layer.render(&ctx).rows;
         assert!(!rows.iter().any(|r| r.key == game.id));
+    }
+
+    fn doubt(score: f64) -> Review {
+        Review {
+            doubt: Some(Doubt {
+                source: "IGDB".into(),
+                id: "77".into(),
+                found: "x".into(),
+                score,
+                cover: None,
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn accept_all_takes_only_high_confidence_and_undo_restores_the_queue() {
+        let found: Found = [0.95, 0.7, 0.2, 0.9]
+            .into_iter()
+            .map(|s| (Game::default(), doubt(s)))
+            .chain([(Game::default(), Review::default())])
+            .collect();
+        let high: Vec<f64> = high_confidence(&found)
+            .iter()
+            .filter_map(|(_, r)| r.doubt.as_ref().map(|d| d.score))
+            .collect();
+        assert_eq!(high, [0.95, 0.9]);
+
+        let dir = tempfile::tempdir().unwrap();
+        let (_guard, mut ctx) = crate::metadata::test_ctx(dir.path(), true);
+        ctx.library.refresh();
+        let game = ctx.library.games()[0].clone();
+        let part = GameMetadata {
+            source_ids: [("IGDB".to_owned(), "77".to_owned())].into(),
+            title: Some(format!("{} Remaster", game.title)),
+            matched_by_title: true,
+            cover_url: Some("https://x/c.png".into()),
+            ..GameMetadata::new("IGDB")
+        };
+        let cached = GameMetadata {
+            parts: vec![part],
+            ..GameMetadata::new("IGDB")
+        };
+        crate::metadata::cache(&ctx)
+            .write(&game.id, &cached)
+            .unwrap();
+        ctx.desktop = true;
+
+        let rows = queue_rows(&ctx);
+        let row = rows.iter().find(|r| r.row.key == game.id).expect("na fila");
+        let cover = row.cover.as_ref().unwrap();
+        assert!(cover.has_proposed && cover.level > 0 && cover.confidence.contains('%'));
+        assert_eq!(
+            pending(&ctx),
+            Some(rows.iter().filter(|r| r.cover.is_some()).count())
+        );
+
+        // Aceitar fixa o id, tira a linha e avisa com Desfazer.
+        let accept = row.accept.clone().unwrap();
+        accept(&mut ctx);
+        assert_eq!(ctx.pinned_ids[&game.id]["IGDB"], "77");
+        assert!(ctx.toast_undo.is_some());
+        assert!(!queue_rows(&ctx).iter().any(|r| r.row.key == game.id));
+
+        // Desfazer volta o id de antes e a linha volta para a fila.
+        let undo = ctx.toast_undo.clone().unwrap();
+        undo(&mut ctx);
+        assert!(
+            ctx.pinned_ids
+                .get(&game.id)
+                .is_none_or(|p| !p.contains_key("IGDB"))
+        );
+        assert!(queue_rows(&ctx).iter().any(|r| r.row.key == game.id));
     }
 }

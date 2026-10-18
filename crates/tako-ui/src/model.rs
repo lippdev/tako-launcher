@@ -252,6 +252,25 @@ theme_struct! {
 }
 
 theme_struct! {
+    /// Linha da fila de capas (FilaDeCapas), em paralelo às linhas das Configurações (só o desktop).
+    pub struct CoverRow {
+        pub current: Image,
+        pub has_current: bool,
+        pub proposed: Image,
+        pub has_proposed: bool,
+        // Texto no lugar da capa atual ("Sem capa").
+        pub current_label: String,
+        // Barrinhas preenchidas: 3 alta, 2 média, 1 baixa, 0 sem proposta.
+        pub level: i32,
+        // "Confiança média · 71%" e o motivo, em português.
+        pub confidence: String,
+        pub reason: String,
+        pub accept: String,
+        pub other: String,
+    }
+}
+
+theme_struct! {
     /// DestaqueFases: a fase 2 do destaque (o que o Tako sabe do jogo além da primeira tela).
     pub struct DeskMore {
         // A fase 2 está aberta.

@@ -36,6 +36,7 @@ struct DeskNav { id: string, label: string, icon: string, count: string, section
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
 struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string }
+struct CoverRow { current: image, has-current: bool, proposed: image, has-proposed: bool, current-label: string, level: int, confidence: string, reason: string, accept: string, other: string }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
 struct DeskMore { on: bool, labels: [string], description: string, details: [DeskInfo], sessions-summary: string, sessions: [DeskInfo], shots: [image] }
@@ -2891,8 +2892,13 @@ component DeskRow inherits Rectangle {
     in property <bool> loose;
     // Lista do onboarding (LojaEncontrada): linhas sem caixa, separadas por divisórias.
     in property <bool> bare;
-    out property <length> row-h: is-header ? 40px : max(loose ? Ui.control-height : Ui.settings-row-height, lay.preferred-height);
+    // FilaDeCapas: a linha da fila (capa atual, proposta, confiança e as ações dentro dela).
+    in property <CoverRow> cv;
+    property <bool> is-cover: data.kind == "cover";
+    out property <length> row-h: is-header ? 40px : (is-cover ? 120px : max(loose ? Ui.control-height : Ui.settings-row-height, lay.preferred-height));
     callback clicked();
+    // Ação dentro da linha: 0 = Aceitar, 1 = Escolher outra.
+    callback act(int);
     // ControleDeslizante: valor novo e se soltou.
     callback slide(int, bool);
     // Canto inferior direito da pílula do select, para a lista nascer embaixo dela, alinhada à direita.
@@ -2930,7 +2936,7 @@ component DeskRow inherits Rectangle {
         letter-spacing: 0.1 * self.font-size;
     }
     ta := TouchArea {
-        enabled: !is-header;
+        enabled: !is-header && !is-cover;
         mouse-cursor: data.enabled ? pointer : default;
         clicked => {
             if (data.kind == "choice") {
@@ -2940,8 +2946,99 @@ component DeskRow inherits Rectangle {
             root.clicked();
         }
     }
+    if is-cover: HorizontalLayout {
+        padding-left: 18px;
+        padding-right: 14px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 16px;
+        // Nome e de onde veio (loja ou "Instalado à mão").
+        VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            horizontal-stretch: 0;
+            preferred-width: 170px;
+            min-width: 70px;
+            max-width: 170px;
+            Text { text: data.title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; wrap: word-wrap; }
+            Text { text: data.description; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; }
+        }
+        // Capa atual, ou "Sem capa" tracejado (o Slint não tem traço; contorno fino).
+        Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 64px;
+            height: 64px;
+            border-radius: 10px;
+            clip: true;
+            if cv.has-current: Image { width: parent.width; height: parent.height; source: cv.current; image-fit: cover; vertical-alignment: top; }
+            if !cv.has-current: Rectangle {
+                border-radius: 10px;
+                border-width: 1.5px;
+                border-color: DeskArt.gray ? Ui.settings-separator : Ui.glass-edge-strong;
+                Text { width: parent.width; height: parent.height; text: cv.current-label; color: Ui.desk-on-muted; font-size: 11px * Ui.text-scale; font-weight: 500; horizontal-alignment: center; vertical-alignment: center; wrap: word-wrap; }
+            }
+        }
+        if cv.has-proposed: Rectangle {
+            width: 18px;
+            DeskIcon { name: "chevron"; size: 18px; tint: Ui.desk-on-muted; }
+        }
+        if cv.has-proposed: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 64px;
+            height: 64px;
+            border-radius: 10px;
+            clip: true;
+            background: DeskArt.gray ? Ui.settings-control : Ui.glass-control;
+            Image { width: parent.width; height: parent.height; source: cv.proposed; image-fit: cover; vertical-alignment: top; }
+        }
+        // Confiança sempre escrita e com três barrinhas (a cor nunca sozinha); o motivo embaixo.
+        VerticalLayout {
+            alignment: center;
+            spacing: 6px;
+            horizontal-stretch: 1;
+            min-width: 100px;
+            if cv.level > 0: HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                HorizontalLayout {
+                    spacing: 2px;
+                    alignment: end;
+                    y: 1px;
+                    width: 16px;
+                    height: 12px;
+                    for h[k] in [5px, 8px, 12px]: Rectangle {
+                        width: 4px;
+                        height: h;
+                        y: 12px - h;
+                        border-radius: 1px;
+                        background: k < cv.level ? (cv.level == 3 ? Ui.success : (cv.level == 2 ? Ui.warning : Ui.error)) : (DeskArt.gray ? Ui.settings-separator : Ui.glass-edge-strong);
+                    }
+                }
+                Text { text: cv.confidence; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
+            }
+            Text { text: cv.reason; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; line-height-factor: 1.07; wrap: word-wrap; }
+        }
+        // Aceitar (só com proposta) e Escolher outra, uma sobre a outra para a linha caber na janela pequena.
+        VerticalLayout {
+            alignment: center;
+            spacing: 8px;
+            horizontal-stretch: 0;
+            for label[k] in [cv.accept, cv.other]: Rectangle {
+                visible: label != "";
+                width: label == "" ? 0 : pl.preferred-width + 28px;
+                height: label == "" ? 0 : 36px;
+                border-radius: self.height / 2;
+                background: pta.has-hover ? Ui.settings-control-hover : Ui.settings-control;
+                animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                accessible-role: button;
+                accessible-label: label + ": " + data.title;
+                pl := Text { x: 14px; text: label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; height: parent.height; }
+                pta := TouchArea { mouse-cursor: pointer; clicked => { root.act(k); } }
+            }
+        }
+    }
     lay := HorizontalLayout {
-        visible: !is-header;
+        visible: !is-header && !is-cover;
         height: parent.height;
         padding-left: loose || bare ? 4px : 18px;
         padding-right: 14px;
@@ -3130,6 +3227,8 @@ component RowScroll inherits Rectangle {
     in property <bool> bare;
     in property <bool> side-panel;
     in property <length> gap: Ui.space-8;
+    // FilaDeCapas: dados extras das linhas "cover", na mesma ordem das linhas.
+    in property <[CoverRow]> covers;
     // Outra camada no mesmo lugar (outro título): volta ao topo.
     in property <string> content-key;
     out property <length> content-h: rl.preferred-height;
@@ -3172,6 +3271,8 @@ component RowScroll inherits Rectangle {
                     bare: root.bare;
                     side-panel: root.side-panel;
                     data: r;
+                    cv: covers[i];
+                    act(k) => { root.clicked("row-act:" + k, i); }
                     loose: inline-buttons && !root.body(i - 1) && !root.body(i + 1);
                     first: !root.body(i - 1);
                     last: !root.body(i + 1);
@@ -3281,6 +3382,7 @@ component DeskSettings inherits Rectangle {
     in property <string> heading;
     in property <string> subtitle;
     in property <[PanelRow]> rows;
+    in property <[CoverRow]> covers;
     in property <int> row-focus;
     in property <bool> focus-visible;
     in property <bool> small;
@@ -3336,6 +3438,12 @@ component DeskSettings inherits Rectangle {
                             font-weight: c.selected ? 600 : 500;
                             vertical-alignment: center;
                             overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        // Contagem do item (FilaDeCapas: capas a revisar; na busca, linhas que combinam).
+                        if c.count != "" && c.count != "0": Rectangle {
+                            width: cnt.preferred-width + Ui.space-12;
+                            cnt := Text { x: 0; text: c.count; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; height: parent.height; }
                         }
                     }
                     cta := TouchArea {
@@ -3377,6 +3485,7 @@ component DeskSettings inherits Rectangle {
                     vertical-stretch: 1;
                     content-key: heading;
                     rows: rows;
+                    covers: covers;
                     sel: row-focus;
                     key-focus: focus-visible;
                     clicked(z, i) => { root.clicked(z, i); }
@@ -3546,7 +3655,7 @@ component DeskOverlay inherits Rectangle {
     callback menu(length, length);
     callback edited(string, string);
     callback hovered(string, int);
-    property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "art"
+    property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
         && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress";
     property <bool> has-buttons: ov.rows.length > 0 && ov.rows[ov.rows.length - 1].kind == "button";
     if ov.kind == "splash" || ov.kind == "launch" || ov.kind == "progress": OverlayView {
@@ -4249,6 +4358,176 @@ component DeskOverlay inherits Rectangle {
             }
         }
     }
+    // EtiquetasDoJogo: PainelLateral com as etiquetas do jogo como chips (× para tirar), o campo "+ Etiqueta" e as
+    // sugestões presas ao campo (as existentes com o número de jogos e `Criar "…"`). `ov.tabs` = chips, `ov.tabs2` =
+    // linha de cada chip, `ov.thumb-cols` = número de linhas, `ov.rows` = sugestões, `ov.preview-text` = "Tirar".
+    if ov.kind == "tags": Rectangle {
+        background: Ui.desk-canvas.with-alpha(shown ? 0.25 : 0);
+        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        TouchArea { clicked => { root.clicked("outside", 0); } }
+        Vidro {
+            layer: true;
+            x: parent.width - self.width - (parent.width < 1280px ? Ui.space-20 : Ui.space-36) + (shown ? 0 : 48px);
+            opacity: shown ? 1 : 0;
+            animate x, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+            y: 84px;
+            width: min(parent.width - 120px, 440px);
+            height: min(parent.height - 84px - Ui.space-28, tl.preferred-height);
+            TouchArea { }
+            tl := VerticalLayout {
+                padding: 22px;
+                spacing: 12px;
+                HorizontalLayout {
+                    spacing: Ui.space-12;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        spacing: 4px;
+                        if ov.overline != "": Text {
+                            text: ov.overline;
+                            color: Ui.desk-on-muted;
+                            font-size: Ui.desk-overline;
+                            font-weight: 700;
+                            letter-spacing: 0.1 * self.font-size;
+                            overflow: elide;
+                        }
+                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
+                    }
+                    CloseButton { label: close-label; size: 40px; clicked => { root.clicked("outside", 0); } }
+                }
+                if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
+                // Chips, uma fileira por linha calculada pelo Tako.
+                VerticalLayout {
+                    spacing: 8px;
+                    for line in ov.thumb-cols: HorizontalLayout {
+                        height: 32px;
+                        alignment: start;
+                        for t[i] in ov.tabs: HorizontalLayout {
+                          padding-right: ov.tabs2[i] == line + "" ? 8px : 0;
+                          if ov.tabs2[i] == line + "": Rectangle {
+                                width: ctxt.preferred-width + 14px + 34px;
+                                height: 32px;
+                                border-radius: self.height / 2;
+                                background: Ui.glass-control;
+                                border-width: 1px;
+                                border-color: Ui.glass-edge;
+                                ctxt := Text {
+                                    x: 14px;
+                                    text: t;
+                                    color: Ui.on-accent;
+                                    font-size: Ui.desk-label-sm;
+                                    font-weight: 500;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+                                // × de 16 dentro de uma área de clique de 24.
+                                Rectangle {
+                                    x: parent.width - 28px;
+                                    y: (parent.height - 24px) / 2;
+                                    width: 24px;
+                                    height: 24px;
+                                    border-radius: 12px;
+                                    background: xta.has-hover ? Ui.glass-hover : transparent;
+                                    accessible-role: button;
+                                    accessible-label: ov.preview-text + " " + t;
+                                    DeskIcon { name: "close"; size: 14px; x: 5px; y: 5px; tint: Ui.desk-on-muted; }
+                                    xta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("chip", i); } }
+                                }
+                            }
+                          }
+                        }
+                    }
+                // Campo no fim da fileira.
+                Rectangle {
+                    height: Ui.control-height;
+                    border-radius: Ui.radius-control;
+                    background: Ui.glass-control;
+                    border-width: 1px;
+                    border-color: tti.has-focus ? Ui.glass-edge-strong : Ui.glass-edge;
+                    property <string> typed: ov.input;
+                    changed typed => { if (tti.text != ov.input) { tti.text = ov.input; } }
+                    if tti.text == "": Text {
+                        x: 14px;
+                        width: parent.width - 28px;
+                        text: ov.input-hint;
+                        color: Ui.desk-on-subtle;
+                        font-size: Ui.desk-label;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    FocusScope {
+                        x: 14px;
+                        width: parent.width - 28px;
+                        key-pressed(e) => {
+                            if (e.text == Key.Escape) {
+                                root.clicked("cancel", 0);
+                                return accept;
+                            }
+                            if (e.text == Key.DownArrow) {
+                                root.clicked("move", 1);
+                                return accept;
+                            }
+                            if (e.text == Key.UpArrow) {
+                                root.clicked("move", 0);
+                                return accept;
+                            }
+                            if (e.text == Key.Backspace && tti.text == "") {
+                                root.clicked("backspace", 0);
+                                return accept;
+                            }
+                            reject
+                        }
+                        tti := TextInput {
+                            width: parent.width;
+                            height: parent.height;
+                            color: Ui.on-accent;
+                            font-size: Ui.desk-label;
+                            vertical-alignment: center;
+                            single-line: true;
+                            selection-background-color: Ui.glass-pressed;
+                            init => { self.text = ov.input; self.focus(); }
+                            edited => { root.edited("overlay-input", self.text); }
+                            accepted => { root.clicked("done", 0); }
+                        }
+                    }
+                }
+                // Sugestões: a lista do MenuDeContexto junto do campo.
+                if ov.rows.length > 0: Rectangle {
+                    height: min(ov.rows.length * 38px + 12px, 280px);
+                    border-radius: Ui.radius-control;
+                    background: Ui.glass-solid;
+                    border-width: 1px;
+                    border-color: Ui.glass-edge-strong;
+                    Flickable {
+                        y: 6px;
+                        x: 6px;
+                        width: parent.width - 12px;
+                        height: parent.height - 12px;
+                        viewport-height: ov.rows.length * 38px;
+                        for r[i] in ov.rows: Rectangle {
+                            y: i * 38px;
+                            height: 36px;
+                            border-radius: 10px;
+                            background: i == ov.sel ? Ui.focus-fill : (rta.has-hover ? Ui.glass-hover : transparent);
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 8px;
+                                if r.icon != "": DeskIcon { name: r.icon; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+                                Text { text: r.title; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: r.key == "create" ? 600 : 500; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                                if r.value != "": Text { text: r.value; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+                            }
+                            rta := TouchArea {
+                                mouse-cursor: pointer;
+                                moved => { root.hovered("row", i); }
+                                clicked => { root.clicked("row", i); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     // Campo de texto (CampoDeTexto): diálogo de 480 com o teclado do computador, colar e seleção; Enter confirma, Esc
     // cancela.
     if ov.kind == "keyboard": Rectangle {
@@ -4625,6 +4904,7 @@ export component Desktop inherits Window {
     in property <string> settings-heading;
     in property <string> settings-subtitle;
     in property <[PanelRow]> settings-rows;
+    in property <[CoverRow]> settings-covers;
     in property <int> settings-row-focus: -1;
 
     // Entrada: zona e índice (como na tela cheia), textos editados e a primeira linha visível da lista.
@@ -4849,6 +5129,7 @@ export component Desktop inherits Window {
                 heading: settings-heading;
                 subtitle: settings-subtitle;
                 rows: settings-rows;
+                covers: settings-covers;
                 row-focus: settings-row-focus;
                 focus-visible: desk-focus-visible;
                 small: root.small;

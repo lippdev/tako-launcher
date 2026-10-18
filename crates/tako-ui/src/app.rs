@@ -177,6 +177,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         profiles,
         pads_connected: 0,
         pad_lost: false,
+        art_review: Default::default(),
         pad_battery: None,
         input: InputKind::Keyboard,
         toast: None,

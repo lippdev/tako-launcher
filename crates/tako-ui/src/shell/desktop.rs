@@ -484,7 +484,7 @@ impl DesktopLibrary {
         }
         match action {
             0 => Nav::Layer(Box::new(dialogs::choose_collections_many(ctx, ids))),
-            1 => Nav::Layer(Box::new(dialogs::choose_tags(ctx, ids, None))),
+            1 => Nav::Layer(dialogs::tags_layer(ctx, ids, None)),
             2 => {
                 // Algum fora dos favoritos: favorita todos; senão tira todos.
                 let fav = ids
