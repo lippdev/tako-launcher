@@ -455,11 +455,16 @@ component TopBar inherits Vidro {
                 padding-right: 10px;
                 spacing: 4px;
                 Image {
-                    source: @image-url("tako-logo.png");
+                    // Cópia em 2× (198 × 92) da logo horizontal: a exibida em 46px de altura ficava serrilhada.
+                    source: @image-url("tako-logo-brand.png");
                     height: small ? 38px : 46px;
-                    width: self.height * 495 / 192;
+                    width: self.height * 1842 / 854;
                     y: (parent.height - self.height) / 2;
                     image-fit: contain;
+                    // Hover: leve aumento e brilho; com "Reduzir animações" a escala fica em 1.
+                    opacity: bta.has-hover ? 1 : 0.9;
+                    transform-scale: bta.has-hover && !Ui.reduce-motion ? 1.04 : 1;
+                    animate transform-scale, opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
                 }
                 DeskIcon { name: "chevron-down"; size: 12px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
             }
@@ -3978,7 +3983,7 @@ component WindowButton inherits Rectangle {
 
 component DeskTitleBar inherits Rectangle {
     in property <bool> maximized;
-    // Janela sem foco: ícones em on-accent-subtle e logo a 55%.
+    // Janela sem foco: ícones em on-accent-subtle.
     in property <bool> active: true;
     // Minimizar, Maximizar, Restaurar, Fechar.
     in property <[string]> labels;
@@ -3998,16 +4003,6 @@ component DeskTitleBar inherits Rectangle {
             }
         }
         double-clicked => { root.action("max"); }
-    }
-    Image {
-        x: 14px;
-        y: (parent.height - self.height) / 2;
-        width: 47px;
-        height: 18px;
-        // Cópia em 2× (94 × 36): reduzir o PNG de 495 direto para 47 serrilhava o logo.
-        source: @image-url("tako-logo-bar.png");
-        image-fit: contain;
-        opacity: active ? 1 : 0.55;
     }
     HorizontalLayout {
         alignment: end;
