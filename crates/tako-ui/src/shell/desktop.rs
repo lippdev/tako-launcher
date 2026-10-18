@@ -1621,6 +1621,7 @@ impl Page for DesktopLibrary {
                 let (description, about_more) = about(&g.description);
                 let logo = tiles::image(g.shown_logo(), tiles::LOGO);
                 let show_logo = show_logo(ctx, g, &logo, &art_lum);
+                let title_pending = title_pending(ctx, g, &logo, &art_lum);
                 sessions = sessions_rows(ctx, g);
                 (
                     DeskGameView {
@@ -1633,6 +1634,7 @@ impl Page for DesktopLibrary {
                         art_lum,
                         logo,
                         show_logo,
+                        title_pending,
                         accent: parse_color(&g.accent),
                         hint,
                         running,
@@ -1923,6 +1925,21 @@ fn show_logo(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool 
     wanted && logo.size().width > 0 && logo_contrast(g, logo, art_lum).is_none_or(|c| c >= 3.0)
 }
 
+/// O logo (ou a cópia desfocada da arte, que mede o contraste dele) ainda carrega: o título espera em vez de mostrar
+/// o nome em texto e trocar para o logo um instante depois.
+fn title_pending(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool {
+    let mode = title_mode(ctx, &g.id);
+    let wanted = mode == "logo" || (mode != "text" && ctx.settings.string(TITLE_LOGO) != "text");
+    let Some(uri) = g.shown_logo().filter(|_| wanted) else {
+        return false;
+    };
+    if logo.size().width == 0 {
+        return crate::images::is_pending(uri);
+    }
+    // Logo pronto; no padrão, o contraste ainda depende da cópia desfocada da arte.
+    mode != "logo" && art_lum.is_empty() && g.shown_hero().is_some_and(crate::images::is_pending)
+}
+
 /// Contraste (WCAG) entre o logo e a arte atrás do título; `None` sem como medir (sem arte: o fundo é o degradê).
 pub(crate) fn logo_contrast(g: &Game, logo: &slint::Image, art_lum: &[f32]) -> Option<f64> {
     let (cols, rows) = crate::images::GLASS_GRID;
@@ -2053,6 +2070,8 @@ mod tests {
         let dark = vec![0.02; (cols * rows) as usize];
         let light = vec![0.9; (cols * rows) as usize];
         assert!(show_logo(&shell.ctx, &g, &logo, &dark));
+        // Logo e arte prontos: nada a esperar.
+        assert!(!title_pending(&shell.ctx, &g, &logo, &dark));
         assert!(!show_logo(&shell.ctx, &g, &logo, &light));
         assert!(!show_logo(&shell.ctx, &g, &slint::Image::default(), &dark));
         shell.ctx.settings.set(TITLE_LOGO, "text");

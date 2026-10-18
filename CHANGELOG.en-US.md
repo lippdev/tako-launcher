@@ -2,6 +2,10 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.12]
+### Fixes
+- **Game logo:** games with a logo no longer show the name as text before switching to the logo. While the logo loads, the title space stays reserved, and the logo fades in when it arrives.
+
 ## [0.2.0-alpha.11]
 ### What's new
 - **Lighter and smoother:** Tako uses much less memory (each image lives once on the graphics card and the background loads at the window's size), the game list scrolls without stutter and the app keeps up with 120 Hz or faster monitors.

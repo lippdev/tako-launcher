@@ -298,5 +298,7 @@ theme_struct! {
         pub store_name: String,
         // TituloDoJogo: o título é o logo (senão, o nome em texto).
         pub show_logo: bool,
+        // O logo ainda carrega: o título fica vazio (nem o nome em texto) até ele chegar.
+        pub title_pending: bool,
     }
 }
