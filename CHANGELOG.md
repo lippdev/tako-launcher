@@ -11,8 +11,9 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 - **Seleção de vários jogos:** Ctrl ou Shift + clique e Ctrl + A marcam jogos para pôr numa coleção, etiquetar, favoritar, marcar como zerado ou apagar os adicionados à mão de uma vez.
 - **Destaque do jogo:** etiqueta de estado, faixa com a última sessão e o tempo de jogo, Jogar em destaque (Voltar ao jogo enquanto ele roda, Instalar pela loja quando não está instalado) e botões para favoritar, mais ações e as Configurações deste jogo. Cartões Sobre o jogo (com "Mais"), Detalhes, Sessões e Trailer, quando o jogo tem.
 - **Diálogos, painéis, menus e avisos** no mesmo vidro, com transições curtas que somem com "Reduzir animações".
-- **Primeira abertura em tela inteira:** idioma, lojas, capas, como abrir o Tako (em janela ou em tela cheia) e o resumo dos jogos encontrados. A escolha vira "Abrir em", em Configurações › Geral.
-- **Configurações** com a mesma estrutura da biblioteca, sobre o cinza; a bateria do controle aparece em Controles.
+- **Primeira abertura em tela inteira:** lojas, emuladores (quando há algum), capas, como abrir o Tako (em janela ou em tela cheia) e o resumo dos jogos encontrados. A escolha vira "Abrir em", em Configurações › Geral.
+- Depois de favoritar ou mexer em coleções de vários jogos, o aviso oferece **Desfazer**. Botões só de ícone e nomes longos mostram uma dica ao parar o mouse em cima.
+- **Configurações** com a mesma estrutura da biblioteca, sobre o cinza, e busca na barra (Ctrl + K); a bateria do controle aparece em Controles.
 - **Reduzir transparência** em Configurações › Aparência deixa painéis e botões opacos no modo desktop.
 - A tela cheia não muda.
 

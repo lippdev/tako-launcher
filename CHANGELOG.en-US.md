@@ -11,8 +11,9 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **Select several games:** Ctrl or Shift + click and Ctrl + A mark games to add to a collection, tag, favorite, mark as beaten or remove hand-added ones at once.
 - **Game highlight:** status label, a strip with the last session and play time, a prominent Play (Back to game while it runs, Install via the store when it isn't installed) and buttons to favorite, more actions and this game's settings. About (with "More"), Details, Sessions and Trailer cards, when the game has one.
 - **Dialogs, panels, menus and toasts** in the same glass, with short transitions that go away with "Reduce motion".
-- **Full-screen first run:** language, stores, covers, how to open Tako (in a window or full screen) and a summary of the games found. The choice becomes "Open in", in Settings › General.
-- **Settings** with the same structure as the library, over gray; the controller battery shows in Controls.
+- **Full-screen first run:** stores, emulators (when there are any), covers, how to open Tako (in a window or full screen) and a summary of the games found. The choice becomes "Open in", in Settings › General.
+- After favoriting or changing collections for several games, the toast offers **Undo**. Icon-only buttons and long names show a tip when you rest the mouse on them.
+- **Settings** with the same structure as the library, over gray, and search in the bar (Ctrl + K); the controller battery shows in Controls.
 - **Reduce transparency** in Settings › Appearance makes panels and buttons opaque in desktop mode.
 - Full screen is unchanged.
 
