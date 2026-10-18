@@ -35,6 +35,8 @@ pub enum Effect {
     AddGame,
     OpenFolder(String),
     OpenUrl(String),
+    /// Abrir o endereço depois do intervalo (vários pedidos seguidos ao cliente de uma loja).
+    OpenUrlAfter(String, std::time::Duration),
     CheckUpdates,
     InstallUpdate,
     RefreshMetadata(Option<String>),

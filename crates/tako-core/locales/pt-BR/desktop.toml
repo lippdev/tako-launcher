@@ -102,6 +102,7 @@ empty_text = "Marque Jogando, Zerado e outros status pelo menu ⋯ de um jogo, o
 by_store = "Agrupar por Loja"
 
 [desktop.bulk]
+installing = "Abrindo {n} instalações na loja, uma de cada vez"
 count = "{n} selecionados de {total}"
 collection = "Coleção"
 tag = "Etiqueta"

@@ -443,6 +443,10 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
     let id = id.to_owned();
     MenuLayer::menu(title, move |ctx| {
         let mut v = option_items(ctx, &id);
+        // Jogo da conta que não está no computador: Instalar vem primeiro.
+        if let Some(item) = install_item(ctx, &id) {
+            v.insert(0, item);
+        }
         let (c, t, s) = (id.clone(), id.clone(), id.clone());
         let extra = [
             MenuItem::new(
@@ -464,6 +468,23 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
         v.splice(at..at, extra);
         v
     })
+}
+
+/// "Instalar" do menu de contexto (SRC-005): abre o cliente da primeira loja; `None` se o jogo não tem o que instalar.
+fn install_item(ctx: &Ctx, id: &str) -> Option<MenuItem> {
+    let g = ctx.library.find(id)?;
+    if g.is_installed || g.is_upcoming() || g.installing.is_some() {
+        return None;
+    }
+    super::details::install_offers(g).first()?;
+    let id = id.to_owned();
+    Some(
+        MenuItem::new(PanelRow::button("install", ctx.t("desktop.install.label")).icon("download"))
+            .on(move |ctx| {
+                super::details::install_many(ctx, std::slice::from_ref(&id));
+                Flow::Close
+            }),
+    )
 }
 
 /// Linhas das Opções do jogo (vazio se o jogo sumiu).
@@ -735,6 +756,26 @@ pub fn bulk_more(ids: Vec<String>) -> MenuLayer {
         let done = ids.clone();
         let status_ids = ids.clone();
         let mut v = Vec::new();
+        // Vários de uma vez: um pedido por jogo ao cliente da loja, um de cada vez.
+        let installable: Vec<String> = ids
+            .iter()
+            .filter(|id| install_item(ctx, id).is_some())
+            .cloned()
+            .collect();
+        if !installable.is_empty() {
+            v.push(
+                MenuItem::new(
+                    PanelRow::button("install", ctx.t("desktop.install.label")).icon("download"),
+                )
+                .on(move |ctx| {
+                    let n = super::details::install_many(ctx, &installable);
+                    if n > 1 {
+                        ctx.toast(ctx.tf("desktop.bulk.installing", &[("n", &n.to_string())]));
+                    }
+                    Flow::Close
+                }),
+            );
+        }
         if ctx.desktop {
             v.push(
                 MenuItem::new(PanelRow::button("status", ctx.t("desktop.define_status")))
@@ -1486,6 +1527,34 @@ mod tests {
             install_uri: Some(uri.into()),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn installing_many_opens_one_store_request_per_game_spaced_apart() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let mut done = store_game("gog:3", GameStore::Gog, "goggalaxy://openGameView/3");
+        done.is_installed = true;
+        let games = vec![
+            store_game("gog:1", GameStore::Gog, "goggalaxy://openGameView/1"),
+            store_game("gog:2", GameStore::Gog, "goggalaxy://openGameView/2"),
+            done,
+            // Sem endereço de instalação e com lixo no lugar: ficam de fora, sem pânico.
+            store_game("gog:4", GameStore::Gog, "  "),
+        ];
+        *ctx.found.lock().unwrap() = games;
+        ctx.library.refresh();
+        let ids: Vec<String> = ["gog:1", "gog:2", "gog:3", "gog:4", "gog:sumiu"]
+            .map(String::from)
+            .into();
+
+        assert_eq!(super::super::details::install_many(&mut ctx, &ids), 2);
+        assert!(matches!(
+            &ctx.effects[..],
+            [Effect::OpenUrl(a), Effect::OpenUrlAfter(b, wait)]
+                if a.ends_with("/1") && b.ends_with("/2") && !wait.is_zero()
+        ));
+        assert_eq!(ctx.installing.len(), 2);
     }
 
     #[test]

@@ -102,6 +102,7 @@ empty_text = "Mark Playing, Beaten and other statuses from a game's ⋯ menu, or
 by_store = "Group by Store"
 
 [desktop.bulk]
+installing = "Opening {n} installs in the store, one at a time"
 count = "{n} selected of {total}"
 collection = "Collection"
 tag = "Tag"

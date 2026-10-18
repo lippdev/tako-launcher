@@ -18,6 +18,15 @@ pub fn common(effect: &Effect, shell: &mut Shell) -> Option<HostAction> {
                 ctx.toast(e.to_string());
             }
         }
+        Effect::OpenUrlAfter(u, wait) => {
+            let (u, wait, processes) = (u.clone(), *wait, ctx.platform.processes.clone());
+            std::thread::spawn(move || {
+                std::thread::sleep(wait);
+                if let Err(e) = processes.launch(&u, None, None) {
+                    tracing::warn!("abrir a instalação na loja: {e}");
+                }
+            });
+        }
         Effect::OpenFolder(p) => {
             let _ = std::fs::create_dir_all(p);
             if let Err(e) = ctx.platform.processes.open_folder(p) {

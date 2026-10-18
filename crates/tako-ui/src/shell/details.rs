@@ -241,6 +241,35 @@ fn watch_install(ctx: &mut Ctx, id: &str) {
         .push((id.to_owned(), std::time::Instant::now() + Ctx::INSTALL_WAIT));
 }
 
+/// Instalar vários de uma vez (seleção múltipla, SRC-005): um pedido por jogo, espaçados para o cliente da loja
+/// não perder nenhum. Devolve quantos foram pedidos.
+pub(crate) fn install_many(ctx: &mut Ctx, ids: &[String]) -> usize {
+    let mut n = 0;
+    for id in ids {
+        let Some(g) = ctx.library.find(id).cloned() else {
+            continue;
+        };
+        if g.is_installed || g.installing.is_some() {
+            continue;
+        }
+        let Some(o) = install_offers(&g).into_iter().next() else {
+            continue;
+        };
+        let after = INSTALL_GAP * n as u32;
+        ctx.effect(if n == 0 {
+            Effect::OpenUrl(o.install_uri)
+        } else {
+            Effect::OpenUrlAfter(o.install_uri, after)
+        });
+        watch_install(ctx, &g.id);
+        n += 1;
+    }
+    n
+}
+
+/// Intervalo entre dois pedidos de instalação seguidos.
+const INSTALL_GAP: std::time::Duration = std::time::Duration::from_millis(1500);
+
 pub fn stats(ctx: &Ctx, g: &Game) -> Vec<Stat> {
     let lang = ctx.lang();
     let mut s = Vec::new();
