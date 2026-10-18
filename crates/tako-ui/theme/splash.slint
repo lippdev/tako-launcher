@@ -1,0 +1,103 @@
+// TelaCarregamento: a janela de abertura (440 × 600, sem moldura). O polvo se monta com o progresso: anel, corpo
+// e TAKO desde o começo; cada um dos 7 tentáculos chega girando a partir da base quando a barra passa do ponto dele.
+// Com todos no lugar, os tentáculos ondulam devagar e o corpo respira. Fora da API de tema (como o desktop).
+
+import "fonts/PlusJakartaSans-Regular.ttf";
+import { Ui } from "tokens.slint";
+
+export { Ui }
+
+// Um tentáculo: a camada inteira do logo (704 × 802, desenhada em 352 × 401), girando em volta da base do corpo.
+component Tentacle inherits Rectangle {
+    in property <image> source;
+    in property <bool> arrived;
+    // -1 esquerda, 1 direita, 0 os da frente (só crescem).
+    in property <int> side;
+    // Fase da ondulação (graus por tentáculo, para não ondularem juntos).
+    in property <float> wave;
+    in property <bool> idle;
+    opacity: arrived ? 1 : 0;
+    transform-origin: { x: 176px, y: 165px };
+    transform-rotation: arrived ? 0deg : side * 40deg;
+    transform-scale: arrived ? 1 : 0.6;
+    animate opacity, transform-rotation, transform-scale { duration: Ui.tempo-tentaculo; easing: cubic-bezier(0.34, 1.56, 0.64, 1); }
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.source;
+        transform-origin: { x: 176px, y: 165px };
+        transform-rotation: idle ? 1.6deg * sin(animation-tick() / 2400ms * 360deg + root.wave * 1deg) : 0deg;
+    }
+}
+
+export component Splash inherits Window {
+    no-frame: true;
+    width: 440px;
+    height: 600px;
+    background: Ui.splash-bg;
+    title: "Tako";
+    icon: @image-url("tako-mark.png");
+    // 0 a 1; negativo = ainda sem número (barra indeterminada).
+    in property <float> progress: -1;
+    in property <string> status;
+    in property <string> percent;
+    // Linha opcional embaixo da barra (tamanho e versão).
+    in property <string> sub;
+    property <float> p: Ui.reduce-motion ? 1 : max(progress, 0);
+    property <bool> done: p >= 0.88;
+    // Logo vertical: 352 de largura, 28 do topo.
+    Rectangle {
+        x: 44px;
+        y: 28px;
+        width: 352px;
+        height: 401px;
+        accessible-role: image;
+        accessible-label: "Tako";
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: @image-url("splash/splash-base.png");
+            // O corpo respira com todos os tentáculos no lugar.
+            transform-origin: { x: 176px, y: 120px };
+            transform-scale: done && !Ui.reduce-motion ? 1 + 0.012 * sin(animation-tick() / 3200ms * 360deg) : 1;
+        }
+        // Ordem de chegada: alterna os lados (8, 20, 33, 46, 60, 74 e 88%).
+        Tentacle { source: @image-url("splash/splash-t1.png"); arrived: p >= 0.08; side: -1; wave: 0; idle: done && !Ui.reduce-motion; }
+        Tentacle { source: @image-url("splash/splash-t2.png"); arrived: p >= 0.20; side: 1; wave: 70; idle: done && !Ui.reduce-motion; }
+        Tentacle { source: @image-url("splash/splash-t3.png"); arrived: p >= 0.33; side: -1; wave: 140; idle: done && !Ui.reduce-motion; }
+        Tentacle { source: @image-url("splash/splash-t4.png"); arrived: p >= 0.46; side: 1; wave: 210; idle: done && !Ui.reduce-motion; }
+        Tentacle { source: @image-url("splash/splash-t5.png"); arrived: p >= 0.60; side: -1; wave: 280; idle: done && !Ui.reduce-motion; }
+        Tentacle { source: @image-url("splash/splash-t6.png"); arrived: p >= 0.74; side: 1; wave: 350; idle: done && !Ui.reduce-motion; }
+        Tentacle { source: @image-url("splash/splash-t7.png"); arrived: p >= 0.88; side: 0; wave: 50; idle: done && !Ui.reduce-motion; }
+    }
+    // Estado: texto e porcentagem (13, números tabulares), barra de 3 em `brand-red` e a linha opcional.
+    VerticalLayout {
+        x: 44px;
+        y: parent.height - 36px - self.height;
+        width: parent.width - 88px;
+        height: self.preferred-height;
+        spacing: 8px;
+        HorizontalLayout {
+            Text { text: status; color: Ui.splash-muted; font-family: "Plus Jakarta Sans"; font-size: 13px; horizontal-stretch: 1; overflow: elide; }
+            Text { text: percent; color: Ui.splash-muted; font-family: "Plus Jakarta Sans"; font-size: 13px; }
+        }
+        Rectangle {
+            height: 3px;
+            border-radius: 2px;
+            background: Ui.splash-track;
+            clip: true;
+            accessible-role: progress-indicator;
+            accessible-label: status;
+            accessible-value: percent;
+            // Barra real; sem número, um trecho de 30% que corre (parado com "Reduzir animações").
+            if progress >= 0: Rectangle { x: 0; width: parent.width * clamp(progress, 0, 1); border-radius: 2px; background: Ui.brand-red; }
+            if progress < 0: Rectangle {
+                width: parent.width * 0.3;
+                x: Ui.reduce-motion ? parent.width * 0.2 : (parent.width * 1.3) * mod(animation-tick() / 1400ms, 1) - self.width;
+                border-radius: 2px;
+                background: Ui.brand-red;
+            }
+        }
+        if sub != "": Text { text: sub; color: Ui.splash-muted; font-family: "Plus Jakarta Sans"; font-size: 12px; }
+    }
+}

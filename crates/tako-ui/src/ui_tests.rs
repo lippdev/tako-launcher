@@ -371,6 +371,58 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
 /// Captura da janela desktop para conferir com as prévias do design: `TAKO_SNAP_OUT=<pasta>` (obrigatório),
 /// `TAKO_SNAP_ART=<imagem>` (arte do jogo em foco), `TAKO_SNAP_PAGE=settings` e `TAKO_SNAP_CLICK` (opcionais).
 /// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
+/// TelaCarregamento: `TAKO_SNAP_OUT=<pasta>` grava `splash-<progresso>.png` (440 × 600) para cada valor de
+/// `TAKO_SNAP_PROGRESS` (padrão `-1,0.42,1`; negativo = barra indeterminada), depois dos tentáculos assentarem.
+#[test]
+#[ignore = "ferramenta manual de captura"]
+fn splash_snapshot() {
+    let Ok(out_dir) = std::env::var("TAKO_SNAP_OUT") else {
+        return;
+    };
+    std::thread::spawn(move || {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_splash(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        i18n::set_lang(Lang::PtBr);
+        ui.show().unwrap();
+        let (w, h) = (440, 600);
+        window.set_size(slint::PhysicalSize::new(w, h));
+        let progress = std::env::var("TAKO_SNAP_PROGRESS").unwrap_or_else(|_| "-1,0.42,1".into());
+        for p in progress.split(',').filter_map(|p| p.parse::<f32>().ok()) {
+            let state = if p < 0.0 {
+                crate::splash::state(true, 0)
+            } else if p >= 1.0 {
+                crate::splash::state(false, 1000)
+            } else {
+                crate::splash::state(true, (p * 1000.0) as u32)
+            };
+            crate::splash::set(&ui, state);
+            let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+            for _ in 0..30 {
+                slint::platform::update_timers_and_animations();
+                ui.window().request_redraw();
+                window.draw_if_needed(|r| {
+                    r.render(&mut pixels, w as usize);
+                });
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+            image::RgbImage::from_raw(w, h, raw)
+                .unwrap()
+                .save(format!("{out_dir}/splash-{p}.png"))
+                .unwrap();
+        }
+        ui.hide().unwrap();
+    })
+    .join()
+    .unwrap();
+}
+
 #[test]
 #[ignore = "ferramenta manual de captura"]
 fn desktop_snapshot() {

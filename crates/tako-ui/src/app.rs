@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
@@ -224,6 +225,9 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
     ctx
 }
 
+/// Lojas lidas na leitura em curso, em milésimos (a barra da TelaCarregamento).
+pub(crate) static SCAN_PROGRESS: AtomicU32 = AtomicU32::new(0);
+
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar.
 pub fn rescan(shell: &Rc<RefCell<Shell>>) {
     let (found, disabled, simulate, steam_key, steam_cache, emulators) = {
@@ -232,6 +236,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
             return;
         }
         s.ctx.scanning = true;
+        SCAN_PROGRESS.store(0, Ordering::Relaxed);
         (
             s.ctx.found.clone(),
             s.ctx
@@ -292,7 +297,9 @@ fn scan_into(
     if simulate {
         return Vec::new();
     }
-    let (games, reports) = crate::sources::scan(disabled, steam_owned, emulators);
+    let (games, reports) = crate::sources::scan(disabled, steam_owned, emulators, |done, total| {
+        SCAN_PROGRESS.store((done * 1000 / total.max(1)) as u32, Ordering::Relaxed);
+    });
     if let Ok(mut f) = found.lock() {
         *f = games;
     }
@@ -1011,10 +1018,54 @@ impl App {
                 }
             }
         });
-        ui.show().map_err(|e| e.to_string())?;
+        // TelaCarregamento: sem biblioteca para mostrar ainda (primeira abertura), a janela de abertura acompanha a
+        // leitura das lojas e a principal só aparece com a biblioteca pronta.
+        let splash = self.wants_splash().then(|| {
+            let reduce = self
+                .shell
+                .borrow()
+                .ctx
+                .settings
+                .bool(crate::shell::ctx::keys::REDUCED_MOTION, false);
+            crate::splash::open(&self.builtin, reduce).map(|s| (s, reduce))
+        });
+        match splash.flatten() {
+            Some((splash, reduce)) => {
+                let shell = self.shell.clone();
+                let main = self.ui.clone();
+                crate::splash::follow(
+                    splash,
+                    move || {
+                        let s = shell.borrow();
+                        (s.ctx.scanning, SCAN_PROGRESS.load(Ordering::Relaxed))
+                    },
+                    // Os últimos tentáculos assentam (1 s) antes da biblioteca abrir.
+                    if reduce {
+                        Duration::ZERO
+                    } else {
+                        Duration::from_millis(1000)
+                    },
+                    move || {
+                        if let Err(e) = main.borrow().show() {
+                            tracing::warn!("janela principal: {e}");
+                        }
+                    },
+                );
+            }
+            None => ui.show().map_err(|e| e.to_string())?,
+        }
         drop(ui);
         rescan(&self.shell);
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
+    }
+
+    /// Abertura no desktop com a biblioteca vazia (nada lido ainda), fora da simulação e da volta de um jogo.
+    fn wants_splash(&self) -> bool {
+        let s = self.shell.borrow();
+        self.mode.get() == UiMode::Desktop
+            && s.ctx.library.games().is_empty()
+            && !s.ctx.simulated()
+            && s.ctx.running.is_none()
     }
 }
 
@@ -1436,6 +1487,7 @@ mod tests {
             include_str!("../theme/widgets.slint"),
             include_str!("../theme/overlay.slint"),
             include_str!("../theme/desktop.slint"),
+            include_str!("../theme/splash.slint"),
         ] {
             for line in file.lines().filter(|l| l.contains("animate ")) {
                 assert!(line.contains("duration: Ui."), "{line}");
