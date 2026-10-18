@@ -73,7 +73,7 @@ menu = "Modo de exibição"
 reverse = "Inverter ordem"
 
 [desktop.group]
-by = "Agrupar por {group}"
+by_prefix = "Agrupar por"
 status = "Status"
 collection = "Coleção"
 tag = "Etiqueta"

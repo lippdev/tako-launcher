@@ -9,7 +9,8 @@ use tako_core::presentation::game_text;
 
 /// Tamanho em que as capas são decodificadas (2:3, nítido até 1440p; o tema escala).
 pub const COVER: (u32, u32) = (300, 450);
-pub const HERO: (u32, u32) = (1920, 1080);
+// Arte de fundo na altura da janela: um banner largo (3840 × 1240) cortado para 1920 ficaria ampliado e borrado.
+pub const HERO: (u32, u32) = (3840, 2160);
 pub const LOGO: (u32, u32) = (900, 360);
 
 pub fn image(uri: Option<&str>, size: (u32, u32)) -> slint::Image {

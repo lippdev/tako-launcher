@@ -73,7 +73,7 @@ menu = "View mode"
 reverse = "Reverse order"
 
 [desktop.group]
-by = "Group by {group}"
+by_prefix = "Group by"
 status = "Status"
 collection = "Collection"
 tag = "Tag"

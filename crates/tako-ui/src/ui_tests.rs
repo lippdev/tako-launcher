@@ -440,7 +440,14 @@ fn desktop_snapshot() {
             }
         }
         ui.show().unwrap();
-        for (w, h) in [(1600u32, 900u32), (960, 600)] {
+        // `TAKO_SNAP_SIZES=1920x1080,2048x1100`: outros tamanhos além dos das prévias.
+        let sizes: Vec<(u32, u32)> = std::env::var("TAKO_SNAP_SIZES")
+            .unwrap_or_else(|_| "1600x900,960x600".into())
+            .split(',')
+            .filter_map(|s| s.split_once('x'))
+            .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
+            .collect();
+        for (w, h) in sizes {
             window.set_size(slint::PhysicalSize::new(w, h));
             let out = shell.render(Instant::now());
             for (name, value) in &out.props {
@@ -451,6 +458,17 @@ fn desktop_snapshot() {
                     s.set_field("art".into(), Value::Image(art.clone()));
                     s.set_field("art-blur".into(), Value::Image(blur.clone()));
                     s.set_field("art-lum".into(), lum.clone());
+                }
+                // `TAKO_SNAP_TITLE` / `TAKO_SNAP_DESC`: textos longos no destaque.
+                if let ("desk-game", Value::Struct(s)) = (*name, &mut value) {
+                    for (var, field) in [
+                        ("TAKO_SNAP_TITLE", "title"),
+                        ("TAKO_SNAP_DESC", "description"),
+                    ] {
+                        if let Some(text) = std::env::var(var).ok().filter(|t| !t.is_empty()) {
+                            s.set_field(field.into(), Value::String(text.into()));
+                        }
+                    }
                 }
                 crate::bridge::set(&ui, name, value);
             }

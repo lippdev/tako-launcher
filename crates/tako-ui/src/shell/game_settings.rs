@@ -268,10 +268,25 @@ pub fn panel(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
         .find(id)
         .map(|g| g.title.clone())
         .unwrap_or_default();
+    // No desktop (ConfiguracoesDoJogo): painel largo, com "Jogo · N mudanças" embaixo do título.
+    let overline = if ctx.desktop {
+        let n = current(ctx, id).changed_count();
+        if n == 0 {
+            title
+        } else {
+            format!(
+                "{title} · {}",
+                tako_core::i18n::tn("game_settings.changes", n as i64, &[])
+            )
+        }
+    } else {
+        title.to_uppercase()
+    };
+    let desktop = ctx.desktop;
     let id = id.to_owned();
     let layer = MenuLayer::panel(ctx.t("details.game_settings"), move |ctx| rows(ctx, &id))
-        .overline(title.to_uppercase());
-    Box::new(layer)
+        .overline(overline);
+    Box::new(if desktop { layer.wide() } else { layer })
 }
 
 fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {

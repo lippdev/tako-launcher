@@ -18,7 +18,11 @@ import "fonts/Poppins-Medium.ttf";
 import "fonts/Poppins-SemiBold.ttf";
 import "fonts/Poppins-Bold.ttf";
 import "fonts/Poppins-ExtraBold.ttf";
-import "fonts/PlusJakartaSans-Variable.ttf";
+import "fonts/PlusJakartaSans-Regular.ttf";
+import "fonts/PlusJakartaSans-Medium.ttf";
+import "fonts/PlusJakartaSans-SemiBold.ttf";
+import "fonts/PlusJakartaSans-Bold.ttf";
+import "fonts/PlusJakartaSans-ExtraBold.ttf";
 
 import { Ui } from "tokens.slint";
 import { ControlCenter } from "main.slint";
@@ -50,7 +54,10 @@ global DeskArt {
     // Retângulo da arte na janela: na altura da janela, puxada para a direita para não ficar atrás do título.
     out property <length> h: win-h;
     out property <length> w: win-h * aspect;
-    out property <length> x: w >= win-w - 200px ? 200px : win-w - w;
+    // Janela pequena (< 1280): a arte começa em 380 para não ficar atrás do título.
+    out property <bool> small: win-w < 1280px;
+    out property <length> left: small ? 380px : 200px;
+    out property <length> x: w >= win-w - left ? left : win-w - w;
     out property <length> y: 0;
     // A cópia desfocada cobre também a faixa à esquerda da arte (a borda já é borrada; esticar não aparece).
     out property <length> bx: min(x, 0);
@@ -108,6 +115,22 @@ component Vidro inherits Rectangle {
             image-fit: fill;
             opacity: DeskArt.blur.width > 0 ? 1 : 0;
             animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        }
+        // O vidro desfoca o que está atrás dele: a arte já com a luz da cor do jogo e os escurecimentos da janela.
+        if lens && DeskArt.has-art: Rectangle {
+            x: -ax;
+            y: -ay;
+            width: DeskArt.win-w;
+            height: DeskArt.win-h;
+            Rectangle { background: DeskArt.accent.with-alpha(0.22); }
+            Rectangle {
+                background: DeskArt.small
+                    ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
+                        Ui.art-scrim-left 36%, Ui.art-scrim-left 74%, Ui.art-scrim-left.with-alpha(0) 90%)
+                    : @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
+                        Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
+            }
+            Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%); }
         }
         if !DeskArt.gray: Rectangle {
             background: layer || dense || bright ? Ui.glass-panel-dense : Ui.glass-panel;
@@ -626,7 +649,8 @@ component GameRow inherits Rectangle {
             height: Ui.thumb-size;
             border-radius: Ui.radius-thumb;
             clip: true;
-            background: @linear-gradient(160deg, data.accent 0%, data.accent.darker(0.5) 100%);
+            // Sem capa: tons fechados da cor do jogo, nunca a cor pura.
+            background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.55) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
             Image { width: parent.width; height: parent.height; source: data.thumb; image-fit: cover; }
         }
         Text {
@@ -696,7 +720,7 @@ component GameList inherits Rectangle {
             }
         }
     }
-    clip: true;
+    // Sem `clip` aqui: o Flickable já recorta as linhas e a barra de rolagem fica fora, na borda do painel.
     fl := Flickable {
         viewport-height: games.length * row-h;
         for i in shown: GameRow {
@@ -718,9 +742,11 @@ component GameList inherits Rectangle {
             }
         }
     }
+    // Quanto a barra de rolagem sai para a direita: encostada na borda do painel, não no fim das linhas.
+    in property <length> bar-out;
     // Barra de rolagem fina (só quando a lista passa da altura).
     if games.length * row-h > fl.height: Rectangle {
-        x: parent.width - 3px;
+        x: parent.width + bar-out - 5px;
         width: 3px;
         border-radius: 1.5px;
         y: -fl.viewport-y / (games.length * row-h) * fl.height;
@@ -879,21 +905,34 @@ component CoverCard inherits Rectangle {
         animate x, y, width, height { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         border-radius: Ui.radius-card;
         clip: true;
-        background: @linear-gradient(160deg, data.accent 0%, data.accent.darker(0.6) 100%);
+        background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.6) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
         opacity: data.installed ? 1 : 0.45;
+        drop-shadow-offset-y: 10px;
+        drop-shadow-blur: 26px;
+        drop-shadow-color: Ui.shadow-float-color;
+        // Luz no alto à esquerda, como a Cover da tela cheia.
+        Rectangle {
+            x: -parent.width * 0.3;
+            y: -parent.height * 0.6;
+            width: parent.width * 1.2;
+            height: parent.height * 1.4;
+            background: @radial-gradient(circle, Ui.on-accent.with-alpha(0.12) 0%, Ui.on-accent.with-alpha(0) 60%);
+        }
         if data.cover.width == 0: Text {
             x: 14px;
             width: parent.width - 28px;
             text: data.title;
             color: Ui.on-accent;
+            font-family: Ui.font-heading;
             font-size: 19px * Ui.text-scale;
-            font-weight: 800;
+            font-weight: 700;
             letter-spacing: -0.01 * self.font-size;
             horizontal-alignment: center;
             wrap: word-wrap;
         }
         Image { width: parent.width; height: parent.height; source: data.cover; image-fit: cover; }
         Rectangle { background: cta.has-hover && !focused ? Ui.glass-hover : transparent; }
+        Rectangle { border-radius: Ui.radius-card; border-width: 1px; border-color: Ui.glass-edge; }
         if data.checked: Rectangle { border-radius: Ui.radius-card; border-width: 3px; border-color: Ui.primary-top; }
     }
     if focused: Rectangle {
@@ -920,21 +959,20 @@ component CoverCard inherits Rectangle {
     if data.favorite: Rectangle {
         x: 8px;
         y: 8px;
-        width: 26px;
-        height: 26px;
-        border-radius: 13px;
-        background: Ui.glass-panel-dense;
-        Icon { name: "starfill"; size: 14px; tint: Ui.warning; }
+        width: 28px;
+        height: 28px;
+        border-radius: 14px;
+        background: Ui.desk-canvas.with-alpha(0.6);
+        Icon { name: "starfill"; size: 16px; tint: Ui.warning; }
     }
     if data.running: Rectangle {
-        x: root.width - 20px;
-        y: 8px;
-        width: 12px;
-        height: 12px;
-        border-radius: 6px;
-        background: Ui.success;
-        border-width: 2px;
-        border-color: Ui.desk-canvas;
+        x: root.width - 25px;
+        y: 7px;
+        width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        background: Ui.desk-canvas.with-alpha(0.65);
+        Rectangle { width: 12px; height: 12px; border-radius: 6px; background: Ui.success; }
     }
     HorizontalLayout {
         y: root.cover-h + 10px;
@@ -943,13 +981,13 @@ component CoverCard inherits Rectangle {
         Text {
             text: data.title;
             color: data.installed ? Ui.on-accent : Ui.desk-on-muted;
-            font-size: Ui.desk-label;
-            font-weight: 500;
+            font-size: 14px * Ui.text-scale;
+            font-weight: data.installed ? 600 : 500;
             horizontal-stretch: 1;
             overflow: elide;
             vertical-alignment: center;
         }
-        Icon { name: data.store-icon; size: 16px; tint: Ui.desk-on-subtle; y: 3px; }
+        Icon { name: data.store-icon; size: 16px; tint: Ui.desk-on-muted; y: 3px; }
     }
     cta := TouchArea {
         y: 0;
@@ -983,7 +1021,7 @@ component CoverGrid inherits Rectangle {
     callback menu(length, length);
     callback scrolled(int);
     property <length> cell-w: (self.width - (columns - 1) * 22px) / columns;
-    property <length> row-h: cell-w * 1.5 + 54px;
+    property <length> row-h: cell-w * 1.5 + 32px + 26px;
     property <int> rows: ceil(games.length / columns);
     property <int> first-row: max(0, floor(-fl.viewport-y / row-h));
     property <int> shown-rows: min(ceil(fl.height / row-h) + 1, max(0, rows - first-row));
@@ -1033,7 +1071,8 @@ component CategoryRows inherits Rectangle {
     callback menu(length, length);
     callback scrolled(int);
     property <length> cell-w: 150px;
-    property <length> row-h: cell-w * 1.5 + 112px;
+    // Cabeçalho (20) + 14 até as capas, capa, 10 + nome, e 22 até a próxima fileira (gd-shead, gd-shelves).
+    property <length> row-h: cell-w * 1.5 + 34px + 6px + 32px + 22px;
     property <int> first: max(0, floor(-fl.viewport-y / row-h));
     property <int> shown: min(ceil(fl.height / row-h) + 1, max(0, rows.length - first));
     changed first => { root.scrolled(first); }
@@ -1055,7 +1094,7 @@ component CategoryRows inherits Rectangle {
             height: row-h;
             HorizontalLayout {
                 y: 0;
-                height: 40px;
+                height: 24px;
                 spacing: 12px;
                 Text { text: cat.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; vertical-alignment: center; }
                 Text { text: cat.count; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; vertical-alignment: center; }
@@ -1080,8 +1119,8 @@ component CategoryRows inherits Rectangle {
                 }
             }
             hf := Flickable {
-                y: 48px;
-                height: row-h - 48px;
+                y: 34px;
+                height: row-h - 34px;
                 viewport-width: cat.games.length * (cell-w + 20px);
                 interactive: self.viewport-width > self.width;
                 for g[j] in cat.games: CoverCard {
@@ -1102,7 +1141,7 @@ component CategoryRows inherits Rectangle {
             // ‹ › nas pontas da fileira quando ela passa da largura (nada só por arrastar).
             if hf.viewport-width > hf.width: Rectangle {
                 x: 0;
-                y: 48px + cell-w * 0.75 - 18px;
+                y: 40px + cell-w * 0.75 - 18px;
                 width: 36px;
                 height: 36px;
                 border-radius: 18px;
@@ -1118,7 +1157,7 @@ component CategoryRows inherits Rectangle {
             }
             if hf.viewport-width > hf.width: Rectangle {
                 x: parent.width - 36px;
-                y: 48px + cell-w * 0.75 - 18px;
+                y: 40px + cell-w * 0.75 - 18px;
                 width: 36px;
                 height: 36px;
                 border-radius: 18px;
@@ -1317,7 +1356,8 @@ component AboutCard inherits Vidro {
         padding-bottom: small ? Ui.space-16 : Ui.space-20;
         spacing: small ? 10px : Ui.space-16;
         CardTitle { text: title; }
-        Text { text: root.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; }
+        // A descrição ocupa a sobra e corta com "…": não pede altura para a fileira crescer.
+        Text { text: root.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; min-height: 0; preferred-height: 0; }
         if genres.length > 0 || more: VerticalLayout {
             spacing: Ui.space-12;
             Rectangle { height: 1px; background: Ui.glass-edge; }
@@ -1380,17 +1420,19 @@ component DetailsCard inherits Vidro {
     in property <[DeskInfo]> rows;
     in property <bool> small;
     // Coluna dos rótulos pelo mais longo, nunca menos que 104 (corrige o "Desenvolv…").
-    property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
+    property <length> label-w: small ? 80px * Ui.text-scale : max(104px, 13 * 7.4px * Ui.text-scale);
     VerticalLayout {
         padding-left: small ? Ui.space-16 : Ui.space-24;
         padding-right: small ? Ui.space-16 : Ui.space-24;
         padding-top: small ? Ui.space-16 : Ui.space-24;
         padding-bottom: small ? Ui.space-16 : Ui.space-20;
-        spacing: small ? 6px : 10px;
+        // Título → linhas 8; as linhas dividem a altura sem espaço entre elas (mín. 28, máx. 40).
+        spacing: 0;
         CardTitle { text: title; }
+        Rectangle { height: small ? 4px : 8px; }
         for r[i] in rows: Rectangle {
             vertical-stretch: 1;
-            min-height: small ? 22px : 26px;
+            min-height: small ? 22px : 28px;
             max-height: 40px;
             if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
             HorizontalLayout {
@@ -1473,7 +1515,7 @@ component SessionsCard inherits Vidro {
 }
 
 // Fileira de cartões do destaque: Sobre, Trailer, Detalhes e Sessões, 20 entre eles.
-component CardRow inherits HorizontalLayout {
+component CardRow inherits Rectangle {
     in property <DeskGameView> game;
     in property <[DeskInfo]> details;
     in property <string> sessions-summary;
@@ -1486,9 +1528,21 @@ component CardRow inherits HorizontalLayout {
     in property <bool> show-trailer;
     in property <bool> show-sessions;
     callback clicked(string, int);
-    spacing: Ui.space-20;
+    // Largura só pela proporção (flex 1.45 · .9 · 1.1 · 1.1), posta à mão (num layout o texto longo empurra os outros).
+    property <float> s-about: small ? 1 : 1.45;
+    property <float> s-details: small ? 1.2 : 1.1;
+    property <float> total: (show-about ? s-about : 0) + (show-trailer ? 0.9 : 0) + s-details + (show-sessions ? 1.1 : 0);
+    property <int> cards: (show-about ? 1 : 0) + (show-trailer ? 1 : 0) + 1 + (show-sessions ? 1 : 0);
+    property <length> unit: (root.width - (cards - 1) * Ui.space-20) / total;
+    property <length> about-w: show-about ? unit * s-about + Ui.space-20 : 0;
+    property <length> trailer-w: show-trailer ? unit * 0.9 + Ui.space-20 : 0;
+    property <length> details-w: unit * s-details;
+    // Altura que o conteúdo pede (Detalhes com seis linhas), para a fileira crescer em vez de cortar.
+    out property <length> content-h: dc.min-height;
     if show-about: AboutCard {
-        horizontal-stretch: 1.45;
+        x: 0;
+        height: root.height;
+        width: unit * s-about;
         title: about-label;
         text: game.description;
         more: game.about-more;
@@ -1499,19 +1553,25 @@ component CardRow inherits HorizontalLayout {
         more-clicked => { root.clicked("about-more", 0); }
     }
     if show-trailer: TrailerCard {
-        horizontal-stretch: 0.9;
+        x: about-w;
+        height: root.height;
+        width: unit * 0.9;
         art: game.art;
         label: card-labels[3];
         clicked => { root.clicked("trailer", 0); }
     }
-    DetailsCard {
-        horizontal-stretch: 1.1;
+    dc := DetailsCard {
+        x: about-w + trailer-w;
+        height: root.height;
+        width: details-w;
         title: details-label;
         rows: details;
         small: small;
     }
     if show-sessions: SessionsCard {
-        horizontal-stretch: 1.1;
+        x: about-w + trailer-w + details-w + Ui.space-20;
+        height: root.height;
+        width: unit * 1.1;
         labels: card-labels;
         summary: sessions-summary;
         rows: sessions;
@@ -1554,7 +1614,8 @@ component GameStage inherits VerticalLayout {
         }
     }
     property <bool> show-trailer: game.trailer && !small;
-    property <bool> show-sessions: sessions.length > 0 && !small;
+    // Sessões só com espaço para Detalhes ficar com pelo menos ~340 (ícone, rótulo de 104 e um valor de 24 letras).
+    property <bool> show-sessions: sessions.length > 0 && !small && DeskArt.win-w >= 1600px;
     alignment: end;
     spacing: small ? Ui.space-16 : Ui.space-28;
     VerticalLayout {
@@ -1566,21 +1627,34 @@ component GameStage inherits VerticalLayout {
             alignment: start;
             Badge { text: game.overline; live: game.running; }
         }
-        // Título em até duas linhas, até 620 de largura (520 na janela pequena), crescendo para cima.
+        // Título em até duas linhas, até 620 de largura (520 na janela pequena), crescendo para cima: um título longo
+        // encolhe (até 36) para caber em duas.
         HorizontalLayout {
-            Text {
+            title-measure := Text {
+                visible: false;
+                width: 0;
                 text: game.title;
-                color: Ui.on-accent;
                 font-family: Ui.font-heading;
                 font-size: small ? 40px * Ui.text-scale : Ui.desk-display;
                 font-weight: 700;
-                letter-spacing: -0.025 * self.font-size;
-                wrap: word-wrap;
-                overflow: elide;
-                max-height: 2.1 * self.font-size;
-                max-width: small ? 520px : 620px;
+                letter-spacing: -0.02 * self.font-size;
             }
-            Rectangle { horizontal-stretch: 1; }
+            Text {
+                property <length> base: title-measure.font-size;
+                property <length> fit: base * 1.7 * (small ? 520px : 620px) / max(1px, title-measure.preferred-width);
+                text: game.title;
+                color: Ui.on-accent;
+                font-family: Ui.font-heading;
+                font-size: max(min(base, fit), 36px * Ui.text-scale);
+                font-weight: 700;
+                letter-spacing: -0.02 * self.font-size;
+                // Sem `max-height`: com ele o Slint cortava na primeira linha; o tamanho acima já limita a duas.
+                wrap: word-wrap;
+                max-width: small ? 520px : 620px;
+                // Sem esticar, o Text ficava com a largura da palavra mais longa e cortava.
+                horizontal-stretch: 1;
+            }
+            Rectangle { horizontal-stretch: 0.0001; }
         }
         if stats.length > 0: HorizontalLayout {
             alignment: start;
@@ -1618,8 +1692,9 @@ component GameStage inherits VerticalLayout {
         if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
     }
     // Com quatro cartões (Sobre, Trailer, Detalhes, Sessões) a fileira passa da largura e rola na horizontal.
+    // 248 (190 na janela pequena), crescendo se o conteúdo pedir mais: nada passa da borda do cartão.
     if !(show-trailer && show-sessions): CardRow {
-        height: small ? 190px : Ui.card-height;
+        height: max(small ? 190px : Ui.card-height, self.content-h);
         game: game;
         details: details;
         sessions-summary: sessions-summary;
@@ -1661,7 +1736,7 @@ component SortFilter inherits HorizontalLayout {
     in property <int> filter-count;
     in property <[string]> labels;
     callback clicked(string);
-    spacing: 2px;
+    spacing: 8px;
     IconBtn { icon: "sort"; label: labels[3]; on: reversed; clicked => { root.clicked("reverse"); } }
     IconBtn {
         icon: "filter";
@@ -1703,6 +1778,7 @@ component DeskLibrary inherits Rectangle {
     in property <bool> reversed;
     in property <string> view: "list";
     in property <string> group-label;
+    in property <string> group-prefix;
     in property <[PanelRow]> bulk;
     in property <bool> loading;
     in property <string> loading-label;
@@ -1796,6 +1872,7 @@ component DeskLibrary inherits Rectangle {
                     }
                     if !loading && games.length > 0: GameList {
                         height: parent.height - (selecting ? 60px : 0);
+                        bar-out: Ui.space-12;
                         games: games;
                         selected: selected;
                         selecting: selecting;
@@ -1875,7 +1952,8 @@ component DeskLibrary inherits Rectangle {
                     padding-left: 18px;
                     padding-right: 14px;
                     spacing: 6px;
-                    Text { text: group-label; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; vertical-alignment: center; }
+                    Text { text: group-prefix; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
+                    Text { text: group-label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
                     Icon { name: "updown"; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                 }
                 TouchArea {
@@ -2027,8 +2105,11 @@ component DeskRow inherits Rectangle {
     in property <bool> focused;
     in property <bool> first: true;
     in property <bool> last: true;
-    // Escolhas mostram o valor e "›" (clicar passa ao próximo; ←→ ajustam); só o controle deslizante tem ‹ ›.
-    in property <bool> adjustable: data.kind == "slider";
+    // PainelLateral (filtros): escolhas com ‹ › e liga/desliga como caixa de marcar. Nos outros lugares a escolha
+    // mostra o valor e "›" (Configurações deste jogo) ou um menu em pílula (Configurações).
+    in property <bool> side-panel;
+    in property <bool> adjustable: data.kind == "slider" || (side-panel && data.kind == "choice");
+    property <bool> as-check: side-panel && data.kind == "toggle";
     // Opção solta num diálogo ("Não perguntar de novo"): linha sem caixa.
     in property <bool> loose;
     // Lista do onboarding (LojaEncontrada): linhas sem caixa, separadas por divisórias.
@@ -2079,10 +2160,10 @@ component DeskRow inherits Rectangle {
         height: parent.height;
         padding-left: loose || bare ? 4px : 18px;
         padding-right: 14px;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        padding-top: DeskArt.gray ? 12px : 10px;
+        padding-bottom: DeskArt.gray ? 12px : 10px;
         spacing: 14px;
-        if data.kind == "radio" || data.kind == "check": Rectangle {
+        if data.kind == "radio" || data.kind == "check" || as-check: Rectangle {
             width: 20px;
             Rectangle {
                 width: 20px;
@@ -2125,7 +2206,7 @@ component DeskRow inherits Rectangle {
                 wrap: word-wrap;
             }
         }
-        if data.kind == "toggle": DeskToggle { on: data.on; y: (parent.height - self.height) / 2; }
+        if data.kind == "toggle" && !as-check: DeskToggle { on: data.on; y: (parent.height - self.height) / 2; }
         // Bateria do controle (28 × 12), sempre com o número; abaixo de 20% em `warning`.
         if data.key == "controller" && data.value != "": battery := Rectangle {
             width: 32px;
@@ -2175,7 +2256,17 @@ component DeskRow inherits Rectangle {
                 Rectangle { width: 14px; Icon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
             }
         }
-        if data.value != "" && data.kind != "toggle" && data.kind != "slider" && !(data.kind == "choice" && DeskArt.gray): Text {
+        // Nas Configurações a ação é um botão em pílula com o nome dela ("Trocar", "Procurar").
+        if data.kind == "action" && data.value != "" && DeskArt.gray: Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 36px;
+            width: al.preferred-width + 32px;
+            border-radius: self.height / 2;
+            background: ta.has-hover ? Ui.settings-control-hover : Ui.settings-control;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            al := Text { text: data.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
+        }
+        if data.value != "" && data.kind != "toggle" && data.kind != "slider" && !(data.kind == "choice" && DeskArt.gray) && !(data.kind == "action" && DeskArt.gray): Text {
             text: data.value;
             color: data.emphasized ? Ui.on-accent : Ui.desk-on-muted;
             font-size: Ui.desk-label-sm;
@@ -2186,7 +2277,7 @@ component DeskRow inherits Rectangle {
             overflow: elide;
         }
         if adjustable: AdjustButton { label: "›"; y: (parent.height - self.height) / 2; clicked => { root.inc(); } }
-        if (data.kind == "action" || data.kind == "button" || (data.kind == "choice" && !DeskArt.gray)) && !adjustable: Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
+        if (data.kind == "action" || data.kind == "button" || (data.kind == "choice" && !DeskArt.gray)) && !adjustable && !as-check && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
 }
 
@@ -2242,6 +2333,7 @@ component RowScroll inherits Rectangle {
     // Diálogo: as ações ficam na ordem do Tako, empilhadas em largura total; um grupo de uma linha só fica solto.
     in property <bool> inline-buttons;
     in property <bool> bare;
+    in property <bool> side-panel;
     in property <length> gap: Ui.space-8;
     // Outra camada no mesmo lugar (outro título): volta ao topo.
     in property <string> content-key;
@@ -2282,6 +2374,7 @@ component RowScroll inherits Rectangle {
                 row := DeskRow {
                     visible: !(button && (footer || inline-buttons));
                     bare: root.bare;
+                    side-panel: root.side-panel;
                     data: r;
                     loose: inline-buttons && !root.body(i - 1) && !root.body(i + 1);
                     first: !root.body(i - 1);
@@ -2305,7 +2398,7 @@ component CloseButton inherits Rectangle {
     border-radius: size / 2;
     background: cta.has-hover ? Ui.glass-hover : Ui.glass-control;
     accessible-role: button;
-    Icon { name: "close"; size: 16px; tint: Ui.desk-on-muted; }
+    Icon { name: "close"; size: 18px; tint: Ui.on-accent; }
     cta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
@@ -2352,7 +2445,6 @@ component DeskSettings inherits Rectangle {
     property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
     HorizontalLayout {
         spacing: small ? Ui.space-20 : Ui.space-28;
-        alignment: start;
         Vidro {
             width: list-w;
             height: cl.preferred-height;
@@ -2376,7 +2468,8 @@ component DeskSettings inherits Rectangle {
                 for c[i] in categories: Rectangle {
                     // Na busca, a categoria sem nada que combine fica apagada.
                     opacity: c.count == "0" ? 0.4 : 1;
-                    height: Ui.list-row-height + (Ui.text-scale - 1) * 32px;
+                    // Na janela pequena as oito categorias cabem em 600 de altura.
+                    height: (small ? Ui.control-height : Ui.list-row-height) + (Ui.text-scale - 1) * 32px;
                     border-radius: Ui.radius-row;
                     background: !c.selected && cta.has-hover ? Ui.glass-hover : transparent;
                     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -2413,8 +2506,12 @@ component DeskSettings inherits Rectangle {
             VerticalLayout {
                 max-width: 860px;
                 horizontal-stretch: 1;
+                // Ancorado no topo: numa janela alta a sobra fica embaixo das linhas.
+                alignment: start;
                 spacing: Ui.space-12;
+                // Cabeçalho na altura do conteúdo: numa janela alta a sobra fica nas linhas, não aqui.
                 HorizontalLayout {
+                    vertical-stretch: 0;
                     padding-top: 4px;
                     padding-bottom: 10px;
                     padding-left: 8px;
@@ -2424,6 +2521,7 @@ component DeskSettings inherits Rectangle {
                         Icon { name: categories[category-focus].icon; size: 34px; tint: Ui.on-accent; }
                     }
                     VerticalLayout {
+                        alignment: center;
                         spacing: 6px;
                         Text { text: heading; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-headline; font-weight: 700; letter-spacing: -0.01 * self.font-size; }
                         Text { text: subtitle; color: Ui.desk-on-muted; font-size: Ui.desk-label; wrap: word-wrap; }
@@ -2814,7 +2912,7 @@ component DeskOverlay inherits Rectangle {
                 // Janela baixa: o título cai para 40, como no destaque da janela pequena.
                 font-size: root.height < 760px ? 40px * Ui.text-scale : Ui.desk-display;
                 font-weight: 800;
-                letter-spacing: -0.025 * self.font-size;
+                letter-spacing: -0.02 * self.font-size;
                 wrap: word-wrap;
                 max-width: 520px;
             }
@@ -2872,9 +2970,10 @@ component DeskOverlay inherits Rectangle {
             x: parent.width - self.width - Ui.space-36 + (shown ? 0 : 48px);
             opacity: shown ? 1 : 0;
             animate x, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            y: Ui.space-36;
-            width: min(parent.width - 120px, ov.wide ? 580px : 440px);
-            height: min(parent.height - 2 * Ui.space-36, pl.preferred-height);
+            // O largo (Configurações deste jogo) fica abaixo da barra superior: 84 do topo, 28 de baixo, 480 de largura.
+            y: ov.wide ? 84px : Ui.space-36;
+            width: min(parent.width - 120px, ov.wide ? 480px : 440px);
+            height: min(parent.height - (ov.wide ? 84px + Ui.space-28 : 2 * Ui.space-36), pl.preferred-height);
             TouchArea { }
             pl := VerticalLayout {
                 padding: 22px;
@@ -2886,7 +2985,7 @@ component DeskOverlay inherits Rectangle {
                         horizontal-stretch: 1;
                         alignment: center;
                         spacing: 4px;
-                        if ov.overline != "": Text {
+                        if ov.overline != "" && !ov.wide: Text {
                             text: ov.overline;
                             color: Ui.desk-on-muted;
                             font-size: Ui.desk-overline;
@@ -2895,6 +2994,8 @@ component DeskOverlay inherits Rectangle {
                             overflow: elide;
                         }
                         Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
+                        // No largo, o jogo e as mudanças vão embaixo do título.
+                        if ov.overline != "" && ov.wide: Text { text: ov.overline; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; }
                     }
                     CloseButton { size: 40px; clicked => { root.clicked("outside", 0); } }
                 }
@@ -2903,6 +3004,7 @@ component DeskOverlay inherits Rectangle {
                     vertical-stretch: 1;
                     preferred-height: self.content-h;
                     footer: true;
+                    side-panel: !ov.wide;
                     content-key: ov.title;
                     rows: ov.rows;
                     sel: top-most ? ov.sel : -1;
@@ -3133,8 +3235,11 @@ component ArtLayer inherits Rectangle {
         }
         // Escurecimento: leve atrás da lista (a arte aparece pelo vidro), 70% atrás do título, nada à direita.
         Rectangle {
-            background: @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
-                Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
+            background: DeskArt.small
+                ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
+                    Ui.art-scrim-left 36%, Ui.art-scrim-left 74%, Ui.art-scrim-left.with-alpha(0) 90%)
+                : @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
+                    Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
         }
         Rectangle {
             background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%);
@@ -3202,6 +3307,7 @@ export component Desktop inherits Window {
     in property <bool> desk-reversed;
     in property <string> desk-view: "list";
     in property <string> desk-group-label;
+    in property <string> desk-group-prefix;
     in property <[PanelRow]> desk-bulk;
     in property <bool> desk-loading;
     in property <string> desk-loading-label;
@@ -3248,7 +3354,8 @@ export component Desktop inherits Window {
     default-font-family: Ui.font-desk;
 
     // Janela abaixo de 1280 de largura: margens, cartões e título encolhem (JanelaPequena).
-    property <bool> small: self.width < 1280px;
+    // Janela baixa (1280 × 720) também: título, faixa, ações e cartões de 248 não cabem em 720.
+    property <bool> small: self.width < 1280px || self.height < 760px;
 
     init => {
         // Escala de mesa dos tokens (o palco da tela cheia tem 1080 unidades de altura).
@@ -3381,6 +3488,7 @@ export component Desktop inherits Window {
                 reversed: desk-reversed;
                 view: desk-view;
                 group-label: desk-group-label;
+                group-prefix: desk-group-prefix;
                 bulk: desk-bulk;
                 loading: desk-loading;
                 loading-label: desk-loading-label;

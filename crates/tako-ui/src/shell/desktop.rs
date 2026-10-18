@@ -1156,15 +1156,11 @@ impl Page for DesktopLibrary {
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
+        // "Agrupar por **Status**": o nome do agrupamento em destaque.
+        out.set("desk-group-prefix", ctx.t("desktop.group.by_prefix"));
         out.set(
             "desk-group-label",
-            ctx.tf(
-                "desktop.group.by",
-                &[(
-                    "group",
-                    &ctx.t(&format!("desktop.group.{}", GroupBy::of(ctx).key())),
-                )],
-            ),
+            ctx.t(&format!("desktop.group.{}", GroupBy::of(ctx).key())),
         );
         out.set(
             "desk-bulk",

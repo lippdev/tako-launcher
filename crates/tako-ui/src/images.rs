@@ -26,8 +26,9 @@ struct Request {
 pub const GLASS_GRID: (u32, u32) = (16, 9);
 /// Altura da cópia de vidro. Pequena de propósito: desfocada, não precisa de mais, e o desfoque fica barato.
 const GLASS_HEIGHT: u32 = 240;
-/// `glass-blur` (28px) na escala da cópia, para uma arte mostrada na altura de uma janela de ~900px.
-const GLASS_SIGMA: f32 = 28.0 * GLASS_HEIGHT as f32 / 900.0;
+/// Desfoque na escala da cópia, para uma arte mostrada na altura de uma janela de ~900px: a borda da janela já
+/// desfoca a arte em 42px e o vidro desfoca de novo em `glass-blur` (28px); juntos dão ~50px.
+const GLASS_SIGMA: f32 = 50.0 * GLASS_HEIGHT as f32 / 900.0;
 /// `glass-saturate` (140%).
 const GLASS_SATURATE: f32 = 1.4;
 
@@ -301,7 +302,7 @@ pub(crate) fn glass_copy(img: &image::DynamicImage) -> (image::RgbaImage, Vec<f3
         let sat = |c: f32| (gray + (c - gray) * GLASS_SATURATE).clamp(0.0, 255.0) as u8;
         p.0 = [sat(r), sat(g), sat(b), 255];
     }
-    let blurred = image::imageops::fast_blur(&small, GLASS_SIGMA);
+    let blurred = image::imageops::blur(&small, GLASS_SIGMA);
     let (cols, rows) = GLASS_GRID;
     let mut lum = Vec::with_capacity((cols * rows) as usize);
     for row in 0..rows {
