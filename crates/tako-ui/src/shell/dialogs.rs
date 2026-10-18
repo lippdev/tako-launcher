@@ -422,7 +422,7 @@ pub fn broken_game(ctx: &Ctx, id: &str) -> MenuLayer {
 }
 
 /// Histórico de sessões (SESSION-002): data, hora e duração, da mais recente para a mais antiga.
-fn sessions(ctx: &Ctx, id: &str) -> MenuLayer {
+pub fn sessions(ctx: &Ctx, id: &str) -> MenuLayer {
     let id = id.to_owned();
     MenuLayer::panel(ctx.t("options.sessions"), move |ctx| {
         let lang = ctx.lang();

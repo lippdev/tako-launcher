@@ -23,6 +23,9 @@ about = "About the game"
 details = "Details"
 add_game = "Add game"
 search_key = "Ctrl + K"
+install_via = "Install {via}"
+about_more = "More"
+trailer = "Trailer"
 search_esc = "Esc"
 theme_big_picture = "Themes apply to full screen. Desktop mode uses Tako's own look."
 
@@ -101,3 +104,27 @@ library_text = "Tako looks in the installed stores."
 rescan = "Look for games"
 tab = "No games here"
 loading = "Reading the library…"
+
+[desktop.badge]
+playing = "Playing"
+broken = "Broken"
+
+[desktop.day]
+today = "Today"
+yesterday = "Yesterday"
+
+[desktop.strip]
+last_session = "Last session"
+current_session = "Current session"
+playing_now = "playing now"
+never_played = "Never played"
+not_played = "Not played yet"
+
+[desktop.info]
+critic = "Critics"
+tags = "Tags"
+
+[desktop.sessions]
+title = "Sessions"
+see_all = "See all"
+summary = "{n} sessions · {avg} on average"

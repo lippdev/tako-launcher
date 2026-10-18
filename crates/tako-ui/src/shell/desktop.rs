@@ -5,7 +5,7 @@
 
 use super::library::Criteria;
 use super::{Cmd, Ctx, Effect, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles};
-use crate::model::{DeskCategory, DeskGame, DeskGameView, Hint, NavItem, PanelRow, Stat};
+use crate::model::{DeskCategory, DeskGame, DeskGameView, DeskInfo, Hint, NavItem, PanelRow};
 use crate::values::parse_color;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -160,6 +160,8 @@ enum Action {
     Play,
     Favorite,
     More,
+    /// Configurações deste jogo (a engrenagem).
+    Settings,
     End,
 }
 
@@ -482,12 +484,13 @@ impl DesktopLibrary {
         self.cat_focus = (0, 0);
     }
 
+    /// AcoesDoJogo: Jogar, favoritar, ⋯ e a engrenagem; com o jogo aberto, Voltar ao jogo, Encerrar e ⋯.
     fn actions(&self, ctx: &Ctx, g: &Game) -> Vec<Action> {
-        let mut v = vec![Action::Play, Action::Favorite, Action::More];
         if ctx.running.as_ref().is_some_and(|r| r.id == g.id) {
-            v.push(Action::End);
+            vec![Action::Play, Action::End, Action::More]
+        } else {
+            vec![Action::Play, Action::Favorite, Action::More, Action::Settings]
         }
-        v
     }
 
     fn run(&mut self, action: Action, ctx: &mut Ctx) -> Nav {
@@ -508,6 +511,7 @@ impl DesktopLibrary {
                 Nav::Stay
             }
             Action::More => Nav::Layer(Box::new(dialogs::more_actions(ctx, &id))),
+            Action::Settings => Nav::Layer(dialogs::game_settings(ctx, &id)),
             Action::End => {
                 ctx.effect(Effect::EndGame);
                 Nav::Stay
@@ -551,36 +555,177 @@ impl DesktopLibrary {
     }
 }
 
-/// Tempo de jogo, última vez, tamanho e loja: a linha de informações ao lado de Jogar.
-fn summary(ctx: &Ctx, g: &Game) -> Vec<Stat> {
+/// "Hoje", "Ontem" ou o dia e o mês, para a última sessão e o cartão de Sessões.
+fn day(ctx: &Ctx, at: chrono::DateTime<chrono::Local>) -> String {
+    let today = chrono::Local::now().date_naive();
+    let d = at.date_naive();
+    if d == today {
+        ctx.t("desktop.day.today")
+    } else if today.pred_opt() == Some(d) {
+        ctx.t("desktop.day.yesterday")
+    } else {
+        game_text::short_date(ctx.lang(), d)
+    }
+}
+
+/// Faixa de estado do destaque: Última sessão e Tempo de jogo. Nuvem e Conquistas só entram quando o Tako tiver esses
+/// dados (sem métricas inventadas).
+fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let lang = ctx.lang();
-    let dash = || "—".to_owned();
-    vec![
-        Stat {
-            label: ctx.t("desktop.play_time"),
-            value: if g.play_time.is_zero() {
-                dash()
-            } else {
-                game_text::play_time(lang, g.play_time)
+    let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
+    let last = ctx.library.sessions(&g.id).last().map(|s| s.started_at);
+    let session = if running {
+        DeskInfo {
+            icon: "calendar".into(),
+            label: ctx.t("desktop.strip.current_session"),
+            value: ctx.t("desktop.strip.playing_now"),
+            dot: true,
+            ..Default::default()
+        }
+    } else {
+        let value = match last.or(g.last_played_at) {
+            Some(at) => {
+                let at = at.with_timezone(&chrono::Local);
+                format!("{}, {}", day(ctx, at), at.format("%H:%M"))
+            }
+            None => ctx.t("desktop.strip.never_played"),
+        };
+        DeskInfo {
+            icon: "calendar".into(),
+            label: ctx.t("desktop.strip.last_session"),
+            value,
+            ..Default::default()
+        }
+    };
+    let time = DeskInfo {
+        icon: "clock".into(),
+        label: ctx.t("desktop.play_time"),
+        value: if g.play_time.is_zero() {
+            ctx.t("desktop.strip.not_played")
+        } else {
+            game_text::play_time(lang, g.play_time)
+        },
+        ..Default::default()
+    };
+    vec![session, time]
+}
+
+/// CartaoDetalhes: uma linha com ícone por informação que o jogo tem, até 6, as de menor prioridade saem primeiro.
+/// O tempo de jogo e a última vez ficam só na faixa do destaque.
+fn details_rows(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
+    let lang = ctx.lang();
+    // (prioridade, linha): 0 é a mais importante.
+    let mut rows: Vec<(u8, DeskInfo)> = Vec::new();
+    let mut add = |prio: u8, icon: &str, key: &str, value: String| {
+        if !value.trim().is_empty() {
+            rows.push((
+                prio,
+                DeskInfo {
+                    icon: icon.into(),
+                    label: ctx.t(key),
+                    value,
+                    ..Default::default()
+                },
+            ));
+        }
+    };
+    if let Some(d) = g.release_date {
+        add(1, "calendar", "details.release", game_text::date(lang, d));
+    }
+    if let Some(score) = g.metacritic_score.or(g.critic_score) {
+        add(5, "star", "desktop.info.critic", score.to_string());
+    }
+    let genres: Vec<&str> = g.genres.iter().take(2).map(String::as_str).collect();
+    add(2, "tag", "details.genres", genres.join(" · "));
+    if let Some(dev) = &g.developer {
+        let first = dev.split([',', ';']).next().unwrap_or(dev).trim();
+        add(3, "user", "details.developer", first.to_owned());
+    }
+    if let Some(f) = &g.franchise {
+        add(6, "layers", "details.series", f.clone());
+    }
+    if !g.tags.is_empty() {
+        rows.push((
+            4,
+            DeskInfo {
+                icon: "tag".into(),
+                label: ctx.t("desktop.info.tags"),
+                chips: g.tags.iter().take(3).cloned().collect(),
+                value: if g.tags.len() > 3 {
+                    format!("+{}", g.tags.len() - 3)
+                } else {
+                    String::new()
+                },
+                ..Default::default()
             },
+        ));
+    }
+    rows.push((
+        0,
+        DeskInfo {
+            icon: "check".into(),
+            label: ctx.t("details.status"),
+            value: game_text::status(lang, g),
+            dot: g.is_installed,
+            ..Default::default()
         },
-        Stat {
-            label: ctx.t("desktop.last_played"),
-            value: if g.last_played_at.is_some() {
-                game_text::last_played(lang, g.last_played_at, chrono::Utc::now())
-            } else {
-                ctx.t("desktop.never")
-            },
-        },
-        Stat {
-            label: ctx.t("desktop.size"),
-            value: g.size_label.clone().unwrap_or_else(dash),
-        },
-        Stat {
-            label: ctx.t("desktop.store"),
-            value: game_text::store_name(lang, g.store()),
-        },
-    ]
+    ));
+    while rows.len() > 6 {
+        if let Some(worst) = rows.iter().enumerate().max_by_key(|(_, (p, _))| *p).map(|(i, _)| i) {
+            rows.remove(worst);
+        }
+    }
+    rows.into_iter().map(|(_, r)| r).collect()
+}
+
+/// Descrição do CartaoSobre: até uns 240 caracteres, cortada na última palavra com "…". `true` quando cortou.
+fn about(description: &str) -> (String, bool) {
+    const LIMIT: usize = 240;
+    let clean = description.split_whitespace().collect::<Vec<_>>().join(" ");
+    if clean.chars().count() <= LIMIT {
+        return (clean, false);
+    }
+    let cut: String = clean.chars().take(LIMIT).collect();
+    let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(head, _)| head);
+    (format!("{}…", cut.trim_end_matches([',', '.', ';', ':'])), true)
+}
+
+/// CartaoSessoes: as 4 últimas sessões (dia, horário, duração) e o resumo; a sessão aberta tem o ponto verde.
+fn sessions_rows(ctx: &Ctx, g: &Game) -> (String, Vec<DeskInfo>) {
+    let lang = ctx.lang();
+    let all = ctx.library.sessions(&g.id);
+    if all.is_empty() {
+        return (String::new(), Vec::new());
+    }
+    let total: std::time::Duration = all.iter().map(|s| s.duration).sum();
+    let avg = total / all.len() as u32;
+    let summary = ctx.tf(
+        "desktop.sessions.summary",
+        &[
+            ("n", &all.len().to_string()),
+            ("avg", &game_text::play_time(lang, avg)),
+        ],
+    );
+    let mut rows: Vec<DeskInfo> = Vec::new();
+    if ctx.running.as_ref().is_some_and(|r| r.id == g.id) {
+        rows.push(DeskInfo {
+            label: ctx.t("desktop.day.today"),
+            detail: ctx.t("desktop.strip.playing_now"),
+            dot: true,
+            ..Default::default()
+        });
+    }
+    for s in all.iter().rev().take(4 - rows.len()) {
+        let start = s.started_at.with_timezone(&chrono::Local);
+        let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
+        rows.push(DeskInfo {
+            label: day(ctx, start),
+            detail: format!("{} – {}", start.format("%H:%M"), end.format("%H:%M")),
+            value: game_text::play_time(lang, s.duration),
+            ..Default::default()
+        });
+    }
+    (summary, rows)
 }
 
 impl Page for DesktopLibrary {
@@ -825,6 +970,34 @@ impl Page for DesktopLibrary {
                 }
             }
             "rescan" => ctx.effect(Effect::Rescan),
+            // Cartões do destaque: o texto inteiro do Sobre, o trailer e o histórico de sessões.
+            "about-more" | "trailer" | "sessions" => {
+                let Some(g) = self.selected(ctx).and_then(|id| ctx.library.find(&id).cloned()) else {
+                    return Nav::Stay;
+                };
+                match zone {
+                    "about-more" => {
+                        let text = g.description.clone();
+                        let layer = super::layer::MenuLayer::dialog(ctx.t("desktop.about"), |ctx| {
+                            vec![super::layer::MenuItem::new(PanelRow::button(
+                                "close",
+                                ctx.t("common.close"),
+                            ))
+                            .on(|_| super::layer::Flow::Close)]
+                        })
+                        .text(text)
+                        .overline(g.title.to_uppercase())
+                        .wide();
+                        return Nav::Layer(Box::new(layer));
+                    }
+                    "trailer" => {
+                        if let Some(url) = g.media.get(tako_core::library::media::VIDEO) {
+                            ctx.effect(Effect::OpenUrl(url.clone()));
+                        }
+                    }
+                    _ => return Nav::Layer(Box::new(dialogs::sessions(ctx, &g.id))),
+                }
+            }
             "game-play" => {
                 self.select_index(ctx, index);
                 return self.run(Action::Play, ctx);
@@ -1025,52 +1198,62 @@ impl Page for DesktopLibrary {
         );
         out.set("desk-selected", cur.map(|i| i as i32).unwrap_or(-1));
         let game = cur.and_then(|i| ctx.library.find(&ids[i]));
+        let mut sessions = (String::new(), Vec::new());
         let (view, actions, stats, details) = match game {
             Some(g) => {
-                let mut overline = game_text::status(lang, g);
-                if g.play_status.is_some() {
-                    overline = format!(
-                        "{overline} · {}",
-                        library_text::status_label(lang, g.play_status)
-                    );
-                }
                 let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
-                let actions: Vec<PanelRow> =
-                    self.actions(ctx, g)
-                        .into_iter()
-                        .map(|a| match a {
-                            Action::Play if running && ctx.launching => {
-                                PanelRow::button("play", ctx.t("desktop.opening"))
-                                    .icon("play")
-                                    .enabled(false)
-                            }
-                            Action::Play => {
-                                let mut row = PanelRow::button("play", tiles::play_label(ctx, g))
-                                    .icon("play");
-                                row.style = "primary".into();
-                                row
-                            }
-                            Action::Favorite => {
-                                let mut row = PanelRow::button(
-                                    "favorite",
-                                    ctx.t(if g.is_favorite {
-                                        "details.unfavorite"
-                                    } else {
-                                        "details.favorite"
-                                    }),
-                                )
-                                .icon(if g.is_favorite { "starfill" } else { "star" });
-                                row.on = g.is_favorite;
-                                row
-                            }
-                            Action::More => {
-                                PanelRow::button("more", ctx.t("desktop.more")).icon("more")
-                            }
-                            Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
-                                .icon("power")
-                                .danger(),
-                        })
-                        .collect();
+                // Etiqueta de estado: JOGANDO, QUEBRADO, INSTALADO ou NÃO INSTALADO (e os casos de ROM e lançamento).
+                let badge = if running {
+                    ctx.t("desktop.badge.playing")
+                } else if g.is_broken {
+                    ctx.t("desktop.badge.broken")
+                } else {
+                    game_text::status(lang, g)
+                };
+                let actions: Vec<PanelRow> = self
+                    .actions(ctx, g)
+                    .into_iter()
+                    .map(|a| match a {
+                        Action::Play if running && ctx.launching => {
+                            PanelRow::button("play", ctx.t("desktop.opening"))
+                                .icon("play")
+                                .enabled(false)
+                        }
+                        Action::Play => {
+                            let (label, icon) = if running {
+                                (ctx.t("game.resume"), "gamepad")
+                            } else if !g.is_installed && !g.is_upcoming() && g.store() != GameStore::Manual {
+                                let via = game_text::store_via(lang, g.store());
+                                (ctx.tf("desktop.install_via", &[("via", &via)]), store_icon(g.store()))
+                            } else {
+                                (tiles::play_label(ctx, g), "play")
+                            };
+                            let mut row = PanelRow::button("play", label).icon(icon);
+                            row.style = "primary".into();
+                            row
+                        }
+                        Action::Favorite => {
+                            let mut row = PanelRow::button(
+                                "favorite",
+                                ctx.t(if g.is_favorite {
+                                    "details.unfavorite"
+                                } else {
+                                    "details.favorite"
+                                }),
+                            )
+                            .icon(if g.is_favorite { "starfill" } else { "star" });
+                            row.on = g.is_favorite;
+                            row
+                        }
+                        Action::More => PanelRow::button("more", ctx.t("desktop.more")).icon("dots"),
+                        Action::Settings => {
+                            PanelRow::button("settings", ctx.t("details.game_settings")).icon("gear")
+                        }
+                        Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
+                            .icon("power")
+                            .danger(),
+                    })
+                    .collect();
                 let hint = if g.is_broken {
                     ctx.t("game.broken_text")
                 } else {
@@ -1080,22 +1263,33 @@ impl Page for DesktopLibrary {
                     .shown_hero()
                     .and_then(crate::images::glass)
                     .unwrap_or_default();
+                let (description, about_more) = about(&g.description);
+                sessions = sessions_rows(ctx, g);
                 (
                     DeskGameView {
                         has_game: true,
                         title: g.title.clone(),
-                        overline: overline.to_uppercase(),
-                        description: g.description.clone(),
+                        overline: badge.to_uppercase(),
+                        description,
                         art: tiles::image(g.shown_hero(), tiles::HERO),
                         art_blur,
                         art_lum,
                         logo: tiles::image(g.shown_logo(), tiles::LOGO),
                         accent: parse_color(&g.accent),
                         hint,
+                        running,
+                        about_more,
+                        genres: g.genres.iter().take(4).cloned().collect(),
+                        genres_more: if g.genres.len() > 4 {
+                            format!("+{}", g.genres.len() - 4)
+                        } else {
+                            String::new()
+                        },
+                        trailer: g.media.contains_key(tako_core::library::media::VIDEO),
                     },
                     actions,
-                    summary(ctx, g),
-                    details::stats(ctx, g),
+                    strip(ctx, g),
+                    details_rows(ctx, g),
                 )
             }
             None => (DeskGameView::default(), Vec::new(), Vec::new(), Vec::new()),
@@ -1104,6 +1298,17 @@ impl Page for DesktopLibrary {
         out.set("desk-actions", actions);
         out.set("desk-stats", stats);
         out.set("desk-details", details);
+        out.set("desk-sessions-summary", sessions.0);
+        out.set("desk-sessions", sessions.1);
+        out.set(
+            "desk-card-labels",
+            vec![
+                ctx.t("desktop.sessions.title"),
+                ctx.t("desktop.sessions.see_all"),
+                ctx.t("desktop.about_more"),
+                ctx.t("desktop.trailer"),
+            ],
+        );
         out.set("desk-about-label", ctx.t("desktop.about"));
         out.set("desk-details-label", ctx.t("desktop.details"));
         out.set(
@@ -1385,6 +1590,34 @@ mod tests {
         shell.handle(Cmd::Accept);
         assert_eq!(page(&shell).search_focus, 1);
         assert_eq!(page(&shell).zone(), Zone::List);
+    }
+
+    #[test]
+    fn hero_cards_cut_long_text_and_keep_at_most_six_detail_rows() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, shell) = shell();
+        // Sobre o jogo: corta na palavra com "…" e avisa para mostrar "Mais".
+        let long = "palavra ".repeat(60);
+        let (text, more) = about(&long);
+        assert!(more && text.ends_with('…') && text.chars().count() <= 241);
+        assert_eq!(about("curta"), ("curta".to_owned(), false));
+        // Detalhes: com tudo preenchido, sai a de menor prioridade (Série) e o Status fica.
+        let mut g = shell.ctx.library.games()[0].clone();
+        g.release_date = chrono::NaiveDate::from_ymd_opt(2025, 9, 25);
+        g.metacritic_score = Some(93);
+        g.genres = vec!["Roguelike".into(), "Ação".into(), "Indie".into()];
+        g.developer = Some("Supergiant Games, Outro".into());
+        g.franchise = Some("Hades".into());
+        g.tags = ["Co-op".to_owned()].into();
+        let rows = details_rows(&shell.ctx, &g);
+        assert_eq!(rows.len(), 6);
+        assert!(rows.iter().any(|r| r.dot || r.label == shell.ctx.t("details.status")));
+        assert!(!rows.iter().any(|r| r.value == "Hades"));
+        assert!(rows.iter().any(|r| r.value == "Roguelike · Ação"));
+        assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
+        // A faixa não inventa Nuvem nem Conquistas.
+        assert_eq!(strip(&shell.ctx, &g).len(), 2);
     }
 
     #[test]

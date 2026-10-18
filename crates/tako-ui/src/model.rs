@@ -228,6 +228,21 @@ theme_struct! {
 }
 
 theme_struct! {
+    /// Item com ícone do modo desktop: faixa de estado do destaque, linhas de Detalhes e de Sessões.
+    pub struct DeskInfo {
+        pub icon: String,
+        pub label: String,
+        pub value: String,
+        // Texto de apoio (horário da sessão).
+        pub detail: String,
+        // Ponto verde (jogando, instalado).
+        pub dot: bool,
+        // Etiquetas do usuário (LIB-002), como chips.
+        pub chips: Vec<String>,
+    }
+}
+
+theme_struct! {
     /// Fileira da BibliotecaCategorias: título, quantos jogos, ícone e as capas.
     pub struct DeskCategory {
         pub title: String,
@@ -251,5 +266,14 @@ theme_struct! {
         pub logo: Image,
         pub accent: Color,
         pub hint: String,
+        // Jogando agora: a etiqueta ganha o ponto verde.
+        pub running: bool,
+        // A descrição foi cortada: o cartão mostra "Mais".
+        pub about_more: bool,
+        // Até 4 gêneros (texto, não chips) e o "+N" do resto.
+        pub genres: Vec<String>,
+        pub genres_more: String,
+        // Tem trailer (a mídia `video` do jogo).
+        pub trailer: bool,
     }
 }

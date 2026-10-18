@@ -23,6 +23,9 @@ about = "Sobre o jogo"
 details = "Detalhes"
 add_game = "Adicionar jogo"
 search_key = "Ctrl + K"
+install_via = "Instalar {via}"
+about_more = "Mais"
+trailer = "Trailer"
 search_esc = "Esc"
 theme_big_picture = "O tema vale para a tela cheia. O modo desktop usa o visual do Tako."
 
@@ -101,3 +104,27 @@ library_text = "O Tako procura nas lojas instaladas."
 rescan = "Procurar jogos"
 tab = "Nenhum jogo aqui"
 loading = "Lendo a biblioteca…"
+
+[desktop.badge]
+playing = "Jogando"
+broken = "Quebrado"
+
+[desktop.day]
+today = "Hoje"
+yesterday = "Ontem"
+
+[desktop.strip]
+last_session = "Última sessão"
+current_session = "Sessão atual"
+playing_now = "jogando agora"
+never_played = "Nunca jogado"
+not_played = "Ainda não jogado"
+
+[desktop.info]
+critic = "Crítica"
+tags = "Etiquetas"
+
+[desktop.sessions]
+title = "Sessões"
+see_all = "Ver todas"
+summary = "{n} sessões · média de {avg}"

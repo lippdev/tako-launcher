@@ -30,8 +30,9 @@ export { Ui }
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool }
 struct DeskStat { label: string, value: string }
+struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
 
 // O que fica atrás do vidro: a arte do jogo em foco e a cópia desfocada dela (feita uma vez pelo Tako), no mesmo
 // retângulo da janela. Cada painel de vidro desenha o pedaço da cópia que fica atrás dele.
@@ -71,6 +72,8 @@ component Vidro inherits Rectangle {
     in property <length> radius: Ui.radius-card;
     // Camada (diálogo, menu, painel lateral, aviso): tinta densa, contorno forte e sombra de camada.
     in property <bool> layer;
+    // Tinta densa sempre (perigo, Sessões), além da escolha automática sobre arte clara.
+    in property <bool> dense;
     property <length> ax: self.absolute-position.x;
     property <length> ay: self.absolute-position.y;
     // Tinta adaptativa: densa quando a arte embaixo do painel é clara (limite 0,18, o mesmo do AccentPalette).
@@ -107,7 +110,7 @@ component Vidro inherits Rectangle {
             animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         if !DeskArt.gray: Rectangle {
-            background: layer || bright ? Ui.glass-panel-dense : Ui.glass-panel;
+            background: layer || dense || bright ? Ui.glass-panel-dense : Ui.glass-panel;
             animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // Luz ambiente: 16% da cor do jogo a partir do canto superior esquerdo, em tamanho fixo.
@@ -1085,11 +1088,396 @@ component CategoryRows inherits Rectangle {
     }
 }
 
-// Destaque do jogo selecionado e a fileira de cartões, ancorados embaixo sobre a arte.
+// Etiqueta de estado do destaque: INSTALADO, NÃO INSTALADO, JOGANDO (com o ponto verde), QUEBRADO.
+component Badge inherits Rectangle {
+    in property <string> text;
+    in property <bool> live;
+    height: 26px;
+    width: bl.preferred-width;
+    border-radius: self.height / 2;
+    background: Ui.glass-control;
+    border-width: 1px;
+    border-color: Ui.glass-edge-strong;
+    bl := HorizontalLayout {
+        padding-left: Ui.space-12;
+        padding-right: Ui.space-12;
+        spacing: 6px;
+        if live: Rectangle { y: 9px; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
+        Text {
+            text: root.text;
+            color: Ui.on-accent;
+            font-size: Ui.desk-overline;
+            font-weight: 700;
+            letter-spacing: 0.1 * self.font-size;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Faixa de estado do jogo: cápsula de vidro com itens separados por divisórias (ícone de 26, rótulo em caixa alta e
+// valor). Só os itens que o Tako tem; na janela pequena, os três primeiros.
+component StatusStrip inherits Vidro {
+    in property <[DeskInfo]> items;
+    in property <bool> small;
+    height: 62px;
+    width: sl.preferred-width;
+    sl := HorizontalLayout {
+        padding-left: Ui.space-16;
+        padding-right: 22px;
+        for it[i] in items: HorizontalLayout {
+            visible: !small || i < 3;
+            spacing: 11px;
+            // Divisória no meio do espaço entre os itens.
+            if i > 0: HorizontalLayout {
+                padding-left: small ? 11px : 14px;
+                padding-right: small ? 0 : 3px;
+                Rectangle { width: 1px; height: 30px; y: 16px; background: Ui.divider; }
+            }
+            Icon { name: it.icon; size: 26px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+            VerticalLayout {
+                alignment: center;
+                spacing: 5px;
+                Text {
+                    text: it.label.to-uppercase();
+                    color: Ui.desk-on-muted;
+                    font-size: 11px * Ui.text-scale;
+                    font-weight: 700;
+                    letter-spacing: 0.08 * self.font-size;
+                }
+                HorizontalLayout {
+                    spacing: 7px;
+                    if it.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
+                    Text { text: it.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; }
+                }
+            }
+        }
+    }
+}
+
+// Pílula principal (Jogar, Voltar ao jogo, Instalar): branca, a única por tela. Responde no pressionar (0,97).
+component PlayButton inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <bool> enabled: true;
+    in property <bool> focused;
+    in property <bool> small;
+    callback clicked();
+    height: small ? 50px : Ui.primary-height;
+    width: max(small ? 180px : 232px, pl.preferred-width);
+    accessible-role: button;
+    accessible-label: label;
+    property <float> press: pta.pressed && enabled ? Ui.escala-pressionado : 1;
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: root.width * press;
+        height: root.height * press;
+        border-radius: self.height / 2;
+        background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%);
+        drop-shadow-offset-y: Ui.shadow-float-y;
+        drop-shadow-blur: Ui.shadow-float-blur;
+        drop-shadow-color: Ui.shadow-float-color;
+        opacity: enabled ? 1 : 0.7;
+        // Brilho de 1px no topo.
+        Rectangle { x: parent.height / 2; y: 1px; width: parent.width - parent.height; height: 1px; background: Ui.primary-top; }
+        if pta.pressed: Rectangle { border-radius: parent.border-radius; background: Ui.on-primary.with-alpha(0.06); }
+    }
+    if focused: FocusRing { radius: root.height / 2; background: transparent; }
+    pl := HorizontalLayout {
+        padding-left: 32px;
+        padding-right: 32px;
+        spacing: Ui.space-12;
+        alignment: center;
+        Icon { name: icon; size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
+        Text { text: label; color: Ui.on-primary; font-size: 19px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+    }
+    pta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Botão redondo de vidro só com ícone (favoritar, ⋯, engrenagem) ou pílula de vidro com rótulo (Encerrar jogo).
+// Sobre a arte é uma lente; perigo usa a tinta densa para o vermelho manter contraste.
+component GlassButton inherits Vidro {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> show-label;
+    in property <bool> on;
+    in property <bool> danger;
+    in property <bool> focused;
+    in property <bool> small;
+    callback clicked();
+    dense: danger;
+    radius: self.height / 2;
+    height: show-label ? Ui.control-height + 8px : (small ? 46px : Ui.round-button);
+    width: show-label ? gl.preferred-width : self.height;
+    accessible-role: button;
+    accessible-label: label;
+    Rectangle {
+        border-radius: root.height / 2;
+        background: gta.pressed ? Ui.glass-pressed : (gta.has-hover ? Ui.glass-hover : transparent);
+        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    }
+    if focused: FocusRing { radius: root.height / 2; background: transparent; }
+    gl := HorizontalLayout {
+        padding-left: show-label ? 18px : 0;
+        padding-right: show-label ? 20px : 0;
+        spacing: 10px;
+        alignment: center;
+        Icon {
+            name: icon;
+            size: 22px;
+            tint: danger ? Ui.error : (on ? Ui.warning : Ui.on-accent);
+            y: (parent.height - self.height) / 2;
+        }
+        if show-label: Text { text: label; color: danger ? Ui.error : Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+    }
+    gta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Título de cartão (Poppins, `title`).
+component CardTitle inherits Text {
+    color: Ui.on-accent;
+    font-family: Ui.font-heading;
+    font-size: Ui.desk-title;
+    font-weight: 700;
+    overflow: elide;
+}
+
+// CartaoSobre: descrição (cortada com "Mais", que abre o texto inteiro) e os gêneros como texto no rodapé.
+component AboutCard inherits Vidro {
+    in property <string> title;
+    in property <string> text;
+    in property <bool> more;
+    in property <string> more-label;
+    in property <[string]> genres;
+    in property <string> genres-more;
+    in property <bool> small;
+    callback more-clicked();
+    VerticalLayout {
+        padding-left: small ? Ui.space-16 : Ui.space-24;
+        padding-right: small ? Ui.space-16 : Ui.space-24;
+        padding-top: small ? Ui.space-16 : Ui.space-24;
+        padding-bottom: small ? Ui.space-16 : Ui.space-20;
+        spacing: small ? 10px : Ui.space-16;
+        CardTitle { text: title; }
+        Text { text: root.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; }
+        if genres.length > 0 || more: VerticalLayout {
+            spacing: Ui.space-12;
+            Rectangle { height: 1px; background: Ui.glass-edge; }
+            HorizontalLayout {
+                height: 24px;
+                spacing: Ui.space-8;
+                for g[i] in genres: HorizontalLayout {
+                    visible: !small || i < 2;
+                    spacing: Ui.space-8;
+                    if i > 0: Text { text: "·"; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+                    Text { text: g; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; max-width: 150px; overflow: elide; }
+                }
+                if genres-more != "" && !small: Text { text: genres-more; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
+                Rectangle { horizontal-stretch: 1; }
+                if more: Rectangle {
+                    width: ml.preferred-width + 16px;
+                    border-radius: Ui.radius-thumb;
+                    background: mta.has-hover ? Ui.glass-hover : transparent;
+                    accessible-role: button;
+                    accessible-label: more-label;
+                    ml := Text { text: more-label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; }
+                    mta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.more-clicked(); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// CartaoTrailer: miniatura parada (a arte), escurecida embaixo, com o botão de vidro "Trailer"; só toca ao clicar.
+component TrailerCard inherits Rectangle {
+    in property <image> art;
+    in property <string> label;
+    callback clicked();
+    border-radius: Ui.radius-card;
+    clip: true;
+    background: Ui.glass-solid;
+    drop-shadow-offset-y: Ui.shadow-float-y;
+    drop-shadow-blur: Ui.shadow-float-blur;
+    drop-shadow-color: Ui.shadow-float-color;
+    Image { width: parent.width; height: parent.height; source: art; image-fit: cover; }
+    Rectangle { background: @linear-gradient(0deg, Ui.desk-canvas.with-alpha(0.8) 0%, Ui.desk-canvas.with-alpha(0) 55%); }
+    Rectangle { border-radius: Ui.radius-card; border-width: 1px; border-color: Ui.glass-edge; }
+    GlassButton {
+        x: Ui.space-16;
+        y: parent.height - self.height - Ui.space-16;
+        height: 40px;
+        show-label: true;
+        icon: "play";
+        label: root.label;
+        clicked => { root.clicked(); }
+    }
+}
+
+// CartaoDetalhes: linhas em grade (ícone · rótulo · valor) que dividem a altura, com divisórias; Status com o ponto.
+component DetailsCard inherits Vidro {
+    in property <string> title;
+    in property <[DeskInfo]> rows;
+    in property <bool> small;
+    // Coluna dos rótulos pelo mais longo, nunca menos que 104 (corrige o "Desenvolv…").
+    property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
+    VerticalLayout {
+        padding-left: small ? Ui.space-16 : Ui.space-24;
+        padding-right: small ? Ui.space-16 : Ui.space-24;
+        padding-top: small ? Ui.space-16 : Ui.space-24;
+        padding-bottom: small ? Ui.space-16 : Ui.space-20;
+        spacing: small ? 6px : 10px;
+        CardTitle { text: title; }
+        for r[i] in rows: Rectangle {
+            vertical-stretch: 1;
+            min-height: small ? 22px : 26px;
+            max-height: 40px;
+            if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
+            HorizontalLayout {
+                spacing: Ui.space-12;
+                Icon { name: r.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
+                Text { text: r.label; width: root.label-w; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; overflow: elide; }
+                if r.chips.length == 0: HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: Ui.space-8;
+                    if r.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
+                    Text { text: r.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                }
+                if r.chips.length > 0: HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 6px;
+                    for c in r.chips: Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        height: 22px;
+                        width: min(cl.preferred-width + 16px, 96px);
+                        border-radius: 11px;
+                        background: Ui.glass-control;
+                        border-width: 1px;
+                        border-color: Ui.glass-edge;
+                        cl := Text { width: parent.width - 16px; text: c; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 600; overflow: elide; horizontal-alignment: center; }
+                    }
+                    if r.value != "": Text { text: r.value; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+            }
+        }
+        if rows.length < 6: Rectangle { vertical-stretch: 6 - rows.length; }
+    }
+}
+
+// CartaoSessoes: o histórico (SESSION-002): título com "Ver todas ›", o resumo e as últimas sessões.
+component SessionsCard inherits Vidro {
+    in property <[string]> labels;
+    in property <string> summary;
+    in property <[DeskInfo]> rows;
+    callback see-all();
+    dense: true;
+    VerticalLayout {
+        padding: Ui.space-24;
+        padding-bottom: Ui.space-20;
+        spacing: 6px;
+        HorizontalLayout {
+            CardTitle { text: labels[0]; horizontal-stretch: 1; }
+            Rectangle {
+                width: sl.preferred-width + 8px;
+                border-radius: Ui.radius-thumb;
+                background: sta.has-hover ? Ui.glass-hover : transparent;
+                accessible-role: button;
+                accessible-label: labels[1];
+                sl := HorizontalLayout {
+                    spacing: 4px;
+                    alignment: center;
+                    Text { text: labels[1]; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+                    Icon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                }
+                sta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.see-all(); }
+                }
+            }
+        }
+        Text { text: summary; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
+        for r[i] in rows: Rectangle {
+            vertical-stretch: 1;
+            max-height: 40px;
+            if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
+            HorizontalLayout {
+                spacing: Ui.space-8;
+                if r.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
+                Text { text: r.label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 700; vertical-alignment: center; }
+                Text { text: r.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                Text { text: r.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+            }
+        }
+    }
+}
+
+// Fileira de cartões do destaque: Sobre, Trailer, Detalhes e Sessões, 20 entre eles.
+component CardRow inherits HorizontalLayout {
+    in property <DeskGameView> game;
+    in property <[DeskInfo]> details;
+    in property <string> sessions-summary;
+    in property <[DeskInfo]> sessions;
+    in property <[string]> card-labels;
+    in property <string> about-label;
+    in property <string> details-label;
+    in property <bool> small;
+    in property <bool> show-about;
+    in property <bool> show-trailer;
+    in property <bool> show-sessions;
+    callback clicked(string, int);
+    spacing: Ui.space-20;
+    if show-about: AboutCard {
+        horizontal-stretch: 1.45;
+        title: about-label;
+        text: game.description;
+        more: game.about-more;
+        more-label: card-labels[2];
+        genres: game.genres;
+        genres-more: game.genres-more;
+        small: small;
+        more-clicked => { root.clicked("about-more", 0); }
+    }
+    if show-trailer: TrailerCard {
+        horizontal-stretch: 0.9;
+        art: game.art;
+        label: card-labels[3];
+        clicked => { root.clicked("trailer", 0); }
+    }
+    DetailsCard {
+        horizontal-stretch: 1.1;
+        title: details-label;
+        rows: details;
+        small: small;
+    }
+    if show-sessions: SessionsCard {
+        horizontal-stretch: 1.1;
+        labels: card-labels;
+        summary: sessions-summary;
+        rows: sessions;
+        see-all => { root.clicked("sessions", 0); }
+    }
+}
+
+// Destaque do jogo selecionado e a fileira de cartões, ancorados embaixo sobre a arte (Destaque, AcoesDoJogo,
+// CartaoSobre, CartaoTrailer, CartaoDetalhes, CartaoSessoes). Com quatro cartões, a fileira rola na horizontal.
 component GameStage inherits VerticalLayout {
     in property <DeskGameView> game;
     in property <[PanelRow]> actions;
-    in property <[DeskStat]> details;
+    in property <[DeskInfo]> stats;
+    in property <[DeskInfo]> details;
+    in property <string> sessions-summary;
+    in property <[DeskInfo]> sessions;
+    in property <[string]> card-labels;
     in property <string> about-label;
     in property <string> details-label;
     in property <string> zone;
@@ -1098,71 +1486,103 @@ component GameStage inherits VerticalLayout {
     in property <bool> small;
     callback clicked(string, int);
     callback menu(length, length);
+    property <bool> show-about: game.description != "";
+    property <bool> show-trailer: game.trailer && !small;
+    property <bool> show-sessions: sessions.length > 0 && !small;
     alignment: end;
     spacing: small ? Ui.space-16 : Ui.space-28;
     VerticalLayout {
         spacing: small ? 10px : 14px;
         alignment: end;
-        if game.overline != "": Overline { text: game.overline; }
-        Text {
-            text: game.title;
-            color: Ui.on-accent;
-            font-family: Ui.font-heading;
-            font-size: small ? 40px * Ui.text-scale : Ui.desk-display;
-            font-weight: 700;
-            letter-spacing: -0.025 * self.font-size;
-            wrap: word-wrap;
-            overflow: elide;
-            max-height: 2.1 * self.font-size;
+        if game.overline != "": HorizontalLayout {
+            alignment: start;
+            Badge { text: game.overline; live: game.running; }
+        }
+        // Título em até duas linhas, até 620 de largura (520 na janela pequena), crescendo para cima.
+        HorizontalLayout {
+            Text {
+                text: game.title;
+                color: Ui.on-accent;
+                font-family: Ui.font-heading;
+                font-size: small ? 40px * Ui.text-scale : Ui.desk-display;
+                font-weight: 700;
+                letter-spacing: -0.025 * self.font-size;
+                wrap: word-wrap;
+                overflow: elide;
+                max-height: 2.1 * self.font-size;
+                max-width: small ? 520px : 620px;
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        if stats.length > 0: HorizontalLayout {
+            alignment: start;
+            StatusStrip { items: stats; small: small; }
         }
         HorizontalLayout {
             spacing: Ui.space-12;
             alignment: start;
-            for a[i] in actions: DeskButton {
-                label: a.key == "favorite" || a.key == "more" ? "" : a.title;
-                icon: a.key == "more" ? "dots" : a.icon;
-                primary: a.style == "primary";
-                danger: a.style == "danger";
-                on: a.on;
-                enabled: a.enabled;
-                min-w: a.style == "primary" ? 232px : 0;
-                focused: focus-visible && zone == "actions" && zone-index == i;
-                clicked => {
-                    root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
-                    root.clicked("action", i);
+            padding-top: 6px;
+            for a[i] in actions: HorizontalLayout {
+                if a.style == "primary": PlayButton {
+                    label: a.title;
+                    icon: a.icon;
+                    enabled: a.enabled;
+                    small: small;
+                    focused: focus-visible && zone == "actions" && zone-index == i;
+                    clicked => { root.clicked("action", i); }
+                }
+                if a.style != "primary": GlassButton {
+                    y: (parent.height - self.height) / 2;
+                    icon: a.icon;
+                    label: a.title;
+                    show-label: a.style == "danger";
+                    on: a.on;
+                    danger: a.style == "danger";
+                    small: small;
+                    focused: focus-visible && zone == "actions" && zone-index == i;
+                    clicked => {
+                        root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
+                        root.clicked("action", i);
+                    }
                 }
             }
         }
         if game.hint != "": Text { text: game.hint; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
     }
-    HorizontalLayout {
+    // Com quatro cartões (Sobre, Trailer, Detalhes, Sessões) a fileira passa da largura e rola na horizontal.
+    if !(show-trailer && show-sessions): CardRow {
         height: small ? 190px : Ui.card-height;
-        spacing: Ui.space-20;
-        if game.description != "": Vidro {
-            horizontal-stretch: 1.45;
-            VerticalLayout {
-                padding: Ui.space-24;
-                padding-bottom: Ui.space-20;
-                spacing: Ui.space-16;
-                alignment: start;
-                Text { text: about-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
-                Text { text: game.description; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; }
-            }
-        }
-        Vidro {
-            horizontal-stretch: 1.1;
-            VerticalLayout {
-                padding: Ui.space-24;
-                padding-bottom: Ui.space-20;
-                spacing: Ui.space-12;
-                alignment: start;
-                Text { text: details-label; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; }
-                for d[i] in details: HorizontalLayout {
-                    spacing: Ui.space-16;
-                    Text { text: d.label; min-width: 104px; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
-                    Text { text: d.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; horizontal-stretch: 1; overflow: elide; }
-                }
-            }
+        game: game;
+        details: details;
+        sessions-summary: sessions-summary;
+        sessions: sessions;
+        card-labels: card-labels;
+        about-label: about-label;
+        details-label: details-label;
+        small: small;
+        show-about: show-about;
+        show-trailer: show-trailer;
+        show-sessions: show-sessions;
+        clicked(z, i) => { root.clicked(z, i); }
+    }
+    if show-trailer && show-sessions: cards := Flickable {
+        height: Ui.card-height;
+        viewport-width: 360px + 240px + 320px + 320px + 3 * Ui.space-20;
+        CardRow {
+            width: cards.viewport-width;
+            height: cards.height;
+            game: game;
+            details: details;
+            sessions-summary: sessions-summary;
+            sessions: sessions;
+            card-labels: card-labels;
+            about-label: about-label;
+            details-label: details-label;
+            small: small;
+            show-about: show-about;
+            show-trailer: true;
+            show-sessions: true;
+            clicked(z, i) => { root.clicked(z, i); }
         }
     }
 }
@@ -1196,7 +1616,11 @@ component DeskLibrary inherits Rectangle {
     in property <int> selected;
     in property <DeskGameView> game;
     in property <[PanelRow]> actions;
-    in property <[DeskStat]> details;
+    in property <[DeskInfo]> stats;
+    in property <[DeskInfo]> details;
+    in property <string> sessions-summary;
+    in property <[DeskInfo]> sessions;
+    in property <[string]> card-labels;
     in property <string> about-label;
     in property <string> details-label;
     in property <string> zone;
@@ -1333,7 +1757,11 @@ component DeskLibrary inherits Rectangle {
             horizontal-stretch: 1;
             game: game;
             actions: actions;
+            stats: stats;
             details: details;
+            sessions-summary: sessions-summary;
+            sessions: sessions;
+            card-labels: card-labels;
             about-label: about-label;
             details-label: details-label;
             zone: zone;
@@ -2046,8 +2474,11 @@ export component Desktop inherits Window {
     in property <int> desk-selected: -1;
     in property <DeskGameView> desk-game;
     in property <[PanelRow]> desk-actions;
-    in property <[DeskStat]> desk-stats;
-    in property <[DeskStat]> desk-details;
+    in property <[DeskInfo]> desk-stats;
+    in property <[DeskInfo]> desk-details;
+    in property <string> desk-sessions-summary;
+    in property <[DeskInfo]> desk-sessions;
+    in property <[string]> desk-card-labels;
     in property <string> desk-about-label;
     in property <string> desk-details-label;
     in property <string> desk-zone: "list";
@@ -2199,7 +2630,11 @@ export component Desktop inherits Window {
                 selected: desk-selected;
                 game: desk-game;
                 actions: desk-actions;
+                stats: desk-stats;
                 details: desk-details;
+                sessions-summary: desk-sessions-summary;
+                sessions: desk-sessions;
+                card-labels: desk-card-labels;
                 about-label: desk-about-label;
                 details-label: desk-details-label;
                 zone: desk-zone;
