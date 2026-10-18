@@ -5049,7 +5049,6 @@ dependencies = [
  "tempfile",
  "toml",
  "tracing",
- "windows",
 ]
 
 [[package]]
