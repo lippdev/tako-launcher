@@ -327,10 +327,20 @@ pub fn panel(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
         title.to_uppercase()
     };
     let desktop = ctx.desktop;
+    let cover = ctx
+        .library
+        .find(id)
+        .and_then(|g| g.shown_cover().map(str::to_owned));
     let id = id.to_owned();
     let layer = MenuLayer::panel(ctx.t("details.game_settings"), move |ctx| rows(ctx, &id))
         .overline(overline);
-    Box::new(if desktop { layer.wide() } else { layer })
+    Box::new(if desktop {
+        layer
+            .wide()
+            .image(super::tiles::image(cover.as_deref(), (64, 96)))
+    } else {
+        layer
+    })
 }
 
 fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {

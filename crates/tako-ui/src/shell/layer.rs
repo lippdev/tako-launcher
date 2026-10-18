@@ -218,6 +218,8 @@ pub struct MenuLayer {
     /// nota de rodapé.
     pub full: bool,
     pub note: String,
+    /// Miniatura ao lado do título (desktop: a capa do jogo em Configurações deste jogo).
+    pub image: slint::Image,
 }
 
 impl MenuLayer {
@@ -239,6 +241,7 @@ impl MenuLayer {
             steps: (Vec::new(), 0),
             full: false,
             note: String::new(),
+            image: slint::Image::default(),
         }
     }
 
@@ -279,6 +282,11 @@ impl MenuLayer {
 
     pub fn steps(mut self, names: Vec<String>, current: usize) -> Self {
         self.steps = (names, current);
+        self
+    }
+
+    pub fn image(mut self, image: slint::Image) -> Self {
+        self.image = image;
         self
     }
 
@@ -397,6 +405,7 @@ impl Layer for MenuLayer {
             // Onboarding em tela inteira: marca, nota e as capas da parede ao fundo.
             tab2: i32::from(self.full),
             input_hint: self.note.clone(),
+            image: self.image.clone(),
             thumbs: if self.full {
                 super::first_run::wall(ctx)
             } else {

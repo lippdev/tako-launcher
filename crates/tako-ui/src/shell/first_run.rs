@@ -144,6 +144,9 @@ pub fn welcome(ctx: &Ctx) -> MenuLayer {
 
 /// Passo 2 (no desktop, 1): lojas que este sistema lê, com o que a leitura achou em cada uma.
 fn stores(ctx: &Ctx) -> MenuLayer {
+    if ctx.desktop {
+        return desktop_stores(ctx);
+    }
     let n = if ctx.desktop { 1 } else { 2 };
     let layer = step(ctx, n, "stores", "stores_text", |ctx| {
         let mut v = library::store_rows(ctx);
@@ -166,6 +169,70 @@ fn stores(ctx: &Ctx) -> MenuLayer {
     } else {
         layer.on_back(|ctx| Flow::Replace(Box::new(welcome(ctx))))
     }
+}
+
+/// Passo 1 do desktop (TelaOnboarding, LojaEncontrada): as lojas com o que o Tako achou nelas (ponto verde quando
+/// achou, "Não instalado" apagado), **Procurar jogos** (procura e segue) e **Escolher pastas…** (liga e desliga lojas).
+fn desktop_stores(ctx: &Ctx) -> MenuLayer {
+    step(ctx, 1, "stores", "stores_text", |ctx| {
+        let mut v: Vec<MenuItem> = library::stores()
+            .iter()
+            .map(|&store| {
+                let report = ctx.sources.iter().find(|r| r.store == store && r.enabled);
+                let found = report.is_some_and(|r| r.client_installed);
+                let desc = match report {
+                    Some(r) if r.client_installed => r.summary(),
+                    Some(_) => ctx.t("first_run.full.stores_missing"),
+                    None => ctx.t("first_run.full.stores_unchecked"),
+                };
+                let mut row = PanelRow::info(
+                    format!("store:{}", store.key()),
+                    tako_core::presentation::game_text::store_name(ctx.lang(), store),
+                    "",
+                )
+                .desc(desc)
+                .icon(super::sidebar::store_icon(store))
+                .enabled(report.is_none_or(|r| r.client_installed))
+                .emphasized(true);
+                row.on = found;
+                MenuItem::new(row)
+            })
+            .collect();
+        v.push(
+            MenuItem::new(PanelRow {
+                style: "primary".into(),
+                ..PanelRow::button("search", ctx.t("first_run.full.stores_search"))
+            })
+            .on(|ctx| {
+                ctx.effect(super::Effect::Rescan);
+                if super::settings::emulators::anything_found(ctx) {
+                    Flow::Replace(Box::new(emulators(ctx)))
+                } else {
+                    Flow::Replace(Box::new(providers(ctx)))
+                }
+            }),
+        );
+        v.push(
+            MenuItem::new(PanelRow::button(
+                "choose",
+                ctx.t("first_run.full.stores_choose"),
+            ))
+            .on(|ctx| {
+                let layer = MenuLayer::dialog(ctx.t("settings.library.stores_header"), |ctx| {
+                    let mut v = library::store_rows(ctx);
+                    v.push(
+                        MenuItem::new(PanelRow::button("done", ctx.t("common.done")))
+                            .on(|_| Flow::Close),
+                    );
+                    v
+                });
+                Flow::Push(Box::new(layer))
+            }),
+        );
+        v
+    })
+    .focus_at(library::stores().len())
+    .on_back(finish)
 }
 
 /// Passo 2 (desktop): emuladores e pastas de ROMs (os mesmos controles de Configurações › Emuladores e ROMs).
@@ -197,6 +264,15 @@ fn providers(ctx: &Ctx) -> MenuLayer {
             v.push(
                 MenuItem::new(PanelRow::button("next", ctx.t("first_run.next")))
                     .on(|ctx| Flow::Replace(Box::new(mode(ctx)))),
+            );
+            v.push(
+                MenuItem::new(PanelRow::button("back", ctx.t("first_run.full.back"))).on(|ctx| {
+                    if super::settings::emulators::anything_found(ctx) {
+                        Flow::Replace(Box::new(emulators(ctx)))
+                    } else {
+                        Flow::Replace(Box::new(stores(ctx)))
+                    }
+                }),
             );
         } else {
             v.push(MenuItem::new(PanelRow::button("done", ctx.t("first_run.finish"))).on(finish));
@@ -239,6 +315,7 @@ pub(crate) fn mode(ctx: &Ctx) -> MenuLayer {
                         current == value,
                     )
                     .desc(ctx.t(&format!("first_run.full.mode_{key}_desc")))
+                    .value(ctx.t(&format!("first_run.full.mode_{key}_hint")))
                     .icon(if key == "window" { "monitor" } else { "tv" }),
                 )
                 .on(move |ctx| {
@@ -255,6 +332,10 @@ pub(crate) fn mode(ctx: &Ctx) -> MenuLayer {
                 }
                 Flow::Replace(Box::new(ready(ctx)))
             }),
+        );
+        v.push(
+            MenuItem::new(PanelRow::button("back", ctx.t("first_run.full.back")))
+                .on(|ctx| Flow::Replace(Box::new(providers(ctx)))),
         );
         v
     })
@@ -393,7 +474,8 @@ mod tests {
         assert_eq!(o.title, ctx.t("first_run.full.stores"));
         assert!(keys_of(&first, &ctx).contains(&"skip".to_owned()));
         // Emuladores só aparecem quando há algum neste PC; senão o passo é pulado e vai direto para as capas.
-        let second = next(accept(&first, &mut ctx, "next")).render(&ctx);
+        // "Procurar jogos" procura e segue.
+        let second = next(accept(&first, &mut ctx, "search")).render(&ctx);
         if super::super::settings::emulators::anything_found(&ctx) {
             assert_eq!(
                 (second.tab, second.title),

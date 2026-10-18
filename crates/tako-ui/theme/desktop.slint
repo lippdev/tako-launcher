@@ -585,28 +585,28 @@ component Tabs inherits Rectangle {
         radius: 11px;
         animate x { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     }
-    HorizontalLayout {
-        padding: 3px;
-        spacing: 2px;
-        for t[i] in tabs: Rectangle {
-            horizontal-stretch: 1;
-            border-radius: 11px;
-            background: i != current && tta.has-hover ? Ui.glass-hover : transparent;
-            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            accessible-role: tab;
-            accessible-label: t;
-            if i == focus-index: FocusRing { radius: 11px; }
-            Text {
-                text: t;
-                color: i == current ? Ui.on-accent : Ui.desk-on-muted;
-                font-size: 14px * Ui.text-scale;
-                font-weight: i == current ? 600 : 500;
-                overflow: elide;
-            }
-            tta := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.clicked(i); }
-            }
+    // Abas de largura igual, na mesma conta da pílula (num layout, o texto mais longo ganhava mais largura).
+    for t[i] in tabs: Rectangle {
+        x: 3px + i * (tab-w + 2px);
+        y: 3px;
+        width: tab-w;
+        height: root.height - 6px;
+        border-radius: 11px;
+        background: i != current && tta.has-hover ? Ui.glass-hover : transparent;
+        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        accessible-role: tab;
+        accessible-label: t;
+        if i == focus-index: FocusRing { radius: 11px; }
+        Text {
+            text: t;
+            color: i == current ? Ui.on-accent : Ui.desk-on-muted;
+            font-size: 14px * Ui.text-scale;
+            font-weight: i == current ? 600 : 500;
+            overflow: elide;
+        }
+        tta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.clicked(i); }
         }
     }
 }
@@ -720,8 +720,9 @@ component GameRow inherits Rectangle {
         }
         Rectangle {
             y: (parent.height - self.height) / 2;
-            width: Ui.thumb-size;
-            height: Ui.thumb-size;
+            // 40 na linha comum, 32 na linha compacta da janela pequena.
+            width: min(Ui.thumb-size, root.height - 10px);
+            height: self.width;
             border-radius: Ui.radius-thumb;
             clip: true;
             // Sem capa: tons fechados da cor do jogo, nunca a cor pura.
@@ -782,7 +783,9 @@ component GameList inherits Rectangle {
     callback clicked(string, int);
     callback menu(length, length);
     callback scrolled(int);
-    property <length> row-h: Ui.list-row-height + (Ui.text-scale - 1) * 32px + 6px;
+    // Janela pequena (JanelaPequena): linhas compactas de 42 com miniatura de 32.
+    in property <bool> compact;
+    property <length> row-h: (compact ? 42px : Ui.list-row-height) + (Ui.text-scale - 1) * 32px + 6px;
     property <int> first: max(0, floor(-fl.viewport-y / row-h));
     property <int> shown: min(ceil(fl.height / row-h) + 2, max(0, games.length - first));
     changed first => { root.scrolled(first); }
@@ -1121,7 +1124,8 @@ component CoverGrid inherits Rectangle {
             width: cell-w;
             height: row-h - 8px;
             data: games[idx];
-            focused: key-focus && idx == root.selected;
+            // A capa selecionada fica destacada (moldura, ▶) também com o mouse, como na prévia da grade.
+            focused: idx == root.selected;
             clicked => { root.clicked("cover", idx); }
             toggle => { root.clicked("game-toggle", idx); }
             range => { root.clicked("game-range", idx); }
@@ -1432,7 +1436,7 @@ component AboutCard inherits Vidro {
         spacing: small ? 10px : Ui.space-16;
         CardTitle { text: title; }
         // A descrição ocupa a sobra e corta com "…": não pede altura para a fileira crescer.
-        Text { text: root.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; overflow: elide; vertical-stretch: 1; min-height: 0; preferred-height: 0; }
+        Text { text: root.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; overflow: elide; vertical-stretch: 1; min-height: 0; preferred-height: 0; }
         if genres.length > 0 || more: VerticalLayout {
             spacing: Ui.space-12;
             Rectangle { height: 1px; background: Ui.glass-edge; }
@@ -1495,7 +1499,7 @@ component DetailsCard inherits Vidro {
     in property <[DeskInfo]> rows;
     in property <bool> small;
     // Coluna dos rótulos pelo mais longo, nunca menos que 104 (corrige o "Desenvolv…").
-    property <length> label-w: small ? 80px * Ui.text-scale : max(104px, 13 * 7.4px * Ui.text-scale);
+    property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
     VerticalLayout {
         padding-left: small ? Ui.space-16 : Ui.space-24;
         padding-right: small ? Ui.space-16 : Ui.space-24;
@@ -1729,6 +1733,8 @@ component GameStage inherits VerticalLayout {
                 color: Ui.on-accent;
                 font-family: Ui.font-heading;
                 font-size: max(min(base, fit), 36px * Ui.text-scale);
+                // Entrelinha 1,04 do `display` (Poppins tem 1,5 de natural).
+                line-height-factor: 0.69;
                 font-weight: 700;
                 letter-spacing: -0.02 * self.font-size;
                 // Sem `max-height`: com ele o Slint cortava na primeira linha; o tamanho acima já limita a duas.
@@ -1996,6 +2002,7 @@ component DeskLibrary inherits Rectangle {
                         animate opacity { duration: Ui.list-fade(list-in); easing: list-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
                         height: parent.height - (selecting ? 60px : 0);
                         bar-out: Ui.space-12;
+                        compact: small;
                         games: games;
                         selected: selected;
                         selecting: selecting;
@@ -2318,7 +2325,8 @@ component DeskRow inherits Rectangle {
         }
         if data.icon != "": Rectangle {
             width: 22px;
-            DeskIcon { name: data.icon; size: 22px; tint: data.style == "danger" ? Ui.error : Ui.desk-on-muted; }
+            // Logos de loja em SVG (LojaEncontrada); os outros nomes caem no ícone comum.
+            StoreIcon { name: data.icon; size: 22px; tint: data.style == "danger" ? Ui.error : Ui.desk-on-muted; }
         }
         if data.image.width > 0: Rectangle {
             width: 36px;
@@ -2339,10 +2347,20 @@ component DeskRow inherits Rectangle {
                 text: data.description;
                 color: Ui.desk-on-muted;
                 font-size: Ui.desk-label-sm;
+                // 13/1,35 das linhas (Plus Jakarta tem 1,26 de natural).
+                line-height-factor: 1.07;
                 wrap: word-wrap;
             }
         }
         if data.kind == "toggle" && !as-check: DeskToggle { on: data.on; y: (parent.height - self.height) / 2; }
+        // Loja encontrada (onboarding): ponto `success` quando a pasta existe.
+        if data.kind == "info" && data.on: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: Ui.success;
+        }
         // Bateria do controle (28 × 12), sempre com o número; abaixo de 20% em `warning`.
         if data.key == "controller" && data.value != "": battery := Rectangle {
             width: 32px;
@@ -2831,6 +2849,8 @@ component ModeCard inherits Rectangle {
         spacing: 6px;
         Text { text: data.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: 18px * Ui.text-scale; font-weight: 700; }
         Text { text: data.description; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; wrap: word-wrap; }
+        // Para quem é cada modo, em uma linha (OnboardingModo).
+        if data.value != "": Text { text: data.value; color: Ui.on-accent; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
     }
     TouchArea {
         mouse-cursor: pointer;
@@ -2913,7 +2933,7 @@ component DeskOverlay inherits Rectangle {
                             letter-spacing: 0.1 * self.font-size;
                         }
                         Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
-                        if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; }
+                        if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
                     }
                     CloseButton { clicked => { root.clicked("outside", 0); } }
                 }
@@ -3110,11 +3130,12 @@ component DeskOverlay inherits Rectangle {
                 // Janela baixa: o título cai para 40, como no destaque da janela pequena.
                 font-size: root.height < 760px ? 40px * Ui.text-scale : Ui.desk-display;
                 font-weight: 800;
+                line-height-factor: 0.69;
                 letter-spacing: -0.02 * self.font-size;
                 wrap: word-wrap;
                 max-width: 520px;
             }
-            if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-label-lg; wrap: word-wrap; max-width: 520px; }
+            if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-label-lg; line-height-factor: 1.23; wrap: word-wrap; width: 420px; }
             // Modo: as duas opções lado a lado, com a miniatura de cada modo.
             if ov.tab == 3: HorizontalLayout {
                 alignment: start;
@@ -3181,7 +3202,15 @@ component DeskOverlay inherits Rectangle {
                 spacing: 10px;
                 HorizontalLayout {
                     spacing: Ui.space-12;
-                    if ov.image.width > 0: Image { source: ov.image; width: 44px; height: 44px; image-fit: contain; }
+                    // Capa do jogo (ConfiguracoesDoJogo): miniatura de 40, recortada, raio `radius-thumb`.
+                    if ov.image.width > 0: Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: Ui.radius-thumb;
+                        clip: true;
+                        Image { width: parent.width; height: parent.height; source: ov.image; image-fit: cover; }
+                    }
                     VerticalLayout {
                         horizontal-stretch: 1;
                         alignment: center;
@@ -3200,7 +3229,7 @@ component DeskOverlay inherits Rectangle {
                     }
                     CloseButton { size: 40px; clicked => { root.clicked("outside", 0); } }
                 }
-                if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; wrap: word-wrap; }
+                if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
                 RowScroll {
                     vertical-stretch: 1;
                     preferred-height: self.content-h;

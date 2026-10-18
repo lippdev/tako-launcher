@@ -13,7 +13,7 @@ use tako_core::presentation::game_text;
 use tako_sources::report::LibrarySourceReport;
 
 /// Lojas que este SO lê (montar as fontes a cada desenho seria caro e o resultado não muda).
-fn stores() -> &'static [GameStore] {
+pub(crate) fn stores() -> &'static [GameStore] {
     static S: OnceLock<Vec<GameStore>> = OnceLock::new();
     S.get_or_init(crate::sources::stores)
 }
@@ -32,7 +32,7 @@ pub(crate) fn toggle_store(disabled: &str, store: GameStore) -> String {
     list.join(",")
 }
 
-fn store_icon(store: GameStore) -> String {
+pub(crate) fn store_icon(store: GameStore) -> String {
     match store {
         GameStore::Heroic | GameStore::Lutris | GameStore::Emulators => String::new(),
         s => format!("store-{}", s.key().to_ascii_lowercase()),
