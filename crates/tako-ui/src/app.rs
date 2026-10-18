@@ -1207,6 +1207,12 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
             .bool(crate::shell::ctx::keys::REDUCED_TRANSPARENCY, false)
             .to_value(),
     );
+    for (name, key) in [
+        ("silence", "accessibility.sound_silence"),
+        ("max", "accessibility.sound_max"),
+    ] {
+        bridge::set_global(ui, "DeskText", name, s.ctx.t(key).to_value());
+    }
     bridge::set_global(
         ui,
         "Ui",

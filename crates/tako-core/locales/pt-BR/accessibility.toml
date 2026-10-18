@@ -2,3 +2,6 @@
 text_size = "Tamanho do texto"
 sound_volume = "Volume dos sons de navegação"
 sound_desc = "0% desliga. Tons locais curtos para navegar; nunca tocam durante um jogo."
+sound_muted = "Mudo"
+sound_silence = "Silenciar"
+sound_max = "Volume máximo"

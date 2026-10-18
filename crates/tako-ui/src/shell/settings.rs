@@ -615,7 +615,11 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
                     "navigation-volume",
                     ctx.t("accessibility.sound_volume"),
                     if ctx.desktop {
-                        crate::navigation_feedback::volume(&ctx.settings).to_string()
+                        // O controle mostra "70%"; em 0, "Mudo" (o valor que ele lê vira 0).
+                        match crate::navigation_feedback::volume(&ctx.settings) {
+                            0 => ctx.t("accessibility.sound_muted"),
+                            v => v.to_string(),
+                        }
                     } else {
                         format!("{}%", crate::navigation_feedback::volume(&ctx.settings))
                     },
@@ -624,7 +628,17 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             .desc(ctx.t("accessibility.sound_desc")),
         )
         .on(|ctx| change_navigation_volume(ctx, 1))
-        .on_adjust(change_navigation_volume),
+        .on_adjust(change_navigation_volume)
+        .on_slide(|ctx, v, done| {
+            use crate::navigation_feedback as feedback;
+            ctx.settings.set(feedback::SOUND_VOLUME, &v.to_string());
+            ctx.dirty = true;
+            // Ao soltar, um som de amostra no volume novo.
+            if done {
+                feedback::play(ctx, Cmd::Right);
+            }
+            Flow::Stay
+        }),
         MenuItem::new(
             PanelRow::action("theme", ctx.t("settings.appearance.theme"))
                 .desc(ctx.t("settings.appearance.theme_desc"))
@@ -672,7 +686,10 @@ fn change_text_size(ctx: &mut Ctx, direction: i32) -> Flow {
 
 fn change_navigation_volume(ctx: &mut Ctx, direction: i32) -> Flow {
     use crate::navigation_feedback as feedback;
-    let next = (i32::from(feedback::volume(&ctx.settings)) + direction.signum() * 10).clamp(0, 100);
+    // No desktop ← → andam 5 (Shift 10, em `MenuItem::slide_key`); na tela cheia, 10.
+    let step = if ctx.desktop { 5 } else { 10 };
+    let next =
+        (i32::from(feedback::volume(&ctx.settings)) + direction.signum() * step).clamp(0, 100);
     ctx.settings.set(feedback::SOUND_VOLUME, &next.to_string());
     ctx.dirty = true;
     Flow::Stay
@@ -955,6 +972,21 @@ impl Page for SettingsPage {
         "settings"
     }
 
+    fn key(
+        &mut self,
+        text: &str,
+        mods: tako_core::input::shortcut::KeyModifiers,
+        ctx: &mut Ctx,
+    ) -> Option<Nav> {
+        if !ctx.desktop {
+            return None;
+        }
+        let shift = mods == tako_core::input::shortcut::KeyModifiers::SHIFT;
+        let item = self.items(ctx).into_iter().nth(self.row?)?;
+        let flow = item.slide_key(text, shift, ctx)?;
+        Some(Self::run(flow, ctx))
+    }
+
     fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
         let items = self.items(ctx);
         let n = self.cats.len();
@@ -1104,20 +1136,13 @@ impl Page for SettingsPage {
 
     fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Nav {
         match zone {
-            // ‹ › do modo desktop numa linha que se ajusta.
-            "row-dec" | "row-inc" => {
+            z if z.starts_with("row-slide:") || z.starts_with("row-drop:") => {
                 self.row = Some(index);
-                let adjustable = self
+                let flow = self
                     .items(ctx)
                     .get(index)
-                    .is_some_and(|i| i.adjust.is_some());
-                let cmd = match (adjustable, zone) {
-                    // Sem ajuste, a linha só tem o "próximo valor" do A.
-                    (false, _) => Cmd::Accept,
-                    (true, "row-dec") => Cmd::Left,
-                    _ => Cmd::Right,
-                };
-                self.handle(cmd, ctx)
+                    .and_then(|i| i.slide_zone(z, ctx));
+                flow.map_or(Nav::Stay, |f| Self::run(f, ctx))
             }
             // No desktop a categoria só troca as linhas; o foco não pula para elas (e sai da busca).
             "category" if ctx.desktop => {

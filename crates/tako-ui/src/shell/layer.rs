@@ -60,6 +60,8 @@ pub trait Layer {
 
 pub type Action = Rc<dyn Fn(&mut Ctx) -> Flow>;
 pub type Adjust = Rc<dyn Fn(&mut Ctx, i32) -> Flow>;
+/// Controle deslizante do desktop: o valor novo (0–100) e se a pessoa soltou.
+pub type Slide = Rc<dyn Fn(&mut Ctx, i32, bool) -> Flow>;
 /// As opções de uma escolha e a atual.
 pub type Options = Rc<dyn Fn(&Ctx) -> (Vec<Pick>, usize)>;
 
@@ -105,6 +107,8 @@ pub struct MenuItem {
     pub adjust: Option<Adjust>,
     /// No desktop, a escolha abre um select com estas opções em vez de ciclar.
     pub options: Option<Options>,
+    /// No desktop, o controle deslizante (arrastar, trilha, roda, Home/End) vai direto a um valor.
+    pub slide: Option<Slide>,
 }
 
 impl MenuItem {
@@ -122,7 +126,39 @@ impl MenuItem {
             accept: None,
             adjust: None,
             options: None,
+            slide: None,
         }
+    }
+    pub fn on_slide(mut self, f: impl Fn(&mut Ctx, i32, bool) -> Flow + 'static) -> Self {
+        self.slide = Some(Rc::new(f));
+        self
+    }
+
+    /// Zona do controle deslizante: "row-slide:<valor>" enquanto arrasta, "row-drop:<valor>" ao soltar.
+    pub fn slide_zone(&self, zone: &str, ctx: &mut Ctx) -> Option<Flow> {
+        let (value, done) = zone
+            .strip_prefix("row-slide:")
+            .map(|v| (v, false))
+            .or_else(|| zone.strip_prefix("row-drop:").map(|v| (v, true)))?;
+        let slide = self.slide.clone().filter(|_| self.row.enabled)?;
+        Some(slide(ctx, value.parse::<i32>().ok()?.clamp(0, 100), done))
+    }
+
+    /// Teclas do controle deslizante focado: Shift+← → e Page Up/Down andam 10, Home/End vão a 0 e 100.
+    pub fn slide_key(&self, text: &str, shift: bool, ctx: &mut Ctx) -> Option<Flow> {
+        use super::keys::{LEFT, RIGHT};
+        let slide = self.slide.clone().filter(|_| self.row.enabled)?;
+        let now = self.row.value.parse::<i32>().unwrap_or(0);
+        let next = match text.chars().next()? {
+            LEFT if shift => now - 10,
+            RIGHT if shift => now + 10,
+            '\u{F72C}' => now + 10, // Page Up
+            '\u{F72D}' => now - 10, // Page Down
+            '\u{F729}' => 0,        // Home
+            '\u{F72B}' => 100,      // End
+            _ => return None,
+        };
+        Some(slide(ctx, next.clamp(0, 100), true))
     }
     pub fn options(mut self, f: impl Fn(&Ctx) -> (Vec<Pick>, usize) + 'static) -> Self {
         self.options = Some(Rc::new(f));
@@ -440,24 +476,13 @@ impl Layer for MenuLayer {
             return self.handle(Cmd::Back, ctx);
         }
         self.focus = index;
-        // ‹ › do modo desktop numa linha que se ajusta (volume, valores que ciclam).
-        if zone == "row-dec" || zone == "row-inc" {
-            // Sem ajuste, a linha só tem o "próximo valor" do A.
-            let adjustable = self
-                .items(ctx)
-                .get(index)
-                .is_some_and(|i| i.adjust.is_some());
-            if !adjustable {
-                return self.handle(Cmd::Accept, ctx);
-            }
-            return self.handle(
-                if zone == "row-dec" {
-                    Cmd::Left
-                } else {
-                    Cmd::Right
-                },
-                ctx,
-            );
+        // Controle deslizante do desktop.
+        if let Some(flow) = self
+            .items(ctx)
+            .get(index)
+            .and_then(|i| i.slide_zone(zone, ctx))
+        {
+            return flow;
         }
         self.handle(Cmd::Accept, ctx)
     }

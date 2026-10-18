@@ -726,3 +726,37 @@ fn desktop_choices_are_selects_that_pick_each_option() {
     }
     i18n::set_lang(Lang::PtBr);
 }
+
+#[test]
+fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
+    use crate::navigation_feedback::{SOUND_VOLUME, volume};
+    use crate::shell::keys::RIGHT;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    let row = |ctx: &Ctx| {
+        categories()
+            .iter()
+            .flat_map(|c| (c.rows)(ctx))
+            .find(|i| i.row.key == "navigation-volume")
+            .expect("linha do volume")
+    };
+    assert_eq!(row(&ctx).row.kind, "slider");
+    let _ = row(&ctx).slide_zone("row-slide:37", &mut ctx);
+    assert_eq!(volume(&ctx.settings), 37);
+    let _ = row(&ctx).slide_zone("row-drop:0", &mut ctx);
+    assert_eq!(row(&ctx).row.value, ctx.t("accessibility.sound_muted"));
+    let _ = row(&ctx).slide_key("\u{F72B}", false, &mut ctx);
+    assert_eq!(volume(&ctx.settings), 100);
+    ctx.settings.set(SOUND_VOLUME, "50");
+    let _ = row(&ctx).slide_key(&RIGHT.to_string(), true, &mut ctx);
+    assert_eq!(volume(&ctx.settings), 60);
+    // Sem Shift, ← → são do ajuste comum (5 no desktop).
+    assert!(
+        row(&ctx)
+            .slide_key(&RIGHT.to_string(), false, &mut ctx)
+            .is_none()
+    );
+    let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
+    assert_eq!(volume(&ctx.settings), 65);
+}

@@ -84,6 +84,12 @@ component DeskIcon inherits Rectangle {
 
 // O que fica atrás do vidro: a arte do jogo em foco e a cópia desfocada dela (feita uma vez pelo Tako), no mesmo
 // retângulo da janela. Cada painel de vidro desenha o pedaço da cópia que fica atrás dele.
+// Textos do desktop que componentes fundos usam (o Tako preenche no idioma da pessoa).
+export global DeskText {
+    in-out property <string> silence: "Silenciar";
+    in-out property <string> max: "Volume máximo";
+}
+
 global DeskArt {
     in-out property <image> blur;
     // Luminância média da cópia numa grade de 16 × 9 (linhas de cima para baixo).
@@ -2245,22 +2251,153 @@ component DeskToggle inherits Rectangle {
     }
 }
 
-// ‹ › redondos de 32 para ajustar valores na linha.
-component AdjustButton inherits Rectangle {
+// Alto-falante do ControleDeslizante: botão de 28 com ícone de 18.
+component SliderSpeaker inherits Rectangle {
+    in property <string> icon;
     in property <string> label;
     callback clicked();
-    width: 32px;
-    height: 32px;
-    border-radius: 16px;
-    background: ata.pressed ? Ui.glass-pressed : (ata.has-hover ? Ui.glass-hover : Ui.glass-control);
-    border-width: 1px;
-    border-color: Ui.glass-edge;
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
+    background: sta.has-hover ? (DeskArt.gray ? Ui.settings-control-hover : Ui.glass-hover) : transparent;
+    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
     accessible-role: button;
     accessible-label: label;
-    Text { text: label; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
-    ata := TouchArea {
+    accessible-action-default => { root.clicked(); }
+    DeskIcon { name: icon; size: 18px; tint: Ui.desk-on-muted; }
+    sta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
+    }
+}
+
+// ControleDeslizante (valor contínuo, 0–100): alto-falante que silencia e volta · trilha de 180 com a bolinha ·
+// alto-falante que vai a 100% · valor escrito. Arrasta-se; clicar na trilha pula para o ponto e já arrasta; a roda
+// muda 5%. `value` vem do Tako ("70" ou o texto de mudo); ← → (Shift), Home/End e Page Up/Down também são dele.
+component DeskSlider inherits Rectangle {
+    in property <string> value;
+    in property <string> label;
+    in property <bool> focused;
+    // Valor novo e se a pessoa soltou (aí o Tako toca a amostra).
+    callback changed(int, bool);
+    property <float> level: value.is-float() ? clamp(value.to-float(), 0, 100) : 0;
+    property <bool> muted: level <= 0;
+    // Volume de antes do mudo, para o alto-falante voltar a ele.
+    property <float> before: 70;
+    property <float> drag-v;
+    property <bool> dragging: tta.pressed;
+    property <float> shown: dragging ? drag-v : level;
+    width: 28px + 180px + 28px + 40px + 3 * 10px;
+    height: 28px;
+    HorizontalLayout {
+        spacing: 10px;
+        SliderSpeaker {
+            icon: root.muted ? "speaker-mute" : "speaker";
+            label: DeskText.silence;
+            clicked => {
+                if root.muted {
+                    root.changed(round(root.before > 0 ? root.before : 50), true);
+                } else {
+                    root.before = root.level;
+                    root.changed(0, true);
+                }
+            }
+        }
+        track := Rectangle {
+            width: 180px;
+            accessible-role: slider;
+            accessible-label: root.label;
+            accessible-value: root.muted ? root.value : round(root.level) + "%";
+            accessible-value-minimum: 0;
+            accessible-value-maximum: 100;
+            accessible-value-step: 5;
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 6px;
+                border-radius: 3px;
+                background: DeskArt.gray ? Ui.settings-control : Ui.glass-pressed;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * root.shown / 100;
+                    border-radius: 3px;
+                    background: root.muted ? Ui.on-accent-subtle : Ui.on-accent;
+                }
+            }
+            if root.focused: Rectangle {
+                x: knob.x - 4px;
+                y: knob.y - 4px;
+                width: knob.width + 8px;
+                height: knob.height + 8px;
+                border-radius: self.height / 2;
+                background: Ui.focus-glow;
+                border-width: 2px;
+                border-color: Ui.focus-ring;
+            }
+            knob := Rectangle {
+                property <length> s: tta.has-hover || root.dragging ? 18px * 1.12 : 18px;
+                width: s;
+                height: s;
+                x: parent.width * root.shown / 100 - self.width / 2;
+                y: (parent.height - self.height) / 2;
+                border-radius: self.width / 2;
+                background: Ui.primary-top;
+                drop-shadow-color: #00000059;
+                drop-shadow-offset-y: 1px;
+                drop-shadow-blur: 4px;
+                animate width, height { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            }
+            // Arrastando: o valor numa dica acima da bolinha.
+            if root.dragging: Rectangle {
+                width: tipv.preferred-width + 16px;
+                height: 24px;
+                x: knob.x + knob.width / 2 - self.width / 2;
+                y: knob.y - self.height - 6px;
+                border-radius: 6px;
+                background: Ui.settings-surface;
+                border-width: 1px;
+                border-color: Ui.glass-edge-strong;
+                tipv := Text { text: round(root.drag-v) + "%"; color: Ui.on-accent; font-size: 12px; font-weight: 600; }
+            }
+            tta := TouchArea {
+                mouse-cursor: pointer;
+                pointer-event(e) => {
+                    if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                        root.drag-v = clamp(self.mouse-x / self.width * 100, 0, 100);
+                        root.changed(round(root.drag-v), false);
+                    } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                        root.changed(round(root.drag-v), true);
+                    }
+                }
+                moved => {
+                    if self.pressed {
+                        root.drag-v = clamp(self.mouse-x / self.width * 100, 0, 100);
+                        root.changed(round(root.drag-v), false);
+                    }
+                }
+                scroll-event(e) => {
+                    if e.delta-y > 0 {
+                        root.changed(min(100, round(root.level) + 5), true);
+                    } else if e.delta-y < 0 {
+                        root.changed(max(0, round(root.level) - 5), true);
+                    }
+                    accept
+                }
+            }
+        }
+        SliderSpeaker {
+            icon: "volume";
+            label: DeskText.max;
+            clicked => { root.changed(100, true); }
+        }
+        Text {
+            width: 40px;
+            text: root.muted ? root.value : round(root.level) + "%";
+            color: Ui.on-accent;
+            font-size: 13px * Ui.text-scale;
+            font-weight: 600;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
     }
 }
 
@@ -2274,7 +2411,6 @@ component DeskRow inherits Rectangle {
     // PainelLateral (filtros): liga/desliga como caixa de marcar. Toda escolha de uma opção entre várias é um select
     // (CampoDeSelecao): a pílula com ⌃⌄; o Tako abre a lista junto dela.
     in property <bool> side-panel;
-    in property <bool> adjustable: data.kind == "slider";
     property <bool> as-check: side-panel && data.kind == "toggle";
     // Opção solta num diálogo ("Não perguntar de novo"): linha sem caixa.
     in property <bool> loose;
@@ -2282,8 +2418,8 @@ component DeskRow inherits Rectangle {
     in property <bool> bare;
     out property <length> row-h: is-header ? 40px : max(loose ? Ui.control-height : Ui.settings-row-height, lay.preferred-height);
     callback clicked();
-    callback dec();
-    callback inc();
+    // ControleDeslizante: valor novo e se soltou.
+    callback slide(int, bool);
     // Canto inferior direito da pílula do select, para a lista nascer embaixo dela, alinhada à direita.
     callback anchor(length, length);
     property <bool> is-header: data.kind == "header";
@@ -2411,19 +2547,12 @@ component DeskRow inherits Rectangle {
             }
             Rectangle { x: 29px; width: 2px; height: 5px; border-radius: 1px; background: Ui.desk-on-muted; }
         }
-        if adjustable: AdjustButton { label: "‹"; y: (parent.height - self.height) / 2; clicked => { root.dec(); } }
-        if data.kind == "slider": Rectangle {
+        if data.kind == "slider": DeskSlider {
             y: (parent.height - self.height) / 2;
-            width: 150px;
-            height: 6px;
-            border-radius: 3px;
-            background: Ui.glass-pressed;
-            Rectangle {
-                x: 0;
-                width: parent.width * clamp(data.value.to-float() / 100, 0, 1);
-                border-radius: parent.border-radius;
-                background: Ui.on-accent;
-            }
+            value: data.value;
+            label: data.title;
+            focused: root.focused;
+            changed(v, done) => { root.slide(v, done); }
         }
         // Select (CampoDeSelecao): pílula de 36 (32 no vidro), valor 14/600 e ⌃⌄; de 120 a 280, cortando com "…".
         if data.kind == "choice": Rectangle {
@@ -2467,8 +2596,7 @@ component DeskRow inherits Rectangle {
             max-width: 260px;
             overflow: elide;
         }
-        if adjustable: AdjustButton { label: "›"; y: (parent.height - self.height) / 2; clicked => { root.inc(); } }
-        if (data.kind == "action" || data.kind == "button") && !adjustable && !as-check && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
+        if (data.kind == "action" || data.kind == "button") && !as-check && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
 }
 
@@ -2573,8 +2701,7 @@ component RowScroll inherits Rectangle {
                     last: !root.body(i + 1);
                     focused: key-focus && i == sel;
                     clicked => { root.clicked("row", i); }
-                    dec => { root.clicked("row-dec", i); }
-                    inc => { root.clicked("row-inc", i); }
+                    slide(v, done) => { root.clicked((done ? "row-drop:" : "row-slide:") + v, i); }
                     anchor(x, y) => { root.anchor(x, y); }
                 }
             }
