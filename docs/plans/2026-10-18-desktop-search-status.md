@@ -33,10 +33,10 @@
 
 ### Task 2: Count alignment and active filters
 
-- [ ] Set count padding to 9/8, targets to 30×30, spacing to 2 and icons to 17; remove filter badge.
-- [ ] Build fixed chips from LibraryCriteria with individual removal and clear-all, preserving search/sort.
+- [x] Set count padding to 9/8, targets to 30×30, spacing to 2 and icons to 17; remove filter badge.
+- [x] Build fixed chips from LibraryCriteria with individual removal and clear-all, preserving search/sort.
 - [ ] Test removal and render both requested sizes with multiple active filters.
-- [ ] Commit item 5 in Portuguese.
+- [x] Commit item 5 in Portuguese.
 
 ### Task 3: Game status
 

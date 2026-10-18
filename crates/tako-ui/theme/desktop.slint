@@ -2381,19 +2381,18 @@ component GamePhases inherits Rectangle {
     }
 }
 
-// Ícones da linha de contagem: inverter a ordem e filtrar (com a quantidade de filtros).
+// Ícones da linha de contagem: inverter a ordem e filtrar; filtros ativos só acendem o ícone.
 component SortFilter inherits HorizontalLayout {
     in property <bool> reversed;
     in property <int> filter-count;
     in property <[string]> labels;
     callback clicked(string);
-    spacing: 8px;
+    spacing: 2px;
     IconBtn { icon: "sort"; label: labels[3]; on: reversed; clicked => { root.clicked("reverse"); } }
     IconBtn {
         icon: "filter";
         label: labels[4];
         on: filter-count > 0;
-        badge: filter-count > 0 ? filter-count : "";
         clicked => { root.clicked("filter"); }
     }
 }
@@ -2413,6 +2412,8 @@ component DeskLibrary inherits Rectangle {
     in property <[DeskNav]> collections;
     in property <DeskNav> collection;
     in property <int> filter-count;
+    in property <[[PanelRow]]> filter-chips;
+    in property <string> clear-label;
     in property <string> count;
     // Janela pequena: só a contagem, sem o nome da ordenação (os quatro ícones ocupam o resto da linha).
     in property <string> count-short;
@@ -2539,8 +2540,8 @@ component DeskLibrary inherits Rectangle {
                 }
                 HorizontalLayout {
                     height: 36px;
-                    padding-left: Ui.space-12;
-                    padding-right: 4px;
+                    padding-left: 9px;
+                    padding-right: 8px;
                     spacing: 2px;
                     Text {
                         text: loading ? loading-label : (small ? count-short : count);
@@ -2572,6 +2573,73 @@ component DeskLibrary inherits Rectangle {
                         filter-count: filter-count;
                         labels: view-labels;
                         clicked(z) => { root.clicked(z, 0); }
+                    }
+                }
+                if filter-chips.length > 0: HorizontalLayout {
+                    spacing: 6px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        for row[r] in filter-chips: HorizontalLayout {
+                            height: 28px;
+                            spacing: 6px;
+                            alignment: start;
+                            for chip[i] in row: Rectangle {
+                                width: min(chip-layout.preferred-width, (parent.width - 6px) / row.length);
+                                height: 28px;
+                                border-radius: 14px;
+                                background: Ui.glass-control;
+                                border-width: 1px;
+                                border-color: Ui.glass-edge-strong;
+                                chip-layout := HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 2px;
+                                    spacing: 2px;
+                                    Text {
+                                        text: chip.title;
+                                        color: Ui.on-accent;
+                                        font-size: 12px * Ui.text-scale;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+                                    Rectangle {
+                                        width: 24px;
+                                        height: 24px;
+                                        y: 2px;
+                                        border-radius: 12px;
+                                        background: remove-ta.has-hover ? Ui.glass-hover : transparent;
+                                        accessible-role: button;
+                                        accessible-label: chip.description;
+                                        accessible-action-default => { root.clicked("remove-filter", r * 2 + i); }
+                                        DeskIcon { name: "close"; size: 12px; tint: Ui.desk-on-muted; }
+                                        remove-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.clicked("remove-filter", r * 2 + i); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if filter-count > 1: Rectangle {
+                        width: clear-text.preferred-width + 8px;
+                        accessible-role: button;
+                        accessible-label: clear-label;
+                        accessible-action-default => { root.clicked("clear-filters", 0); }
+                        clear-text := Text {
+                            height: 28px;
+                            text: clear-label;
+                            font-size: 12px * Ui.text-scale;
+                            font-weight: 600;
+                            color: Ui.on-accent;
+                            vertical-alignment: center;
+                        }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.clicked("clear-filters", 0); }
+                        }
                     }
                 }
                 Rectangle {
@@ -5904,6 +5972,7 @@ export component Desktop inherits Window {
     in property <string> desk-search-hint;
     in property <string> desk-filter-label;
     in property <int> desk-filter-count;
+    in property <[[PanelRow]]> desk-filter-chips;
     in property <bool> desk-filtered;
     in property <string> desk-clear-label;
     in property <string> desk-count;
@@ -6128,6 +6197,8 @@ export component Desktop inherits Window {
                 collection: desk-collection;
                 small: root.small;
                 filter-count: desk-filter-count;
+                filter-chips: desk-filter-chips;
+                clear-label: desk-clear-label;
                 count: desk-count;
                 count-short: desk-count-short;
                 games: page == "desk-library" ? desk-games : [];

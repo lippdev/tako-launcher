@@ -342,6 +342,94 @@ impl DesktopLibrary {
         }
     }
 
+    fn active_filters(&self, ctx: &Ctx) -> Vec<PanelRow> {
+        let c = self.criteria.borrow();
+        let mut rows = Vec::new();
+        let mut add = |id: String, label: String| {
+            let remove = ctx.tf("desktop.remove_filter", &[("filter", &label)]);
+            rows.push(PanelRow::button(id, label).desc(remove));
+        };
+        for status in &c.statuses {
+            add(
+                format!("status:{}", status.key()),
+                library_text::status_label(ctx.lang(), Some(*status)),
+            );
+        }
+        if c.install != InstallFilter::Any {
+            add(
+                "install".into(),
+                library_text::install_label(ctx.lang(), c.install),
+            );
+        }
+        for (on, id, key) in [
+            (c.favorites_only, "favorites", "filters.favorites_only"),
+            (c.played_only, "played", "filters.played"),
+            (c.broken_only, "broken", "filters.broken"),
+        ] {
+            if on {
+                add(id.into(), ctx.t(key));
+            }
+        }
+        if c.play_time != tako_core::library::criteria::PlayTimeFilter::Any {
+            add("play-time".into(), ctx.t(c.play_time.key()));
+        }
+        for (kind, values) in [
+            ("source", &c.sources),
+            ("genre", &c.genres),
+            ("tag", &c.tags),
+            ("collection", &c.collections),
+        ] {
+            for value in values {
+                let label = if kind == "collection" {
+                    ctx.collections
+                        .collections()
+                        .iter()
+                        .find(|col| col.id == *value)
+                        .map(|col| col.name.clone())
+                        .unwrap_or_else(|| value.clone())
+                } else {
+                    value.clone()
+                };
+                add(format!("{kind}:{value}"), label);
+            }
+        }
+        rows
+    }
+
+    fn remove_filter(&mut self, ctx: &Ctx, index: usize) {
+        let Some(row) = self.active_filters(ctx).get(index).cloned() else {
+            return;
+        };
+        let mut c = self.criteria.borrow_mut();
+        match row.key.as_str() {
+            "install" => c.install = InstallFilter::Any,
+            "favorites" => c.favorites_only = false,
+            "played" => c.played_only = false,
+            "broken" => c.broken_only = false,
+            "play-time" => c.play_time = tako_core::library::criteria::PlayTimeFilter::Any,
+            id => {
+                if let Some((kind, value)) = id.split_once(':') {
+                    match kind {
+                        "status" => c.statuses.retain(|s| s.key() != value),
+                        "source" => {
+                            c.sources.remove(value);
+                        }
+                        "genre" => {
+                            c.genres.remove(value);
+                        }
+                        "tag" => {
+                            c.tags.remove(value);
+                        }
+                        "collection" => {
+                            c.collections.remove(value);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     fn ids(&self, ctx: &Ctx) -> Vec<String> {
         self.games(ctx).into_iter().map(|g| g.id.clone()).collect()
     }
@@ -1304,6 +1392,13 @@ impl Page for DesktopLibrary {
                 )));
             }
             "search-leave" => self.zone = Zone::List,
+            "remove-filter" => self.remove_filter(ctx, index),
+            "clear-filters" => {
+                let mut c = self.criteria.borrow_mut();
+                let reversed = c.reversed;
+                *c = c.clear_filters();
+                c.reversed = reversed;
+            }
             "clear" => self.clear(),
             "add-game" => ctx.effect(Effect::AddGame),
             "group-store" => ctx.settings.set(GROUP_KEY, GroupBy::Store.key()),
@@ -1376,6 +1471,11 @@ impl Page for DesktopLibrary {
         out.set("desk-search-hint", ctx.t("desktop.search"));
         out.set("desk-filter-label", ctx.t("desktop.filter_sort"));
         out.set("desk-filter-count", c.active_filter_count() as i32);
+        let filters = self.active_filters(ctx);
+        out.set(
+            "desk-filter-chips",
+            filters.chunks(2).map(|r| r.to_vec()).collect::<Vec<_>>(),
+        );
         out.set("desk-clear-label", ctx.t("desktop.clear"));
         out.set("desk-filtered", c.has_search() || c.has_filters());
         let view = View::of(ctx);
@@ -2403,6 +2503,46 @@ mod tests {
             shell.focused_game(),
             Some(page(&shell).ids(&shell.ctx)[3].clone())
         );
+    }
+
+    #[test]
+    fn fixed_filter_chips_remove_each_criterion_without_touching_search_or_sort() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        let mut page = DesktopLibrary::new();
+        *page.criteria.borrow_mut() = LibraryCriteria {
+            search: "hades".into(),
+            install: InstallFilter::Installed,
+            favorites_only: true,
+            played_only: true,
+            broken_only: true,
+            play_time: tako_core::library::criteria::PlayTimeFilter::Unplayed,
+            statuses: [PlayStatus::Playing].into(),
+            sources: ["Steam".into()].into(),
+            genres: ["Ação".into()].into(),
+            tags: ["Sofá".into()].into(),
+            collections: ["collection-id".into()].into(),
+            reversed: true,
+            ..Default::default()
+        };
+        let sort = page.criteria.borrow().sort;
+        while page.criteria.borrow().has_filters() {
+            let count = page.criteria.borrow().active_filter_count();
+            assert_eq!(page.active_filters(&ctx).len(), count);
+            page.remove_filter(&ctx, usize::MAX);
+            assert_eq!(page.criteria.borrow().active_filter_count(), count);
+            page.remove_filter(&ctx, 0);
+            assert_eq!(page.criteria.borrow().active_filter_count(), count - 1);
+            let c = page.criteria.borrow();
+            assert_eq!(c.search, "hades");
+            assert_eq!(c.sort, sort);
+            assert!(c.reversed);
+        }
+        assert!(page.active_filters(&ctx).is_empty());
     }
 
     #[test]
