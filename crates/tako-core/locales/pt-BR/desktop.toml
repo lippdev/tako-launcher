@@ -86,6 +86,8 @@ installed = "Instalados"
 not_installed = "Não instalados"
 see_all = "Ver todos"
 empty = "Nenhum jogo para agrupar por {group}"
+empty_text = "Marque Jogando, Zerado e outros status pelo menu ⋯ de um jogo, ou veja a biblioteca agrupada de outro jeito."
+by_store = "Agrupar por Loja"
 
 [desktop.bulk]
 count = "{n} selecionados de {total}"
