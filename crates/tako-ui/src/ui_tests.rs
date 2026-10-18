@@ -16,7 +16,16 @@ impl Platform for Headless {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
         Ok(self.0.clone())
     }
+    // Relógio das animações: o real, ou o da captura quadro a quadro (desenhar 1600 × 900 leva mais que um quadro).
+    fn duration_since_start(&self) -> std::time::Duration {
+        CLOCK.with(|c| c.get()).unwrap_or_else(|| START.elapsed())
+    }
 }
+
+thread_local! {
+    static CLOCK: std::cell::Cell<Option<std::time::Duration>> = const { std::cell::Cell::new(None) };
+}
+static START: std::sync::LazyLock<Instant> = std::sync::LazyLock::new(Instant::now);
 
 fn property<'a>(out: &'a Out, name: &str) -> &'a Value {
     &out.props
@@ -386,7 +395,7 @@ fn desktop_snapshot() {
                 ),
             )
         };
-        let art = std::env::var("TAKO_SNAP_ART").ok().map(|p| {
+        let load_art = |p: String| {
             let img = image::open(p).unwrap();
             let (blur, lum) = crate::images::glass_copy(&img);
             let lum: Vec<Value> = lum.into_iter().map(|l| Value::Number(l.into())).collect();
@@ -395,7 +404,13 @@ fn desktop_snapshot() {
                 to_image(&blur),
                 crate::values::model(lum),
             )
-        });
+        };
+        let art = std::env::var("TAKO_SNAP_ART").ok().map(load_art);
+        // `TAKO_SNAP_SWITCH=game:3` (com `TAKO_SNAP_ART2=<imagem>`): depois da captura, troca de jogo e grava
+        // `TAKO_SNAP_FRAMES` quadros (padrão 24) em `desktop-<w>x<h>-sNN.png`, com o accent de cada jogo;
+        // `TAKO_SNAP_SWITCH=intro` grava a entrada do app em `iNN`.
+        let switch = std::env::var("TAKO_SNAP_SWITCH").ok();
+        let art2 = std::env::var("TAKO_SNAP_ART2").ok().map(load_art);
         let mut ctx = crate::app::build_ctx(
             DataPaths::at(dir.path().join("data")),
             tako_platform::Platform::simulated(),
@@ -450,6 +465,10 @@ fn desktop_snapshot() {
                 shell.click(zone, i.parse().unwrap_or(0));
             }
         }
+        // Entrada do app: apagado desde o primeiro quadro, como na abertura.
+        if switch.as_deref() == Some("intro") {
+            ui.set_property("desk-intro", Value::Bool(true)).unwrap();
+        }
         ui.show().unwrap();
         // `TAKO_SNAP_SIZES=1920x1080,2048x1100`: outros tamanhos além dos das prévias.
         let sizes: Vec<(u32, u32)> = std::env::var("TAKO_SNAP_SIZES")
@@ -458,13 +477,12 @@ fn desktop_snapshot() {
             .filter_map(|s| s.split_once('x'))
             .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
             .collect();
-        for (w, h) in sizes {
-            window.set_size(slint::PhysicalSize::new(w, h));
+        let apply = |shell: &mut Shell, art: Option<&(slint::Image, slint::Image, Value)>| {
             let out = shell.render(Instant::now());
             for (name, value) in &out.props {
                 let mut value = value.clone();
                 if let (Some((art, blur, lum)), "desk-game", Value::Struct(s)) =
-                    (&art, *name, &mut value)
+                    (art, *name, &mut value)
                 {
                     s.set_field("art".into(), Value::Image(art.clone()));
                     s.set_field("art-blur".into(), Value::Image(blur.clone()));
@@ -492,6 +510,22 @@ fn desktop_snapshot() {
                 }
                 crate::bridge::set(&ui, name, value);
             }
+            if switch.is_some() {
+                let id = shell.focused_game();
+                let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
+                let p = tako_core::presentation::color::AccentPalette::for_accent(
+                    g.map(|g| g.accent.as_str()),
+                    true,
+                );
+                for (name, c) in [("accent", p.accent), ("accent-deep", p.deep)] {
+                    let c = slint::Color::from_rgb_u8(c.r, c.g, c.b);
+                    crate::bridge::set_global(&ui, "Ui", name, Value::Brush(c.into()));
+                }
+            }
+        };
+        for (w, h) in sizes {
+            window.set_size(slint::PhysicalSize::new(w, h));
+            apply(&mut shell, art.as_ref());
             // As entradas animam (Timer de 1 ms e `page-time`): a captura espera elas terminarem
             // (`TAKO_SNAP_WAIT=<ms>` fotografa no meio delas).
             let wait: u64 = std::env::var("TAKO_SNAP_WAIT")
@@ -519,6 +553,38 @@ fn desktop_snapshot() {
                 .unwrap()
                 .save(format!("{out_dir}/desktop-{w}x{h}.png"))
                 .unwrap();
+            // Quadros de 40 ms no relógio das animações, a partir de agora.
+            let capture = |prefix: &str, pixels: &mut Vec<Rgb8Pixel>| {
+                let frames: u32 = std::env::var("TAKO_SNAP_FRAMES")
+                    .ok()
+                    .and_then(|f| f.parse().ok())
+                    .unwrap_or(24);
+                let t0 = START.elapsed();
+                for f in 0..frames {
+                    let t = 40 * f;
+                    CLOCK.with(|c| c.set(Some(t0 + std::time::Duration::from_millis(t.into()))));
+                    slint::platform::update_timers_and_animations();
+                    ui.window().request_redraw();
+                    window.draw_if_needed(|r| {
+                        r.render(pixels, w as usize);
+                    });
+                    let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+                    image::RgbImage::from_raw(w, h, raw)
+                        .unwrap()
+                        .save(format!("{out_dir}/desktop-{w}x{h}-{prefix}{f:02}.png"))
+                        .unwrap();
+                }
+                CLOCK.with(|c| c.set(None));
+            };
+            // `TAKO_SNAP_SWITCH=intro`: a entrada do app (primeiro quadro apagado, depois `iNN`).
+            if switch.as_deref() == Some("intro") {
+                ui.set_property("desk-intro", Value::Bool(false)).unwrap();
+                capture("i", &mut pixels);
+            } else if let Some((zone, i)) = switch.as_deref().and_then(|s| s.split_once(':')) {
+                shell.click(zone, i.parse().unwrap_or(0));
+                apply(&mut shell, art2.as_ref().or(art.as_ref()));
+                capture("s", &mut pixels);
+            }
         }
         ui.hide().unwrap();
     })
