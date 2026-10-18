@@ -277,6 +277,8 @@ theme_struct! {
         pub trailer: bool,
         // A arte (ou a cópia de vidro) ainda carrega: a janela segura a do jogo anterior para não piscar.
         pub art_loading: bool,
+        pub store_icon: String,
+        pub store_name: String,
         // TituloDoJogo: o título é o logo (senão, o nome em texto).
         pub show_logo: bool,
     }

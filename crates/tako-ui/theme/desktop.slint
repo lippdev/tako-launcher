@@ -35,7 +35,7 @@ export { Ui }
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, store-icon: string, store-name: string }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
 
@@ -673,6 +673,7 @@ component GameRow inherits Rectangle {
     in property <bool> selected;
     in property <bool> focused;
     in property <bool> selecting;
+    in property <length> thumb: Ui.thumb-size;
     callback clicked();
     callback toggle();
     callback range();
@@ -725,7 +726,7 @@ component GameRow inherits Rectangle {
         Rectangle {
             y: (parent.height - self.height) / 2;
             // 40 na linha comum, 32 na linha compacta da janela pequena.
-            width: min(Ui.thumb-size, root.height - 10px);
+            width: root.thumb;
             height: self.width;
             border-radius: Ui.radius-thumb;
             clip: true;
@@ -750,13 +751,10 @@ component GameRow inherits Rectangle {
             border-radius: 4px;
             background: Ui.success;
         }
+        // Vaga fixa do ▶: a linha escolhida não empurra nada (FIX-004). A loja fica no destaque.
         Rectangle {
-            width: 18px;
-            accessible-role: image;
-            accessible-label: data.store-name;
-            DeskIcon { name: data.store-icon; size: 16px; tint: picked ? Ui.desk-on-muted : Ui.desk-on-subtle; }
-        }
-        if selected && !selecting: Rectangle {
+            width: 36px;
+            if selected && !selecting: Rectangle {
             y: (parent.height - self.height) / 2;
             width: 36px;
             height: 36px;
@@ -771,8 +769,8 @@ component GameRow inherits Rectangle {
                 mouse-cursor: pointer;
                 clicked => { root.play(); }
             }
+            }
         }
-        if !selected || selecting: Rectangle { width: 2px; }
     }
     // Nome longo corta com reticências; o inteiro fica na dica.
     Tip { text: data.title.character-count > 26 ? data.title : ""; hovering: ta.has-hover; }
@@ -790,7 +788,7 @@ component GameList inherits Rectangle {
     callback scrolled(int);
     // Janela pequena (JanelaPequena): linhas compactas de 42 com miniatura de 32.
     in property <bool> compact;
-    property <length> row-h: (compact ? 42px : Ui.list-row-height) + (Ui.text-scale - 1) * 32px + 6px;
+    property <length> row-h: (compact ? 42px : Ui.game-row-height) + (Ui.text-scale - 1) * 32px + 6px;
     property <int> first: max(0, floor(-fl.viewport-y / row-h));
     // Vagas fixas: a linha `r` fica sempre na vaga `mod(r, slots)`. Rolar uma linha troca só a vaga que saiu de cima
     // (ela entra embaixo); as outras guardam dados, textos, miniatura e a seleção, sem refazer nada por quadro.
@@ -820,6 +818,7 @@ component GameList inherits Rectangle {
             y: r * row-h;
             width: fl.width;
             height: row-h - 6px;
+            thumb: compact ? 32px : Ui.thumb-size;
             data: games[r];
             selected: r == root.selected;
             focused: key-focus && r == root.selected;
@@ -1289,6 +1288,27 @@ component Badge inherits Rectangle {
             letter-spacing: 0.1 * self.font-size;
             vertical-alignment: center;
         }
+    }
+}
+
+// Loja de origem do jogo escolhido: cápsula de vidro com o logo e o nome.
+component StorePill inherits Rectangle {
+    in property <string> icon;
+    in property <string> text;
+    height: 28px;
+    width: sl.preferred-width;
+    border-radius: self.height / 2;
+    background: Ui.glass-control;
+    border-width: 1px;
+    border-color: Ui.glass-edge-strong;
+    accessible-role: image;
+    accessible-label: text;
+    sl := HorizontalLayout {
+        padding-left: Ui.space-12;
+        padding-right: Ui.space-12;
+        spacing: 7px;
+        DeskIcon { name: icon; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
     }
 }
 
@@ -2012,6 +2032,12 @@ component DeskLibrary inherits Rectangle {
                     }
                     IconBtn {
                         y: (parent.height - self.height) / 2;
+                        icon: "plus";
+                        label: view-labels[6];
+                        clicked => { root.clicked("add-game", 0); }
+                    }
+                    IconBtn {
+                        y: (parent.height - self.height) / 2;
                         icon: "grid";
                         label: view-labels[5];
                         clicked => {
@@ -2033,11 +2059,11 @@ component DeskLibrary inherits Rectangle {
                         alignment: start;
                         spacing: 6px;
                         for i in 8: HorizontalLayout {
-                            height: Ui.list-row-height;
+                            height: Ui.game-row-height;
                             padding-left: Ui.space-8;
                             spacing: 14px;
-                            Skeleton { width: Ui.thumb-size; height: Ui.thumb-size; y: 6px; }
-                            Skeleton { width: 110px + mod(i * 37, 80) * 1px; height: 14px; y: 19px; radius: 7px; }
+                            Skeleton { width: Ui.thumb-size; height: Ui.thumb-size; y: 2px; }
+                            Skeleton { width: 110px + mod(i * 37, 80) * 1px; height: 14px; y: 15px; radius: 7px; }
                             Rectangle { horizontal-stretch: 1; }
                         }
                     }
@@ -2096,6 +2122,18 @@ component DeskLibrary inherits Rectangle {
             clicked(z, i) => { root.clicked(z, i); }
             menu(x, y) => { root.menu(x, y); }
         }
+    }
+
+    // Loja do jogo escolhido, no canto superior direito do destaque.
+    if !wide && game.has-game && game.store-name != "": HorizontalLayout {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: 28px;
+        alignment: end;
+        opacity: mode-in ? 1 : 0;
+        animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
+        StorePill { icon: game.store-icon; text: game.store-name; }
     }
 
     if wide: VerticalLayout {
