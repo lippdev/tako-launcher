@@ -77,3 +77,10 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Emulador em Flatpak: o jogo abre por `flatpak run <id>` (ROM fora de `~` pode precisar de permissão de pasta no Flatseal: anotar).
 - [ ] ES-DE: os jogos da pasta `~/ROMs` aparecem com os nomes e capas do ES-DE; os escondidos nele não aparecem.
 - [ ] Abrir um jogo de cada emulador: tela cheia, direto no jogo, e o Tako acompanha até fechar.
+
+## Jogos não instalados: instalando e espaço livre (SRC-005)
+
+- [ ] Steam nativa e Flatpak: Instalar em um jogo da conta abre `steam://install/<appid>`; em até 3 s o jogo aparece "instalando" com a porcentagem e, ao terminar, vira instalado sozinho (os `appmanifest` do Flatpak ficam em `~/.var/app/com.valvesoftware.Steam`).
+- [ ] Cancelar a instalação na Steam: o jogo volta a "não instalado". Pausar: a porcentagem para.
+- [ ] Heroic (Epic/GOG/Amazon): o jogo mandado instalar só vira instalado na releitura de 30 s (o Tako não vê o andamento do Heroic).
+- [ ] O espaço livre mostrado é o do disco da Steam (ou de `~` sem Steam), com o ponto de montagem certo (ex.: `/`, `/home`, `/mnt/jogos`) e o número igual ao de `df -h`. Biblioteca da Steam em outro disco montado: mostra o ponto de montagem dele.
