@@ -2,6 +2,17 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [0.2.0-alpha.9]
+### Novidades
+- **Logo do jogo no destaque:** o título do jogo vira o logo oficial (da Steam, ou do SteamGridDB quando falta). Sem logo, com pouco contraste sobre a arte ou se você preferir, volta o nome em texto. Escolha em Configurações › Aparência › "Título dos jogos", ou jogo a jogo na aba Logo de Trocar imagens.
+- **Volume que se arrasta:** o volume dos sons de navegação virou um controle deslizante, com clique na trilha, roda do mouse, setas (Shift anda mais), Home/End, botões de mudo e de 100% e um som de amostra ao soltar.
+- **Confirmação de tela:** trocar a tela de jogo ou a resolução pergunta "Manter esta configuração?" e volta sozinho em 15 s se você não confirmar.
+- **Barra da janela:** clique direito abre o menu da janela, o botão de maximizar acompanha Win+↑/↓, a barra esmaece quando a janela perde o foco e aparece "Atualização pronta" quando há uma versão nova baixada.
+- **Troca de jogo:** a arte nova chega deslizando de leve e o texto sobe ao entrar; com o teclado, a arte só troca quando você para num jogo.
+- **Trocar imagens:** Estilo virou uma lista e as setas andam pela grade como ela aparece.
+- **Coleções:** a aba vazia oferece "Nova coleção…".
+- O ícone do Tako aparece na barra de tarefas e nos atalhos do Windows, os logos das lojas ficam sem contorno em todos os menus e gêneros aparecem como "Ação - Plataforma".
+
 ## [0.2.0-alpha.8]
 ### Novidades
 - **Janela própria:** o Tako desenha a barra da janela sobre a arte do jogo, com o logo e os botões Minimizar, Maximizar e Fechar (arraste pela barra; duplo clique maximiza).

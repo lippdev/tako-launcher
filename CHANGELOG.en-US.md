@@ -2,6 +2,17 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [0.2.0-alpha.9]
+### What's new
+- **Game logo in the highlight:** the game title becomes its official logo (from Steam, or SteamGridDB when missing). Without a logo, with low contrast over the art or if you prefer, the name comes back as text. Choose in Settings › Appearance › "Game titles", or per game in the Logo tab of Change images.
+- **Draggable volume:** the navigation sound volume is now a slider, with click on the track, mouse wheel, arrows (Shift moves more), Home/End, mute and 100% buttons and a sample tone on release.
+- **Display confirmation:** changing the game screen or resolution asks "Keep this setting?" and reverts on its own after 15 s unless you confirm.
+- **Window bar:** right click opens the window menu, the maximize button follows Win+Up/Down, the bar dims when the window loses focus and "Update ready" shows up when a new version is downloaded.
+- **Game switching:** the new art slides in gently and the text rises as it appears; with the keyboard, the art only changes once you stop on a game.
+- **Change images:** Style is now a list and the arrows move through the grid as it is shown.
+- **Collections:** the empty tab offers "New collection…".
+- Tako's icon shows on the Windows taskbar and shortcuts, store logos have no outline in any menu and genres read "Action - Platformer".
+
 ## [0.2.0-alpha.8]
 ### What's new
 - **Own window bar:** Tako draws the window bar over the game art, with the logo and Minimize, Maximize and Close (drag by the bar; double click maximizes).
