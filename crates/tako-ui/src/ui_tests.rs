@@ -535,6 +535,13 @@ fn desktop_snapshot() {
             true,
         );
         i18n::set_lang(Lang::PtBr);
+        // `TAKO_SNAP_NI=1`: acrescenta jogos não instalados de três lojas, um baixando (NaoInstalados).
+        if std::env::var("TAKO_SNAP_NI").is_ok_and(|v| v == "1") {
+            ctx.found
+                .lock()
+                .unwrap()
+                .extend(crate::demo::not_installed());
+        }
         ctx.library.refresh();
         // `TAKO_SNAP_UNIFIED=1` liga a barra lateral unida; `TAKO_SNAP_NARROW=1`, a largura Estreita.
         if std::env::var("TAKO_SNAP_UNIFIED").is_ok_and(|v| v == "1") {
@@ -740,6 +747,10 @@ fn desktop_snapshot() {
             .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
             .collect();
         let apply = |shell: &mut Shell, art: Option<&(slint::Image, slint::Image, Value)>| {
+            // Como o app: a grade conta linhas por coluna, e as colunas vêm da largura da janela.
+            if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
+                shell.ctx.grid_columns = (n as usize).max(1);
+            }
             let out = shell.render(Instant::now());
             for (name, value) in &out.props {
                 let mut value = value.clone();
