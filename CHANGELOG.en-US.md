@@ -2,6 +2,14 @@
 
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
+## [Unreleased]
+### What's new
+- **Games not installed:** games from your store accounts that aren't on this PC show up after the installed ones, grouped by store, in the list and the grid. Each group opens and closes, and Tako remembers how you left it.
+- **Install from the store:** the ⬇ button on the row, the cover and the highlight opens the install in the store client, showing the store and the size. Games bought in more than one store let you pick which to install from.
+- **Install progress:** on Steam, Tako shows the percentage as a ring in the list and grid and "Downloading… 42%" in the highlight. When it finishes, the game becomes installed without restarting. Epic shows "Installing" without a number.
+- **Free space:** the highlight shows how much space is left on the disk and warns when there isn't enough for the game.
+- "Install" is also in the game menu and in multi-select, which open one at a time in the store.
+
 ## [0.2.0-alpha.14]
 ### What's new
 - **One top bar:** Tako's bar is now the window's own bar, edge to edge, with Minimize, Maximize and Close on the right. On Windows, the empty part of the bar drags the window, double-click maximizes and Maximize shows the snap layouts.
