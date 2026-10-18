@@ -92,6 +92,10 @@ export global DeskText {
 
 global DeskArt {
     in-out property <image> blur;
+    // Troca de jogo: a cópia do jogo anterior fica embaixo e a nova (`blur`) entra por cima junto com a arte, para o
+    // vidro e as bordas não trocarem antes do fundo (TrocaDeJogo › luz ambiente, vidro, accent).
+    in-out property <image> blur-old;
+    in-out property <bool> blur-in: true;
     // Largura do select que abriu a lista (SeletorDeColecao: a lista tem a largura dele); 0 = pela lista.
     in-out property <length> anchor-w;
     // Luminância média da cópia numa grade de 16 × 9 (linhas de cima para baixo).
@@ -101,8 +105,9 @@ global DeskArt {
     in-out property <float> aspect: 16 / 9;
     in-out property <length> win-w;
     in-out property <length> win-h;
-    out property <color> accent: Ui.accent;
-    out property <color> accent-deep: Ui.accent-deep;
+    // A cor do jogo cuja arte está na tela (o Desktop troca junto com a arte; quem pinta com ela anima em `art-fade`).
+    in-out property <color> accent: Ui.accent;
+    in-out property <color> accent-deep: Ui.accent-deep;
     // Retângulo da arte na janela (FundoDoJogo, padrão 3840 × 1240): cobre a altura com o centro da arte a 62% da
     // largura, sem sobra nas bordas; numa janela mais larga que a arte, cobre a largura e ancora a 30% do topo.
     out property <bool> small: win-w < 1280px;
@@ -157,6 +162,16 @@ component Vidro inherits Rectangle {
             width: DeskArt.win-w;
             height: DeskArt.win-h;
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
+            animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+        }
+        // Troca de jogo: a cópia anterior embaixo e a nova entrando por cima junto com a arte.
+        if lens && DeskArt.has-art: Image {
+            x: DeskArt.bx - ax;
+            y: DeskArt.y - ay;
+            width: DeskArt.bw;
+            height: DeskArt.h;
+            source: DeskArt.blur-old;
+            image-fit: fill;
         }
         if lens && DeskArt.has-art: Image {
             x: DeskArt.bx - ax;
@@ -165,8 +180,8 @@ component Vidro inherits Rectangle {
             height: DeskArt.h;
             source: DeskArt.blur;
             image-fit: fill;
-            opacity: DeskArt.blur.width > 0 ? 1 : 0;
-            animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            opacity: DeskArt.blur.width > 0 && DeskArt.blur-in ? 1 : 0;
+            animate opacity { duration: Ui.art-fade(DeskArt.blur-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // O vidro desfoca o que está atrás dele: a arte já com a luz da cor do jogo e os escurecimentos da janela.
         if lens && DeskArt.has-art: Rectangle {
@@ -174,7 +189,10 @@ component Vidro inherits Rectangle {
             y: -ay;
             width: DeskArt.win-w;
             height: DeskArt.win-h;
-            Rectangle { background: DeskArt.accent.with-alpha(0.22); }
+            Rectangle {
+                background: DeskArt.accent.with-alpha(0.22);
+                animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            }
             Rectangle {
                 background: DeskArt.small
                     ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
@@ -195,6 +213,7 @@ component Vidro inherits Rectangle {
             width: Ui.glass-light-width * 2;
             height: Ui.glass-light-height * 2;
             background: @radial-gradient(circle, DeskArt.accent.with-alpha(0.16) 0%, DeskArt.accent.with-alpha(0) 75%);
+            animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // Volume da lente: brilho de cima, 150 px fixos para barra, painel e cartão parecerem o mesmo material.
         if !DeskArt.gray: Rectangle {
@@ -3842,11 +3861,25 @@ component ArtLayer inherits Rectangle {
     property <image> top-src;
     property <image> bottom-src;
     property <bool> top-in: true;
-    init => { top-src = art; }
-    changed art => {
-        bottom-src = top-src;
+    // Opacidade da de cima; a cópia desfocada dela (`DeskArt.blur`) entra no vidro e nas bordas no mesmo passo.
+    property <float> top-alpha: top-in ? 1 : 0;
+    animate top-alpha { duration: Ui.art-fade(top-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    // A cópia que acompanha a arte de cima (vira a de baixo na próxima troca).
+    property <image> blur-top;
+    init => {
         top-src = art;
+        blur-top = DeskArt.blur;
+    }
+    changed art => {
+        // Troca interrompida: fica embaixo a que mais aparece no quadro (a de cima só se já passou da metade).
+        if (top-alpha >= 0.5) {
+            bottom-src = top-src;
+            DeskArt.blur-old = blur-top;
+        }
+        top-src = art;
+        blur-top = DeskArt.blur;
         top-in = false;
+        DeskArt.blur-in = false;
         top-timer.running = true;
     }
     top-timer := Timer {
@@ -3855,6 +3888,7 @@ component ArtLayer inherits Rectangle {
         triggered => {
             self.running = false;
             top-in = true;
+            DeskArt.blur-in = true;
         }
     }
     // Máscara das bordas em faixas (o Slint não tem máscara): opaca até 12%, some em 30%, volta de 62% a 92%.
@@ -3869,6 +3903,7 @@ component ArtLayer inherits Rectangle {
         animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         if !DeskArt.has-art: Rectangle {
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
+            animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             // Brilho suave no alto à direita (EstadoSemArte).
             Rectangle {
                 x: parent.width * 0.55;
@@ -3899,8 +3934,7 @@ component ArtLayer inherits Rectangle {
                 y: DeskArt.y - (self.height - DeskArt.h) / 2;
                 source: root.top-src;
                 image-fit: fill;
-                opacity: root.top-in ? 1 : 0;
-                animate opacity { duration: Ui.art-fade(root.top-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                opacity: root.top-alpha;
                 // O desfoque sai: a cópia desfocada da mesma arte por cima, de 1 a 0 (o Slint não anima `blur`).
                 if DeskArt.blur.width > 0: Image {
                     width: parent.width;
@@ -3925,10 +3959,22 @@ component ArtLayer inherits Rectangle {
                         y: DeskArt.y;
                         width: DeskArt.bw;
                         height: DeskArt.h;
-                        source: DeskArt.blur;
+                        source: DeskArt.blur-old;
                         image-fit: fill;
                     }
-                    Rectangle { background: DeskArt.accent.with-alpha(0.45); }
+                    Image {
+                        x: DeskArt.bx - parent.x;
+                        y: DeskArt.y;
+                        width: DeskArt.bw;
+                        height: DeskArt.h;
+                        source: DeskArt.blur;
+                        image-fit: fill;
+                        opacity: root.top-alpha;
+                    }
+                    Rectangle {
+                        background: DeskArt.accent.with-alpha(0.45);
+                        animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                    }
                 }
             }
         }
@@ -4171,6 +4217,8 @@ export component Desktop inherits Window {
             DeskArt.has-art = desk-game.has-game && desk-game.art.width > 0;
             DeskArt.blur = desk-game.art-blur;
             DeskArt.lum = desk-game.art-lum;
+            DeskArt.accent = Ui.accent;
+            DeskArt.accent-deep = Ui.accent-deep;
             if (desk-game.art.height > 0) {
                 DeskArt.aspect = desk-game.art.width / desk-game.art.height;
             }
@@ -4178,6 +4226,9 @@ export component Desktop inherits Window {
         }
     }
     property <image> art-shown;
+    // A cor do jogo muda junto com a arte (enquanto a nova carrega, fica a do jogo que está na tela).
+    property <color> accent-now: Ui.accent;
+    changed accent-now => { root.sync-art(); }
     changed width => { root.sync-art(); }
     changed height => { root.sync-art(); }
     changed page => {
