@@ -38,7 +38,7 @@ struct DeskCategory { title: string, count: string, icon: string, games: [DeskGa
 struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string }
 struct CoverRow { current: image, has-current: bool, proposed: image, has-proposed: bool, current-label: string, level: int, confidence: string, reason: string, accept: string, other: string }
 struct DeskStat { label: string, value: string }
-struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
+struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string], score: int }
 struct DeskBar { label: string, value: string, fraction: float, today: bool, future: bool }
 struct DeskEntry { id: string, title: string, detail: string, note: string, value: string, thumb: image, accent: color, fraction: float, dot: bool, header: bool, row: int }
 struct DeskCard { title: string, count: string, auto: bool, covers: [DeskEntry] }
@@ -1444,7 +1444,8 @@ component StatusStrip inherits Vidro {
         padding-left: Ui.space-16;
         padding-right: 22px;
         for it[i] in items: HorizontalLayout {
-            visible: !small || i < 3;
+            // Metacritic é o último da faixa e o primeiro a sair quando falta largura.
+            visible: it.icon == "metacritic" ? !small : (!small || i < 3);
             spacing: 11px;
             // Divisória no meio do espaço entre os itens.
             if i > 0: HorizontalLayout {
@@ -1452,7 +1453,23 @@ component StatusStrip inherits Vidro {
                 padding-right: small ? 0 : 3px;
                 Rectangle { width: 1px; height: 30px; y: 16px; background: Ui.divider; }
             }
-            DeskIcon { name: it.icon; size: 26px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+            if it.icon != "metacritic": DeskIcon { name: it.icon; size: 26px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+            if it.icon == "metacritic": Rectangle {
+                width: 22px;
+                height: 22px;
+                border-radius: 6px;
+                y: (parent.height - self.height) / 2;
+                background: it.score >= 75 ? Ui.success : (it.score >= 50 ? Ui.warning : Ui.error);
+                Text {
+                    text: it.score;
+                    font-family: Ui.font-text;
+                    font-size: 11px * Ui.text-scale;
+                    font-weight: 800;
+                    color: it.score < 50 ? #ffffff : #0b0d10;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+            }
             VerticalLayout {
                 alignment: center;
                 spacing: 5px;
@@ -1687,7 +1704,7 @@ component DetailsCard inherits Vidro {
         spacing: 0;
         CardTitle { text: title; }
         Rectangle { height: small ? 4px : 8px; }
-        for r[i] in rows: Rectangle {
+        for r[i] in rows: if i < 3: Rectangle {
             vertical-stretch: 1;
             min-height: small ? 22px : 28px;
             max-height: 40px;
@@ -1762,7 +1779,7 @@ component SessionsCard inherits Vidro {
             }
         }
         Text { text: summary; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
-        for r[i] in rows: Rectangle {
+        for r[i] in rows: if i < 3: Rectangle {
             vertical-stretch: 1;
             max-height: 40px;
             if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
@@ -1777,7 +1794,7 @@ component SessionsCard inherits Vidro {
     }
 }
 
-// Fileira de cartões do destaque: Sobre, Trailer, Detalhes e Sessões, 20 entre eles.
+// Fileira de cartões do destaque: Sobre, Detalhes e Sessões, 20 entre eles (larguras 1,25 · 1,1 · 1,1).
 component CardRow inherits Rectangle {
     in property <DeskGameView> game;
     in property <[DeskInfo]> details;
@@ -1788,29 +1805,26 @@ component CardRow inherits Rectangle {
     in property <string> details-label;
     in property <bool> small;
     in property <bool> show-about;
-    in property <bool> show-trailer;
     in property <bool> show-sessions;
     callback clicked(string, int);
-    // Largura só pela proporção (flex 1.45 · .9 · 1.1 · 1.1), posta à mão (num layout o texto longo empurra os outros).
-    property <float> s-about: small ? 1 : 1.45;
-    property <float> s-details: small ? 1.2 : 1.1;
-    property <float> total: (show-about ? s-about : 0) + (show-trailer ? 0.9 : 0) + s-details + (show-sessions ? 1.1 : 0);
-    property <int> cards: (show-about ? 1 : 0) + (show-trailer ? 1 : 0) + 1 + (show-sessions ? 1 : 0);
+    // Larguras 1,25 · 1,1 · 1,1, 20 entre eles (ou 1,25 · 1,1 sem sessões); o trailer mora na fase 2.
+    property <float> s-about: 1.25;
+    property <float> s-details: 1.1;
+    property <float> s-sessions: 1.1;
+    property <float> total: (show-about ? s-about : 0) + s-details + (show-sessions ? s-sessions : 0);
+    property <int> cards: (show-about ? 1 : 0) + 1 + (show-sessions ? 1 : 0);
     property <length> unit: (root.width - (cards - 1) * Ui.space-20) / total;
     property <length> about-w: show-about ? unit * s-about + Ui.space-20 : 0;
-    property <length> trailer-w: show-trailer ? unit * 0.9 + Ui.space-20 : 0;
     property <length> details-w: unit * s-details;
     // Altura que o conteúdo pede (Detalhes com seis linhas), para a fileira crescer em vez de cortar.
     out property <length> content-h: dc.min-height;
     // Entrada do app: os cartões acendem um a um depois das ações, subindo `intro-rise`.
     property <float> intro-about: DeskIntro.on ? 1 : 0;
     animate intro-about { duration: Ui.page-time; delay: Ui.intro-delay(5); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    property <float> intro-trailer: DeskIntro.on ? 1 : 0;
-    animate intro-trailer { duration: Ui.page-time; delay: Ui.intro-delay(6); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     property <float> intro-details: DeskIntro.on ? 1 : 0;
-    animate intro-details { duration: Ui.page-time; delay: Ui.intro-delay(7); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    animate intro-details { duration: Ui.page-time; delay: Ui.intro-delay(6); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     property <float> intro-sessions: DeskIntro.on ? 1 : 0;
-    animate intro-sessions { duration: Ui.page-time; delay: Ui.intro-delay(8); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    animate intro-sessions { duration: Ui.page-time; delay: Ui.intro-delay(7); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     if show-about: AboutCard {
         x: 0;
         y: (1 - intro-about) * Ui.intro-rise;
@@ -1826,18 +1840,8 @@ component CardRow inherits Rectangle {
         small: small;
         more-clicked => { root.clicked("about-more", 0); }
     }
-    if show-trailer: TrailerCard {
-        x: about-w;
-        y: (1 - intro-trailer) * Ui.intro-rise;
-        opacity: intro-trailer;
-        height: root.height;
-        width: unit * 0.9;
-        art: game.art;
-        label: card-labels[3];
-        clicked => { root.clicked("trailer", 0); }
-    }
     dc := DetailsCard {
-        x: about-w + trailer-w;
+        x: about-w;
         y: (1 - intro-details) * Ui.intro-rise;
         opacity: intro-details;
         height: root.height;
@@ -1847,11 +1851,11 @@ component CardRow inherits Rectangle {
         small: small;
     }
     if show-sessions: SessionsCard {
-        x: about-w + trailer-w + details-w + Ui.space-20;
+        x: about-w + details-w + Ui.space-20;
         y: (1 - intro-sessions) * Ui.intro-rise;
         opacity: intro-sessions;
         height: root.height;
-        width: unit * 1.1;
+        width: unit * s-sessions;
         labels: card-labels;
         summary: sessions-summary;
         rows: sessions;
@@ -1882,9 +1886,9 @@ component LoadingStage inherits VerticalLayout {
     HorizontalLayout {
         height: small ? 190px : Ui.card-height;
         spacing: Ui.space-20;
-        Skeleton { horizontal-stretch: 1.45; radius: Ui.radius-card; }
-        Skeleton { horizontal-stretch: small ? 1.2 : 1.1; radius: Ui.radius-card; }
-        Skeleton { horizontal-stretch: small ? 1 : 0.9; radius: Ui.radius-card; }
+        Skeleton { horizontal-stretch: 1.25; radius: Ui.radius-card; }
+        Skeleton { horizontal-stretch: 1.1; radius: Ui.radius-card; }
+        if !small: Skeleton { horizontal-stretch: 1.1; radius: Ui.radius-card; }
     }
 }
 
@@ -1948,9 +1952,8 @@ component GameStage inherits VerticalLayout {
             text-rise = true;
         }
     }
-    property <bool> show-trailer: game.trailer && !small;
-    // Sessões só com espaço para Detalhes ficar com pelo menos ~340 (ícone, rótulo de 104 e um valor de 24 letras).
-    property <bool> show-sessions: sessions.length > 0 && !small && DeskArt.win-w >= 1600px;
+    // Abaixo de 1280 de largura ou na janela pequena, Sessões sai da fileira da fase 1.
+    property <bool> show-sessions: sessions.length > 0 && !small && DeskArt.win-w >= 1280px;
     alignment: end;
     // Os 8 da subida do texto saem do espaço até os cartões.
     spacing: (small ? Ui.space-16 : Ui.space-28) - 8px;
@@ -2070,9 +2073,9 @@ component GameStage inherits VerticalLayout {
         }
         if game.hint != "": Text { text: game.hint; opacity: intro-actions; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
     }
-    // Com quatro cartões (Sobre, Trailer, Detalhes, Sessões) a fileira passa da largura e rola na horizontal.
+    // Fileira Sobre · Detalhes · Sessões da fase 1 (o trailer fica na fase 2).
     // 248 (190 na janela pequena), crescendo se o conteúdo pedir mais: nada passa da borda do cartão.
-    if !(show-trailer && show-sessions): CardRow {
+    CardRow {
         opacity: text-in ? 1 : 0;
         animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         height: max(small ? 190px : Ui.card-height, self.content-h);
@@ -2085,31 +2088,8 @@ component GameStage inherits VerticalLayout {
         details-label: details-label;
         small: small;
         show-about: show-about;
-        show-trailer: show-trailer;
         show-sessions: show-sessions;
         clicked(z, i) => { root.clicked(z, i); }
-    }
-    if show-trailer && show-sessions: cards := Flickable {
-        opacity: text-in ? 1 : 0;
-        animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
-        height: Ui.card-height;
-        viewport-width: 360px + 240px + 320px + 320px + 3 * Ui.space-20;
-        CardRow {
-            width: cards.viewport-width;
-            height: cards.height;
-            game: game;
-            details: details;
-            sessions-summary: sessions-summary;
-            sessions: sessions;
-            card-labels: card-labels;
-            about-label: about-label;
-            details-label: details-label;
-            small: small;
-            show-about: show-about;
-            show-trailer: true;
-            show-sessions: true;
-            clicked(z, i) => { root.clicked(z, i); }
-        }
     }
 }
 

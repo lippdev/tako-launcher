@@ -872,7 +872,24 @@ fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         },
         ..Default::default()
     };
-    vec![session, time]
+    let mut items = vec![session, time];
+    if let Some(score) = g.metacritic_score {
+        let band = match score {
+            90..=i32::MAX => "desktop.strip.metacritic_universal",
+            75..=89 => "desktop.strip.metacritic_favorable",
+            50..=74 => "desktop.strip.metacritic_mixed",
+            20..=49 => "desktop.strip.metacritic_unfavorable",
+            _ => "desktop.strip.metacritic_overwhelming",
+        };
+        items.push(DeskInfo {
+            icon: "metacritic".into(),
+            label: ctx.t("desktop.strip.metacritic"),
+            value: ctx.t(band),
+            score,
+            ..Default::default()
+        });
+    }
+    items
 }
 
 /// CartaoDetalhes: uma linha com ícone por informação que o jogo tem, até 6, as de menor prioridade saem primeiro.
@@ -988,7 +1005,7 @@ fn sessions_rows(ctx: &Ctx, g: &Game) -> (String, Vec<DeskInfo>) {
             ..Default::default()
         });
     }
-    for s in all.iter().rev().take(4 - rows.len()) {
+    for s in all.iter().rev().take(3 - rows.len()) {
         let start = s.started_at.with_timezone(&chrono::Local);
         let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
         rows.push(DeskInfo {
@@ -1362,7 +1379,10 @@ impl Page for DesktopLibrary {
                             ctx.effect(Effect::OpenUrl(url.clone()));
                         }
                     }
-                    _ => return Nav::Layer(Box::new(dialogs::sessions(ctx, &g.id))),
+                    _ => {
+                        ctx.open_route = Some("desk:profile:sessions".into());
+                        return Nav::Stay;
+                    }
                 }
             }
             "game-play" => {

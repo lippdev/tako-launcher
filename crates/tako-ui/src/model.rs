@@ -248,6 +248,8 @@ theme_struct! {
         pub dot: bool,
         // Etiquetas do usuário (LIB-002), como chips.
         pub chips: Vec<String>,
+        // Nota (Metacritic) na faixa de estado.
+        pub score: i32,
     }
 }
 

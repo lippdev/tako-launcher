@@ -261,7 +261,7 @@ impl ProfilePage {
         self.zone
     }
 
-    fn open_tab(&mut self, tab: Tab) {
+    pub fn open_tab(&mut self, tab: Tab) {
         self.tab = tab;
         self.zone = Zone::Tabs;
         self.index = TABS.iter().position(|t| *t == tab).unwrap_or(0);

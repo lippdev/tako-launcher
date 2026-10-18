@@ -269,6 +269,15 @@ impl Shell {
                 }
                 return;
             }
+            if route == "desk:profile:sessions" {
+                self.layers.clear();
+                self.pages.truncate(1);
+                let mut p = profile::ProfilePage::new();
+                p.open_tab(profile::Tab::Sessions);
+                self.pages.push(Box::new(p));
+                self.ctx.dirty = true;
+                return;
+            }
             self.desktop_nav(match route {
                 "settings" => 1,
                 profile::ROUTE => 3,

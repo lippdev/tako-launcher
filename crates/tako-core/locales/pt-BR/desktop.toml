@@ -134,6 +134,12 @@ current_session = "Sessão atual"
 playing_now = "jogando agora"
 never_played = "Nunca jogado"
 not_played = "Ainda não jogado"
+metacritic = "Metacritic"
+metacritic_universal = "Aclamação universal"
+metacritic_favorable = "Geralmente favorável"
+metacritic_mixed = "Críticas mistas"
+metacritic_unfavorable = "Geralmente desfavorável"
+metacritic_overwhelming = "Aversão esmagadora"
 
 [desktop.info]
 critic = "Crítica"
