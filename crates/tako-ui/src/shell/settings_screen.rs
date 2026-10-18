@@ -4,6 +4,7 @@
 use super::{Ctx, Effect, Flow, MenuItem, cached, toggle};
 use crate::model::PanelRow;
 use crate::shell::ctx::keys;
+use crate::shell::layer::Pick;
 use std::time::Duration;
 use tako_core::devices::{AudioDevice, ConnectedDisplay, DisplayMode, HdrStatus};
 use tako_core::session::settings::{MonitorPreset, MonitorPresets};
@@ -69,6 +70,42 @@ fn remember_preset(ctx: &mut Ctx) {
     ctx.settings.set(keys::GAME_SCREEN_PRESETS, &all.to_text());
 }
 
+fn pick_display(ctx: &mut Ctx, d: &ConnectedDisplay) {
+    remember_preset(ctx);
+    ctx.settings.set(keys::GAME_SCREEN_ID, &d.id);
+    ctx.settings.set(keys::GAME_SCREEN_NAME, &d.name);
+    // Volta o que esta tela tinha; sem preset, o padrão (manter a atual, sem HDR).
+    let p = presets(ctx).get(&d.id).unwrap_or_default();
+    let mode = p.mode.map(|m| m.key()).unwrap_or_default();
+    ctx.settings.set(keys::GAME_SCREEN_MODE, &mode);
+    ctx.settings.set_bool(keys::GAME_SCREEN_HDR, p.hdr);
+}
+
+fn pick_mode(ctx: &mut Ctx, m: Option<DisplayMode>) {
+    let key = m.map(|m| m.key()).unwrap_or_default();
+    ctx.settings.set(keys::GAME_SCREEN_MODE, &key);
+    remember_preset(ctx);
+}
+
+fn pick_audio(ctx: &mut Ctx, d: Option<&AudioDevice>) {
+    let (id, name) = d
+        .map(|d| (d.id.clone(), d.name.clone()))
+        .unwrap_or_default();
+    ctx.settings.set(keys::GAME_AUDIO_ID, &id);
+    ctx.settings.set(keys::GAME_AUDIO_NAME, &name);
+}
+
+/// "Manter a atual" e depois os modos da tela de jogo, do maior para o menor.
+fn mode_list(ctx: &Ctx) -> Result<Vec<Option<DisplayMode>>, String> {
+    let id = ctx.settings.string(keys::GAME_SCREEN_ID);
+    if id.is_empty() {
+        return Ok(vec![None]);
+    }
+    let mut all: Vec<Option<DisplayMode>> = vec![None];
+    all.extend(modes(ctx, &id)?.into_iter().map(Some));
+    Ok(all)
+}
+
 /// Próximo da lista (com volta), a partir do atual.
 fn cycle<T>(items: &[T], current: Option<usize>, dir: i32) -> Option<&T> {
     if items.is_empty() {
@@ -120,34 +157,46 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             name
         },
     )
-    .desc(ctx.t("settings.screen.display_desc"));
+    // No desktop é um select: sem o "← → trocam" da tela cheia.
+    .desc(ctx.t(if ctx.desktop {
+        "settings.screen.display_desc_desktop"
+    } else {
+        "settings.screen.display_desc"
+    }));
     if let Err(e) = &list {
         display_row = display_row.desc(e.clone());
     }
     v.push(disable(
-        MenuItem::new(display_row).on_adjust(|ctx, dir| {
-            match displays(ctx) {
-                Err(e) => ctx.toast(e),
-                Ok(list) => {
-                    let id = ctx.settings.string(keys::GAME_SCREEN_ID);
-                    let cur = list.iter().position(|d| d.id.eq_ignore_ascii_case(&id));
-                    match cycle(&list, cur, dir) {
-                        None => ctx.toast(ctx.t("settings.screen.no_displays")),
-                        Some(d) => {
-                            remember_preset(ctx);
-                            ctx.settings.set(keys::GAME_SCREEN_ID, &d.id);
-                            ctx.settings.set(keys::GAME_SCREEN_NAME, &d.name);
-                            // Volta o que esta tela tinha; sem preset, o padrão (manter a atual, sem HDR).
-                            let p = presets(ctx).get(&d.id).unwrap_or_default();
-                            let mode = p.mode.map(|m| m.key()).unwrap_or_default();
-                            ctx.settings.set(keys::GAME_SCREEN_MODE, &mode);
-                            ctx.settings.set_bool(keys::GAME_SCREEN_HDR, p.hdr);
+        MenuItem::new(display_row)
+            .on_adjust(|ctx, dir| {
+                match displays(ctx) {
+                    Err(e) => ctx.toast(e),
+                    Ok(list) => {
+                        let id = ctx.settings.string(keys::GAME_SCREEN_ID);
+                        let cur = list.iter().position(|d| d.id.eq_ignore_ascii_case(&id));
+                        match cycle(&list, cur, dir) {
+                            None => ctx.toast(ctx.t("settings.screen.no_displays")),
+                            Some(d) => pick_display(ctx, d),
                         }
                     }
                 }
-            }
-            Flow::Stay
-        }),
+                Flow::Stay
+            })
+            .options(|ctx| {
+                let list = displays(ctx).unwrap_or_default();
+                let id = ctx.settings.string(keys::GAME_SCREEN_ID);
+                let cur = list.iter().position(|d| d.id.eq_ignore_ascii_case(&id));
+                let picks = list
+                    .into_iter()
+                    .map(|d| {
+                        Pick::new(d.name.clone()).set(move |ctx| {
+                            pick_display(ctx, &d);
+                            Flow::Stay
+                        })
+                    })
+                    .collect();
+                (picks, cur.unwrap_or(usize::MAX))
+            }),
         usable,
     ));
 
@@ -180,29 +229,42 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         mode_row = mode_row.desc(e);
     }
     v.push(disable(
-        MenuItem::new(mode_row).on_adjust(|ctx, dir| {
-            let id = ctx.settings.string(keys::GAME_SCREEN_ID);
-            if id.is_empty() {
-                ctx.toast(ctx.t("settings.screen.choose_first"));
-                return Flow::Stay;
-            }
-            match modes(ctx, &id) {
-                Err(e) => ctx.toast(e),
-                Ok(list) => {
-                    // "Manter a atual" e depois os modos, do maior para o menor.
-                    let mut all: Vec<Option<DisplayMode>> = vec![None];
-                    all.extend(list.into_iter().map(Some));
-                    let cur = DisplayMode::parse(&ctx.settings.string(keys::GAME_SCREEN_MODE));
-                    let i = all.iter().position(|m| *m == cur);
-                    if let Some(m) = cycle(&all, i, dir) {
-                        let key = m.map(|m| m.key()).unwrap_or_default();
-                        ctx.settings.set(keys::GAME_SCREEN_MODE, &key);
-                        remember_preset(ctx);
+        MenuItem::new(mode_row)
+            .on_adjust(|ctx, dir| {
+                let id = ctx.settings.string(keys::GAME_SCREEN_ID);
+                if id.is_empty() {
+                    ctx.toast(ctx.t("settings.screen.choose_first"));
+                    return Flow::Stay;
+                }
+                match mode_list(ctx) {
+                    Err(e) => ctx.toast(e),
+                    Ok(all) => {
+                        let cur = DisplayMode::parse(&ctx.settings.string(keys::GAME_SCREEN_MODE));
+                        let i = all.iter().position(|m| *m == cur);
+                        if let Some(m) = cycle(&all, i, dir) {
+                            pick_mode(ctx, *m);
+                        }
                     }
                 }
-            }
-            Flow::Stay
-        }),
+                Flow::Stay
+            })
+            .options(|ctx| {
+                let all = mode_list(ctx).unwrap_or_else(|_| vec![None]);
+                let now = DisplayMode::parse(&ctx.settings.string(keys::GAME_SCREEN_MODE));
+                let cur = all.iter().position(|m| *m == now).unwrap_or(0);
+                let picks = all
+                    .into_iter()
+                    .map(|m| {
+                        let label =
+                            m.map_or_else(|| ctx.t("settings.screen.keep_mode"), |m| m.to_string());
+                        Pick::new(label).set(move |ctx| {
+                            pick_mode(ctx, m);
+                            Flow::Stay
+                        })
+                    })
+                    .collect();
+                (picks, cur)
+            }),
         usable,
     ));
 
@@ -254,25 +316,52 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         }
         Ok(_) => {}
     }
-    v.push(MenuItem::new(audio_row).on_adjust(|ctx, dir| {
-        if let Ok((_, devices)) = audio(ctx) {
-            let mut all: Vec<Option<AudioDevice>> = vec![None];
-            all.extend(devices.into_iter().map(Some));
-            let id = ctx.settings.string(keys::GAME_AUDIO_ID);
-            let i = all
-                .iter()
-                .position(|d| d.as_ref().map(|d| d.id.as_str()).unwrap_or("") == id);
-            if let Some(d) = cycle(&all, i, dir) {
-                let (id, name) = d
-                    .as_ref()
-                    .map(|d| (d.id.clone(), d.name.clone()))
-                    .unwrap_or_default();
-                ctx.settings.set(keys::GAME_AUDIO_ID, &id);
-                ctx.settings.set(keys::GAME_AUDIO_NAME, &name);
-            }
-        }
-        Flow::Stay
-    }));
+    v.push(
+        MenuItem::new(audio_row)
+            .on_adjust(|ctx, dir| {
+                if let Ok((_, devices)) = audio(ctx) {
+                    let mut all: Vec<Option<AudioDevice>> = vec![None];
+                    all.extend(devices.into_iter().map(Some));
+                    let id = ctx.settings.string(keys::GAME_AUDIO_ID);
+                    let i = all
+                        .iter()
+                        .position(|d| d.as_ref().map(|d| d.id.as_str()).unwrap_or("") == id);
+                    if let Some(d) = cycle(&all, i, dir) {
+                        pick_audio(ctx, d.as_ref());
+                    }
+                }
+                Flow::Stay
+            })
+            .options(|ctx| {
+                let mut all: Vec<Option<AudioDevice>> = vec![None];
+                all.extend(
+                    audio(ctx)
+                        .map(|(_, d)| d)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(Some),
+                );
+                let id = ctx.settings.string(keys::GAME_AUDIO_ID);
+                let cur = all
+                    .iter()
+                    .position(|d| d.as_ref().map(|d| d.id.as_str()).unwrap_or("") == id)
+                    .unwrap_or(0);
+                let picks = all
+                    .into_iter()
+                    .map(|d| {
+                        let label = d.as_ref().map_or_else(
+                            || ctx.t("settings.screen.audio_keep"),
+                            |d| d.name.clone(),
+                        );
+                        Pick::new(label).set(move |ctx| {
+                            pick_audio(ctx, d.as_ref());
+                            Flow::Stay
+                        })
+                    })
+                    .collect();
+                (picks, cur)
+            }),
+    );
 
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.screen.during_header"),

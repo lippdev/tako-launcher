@@ -60,6 +60,41 @@ pub trait Layer {
 
 pub type Action = Rc<dyn Fn(&mut Ctx) -> Flow>;
 pub type Adjust = Rc<dyn Fn(&mut Ctx, i32) -> Flow>;
+/// As opções de uma escolha e a atual.
+pub type Options = Rc<dyn Fn(&Ctx) -> (Vec<Pick>, usize)>;
+
+/// Uma opção do select do desktop (CampoDeSelecao). Sem `set`, escolher anda o ajuste da linha (→) até ela.
+#[derive(Clone)]
+pub struct Pick {
+    pub label: String,
+    /// Nota curta à direita ("Nativa", "Não suportada").
+    pub note: String,
+    pub enabled: bool,
+    pub set: Option<Action>,
+}
+
+impl Pick {
+    pub fn new(label: impl Into<String>) -> Self {
+        Pick {
+            label: label.into(),
+            note: String::new(),
+            enabled: true,
+            set: None,
+        }
+    }
+    pub fn note(mut self, note: impl Into<String>) -> Self {
+        self.note = note.into();
+        self
+    }
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+    pub fn set(mut self, f: impl Fn(&mut Ctx) -> Flow + 'static) -> Self {
+        self.set = Some(Rc::new(f));
+        self
+    }
+}
 
 /// Linha de menu: o que mostra e o que A, ← e → fazem.
 #[derive(Clone)]
@@ -68,15 +103,83 @@ pub struct MenuItem {
     pub accept: Option<Action>,
     /// ← e → ajustam (volume, valores que ciclam).
     pub adjust: Option<Adjust>,
+    /// No desktop, a escolha abre um select com estas opções em vez de ciclar.
+    pub options: Option<Options>,
 }
 
 impl MenuItem {
+    /// A linha como o tema a desenha: no desktop, "choice" sem lista (um texto que se digita) é navegação, valor e ›.
+    pub fn shown(self, ctx: &Ctx) -> PanelRow {
+        let mut row = self.row;
+        if ctx.desktop && row.kind == "choice" && self.options.is_none() {
+            row.kind = "action".into();
+        }
+        row
+    }
     pub fn new(row: PanelRow) -> Self {
         MenuItem {
             row,
             accept: None,
             adjust: None,
+            options: None,
         }
+    }
+    pub fn options(mut self, f: impl Fn(&Ctx) -> (Vec<Pick>, usize) + 'static) -> Self {
+        self.options = Some(Rc::new(f));
+        self
+    }
+
+    /// O select do desktop (só quando a linha tem opções e está ativa): a lista junto da pílula, com ✓ na atual.
+    pub fn select(&self, ctx: &Ctx) -> Option<Box<dyn Layer>> {
+        if !ctx.desktop || !self.row.enabled {
+            return None;
+        }
+        let options = self.options.clone()?;
+        // Sem `set` na opção: anda o ajuste (ou o A) da linha para a frente até chegar nela.
+        let step: Option<Action> = match (&self.adjust, &self.accept) {
+            (Some(a), _) => {
+                let a = a.clone();
+                Some(Rc::new(move |ctx: &mut Ctx| a(ctx, 1)))
+            }
+            (None, Some(f)) => Some(f.clone()),
+            _ => None,
+        };
+        let current = options(ctx).1;
+        let build = move |ctx: &Ctx| {
+            let (picks, cur) = options(ctx);
+            picks
+                .into_iter()
+                .enumerate()
+                .map(|(k, p)| {
+                    let row = PanelRow::button(format!("opt-{k}"), p.label)
+                        .icon(if k == cur { "tick" } else { "" })
+                        .value(p.note)
+                        .enabled(p.enabled)
+                        .emphasized(k == cur);
+                    let (options, step, set) = (options.clone(), step.clone(), p.set);
+                    MenuItem::new(row).on(move |ctx| {
+                        if let Some(set) = &set {
+                            return match set(ctx) {
+                                Flow::Stay => Flow::Close,
+                                Flow::Push(layer) => Flow::Replace(layer),
+                                other => other,
+                            };
+                        }
+                        let (list, cur) = options(ctx);
+                        let n = list.len().max(1);
+                        if let Some(step) = &step {
+                            for _ in 0..(k + n - cur.min(n - 1)) % n {
+                                step(ctx);
+                            }
+                        }
+                        Flow::Close
+                    })
+                })
+                .collect()
+        };
+        Some(Box::new(
+            MenuLayer::menu("", build).wide().focus_at(current),
+        ))
     }
     pub fn on(mut self, f: impl Fn(&mut Ctx) -> Flow + 'static) -> Self {
         self.accept = Some(Rc::new(f));
@@ -237,6 +340,8 @@ impl Layer for MenuLayer {
         match cmd {
             Cmd::Up => self.focus = self.step(&items, cur, -1),
             Cmd::Down => self.focus = self.step(&items, cur, 1),
+            // No desktop um select só muda pela lista (← → não trocam o valor sem querer).
+            Cmd::Left | Cmd::Right if ctx.desktop && items[cur].options.is_some() => {}
             Cmd::Left | Cmd::Right => {
                 if let Some(adj) = &items[cur].adjust {
                     return adj(ctx, if cmd == Cmd::Left { -1 } else { 1 });
@@ -244,6 +349,9 @@ impl Layer for MenuLayer {
             }
             Cmd::Accept => {
                 let item = &items[cur];
+                if let Some(layer) = item.select(ctx) {
+                    return Flow::Push(layer);
+                }
                 if item.row.enabled
                     && let Some(f) = &item.accept
                 {
@@ -281,7 +389,7 @@ impl Layer for MenuLayer {
             title: self.title.clone(),
             overline: self.overline.clone(),
             text: self.text.clone(),
-            rows: items.into_iter().map(|i| i.row).collect(),
+            rows: items.into_iter().map(|i| i.shown(ctx)).collect(),
             sel: focus,
             wide: self.wide,
             tabs: self.steps.0.clone(),

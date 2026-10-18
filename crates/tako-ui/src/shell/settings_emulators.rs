@@ -3,6 +3,7 @@
 
 use super::{Ctx, Flow, MenuItem};
 use crate::model::PanelRow;
+use crate::shell::layer::Pick;
 use crate::shell::{Effect, MenuLayer};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -164,6 +165,12 @@ pub(crate) fn rows(ctx: &Ctx, cache: &Cache) -> Vec<MenuItem> {
             ),
         };
         let id = s.id;
+        // Select: automático e as opções deste PC, na ordem do ciclo (escolher anda o ciclo até a opção).
+        let auto = ctx.tf(
+            "settings.emulators.auto_with",
+            &[("emulator", options[0].name())],
+        );
+        let choices = options.clone();
         let cycle = move |ctx: &mut Ctx, dir: i32| {
             let mut c = config(ctx);
             // Automático e as opções deste PC, em roda.
@@ -185,7 +192,17 @@ pub(crate) fn rows(ctx: &Ctx, cache: &Cache) -> Vec<MenuItem> {
         by_system.push(
             MenuItem::new(PanelRow::choice(format!("system-{id}"), s.name, value))
                 .on(move |ctx| cycle(ctx, 1))
-                .on_adjust(move |ctx, d| cycle2(ctx, d)),
+                .on_adjust(move |ctx, d| cycle2(ctx, d))
+                .options(move |ctx| {
+                    let now = config(ctx).by_system.get(id).copied();
+                    let mut picks = vec![Pick::new(auto.clone())];
+                    picks.extend(choices.iter().map(|e| Pick::new(e.name())));
+                    let cur = choices
+                        .iter()
+                        .position(|e| Some(*e) == now)
+                        .map_or(0, |i| i + 1);
+                    (picks, cur)
+                }),
         );
     }
     if !by_system.is_empty() {

@@ -9,6 +9,7 @@ use crate::gamepad::PadFamily;
 use crate::model::{Hint, Overlay, PanelRow};
 use crate::shell::ctx::{InputKind, button_glyph, keys};
 use crate::shell::keyboard::KeyboardLayer;
+use crate::shell::layer::Pick;
 use crate::shell::{Cmd, Effect, Layer, MenuLayer};
 use std::cell::{Cell, RefCell};
 use std::time::Instant;
@@ -161,7 +162,24 @@ fn profile_rows(ctx: &Ctx, v: &mut Vec<MenuItem>) {
                 PanelRow::choice(format!("pad-{i}"), label, profile_name(ctx, profile)).desc(desc),
             )
             .on(move |ctx| cycle_profile(ctx, &g1, &n1, 1))
-            .on_adjust(move |ctx, d| cycle_profile(ctx, &guid, &name, d)),
+            .on_adjust({
+                let (guid, name) = (guid.clone(), name.clone());
+                move |ctx, d| cycle_profile(ctx, &guid, &name, d)
+            })
+            .options(move |ctx| {
+                let all = ctx.profiles.all();
+                let now = ctx.profiles.of(&guid).id;
+                let cur = all.iter().position(|p| p.id == now).unwrap_or(0);
+                let picks = all
+                    .iter()
+                    .map(|p| {
+                        let (guid, name, id) = (guid.clone(), name.clone(), p.id);
+                        Pick::new(profile_name(ctx, p))
+                            .set(move |ctx| assign_profile(ctx, &guid, &name, id))
+                    })
+                    .collect();
+                (picks, cur)
+            }),
         );
     }
     let current = ctx.profile();
@@ -212,7 +230,20 @@ fn button_rows(ctx: &Ctx, v: &mut Vec<MenuItem>) {
                 value,
             ))
             .on(move |ctx| cycle_button(ctx, command, 1))
-            .on_adjust(move |ctx, d| cycle_button(ctx, command, d)),
+            .on_adjust(move |ctx, d| cycle_button(ctx, command, d))
+            .options(move |ctx| {
+                let now = ctx.profile().buttons.button(command);
+                let all: Vec<GamepadButtons> = ButtonMap::buttons().collect();
+                let cur = all.iter().position(|b| Some(*b) == now).unwrap_or(0);
+                let picks = all
+                    .into_iter()
+                    .map(|b| {
+                        Pick::new(button_glyph(ctx.pad, b))
+                            .set(move |ctx| change_buttons(ctx, |m| m.assign(command, b)))
+                    })
+                    .collect();
+                (picks, cur)
+            }),
         );
     }
     // A combinação da Central também é do perfil (precisa de View ou Guia, como antes).
@@ -286,6 +317,11 @@ fn cycle_profile(ctx: &mut Ctx, guid: &str, name: &str, dir: i32) -> Flow {
     let now = ctx.profiles.of(guid).id;
     let i = ids.iter().position(|id| *id == now).unwrap_or(0) as i32;
     let next = ids[(i + dir).rem_euclid(ids.len() as i32) as usize];
+    assign_profile(ctx, guid, name, next)
+}
+
+/// Põe o perfil no controle e avisa.
+fn assign_profile(ctx: &mut Ctx, guid: &str, name: &str, next: u32) -> Flow {
     edit_profiles(ctx, |p| p.assign(guid, name, next));
     let label = profile_name(ctx, ctx.profiles.of(guid));
     let pad = if name.is_empty() {
@@ -388,11 +424,15 @@ fn confirm_delete(ctx: &Ctx) -> MenuLayer {
 
 /// Troca o botão da ação e avisa com quem trocou (o botão que o usuário aperta pode ter mudado de função).
 fn cycle_button(ctx: &mut Ctx, command: AppCommand, dir: i32) -> Flow {
+    change_buttons(ctx, |m| m.cycle(command, dir))
+}
+
+fn change_buttons(ctx: &mut Ctx, f: impl FnOnce(&mut ButtonMap)) -> Flow {
     let id = ctx.profile().id;
     let before = ctx.profile().buttons;
     edit_profiles(ctx, |p| {
         if let Some(p) = p.get_mut(id) {
-            p.buttons.cycle(command, dir);
+            f(&mut p.buttons);
         }
     });
     let map = ctx.profile().buttons;

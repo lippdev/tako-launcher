@@ -16,7 +16,7 @@ mod screen;
 mod tests;
 
 use super::ctx::keys;
-use super::layer::{Flow, MenuItem, MenuLayer};
+use super::layer::{Flow, MenuItem, MenuLayer, Pick};
 use super::{Cmd, Ctx, Effect, Nav, Out, Page};
 use crate::model::{Hint, NavItem, PanelRow};
 use std::any::Any;
@@ -260,6 +260,22 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
             i18n::set_lang(next);
             ctx.dirty = true;
             Flow::Stay
+        })
+        .options(|ctx| {
+            let langs = [Lang::PtBr, Lang::EnUs];
+            let cur = langs.iter().position(|l| *l == ctx.lang()).unwrap_or(0);
+            let picks = langs
+                .into_iter()
+                .map(|lang| {
+                    Pick::new(lang_name(lang)).set(move |ctx| {
+                        ctx.settings.set(keys::LANGUAGE, lang.code());
+                        i18n::set_lang(lang);
+                        ctx.dirty = true;
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (picks, cur)
         }),
         MenuItem::new(PanelRow::header(ctx.t("settings.general.updates_header"))),
         MenuItem::new(
@@ -352,6 +368,21 @@ fn mode_rows(ctx: &Ctx) -> Vec<MenuItem> {
                     },
                 );
                 Flow::Stay
+            })
+            .options(move |ctx| {
+                let picks = [
+                    (OPEN_IN_DESKTOP, "first_run.full.mode_window"),
+                    (OPEN_IN_BIG_PICTURE, "first_run.full.mode_full"),
+                ]
+                .into_iter()
+                .map(|(value, label)| {
+                    Pick::new(ctx.t(label)).set(move |ctx| {
+                        ctx.settings.set(OPEN_IN, value);
+                        Flow::Stay
+                    })
+                })
+                .collect();
+                (picks, usize::from(big))
             }),
         );
     }
@@ -565,13 +596,31 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             format!("{}%", crate::navigation_feedback::text_size(&ctx.settings)),
         ))
         .on(|ctx| change_text_size(ctx, 1))
-        .on_adjust(change_text_size),
+        .on_adjust(change_text_size)
+        .options(|ctx| {
+            use crate::navigation_feedback::{self as feedback, TEXT_SIZES};
+            let now = feedback::text_size(&ctx.settings);
+            let cur = TEXT_SIZES.iter().position(|n| *n == now).unwrap_or(0);
+            let picks = TEXT_SIZES
+                .iter()
+                .map(|n| Pick::new(format!("{n}%")))
+                .collect();
+            (picks, cur)
+        }),
         MenuItem::new(
-            PanelRow::choice(
-                "navigation-volume",
-                ctx.t("accessibility.sound_volume"),
-                format!("{}%", crate::navigation_feedback::volume(&ctx.settings)),
-            )
+            PanelRow {
+                // Volume é contínuo: no desktop, controle deslizante (o valor vai em 0–100).
+                kind: if ctx.desktop { "slider" } else { "choice" }.into(),
+                ..PanelRow::choice(
+                    "navigation-volume",
+                    ctx.t("accessibility.sound_volume"),
+                    if ctx.desktop {
+                        crate::navigation_feedback::volume(&ctx.settings).to_string()
+                    } else {
+                        format!("{}%", crate::navigation_feedback::volume(&ctx.settings))
+                    },
+                )
+            }
             .desc(ctx.t("accessibility.sound_desc")),
         )
         .on(|ctx| change_navigation_volume(ctx, 1))
@@ -925,6 +974,9 @@ impl Page for SettingsPage {
             (Some(r), Cmd::Up) => self.row = Some(Self::step(&items, r, -1)),
             (Some(r), Cmd::Down) => self.row = Some(Self::step(&items, r, 1)),
             (Some(_), Cmd::Back) => self.row = None,
+            // No desktop um select só muda pela lista.
+            (Some(r), Cmd::Left) | (Some(r), Cmd::Right)
+                if ctx.desktop && items.get(r).is_some_and(|i| i.options.is_some()) => {}
             (Some(r), Cmd::Left) | (Some(r), Cmd::Right) => {
                 if let Some(adj) = items
                     .get(r)
@@ -946,6 +998,9 @@ impl Page for SettingsPage {
                         ctx.toast(item.row.description.clone());
                     }
                     return Nav::Stay;
+                }
+                if let Some(layer) = item.select(ctx) {
+                    return Self::run(Flow::Push(layer), ctx);
                 }
                 if let Some(f) = item.accept.clone() {
                     return Self::run(f(ctx), ctx);
@@ -1024,7 +1079,7 @@ impl Page for SettingsPage {
                 ctx.tf("desktop.settings_found", &[("n", &n.to_string())]),
             );
         }
-        let rows: Vec<PanelRow> = items.into_iter().map(|i| i.row).collect();
+        let rows: Vec<PanelRow> = items.into_iter().map(|i| i.shown(ctx)).collect();
         out.set("settings-rows", rows);
         out.set(
             "settings-row-focus",

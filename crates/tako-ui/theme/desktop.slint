@@ -2105,10 +2105,10 @@ component DeskRow inherits Rectangle {
     in property <bool> focused;
     in property <bool> first: true;
     in property <bool> last: true;
-    // PainelLateral (filtros): escolhas com ‹ › e liga/desliga como caixa de marcar. Nos outros lugares a escolha
-    // mostra o valor e "›" (Configurações deste jogo) ou um menu em pílula (Configurações).
+    // PainelLateral (filtros): liga/desliga como caixa de marcar. Toda escolha de uma opção entre várias é um select
+    // (CampoDeSelecao): a pílula com ⌃⌄; o Tako abre a lista junto dela.
     in property <bool> side-panel;
-    in property <bool> adjustable: data.kind == "slider" || (side-panel && data.kind == "choice");
+    in property <bool> adjustable: data.kind == "slider";
     property <bool> as-check: side-panel && data.kind == "toggle";
     // Opção solta num diálogo ("Não perguntar de novo"): linha sem caixa.
     in property <bool> loose;
@@ -2118,6 +2118,8 @@ component DeskRow inherits Rectangle {
     callback clicked();
     callback dec();
     callback inc();
+    // Canto inferior direito da pílula do select, para a lista nascer embaixo dela, alinhada à direita.
+    callback anchor(length, length);
     property <bool> is-header: data.kind == "header";
     property <color> group-bg: DeskArt.gray ? Ui.settings-surface : Ui.glass-control;
     // Grupos das Configurações usam o raio dos cartões; nos painéis de vidro, o dos controles.
@@ -2153,7 +2155,12 @@ component DeskRow inherits Rectangle {
     ta := TouchArea {
         enabled: !is-header;
         mouse-cursor: data.enabled ? pointer : default;
-        clicked => { root.clicked(); }
+        clicked => {
+            if (data.kind == "choice") {
+                root.anchor(root.absolute-position.x + root.width - 14px, root.absolute-position.y + (root.height + (DeskArt.gray ? 36px : 32px)) / 2 + 6px);
+            }
+            root.clicked();
+        }
     }
     lay := HorizontalLayout {
         visible: !is-header;
@@ -2241,18 +2248,25 @@ component DeskRow inherits Rectangle {
                 background: Ui.on-accent;
             }
         }
-        // Nas Configurações a escolha é um menu em pílula ("Português (Brasil) ⌃⌄").
-        if data.kind == "choice" && DeskArt.gray: Rectangle {
+        // Select (CampoDeSelecao): pílula de 36 (32 no vidro), valor 14/600 e ⌃⌄; de 120 a 280, cortando com "…".
+        if data.kind == "choice": Rectangle {
             y: (parent.height - self.height) / 2;
-            height: 36px;
-            width: ml.preferred-width;
+            height: DeskArt.gray ? 36px : 32px;
+            width: clamp(ml.preferred-width, 120px, 280px);
             border-radius: self.height / 2;
-            background: ta.has-hover ? Ui.settings-control-hover : Ui.settings-control;
+            background: DeskArt.gray
+                ? (ta.has-hover ? Ui.settings-control-hover : Ui.settings-control)
+                : (ta.has-hover ? Ui.glass-hover : Ui.glass-control);
+            border-width: DeskArt.gray ? 0 : 1px;
+            border-color: Ui.glass-edge;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: combobox;
+            accessible-label: data.title + ": " + data.value;
             ml := HorizontalLayout {
-                padding-left: 16px;
+                padding-left: 14px;
                 padding-right: 12px;
-                spacing: 6px;
-                Text { text: data.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+                spacing: 12px;
+                Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
                 Rectangle { width: 14px; Icon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
             }
         }
@@ -2266,7 +2280,7 @@ component DeskRow inherits Rectangle {
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             al := Text { text: data.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
         }
-        if data.value != "" && data.kind != "toggle" && data.kind != "slider" && !(data.kind == "choice" && DeskArt.gray) && !(data.kind == "action" && DeskArt.gray): Text {
+        if data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && !(data.kind == "action" && DeskArt.gray): Text {
             text: data.value;
             color: data.emphasized ? Ui.on-accent : Ui.desk-on-muted;
             font-size: Ui.desk-label-sm;
@@ -2277,7 +2291,7 @@ component DeskRow inherits Rectangle {
             overflow: elide;
         }
         if adjustable: AdjustButton { label: "›"; y: (parent.height - self.height) / 2; clicked => { root.inc(); } }
-        if (data.kind == "action" || data.kind == "button" || (data.kind == "choice" && !DeskArt.gray)) && !adjustable && !as-check && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
+        if (data.kind == "action" || data.kind == "button") && !adjustable && !as-check && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
 }
 
@@ -2339,6 +2353,7 @@ component RowScroll inherits Rectangle {
     in property <string> content-key;
     out property <length> content-h: rl.preferred-height;
     callback clicked(string, int);
+    callback anchor(length, length);
     pure function body(i: int) -> bool {
         return i >= 0 && i < rows.length && rows[i].kind != "header" && !((footer || inline-buttons) && rows[i].kind == "button");
     }
@@ -2383,6 +2398,7 @@ component RowScroll inherits Rectangle {
                     clicked => { root.clicked("row", i); }
                     dec => { root.clicked("row-dec", i); }
                     inc => { root.clicked("row-inc", i); }
+                    anchor(x, y) => { root.anchor(x, y); }
                 }
             }
         }
@@ -2442,6 +2458,7 @@ component DeskSettings inherits Rectangle {
     in property <bool> focus-visible;
     in property <bool> small;
     callback clicked(string, int);
+    callback menu(length, length);
     property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
     HorizontalLayout {
         spacing: small ? Ui.space-20 : Ui.space-28;
@@ -2534,6 +2551,7 @@ component DeskSettings inherits Rectangle {
                     sel: row-focus;
                     key-focus: focus-visible;
                     clicked(z, i) => { root.clicked(z, i); }
+                    anchor(x, y) => { root.menu(x, y); }
                 }
             }
             Rectangle { horizontal-stretch: 0.0001; }
@@ -2682,6 +2700,7 @@ component DeskOverlay inherits Rectangle {
     in property <string> cancel-label;
     in property <string> ok-label;
     callback clicked(string, int);
+    callback menu(length, length);
     callback edited(string, string);
     callback hovered(string, int);
     property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "art"
@@ -2746,6 +2765,7 @@ component DeskOverlay inherits Rectangle {
                     sel: top-most ? ov.sel : -1;
                     key-focus: focus-visible;
                     clicked(z, i) => { root.clicked(z, i); }
+                    anchor(x, y) => { root.menu(x, y); }
                 }
                 if ov.tabs.length > 0: HorizontalLayout {
                     padding-top: 4px;
@@ -2940,6 +2960,7 @@ component DeskOverlay inherits Rectangle {
                 sel: top-most ? ov.sel : -1;
                 key-focus: focus-visible;
                 clicked(z, i) => { root.clicked(z, i); }
+                anchor(x, y) => { root.menu(x, y); }
             }
             HorizontalLayout {
                 padding-top: 6px;
@@ -3011,6 +3032,7 @@ component DeskOverlay inherits Rectangle {
                     sel: top-most ? ov.sel : -1;
                     key-focus: focus-visible;
                     clicked(z, i) => { root.clicked(z, i); }
+                    anchor(x, y) => { root.menu(x, y); }
                 }
                 if has-buttons: PopupFooter {
                     rows: ov.rows;
@@ -3031,58 +3053,69 @@ component DeskOverlay inherits Rectangle {
             transform-scale: shown ? 1 : Ui.escala-menu;
             animate opacity, transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
             radius: Ui.radius-control;
-            width: ov.title == "" ? 280px : 260px;
-            height: min(ml.preferred-height, root.height - 40px);
-            x: clamp(menu-x, 12px, root.width - self.width - 12px);
-            y: clamp(menu-y, 12px, root.height - self.height - 12px);
+            // Select (`wide`): nasce embaixo da pílula, alinhado à direita dela; vira para cima se não couber.
+            property <bool> select: ov.wide;
+            width: select ? clamp(ml.preferred-width, 200px, 340px) : (ov.title == "" ? 280px : 260px);
+            height: min(ml.preferred-height, select ? 8 * 38px + 12px : root.height - 40px);
+            x: clamp(select ? menu-x - self.width : menu-x, 12px, root.width - self.width - 12px);
+            y: select && menu-y + self.height > root.height - 12px
+                ? max(12px, menu-y - 6px - 36px - 6px - self.height)
+                : clamp(menu-y, 12px, root.height - self.height - 12px);
             TouchArea { }
-            ml := VerticalLayout {
-                padding: 6px;
-                spacing: 2px;
-                if ov.title != "": Text {
-                    text: ov.title;
-                    color: Ui.desk-on-subtle;
-                    font-size: Ui.desk-label-sm;
-                    font-weight: 600;
-                    height: 30px;
-                    vertical-alignment: center;
-                    overflow: elide;
-                    x: 10px;
-                }
-                for r[i] in ov.rows: Rectangle {
-                    height: r.kind == "separator" ? 9px : 36px;
-                    border-radius: 10px;
-                    background: r.kind != "separator" && mta.has-hover && r.enabled ? Ui.glass-hover : transparent;
-                    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                    opacity: r.enabled ? 1 : 0.5;
-                    if r.kind == "separator": Rectangle { x: 8px; width: parent.width - 16px; height: 1px; background: Ui.divider; }
-                    if focus-visible && i == ov.sel && top-most: FocusRing { radius: 10px; }
-                    if r.kind != "separator": HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        spacing: 10px;
-                        Icon { name: r.icon; size: 18px; tint: r.style == "danger" ? Ui.error : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
-                        Text {
-                            text: r.title;
-                            color: r.style == "danger" ? Ui.error : Ui.on-accent;
-                            font-size: Ui.desk-label;
-                            font-weight: 500;
-                            vertical-alignment: center;
-                            horizontal-stretch: 1;
-                            overflow: elide;
-                        }
-                        if r.value != "": Text {
-                            text: r.value;
-                            color: Ui.desk-on-subtle;
-                            font-size: Ui.desk-keycap;
-                            font-weight: 500;
-                            vertical-alignment: center;
-                        }
+            // Até 8 opções visíveis no select; o resto rola.
+            mf := Flickable {
+                viewport-height: ml.preferred-height;
+                ml := VerticalLayout {
+                    width: mf.width;
+                    padding: 6px;
+                    spacing: 2px;
+                    if ov.title != "": Text {
+                        text: ov.title;
+                        color: Ui.desk-on-subtle;
+                        font-size: Ui.desk-label-sm;
+                        font-weight: 600;
+                        height: 30px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        x: 10px;
                     }
-                    mta := TouchArea {
-                        enabled: r.kind != "separator";
-                        mouse-cursor: pointer;
-                        clicked => { root.clicked("row", i); }
+                    for r[i] in ov.rows: Rectangle {
+                        height: r.kind == "separator" ? 9px : 36px;
+                        border-radius: 10px;
+                        background: r.kind != "separator" && mta.has-hover && r.enabled ? Ui.glass-hover : transparent;
+                        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                        opacity: r.enabled ? 1 : 0.5;
+                        if r.kind == "separator": Rectangle { x: 8px; width: parent.width - 16px; height: 1px; background: Ui.divider; }
+                        if focus-visible && i == ov.sel && top-most: FocusRing { radius: 10px; }
+                        if r.kind != "separator": HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 10px;
+                            // No select, a coluna do ✓ (16) marca a atual, em peso 600.
+                            if !ov.wide: Icon { name: r.icon; size: 18px; tint: r.style == "danger" ? Ui.error : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                            if ov.wide: Rectangle { width: 18px; Icon { name: r.icon; size: 16px; tint: Ui.on-accent; } }
+                            Text {
+                                text: r.title;
+                                color: r.style == "danger" ? Ui.error : Ui.on-accent;
+                                font-size: ov.wide ? 14px * Ui.text-scale : Ui.desk-label;
+                                font-weight: r.emphasized ? 600 : 500;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                                overflow: elide;
+                            }
+                            if r.value != "": Text {
+                                text: r.value;
+                                color: Ui.desk-on-subtle;
+                                font-size: Ui.desk-keycap;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
+                        }
+                        mta := TouchArea {
+                            enabled: r.kind != "separator";
+                            mouse-cursor: pointer;
+                            clicked => { root.clicked("row", i); }
+                        }
                     }
                 }
             }
@@ -3521,6 +3554,10 @@ export component Desktop inherits Window {
                     fs.focus();
                     root.clicked(z, i);
                 }
+                menu(x, y) => {
+                    root.menu-x = x;
+                    root.menu-y = y;
+                }
             }
         }
     }
@@ -3556,6 +3593,10 @@ export component Desktop inherits Window {
         }
         hovered(z, idx) => { if (i == overlays.length - 1) { root.hovered("overlay-" + z, idx); } }
         edited(z, t) => { root.edited(z, t); }
+        menu(x, y) => {
+            root.menu-x = x;
+            root.menu-y = y;
+        }
     }
 
     // Aviso (toast): pílula de vidro de camada a 28 do rodapé; some sozinha e não rouba o foco.

@@ -1,7 +1,7 @@
 //! Diálogos e painéis do jogo e da biblioteca (os `DialogViewModel` do WPF).
 
 use super::keyboard::KeyboardLayer;
-use super::layer::{Flow, MenuItem, MenuLayer};
+use super::layer::{Flow, MenuItem, MenuLayer, Pick};
 use super::library::Criteria;
 use super::{Ctx, Effect};
 use crate::model::PanelRow;
@@ -750,6 +750,33 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                 *cr.borrow_mut() = next;
                 ctx.dirty = true;
                 Flow::Stay
+            })
+            .options({
+                let cr = criteria.clone();
+                move |ctx| {
+                    use tako_core::library::criteria::InstallFilter;
+                    let all = [
+                        InstallFilter::Any,
+                        InstallFilter::Installed,
+                        InstallFilter::NotInstalled,
+                    ];
+                    let cur = all
+                        .iter()
+                        .position(|i| *i == cr.borrow().install)
+                        .unwrap_or(0);
+                    let picks = all
+                        .into_iter()
+                        .map(|i| {
+                            let cr = cr.clone();
+                            Pick::new(library_text::install_label(ctx.lang(), i)).set(move |ctx| {
+                                cr.borrow_mut().install = i;
+                                ctx.dirty = true;
+                                Flow::Stay
+                            })
+                        })
+                        .collect();
+                    (picks, cur)
+                }
             }),
         );
         let cr = criteria.clone();
@@ -803,10 +830,80 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                 c.play_time = c.play_time.next();
                 ctx.dirty = true;
                 Flow::Stay
+            })
+            .options({
+                let cr = criteria.clone();
+                move |ctx| {
+                    // A ordem do ciclo (`next`), a partir de "Qualquer tempo".
+                    let mut all = vec![tako_core::library::criteria::PlayTimeFilter::Any];
+                    while all.len() < 5 {
+                        all.push(all[all.len() - 1].next());
+                    }
+                    let cur = all
+                        .iter()
+                        .position(|p| *p == cr.borrow().play_time)
+                        .unwrap_or(0);
+                    let picks = all
+                        .into_iter()
+                        .map(|p| {
+                            let cr = cr.clone();
+                            Pick::new(ctx.t(p.key())).set(move |ctx| {
+                                cr.borrow_mut().play_time = p;
+                                ctx.dirty = true;
+                                Flow::Stay
+                            })
+                        })
+                        .collect();
+                    (picks, cur)
+                }
             }),
         );
-        v.push(MenuItem::new(PanelRow::header(ctx.t("filters.sort"))));
-        for s in library_text::SORT_ORDER {
+        // No desktop, a ordenação é um select (PainelLateral): grupo "Ordenar" com "Ordenar por", sem lista marcável.
+        v.push(MenuItem::new(PanelRow::header(ctx.t(if ctx.desktop {
+            "filters.sort_group"
+        } else {
+            "filters.sort"
+        }))));
+        if ctx.desktop {
+            let cr = criteria.clone();
+            v.push(
+                MenuItem::new(PanelRow::choice(
+                    "sort",
+                    ctx.t("filters.sort_by"),
+                    library_text::sort_label(lang, c.sort),
+                ))
+                .on(move |_| {
+                    let next = library_text::next_sort(cr.borrow().sort);
+                    cr.borrow_mut().sort = next;
+                    Flow::Stay
+                })
+                .options({
+                    let cr = criteria.clone();
+                    move |ctx| {
+                        let order = library_text::SORT_ORDER;
+                        let cur = order
+                            .iter()
+                            .position(|s| *s == cr.borrow().sort)
+                            .unwrap_or(0);
+                        let picks = order
+                            .into_iter()
+                            .map(|s| {
+                                let cr = cr.clone();
+                                Pick::new(library_text::sort_label(ctx.lang(), s)).set(move |_| {
+                                    cr.borrow_mut().sort = s;
+                                    Flow::Stay
+                                })
+                            })
+                            .collect();
+                        (picks, cur)
+                    }
+                }),
+            );
+        }
+        for s in library_text::SORT_ORDER
+            .into_iter()
+            .filter(|_| !ctx.desktop)
+        {
             let cr = criteria.clone();
             v.push(
                 MenuItem::new(PanelRow::radio(

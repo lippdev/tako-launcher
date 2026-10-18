@@ -690,3 +690,39 @@ fn desktop_search_finds_rows_in_every_category_and_a_category_click_leaves_it() 
     page.click("category", 0, &mut ctx);
     assert!(page.query.is_empty());
 }
+
+/// No desktop toda escolha é um select (CampoDeSelecao): cada linha "choice" tem a lista, e escolher qualquer opção
+/// a deixa como a atual (inclusive as que andam o ciclo até ela).
+#[test]
+fn desktop_choices_are_selects_that_pick_each_option() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    for cat in categories() {
+        let keys: Vec<String> = (cat.rows)(&ctx)
+            .into_iter()
+            .filter(|i| i.row.kind == "choice" && i.row.enabled)
+            .map(|i| i.row.key)
+            .collect();
+        for key in keys {
+            let item = find(&(cat.rows)(&ctx), &key);
+            let options = item
+                .options
+                .clone()
+                .unwrap_or_else(|| panic!("{}: {key} sem select", cat.id));
+            let n = options(&ctx).0.len();
+            for k in 0..n {
+                let item = find(&(cat.rows)(&ctx), &key);
+                if !options(&ctx).0[k].enabled {
+                    continue;
+                }
+                let mut layer = item.select(&ctx).expect("select");
+                let _ = layer.click("row", k, &mut ctx);
+                let item = find(&(cat.rows)(&ctx), &key);
+                let now = (item.options.unwrap())(&ctx).1;
+                assert_eq!(now, k, "{}: {key} opção {k}", cat.id);
+            }
+        }
+    }
+    i18n::set_lang(Lang::PtBr);
+}

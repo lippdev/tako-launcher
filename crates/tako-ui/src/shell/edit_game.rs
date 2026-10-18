@@ -3,7 +3,7 @@
 
 use super::Ctx;
 use super::keyboard::KeyboardLayer;
-use super::layer::{Flow, Layer, MenuItem, MenuLayer};
+use super::layer::{Flow, Layer, MenuItem, MenuLayer, Pick};
 use crate::model::PanelRow;
 use std::cell::RefCell;
 use std::path::Path;
@@ -176,7 +176,17 @@ fn rows(ctx: &Ctx, draft: &Shared) -> Vec<MenuItem> {
             ctx.t(TRACKING[d.tracking].1),
         ))
         .on(move |_| cycle(&t1, 1))
-        .on_adjust(move |_, dir| cycle(&t2, dir)),
+        .on_adjust(move |_, dir| cycle(&t2, dir))
+        .options({
+            let d = draft.clone();
+            move |ctx| {
+                let picks = TRACKING
+                    .iter()
+                    .map(|(_, label)| Pick::new(ctx.t(label)))
+                    .collect();
+                (picks, d.borrow().tracking)
+            }
+        }),
         MenuItem::new(PanelRow::info(
             "target",
             ctx.t("edit_game.target"),

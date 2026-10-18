@@ -142,7 +142,8 @@ impl ButtonMap {
         BUTTON_MAP.into_iter().map(|(_, c)| c)
     }
 
-    fn buttons() -> impl Iterator<Item = GamepadButtons> {
+    /// Botões remapeáveis, na mesma ordem de `commands`.
+    pub fn buttons() -> impl Iterator<Item = GamepadButtons> {
         BUTTON_MAP.into_iter().map(|(b, _)| b)
     }
 

@@ -3,7 +3,7 @@
 //! prévia. A aplica e fixa por tipo, ☰ volta para a automática, Y escolhe outra imagem do PC, X abre os filtros do
 //! SteamGridDB (estilo, formato, animadas), B fecha. O SteamGridDB vem em páginas: perto do fim carrega a próxima.
 
-use super::layer::{Flow, Layer, MenuItem, MenuLayer};
+use super::layer::{Flow, Layer, MenuItem, MenuLayer, Pick};
 use super::{Cmd, Ctx};
 use crate::metadata::{Pending, spawn};
 use crate::model::{Hint, Overlay, PanelRow, Tile};
@@ -193,6 +193,22 @@ impl ArtPicker {
                         .map(|s| (*s).to_owned());
                     });
                     Flow::Stay
+                })
+                .options({
+                    let filter = filter.clone();
+                    move |_| {
+                        // Nenhum e os estilos, na ordem do ciclo.
+                        let f = filter.borrow();
+                        let all = styles(f.kind);
+                        let mut picks = vec![Pick::new(style_label(None))];
+                        picks.extend(all.iter().map(|s| Pick::new(style_label(Some(s)))));
+                        let cur = f
+                            .style
+                            .as_deref()
+                            .and_then(|s| all.iter().position(|x| *x == s))
+                            .map_or(0, |i| i + 1);
+                        (picks, cur)
+                    }
                 }),
             );
             if f.kind == ArtKind::Cover {
@@ -210,6 +226,16 @@ impl ArtPicker {
                     .on(move |_| {
                         c(&|f| f.horizontal = !f.horizontal);
                         Flow::Stay
+                    })
+                    .options({
+                        let horizontal = f.horizontal;
+                        move |ctx| {
+                            let picks = ["art_picker.vertical", "art_picker.horizontal"]
+                                .into_iter()
+                                .map(|k| Pick::new(ctx.t(k)))
+                                .collect();
+                            (picks, usize::from(horizontal))
+                        }
                     }),
                 );
             }
