@@ -458,7 +458,14 @@ impl App {
     pub fn redraw(&self) {
         let action = pump_effects(&self.shell, &self.host);
         self.apply(action);
-        render(&self.shell, &self.ui.borrow());
+        // Minimizada (PRD §8; no desktop, durante o jogo): nada muda no tema, então nada anima nem redesenha (o
+        // femtovg desenha mesmo com a janela escondida). `dirty` fica para a volta; o fim do jogo ainda passa, porque
+        // é o `render` que restaura a janela.
+        let ui = self.ui.borrow();
+        if ui.window().is_minimized() && self.shell.borrow().ctx.welcome_back.is_none() {
+            return;
+        }
+        render(&self.shell, &ui);
     }
 
     pub fn apply(&self, action: HostAction) {
