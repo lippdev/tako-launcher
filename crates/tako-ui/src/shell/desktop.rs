@@ -2248,8 +2248,12 @@ mod tests {
         assert!(!rows.iter().any(|r| r.value == "Hades"));
         assert!(rows.iter().any(|r| r.value == "Roguelike - Ação"));
         assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
-        // A faixa não inventa Nuvem nem Conquistas.
-        assert_eq!(strip(&shell.ctx, &g).len(), 2);
+        // A faixa não inventa Nuvem nem Conquistas; o Metacritic entra por último quando o jogo tem nota.
+        let items = strip(&shell.ctx, &g);
+        assert_eq!(items.len(), 2 + usize::from(g.metacritic_score.is_some()));
+        let mut sem_nota = g.clone();
+        sem_nota.metacritic_score = None;
+        assert_eq!(strip(&shell.ctx, &sem_nota).len(), 2);
     }
 
     #[test]

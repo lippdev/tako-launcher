@@ -1704,7 +1704,7 @@ component DetailsCard inherits Vidro {
         spacing: 0;
         CardTitle { text: title; }
         Rectangle { height: small ? 4px : 8px; }
-        for r[i] in rows: if i < 3: Rectangle {
+        for r[i] in rows: Rectangle {
             vertical-stretch: 1;
             min-height: small ? 22px : 28px;
             max-height: 40px;
@@ -1779,7 +1779,7 @@ component SessionsCard inherits Vidro {
             }
         }
         Text { text: summary; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
-        for r[i] in rows: if i < 3: Rectangle {
+        for r[i] in rows: Rectangle {
             vertical-stretch: 1;
             max-height: 40px;
             if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
@@ -2588,7 +2588,7 @@ component DeskLibrary inherits Rectangle {
                             spacing: 6px;
                             alignment: start;
                             for chip[i] in row: Rectangle {
-                                width: min(chip-layout.preferred-width, (parent.width - 6px) / row.length);
+                                width: chip-layout.preferred-width;
                                 height: 28px;
                                 border-radius: 14px;
                                 background: Ui.glass-control;
@@ -3434,7 +3434,7 @@ component PopupButton inherits Rectangle {
     property <bool> primary: data.style == "primary" || data.key == "next" || data.key == "done";
     in property <length> min-w;
     height: custom-height > 0 ? custom-height : Ui.control-height;
-    preferred-width: max(min-w, primary ? 110px : 0, pl.preferred-width);
+    width: max(min-w, primary ? 110px : 0, pl.preferred-width);
     border-radius: self.height / 2;
     background: primary
         ? @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%)
@@ -6349,7 +6349,7 @@ export component Desktop inherits Window {
         property <bool> profile-menu: ov.kind == "menu" && ov.rows[0].key == "view-profile";
         bar-menu: brand-menu || profile-menu;
         menu-x: brand-menu ? (small ? Ui.space-20 : Ui.space-36) : profile-menu ? bar.profile-x : root.menu-x;
-        menu-y: bar-menu ? Ui.space-8 : root.menu-y - Ui.topbar-height;
+        menu-y: brand-menu || profile-menu ? Ui.space-8 : root.menu-y - Ui.topbar-height;
         art: desk-game.art;
         leaving: leaving;
         clicked(z, idx) => {
