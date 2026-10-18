@@ -26,6 +26,7 @@ pub mod settings;
 pub mod sidebar;
 pub mod smart;
 pub mod source_ids;
+pub mod tags_editor;
 pub mod tiles;
 
 pub use ctx::{Ctx, Effect, InputKind, RunningGame, Settings};

@@ -449,6 +449,26 @@ fn desktop_snapshot() {
                 let layer = crate::shell::art::picker(&shell.ctx, &id);
                 shell.push_layer(layer);
             }
+            // EtiquetasDoJogo: etiquetas nos primeiros jogos e o editor do primeiro (`TAKO_SNAP_TYPE=<texto>` digita).
+            Ok("tags") => {
+                let ids: Vec<String> = (0..3)
+                    .map(|i| shell.ctx.library.games()[i].id.clone())
+                    .collect();
+                for (tag, n) in [
+                    ("Zerado", 3),
+                    ("Co-op", 2),
+                    ("Com mods", 1),
+                    ("Para zerar depois", 1),
+                ] {
+                    shell.ctx.library.set_tag(&ids[..n], tag, true).unwrap();
+                }
+                shell.ctx.library.set_tag(&ids[..1], "Sofá", true).unwrap();
+                let layer = crate::shell::dialogs::tags_layer(&shell.ctx, ids[..1].to_vec(), None);
+                shell.push_layer(layer);
+                if let Ok(t) = std::env::var("TAKO_SNAP_TYPE") {
+                    shell.edited("overlay-input", &t);
+                }
+            }
             Ok("ask") => {
                 shell.ctx.pads_connected = 1;
                 shell.ask_big_picture = true;

@@ -3460,7 +3460,7 @@ component DeskOverlay inherits Rectangle {
     callback menu(length, length);
     callback edited(string, string);
     callback hovered(string, int);
-    property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "art"
+    property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
         && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress";
     property <bool> has-buttons: ov.rows.length > 0 && ov.rows[ov.rows.length - 1].kind == "button";
     if ov.kind == "splash" || ov.kind == "launch" || ov.kind == "progress": OverlayView {
@@ -4162,6 +4162,176 @@ component DeskOverlay inherits Rectangle {
                             enabled: r.kind != "separator";
                             mouse-cursor: pointer;
                             clicked => { root.clicked("row", i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // EtiquetasDoJogo: PainelLateral com as etiquetas do jogo como chips (× para tirar), o campo "+ Etiqueta" e as
+    // sugestões presas ao campo (as existentes com o número de jogos e `Criar "…"`). `ov.tabs` = chips, `ov.tabs2` =
+    // linha de cada chip, `ov.thumb-cols` = número de linhas, `ov.rows` = sugestões, `ov.preview-text` = "Tirar".
+    if ov.kind == "tags": Rectangle {
+        background: Ui.desk-canvas.with-alpha(shown ? 0.25 : 0);
+        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        TouchArea { clicked => { root.clicked("outside", 0); } }
+        Vidro {
+            layer: true;
+            x: parent.width - self.width - (parent.width < 1280px ? Ui.space-20 : Ui.space-36) + (shown ? 0 : 48px);
+            opacity: shown ? 1 : 0;
+            animate x, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+            y: 84px;
+            width: min(parent.width - 120px, 440px);
+            height: min(parent.height - 84px - Ui.space-28, tl.preferred-height);
+            TouchArea { }
+            tl := VerticalLayout {
+                padding: 22px;
+                spacing: 12px;
+                HorizontalLayout {
+                    spacing: Ui.space-12;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        spacing: 4px;
+                        if ov.overline != "": Text {
+                            text: ov.overline;
+                            color: Ui.desk-on-muted;
+                            font-size: Ui.desk-overline;
+                            font-weight: 700;
+                            letter-spacing: 0.1 * self.font-size;
+                            overflow: elide;
+                        }
+                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
+                    }
+                    CloseButton { label: close-label; size: 40px; clicked => { root.clicked("outside", 0); } }
+                }
+                if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
+                // Chips, uma fileira por linha calculada pelo Tako.
+                VerticalLayout {
+                    spacing: 8px;
+                    for line in ov.thumb-cols: HorizontalLayout {
+                        height: 32px;
+                        alignment: start;
+                        for t[i] in ov.tabs: HorizontalLayout {
+                          padding-right: ov.tabs2[i] == line + "" ? 8px : 0;
+                          if ov.tabs2[i] == line + "": Rectangle {
+                                width: ctxt.preferred-width + 14px + 34px;
+                                height: 32px;
+                                border-radius: self.height / 2;
+                                background: Ui.glass-control;
+                                border-width: 1px;
+                                border-color: Ui.glass-edge;
+                                ctxt := Text {
+                                    x: 14px;
+                                    text: t;
+                                    color: Ui.on-accent;
+                                    font-size: Ui.desk-label-sm;
+                                    font-weight: 500;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+                                // × de 16 dentro de uma área de clique de 24.
+                                Rectangle {
+                                    x: parent.width - 28px;
+                                    y: (parent.height - 24px) / 2;
+                                    width: 24px;
+                                    height: 24px;
+                                    border-radius: 12px;
+                                    background: xta.has-hover ? Ui.glass-hover : transparent;
+                                    accessible-role: button;
+                                    accessible-label: ov.preview-text + " " + t;
+                                    DeskIcon { name: "close"; size: 14px; x: 5px; y: 5px; tint: Ui.desk-on-muted; }
+                                    xta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("chip", i); } }
+                                }
+                            }
+                          }
+                        }
+                    }
+                // Campo no fim da fileira.
+                Rectangle {
+                    height: Ui.control-height;
+                    border-radius: Ui.radius-control;
+                    background: Ui.glass-control;
+                    border-width: 1px;
+                    border-color: tti.has-focus ? Ui.glass-edge-strong : Ui.glass-edge;
+                    property <string> typed: ov.input;
+                    changed typed => { if (tti.text != ov.input) { tti.text = ov.input; } }
+                    if tti.text == "": Text {
+                        x: 14px;
+                        width: parent.width - 28px;
+                        text: ov.input-hint;
+                        color: Ui.desk-on-subtle;
+                        font-size: Ui.desk-label;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    FocusScope {
+                        x: 14px;
+                        width: parent.width - 28px;
+                        key-pressed(e) => {
+                            if (e.text == Key.Escape) {
+                                root.clicked("cancel", 0);
+                                return accept;
+                            }
+                            if (e.text == Key.DownArrow) {
+                                root.clicked("move", 1);
+                                return accept;
+                            }
+                            if (e.text == Key.UpArrow) {
+                                root.clicked("move", 0);
+                                return accept;
+                            }
+                            if (e.text == Key.Backspace && tti.text == "") {
+                                root.clicked("backspace", 0);
+                                return accept;
+                            }
+                            reject
+                        }
+                        tti := TextInput {
+                            width: parent.width;
+                            height: parent.height;
+                            color: Ui.on-accent;
+                            font-size: Ui.desk-label;
+                            vertical-alignment: center;
+                            single-line: true;
+                            selection-background-color: Ui.glass-pressed;
+                            init => { self.text = ov.input; self.focus(); }
+                            edited => { root.edited("overlay-input", self.text); }
+                            accepted => { root.clicked("done", 0); }
+                        }
+                    }
+                }
+                // Sugestões: a lista do MenuDeContexto junto do campo.
+                if ov.rows.length > 0: Rectangle {
+                    height: min(ov.rows.length * 38px + 12px, 280px);
+                    border-radius: Ui.radius-control;
+                    background: Ui.glass-solid;
+                    border-width: 1px;
+                    border-color: Ui.glass-edge-strong;
+                    Flickable {
+                        y: 6px;
+                        x: 6px;
+                        width: parent.width - 12px;
+                        height: parent.height - 12px;
+                        viewport-height: ov.rows.length * 38px;
+                        for r[i] in ov.rows: Rectangle {
+                            y: i * 38px;
+                            height: 36px;
+                            border-radius: 10px;
+                            background: i == ov.sel ? Ui.focus-fill : (rta.has-hover ? Ui.glass-hover : transparent);
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 8px;
+                                if r.icon != "": DeskIcon { name: r.icon; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+                                Text { text: r.title; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: r.key == "create" ? 600 : 500; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                                if r.value != "": Text { text: r.value; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+                            }
+                            rta := TouchArea {
+                                mouse-cursor: pointer;
+                                moved => { root.hovered("row", i); }
+                                clicked => { root.clicked("row", i); }
+                            }
                         }
                     }
                 }

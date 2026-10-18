@@ -305,7 +305,7 @@ pub fn quick_actions(ctx: &Ctx, id: &str) -> MenuLayer {
                 let id = id.clone();
                 move |ctx| {
                     let title = ctx.library.find(&id).map(|g| g.title.clone());
-                    Flow::Replace(Box::new(choose_tags(ctx, vec![id.clone()], title)))
+                    Flow::Replace(tags_layer(ctx, vec![id.clone()], title))
                 }
             }),
             MenuItem::new(
@@ -353,7 +353,7 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
             MenuItem::new(PanelRow::button("tags", ctx.t("tags.title")).icon("check")).on(
                 move |ctx| {
                     let title = ctx.library.find(&t).map(|g| g.title.clone());
-                    Flow::Replace(Box::new(choose_tags(ctx, vec![t.clone()], title)))
+                    Flow::Replace(tags_layer(ctx, vec![t.clone()], title))
                 },
             ),
             MenuItem::new(
@@ -714,6 +714,20 @@ pub fn new_collection(ctx: &Ctx, add_game: Option<String>) -> KeyboardLayer {
         collections::name_problem(name, ctx.collections.collections(), None)
             .map(|p| p.message(ctx.lang()))
     })
+}
+
+/// O editor de tags da plataforma: chips com campo no desktop, a lista de marcar na tela cheia.
+pub fn tags_layer(
+    ctx: &Ctx,
+    ids: Vec<String>,
+    overline: Option<String>,
+) -> Box<dyn super::layer::Layer> {
+    if ctx.desktop {
+        let overline = overline.unwrap_or_else(|| tn("common.games", ids.len() as i64, &[]));
+        Box::new(super::tags_editor::TagsLayer::new(ids, overline))
+    } else {
+        Box::new(choose_tags(ctx, ids, overline))
+    }
 }
 
 /// Tags de um ou de vários jogos (LIB-002). Marcada = todos os jogos têm; A liga em todos ou tira de todos.
@@ -1105,7 +1119,7 @@ pub fn library_filters(ctx: &Ctx, criteria: Criteria, route: LibraryFilter) -> M
                         .desc(ctx.t("tags.tag_shown_desc"))
                         .value(tn("common.games", shown.len() as i64, &[])),
                 )
-                .on(move |ctx| Flow::Push(Box::new(choose_tags(ctx, shown.clone(), None)))),
+                .on(move |ctx| Flow::Push(tags_layer(ctx, shown.clone(), None))),
             );
         }
         v
