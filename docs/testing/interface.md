@@ -22,6 +22,10 @@ O CI completo continua obrigatório: `scripts/bancada.sh ci B`.
 - Nos três tamanhos e nos dois idiomas: conferir recorte, sobreposição, dicas, legibilidade e textos longos.
 - Confirmar foco com artes claras/escuras e tema de alto contraste, além de reduzir animações.
 - Biblioteca vazia, 1 jogo e biblioteca grande: saída para Configurações/Desktop sempre alcançável.
+- Prévia de tema (THEME-002), com controle real na tela cheia: Aparência › Tema, escolher um tema instalado, ver o
+  tema inteiro com as dicas "Aplicar tema" e "Voltar ao anterior (N s)"; A salva, B volta, e sem resposta volta em 15 s
+  (a contagem anda a cada segundo). Reabrir o Tako durante a prévia deve abrir o tema de antes. Um tema com `.slint`
+  quebrado avisa e mantém o anterior.
 - Repetir com backend GPU nas três plataformas; software headless não mede fluidez nem certifica a GPU.
 
 O teste automatizado é uma regressão de navegação, vínculo e renderização; comparação artística de screenshots

@@ -206,6 +206,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         welcome_back: None,
         installing: Vec::new(),
         redraw_at: None,
+        theme_preview: None,
         launching: false,
         launch_since: None,
         leaving: false,
@@ -417,11 +418,15 @@ fn measure_sizes(found: &Arc<Mutex<Vec<Game>>>, to_measure: Vec<(String, String)
 
 /// O tema escolhido ou, se ele falhar, o padrão (PRD §7: volta ao padrão sem loop de falha).
 /// Também devolve a pasta do tema escolhido (para o `tokens.toml`); `None` = o padrão.
-fn load_theme(
+pub(crate) fn load_theme(
     ctx: &Ctx,
     builtin: &std::path::Path,
 ) -> Result<(ComponentDefinition, Option<std::path::PathBuf>), String> {
-    let selected = tako_themes::selected(&ctx.paths.themes());
+    // Em prévia (THEME-002) vale o tema da prévia; o escolhido só muda quando a pessoa confirma.
+    let selected = match &ctx.theme_preview {
+        Some(p) => p.id.clone(),
+        None => tako_themes::selected(&ctx.paths.themes()),
+    };
     if let Some(id) = selected.filter(|_| !ctx.safe_mode) {
         let dir = ctx.paths.themes().join(&id);
         match tako_themes::validate_package(&dir) {
@@ -645,10 +650,16 @@ impl App {
                 return;
             }
         };
+        // Tema da prévia que não carregou: `load_theme` caiu no padrão, mas a tela não trocou; fica o anterior.
+        if dir.is_none() && self.shell.borrow().ctx.theme_preview_wants_installed() {
+            self.shell.borrow_mut().fail_theme_preview();
+            return;
+        }
         let new = match def.create() {
             Ok(n) => n,
             Err(e) => {
                 tracing::error!("tema: {e}");
+                self.shell.borrow_mut().fail_theme_preview();
                 return;
             }
         };
@@ -1081,6 +1092,7 @@ impl App {
                         s.ctx.redraw_at = None;
                         s.ctx.dirty = true;
                     }
+                    s.tick_theme_preview(Instant::now());
                     if now >= next_live && s.live() {
                         next_live = now + Duration::from_secs(1);
                         s.ctx.dirty = true;

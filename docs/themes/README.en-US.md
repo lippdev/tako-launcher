@@ -51,8 +51,11 @@ Check it:
 tako theme check my-theme
 ```
 
-To try it, copy the folder into `<Tako data>/themes/` and pick the theme in **Settings › Appearance › Theme**. To
-share it, zip the folder as a `.takotheme` (see [section 7](#7-package-and-distribution)).
+To try it, copy the folder into `<Tako data>/themes/` and pick the theme in **Settings › Appearance › Theme**.
+Picking a theme shows a preview: it fills the screen, but only becomes Tako's theme if you confirm with **Apply**.
+**Back**, or 15 seconds without an answer, restores the previous theme; if the theme fails to load, the previous one
+stays.
+To share it, zip the folder as a `.takotheme` (see [section 7](#7-package-and-distribution)).
 
 ## 2. What a theme can and cannot do
 
@@ -190,6 +193,9 @@ its bar.
 | `recovery` | Recovery screen | `title`, `text`, `rows`, `sel` |
 
 `sel = -1` means "no selectable row" (read only).
+
+An empty (or unknown) `kind` is a layer with no drawing, like the theme preview: draw nothing and let the `hints` bar
+do the talking. Never cover the screen with a scrim for an unknown `kind`.
 
 ### 4.9 Callbacks
 

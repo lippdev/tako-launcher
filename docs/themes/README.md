@@ -52,6 +52,9 @@ tako theme check meu-tema
 ```
 
 Para testar, copie a pasta para `<dados do Tako>/themes/` e escolha o tema em **Configurações › Aparência › Tema**.
+Escolher um tema mostra uma prévia: ele aparece inteiro na tela, mas só vira o tema do Tako se você confirmar com
+**Aplicar**. **Voltar** ou 15 segundos sem resposta devolvem o tema anterior; se o tema não carregar, o anterior
+continua.
 Para distribuir, compacte a pasta como `.takotheme` (veja a [seção 7](#7-pacote-e-distribuição)).
 
 ## 2. O que um tema pode e não pode fazer
@@ -191,6 +194,9 @@ dela.
 | `recovery` | Tela de recuperação | `title`, `text`, `rows`, `sel` |
 
 `sel = -1` quer dizer "sem linha selecionável" (só leitura).
+
+Um `kind` vazio (ou que o tema não conhece) é uma camada sem desenho, como a prévia de tema: desenhe nada e deixe a
+barra de `hints` falar. Nunca cubra a tela com um véu para um `kind` desconhecido.
 
 ### 4.9 Callbacks
 
