@@ -1,6 +1,6 @@
 # ADR-0028: Downloads por torrent a partir de fontes do usuário (DL-001)
 
-- Status: Proposta
+- Status: Aceita (mantenedor @nextestudios, 2026-10-18)
 - Data: 2026-10-18
 
 ## Contexto
@@ -17,7 +17,7 @@ Restrições que valem para qualquer solução:
 
 O ponto difícil é o "instalado e jogável": a maioria dos torrents de jogos traz um instalador, e o Tako não pode executá-lo.
 
-## Decisão (proposta)
+## Decisão
 
 ### 1. Fontes `.json`
 
@@ -58,7 +58,7 @@ O Tako **nunca** executa instalador, script, `setup.exe`, `.msi` ou o que veio n
 - **C. Executar o instalador pelo Tako** (instalação silenciosa, elevação). Prós: experiência de um clique. Contras: viola §6.7, o Tako passaria a executar código não confiável de fonte desconhecida, possivelmente elevado. **Rejeitada.**
 - **D. Escanear com antivírus antes.** Não substitui o A/B: não vai ao núcleo do problema e dependeria de integração por SO. Pode ser acrescentado depois como aviso, nunca como permissão para executar.
 
-**Recomendação: A + B juntas.** Concluído, o item vai para CONCLUÍDOS com "Abrir pasta" e "Definir executável". O Tako não escolhe nem executa nada sozinho; em nenhum caso desativa antivírus ou anti-cheat nem altera os arquivos baixados. O "Jogar" só aparece depois do usuário apontar o executável (A) ou depois de o jogo ser detectado como instalado (B).
+**Decisão do mantenedor: só a B.** Concluído, o item vai para CONCLUÍDOS com "Abrir pasta"; o Tako não oferece "Definir executável" para o conteúdo baixado (a opção A foi recusada: apontar e abrir um executável baixado conta como executar arquivo baixado, §6.7). O jogo só aparece como jogável quando o usuário o instala por conta própria e ele é detectado pela fonte de biblioteca normal, ou quando o usuário o adiciona à mão pelo fluxo de sempre. Em nenhum caso o Tako executa, desativa antivírus ou anti-cheat ou altera os arquivos baixados.
 
 ### 6. Instalações das lojas (SRC-005) no mesmo painel
 
@@ -108,13 +108,13 @@ Real-Debrid e serviços equivalentes: conta/token do usuário (guardado no cofre
 - A UI do painel é única para torrent e lojas, mas o controle é diferente: o modelo de dados precisa guardar a origem.
 - Risco legal e de reputação do projeto aberto: mitigado só em parte pelos avisos; a decisão do mantenedor de não listar fontes precisa ser mantida em código, docs, issues e testes.
 
-## Perguntas abertas para o mantenedor
+## Decisões do mantenedor (2026-10-18)
 
-1. Abrir o executável de um jogo baixado, escolhido pelo usuário, conta como "executar arquivos baixados" (§6.7)? Se sim, a opção A cai e sobra só a B (abrir a pasta). Se não, a A é aceita?
-2. O critério do PRD ("ao terminar, o jogo fica instalado e jogável pelo Tako") passa a valer só para conteúdo portátil, com instalador sendo manual?
-3. Aceita o `librqbit` (e o `tokio` junto) ou prefere outro caminho (binding de `libtorrent`, cliente externo)?
-4. Padrões de privacidade: sem semear ao concluir, sem UPnP, e limite de upload; quer também interface de rede fixa para VPN já na primeira versão?
-5. O aviso legal de primeiro uso (texto e confirmação) deve passar por revisão jurídica antes da release?
-6. Os downloads devem existir nas builds de release oficiais ou só como função desligada por padrão (opt-in nas Configurações)?
-7. Limites de fonte (5 MiB, 20 000 itens, 8 URIs) estão adequados ou prefere outros?
-8. Pasta padrão em Downloads do SO ou dentro dos dados do Tako?
+1. Ao terminar: **só "Abrir pasta"** (opção B). A opção A sai; o critério do PRD passa a ser "baixado e vinculado; jogável depois que o usuário instala ou adiciona o jogo".
+2. Motor: **`librqbit` com `tokio`** aceitos, condicionados à checagem de licença e manutenção com `cargo deny` antes do merge.
+3. Privacidade e aviso legal: **os padrões desta ADR** — aviso de IP exposto e aviso legal com confirmação no primeiro uso, sem semear ao concluir, sem UPnP, limite de upload e função desligada até o usuário ligar nas Configurações. Interface de rede fixa (VPN) fica para depois.
+
+## Ainda abertas (não bloqueiam a primeira versão)
+
+- Revisão jurídica do texto do aviso legal antes de uma release estável.
+- Limites das fontes (5 MiB, 20 000 itens, 8 URIs) e pasta padrão em Downloads do SO: valem os padrões desta ADR até alguém pedir outros.
