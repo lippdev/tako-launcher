@@ -465,6 +465,24 @@ fn release_notes(notes: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
+pub(crate) fn snapshot(ctx: &mut Ctx, downloading: bool) {
+    ctx.app_update.info = Some(UpdateInfo {
+        version: "0.2.0-alpha.14".into(), name: String::new(),
+        notes: "- Barra de cima unificada\n- Status e filtros na biblioteca\n- Melhorias nas atualizações".into(),
+        page_url: "https://github.com/lippdev/tako-launcher/releases".into(),
+        asset: Some(feed::Asset { url: String::new(), name: String::new(), digest: String::new(), size: 19084083 }),
+        is_prerelease: true,
+    });
+    ctx.app_update.downloading = downloading;
+    *ctx.app_update.progress.lock().unwrap() = 0.68;
+    ctx.app_update.started = Some(Instant::now() - Duration::from_secs(12));
+    if !downloading {
+        ctx.update_ready = Some("snapshot-only".into());
+    }
+    ctx.pending_layer = Some(Box::new(UpdateDialog::new(false)));
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     #[test]
@@ -642,22 +660,4 @@ mod tests {
                 .any(|e| matches!(e, Effect::InstallUpdate))
         );
     }
-}
-
-#[cfg(test)]
-pub(crate) fn snapshot(ctx: &mut Ctx, downloading: bool) {
-    ctx.app_update.info = Some(UpdateInfo {
-        version: "0.2.0-alpha.14".into(), name: String::new(),
-        notes: "- Barra de cima unificada\n- Status e filtros na biblioteca\n- Melhorias nas atualizações".into(),
-        page_url: "https://github.com/lippdev/tako-launcher/releases".into(),
-        asset: Some(feed::Asset { url: String::new(), name: String::new(), digest: String::new(), size: 19084083 }),
-        is_prerelease: true,
-    });
-    ctx.app_update.downloading = downloading;
-    *ctx.app_update.progress.lock().unwrap() = 0.68;
-    ctx.app_update.started = Some(Instant::now() - Duration::from_secs(12));
-    if !downloading {
-        ctx.update_ready = Some("snapshot-only".into());
-    }
-    ctx.pending_layer = Some(Box::new(UpdateDialog::new(false)));
 }
