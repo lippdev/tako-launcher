@@ -9,8 +9,22 @@ use tako_core::presentation::game_text;
 
 /// Tamanho em que as capas são decodificadas (2:3, nítido até 1440p; o tema escala).
 pub const COVER: (u32, u32) = (300, 450);
-// Arte de fundo na altura da janela: um banner largo (3840 × 1240) cortado para 1920 ficaria ampliado e borrado.
-pub const HERO: (u32, u32) = (3840, 2160);
+/// Arte de fundo: cobre a altura da janela, então decodifica na altura dela (ver `art_height`), nunca mais larga que
+/// 3840. Um banner largo (3840 × 1240) cortado para 1920 de largura ficaria ampliado e borrado.
+pub fn hero(ctx: &Ctx) -> (u32, u32) {
+    (3840, ctx.art_height)
+}
+
+/// Altura em que a arte de fundo é decodificada para uma janela de `w` × `h` pixels físicos: a altura dela ou, numa
+/// janela mais larga que 16:9, a altura de uma arte 16:9 que cobre a largura. Em degraus, para redimensionar a
+/// janela não decodificar a arte de novo a cada pixel; 2160 (4K) no máximo, como antes.
+pub fn art_height(w: u32, h: u32) -> u32 {
+    let need = h.max(w * 9 / 16);
+    [1080, 1440, 2160]
+        .into_iter()
+        .find(|b| *b >= need)
+        .unwrap_or(2160)
+}
 pub const LOGO: (u32, u32) = (900, 360);
 
 pub fn image(uri: Option<&str>, size: (u32, u32)) -> slint::Image {
@@ -57,5 +71,23 @@ pub fn play_label(ctx: &Ctx, g: &Game) -> String {
         }
     } else {
         ctx.t("game.play")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn hero_is_decoded_at_the_window_height_in_steps() {
+        use super::art_height;
+        // 1080p e menores: 1080 (um banner 3840 × 1240 vira 3345 × 1080, sem ampliar).
+        assert_eq!(art_height(1600, 900), 1080);
+        assert_eq!(art_height(1920, 1080), 1080);
+        assert_eq!(art_height(2560, 1440), 1440);
+        // Ultrawide: a arte 16:9 precisa cobrir a largura.
+        assert_eq!(art_height(3440, 1440), 2160);
+        assert_eq!(art_height(2560, 1080), 1440);
+        // Retina / 4K: o teto de antes.
+        assert_eq!(art_height(3200, 1800), 2160);
+        assert_eq!(art_height(7680, 4320), 2160);
     }
 }

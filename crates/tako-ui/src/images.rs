@@ -32,9 +32,10 @@ const GLASS_SIGMA: f32 = 50.0 * GLASS_HEIGHT as f32 / 900.0;
 /// `glass-saturate` (140%).
 const GLASS_SATURATE: f32 = 1.4;
 
-/// Teto do LRU. Cabe a home inteira (capas de 300x450 ≈ 0,5 MB, fundo ≈ 5–8 MB) com folga para voltar
-/// rápido; o que está na tela nunca sai (ver `Lru::evict`), então o teto vale para o que está fora dela.
-const LIMIT: usize = 48 * 1024 * 1024;
+/// Teto do LRU. Cabe a tela inteira (capas de 344x516 ≈ 0,7 MB, fundo na altura da janela ≈ 8–15 MB) e mais um
+/// fundo para voltar rápido; o que está na tela nunca sai (ver `Lru::evict`), então o teto vale para o que está
+/// fora dela. Cada imagem também ocupa uma textura do mesmo tamanho na GPU enquanto aparece.
+const LIMIT: usize = 32 * 1024 * 1024;
 
 struct Lru {
     /// Imagem, bytes e o último quadro (`frame`) em que foi pedida.
@@ -255,7 +256,7 @@ fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
                         if let Some(lum) = lum {
                             s.lum.insert(key.clone(), lum);
                         }
-                        s.lru.insert(key, Image::from_rgba8(buf), bytes);
+                        s.lru.insert(key, shared(buf), bytes);
                     }
                     None => {
                         s.failed.insert(key);
@@ -275,6 +276,22 @@ fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
             return;
         }
     }
+}
+
+/// Imagem com chave de cache própria: o femtovg sobe uma textura só por imagem, por mais `Image` do tema que a
+/// mostrem. Sem chave (`Image::from_rgba8`), cada elemento sobe a sua: as ~90 faixas da borda da arte e cada painel
+/// de vidro tinham uma cópia da arte desfocada na GPU, e o fundo nítido duas ou três.
+pub(crate) fn shared(buf: SharedPixelBuffer<Rgba8Pixel>) -> Image {
+    use i_slint_core::graphics::{ImageCacheKey, ImageInner, SharedImageBuffer};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    // `EmbeddedData` costuma ser o endereço de dados estáticos do binário; daqui para cima nenhum endereço real chega
+    // (64 bits). Cada imagem nova ganha uma chave nova, então nunca há textura velha com a chave de outra.
+    static NEXT: AtomicUsize = AtomicUsize::new(usize::MAX / 2);
+    ImageInner::EmbeddedImage {
+        cache_key: ImageCacheKey::EmbeddedData(NEXT.fetch_add(1, Ordering::Relaxed)),
+        buffer: SharedImageBuffer::RGBA8(buf),
+    }
+    .into()
 }
 
 type Loaded = (SharedPixelBuffer<Rgba8Pixel>, Option<Vec<f32>>);
@@ -432,6 +449,22 @@ mod tests {
         // Desfocada: a borda entre o branco e o preto vira um degradê.
         let mid = copy.get_pixel(200, GLASS_HEIGHT / 2).0[0];
         assert!(mid > 20 && mid < 235, "{mid}");
+    }
+
+    #[test]
+    fn shared_images_get_their_own_cache_key() {
+        use i_slint_core::graphics::{ImageCacheKey, ImageInner};
+        let key = |img: &Image| match <&ImageInner>::from(img) {
+            ImageInner::EmbeddedImage { cache_key, .. } => cache_key.clone(),
+            _ => ImageCacheKey::Invalid,
+        };
+        let a = shared(SharedPixelBuffer::new(2, 2));
+        let b = shared(SharedPixelBuffer::new(2, 2));
+        assert!(matches!(key(&a), ImageCacheKey::EmbeddedData(_)));
+        assert!(key(&a) != key(&b));
+        // A mesma imagem passada adiante (LRU, tema) continua com a mesma chave: uma textura só.
+        assert!(key(&a.clone()) == key(&a) && a.clone() == a);
+        assert_eq!(a.to_rgba8().map(|p| p.width()), Some(2));
     }
 
     #[test]

@@ -525,3 +525,103 @@ fn desktop_snapshot() {
     .join()
     .unwrap();
 }
+
+/// Custo da rolagem da lista do desktop (CPU, renderizador de software): `TAKO_BENCH_FRAMES=<n>` quadros de roda do
+/// mouse sobre a lista; imprime o tempo médio do quadro e do `render` do Rust que o `scrolled` dispara.
+/// `cargo test -p tako-ui --release desktop_scroll_bench -- --ignored --nocapture`.
+#[test]
+#[ignore = "medição manual"]
+fn desktop_scroll_bench() {
+    std::thread::spawn(|| {
+        use std::cell::RefCell;
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap()
+            .create()
+            .unwrap();
+        let (w, h) = (1600u32, 620u32);
+        window.set_size(slint::PhysicalSize::new(w, h));
+        ui.show().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        let shell = Rc::new(RefCell::new(shell));
+        let rust = Rc::new(RefCell::new((0u32, std::time::Duration::ZERO)));
+        for (name, value) in shell.borrow_mut().render(Instant::now()).props {
+            crate::bridge::set(&ui, name, value);
+        }
+        {
+            let (shell, rust, ui2) = (shell.clone(), rust.clone(), ui.clone_strong());
+            ui.set_callback("scrolled", move |args| {
+                let Some(Value::Number(first)) = args.first() else {
+                    return Value::Void;
+                };
+                let t = Instant::now();
+                shell.borrow_mut().ctx.list_first = *first as usize;
+                for (name, value) in shell.borrow_mut().render(Instant::now()).props {
+                    crate::bridge::set(&ui2, name, value);
+                }
+                let mut r = rust.borrow_mut();
+                r.0 += 1;
+                r.1 += t.elapsed();
+                Value::Void
+            })
+            .unwrap();
+        }
+        let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+        let mut draw = || {
+            slint::platform::update_timers_and_animations();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w as usize);
+            });
+        };
+        for _ in 0..20 {
+            draw();
+        }
+        let frames: u32 = std::env::var("TAKO_BENCH_FRAMES")
+            .ok()
+            .and_then(|f| f.parse().ok())
+            .unwrap_or(400);
+        let start = Instant::now();
+        for f in 0..frames {
+            // Desce e sobe: a lista inteira passa pela tela várias vezes.
+            let dy = if (f / 40) % 2 == 0 { -24.0 } else { 24.0 };
+            window.dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+                position: slint::LogicalPosition::new(200.0, 400.0),
+                delta_x: 0.0,
+                delta_y: dy,
+            });
+            draw();
+        }
+        let total = start.elapsed();
+        let (calls, rust) = *rust.borrow();
+        println!(
+            "quadros: {frames}, média {:.3} ms/quadro; scrolled: {calls} chamadas, média {:.3} ms",
+            total.as_secs_f64() * 1000.0 / f64::from(frames),
+            rust.as_secs_f64() * 1000.0 / f64::from(calls.max(1)),
+        );
+        assert!(calls > 0, "a lista não rolou");
+        // `TAKO_BENCH_OUT=<png>`: o último quadro (a lista rolada), para conferir a ordem das linhas.
+        if let Ok(path) = std::env::var("TAKO_BENCH_OUT") {
+            ui.window().request_redraw();
+            draw();
+            let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+            image::RgbImage::from_raw(w, h, raw)
+                .unwrap()
+                .save(path)
+                .unwrap();
+        }
+        ui.hide().unwrap();
+    })
+    .join()
+    .unwrap();
+}

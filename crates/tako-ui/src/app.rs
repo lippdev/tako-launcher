@@ -216,6 +216,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         metadata: None,
         broken_checked: None,
         desktop: false,
+        art_height: 2160,
         list_first: 0,
         focus_visible: false,
     };
@@ -457,7 +458,14 @@ impl App {
     pub fn redraw(&self) {
         let action = pump_effects(&self.shell, &self.host);
         self.apply(action);
-        render(&self.shell, &self.ui.borrow());
+        // Minimizada (PRD §8; no desktop, durante o jogo): nada muda no tema, então nada anima nem redesenha (o
+        // femtovg desenha mesmo com a janela escondida). `dirty` fica para a volta; o fim do jogo ainda passa, porque
+        // é o `render` que restaura a janela.
+        let ui = self.ui.borrow();
+        if ui.window().is_minimized() && self.shell.borrow().ctx.welcome_back.is_none() {
+            return;
+        }
+        render(&self.shell, &ui);
     }
 
     pub fn apply(&self, action: HostAction) {
@@ -1214,6 +1222,10 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         ));
         w.set_fullscreen(full);
     }
+    let size = ui.window().size();
+    if size.width > 0 && size.height > 0 {
+        s.ctx.art_height = crate::shell::tiles::art_height(size.width, size.height);
+    }
     if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
         s.ctx.grid_columns = (n as usize).max(1);
     }
@@ -1263,7 +1275,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
             .to_value(),
     );
     let art = game
-        .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::HERO))
+        .map(|g| crate::shell::tiles::image(g.shown_hero(), crate::shell::tiles::hero(&s.ctx)))
         .unwrap_or_default();
     bridge::set(ui, "backdrop", art.to_value());
     images::frame_done();
