@@ -35,8 +35,10 @@ pub fn steam_source(owned_cache: Option<std::path::PathBuf>) -> Box<dyn LibraryS
 
 /// Lojas só do Windows, na ordem da barra lateral (a Steam vem de [`steam_source`]).
 #[cfg(windows)]
+/// `unprotect`: o DPAPI do usuário (`tako_platform::windows::dpapi::unprotect`), para os jogos da conta Amazon.
 pub fn windows_sources(
     registry: std::sync::Arc<dyn registry::RegistryReader>,
+    unprotect: amazon::owned::Unprotect,
 ) -> Vec<Box<dyn LibrarySource>> {
     let env = |k: &str| std::env::var(k).unwrap_or_default();
     let (program_data, local_app_data) = (env("ProgramData"), env("LOCALAPPDATA"));
@@ -56,7 +58,9 @@ pub fn windows_sources(
             &program_data,
             Some(env("ProgramFiles(x86)")),
         )),
-        Box::new(amazon::AmazonLibrarySource::new(r(), &local_app_data)),
+        Box::new(
+            amazon::AmazonLibrarySource::new(r(), &local_app_data).with_unprotect(Some(unprotect)),
+        ),
     ]
 }
 
