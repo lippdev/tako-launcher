@@ -13,12 +13,25 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use tako_core::i18n::{Lang, lang, t};
-use tako_core::library::{Game, GameStore};
+use tako_core::library::{Game, GameStore, InstallProgress};
 
 /// Esquema das artes resolvidas pelo launcher (API da Steam, CDN e cache local da Steam).
 pub const ART_SCHEME: &str = "steam-art";
 
 const FULLY_INSTALLED: u32 = 4;
+/// Bits de `StateFlags` de quem está sendo baixado ou instalado (UpdateRunning, UpdatePaused, UpdateStarted,
+/// Reconfiguring, Validating, AddingFiles, Preallocating, Downloading, Staging, Committing). Manifest sem
+/// nenhum deles e sem o bit de instalado é resto de uma instalação cancelada: não vira jogo.
+const IN_PROGRESS: u64 = 0x100
+    | 0x200
+    | 0x400
+    | 0x1_0000
+    | 0x2_0000
+    | 0x4_0000
+    | 0x8_0000
+    | 0x10_0000
+    | 0x20_0000
+    | 0x40_0000;
 
 /// Ferramentas que a Steam instala como "apps" e que não são jogos (Proton, runtimes do Linux, redistribuíveis).
 const TOOL_APP_IDS: [u32; 7] = [228980, 1070560, 1391110, 1628350, 1493710, 2180100, 250820];
@@ -34,7 +47,7 @@ const ACCENTS: [&str; 8] = [
     "#2B3A55", "#4A2B55", "#552B3A", "#2B5548", "#55432B", "#2B4655", "#3F2B55", "#55302B",
 ];
 
-/// Jogo instalado numa biblioteca da Steam.
+/// Jogo instalado numa biblioteca da Steam, ou ainda baixando (`installing`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SteamApp {
     pub app_id: u32,
@@ -44,9 +57,13 @@ pub struct SteamApp {
     pub installed_at: Option<DateTime<Utc>>,
     pub last_played: Option<DateTime<Utc>>,
     pub play_time: Duration,
+    /// `Some` = a Steam ainda está instalando (o `appmanifest` existe sem o bit de instalado).
+    pub installing: Option<InstallProgress>,
+    /// Tamanho da instalação pedida, enquanto baixa (o `SizeOnDisk` ainda está crescendo).
+    pub install_size: Option<u64>,
 }
 
-/// Jogos instalados em todas as bibliotecas de `steam_root`, por nome.
+/// Jogos instalados (e os que a Steam está instalando) em todas as bibliotecas de `steam_root`, por nome.
 pub fn scan(steam_root: &Path) -> Vec<SteamApp> {
     let usage = read_usage(steam_root);
     let mut apps: Vec<SteamApp> = Vec::new();
@@ -113,7 +130,8 @@ fn read_manifest(
     let name = state.value("name").filter(|s| !s.is_empty())?;
     let install_dir = state.value("installdir").filter(|s| !s.is_empty())?;
     let flags = number(state.value("StateFlags")).unwrap_or(0);
-    if flags & u64::from(FULLY_INSTALLED) == 0
+    let installed = flags & u64::from(FULLY_INSTALLED) != 0;
+    if (!installed && flags & IN_PROGRESS == 0)
         || TOOL_APP_IDS.contains(&app_id)
         || TOOL_PREFIXES.iter().any(|p| {
             name.get(..p.len())
@@ -123,14 +141,35 @@ fn read_manifest(
         return None;
     }
     let (last_played, play_time) = usage.get(&app_id).cloned().unwrap_or_default();
+    let (installing, install_size) = if installed {
+        (None, None)
+    } else {
+        let (done, total) = (
+            number(state.value("BytesDownloaded")).unwrap_or(0),
+            number(state.value("BytesToDownload")).unwrap_or(0),
+        );
+        // Sem total, a Steam não informou: a interface mostra "instalando" sem porcentagem.
+        let fraction = (total > 0).then(|| (done as f64 / total as f64).clamp(0.0, 1.0) as f32);
+        // BytesToStage é o tamanho final no disco; o download pode ser menor (comprimido).
+        let size = number(state.value("BytesToStage"))
+            .filter(|&b| b > 0)
+            .or(Some(total).filter(|&b| b > 0));
+        (Some(InstallProgress { fraction }), size)
+    };
     Some(SteamApp {
         app_id,
         name: name.to_owned(),
         install_path: steamapps.join("common").join(install_dir),
-        size_on_disk: number(state.value("SizeOnDisk")).unwrap_or(0),
+        size_on_disk: if installed {
+            number(state.value("SizeOnDisk")).unwrap_or(0)
+        } else {
+            0
+        },
         installed_at: crate::install_dates::of(file),
         last_played: last_played.or_else(|| unix_time(state.value("LastPlayed"))),
         play_time,
+        installing,
+        install_size,
     })
 }
 
@@ -203,9 +242,12 @@ fn same_path(a: &Path, b: &Path) -> bool {
     norm(a) == norm(b)
 }
 
-/// Converte um jogo da Steam em [`Game`] (id `steam:<appid>`, abre por `steam://rungameid/<appid>`).
+/// Converte um jogo da Steam em [`Game`] (id `steam:<appid>`, abre por `steam://rungameid/<appid>`). Enquanto a
+/// Steam instala, o jogo não é jogável: fica como não instalado, com o progresso, e o mesmo id vira instalado no
+/// lugar quando terminar.
 pub fn to_game(app: &SteamApp) -> Game {
     let id = app.app_id;
+    let installed = app.installing.is_none();
     Game {
         id: format!("steam:{id}"),
         title: app.name.clone(),
@@ -215,15 +257,58 @@ pub fn to_game(app: &SteamApp) -> Game {
         accent: ACCENTS[id as usize % ACCENTS.len()].to_owned(),
         cover_uri: Some(format!("{ART_SCHEME}://{id}/cover")),
         hero_uri: Some(format!("{ART_SCHEME}://{id}/hero")),
-        is_installed: true,
+        is_installed: installed,
         added_at: app.installed_at,
         last_played_at: app.last_played,
         play_time: app.play_time,
-        launch_target: Some(format!("steam://rungameid/{id}")),
-        install_path: Some(app.install_path.to_string_lossy().into_owned()),
+        launch_target: installed.then(|| format!("steam://rungameid/{id}")),
+        install_path: installed.then(|| app.install_path.to_string_lossy().into_owned()),
+        install_uri: (!installed).then(|| owned::install_uri(id)),
+        installing: app.installing,
+        install_size: app.install_size,
         steam_app_id: Some(id),
         ..Default::default()
     }
+}
+
+/// O que mudou em [`follow_installs`].
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Followed {
+    /// Progresso ou tamanho de algum jogo mudou (vale redesenhar).
+    pub changed: bool,
+    /// Algum jogo terminou de instalar (vale a leitura completa, que traz tempo jogado e o resto).
+    pub finished: bool,
+}
+
+/// Acompanha as instalações em andamento relendo só os `appmanifest` dos jogos de `watch` (ids `steam:<appid>`),
+/// sem varrer a Steam toda: atualiza progresso e tamanho em `games`. Sem manifest o jogo deixa de estar
+/// instalando (cancelado ou ainda não começou).
+pub fn follow_installs(steam_root: &Path, games: &mut [Game], watch: &[String]) -> Followed {
+    let libraries = library_folders(steam_root);
+    let mut result = Followed::default();
+    for game in games.iter_mut().filter(|g| {
+        g.store() == GameStore::Steam && !g.is_installed && watch.iter().any(|w| w == &g.id)
+    }) {
+        let Some(app_id) = game.steam_app_id else {
+            continue;
+        };
+        let name = format!("appmanifest_{app_id}.acf");
+        let app = libraries.iter().find_map(|lib| {
+            let steamapps = lib.join("steamapps");
+            read_manifest(&steamapps.join(&name), &steamapps, &HashMap::new())
+        });
+        let (installing, size) = match app {
+            Some(app) if app.installing.is_none() => {
+                result.finished = true;
+                continue;
+            }
+            Some(app) => (app.installing, app.install_size),
+            None => (None, game.install_size),
+        };
+        result.changed |= (game.installing, game.install_size) != (installing, size);
+        (game.installing, game.install_size) = (installing, size);
+    }
+    result
 }
 
 /// "500 MB", "2,5 GB", "120 GB" (uma casa abaixo de 10 GB); `None` sem tamanho.
@@ -412,6 +497,7 @@ mod tests {
         manifest(&extra, 1493710, "Proton Experimental", 4, 1);
         manifest(&extra, 1628350, "Steam Linux Runtime 3.0 (sniper)", 4, 1);
         manifest(&extra, 999, "Baixando", 1026, 1);
+        manifest(&extra, 998, "Resto de cancelada", 2, 1);
         write(
             &steam,
             "userdata/123/config/localconfig.vdf",
@@ -423,8 +509,10 @@ mod tests {
         let apps = scan(&steam);
 
         let names: Vec<_> = apps.iter().map(|a| a.name.as_str()).collect();
-        assert_eq!(names, ["Dota 2", "Hollow Knight: Silksong"]);
-        let dota = &apps[0];
+        // O que ainda baixa vem junto (instalando); o resto de instalação cancelada, não.
+        assert_eq!(names, ["Baixando", "Dota 2", "Hollow Knight: Silksong"]);
+        assert!(apps[0].installing.is_some() && apps[1].installing.is_none());
+        let dota = &apps[1];
         assert_eq!(dota.play_time, Duration::from_secs(125 * 60));
         assert_eq!(dota.last_played, DateTime::from_timestamp(1_760_000_000, 0));
         assert_eq!(
@@ -438,6 +526,108 @@ mod tests {
         assert_eq!(game.size_label.as_deref(), Some("40 GB"));
         assert_eq!(game.cover_uri.as_deref(), Some("steam-art://570/cover"));
         assert_eq!(game.steam_app_id, Some(570));
+    }
+
+    fn downloading(library: &Path, app_id: u32, flags: u32, bytes: &str) {
+        write(
+            library,
+            &format!("steamapps/appmanifest_{app_id}.acf"),
+            &format!(
+                "\"AppState\" {{ \"appid\" \"{app_id}\" \"name\" \"Hades\" \"installdir\" \"Hades\" \"StateFlags\" \"{flags}\" {bytes} }}"
+            ),
+        );
+    }
+
+    #[test]
+    fn installing_game_has_progress_size_and_the_store_address_until_it_finishes() {
+        let dir = tempfile::tempdir().unwrap();
+        let steam = dir.path();
+        downloading(
+            steam,
+            1145360,
+            1026,
+            "\"BytesToDownload\" \"1000\" \"BytesDownloaded\" \"250\" \"BytesToStage\" \"3000\"",
+        );
+        let app = &scan(steam)[0];
+        assert_eq!(
+            app.installing,
+            Some(InstallProgress {
+                fraction: Some(0.25)
+            })
+        );
+        let game = to_game(app);
+        assert_eq!(game.id, "steam:1145360");
+        assert!(!game.is_installed && !game.can_play());
+        assert_eq!(game.install_size, Some(3000));
+        assert_eq!(game.launch_target, None);
+        assert_eq!(game.install_uri.as_deref(), Some("steam://install/1145360"));
+        assert_eq!(game.size_bytes, None);
+
+        // Acompanhar: só os manifests do jogo; o progresso anda no `found`, sem varrer tudo.
+        let mut games = vec![game];
+        let watch = ["steam:1145360".to_owned()];
+        downloading(
+            steam,
+            1145360,
+            1048576 | 1024,
+            "\"BytesToDownload\" \"1000\" \"BytesDownloaded\" \"900\"",
+        );
+        let r = follow_installs(steam, &mut games, &watch);
+        assert_eq!((r.changed, r.finished), (true, false));
+        assert_eq!(
+            games[0].installing,
+            Some(InstallProgress {
+                fraction: Some(0.9)
+            })
+        );
+        // Nada mudou desde a última leitura: nada a redesenhar.
+        assert_eq!(
+            follow_installs(steam, &mut games, &watch),
+            Followed::default()
+        );
+        assert_eq!(games[0].install_size, Some(1000));
+        // Não está na lista de acompanhados: não mexe.
+        games[0].installing = None;
+        assert_eq!(follow_installs(steam, &mut games, &[]), Followed::default());
+        assert_eq!(games[0].installing, None);
+
+        // Terminou: o aviso para a leitura completa trocar o jogo por instalado.
+        downloading(steam, 1145360, 4, "\"SizeOnDisk\" \"3000\"");
+        games[0].installing = Some(InstallProgress::default());
+        assert!(follow_installs(steam, &mut games, &watch).finished);
+        let done = to_game(&scan(steam)[0]);
+        assert!(done.is_installed && done.installing.is_none());
+        assert_eq!(done.id, "steam:1145360");
+        assert_eq!(done.size_bytes, Some(3000));
+
+        // Cancelou: sem manifest deixa de estar instalando.
+        std::fs::remove_file(steam.join("steamapps/appmanifest_1145360.acf")).unwrap();
+        games[0].installing = Some(InstallProgress::default());
+        assert!(follow_installs(steam, &mut games, &watch).changed);
+        assert_eq!(games[0].installing, None);
+    }
+
+    #[test]
+    fn broken_install_numbers_never_panic() {
+        let dir = tempfile::tempdir().unwrap();
+        for (i, bytes) in [
+            "",
+            "\"BytesToDownload\" \"0\" \"BytesDownloaded\" \"5\"",
+            "\"BytesToDownload\" \"-3\" \"BytesDownloaded\" \"x\"",
+            "\"BytesToDownload\" \"10\" \"BytesDownloaded\" \"99\"",
+            "\"BytesToDownload\" \"99999999999999999999999\"",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            downloading(dir.path(), 100 + i as u32, 1026, bytes);
+        }
+        let fractions: Vec<_> = scan(dir.path())
+            .iter()
+            .map(|a| a.installing.unwrap().fraction)
+            .collect();
+        // Sem total ou com número ruim: sem porcentagem; baixou mais que o total: trava em 100%.
+        assert_eq!(fractions, [None, None, None, Some(1.0), None]);
     }
 
     #[test]
