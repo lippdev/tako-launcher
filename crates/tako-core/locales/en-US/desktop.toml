@@ -145,3 +145,10 @@ minimize = "Minimize"
 maximize = "Maximize"
 restore = "Restore"
 close = "Close"
+
+[desktop.phase]
+more = "More about the game"
+back = "Back"
+images = "Images"
+publisher = "Publisher"
+folder = "Folder"

@@ -145,3 +145,10 @@ minimize = "Minimizar"
 maximize = "Maximizar"
 restore = "Restaurar"
 close = "Fechar"
+
+[desktop.phase]
+more = "Mais sobre o jogo"
+back = "Voltar"
+images = "Imagens"
+publisher = "Publicadora"
+folder = "Pasta"

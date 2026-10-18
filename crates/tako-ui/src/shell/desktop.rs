@@ -8,7 +8,9 @@ use super::library::Criteria;
 use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles,
 };
-use crate::model::{DeskCategory, DeskGame, DeskGameView, DeskInfo, Hint, NavItem, PanelRow};
+use crate::model::{
+    DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, Hint, NavItem, PanelRow,
+};
 use crate::values::parse_color;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -204,7 +206,13 @@ pub struct DesktopLibrary {
     /// TrocaDeJogo: o jogo no destaque e a seleção do teclado esperando parar (id, desde quando).
     hero: Option<String>,
     hero_wait: Option<(String, std::time::Instant)>,
+    /// DestaqueFases: o jogo com a fase 2 aberta; trocar de jogo (ou sair da Lista) volta para a fase 1.
+    more: Option<String>,
 }
+
+/// Page Up e Page Down como o Slint manda.
+const PAGE_UP: char = '\u{F72C}';
+const PAGE_DOWN: char = '\u{F72D}';
 
 /// Teclado rápido: só a seleção anda; arte e texto trocam quando ela para por este tempo.
 const HERO_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
@@ -232,6 +240,7 @@ impl DesktopLibrary {
             cat_focus: (0, 0),
             hero: None,
             hero_wait: None,
+            more: None,
         }
     }
 
@@ -887,6 +896,68 @@ fn sessions_rows(ctx: &Ctx, g: &Game) -> (String, Vec<DeskInfo>) {
     (summary, rows)
 }
 
+/// DestaqueFases › fase 2, Detalhes: todas as informações que o jogo tem, sem o limite de 6 da fase 1.
+fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
+    let lang = ctx.lang();
+    let text = |v: &Option<String>| v.clone().unwrap_or_default();
+    let tags: Vec<&str> = g.tags.iter().map(String::as_str).collect();
+    let release = g.release_date.map(|d| game_text::date(lang, d));
+    let score = g.metacritic_score.or(g.critic_score).map(|s| s.to_string());
+    [
+        ("check", "details.status", game_text::status(lang, g)),
+        (
+            store_icon(g.store()),
+            "desktop.store",
+            game_text::store_name(lang, g.store()),
+        ),
+        ("tag", "details.genres", g.genres.join(" - ")),
+        ("user", "details.developer", text(&g.developer)),
+        ("user", "desktop.phase.publisher", text(&g.publisher)),
+        ("calendar", "details.release", text(&release)),
+        ("layers", "details.series", text(&g.franchise)),
+        ("star", "desktop.info.critic", text(&score)),
+        ("tag", "desktop.info.tags", tags.join(", ")),
+        ("monitor", "details.system", text(&g.platform)),
+        ("user", "details.players", text(&g.players)),
+        ("gauge", "desktop.size", text(&g.size_label)),
+        ("folder", "desktop.phase.folder", text(&g.install_path)),
+    ]
+    .into_iter()
+    .filter(|(.., value)| !value.trim().is_empty())
+    .map(|(icon, key, value)| DeskInfo {
+        icon: icon.into(),
+        label: ctx.t(key),
+        value,
+        ..Default::default()
+    })
+    .collect()
+}
+
+/// DestaqueFases › fase 2, Sessões: o histórico, da mais recente para a mais antiga.
+fn more_sessions(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
+    // shortcut: só as 100 últimas (o painel de sessões tem todas), subir se alguém sentir falta.
+    let lang = ctx.lang();
+    let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
+    let now = running.then(|| DeskInfo {
+        label: ctx.t("desktop.day.today"),
+        detail: ctx.t("desktop.strip.playing_now"),
+        dot: true,
+        ..Default::default()
+    });
+    now.into_iter()
+        .chain(ctx.library.sessions(&g.id).iter().rev().take(100).map(|s| {
+            let start = s.started_at.with_timezone(&chrono::Local);
+            let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
+            DeskInfo {
+                label: day(ctx, start),
+                detail: format!("{} – {}", start.format("%H:%M"), end.format("%H:%M")),
+                value: game_text::play_time(lang, s.duration),
+                ..Default::default()
+            }
+        }))
+        .collect()
+}
+
 impl Page for DesktopLibrary {
     fn route(&self) -> String {
         ROUTE.into()
@@ -1033,8 +1104,9 @@ impl Page for DesktopLibrary {
             }
             (Zone::Collections, Cmd::Down) => self.zone = Zone::List,
             (Zone::Collections, Cmd::Up) => self.cycle(false),
-            // Esc: limpa a busca e os filtros, depois volta para a lista.
-            // Esc: sai da seleção múltipla, depois limpa a busca e os filtros, depois volta para a lista.
+            // Esc: fecha a fase 2 do destaque, sai da seleção múltipla, depois limpa a busca e os filtros, depois
+            // volta para a lista.
+            (_, Cmd::Back) if self.more.is_some() => self.more = None,
             (_, Cmd::Back) if !self.checked.is_empty() => {
                 self.checked.clear();
                 self.anchor = None;
@@ -1063,6 +1135,15 @@ impl Page for DesktopLibrary {
         // Shift+Tab chega como Tab com Shift ou como "back tab" (U+0019), conforme o sistema.
         if c == keys::TAB || c == '\u{0019}' {
             self.cycle(c == keys::TAB && mods != KeyModifiers::SHIFT);
+            return Some(Nav::Stay);
+        }
+        // DestaqueFases: Page Down abre a fase 2 do destaque, Page Up volta (com o foco na lista ou nas ações).
+        if (c == PAGE_DOWN || c == PAGE_UP)
+            && mods == KeyModifiers::NONE
+            && matches!(self.zone, Zone::List | Zone::Actions)
+            && View::of(ctx) == View::List
+        {
+            self.more = (c == PAGE_DOWN).then(|| self.hero.clone()).flatten();
             return Some(Nav::Stay);
         }
         None
@@ -1141,6 +1222,12 @@ impl Page for DesktopLibrary {
                 }
             }
             "rescan" => ctx.effect(Effect::Rescan),
+            // DestaqueFases: 1 abre a fase 2 (roda para baixo, "Mais sobre o jogo"), 0 volta para a fase 1.
+            "game-more" => {
+                self.more = (index == 1)
+                    .then(|| self.hero.clone().or_else(|| self.selected(ctx)))
+                    .flatten();
+            }
             // Cartões do destaque: o texto inteiro do Sobre, o trailer e o histórico de sessões.
             "about-more" | "trailer" | "sessions" => {
                 let Some(g) = self
@@ -1416,7 +1503,42 @@ impl Page for DesktopLibrary {
         );
         out.set("desk-selected", cur.map(|i| i as i32).unwrap_or(-1));
         let hero = self.hero_id(ctx, cur.map(|i| ids[i].clone()));
+        // Outro jogo no destaque (ou fora da Lista): volta para a fase 1.
+        if self.more != hero || View::of(ctx) != View::List {
+            self.more = None;
+        }
+        let more_on = self.more.is_some();
         let game = hero.and_then(|id| ctx.library.find(&id));
+        out.set(
+            "desk-more",
+            DeskMore {
+                on: more_on,
+                labels: [
+                    "desktop.phase.more",
+                    "desktop.phase.back",
+                    "desktop.about",
+                    "desktop.details",
+                    "desktop.sessions.title",
+                    "desktop.phase.images",
+                    "desktop.trailer",
+                ]
+                .iter()
+                .map(|k| ctx.t(k))
+                .collect(),
+                description: game
+                    .map(|g| g.description.trim().to_owned())
+                    .unwrap_or_default(),
+                details: game.map(|g| more_details(ctx, g)).unwrap_or_default(),
+                sessions_summary: game.map(|g| sessions_rows(ctx, g).0).unwrap_or_default(),
+                sessions: game.map(|g| more_sessions(ctx, g)).unwrap_or_default(),
+                // A captura só decodifica com a fase aberta, no tamanho da miniatura (256 × 144, 2× para HiDPI).
+                shots: game
+                    .filter(|_| more_on)
+                    .and_then(|g| g.media.get(tako_core::library::media::SCREENSHOT))
+                    .map(|uri| vec![tiles::image(Some(uri), (512, 288))])
+                    .unwrap_or_default(),
+            },
+        );
         let mut sessions = (String::new(), Vec::new());
         let (view, actions, stats, details) = match game {
             Some(g) => {
@@ -2018,6 +2140,48 @@ mod tests {
         let mut back = page(&shell).ids(&shell.ctx);
         back.reverse();
         assert_eq!(back, ids);
+    }
+
+    /// A fase 2 do destaque está aberta no último desenho.
+    fn more_on(shell: &mut Shell) -> bool {
+        let out = shell.render(std::time::Instant::now());
+        out.props
+            .iter()
+            .find_map(|(n, v)| match (*n, v) {
+                ("desk-more", slint_interpreter::Value::Struct(s)) => s.get_field("on").cloned(),
+                _ => None,
+            })
+            .is_some_and(|v| v == slint_interpreter::Value::Bool(true))
+    }
+
+    #[test]
+    fn the_hero_pages_to_phase_two_and_back_and_a_new_game_starts_on_phase_one() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        assert!(!more_on(&mut shell));
+        // Page Down abre, Page Up volta; Esc também volta.
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert!(more_on(&mut shell));
+        shell.key("\u{F72C}", KeyModifiers::NONE);
+        assert!(!more_on(&mut shell));
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        shell.handle(Cmd::Back);
+        assert!(!more_on(&mut shell));
+        // A roda (ou "Mais sobre o jogo") abre; outro jogo no destaque volta para a fase 1.
+        shell.click("game-more", 1);
+        assert!(more_on(&mut shell));
+        shell.click("game", 2);
+        assert!(!more_on(&mut shell));
+        shell.click("game-more", 1);
+        shell.click("game-more", 0);
+        assert!(!more_on(&mut shell));
+        // Fora da Lista não há destaque nem fase 2.
+        shell.click("game-more", 1);
+        shell.click("view", 1);
+        assert!(!more_on(&mut shell));
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert!(!more_on(&mut shell));
     }
 
     #[test]
