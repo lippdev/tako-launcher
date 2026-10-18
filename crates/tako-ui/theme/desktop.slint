@@ -35,7 +35,7 @@ export { Ui }
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, store-icon: string, store-name: string }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
 struct DeskMore { on: bool, labels: [string], description: string, details: [DeskInfo], sessions-summary: string, sessions: [DeskInfo], shots: [image] }
@@ -1817,9 +1817,11 @@ component GameStage inherits VerticalLayout {
         }
         // TituloDoJogo: o logo do jogo numa caixa de 520 × 180 (380 × 130 na janela pequena), ancorado embaixo à
         // esquerda, nunca ampliado acima do tamanho dele; a etiqueta fica 20 acima.
-        if game.show-logo: HorizontalLayout {
+        // Logo ainda carregando: a caixa fica vazia na altura dele (nunca o nome em texto antes do logo).
+        if game.show-logo || game.title-pending: HorizontalLayout {
             alignment: start;
             padding-top: 20px - (small ? 10px : 14px);
+            min-height: game.title-pending ? self.box-h + self.padding-top : 0;
             property <length> box-w: small ? 380px : 520px;
             property <length> box-h: small ? 130px : 180px;
             property <length> src-w: max(1px, game.logo.width * 1px);
@@ -1827,7 +1829,9 @@ component GameStage inherits VerticalLayout {
             property <float> fit: min(1, min(box-w / src-w, box-h / src-h));
             Image {
                 source: game.logo;
-                opacity: intro-title;
+                // O logo acende quando chega, em vez de aparecer de uma vez.
+                opacity: game.logo.width > 0 ? intro-title : 0;
+                animate opacity { duration: Ui.text-fade(true); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
                 width: parent.src-w * parent.fit;
                 height: parent.src-h * parent.fit;
                 image-fit: contain;
@@ -1837,7 +1841,7 @@ component GameStage inherits VerticalLayout {
         }
         // Título em até duas linhas, até 620 de largura (520 na janela pequena), crescendo para cima: um título longo
         // encolhe (até 36) para caber em duas.
-        if !game.show-logo: HorizontalLayout {
+        if !game.show-logo && !game.title-pending: HorizontalLayout {
             title-measure := Text {
                 visible: false;
                 width: 0;
