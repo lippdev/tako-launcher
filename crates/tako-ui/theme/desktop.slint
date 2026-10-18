@@ -38,6 +38,7 @@ struct DeskCategory { title: string, count: string, icon: string, games: [DeskGa
 struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, store-icon: string, store-name: string }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string] }
+struct DeskMore { on: bool, labels: [string], description: string, details: [DeskInfo], sessions-summary: string, sessions: [DeskInfo], shots: [image] }
 
 // Ícone do desktop: cor opaca com a transparência no elemento inteiro (com a cor translúcida no traço, o femtovg
 // somava a transparência onde os traços se cruzam e o ícone parecia ter contorno) e pontas e cantos redondos,
@@ -1889,6 +1890,273 @@ component GameStage inherits VerticalLayout {
     }
 }
 
+// Linha de rótulo e valor da fase 2 (como no CartaoDetalhes), 36 de altura mínima; o valor quebra em linhas.
+component MoreRow inherits Rectangle {
+    in property <DeskInfo> info;
+    in property <bool> first;
+    in property <length> label-w;
+    min-height: 36px;
+    if !first: Rectangle { y: 0; height: 1px; background: Ui.divider; }
+    HorizontalLayout {
+        padding-top: Ui.space-8;
+        padding-bottom: Ui.space-8;
+        spacing: Ui.space-12;
+        if info.icon != "": DeskIcon { name: info.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
+        if info.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
+        Text { text: info.label; width: root.label-w; color: info.icon != "" ? Ui.desk-on-subtle : Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: info.icon != "" ? 500 : 700; vertical-alignment: center; overflow: elide; }
+        if info.detail != "": Text { text: info.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
+        Text { text: info.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; horizontal-alignment: info.icon != "" ? left : right; }
+    }
+}
+
+// Cartão de vidro da fase 2: título `title` e o conteúdo embaixo, 24 por dentro (16 na janela pequena).
+component MoreCard inherits Vidro {
+    in property <string> title;
+    in property <bool> small;
+    VerticalLayout {
+        padding: small ? Ui.space-16 : Ui.space-24;
+        padding-bottom: small ? Ui.space-16 : Ui.space-20;
+        spacing: Ui.space-12;
+        CardTitle { text: title; }
+        @children
+    }
+}
+
+// DestaqueFases › fase 2: o que o Tako sabe do jogo além da primeira tela (Sobre inteiro, todos os Detalhes, o
+// histórico de sessões e a captura/trailer quando existem). Duas colunas (uma na janela pequena); rola por dentro
+// quando passa da altura (`offset`, posto pela roda em GamePhases). Seção sem dado não aparece.
+component GameMore inherits Rectangle {
+    in property <DeskMore> more;
+    in property <bool> trailer;
+    in property <bool> small;
+    in property <length> offset;
+    out property <length> scroll-max: max(0px, content-h - view.height);
+    callback clicked(string, int);
+    property <bool> one-col: small || root.width < 820px;
+    property <length> gap: small ? Ui.space-16 : Ui.space-20;
+    property <length> left-w: one-col ? root.width : (root.width - gap) * 0.58;
+    property <length> content-h: one-col ? lc.preferred-height + gap + rc.preferred-height : max(lc.preferred-height, rc.preferred-height);
+    property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
+    // "⌃ Voltar": volta para a fase 1 (como a roda para cima no topo, Page Up e Esc).
+    back := Vidro {
+        x: (root.width - self.width) / 2;
+        y: 0;
+        height: 32px;
+        width: bl.preferred-width;
+        radius: 16px;
+        accessible-role: button;
+        accessible-label: more.labels[1];
+        if bta.has-hover: Rectangle { border-radius: 16px; background: Ui.glass-hover; }
+        bl := HorizontalLayout {
+            padding-left: Ui.space-12;
+            padding-right: Ui.space-16;
+            spacing: 6px;
+            DeskIcon { name: "chevron-up"; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
+            Text { text: more.labels[1]; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+        }
+        bta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.clicked("game-more", 0); }
+        }
+    }
+    view := Rectangle {
+        y: back.height + Ui.space-12;
+        height: root.height - self.y;
+        clip: true;
+        Rectangle {
+            y: -root.offset;
+            height: root.content-h;
+            lc := VerticalLayout {
+                x: 0;
+                y: 0;
+                width: root.left-w;
+                height: self.preferred-height;
+                spacing: root.gap;
+                if more.description != "": MoreCard {
+                    title: more.labels[2];
+                    small: small;
+                    Text { text: more.description; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; horizontal-stretch: 1; }
+                }
+                // Imagens: a captura de tela que a fonte de metadados trouxe e o trailer, quando existem.
+                if more.shots.length > 0 || trailer: MoreCard {
+                    title: more.labels[5];
+                    small: small;
+                    HorizontalLayout {
+                        spacing: Ui.space-12;
+                        alignment: start;
+                        for shot in more.shots: Rectangle {
+                            width: small ? 192px : 256px;
+                            height: self.width * 9 / 16;
+                            border-radius: Ui.radius-thumb;
+                            clip: true;
+                            background: Ui.glass-control;
+                            Image { width: parent.width; height: parent.height; source: shot; image-fit: cover; }
+                            Rectangle { border-radius: Ui.radius-thumb; border-width: 1px; border-color: Ui.glass-edge; }
+                        }
+                        if trailer: GlassButton {
+                            y: (parent.height - self.height) / 2;
+                            height: 40px;
+                            show-label: true;
+                            icon: "play";
+                            label: more.labels[6];
+                            clicked => { root.clicked("trailer", 0); }
+                        }
+                    }
+                }
+            }
+            rc := VerticalLayout {
+                x: root.one-col ? 0 : root.left-w + root.gap;
+                y: root.one-col ? lc.preferred-height + root.gap : 0;
+                width: root.one-col ? root.width : root.width - root.left-w - root.gap;
+                height: self.preferred-height;
+                spacing: root.gap;
+                MoreCard {
+                    title: more.labels[3];
+                    small: small;
+                    VerticalLayout {
+                        spacing: 0;
+                        for r[i] in more.details: MoreRow { info: r; first: i == 0; label-w: root.label-w; }
+                    }
+                }
+                if more.sessions.length > 0: MoreCard {
+                    title: more.labels[4];
+                    small: small;
+                    dense: true;
+                    VerticalLayout {
+                        spacing: 0;
+                        Text { text: more.sessions-summary; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
+                        for r[i] in more.sessions: MoreRow { info: r; first: i == 0; label-w: 72px * Ui.text-scale; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// DestaqueFases: o destaque em duas fases. Um gesto da roda (ou do trackpad) para baixo troca para a fase 2 inteira;
+// para cima no topo dela, volta. Uma troca por gesto: a roda fica travada até o gesto parar (300 sem eventos, 500 no
+// mínimo). A fase nova entra 24 de baixo/cima em `tempo-fase` (`curva-entrada`); a atual apaga em `tempo-fase-sai`.
+// Quem decide a fase é o Tako (`more.on`): Page Down/Up, Esc e a troca de jogo também passam por ele.
+component GamePhases inherits Rectangle {
+    in property <DeskMore> more;
+    in property <bool> trailer;
+    in property <bool> small;
+    callback clicked(string, int);
+    property <bool> on: more.on;
+    // A fase 2 guarda o último conteúdo enquanto apaga (o Tako para de mandar a captura ao voltar).
+    property <DeskMore> shown;
+    init => {
+        if (more.on) {
+            shown = more;
+        }
+    }
+    changed more => {
+        if (more.on) {
+            shown = more;
+        }
+    }
+    // Trava da roda: `busy` depois de trocar de fase; `scrolled` depois de rolar a fase 2 (não troca no mesmo gesto).
+    property <bool> busy;
+    property <bool> scrolled;
+    property <int> ticks;
+    property <int> quiet;
+    property <length> offset;
+    changed on => {
+        offset = 0;
+        busy = true;
+        ticks = 0;
+        quiet = 0;
+    }
+    Timer {
+        interval: 100ms;
+        running: root.busy || root.scrolled;
+        triggered => {
+            root.ticks += 1;
+            root.quiet += 1;
+            if (root.quiet >= 3 && (!root.busy || root.ticks >= 5)) {
+                root.busy = false;
+                root.scrolled = false;
+            }
+        }
+    }
+    // Embaixo de tudo: os botões não tratam a roda e ela chega aqui; a lista de jogos fica fora deste retângulo.
+    TouchArea {
+        scroll-event(e) => {
+            if (abs(e.delta-y) <= abs(e.delta-x) || abs(e.delta-y) < 2px) {
+                return reject;
+            }
+            root.quiet = 0;
+            if (root.busy) {
+                return accept;
+            }
+            if (!root.on) {
+                if (e.delta-y < 0) {
+                    root.busy = true;
+                    root.ticks = 0;
+                    root.clicked("game-more", 1);
+                }
+                return accept;
+            }
+            if ((e.delta-y < 0 && root.offset < more2.scroll-max) || (e.delta-y > 0 && root.offset > 0)) {
+                if (!root.scrolled) {
+                    root.ticks = 0;
+                }
+                root.scrolled = true;
+                root.offset = max(0px, min(more2.scroll-max, root.offset - e.delta-y));
+                return accept;
+            }
+            if (e.delta-y > 0 && !root.scrolled) {
+                root.busy = true;
+                root.ticks = 0;
+                root.clicked("game-more", 0);
+            }
+            accept
+        }
+    }
+    Rectangle {
+        y: on ? -24px : 0;
+        animate y { duration: Ui.tempo-fase; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        opacity: on ? 0 : 1;
+        animate opacity { duration: Ui.phase-fade(!on); easing: !on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
+        visible: self.opacity > 0.01;
+        @children
+        // "Mais sobre o jogo ⌄": no respiro embaixo do destaque, no centro; abre a fase 2.
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: parent.height + (small ? 0px : 2px);
+            height: small ? 16px : 24px;
+            width: hl.preferred-width;
+            border-radius: self.height / 2;
+            background: hta.has-hover ? Ui.glass-hover : transparent;
+            accessible-role: button;
+            accessible-label: more.labels[0];
+            hl := HorizontalLayout {
+                padding-left: Ui.space-12;
+                padding-right: Ui.space-8;
+                spacing: 4px;
+                Text { text: more.labels[0]; color: Ui.desk-on-muted; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
+                DeskIcon { name: "chevron-down"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+            }
+            hta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked("game-more", 1); }
+            }
+        }
+    }
+    more2 := GameMore {
+        y: on ? 0 : 24px;
+        animate y { duration: Ui.tempo-fase; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        opacity: on ? 1 : 0;
+        animate opacity { duration: Ui.phase-fade(on); easing: on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
+        visible: self.opacity > 0.01;
+        more: shown;
+        trailer: trailer;
+        small: small;
+        offset: root.offset;
+        clicked(z, i) => { root.clicked(z, i); }
+    }
+}
+
 // Ícones da linha de contagem: inverter a ordem e filtrar (com a quantidade de filtros).
 component SortFilter inherits HorizontalLayout {
     in property <bool> reversed;
@@ -1918,6 +2186,8 @@ component DeskLibrary inherits Rectangle {
     in property <[DeskGame]> games;
     in property <int> selected;
     in property <DeskGameView> game;
+    // DestaqueFases: a fase 2 do destaque (e se ela está aberta).
+    in property <DeskMore> more;
     in property <[PanelRow]> actions;
     in property <[DeskInfo]> stats;
     in property <[DeskInfo]> details;
@@ -2104,8 +2374,15 @@ component DeskLibrary inherits Rectangle {
             }
         }
         if !game.has-game: Rectangle { horizontal-stretch: 1; }
-        if game.has-game: GameStage {
+        if game.has-game: phases := GamePhases {
             horizontal-stretch: 1;
+            more: more;
+            trailer: game.trailer;
+            small: small;
+            clicked(z, i) => { root.clicked(z, i); }
+          GameStage {
+            width: phases.width;
+            height: phases.height;
             game-in: game;
             actions: actions;
             stats: stats;
@@ -2121,6 +2398,7 @@ component DeskLibrary inherits Rectangle {
             small: small;
             clicked(z, i) => { root.clicked(z, i); }
             menu(x, y) => { root.menu(x, y); }
+          }
         }
     }
 
@@ -4120,6 +4398,7 @@ export component Desktop inherits Window {
     in property <[DeskGame]> desk-games;
     in property <int> desk-selected: -1;
     in property <DeskGameView> desk-game;
+    in property <DeskMore> desk-more;
     in property <[PanelRow]> desk-actions;
     in property <[DeskInfo]> desk-stats;
     in property <[DeskInfo]> desk-details;
@@ -4322,6 +4601,7 @@ export component Desktop inherits Window {
                 games: page == "desk-library" ? desk-games : [];
                 selected: desk-selected;
                 game: desk-game;
+                more: desk-more;
                 actions: desk-actions;
                 stats: desk-stats;
                 details: desk-details;

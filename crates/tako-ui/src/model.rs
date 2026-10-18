@@ -243,6 +243,23 @@ theme_struct! {
 }
 
 theme_struct! {
+    /// DestaqueFases: a fase 2 do destaque (o que o Tako sabe do jogo além da primeira tela).
+    pub struct DeskMore {
+        // A fase 2 está aberta.
+        pub on: bool,
+        // Mais sobre o jogo, Voltar, Sobre, Detalhes, Sessões, Imagens, Trailer.
+        pub labels: Vec<String>,
+        // A descrição inteira, sem corte.
+        pub description: String,
+        pub details: Vec<DeskInfo>,
+        pub sessions_summary: String,
+        pub sessions: Vec<DeskInfo>,
+        // Capturas de tela da fonte de metadados (só com a fase aberta).
+        pub shots: Vec<Image>,
+    }
+}
+
+theme_struct! {
     /// Fileira da BibliotecaCategorias: título, quantos jogos, ícone e as capas.
     pub struct DeskCategory {
         pub title: String,
