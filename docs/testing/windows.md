@@ -207,3 +207,16 @@ Precisa de um executável que feche com erro. Crie `C:\TakoTeste\dll.bat` com `e
 4. Um jogo de verdade que feche normalmente depois de jogar: "Bem-vindo de volta", sem aviso.
 5. Um jogo aberto pela loja (Steam, Epic) que feche sozinho em poucos segundos: o aviso de antes, sem código.
 6. Em `logs\`, a linha "terminou fora do normal" traz o código em hex.
+
+## 20. Interface que fecha e reabre ao jogar (BUG-001)
+
+Diagnóstico em [`docs/bugs/BUG-001.md`](../bugs/BUG-001.md). Anote o modo (desktop ou tela cheia) em cada passo.
+
+1. Com a Steam já aberta, no desktop, jogue um jogo da Steam. Em `logs\`, a linha `acompanhando … pid: …` diz se
+   a URI devolveu processo: `Some(N)` confirma a hipótese H2a.
+2. Siga as linhas `acompanhamento de …: Waiting/Running → …` até `jogo terminou`. Se aparecer `→ Exited` com o
+   jogo ainda aberto, anote os segundos e os `processos` da linha.
+3. Repita com a Steam fechada (ela abre junto com o jogo) e com um jogo da Epic.
+4. Repita os passos 1 e 2 na tela cheia (F11). Ali a interface fecha quando o jogo aparece e reabre só no fim
+   do jogo, como prevê a ADR-0026. A linha `interface saiu: código 0 … jogo Some(…)` marca essa saída prevista.
+5. Se a interface sumir sozinha, procure `pânico (ui)` e `interface sem resposta` no log.
