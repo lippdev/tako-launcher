@@ -162,6 +162,45 @@ component FocusRing inherits Rectangle {
     }
 }
 
+// Dica do mouse (MenusEDicas): aparece 500 ms depois de parar em cima e entra em 120 ms; some ao sair. Botões só
+// de ícone e nomes cortados mostram o texto inteiro aqui.
+component Tip inherits Rectangle {
+    in property <string> text;
+    in property <bool> hovering;
+    property <bool> show;
+    changed hovering => {
+        show = false;
+        tip-timer.running = hovering && text != "";
+    }
+    tip-timer := Timer {
+        interval: 500ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            show = root.hovering;
+        }
+    }
+    // Abaixo do dono, centralizada; não captura o mouse.
+    if show: Rectangle {
+        property <bool> lit;
+        init => { lit = true; }
+        opacity: lit ? 1 : 0;
+        animate opacity { duration: Ui.tempo-texto-sai; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        x: (root.width - self.width) / 2;
+        y: root.height + 6px;
+        width: tl.preferred-width + 20px;
+        height: 28px;
+        border-radius: Ui.radius-thumb;
+        background: Ui.glass-solid;
+        border-width: 1px;
+        border-color: Ui.glass-edge-strong;
+        drop-shadow-offset-y: Ui.shadow-float-y;
+        drop-shadow-blur: Ui.shadow-float-blur;
+        drop-shadow-color: Ui.shadow-float-color;
+        tl := Text { text: root.text; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 500; }
+    }
+}
+
 // Botão do desktop: primário (sólido), perigo (texto vermelho) ou comum (translúcido). Só ícone quando sem rótulo.
 component DeskButton inherits Rectangle {
     in property <string> label;
@@ -416,6 +455,7 @@ component TopBar inherits Vidro {
                 mouse-cursor: pointer;
                 clicked => { root.clicked("desk-nav", 2); }
             }
+            Tip { text: small ? big-picture-label : ""; hovering: fta.has-hover; }
         }
     }
 }
@@ -521,6 +561,7 @@ component IconBtn inherits Rectangle {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
+    Tip { text: label; hovering: ita.has-hover; }
 }
 
 // Linha da lista (ListaDeJogos): miniatura quadrada, nome, loja de origem e, na escolhida, o ▶ redondo. Na seleção
@@ -628,6 +669,8 @@ component GameRow inherits Rectangle {
         }
         if !selected || selecting: Rectangle { width: 2px; }
     }
+    // Nome longo corta com reticências; o inteiro fica na dica.
+    Tip { text: data.title.character-count > 26 ? data.title : ""; hovering: ta.has-hover; }
 }
 
 // Lista virtualizada: só as linhas visíveis existem; rola com a roda do mouse e segue a seleção do teclado. As linhas
@@ -1245,6 +1288,7 @@ component GlassButton inherits Vidro {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
+    Tip { text: show-label ? "" : label; hovering: gta.has-hover; }
 }
 
 // Título de cartão (Poppins, `title`).
