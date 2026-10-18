@@ -428,6 +428,17 @@ fn desktop_snapshot() {
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("settings") => shell.open_route("settings"),
+            // `TAKO_SNAP_PAGE=profile` (ou `profile-sessions`, `profile-collections`): a TelaPerfil com sessões
+            // de demonstração na semana.
+            Ok(p) if p.starts_with("profile") => {
+                crate::demo::sessions(&mut shell.ctx);
+                shell.open_route(crate::shell::profile::ROUTE);
+                match p {
+                    "profile-sessions" => shell.click("profile-tab", 1),
+                    "profile-collections" => shell.click("profile-tab", 2),
+                    _ => {}
+                }
+            }
             Ok("first-run") => {
                 let layer = crate::shell::first_run::welcome(&shell.ctx);
                 shell.push_layer(Box::new(layer));
@@ -553,6 +564,13 @@ fn desktop_snapshot() {
             if let Some((zone, i)) = click.split_once(':') {
                 shell.click(zone, i.parse().unwrap_or(0));
             }
+        }
+        if let Some(t) = std::env::var("TAKO_SNAP_TEXT")
+            .ok()
+            .and_then(|t| t.parse::<f64>().ok())
+        {
+            ui.set_global_property("Ui", "text-scale", Value::Number(t / 100.))
+                .unwrap();
         }
         // Entrada do app: apagado desde o primeiro quadro, como na abertura.
         if switch.as_deref() == Some("intro") {

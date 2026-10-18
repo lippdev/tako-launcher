@@ -330,3 +330,87 @@ theme_struct! {
         pub title_pending: bool,
     }
 }
+
+theme_struct! {
+    /// TelaPerfil: uma barra do gráfico da semana (segunda a domingo).
+    pub struct DeskBar {
+        pub label: String,
+        // Só hoje tem o valor escrito.
+        pub value: String,
+        // Altura da barra, de 0 a 1 (o dia com mais tempo = 1).
+        pub fraction: f32,
+        pub today: bool,
+        // Dia que ainda não chegou (tracejado).
+        pub future: bool,
+    }
+}
+
+theme_struct! {
+    /// TelaPerfil: linha com capa (mais jogados, sessões, capas das coleções) ou cabeçalho de dia (`header`).
+    pub struct DeskEntry {
+        pub id: String,
+        pub title: String,
+        pub detail: String,
+        // Texto à direita antes do valor ("42 h no jogo").
+        pub note: String,
+        pub value: String,
+        pub thumb: Image,
+        pub accent: Color,
+        // Trilho proporcional (mais jogados), de 0 a 1.
+        pub fraction: f32,
+        // Ponto verde (jogando agora).
+        pub dot: bool,
+        pub header: bool,
+        // Guia Sessões: o índice da linha sem os cabeçalhos de dia (o que o tema manda no clique).
+        pub row: i32,
+    }
+}
+
+theme_struct! {
+    /// PerfilColecoes: um cartão de coleção (do usuário ou automática).
+    pub struct DeskCard {
+        pub title: String,
+        pub count: String,
+        pub auto: bool,
+        pub covers: Vec<DeskEntry>,
+    }
+}
+
+theme_struct! {
+    /// TelaPerfil inteira (Visão geral, Sessões e Coleções).
+    pub struct DeskProfile {
+        pub name: String,
+        pub initial: String,
+        // Linha de estado: "Perfil principal", "Jogando … · 42 min" (com `dot`), "Jogou por último hoje".
+        pub line: Vec<DeskInfo>,
+        pub playing: bool,
+        pub tabs: Vec<String>,
+        pub tab: i32,
+        // Ações em ícone: ícone e nome (o nome aparece no hover e no foco).
+        pub actions: Vec<DeskInfo>,
+        // Blocos: rótulo e valor (Tempo jogado, Mais jogado, Jogos na biblioteca).
+        pub tiles: Vec<DeskInfo>,
+        pub week_label: String,
+        pub week_total: String,
+        pub week: Vec<DeskBar>,
+        // Leitura do gráfico para o leitor de tela ("segunda 40 min, …").
+        pub week_text: String,
+        pub top: Vec<DeskEntry>,
+        pub fan: Vec<DeskEntry>,
+        pub recent_title: String,
+        pub see_all: String,
+        pub recent: Vec<DeskEntry>,
+        pub empty: String,
+        pub periods: Vec<String>,
+        pub period: i32,
+        pub summary: String,
+        pub sessions: Vec<DeskEntry>,
+        pub cards_summary: String,
+        pub cards: Vec<DeskCard>,
+        pub auto_label: String,
+        pub new_label: String,
+        pub new_text: String,
+        pub zone: String,
+        pub index: i32,
+    }
+}
