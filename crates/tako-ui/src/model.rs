@@ -233,6 +233,19 @@ theme_struct! {
         pub checked: bool,
         // Posição na lista que o tema avisa nos cliques (nas categorias, na lista achatada das fileiras).
         pub index: i32,
+        // Rótulo acessível inteiro (título, loja e, se for o caso, "não instalado" e o progresso).
+        pub label: String,
+        // "" = jogo; "section" = NÃO INSTALADOS; "group" = cabeçalho de uma loja (`index` = ordem do grupo).
+        pub kind: String,
+        // Cabeçalhos: quantos jogos; o grupo aberto.
+        pub count: String,
+        pub open: bool,
+        // Instalação pela loja em andamento: fração de 0 a 1 (negativa = a loja não informa), "42%" e os rótulos
+        // do botão "Instalar <jogo>" e do anel.
+        pub installing: bool,
+        pub progress: f32,
+        pub percent: String,
+        pub install_label: String,
     }
 }
 

@@ -33,7 +33,7 @@ import { Overlay, Overline, OverlayView, Tile } from "overlay.slint";
 export { Ui }
 
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
-struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int }
+struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int, label: string, kind: string, count: string, open: bool, installing: bool, progress: float, percent: string, install-label: string }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
 struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string, play-status: string, play-status-label: string }
 struct CoverRow { current: image, has-current: bool, proposed: image, has-proposed: bool, current-label: string, level: int, confidence: string, reason: string, accept: string, other: string }
@@ -813,6 +813,90 @@ component IconBtn inherits Rectangle {
     Tip { text: label; hovering: ita.has-hover; }
 }
 
+// Anel de progresso da instalação (NaoInstalados): trilha fraca e o arco da fração; a loja que não informa a
+// fração (negativa) mostra um arco girando, parado com "reduzir animações".
+component ProgressRing inherits Rectangle {
+    in property <length> size: 36px;
+    in property <length> thickness: 3.5px;
+    in property <float> fraction: -1;
+    in property <color> tint: Ui.on-accent;
+    in property <color> track: #ffffff26;
+    width: size;
+    height: size;
+    property <float> box: size / 1px;
+    property <float> r: box / 2 - thickness / 2px;
+    property <angle> sweep: (fraction < 0 ? 0.25 : min(max(fraction, 0.01), 0.999)) * 360deg;
+    Rectangle {
+        border-radius: parent.width / 2;
+        border-width: root.thickness;
+        border-color: root.track;
+    }
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: root.box;
+        viewbox-height: root.box;
+        commands: "M " + root.box / 2 + " " + (root.box / 2 - root.r) + " A " + root.r + " " + root.r + " 0 " + (root.sweep > 180deg ? "1" : "0") + " 1 " + (root.box / 2 + root.r * Math.sin(root.sweep)) + " " + (root.box / 2 - root.r * Math.cos(root.sweep));
+        stroke: root.tint;
+        stroke-width: root.thickness;
+        fill: transparent;
+        transform-rotation: fraction < 0 && !Ui.reduce-motion ? animation-tick() / 900ms * 360deg : 0deg;
+    }
+}
+
+// Cabeçalho de uma loja na seção NÃO INSTALADOS (lista e grade): ícone, nome, quantos jogos e ⌄ (aberto) ou › (fechado).
+component StoreGroup inherits Rectangle {
+    in property <string> icon;
+    in property <string> title;
+    in property <string> count;
+    in property <string> label;
+    in property <bool> open;
+    in property <bool> focused;
+    callback clicked();
+    height: 36px;
+    border-radius: Ui.radius-control - 4px;
+    background: ta.has-hover ? Ui.glass-hover : transparent;
+    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    accessible-role: button;
+    accessible-label: label;
+    accessible-expandable: true;
+    accessible-expanded: open;
+    accessible-action-default => { root.clicked(); }
+    if focused: FocusRing { radius: root.border-radius; }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 10px;
+        spacing: 10px;
+        DeskIcon { name: icon; size: 16px; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+        Text { text: title; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
+        Text { text: count; color: Ui.on-accent-subtle; font-size: 13px * Ui.text-scale; vertical-alignment: center; }
+        Rectangle { horizontal-stretch: 1; }
+        DeskIcon { name: open ? "chevron-down" : "chevron"; size: 16px; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Divisória NÃO INSTALADOS: linha de 1 em `divider` e, embaixo, o overline com o total.
+component NotInstalledTitle inherits Rectangle {
+    in property <string> title;
+    in property <string> count;
+    accessible-role: text;
+    accessible-label: title + " " + count;
+    Rectangle { x: 8px; y: 14px; width: parent.width - 16px; height: 1px; background: Ui.divider; }
+    HorizontalLayout {
+        x: 8px;
+        y: 14px + 1px + 12px;
+        height: 16px * Ui.text-scale;
+        spacing: 8px;
+        alignment: start;
+        Text { text: title; color: Ui.on-accent-subtle; font-size: Ui.desk-overline; font-weight: 700; letter-spacing: 0.08 * self.font-size; vertical-alignment: center; }
+        Text { text: count; color: Ui.on-accent-subtle; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
+    }
+}
+
 // Linha da lista (ListaDeJogos): miniatura quadrada, nome, loja de origem e, na escolhida, o ▶ redondo. Na seleção
 // múltipla, a caixa redonda à esquerda; Ctrl e Shift no clique marcam.
 component GameRow inherits Rectangle {
@@ -825,13 +909,16 @@ component GameRow inherits Rectangle {
     callback toggle();
     callback range();
     callback play();
+    callback install();
     callback menu(length, length);
     property <bool> picked: selecting ? data.checked : selected;
+    // Em cima do ⬇ o mouse sai da linha para o botão: ele conta como a linha, senão o ⬇ some sob o cursor.
+    property <bool> hot: ta.has-hover || ita.has-hover;
     border-radius: Ui.radius-row;
-    background: !picked && ta.has-hover ? Ui.glass-hover : transparent;
+    background: !picked && hot ? Ui.glass-hover : transparent;
     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
     accessible-role: list-item;
-    accessible-label: data.title + " · " + data.store-name;
+    accessible-label: data.label;
     if picked: Selected { lifted: true; }
     if focused: FocusRing { }
     ta := TouchArea {
@@ -877,6 +964,7 @@ component GameRow inherits Rectangle {
             height: self.width;
             border-radius: Ui.radius-thumb;
             clip: true;
+            opacity: data.installed ? 1 : 0.5;
             // Sem capa: tons fechados da cor do jogo, nunca a cor pura.
             background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.55) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
             // O quadrado do topo da capa (CapaDoJogo), não o meio.
@@ -884,7 +972,7 @@ component GameRow inherits Rectangle {
         }
         nt := Text {
             text: data.title;
-            color: data.installed ? Ui.on-accent : Ui.desk-on-muted;
+            color: data.installed ? Ui.on-accent : Ui.on-accent-muted;
             font-size: Ui.desk-label;
             font-weight: picked ? 600 : 500;
             vertical-alignment: center;
@@ -901,7 +989,39 @@ component GameRow inherits Rectangle {
         // Vaga fixa do ▶: a linha escolhida não empurra nada (FIX-004). A loja fica no destaque.
         Rectangle {
             width: 36px;
-            if selected && !selecting: Rectangle {
+            // NaoInstalados: o ⬇ no lugar do ▶ (no mouse em cima e na linha escolhida) e, baixando, o anel.
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                visible: data.install-label != "" && !data.installing && !selecting;
+                opacity: hot || selected ? 1 : 0;
+                animate opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                background: ita.has-hover ? Ui.glass-edge-strong : Ui.glass-pressed;
+                border-width: 1px;
+                border-color: Ui.glass-edge-strong;
+                animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                accessible-role: button;
+                accessible-label: data.install-label;
+                accessible-action-default => { root.install(); }
+                DeskIcon { name: "download"; size: 18px; tint: Ui.on-accent; }
+                ita := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.install(); }
+                }
+            }
+            if data.installing && !selecting: ProgressRing {
+                y: (parent.height - self.height) / 2;
+                size: 36px;
+                fraction: data.progress;
+                accessible-role: progress-indicator;
+                accessible-label: data.install-label;
+                accessible-value: data.percent;
+                accessible-value-minimum: 0;
+                accessible-value-maximum: 100;
+            }
+            if selected && !selecting && data.install-label == "": Rectangle {
             y: (parent.height - self.height) / 2;
             width: 36px;
             height: 36px;
@@ -953,7 +1073,9 @@ component GameList inherits Rectangle {
     // Sem `clip` aqui: o Flickable já recorta as linhas e a barra de rolagem fica fora, na borda do painel.
     fl := Flickable {
         viewport-height: games.length * row-h;
-        for k in slots: GameRow {
+        // A vaga serve a jogo, divisória e cabeçalho de loja: todos com a mesma altura, então a conta de posição, as
+        // vagas fixas e a rolagem seguem iguais.
+        for k in slots: Rectangle {
             // `want` muda em todas as vagas a cada linha rolada; `r` só na que trocou de linha (o `changed` corta a
             // propagação), então só ela refaz `data` e o que depende dele.
             property <int> want: first + mod(k - first, slots);
@@ -965,18 +1087,40 @@ component GameList inherits Rectangle {
             y: r * row-h;
             width: fl.width;
             height: row-h - 6px;
-            thumb: compact ? 32px : Ui.thumb-size;
-            data: games[r];
-            selected: r == root.selected;
-            focused: key-focus && r == root.selected;
-            selecting: root.selecting;
-            clicked => { root.clicked("game", r); }
-            toggle => { root.clicked("game-toggle", r); }
-            range => { root.clicked("game-range", r); }
-            play => { root.clicked("game-play", r); }
-            menu(x, y) => {
-                root.menu(x, y);
-                root.clicked("game-menu", r);
+            if r < games.length && games[r].kind == "": GameRow {
+                width: parent.width;
+                height: parent.height;
+                thumb: compact ? 32px : Ui.thumb-size;
+                data: games[parent.r];
+                selected: parent.r == root.selected;
+                focused: key-focus && parent.r == root.selected;
+                selecting: root.selecting;
+                clicked => { root.clicked("game", games[parent.r].index); }
+                toggle => { root.clicked("game-toggle", games[parent.r].index); }
+                range => { root.clicked("game-range", games[parent.r].index); }
+                play => { root.clicked("game-play", games[parent.r].index); }
+                install => { root.clicked("game-play", games[parent.r].index); }
+                menu(x, y) => {
+                    root.menu(x, y);
+                    root.clicked("game-menu", games[parent.r].index);
+                }
+            }
+            if r < games.length && games[r].kind == "section": NotInstalledTitle {
+                width: parent.width;
+                height: parent.height;
+                title: games[parent.r].title;
+                count: games[parent.r].count;
+            }
+            if r < games.length && games[r].kind == "group": StoreGroup {
+                y: (parent.height - self.height) / 2;
+                width: parent.width;
+                icon: games[parent.r].store-icon;
+                title: games[parent.r].title;
+                count: games[parent.r].count;
+                label: games[parent.r].label;
+                open: games[parent.r].open;
+                focused: key-focus && parent.r == root.selected;
+                clicked => { root.clicked("group", games[parent.r].index); }
             }
         }
     }
