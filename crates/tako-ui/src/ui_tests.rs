@@ -399,8 +399,18 @@ fn desktop_snapshot() {
         ctx.library.refresh();
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
-        if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("settings") {
-            shell.open_route("settings");
+        match std::env::var("TAKO_SNAP_PAGE").as_deref() {
+            Ok("settings") => shell.open_route("settings"),
+            Ok("first-run") => {
+                let layer = crate::shell::first_run::welcome(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("ask") => {
+                shell.ctx.pads_connected = 1;
+                shell.ask_big_picture = true;
+                crate::shell::desktop::ask_big_picture(&mut shell, std::time::Duration::ZERO);
+            }
+            _ => {}
         }
         // `TAKO_SNAP_CLICK=zona:índice,…`: cliques antes da captura (ex.: `desk-brand:0`, `game:3`).
         for click in std::env::var("TAKO_SNAP_CLICK").unwrap_or_default().split(',') {

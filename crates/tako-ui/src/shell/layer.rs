@@ -109,6 +109,8 @@ pub struct MenuLayer {
     /// O que B faz além de fechar (ex.: devolver o foco a quem abriu).
     pub on_back: Option<Action>,
     pub accept_label: Option<String>,
+    /// Indicador de passos de um assistente (nomes e o atual); o desktop desenha, a tela cheia usa a etiqueta.
+    pub steps: (Vec<String>, usize),
 }
 
 impl MenuLayer {
@@ -127,6 +129,7 @@ impl MenuLayer {
             focus: usize::MAX,
             on_back: None,
             accept_label: None,
+            steps: (Vec::new(), 0),
         }
     }
 
@@ -155,6 +158,11 @@ impl MenuLayer {
 
     pub fn overline(mut self, t: impl Into<String>) -> Self {
         self.overline = t.into();
+        self
+    }
+
+    pub fn steps(mut self, names: Vec<String>, current: usize) -> Self {
+        self.steps = (names, current);
         self
     }
 
@@ -263,6 +271,8 @@ impl Layer for MenuLayer {
             rows: items.into_iter().map(|i| i.row).collect(),
             sel: focus,
             wide: self.wide,
+            tabs: self.steps.0.clone(),
+            tab: self.steps.1 as i32,
             ..Default::default()
         }
     }

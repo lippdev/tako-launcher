@@ -54,6 +54,14 @@ fn step(
             &[("n", &n.to_string()), ("total", &STEPS.to_string())],
         ))
         .text(ctx.t(text))
+        .steps(
+            vec![
+                ctx.t("first_run.welcome_short"),
+                ctx.t("first_run.stores"),
+                ctx.t("first_run.metadata"),
+            ],
+            n - 1,
+        )
         .wide()
 }
 

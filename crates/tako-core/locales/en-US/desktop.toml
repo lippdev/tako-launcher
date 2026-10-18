@@ -42,7 +42,8 @@ quit_key = "Alt + F4"
 
 [desktop.ask]
 title = "Controller connected"
-text = "Do you want to use Tako in full screen? It's made for controllers and TVs. You can switch any time with the Full screen button (F11) or in Settings."
+question = "Use Tako in full screen?"
+text = "It's made for controllers and TVs. You can switch any time with the Full screen button (F11) or in Settings."
 go = "Go to full screen"
 stay = "Stay on the desktop"
 never = "Don't ask again"

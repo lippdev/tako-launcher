@@ -1514,8 +1514,8 @@ pub fn ask_big_picture(shell: &mut super::Shell, since_start: std::time::Duratio
 pub fn question(ctx: &Ctx) -> super::layer::MenuLayer {
     use super::layer::{Flow, MenuItem, MenuLayer};
     use crate::mode::{ASK_SETTING, UiMode};
-    MenuLayer::dialog(ctx.t("desktop.ask.title"), |ctx| {
-        let mut go = PanelRow::button("go", ctx.t("desktop.ask.go")).icon("gamepad");
+    MenuLayer::dialog(ctx.t("desktop.ask.question"), |ctx| {
+        let mut go = PanelRow::button("go", ctx.t("desktop.ask.go")).icon("tv");
         go.style = "primary".into();
         vec![
             MenuItem::new(go).on(|ctx| {
@@ -1523,12 +1523,14 @@ pub fn question(ctx: &Ctx) -> super::layer::MenuLayer {
                 Flow::Close
             }),
             MenuItem::new(PanelRow::button("stay", ctx.t("desktop.ask.stay"))).on(|_| Flow::Close),
-            MenuItem::new(PanelRow::button("never", ctx.t("desktop.ask.never"))).on(|ctx| {
+            // Opção solta, sem caixa: marcar fecha e não pergunta mais.
+            MenuItem::new(PanelRow::check("never", ctx.t("desktop.ask.never"), false)).on(|ctx| {
                 ctx.settings.set_bool(ASK_SETTING, false);
                 Flow::Close
             }),
         ]
     })
+    .overline(ctx.t("desktop.ask.title").to_uppercase())
     .text(ctx.t("desktop.ask.text"))
 }
 

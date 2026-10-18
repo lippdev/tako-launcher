@@ -42,7 +42,8 @@ quit_key = "Alt + F4"
 
 [desktop.ask]
 title = "Controle conectado"
-text = "Quer usar o Tako em tela cheia? Ela é feita para o controle e a TV. Dá para trocar quando quiser pelo botão Tela cheia (F11) ou em Configurações."
+question = "Quer usar o Tako em tela cheia?"
+text = "Ela é feita para o controle e a TV. Dá para trocar quando quiser pelo botão Tela cheia (F11) ou em Configurações."
 go = "Ir para a tela cheia"
 stay = "Continuar no desktop"
 never = "Não perguntar de novo"

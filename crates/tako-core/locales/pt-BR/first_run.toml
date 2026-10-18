@@ -1,6 +1,7 @@
 [first_run]
 step = "PRIMEIROS PASSOS · {n} DE {total}"
 welcome = "Boas-vindas ao Tako"
+welcome_short = "Boas-vindas"
 welcome_text = "Três passos rápidos para deixar a biblioteca pronta. Tudo dá para mudar depois em Configurações. Primeiro, o idioma:"
 stores = "Lojas"
 stores_text = "O Tako lê os jogos instalados destas lojas. Desligue as que você não usa."
