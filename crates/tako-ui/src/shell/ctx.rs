@@ -275,6 +275,9 @@ pub struct Ctx {
     pub launch_since: Option<Instant>,
     /// Saindo para o jogo: a interface some aos poucos antes de fechar.
     pub leaving: bool,
+    /// Entrada do app (BRAND-002) na tela: cobre a primeira tela, que já está pronta por baixo. Acaba no tempo
+    /// (`INTRO_HOLD`) ou na primeira entrada do usuário, que só pula e não age.
+    pub intro: bool,
     /// Até quando a janela fica por cima de tudo em "Abrindo…" (esconde as janelas de inicialização do jogo).
     pub launch_on_top_until: Option<Instant>,
     /// A janela está por cima de tudo agora (o que foi aplicado no SO).

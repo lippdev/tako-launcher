@@ -103,6 +103,7 @@ import { Tile, HomeRow, NavItem, Hero, Stat, Details, Overlay, Key } from "@tako
 | `hints` | `[Hint]` | Dicas da barra de baixo (glifo do botão e texto), em ordem. |
 | `transparent-background` | `bool` | A janela está por cima do jogo: desenhe só o necessário, com fundo transparente. |
 | `leaving` | `bool` | Saindo para o jogo: o Tako fecha depois de `Ui.leave-time`. Ideal para um fade. |
+| `intro` | `bool` | Entrada do app: verdadeiro por cerca de 1 s só na abertura, com a primeira tela já pronta por baixo. Cubra-a com uma animação curta e apague ao virar falso. Qualquer tecla, botão ou clique do usuário acaba a entrada (o Tako avisa com o clique `intro`) e nunca fica verdadeiro com "Reduzir animações". |
 
 ### 4.2 Barra lateral
 

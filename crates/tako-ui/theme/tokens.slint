@@ -213,6 +213,14 @@ export global Ui {
         return reduce-motion ? 0ms : step * 70ms;
     }
     out property <length> intro-rise: 12px;
+    // Entrada da tela cheia (BRAND-002): cada tentáculo chega em 450 e o véu sai em 200. Com "Reduzir animações" a
+    // entrada nem aparece (o Tako não liga `intro`); os zeros só garantem que nada anime.
+    out property <duration> tempo-intro-polvo: reduce-motion ? 0ms : 450ms;
+    out property <duration> tempo-intro-sai: reduce-motion ? 0ms : 200ms;
+    // O véu aparece de uma vez (cobre a primeira tela no 1º quadro) e só a saída anima.
+    public pure function intro-fade(on: bool) -> duration {
+        return on ? 0ms : tempo-intro-sai;
+    }
     // TelaCarregamento: cada tentáculo chega em 1 s (ease-out-back); com "Reduzir animações", o polvo já vem pronto.
     out property <duration> tempo-tentaculo: reduce-motion ? 0ms : 1000ms;
     // Escala: com "Reduzir animações" tudo fica em 1.

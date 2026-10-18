@@ -209,6 +209,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         launching: false,
         launch_since: None,
         leaving: false,
+        intro: false,
         launch_on_top_until: None,
         window_on_top: false,
         move_window: None,
@@ -515,6 +516,8 @@ impl App {
             && mode == UiMode::Desktop
             && plain_start
             && shell.ctx.settings.bool(crate::mode::ASK_SETTING, true);
+        // Entrada do app (BRAND-002): só na abertura em tela cheia; a volta do desktop não repete.
+        shell.ctx.intro = shell.wants_intro(mode == UiMode::BigPicture, plain_start);
         let shell = Rc::new(RefCell::new(shell));
         crate::tasks::attach(&shell);
         crate::metadata::start_metadata(&shell);
@@ -1167,8 +1170,23 @@ impl App {
             None => ui.show().map_err(|e| e.to_string())?,
         }
         drop(ui);
+        self.end_intro_later();
         rescan(&self.shell, true); // ao abrir: a lista de não instalados da Steam vem fresca
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
+    }
+
+    /// A entrada do app (BRAND-002) acaba sozinha depois de `INTRO_HOLD`, sem esperar nada: a primeira tela já está
+    /// pronta por baixo.
+    fn end_intro_later(&self) {
+        if !self.shell.borrow().ctx.intro {
+            return;
+        }
+        let app = self.clone();
+        slint::Timer::single_shot(Shell::INTRO_HOLD, move || {
+            if app.shell.borrow_mut().end_intro() {
+                app.redraw();
+            }
+        });
     }
 
     /// Abertura no desktop com a biblioteca vazia (nada lido ainda), fora da simulação e da volta de um jogo.

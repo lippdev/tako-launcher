@@ -708,6 +708,23 @@ export component ControlCenter inherits Rectangle {
     }
 }
 
+// Um tentáculo da entrada do app: a camada inteira do polvo, chegando girando a partir da base do corpo (como na
+// TelaCarregamento, que tem o mesmo desenho; aqui a janela é a principal).
+component IntroTentacle inherits Rectangle {
+    in property <image> source;
+    in property <bool> arrived;
+    // -1 esquerda, 1 direita, 0 os da frente (só crescem).
+    in property <int> side;
+    // Atraso da chegada, para os tentáculos não chegarem juntos.
+    in property <duration> wait;
+    opacity: arrived ? 1 : 0;
+    transform-origin: { x: self.width * 0.5, y: self.height * 0.41 };
+    transform-rotation: arrived ? 0deg : side * 40deg;
+    transform-scale: arrived ? 1 : 0.6;
+    animate opacity, transform-rotation, transform-scale { duration: Ui.tempo-intro-polvo; delay: root.wait; easing: cubic-bezier(0.34, 1.56, 0.64, 1); }
+    Image { width: parent.width; height: parent.height; source: root.source; }
+}
+
 export component App inherits Window {
     // Geral.
     in property <string> page: "home";
@@ -721,6 +738,9 @@ export component App inherits Window {
     in property <bool> transparent-background;
     // A janela do jogo apareceu: "Abrindo…" some aos poucos.
     in property <bool> leaving;
+    // Entrada do app (BRAND-002): o polvo se monta por cima da primeira tela, que já está pronta por baixo. Some
+    // sozinha em cerca de 1 s ou quando o usuário aperta qualquer coisa. Nunca liga com "Reduzir animações".
+    in property <bool> intro;
 
     // Barra lateral.
     in property <[NavItem]> sidebar;
@@ -927,6 +947,37 @@ export component App inherits Window {
         drop-shadow-blur: 24 * Ui.u;
         drop-shadow-color: #00000066;
         tt := Text { text: toast; color: Ui.on-surface-solid; font-size: Ui.label-lg; font-weight: 600; font-family: Ui.font-text; }
+    }
+
+    // Entrada do app: começa montada no 1º quadro (sem esperar nada) e os tentáculos chegam logo depois.
+    property <bool> intro-play;
+    Timer {
+        interval: 16ms;
+        running: root.intro && !root.intro-play;
+        triggered => { root.intro-play = true; }
+    }
+    Rectangle {
+        visible: root.intro || self.opacity > 0;
+        background: Ui.splash-bg;
+        opacity: root.intro ? 1 : 0;
+        animate opacity { duration: Ui.intro-fade(root.intro); easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        accessible-role: image;
+        accessible-label: "Tako";
+        TouchArea { clicked => { root.clicked("intro", 0); } }
+        Rectangle {
+            height: root.height * 0.5;
+            width: self.height * 704 / 802;
+            x: (root.width - self.width) / 2;
+            y: (root.height - self.height) / 2;
+            Image { width: parent.width; height: parent.height; source: @image-url("splash/splash-base.png"); }
+            IntroTentacle { source: @image-url("splash/splash-t1.png"); arrived: root.intro-play; side: -1; wait: 0ms; }
+            IntroTentacle { source: @image-url("splash/splash-t2.png"); arrived: root.intro-play; side: 1; wait: 40ms; }
+            IntroTentacle { source: @image-url("splash/splash-t3.png"); arrived: root.intro-play; side: -1; wait: 80ms; }
+            IntroTentacle { source: @image-url("splash/splash-t4.png"); arrived: root.intro-play; side: 1; wait: 120ms; }
+            IntroTentacle { source: @image-url("splash/splash-t5.png"); arrived: root.intro-play; side: -1; wait: 160ms; }
+            IntroTentacle { source: @image-url("splash/splash-t6.png"); arrived: root.intro-play; side: 1; wait: 200ms; }
+            IntroTentacle { source: @image-url("splash/splash-t7.png"); arrived: root.intro-play; side: 0; wait: 240ms; }
+        }
     }
 
     // Teclado físico: o Tako decide o que cada tecla faz.
