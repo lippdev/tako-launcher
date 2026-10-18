@@ -13,6 +13,7 @@ tako-platform.workspace = true
 tako-sources.workspace = true
 slint.workspace = true
 slint-interpreter.workspace = true
+i-slint-core.workspace = true
 toml.workspace = true
 sdl3.workspace = true
 tracing.workspace = true

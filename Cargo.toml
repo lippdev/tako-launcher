@@ -39,6 +39,8 @@ tempfile = "3"
 insta = "1"
 slint = { version = "1.18.1", default-features = false, features = ["std", "compat-1-2", "unstable-winit-030"] }
 slint-interpreter = { version = "1.18.1", default-features = false, features = ["backend-default", "renderer-femtovg", "renderer-software", "compat-1-2"] }
+# Só para dar chave de cache às imagens decodificadas (images::shared); o slint fixa esta mesma versão exata.
+i-slint-core = { version = "=1.18.1", default-features = false }
 roxmltree = "0.21"
 rfd = "0.15.4"
 libc = "0.2"
