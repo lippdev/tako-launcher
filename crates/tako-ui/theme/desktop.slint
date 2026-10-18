@@ -481,10 +481,10 @@ component TopBar inherits Vidro {
                 padding-right: 10px;
                 spacing: 4px;
                 Image {
-                    // Cópia em 2× (198 × 92) da logo horizontal: a exibida em 46px de altura ficava serrilhada.
+                    // Logo horizontal em 2× (237 × 92) do design: exibida em 46px de altura (38 na janela pequena) sem serrilhado.
                     source: @image-url("tako-logo-brand.png");
                     height: small ? 38px : 46px;
-                    width: self.height * 1842 / 854;
+                    width: self.height * 237 / 92;
                     y: (parent.height - self.height) / 2;
                     image-fit: contain;
                     // Hover: leve aumento e brilho; com "Reduzir animações" a escala fica em 1.
@@ -1332,7 +1332,7 @@ component StorePill inherits Rectangle {
     sl := HorizontalLayout {
         padding-left: Ui.space-12;
         padding-right: Ui.space-12;
-        spacing: 7px;
+        spacing: 6px;
         DeskIcon { name: icon; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
         Text { text: root.text; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
     }
