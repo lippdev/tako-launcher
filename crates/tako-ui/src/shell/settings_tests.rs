@@ -1631,7 +1631,10 @@ fn console_mode_row_displays_status_and_triggers_check() {
     assert_eq!(cm_row.row.style, "error");
 
     // 5. Ação de verificar de novo
-    assert_eq!(cm_row.row.action, ctx.t("settings.integrations.console_mode_check_again"));
+    assert_eq!(
+        cm_row.row.action,
+        ctx.t("settings.integrations.console_mode_check_again")
+    );
     let flow = accept(&mut ctx, &cm_row);
     assert!(matches!(flow, Flow::Stay));
 }
@@ -1649,7 +1652,10 @@ fn console_mode_row_displays_checking_when_verifying() {
         ctx.t("settings.integrations.console_mode_checking")
     );
     assert!(!cm_row.row.enabled);
-    assert_eq!(cm_row.row.action, ctx.t("settings.integrations.console_mode_check_again"));
+    assert_eq!(
+        cm_row.row.action,
+        ctx.t("settings.integrations.console_mode_check_again")
+    );
     super::integrations::set_checking_for_test(false);
 }
 
