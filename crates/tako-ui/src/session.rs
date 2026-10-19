@@ -144,11 +144,16 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         .map(str::trim)
         .filter(|r| !r.is_empty());
     let wine_config = if (cfg!(target_os = "linux") || cfg!(test))
+        && !tako_platform::sunshine::is_flatpak()
         && is_manual
         && is_windows_exe
         && let Some(runner) = runner
     {
-        let detected = tako_platform::linux_compatibility::detect_runtimes();
+        let detected = if runner == "system-wine" {
+            Vec::new()
+        } else {
+            tako_platform::linux_compatibility::detect_runtimes()
+        };
         let runtime = tako_platform::linux_compatibility::resolve_runtime(runner, &detected)
             .ok_or_else(|| {
                 let msg = ctx.tf("session.runtime_not_found", &[("runtime", runner)]);

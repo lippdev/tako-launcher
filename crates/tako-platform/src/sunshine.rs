@@ -2,6 +2,9 @@
 
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+
+static EXPORT_LOCK: Mutex<()> = Mutex::new(());
 
 const MARKER: &str = "[Tako] ";
 const MAX_APPS_JSON: u64 = 4 * 1024 * 1024;
@@ -65,7 +68,14 @@ pub struct Detection {
 
 /// Identifica se o processo está em uma sandbox Flatpak.
 pub fn is_flatpak() -> bool {
-    std::env::var_os("FLATPAK_ID").is_some() || Path::new("/.flatpak-info").exists()
+    is_flatpak_state(
+        std::env::var_os("FLATPAK_ID").is_some(),
+        Path::new("/.flatpak-info").exists(),
+    )
+}
+
+fn is_flatpak_state(flatpak_id_present: bool, flatpak_info_exists: bool) -> bool {
+    flatpak_id_present || flatpak_info_exists
 }
 
 /// Caminho ou comando de execução do Tako para registrar no Sunshine.
@@ -362,6 +372,9 @@ fn is_tako_entry(value: &Value) -> bool {
 
 /// Faz backup sem substituir uma cópia anterior e grava apenas depois da validação do documento inteiro.
 pub fn export(path: &Path, entries: &[Value]) -> Result<PathBuf, SunshineError> {
+    let _guard = EXPORT_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let bytes = if path.exists() {
         let metadata = std::fs::metadata(path).map_err(|e| {
             if e.kind() == std::io::ErrorKind::PermissionDenied {
@@ -537,15 +550,9 @@ mod tests {
 
     #[test]
     fn flatpak_detection_and_executable() {
-        // SAFETY: teste isolado para validar detecção e executável em Flatpak
-        unsafe { std::env::set_var("FLATPAK_ID", "io.github.lippdev.Tako") };
-        assert!(is_flatpak());
-        assert_eq!(
-            tako_executable().unwrap(),
-            "flatpak run io.github.lippdev.Tako"
-        );
-        // SAFETY: restaura o ambiente após o teste
-        unsafe { std::env::remove_var("FLATPAK_ID") };
+        assert!(is_flatpak_state(true, false));
+        assert!(is_flatpak_state(false, true));
+        assert!(!is_flatpak_state(false, false));
     }
 
     #[test]

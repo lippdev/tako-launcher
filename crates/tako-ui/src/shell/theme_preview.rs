@@ -579,6 +579,29 @@ mod tests {
     }
 
     #[test]
+    fn builtin_extra_themes_can_preview_overrides() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = setup();
+        let draft = tako_themes::overrides::ThemeTokensOverride {
+            accent: Some("#E3161E".into()),
+            ..Default::default()
+        };
+
+        for id in tako_themes::BUILTIN_EXTRA_THEME_IDS {
+            ctx.effects.clear();
+            let flow = start_override(&mut ctx, Some(id), draft.clone());
+            assert!(matches!(flow, Flow::Replace(_)));
+            assert_eq!(ctx.theme_preview.as_ref().unwrap().id.as_deref(), Some(id));
+            assert_eq!(
+                ctx.theme_preview.as_ref().unwrap().draft_override,
+                Some(draft.clone())
+            );
+            assert!(matches!(ctx.effects.last(), Some(Effect::ApplyTheme(theme)) if theme == id));
+            ctx.theme_preview = None;
+        }
+    }
+
+    #[test]
     fn previewing_theme_override_timeout_returns_to_edit_panel_and_preserves_draft() {
         let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_d, ctx) = setup();

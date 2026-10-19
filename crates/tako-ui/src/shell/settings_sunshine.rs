@@ -11,6 +11,7 @@ use tako_platform::sunshine::{self, App, SunshineError};
 thread_local! {
     static CACHED_DETECTION: RefCell<Option<(Instant, sunshine::Detection)>> = const { RefCell::new(None) };
     static CHECKING: Cell<bool> = const { Cell::new(false) };
+    static SYNC_ERROR_SHOWN: Cell<bool> = const { Cell::new(false) };
 }
 
 pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
@@ -139,6 +140,7 @@ fn apps(ctx: &Ctx) -> Result<Vec<sunshine::App>, SunshineError> {
         .library
         .games()
         .iter()
+        .filter(|game| game.is_installed)
         .map(|game| App {
             id: game.id.clone(),
             title: game.title.clone(),
@@ -252,26 +254,31 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
                     ctx.t("settings.system.sunshine_confirm"),
                 ))
                 .on(move |ctx| {
-                    match export(ctx, &all_apps) {
-                        Ok((backup, skipped)) => {
-                            if enable_sync {
-                                ctx.settings.set_bool(keys::SUNSHINE_SYNC, true);
+                    let apps = all_apps.clone();
+                    crate::tasks::run(
+                        ctx,
+                        move || export(&apps),
+                        move |ctx, result| match result {
+                            Ok((backup, skipped)) => {
+                                if enable_sync {
+                                    ctx.settings.set_bool(keys::SUNSHINE_SYNC, true);
+                                }
+                                let path = backup.display().to_string();
+                                let exported =
+                                    ctx.tf("settings.system.sunshine_exported", &[("path", &path)]);
+                                if skipped > 0 {
+                                    let skipped_msg = ctx.tf(
+                                        "settings.system.sunshine_skipped_games",
+                                        &[("count", &skipped.to_string())],
+                                    );
+                                    ctx.toast(format!("{exported} · {skipped_msg}"));
+                                } else {
+                                    ctx.toast(exported);
+                                }
                             }
-                            let path = backup.display().to_string();
-                            let exported =
-                                ctx.tf("settings.system.sunshine_exported", &[("path", &path)]);
-                            if skipped > 0 {
-                                let skipped_msg = ctx.tf(
-                                    "settings.system.sunshine_skipped_games",
-                                    &[("count", &skipped.to_string())],
-                                );
-                                ctx.toast(format!("{exported} · {skipped_msg}"));
-                            } else {
-                                ctx.toast(exported);
-                            }
-                        }
-                        Err(error) => ctx.toast(format_sunshine_error(ctx, &error)),
-                    }
+                            Err(error) => ctx.toast(format_sunshine_error(ctx, &error)),
+                        },
+                    );
                     Flow::Close
                 }),
             ]
@@ -281,7 +288,7 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
     .wide()
 }
 
-fn export(_ctx: &mut Ctx, apps: &[App]) -> Result<(PathBuf, usize), SunshineError> {
+fn export(apps: &[App]) -> Result<(PathBuf, usize), SunshineError> {
     let path = sunshine::find_apps_json().ok_or(SunshineError::SunshineFolderMissing)?;
     let (entries, skipped) = collect_entries(apps, Some(&path));
     let backup = sunshine::export(&path, &entries)?;
@@ -313,7 +320,11 @@ pub(crate) fn sync_after_rescan(ctx: &mut Ctx) {
             }
             Err(e) => {
                 tracing::warn!("não foi possível sincronizar os apps do Sunshine: {e}");
-                ctx.toast(format_sunshine_error(ctx, &e));
+                SYNC_ERROR_SHOWN.with(|shown| {
+                    if !shown.replace(true) {
+                        ctx.toast(format_sunshine_error(ctx, &e));
+                    }
+                });
             }
         },
     );

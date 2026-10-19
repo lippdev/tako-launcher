@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 pub const TEXT_SIZE: &str = "TextSizePercent";
 pub const SOUND_VOLUME: &str = "NavigationSoundVolume";
 pub const TEXT_SIZES: [i32; 3] = [100, 110, 125];
+const MAX_DECODED_MUSIC_BYTES: usize = 128 * 1024 * 1024;
 
 pub const THEME_MUSIC_VOLUME: &str = "ThemeMusicVolume";
 pub const THEME_MUSIC_ENABLED: &str = "ThemeMusicEnabled";
@@ -258,7 +259,8 @@ fn load_wav_samples(path: &Path) -> Option<Vec<f32>> {
     if bytes.is_empty() || bytes.len() > tako_themes::MAX_THEME_MUSIC_BYTES as usize {
         return None;
     }
-    decode_wav_to_mono_48k(&bytes)
+    let samples = decode_wav_to_mono_48k(&bytes)?;
+    Some(samples)
 }
 
 thread_local! {
@@ -354,6 +356,10 @@ pub struct DecodedMusic {
     pub buffer: Arc<[u8]>,
 }
 
+fn decoded_music_size_allowed(size: usize) -> bool {
+    size <= MAX_DECODED_MUSIC_BYTES
+}
+
 fn load_music_file(path: &Path) -> Result<DecodedMusic, String> {
     let meta = std::fs::metadata(path).map_err(|e| e.to_string())?;
     if meta.len() == 0 {
@@ -366,6 +372,12 @@ fn load_music_file(path: &Path) -> Result<DecodedMusic, String> {
         ));
     }
     let wav = AudioSpecWAV::load_wav(path).map_err(|e| e.to_string())?;
+    if !decoded_music_size_allowed(wav.buffer().len()) {
+        return Err(format!(
+            "música decodificada excede limite de {} MB",
+            MAX_DECODED_MUSIC_BYTES / (1024 * 1024)
+        ));
+    }
     let buffer: Arc<[u8]> = Arc::from(wav.buffer());
     Ok(DecodedMusic {
         freq: wav.freq,
@@ -985,6 +997,12 @@ mod tests {
 
         // 7. Invalid header -> returns None
         assert!(decode_wav_to_mono_48k(b"NOT_A_WAV").is_none());
+    }
+
+    #[test]
+    fn decoded_music_size_limit_accepts_128_mib_and_rejects_larger_buffers() {
+        assert!(decoded_music_size_allowed(MAX_DECODED_MUSIC_BYTES));
+        assert!(!decoded_music_size_allowed(MAX_DECODED_MUSIC_BYTES + 1));
     }
 
     #[test]

@@ -157,7 +157,7 @@ sidebar_normal = "Normal"
 sidebar_narrow = "Estreita"
 
 edit_theme = "Personalizar tema atual"
-edit_theme_desc = "Ajuste a cor de destaque, fonte e fundo do tema"
+edit_theme_desc = "Ajuste a cor de destaque, a fonte e o fundo do tema da tela cheia"
 accent_color = "Cor de destaque"
 accent_color_desc = "Cor usada em botões, foco e detalhes"
 accent_blue = "Azul Tako"

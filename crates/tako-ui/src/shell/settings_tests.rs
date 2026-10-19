@@ -297,7 +297,13 @@ fn sunshine_preview_filters_invalid_ids() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();
     assert!(!ctx.library.games().is_empty());
-    let total = ctx.library.games().len();
+    let installed = ctx
+        .library
+        .games()
+        .iter()
+        .filter(|g| g.is_installed)
+        .count();
+    let first_was_installed = ctx.library.games()[0].is_installed;
     ctx.library.games_mut()[0].id = "invalid id with spaces !@#$".into();
     ctx.library.games_mut()[0].title = "Jogo Inválido".into();
 
@@ -305,9 +311,9 @@ fn sunshine_preview_filters_invalid_ids() {
         .library
         .games()
         .iter()
-        .filter(|g| tako_platform::sunshine::is_valid_game_id(&g.id))
+        .filter(|g| g.is_installed && tako_platform::sunshine::is_valid_game_id(&g.id))
         .count();
-    assert_eq!(valid_count, total - 1);
+    assert_eq!(valid_count, installed - usize::from(first_was_installed));
 
     let layer = sunshine::preview_dialog(&ctx, false);
     let rendered = layer.render(&ctx);
@@ -1288,7 +1294,23 @@ fn edit_theme_hidden_when_ui_not_supported() {
 }
 
 #[test]
-fn custom_accent_wins_over_game_accent() {
+fn edit_theme_hides_font_and_background_for_themes_that_do_not_use_them() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.theme_supports_font = false;
+    ctx.theme_supports_background = false;
+
+    let rows = edit_theme_panel(&ctx).items(&ctx);
+    assert!(rows.iter().any(|item| item.row.key == "accent"));
+    assert!(rows.iter().any(|item| item.row.key == "save"));
+    assert!(!rows.iter().any(|item| item.row.key == "font"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_type"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_color"));
+    assert!(!rows.iter().any(|item| item.row.key == "choose_image"));
+}
+
+#[test]
+fn desktop_ignores_custom_theme_accent() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();
 
@@ -1312,12 +1334,11 @@ fn custom_accent_wins_over_game_accent() {
         ..Default::default()
     };
 
-    // Ao montar a linha de DeskGame, o accent personalizado (#E3161E) deve vencer o do jogo (#00FF00)
-    // exercitando a função real de desktop.rs
+    // O desktop segue a cor do jogo; o override de tema vale na tela cheia.
     let desk_game_accent = crate::shell::desktop::game_card_accent(&ctx, &g.accent);
     assert_eq!(
         desk_game_accent,
-        slint::Color::from_rgb_u8(0xE3, 0x16, 0x1E)
+        slint::Color::from_rgb_u8(0x00, 0xFF, 0x00)
     );
 }
 
