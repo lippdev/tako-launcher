@@ -11,6 +11,11 @@ pub const THEME_API_VERSION: u32 = 1;
 pub const DEFAULT_ENTRY: &str = "main.slint";
 pub const MAX_ID_LEN: usize = 128;
 
+/// Limite máximo do tamanho do arquivo de música de fundo (32 MB).
+pub const MAX_THEME_MUSIC_BYTES: u64 = 32 * 1024 * 1024;
+/// Duração máxima de cada som de navegação (2 segundos).
+pub const MAX_NAV_SOUND_DURATION_SECS: f64 = 2.0;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ThemeAudio {
     pub music: Option<String>,
@@ -119,6 +124,70 @@ pub fn parse_audio_table(table: &toml::Table, problems: &mut Vec<Problem>) -> Th
         }
     }
     audio
+}
+
+/// Calcula a duração em segundos de um arquivo WAV a partir de seu cabeçalho RIFF.
+/// Retorna `None` se o arquivo não for um WAV válido ou estiver corrompido.
+pub fn wav_duration(path: &std::path::Path) -> Option<f64> {
+    use std::io::{Read, Seek, SeekFrom};
+    let file = std::fs::File::open(path).ok()?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut header = [0u8; 12];
+    reader.read_exact(&mut header).ok()?;
+    if &header[0..4] != b"RIFF" || &header[8..12] != b"WAVE" {
+        return None;
+    }
+    let mut byte_rate = 0u32;
+    let mut data_len = 0u32;
+    let mut found_fmt = false;
+    let mut found_data = false;
+
+    let mut chunk_header = [0u8; 8];
+    while reader.read_exact(&mut chunk_header).is_ok() {
+        let chunk_id = &chunk_header[0..4];
+        let chunk_size = u32::from_le_bytes([
+            chunk_header[4],
+            chunk_header[5],
+            chunk_header[6],
+            chunk_header[7],
+        ]);
+        if chunk_id == b"fmt " {
+            if chunk_size < 16 {
+                return None;
+            }
+            let mut fmt_data = vec![0u8; chunk_size as usize];
+            reader.read_exact(&mut fmt_data).ok()?;
+            byte_rate = u32::from_le_bytes([
+                fmt_data[8],
+                fmt_data[9],
+                fmt_data[10],
+                fmt_data[11],
+            ]);
+            found_fmt = true;
+        } else if chunk_id == b"data" {
+            data_len = chunk_size;
+            found_data = true;
+            if found_fmt {
+                break;
+            }
+            if reader.seek(SeekFrom::Current(chunk_size as i64)).is_err() {
+                break;
+            }
+        } else {
+            let skip = (chunk_size + (chunk_size & 1)) as i64;
+            if reader.seek(SeekFrom::Current(skip)).is_err() {
+                break;
+            }
+        }
+        if found_fmt && found_data {
+            break;
+        }
+    }
+    if found_fmt && found_data && byte_rate > 0 {
+        Some(data_len as f64 / byte_rate as f64)
+    } else {
+        None
+    }
 }
 
 impl ThemeManifest {
@@ -339,6 +408,44 @@ mod tests {
 
         let bad_fmt = format!("{OK}[audio]\nmusic = \"music.ogg\"\n");
         assert_eq!(codes(&bad_fmt), ["manifest.unsupported-audio-format"]);
+    }
+
+    #[test]
+    fn calculates_wav_duration_and_rejects_invalid() {
+        let dir = tempfile::tempdir().unwrap();
+        let not_wav = dir.path().join("not.wav");
+        std::fs::write(&not_wav, b"NOT_A_WAV_FILE").unwrap();
+        assert_eq!(wav_duration(&not_wav), None);
+
+        let valid_wav = dir.path().join("valid.wav");
+        let sample_rate: u32 = 44100;
+        let channels: u16 = 1;
+        let bits_per_sample: u16 = 16;
+        let byte_rate = sample_rate * channels as u32 * (bits_per_sample as u32 / 8);
+        let block_align = channels * (bits_per_sample / 8);
+        let num_samples = 44100; // 1.0 second
+        let data_bytes = num_samples * block_align as u32;
+        let riff_size = 36 + data_bytes;
+
+        let mut v = Vec::with_capacity(44 + data_bytes as usize);
+        v.extend_from_slice(b"RIFF");
+        v.extend_from_slice(&riff_size.to_le_bytes());
+        v.extend_from_slice(b"WAVE");
+        v.extend_from_slice(b"fmt ");
+        v.extend_from_slice(&16u32.to_le_bytes());
+        v.extend_from_slice(&1u16.to_le_bytes());
+        v.extend_from_slice(&channels.to_le_bytes());
+        v.extend_from_slice(&sample_rate.to_le_bytes());
+        v.extend_from_slice(&byte_rate.to_le_bytes());
+        v.extend_from_slice(&block_align.to_le_bytes());
+        v.extend_from_slice(&bits_per_sample.to_le_bytes());
+        v.extend_from_slice(b"data");
+        v.extend_from_slice(&data_bytes.to_le_bytes());
+        v.resize(44 + data_bytes as usize, 0);
+
+        std::fs::write(&valid_wav, &v).unwrap();
+        let dur = wav_duration(&valid_wav).unwrap();
+        assert!((dur - 1.0).abs() < 0.01);
     }
 
     #[test]

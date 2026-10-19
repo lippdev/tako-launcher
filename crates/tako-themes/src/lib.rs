@@ -15,8 +15,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tako_core::i18n::tf;
 
 pub use manifest::{
-    DEFAULT_ENTRY, MANIFEST_FILE, MAX_MANIFEST_BYTES, THEME_API_VERSION, ThemeAudio, ThemeManifest,
-    is_safe_id, parse_audio_table, validate_audio_path,
+    DEFAULT_ENTRY, MANIFEST_FILE, MAX_MANIFEST_BYTES, MAX_NAV_SOUND_DURATION_SECS,
+    MAX_THEME_MUSIC_BYTES, THEME_API_VERSION, ThemeAudio, ThemeManifest, is_safe_id,
+    parse_audio_table, validate_audio_path, wav_duration,
 };
 pub use package::{
     ALLOWED_EXTENSIONS, EXTENSION, Limits, normalize_entry, validate_package, validate_package_with,
@@ -284,35 +285,43 @@ pub fn resolve_theme_audio(theme_dir: &Path) -> ThemeAudioPaths {
         .ok()
         .and_then(|text| parse_tokens_audio(&text).ok())
         .unwrap_or_default();
-    let merged = ThemeAudio {
-        music: tokens_audio.music.or(manifest_audio.music),
-        move_sound: tokens_audio.move_sound.or(manifest_audio.move_sound),
-        accept_sound: tokens_audio.accept_sound.or(manifest_audio.accept_sound),
-        back_sound: tokens_audio.back_sound.or(manifest_audio.back_sound),
-    };
-
-    let resolve_file = |rel_opt: Option<String>| -> Option<PathBuf> {
+        let resolve_file = |rel_opt: Option<String>, is_music: bool| -> Option<PathBuf> {
         let rel = rel_opt?;
         let clean = validate_audio_path(&rel).ok()?;
         let full = theme_dir.join(clean);
-        if full.is_file() {
-            if let (Ok(canon_full), Ok(canon_dir)) = (full.canonicalize(), theme_dir.canonicalize())
-            {
-                if canon_full.starts_with(canon_dir) {
-                    return Some(full);
-                }
-            } else if full.starts_with(theme_dir) {
-                return Some(full);
+        if !full.is_file() {
+            return None;
+        }
+        let canon_dir = theme_dir.canonicalize().ok()?;
+        let canon_full = full.canonicalize().ok()?;
+        if !canon_full.starts_with(&canon_dir) {
+            return None;
+        }
+        if is_music {
+            let size = full.metadata().ok()?.len();
+            if size > MAX_THEME_MUSIC_BYTES || size == 0 {
+                return None;
+            }
+        } else {
+            let dur = wav_duration(&full)?;
+            if dur > MAX_NAV_SOUND_DURATION_SECS || dur <= 0.0 {
+                return None;
             }
         }
-        None
+        Some(full)
+    };
+
+    let resolve_merged = |token_rel: Option<String>, manifest_rel: Option<String>, is_music: bool| -> Option<PathBuf> {
+        token_rel
+            .and_then(|t| resolve_file(Some(t), is_music))
+            .or_else(|| manifest_rel.and_then(|m| resolve_file(Some(m), is_music)))
     };
 
     ThemeAudioPaths {
-        music: resolve_file(merged.music),
-        move_sound: resolve_file(merged.move_sound),
-        accept_sound: resolve_file(merged.accept_sound),
-        back_sound: resolve_file(merged.back_sound),
+        music: resolve_merged(tokens_audio.music, manifest_audio.music, true),
+        move_sound: resolve_merged(tokens_audio.move_sound, manifest_audio.move_sound, false),
+        accept_sound: resolve_merged(tokens_audio.accept_sound, manifest_audio.accept_sound, false),
+        back_sound: resolve_merged(tokens_audio.back_sound, manifest_audio.back_sound, false),
     }
 }
 

@@ -248,6 +248,7 @@ pub struct Ctx {
     pub app_update: crate::app_updates::State,
     pub safe_mode: bool,
     pub scanning: bool,
+    pub pending_link: Option<tako_core::links::Link>,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
     pub grid_columns: usize,
     /// Camada que uma página pediu para abrir junto com ela.

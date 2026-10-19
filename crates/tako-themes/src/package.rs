@@ -183,6 +183,31 @@ impl Package {
                 ));
             }
         }
+        if let Some(tokens_entry) = files.iter().find(|e| e.path == "tokens.toml") {
+            let mut reader = open_entry(&mut source, tokens_entry).map_err(|e| io_problem(&e))?;
+            if let Some(bytes) = read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))? {
+                if let Ok(text) = String::from_utf8(bytes) {
+                    if let Ok(tokens_audio) = crate::parse_tokens_audio(&text) {
+                        for audio_path in [
+                            &tokens_audio.music,
+                            &tokens_audio.move_sound,
+                            &tokens_audio.accept_sound,
+                            &tokens_audio.back_sound,
+                        ]
+                        .into_iter()
+                        .flatten()
+                        {
+                            if !files.iter().any(|e| e.path == *audio_path) {
+                                return Err(one(
+                                    "package.missing-audio",
+                                    tf("themes.package.missing_audio", &[("path", audio_path)]),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         Ok(Package {
             source,
             files,
@@ -514,23 +539,50 @@ mod tests {
             Err("themes.path.too_long")
         );
     }
-}
-#[test]
-fn validates_declared_audio_files_exist_in_package() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path();
-    std::fs::write(
+
+    #[test]
+    fn validates_declared_audio_files_exist_in_package() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        std::fs::write(
             dir.join("theme.toml"),
             "id = \"meu.tema\"\nname = \"Tema\"\nversion = \"1.0\"\nauthor = \"Eu\"\napi = 1\nentry = \"main.slint\"\n[audio]\nmusic = \"bgm.wav\"\n",
         )
         .unwrap();
-    std::fs::write(dir.join("main.slint"), "").unwrap();
-    // Missing bgm.wav
-    let err = validate_package(dir).unwrap_err();
-    assert_eq!(err[0].code, "package.missing-audio");
+        std::fs::write(dir.join("main.slint"), "").unwrap();
+        // Missing bgm.wav
+        let err = validate_package(dir).unwrap_err();
+        assert_eq!(err[0].code, "package.missing-audio");
 
-    // Present bgm.wav
-    std::fs::write(dir.join("bgm.wav"), b"RIFF....WAVE").unwrap();
-    let manifest = validate_package(dir).unwrap();
-    assert_eq!(manifest.audio.music.as_deref(), Some("bgm.wav"));
+        // Present bgm.wav
+        std::fs::write(dir.join("bgm.wav"), b"RIFF....WAVE").unwrap();
+        let manifest = validate_package(dir).unwrap();
+        assert_eq!(manifest.audio.music.as_deref(), Some("bgm.wav"));
+    }
+
+    #[test]
+    fn validates_declared_audio_files_in_tokens_exist_in_package() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        std::fs::write(
+            dir.join("theme.toml"),
+            "id = \"meu.tema\"\nname = \"Tema\"\nversion = \"1.0\"\nauthor = \"Eu\"\napi = 1\nentry = \"main.slint\"\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("main.slint"), "").unwrap();
+        std::fs::write(
+            dir.join("tokens.toml"),
+            "[audio]\naccept = \"click.wav\"\n",
+        )
+        .unwrap();
+
+        // Missing click.wav declared in tokens.toml
+        let err = validate_package(dir).unwrap_err();
+        assert_eq!(err[0].code, "package.missing-audio");
+
+        // Present click.wav
+        std::fs::write(dir.join("click.wav"), b"RIFF....WAVE").unwrap();
+        let manifest = validate_package(dir).unwrap();
+        assert_eq!(manifest.id, "meu.tema");
+    }
 }

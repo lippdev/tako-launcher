@@ -1,5 +1,10 @@
 //! Carrega o tema: o padrão (embutido) ou o escolhido pelo usuário, com volta ao padrão se falhar (PRD §7).
 
+use slint_interpreter::{Compiler, ComponentDefinition};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use tako_core::i18n::tf;
+
 fn is_audio_key(key: &str) -> bool {
     matches!(
         key,
@@ -14,11 +19,6 @@ fn is_audio_key(key: &str) -> bool {
             | "voltar"
     )
 }
-
-use slint_interpreter::{Compiler, ComponentDefinition};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use tako_core::i18n::tf;
 
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/default_theme.rs"));

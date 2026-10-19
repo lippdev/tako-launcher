@@ -465,6 +465,34 @@ fn theme_from_a_repository_remembers_where_it_came_from() {
     assert!(remote::sources(&w.root()).is_empty());
 }
 
+fn dummy_wav(duration_secs: f64) -> Vec<u8> {
+    let sample_rate: u32 = 44100;
+    let channels: u16 = 1;
+    let bits_per_sample: u16 = 16;
+    let byte_rate = sample_rate * channels as u32 * (bits_per_sample as u32 / 8);
+    let block_align = channels * (bits_per_sample / 8);
+    let num_samples = (sample_rate as f64 * duration_secs) as u32;
+    let data_bytes = num_samples * block_align as u32;
+    let riff_size = 36 + data_bytes;
+
+    let mut v = Vec::with_capacity(44 + data_bytes as usize);
+    v.extend_from_slice(b"RIFF");
+    v.extend_from_slice(&riff_size.to_le_bytes());
+    v.extend_from_slice(b"WAVE");
+    v.extend_from_slice(b"fmt ");
+    v.extend_from_slice(&16u32.to_le_bytes());
+    v.extend_from_slice(&1u16.to_le_bytes());
+    v.extend_from_slice(&channels.to_le_bytes());
+    v.extend_from_slice(&sample_rate.to_le_bytes());
+    v.extend_from_slice(&byte_rate.to_le_bytes());
+    v.extend_from_slice(&block_align.to_le_bytes());
+    v.extend_from_slice(&bits_per_sample.to_le_bytes());
+    v.extend_from_slice(b"data");
+    v.extend_from_slice(&data_bytes.to_le_bytes());
+    v.resize(44 + data_bytes as usize, 0);
+    v
+}
+
 #[test]
 fn resolves_theme_audio_and_tokens_override_with_path_safety() {
     let w = Work::new();
@@ -476,8 +504,8 @@ fn resolves_theme_audio_and_tokens_override_with_path_safety() {
     )
     .unwrap();
     fs::write(theme_dir.join("main.slint"), SLINT).unwrap();
-    fs::write(theme_dir.join("bgm.wav"), b"WAV1").unwrap();
-    fs::write(theme_dir.join("mover.wav"), b"WAV2").unwrap();
+    fs::write(theme_dir.join("bgm.wav"), dummy_wav(1.0)).unwrap();
+    fs::write(theme_dir.join("mover.wav"), dummy_wav(0.5)).unwrap();
 
     // Default from theme.toml
     let audio = resolve_theme_audio(&theme_dir);
@@ -492,18 +520,77 @@ fn resolves_theme_audio_and_tokens_override_with_path_safety() {
         "[audio]\nmusic = \"tokens_bgm.wav\"\naccept = \"confirm.wav\"\n",
     )
     .unwrap();
-    fs::write(theme_dir.join("tokens_bgm.wav"), b"WAV3").unwrap();
-    fs::write(theme_dir.join("confirm.wav"), b"WAV4").unwrap();
+    fs::write(theme_dir.join("tokens_bgm.wav"), dummy_wav(1.0)).unwrap();
+    fs::write(theme_dir.join("confirm.wav"), dummy_wav(0.5)).unwrap();
 
     let audio = resolve_theme_audio(&theme_dir);
     assert_eq!(audio.music, Some(theme_dir.join("tokens_bgm.wav")));
     assert_eq!(audio.move_sound, Some(theme_dir.join("mover.wav")));
     assert_eq!(audio.accept_sound, Some(theme_dir.join("confirm.wav")));
 
-    // Path traversal attempt in tokens.toml is ignored and safely rejected
+    // Path traversal attempt in tokens.toml is ignored and safely rejected (file outside actually exists)
+    let outside_path = w.root().join("outside.wav");
+    fs::write(&outside_path, dummy_wav(0.5)).unwrap();
     fs::write(
         theme_dir.join("tokens.toml"),
         "[audio]\nmusic = \"../outside.wav\"\n",
+    )
+    .unwrap();
+    let audio = resolve_theme_audio(&theme_dir);
+    assert_eq!(audio.music, Some(theme_dir.join("bgm.wav")));
+
+    // Absolute path is rejected
+    let abs_str = outside_path.to_string_lossy();
+    fs::write(
+        theme_dir.join("tokens.toml"),
+        format!("[audio]\nmusic = \"{abs_str}\"\n"),
+    )
+    .unwrap();
+    let audio = resolve_theme_audio(&theme_dir);
+    assert_eq!(audio.music, Some(theme_dir.join("bgm.wav")));
+
+    // Symlink pointing outside is rejected
+    #[cfg(unix)]
+    {
+        let symlink_path = theme_dir.join("symlink_outside.wav");
+        let _ = std::os::unix::fs::symlink(&outside_path, &symlink_path);
+        fs::write(
+            theme_dir.join("tokens.toml"),
+            "[audio]\nmove = \"symlink_outside.wav\"\n",
+        )
+        .unwrap();
+        let audio = resolve_theme_audio(&theme_dir);
+        assert_eq!(audio.move_sound, Some(theme_dir.join("mover.wav")));
+    }
+
+    // Navigation sound duration > 2.0s is rejected
+    fs::write(theme_dir.join("long_move.wav"), dummy_wav(2.5)).unwrap();
+    fs::write(
+        theme_dir.join("tokens.toml"),
+        "[audio]\nmove = \"long_move.wav\"\n",
+    )
+    .unwrap();
+    let audio = resolve_theme_audio(&theme_dir);
+    assert_eq!(audio.move_sound, Some(theme_dir.join("mover.wav")));
+
+    // Navigation sound duration <= 2.0s is accepted
+    fs::write(theme_dir.join("short_move.wav"), dummy_wav(1.8)).unwrap();
+    fs::write(
+        theme_dir.join("tokens.toml"),
+        "[audio]\nmove = \"short_move.wav\"\n",
+    )
+    .unwrap();
+    let audio = resolve_theme_audio(&theme_dir);
+    assert_eq!(audio.move_sound, Some(theme_dir.join("short_move.wav")));
+
+    // Music > 32 MB is rejected
+    let big_music = theme_dir.join("big_music.wav");
+    let file = fs::File::create(&big_music).unwrap();
+    file.set_len(crate::MAX_THEME_MUSIC_BYTES + 1024).unwrap();
+    drop(file);
+    fs::write(
+        theme_dir.join("tokens.toml"),
+        "[audio]\nmusic = \"big_music.wav\"\n",
     )
     .unwrap();
     let audio = resolve_theme_audio(&theme_dir);
