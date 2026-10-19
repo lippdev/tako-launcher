@@ -348,8 +348,6 @@ pub struct DesktopLibrary {
     more: Option<String>,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
-    /// "Instalar pela": a loja escolhida por jogo (posição em `install_offers`); o menu deixa aqui e a página lê.
-    install_pick: dialogs::InstallPick,
 }
 
 /// Page Up e Page Down como o Slint manda.
@@ -385,7 +383,6 @@ impl DesktopLibrary {
             hero_wait: None,
             more: None,
             group_focus: None,
-            install_pick: Rc::default(),
         }
     }
 
@@ -933,11 +930,6 @@ impl DesktopLibrary {
         }
     }
 
-    /// A loja escolhida no "Instalar pela" para este jogo (a primeira oferta se ele nunca escolheu).
-    fn pick_of(&self, id: &str) -> usize {
-        self.install_pick.borrow().get(id).copied().unwrap_or(0)
-    }
-
     fn run(&mut self, action: Action, ctx: &mut Ctx) -> Nav {
         let Some(id) = self.selected(ctx) else {
             return Nav::Stay;
@@ -949,7 +941,7 @@ impl DesktopLibrary {
                 if ctx.launching {
                     return Nav::Stay;
                 }
-                details::primary_action_with(ctx, &id, self.pick_of(&id))
+                details::primary_action(ctx, &id)
             }
             Action::Favorite => {
                 dialogs::toggle_favorite(ctx, &id);
@@ -1635,11 +1627,7 @@ impl Page for DesktopLibrary {
             }
             "install-more" => {
                 if let Some(id) = self.selected(ctx) {
-                    return Nav::Layer(Box::new(dialogs::install_from(
-                        ctx,
-                        &id,
-                        self.install_pick.clone(),
-                    )));
+                    return Nav::Layer(Box::new(dialogs::install_from(ctx, &id)));
                 }
             }
             "action" => {
@@ -2165,7 +2153,7 @@ impl Page for DesktopLibrary {
                 } else {
                     game_text::status(lang, g)
                 };
-                let install = details::install_stage(ctx, g, self.pick_of(&g.id));
+                let install = details::install_stage(ctx, g);
                 let actions: Vec<PanelRow> =
                     self.actions(ctx, g)
                         .into_iter()
@@ -3097,9 +3085,9 @@ mod tests {
         assert!(
             shell
                 .ctx
-                .effects
+                .install_queue
                 .iter()
-                .any(|e| matches!(e, Effect::OpenUrl(u) if u.starts_with("demo://install/")))
+                .any(|(_, o)| o.install_uri.starts_with("demo://install/"))
         );
         assert_eq!(View::of(&shell.ctx), View::Grid);
         // ↑ volta ao cabeçalho; Enter fecha o grupo e o trecho fica sem capas.

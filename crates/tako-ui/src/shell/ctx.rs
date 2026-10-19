@@ -35,8 +35,6 @@ pub enum Effect {
     AddGame,
     OpenFolder(String),
     OpenUrl(String),
-    /// Abrir o endereço depois do intervalo (vários pedidos seguidos ao cliente de uma loja).
-    OpenUrlAfter(String, std::time::Duration),
     CheckUpdates,
     InstallUpdate,
     RefreshMetadata(Option<String>),
@@ -269,6 +267,10 @@ pub struct Ctx {
     pub welcome_back: Option<(String, std::time::Duration, tako_core::session::GameEnd)>,
     /// Jogos mandados instalar pela loja e até quando esperar por eles (SRC-005).
     pub installing: Vec<(String, Instant)>,
+    /// Loja escolhida em "Instalar pela" por jogo; sem escolha vale a loja do próprio jogo (SRC-005).
+    pub install_pick: HashMap<String, tako_core::library::GameStore>,
+    /// Pedidos de instalação à espera da hora de sair (`details::run_install_queue`).
+    pub install_queue: Vec<(Instant, tako_core::library::InstallOffer)>,
     /// Desenhar de novo neste instante mesmo sem entrada (camadas que mudam com o tempo).
     pub redraw_at: Option<Instant>,
     /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).

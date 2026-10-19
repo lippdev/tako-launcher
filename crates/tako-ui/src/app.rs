@@ -205,6 +205,8 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         controller_mouse: false,
         welcome_back: None,
         installing: Vec::new(),
+        install_pick: HashMap::new(),
+        install_queue: Vec::new(),
         redraw_at: None,
         launching: false,
         launch_since: None,
@@ -1033,6 +1035,10 @@ impl App {
                 }
                 // Instalando pela loja (SRC-005): a Steam é acompanhada a cada 3 s pelos próprios manifests; as outras
                 // lojas não dão o andamento, então a biblioteca toda é relida a cada 30 s até o jogo aparecer instalado.
+                crate::shell::details::run_install_queue(
+                    &mut app.shell.borrow_mut().ctx,
+                    Instant::now(),
+                );
                 if now >= next_install_poll {
                     next_install_poll = now + Duration::from_secs(3);
                     follow_installs(&app.shell);

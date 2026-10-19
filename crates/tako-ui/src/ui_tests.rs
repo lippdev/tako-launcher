@@ -720,6 +720,7 @@ fn desktop_snapshot() {
                 let need = (9.1 * GIB) as u64;
                 let offer = |store, uri: &str, gib: f64| InstallOffer {
                     store,
+                    game_id: String::new(),
                     install_uri: uri.into(),
                     size: Some((gib * GIB) as u64),
                 };

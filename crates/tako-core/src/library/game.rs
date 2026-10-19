@@ -207,6 +207,9 @@ pub struct InstallProgress {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstallOffer {
     pub store: GameStore,
+    /// A cópia do jogo nessa loja (é o id dela que a interface acompanha até ficar instalada).
+    #[serde(default)]
+    pub game_id: String,
     pub install_uri: String,
     pub size: Option<u64>,
 }

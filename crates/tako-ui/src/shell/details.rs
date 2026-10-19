@@ -2,7 +2,7 @@
 
 use super::{Cmd, Ctx, Effect, Nav, Out, Page, dialogs, tiles};
 use crate::model::{Details, Hint, PanelRow, Stat};
-use tako_core::library::{Game, GameStore, InstallOffer};
+use tako_core::library::{Game, GameStore, InstallOffer, InstallProgress};
 use tako_core::metadata::art::format_bytes;
 use tako_core::presentation::{game_text, library_text};
 
@@ -39,11 +39,6 @@ impl DetailsPage {
 
 /// A ação principal de um jogo (Jogar, Voltar ao jogo, Instalar via loja...).
 pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
-    primary_action_with(ctx, id, 0)
-}
-
-/// Como `primary_action`; `offer` é a loja escolhida no destaque (a posição em `install_offers`).
-pub fn primary_action_with(ctx: &mut Ctx, id: &str, offer: usize) -> Nav {
     let Some(g) = ctx.library.find(id).cloned() else {
         return Nav::Stay;
     };
@@ -63,14 +58,17 @@ pub fn primary_action_with(ctx: &mut Ctx, id: &str, offer: usize) -> Nav {
         ctx.effect(Effect::Launch(g.id.clone()));
     } else if g.is_upcoming() {
         ctx.toast(tiles::play_label(ctx, &g));
-    } else if g.installing.is_some() {
-        // A loja já está instalando: abrir o cliente outra vez não muda nada.
-    } else if !install(ctx, &g, offer) {
+    } else if let Some(p) = g.installing {
+        // A loja já está instalando: abrir o cliente outra vez não muda nada, então o aviso mostra o andamento.
+        ctx.toast(installing_label(ctx, p, g.store()));
+    } else if install_offers(&g).is_empty() {
         ctx.toast(ctx.t(if g.store() == GameStore::Manual {
             "game.missing_file"
         } else {
             "game.not_installed"
         }));
+    } else {
+        install_many(ctx, std::slice::from_ref(&g.id));
     }
     Nav::Stay
 }
@@ -99,7 +97,7 @@ pub(crate) fn install_offers(g: &Game) -> Vec<InstallOffer> {
     let listed: Vec<InstallOffer> = g
         .install_offers
         .iter()
-        .filter(|o| !o.install_uri.trim().is_empty())
+        .filter(|o| is_install_uri(&o.install_uri))
         .take(MAX_OFFERS)
         .cloned()
         .collect();
@@ -107,15 +105,52 @@ pub(crate) fn install_offers(g: &Game) -> Vec<InstallOffer> {
         return listed;
     }
     let uri = match (&g.install_uri, g.store(), g.steam_app_id) {
-        (Some(uri), ..) if !uri.trim().is_empty() => uri.clone(),
+        (Some(uri), ..) if is_install_uri(uri) => uri.clone(),
         (_, GameStore::Steam, Some(id)) => format!("steam://install/{id}"),
         _ => return Vec::new(),
     };
     vec![InstallOffer {
         store: g.store(),
+        game_id: g.id.clone(),
         install_uri: uri,
         size: g.install_size,
     }]
+}
+
+/// Esquemas dos clientes de loja que o Tako abre para instalar (os que as fontes geram). Defesa em profundidade: o
+/// endereço vem de arquivos das lojas e nunca pode abrir um caminho, um `file://` ou um executável. O `demo` é o
+/// do modo demonstração e não tem programa registrado.
+const INSTALL_SCHEMES: [&str; 6] = [
+    "steam",
+    "com.epicgames.launcher",
+    "goggalaxy",
+    "heroic",
+    "amazon-games",
+    "demo",
+];
+
+pub(crate) fn is_install_uri(uri: &str) -> bool {
+    let uri = uri.trim();
+    uri.split_once("://").is_some_and(|(scheme, rest)| {
+        !rest.is_empty()
+            && INSTALL_SCHEMES
+                .iter()
+                .any(|s| scheme.eq_ignore_ascii_case(s))
+            && !uri.chars().any(char::is_control)
+    })
+}
+
+/// A oferta que vale para o jogo: a loja escolhida; sem escolha (ou se ela saiu da lista), a loja do próprio jogo;
+/// por último, a primeira.
+pub(crate) fn chosen_offer<'a>(
+    g: &Game,
+    offers: &'a [InstallOffer],
+    pick: Option<GameStore>,
+) -> Option<&'a InstallOffer> {
+    pick.into_iter()
+        .chain([g.store()])
+        .find_map(|s| offers.iter().find(|o| o.store == s))
+        .or(offers.first())
 }
 
 /// Tamanho de uma oferta: o dela ou, na loja do próprio jogo, o que o jogo guarda. Zero = não informado.
@@ -137,28 +172,17 @@ pub(crate) struct InstallStage {
 }
 
 /// `None` = o jogo não tem o que instalar (já instalado, por lançar ou sem endereço de instalação).
-pub(crate) fn install_stage(ctx: &Ctx, g: &Game, pick: usize) -> Option<InstallStage> {
+pub(crate) fn install_stage(ctx: &Ctx, g: &Game) -> Option<InstallStage> {
     if g.is_installed || g.is_upcoming() {
         return None;
     }
     let offers = install_offers(g);
-    let o = offers.get(pick).or(offers.first())?;
+    let o = chosen_offer(g, &offers, ctx.install_pick.get(&g.id).copied())?;
     let lang = ctx.lang();
     let at = game_text::store_in(lang, o.store);
     if let Some(p) = g.installing {
-        // A fração vem da loja: fora de 0..1 ou NaN conta como "sem número".
-        let label = match p.fraction.filter(|f| f.is_finite()) {
-            Some(f) => ctx.tf(
-                "desktop.install.progress",
-                &[(
-                    "pct",
-                    &((f.clamp(0.0, 1.0) * 100.0).round() as u32).to_string(),
-                )],
-            ),
-            None => ctx.tf("desktop.install.installing", &[("in", &at)]),
-        };
         return Some(InstallStage {
-            label,
+            label: installing_label(ctx, p, o.store),
             sub: String::new(),
             split: false,
             installing: true,
@@ -204,6 +228,24 @@ pub(crate) fn install_stage(ctx: &Ctx, g: &Game, pick: usize) -> Option<InstallS
     })
 }
 
+/// "Baixando… 42%" ou, sem número, "Instalando na Steam…". A fração vem da loja: fora de 0..1 ou NaN conta como
+/// "sem número".
+fn installing_label(ctx: &Ctx, p: InstallProgress, store: GameStore) -> String {
+    match p.fraction.filter(|f| f.is_finite()) {
+        Some(f) => ctx.tf(
+            "desktop.install.progress",
+            &[(
+                "pct",
+                &((f.clamp(0.0, 1.0) * 100.0).round() as u32).to_string(),
+            )],
+        ),
+        None => ctx.tf(
+            "desktop.install.installing",
+            &[("in", &game_text::store_in(ctx.lang(), store))],
+        ),
+    }
+}
+
 /// "9,1 GB" (pt-BR) ou "9.1 GB"; sem a casa quando ela é zero ("120 GB").
 pub(crate) fn size_text(bytes: u64) -> String {
     if bytes == 0 {
@@ -224,26 +266,21 @@ fn drive_label(drive: &str) -> String {
     }
 }
 
-/// Abre o cliente da loja escolhida na tela de instalação e fica de olho até o jogo aparecer instalado.
-fn install(ctx: &mut Ctx, g: &Game, offer: usize) -> bool {
-    let offers = install_offers(g);
-    let Some(o) = offers.get(offer).or(offers.first()) else {
-        return false;
-    };
-    ctx.effect(Effect::OpenUrl(o.install_uri.clone()));
-    watch_install(ctx, &g.id);
-    true
-}
-
 fn watch_install(ctx: &mut Ctx, id: &str) {
     ctx.installing.retain(|(i, _)| i != id);
     ctx.installing
         .push((id.to_owned(), std::time::Instant::now() + Ctx::INSTALL_WAIT));
 }
 
-/// Instalar vários de uma vez (seleção múltipla, SRC-005): um pedido por jogo, espaçados para o cliente da loja
-/// não perder nenhum. Devolve quantos foram pedidos.
+/// Instalar um ou vários de uma vez (menu, seleção múltipla, destaque; SRC-005): um pedido por jogo na loja
+/// escolhida (sem escolha, a do próprio jogo), espaçados para o cliente da loja não perder nenhum e sem repetir o
+/// mesmo endereço. Os pedidos entram na fila do `Ctx` (`run_install_queue`). Devolve quantos foram pedidos.
 pub(crate) fn install_many(ctx: &mut Ctx, ids: &[String]) -> usize {
+    let mut seen: std::collections::HashSet<String> = ctx
+        .install_queue
+        .iter()
+        .map(|(_, o)| o.install_uri.clone())
+        .collect();
     let mut n = 0;
     for id in ids {
         let Some(g) = ctx.library.find(id).cloned() else {
@@ -252,19 +289,40 @@ pub(crate) fn install_many(ctx: &mut Ctx, ids: &[String]) -> usize {
         if g.is_installed || g.installing.is_some() {
             continue;
         }
-        let Some(o) = install_offers(&g).into_iter().next() else {
+        let offers = install_offers(&g);
+        let Some(o) = chosen_offer(&g, &offers, ctx.install_pick.get(id).copied()) else {
             continue;
         };
-        let after = INSTALL_GAP * n as u32;
-        ctx.effect(if n == 0 {
-            Effect::OpenUrl(o.install_uri)
-        } else {
-            Effect::OpenUrlAfter(o.install_uri, after)
-        });
-        watch_install(ctx, &g.id);
+        if !seen.insert(o.install_uri.clone()) {
+            continue;
+        }
+        let mut o = o.clone();
+        if o.game_id.is_empty() {
+            o.game_id = g.id.clone();
+        }
+        let at = std::time::Instant::now() + INSTALL_GAP * n as u32;
+        ctx.install_queue.push((at, o));
         n += 1;
     }
     n
+}
+
+/// Manda à loja os pedidos de instalação que já deram a hora e passa a vigiar a cópia da loja escolhida; se o
+/// sistema não abre o endereço, o aviso aparece na tela. Chamado a cada ciclo da interface (thread da UI).
+pub fn run_install_queue(ctx: &mut Ctx, now: std::time::Instant) {
+    if ctx.install_queue.is_empty() {
+        return;
+    }
+    let (due, later): (Vec<_>, Vec<_>) = std::mem::take(&mut ctx.install_queue)
+        .into_iter()
+        .partition(|(at, _)| *at <= now);
+    ctx.install_queue = later;
+    for (_, o) in due {
+        match ctx.platform.processes.launch(&o.install_uri, None, None) {
+            Ok(_) => watch_install(ctx, &o.game_id),
+            Err(e) => ctx.toast(e.to_string()),
+        }
+    }
 }
 
 /// Intervalo entre dois pedidos de instalação seguidos.
@@ -476,9 +534,68 @@ mod tests {
     fn offer(store: GameStore, uri: &str, size: Option<u64>) -> InstallOffer {
         InstallOffer {
             store,
+            game_id: format!("{}:1", store.id_prefix()),
             install_uri: uri.into(),
             size,
         }
+    }
+
+    #[test]
+    fn only_store_client_schemes_are_opened_to_install() {
+        for ok in [
+            "steam://install/1",
+            "com.epicgames.launcher://apps/a%3Ab%3Ac?action=install",
+            "goggalaxy://openGameView/1",
+            "heroic://launch/gog/1",
+            "amazon-games://play/x",
+            "STEAM://install/1",
+        ] {
+            assert!(is_install_uri(ok), "{ok}");
+        }
+        for bad in [
+            "file:///x",
+            "C:\\x.exe",
+            "/usr/bin/x",
+            "steam://",
+            "steam:install",
+            "https://x",
+            "javascript://x",
+            "steam://install/1\nfile:///x",
+            "",
+        ] {
+            assert!(!is_install_uri(bad), "{bad:?}");
+        }
+        // Valor ruim vindo da loja não vira oferta, nem pelo `install_uri` do jogo.
+        let mut g = game();
+        g.install_offers = vec![
+            offer(GameStore::Gog, "file:///x", None),
+            offer(GameStore::Epic, "C:\\x.exe", None),
+        ];
+        g.install_uri = Some("file:///etc/passwd".into());
+        let offers = install_offers(&g);
+        assert_eq!(offers.len(), 1);
+        assert_eq!(offers[0].install_uri, "steam://install/1");
+    }
+
+    #[test]
+    fn the_default_offer_is_the_items_own_store_not_the_first_of_the_list() {
+        let offers = [
+            offer(GameStore::Steam, "steam://install/1", None),
+            offer(GameStore::Gog, "goggalaxy://1", None),
+        ];
+        let mut gog = game();
+        gog.id = "gog:1".into();
+        gog.store = Some(GameStore::Gog);
+        let store = |g: &Game, pick| chosen_offer(g, &offers, pick).map(|o| o.store);
+        assert_eq!(store(&gog, None), Some(GameStore::Gog));
+        assert_eq!(store(&game(), None), Some(GameStore::Steam));
+        // A escolha vale por loja, não por posição; loja que sumiu da lista volta à do item.
+        assert_eq!(store(&game(), Some(GameStore::Gog)), Some(GameStore::Gog));
+        assert_eq!(store(&gog, Some(GameStore::Epic)), Some(GameStore::Gog));
+        // O item de uma loja que não está na lista cai na primeira.
+        let mut epic = game();
+        epic.store = Some(GameStore::Epic);
+        assert_eq!(store(&epic, None), Some(GameStore::Steam));
     }
 
     #[test]
@@ -492,7 +609,13 @@ mod tests {
         // Endereço em branco vindo da loja não vira opção.
         assert_eq!(install_offers(&g).len(), 1);
         g.install_offers = (0..50)
-            .map(|i| offer(GameStore::Epic, &format!("e://{i}"), None))
+            .map(|i| {
+                offer(
+                    GameStore::Epic,
+                    &format!("com.epicgames.launcher://{i}"),
+                    None,
+                )
+            })
             .collect();
         assert_eq!(install_offers(&g).len(), MAX_OFFERS);
         let mut none = game();
@@ -523,7 +646,7 @@ mod tests {
         let mut g = game();
         g.install_size = Some(9 << 30);
         // Sem espaço livre conhecido: só por onde abre.
-        let s = install_stage(&ctx, &g, 0).unwrap();
+        let s = install_stage(&ctx, &g).unwrap();
         assert_eq!(s.label, "Instalar");
         assert!(s.sub.starts_with("Steam · 9"));
         assert!(!s.split && !s.warn);
@@ -533,7 +656,7 @@ mod tests {
             drive: "C".into(),
             bytes: 120 << 30,
         });
-        let s = install_stage(&ctx, &g, 0).unwrap();
+        let s = install_stage(&ctx, &g).unwrap();
         assert!(s.note.starts_with("Livre no C: 120"), "{}", s.note);
         assert!(!s.warn);
 
@@ -541,7 +664,7 @@ mod tests {
             drive: "C".into(),
             bytes: 6 << 30,
         });
-        let s = install_stage(&ctx, &g, 0).unwrap();
+        let s = install_stage(&ctx, &g).unwrap();
         assert!(s.warn);
         assert!(s.note.starts_with("Faltam 3"), "{}", s.note);
         assert!(s.note.ends_with("no C:"), "{}", s.note);
@@ -549,14 +672,14 @@ mod tests {
         g.installing = Some(InstallProgress {
             fraction: Some(0.42),
         });
-        let s = install_stage(&ctx, &g, 0).unwrap();
+        let s = install_stage(&ctx, &g).unwrap();
         assert!(s.installing && s.note.is_empty());
         assert_eq!(s.label, "Baixando… 42%");
         for bad in [f32::NAN, f32::INFINITY, -1.0, 7.0] {
             g.installing = Some(InstallProgress {
                 fraction: Some(bad),
             });
-            let label = install_stage(&ctx, &g, 0).unwrap().label;
+            let label = install_stage(&ctx, &g).unwrap().label;
             assert!(
                 matches!(
                     label.as_str(),
@@ -567,7 +690,7 @@ mod tests {
         }
         g.installing = Some(InstallProgress { fraction: None });
         assert_eq!(
-            install_stage(&ctx, &g, 0).unwrap().label,
+            install_stage(&ctx, &g).unwrap().label,
             "Instalando na Steam…"
         );
     }
@@ -580,9 +703,13 @@ mod tests {
             offer(GameStore::Steam, "steam://install/1", Some(9 << 30)),
             offer(GameStore::Gog, "goggalaxy://1", Some(8 << 30)),
         ];
-        assert!(install_stage(&ctx, &g, 0).unwrap().split);
-        assert!(install_stage(&ctx, &g, 1).unwrap().sub.starts_with("GOG"));
+        let mut ctx = ctx;
+        assert!(install_stage(&ctx, &g).unwrap().split);
+        // Sem escolha vale a loja do próprio jogo (Steam); escolhida a GOG, a pílula passa a ela.
+        assert!(install_stage(&ctx, &g).unwrap().sub.starts_with("Steam"));
+        ctx.install_pick.insert(g.id.clone(), GameStore::Gog);
+        assert!(install_stage(&ctx, &g).unwrap().sub.starts_with("GOG"));
         g.is_installed = true;
-        assert!(install_stage(&ctx, &g, 0).is_none());
+        assert!(install_stage(&ctx, &g).is_none());
     }
 }
