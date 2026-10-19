@@ -600,3 +600,181 @@ fn resolves_theme_audio_and_tokens_override_with_path_safety() {
     let audio = resolve_theme_audio(&theme_dir);
     assert_eq!(audio.music, Some(theme_dir.join("bgm.wav")));
 }
+
+#[test]
+fn test_theme_name_validation_and_id_derivation() {
+    use crate::create::{ThemeNameProblem, derive_theme_id, validate_theme_name};
+
+    assert_eq!(validate_theme_name(""), Err(ThemeNameProblem::Empty));
+    assert_eq!(validate_theme_name("   "), Err(ThemeNameProblem::Empty));
+    let long_name = "a".repeat(51);
+    assert_eq!(
+        validate_theme_name(&long_name),
+        Err(ThemeNameProblem::TooLong(50))
+    );
+    assert_eq!(
+        validate_theme_name("Meu/Tema"),
+        Err(ThemeNameProblem::InvalidCharacters)
+    );
+    assert_eq!(
+        validate_theme_name("Meu\\Tema"),
+        Err(ThemeNameProblem::InvalidCharacters)
+    );
+    assert_eq!(
+        validate_theme_name("Tema:Novo"),
+        Err(ThemeNameProblem::InvalidCharacters)
+    );
+    assert_eq!(
+        validate_theme_name("Tema..Novo"),
+        Err(ThemeNameProblem::InvalidCharacters)
+    );
+    assert!(validate_theme_name("Meu Tema 2026").is_ok());
+    assert!(validate_theme_name("Tema Alto-Contraste").is_ok());
+
+    assert_eq!(derive_theme_id("Meu Tema 2026!"), "meu-tema-2026");
+    assert_eq!(
+        derive_theme_id("Tema com Acentos (São Paulo)"),
+        "tema-com-acentos-sao-paulo"
+    );
+    assert_eq!(derive_theme_id("..."), "meu-tema");
+    assert_ne!(derive_theme_id("default"), "default");
+}
+
+#[test]
+fn test_create_theme_from_default_and_installed_and_reject_duplicate() {
+    use crate::create::{
+        CreateThemeError, CreateThemeOptions, create_theme, is_tokens_only_theme, uses_default_ui,
+    };
+    use crate::overrides::ThemeTokensOverride;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+
+    let mut tokens = ThemeTokensOverride {
+        accent: Some("#6C5CE7".into()),
+        font: Some("Poppins".into()),
+        canvas: Some("#0E1116".into()),
+        ..ThemeTokensOverride::default()
+    };
+
+    let opts = CreateThemeOptions {
+        name: "Meu Tema Púrpura",
+        author: Some("Criador"),
+        version: Some("1.0.0"),
+        description: Some("Tema criado para testes"),
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+    };
+
+    let installed = create_theme(&themes_root, &opts).unwrap();
+    assert_eq!(installed.id(), "meu-tema-purpura");
+    assert!(installed.dir.join("theme.toml").is_file());
+    assert!(installed.dir.join("main.slint").is_file());
+    assert!(installed.dir.join("tokens.toml").is_file());
+    assert!(uses_default_ui(&installed.dir));
+    assert!(is_tokens_only_theme(&installed.dir));
+
+    let toml_str = fs::read_to_string(installed.dir.join("tokens.toml")).unwrap();
+    assert!(toml_str.contains("accent = \"#6C5CE7\""));
+    assert!(toml_str.contains("font = \"Poppins\""));
+
+    // Tentar criar de novo sem overwrite deve falhar com AlreadyExists
+    let err = create_theme(&themes_root, &opts).unwrap_err();
+    assert!(matches!(err, CreateThemeError::AlreadyExists(id) if id == "meu-tema-purpura"));
+
+    // Com overwrite = true, deve substituir com sucesso
+    tokens.accent = Some("#0B7A3B".into());
+    let opts_overwrite = CreateThemeOptions {
+        name: "Meu Tema Púrpura",
+        author: Some("Criador"),
+        version: Some("1.0.1"),
+        description: Some("Tema atualizado"),
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: true,
+    };
+    let updated = create_theme(&themes_root, &opts_overwrite).unwrap();
+    let updated_toml = fs::read_to_string(updated.dir.join("tokens.toml")).unwrap();
+    assert!(updated_toml.contains("accent = \"#0B7A3B\""));
+
+    // Criar um novo tema a partir do tema instalado como base
+    let base_tokens = ThemeTokensOverride::from_toml_str(&updated_toml);
+    let mut derived_tokens = base_tokens.clone();
+    derived_tokens.accent = Some("#E3161E".into());
+
+    let opts_derived = CreateThemeOptions {
+        name: "Tema Derivado",
+        author: Some("Outro"),
+        version: Some("1.0.0"),
+        description: None,
+        tokens: &derived_tokens,
+        background_image_source: None,
+        overwrite: false,
+    };
+    let derived = create_theme(&themes_root, &opts_derived).unwrap();
+    assert_eq!(derived.id(), "tema-derivado");
+    let derived_toml = fs::read_to_string(derived.dir.join("tokens.toml")).unwrap();
+    assert!(derived_toml.contains("accent = \"#E3161E\""));
+    assert!(derived_toml.contains("font = \"Poppins\""));
+}
+
+#[test]
+fn test_export_and_install_round_trip_with_background_image() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::export::export_theme;
+    use crate::install;
+    use crate::overrides::ThemeTokensOverride;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+    let src_dir = tmp.path().join("src");
+    fs::create_dir_all(&src_dir).unwrap();
+
+    // Cria uma imagem PNG de teste
+    let img = image::RgbaImage::new(32, 32);
+    let img_path = src_dir.join("meu-wallpaper.png");
+    img.save(&img_path).unwrap();
+
+    let tokens = ThemeTokensOverride {
+        accent: Some("#2B3A55".into()),
+        ..ThemeTokensOverride::default()
+    };
+
+    let opts = CreateThemeOptions {
+        name: "Tema com Wallpaper",
+        author: Some("Artista"),
+        version: Some("1.0.0"),
+        description: Some("Tema com imagem"),
+        tokens: &tokens,
+        background_image_source: Some(&img_path),
+        overwrite: false,
+    };
+
+    let created = create_theme(&themes_root, &opts).unwrap();
+    assert!(created.dir.join("background.png").is_file());
+    let tokens_content = fs::read_to_string(created.dir.join("tokens.toml")).unwrap();
+    assert!(tokens_content.contains("custom-background = \"background.png\""));
+
+    // Exporta para .takotheme
+    let export_dir = tmp.path().join("exported");
+    fs::create_dir_all(&export_dir).unwrap();
+    let pkg_path = export_dir.join("tema-com-wallpaper.takotheme");
+    export_theme(&created.dir, &pkg_path).unwrap();
+    assert!(pkg_path.is_file());
+
+    // Instala em outra pasta themes_root_2
+    let themes_root_2 = tmp.path().join("themes_dest");
+    let installed = install(&pkg_path, &themes_root_2).unwrap();
+    assert_eq!(installed.id(), "tema-com-wallpaper");
+    assert!(installed.dir.join("background.png").is_file());
+    assert!(installed.dir.join("tokens.toml").is_file());
+
+    let installed_tokens = fs::read_to_string(installed.dir.join("tokens.toml")).unwrap();
+    assert_eq!(installed_tokens, tokens_content);
+
+    // Valida o pacote instalado
+    let manifest = crate::package::validate_package(&installed.dir).unwrap();
+    assert_eq!(manifest.name, "Tema com Wallpaper");
+    assert_eq!(manifest.author, "Artista");
+}
