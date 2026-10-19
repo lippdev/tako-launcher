@@ -20,13 +20,17 @@ pub enum GameStore {
     Heroic,
     /// Lutris (Linux).
     Lutris,
+    /// Bottles (Linux).
+    Bottles,
+    /// itch.io (Linux).
+    Itch,
     /// ROMs abertas por emuladores (SRC-001): RetroArch, ES-DE, emuladores avulsos e as pastas do usuário.
     Emulators,
     Manual,
 }
 
 impl GameStore {
-    pub const ALL: [GameStore; 12] = [
+    pub const ALL: [GameStore; 14] = [
         GameStore::Steam,
         GameStore::Epic,
         GameStore::Gog,
@@ -37,6 +41,8 @@ impl GameStore {
         GameStore::Amazon,
         GameStore::Heroic,
         GameStore::Lutris,
+        GameStore::Bottles,
+        GameStore::Itch,
         GameStore::Emulators,
         GameStore::Manual,
     ];
@@ -54,6 +60,8 @@ impl GameStore {
             GameStore::Amazon => "Amazon",
             GameStore::Heroic => "Heroic",
             GameStore::Lutris => "Lutris",
+            GameStore::Bottles => "Bottles",
+            GameStore::Itch => "Itch",
             GameStore::Emulators => "Emulators",
             GameStore::Manual => "Manual",
         }
@@ -78,6 +86,8 @@ impl GameStore {
             GameStore::Amazon => "amazon",
             GameStore::Heroic => "heroic",
             GameStore::Lutris => "lutris",
+            GameStore::Bottles => "bottles",
+            GameStore::Itch => "itch",
             GameStore::Emulators => "emulator",
             GameStore::Manual => "manual",
         }
@@ -229,7 +239,8 @@ pub struct InstallOffer {
 pub struct Game {
     /// `steam:<appid>`, `epic:<AppName>`, `gog:<id>`, `xbox:<PackageFamily>`, `ubisoft:<installId>`,
     /// `ea:<contentId>`, `battlenet:<uid>`, `amazon:<productId>`, `heroic:<runner>:<appName>`,
-    /// `lutris:<slug>`, `emulator:<hash do caminho da ROM>`, `manual:<guid>`.
+    /// `lutris:<slug>`, `bottles:<bottle>:<program>`, `itch:<gameId>`,
+    /// `emulator:<hash do caminho da ROM>`, `manual:<guid>`.
     pub id: String,
     pub title: String,
     pub store: Option<GameStore>,
