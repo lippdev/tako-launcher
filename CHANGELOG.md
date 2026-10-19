@@ -18,8 +18,11 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 - **Ferramentas junto do jogo:** nas configurações do jogo, programas extras (overlay de FPS, mods) abrem com o jogo e podem fechar no fim, com a sua permissão.
 - **Links `tako://` no macOS:** atalhos e o Stream Deck abrem jogos e telas do Tako também no Mac.
 - **Pacotes Linux:** PKGBUILDs para o AUR e Flatpak no repositório (ainda não publicados).
+- **Bottles e itch.io no Linux:** os jogos instalados pelo Bottles e pelo app do itch.io aparecem na biblioteca.
 
 ### Correções
+- **Lista lenta e imagens que não carregavam (alpha.15):** os ícones da lista têm fila própria e não seguram mais as capas e os fundos; a interface só redesenha quando uma imagem chega, e arte que a loja não tem não é pedida de novo a cada abertura.
+- **Tempo de jogo:** jogo com sessão mas sem tempo registrado mostra "Não registrado" em vez de "Ainda não jogado".
 - **Janela no Windows:** Minimizar, Maximizar e Fechar da barra do desktop voltam a responder; o encaixe do Maximizar continua.
 - **Interface que fecha e reabre ao jogar:** logs novos para diagnosticar o problema (BUG-001).
 
