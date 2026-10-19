@@ -12,8 +12,6 @@ pub const CURRENT_API_VERSION: u32 = 1;
 /// Tamanho máximo permitido para um quadro de aperto de mão (64 KiB).
 pub const MAX_HANDSHAKE_FRAME_BYTES: usize = 64 * 1024;
 
-/// Tamanho máximo permitido para um arquivo de descoberta (64 KiB).
-pub const MAX_DISCOVERY_FILE_BYTES: usize = 64 * 1024;
 
 /// Resultado tipado da detecção do Console Mode (CMI-002).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,15 +62,6 @@ pub struct HelloServer {
     pub capabilities: Vec<String>,
 }
 
-/// Estrutura de um arquivo de descoberta local (`discovery.json`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DiscoveryDocument {
-    pub api: u32,
-    #[serde(default)]
-    pub version: String,
-    #[serde(default)]
-    pub capabilities: Vec<String>,
-}
 
 /// Codifica a mensagem `hello` do cliente com prefixo de 4 bytes little-endian.
 pub fn encode_hello_frame(api: u32) -> Result<Vec<u8>, ProtocolError> {
@@ -129,28 +118,6 @@ pub fn parse_hello_response(bytes: &[u8]) -> Result<ConsoleModeStatus, ProtocolE
     }
 }
 
-/// Lê e valida o conteúdo de um arquivo de descoberta (`discovery.json`).
-pub fn parse_discovery_content(bytes: &[u8]) -> Result<ConsoleModeStatus, ProtocolError> {
-    if bytes.len() > MAX_DISCOVERY_FILE_BYTES {
-        return Err(ProtocolError::FrameTooLarge(bytes.len()));
-    }
-    let doc: DiscoveryDocument =
-        serde_json::from_slice(bytes).map_err(|e| ProtocolError::Malformed(e.to_string()))?;
-
-    if doc.api == CURRENT_API_VERSION {
-        Ok(ConsoleModeStatus::Instalado {
-            versao_api: doc.api,
-            capacidades: doc.capabilities,
-        })
-    } else {
-        let versao = if doc.version.is_empty() {
-            format!("API v{}", doc.api)
-        } else {
-            doc.version
-        };
-        Ok(ConsoleModeStatus::Incompativel { versao })
-    }
-}
 
 /// Executa o aperto de mão com o Console Mode através de um fluxo `Read + Write`.
 pub fn perform_handshake<S: Read + Write>(stream: &mut S) -> ConsoleModeStatus {
@@ -360,34 +327,5 @@ mod tests {
         assert_eq!(status, ConsoleModeStatus::Erro);
     }
 
-    #[test]
-    fn parse_discovery_content_installed_success() {
-        let json = br#"{"api":1,"version":"1.0.4","capabilities":["fps","tv"]}"#;
-        let status = parse_discovery_content(json).unwrap();
-        assert_eq!(
-            status,
-            ConsoleModeStatus::Instalado {
-                versao_api: 1,
-                capacidades: vec!["fps".into(), "tv".into()],
-            }
-        );
-    }
 
-    #[test]
-    fn parse_discovery_content_incompatible() {
-        let json = br#"{"api":2,"version":"2.4.0","capabilities":[]}"#;
-        let status = parse_discovery_content(json).unwrap();
-        assert_eq!(
-            status,
-            ConsoleModeStatus::Incompativel {
-                versao: "2.4.0".into(),
-            }
-        );
-    }
-
-    #[test]
-    fn parse_discovery_content_malformed_returns_error() {
-        let json = b"{ invalid json content !@#$";
-        assert!(parse_discovery_content(json).is_err());
-    }
 }
