@@ -155,10 +155,21 @@ impl ServerHandle {
         self.active_conns.load(Ordering::Relaxed)
     }
 
+    pub fn generation(&self) -> u64 {
+        self.generation.load(Ordering::SeqCst)
+    }
+
     pub fn set_token(&self, new_token: String) {
-        if let Ok(mut t) = self.token.write() {
+        if let Ok(mut t) = self.token.write()
+            && *t != new_token
+        {
             *t = new_token;
             self.generation.fetch_add(1, Ordering::SeqCst);
+            if let Ok(mut streams) = self.active_streams.lock() {
+                for (_, s) in streams.map.drain() {
+                    let _ = s.shutdown(std::net::Shutdown::Both);
+                }
+            }
         }
     }
 
@@ -204,6 +215,7 @@ pub fn start_server<H: ApiHandler>(
     let socket_addr = SocketAddr::new(IpAddr::V4(ip), port);
     let listener = TcpListener::bind(socket_addr)?;
     let actual_addr = listener.local_addr()?;
+    let actual_port = actual_addr.port();
     let running = Arc::new(AtomicBool::new(true));
     let generation = Arc::new(AtomicU64::new(1));
     let token_holder = Arc::new(RwLock::new(token));
@@ -263,6 +275,7 @@ pub fn start_server<H: ApiHandler>(
                         let conn_gen = gen_flag.load(Ordering::SeqCst);
                         let s_map = streams_ref.clone();
                         let c_counter = conns_ref.clone();
+                        let s_port = actual_port;
 
                         std::thread::spawn(move || {
                             struct ConnGuard {
@@ -285,7 +298,7 @@ pub fn start_server<H: ApiHandler>(
                                 streams: s_map,
                                 conns: c_counter,
                             };
-                            let _ = handle_connection(stream, h, t, r, g, conn_gen);
+                            let _ = handle_connection(stream, h, t, r, g, conn_gen, s_port);
                         });
                     }
                     Err(_) => {
@@ -353,6 +366,17 @@ fn read_line_limited<R: BufRead>(
     Ok(Some(s))
 }
 
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 fn handle_connection<H: ApiHandler>(
     mut stream: TcpStream,
     handler: Arc<H>,
@@ -360,6 +384,7 @@ fn handle_connection<H: ApiHandler>(
     run_flag: Arc<AtomicBool>,
     gen_flag: Arc<AtomicU64>,
     conn_gen: u64,
+    server_port: u16,
 ) -> std::io::Result<()> {
     let cloned_stream = stream.try_clone()?;
     let mut reader = BufReader::new(cloned_stream);
@@ -392,6 +417,7 @@ fn handle_connection<H: ApiHandler>(
 
     // Lê cabeçalhos com limites estritos
     let mut auth_header: Option<String> = None;
+    let mut host_header: Option<String> = None;
     let mut total_bytes = 0usize;
     loop {
         let line = match read_line_limited(&mut reader, MAX_HEADER_LINE_BYTES) {
@@ -420,24 +446,49 @@ fn handle_connection<H: ApiHandler>(
                 r#"{"error":"Headers too large"}"#,
             );
         }
-        if let Some((name, val)) = line.split_once(':')
-            && name.trim().eq_ignore_ascii_case("authorization")
-        {
-            auth_header = Some(val.trim().to_string());
+        if let Some((name, val)) = line.split_once(':') {
+            let name_trim = name.trim();
+            if name_trim.eq_ignore_ascii_case("authorization") {
+                auth_header = Some(val.trim().to_string());
+            } else if name_trim.eq_ignore_ascii_case("host") {
+                host_header = Some(val.trim().to_string());
+            }
         }
     }
 
-    // Suporte a OPTIONS (CORS pre-flight local)
-    if method.eq_ignore_ascii_case("OPTIONS") {
-        return send_options_response(&mut stream);
+    // Proteção contra DNS rebinding: rejeita com 421 se Host não for 127.0.0.1:<porta> ou localhost:<porta>
+    let expected_host1 = format!("127.0.0.1:{server_port}");
+    let expected_host2 = format!("localhost:{server_port}");
+    let host_valid = host_header.as_deref().is_some_and(|h| {
+        h.eq_ignore_ascii_case(&expected_host1) || h.eq_ignore_ascii_case(&expected_host2)
+    });
+    if !host_valid {
+        return send_response(
+            &mut stream,
+            421,
+            "Misdirected Request",
+            r#"{"error":"Misdirected Request"}"#,
+        );
     }
 
-    // Validação de autenticação: Bearer <token>
+    // CORS pre-flight removido: responde 405 Method Not Allowed a OPTIONS
+    if method.eq_ignore_ascii_case("OPTIONS") {
+        return send_response(
+            &mut stream,
+            405,
+            "Method Not Allowed",
+            r#"{"error":"Method not allowed"}"#,
+        );
+    }
+
+    // Validação de autenticação: Bearer <token> em tempo constante
     let expected_token = token_holder.read().map(|t| t.clone()).unwrap_or_default();
 
     let authorized = auth_header.as_deref().is_some_and(|h| {
         if let Some(provided) = h.strip_prefix("Bearer ") {
-            !provided.is_empty() && provided == expected_token
+            !provided.is_empty()
+                && !expected_token.is_empty()
+                && constant_time_eq(provided.as_bytes(), expected_token.as_bytes())
         } else {
             false
         }
@@ -619,22 +670,10 @@ fn send_response(
          Content-Type: application/json; charset=utf-8\r\n\
          Content-Length: {}\r\n\
          Connection: close\r\n\
-         Access-Control-Allow-Origin: *\r\n\
          \r\n\
          {body}",
         body.len()
     );
-    stream.write_all(response.as_bytes())?;
-    stream.flush()
-}
-
-fn send_options_response(stream: &mut TcpStream) -> std::io::Result<()> {
-    let response = "HTTP/1.1 204 No Content\r\n\
-         Access-Control-Allow-Origin: *\r\n\
-         Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
-         Access-Control-Allow-Headers: Authorization, Content-Type\r\n\
-         Connection: close\r\n\
-         \r\n";
     stream.write_all(response.as_bytes())?;
     stream.flush()
 }
@@ -1050,5 +1089,100 @@ mod tests {
             handler.played.lock().unwrap().is_empty(),
             "nenhuma ação deve ter sido executada"
         );
+    }
+    #[test]
+    fn options_method_returns_405_and_no_cors_wildcard() {
+        let handler = Arc::new(MockHandler::new());
+        let server = start_server(Ipv4Addr::LOCALHOST, 0, "secret".into(), handler).unwrap();
+        let port = server.port();
+
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        use std::io::Read;
+        let _ = write!(
+            stream,
+            "OPTIONS /api/v1/games HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n"
+        );
+        let mut response = String::new();
+        let _ = BufReader::new(&mut stream).read_to_string(&mut response);
+        assert!(response.starts_with("HTTP/1.1 405 Method Not Allowed"));
+        assert!(!response.contains("Access-Control-Allow-Origin"));
+    }
+
+    #[test]
+    fn dns_rebinding_rejected_with_421() {
+        let handler = Arc::new(MockHandler::new());
+        let server = start_server(Ipv4Addr::LOCALHOST, 0, "secret".into(), handler).unwrap();
+        let port = server.port();
+
+        use std::io::Read;
+        // 1. Host externo (ex: attacker.com) -> 421 Misdirected Request
+        let mut stream1 = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        let _ = write!(
+            stream1,
+            "GET /api/v1/games HTTP/1.1\r\nHost: attacker.com\r\nAuthorization: Bearer secret\r\n\r\n"
+        );
+        let mut res1 = String::new();
+        let _ = BufReader::new(&mut stream1).read_to_string(&mut res1);
+        assert!(res1.starts_with("HTTP/1.1 421 Misdirected Request"));
+
+        // 2. Sem cabeçalho Host -> 421 Misdirected Request
+        let mut stream2 = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        let _ = write!(
+            stream2,
+            "GET /api/v1/games HTTP/1.1\r\nAuthorization: Bearer secret\r\n\r\n"
+        );
+        let mut res2 = String::new();
+        let _ = BufReader::new(&mut stream2).read_to_string(&mut res2);
+        assert!(res2.starts_with("HTTP/1.1 421 Misdirected Request"));
+
+        // 3. Host localhost com porta correta -> 200 OK
+        let mut stream3 = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        let _ = write!(
+            stream3,
+            "GET /api/v1/games HTTP/1.1\r\nHost: localhost:{port}\r\nAuthorization: Bearer secret\r\n\r\n"
+        );
+        let mut res3 = String::new();
+        let _ = BufReader::new(&mut stream3).read_to_string(&mut res3);
+        assert!(res3.starts_with("HTTP/1.1 200 OK"));
+    }
+
+    #[test]
+    fn set_token_only_increments_generation_when_changed_and_closes_connections() {
+        let handler = Arc::new(MockHandler::new());
+        let server = start_server(Ipv4Addr::LOCALHOST, 0, "token_inicial".into(), handler).unwrap();
+        let port = server.port();
+
+        let gen0 = server.generation();
+
+        // Mesma string: não deve incrementar geração
+        server.set_token("token_inicial".into());
+        assert_eq!(server.generation(), gen0);
+
+        // Conecta uma stream
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Token novo: deve incrementar geração e encerrar conexões aceitas
+        server.set_token("token_diferente".into());
+        assert_eq!(server.generation(), gen0 + 1);
+
+        // A stream antiga deve estar encerrada / desconectada
+        use std::io::Read;
+        let _ = write!(
+            stream,
+            "GET /api/v1/games HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer token_diferente\r\n\r\n"
+        );
+        let mut res = String::new();
+        let _ = BufReader::new(&mut stream).read_to_string(&mut res);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn test_constant_time_eq() {
+        assert!(constant_time_eq(b"abcdef", b"abcdef"));
+        assert!(!constant_time_eq(b"abcdef", b"abcdeg"));
+        assert!(!constant_time_eq(b"abcdef", b"abcde"));
+        assert!(!constant_time_eq(b"", b"a"));
+        assert!(constant_time_eq(b"", b""));
     }
 }
