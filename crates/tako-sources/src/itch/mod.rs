@@ -1,4 +1,4 @@
-//! itch.io (Linux, SRC-002): jogos instalados lidos de `butler.db` do app oficial sem o itch aberto.
+//! itch.io (Linux, SRC-002): jogos instalados lidos de `butler.db` do app itch (>= 26.17.0) sem o itch aberto.
 //!
 //! O itch.io desktop utiliza o `butler` / `butlerd` como daemon e banco local SQLite em:
 //! `~/.config/itch/db/butler.db` (nativo) ou `~/.var/app/io.itch.itch/config/itch/db/butler.db` (Flatpak).
@@ -16,8 +16,8 @@
 //!
 //!    Abrir o executável diretamente permite ao Tako acompanhar o processo (`GameTrackingStrategy::Process`),
 //!    contar o tempo de sessão e fechar limpo sem intermediários.
-//! 2. **Protocolo `itch://`:** Sintaxe oficial do app itch (github.com/itchio/itch e itchio/itch-setup, itch.io app docs):
-//!    `itch://install?game_id=<id>&launch`. O app oficial abre e solicita confirmação do usuário antes da execução.
+//! 2. **Protocolo `itch://`:** Sintaxe do app itch (versão mínima 26.17.0, que trouxe `&launch`):
+//!    `itch://install?game_id=<id>&launch`. O app itch (>= 26.17.0) abre e solicita confirmação do usuário antes da execução.
 //!    Utilizado quando não há binário Linux único identificado, para jogos HTML5 ou quando o executável não é encontrado.
 
 use crate::{LibraryScan, LibrarySource, read_limited};
@@ -192,6 +192,7 @@ fn resolve_manifest_executable(game_dir: &Path) -> Option<Option<PathBuf>> {
 #[derive(serde::Deserialize)]
 struct DashVerdict {
     #[serde(rename = "basePath", default)]
+    #[allow(dead_code)]
     base_path: Option<String>,
     #[serde(default)]
     candidates: Vec<DashCandidate>,
@@ -209,6 +210,9 @@ struct DashCandidate {
 
 /// Avalia os `candidates` do JSON em `caves.verdict`.
 /// Usa apenas quando houver exatamente um candidato Linux.
+/// Aplica as mesmas validações de segurança do `.itch.toml`:
+/// ignora o `basePath` e usa sempre `game_dir`, recusa caminhos absolutos ou com `..`,
+/// canonicaliza o destino e exige que esteja dentro de `game_dir`.
 fn resolve_verdict_executable(game_dir: &Path, verdict_str: &str) -> Option<PathBuf> {
     let verdict: DashVerdict = serde_json::from_str(verdict_str).ok()?;
     let linux_candidates: Vec<&DashCandidate> = verdict
@@ -222,24 +226,37 @@ fn resolve_verdict_executable(game_dir: &Path, verdict_str: &str) -> Option<Path
     }
 
     let candidate = linux_candidates[0];
-    let rel_path = candidate
-        .path
+    let path_str = candidate.path.trim();
+
+    // Recusa caminho absoluto ou subida de diretório ".."
+    if path_str.starts_with('/') || Path::new(path_str).is_absolute() || path_str.contains("..") {
+        return None;
+    }
+
+    let rel_path = path_str
         .split('/')
         .fold(PathBuf::new(), |acc, part| acc.join(part));
 
-    let base = verdict
-        .base_path
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| game_dir.to_path_buf());
+    // Ignora o basePath do verdict e usa sempre game_dir
+    let candidate_target = game_dir.join(&rel_path);
 
-    let target = base.join(&rel_path);
-    if target.is_file() { Some(target) } else { None }
+    // Canonicaliza e exige starts_with(game_dir)
+    let (Ok(canonical_game_dir), Ok(canonical_target)) =
+        (game_dir.canonicalize(), candidate_target.canonicalize())
+    else {
+        return None;
+    };
+
+    if !canonical_target.starts_with(&canonical_game_dir) || !canonical_target.is_file() {
+        return None;
+    }
+
+    Some(candidate_target)
 }
 
 /// Tenta encontrar o executável principal dentro da pasta do jogo no itch.io.
 /// Consulta primeiro o `.itch.toml` e, em seguida, os `candidates` do `verdict` do butler.
+/// Ignora payloads de verdict acima de 1 MiB.
 pub fn find_executable(game_dir: &Path, verdict_json: Option<&str>) -> Option<PathBuf> {
     if !game_dir.is_dir() {
         return None;
@@ -250,8 +267,9 @@ pub fn find_executable(game_dir: &Path, verdict_json: Option<&str>) -> Option<Pa
         return manifest_result;
     }
 
-    // 2. Candidates em `caves.verdict` (apenas quando houver exatamente um candidato Linux)
-    if let Some(v) = verdict_json.filter(|s| !s.trim().is_empty()) {
+    // 2. Candidates em `caves.verdict` (apenas quando houver exatamente um candidato Linux e <= 1 MiB)
+    const MAX_VERDICT_BYTES: usize = 1024 * 1024;
+    if let Some(v) = verdict_json.filter(|s| !s.trim().is_empty() && s.len() <= MAX_VERDICT_BYTES) {
         return resolve_verdict_executable(game_dir, v);
     }
 
@@ -298,7 +316,7 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
                 c.install_folder_name,
                 c.install_location_id,
                 c.custom_install_folder,
-                c.verdict,
+                CASE WHEN length(c.verdict) <= 1048576 THEN c.verdict ELSE NULL END,
                 c.installed_size,
                 c.seconds_run,
                 c.last_touched_at
@@ -368,7 +386,7 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
             default_apps_dir.join(format!("game-{game_id}"))
         };
 
-        // Resolução do alvo de abertura: executável direto com fallback para o protocolo oficial itch://
+        // Resolução do alvo de abertura: executável direto com fallback para o protocolo itch:// (>= 26.17.0)
         let exe = find_executable(&game_dir, verdict.as_deref());
         let (launch_target, working_directory, tracking) = if let Some(target) = exe {
             let cwd = target

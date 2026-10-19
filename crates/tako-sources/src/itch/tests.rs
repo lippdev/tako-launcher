@@ -318,6 +318,119 @@ fn verdict_no_linux_candidates_falls_back_to_protocol() {
 }
 
 #[test]
+fn verdict_larger_than_1_mib_is_ignored_and_falls_back_to_protocol() {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("butler.db");
+    let apps_dir = dir.path().join("apps");
+    let game_dir = apps_dir.join("celeste_classic");
+    fs::create_dir_all(&game_dir).unwrap();
+
+    let exe_path = game_dir.join("celeste.x86_64");
+    fs::write(&exe_path, b"fake binary").unwrap();
+
+    // Cria um payload maior que 1 MiB (1_048_576 bytes)
+    let padding = "a".repeat(1_048_577);
+    let large_verdict = format!(
+        r#"{{"basePath":"{}","candidates":[{{"path":"celeste.x86_64","flavor":"linux"}}],"_padding":"{}"}}"#,
+        game_dir.display(),
+        padding
+    );
+    assert!(large_verdict.len() > 1024 * 1024);
+
+    setup_test_db(&db_path, &apps_dir, Some(&large_verdict));
+
+    let games = read_games(&db_path).unwrap();
+    assert_eq!(games.len(), 1);
+    // Cai no fallback do protocolo itch:// porque o verdict > 1 MiB foi ignorado
+    assert_eq!(
+        games[0].launch_target.as_deref(),
+        Some("itch://install?game_id=42&launch")
+    );
+}
+
+#[test]
+fn verdict_absolute_path_falls_back_to_protocol() {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("butler.db");
+    let apps_dir = dir.path().join("apps");
+    let game_dir = apps_dir.join("celeste_classic");
+    fs::create_dir_all(&game_dir).unwrap();
+
+    let verdict = serde_json::json!({
+        "basePath": game_dir.to_str().unwrap(),
+        "candidates": [
+            { "path": "/bin/sh", "flavor": "linux" }
+        ]
+    })
+    .to_string();
+
+    setup_test_db(&db_path, &apps_dir, Some(&verdict));
+
+    let games = read_games(&db_path).unwrap();
+    assert_eq!(games.len(), 1);
+    assert_eq!(
+        games[0].launch_target.as_deref(),
+        Some("itch://install?game_id=42&launch")
+    );
+}
+
+#[test]
+fn verdict_parent_traversal_falls_back_to_protocol() {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("butler.db");
+    let apps_dir = dir.path().join("apps");
+    let game_dir = apps_dir.join("celeste_classic");
+    fs::create_dir_all(&game_dir).unwrap();
+
+    let verdict = serde_json::json!({
+        "basePath": game_dir.to_str().unwrap(),
+        "candidates": [
+            { "path": "../escape.sh", "flavor": "linux" }
+        ]
+    })
+    .to_string();
+
+    setup_test_db(&db_path, &apps_dir, Some(&verdict));
+
+    let games = read_games(&db_path).unwrap();
+    assert_eq!(games.len(), 1);
+    assert_eq!(
+        games[0].launch_target.as_deref(),
+        Some("itch://install?game_id=42&launch")
+    );
+}
+
+#[test]
+fn verdict_ignores_base_path_and_uses_game_dir() {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("butler.db");
+    let apps_dir = dir.path().join("apps");
+    let game_dir = apps_dir.join("celeste_classic");
+    fs::create_dir_all(&game_dir).unwrap();
+
+    let exe_path = game_dir.join("celeste.x86_64");
+    fs::write(&exe_path, b"fake binary").unwrap();
+
+    // basePath aponta para pasta externa inexistente/arbitrária, mas o executável está em game_dir
+    let verdict = serde_json::json!({
+        "basePath": "/tmp/outra_pasta/arbitraria",
+        "candidates": [
+            { "path": "celeste.x86_64", "flavor": "linux" }
+        ]
+    })
+    .to_string();
+
+    setup_test_db(&db_path, &apps_dir, Some(&verdict));
+
+    let games = read_games(&db_path).unwrap();
+    assert_eq!(games.len(), 1);
+    assert_eq!(
+        games[0].launch_target.as_deref(),
+        Some(exe_path.to_str().unwrap())
+    );
+}
+
+#[test]
 fn reads_installed_games_custom_install_folder() {
     let dir = tempdir().unwrap();
     let db_path = dir.path().join("butler.db");
