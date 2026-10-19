@@ -41,7 +41,12 @@ export component Octopus inherits Rectangle {
     // "Reduzir animações": o polvo já vem completo e parado.
     property <float> p: Ui.reduce-motion ? 1 : (self-assemble ? own : max(progress, 0));
     property <bool> done: p >= 0.88;
-    property <bool> alive: done && !Ui.reduce-motion;
+    // A TelaCarregamento ondula até o app abrir; no app, só tamanhos de ~90 para cima, por 3 ciclos (7,2 s) e depois
+    // parado: ondulação infinita redesenharia a janela inteira a cada quadro.
+    in property <bool> wave-forever: false;
+    property <bool> can-wave: done && self.width >= 90px && !Ui.reduce-motion;
+    property <bool> settled;
+    property <bool> alive: can-wave && (wave-forever || !settled);
     property <length> h: self.width * (with-name ? 802 / 704 : 0.77);
     // Alto fixo pelos três limites (num layout, só `height` não vale e o corte sem o nome seria esticado).
     min-height: h;
@@ -55,6 +60,11 @@ export component Octopus inherits Rectangle {
             self.running = false;
             started = true;
         }
+    }
+    Timer {
+        interval: 7200ms;
+        running: can-wave && !wave-forever && !settled;
+        triggered => { settled = true; }
     }
     // `x` e `y` explícitos: sem eles o Slint centraliza o filho, e o corte sem o nome sairia dos dois lados.
     Rectangle {

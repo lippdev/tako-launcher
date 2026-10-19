@@ -1190,7 +1190,7 @@ component EmptyList inherits VerticalLayout {
     padding-bottom: Ui.space-36;
     HorizontalLayout {
         alignment: center;
-        Octopus { width: 94px; with-name: false; self-assemble: true; opacity: 0.85; accessible-role: none; }
+        Octopus { width: 94px; with-name: false; self-assemble: true; accessible-role: none; }
     }
     Text { text: title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-label-lg; font-weight: 700; horizontal-alignment: center; wrap: word-wrap; }
     if text != "": Text { text: text; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; horizontal-alignment: center; wrap: word-wrap; }
@@ -2892,8 +2892,6 @@ component DeskLibrary inherits Rectangle {
                     padding-left: 9px;
                     padding-right: 8px;
                     spacing: 2px;
-                    // Espera (BRAND-001): o polvo pequeno acompanha "Lendo a biblioteca…".
-                    if loading: Octopus { y: (parent.height - self.height) / 2; width: 30px; with-name: false; self-assemble: true; accessible-role: none; }
                     Text {
                         text: loading ? loading-label : (small ? count-short : count);
                         color: selecting ? Ui.on-accent : Ui.desk-on-subtle;
@@ -2902,6 +2900,13 @@ component DeskLibrary inherits Rectangle {
                         vertical-alignment: center;
                         horizontal-stretch: 1;
                         overflow: elide;
+                    }
+                    // Espera (BRAND-001): o polvo pequeno (só monta, sem ondular), num espaço sempre reservado para o
+                    // texto não andar quando ele some.
+                    Rectangle {
+                        width: 22px;
+                        // Fora de layout o alto do Octopus não vem dos limites dele: o corte sem o nome pede `height`.
+                        if loading: Octopus { x: 0; y: (parent.height - self.height) / 2; width: 22px; height: 17px; with-name: false; self-assemble: true; accessible-role: none; }
                     }
                     IconBtn {
                         y: (parent.height - self.height) / 2;
