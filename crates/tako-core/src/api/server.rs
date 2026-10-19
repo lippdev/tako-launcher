@@ -601,8 +601,8 @@ fn handle_connection<H: ApiHandler>(
             let json = serde_json::to_string(&state).unwrap_or_else(|_| "{}".into());
             send_response(&mut stream, 200, "OK", &json)
         }
-        ("POST", ["api", "v1", "games", raw_id, "open"]) => {
-            let Ok(id) = decode_path_id(raw_id) else {
+        ("POST", ["api", "v1", "games", raw_id, action @ ("open" | "play")]) => {
+            let Some(id) = crate::links::decode_id(raw_id) else {
                 return send_response(
                     &mut stream,
                     400,
@@ -629,58 +629,13 @@ fn handle_connection<H: ApiHandler>(
                 );
             }
 
-            match handler.open_game(&id) {
-                Ok(()) => {
-                    let json = serde_json::json!({ "success": true, "id": id }).to_string();
-                    send_response(&mut stream, 200, "OK", &json)
-                }
-                Err(ApiActionError::NotFound) => send_response(
-                    &mut stream,
-                    404,
-                    "Not Found",
-                    r#"{"error":"Game not found"}"#,
-                ),
-                Err(ApiActionError::Unavailable) => send_response(
-                    &mut stream,
-                    503,
-                    "Service Unavailable",
-                    r#"{"error":"Interface unavailable"}"#,
-                ),
-                Err(ApiActionError::Other(e)) => {
-                    let json = serde_json::json!({ "error": e }).to_string();
-                    send_response(&mut stream, 500, "Internal Server Error", &json)
-                }
-            }
-        }
-        ("POST", ["api", "v1", "games", raw_id, "play"]) => {
-            let Ok(id) = decode_path_id(raw_id) else {
-                return send_response(
-                    &mut stream,
-                    400,
-                    "Bad Request",
-                    r#"{"error":"Invalid percent-encoding"}"#,
-                );
+            let result = if *action == "open" {
+                handler.open_game(&id)
+            } else {
+                handler.play_game(&id)
             };
 
-            // Revalidação de sessão e geração ativa antes do despacho
-            if !run_flag.load(Ordering::SeqCst) {
-                return send_response(
-                    &mut stream,
-                    503,
-                    "Service Unavailable",
-                    r#"{"error":"Interface unavailable"}"#,
-                );
-            }
-            if gen_flag.load(Ordering::SeqCst) != conn_gen {
-                return send_response(
-                    &mut stream,
-                    401,
-                    "Unauthorized",
-                    r#"{"error":"Unauthorized"}"#,
-                );
-            }
-
-            match handler.play_game(&id) {
+            match result {
                 Ok(()) => {
                     let json = serde_json::json!({ "success": true, "id": id }).to_string();
                     send_response(&mut stream, 200, "OK", &json)
@@ -717,25 +672,6 @@ fn handle_connection<H: ApiHandler>(
         ),
         _ => send_response(&mut stream, 404, "Not Found", r#"{"error":"Not found"}"#),
     }
-}
-
-/// Decodifica percent-encoding de um identificador na URL (ex: `steam%3A570` -> `steam:570`).
-/// Retorna `Err(())` se houver sequência inválida ou se o resultado não for UTF-8 válido.
-fn decode_path_id(raw: &str) -> Result<String, ()> {
-    let mut bytes = raw.bytes();
-    let mut decoded = Vec::new();
-    while let Some(b) = bytes.next() {
-        if b == b'%' {
-            let hi_byte = bytes.next().ok_or(())?;
-            let lo_byte = bytes.next().ok_or(())?;
-            let hi = (hi_byte as char).to_digit(16).ok_or(())?;
-            let lo = (lo_byte as char).to_digit(16).ok_or(())?;
-            decoded.push((hi * 16 + lo) as u8);
-        } else {
-            decoded.push(b);
-        }
-    }
-    String::from_utf8(decoded).map_err(|_| ())
 }
 
 fn send_response(

@@ -35,8 +35,10 @@ impl LocalApiHandler {
             return Err(ApiActionError::NotFound);
         }
 
-        let clean_id = tako_core::links::decode_id(id).unwrap_or_else(|| id.to_string());
-        let link = tako_core::links::Link::Game { id: clean_id, play };
+        let link = tako_core::links::Link::Game {
+            id: id.to_string(),
+            play,
+        };
 
         slint::invoke_from_event_loop(move || {
             crate::app::dispatch_link(link);
