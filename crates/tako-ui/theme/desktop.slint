@@ -4116,39 +4116,66 @@ component FooterLink inherits Rectangle {
 }
 
 // Rodapé dos popups: as linhas de botão, à direita, na ordem do Tako.
-component PopupFooter inherits HorizontalLayout {
+component PopupFooter inherits Rectangle {
     in property <[PanelRow]> rows;
     in property <int> sel;
     in property <bool> key-focus;
     callback clicked(int);
-    horizontal-stretch: 1;
-    alignment: end;
-    if rows.length >= 3 || self.width < 440px: VerticalLayout {
+
+    pure function has-btn-before(i: int) -> bool {
+        return i > 0 && rows[i - 1].kind == "button";
+    }
+
+    measure := HorizontalLayout {
+        visible: false;
+        height: 0px;
+        spacing: 0px;
+        for r[i] in rows: Rectangle {
+            width: r.kind == "button" ? (btn-m.width + (root.has-btn-before(i) ? 10px : 0px)) : 0px;
+            btn-m := PopupButton {
+                data: r;
+            }
+        }
+    }
+
+    property <bool> stack: measure.preferred-width > root.width;
+
+    height: stack ? vl.preferred-height : Ui.control-height;
+
+    vl := VerticalLayout {
+        visible: stack;
         width: root.width;
         alignment: end;
-        spacing: 8px;
+        spacing: 0px;
         for r[i] in rows: Rectangle {
-            height: r.kind == "button" ? Ui.control-height : 0px;
+            height: r.kind == "button" ? (Ui.control-height + (root.has-btn-before(i) ? 8px : 0px)) : 0px;
             width: parent.width;
-            visible: r.kind == "button";
+            clip: true;
             if r.kind == "button": PopupButton {
+                y: root.has-btn-before(i) ? 8px : 0px;
                 width: parent.width;
-                height: parent.height;
+                height: Ui.control-height;
                 data: r;
                 focused: key-focus && i == sel;
                 clicked => { root.clicked(i); }
             }
         }
     }
-    if rows.length < 3 && self.width >= 440px: HorizontalLayout {
+
+    if !stack: HorizontalLayout {
         width: root.width;
         alignment: end;
-        spacing: 10px;
-        for r[i] in rows: PopupButton {
-            visible: r.kind == "button";
-            data: r;
-            focused: key-focus && i == sel;
-            clicked => { root.clicked(i); }
+        spacing: 0px;
+        for r[i] in rows: Rectangle {
+            width: r.kind == "button" ? (btn-h.width + (root.has-btn-before(i) ? 10px : 0px)) : 0px;
+            height: Ui.control-height;
+            clip: true;
+            if r.kind == "button": btn-h := PopupButton {
+                x: root.has-btn-before(i) ? 10px : 0px;
+                data: r;
+                focused: key-focus && i == sel;
+                clicked => { root.clicked(i); }
+            }
         }
     }
 }
