@@ -47,15 +47,16 @@ impl MetadataCache {
     }
 }
 
-/// Grava num `.tmp` e renomeia: queda no meio não deixa arquivo pela metade.
+/// Grava num temporário único e renomeia: gravações concorrentes não se atropelam.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    let mut tmp = path.as_os_str().to_owned();
-    tmp.push(".tmp");
-    std::fs::write(&tmp, bytes)?;
-    std::fs::rename(&tmp, path)
+    let dir = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
+    std::io::Write::write_all(&mut tmp, bytes)?;
+    tmp.as_file().sync_all()?;
+    tmp.persist(path).map(|_| ()).map_err(|e| e.error)
 }
 
 #[cfg(test)]
@@ -80,5 +81,19 @@ mod tests {
         );
         std::fs::write(cache.path_for("x"), "{ quebrado").unwrap();
         assert!(cache.read("x").is_none());
+    }
+
+    #[test]
+    fn atomic_writes_use_distinct_temporaries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("shared.json");
+        std::thread::scope(|scope| {
+            for value in [b"first".as_slice(), b"second".as_slice()] {
+                let path = &path;
+                scope.spawn(move || write_atomic(path, value).unwrap());
+            }
+        });
+        let bytes = std::fs::read(path).unwrap();
+        assert!(bytes == b"first" || bytes == b"second");
     }
 }
