@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 struct State {
     next: EngineId,
     started: Vec<(String, PathBuf)>,
+    resumes: Vec<bool>,
     status: HashMap<EngineId, EngineStatus>,
     paused: HashMap<EngineId, bool>,
     removed: Vec<(EngineId, bool)>,
@@ -50,6 +51,10 @@ impl MemoryDownloader {
     pub fn started(&self) -> Vec<(String, PathBuf)> {
         self.with(|s| s.started.clone())
     }
+    /// O `resume` de cada `start`, em ordem.
+    pub fn resumes(&self) -> Vec<bool> {
+        self.with(|s| s.resumes.clone())
+    }
     pub fn removed(&self) -> Vec<(EngineId, bool)> {
         self.with(|s| s.removed.clone())
     }
@@ -59,9 +64,10 @@ impl MemoryDownloader {
 }
 
 impl Downloader for MemoryDownloader {
-    fn start(&mut self, uri: &str, folder: &Path) -> Result<EngineId, DownloadError> {
+    fn start(&mut self, uri: &str, folder: &Path, resume: bool) -> Result<EngineId, DownloadError> {
         Ok(self.with(|s| {
             s.next += 1;
+            s.resumes.push(resume);
             s.started.push((uri.to_owned(), folder.to_owned()));
             s.status.insert(s.next, EngineStatus::default());
             s.next

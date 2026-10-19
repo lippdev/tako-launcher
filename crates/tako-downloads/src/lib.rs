@@ -1,13 +1,14 @@
 //! Downloads por torrent do Tako (DL-001, ADR-0028): o motor `librqbit` numa thread própria com `tokio`, atrás do
 //! trait [`tako_core::downloads::Downloader`], e a leitura das fontes `.json` do usuário por `https`.
 //!
-//! Padrões conservadores (ADR-0028 §2 e §7): nenhuma porta aberta (sem escuta, sem UPnP), sem LSD, sem
-//! persistência do motor, limite de envio, e o torrent sai do motor ao terminar (sem semear). Antes de gravar, os
-//! caminhos de dentro do torrent são validados e o espaço livre é conferido. Nada do conteúdo baixado é executado.
+//! Padrões conservadores (ADR-0028 §2 e §7): sem porta TCP de entrada para pares e sem UPnP (o DHT, necessário
+//! para magnet, usa uma porta UDP), sem LSD, sem arquivos de estado do motor nem do DHT, limite de envio, e o
+//! torrent sai do motor ao terminar (sem semear). Antes de gravar, os caminhos de dentro do torrent são validados
+//! (inclusive contra links simbólicos) e o espaço livre é conferido. Nada do conteúdo baixado é executado.
 
 use librqbit::{
-    AddTorrent, AddTorrentOptions, AddTorrentResponse, ManagedTorrent, Session, SessionOptions,
-    api::TorrentIdOrHash, limits::LimitsConfig,
+    AddTorrent, AddTorrentOptions, AddTorrentResponse, DhtSessionConfig, ManagedTorrent, Session,
+    SessionOptions, api::TorrentIdOrHash, limits::LimitsConfig,
 };
 use std::collections::HashMap;
 use std::num::NonZeroU32;
@@ -71,7 +72,7 @@ pub struct EngineOptions {
 }
 
 enum Cmd {
-    Start(EngineId, String, PathBuf),
+    Start(EngineId, String, PathBuf, bool),
     Pause(EngineId),
     Resume(EngineId),
     Remove(EngineId, bool),
@@ -124,13 +125,13 @@ impl TorrentEngine {
 }
 
 impl Downloader for TorrentEngine {
-    fn start(&mut self, uri: &str, folder: &Path) -> Result<EngineId, DownloadError> {
+    fn start(&mut self, uri: &str, folder: &Path, resume: bool) -> Result<EngineId, DownloadError> {
         let uri = tako_core::downloads::source::valid_uri(uri).ok_or(DownloadError::InvalidUri)?;
         self.next += 1;
         lock(&self.state)
             .status
             .insert(self.next, EngineStatus::default());
-        self.send(Cmd::Start(self.next, uri, folder.to_owned()));
+        self.send(Cmd::Start(self.next, uri, folder.to_owned(), resume));
         Ok(self.next)
     }
     fn pause(&mut self, id: EngineId) {
@@ -150,8 +151,13 @@ impl Downloader for TorrentEngine {
 
 async fn session(folder: &Path, options: EngineOptions) -> Result<Arc<Session>, String> {
     let opts = SessionOptions {
-        // Sem escuta (nenhuma porta aberta, nem por UPnP), sem LSD e sem arquivos de estado do motor.
+        // Sem escuta TCP para pares e sem UPnP; o DHT escuta UDP (magnet precisa dele), sem gravar `dht.json`.
+        // Sem LSD e sem arquivos de estado do motor.
         listen: None,
+        dht: Some(DhtSessionConfig {
+            persistence: None,
+            ..Default::default()
+        }),
         persistence: None,
         fastresume: false,
         disable_local_service_discovery: true,
@@ -175,7 +181,7 @@ async fn run(mut rx: mpsc::UnboundedReceiver<Cmd>, state: State, options: Engine
             cmd = rx.recv() => {
                 let Some(cmd) = cmd else { break };
                 match cmd {
-                    Cmd::Start(id, uri, folder) => {
+                    Cmd::Start(id, uri, folder, resume) => {
                         if current.is_none() {
                             match session(&folder, options).await {
                                 Ok(s) => current = Some(s),
@@ -186,7 +192,7 @@ async fn run(mut rx: mpsc::UnboundedReceiver<Cmd>, state: State, options: Engine
                             }
                         }
                         if let Some(s) = current.clone() {
-                            tokio::spawn(start(s, state.clone(), id, uri, folder));
+                            tokio::spawn(start(s, state.clone(), id, uri, folder, resume));
                         }
                     }
                     Cmd::Pause(id) => {
@@ -239,8 +245,15 @@ fn refresh(state: &State) {
 }
 
 /// Metadados primeiro (sem gravar nada), depois a checagem dos caminhos e do espaço, e só então o download.
-async fn start(session: Arc<Session>, state: State, id: EngineId, uri: String, folder: PathBuf) {
-    if let Err(e) = add(&session, &state, id, &uri, &folder).await {
+async fn start(
+    session: Arc<Session>,
+    state: State,
+    id: EngineId,
+    uri: String,
+    folder: PathBuf,
+    resume: bool,
+) {
+    if let Err(e) = add(&session, &state, id, &uri, &folder, resume).await {
         fail(&state, id, e);
     }
 }
@@ -251,6 +264,7 @@ async fn add(
     id: EngineId,
     uri: &str,
     folder: &Path,
+    resume: bool,
 ) -> Result<(), DownloadError> {
     // Mensagens fixas: o texto dos erros de rede e do motor pode ter a URL, o hash ou caminhos (fora do log).
     let engine = |e: &str| DownloadError::Engine(e.to_owned());
@@ -279,17 +293,20 @@ async fn add(
         return Err(engine("resposta inesperada do motor"));
     };
     let mut total = 0u64;
+    let mut files = Vec::new();
     for f in listed.info.iter_file_details() {
         let parts = f.filename.to_vec();
-        let ok = !f.attrs().symlink
-            && f.symlink_path.is_none()
-            && paths::safe_relative(&parts).is_some_and(|p| paths::inside(folder, &p));
-        if !ok {
-            return Err(DownloadError::UnsafePaths);
+        let rel = paths::safe_relative(&parts).filter(|p| paths::inside(folder, p));
+        match rel {
+            Some(rel) if !f.attrs().symlink && f.symlink_path.is_none() => files.push(rel),
+            _ => return Err(DownloadError::UnsafePaths),
         }
         total = total.saturating_add(f.len);
     }
+    check_folder(folder, &files, resume)?;
     std::fs::create_dir_all(folder).map_err(|_| engine("não deu para criar a pasta"))?;
+    // De novo depois de criar: nada trocou a pasta por um link no meio do caminho.
+    check_folder(folder, &files, true)?;
     if let Some(free) = tako_platform::space::free_space(folder)
         && free.bytes < total
     {
@@ -306,8 +323,8 @@ async fn add(
             AddTorrent::from_bytes(listed.torrent_bytes),
             Some(AddTorrentOptions {
                 paused,
-                // Retomar depois de reabrir o Tako precisa escrever sobre o que já baixou (na pasta dele).
-                overwrite: true,
+                // Só ao retomar um download do Tako: escreve sobre o que ele mesmo já baixou na pasta dele.
+                overwrite: resume,
                 output_folder: Some(folder.to_string_lossy().into_owned()),
                 ..Default::default()
             }),
@@ -337,6 +354,23 @@ async fn add(
     Ok(())
 }
 
+/// A pasta do download e tudo abaixo dela que já existe: nenhum link simbólico (nem a própria pasta, nem
+/// `<Downloads>/Tako`). Download novo nunca grava numa pasta que já existe.
+fn check_folder(folder: &Path, files: &[PathBuf], resume: bool) -> Result<(), DownloadError> {
+    let (Some(root), Some(name)) = (folder.parent(), folder.file_name()) else {
+        return Err(DownloadError::UnsafePaths);
+    };
+    if paths::has_link(root, Path::new(name)) || files.iter().any(|f| paths::has_link(folder, f)) {
+        return Err(DownloadError::UnsafePaths);
+    }
+    if !resume && std::fs::symlink_metadata(folder).is_ok() {
+        return Err(DownloadError::Engine(
+            "a pasta do download já existe".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -354,10 +388,40 @@ mod tests {
     }
 
     #[test]
+    fn new_downloads_never_write_into_an_existing_folder_or_through_a_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("Tako").join("Jogo");
+        let files = [PathBuf::from("data/a.bin")];
+        assert!(check_folder(&folder, &files, false).is_ok());
+        std::fs::create_dir_all(folder.join("data")).unwrap();
+        assert!(
+            check_folder(&folder, &files, false).is_err(),
+            "pasta já existe"
+        );
+        assert!(check_folder(&folder, &files, true).is_ok(), "retomada");
+        #[cfg(unix)]
+        {
+            let outside = dir.path().join("fora");
+            std::fs::create_dir_all(&outside).unwrap();
+            std::os::unix::fs::symlink(&outside, folder.join("data/a.bin")).unwrap();
+            assert_eq!(
+                check_folder(&folder, &files, true),
+                Err(DownloadError::UnsafePaths)
+            );
+            let linked = dir.path().join("Tako").join("Link");
+            std::os::unix::fs::symlink(&outside, &linked).unwrap();
+            assert_eq!(
+                check_folder(&linked, &[], true),
+                Err(DownloadError::UnsafePaths)
+            );
+        }
+    }
+
+    #[test]
     fn invalid_uris_never_reach_the_engine() {
         let mut e = TorrentEngine::new(EngineOptions::default()).unwrap();
         assert_eq!(
-            e.start("javascript:alert(1)", Path::new("/tmp/x")),
+            e.start("javascript:alert(1)", Path::new("/tmp/x"), false),
             Err(DownloadError::InvalidUri)
         );
     }

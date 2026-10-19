@@ -116,8 +116,9 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
          ALTER TABLE game_settings ADD COLUMN screen_name TEXT;",
     ),
     // Downloads por torrent (DL-001): fontes que o usuário adicionou e os downloads com o jogo vinculado.
+    // A 13 e a 14 são de PRs anteriores na ordem de merge (#126 e #132).
     (
-        13,
+        15,
         "CREATE TABLE IF NOT EXISTS download_sources (
             url TEXT PRIMARY KEY,
             name TEXT NOT NULL,

@@ -1,4 +1,4 @@
-//! Fontes de download `.json` que o próprio usuário adiciona (DL-001, ADR-0028 §1), no formato do Hydra:
+//! Fontes de download `.json` que o próprio usuário adiciona (DL-001, ADR-0028 §1), no formato de fonte .json:
 //! `{ "name": "…", "downloads": [ { "title": "…", "uris": ["magnet:?…"], "uploadDate": "…", "fileSize": "…" } ] }`.
 //!
 //! Parser puro, sem rede. A fonte não é confiável: limites de tamanho, item quebrado é descartado (com contagem)

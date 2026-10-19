@@ -25,6 +25,8 @@ pub const ACCEPTED: &str = "DownloadsLegalAccepted";
 pub const UPLOAD: &str = "DownloadsUploadLimitKiB";
 const UPLOAD_DEFAULT: i64 = 256;
 const UPLOAD_CHOICES: [i64; 4] = [64, 256, 1024, 0];
+/// Fontes por perfil (cada uma pode ter até 20 000 itens em memória).
+pub const MAX_SOURCES: usize = 20;
 /// Sugestões da fonte mostradas no jogo.
 const SUGGESTIONS: usize = 8;
 
@@ -107,23 +109,33 @@ fn load_sources(ctx: &mut Ctx) {
     }
     ctx.downloads.sources_loaded = true;
     let dir = sources_dir(ctx);
-    let rows = ctx
-        .downloads
-        .store
-        .as_ref()
-        .and_then(|s| s.sources().ok())
-        .unwrap_or_default();
-    ctx.downloads.sources = rows
-        .into_iter()
-        .map(|r| {
-            let s = source::read_cache(&dir, &r.url).unwrap_or(Source {
-                name: r.name.clone(),
-                items: Vec::new(),
-                dropped: 0,
-            });
-            (r, s)
-        })
-        .collect();
+    let store = ctx.downloads.store.clone();
+    // O cache pode ter alguns MB por fonte: lido e validado fora da thread da UI.
+    crate::tasks::run(
+        ctx,
+        move || {
+            let rows = store.and_then(|s| s.sources().ok()).unwrap_or_default();
+            rows.into_iter()
+                .map(|r| {
+                    let s = source::read_cache(&dir, &r.url).unwrap_or(Source {
+                        name: r.name.clone(),
+                        items: Vec::new(),
+                        dropped: 0,
+                    });
+                    (r, s)
+                })
+                .collect::<Vec<_>>()
+        },
+        |ctx, loaded| {
+            // Uma fonte adicionada enquanto lia já está na lista e fica como está.
+            for (r, s) in loaded {
+                if !ctx.downloads.sources.iter().any(|(x, _)| x.url == r.url) {
+                    ctx.downloads.sources.push((r, s));
+                }
+            }
+            ctx.dirty = true;
+        },
+    );
 }
 
 /// Lê o motor (a cada segundo, pelo app) e põe o progresso nos jogos vinculados. `true` = redesenhar.
@@ -796,12 +808,25 @@ fn legal_dialog(ctx: &Ctx) -> MenuLayer {
     .text(ctx.t("downloads.legal_text"))
 }
 
+/// Cabe mais uma fonte (atualizar uma que já existe sempre cabe).
+fn can_add(ctx: &Ctx, url: &str) -> bool {
+    ctx.downloads.sources.len() < MAX_SOURCES
+        || ctx.downloads.sources.iter().any(|(r, _)| r.url == url)
+}
+
 fn add_source(ctx: &Ctx) -> KeyboardLayer {
     KeyboardLayer::new(ctx, ctx.t("downloads.add_source"), "", |ctx, text| {
         let url = text.trim().to_owned();
         if !url.to_ascii_lowercase().starts_with("https://") {
             ctx.toast(ctx.t("downloads.https_only"));
             return Flow::Stay;
+        }
+        if !can_add(ctx, &url) {
+            ctx.toast(ctx.tf(
+                "downloads.too_many_sources",
+                &[("max", &MAX_SOURCES.to_string())],
+            ));
+            return Flow::Close;
         }
         fetch_source(ctx, url);
         Flow::Close
@@ -1100,6 +1125,29 @@ mod tests {
         delete.accept.unwrap()(&mut ctx);
         assert!(ctx.downloads.manager.as_ref().unwrap().get(id).is_none());
         assert_eq!(ctx.library.find(&game).unwrap().installing, None);
+    }
+
+    #[test]
+    fn sources_are_limited_but_a_refresh_always_fits() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = ctx();
+        for i in 0..MAX_SOURCES {
+            ctx.downloads.sources.push((
+                SourceRow {
+                    url: format!("https://f{i}.invalid/a.json"),
+                    name: format!("F{i}"),
+                    items: 0,
+                    updated_at: chrono::Utc::now(),
+                },
+                Source {
+                    name: String::new(),
+                    items: Vec::new(),
+                    dropped: 0,
+                },
+            ));
+        }
+        assert!(!can_add(&ctx, "https://nova.invalid/a.json"));
+        assert!(can_add(&ctx, "https://f3.invalid/a.json"));
     }
 
     #[test]

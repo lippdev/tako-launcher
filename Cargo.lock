@@ -6467,6 +6467,7 @@ dependencies = [
  "librqbit",
  "tako-core",
  "tako-platform",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "tracing",

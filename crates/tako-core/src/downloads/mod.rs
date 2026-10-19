@@ -45,8 +45,9 @@ pub struct EngineStatus {
 /// Motor de download (torrent hoje; HTTP do DL-002 depois). Nada aqui bloqueia a interface: metadados, validação
 /// dos caminhos e espaço livre acontecem no motor, e o resultado aparece em [`Downloader::status`].
 pub trait Downloader: Send {
-    /// Começa (ou retoma depois de reabrir o Tako) gravando só dentro de `folder`.
-    fn start(&mut self, uri: &str, folder: &Path) -> Result<EngineId, DownloadError>;
+    /// Começa gravando só dentro de `folder`. `resume` = o download já é do Tako e já começou antes (reabrir,
+    /// tentar de novo): só então o motor pode escrever sobre os arquivos que já estão na pasta.
+    fn start(&mut self, uri: &str, folder: &Path, resume: bool) -> Result<EngineId, DownloadError>;
     fn pause(&mut self, id: EngineId);
     fn resume(&mut self, id: EngineId);
     /// Tira do motor (sem semear depois) e, se pedido, apaga os arquivos.
@@ -244,10 +245,12 @@ impl Downloads {
         }
         let id = self.items.iter().map(|d| d.id).max().unwrap_or(0) + 1;
         let mut folder = self.root.join(paths::folder_name(&new.title));
-        // Dois itens com o mesmo nome não dividem a pasta.
+        // Nunca grava numa pasta que já existe (do usuário ou de outro item): ganha " (2)", " (3)"...
         let base = folder.clone();
         let mut n = 2;
-        while self.items.iter().any(|d| d.folder == folder) {
+        while self.items.iter().any(|d| d.folder == folder)
+            || std::fs::symlink_metadata(&folder).is_ok()
+        {
             folder = PathBuf::from(format!("{} ({n})", base.display()));
             n += 1;
         }
@@ -277,12 +280,14 @@ impl Downloads {
 
     fn run(&mut self, index: usize) {
         let d = &mut self.items[index];
+        // Só o que saiu da fila alguma vez já tem arquivos do Tako na pasta.
+        let resume = d.state != DownloadState::Queued;
         let started = match d.engine {
             Some(e) => {
                 self.engine.resume(e);
                 Ok(e)
             }
-            None => self.engine.start(&d.uri, &d.folder),
+            None => self.engine.start(&d.uri, &d.folder, resume),
         };
         match started {
             Ok(e) => {
@@ -531,6 +536,35 @@ mod tests {
         let b = d.add(new("A", None, B)).unwrap();
         assert_eq!(b, 8);
         assert_eq!(d.get(b).unwrap().folder, PathBuf::from("/d/Tako/A (2)"));
+    }
+
+    #[test]
+    fn an_existing_folder_on_disk_is_never_reused_and_only_resumes_may_overwrite() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("Jogo")).unwrap();
+        std::fs::create_dir_all(dir.path().join("Jogo (2)")).unwrap();
+        let engine = MemoryDownloader::default();
+        let mut d = Downloads::new(Box::new(engine.clone()), dir.path().into(), vec![]);
+        let a = d.add(new("Jogo", None, A)).unwrap();
+        assert_eq!(d.get(a).unwrap().folder, dir.path().join("Jogo (3)"));
+        assert_eq!(engine.resumes(), vec![false]);
+        d.pause(a).unwrap();
+        d.cancel(a, false).unwrap();
+        // Item que já tinha começado (lido do banco, pausado): retomar pode escrever sobre a pasta dele.
+        let saved = vec![Download::stored(
+            9,
+            "B".into(),
+            None,
+            "f".into(),
+            B.into(),
+            dir.path().join("B"),
+            DownloadState::Paused,
+            10,
+            Some(100),
+        )];
+        let mut d = Downloads::new(Box::new(engine.clone()), dir.path().into(), saved);
+        d.resume(9).unwrap();
+        assert_eq!(engine.resumes(), vec![false, true]);
     }
 
     #[test]
