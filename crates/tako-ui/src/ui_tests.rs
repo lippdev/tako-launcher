@@ -649,7 +649,16 @@ fn desktop_snapshot() {
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
-            Ok("settings") => shell.open_route("settings"),
+            Ok("settings") => {
+                shell.open_route("settings");
+                if let Ok(category) = std::env::var("TAKO_SNAP_SETTINGS_CATEGORY")
+                    && let Some(index) = crate::shell::settings::categories()
+                        .iter()
+                        .position(|item| item.id == category)
+                {
+                    shell.click("category", index);
+                }
+            }
             Ok("grid") => shell.click("view", 1),
             Ok("categories") => shell.click("view", 2),
             Ok("update-ready") | Ok("update-downloading") => {

@@ -42,7 +42,7 @@ fn navigates_between_categories_and_rows() {
     let (_d, mut ctx) = ctx();
     let mut page = SettingsPage::new();
     let n = page.cats.len();
-    assert_eq!(n, 8);
+    assert_eq!(n, 9);
     page.handle(Cmd::NextSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "library");
     page.handle(Cmd::PrevSection, &mut ctx);
@@ -255,6 +255,16 @@ fn every_row_has_text() {
         }
     }
     i18n::set_lang(Lang::PtBr);
+}
+
+#[test]
+fn sunshine_sync_starts_off_and_requires_preview_confirmation_to_enable() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let row = find(&rows_of(&ctx, "integrations"), "sunshine-sync");
+    assert!(!row.row.on);
+    assert!(matches!(accept(&mut ctx, &row), Flow::Push(_)));
+    assert!(!ctx.settings.bool(keys::SUNSHINE_SYNC, false));
 }
 
 #[test]

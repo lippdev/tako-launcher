@@ -11,6 +11,8 @@ pub(crate) mod library;
 pub(crate) mod metadata;
 #[path = "settings_screen.rs"]
 pub(crate) mod screen;
+#[path = "settings_sunshine.rs"]
+pub(crate) mod sunshine;
 #[cfg(test)]
 #[path = "settings_tests.rs"]
 mod tests;
@@ -65,6 +67,11 @@ pub fn categories() -> Vec<Category> {
             id: "controls",
             icon: "gamepad",
             rows: controls::rows,
+        },
+        Category {
+            id: "integrations",
+            icon: "tv",
+            rows: sunshine::rows,
         },
         Category {
             id: "system",
@@ -885,17 +892,6 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             .desc(ctx.t("settings.system.safemode_off_desc")),
         )
     });
-    if crate::discord::available() {
-        v.push(MenuItem::new(PanelRow::header(
-            ctx.t("settings.system.integrations_header"),
-        )));
-        v.push(toggle(
-            ctx,
-            "settings.system.discord",
-            keys::DISCORD_PRESENCE,
-            false,
-        ));
-    }
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.system.advanced_header"),
     )));
