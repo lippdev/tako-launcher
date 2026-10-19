@@ -86,6 +86,7 @@ fn offers(games: &[Game], copies: &[usize]) -> Vec<InstallOffer> {
         .filter_map(|g| {
             Some(InstallOffer {
                 store: g.store(),
+                game_id: g.id.clone(),
                 install_uri: g.install_uri.clone()?,
                 size: g.install_size,
             })
@@ -201,6 +202,13 @@ mod tests {
             assert_eq!(steam.install_offers[0].install_uri, "steam://install/7");
             assert_eq!(steam.install_offers[0].size, Some(5 << 30));
             assert_eq!(steam.install_offers[1].size, None);
+            // Cada oferta aponta para a cópia da própria loja (é ela que a interface acompanha).
+            let ids: Vec<&str> = steam
+                .install_offers
+                .iter()
+                .map(|o| o.game_id.as_str())
+                .collect();
+            assert_eq!(ids, ["steam:7", "epic:F", "gog:9"]);
             // Sozinho numa loja: sem ofertas (vale o install_uri do jogo).
             assert!(stores("gog:1").is_empty());
             // Nada instalado: ninguém "também instalado em".
