@@ -114,3 +114,30 @@ fn source_merges_dirs_and_reports_missing() {
     assert!(!none.client_installed);
     assert!(none.notice.is_some());
 }
+
+// Caminhos montados a partir do temporário: `is_absolute` depende do SO (no Windows "/home/u" não é absoluto).
+#[test]
+fn data_dirs_do_not_repeat_the_default_folder() {
+    let home = std::env::temp_dir().join("u");
+    let expected = [
+        home.join(".local/share/lutris"),
+        home.join(".var/app/net.lutris.Lutris/data/lutris"),
+    ];
+    for xdg in [
+        None,
+        Some(home.join(".local/share")),
+        Some(PathBuf::from("rel")),
+    ] {
+        assert_eq!(data_dirs(&home, xdg), expected);
+    }
+}
+
+#[test]
+fn data_dirs_add_the_host_folder_when_xdg_is_the_sandbox() {
+    let home = std::env::temp_dir().join("u");
+    let sandbox = home.join(".var/app/io.github.lippdev.Tako/data");
+    let dirs = data_dirs(&home, Some(sandbox.clone()));
+    assert_eq!(dirs.len(), 3);
+    assert_eq!(dirs[0], sandbox.join("lutris"));
+    assert_eq!(dirs[2], home.join(".local/share/lutris"));
+}
