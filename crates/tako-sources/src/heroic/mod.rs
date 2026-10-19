@@ -408,10 +408,16 @@ impl HeroicSource {
                 .map(PathBuf::from)
                 .filter(|p| p.is_absolute())
                 .unwrap_or_else(|| home.join(".config"));
-            vec![
+            let mut roots = vec![
                 config.join("heroic"),
                 home.join(".var/app/com.heroicgameslauncher.hgl/config/heroic"),
-            ]
+            ];
+            // Num Flatpak o XDG_CONFIG_HOME é o da sandbox; o Heroic nativo fica na pasta padrão do usuário.
+            let host = home.join(".config/heroic");
+            if !roots.contains(&host) {
+                roots.push(host);
+            }
+            roots
         };
         #[cfg(target_os = "macos")]
         let roots = vec![home.join("Library/Application Support/heroic")];

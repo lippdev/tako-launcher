@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tako
+Comment=Game launcher for the TV and the controller
+Comment[pt_BR]=Launcher de jogos para a TV e o controle
+Exec=tako --open-url %u
+MimeType=x-scheme-handler/tako;
+Icon=io.github.lippdev.Tako
+Categories=Game;
+Keywords=games;launcher;steam;gamepad;
+Terminal=false

@@ -1,0 +1,65 @@
+# Flatpak do Tako (PLAT-002). Compila do código-fonte desta árvore; o roteiro (e a variante para o Flathub, com a
+# fonte git da tag) está em docs/packaging-linux.md. Antes de compilar, gere as fontes do cargo:
+#   flatpak-cargo-generator Cargo.lock -o packaging/flatpak/cargo-sources.json   (não é versionado)
+app-id: io.github.lippdev.Tako
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: tako
+
+# Permissões mínimas, uma por necessidade (justificativas completas em docs/packaging-linux.md).
+# Não há --talk-name=org.freedesktop.Flatpak (flatpak-spawn --host): seria sair da sandbox por inteiro.
+finish-args:
+  # Janela e GPU (--device=all, abaixo, já cobre o /dev/dri).
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # Controle (SDL3: evdev, hidraw) e o mouse virtual do cursor pelo controle (/dev/uinput, ADR-0024).
+  - --device=all
+  # Metadados, capas e a lista de atualizações.
+  - --share=network
+  # Saída de áudio padrão, volume e mudo (pactl).
+  - --socket=pulseaudio
+  # Chaves de API no cofre do sistema (Secret Service).
+  - --talk-name=org.freedesktop.secrets
+  # Troca de telas no GNOME Wayland (ADR-0024).
+  - --talk-name=org.gnome.Mutter.DisplayConfig
+  # Lojas, somente leitura: Steam (nativa e Flatpak), Heroic e Lutris (nativos e Flatpak).
+  - --filesystem=xdg-data/Steam:ro
+  - --filesystem=~/.steam:ro
+  - --filesystem=~/.var/app/com.valvesoftware.Steam/.local/share/Steam:ro
+  - --filesystem=~/.var/app/com.valvesoftware.Steam/.steam:ro
+  - --filesystem=xdg-config/heroic:ro
+  - --filesystem=~/.var/app/com.heroicgameslauncher.hgl/config/heroic:ro
+  - --filesystem=xdg-data/lutris:ro
+  - --filesystem=~/.var/app/net.lutris.Lutris/data/lutris:ro
+  # Bibliotecas em outros discos e a pasta padrão de jogos do Heroic e do Lutris.
+  - --filesystem=/mnt:ro
+  - --filesystem=/media:ro
+  - --filesystem=/run/media:ro
+  - --filesystem=~/Games:ro
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/tako/cargo
+    # Versão da release (o Cargo.toml do workspace não acompanha); manter igual à do metainfo.
+    TAKO_VERSION: 0.2.0-alpha.14
+
+modules:
+  - name: tako
+    buildsystem: simple
+    build-commands:
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo --offline build --release --locked -p tako --verbose
+      - install -Dm755 target/release/tako /app/bin/tako
+      - install -Dm644 packaging/flatpak/io.github.lippdev.Tako.desktop /app/share/applications/io.github.lippdev.Tako.desktop
+      - install -Dm644 packaging/flatpak/io.github.lippdev.Tako.metainfo.xml /app/share/metainfo/io.github.lippdev.Tako.metainfo.xml
+      - install -Dm644 packaging/tako-mark.png /app/share/icons/hicolor/256x256/apps/io.github.lippdev.Tako.png
+    sources:
+      - type: dir
+        path: ../..
+        skip: [.git, target, dist, artifacts]
+      - cargo-sources.json

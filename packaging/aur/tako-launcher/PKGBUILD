@@ -1,0 +1,61 @@
+# Maintainer: Tako <https://github.com/lippdev/tako-launcher>
+# Pacote do AUR (PLAT-002) que compila o Tako do código-fonte da tag. Para instalar o binário pronto, use o
+# `tako-launcher-bin`. Roteiro de publicação: docs/packaging-linux.md.
+# Diferença para a release: as credenciais do ScreenScraper (ADR-0022) não vão no código-fonte, então os metadados
+# dele aparecem como indisponíveis nas Configurações.
+pkgname=tako-launcher
+pkgver=0.2.0_alpha.14
+pkgrel=1
+pkgdesc='Game launcher for the TV and the controller'
+arch=('x86_64' 'aarch64')
+url='https://github.com/lippdev/tako-launcher'
+license=('AGPL-3.0-only')
+depends=('glibc' 'gcc-libs' 'fontconfig' 'libxkbcommon' 'libglvnd' 'wayland'
+         'libx11' 'libxcursor' 'libxext' 'libxfixes' 'libxi' 'libxrandr')
+# O SDL3 é compilado e embutido (sdl3 "build-from-source-static"): precisa do cmake e dos cabeçalhos dos backends.
+makedepends=('cargo' 'cmake' 'pkgconf' 'wayland-protocols' 'alsa-lib' 'libpulse' 'pipewire' 'dbus' 'ibus'
+             'libdecor' 'libxss' 'libxtst' 'libxinerama' 'libdrm' 'mesa' 'systemd-libs')
+optdepends=('libpulse: audio devices and volume (pactl)'
+            'pipewire-pulse: audio on PipeWire systems'
+            'xdg-utils: open store links and folders'
+            'kscreen: display switching on KDE Wayland (kscreen-doctor)'
+            'wlr-randr: display switching on wlroots compositors'
+            'libdecor: window decorations on Wayland')
+provides=('tako-launcher')
+conflicts=('tako-launcher-bin')
+options=('!lto')
+_tag="v${pkgver//_/-}"
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$_tag.tar.gz")
+sha256sums=('519cc7c9e100c09b8ebfd7740ade65a77214dd956ab11cb0efa37ebb85766ad8')
+
+prepare() {
+  cd "$pkgname-${pkgver//_/-}"
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-${pkgver//_/-}"
+  export CARGO_TARGET_DIR=target
+  TAKO_VERSION="${pkgver//_/-}" cargo build --release --frozen -p tako
+}
+
+package() {
+  cd "$pkgname-${pkgver//_/-}"
+  install -Dm755 target/release/tako "$pkgdir/usr/bin/tako"
+  install -Dm644 packaging/linux/60-tako-uinput.rules "$pkgdir/usr/lib/udev/rules.d/60-tako-uinput.rules"
+  install -Dm644 packaging/tako-mark.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/tako.png"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/tako.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Tako
+Comment=Game launcher for the TV and the controller
+Comment[pt_BR]=Launcher de jogos para a TV e o controle
+Exec=tako --open-url %u
+MimeType=x-scheme-handler/tako;
+Icon=tako
+Categories=Game;
+Terminal=false
+DESKTOP
+}

@@ -48,7 +48,7 @@ pub enum Package {
     WindowsPortable,
     LinuxAppImage,
     LinuxTarGz,
-    /// Atualiza pelo gerenciador de pacotes, nunca sozinho.
+    /// Atualiza pelo gerenciador de pacotes (apt, pacman, Flatpak), nunca sozinho.
     LinuxDeb,
     /// `.app` atualizado pelo `.zip`; o `.dmg` é só para instalar à mão.
     MacApp,
@@ -62,7 +62,8 @@ impl Package {
             Os::Windows => Package::WindowsPortable,
             Os::MacOs => Package::MacApp,
             Os::Linux if appimage.is_some() => Package::LinuxAppImage,
-            Os::Linux if exe.starts_with("/usr") => Package::LinuxDeb,
+            // /usr: deb e AUR; /app: Flatpak (somente leitura, quem atualiza é o Flatpak).
+            Os::Linux if exe.starts_with("/usr") || exe.starts_with("/app") => Package::LinuxDeb,
             Os::Linux => Package::LinuxTarGz,
         }
     }
@@ -515,6 +516,10 @@ mod tests {
         );
         assert_eq!(
             d(Os::Linux, Installed, "/usr/bin/tako", None),
+            Package::LinuxDeb
+        );
+        assert_eq!(
+            d(Os::Linux, Installed, "/app/bin/tako", None),
             Package::LinuxDeb
         );
         assert_eq!(

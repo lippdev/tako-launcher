@@ -131,10 +131,16 @@ impl LutrisSource {
             .map(PathBuf::from)
             .filter(|p| p.is_absolute())
             .unwrap_or_else(|| home.join(".local/share"));
-        LutrisSource::new(vec![
+        let mut dirs = vec![
             data.join("lutris"),
             home.join(".var/app/net.lutris.Lutris/data/lutris"),
-        ])
+        ];
+        // Num Flatpak o XDG_DATA_HOME é o da sandbox; o Lutris nativo fica na pasta padrão do usuário.
+        let host = home.join(".local/share/lutris");
+        if !dirs.contains(&host) {
+            dirs.push(host);
+        }
+        LutrisSource::new(dirs)
     }
 }
 
