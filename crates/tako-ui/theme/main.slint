@@ -963,7 +963,8 @@ export component App inherits Window {
         animate opacity { duration: Ui.intro-fade(root.intro); easing: cubic-bezier(0.22, 1, 0.36, 1); }
         accessible-role: image;
         accessible-label: "Tako";
-        TouchArea { clicked => { root.clicked("intro", 0); } }
+        // Só enquanto a entrada está ligada: na saída (fade) o véu não pode engolir cliques e hover reais.
+        TouchArea { visible: root.intro; clicked => { root.clicked("intro", 0); } }
         Rectangle {
             height: root.height * 0.5;
             width: self.height * 704 / 802;

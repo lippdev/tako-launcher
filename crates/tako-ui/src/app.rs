@@ -516,8 +516,10 @@ impl App {
             && mode == UiMode::Desktop
             && plain_start
             && shell.ctx.settings.bool(crate::mode::ASK_SETTING, true);
-        // Entrada do app (BRAND-002): só na abertura em tela cheia; a volta do desktop não repete.
-        shell.ctx.intro = shell.wants_intro(mode == UiMode::BigPicture, plain_start);
+        // Entrada do app (BRAND-002): só na abertura em tela cheia; a volta do desktop não repete. Tema sem a
+        // propriedade `intro` não a mostra, então a 1ª entrada não pode ser engolida em silêncio.
+        shell.ctx.intro = shell.wants_intro(mode == UiMode::BigPicture, plain_start)
+            && ui.get_property("intro").is_ok();
         let shell = Rc::new(RefCell::new(shell));
         crate::tasks::attach(&shell);
         crate::metadata::start_metadata(&shell);

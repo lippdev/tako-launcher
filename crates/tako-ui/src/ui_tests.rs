@@ -76,12 +76,36 @@ fn big_picture_intro_covers_the_ready_first_screen_and_leaves_with_the_flag() {
         // Com a entrada, o véu preto cobre tudo no 1º quadro (sem esperar a primeira tela).
         let veiled = draw(&mut shell);
         assert_eq!(veiled[0], Rgb8Pixel::new(0, 0, 0));
+        // O véu pega o clique enquanto a entrada está ligada, mas não durante a saída (fade): aí o clique é da tela.
+        let zones = Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let seen = zones.clone();
+        ui.set_callback("clicked", move |args| {
+            if let Some(Value::String(z)) = args.first() {
+                seen.borrow_mut().push(z.to_string());
+            }
+            Value::Void
+        })
+        .unwrap();
+        let click = || {
+            use slint::platform::{PointerEventButton, WindowEvent};
+            let position = slint::LogicalPosition::new(640., 360.);
+            let button = PointerEventButton::Left;
+            window.dispatch_event(WindowEvent::PointerPressed { position, button });
+            window.dispatch_event(WindowEvent::PointerReleased { position, button });
+        };
+        click();
+        assert_eq!(zones.borrow().as_slice(), ["intro"]);
+        zones.borrow_mut().clear();
         // Pulou: depois da saída (200 ms) a primeira tela, que estava pronta por baixo, aparece.
         shell.end_intro();
         let t = START.elapsed();
         CLOCK.with(|c| c.set(Some(t)));
         draw(&mut shell);
         slint::platform::update_timers_and_animations();
+        CLOCK.with(|c| c.set(Some(t + std::time::Duration::from_millis(50))));
+        slint::platform::update_timers_and_animations();
+        click();
+        assert!(!zones.borrow().iter().any(|z| z == "intro"), "{zones:?}");
         CLOCK.with(|c| c.set(Some(t + std::time::Duration::from_millis(400))));
         slint::platform::update_timers_and_animations();
         let shown = draw(&mut shell);
