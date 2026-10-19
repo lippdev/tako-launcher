@@ -9,6 +9,19 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 - **Progresso da instalação:** na Steam, o Tako mostra a porcentagem com um anel na lista e na grade e "Baixando… 42%" no destaque. Quando termina, o jogo vira instalado sem reiniciar. Na Epic aparece "Instalando" sem número.
 - **Espaço livre:** o destaque mostra quanto sobra no disco e avisa quando falta espaço para o jogo.
 - "Instalar" também no menu do jogo e na seleção de vários jogos, que abrem um por vez na loja.
+- **Ícone do jogo na lista:** a lista mostra o ícone do jogo, como na Steam (da loja ou do executável no Windows, ou a inicial do título); a capa fica só na Grade.
+- **Jogos da Amazon:** no Windows, os jogos da sua conta Amazon aparecem como não instalados e o Instalar abre o Amazon Games.
+- **VRR por jogo:** no Linux (KDE e wlroots), a tela de jogo pode ligar o VRR só para aquele jogo e desligá-lo no fim, inclusive depois de uma queda.
+- **Prévia do tema:** na tela cheia, escolher um tema mostra uma prévia de 15 s; A aplica, B volta ao anterior.
+- **Entrada do app:** a tela cheia abre com uma animação curta do polvo, que qualquer tecla pula e que some com "Reduzir animações".
+- **Polvo do Tako:** o polvo animado aparece nos estados vazios, na espera da biblioteca e no "Bem-vindo de volta" do desktop.
+- **Ferramentas junto do jogo:** nas configurações do jogo, programas extras (overlay de FPS, mods) abrem com o jogo e podem fechar no fim, com a sua permissão.
+- **Links `tako://` no macOS:** atalhos e o Stream Deck abrem jogos e telas do Tako também no Mac.
+- **Pacotes Linux:** PKGBUILDs para o AUR e Flatpak no repositório (ainda não publicados).
+
+### Correções
+- **Janela no Windows:** Minimizar, Maximizar e Fechar da barra do desktop voltam a responder; o encaixe do Maximizar continua.
+- **Interface que fecha e reabre ao jogar:** logs novos para diagnosticar o problema (BUG-001).
 
 ## [0.2.0-alpha.14]
 ### Novidades
