@@ -187,25 +187,23 @@ impl Package {
             let mut reader = open_entry(&mut source, tokens_entry).map_err(|e| io_problem(&e))?;
             if let Some(bytes) =
                 read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))?
+                && let Ok(text) = String::from_utf8(bytes)
+                && let Ok(tokens_audio) = crate::parse_tokens_audio(&text)
             {
-                if let Ok(text) = String::from_utf8(bytes) {
-                    if let Ok(tokens_audio) = crate::parse_tokens_audio(&text) {
-                        for audio_path in [
-                            &tokens_audio.music,
-                            &tokens_audio.move_sound,
-                            &tokens_audio.accept_sound,
-                            &tokens_audio.back_sound,
-                        ]
-                        .into_iter()
-                        .flatten()
-                        {
-                            if !files.iter().any(|e| e.path == *audio_path) {
-                                return Err(one(
-                                    "package.missing-audio",
-                                    tf("themes.package.missing_audio", &[("path", audio_path)]),
-                                ));
-                            }
-                        }
+                for audio_path in [
+                    &tokens_audio.music,
+                    &tokens_audio.move_sound,
+                    &tokens_audio.accept_sound,
+                    &tokens_audio.back_sound,
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    if !files.iter().any(|e| e.path == *audio_path) {
+                        return Err(one(
+                            "package.missing-audio",
+                            tf("themes.package.missing_audio", &[("path", audio_path)]),
+                        ));
                     }
                 }
             }

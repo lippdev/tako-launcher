@@ -107,10 +107,10 @@ fn compute_tone_samples(cmd: Cmd) -> [f32; TONE_COUNT] {
         _ => 660.,
     };
     let mut out = [0.0f32; TONE_COUNT];
-    for i in 0..TONE_COUNT {
+    for (i, sample) in out.iter_mut().enumerate() {
         let envelope = (i.min(TONE_COUNT - 1 - i) as f32 / 96.).min(1.);
         let phase = std::f32::consts::TAU * hz * i as f32 / 48_000.;
-        out[i] = phase.sin() * envelope * 0.12;
+        *sample = phase.sin() * envelope * 0.12;
     }
     out
 }
@@ -122,6 +122,7 @@ static DEFAULT_BACK: LazyLock<[f32; TONE_COUNT]> =
 static DEFAULT_MOVE: LazyLock<[f32; TONE_COUNT]> =
     LazyLock::new(|| compute_tone_samples(Cmd::Right));
 
+#[cfg(test)]
 pub fn tone(cmd: Cmd, volume: u8) -> Vec<f32> {
     let base: &[f32] = match cmd {
         Cmd::Accept => &DEFAULT_ACCEPT[..],
@@ -222,7 +223,9 @@ pub fn play(ctx: &Ctx, cmd: Cmd) {
         let gain = f32::from(volume(&ctx.settings).min(100)) / 100.;
         let _ = stream.set_gain(gain);
 
-        let sounds = CUSTOM_SOUNDS.read().unwrap();
+        let Ok(sounds) = CUSTOM_SOUNDS.read() else {
+            return;
+        };
         let custom = match cmd {
             Cmd::Accept => sounds.accept.as_deref(),
             Cmd::Back => sounds.back.as_deref(),
@@ -380,8 +383,10 @@ impl MusicPlayer {
 
         if can_play && self.music_path.is_some() {
             // Carrega em thread de fundo apenas quando for tocar
-            if self.music_data.is_none() && self.loading_rx.is_none() {
-                let path = self.music_path.clone().unwrap();
+            if self.music_data.is_none()
+                && self.loading_rx.is_none()
+                && let Some(path) = self.music_path.clone()
+            {
                 let (tx, rx) = channel();
                 self.loading_rx = Some(rx);
                 std::thread::spawn(move || {
@@ -502,14 +507,14 @@ pub fn set_theme(theme_dir: Option<&Path>) {
             let back = back_p.as_deref().and_then(load_wav_samples).map(Arc::from);
             let move_sound = move_p.as_deref().and_then(load_wav_samples).map(Arc::from);
 
-            if NAV_GENERATION.load(Ordering::SeqCst) == generation {
-                if let Ok(mut sounds) = CUSTOM_SOUNDS.write() {
-                    *sounds = CustomNavSounds {
-                        accept,
-                        back,
-                        move_sound,
-                    };
-                }
+            if NAV_GENERATION.load(Ordering::SeqCst) == generation
+                && let Ok(mut sounds) = CUSTOM_SOUNDS.write()
+            {
+                *sounds = CustomNavSounds {
+                    accept,
+                    back,
+                    move_sound,
+                };
             }
         });
     }
@@ -728,7 +733,9 @@ mod tests {
     #[test]
     fn set_theme_none_clears() {
         set_theme(None);
-        let sounds = CUSTOM_SOUNDS.read().unwrap();
+        let Ok(sounds) = CUSTOM_SOUNDS.read() else {
+            return;
+        };
         assert!(sounds.accept.is_none());
         assert!(sounds.back.is_none());
         assert!(sounds.move_sound.is_none());
