@@ -257,37 +257,25 @@ fn owned_games_that_are_not_installed_come_from_the_library_cache() {
     );
 }
 
+// Caminhos montados a partir do temporário: `is_absolute` depende do SO (no Windows "/home/u" não é absoluto).
 #[test]
 fn linux_roots_do_not_repeat_the_default_folder() {
-    let home = Path::new("/home/u");
-    for xdg in [
-        None,
-        Some(PathBuf::from("/home/u/.config")),
-        Some(PathBuf::from("rel")),
-    ] {
-        let roots = linux_roots(home, xdg);
-        assert_eq!(
-            roots,
-            [
-                PathBuf::from("/home/u/.config/heroic"),
-                PathBuf::from("/home/u/.var/app/com.heroicgameslauncher.hgl/config/heroic"),
-            ]
-        );
+    let home = std::env::temp_dir().join("u");
+    let expected = [
+        home.join(".config/heroic"),
+        home.join(".var/app/com.heroicgameslauncher.hgl/config/heroic"),
+    ];
+    for xdg in [None, Some(home.join(".config")), Some(PathBuf::from("rel"))] {
+        assert_eq!(linux_roots(&home, xdg), expected);
     }
 }
 
 #[test]
 fn linux_roots_add_the_host_folder_when_xdg_is_the_sandbox() {
-    let roots = linux_roots(
-        Path::new("/home/u"),
-        Some(PathBuf::from(
-            "/home/u/.var/app/io.github.lippdev.Tako/config",
-        )),
-    );
+    let home = std::env::temp_dir().join("u");
+    let sandbox = home.join(".var/app/io.github.lippdev.Tako/config");
+    let roots = linux_roots(&home, Some(sandbox.clone()));
     assert_eq!(roots.len(), 3);
-    assert_eq!(
-        roots[0],
-        PathBuf::from("/home/u/.var/app/io.github.lippdev.Tako/config/heroic")
-    );
-    assert_eq!(roots[2], PathBuf::from("/home/u/.config/heroic"));
+    assert_eq!(roots[0], sandbox.join("heroic"));
+    assert_eq!(roots[2], home.join(".config/heroic"));
 }
