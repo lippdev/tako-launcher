@@ -66,7 +66,7 @@ Implementar a API local de integração com a seguinte especificação:
   - No **modo desktop**, a interface permanece aberta ou minimizada durante o jogo, portanto a API continua disponível e informando o estado da sessão.
   - No **modo de tela cheia (Big Picture)**, por regra arquitetural (ADR-0026 e ADR-0027), a interface fecha durante a execução do jogo para liberar recursos da GPU e restaura a supervisão ao supervisor; a API local fecha junto com a interface e só volta a responder quando a interface reabrir após o término da sessão.
 - **Sincronização de Estado via EXT-001:** o estado de jogos em execução (`running_game`) é sincronizado de forma reativa ouvindo os eventos de sessão de `tako_core::session::events` (`GameStarting`, `GameStarted` e `GameExited`).
-  - O campo `started_at` reflete o timestamp real de início da sessão (`DateTime<Utc>`) recebido no evento, sem resetar a cada chamada ou consulta. Quando o início não for conhecido, o campo é emitido como `null`.
+  - O campo `started_at` reflete o timestamp real de início da sessão (`DateTime<Utc>`) recebido no evento, sem resetar a cada chamada ou consulta. Quando o início não for conhecido, o campo é omitido.
 
 ### 5. Escopo dos Endpoints (v1)
 

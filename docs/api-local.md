@@ -177,10 +177,34 @@ Se o ID não existir na biblioteca:
     "error": "Method not allowed"
   }
   ```
-- **`429 Too Many Requests`:** Excesso de conexões simultâneas locais.
+- **`408 Request Timeout`:** Prazo total de envio da requisição excedido (cliente lento).
+  ```json
+  {
+    "error": "Request timeout"
+  }
+  ```
+- **`414 URI Too Long`:** Linha de requisição excede o limite máximo permitido (8 KiB).
+  ```json
+  {
+    "error": "Request line too long"
+  }
+  ```
+- **`421 Misdirected Request`:** Cabeçalho `Host` ausente ou apontando para domínio externo (proteção contra DNS rebinding). Aceita apenas `127.0.0.1:<porta>` ou `localhost:<porta>`.
+  ```json
+  {
+    "error": "Misdirected Request"
+  }
+  ```
+- **`429 Too Many Requests`:** Excesso de conexões simultâneas locais (limite de 16).
   ```json
   {
     "error": "Too many concurrent connections"
+  }
+  ```
+- **`431 Request Header Fields Too Large`:** Cabeçalho individual excede 4 KiB ou o conjunto total de cabeçalhos excede 16 KiB.
+  ```json
+  {
+    "error": "Header line too large"
   }
   ```
 - **`503 Service Unavailable`:** A interface gráfica está indisponível para receber comandos ou a API foi encerrada.
