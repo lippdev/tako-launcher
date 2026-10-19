@@ -851,6 +851,14 @@ fn fetch_source(ctx: &mut Ctx, url: String) {
         },
         move |ctx, result| match result {
             Ok(parsed) => {
+                if !can_add(ctx, &url) {
+                    let _ = std::fs::remove_file(source::cache_file(&sources_dir(ctx), &url));
+                    ctx.toast(ctx.tf(
+                        "downloads.too_many_sources",
+                        &[("max", &MAX_SOURCES.to_string())],
+                    ));
+                    return;
+                }
                 let name = if parsed.name.is_empty() {
                     host(&url)
                 } else {
