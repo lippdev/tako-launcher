@@ -94,7 +94,10 @@ pub fn parse_hello_response(bytes: &[u8]) -> Result<ConsoleModeStatus, ProtocolE
     if bytes.len() < 4 {
         return Err(ProtocolError::IncompleteHeader);
     }
-    let len = u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as usize;
+    let Ok(arr) = bytes[0..4].try_into() else {
+        return Err(ProtocolError::IncompleteHeader);
+    };
+    let len = u32::from_le_bytes(arr) as usize;
     if len > MAX_HANDSHAKE_FRAME_BYTES {
         return Err(ProtocolError::FrameTooLarge(len));
     }

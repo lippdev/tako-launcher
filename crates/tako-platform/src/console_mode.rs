@@ -172,7 +172,7 @@ impl<T: Read + Write + ?Sized> ReadWrite for T {}
 
 /// Detecção nativa do Console Mode no ambiente atual.
 pub fn detect() -> ConsoleModeStatus {
-    detect_internal(&PlatformPaths, |p| connect_local_socket(p))
+    detect_internal(&PlatformPaths, connect_local_socket)
 }
 
 /// Lógica de detecção desacoplada para testes com fixtures e fakes.
@@ -202,26 +202,26 @@ where
     }
 
     // 2. Tenta ler o arquivo de descoberta local (ex.: se o processo deixou metadados de API)
-    if let Some(discovery_path) = paths.discovery_path() {
-        if discovery_path.is_file() {
-            match fs::read(&discovery_path) {
-                Ok(bytes) => match parse_discovery_content(&bytes) {
-                    Ok(status) => return status,
-                    Err(e) => {
-                        tracing::warn!(
-                            path = %discovery_path.display(),
-                            "arquivo de descoberta do Console Mode inválido: {e}"
-                        );
-                        return ConsoleModeStatus::Erro;
-                    }
-                },
+    if let Some(discovery_path) = paths.discovery_path()
+        && discovery_path.is_file()
+    {
+        match fs::read(&discovery_path) {
+            Ok(bytes) => match parse_discovery_content(&bytes) {
+                Ok(status) => return status,
                 Err(e) => {
                     tracing::warn!(
                         path = %discovery_path.display(),
-                        "erro ao ler arquivo de descoberta do Console Mode: {e}"
+                        "arquivo de descoberta do Console Mode inválido: {e}"
                     );
                     return ConsoleModeStatus::Erro;
                 }
+            },
+            Err(e) => {
+                tracing::warn!(
+                    path = %discovery_path.display(),
+                    "erro ao ler arquivo de descoberta do Console Mode: {e}"
+                );
+                return ConsoleModeStatus::Erro;
             }
         }
     }
