@@ -1440,7 +1440,7 @@ pub(crate) fn finish_create_theme(
                 )
                 .text(ctx.tf(
                     "settings.appearance.theme_overwrite_confirm",
-                    &[("name", &existing_name)],
+                    &[("name", &existing_name), ("suggested", &unique_id)],
                 ))
                 .focus_at(2),
             ));
