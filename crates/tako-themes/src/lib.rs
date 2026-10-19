@@ -99,9 +99,12 @@ impl InstalledTheme {
 
 fn reserved(id: &str) -> bool {
     id.eq_ignore_ascii_case(DEFAULT_THEME_ID)
-        || BUILTIN_EXTRA_THEME_IDS
-            .iter()
-            .any(|reserved| id.eq_ignore_ascii_case(reserved))
+}
+
+fn is_builtin_extra(id: &str) -> bool {
+    BUILTIN_EXTRA_THEME_IDS
+        .iter()
+        .any(|builtin| id.eq_ignore_ascii_case(builtin))
 }
 
 /// Instala o pacote em `<themes_root>/<id>/`, trocando uma versão anterior do mesmo tema só no fim.
@@ -116,7 +119,7 @@ pub fn install_with(
 ) -> Result<InstalledTheme, Vec<Problem>> {
     let mut pkg = package::Package::open(package, limits)?;
     let id = pkg.manifest.id.clone();
-    if reserved(&id) {
+    if reserved(&id) || is_builtin_extra(&id) {
         return Err(vec![Problem::new(
             "package.reserved-id",
             tf("themes.package.reserved_id", &[("id", &id)]),
@@ -183,7 +186,7 @@ pub fn extract_for_check(package: &Path, output: &Path) -> Result<ThemeManifest,
 
 /// Remove um tema instalado (e a escolha, se era ele). O id seguro impede sair da pasta de temas.
 pub fn uninstall(themes_root: &Path, id: &str) -> io::Result<()> {
-    if !is_safe_id(id) || reserved(id) {
+    if !is_safe_id(id) || reserved(id) || is_builtin_extra(id) {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, id.to_owned()));
     }
     let dir = themes_root.join(id);

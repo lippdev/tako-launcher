@@ -437,6 +437,9 @@ fn uninstall_only_takes_safe_ids_and_clears_the_selection() {
     assert!(uninstall(&w.root(), "..").is_err());
     assert!(uninstall(&w.root(), "../themes").is_err());
     assert!(uninstall(&w.root(), "default").is_err());
+    for id in BUILTIN_EXTRA_THEME_IDS {
+        assert!(uninstall(&w.root(), id).is_err());
+    }
     overrides::save_override(&w.root(), Some("Autor_TemaTeste"), "accent = \"#112233\"\n").unwrap();
     assert!(overrides::has_override(&w.root(), Some("Autor_TemaTeste")));
 
@@ -474,6 +477,24 @@ fn selection_is_stored_and_validated() {
     assert_eq!(selected(&root), None);
     fs::write(root.join(".selected"), "../../etc").unwrap();
     assert_eq!(selected(&root), None);
+}
+
+#[test]
+fn builtin_extra_themes_remain_selectable_and_keep_overrides() {
+    let w = Work::new();
+    let root = w.root();
+    for id in BUILTIN_EXTRA_THEME_IDS {
+        select(&root, Some(id)).unwrap();
+        assert_eq!(selected(&root).as_deref(), Some(id));
+        assert_eq!(
+            begin_load(&root, UNIX_EPOCH + Duration::from_secs(1)).as_deref(),
+            Some(id)
+        );
+        end_load(&root);
+
+        overrides::save_override(&root, Some(id), "accent = \"#112233\"\n").unwrap();
+        assert!(overrides::has_override(&root, Some(id)));
+    }
 }
 
 #[test]
