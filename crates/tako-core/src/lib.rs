@@ -4,6 +4,7 @@
 //! `tako-platform` e `tako-sources`.
 
 pub mod api;
+pub mod console_mode;
 pub mod devices;
 pub mod diagnostics;
 pub mod downloads;
