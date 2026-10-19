@@ -200,14 +200,15 @@ component FitaCard inherits Rectangle {
 
         Rectangle {
             y: parent.height - self.height;
-            height: 72 * Ui.u;
-            background: @linear-gradient(180deg, transparent 0%, #0D0F14e6 60%, #0D0F14 100%);
+            height: max(72 * Ui.u, card-caption.preferred-height + 28 * Ui.u);
+            background: @linear-gradient(180deg, transparent 0%, #0D0F14cc 28%, #0D0F14f8 65%, #0D0F14 100%);
         }
 
-        VerticalLayout {
+        card-caption := VerticalLayout {
             x: 10 * Ui.u;
             y: parent.height - self.height - 8 * Ui.u;
             width: parent.width - 20 * Ui.u;
+            height: self.preferred-height;
             spacing: 2 * Ui.u;
             Text {
                 text: tile.title;
@@ -344,16 +345,17 @@ component FitaHome inherits Rectangle {
             x: 60 * Ui.u;
             y: 70 * Ui.u;
             width: min(1000 * Ui.u, parent.width - 120 * Ui.u);
-            height: 320 * Ui.u;
+            height: max(320 * Ui.u, hero-block.preferred-height + 40 * Ui.u);
             background: @linear-gradient(90deg, #0D0F14f8 0%, #0D0F14d9 65%, transparent 100%);
             border-radius: 16 * Ui.u;
         }
 
         // Destaque Cinematográfico no terço superior/médio
-        VerticalLayout {
+        hero-block := VerticalLayout {
             x: 80 * Ui.u;
             y: 90 * Ui.u;
             width: min(1100 * Ui.u, parent.width - 160 * Ui.u);
+            height: self.preferred-height;
             spacing: 12 * Ui.u;
             alignment: start;
 
@@ -631,14 +633,15 @@ component FitaGridCard inherits Rectangle {
 
         Rectangle {
             y: parent.height - self.height;
-            height: 76 * Ui.u;
-            background: @linear-gradient(180deg, transparent 0%, #0D0F14e6 60%, #0D0F14 100%);
+            height: max(76 * Ui.u, grid-caption.preferred-height + 30 * Ui.u);
+            background: @linear-gradient(180deg, transparent 0%, #0D0F14cc 28%, #0D0F14f8 65%, #0D0F14 100%);
         }
 
-        VerticalLayout {
+        grid-caption := VerticalLayout {
             x: 12 * Ui.u;
             y: parent.height - self.height - 10 * Ui.u;
             width: parent.width - 24 * Ui.u;
+            height: self.preferred-height;
             spacing: 2 * Ui.u;
             Text {
                 text: tile.title;
@@ -695,6 +698,8 @@ component FitaLibrary inherits Rectangle {
         x: grid-x;
         y: 48 * Ui.u;
         width: parent.width - 2 * grid-x;
+        height: self.preferred-height;
+        alignment: start;
         spacing: 16 * Ui.u;
 
         HorizontalLayout {
@@ -1044,7 +1049,7 @@ component FitaSettingsPage inherits Rectangle {
     callback hovered(string, int);
 
     property <length> top: 160 * Ui.u;
-    property <length> row-h: 100 * Ui.u;
+    property <length> row-h: max(100 * Ui.u, 100 * Ui.u * Ui.text-scale);
     property <length> header-h: 60 * Ui.u + 45 * Ui.u * Ui.text-scale;
     property <length> view-h: self.height - top - Ui.hint-bar - header-h;
     property <int> shown-row;
