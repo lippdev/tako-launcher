@@ -328,7 +328,16 @@ pub fn start_server_with_timeout<H: ApiHandler>(
                                 streams: s_map,
                                 conns: c_counter,
                             };
-                            let _ = handle_connection(stream, h, t, r, g, conn_gen, s_port, request_timeout);
+                            let _ = handle_connection(
+                                stream,
+                                h,
+                                t,
+                                r,
+                                g,
+                                conn_gen,
+                                s_port,
+                                request_timeout,
+                            );
                         });
                     }
                     Err(_) => {
