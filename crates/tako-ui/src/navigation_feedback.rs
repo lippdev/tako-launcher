@@ -78,6 +78,10 @@ fn tone(cmd: Cmd, volume: u8) -> Vec<f32> {
 }
 
 pub fn play(ctx: &Ctx, cmd: Cmd) {
+    // A entrada que só pula a intro não navega, então não faz som.
+    if ctx.intro {
+        return;
+    }
     if !allowed(ctx) {
         sync(ctx);
         return;

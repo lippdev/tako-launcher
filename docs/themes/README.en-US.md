@@ -51,8 +51,11 @@ Check it:
 tako theme check my-theme
 ```
 
-To try it, copy the folder into `<Tako data>/themes/` and pick the theme in **Settings › Appearance › Theme**. To
-share it, zip the folder as a `.takotheme` (see [section 7](#7-package-and-distribution)).
+To try it, copy the folder into `<Tako data>/themes/` and pick the theme in **Settings › Appearance › Theme**.
+Picking a theme shows a preview: it fills the screen, but only becomes Tako's theme if you confirm with **Apply**.
+**Back**, or 15 seconds without an answer, restores the previous theme; if the theme fails to load, the previous one
+stays.
+To share it, zip the folder as a `.takotheme` (see [section 7](#7-package-and-distribution)).
 
 ## 2. What a theme can and cannot do
 
@@ -102,6 +105,7 @@ import { Tile, HomeRow, NavItem, Hero, Stat, Details, Overlay, Key } from "@tako
 | `hints` | `[Hint]` | Bottom bar hints (button glyph and text), in order. |
 | `transparent-background` | `bool` | The window is over the game: draw only what's needed, on a transparent background. |
 | `leaving` | `bool` | Leaving for the game: Tako closes after `Ui.leave-time`. Ideal for a fade. |
+| `intro` | `bool` | App intro: true for about 1 s on launch only, with the first screen already ready underneath. Cover it with a short animation and fade it out when it turns false. Any key, button or `clicked` (from any zone) skips the intro; the theme may use the `intro` zone for the veil area. It is never true with "Reduce animations" nor in a theme that does not declare the property. |
 
 ### 4.2 Sidebar
 
@@ -190,6 +194,9 @@ its bar.
 | `recovery` | Recovery screen | `title`, `text`, `rows`, `sel` |
 
 `sel = -1` means "no selectable row" (read only).
+
+Since THEME-002, an empty (or unknown) `kind` is a layer with no drawing, like the theme preview: draw nothing and let the `hints` bar
+do the talking. Never cover the screen with a scrim for an unknown `kind`.
 
 ### 4.9 Callbacks
 
