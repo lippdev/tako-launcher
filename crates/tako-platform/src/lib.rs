@@ -10,10 +10,19 @@ use tako_core::devices::{
     fake::{FakeAudio, FakeDisplays, FakePointer, FakeProcesses},
 };
 
+pub mod downloads;
 pub mod exe_icon;
 pub mod secrets;
 pub mod space;
 pub mod usage;
+
+/// Copia um texto para a área de transferência do sistema.
+pub fn copy_to_clipboard(text: &str) -> bool {
+    let Ok(mut clipboard) = arboard::Clipboard::new() else {
+        return false;
+    };
+    clipboard.set_text(text).is_ok()
+}
 
 /// Atalho de teclado global durante o jogo; o retorno mantém o atalho registrado até ser solto. `None` = sem
 /// atalho (tecla sem equivalente, atalho em uso por outro app ou SO sem suporte).

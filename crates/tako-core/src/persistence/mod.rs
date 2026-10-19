@@ -9,6 +9,7 @@ pub mod backup;
 mod choices;
 mod collections;
 mod database;
+mod downloads;
 mod game_settings;
 mod library;
 pub mod migrator;
@@ -24,6 +25,7 @@ pub use backup::{
 pub use choices::GameChoicesStore;
 pub use collections::{CollectionRow, CollectionStore};
 pub use database::TakoDatabase;
+pub use downloads::{DownloadStore, SourceRow};
 pub use game_settings::GameSettingsStore;
 pub use library::{GameStateRow, IMPORTED_SUFFIX, LibraryData, LibraryStore, ManualGameRow};
 pub use settings::{SettingsStore, parse_bool};

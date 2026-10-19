@@ -20,6 +20,20 @@ fn rows_of(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     (cat.rows)(ctx)
 }
 
+#[test]
+fn downloads_settings_only_appear_on_desktop() {
+    let _g = LOCK.lock().unwrap();
+    let (_dir, mut ctx) = ctx();
+    let mut page = SettingsPage::at("downloads");
+    ctx.desktop = false;
+    page.render(&ctx, &mut Out::default());
+    assert!(!page.cats.iter().any(|c| c.id == "downloads"));
+    assert!(page.cat < page.cats.len());
+    ctx.desktop = true;
+    page.render(&ctx, &mut Out::default());
+    assert!(page.cats.iter().any(|c| c.id == "downloads"));
+}
+
 fn find(items: &[MenuItem], key: &str) -> MenuItem {
     items
         .iter()
@@ -42,7 +56,7 @@ fn navigates_between_categories_and_rows() {
     let (_d, mut ctx) = ctx();
     let mut page = SettingsPage::new();
     let n = page.cats.len();
-    assert_eq!(n, 8);
+    assert_eq!(n, 9);
     page.handle(Cmd::NextSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "library");
     page.handle(Cmd::PrevSection, &mut ctx);
@@ -976,4 +990,97 @@ fn restoring_blocks_play_rescan_restore_and_settings() {
         !dialog.text.is_empty(),
         "corpo do diálogo deve conter .text(desc)"
     );
+}
+
+#[test]
+fn api_settings_panel_toggles_and_regenerates_token() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    assert!(!ctx.settings.bool(keys::API_ENABLED, false));
+
+    let rows = rows_of(&ctx, "system");
+    let api_row = find(&rows, "settings.system.api");
+    assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
+
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+
+    let panel_rows = panel.render(&ctx).rows;
+    let enabled_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-enabled")
+        .unwrap();
+    for _ in 0..enabled_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    assert!(ctx.settings.bool(keys::API_ENABLED, false));
+    let token1 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token1.is_empty());
+
+    let regen_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-regenerate")
+        .unwrap();
+    let current_pos = enabled_pos;
+    if regen_pos > current_pos {
+        for _ in current_pos..regen_pos {
+            panel.handle(Cmd::Down, &mut ctx);
+        }
+    }
+    let regen_flow = panel.handle(Cmd::Accept, &mut ctx);
+    let mut confirm_dialog = match regen_flow {
+        Flow::Push(l) => l,
+        _ => panic!("esperava diálogo de confirmação"),
+    };
+    confirm_dialog.handle(Cmd::Accept, &mut ctx);
+    let token2 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token2.is_empty());
+    assert_ne!(token1, token2);
+    assert!(ctx.toast.is_some());
+}
+
+#[test]
+fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Linha do token segue padrão Botão ("Mostrar") e abre diálogo com botão Copiar
+    let valid_token = tako_core::api::generate_token();
+    ctx.settings.set(keys::API_TOKEN, &valid_token);
+    let rows = rows_of(&ctx, "system");
+    let api_row = find(&rows, "settings.system.api");
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+    let panel_rows = panel.render(&ctx).rows;
+    let token_row = panel_rows.iter().find(|r| r.key == "api-token").unwrap();
+    assert_eq!(token_row.value, ctx.t("settings.system.api_token_show"));
+    let token_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-token")
+        .unwrap();
+    for _ in 0..token_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    let token_dialog = match panel.handle(Cmd::Accept, &mut ctx) {
+        Flow::Push(l) => l,
+        _ => panic!("esperava diálogo do token"),
+    };
+    let dialog_rendered = token_dialog.render(&ctx);
+    assert!(dialog_rendered.text.contains(&valid_token));
+    assert!(dialog_rendered.rows.iter().any(|r| r.key == "copy"));
+
+    // 2. Token inválido (não-hex) ao ser ativado é regenerado com formato válido (32 hex)
+    ctx.settings.set(keys::API_TOKEN, "invalido");
+    ctx.settings.set_bool(keys::API_ENABLED, false);
+    for _ in 0..token_pos {
+        panel.handle(Cmd::Up, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    let token = ctx.settings.string(keys::API_TOKEN);
+    assert!(tako_core::api::is_valid_token(&token));
 }
