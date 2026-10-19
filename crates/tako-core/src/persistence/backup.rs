@@ -453,6 +453,37 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
     };
 
     let manifest_toml = toml::to_string(&manifest)?;
+    if manifest_toml.len() as u64 > MAX_MANIFEST_BYTES {
+        return Err(BackupError::TooLarge {
+            size: manifest_toml.len() as u64,
+            max: MAX_MANIFEST_BYTES,
+        });
+    }
+
+    let mut entries_count: usize = 0;
+    let mut total_uncompressed: u64 = manifest_toml.len() as u64;
+
+    let db_size = fs::metadata(&temp_db_path)?.len();
+    if db_size > MAX_FILE_BYTES {
+        return Err(BackupError::TooLarge {
+            size: db_size,
+            max: MAX_FILE_BYTES,
+        });
+    }
+    total_uncompressed = total_uncompressed.saturating_add(db_size);
+    if total_uncompressed > MAX_UNCOMPRESSED_BYTES {
+        return Err(BackupError::TooLarge {
+            size: total_uncompressed,
+            max: MAX_UNCOMPRESSED_BYTES,
+        });
+    }
+    entries_count += 2; // manifest + tako.db
+    if entries_count > MAX_ENTRIES {
+        return Err(BackupError::TooLarge {
+            size: entries_count as u64,
+            max: MAX_ENTRIES as u64,
+        });
+    }
 
     // Escreve primeiro em arquivo temporário no mesmo diretório para atomicidade
     let temp_dest = tempfile::Builder::new()
@@ -477,13 +508,27 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
         // 3. Temas instalados pelo usuário
         let themes_root = paths.themes();
         if themes_root.is_dir() {
-            add_directory_to_zip(&themes_root, "themes", &mut zip, file_options)?;
+            add_directory_to_zip(
+                &themes_root,
+                "themes",
+                &mut zip,
+                file_options,
+                &mut entries_count,
+                &mut total_uncompressed,
+            )?;
         }
 
         // 4. Capas e artes personalizadas escolhidas pelo usuário (art-choices/)
         let art_choices_root = paths.art_choices();
         if art_choices_root.is_dir() {
-            add_directory_to_zip(&art_choices_root, "art-choices", &mut zip, file_options)?;
+            add_directory_to_zip(
+                &art_choices_root,
+                "art-choices",
+                &mut zip,
+                file_options,
+                &mut entries_count,
+                &mut total_uncompressed,
+            )?;
         }
 
         // Observação sobre updates.json:
@@ -492,6 +537,14 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
         // incluídas no arquivo .takobackup nem restauradas.
 
         zip.finish()?;
+    }
+
+    let zip_size = temp_dest.as_file().metadata()?.len();
+    if zip_size > MAX_BACKUP_BYTES {
+        return Err(BackupError::TooLarge {
+            size: zip_size,
+            max: MAX_BACKUP_BYTES,
+        });
     }
 
     temp_dest
@@ -559,15 +612,31 @@ fn create_raw_auto_backup(paths: &DataPaths, dest_file: &Path) -> Result<(), Bac
         }
 
         // 3. Temas
+        let mut dummy_entries = 0;
+        let mut dummy_uncompressed = 0;
         let themes_root = paths.themes();
         if themes_root.is_dir() {
-            let _ = add_directory_to_zip(&themes_root, "themes", &mut zip, file_options);
+            let _ = add_directory_to_zip(
+                &themes_root,
+                "themes",
+                &mut zip,
+                file_options,
+                &mut dummy_entries,
+                &mut dummy_uncompressed,
+            );
         }
 
         // 4. Capas e artes personalizadas (art-choices/)
         let art_choices_root = paths.art_choices();
         if art_choices_root.is_dir() {
-            let _ = add_directory_to_zip(&art_choices_root, "art-choices", &mut zip, file_options);
+            let _ = add_directory_to_zip(
+                &art_choices_root,
+                "art-choices",
+                &mut zip,
+                file_options,
+                &mut dummy_entries,
+                &mut dummy_uncompressed,
+            );
         }
 
         zip.finish()?;
@@ -1075,6 +1144,8 @@ fn add_directory_to_zip(
     prefix: &str,
     zip: &mut ZipWriter<&File>,
     options: SimpleFileOptions,
+    entries_count: &mut usize,
+    total_uncompressed: &mut u64,
 ) -> Result<(), BackupError> {
     let mut stack = vec![(root.to_path_buf(), prefix.to_string())];
     while let Some((dir, current_prefix)) = stack.pop() {
@@ -1105,9 +1176,30 @@ fn add_directory_to_zip(
 
             if file_type.is_dir() {
                 stack.push((path, entry_name));
-            } else if file_type.is_file()
-                && let Ok(mut f) = File::open(&path)
-            {
+            } else if file_type.is_file() {
+                let file_size = entry.metadata()?.len();
+                if file_size > MAX_FILE_BYTES {
+                    return Err(BackupError::TooLarge {
+                        size: file_size,
+                        max: MAX_FILE_BYTES,
+                    });
+                }
+                *total_uncompressed = total_uncompressed.saturating_add(file_size);
+                if *total_uncompressed > MAX_UNCOMPRESSED_BYTES {
+                    return Err(BackupError::TooLarge {
+                        size: *total_uncompressed,
+                        max: MAX_UNCOMPRESSED_BYTES,
+                    });
+                }
+                *entries_count += 1;
+                if *entries_count > MAX_ENTRIES {
+                    return Err(BackupError::TooLarge {
+                        size: *entries_count as u64,
+                        max: MAX_ENTRIES as u64,
+                    });
+                }
+
+                let mut f = File::open(&path)?;
                 zip.start_file(entry_name, options)?;
                 io::copy(&mut f, zip)?;
             }
@@ -2132,6 +2224,34 @@ mod tests {
         assert!(
             dest_theme_dir.join("theme.toml").exists(),
             "tema original deve continuar intacto"
+        );
+    }
+
+    #[test]
+    fn create_backup_fails_if_file_exceeds_max_file_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = make_test_paths(dir.path());
+
+        let db = TakoDatabase::new(paths.database());
+        let _ = db.open().unwrap();
+
+        // Cria um arquivo esparso em themes que excede MAX_FILE_BYTES
+        let large_theme_dir = paths.themes().join("large_theme");
+        fs::create_dir_all(&large_theme_dir).unwrap();
+        let large_file_path = large_theme_dir.join("data.bin");
+        let f = File::create(&large_file_path).unwrap();
+        f.set_len(MAX_FILE_BYTES + 1024).unwrap();
+
+        let backup_file = dir.path().join("oversized.takobackup");
+        let err = create_backup(&paths, &backup_file).unwrap_err();
+        assert!(
+            matches!(err, BackupError::TooLarge { .. }),
+            "create_backup deve falhar com TooLarge ao exceder MAX_FILE_BYTES: {err:?}"
+        );
+        let msg = err.to_string();
+        assert!(
+            msg.contains("limite") || msg.contains("limit") || msg.contains("passa"),
+            "mensagem de erro deve ser clara: {msg}"
         );
     }
 
