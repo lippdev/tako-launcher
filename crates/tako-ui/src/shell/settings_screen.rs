@@ -15,7 +15,7 @@ const TTL: Duration = Duration::from_secs(3);
 pub const HIDE_DISCONNECT: &str = "Disconnect";
 pub const HIDE_NONE: &str = "None";
 
-fn displays(ctx: &Ctx) -> Result<Vec<ConnectedDisplay>, String> {
+pub(crate) fn displays(ctx: &Ctx) -> Result<Vec<ConnectedDisplay>, String> {
     let d = ctx.platform.displays.clone();
     cached("settings.displays", TTL, move || {
         d.list().map_err(|e| e.to_string())

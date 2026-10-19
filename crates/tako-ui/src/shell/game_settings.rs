@@ -586,7 +586,7 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
         c.vrr.is_some().then(|| vrr_default.clone()),
     );
     // Tela conectada sem VRR (ou SO sem API, como o Windows): indisponível, com o motivo.
-    let unsupported = ctx.platform.displays.list().is_ok_and(|l| {
+    let unsupported = super::settings::screen::displays(ctx).is_ok_and(|l| {
         l.iter().any(|d| {
             d.id.eq_ignore_ascii_case(&screen_id)
                 && d.vrr == tako_core::devices::VrrStatus::Unsupported
