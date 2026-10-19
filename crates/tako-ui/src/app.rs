@@ -991,9 +991,10 @@ impl App {
         {
             let app = self.clone();
             let resolver = crate::art::resolver(&self.shell.borrow().ctx);
+            // Só marca: o timer de 16 ms desenha uma vez por quadro, por mais imagens que cheguem juntas (remontar
+            // a lista de 300 jogos custa ~16 ms em debug; uma vez por imagem travava a UI numa rajada de ícones).
             images::init(resolver, 2, move || {
                 app.shell.borrow_mut().ctx.dirty = true;
-                app.redraw();
             });
         }
         let mut pads = Pads::open()
