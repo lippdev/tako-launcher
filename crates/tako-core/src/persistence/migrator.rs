@@ -115,6 +115,28 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         "ALTER TABLE game_settings ADD COLUMN screen_id TEXT;
          ALTER TABLE game_settings ADD COLUMN screen_name TEXT;",
     ),
+    // Downloads por torrent (DL-001): fontes que o usuário adicionou e os downloads com o jogo vinculado.
+    (
+        13,
+        "CREATE TABLE IF NOT EXISTS download_sources (
+            url TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            items INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS downloads (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            game_id TEXT,
+            source TEXT NOT NULL,
+            uri TEXT NOT NULL,
+            folder TEXT NOT NULL,
+            state TEXT NOT NULL,
+            error TEXT NOT NULL,
+            done INTEGER NOT NULL,
+            total INTEGER
+        );",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).

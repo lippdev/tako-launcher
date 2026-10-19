@@ -5,6 +5,7 @@
 
 pub mod devices;
 pub mod diagnostics;
+pub mod downloads;
 pub mod i18n;
 pub mod input;
 pub mod library;

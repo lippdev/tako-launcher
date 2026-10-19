@@ -1,0 +1,19 @@
+[package]
+name = "tako-downloads"
+description = "Downloads por torrent do Tako (DL-001): motor librqbit numa thread própria e leitura das fontes do usuário."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tako-core.workspace = true
+tako-platform.workspace = true
+librqbit.workspace = true
+tokio.workspace = true
+ureq.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
