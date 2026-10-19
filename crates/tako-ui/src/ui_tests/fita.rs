@@ -130,7 +130,7 @@ fn collection_tab_only_focuses_the_row() {
             panic!()
         };
         let last = rows.row_count() - 1;
-        let zone = format!("row-{last}");
+        let zone = format!("tab-{last}");
         let _x = (80..1840)
             .step_by(3)
             .find(|x| {
@@ -471,6 +471,60 @@ fn card_captions_and_library_header_height_and_contrast() {
         assert!(
             lum_lower < 50.0,
             "scrim do cartão garante contraste no fundo: {lum_lower}"
+        );
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
+fn default_theme_hover_on_row_updates_column_even_if_previously_saved() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let mut f = Fixture::new("default");
+        f.draw(1920, 1080);
+        // Primeiro foca a fileira 0 na coluna 3
+        f.shell.hover("row-0", 3);
+        assert_eq!(super::number(&f.shell.render(Instant::now()), "home-col-focus"), 3);
+        // Move para o destaque (hero)
+        f.shell.hover("hero", 0);
+        // Move para a fileira 0 no índice 2 com coluna salva 3: deve atualizar para coluna 2
+        f.shell.hover("row-0", 2);
+        assert_eq!(
+            super::number(&f.shell.render(Instant::now()), "home-col-focus"),
+            2,
+            "hover em row-0 índice 2 com coluna salva 3 deve atualizar para coluna 2"
+        );
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
+fn fita_tab_hover_changes_row_without_resetting_column() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let mut f = Fixture::new("tako-fita");
+        f.draw(1920, 1080);
+        // Foca fileira 1 na coluna 2
+        f.shell.hover("row-1", 2);
+        assert_eq!(super::number(&f.shell.render(Instant::now()), "home-row-focus"), 1);
+        assert_eq!(super::number(&f.shell.render(Instant::now()), "home-col-focus"), 2);
+        // Move para fileira 0 na coluna 1
+        f.shell.hover("row-0", 1);
+        assert_eq!(super::number(&f.shell.render(Instant::now()), "home-row-focus"), 0);
+        assert_eq!(super::number(&f.shell.render(Instant::now()), "home-col-focus"), 1);
+        // Hover/clique na aba da fileira 1 (tab-1) deve mudar só a fileira para 1, preservando coluna salva 2
+        f.shell.hover("tab-1", 0);
+        assert_eq!(
+            super::number(&f.shell.render(Instant::now()), "home-row-focus"),
+            1,
+            "tab-1 deve selecionar a fileira 1"
+        );
+        assert_eq!(
+            super::number(&f.shell.render(Instant::now()), "home-col-focus"),
+            2,
+            "tab-1 deve manter a coluna salva 2 da fileira 1"
         );
     })
     .join()

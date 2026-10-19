@@ -391,15 +391,16 @@ impl Page for HomePage {
             self.row = None;
             self.hero_button = index;
         } else if let Some(r) = zone
+            .strip_prefix("tab-")
+            .and_then(|r| r.parse::<usize>().ok())
+        {
+            self.row = Some(r);
+        } else if let Some(r) = zone
             .strip_prefix("row-")
             .and_then(|r| r.parse::<usize>().ok())
         {
-            if self.row != Some(r) {
-                self.row = Some(r);
-                self.cols.entry(r).or_insert(index);
-            } else {
-                self.cols.insert(r, index);
-            }
+            self.row = Some(r);
+            self.cols.insert(r, index);
         }
     }
 
