@@ -7,7 +7,8 @@ use crate::unix::outputs::{
 use crate::unix::session::Session;
 use crate::unix::{kscreen, mutter, run, wlr};
 use std::collections::HashMap;
-use tako_core::devices::{DeviceError, DeviceResult, Displays, HdrStatus};
+use tako_core::devices::{DeviceError, DeviceResult, Displays, HdrStatus, VrrStatus};
+use tako_core::i18n::t;
 
 pub fn for_session(session: Session) -> Box<dyn Displays> {
     match session {
@@ -165,6 +166,8 @@ impl X11 {
                     rotation: crtc.map_or(0, |c| rotation_deg(c.rotation)),
                     scale: 1.0,
                     hdr: HdrStatus::Unsupported,
+                    // `vrr_capable` é só leitura: quem liga é o driver (Xorg) e o jogo em tela cheia.
+                    vrr: VrrStatus::Unsupported,
                 }
             })
             .collect()
@@ -174,6 +177,10 @@ impl X11 {
 impl OutputBackend for X11 {
     fn outputs(&self) -> DeviceResult<Vec<Output>> {
         Ok(X11::to_outputs(&X11::read()?))
+    }
+
+    fn vrr_limitation(&self) -> Option<String> {
+        Some(t("vrr.platform.x11"))
     }
 
     /// Como o `xrandr`: desliga os CRTCs que mudam, ajusta o tamanho da tela e liga de novo.
@@ -296,7 +303,7 @@ impl OutputBackend for Kscreen {
         kscreen::parse(&run::tool("kscreen-doctor", &["-j".into()])?).map_err(DeviceError::Failed)
     }
     fn commit(&self, desired: &[Output]) -> DeviceResult<()> {
-        run::tool("kscreen-doctor", &kscreen::args(desired)).map(drop)
+        run::apply_tool("kscreen-doctor", &kscreen::args(desired)).map(drop)
     }
     fn set_hdr(&self, id: &str, enabled: bool) -> DeviceResult<()> {
         let o = self
@@ -308,7 +315,15 @@ impl OutputBackend for Kscreen {
             return Err(DeviceError::Unsupported("HDR".into()));
         }
         let state = if enabled { "enable" } else { "disable" };
-        run::tool("kscreen-doctor", &[format!("output.{id}.hdr.{state}")]).map(drop)
+        run::apply_tool("kscreen-doctor", &[format!("output.{id}.hdr.{state}")]).map(drop)
+    }
+    fn set_vrr(&self, id: &str, enabled: bool) -> DeviceResult<()> {
+        if self.outputs()?.iter().find(|o| o.id == id).map(|o| o.vrr)
+            == Some(VrrStatus::Unsupported)
+        {
+            return Err(DeviceError::Unsupported("VRR".into()));
+        }
+        run::apply_tool("kscreen-doctor", &[kscreen::vrr_arg(id, enabled)]).map(drop)
     }
 }
 
@@ -321,7 +336,10 @@ impl OutputBackend for Wlr {
         wlr::parse(&run::tool("wlr-randr", &["--json".into()])?).map_err(DeviceError::Failed)
     }
     fn commit(&self, desired: &[Output]) -> DeviceResult<()> {
-        run::tool("wlr-randr", &wlr::args(desired)).map(drop)
+        run::apply_tool("wlr-randr", &wlr::args(desired)).map(drop)
+    }
+    fn set_vrr(&self, id: &str, enabled: bool) -> DeviceResult<()> {
+        run::apply_tool("wlr-randr", &wlr::vrr_args(id, enabled)).map(drop)
     }
 }
 
@@ -416,6 +434,11 @@ impl Mutter {
 impl OutputBackend for Mutter {
     fn outputs(&self) -> DeviceResult<Vec<Output>> {
         Ok(mutter::outputs(&Mutter::state(&Mutter::proxy()?)?))
+    }
+    // shortcut: o Mutter 46+ expõe o VRR como modos de taxa variável, ainda experimental; ler e ligar fica para
+    // quando houver um GNOME com VRR para validar.
+    fn vrr_limitation(&self) -> Option<String> {
+        Some(t("vrr.platform.gnome"))
     }
 
     fn commit(&self, desired: &[Output]) -> DeviceResult<()> {

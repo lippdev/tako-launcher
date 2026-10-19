@@ -143,6 +143,13 @@ macos() {
   <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>dev.lipp.tako</string>
+      <key>CFBundleURLSchemes</key><array><string>tako</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST

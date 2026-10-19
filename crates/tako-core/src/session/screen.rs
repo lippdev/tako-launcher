@@ -1,10 +1,11 @@
 //! "Tela de jogo" (port de `ConsoleMode.Runtime/Display/GameScreen.cs` e de
 //! `Session/GameScreen/GameScreenSession.cs`, só o modo que desconecta as outras telas): ao abrir o jogo,
-//! liga a tela escolhida, torna-a principal, desliga as outras, aplica resolução/taxa e liga o HDR; ao
+//! liga a tela escolhida, torna-a principal, desliga as outras, aplica resolução/taxa e liga o HDR e o VRR; ao
 //! terminar, devolve exatamente a topologia lida antes. Falhas nunca derrubam a sessão.
 
 use crate::devices::{
-    ConnectedDisplay, DeviceError, DisplayMode, DisplayTopology, Displays, HdrStatus, ScreenBounds,
+    ConnectedDisplay, DeviceError, DeviceResult, DisplayMode, DisplayTopology, Displays, HdrStatus,
+    ScreenBounds,
 };
 use crate::i18n::{t, tf};
 use std::time::Duration;
@@ -16,6 +17,7 @@ pub struct GameScreenSettings {
     /// `None` = manter o modo atual.
     pub mode: Option<DisplayMode>,
     pub enable_hdr: bool,
+    pub enable_vrr: bool,
 }
 
 impl GameScreenSettings {
@@ -39,6 +41,7 @@ pub struct GameScreenPlan {
     pub hide_ids: Vec<String>,
     pub mode: Option<DisplayMode>,
     pub turn_on_hdr: bool,
+    pub turn_on_vrr: bool,
     pub notes: Vec<String>,
     pub problem: Option<String>,
 }
@@ -60,6 +63,7 @@ pub fn plan(settings: &GameScreenSettings, displays: &[ConnectedDisplay]) -> Gam
             hide_ids: vec![],
             mode: None,
             turn_on_hdr: false,
+            turn_on_vrr: false,
             notes: vec![],
             problem: Some(t("session.screen.not_connected")),
         };
@@ -74,22 +78,27 @@ pub fn plan(settings: &GameScreenSettings, displays: &[ConnectedDisplay]) -> Gam
         .mode
         .filter(|m| m.is_valid() && (!target.is_active || target.current_mode != Some(*m)));
     let mut notes = vec![];
-    let turn_on_hdr = settings.enable_hdr
-        && match target.hdr {
-            HdrStatus::Unsupported => {
-                notes.push(tf("session.screen.no_hdr", &[("screen", &target.name)]));
-                false
+    let mut wants = |enable: bool, status: HdrStatus, note: &str| {
+        enable
+            && match status {
+                HdrStatus::Unsupported => {
+                    notes.push(tf(note, &[("screen", &target.name)]));
+                    false
+                }
+                HdrStatus::On => false,
+                // Desligado, ou desconhecido porque a tela ainda está desligada: tenta depois de ligá-la.
+                HdrStatus::Off | HdrStatus::Unknown => true,
             }
-            HdrStatus::On => false,
-            // Desligado, ou desconhecido porque a tela ainda está desligada: tenta depois de ligá-la.
-            HdrStatus::Off | HdrStatus::Unknown => true,
-        };
+    };
+    let turn_on_hdr = wants(settings.enable_hdr, target.hdr, "session.screen.no_hdr");
+    let turn_on_vrr = wants(settings.enable_vrr, target.vrr, "vrr.session.unavailable");
     GameScreenPlan {
         enable_target: !target.is_active,
         target: Some(target.clone()),
         hide_ids,
         mode,
         turn_on_hdr,
+        turn_on_vrr,
         notes,
         problem: None,
     }
@@ -131,6 +140,7 @@ impl GameScreenResult {
 struct Active {
     before: DisplayTopology,
     hdr_turned_on_for: Option<String>,
+    vrr_turned_on_for: Option<String>,
 }
 
 /// Entre [`GameScreenSession::begin`] e [`GameScreenSession::end`]. Lento (espera a TV ligar): fora da
@@ -176,6 +186,18 @@ impl GameScreenSession {
         settings: &GameScreenSettings,
         confirmed_setup: Option<&str>,
     ) -> GameScreenResult {
+        self.begin_with(displays, settings, confirmed_setup, &mut |_| {})
+    }
+
+    /// Como [`Self::begin`]; `before_vrr` recebe a tela logo antes de o VRR ser ligado, para gravar a marca
+    /// antes (uma queda logo depois de ligar ainda deixa como desligar).
+    pub fn begin_with(
+        &mut self,
+        displays: &dyn Displays,
+        settings: &GameScreenSettings,
+        confirmed_setup: Option<&str>,
+        before_vrr: &mut dyn FnMut(&str),
+    ) -> GameScreenResult {
         if self.active.is_some() {
             return GameScreenResult::skip(t("session.screen.already_active"));
         }
@@ -202,11 +224,12 @@ impl GameScreenSession {
             return GameScreenResult::skip(t("session.screen.not_connected"));
         };
         tracing::info!(
-            "tela de jogo: {}, desligar {} tela(s), modo {:?}, ligar HDR {}",
+            "tela de jogo: {}, desligar {} tela(s), modo {:?}, ligar HDR {}, ligar VRR {}",
             target.name,
             plan.hide_ids.len(),
             plan.mode,
-            plan.turn_on_hdr
+            plan.turn_on_hdr,
+            plan.turn_on_vrr
         );
         for note in &plan.notes {
             tracing::info!("tela de jogo: {note}");
@@ -214,8 +237,16 @@ impl GameScreenSession {
         self.active = Some(Active {
             before,
             hdr_turned_on_for: None,
+            vrr_turned_on_for: None,
         });
-        match self.apply(displays, settings, &plan, &target, confirmed_setup) {
+        match self.apply(
+            displays,
+            settings,
+            &plan,
+            &target,
+            confirmed_setup,
+            before_vrr,
+        ) {
             Ok(result) => result,
             Err(e) => {
                 tracing::warn!(
@@ -241,6 +272,7 @@ impl GameScreenSession {
         plan: &GameScreenPlan,
         target: &ConnectedDisplay,
         confirmed_setup: Option<&str>,
+        before_vrr: &mut dyn FnMut(&str),
     ) -> Result<GameScreenResult, DeviceError> {
         let id = target.id.clone();
         if plan.enable_target {
@@ -277,19 +309,20 @@ impl GameScreenSession {
             tracing::warn!("tela de jogo: {mode} recusado em {}: {e}", target.name);
         }
         if plan.turn_on_hdr {
-            match find(displays, &id).map(|d| d.hdr) {
-                Some(HdrStatus::Off) => match displays.set_hdr(&id, true) {
-                    Ok(()) => {
-                        if let Some(a) = self.active.as_mut() {
-                            a.hdr_turned_on_for = Some(id.clone());
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!("tela de jogo: falha ao ligar o HDR de {}: {e}", target.name)
-                    }
-                },
-                Some(HdrStatus::On) => {}
-                _ => tracing::info!("tela de jogo: HDR não disponível em {}", target.name),
+            let status = find(displays, &id).map(|d| d.hdr);
+            let on = switch_on("HDR", status, &target.name, || displays.set_hdr(&id, true));
+            if let Some(a) = self.active.as_mut().filter(|_| on) {
+                a.hdr_turned_on_for = Some(id.clone());
+            }
+        }
+        if plan.turn_on_vrr {
+            let status = find(displays, &id).map(|d| d.vrr);
+            let on = switch_on("VRR", status, &target.name, || {
+                before_vrr(&id);
+                displays.set_vrr(&id, true)
+            });
+            if let Some(a) = self.active.as_mut().filter(|_| on) {
+                a.vrr_turned_on_for = Some(id.clone());
             }
         }
         let bounds = find(displays, &id).and_then(|d| d.bounds);
@@ -307,7 +340,7 @@ impl GameScreenSession {
         })
     }
 
-    /// Desfaz: desliga o HDR que foi ligado e devolve a topologia de antes. Sem sessão ativa, nada
+    /// Desfaz: desliga o HDR e o VRR que foram ligados e devolve a topologia de antes. Sem sessão ativa, nada
     /// muda (terminar duas vezes é seguro). Falso se a conferência ainda encontrou diferença.
     pub fn end(&mut self, displays: &dyn Displays) -> bool {
         let Some(active) = self.active.take() else {
@@ -317,6 +350,11 @@ impl GameScreenSession {
             && let Err(e) = displays.set_hdr(id, false)
         {
             tracing::warn!("tela de jogo: falha ao desligar o HDR de {id}: {e}");
+        }
+        if let Some(id) = &active.vrr_turned_on_for
+            && let Err(e) = displays.set_vrr(id, false)
+        {
+            tracing::warn!("tela de jogo: falha ao desligar o VRR de {id}: {e}");
         }
         // Duas tentativas: depois de religar telas o SO às vezes reposiciona tudo de novo.
         for attempt in 1..=2 {
@@ -362,6 +400,29 @@ impl GameScreenSession {
     }
 }
 
+/// Liga o HDR ou o VRR se estiver desligado; `true` se foi o Tako que ligou (e então desliga no fim).
+fn switch_on(
+    what: &str,
+    status: Option<HdrStatus>,
+    name: &str,
+    set: impl FnOnce() -> DeviceResult<()>,
+) -> bool {
+    match status {
+        Some(HdrStatus::Off) => match set() {
+            Ok(()) => true,
+            Err(e) => {
+                tracing::warn!("tela de jogo: falha ao ligar o {what} de {name}: {e}");
+                false
+            }
+        },
+        Some(HdrStatus::On) => false,
+        _ => {
+            tracing::info!("tela de jogo: {what} não disponível em {name}");
+            false
+        }
+    }
+}
+
 fn find(displays: &dyn Displays, id: &str) -> Option<ConnectedDisplay> {
     displays
         .list()
@@ -403,6 +464,7 @@ pub(crate) mod tests {
             }),
             current_mode: mode,
             hdr,
+            vrr: hdr,
         }
     }
 
@@ -433,6 +495,7 @@ pub(crate) mod tests {
             display_id: id.into(),
             mode,
             enable_hdr: hdr,
+            enable_vrr: false,
         }
     }
 
@@ -509,6 +572,21 @@ pub(crate) mod tests {
         assert!(asleep.turn_on_hdr); // decide depois de ligar a TV
     }
 
+    #[test]
+    fn vrr_follows_the_same_rules_as_hdr() {
+        let desk = planner_desk();
+        let vrr = |id: &str, d: &[ConnectedDisplay]| {
+            let mut st = settings(id, None, false);
+            st.enable_vrr = true;
+            plan(&st, d)
+        };
+        let off = vrr("S", &desk[..2]);
+        let unsupported = vrr("D", &desk[..2]);
+        assert!(off.turn_on_vrr && !off.turn_on_hdr);
+        assert!(!unsupported.turn_on_vrr);
+        assert_eq!(unsupported.notes, ["VRR não disponível em D"]);
+    }
+
     // GameScreenSessionTests, contra o FakeDisplays com falhas injetadas.
 
     /// FakeDisplays que registra as chamadas e pode recusar ligar uma tela, falhar a leitura ou
@@ -571,6 +649,10 @@ pub(crate) mod tests {
             self.log(format!("hdr {id} {}", if on { "on" } else { "off" }));
             self.inner.set_hdr(id, on)
         }
+        fn set_vrr(&self, id: &str, on: bool) -> DeviceResult<()> {
+            self.log(format!("vrr {id} {}", if on { "on" } else { "off" }));
+            self.inner.set_vrr(id, on)
+        }
         fn capture(&self) -> DeviceResult<DisplayTopology> {
             self.fail()?;
             self.inner.capture()
@@ -620,6 +702,40 @@ pub(crate) mod tests {
         let calls = desk.calls().len();
         assert!(s.end(&desk)); // terminar de novo não mexe em nada
         assert_eq!(desk.calls().len(), calls);
+    }
+
+    #[test]
+    fn vrr_turned_on_for_the_game_is_turned_off_at_the_end() {
+        let desk = Desk::new();
+        let mut st = settings(TV, None, false);
+        st.enable_vrr = true;
+        let mut s = session();
+        assert_eq!(
+            s.begin(&desk, &st, None).outcome,
+            GameScreenOutcome::Applied
+        );
+        let tv = find(&desk, TV).unwrap();
+        assert_eq!(tv.vrr, crate::devices::VrrStatus::On);
+        assert!(s.end(&desk));
+        assert!(desk.calls().contains(&format!("vrr {TV} off")));
+        assert_eq!(find(&desk, TV).unwrap().vrr, crate::devices::VrrStatus::Off);
+
+        // Já ligado antes do jogo: o Tako não liga e, no fim, não desliga.
+        let mut s = session();
+        desk.inner.set_vrr(TV, true).unwrap();
+        s.begin(&desk, &st, None);
+        s.end(&desk);
+        let vrr_calls = desk.calls().iter().filter(|c| c.starts_with("vrr")).count();
+        assert_eq!(vrr_calls, 2); // só o liga/desliga da primeira sessão
+        assert_eq!(find(&desk, TV).unwrap().vrr, crate::devices::VrrStatus::On);
+
+        // A marca vem antes de ligar: uma queda logo depois ainda sabe desligar.
+        let desk = Desk::new();
+        let mut s = session();
+        s.begin_with(&desk, &st, None, &mut |id| desk.log(format!("mark {id}")));
+        let calls = desk.calls();
+        let at = |c: String| calls.iter().position(|x| *x == c).unwrap();
+        assert!(at(format!("mark {TV}")) < at(format!("vrr {TV} on")));
     }
 
     #[test]
@@ -736,6 +852,9 @@ pub(crate) mod tests {
             }
             fn set_hdr(&self, id: &str, on: bool) -> DeviceResult<()> {
                 self.0.set_hdr(id, on)
+            }
+            fn set_vrr(&self, id: &str, on: bool) -> DeviceResult<()> {
+                self.0.set_vrr(id, on)
             }
             fn capture(&self) -> DeviceResult<DisplayTopology> {
                 self.0.capture()

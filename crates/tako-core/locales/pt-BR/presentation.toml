@@ -7,6 +7,9 @@ store_of.masculine = "do {store}"
 store_of.feminine = "da {store}"
 store_via.masculine = "pelo {store}"
 store_via.feminine = "pela {store}"
+store_in.emulators = "nos emuladores"
+store_in.masculine = "no {store}"
+store_in.feminine = "na {store}"
 
 [presentation.last_played]
 never = "Nunca jogado"

@@ -46,3 +46,17 @@ conectado. O harness não faz parte do produto.
 3. Com hardware de tela/áudio, conferir restauração após o fim e após queda da UI. No Linux e macOS,
    compilar e repetir o ciclo nativo; o teclado global nesses SOs continua fora do suporte atual.
 4. Fechar o Tako de teste e conferir `scripts/bancada.sh status`. Não deixar a bancada presa.
+
+## Destaque de jogo não instalado (SRC-005)
+
+Precisa de contas com jogos fora do PC (Steam e, de preferência, um jogo também na GOG ou na Epic).
+
+1. Selecione um jogo não instalado: etiqueta NÃO INSTALADO, "Ainda não jogado" no tempo e Status "Não instalado"
+   sem ponto. A pílula vira "⬇ Instalar" com "Steam · 9,1 GB"; os cantos (a ponta de dentro do ⌄ é de 6) só se
+   conferem na janela nativa, a captura de teste desenha o degradê sem cantos.
+2. Num jogo em duas lojas: ⌄ abre "Instalar pela" no lugar certo, com ✓ na escolhida; escolha a outra e clique em
+   Instalar: o cliente da loja escolhida abre na tela de instalação.
+3. Embaixo da pílula: "Livre no C: …" e por onde a instalação abre. Com o disco quase cheio, "Faltam … no C:" em amarelo.
+4. Menu ⋯ › Instalar e, na seleção múltipla, ⋯ › Instalar com 3 jogos da Steam: abre um por vez, sem perder pedidos.
+5. Enquanto a Steam baixa: "Baixando… N%" (ou "Instalando na Steam…") com o botão desabilitado; ao terminar, o
+   destaque vira Jogar.

@@ -69,6 +69,7 @@ pub fn global_settings(ctx: &Ctx) -> GlobalSessionSettings {
         game_screen_id: s.string(keys::GAME_SCREEN_ID),
         game_screen_mode: s.get(keys::GAME_SCREEN_MODE).and_then(DisplayMode::parse),
         game_screen_hdr: s.bool(keys::GAME_SCREEN_HDR, false),
+        game_screen_vrr: s.bool(keys::GAME_SCREEN_VRR, false),
         monitor_presets: MonitorPresets::parse(&s.string(keys::GAME_SCREEN_PRESETS)),
         game_audio: (!audio_id.trim().is_empty()).then(|| {
             let name = s.string(keys::GAME_AUDIO_NAME);
@@ -159,7 +160,13 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
             )
         });
         let mut session = GameScreenSession::default();
-        let result = session.begin(p.displays.as_ref(), screen, confirmed.as_deref());
+        // `session` acaba aqui: quem desliga o VRR no fim é o guard, pelo arquivo gravado antes de ligar.
+        let result = session.begin_with(
+            p.displays.as_ref(),
+            screen,
+            confirmed.as_deref(),
+            &mut |id| g.remember_vrr_turned_on(id),
+        );
         if result.outcome == GameScreenOutcome::Reverted {
             g.discard();
             return Err(result
@@ -331,13 +338,16 @@ pub fn restore_now(platform: &Platform, paths: &DataPaths, recorded: bool) {
         audio: platform.audio.as_ref(),
     };
     let g = guard(paths);
-    if let Some(snapshot) = store.read() {
-        let report = g.restore_from(env, &snapshot, Utc::now());
-        if !report.succeeded() {
-            tracing::warn!("restauração incompleta: {report:?}");
+    // `restore_from` apaga o arquivo (ou deixa só a marca do VRR de uma tela desconectada).
+    match store.read() {
+        Some(snapshot) => {
+            let report = g.restore_from(env, &snapshot, Utc::now());
+            if !report.succeeded() {
+                tracing::warn!("restauração incompleta: {report:?}");
+            }
         }
+        None => store.delete(),
     }
-    store.delete();
 }
 
 /// Ao abrir: restaura o que uma sessão anterior deixou (queda do Tako ou do PC no meio do jogo).
@@ -355,7 +365,6 @@ pub fn recover_after_crash(platform: &Platform, paths: &DataPaths) {
     if let Some(pending) = g.pending_from_previous_run(env, Utc::now()) {
         tracing::info!("restaurando telas e áudio de uma sessão que não terminou");
         let _ = g.restore_from(env, &pending, Utc::now());
-        PendingEnvironmentStore::new(paths.session_environment()).delete();
     }
 }
 
@@ -384,6 +393,8 @@ pub struct Running {
     presence: Option<crate::discord::Presence>,
     /// Desde quando o jogo mostra uma janela que não cobre a tela (ver [`Running::window_shown`]).
     windowed_since: Option<std::time::Instant>,
+    /// Últimos processos do jogo registrados no log (BUG-001), para logar de novo só quando mudarem.
+    logged_paths: Vec<String>,
 }
 
 impl Running {
@@ -405,6 +416,7 @@ impl Running {
             screen_height: 1080,
             presence: None,
             windowed_since: None,
+            logged_paths: Vec::new(),
         })
     }
 
@@ -489,9 +501,24 @@ impl Running {
     pub fn poll(&mut self, platform: &Platform) -> Option<Duration> {
         let steam =
             (self.req.steam_app_id.is_some()).then(|| platform.processes.steam_running_app_id());
+        let before = self.tracker.status;
         let status = self
             .tracker
             .update(&platform.processes.snapshot(), Utc::now(), steam);
+        let paths = self.tracker.game_executable_paths();
+        if status != before || paths != self.logged_paths.as_slice() {
+            // BUG-001: mostra se a sessão acabou cedo demais (processos fora da pasta, Steam sem confirmar).
+            // Display (join), não Debug: o Debug dobra as barras e o LogRedactor não reconheceria o caminho.
+            tracing::info!(
+                "acompanhamento de {}: {before:?} → {status:?} ({} s desde a abertura, processos {}, steam {:?}, confirmado pela steam {})",
+                self.req.game_id,
+                (Utc::now() - self.req.launched_at).num_seconds(),
+                paths.join(", "),
+                steam,
+                self.tracker.steam_confirmed
+            );
+            self.logged_paths = paths.to_vec();
+        }
         match status {
             GameRunStatus::Exited => Some(self.tracker.play_time().to_std().unwrap_or_default()),
             GameRunStatus::TimedOut => Some(Duration::ZERO),
@@ -762,6 +789,34 @@ mod tests {
             mine.ends_with(&["starting", "started", "exited"]),
             "{mine:?}"
         );
+    }
+
+    #[test]
+    fn vrr_turned_on_for_the_game_is_turned_off_after_it() {
+        use tako_core::devices::VrrStatus;
+        let dir = tempfile::tempdir().unwrap();
+        let platform = Platform::simulated();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), platform.clone(), true);
+        ctx.library.refresh();
+        let id = ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.is_installed)
+            .unwrap()
+            .id
+            .clone();
+        // A TV do simulado tem VRR desligado.
+        ctx.settings.set_bool(keys::GAME_SCREEN_ENABLED, true);
+        ctx.settings.set(keys::GAME_SCREEN_ID, "DISPLAY2");
+        ctx.settings.set_bool(keys::GAME_SCREEN_VRR, true);
+        let vrr = || platform.displays.list().unwrap()[1].vrr;
+        let Started::Tracking(req) = start(&mut ctx, &id).unwrap() else {
+            panic!("deveria acompanhar")
+        };
+        assert_eq!(vrr(), VrrStatus::On);
+        restore_now(&platform, &ctx.paths, req.restore);
+        assert_eq!(vrr(), VrrStatus::Off);
     }
 
     #[test]

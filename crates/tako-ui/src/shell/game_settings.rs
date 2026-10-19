@@ -481,8 +481,9 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     );
 
     // Em outra tela, o padrão é o preset dela (a resolução do Tako é da tela de jogo dele).
-    let (default_mode, default_hdr) =
-        crate::session::global_settings(ctx).screen_defaults(&screen_of(ctx, &c));
+    let screen_id = screen_of(ctx, &c);
+    let defaults = crate::session::global_settings(ctx).screen_defaults(&screen_id);
+    let (default_mode, default_hdr) = (defaults.mode, defaults.hdr);
     let global_mode = default_mode.map(|m| m.key()).unwrap_or_default();
     let default_mode_label = default_of(
         ctx,
@@ -564,6 +565,47 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
             let id = i();
             move |ctx| tri_options(current(ctx, &id).hdr, hdr_default.clone(), on_off, ctx)
         }),
+    );
+
+    let vrr_default = default_of(ctx, &on_off(ctx, defaults.vrr));
+    let vrr_value = match c.vrr {
+        Some(v) => on_off(ctx, v),
+        None => vrr_default.clone(),
+    };
+    let (a, b) = (i(), i());
+    let toggle_vrr = move |ctx: &mut Ctx, dir: i32, id: &str| {
+        let next = cycle(&[None, Some(true), Some(false)], &current(ctx, id).vrr, dir);
+        change(ctx, id, |o| o.vrr = next);
+        Flow::Stay
+    };
+    let mut vrr_row = row(
+        ctx,
+        "vrr",
+        ctx.t("vrr.game"),
+        vrr_value,
+        c.vrr.is_some().then(|| vrr_default.clone()),
+    );
+    // Tela conectada sem VRR (ou SO sem API, como o Windows): indisponível, com o motivo.
+    let unsupported = super::settings::screen::displays(ctx).is_ok_and(|l| {
+        l.iter().any(|d| {
+            d.id.eq_ignore_ascii_case(&screen_id)
+                && d.vrr == tako_core::devices::VrrStatus::Unsupported
+        })
+    });
+    if unsupported {
+        let why = ctx.platform.displays.vrr_limitation();
+        vrr_row = vrr_row
+            .desc(why.unwrap_or_else(|| ctx.t("vrr.unsupported")))
+            .enabled(false);
+    }
+    v.push(
+        MenuItem::new(vrr_row)
+            .on(move |ctx| toggle_vrr(ctx, 1, &a))
+            .on_adjust(move |ctx, d| toggle_vrr(ctx, d, &b))
+            .options({
+                let id = i();
+                move |ctx| tri_options(current(ctx, &id).vrr, vrr_default.clone(), on_off, ctx)
+            }),
     );
 
     v.push(MenuItem::new(PanelRow::header(
@@ -904,6 +946,14 @@ mod tests {
         layer.handle(Cmd::Down, &mut ctx);
         layer.handle(Cmd::Right, &mut ctx);
         assert_eq!(value(&layer.render(&ctx), "hdr"), ("Ligado".into(), true));
+        // VRR logo abaixo, do mesmo jeito.
+        assert_eq!(value(&o, "vrr"), ("Padrão: Desligado".into(), false));
+        layer.handle(Cmd::Down, &mut ctx);
+        layer.handle(Cmd::Left, &mut ctx);
+        assert_eq!(
+            value(&layer.render(&ctx), "vrr"),
+            ("Desligado".into(), true)
+        );
         // No desktop, a mudança mostra o padrão do Tako embaixo.
         ctx.desktop = true;
         let o = layer.render(&ctx);
@@ -916,7 +966,8 @@ mod tests {
         let saved = current(&fresh, &id);
         assert_eq!(saved.use_game_screen, Some(false));
         assert_eq!(saved.hdr, Some(true));
-        assert_eq!(saved.changed_count(), 2);
+        assert_eq!(saved.vrr, Some(false));
+        assert_eq!(saved.changed_count(), 3);
 
         // "Usar tudo do Tako" volta ao padrão.
         let reset = layer
@@ -995,6 +1046,7 @@ mod tests {
         let preset = MonitorPreset {
             mode: Some(full_hd),
             hdr: true,
+            vrr: true,
         };
         presets.set(&screens[0].id, preset);
         ctx.settings
@@ -1005,6 +1057,11 @@ mod tests {
             ("Padrão: 1920 × 1080 · 60 Hz".into(), false)
         );
         assert_eq!(value(&o, "hdr"), ("Padrão: Ligado".into(), false));
+        // Este monitor não tem VRR: a linha mostra o padrão, mas fica indisponível com o motivo.
+        let vrr = o.rows.iter().find(|r| r.key == "vrr").unwrap();
+        assert_eq!(vrr.value, "Padrão: Ligado");
+        assert!(!vrr.enabled);
+        assert_eq!(vrr.description, "Esta tela não informa VRR");
         // O que a sessão usa (no --simulate as escolhas do jogo ficam só na memória).
         let global = crate::session::global_settings(&ctx);
         let s = tako_core::session::settings::resolve(&global, Some(&current(&ctx, &id)));

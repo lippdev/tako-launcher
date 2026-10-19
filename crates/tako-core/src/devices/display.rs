@@ -21,6 +21,9 @@ pub enum HdrStatus {
     On,
 }
 
+/// VRR (FreeSync, G-Sync, Adaptive Sync) tem os mesmos estados do HDR.
+pub type VrrStatus = HdrStatus;
+
 /// Resolução e taxa. A chave textual (`3840x2160@120`) é a gravada nas configurações.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DisplayMode {
@@ -91,6 +94,8 @@ pub struct ConnectedDisplay {
     pub bounds: Option<ScreenBounds>,
     pub current_mode: Option<DisplayMode>,
     pub hdr: HdrStatus,
+    #[serde(default)]
+    pub vrr: VrrStatus,
 }
 
 /// Estado de uma tela, para capturar antes do jogo e restaurar depois.
@@ -154,7 +159,7 @@ impl DisplayTopology {
     }
 }
 
-/// Troca de resolução e taxa, ligar/desligar telas e HDR (PRD §5.3).
+/// Troca de resolução e taxa, ligar/desligar telas, HDR e VRR (PRD §5.3).
 pub trait Displays: Send + Sync {
     fn list(&self) -> DeviceResult<Vec<ConnectedDisplay>>;
     fn modes(&self, display_id: &str) -> DeviceResult<Vec<DisplayMode>>;
@@ -162,6 +167,14 @@ pub trait Displays: Send + Sync {
     /// Liga só estas telas (as outras são desligadas) e torna `primary` a principal.
     fn set_active(&self, active_ids: &[String], primary: &str) -> DeviceResult<()>;
     fn set_hdr(&self, display_id: &str, enabled: bool) -> DeviceResult<()>;
+    /// Liga ou desliga o VRR. Nem todo SO deixa ([`Displays::vrr_limitation`]).
+    fn set_vrr(&self, _display_id: &str, _enabled: bool) -> DeviceResult<()> {
+        Err(super::DeviceError::Unsupported("VRR".into()))
+    }
+    /// Por que o Tako não consegue mexer no VRR neste SO ou sessão, para a interface mostrar.
+    fn vrr_limitation(&self) -> Option<String> {
+        None
+    }
     fn capture(&self) -> DeviceResult<DisplayTopology>;
     fn apply(&self, topology: &DisplayTopology) -> DeviceResult<()>;
     /// Sessão gamescope e afins: a resolução é da sessão; o Tako só informa.

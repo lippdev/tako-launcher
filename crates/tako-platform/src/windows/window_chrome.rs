@@ -22,6 +22,7 @@ use windows::core::w;
 pub enum ChromeHit {
     Client,
     Caption,
+    Minimize,
     Maximize,
     Close,
 }
@@ -30,14 +31,26 @@ pub enum ChromeHit {
 pub trait ChromeHost {
     /// `x`, `y` e `width` em pixels físicos da área cliente.
     fn hit(&self, x: i32, y: i32, width: i32) -> ChromeHit;
-    /// 0 = nenhum, 1 = Maximizar, 2 = Fechar.
+    /// 0 = nenhum, 1 = Maximizar, 2 = Fechar, 3 = Minimizar.
     fn set_hover(&self, button: u8);
     fn set_pressed(&self, button: u8);
+    /// O botão foi clicado (apertado e solto em cima dele).
+    fn activate(&self, button: u8);
+}
+
+fn button(hit: u32) -> u8 {
+    match hit {
+        HTMAXBUTTON => 1,
+        HTCLOSE => 2,
+        HTMINBUTTON => 3,
+        _ => 0,
+    }
 }
 
 struct State {
     previous: isize,
     host: Box<dyn ChromeHost>,
+    pressed: std::cell::Cell<u8>,
 }
 
 const PROP: windows::core::PCWSTR = w!("TakoWindowChrome");
@@ -65,7 +78,11 @@ pub fn install(hwnd: isize, host: Box<dyn ChromeHost>) {
             return;
         }
         // O anterior fica guardado antes da troca: a janela pode receber mensagens logo depois dela.
-        let state = Box::into_raw(Box::new(State { previous, host }));
+        let state = Box::into_raw(Box::new(State {
+            previous,
+            host,
+            pressed: std::cell::Cell::new(0),
+        }));
         if SetPropW(
             hwnd,
             PROP,
@@ -112,6 +129,7 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             if ScreenToClient(hwnd, &mut p).as_bool() && GetClientRect(hwnd, &mut rect).is_ok() {
                 let code = match state.host.hit(p.x, p.y, rect.right) {
                     ChromeHit::Caption => HTCAPTION,
+                    ChromeHit::Minimize => HTMINBUTTON,
                     ChromeHit::Maximize => HTMAXBUTTON,
                     ChromeHit::Close => HTCLOSE,
                     ChromeHit::Client => return call(msg, wp, lp),
@@ -119,21 +137,30 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 return LRESULT(code as isize);
             }
         }
-        if msg == WM_NCLBUTTONDOWN && matches!(wp.0 as u32, HTMAXBUTTON | HTCLOSE) {
-            state
-                .host
-                .set_pressed(if wp.0 as u32 == HTMAXBUTTON { 1 } else { 2 });
-            // DefWindowProc acompanha o clique até soltar/cancelar, preservando o comando nativo.
-            let result = call(msg, wp, lp);
+        // Sem moldura do sistema, o DefWindowProc desenha botões antigos e às vezes ignora o clique: o Tako trata
+        // o apertar e o soltar, e o Windows segue mostrando os layouts de encaixe ao parar sobre o Maximizar.
+        let hit = button(wp.0 as u32);
+        if (msg == WM_NCLBUTTONDOWN || msg == WM_NCLBUTTONDBLCLK) && hit != 0 {
+            state.pressed.set(hit);
+            state.host.set_pressed(hit);
+            return LRESULT(0);
+        }
+        if msg == WM_NCLBUTTONUP && state.pressed.get() != 0 {
+            let pressed = state.pressed.replace(0);
             state.host.set_pressed(0);
-            return result;
+            if hit == pressed {
+                state.host.activate(hit);
+            }
+            return LRESULT(0);
         }
         if msg == WM_NCMOUSEMOVE {
-            state.host.set_hover(match wp.0 as u32 {
-                HTMAXBUTTON => 1,
-                HTCLOSE => 2,
-                _ => 0,
-            });
+            state.host.set_hover(hit);
+            let pressed = state.pressed.get();
+            if pressed != 0 {
+                state
+                    .host
+                    .set_pressed(if hit == pressed { pressed } else { 0 });
+            }
             let mut track = TRACKMOUSEEVENT {
                 cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
                 dwFlags: TME_LEAVE | TME_NONCLIENT,
@@ -144,6 +171,9 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
         }
         if msg == WM_NCMOUSELEAVE || msg == WM_MOUSEMOVE {
             state.host.set_hover(0);
+            if state.pressed.replace(0) != 0 {
+                state.host.set_pressed(0);
+            }
         }
         // O Windows cuida de duplo clique, menu de sistema, snap e comandos dos botões não cliente.
         call(msg, wp, lp)

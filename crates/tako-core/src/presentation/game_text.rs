@@ -67,6 +67,14 @@ pub fn store_via(lang: Lang, store: GameStore) -> String {
     )
 }
 
+/// "na Steam", "no GOG" (para "Instalando na Steam…"); em inglês, "on Steam".
+pub fn store_in(lang: Lang, store: GameStore) -> String {
+    if store == GameStore::Emulators {
+        return tr(lang, "presentation.store_in.emulators", &[]);
+    }
+    gendered(lang, "store_in", &store_name(lang, store), masculine(store))
+}
+
 /// "pelo GOG Galaxy" e afins: nome livre, masculino.
 pub(crate) fn via_name(lang: Lang, name: &str) -> String {
     gendered(lang, "store_via", name, true)
@@ -258,6 +266,9 @@ mod tests {
         assert_eq!(store_of(Lang::PtBr, GameStore::Gog), "do GOG");
         assert_eq!(store_via(Lang::PtBr, GameStore::Ea), "pelo EA app");
         assert_eq!(store_via(Lang::EnUs, GameStore::Ea), "via EA app");
+        assert_eq!(store_in(Lang::PtBr, GameStore::Steam), "na Steam");
+        assert_eq!(store_in(Lang::PtBr, GameStore::Gog), "no GOG");
+        assert_eq!(store_in(Lang::EnUs, GameStore::Steam), "on Steam");
         assert_eq!(store_name(Lang::EnUs, GameStore::Manual), "Added");
     }
 

@@ -347,6 +347,9 @@ theme_struct! {
         pub logo: Image,
         pub accent: Color,
         pub hint: String,
+        // Jogo não instalado: espaço livre e por onde a instalação abre, ou o aviso de falta de espaço (`warn`).
+        pub install_note: String,
+        pub install_warn: bool,
         // Jogando agora: a etiqueta ganha o ponto verde.
         pub running: bool,
         // A descrição foi cortada: o cartão mostra "Mais".

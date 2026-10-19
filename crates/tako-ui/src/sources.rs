@@ -12,9 +12,10 @@ pub fn all_sources(
 ) -> Vec<Box<dyn LibrarySource>> {
     let mut v: Vec<Box<dyn LibrarySource>> = vec![tako_sources::steam_source(steam_owned)];
     #[cfg(windows)]
-    v.extend(tako_sources::windows_sources(std::sync::Arc::new(
-        tako_sources::registry_windows::WindowsRegistry,
-    )));
+    v.extend(tako_sources::windows_sources(
+        std::sync::Arc::new(tako_sources::registry_windows::WindowsRegistry),
+        tako_platform::windows::dpapi::unprotect,
+    ));
     #[cfg(unix)]
     v.extend(tako_sources::unix_sources());
     // Emuladores e ROMs (SRC-001), nos três SOs, antes dos adicionados à mão.
