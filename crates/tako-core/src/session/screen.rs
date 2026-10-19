@@ -179,17 +179,24 @@ impl GameScreenSession {
         self.active.as_ref()?.hdr_turned_on_for.as_deref()
     }
 
-    /// Tela em que a sessão ligou o VRR (o guard grava para desligar no fim).
-    pub fn vrr_display_id(&self) -> Option<&str> {
-        self.active.as_ref()?.vrr_turned_on_for.as_deref()
-    }
-
     /// `confirmed_setup`: a combinação já confirmada; diferente dela, o resultado pede confirmação.
     pub fn begin(
         &mut self,
         displays: &dyn Displays,
         settings: &GameScreenSettings,
         confirmed_setup: Option<&str>,
+    ) -> GameScreenResult {
+        self.begin_with(displays, settings, confirmed_setup, &mut |_| {})
+    }
+
+    /// Como [`Self::begin`]; `before_vrr` recebe a tela logo antes de o VRR ser ligado, para gravar a marca
+    /// antes (uma queda logo depois de ligar ainda deixa como desligar).
+    pub fn begin_with(
+        &mut self,
+        displays: &dyn Displays,
+        settings: &GameScreenSettings,
+        confirmed_setup: Option<&str>,
+        before_vrr: &mut dyn FnMut(&str),
     ) -> GameScreenResult {
         if self.active.is_some() {
             return GameScreenResult::skip(t("session.screen.already_active"));
@@ -232,7 +239,14 @@ impl GameScreenSession {
             hdr_turned_on_for: None,
             vrr_turned_on_for: None,
         });
-        match self.apply(displays, settings, &plan, &target, confirmed_setup) {
+        match self.apply(
+            displays,
+            settings,
+            &plan,
+            &target,
+            confirmed_setup,
+            before_vrr,
+        ) {
             Ok(result) => result,
             Err(e) => {
                 tracing::warn!(
@@ -258,6 +272,7 @@ impl GameScreenSession {
         plan: &GameScreenPlan,
         target: &ConnectedDisplay,
         confirmed_setup: Option<&str>,
+        before_vrr: &mut dyn FnMut(&str),
     ) -> Result<GameScreenResult, DeviceError> {
         let id = target.id.clone();
         if plan.enable_target {
@@ -302,7 +317,10 @@ impl GameScreenSession {
         }
         if plan.turn_on_vrr {
             let status = find(displays, &id).map(|d| d.vrr);
-            let on = switch_on("VRR", status, &target.name, || displays.set_vrr(&id, true));
+            let on = switch_on("VRR", status, &target.name, || {
+                before_vrr(&id);
+                displays.set_vrr(&id, true)
+            });
             if let Some(a) = self.active.as_mut().filter(|_| on) {
                 a.vrr_turned_on_for = Some(id.clone());
             }
@@ -710,6 +728,14 @@ pub(crate) mod tests {
         let vrr_calls = desk.calls().iter().filter(|c| c.starts_with("vrr")).count();
         assert_eq!(vrr_calls, 2); // só o liga/desliga da primeira sessão
         assert_eq!(find(&desk, TV).unwrap().vrr, crate::devices::VrrStatus::On);
+
+        // A marca vem antes de ligar: uma queda logo depois ainda sabe desligar.
+        let desk = Desk::new();
+        let mut s = session();
+        s.begin_with(&desk, &st, None, &mut |id| desk.log(format!("mark {id}")));
+        let calls = desk.calls();
+        let at = |c: String| calls.iter().position(|x| *x == c).unwrap();
+        assert!(at(format!("mark {TV}")) < at(format!("vrr {TV} on")));
     }
 
     #[test]
