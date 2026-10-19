@@ -162,6 +162,7 @@ pub fn uninstall(themes_root: &Path, id: &str) -> io::Result<()> {
     if dir.exists() {
         fs::remove_dir_all(&dir)?;
     }
+    let _ = overrides::reset_override(themes_root, Some(id));
     if selected(themes_root).is_some_and(|s| s.eq_ignore_ascii_case(id)) {
         select(themes_root, None)?;
     }
