@@ -1,6 +1,7 @@
 //! Implementações para Linux (PRD §5.3). A matriz de suporte por sessão está na ADR-0024.
 
 mod audio;
+pub use crate::linux_compatibility as compatibility;
 mod displays;
 mod input;
 mod processes;
