@@ -159,10 +159,8 @@ struct Run {
     end: usize,
 }
 
-/// Entra na seção NÃO INSTALADOS: jogo de uma loja que ainda não está no computador. ROM ou arquivo que sumiu e
-/// lançamento futuro não têm o que instalar e ficam onde estavam.
-/// Ícone da linha e, se não houver, a inicial do nome. Ponto único da carga: quando o cache de ícones já recortados
-/// existir, é só trocar o `images::get`. `load: false` = linha fora da área visível (não pede nada).
+/// Ícone da linha e, se não houver, a inicial do nome. Carrega o ícone recortado via [`crate::images::icon`].
+/// `load: false` = linha fora da área visível (não pede nada).
 fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
     let uri = g.shown_icon();
     // 56 px já recortado e com contorno no cache: serve à tela normal e à de alta densidade.
@@ -185,6 +183,8 @@ fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
     (icon, initial)
 }
 
+/// Entra na seção NÃO INSTALADOS: jogo de uma loja que ainda não está no computador. ROM ou arquivo que sumiu e
+/// lançamento futuro não têm o que instalar e ficam onde estavam.
 fn to_install(g: &Game) -> bool {
     !g.is_installed
         && !g.is_upcoming()

@@ -78,6 +78,7 @@ pub fn fill_exe_icon(
     if let Some(file) = extract(std::path::Path::new(exe), dir) {
         game.media
             .insert(ICON.to_owned(), tako_sources::file_uri(&file));
+        game.icon_origin = Some(tako_core::library::IconOrigin::Exe);
     }
 }
 
@@ -105,6 +106,10 @@ mod tests {
         let mut manual = game(GameStore::Manual, r"C:\Jogos\Farol.EXE");
         fill_exe_icon(&mut manual, dir, fake);
         assert_eq!(icon(&manual).as_deref(), Some("file:///c/icone.png"));
+        assert_eq!(
+            manual.icon_origin,
+            Some(tako_core::library::IconOrigin::Exe)
+        );
         let mut store_icon = game(GameStore::Gog, r"C:\Jogos\x.exe");
         store_icon
             .media

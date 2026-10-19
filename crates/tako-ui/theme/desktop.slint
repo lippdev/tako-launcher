@@ -908,7 +908,7 @@ component GameRow inherits Rectangle {
     in property <bool> selected;
     in property <bool> focused;
     in property <bool> selecting;
-    in property <length> icon-size: 28px;
+    in property <length> icon-size: Ui.list-icon-size;
     callback clicked();
     callback toggle();
     callback range();
@@ -945,13 +945,13 @@ component GameRow inherits Rectangle {
     }
     HorizontalLayout {
         padding-left: Ui.space-8;
-        padding-right: 6px;
-        spacing: 12px;
+        padding-right: Ui.space-6;
+        spacing: Ui.space-12;
         if selecting: Rectangle {
             y: (parent.height - self.height) / 2;
-            width: 24px;
-            height: 24px;
-            border-radius: 12px;
+            width: Ui.space-24;
+            height: Ui.space-24;
+            border-radius: Ui.space-12;
             background: data.checked ? Ui.primary-top : Ui.glass-control;
             border-width: data.checked ? 0 : 1px;
             border-color: Ui.glass-edge-strong;
@@ -970,8 +970,8 @@ component GameRow inherits Rectangle {
             height: self.width;
             opacity: data.installed ? 1 : 0.5;
             if data.initial != "": Rectangle {
-                border-radius: 6px;
-                background: data.accent;
+                border-radius: Ui.radius-icon;
+                background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.55) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
                 Text {
                     text: data.initial;
                     color: #ffffffd9;
@@ -1104,7 +1104,7 @@ component GameList inherits Rectangle {
             if r < games.length && games[r].kind == "": GameRow {
                 width: parent.width;
                 height: parent.height;
-                icon-size: compact ? 24px : 28px;
+                icon-size: compact ? Ui.list-icon-compact : Ui.list-icon-size;
                 data: games[parent.r];
                 selected: parent.r == root.selected;
                 focused: key-focus && parent.r == root.selected;
@@ -3065,8 +3065,8 @@ component DeskLibrary inherits Rectangle {
                         for i in 8: HorizontalLayout {
                             height: Ui.game-row-height;
                             padding-left: Ui.space-8;
-                            spacing: 12px;
-                            Skeleton { width: 28px; height: 28px; y: 8px; radius: 6px; }
+                            spacing: Ui.space-12;
+                            Skeleton { width: Ui.list-icon-size; height: Ui.list-icon-size; y: 8px; radius: Ui.radius-icon; }
                             Skeleton { width: 110px + mod(i * 37, 80) * 1px; height: 14px; y: 15px; radius: 7px; }
                             Rectangle { horizontal-stretch: 1; }
                         }
