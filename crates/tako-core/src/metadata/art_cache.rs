@@ -71,18 +71,18 @@ impl ArtCache {
             touch(&cached);
             return Some(cached);
         }
-        // Arte que a loja confirmou não ter (404, ou a API da Steam sem o ícone): não pergunta de novo por
-        // `MISS_DAYS` dias. Falha de rede não marca.
-        let miss = cached.with_extension("miss");
-        let fresh = |p: &Path| {
-            std::fs::metadata(p)
-                .and_then(|m| m.modified())
-                .ok()
-                .and_then(|t| t.elapsed().ok())
-                .is_some_and(|age| age.as_secs() < MISS_DAYS * 24 * 3600)
-        };
-        if fresh(&miss) {
-            return None;
+        // Arte que a loja confirmou não ter (404/410, ou a API da Steam sem ela): não vai à rede por `MISS_DAYS`
+        // dias. Só a rede é pulada: o cache local da Steam continua valendo.
+        let mut miss = cached.clone().into_os_string();
+        miss.push(".miss");
+        let miss = PathBuf::from(miss);
+        let fresh = std::fs::metadata(&miss)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age.as_secs() < MISS_DAYS * 24 * 3600);
+        if fresh {
+            return self.steam.local_files(uri).into_iter().next();
         }
         let transient = Cell::new(false);
         let found = match scheme.as_deref() {
@@ -155,7 +155,7 @@ impl ArtCache {
             .sum()
     }
 
-    /// `transient` vira `true` quando a falha pode passar (sem rede, 5xx, 429): só as outras marcam falta.
+    /// `transient` vira `true` em toda falha que não seja 404 ou 410: só essas marcam falta.
     fn download(&self, url: &str, transient: &Cell<bool>) -> Option<Vec<u8>> {
         let mut req = HttpRequest::get(url);
         req.max_bytes = MAX_IMAGE_BYTES;
@@ -167,14 +167,16 @@ impl ArtCache {
                 return None;
             }
         };
-        if r.status >= 500 || r.status == 408 || r.status == 429 {
-            transient.set(true);
-        }
         let type_ok = r.content_type.as_deref().is_none_or(|c| {
             let c = c.to_ascii_lowercase();
             c.starts_with("image/") || c.starts_with("application/octet-stream")
         });
-        (r.is_success() && type_ok && looks_like_image(&r.body)).then_some(r.body)
+        let ok = r.is_success() && type_ok && looks_like_image(&r.body);
+        // Só 404 e 410 dizem que a arte não existe; 401, 403, 5xx ou um 200 em HTML (portal de Wi-Fi) podem passar.
+        if !ok && !matches!(r.status, 404 | 410) {
+            transient.set(true);
+        }
+        ok.then_some(r.body)
     }
 
     fn store(&self, path: &Path, bytes: &[u8]) -> Option<PathBuf> {
@@ -325,19 +327,76 @@ mod tests {
         let old = SystemTime::now() - std::time::Duration::from_secs(8 * 24 * 3600);
         std::fs::File::options()
             .write(true)
-            .open(c.cache_path(steam).with_extension("miss"))
+            .open(miss_of(&c, steam))
             .unwrap()
             .set_modified(old)
             .unwrap();
         assert!(c.locate(steam).is_none());
         assert_eq!(http.sent().len(), 2);
-        // Falha que pode passar (5xx, ou a API da Steam fora do ar) não marca nada.
-        for uri in ["https://cdn.epic/outro.png", "steam-art://10/icon"] {
-            let http = Arc::new(FakeHttp::with_fallback(503, ""));
-            assert!(cache(dir.path(), http.clone()).locate(uri).is_none());
-            assert!(cache(dir.path(), http.clone()).locate(uri).is_none());
-            assert_eq!(http.sent().len(), 2, "{uri}");
+        // 410 também marca; o marcador vai ao lado do arquivo, com a extensão dele.
+        let http = Arc::new(FakeHttp::with_fallback(410, ""));
+        let gone = "https://cdn.epic/sumiu.png";
+        let c = cache(dir.path(), http.clone());
+        assert!(c.locate(gone).is_none());
+        assert!(miss_of(&c, gone).to_string_lossy().ends_with(".png.miss"));
+        assert!(miss_of(&c, gone).is_file());
+        // O resto pode passar e não marca: 5xx, 401, 403, a API da Steam fora do ar e 200 que não é imagem
+        // (portal de Wi-Fi em HTML, ou corpo que não passa em `looks_like_image`).
+        for (status, body, kind, uri) in [
+            (503, "", "image/png", "https://cdn.epic/outro.png"),
+            (503, "", "image/png", "steam-art://10/icon"),
+            (401, "", "image/png", "https://cdn.epic/a.png"),
+            (403, "", "image/png", "https://cdn.epic/b.png"),
+            (
+                200,
+                "<html>login</html>",
+                "text/html",
+                "https://cdn.epic/c.png",
+            ),
+            (200, "NOMEDIA", "image/png", "https://cdn.epic/d.png"),
+        ] {
+            let mut fake = FakeHttp::new();
+            let kind = kind.to_owned();
+            let body = body.as_bytes().to_vec();
+            fake.rule = Some(Box::new(move |_| {
+                Some(HttpResponse {
+                    status,
+                    body: body.clone(),
+                    content_type: Some(kind.clone()),
+                    retry_after: None,
+                })
+            }));
+            let http = Arc::new(fake);
+            let c = cache(dir.path(), http.clone());
+            assert!(c.locate(uri).is_none());
+            assert!(c.locate(uri).is_none());
+            assert!(!miss_of(&c, uri).exists(), "{status} {uri}");
         }
+    }
+
+    fn miss_of(c: &ArtCache, uri: &str) -> PathBuf {
+        PathBuf::from(format!("{}.miss", c.cache_path(uri).display()))
+    }
+
+    #[test]
+    fn a_miss_mark_does_not_hide_the_local_steam_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let steam_root = dir.path().join("steam");
+        let library = steam_root.join("appcache/librarycache");
+        std::fs::create_dir_all(&library).unwrap();
+        let http = Arc::new(FakeHttp::with_fallback(404, ""));
+        let c = ArtCache::new(
+            dir.path().join("cache"),
+            http.clone(),
+            SteamArtResolver::new(http.clone(), Some(steam_root)),
+            None,
+        );
+        let uri = "steam-art://570/icon";
+        // Marcado como sem ícone; depois a Steam baixou o dela.
+        write_atomic(&miss_of(&c, uri), b"").unwrap();
+        std::fs::write(library.join("570_icon.jpg"), [0xFF, 0xD8, 0xFF]).unwrap();
+        assert_eq!(c.locate(uri), Some(library.join("570_icon.jpg")));
+        assert!(http.sent().is_empty());
     }
 
     #[test]
