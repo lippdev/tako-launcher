@@ -10,6 +10,7 @@ use tako_core::devices::{
     fake::{FakeAudio, FakeDisplays, FakePointer, FakeProcesses},
 };
 
+pub mod downloads;
 pub mod exe_icon;
 pub mod secrets;
 pub mod space;
