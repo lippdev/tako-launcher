@@ -37,45 +37,82 @@ fn warn_env_ignored(env: &[(String, String)], target: &str) {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum LaunchTarget<'a> {
+    Empty,
+    Uri(&'a str),
+    MissingPath(&'a str),
+    DesktopFile(&'a Path),
+    Command(&'a Path),
+}
+
+/// Classifica o alvo de lançamento sem disparar comandos reais.
+/// Alvos contendo barra são caminhos relativos ou absolutos que precisam existir no disco.
+/// Alvos sem barra (ex.: `bottles-cli`, `flatpak`) são resolvidos pelo PATH e não falham na checagem local.
+pub(crate) fn classify_target_with(
+    target: &str,
+    exists: impl Fn(&Path) -> bool,
+) -> LaunchTarget<'_> {
+    let trimmed = target.trim();
+    if trimmed.is_empty() {
+        return LaunchTarget::Empty;
+    }
+    if text::is_uri(trimmed) {
+        return LaunchTarget::Uri(trimmed);
+    }
+    let path = Path::new(trimmed);
+    if trimmed.contains('/') && !exists(path) {
+        return LaunchTarget::MissingPath(trimmed);
+    }
+    if path.extension().is_some_and(|e| e == "desktop") {
+        return LaunchTarget::DesktopFile(path);
+    }
+    LaunchTarget::Command(path)
+}
+
+fn classify_target(target: &str) -> LaunchTarget<'_> {
+    classify_target_with(target, |p| p.exists())
+}
+
 fn start(
     target: &str,
     arguments: Option<&str>,
     working_dir: Option<&str>,
     env: &[(String, String)],
 ) -> DeviceResult<Option<u32>> {
-    let target = target.trim();
-    if target.is_empty() {
-        return Err(DeviceError::NotFound("alvo vazio".into()));
-    }
-    if text::is_uri(target) {
-        warn_env_ignored(env, target);
-        return open_with_system(target);
-    }
-    let path = Path::new(target);
-    if !path.exists() {
-        return Err(DeviceError::NotFound(target.into()));
-    }
-    let args = arguments.map(text::split_args).unwrap_or_default();
-    if path.extension().is_some_and(|e| e == "desktop") {
-        warn_env_ignored(env, target);
-        if run::has_tool("gio") {
-            let mut c = Command::new("gio");
-            c.arg("launch").arg(path).args(args);
-            return run::spawn(&mut c).map(|_| None);
+    match classify_target(target) {
+        LaunchTarget::Empty => Err(DeviceError::NotFound("alvo vazio".into())),
+        LaunchTarget::Uri(uri) => {
+            warn_env_ignored(env, uri);
+            open_with_system(uri)
         }
-        return open_with_system(target);
+        LaunchTarget::MissingPath(missing) => Err(DeviceError::NotFound(missing.into())),
+        LaunchTarget::DesktopFile(path) => {
+            let target_str = target.trim();
+            warn_env_ignored(env, target_str);
+            let args = arguments.map(text::split_args).unwrap_or_default();
+            if run::has_tool("gio") {
+                let mut c = Command::new("gio");
+                c.arg("launch").arg(path).args(args);
+                return run::spawn(&mut c).map(|_| None);
+            }
+            open_with_system(target_str)
+        }
+        LaunchTarget::Command(path) => {
+            let args = arguments.map(text::split_args).unwrap_or_default();
+            let mut cmd = command_for(path, args);
+            if let Some(dir) = working_dir
+                .filter(|d| !d.trim().is_empty())
+                .map(PathBuf::from)
+                .or_else(|| path.parent().map(Path::to_path_buf))
+                .filter(|d| d.is_dir())
+            {
+                cmd.current_dir(dir);
+            }
+            cmd.envs(env.iter().map(|(k, v)| (k, v)));
+            run::spawn(&mut cmd).map(Some)
+        }
     }
-    let mut cmd = command_for(path, args);
-    if let Some(dir) = working_dir
-        .filter(|d| !d.trim().is_empty())
-        .map(PathBuf::from)
-        .or_else(|| path.parent().map(Path::to_path_buf))
-        .filter(|d| d.is_dir())
-    {
-        cmd.current_dir(dir);
-    }
-    cmd.envs(env.iter().map(|(k, v)| (k, v)));
-    run::spawn(&mut cmd).map(Some)
 }
 
 impl ProcessLauncher for LinuxProcesses {
@@ -159,6 +196,40 @@ impl ProcessLauncher for LinuxProcesses {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn classifies_targets_purely_without_spawning_processes() {
+        assert_eq!(classify_target_with("", |_| true), LaunchTarget::Empty);
+        assert_eq!(classify_target_with("   ", |_| true), LaunchTarget::Empty);
+        assert_eq!(
+            classify_target_with("steam://rungameid/123", |_| false),
+            LaunchTarget::Uri("steam://rungameid/123")
+        );
+        assert_eq!(
+            classify_target_with("bottles-cli", |_| false),
+            LaunchTarget::Command(Path::new("bottles-cli"))
+        );
+        assert_eq!(
+            classify_target_with("flatpak", |_| false),
+            LaunchTarget::Command(Path::new("flatpak"))
+        );
+        assert_eq!(
+            classify_target_with("/usr/bin/missing", |_| false),
+            LaunchTarget::MissingPath("/usr/bin/missing")
+        );
+        assert_eq!(
+            classify_target_with("./local/missing", |_| false),
+            LaunchTarget::MissingPath("./local/missing")
+        );
+        assert_eq!(
+            classify_target_with("/usr/bin/existing", |p| p == Path::new("/usr/bin/existing")),
+            LaunchTarget::Command(Path::new("/usr/bin/existing"))
+        );
+        assert_eq!(
+            classify_target_with("/usr/share/app.desktop", |_| true),
+            LaunchTarget::DesktopFile(Path::new("/usr/share/app.desktop"))
+        );
+    }
 
     #[test]
     fn launches_and_sees_the_process() {

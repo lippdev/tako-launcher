@@ -56,7 +56,7 @@ O `Cargo.toml` pede Rust 1.97; o `rust-stable` do SDK acompanha o estável, ent�
 | `--socket=pulseaudio` | Saída de áudio e volume (`pactl`, funciona também no PipeWire). |
 | `--talk-name=org.freedesktop.secrets` | Chaves de API no cofre do sistema. |
 | `--talk-name=org.gnome.Mutter.DisplayConfig` | Trocar a tela no GNOME Wayland. |
-| `--filesystem=...:ro` | Só leitura e só as pastas das lojas: Steam (`xdg-data/Steam`, `~/.steam`, e a Steam Flatpak em `~/.var/app/com.valvesoftware.Steam/...`), Heroic e Lutris (nativos e Flatpak), `/mnt`, `/media`, `/run/media` (bibliotecas em outros discos) e `~/Games`. Sem `home` inteira. |
+| `--filesystem=...:ro` | Só leitura e só as pastas das lojas: Steam (`xdg-data/Steam`, `~/.steam`, e a Steam Flatpak em `~/.var/app/com.valvesoftware.Steam/...`), Heroic, Lutris, Bottles (`xdg-data/bottles`, `~/.var/app/com.usebottles.bottles/data/bottles`) e itch.io (`xdg-config/itch`, `~/.var/app/io.itch.itch/config/itch`) (nativos e Flatpak), `/mnt`, `/media`, `/run/media` (bibliotecas em outros discos) e `~/Games`. Sem `home` inteira. |
 
 **Não** há `--talk-name=org.freedesktop.Flatpak` (`flatpak-spawn --host`): daria ao app o equivalente a sair da sandbox, e o Flathub só aceita com justificativa forte.
 
@@ -66,13 +66,15 @@ O `Cargo.toml` pede Rust 1.97; o `rust-stable` do SDK acompanha o estável, ent�
 - Tela: só XRandR (X11) e Mutter (GNOME). `kscreen-doctor` e `wlr-randr` não existem na sandbox: nesses ambientes as opções de tela somem (`Unsupported`).
 - "Abrir com o sistema" grava no `~/.var/app/<id>/config/autostart`, que o sistema não lê; precisa do portal Background (não implementado).
 - Atualizador interno desligado (o Tako reconhece a sandbox por `FLATPAK_ID` ou `/.flatpak-info`); atualiza pelo Flatpak.
-- Cada fonte lê `XDG_*_HOME` da sandbox e também a pasta padrão do usuário (`~/.config/heroic`, `~/.local/share/lutris`), então Heroic e Lutris nativos aparecem. Já a descoberta de emuladores nativos e "Adicionar jogo" por `.desktop` do usuário olham só o `XDG_*_HOME` da sandbox.
+- A fonte Bottles fica oculta dentro do Flatpak porque a sandbox não inclui `bottles-cli` nem `flatpak` para disparar os programas das garrafas.
+- Jogos do itch.io instalados em locais fora das pastas padrão precisam de permissão do usuário: `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
+- Cada fonte lê `XDG_*_HOME` da sandbox e também a pasta padrão do usuário (`~/.config/heroic`, `~/.local/share/lutris`, `~/.config/itch`), então Heroic, Lutris e itch.io nativos aparecem. Já a descoberta de emuladores nativos e "Adicionar jogo" por `.desktop` do usuário olham só o `XDG_*_HOME` da sandbox.
 - Uma saída para tudo isso é um backend `flatpak-spawn --host` em `tako-platform`: decisão de produto do mantenedor (amplia a permissão); não está nesta entrega.
 
 ### O que o linter do Flathub aponta (resultado do `flatpak-builder-lint`)
 
 - `appid-url-not-reachable`: para `io.github.lippdev.<X>` o Flathub espera um repositório `lippdev/<x>`; o repositório se chama `tako-launcher`. Opções: ID `io.github.lippdev.tako_launcher`, ou espelhar/renomear o repositório, ou um ID por domínio próprio. Decisão do mantenedor, antes de submeter.
-- `finish-args-flatpak-appdata-folder-*` e `finish-args-unnecessary-xdg-*-ro-access`: o Flathub não aceita, por regra, ler as pastas de outros apps (Steam, Heroic e Lutris). É preciso pedir exceção na submissão, explicando que é um launcher que só lista a biblioteca (somente leitura).
+- `finish-args-flatpak-appdata-folder-*` e `finish-args-unnecessary-xdg-*-ro-access`: o Flathub não aceita, por regra, ler as pastas de outros apps (Steam, Heroic, Lutris, Bottles e itch.io). É preciso pedir exceção na submissão, explicando que é um launcher que só lista a biblioteca (somente leitura).
 - Runtime: o linter sugere o 26.08; trocar `runtime-version` (e o `rust-stable`) quando for compilar para o Flathub.
 
 ### Publicar no Flathub (mantenedor)
