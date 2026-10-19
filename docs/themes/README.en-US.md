@@ -105,6 +105,7 @@ import { Tile, HomeRow, NavItem, Hero, Stat, Details, Overlay, Key } from "@tako
 | `hints` | `[Hint]` | Bottom bar hints (button glyph and text), in order. |
 | `transparent-background` | `bool` | The window is over the game: draw only what's needed, on a transparent background. |
 | `leaving` | `bool` | Leaving for the game: Tako closes after `Ui.leave-time`. Ideal for a fade. |
+| `intro` | `bool` | App intro: true for about 1 s on launch only, with the first screen already ready underneath. Cover it with a short animation and fade it out when it turns false. Any key, button or `clicked` (from any zone) skips the intro; the theme may use the `intro` zone for the veil area. It is never true with "Reduce animations" nor in a theme that does not declare the property. |
 
 ### 4.2 Sidebar
 

@@ -397,7 +397,29 @@ impl Shell {
         self.ctx.dirty = true;
     }
 
+    /// Quanto a entrada do app fica na tela se ninguém pular (BRAND-002; o PRD §8.1 pede a 1ª tela interativa em
+    /// ≤ 1,5 s, então o total com a saída fica perto de 1 s).
+    pub const INTRO_HOLD: Duration = Duration::from_millis(800);
+
+    /// Entrada do app (BRAND-002): só numa abertura comum em tela cheia e sem "Reduzir animações".
+    pub fn wants_intro(&self, big_picture: bool, plain_start: bool) -> bool {
+        big_picture
+            && plain_start
+            && self.layers.is_empty()
+            && !self.ctx.settings.bool(ctx::keys::REDUCED_MOTION, false)
+    }
+
+    /// Acaba a entrada; `true` se ela estava na tela. A entrada do usuário que pula não faz mais nada.
+    pub fn end_intro(&mut self) -> bool {
+        let was = std::mem::take(&mut self.ctx.intro);
+        self.ctx.dirty |= was;
+        was
+    }
+
     pub fn handle(&mut self, cmd: Cmd) {
+        if self.end_intro() {
+            return;
+        }
         self.ctx.dirty = true;
         self.ctx.pointer = false;
         self.ctx.focus_visible = true;
@@ -429,6 +451,9 @@ impl Shell {
     }
 
     pub fn text(&mut self, text: &str) {
+        if self.end_intro() {
+            return;
+        }
         if let Some(top) = self.layers.last_mut() {
             top.text(text, &mut self.ctx);
             self.ctx.dirty = true;
@@ -437,6 +462,9 @@ impl Shell {
 
     /// Tecla crua para a camada de cima; `false` = segue o mapa de comandos.
     pub fn key(&mut self, text: &str, mods: tako_core::input::shortcut::KeyModifiers) -> bool {
+        if self.end_intro() {
+            return true;
+        }
         if self.cc.is_some() {
             return false;
         }
@@ -481,6 +509,9 @@ impl Shell {
     }
 
     pub fn erase(&mut self) {
+        if self.end_intro() {
+            return;
+        }
         if let Some(top) = self.layers.last_mut() {
             top.erase(&mut self.ctx);
             self.ctx.dirty = true;
@@ -488,6 +519,9 @@ impl Shell {
     }
 
     pub fn click(&mut self, zone: &str, index: usize) {
+        if self.end_intro() {
+            return;
+        }
         self.ctx.dirty = true;
         self.ctx.pointer = false;
         self.ctx.focus_visible = false;
@@ -743,6 +777,9 @@ impl Shell {
 
     /// Seções com LB/RB valem em qualquer página de rota (a de Configurações usa para categorias).
     pub fn section(&mut self, forward: bool) {
+        if self.end_intro() {
+            return;
+        }
         // No desktop as seções são as abas da biblioteca e as categorias das Configurações (a página trata).
         if self.layers.is_empty()
             && self.cc.is_none()
@@ -821,6 +858,7 @@ impl Shell {
         }
         // A janela do jogo apareceu: tudo some aos poucos e o jogo aparece pela janela transparente.
         out.set("leaving", self.ctx.leaving);
+        out.set("intro", self.ctx.intro);
         if self.ctx.leaving {
             out.set("transparent-background", true);
         }
@@ -1001,5 +1039,66 @@ mod tests {
         shell.hover("toast", 0);
         assert!(!shell.ctx.toast_expired(Instant::now()));
         assert!(shell.ctx.toast_expired(late));
+    }
+
+    fn intro_shell(dir: &std::path::Path) -> Shell {
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        Shell::new(ctx)
+    }
+
+    #[test]
+    fn intro_is_off_with_reduced_motion_and_outside_a_plain_big_picture_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut shell = intro_shell(dir.path());
+        assert!(shell.wants_intro(true, true));
+        // Desktop, abertura vinda de um jogo ou link: sem entrada.
+        assert!(!shell.wants_intro(false, true));
+        assert!(!shell.wants_intro(true, false));
+        // "Reduzir animações": a entrada nem aparece, então a primeira tela não espera nada.
+        shell.ctx.settings.set_bool(ctx::keys::REDUCED_MOTION, true);
+        assert!(!shell.wants_intro(true, true));
+    }
+
+    #[test]
+    fn any_input_skips_the_intro_at_once_without_acting() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut shell = intro_shell(dir.path());
+        shell.ctx.library.refresh();
+        let none = tako_core::input::shortcut::KeyModifiers::NONE;
+        let first = shell.focused_game();
+        for step in 0..4 {
+            shell.ctx.intro = true;
+            assert!(matches!(
+                shell
+                    .render(Instant::now())
+                    .props
+                    .iter()
+                    .find(|(n, _)| *n == "intro"),
+                Some((_, Value::Bool(true)))
+            ));
+            match step {
+                0 => shell.handle(Cmd::Right),
+                1 => assert!(shell.key("a", none)),
+                2 => shell.click("row-0", 1),
+                _ => shell.section(true),
+            }
+            // Pulou na hora: some do próximo desenho e a entrada do usuário não navegou.
+            assert!(!shell.ctx.intro);
+            assert!(shell.ctx.dirty);
+            assert!(matches!(
+                shell
+                    .render(Instant::now())
+                    .props
+                    .iter()
+                    .find(|(n, _)| *n == "intro"),
+                Some((_, Value::Bool(false)))
+            ));
+            assert_eq!(shell.focused_game(), first);
+        }
+        assert!(!shell.end_intro());
     }
 }
