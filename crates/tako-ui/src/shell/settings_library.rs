@@ -34,7 +34,11 @@ pub(crate) fn toggle_store(disabled: &str, store: GameStore) -> String {
 
 pub(crate) fn store_icon(store: GameStore) -> String {
     match store {
-        GameStore::Heroic | GameStore::Lutris | GameStore::Emulators => String::new(),
+        GameStore::Heroic
+        | GameStore::Lutris
+        | GameStore::Bottles
+        | GameStore::Itch
+        | GameStore::Emulators => String::new(),
         s => format!("store-{}", s.key().to_ascii_lowercase()),
     }
 }
