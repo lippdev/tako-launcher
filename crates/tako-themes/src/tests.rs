@@ -464,3 +464,48 @@ fn theme_from_a_repository_remembers_where_it_came_from() {
     uninstall(&w.root(), "Autor_TemaTeste").unwrap();
     assert!(remote::sources(&w.root()).is_empty());
 }
+
+#[test]
+fn resolves_theme_audio_and_tokens_override_with_path_safety() {
+    let w = Work::new();
+    let theme_dir = w.root().join("tema-audio");
+    fs::create_dir_all(&theme_dir).unwrap();
+    fs::write(
+        theme_dir.join("theme.toml"),
+        format!("{TOML}\n[audio]\nmusic = \"bgm.wav\"\nmove = \"mover.wav\"\n"),
+    )
+    .unwrap();
+    fs::write(theme_dir.join("main.slint"), SLINT).unwrap();
+    fs::write(theme_dir.join("bgm.wav"), b"WAV1").unwrap();
+    fs::write(theme_dir.join("mover.wav"), b"WAV2").unwrap();
+
+    // Default from theme.toml
+    let audio = resolve_theme_audio(&theme_dir);
+    assert_eq!(audio.music, Some(theme_dir.join("bgm.wav")));
+    assert_eq!(audio.move_sound, Some(theme_dir.join("mover.wav")));
+    assert_eq!(audio.accept_sound, None);
+    assert_eq!(audio.back_sound, None);
+
+    // Override with tokens.toml
+    fs::write(
+        theme_dir.join("tokens.toml"),
+        "[audio]\nmusic = \"tokens_bgm.wav\"\naccept = \"confirm.wav\"\n",
+    )
+    .unwrap();
+    fs::write(theme_dir.join("tokens_bgm.wav"), b"WAV3").unwrap();
+    fs::write(theme_dir.join("confirm.wav"), b"WAV4").unwrap();
+
+    let audio = resolve_theme_audio(&theme_dir);
+    assert_eq!(audio.music, Some(theme_dir.join("tokens_bgm.wav")));
+    assert_eq!(audio.move_sound, Some(theme_dir.join("mover.wav")));
+    assert_eq!(audio.accept_sound, Some(theme_dir.join("confirm.wav")));
+
+    // Path traversal attempt in tokens.toml is ignored and safely rejected
+    fs::write(
+        theme_dir.join("tokens.toml"),
+        "[audio]\nmusic = \"../outside.wav\"\n",
+    )
+    .unwrap();
+    let audio = resolve_theme_audio(&theme_dir);
+    assert_eq!(audio.music, Some(theme_dir.join("bgm.wav")));
+}

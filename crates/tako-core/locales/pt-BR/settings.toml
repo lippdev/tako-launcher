@@ -155,6 +155,17 @@ sidebar_width_desc = "Vale para os dois layouts"
 sidebar_normal = "Normal"
 sidebar_narrow = "Estreita"
 
+[settings.sound]
+title = "Som"
+subtitle = "Música de fundo e efeitos de navegação."
+music_enabled = "Música de fundo do tema"
+music_enabled_desc = "Toca a música definida pelo tema na tela cheia."
+music_volume = "Volume da música do tema"
+music_volume_desc = "0% silencia a música do tema. A música nunca toca durante os jogos."
+music_muted = "Mudo"
+navigation_volume = "Volume dos sons de navegação"
+navigation_volume_desc = "0% desliga. Tons locais curtos para navegar; nunca tocam durante um jogo."
+
 [settings.screen]
 title = "Tela e áudio"
 subtitle = "Onde o jogo aparece e por onde o som sai."

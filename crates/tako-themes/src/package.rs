@@ -14,8 +14,8 @@ use crate::manifest::{MANIFEST_FILE, MAX_MANIFEST_BYTES, ThemeManifest};
 
 pub const EXTENSION: &str = "takotheme";
 pub const MAX_PATH_LEN: usize = 240;
-pub const ALLOWED_EXTENSIONS: [&str; 11] = [
-    "slint", "toml", "png", "jpg", "jpeg", "svg", "webp", "ttf", "otf", "txt", "md",
+pub const ALLOWED_EXTENSIONS: [&str; 12] = [
+    "slint", "toml", "png", "jpg", "jpeg", "svg", "webp", "ttf", "otf", "txt", "md", "wav",
 ];
 
 /// Limites de um pacote; os padrões cobrem com folga temas reais.
@@ -166,6 +166,22 @@ impl Package {
                     &[("entry", &manifest.entry)],
                 ),
             ));
+        }
+        for audio_path in [
+            &manifest.audio.music,
+            &manifest.audio.move_sound,
+            &manifest.audio.accept_sound,
+            &manifest.audio.back_sound,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !files.iter().any(|e| e.path == *audio_path) {
+                return Err(one(
+                    "package.missing-audio",
+                    tf("themes.package.missing_audio", &[("path", audio_path)]),
+                ));
+            }
         }
         Ok(Package {
             source,
@@ -498,4 +514,23 @@ mod tests {
             Err("themes.path.too_long")
         );
     }
+}
+#[test]
+fn validates_declared_audio_files_exist_in_package() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    std::fs::write(
+            dir.join("theme.toml"),
+            "id = \"meu.tema\"\nname = \"Tema\"\nversion = \"1.0\"\nauthor = \"Eu\"\napi = 1\nentry = \"main.slint\"\n[audio]\nmusic = \"bgm.wav\"\n",
+        )
+        .unwrap();
+    std::fs::write(dir.join("main.slint"), "").unwrap();
+    // Missing bgm.wav
+    let err = validate_package(dir).unwrap_err();
+    assert_eq!(err[0].code, "package.missing-audio");
+
+    // Present bgm.wav
+    std::fs::write(dir.join("bgm.wav"), b"RIFF....WAVE").unwrap();
+    let manifest = validate_package(dir).unwrap();
+    assert_eq!(manifest.audio.music.as_deref(), Some("bgm.wav"));
 }

@@ -283,6 +283,33 @@ Slint: `name = "#RRGGBB"` or `"#RRGGBBAA"`. Available colors: `canvas`, `on-acce
 `control-track-on-solid`, `value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. When loading, Tako
 ignores (with a log entry) an invalid key or color. `tako theme check` points out both.
 
+
+### Background music and navigation sounds (THEME-007)
+
+A theme can include background music and custom sounds for navigation in Tako. These can be declared in either `theme.toml` or `tokens.toml`:
+
+```toml
+[audio]
+music = "audio/bgm.wav"
+move = "audio/move.wav"
+accept = "audio/accept.wav"
+back = "audio/back.wav"
+```
+
+Declarations directly at the root level of the file are also accepted.
+
+- **Supported format:** `.wav` (PCM). Because Tako's audio engine uses the native SDL3 library directly without heavy external decoders, formats like `.ogg` and `.opus` are not natively decoded by the library and are rejected during validation.
+- **Path validation:** Files must remain inside the theme directory, without absolute paths or `..` (leaving the theme folder is not permitted).
+- **Music playback behavior:**
+  - Plays exclusively in full screen (Big Picture), in a seamless loop with smooth fade (fade-in on start/resume and fade-out on pause).
+  - Pauses with a fade when launching a game, stays completely stopped while the game runs, and resumes when the game exits.
+  - Pauses when Tako's window loses focus or is minimized, resuming when focus returns.
+  - In desktop mode, theme music does not play.
+- **Settings › Sound:**
+  - **Theme music volume:** 0 to 100% volume slider/selector, separate from the navigation sound volume. At 0%, music is muted and does not play.
+  - **Theme background music:** toggle to enable or disable background music at any time.
+  - **Navigation sound volume:** dedicated volume (0 to 100%) for move, accept, and back sound effects.
+
 ### The `@tako` library
 
 `@tako/...` points to the default theme files of the installed Tako version:
@@ -310,7 +337,7 @@ Limits (third-party data is checked before any file is written):
 | One file | 64 MB |
 | Files and folders | 5,000 |
 | Path | 240 characters, no `..`, no absolute path, no reserved Windows names |
-| File types | `.slint`, `.toml`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.ttf`, `.otf`, `.txt`, `.md` |
+| File types | `.slint`, `.toml`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.ttf`, `.otf`, `.txt`, `.md`, `.wav` |
 
 Images and fonts come in through Slint itself (`@image-url("background.png")`, `import "fonts/Mine.ttf";`), with
 paths relative to the `.slint` file.

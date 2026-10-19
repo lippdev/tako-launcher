@@ -515,6 +515,7 @@ impl App {
         let (def, dir) = load_mode(&ctx, &builtin, mode)?;
         let ui = def.create().map_err(|e| e.to_string())?;
         theme::apply_tokens(&ui, dir.as_deref());
+        crate::navigation_feedback::set_theme(dir.as_deref());
         // Entrada do app (só na abertura, não na volta da tela cheia): começa apagado e acende depois do 1º quadro.
         if mode == UiMode::Desktop {
             bridge::set(&ui, "desk-intro", Value::Bool(true));
@@ -708,6 +709,7 @@ impl App {
             }
         };
         theme::apply_tokens(&new, dir.as_deref());
+        crate::navigation_feedback::set_theme(dir.as_deref());
         new.window()
             .set_fullscreen(self.ui.borrow().window().is_fullscreen());
         let old = self.ui.replace(new);
@@ -1160,6 +1162,21 @@ impl App {
                 let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {
                     app.shell.borrow_mut().ctx.dirty = true;
+                }
+                {
+                    let ui = app.ui.borrow();
+                    let window = ui.window();
+                    let window_minimized = window.is_minimized();
+                    use slint::winit_030::WinitWindowAccessor;
+                    let window_focused =
+                        window.with_winit_window(|w| w.has_focus()).unwrap_or(true);
+                    crate::navigation_feedback::tick_theme_music(
+                        &app.shell.borrow().ctx,
+                        app.mode.get() == UiMode::BigPicture,
+                        window_focused,
+                        window_minimized,
+                        Instant::now(),
+                    );
                 }
                 let pending = {
                     let s = app.shell.borrow();

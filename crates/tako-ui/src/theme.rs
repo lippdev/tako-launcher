@@ -1,5 +1,20 @@
 //! Carrega o tema: o padrão (embutido) ou o escolhido pelo usuário, com volta ao padrão se falhar (PRD §7).
 
+fn is_audio_key(key: &str) -> bool {
+    matches!(
+        key,
+        "audio"
+            | "music"
+            | "musica"
+            | "move"
+            | "mover"
+            | "accept"
+            | "confirmar"
+            | "back"
+            | "voltar"
+    )
+}
+
 use slint_interpreter::{Compiler, ComponentDefinition};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -70,6 +85,9 @@ pub fn apply_tokens(ui: &slint_interpreter::ComponentInstance, dir: Option<&Path
         }
     };
     for (name, value) in table {
+        if is_audio_key(&name) {
+            continue;
+        }
         match value.as_str().and_then(parse_color) {
             Some(c) => crate::bridge::set_global(
                 ui,
@@ -176,18 +194,21 @@ fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
         Ok(t) => t,
         Err(e) => return vec![tf("themes.check.tokens_invalid", &[("error", e.message())])],
     };
-    table
-        .iter()
-        .filter_map(|(name, value)| {
-            if !colors.iter().any(|c| c == name) {
-                Some(tf("themes.check.token_unknown", &[("name", name)]))
-            } else if value.as_str().and_then(parse_color).is_none() {
-                Some(tf("themes.check.token_invalid", &[("name", name)]))
-            } else {
-                None
-            }
-        })
-        .collect()
+    let mut problems = Vec::new();
+    if let Err(probs) = tako_themes::parse_tokens_audio(text) {
+        problems.extend(probs.into_iter().map(|p| p.message));
+    }
+    for (name, value) in &table {
+        if is_audio_key(name) {
+            continue;
+        }
+        if !colors.iter().any(|c| c == name) {
+            problems.push(tf("themes.check.token_unknown", &[("name", name)]));
+        } else if value.as_str().and_then(parse_color).is_none() {
+            problems.push(tf("themes.check.token_invalid", &[("name", name)]));
+        }
+    }
+    problems
 }
 
 #[cfg(test)]

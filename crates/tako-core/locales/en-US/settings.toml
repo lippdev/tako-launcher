@@ -155,6 +155,17 @@ sidebar_width_desc = "Applies to both layouts"
 sidebar_normal = "Normal"
 sidebar_narrow = "Narrow"
 
+[settings.sound]
+title = "Sound"
+subtitle = "Background music and navigation effects."
+music_enabled = "Theme background music"
+music_enabled_desc = "Plays the music defined by the theme in full screen."
+music_volume = "Theme music volume"
+music_volume_desc = "0% mutes the theme music. Music never plays during games."
+music_muted = "Muted"
+navigation_volume = "Navigation sound volume"
+navigation_volume_desc = "0% turns sounds off. Short local navigation tones; never play during a game."
+
 [settings.screen]
 title = "Display and audio"
 subtitle = "Where the game shows up and where the sound goes."

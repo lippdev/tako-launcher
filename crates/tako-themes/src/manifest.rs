@@ -11,6 +11,14 @@ pub const THEME_API_VERSION: u32 = 1;
 pub const DEFAULT_ENTRY: &str = "main.slint";
 pub const MAX_ID_LEN: usize = 128;
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ThemeAudio {
+    pub music: Option<String>,
+    pub move_sound: Option<String>,
+    pub accept_sound: Option<String>,
+    pub back_sound: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThemeManifest {
     pub id: String,
@@ -22,6 +30,95 @@ pub struct ThemeManifest {
     pub description: Option<String>,
     /// Arquivo `.slint` principal, relativo à raiz do tema.
     pub entry: String,
+    pub audio: ThemeAudio,
+}
+
+/// Valida um caminho de áudio relativo à pasta do tema:
+/// - Deve ser relativo, sem sair da pasta (sem `..`, sem caminhos absolutos, caracteres válidos)
+/// - Deve ser um arquivo `.wav` (formato decodificado nativamente pela biblioteca de áudio do Tako)
+pub fn validate_audio_path(path: &str) -> Result<String, Problem> {
+    if path.trim().is_empty() {
+        return Err(Problem::new(
+            "manifest.invalid-audio-path",
+            tf(
+                "themes.manifest.invalid_audio_path",
+                &[("path", path), ("reason", &t("themes.path.empty"))],
+            ),
+        ));
+    }
+    let norm = match crate::package::normalize_entry(path) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return Err(Problem::new(
+                "manifest.invalid-audio-path",
+                tf(
+                    "themes.manifest.invalid_audio_path",
+                    &[("path", path), ("reason", &t("themes.path.empty"))],
+                ),
+            ));
+        }
+        Err(reason) => {
+            return Err(Problem::new(
+                "manifest.invalid-audio-path",
+                tf(
+                    "themes.manifest.invalid_audio_path",
+                    &[("path", path), ("reason", &t(reason))],
+                ),
+            ));
+        }
+    };
+    let ext = norm
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase())
+        .filter(|e| !e.contains('/'));
+    match ext.as_deref() {
+        Some("wav") => Ok(norm),
+        _ => Err(Problem::new(
+            "manifest.unsupported-audio-format",
+            tf(
+                "themes.manifest.unsupported_audio_format",
+                &[("path", path)],
+            ),
+        )),
+    }
+}
+
+pub fn parse_audio_table(table: &toml::Table, problems: &mut Vec<Problem>) -> ThemeAudio {
+    let mut audio = ThemeAudio::default();
+    let audio_table = table.get("audio").and_then(|v| v.as_table());
+    let get_str = |key: &str, alt_key: &str| -> Option<String> {
+        audio_table
+            .and_then(|t| t.get(key).or_else(|| t.get(alt_key)))
+            .or_else(|| table.get(key).or_else(|| table.get(alt_key)))
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_owned())
+    };
+
+    if let Some(m) = get_str("music", "musica") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.music = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    if let Some(m) = get_str("move", "mover") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.move_sound = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    if let Some(m) = get_str("accept", "confirmar") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.accept_sound = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    if let Some(m) = get_str("back", "voltar") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.back_sound = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    audio
 }
 
 impl ThemeManifest {
@@ -104,6 +201,7 @@ impl ThemeManifest {
             Some(toml::Value::String(s)) => Some(s.clone()),
             _ => None,
         };
+        let audio = parse_audio_table(&table, &mut problems);
         match (id, name, version, author, api, entry) {
             (Some(id), Some(name), Some(version), Some(author), Some(api), Some(entry))
                 if problems.is_empty() =>
@@ -116,6 +214,7 @@ impl ThemeManifest {
                     api,
                     description,
                     entry,
+                    audio,
                 })
             }
             _ => Err(problems),
@@ -166,12 +265,80 @@ mod tests {
         assert_eq!(m.id, "autor.tema");
         assert_eq!(m.entry, "main.slint");
         assert_eq!(m.description, None);
+        assert_eq!(m.audio, ThemeAudio::default());
         let m = ThemeManifest::parse(&format!(
             "{OK}description = \"Escuro\"\nentry = \"./ui//home.slint\"\nextra = 3\n"
         ))
         .unwrap();
         assert_eq!(m.entry, "ui/home.slint");
         assert_eq!(m.description.as_deref(), Some("Escuro"));
+    }
+
+    #[test]
+    fn parses_audio_declarations_in_table_and_root() {
+        let text = format!(
+            "{OK}\n[audio]\nmusic = \"audio/bgm.wav\"\nmove = \"sounds/move.wav\"\naccept = \"sounds/accept.wav\"\nback = \"sounds/back.wav\"\n"
+        );
+        let m = ThemeManifest::parse(&text).unwrap();
+        assert_eq!(m.audio.music.as_deref(), Some("audio/bgm.wav"));
+        assert_eq!(m.audio.move_sound.as_deref(), Some("sounds/move.wav"));
+        assert_eq!(m.audio.accept_sound.as_deref(), Some("sounds/accept.wav"));
+        assert_eq!(m.audio.back_sound.as_deref(), Some("sounds/back.wav"));
+
+        // Portuguese keys and top-level
+        let text_pt = format!(
+            "{OK}musica = \"musica.wav\"\nmover = \"mover.wav\"\nconfirmar = \"confirmar.wav\"\nvoltar = \"voltar.wav\"\n"
+        );
+        let m_pt = ThemeManifest::parse(&text_pt).unwrap();
+        assert_eq!(m_pt.audio.music.as_deref(), Some("musica.wav"));
+        assert_eq!(m_pt.audio.move_sound.as_deref(), Some("mover.wav"));
+        assert_eq!(m_pt.audio.accept_sound.as_deref(), Some("confirmar.wav"));
+        assert_eq!(m_pt.audio.back_sound.as_deref(), Some("voltar.wav"));
+    }
+
+    #[test]
+    fn validates_audio_paths_and_rejects_unsafe_and_unsupported_formats() {
+        // Valid WAV
+        assert_eq!(validate_audio_path("bgm.wav").unwrap(), "bgm.wav");
+        assert_eq!(
+            validate_audio_path("audio/bgm.WAV").unwrap(),
+            "audio/bgm.WAV"
+        );
+
+        // Unsafe paths
+        assert_eq!(
+            validate_audio_path("../evil.wav").unwrap_err().code,
+            "manifest.invalid-audio-path"
+        );
+        assert_eq!(
+            validate_audio_path("/abs/evil.wav").unwrap_err().code,
+            "manifest.invalid-audio-path"
+        );
+        assert_eq!(
+            validate_audio_path("").unwrap_err().code,
+            "manifest.invalid-audio-path"
+        );
+
+        // Unsupported formats (e.g. ogg, opus, mp3)
+        assert_eq!(
+            validate_audio_path("audio/bgm.ogg").unwrap_err().code,
+            "manifest.unsupported-audio-format"
+        );
+        assert_eq!(
+            validate_audio_path("audio/bgm.opus").unwrap_err().code,
+            "manifest.unsupported-audio-format"
+        );
+        assert_eq!(
+            validate_audio_path("audio/bgm.mp3").unwrap_err().code,
+            "manifest.unsupported-audio-format"
+        );
+
+        // Rejected in manifest parse
+        let bad = format!("{OK}[audio]\nmusic = \"../outside.wav\"\n");
+        assert_eq!(codes(&bad), ["manifest.invalid-audio-path"]);
+
+        let bad_fmt = format!("{OK}[audio]\nmusic = \"music.ogg\"\n");
+        assert_eq!(codes(&bad_fmt), ["manifest.unsupported-audio-format"]);
     }
 
     #[test]
