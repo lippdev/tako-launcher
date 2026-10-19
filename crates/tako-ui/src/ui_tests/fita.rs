@@ -442,10 +442,12 @@ fn card_captions_and_library_header_height_and_contrast() {
 
         // 1. Cabeçalho da Biblioteca fica contido no topo, nunca sob a grade (base do cabeçalho < topo da grade).
         // top = 120 * u + 60 * u * text_scale = 180px em 1080p escala 1.0.
+        // Varre além de top (até top + 8*u, antes da grade em y≈191) para garantir que nenhum texto vaza para y >= top.
         let u = h as f32 / 1080.;
         let top = (120. * u + 60. * u) as u32;
+        let scan_bottom = (top as f32 + 8. * u) as u32;
         let mut header_bottom_y = 0;
-        for y in (48. * u) as u32..top {
+        for y in (48. * u) as u32..scan_bottom {
             for x in (100. * u) as u32..(w - 100) {
                 let p = pixels[(y * w + x) as usize];
                 if p.r > 100 || p.g > 100 || p.b > 100 {
@@ -456,7 +458,7 @@ fn card_captions_and_library_header_height_and_contrast() {
         assert!(header_bottom_y > 0, "cabeçalho da biblioteca renderizado no topo");
         assert!(
             header_bottom_y < top,
-            "base do cabeçalho da biblioteca ({header_bottom_y}) fica acima do topo da grade ({top})"
+            "base do cabeçalho da biblioteca ({header_bottom_y}) fica acima do topo da grade ({top}) e não há texto do cabeçalho em y >= top"
         );
 
         // 2. Fita: cartões têm legenda ancorada no fundo com scrim contrastante (>= 4.5:1).
@@ -467,16 +469,12 @@ fn card_captions_and_library_header_height_and_contrast() {
         // Coordenadas reais do cartão focado na fita em 1080p:
         // ribbon y = 1080 - 340 - 88 - 16 = 636; cards y = 636 + 44 = 680.
         // Focado com escala 1.12x: art-box vai de y≈672 a y≈974 (bem acima da barra de dicas em y=992).
-        let card_top = 672;
+        let _card_top = 672;
         let card_bottom = 974;
         let x_center = w / 2; // 960
 
         // Amostra o scrim nas coordenadas reais do cartão (14px acima da borda inferior)
         let sample_y = card_bottom - 14; // 960
-        assert!(
-            sample_y > card_top && sample_y < card_bottom,
-            "base da legenda ({sample_y}) está dentro do cartão ({card_top}..{card_bottom})"
-        );
         let lower_p = pixels_home[(sample_y * w + x_center) as usize];
         let lum_lower =
             0.2126 * lower_p.r as f32 + 0.7152 * lower_p.g as f32 + 0.0722 * lower_p.b as f32;

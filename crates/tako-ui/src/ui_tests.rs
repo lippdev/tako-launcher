@@ -711,6 +711,8 @@ fn fullscreen_snapshot() {
         let art_img = slint::Image::load_from_path(&bright_art_path).unwrap();
 
         let game = shell.ctx.library.games()[0].id.clone();
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let prev_lang = i18n::lang();
         for lang in [Lang::EnUs, Lang::PtBr] {
             i18n::set_lang(lang);
             let lang_suffix = match lang {
@@ -781,18 +783,11 @@ fn fullscreen_snapshot() {
                             format!("{out_dir}/fita-{page_name}{lang_suffix}-{scale}-{w}x{h}.png")
                         };
                         img.save(&file_name).unwrap();
-                        if lang == Lang::PtBr {
-                            let alt_name = if (scale - 1.0).abs() < 0.01 {
-                                format!("{out_dir}/fita-{page_name}-PtBr-{w}x{h}.png")
-                            } else {
-                                format!("{out_dir}/fita-{page_name}-PtBr-{scale}-{w}x{h}.png")
-                            };
-                            let _ = img.save(&alt_name);
-                        }
                     }
                 }
             }
         }
+        i18n::set_lang(prev_lang);
         ui.hide().unwrap();
     })
     .join()
