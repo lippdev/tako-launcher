@@ -242,6 +242,7 @@ impl LibrarySource for EpicLibrarySource {
                 games.push(to_game(&install, crate::install_dates::of(&file)));
             }
         }
+        owned::add_icons(&mut games, &owned);
         // Os da conta que faltam instalar (SRC-005).
         let missing = owned::not_installed(&owned, &games);
         games.extend(missing);

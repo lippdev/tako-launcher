@@ -183,12 +183,28 @@ pub fn add_path(ctx: &mut Ctx, path: &Path) {
 }
 
 fn add(ctx: &mut Ctx, record: ManualGameRecord, system: Option<&str>) {
+    let target = record.path.clone();
     match ctx.library.add_manual(record) {
         Ok(g) => {
             let title = match system {
                 Some(s) => format!("{} ({s})", g.title),
                 None => g.title.clone(),
             };
+            if target.to_ascii_lowercase().ends_with(".exe") {
+                let exe = PathBuf::from(target);
+                let exe_icons = ctx.paths.cache().join("exe-icons");
+                crate::tasks::run(
+                    ctx,
+                    move || {
+                        tako_platform::exe_icon::icon_file(&exe, &exe_icons);
+                    },
+                    |ctx, ()| {
+                        ctx.library.refresh();
+                        ctx.sync_collections();
+                        ctx.dirty = true;
+                    },
+                );
+            }
             // A fila de metadados vê a biblioteca mudar e busca capa e informações.
             ctx.sync_collections();
             ctx.toast(ctx.tf("add_game.added", &[("game", &title)]));
