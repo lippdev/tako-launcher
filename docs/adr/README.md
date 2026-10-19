@@ -20,3 +20,4 @@ Ordem de verdade (PRD v0.2 §0): o PRD, depois as ADRs a partir da 0023. As ADRs
 - [ADR-0026](0026-supervisor-e-processo-durante-o-jogo.md): supervisor e processo do Tako durante o jogo (Aceita).
 - [ADR-0027](0027-modo-desktop-e-big-picture.md): desktop principal, Big Picture e janela minimizada durante o jogo (Aceita).
 - [ADR-0028](0028-downloads-por-torrent.md): downloads por torrent de fontes `.json` do usuário (DL-001): formato e validação das fontes, motor `librqbit`, vínculo ao jogo, fim do download sem executar nada, privacidade e avisos legais; instalações das lojas no mesmo painel (Aceita).
+- [ADR-0029](0029-jogos-da-conta-ubisoft-ea-amazon-windows.md): jogos da conta não instalados da Amazon no Windows pelo DPAPI do usuário; Ubisoft depois de um spike com arquivos reais; EA sem lista legível offline (Proposta).
