@@ -18,8 +18,11 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **Tools with the game:** in the game settings, extra programs (FPS overlay, mods) open with the game and can close at the end, with your permission.
 - **`tako://` links on macOS:** shortcuts and Stream Deck open games and Tako screens on the Mac too.
 - **Linux packages:** AUR PKGBUILDs and a Flatpak in the repository (not published yet).
+- **Bottles and itch.io on Linux:** games installed through Bottles and the itch.io app show up in the library.
 
 ### Fixes
+- **Slow list and images not loading (alpha.15):** list icons have their own queue and no longer hold up covers and backgrounds; the UI only redraws when an image arrives, and art the store doesn't have isn't requested again on every launch.
+- **Play time:** a game with a session but no recorded time shows "Not tracked" instead of "Not played yet".
 - **Window on Windows:** Minimize, Maximize and Close on the desktop bar respond again; Maximize snap layouts still work.
 - **UI closing and reopening when playing:** new logs to diagnose the issue (BUG-001).
 
