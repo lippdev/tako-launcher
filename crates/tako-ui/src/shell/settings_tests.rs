@@ -919,9 +919,12 @@ fn edit_theme_image_full_path_and_promotion() {
     let rows = panel.items(&ctx);
     let bg_type_row = find(&rows, "bg_type");
 
-    // 2. Escolhe Imagem (opção 2 de bg_type)
-    let mut bg_type_select = bg_type_row.select(&ctx).expect("select");
-    let _ = bg_type_select.click("row", 2, &mut ctx);
+    // 2. Escolhe Imagem (avança de Padrão -> Sólido -> Imagem via adjust)
+    adjust(&mut ctx, &bg_type_row, 1);
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let bg_type_row = find(&rows, "bg_type");
+    adjust(&mut ctx, &bg_type_row, 1);
 
     // Confirma que bg_type_idx agora é Imagem e a linha choose_image aparece!
     let panel = edit_theme_panel(&ctx);
@@ -1046,7 +1049,6 @@ fn custom_accent_wins_over_game_accent() {
         accent: "#00FF00".into(), // Jogo tem cor verde
         ..Default::default()
     };
-    ctx.library.add(g.clone());
 
     // Ao montar a linha de DeskGame, o accent personalizado (#E3161E) deve vencer o do jogo (#00FF00)
     let desk_game_accent = if let Some(c) = crate::theme::custom_theme_accent(&ctx) {

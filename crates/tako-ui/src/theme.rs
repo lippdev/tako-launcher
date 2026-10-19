@@ -65,10 +65,8 @@ pub fn custom_theme_accent(ctx: &crate::shell::Ctx) -> Option<tako_core::present
     {
         return tako_core::presentation::Rgb::parse(acc);
     }
-    if let Some(ref d) = ctx.theme_draft {
-        if let Some(ref acc) = d.accent {
-            return tako_core::presentation::Rgb::parse(acc);
-        }
+    if let Some(acc) = ctx.theme_draft.as_ref().and_then(|d| d.accent.as_ref()) {
+        return tako_core::presentation::Rgb::parse(acc);
     }
     let selected_id = tako_themes::selected(&ctx.paths.themes());
     let theme_id = selected_id.as_deref();
@@ -228,15 +226,13 @@ pub fn apply_tokens_with_override(
                 }
             }
         } else {
-            if name == "canvas" {
-                if let Some(c_str) = value.as_str() {
-                    if !tako_themes::overrides::validate_canvas(c_str) {
-                        tracing::warn!(
-                            "tokens.toml: canvas ignorado por contraste insuficiente (< 4.5:1)"
-                        );
-                        continue;
-                    }
-                }
+            if name == "canvas"
+                && value
+                    .as_str()
+                    .is_some_and(|c_str| !tako_themes::overrides::validate_canvas(c_str))
+            {
+                tracing::warn!("tokens.toml: canvas ignorado por contraste insuficiente (< 4.5:1)");
+                continue;
             }
             match value.as_str().and_then(parse_color) {
                 Some(c) => {

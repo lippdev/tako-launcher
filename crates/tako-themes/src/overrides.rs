@@ -178,10 +178,8 @@ pub fn clean_background_orphans(
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
         if name_str.starts_with(BACKGROUND_PREFIX) {
-            if let Some(keep_name) = keep {
-                if name_str == keep_name {
-                    continue;
-                }
+            if keep.is_some_and(|keep_name| name_str == keep_name) {
+                continue;
             }
             let _ = fs::remove_file(entry.path());
         }
@@ -274,7 +272,7 @@ pub fn copy_background_image(
     source: &Path,
 ) -> io::Result<String> {
     copy_draft_background_image(themes_root, theme_id, source)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+        .map_err(|e| io::Error::other(e.to_string()))
 }
 
 /// Representação em memória dos tokens editáveis pelo Tako.

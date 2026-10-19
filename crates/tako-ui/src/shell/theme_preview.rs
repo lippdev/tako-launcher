@@ -432,6 +432,7 @@ mod tests {
             font: Some("Poppins".into()),
             canvas: Some("#0B1A33".into()),
             background_image: None,
+            ..Default::default()
         };
 
         // 1. Inicia a prévia ao vivo de sobreposição
