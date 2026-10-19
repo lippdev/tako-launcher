@@ -179,6 +179,11 @@ impl GameScreenSession {
         self.active.as_ref()?.hdr_turned_on_for.as_deref()
     }
 
+    /// Tela em que a sessão ligou o VRR (o guard grava para desligar no fim).
+    pub fn vrr_display_id(&self) -> Option<&str> {
+        self.active.as_ref()?.vrr_turned_on_for.as_deref()
+    }
+
     /// `confirmed_setup`: a combinação já confirmada; diferente dela, o resultado pede confirmação.
     pub fn begin(
         &mut self,
@@ -821,6 +826,9 @@ pub(crate) mod tests {
             }
             fn set_hdr(&self, id: &str, on: bool) -> DeviceResult<()> {
                 self.0.set_hdr(id, on)
+            }
+            fn set_vrr(&self, id: &str, on: bool) -> DeviceResult<()> {
+                self.0.set_vrr(id, on)
             }
             fn capture(&self) -> DeviceResult<DisplayTopology> {
                 self.0.capture()

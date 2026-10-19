@@ -144,6 +144,10 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         });
         let mut session = GameScreenSession::default();
         let result = session.begin(p.displays.as_ref(), screen, confirmed.as_deref());
+        // `session` acaba aqui: quem desliga o VRR no fim é o guard, pelo arquivo.
+        if let Some(id) = session.vrr_display_id() {
+            g.remember_vrr_turned_on(id);
+        }
         if result.outcome == GameScreenOutcome::Reverted {
             g.discard();
             return Err(result
@@ -558,6 +562,34 @@ mod tests {
         restore_now(&platform, &ctx.paths, req.restore);
         assert!(!platform.cursor.is_hidden());
         assert!(!ctx.paths.session_environment().exists());
+    }
+
+    #[test]
+    fn vrr_turned_on_for_the_game_is_turned_off_after_it() {
+        use tako_core::devices::VrrStatus;
+        let dir = tempfile::tempdir().unwrap();
+        let platform = Platform::simulated();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), platform.clone(), true);
+        ctx.library.refresh();
+        let id = ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.is_installed)
+            .unwrap()
+            .id
+            .clone();
+        // A TV do simulado tem VRR desligado.
+        ctx.settings.set_bool(keys::GAME_SCREEN_ENABLED, true);
+        ctx.settings.set(keys::GAME_SCREEN_ID, "DISPLAY2");
+        ctx.settings.set_bool(keys::GAME_SCREEN_VRR, true);
+        let vrr = || platform.displays.list().unwrap()[1].vrr;
+        let Started::Tracking(req) = start(&mut ctx, &id).unwrap() else {
+            panic!("deveria acompanhar")
+        };
+        assert_eq!(vrr(), VrrStatus::On);
+        restore_now(&platform, &ctx.paths, req.restore);
+        assert_eq!(vrr(), VrrStatus::Off);
     }
 
     #[test]

@@ -4,7 +4,7 @@
 
 use crate::devices::audio::AudioLevel;
 use crate::devices::{
-    AudioOutputs, AudioState, DeviceError, DisplayTopology, Displays, MonitorState,
+    AudioOutputs, AudioState, DeviceError, DisplayTopology, Displays, MonitorState, VrrStatus,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,17 @@ pub struct SessionEnvironmentSnapshot {
     pub context: Option<String>,
     pub display: Option<DisplayTopology>,
     pub audio: Option<AudioState>,
+    /// VRR da tela em que o Tako o ligou para o jogo; ausente se o Tako não mexeu.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vrr: Option<VrrState>,
+}
+
+/// VRR de uma tela: no registro, o valor de antes do jogo; na leitura atual, o de agora.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VrrState {
+    pub display_id: String,
+    pub enabled: bool,
 }
 
 impl SessionEnvironmentSnapshot {
@@ -39,6 +50,7 @@ impl SessionEnvironmentSnapshot {
             context: context.map(Into::into),
             display,
             audio,
+            vrr: None,
         }
     }
 
@@ -123,11 +135,13 @@ pub struct EnvironmentDiff {
     pub monitors: Vec<MonitorChange>,
     pub audio_default: Option<AudioDefaultChange>,
     pub audio_levels: Vec<AudioLevelChange>,
+    /// O VRR a devolver, se estiver diferente.
+    pub vrr: Option<VrrState>,
 }
 
 impl EnvironmentDiff {
     pub fn is_empty(&self) -> bool {
-        self.monitors.is_empty() && !self.has_audio_changes()
+        self.monitors.is_empty() && !self.has_audio_changes() && self.vrr.is_none()
     }
     pub fn has_display_changes(&self) -> bool {
         !self.monitors.is_empty()
@@ -144,9 +158,14 @@ impl EnvironmentDiff {
             (Some(e), Some(a)) => compare_display(e, a),
             _ => vec![],
         };
+        let vrr = match (&expected.vrr, &actual.vrr) {
+            (Some(e), Some(a)) if e.enabled != a.enabled => Some(e.clone()),
+            _ => None,
+        };
         let (Some(e), Some(a)) = (&expected.audio, &actual.audio) else {
             return EnvironmentDiff {
                 monitors,
+                vrr,
                 ..Default::default()
             };
         };
@@ -175,6 +194,7 @@ impl EnvironmentDiff {
             monitors,
             audio_default,
             audio_levels,
+            vrr,
         }
     }
 
@@ -188,6 +208,10 @@ impl EnvironmentDiff {
             .steps
             .iter()
             .any(|s| matches!(s, RestoreStep::SetDefaultAudio { .. }));
+        let vrr = plan
+            .steps
+            .iter()
+            .any(|s| matches!(s, RestoreStep::SetVrr(_)));
         let devices: Vec<&str> = plan
             .steps
             .iter()
@@ -209,6 +233,7 @@ impl EnvironmentDiff {
                         .any(|d| d.eq_ignore_ascii_case(c.device_id()))
                 })
                 .collect(),
+            vrr: self.vrr.filter(|_| vrr),
         }
     }
 }
@@ -251,6 +276,7 @@ fn compare_display(expected: &DisplayTopology, actual: &DisplayTopology) -> Vec<
 /// Uma alteração a fazer no SO para voltar ao estado registrado.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RestoreStep {
+    SetVrr(VrrState),
     /// Volta a configuração de telas inteira (topologia, principal, resolução, taxa, rotação, posição).
     Display {
         target: DisplayTopology,
@@ -276,6 +302,10 @@ impl RestoreStep {
     /// Texto para o log.
     pub fn description(&self) -> String {
         match self {
+            RestoreStep::SetVrr(v) => {
+                let state = if v.enabled { "ligado" } else { "desligado" };
+                format!("VRR de {}: {state}", v.display_id)
+            }
             RestoreStep::Display { changed_ids, .. } => {
                 format!("telas ({} alterada(s))", changed_ids.len())
             }
@@ -308,8 +338,9 @@ impl RestorePlan {
         self.steps.is_empty()
     }
 
-    /// Só o que mudou, só o que ainda existe e só o que a plataforma consegue fazer. Telas primeiro
-    /// (trocar de tela pode trocar a saída HDMI), depois a saída padrão, depois volume e mudo.
+    /// Só o que mudou, só o que ainda existe e só o que a plataforma consegue fazer. VRR primeiro (a
+    /// topologia de antes pode desligar a tela), depois telas (trocar de tela pode trocar a saída HDMI),
+    /// depois a saída padrão, depois volume e mudo.
     pub fn new(
         expected: &SessionEnvironmentSnapshot,
         actual: &SessionEnvironmentSnapshot,
@@ -323,6 +354,7 @@ impl RestorePlan {
             reason: reason.into(),
         };
 
+        steps.extend(diff.vrr.clone().map(RestoreStep::SetVrr));
         if let (true, Some(display)) = (diff.has_display_changes(), &expected.display) {
             if display.primary().is_none() {
                 skipped.push(skip("telas", "o estado registrado não tem tela principal"));
@@ -498,7 +530,7 @@ impl SessionEnvironmentGuard {
             self.store.delete();
             return None;
         }
-        let snapshot = capture(env, Some(context), now);
+        let snapshot = capture_new(env, Some(context), now);
         if snapshot.display.is_none() && snapshot.audio.is_none() {
             self.store.delete();
             return None;
@@ -511,6 +543,21 @@ impl SessionEnvironmentGuard {
         }
         self.active = Some(snapshot);
         self.active.as_ref()
+    }
+
+    /// A tela de jogo ligou o VRR de `display_id` (estava desligado): grava para desligar no fim, mesmo
+    /// depois de uma queda. Sem sessão registrada, nada.
+    pub fn remember_vrr_turned_on(&mut self, display_id: &str) {
+        let Some(s) = self.active.as_mut() else {
+            return;
+        };
+        s.vrr = Some(VrrState {
+            display_id: display_id.into(),
+            enabled: false,
+        });
+        if !self.store.write(s) {
+            tracing::warn!("VRR ligado pelo Tako não gravado; só é desligado nesta abertura");
+        }
     }
 
     /// Fim do jogo (estado `Restoring`): restaura só o que mudou. Chamar de novo não faz nada.
@@ -541,7 +588,7 @@ impl SessionEnvironmentGuard {
             self.store.delete();
             return None;
         };
-        let current = capture(env, pending.context.as_deref(), now);
+        let current = capture(env, &pending, now);
         if RestorePlan::new(&pending, &current, env.audio.can_set_default()).is_empty() {
             self.store.delete();
             return None;
@@ -557,7 +604,7 @@ impl SessionEnvironmentGuard {
         now: DateTime<Utc>,
     ) -> RestoreReport {
         let ctx = expected.context.as_deref().unwrap_or("-");
-        let current = capture(env, expected.context.as_deref(), now);
+        let current = capture(env, expected, now);
         let plan = RestorePlan::new(expected, &current, env.audio.can_set_default());
         for s in &plan.skipped {
             tracing::info!("restauração após {ctx}: {} mantido ({})", s.what, s.reason);
@@ -590,7 +637,7 @@ impl SessionEnvironmentGuard {
                 }
             }
         }
-        let after = capture(env, expected.context.as_deref(), now);
+        let after = capture(env, expected, now);
         let remaining = EnvironmentDiff::between(expected, &after).restrict_to(&plan);
         let report = RestoreReport {
             plan,
@@ -611,7 +658,41 @@ impl SessionEnvironmentGuard {
     }
 }
 
-fn capture(env: Env<'_>, context: Option<&str>, now: DateTime<Utc>) -> SessionEnvironmentSnapshot {
+/// O estado atual das mesmas partes de `expected`, inclusive o VRR da tela que ele registrou.
+fn capture(
+    env: Env<'_>,
+    expected: &SessionEnvironmentSnapshot,
+    now: DateTime<Utc>,
+) -> SessionEnvironmentSnapshot {
+    let mut current = capture_new(env, expected.context.as_deref(), now);
+    current.vrr = expected.vrr.as_ref().and_then(|want| {
+        let list = env
+            .displays
+            .list()
+            .inspect_err(|e| tracing::warn!("não foi possível ler o VRR: {e}"))
+            .ok()?;
+        let d = list
+            .iter()
+            .find(|d| d.id.eq_ignore_ascii_case(&want.display_id))?;
+        // Desconhecido ou sem suporte agora: sem saber o estado, nada é alterado.
+        let enabled = match d.vrr {
+            VrrStatus::On => true,
+            VrrStatus::Off => false,
+            _ => return None,
+        };
+        Some(VrrState {
+            display_id: want.display_id.clone(),
+            enabled,
+        })
+    });
+    current
+}
+
+fn capture_new(
+    env: Env<'_>,
+    context: Option<&str>,
+    now: DateTime<Utc>,
+) -> SessionEnvironmentSnapshot {
     let display = env
         .displays
         .capture()
@@ -627,6 +708,7 @@ fn capture(env: Env<'_>, context: Option<&str>, now: DateTime<Utc>) -> SessionEn
 
 fn execute(env: Env<'_>, step: &RestoreStep) -> Result<(), DeviceError> {
     match step {
+        RestoreStep::SetVrr(v) => env.displays.set_vrr(&v.display_id, v.enabled),
         RestoreStep::Display { target, .. } => env.displays.apply(target),
         RestoreStep::SetDefaultAudio { device_id, .. } => env.audio.set_default(device_id),
         RestoreStep::SetVolume {
@@ -1050,6 +1132,10 @@ mod tests {
         fn set_hdr(&self, id: &str, on: bool) -> DeviceResult<()> {
             self.inner.set_hdr(id, on)
         }
+        fn set_vrr(&self, id: &str, on: bool) -> DeviceResult<()> {
+            self.log(format!("vrr {id} {on}"));
+            self.inner.set_vrr(id, on)
+        }
         fn capture(&self) -> DeviceResult<DisplayTopology> {
             self.check_capture()?;
             self.inner.capture()
@@ -1243,6 +1329,29 @@ mod tests {
         assert!(next.restore_from(rig.env(), &pending, now()).succeeded());
         assert!(rig.displays.capture().unwrap().is_equivalent_to(&before));
         assert!(!rig.store().exists());
+    }
+
+    #[test]
+    fn vrr_turned_on_by_tako_is_turned_off_from_the_saved_file_even_after_a_crash() {
+        let rig = Rig::new();
+        // DISPLAY2 tem VRR desligado; a tela de jogo liga e o guard grava a marca.
+        let mut g = rig.guard();
+        g.begin_session(rig.env(), "jogo-1", true, now());
+        rig.displays.inner.set_vrr("DISPLAY2", true).unwrap();
+        g.remember_vrr_turned_on("DISPLAY2");
+        // O Tako cai: a próxima abertura lê só o arquivo.
+        let next = rig.guard();
+        let pending = next.pending_from_previous_run(rig.env(), now()).unwrap();
+        assert!(next.restore_from(rig.env(), &pending, now()).succeeded());
+        assert_eq!(rig.displays.calls(), ["vrr DISPLAY2 false"]);
+        let tv = rig.displays.list().unwrap().remove(1);
+        assert_eq!(tv.vrr, VrrStatus::Off);
+        // Restaurar de novo não faz nada a mais.
+        assert!(
+            next.restore_from(rig.env(), &pending, now())
+                .nothing_to_do()
+        );
+        assert_eq!(rig.displays.calls().len(), 1);
     }
 
     #[test]
