@@ -931,17 +931,57 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
     v
 }
 
-fn api_panel(ctx: &Ctx) -> MenuLayer {
+pub(crate) fn confirm_regenerate_token(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::dialog(ctx.t("settings.system.api_regenerate"), |ctx| {
+        vec![
+            MenuItem::new(
+                PanelRow::button(
+                    "regenerate",
+                    ctx.t("settings.system.api_regenerate_confirm_btn"),
+                )
+                .danger(),
+            )
+            .on(|ctx| {
+                let new_token = tako_core::api::generate_token();
+                ctx.settings.set(keys::API_TOKEN, &new_token);
+                crate::local_api::sync(ctx);
+                ctx.toast(ctx.t("settings.system.api_token_regenerated"));
+                Flow::Close
+            }),
+            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(ctx.t("settings.system.api_regenerate_confirm_desc"))
+}
+
+pub(crate) fn token_dialog(ctx: &Ctx, token: String) -> MenuLayer {
+    let token_for_copy = token.clone();
+    let title = ctx.t("settings.system.api_token_dialog_title");
+    let desc = ctx.t("settings.system.api_token_dialog_desc");
+    let text = format!("{desc}\n\n{token}");
+    MenuLayer::dialog(title, move |ctx| {
+        let token = token_for_copy.clone();
+        vec![
+            MenuItem::new(
+                PanelRow::button("copy", ctx.t("settings.system.api_token_copy")).emphasized(true),
+            )
+            .on(move |ctx| {
+                if tako_platform::copy_to_clipboard(&token) {
+                    ctx.toast(ctx.t("settings.system.api_token_copied"));
+                }
+                Flow::Stay
+            }),
+            MenuItem::new(PanelRow::button("close", ctx.t("hint.close"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(text)
+    .wide()
+}
+
+pub(crate) fn api_panel(ctx: &Ctx) -> MenuLayer {
     MenuLayer::panel(ctx.t("settings.system.api_panel_title"), |ctx| {
         let enabled = ctx.settings.bool(keys::API_ENABLED, false);
         let port = ctx.settings.get(keys::API_PORT).unwrap_or("47774");
-        let token = ctx.settings.string(keys::API_TOKEN);
-        let token_preview = if token.is_empty() {
-            ctx.t("settings.metadata.not_set")
-        } else {
-            let prefix: String = token.chars().take(8).collect();
-            format!("{prefix}…")
-        };
         vec![
             MenuItem::new(
                 PanelRow::toggle("api-enabled", ctx.t("settings.system.api_enabled"), enabled)
@@ -966,7 +1006,7 @@ fn api_panel(ctx: &Ctx) -> MenuLayer {
             MenuItem::new(
                 PanelRow::action("api-token", ctx.t("settings.system.api_token"))
                     .desc(ctx.t("settings.system.api_token_desc"))
-                    .value(token_preview),
+                    .value(ctx.t("settings.system.api_token_show")),
             )
             .on(|ctx| {
                 let mut token = ctx.settings.string(keys::API_TOKEN);
@@ -975,26 +1015,14 @@ fn api_panel(ctx: &Ctx) -> MenuLayer {
                     ctx.settings.set(keys::API_TOKEN, &token);
                     crate::local_api::sync(ctx);
                 }
-                let title = ctx.t("settings.system.api_token_dialog_title");
-                let desc = ctx.t("settings.system.api_token_dialog_desc");
-                let text = format!(
-                    "{desc}
-
-{token}"
-                );
-                Flow::Push(Box::new(text_dialog(title, text)))
+                Flow::Push(Box::new(token_dialog(ctx, token)))
             }),
             MenuItem::new(
                 PanelRow::action("api-regenerate", ctx.t("settings.system.api_regenerate"))
-                    .desc(ctx.t("settings.system.api_regenerate_desc")),
+                    .desc(ctx.t("settings.system.api_regenerate_desc"))
+                    .danger(),
             )
-            .on(|ctx| {
-                let new_token = tako_core::api::generate_token();
-                ctx.settings.set(keys::API_TOKEN, &new_token);
-                crate::local_api::sync(ctx);
-                ctx.toast(ctx.t("settings.system.api_token_regenerated"));
-                Flow::Stay
-            }),
+            .on(|ctx| Flow::Push(Box::new(confirm_regenerate_token(ctx)))),
         ]
     })
 }

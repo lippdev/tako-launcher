@@ -650,6 +650,19 @@ fn desktop_snapshot() {
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("settings") => shell.open_route("settings"),
+            Ok("settings-api") => {
+                shell.open_route("settings");
+                shell
+                    .ctx
+                    .settings
+                    .set_bool(crate::shell::ctx::keys::API_ENABLED, true);
+                shell.ctx.settings.set(
+                    crate::shell::ctx::keys::API_TOKEN,
+                    "0123456789abcdef0123456789abcdef",
+                );
+                let layer = crate::shell::settings::api_panel(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
             Ok("grid") => shell.click("view", 1),
             Ok("categories") => shell.click("view", 2),
             Ok("update-ready") | Ok("update-downloading") => {

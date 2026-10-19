@@ -1290,13 +1290,18 @@ fn restore(ui: &ComponentInstance) {
     window.with_winit_window(|w| w.focus_window());
 }
 
+/// Despacha uma ação de link diretamente para o shell e traz a janela para a frente.
+pub fn dispatch_link(link: tako_core::links::Link) {
+    if let Some(shell) = crate::tasks::shell() {
+        shell.borrow_mut().open_link(link);
+    }
+    raise_current();
+}
+
 /// Um segundo processo encaminhou um link à interface já aberta.
 pub fn open_current_link(url: &str) {
     if let Some(link) = tako_core::links::parse(url) {
-        if let Some(shell) = crate::tasks::shell() {
-            shell.borrow_mut().open_link(link);
-        }
-        raise_current();
+        dispatch_link(link);
     }
 }
 

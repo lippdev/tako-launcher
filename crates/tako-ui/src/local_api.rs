@@ -22,6 +22,31 @@ pub struct LocalApiHandler {
     state: Arc<SharedState>,
 }
 
+impl LocalApiHandler {
+    fn dispatch_game_action(&self, id: &str, play: bool) -> Result<(), ApiActionError> {
+        let found = self
+            .state
+            .games
+            .read()
+            .map(|g| g.iter().any(|item| item.id == id))
+            .unwrap_or(false);
+
+        if !found {
+            return Err(ApiActionError::NotFound);
+        }
+
+        let clean_id = tako_core::links::decode_id(id).unwrap_or_else(|| id.to_string());
+        let link = tako_core::links::Link::Game { id: clean_id, play };
+
+        slint::invoke_from_event_loop(move || {
+            crate::app::dispatch_link(link);
+        })
+        .map_err(|_| ApiActionError::Unavailable)?;
+
+        Ok(())
+    }
+}
+
 impl ApiHandler for LocalApiHandler {
     fn list_games(&self) -> Vec<ApiGame> {
         self.state
@@ -40,45 +65,11 @@ impl ApiHandler for LocalApiHandler {
     }
 
     fn open_game(&self, id: &str) -> Result<(), ApiActionError> {
-        let found = self
-            .state
-            .games
-            .read()
-            .map(|g| g.iter().any(|item| item.id == id))
-            .unwrap_or(false);
-
-        if !found {
-            return Err(ApiActionError::NotFound);
-        }
-
-        let link = format!("tako://game/{id}");
-        slint::invoke_from_event_loop(move || {
-            crate::app::open_current_link(&link);
-        })
-        .map_err(|_| ApiActionError::Unavailable)?;
-
-        Ok(())
+        self.dispatch_game_action(id, false)
     }
 
     fn play_game(&self, id: &str) -> Result<(), ApiActionError> {
-        let found = self
-            .state
-            .games
-            .read()
-            .map(|g| g.iter().any(|item| item.id == id))
-            .unwrap_or(false);
-
-        if !found {
-            return Err(ApiActionError::NotFound);
-        }
-
-        let link = format!("tako://play/{id}");
-        slint::invoke_from_event_loop(move || {
-            crate::app::open_current_link(&link);
-        })
-        .map_err(|_| ApiActionError::Unavailable)?;
-
-        Ok(())
+        self.dispatch_game_action(id, true)
     }
 }
 
@@ -106,7 +97,10 @@ fn get_shared_state() -> Arc<SharedState> {
                             SessionEvent::GameStarting { game, at }
                             | SessionEvent::GameStarted { game, at } => {
                                 if let Ok(mut r) = state_clone.running.write() {
-                                    let pid = r.as_ref().and_then(|info| info.pid);
+                                    let pid = r
+                                        .as_ref()
+                                        .filter(|info| info.id == game.game_id)
+                                        .and_then(|info| info.pid);
                                     *r = Some(RunningGameInfo {
                                         id: game.game_id,
                                         title: game.title,
@@ -131,6 +125,23 @@ fn get_shared_state() -> Arc<SharedState> {
         })
         .clone()
 }
+
+#[cfg(unix)]
+fn protect_db_file(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    if path.exists()
+        && let Ok(metadata) = std::fs::metadata(path)
+    {
+        let mut perms = metadata.permissions();
+        perms.set_mode(0o600);
+        if let Err(e) = std::fs::set_permissions(path, perms) {
+            tracing::warn!(path = %path.display(), error = %e, "não foi possível aplicar 0600 ao tako.db");
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn protect_db_file(_path: &std::path::Path) {}
 
 /// Sincroniza o servidor e o estado compartilhado com o contexto da UI.
 pub fn sync(ctx: &mut Ctx) {
@@ -171,7 +182,7 @@ pub fn sync(ctx: &mut Ctx) {
 
     if let Ok(mut r) = state.running.write() {
         if let (Some(mut current), Some(existing)) = (running_info.clone(), r.as_ref()) {
-            if current.id == existing.id && current.started_at.is_none() {
+            if current.id == existing.id && existing.started_at.is_some() {
                 current.started_at = existing.started_at.clone();
             }
             *r = Some(current);
@@ -195,6 +206,8 @@ pub fn sync(ctx: &mut Ctx) {
         *port_lock = None;
         return;
     }
+
+    protect_db_file(&ctx.paths.database());
 
     let port = ctx
         .settings
@@ -404,6 +417,7 @@ mod tests {
 
     #[test]
     fn invoke_from_event_loop_failure_returns_unavailable() {
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let state = get_shared_state();
         if let Ok(mut g) = state.games.write() {
             g.push(ApiGame {
