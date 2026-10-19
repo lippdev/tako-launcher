@@ -788,11 +788,9 @@ fn rows(
             None => (runner_default.clone(), false),
             Some(id_str) => {
                 let found = opts.iter().flatten().find(|r| r.id == id_str);
-                let name = found
-                    .map(|r| r.name.clone())
-                    .unwrap_or_else(|| {
-                        ctx.tf("game_settings.runner_missing", &[("runner", &id_str)])
-                    });
+                let name = found.map(|r| r.name.clone()).unwrap_or_else(|| {
+                    ctx.tf("game_settings.runner_missing", &[("runner", &id_str)])
+                });
                 let is_proton = found.is_some_and(|r| {
                     r.kind == tako_platform::linux_compatibility::RuntimeKind::Proton
                 });

@@ -80,23 +80,23 @@ pub fn resolve_and_normalize_prefix(path: &Path) -> PathBuf {
     let mut existing = norm.clone();
     let mut trailing = Vec::new();
     while !existing.exists() {
-        if let Some(parent) = existing.parent() {
-            if let Some(file_name) = existing.file_name() {
-                trailing.push(file_name.to_os_string());
-                existing = parent.to_path_buf();
-                continue;
-            }
+        if let Some(parent) = existing.parent()
+            && let Some(file_name) = existing.file_name()
+        {
+            trailing.push(file_name.to_os_string());
+            existing = parent.to_path_buf();
+            continue;
         }
         break;
     }
-    if existing.exists() {
-        if let Ok(canon) = existing.canonicalize() {
-            let mut resolved = canon;
-            for part in trailing.into_iter().rev() {
-                resolved.push(part);
-            }
-            return normalize_path(&resolved);
+    if existing.exists()
+        && let Ok(canon) = existing.canonicalize()
+    {
+        let mut resolved = canon;
+        for part in trailing.into_iter().rev() {
+            resolved.push(part);
         }
+        return normalize_path(&resolved);
     }
     norm
 }
