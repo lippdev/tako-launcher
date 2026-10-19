@@ -197,6 +197,14 @@ pub mod media {
     pub const VIDEO: &str = "video";
 }
 
+/// Origem do ícone do jogo (UX-005), para a ordem de precedência (loja > provedor > exe).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IconOrigin {
+    Store,
+    Provider,
+    Exe,
+}
+
 /// Progresso de uma instalação feita pelo cliente da loja. `fraction` em 0..=1; `None` = a loja não informa.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct InstallProgress {
@@ -271,6 +279,9 @@ pub struct Game {
 
     /// Outras mídias por tipo (chaves em [`media`]).
     pub media: BTreeMap<String, String>,
+    /// Origem do ícone atual (`media["icon"]`): loja, provedor ou executável (UX-005).
+    #[serde(default)]
+    pub icon_origin: Option<IconOrigin>,
     /// Artes escolhidas pelo usuário: valem mais que as automáticas e os metadados nunca as trocam.
     pub pinned_art: BTreeMap<ArtKind, String>,
     pub steam_app_id: Option<u32>,

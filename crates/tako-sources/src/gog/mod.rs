@@ -300,7 +300,9 @@ impl LibrarySource for GogLibrarySource {
         if galaxy.is_some()
             && let Some(db) = &self.galaxy_db
         {
-            let missing = owned::not_installed(&owned::load(db), &games);
+            let owned = owned::load(db);
+            owned::add_icons(&mut games, &owned);
+            let missing = owned::not_installed(&owned, &games);
             games.extend(missing);
         }
         crate::text::sort_by_title(&mut games);

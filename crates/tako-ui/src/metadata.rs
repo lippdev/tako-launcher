@@ -187,7 +187,13 @@ fn load_choices(ctx: &mut Ctx) {
 fn install_enrich(ctx: &mut Ctx) {
     let cache = cache(ctx);
     let pins = ctx.art_pins.clone();
+    let exe_icons = ctx.paths.cache().join("exe-icons");
     let enrich = move |g: &mut Game| {
+        // Jogo adicionado à mão não passa pela leitura das lojas: se o ícone do .exe já foi extraído,
+        // usa o índice publicado pelo scan, sem acessar o executável nem extrair na UI.
+        if g.store() == tako_core::library::GameStore::Manual {
+            crate::sources::fill_exe_icon(g, &exe_icons, tako_platform::exe_icon::cached_icon_file);
+        }
         if let Some(m) = cache.read(&g.id) {
             m.apply_to(g);
         }
@@ -381,5 +387,59 @@ mod tests {
         let g = ctx.library.find(&id).unwrap();
         assert_eq!(g.description, "Do cache");
         assert_eq!(g.pinned_art[&ArtKind::Hero], "file:///fundo.png");
+    }
+
+    #[test]
+    fn enrich_does_not_extract_icons() {
+        use tako_core::library::ManualGameRecord;
+
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = test_ctx(dir.path(), true);
+        let exe = dir.path().join("Jogos").join("manual.exe");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&exe, b"MZfake").unwrap();
+
+        let id = "manual:teste";
+        let mut record =
+            ManualGameRecord::create("Jogo Teste", &exe.to_string_lossy(), chrono::Utc::now());
+        record.id = id.into();
+        ctx.library.add_manual(record).unwrap();
+        install_enrich(&mut ctx);
+        ctx.library.refresh();
+
+        let exe_icons_dir = ctx.paths.cache().join("exe-icons");
+        let g = ctx.library.find(id).unwrap();
+        // O enrich não deve ter extraído nada: nenhum ícone no jogo e nenhum arquivo criado no cache
+        assert_eq!(g.media.get("icon"), None);
+        assert!(
+            !exe_icons_dir.exists() || std::fs::read_dir(&exe_icons_dir).unwrap().next().is_none()
+        );
+
+        // O scan em segundo plano publica o PNG existente; o enrich só lê o índice em memória.
+        std::fs::create_dir_all(&exe_icons_dir).unwrap();
+        let meta = std::fs::metadata(&exe).unwrap();
+        let modified = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_secs());
+        let expected_file = exe_icons_dir.join(tako_platform::exe_icon::cache_name(
+            &exe,
+            meta.len(),
+            modified,
+        ));
+        std::fs::write(&expected_file, b"PNG fake").unwrap();
+        assert_eq!(
+            tako_platform::exe_icon::icon_file(&exe, &exe_icons_dir),
+            Some(expected_file.clone())
+        );
+
+        ctx.library.refresh();
+        let g = ctx.library.find(id).unwrap();
+        assert_eq!(
+            g.media.get("icon").map(String::as_str),
+            Some(tako_sources::file_uri(&expected_file).as_str())
+        );
+        assert_eq!(g.icon_origin, Some(tako_core::library::IconOrigin::Exe));
     }
 }

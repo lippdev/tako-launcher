@@ -2,13 +2,13 @@
 //! (`%ProgramData%\GOG.com\Galaxy\storage\galaxy-2.0.db`, SQLite), aberto só para leitura. Mesmas tabelas que o
 //! gog-galaxy-export-script (`galaxy_library_export.py`) usa: `ProductPurchaseDates` são os jogos da conta
 //! (`gameReleaseKey`), e `GamePieces` + `GamePieceTypes` dão o título (`{"title":"…"}`) e as DLCs de cada jogo
-//! (`{"dlcs":["gog_…"]}`). O Galaxy junta outras lojas no mesmo banco; aqui só entram as chaves `gog_<id>`.
+//! (`{"dlcs":["gog_…"]}`); `originalImages` (`{"squareIcon":"https://…"}`) dá o ícone quadrado. O Galaxy junta outras lojas no mesmo banco; aqui só entram as chaves `gog_<id>`.
 
 use super::ACCENT;
 use rusqlite::{Connection, OpenFlags};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use tako_core::library::{Game, GameStore};
+use tako_core::library::{Game, GameStore, media};
 
 /// O banco cresce com a biblioteca de todas as lojas ligadas ao Galaxy; acima disso não é um banco do Galaxy.
 const MAX_DB: u64 = 1 << 30;
@@ -18,6 +18,17 @@ const MAX_DB: u64 = 1 << 30;
 pub struct GogOwned {
     pub game_id: String,
     pub title: String,
+    /// `squareIcon` do Galaxy, para o ícone do jogo.
+    pub icon: Option<String>,
+}
+
+/// Endereço de imagem aceito: `https`, de tamanho razoável (vira nome de arquivo no cache de artes).
+fn https_url(value: &serde_json::Value) -> Option<String> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|u| u.starts_with("https://") && u.len() <= 2048)
+        .map(str::to_owned)
 }
 
 /// Jogos GOG da conta, sem DLCs. Banco inválido ou sem as tabelas é `Err`.
@@ -28,7 +39,7 @@ pub fn read(database: &Path) -> Result<Vec<GogOwned>, rusqlite::Error> {
         "SELECT DISTINCT p.gameReleaseKey, t.type, g.value FROM ProductPurchaseDates p \
          JOIN GamePieces g ON g.releaseKey = p.gameReleaseKey \
          JOIN GamePieceTypes t ON t.id = g.gamePieceTypeId \
-         WHERE t.type IN ('title', 'dlcs')",
+         WHERE t.type IN ('title', 'dlcs', 'originalImages')",
     )?;
     let rows = stmt.query_map([], |r| {
         Ok((
@@ -38,6 +49,7 @@ pub fn read(database: &Path) -> Result<Vec<GogOwned>, rusqlite::Error> {
         ))
     })?;
     let mut titles: HashMap<String, String> = HashMap::new();
+    let mut icons: HashMap<String, String> = HashMap::new();
     let mut dlcs: HashSet<String> = HashSet::new();
     for row in rows {
         let (Some(key), Some(kind), Some(value)) = row? else {
@@ -57,6 +69,11 @@ pub fn read(database: &Path) -> Result<Vec<GogOwned>, rusqlite::Error> {
                     titles.entry(key).or_insert_with(|| t.to_owned());
                 }
             }
+            "originalImages" => {
+                if let Some(icon) = https_url(&value["squareIcon"]) {
+                    icons.entry(key).or_insert(icon);
+                }
+            }
             _ => dlcs.extend(
                 value["dlcs"]
                     .as_array()
@@ -73,6 +90,7 @@ pub fn read(database: &Path) -> Result<Vec<GogOwned>, rusqlite::Error> {
             let id = key.strip_prefix("gog_")?;
             (!id.is_empty() && id.bytes().all(|b| b.is_ascii_digit())).then(|| GogOwned {
                 game_id: id.to_owned(),
+                icon: icons.get(&key).cloned(),
                 title,
             })
         })
@@ -111,7 +129,31 @@ pub fn to_game(o: &GogOwned) -> Game {
         accent: ACCENT.to_owned(),
         is_installed: false,
         install_uri: Some(install_uri(&o.game_id)),
+        media: o
+            .icon
+            .iter()
+            .map(|i| (media::ICON.to_owned(), i.clone()))
+            .collect(),
+        icon_origin: o
+            .icon
+            .as_ref()
+            .map(|_| tako_core::library::IconOrigin::Store),
         ..Default::default()
+    }
+}
+
+/// Ícone do Galaxy também nos jogos instalados (o registro do GOG não traz imagens).
+pub fn add_icons(games: &mut [Game], owned: &[GogOwned]) {
+    for game in games {
+        if let Some(icon) = owned
+            .iter()
+            .find(|o| game.id == super::id_for(&o.game_id))
+            .and_then(|o| o.icon.as_ref())
+            && !game.media.contains_key(media::ICON)
+        {
+            game.media.insert(media::ICON.to_owned(), icon.clone());
+            game.icon_origin = Some(tako_core::library::IconOrigin::Store);
+        }
     }
 }
 
@@ -139,7 +181,7 @@ pub(crate) mod tests {
             CREATE TABLE ProductPurchaseDates (gameReleaseKey TEXT NOT NULL, userId INTEGER NOT NULL,
                 purchaseDate TEXT NOT NULL);
             INSERT INTO GamePieceTypes (id, type) VALUES (1, 'originalTitle'), (2, 'title'), (3, 'dlcs'),
-                (4, 'allGameReleases');
+                (4, 'allGameReleases'), (5, 'originalImages');
             INSERT INTO ProductPurchaseDates VALUES
                 ('gog_1400000001', 1, '2020-01-01 10:00:00'),
                 ('gog_1400000002', 1, '2020-01-01 10:00:00'),
@@ -153,6 +195,9 @@ pub(crate) mod tests {
                 ('gog_1400000001', 3, 1, '{"dlcs":["gog_1400000002"]}'),
                 ('gog_1400000002', 2, 1, '{"title":"Cidade Submersa - Expansão"}'),
                 ('gog_1400000002', 3, 1, '{"dlcs":null}'),
+                ('gog_1400000001', 5, 1, '{"background":"https://images.gog.com/b.jpg","squareIcon":"https://images.gog.com/cidade_square.png"}'),
+                ('gog_1207658924', 5, 1, '{"squareIcon":"http://inseguro/x.png"}'),
+                ('steam_570', 5, 1, 'quebrado'),
                 ('gog_1207658924', 2, 1, '{"title":" Tabuleiro Antigo "}'),
                 ('gog_1207658924', 3, 1, '{"dlcs":[]}'),
                 ('steam_570', 2, 1, '{"title":"Dota 2"}'),
@@ -173,13 +218,32 @@ pub(crate) mod tests {
             [
                 GogOwned {
                     game_id: "1207658924".into(),
-                    title: "Tabuleiro Antigo".into()
+                    title: "Tabuleiro Antigo".into(),
+                    // `http` não vale.
+                    icon: None,
                 },
                 GogOwned {
                     game_id: "1400000001".into(),
-                    title: "Cidade Submersa".into()
+                    title: "Cidade Submersa".into(),
+                    icon: Some("https://images.gog.com/cidade_square.png".into()),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn installed_games_get_the_galaxy_icon_too() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("galaxy-2.0.db");
+        galaxy_db(&db);
+        let mut games = [Game {
+            id: "gog:1400000001".into(),
+            ..Default::default()
+        }];
+        add_icons(&mut games, &load(&db));
+        assert_eq!(
+            games[0].media["icon"],
+            "https://images.gog.com/cidade_square.png"
         );
     }
 
@@ -201,7 +265,9 @@ pub(crate) mod tests {
         let g = to_game(&GogOwned {
             game_id: "1207658924".into(),
             title: "Tabuleiro".into(),
+            icon: Some("https://images.gog.com/t.png".into()),
         });
+        assert_eq!(g.media["icon"], "https://images.gog.com/t.png");
         assert_eq!(g.id, "gog:1207658924");
         assert_eq!(
             g.install_uri.as_deref(),
