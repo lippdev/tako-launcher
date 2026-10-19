@@ -35,7 +35,8 @@ pub struct GameSettingsOverride {
     pub after_command: Option<String>,
     /// Os comandos que o usuário permitiu, exatamente como estavam (ver [`commands_text`]). Mudou o texto, pergunta
     /// de novo: comandos vindos de fora (importação, extensão) nunca rodam sem o usuário ver.
-    #[serde(default)]
+    /// Nunca vem de fora: um `GameSettingsOverride` lido de JSON chega sem permissão.
+    #[serde(skip)]
     pub approved_commands: Option<String>,
     /// Programas abertos junto do jogo (EXT-001), separados por `;` ou por linha. Entram na permissão dos comandos.
     #[serde(default)]
@@ -57,11 +58,17 @@ pub fn commands_text(
 ) -> Option<String> {
     let before = normalize_arguments(before).unwrap_or_default();
     let after = normalize_arguments(after).unwrap_or_default();
-    let mut text = format!("{before}\n{after}");
-    for t in parse_tools(tools) {
-        text = format!("{text}\n{t}");
+    let tools = parse_tools(tools);
+    if tools.is_empty() {
+        return (!before.is_empty() || !after.is_empty()).then(|| format!("{before}\n{after}"));
     }
-    (text != "\n").then_some(text)
+    // Com ferramentas, uma lista JSON: sem ambiguidade entre os campos e nunca igual ao texto antigo (que tem
+    // uma quebra de linha crua; o JSON compacto não tem).
+    let fields: Vec<&str> = [before.as_str(), after.as_str()]
+        .into_iter()
+        .chain(tools.iter().map(String::as_str))
+        .collect();
+    serde_json::to_string(&fields).ok()
 }
 
 /// Caminhos das ferramentas, separados por `;` ou por linha, sem os vazios.
@@ -476,9 +483,38 @@ mod tests {
         let e = resolve(&global(), Some(&o));
         assert!(e.commands_approved && e.close_tools);
         assert_eq!(o.changed_count(), 3);
+        // Com ferramentas, o texto permitido é uma lista JSON (campos sem ambiguidade).
+        assert_eq!(
+            o.approved_commands.as_deref(),
+            Some(r#"["mount.bat","","C:\\FPS\\fps.exe","C:\\Mods\\mods.exe"]"#)
+        );
         // Só ferramentas também pede permissão.
         let tools_only = with(|o| o.tools = Some("fps.exe".into()));
         assert!(!resolve(&global(), Some(&tools_only)).commands_approved);
+    }
+
+    #[test]
+    fn settings_read_from_outside_never_bring_the_permission() {
+        let mut o = with(|o| {
+            o.before_command = Some("mount.bat".into());
+            o.tools = Some("fps.exe".into());
+        });
+        o.approve_commands();
+        assert!(resolve(&global(), Some(&o)).commands_approved);
+        let json = serde_json::to_string(&o).unwrap();
+        assert!(!json.contains("approved_commands"), "{json}");
+        // Um JSON que tente trazer a permissão também é ignorado.
+        let forged = json.replacen(
+            '{',
+            &format!(
+                "{{\"approved_commands\":{:?},",
+                o.approved_commands.clone().unwrap()
+            ),
+            1,
+        );
+        let imported: GameSettingsOverride = serde_json::from_str(&forged).unwrap();
+        assert_eq!(imported.tools, o.tools);
+        assert!(!resolve(&global(), Some(&imported)).commands_approved);
     }
 
     #[test]

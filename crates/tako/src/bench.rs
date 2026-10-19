@@ -197,6 +197,7 @@ pub fn supervisor_rss() -> i32 {
         after_command: None,
         store: None,
         close_tools: Vec::new(),
+        keep_pids: Vec::new(),
     };
     let mut running = match tako_ui::session::Running::new(req) {
         Ok(r) => r,

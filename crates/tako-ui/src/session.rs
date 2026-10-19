@@ -17,7 +17,9 @@ use tako_core::session::screen::{GameScreenOutcome, GameScreenSession};
 use tako_core::session::settings::{
     EffectiveSessionSettings, GameSettingsOverride, GlobalSessionSettings, MonitorPresets, resolve,
 };
-use tako_core::session::tracking::{GameRunStatus, GameRunTracker, TrackingPlan, plan};
+use tako_core::session::tracking::{
+    GameRunStatus, GameRunTracker, TrackingPlan, plan, processes_of,
+};
 use tako_platform::Platform;
 
 /// O que o supervisor precisa para acompanhar o jogo depois que a interface fecha.
@@ -46,6 +48,9 @@ pub struct TrackRequest {
     /// Ferramentas permitidas para fechar quando o jogo terminar (EXT-001).
     #[serde(default)]
     pub close_tools: Vec<String>,
+    /// Processos dessas ferramentas que já rodavam antes do jogo: o usuário abriu, não são fechados.
+    #[serde(default)]
+    pub keep_pids: Vec<u32>,
 }
 
 /// Resultado de abrir um jogo.
@@ -128,10 +133,6 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         title: game.title.clone(),
         store: game.store(),
     };
-    events::publish(SessionEvent::GameStarting {
-        game: session_game.clone(),
-        at: Utc::now(),
-    });
     if let Some(p) = eff.game_screen_problem {
         ctx.toast(p.message());
     }
@@ -179,6 +180,19 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
     {
         tracing::warn!("áudio do jogo: {e}");
     }
+    // Daqui em diante todo `GameStarting` tem o seu `GameExited` (a tela recusada acima não conta como sessão).
+    events::publish(SessionEvent::GameStarting {
+        game: session_game.clone(),
+        at: Utc::now(),
+    });
+    let exited_now = |played: Option<Duration>| {
+        events::publish(SessionEvent::GameExited {
+            game: session_game.clone(),
+            at: Utc::now(),
+            played,
+            exit_code: None,
+        })
+    };
 
     // Comandos e ferramentas só rodam com a permissão do usuário (a tela pergunta antes de chamar esta função).
     // Ferramentas só são abertas, sem esperar: não seguram a interface nem o heartbeat do supervisor.
@@ -186,6 +200,11 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         &eff.tools
     } else {
         &[]
+    };
+    let keep_pids = if tools.is_empty() {
+        Vec::new()
+    } else {
+        processes_of(&ctx.platform.processes.snapshot(), tools)
     };
     for tool in tools {
         if let Err(e) = ctx.platform.processes.launch(tool, None, None) {
@@ -224,12 +243,15 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
     let pid = match launched {
         Ok(pid) => {
             events::publish(SessionEvent::GameStarted {
-                game: session_game,
+                game: session_game.clone(),
                 at: Utc::now(),
             });
             pid
         }
         Err(e) => {
+            // O jogo não abriu: as ferramentas abertas para ele também fecham.
+            close_tools(&ctx.platform, tools, &keep_pids);
+            exited_now(Some(Duration::ZERO));
             restore_now(&ctx.platform, &ctx.paths, recorded);
             return Err(
                 tako_core::presentation::library_text::client_missing(&game, false, None)
@@ -252,6 +274,8 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
     let tp = plan(&game, pid.is_some());
     if tp.strategy == GameTrackingStrategy::None {
         restore_now(&ctx.platform, &ctx.paths, recorded);
+        // Sem acompanhamento não se sabe quando termina: o fim sai agora, sem duração (e as ferramentas ficam).
+        exited_now(None);
         return Ok(Started::Untracked);
     }
     let req = TrackRequest {
@@ -273,8 +297,23 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         } else {
             Vec::new()
         },
+        keep_pids,
     };
     Ok(Started::Tracking(req))
+}
+
+/// Pede para fechar as ferramentas do jogo, menos os processos que já rodavam antes dele (`keep`).
+fn close_tools(platform: &Platform, tools: &[String], keep: &[u32]) {
+    if tools.is_empty() {
+        return;
+    }
+    let mut pids = processes_of(&platform.processes.snapshot(), tools);
+    pids.retain(|p| !keep.contains(p));
+    if !pids.is_empty()
+        && let Err(e) = platform.processes.request_close(&pids)
+    {
+        tracing::warn!("fechar as ferramentas do jogo: {e}");
+    }
 }
 
 /// Volta telas e áudio ao que estava antes do jogo (lido do disco) e mostra o cursor. Idempotente.
@@ -441,13 +480,7 @@ impl Running {
             tracing::warn!("comando depois do jogo: {e}");
         }
         let tools = std::mem::take(&mut self.req.close_tools);
-        let pids =
-            tako_core::session::tracking::processes_of(&platform.processes.snapshot(), &tools);
-        if !pids.is_empty()
-            && let Err(e) = platform.processes.request_close(&pids)
-        {
-            tracing::warn!("fechar as ferramentas do jogo: {e}");
-        }
+        close_tools(platform, &tools, &self.req.keep_pids);
         let _ = self.mouse.reset(platform.pointer.as_ref());
         restore_now(platform, paths, self.req.restore);
     }
@@ -490,7 +523,7 @@ impl Running {
                     .unwrap_or(tako_core::library::GameStore::Manual),
             },
             at: Utc::now(),
-            played,
+            played: Some(played),
             exit_code: code,
         });
         end
@@ -672,6 +705,15 @@ mod tests {
         restore_now(&platform, &ctx.paths, req.restore);
         fake.exit(req.root_pid.unwrap());
 
+        // O usuário já tinha o "fps" aberto (gravando, por exemplo): esse não fecha no fim.
+        let user_fps = tako_core::devices::ProcessLauncher::launch(
+            fake.as_ref(),
+            "/Ferramentas/fps",
+            None,
+            None,
+        )
+        .unwrap()
+        .unwrap();
         o.approve_commands();
         store.save(&id, &o).unwrap();
         let Started::Tracking(req) = start(&mut ctx, &id).unwrap() else {
@@ -689,9 +731,16 @@ mod tests {
         let played = running.poll(&platform).unwrap();
         running.end(&platform, played);
         running.finish(&platform, &ctx.paths);
-        assert!(
-            platform.processes.snapshot().is_empty(),
-            "as ferramentas fecham no fim"
+        let left: Vec<u32> = platform
+            .processes
+            .snapshot()
+            .iter()
+            .map(|p| p.pid)
+            .collect();
+        assert_eq!(
+            left,
+            [user_fps],
+            "as ferramentas abertas pelo Tako fecham; a do usuário fica"
         );
 
         let mine: Vec<_> = events

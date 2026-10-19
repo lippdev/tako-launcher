@@ -117,7 +117,7 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
     ),
     // Ferramentas abertas junto do jogo e se fecham no fim (EXT-001).
     (
-        13,
+        14,
         "ALTER TABLE game_settings ADD COLUMN tools TEXT;
          ALTER TABLE game_settings ADD COLUMN close_tools INTEGER;",
     ),

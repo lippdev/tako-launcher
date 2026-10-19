@@ -234,3 +234,8 @@ Precisa de Steam, Epic e GOG Galaxy com conta, e da chave da Web API da Steam em
 - [ ] Com "Fechar as ferramentas no fim" em Sim, a ferramenta fecha quando o jogo termina; em Não, continua aberta.
 - [ ] Caminho que não existe: aviso "Não foi possível abrir…" e o jogo abre do mesmo jeito.
 - [ ] Atalho `.lnk` abre, mas não fecha no fim (o processo não tem o caminho do atalho).
+- [ ] Com a ferramenta já aberta antes de jogar (ex.: OBS gravando), o Tako abre outra se o programa permitir e, no
+  fim, fecha só a que ele abriu: a do usuário continua aberta.
+- [ ] Eventos de sessão: cada "Jogar" registra `GameStarting` e `GameExited` no log (nível debug). Se o supervisor
+  cair no meio do jogo (encerrar `tako.exe` pelo Gerenciador de Tarefas), o `GameExited` não sai: o comportamento
+  esperado é a próxima execução só restaurar tela e áudio.

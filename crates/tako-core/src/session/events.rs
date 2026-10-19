@@ -3,6 +3,10 @@
 //!
 //! Por processo: `GameStarting` e `GameStarted` saem de quem abre o jogo (a interface) e `GameExited` de quem o
 //! acompanha (o supervisor, ou a interface sem ele). Juntar os dois lados pelo IPC fica para quem consumir.
+//!
+//! Cada `GameStarting` tem um `GameExited`: no fim do acompanhamento, logo quando o jogo não abre, ou na hora para
+//! o jogo que não dá para acompanhar (sem duração). "Um só" vale por processo: se o supervisor cair no meio do
+//! jogo, o `GameExited` não sai (a próxima execução só restaura tela e áudio).
 
 use crate::library::GameStore;
 use chrono::{DateTime, Utc};
@@ -30,11 +34,12 @@ pub enum SessionEvent {
         game: SessionGame,
         at: DateTime<Utc>,
     },
-    /// O jogo terminou. `exit_code` só quando o Tako abriu o executável direto.
+    /// O jogo terminou. `played` é `None` quando não dá para saber (jogo sem acompanhamento); `exit_code` só
+    /// quando o Tako abriu o executável direto.
     GameExited {
         game: SessionGame,
         at: DateTime<Utc>,
-        played: Duration,
+        played: Option<Duration>,
         exit_code: Option<u32>,
     },
 }
@@ -95,7 +100,7 @@ mod tests {
         let exited = SessionEvent::GameExited {
             game: game("ev:1"),
             at,
-            played: Duration::from_secs(90),
+            played: Some(Duration::from_secs(90)),
             exit_code: Some(0),
         };
         publish(exited.clone());
