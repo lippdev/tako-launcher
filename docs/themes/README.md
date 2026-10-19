@@ -284,6 +284,34 @@ Num tema que reaproveita o padrão, **`tokens.toml`** troca as cores `in-out`, f
 `control-track-off`, `control-off`, `control-on-on-solid`, `control-off-on-solid`, `control-track-on-solid`,
 `value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. Também aceita fontes (`font`, `font-title`, `font-text`, `font-heading`, `font-desk`, `font-wordmark`) e imagem de fundo (`custom-background`, `background-image`). Pelo próprio Tako (Configurações › Aparência), a pessoa usuária pode personalizar o tema atual, gravando uma sobreposição sem modificar os arquivos originais. Ao carregar, o Tako ignora (com log) a chave ou o valor inválido. O `tako theme check` aponta os dois.
 
+
+### Música de fundo e sons de navegação
+
+Um tema pode trazer música de fundo e sons personalizados para a navegação do Tako. As declarações podem ser feitas no `theme.toml` ou no `tokens.toml`:
+
+```toml
+[audio]
+music = "audio/bgm.wav"
+move = "audio/move.wav"
+accept = "audio/accept.wav"
+back = "audio/back.wav"
+```
+
+Também são aceitas as chaves em português (`musica`, `mover`, `confirmar`, `voltar`) e declarações no nível raiz do arquivo.
+
+- **Formato suportado:** `.wav` (PCM). Como o mecanismo de áudio do Tako usa a biblioteca nativa SDL3 para reprodução direta sem decodificadores externos pesados, formatos como `.ogg` e `.opus` não são decodificados nativamente pela biblioteca e são recusados na validação.
+- **Validação de caminho:** Os arquivos devem ficar dentro da pasta do tema, sem caminhos absolutos e sem `..` (não é permitido sair da pasta do tema).
+- **Limites de tamanho e duração:** Música até 32 MB (`MAX_THEME_MUSIC_BYTES`); sons de navegação com duração de até 2 segundos (`MAX_NAV_SOUND_DURATION_SECS`).
+- **Comportamento da música:**
+  - Toca exclusivamente na tela cheia (Big Picture), em loop contínuo e com fade suave (fade-in ao iniciar/retomar e fade-out ao pausar).
+  - Pausa com fade ao abrir um jogo, permanece completamente parada durante todo o jogo e recomeça do início ao encerrar o jogo.
+  - Pausa também quando a janela do Tako perde o foco ou é minimizada, retornando quando o foco volta.
+  - No modo desktop, a música do tema não toca.
+- **Configurações › Som:**
+  - **Volume da música do tema:** controle de 0 a 100%, separado do volume dos sons de navegação. Em 0%, a música fica muda e não é reproduzida.
+  - **Música de fundo do tema:** opção para ligar ou desligar a música a qualquer momento.
+  - **Volume dos sons de navegação:** volume próprio (0 a 100%) para os efeitos ao mover, confirmar e voltar.
+
 ### A biblioteca `@tako`
 
 `@tako/...` aponta para os arquivos do tema padrão da versão do Tako instalada:
@@ -311,7 +339,7 @@ Limites (dados de terceiros são conferidos antes de qualquer arquivo ser gravad
 | Um arquivo | 64 MB |
 | Arquivos e pastas | 5.000 |
 | Caminho | 240 caracteres, sem `..`, sem caminho absoluto, sem nomes reservados do Windows |
-| Tipos de arquivo | `.slint`, `.toml`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.ttf`, `.otf`, `.txt`, `.md` |
+| Tipos de arquivo | `.slint`, `.toml`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.ttf`, `.otf`, `.txt`, `.md`, `.wav` |
 
 Imagens e fontes entram pelo próprio Slint (`@image-url("fundo.png")`, `import "fonts/Minha.ttf";`), com caminho
 relativo ao arquivo `.slint`.

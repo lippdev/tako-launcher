@@ -6,7 +6,7 @@ use tako_core::links::Link;
 impl Shell {
     pub fn open_link(&mut self, link: Link) {
         if self.ctx.scanning {
-            self.pending_link = Some(link);
+            self.ctx.pending_link = Some(link);
             return;
         }
         self.close_control_center();
@@ -30,7 +30,7 @@ impl Shell {
     }
 
     pub(crate) fn apply_pending_link(&mut self) {
-        if let Some(link) = self.pending_link.take() {
+        if let Some(link) = self.ctx.pending_link.take() {
             self.open_link(link);
         }
     }

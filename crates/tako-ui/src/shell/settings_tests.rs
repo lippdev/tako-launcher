@@ -56,7 +56,7 @@ fn navigates_between_categories_and_rows() {
     let (_d, mut ctx) = ctx();
     let mut page = SettingsPage::new();
     let n = page.cats.len();
-    assert_eq!(n, 9);
+    assert_eq!(n, 10);
     page.handle(Cmd::NextSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "library");
     page.handle(Cmd::PrevSection, &mut ctx);
@@ -82,9 +82,13 @@ fn navigates_between_categories_and_rows() {
 fn text_size_and_navigation_volume_persist_and_are_bounded() {
     let dir = tempfile::tempdir().unwrap();
     let (_guard, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
-    let items = rows_of(&ctx, "appearance");
-    let text = find(&items, "text-size");
-    let sound = find(&items, "navigation-volume");
+    let text = find(&rows_of(&ctx, "appearance"), "text-size");
+    let sound = find(&rows_of(&ctx, "sound"), "navigation-volume");
+    assert!(
+        !rows_of(&ctx, "appearance")
+            .iter()
+            .any(|i| i.row.key == "navigation-volume")
+    );
     adjust(&mut ctx, &text, -1);
     assert_eq!(crate::navigation_feedback::text_size(&ctx.settings), 125);
     for _ in 0..20 {
@@ -837,6 +841,47 @@ fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
     );
     let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
     assert_eq!(volume(&ctx.settings), 65);
+}
+
+#[test]
+fn sound_settings_persist_and_adjust_volumes_and_toggle_music() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let items = rows_of(&ctx, "sound");
+
+    let toggle_music = find(&items, "settings.sound.music_enabled");
+    let music_vol = find(&items, "theme-music-volume");
+    let nav_vol = find(&items, "navigation-volume");
+
+    assert!(toggle_music.row.on);
+    assert_eq!(crate::navigation_feedback::music_volume(&ctx.settings), 70);
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 0);
+
+    // Toggle music off
+    accept(&mut ctx, &toggle_music);
+    assert!(!crate::navigation_feedback::music_enabled(&ctx.settings));
+
+    // Toggle music back on
+    accept(&mut ctx, &toggle_music);
+    assert!(crate::navigation_feedback::music_enabled(&ctx.settings));
+
+    // Adjust music volume up
+    for _ in 0..5 {
+        adjust(&mut ctx, &music_vol, 1);
+    }
+    assert_eq!(crate::navigation_feedback::music_volume(&ctx.settings), 100);
+
+    // Adjust music volume down to 0
+    for _ in 0..12 {
+        adjust(&mut ctx, &music_vol, -1);
+    }
+    assert_eq!(crate::navigation_feedback::music_volume(&ctx.settings), 0);
+
+    // Adjust navigation sound volume
+    for _ in 0..3 {
+        adjust(&mut ctx, &nav_vol, 1);
+    }
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 30);
 }
 
 #[test]
