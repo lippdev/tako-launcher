@@ -670,6 +670,17 @@ fn desktop_snapshot() {
                     shell.click("category", index);
                 }
             }
+            // PainelDownloads (DL-001): downloads de demonstração e o painel aberto; `TAKO_SNAP_NI=1` traz a
+            // instalação da Steam no mesmo grupo. `downloads-settings`: Configurações › Downloads ligada.
+            Ok("downloads") => {
+                crate::shell::downloads::demo(&mut shell.ctx);
+                crate::shell::downloads::open(&mut shell.ctx);
+                shell.after_action();
+            }
+            Ok("downloads-settings") => {
+                crate::shell::downloads::demo(&mut shell.ctx);
+                shell.open_route("settings:downloads");
+            }
             Ok("grid") => shell.click("view", 1),
             Ok("categories") => shell.click("view", 2),
             Ok("update-ready") | Ok("update-downloading") => {

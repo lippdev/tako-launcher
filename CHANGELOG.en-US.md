@@ -4,6 +4,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 ### What's new
+- **Torrent downloads:** download games from sources you add yourself, in a panel with pause, resume and a queue. Off by default.
 - **Games not installed:** games from your store accounts that aren't on this PC show up after the installed ones, grouped by store, in the list and the grid. Each group opens and closes, and Tako remembers how you left it.
 - **Install from the store:** the ⬇ button on the row, the cover and the highlight opens the install in the store client, showing the store and the size. Games bought in more than one store let you pick which to install from.
 - **Install progress:** on Steam, Tako shows the percentage as a ring in the list and grid and "Downloading… 42%" in the highlight. When it finishes, the game becomes installed without restarting. Epic shows "Installing" without a number.

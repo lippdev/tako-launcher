@@ -403,7 +403,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 
 Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes são do usuário e ficam a critério dele; o Tako não traz, não recomenda e não lista fontes, nem na interface nem na documentação.
 
-- [ ] **DL-001:** baixar jogos por torrent a partir de fontes `.json` que o próprio usuário adiciona, como o Hydra Launcher. Quando um item da fonte é um jogo que já existe numa biblioteca (Steam, Epic, adicionado à mão, etc.), o download se vincula a esse jogo: o card e os detalhes mostram "Baixando Batman: Arkham Knight" com progresso, em vez de criar um jogo novo. Ao terminar, o jogo fica instalado e jogável pelo Tako.
+- [ ] **DL-001:** baixar jogos por torrent a partir de fontes `.json` que o próprio usuário adiciona, em formato de fonte .json. Quando um item da fonte é um jogo que já existe numa biblioteca (Steam, Epic, adicionado à mão, etc.), o download se vincula a esse jogo: o card e os detalhes mostram "Baixando Batman: Arkham Knight" com progresso, em vez de criar um jogo novo. Ao terminar, o jogo fica instalado e jogável pelo Tako.
 - [ ] **DL-002:** depois do DL-001, usar serviços de download acelerado como o Real-Debrid, com a conta do próprio usuário.
 
 ### Épico DEALS — Promoções (P3)
