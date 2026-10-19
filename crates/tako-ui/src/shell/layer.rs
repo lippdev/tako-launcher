@@ -538,6 +538,12 @@ impl Layer for MenuLayer {
             return self.handle(Cmd::Back, ctx);
         }
         self.focus = index;
+        // Ação 1 dentro da linha (cancelar um download); a 0 é o mesmo que aceitar.
+        if zone == "row-act:1"
+            && let Some(alt) = self.items(ctx).get(index).and_then(|i| i.alt.clone())
+        {
+            return alt(ctx);
+        }
         // Controle deslizante do desktop.
         if let Some(flow) = self
             .items(ctx)

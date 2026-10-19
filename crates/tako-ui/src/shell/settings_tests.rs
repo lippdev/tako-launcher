@@ -20,6 +20,20 @@ fn rows_of(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     (cat.rows)(ctx)
 }
 
+#[test]
+fn downloads_settings_only_appear_on_desktop() {
+    let _g = LOCK.lock().unwrap();
+    let (_dir, mut ctx) = ctx();
+    let mut page = SettingsPage::at("downloads");
+    ctx.desktop = false;
+    page.render(&ctx, &mut Out::default());
+    assert!(!page.cats.iter().any(|c| c.id == "downloads"));
+    assert!(page.cat < page.cats.len());
+    ctx.desktop = true;
+    page.render(&ctx, &mut Out::default());
+    assert!(page.cats.iter().any(|c| c.id == "downloads"));
+}
+
 fn find(items: &[MenuItem], key: &str) -> MenuItem {
     items
         .iter()
@@ -42,7 +56,7 @@ fn navigates_between_categories_and_rows() {
     let (_d, mut ctx) = ctx();
     let mut page = SettingsPage::new();
     let n = page.cats.len();
-    assert_eq!(n, 8);
+    assert_eq!(n, 9);
     page.handle(Cmd::NextSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "library");
     page.handle(Cmd::PrevSection, &mut ctx);
