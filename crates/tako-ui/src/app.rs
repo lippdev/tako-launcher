@@ -219,6 +219,9 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         theme_preview: None,
         theme_draft: None,
         theme_supports_ui: true,
+        theme_supports_font: true,
+        theme_supports_background: true,
+        theme_loaded_from_fallback: false,
         persisted_theme_accent: None,
         base_theme_accent: None,
         launching: false,
@@ -524,20 +527,68 @@ fn apply_theme_tokens(
     ui: &slint_interpreter::ComponentInstance,
     ctx: &Ctx,
     dir: Option<&std::path::Path>,
+    mode: UiMode,
 ) {
+    if !should_apply_theme_tokens(mode) {
+        return;
+    }
     let selected_id = tako_themes::selected(&ctx.paths.themes());
     let theme_id = match &ctx.theme_preview {
         Some(p) => p.id.as_deref(),
         None => selected_id.as_deref(),
     };
-    let override_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), theme_id);
-    let draft_text = ctx
-        .theme_preview
-        .as_ref()
-        .and_then(|p| p.draft_override.as_ref())
-        .map(|ov| ov.to_toml_string());
+    let can_apply_override = can_apply_theme_override(dir, theme_id, ctx.safe_mode);
+    let override_dir = can_apply_override
+        .then(|| tako_themes::overrides::override_dir(&ctx.paths.themes(), theme_id));
+    let draft_text = can_apply_override
+        .then(|| {
+            ctx.theme_preview
+                .as_ref()
+                .and_then(|p| p.draft_override.as_ref())
+                .map(|ov| ov.to_toml_string())
+        })
+        .flatten();
 
-    theme::apply_tokens_with_override(ui, dir, draft_text.as_deref(), Some(&override_dir));
+    theme::apply_tokens_with_override(ui, dir, draft_text.as_deref(), override_dir.as_deref());
+}
+
+fn can_apply_theme_override(
+    dir: Option<&std::path::Path>,
+    theme_id: Option<&str>,
+    safe_mode: bool,
+) -> bool {
+    dir.is_some() || (theme_id.is_none() && !safe_mode)
+}
+
+fn should_apply_theme_tokens(mode: UiMode) -> bool {
+    mode == UiMode::BigPicture
+}
+
+fn set_theme_token_support(
+    ctx: &mut Ctx,
+    dir: Option<&std::path::Path>,
+    builtin: &std::path::Path,
+    mode: UiMode,
+) {
+    let has_selected_theme = match &ctx.theme_preview {
+        Some(preview) => preview.id.is_some(),
+        None => tako_themes::selected(&ctx.paths.themes()).is_some(),
+    };
+    ctx.theme_loaded_from_fallback =
+        mode == UiMode::BigPicture && (ctx.safe_mode || (dir.is_none() && has_selected_theme));
+    let entry = dir
+        .and_then(|dir| {
+            std::fs::read_to_string(dir.join(tako_themes::MANIFEST_FILE))
+                .ok()
+                .and_then(|text| tako_themes::ThemeManifest::parse(&text).ok())
+                .map(|manifest| dir.join(manifest.entry))
+        })
+        .unwrap_or_else(|| builtin.join("main.slint"));
+    (ctx.theme_supports_font, ctx.theme_supports_background) = theme::token_capabilities(&entry);
+    if !ctx.theme_supports_ui {
+        ctx.theme_supports_font = false;
+        ctx.theme_supports_background = false;
+    }
 }
 
 fn theme_accent(ctx: &Ctx) -> Option<tako_core::presentation::Rgb> {
@@ -545,6 +596,20 @@ fn theme_accent(ctx: &Ctx) -> Option<tako_core::presentation::Rgb> {
         return Some(custom);
     }
     ctx.base_theme_accent
+}
+
+fn custom_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presentation::Rgb> {
+    (mode == UiMode::BigPicture && !ctx.theme_loaded_from_fallback)
+        .then(|| theme::custom_theme_accent(ctx))
+        .flatten()
+}
+
+fn fallback_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presentation::Rgb> {
+    if mode == UiMode::Desktop || ctx.theme_loaded_from_fallback {
+        ctx.base_theme_accent
+    } else {
+        theme_accent(ctx)
+    }
 }
 
 impl App {
@@ -559,8 +624,9 @@ impl App {
         let mode = crate::mode::preferred(opts.mode, opts.ask_big_picture, &ctx.settings);
         let (def, dir) = load_mode(&ctx, &builtin, mode)?;
         ctx.theme_supports_ui = def.global_properties("Ui").is_some();
+        set_theme_token_support(&mut ctx, dir.as_deref(), &builtin, mode);
         let ui = def.create().map_err(|e| e.to_string())?;
-        apply_theme_tokens(&ui, &ctx, dir.as_deref());
+        apply_theme_tokens(&ui, &ctx, dir.as_deref(), mode);
         crate::navigation_feedback::set_theme(dir.as_deref());
         // Entrada do app (só na abertura, não na volta da tela cheia): começa apagado e acende depois do 1º quadro.
         if mode == UiMode::Desktop {
@@ -702,10 +768,10 @@ impl App {
         let new =
             load_mode(&self.shell.borrow().ctx, &self.builtin, mode).and_then(|(def, dir)| {
                 let ui = def.create().map_err(|e| e.to_string())?;
-                apply_theme_tokens(&ui, &self.shell.borrow().ctx, dir.as_deref());
-                Ok(ui)
+                apply_theme_tokens(&ui, &self.shell.borrow().ctx, dir.as_deref(), mode);
+                Ok((ui, dir, def.global_properties("Ui").is_some()))
             });
-        let new = match new {
+        let (new, dir, supports_ui) = match new {
             Ok(n) => n,
             Err(e) => {
                 tracing::error!("trocar de modo: {e}");
@@ -716,6 +782,8 @@ impl App {
         self.mode.set(mode);
         {
             let mut s = self.shell.borrow_mut();
+            s.ctx.theme_supports_ui = supports_ui;
+            set_theme_token_support(&mut s.ctx, dir.as_deref(), &self.builtin, mode);
             match mode {
                 UiMode::Desktop => s.enter_desktop(),
                 UiMode::BigPicture => s.enter_big_picture(),
@@ -757,8 +825,22 @@ impl App {
             }
         };
         self.shell.borrow_mut().ctx.reload_theme_cache();
-        self.shell.borrow_mut().ctx.theme_supports_ui = def.global_properties("Ui").is_some();
-        apply_theme_tokens(&new, &self.shell.borrow().ctx, dir.as_deref());
+        {
+            let mut shell = self.shell.borrow_mut();
+            shell.ctx.theme_supports_ui = def.global_properties("Ui").is_some();
+            set_theme_token_support(
+                &mut shell.ctx,
+                dir.as_deref(),
+                &self.builtin,
+                self.mode.get(),
+            );
+        }
+        apply_theme_tokens(
+            &new,
+            &self.shell.borrow().ctx,
+            dir.as_deref(),
+            self.mode.get(),
+        );
         crate::navigation_feedback::set_theme(dir.as_deref());
         new.window()
             .set_fullscreen(self.ui.borrow().window().is_fullscreen());
@@ -1597,8 +1679,13 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         .ctx
         .settings
         .bool(crate::shell::ctx::keys::DYNAMIC_COLOR, true);
-    let custom_accent = theme::custom_theme_accent(&s.ctx);
-    let fallback_accent = custom_accent.or_else(|| theme_accent(&s.ctx));
+    let mode = if s.ctx.desktop {
+        UiMode::Desktop
+    } else {
+        UiMode::BigPicture
+    };
+    let custom_accent = custom_accent_for_mode(&s.ctx, mode);
+    let fallback_accent = custom_accent.or_else(|| fallback_accent_for_mode(&s.ctx, mode));
     let palette = if let Some(custom) = custom_accent {
         AccentPalette::for_accent_with_fallback(None, false, Some(custom))
     } else {
@@ -1666,6 +1753,33 @@ mod tests {
         fn handle(&mut self, _: &Effect, _: &mut Ctx) -> HostAction {
             HostAction::Stay
         }
+    }
+
+    #[test]
+    fn theme_tokens_apply_only_in_big_picture_and_fallback_drops_installed_overrides() {
+        assert!(should_apply_theme_tokens(UiMode::BigPicture));
+        assert!(!should_apply_theme_tokens(UiMode::Desktop));
+        assert!(can_apply_theme_override(
+            Some(std::path::Path::new("theme")),
+            Some("x"),
+            false
+        ));
+        assert!(!can_apply_theme_override(None, Some("broken-theme"), false));
+        assert!(!can_apply_theme_override(None, None, true));
+        assert!(can_apply_theme_override(None, None, false));
+        let mut ctx = build_ctx(
+            DataPaths::at(tempfile::tempdir().unwrap().path()),
+            Platform::simulated(),
+            true,
+        );
+        ctx.persisted_theme_accent = Some(tako_core::presentation::Rgb::new(255, 0, 0));
+        assert_eq!(custom_accent_for_mode(&ctx, UiMode::Desktop), None);
+        assert_eq!(
+            custom_accent_for_mode(&ctx, UiMode::BigPicture),
+            ctx.persisted_theme_accent
+        );
+        ctx.theme_loaded_from_fallback = true;
+        assert_eq!(custom_accent_for_mode(&ctx, UiMode::BigPicture), None);
     }
 
     #[test]

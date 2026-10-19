@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 pub const TEXT_SIZE: &str = "TextSizePercent";
 pub const SOUND_VOLUME: &str = "NavigationSoundVolume";
 pub const TEXT_SIZES: [i32; 3] = [100, 110, 125];
+const MAX_DECODED_MUSIC_BYTES: usize = 128 * 1024 * 1024;
 
 pub const THEME_MUSIC_VOLUME: &str = "ThemeMusicVolume";
 pub const THEME_MUSIC_ENABLED: &str = "ThemeMusicEnabled";
@@ -258,7 +259,9 @@ fn load_wav_samples(path: &Path) -> Option<Vec<f32>> {
     if bytes.is_empty() || bytes.len() > tako_themes::MAX_THEME_MUSIC_BYTES as usize {
         return None;
     }
-    decode_wav_to_mono_48k(&bytes)
+    let samples = decode_wav_to_mono_48k(&bytes)?;
+    (samples.len().checked_mul(std::mem::size_of::<f32>())? <= MAX_DECODED_MUSIC_BYTES)
+        .then_some(samples)
 }
 
 thread_local! {

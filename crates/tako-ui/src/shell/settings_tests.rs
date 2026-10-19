@@ -1288,6 +1288,22 @@ fn edit_theme_hidden_when_ui_not_supported() {
 }
 
 #[test]
+fn edit_theme_hides_font_and_background_for_themes_that_do_not_use_them() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.theme_supports_font = false;
+    ctx.theme_supports_background = false;
+
+    let rows = edit_theme_panel(&ctx).items(&ctx);
+    assert!(rows.iter().any(|item| item.row.key == "accent"));
+    assert!(rows.iter().any(|item| item.row.key == "save"));
+    assert!(!rows.iter().any(|item| item.row.key == "font"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_type"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_color"));
+    assert!(!rows.iter().any(|item| item.row.key == "choose_image"));
+}
+
+#[test]
 fn custom_accent_wins_over_game_accent() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();

@@ -301,6 +301,11 @@ pub struct Ctx {
     pub theme_draft: Option<tako_themes::overrides::ThemeTokensOverride>,
     /// Indica se o tema atual implementa a API padrão do global `Ui` (THEME-003).
     pub theme_supports_ui: bool,
+    /// O tema usa os tokens de fonte e fundo da API padrão.
+    pub theme_supports_font: bool,
+    pub theme_supports_background: bool,
+    /// O tema selecionado falhou ou foi ignorado no modo seguro.
+    pub theme_loaded_from_fallback: bool,
     /// Destaque personalizado persistido em disco para o tema atual.
     pub persisted_theme_accent: Option<tako_core::presentation::Rgb>,
     /// Destaque padrão do tema ativo (lido de tokens.toml do tema).
