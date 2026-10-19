@@ -54,8 +54,9 @@ pub const MANIFEST_FILE: &str = "backup.toml";
 pub const CURRENT_BACKUP_VERSION: u32 = 1;
 
 #[cfg(test)]
-pub(crate) static INJECT_RESTORE_DB_RENAME_FAIL: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+thread_local! {
+    pub(crate) static INJECT_RESTORE_DB_RENAME_FAIL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
 
 /// Limites razoáveis de proteção contra bombas de descompressão e arquivos maliciosos.
 pub const MAX_BACKUP_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
@@ -1080,7 +1081,7 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
         }
     }
     #[cfg(test)]
-    if INJECT_RESTORE_DB_RENAME_FAIL.swap(false, std::sync::atomic::Ordering::SeqCst) {
+    if INJECT_RESTORE_DB_RENAME_FAIL.with(|c| c.replace(false)) {
         rollback(had_old_db, false, false);
         return Err(io::Error::other("simulated db rename failure").into());
     }
@@ -2358,7 +2359,7 @@ mod tests {
         create_backup(&src_paths, &backup_file).unwrap();
 
         // 3. Força falha simulada na troca do banco de dados (rename staging -> tako.db)
-        INJECT_RESTORE_DB_RENAME_FAIL.store(true, std::sync::atomic::Ordering::SeqCst);
+        INJECT_RESTORE_DB_RENAME_FAIL.with(|c| c.set(true));
 
         let res = restore_backup(&paths, &backup_file);
         assert!(
