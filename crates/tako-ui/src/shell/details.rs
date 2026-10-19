@@ -39,6 +39,10 @@ impl DetailsPage {
 
 /// A ação principal de um jogo (Jogar, Voltar ao jogo, Instalar via loja...).
 pub fn primary_action(ctx: &mut Ctx, id: &str) -> Nav {
+    if ctx.restoring {
+        ctx.toast(ctx.t("settings.system.restore_busy"));
+        return Nav::Stay;
+    }
     let Some(g) = ctx.library.find(id).cloned() else {
         return Nav::Stay;
     };

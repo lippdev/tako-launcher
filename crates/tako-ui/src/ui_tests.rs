@@ -1241,6 +1241,16 @@ created-by-tako = true
                 shell.ask_big_picture = true;
                 crate::shell::desktop::ask_big_picture(&mut shell, std::time::Duration::ZERO);
             }
+            Ok("restore-confirm") => {
+                let backup_path = shell
+                    .ctx
+                    .paths
+                    .root
+                    .join("tako-backup-2026-10-19.takobackup");
+                let _ = std::fs::write(&backup_path, vec![0u8; 12 * 1024 * 1024]);
+                let layer = crate::shell::settings::confirm_restore_layer(&shell.ctx, backup_path);
+                shell.push_layer(Box::new(layer));
+            }
             _ => {}
         }
         // `TAKO_SNAP_CLICK=zona:índice,…`: cliques antes da captura (ex.: `desk-brand:0`, `game:3`).
@@ -1357,13 +1367,11 @@ created-by-tako = true
                 r.render(&mut pixels, w as usize);
             });
             let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+            let file_prefix = std::env::var("TAKO_SNAP_NAME").unwrap_or_else(|_| "desktop".into());
             let file_suffix = std::env::var("TAKO_SNAP_FILE_SUFFIX").unwrap_or_default();
             image::RgbImage::from_raw(w, h, raw)
                 .unwrap()
-                .save({
-                    let prefix = std::env::var("TAKO_SNAP_NAME").unwrap_or_else(|_| "desktop".into());
-                    format!("{out_dir}/{prefix}{file_suffix}-{w}x{h}.png")
-                })
+                .save(format!("{out_dir}/{file_prefix}{file_suffix}-{w}x{h}.png"))
                 .unwrap();
             // Quadros de 40 ms no relógio das animações, a partir de agora.
             let capture = |prefix: &str, pixels: &mut Vec<Rgb8Pixel>| {

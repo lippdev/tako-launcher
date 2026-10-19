@@ -970,6 +970,10 @@ impl DesktopLibrary {
         self.selected = Some(id.clone());
         match action {
             Action::Play => {
+                if ctx.restoring {
+                    ctx.toast(ctx.t("settings.system.restore_busy"));
+                    return Nav::Stay;
+                }
                 // Já abrindo: o clique repetido não abre outra vez.
                 if ctx.launching {
                     return Nav::Stay;
@@ -1610,7 +1614,13 @@ impl Page for DesktopLibrary {
                     self.see_all(see, ctx);
                 }
             }
-            "rescan" => ctx.effect(Effect::Rescan),
+            "rescan" => {
+                if ctx.restoring {
+                    ctx.toast(ctx.t("settings.system.restore_busy"));
+                } else {
+                    ctx.effect(Effect::Rescan);
+                }
+            }
             // DestaqueFases: 1 abre a fase 2 (roda para baixo, "Mais sobre o jogo"), 0 volta para a fase 1.
             "game-more" => {
                 self.more = (index == 1)
