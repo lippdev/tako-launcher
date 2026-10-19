@@ -2901,13 +2901,6 @@ component DeskLibrary inherits Rectangle {
                         horizontal-stretch: 1;
                         overflow: elide;
                     }
-                    // Espera (BRAND-001): o polvo pequeno (só monta, sem ondular), num espaço sempre reservado para o
-                    // texto não andar quando ele some.
-                    Rectangle {
-                        width: 22px;
-                        // Fora de layout o alto do Octopus não vem dos limites dele: o corte sem o nome pede `height`.
-                        if loading: Octopus { x: 0; y: (parent.height - self.height) / 2; width: 22px; height: 17px; with-name: false; self-assemble: true; accessible-role: none; }
-                    }
                     IconBtn {
                         y: (parent.height - self.height) / 2;
                         icon: "plus";
@@ -3050,7 +3043,12 @@ component DeskLibrary inherits Rectangle {
           }
         }
         if !game.has-game && !loading: Rectangle { horizontal-stretch: 1; }
-        if !game.has-game && loading: LoadingStage { horizontal-stretch: 1; small: small; }
+        // Espera (BRAND-001): o polvo no alto da área livre do destaque, fora do layout, sem tirar largura do texto.
+        if !game.has-game && loading: Rectangle {
+            horizontal-stretch: 1;
+            LoadingStage { x: 0; y: 0; width: parent.width; height: parent.height; small: small; }
+            Octopus { x: 0; y: 0; width: 90px; height: 69px; with-name: false; self-assemble: true; accessible-role: none; }
+        }
         if game.has-game: phases := GamePhases {
             horizontal-stretch: 1;
             more: more;
