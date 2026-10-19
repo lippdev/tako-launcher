@@ -605,11 +605,9 @@ fn custom_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presenta
 }
 
 fn fallback_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presentation::Rgb> {
-    if mode == UiMode::Desktop || ctx.theme_loaded_from_fallback {
-        ctx.base_theme_accent
-    } else {
-        theme_accent(ctx)
-    }
+    (mode != UiMode::Desktop && !ctx.theme_loaded_from_fallback)
+        .then(|| theme_accent(ctx))
+        .flatten()
 }
 
 impl App {
@@ -1773,13 +1771,16 @@ mod tests {
             true,
         );
         ctx.persisted_theme_accent = Some(tako_core::presentation::Rgb::new(255, 0, 0));
+        ctx.base_theme_accent = Some(tako_core::presentation::Rgb::new(0, 255, 0));
         assert_eq!(custom_accent_for_mode(&ctx, UiMode::Desktop), None);
+        assert_eq!(fallback_accent_for_mode(&ctx, UiMode::Desktop), None);
         assert_eq!(
             custom_accent_for_mode(&ctx, UiMode::BigPicture),
             ctx.persisted_theme_accent
         );
         ctx.theme_loaded_from_fallback = true;
         assert_eq!(custom_accent_for_mode(&ctx, UiMode::BigPicture), None);
+        assert_eq!(fallback_accent_for_mode(&ctx, UiMode::BigPicture), None);
     }
 
     #[test]
