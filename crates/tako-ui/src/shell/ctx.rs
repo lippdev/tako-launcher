@@ -269,12 +269,17 @@ pub struct Ctx {
     pub installing: Vec<(String, Instant)>,
     /// Desenhar de novo neste instante mesmo sem entrada (camadas que mudam com o tempo).
     pub redraw_at: Option<Instant>,
+    /// Tema em prévia (THEME-002): vale na tela, mas não está salvo; vence o tema escolhido até confirmar ou voltar.
+    pub theme_preview: Option<super::theme_preview::ThemePreview>,
     /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).
     pub launching: bool,
     /// Desde quando o jogo está abrindo: depois de `LAUNCH_SLOW` o botão vira "Ainda abrindo…" com "Cancelar".
     pub launch_since: Option<Instant>,
     /// Saindo para o jogo: a interface some aos poucos antes de fechar.
     pub leaving: bool,
+    /// Entrada do app (BRAND-002) na tela: cobre a primeira tela, que já está pronta por baixo. Acaba no tempo
+    /// (`INTRO_HOLD`) ou na primeira entrada do usuário, que só pula e não age.
+    pub intro: bool,
     /// Até quando a janela fica por cima de tudo em "Abrindo…" (esconde as janelas de inicialização do jogo).
     pub launch_on_top_until: Option<Instant>,
     /// A janela está por cima de tudo agora (o que foi aplicado no SO).
@@ -535,6 +540,11 @@ impl Ctx {
         }
         self.profiles = profiles;
         self.dirty = true;
+    }
+
+    /// A prévia em curso é de um tema instalado (não do padrão): se ele não carregar, a prévia falhou.
+    pub fn theme_preview_wants_installed(&self) -> bool {
+        self.theme_preview.as_ref().is_some_and(|p| p.id.is_some())
     }
 
     pub fn hint(&self, cmd: Cmd, label: &str) -> Hint {

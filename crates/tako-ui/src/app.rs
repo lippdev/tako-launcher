@@ -211,9 +211,11 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         welcome_back: None,
         installing: Vec::new(),
         redraw_at: None,
+        theme_preview: None,
         launching: false,
         launch_since: None,
         leaving: false,
+        intro: false,
         launch_on_top_until: None,
         window_on_top: false,
         move_window: None,
@@ -422,11 +424,15 @@ fn measure_sizes(found: &Arc<Mutex<Vec<Game>>>, to_measure: Vec<(String, String)
 
 /// O tema escolhido ou, se ele falhar, o padrão (PRD §7: volta ao padrão sem loop de falha).
 /// Também devolve a pasta do tema escolhido (para o `tokens.toml`); `None` = o padrão.
-fn load_theme(
+pub(crate) fn load_theme(
     ctx: &Ctx,
     builtin: &std::path::Path,
 ) -> Result<(ComponentDefinition, Option<std::path::PathBuf>), String> {
-    let selected = tako_themes::selected(&ctx.paths.themes());
+    // Em prévia (THEME-002) vale o tema da prévia; o escolhido só muda quando a pessoa confirma.
+    let selected = match &ctx.theme_preview {
+        Some(p) => p.id.clone(),
+        None => tako_themes::selected(&ctx.paths.themes()),
+    };
     if let Some(id) = selected.filter(|_| !ctx.safe_mode) {
         let dir = ctx.paths.themes().join(&id);
         match tako_themes::validate_package(&dir) {
@@ -520,6 +526,10 @@ impl App {
             && mode == UiMode::Desktop
             && plain_start
             && shell.ctx.settings.bool(crate::mode::ASK_SETTING, true);
+        // Entrada do app (BRAND-002): só na abertura em tela cheia; a volta do desktop não repete. Tema sem a
+        // propriedade `intro` não a mostra, então a 1ª entrada não pode ser engolida em silêncio.
+        shell.ctx.intro = shell.wants_intro(mode == UiMode::BigPicture, plain_start)
+            && ui.get_property("intro").is_ok();
         let shell = Rc::new(RefCell::new(shell));
         crate::tasks::attach(&shell);
         crate::metadata::start_metadata(&shell);
@@ -650,10 +660,16 @@ impl App {
                 return;
             }
         };
+        // Tema da prévia que não carregou: `load_theme` caiu no padrão, mas a tela não trocou; fica o anterior.
+        if dir.is_none() && self.shell.borrow().ctx.theme_preview_wants_installed() {
+            self.shell.borrow_mut().fail_theme_preview();
+            return;
+        }
         let new = match def.create() {
             Ok(n) => n,
             Err(e) => {
                 tracing::error!("tema: {e}");
+                self.shell.borrow_mut().fail_theme_preview();
                 return;
             }
         };
@@ -662,7 +678,12 @@ impl App {
             .set_fullscreen(self.ui.borrow().window().is_fullscreen());
         let old = self.ui.replace(new);
         self.wire_ui();
-        let _ = self.ui.borrow().show();
+        // Escondida ou minimizada (jogo em curso): a troca não pode trazer o Tako para a frente do jogo.
+        let (was_visible, was_minimized) = (old.window().is_visible(), old.window().is_minimized());
+        if was_visible {
+            let _ = self.ui.borrow().show();
+            self.ui.borrow().window().set_minimized(was_minimized);
+        }
         let _ = old.hide();
         self.shell.borrow_mut().ctx.dirty = true;
         render(&self.shell, &self.ui.borrow());
@@ -1110,6 +1131,7 @@ impl App {
                         s.ctx.redraw_at = None;
                         s.ctx.dirty = true;
                     }
+                    s.tick_theme_preview(Instant::now());
                     if now >= next_live && s.live() {
                         next_live = now + Duration::from_secs(1);
                         s.ctx.dirty = true;
@@ -1196,8 +1218,23 @@ impl App {
             None => ui.show().map_err(|e| e.to_string())?,
         }
         drop(ui);
+        self.end_intro_later();
         rescan(&self.shell, true); // ao abrir: a lista de não instalados da Steam vem fresca
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
+    }
+
+    /// A entrada do app (BRAND-002) acaba sozinha depois de `INTRO_HOLD`, sem esperar nada: a primeira tela já está
+    /// pronta por baixo.
+    fn end_intro_later(&self) {
+        if !self.shell.borrow().ctx.intro {
+            return;
+        }
+        let app = self.clone();
+        slint::Timer::single_shot(Shell::INTRO_HOLD, move || {
+            if app.shell.borrow_mut().end_intro() {
+                app.redraw();
+            }
+        });
     }
 
     /// Abertura no desktop com a biblioteca vazia (nada lido ainda), fora da simulação e da volta de um jogo.
@@ -1618,6 +1655,74 @@ mod tests {
                 assert_eq!(app.shell.borrow().has_layers(), end != GameEnd::Normal);
                 app.shell.borrow_mut().close_layers();
             }
+            app.ui.borrow().hide().unwrap();
+        })
+        .join()
+        .unwrap();
+    }
+
+    #[test]
+    fn theme_preview_winning_over_a_hidden_window_does_not_bring_it_back() {
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        std::thread::spawn(|| {
+            use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+            struct Software;
+            impl slint::platform::Platform for Software {
+                fn create_window_adapter(
+                    &self,
+                ) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError>
+                {
+                    Ok(MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer))
+                }
+            }
+            slint::platform::set_platform(Box::new(Software)).unwrap();
+            struct HidingHost;
+            impl Host for HidingHost {
+                fn handle(&mut self, effect: &Effect, _: &mut Ctx) -> HostAction {
+                    if *effect == Effect::ResumeGame {
+                        HostAction::Hide
+                    } else {
+                        HostAction::Stay
+                    }
+                }
+            }
+            i18n::set_lang(Lang::PtBr);
+            let dir = tempfile::tempdir().unwrap();
+            let ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+            let builtin = theme::install_builtin(&ctx.paths.themes()).unwrap();
+            let ui = theme::compile(&builtin.join("main.slint"), &builtin)
+                .unwrap()
+                .create()
+                .unwrap();
+            let app = App {
+                ui: Rc::new(RefCell::new(ui)),
+                shell: Rc::new(RefCell::new(Shell::new(ctx))),
+                host: Rc::new(RefCell::new(HidingHost)),
+                builtin,
+                mode: Rc::new(std::cell::Cell::new(UiMode::BigPicture)),
+            };
+            app.wire_ui();
+            app.ui.borrow().show().unwrap();
+            // Prévia em curso (a do tema padrão), jogo retomado (a janela esconde) e o prazo da prévia vence.
+            {
+                let mut s = app.shell.borrow_mut();
+                let _ = crate::shell::theme_preview::start(&mut s.ctx, None, "Tako (padrão)");
+                s.ctx.effects.clear();
+                s.ctx.effect(Effect::ResumeGame);
+                s.ctx.effect(Effect::ApplyTheme("default".into()));
+            }
+            app.redraw();
+            assert!(!app.ui.borrow().window().is_visible());
+            app.redraw();
+            assert!(app.shell.borrow().ctx.effects.is_empty());
+            assert!(
+                !app.ui.borrow().window().is_visible(),
+                "recarregar o tema não traz o Tako para a frente do jogo"
+            );
+            // Visível, a troca continua mostrando a janela.
+            restore(&app.ui.borrow());
+            app.reload_theme();
+            assert!(app.ui.borrow().window().is_visible());
             app.ui.borrow().hide().unwrap();
         })
         .join()

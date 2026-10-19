@@ -3,6 +3,7 @@
 pub(crate) enum Hit {
     Client,
     Caption,
+    Minimize,
     Maximize,
     Close,
 }
@@ -14,6 +15,8 @@ pub(crate) fn hit(x: f64, y: f64, width: f64, drag: (f64, f64)) -> Hit {
         Hit::Close
     } else if x >= width - 92. {
         Hit::Maximize
+    } else if x >= width - 138. {
+        Hit::Minimize
     } else if x >= drag.0 && x < drag.1 {
         Hit::Caption
     } else {
@@ -52,6 +55,7 @@ mod native {
                 (number("window-drag-start"), number("window-drag-end")),
             ) {
                 Hit::Caption => ChromeHit::Caption,
+                Hit::Minimize => ChromeHit::Minimize,
                 Hit::Maximize => ChromeHit::Maximize,
                 Hit::Close => ChromeHit::Close,
                 Hit::Client => ChromeHit::Client,
@@ -66,6 +70,21 @@ mod native {
             if let Some(ui) = self.0.upgrade() {
                 let _ = ui.set_property("window-native-pressed", Value::Number(f64::from(button)));
             }
+        }
+        fn activate(&self, button: u8) {
+            let action = match button {
+                1 => "max",
+                2 => "close",
+                3 => "min",
+                _ => return,
+            };
+            // Fora do procedimento da janela: a ação mexe na própria janela (maximizar, fechar).
+            let ui = self.0.clone();
+            slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+                if let Some(ui) = ui.upgrade() {
+                    let _ = ui.invoke("window-action", &[Value::String(action.into())]);
+                }
+            });
         }
     }
 
@@ -96,7 +115,9 @@ mod tests {
             assert_eq!(hit(439., 20., width, drag), Hit::Client);
             assert_eq!(hit(440., 20., width, drag), Hit::Caption);
             assert_eq!(hit(drag.1, 20., width, drag), Hit::Client);
-            assert_eq!(hit(width - 100., 20., width, drag), Hit::Client);
+            assert_eq!(hit(width - 139., 20., width, drag), Hit::Client);
+            assert_eq!(hit(width - 138., 20., width, drag), Hit::Minimize);
+            assert_eq!(hit(width - 93., 20., width, drag), Hit::Minimize);
             assert_eq!(hit(width - 92., 0., width, drag), Hit::Maximize);
             assert_eq!(hit(width - 46., 63., width, drag), Hit::Close);
             assert_eq!(hit(width - 1., 0., width, drag), Hit::Close);
