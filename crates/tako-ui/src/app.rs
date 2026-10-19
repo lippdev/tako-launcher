@@ -191,6 +191,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         app_update: Default::default(),
         safe_mode: false,
         scanning: false,
+        pending_link: None,
         grid_columns: 7,
         pointer: false,
         pending_layer: None,
@@ -524,7 +525,7 @@ impl App {
         if mode == UiMode::Desktop {
             shell.enter_desktop();
         }
-        shell.pending_link = opts.link.clone();
+        shell.ctx.pending_link = opts.link.clone();
         if let Some((id, title)) = &opts.running {
             shell.ctx.running = Some(crate::shell::RunningGame {
                 id: id.clone(),
@@ -606,6 +607,7 @@ impl App {
         match action {
             HostAction::Stay => {}
             HostAction::Close => {
+                crate::navigation_feedback::stop_theme_music();
                 let _ = self.ui.borrow().hide();
                 let _ = slint::quit_event_loop();
             }
@@ -936,7 +938,7 @@ impl App {
                     let window = ui.window();
                     #[cfg(windows)]
                     crate::window_chrome::install(&ui);
-                    let active = window.with_winit_window(|w| w.has_focus()).unwrap_or(true);
+                    let active = window.with_winit_window(|w| w.has_focus()).unwrap_or(false);
                     bridge::set(&ui, "window-maximized", window.is_maximized().to_value());
                     bridge::set(&ui, "window-active", active.to_value());
                 },
@@ -1170,7 +1172,7 @@ impl App {
                     let window_minimized = window.is_minimized();
                     use slint::winit_030::WinitWindowAccessor;
                     let window_focused =
-                        window.with_winit_window(|w| w.has_focus()).unwrap_or(true);
+                        window.with_winit_window(|w| w.has_focus()).unwrap_or(false);
                     crate::navigation_feedback::tick_theme_music(
                         &app.shell.borrow().ctx,
                         app.mode.get() == UiMode::BigPicture,
