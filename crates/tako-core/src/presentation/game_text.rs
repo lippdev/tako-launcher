@@ -296,8 +296,8 @@ mod tests {
             "✓ Hollow Knight (2017) · SNES · IGDB"
         );
         assert_eq!(
-            match_label("Celeste", None, None, false, "Local"),
-            "Celeste · Local"
+            match_label("Hades", None, Some("PC"), false, "Steam"),
+            "Hades · Steam"
         );
     }
 }

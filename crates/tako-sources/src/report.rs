@@ -200,72 +200,72 @@ mod tests {
         ]);
 
         let games = sources.discover(|s| s != GameStore::Xbox);
-        assert_eq!(
-            games
-                .iter()
-                .map(|g| (g.id.as_str(), g.store))
-                .collect::<Vec<_>>(),
-            [
-                ("steam:1", Some(GameStore::Steam)),
-                ("gog:2", Some(GameStore::Gog))
-            ]
-        );
 
-        let reports = sources.reports();
-        assert_eq!(reports[&GameStore::Steam].game_count, 1);
-        assert_eq!(reports[&GameStore::Gog].game_count, 1);
-        assert_eq!(reports[&GameStore::Xbox].game_count, 0);
-
-        assert_eq!(reports[&GameStore::Steam].summary(), "1 jogo instalado");
+        let ids: Vec<_> = games.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(ids, ["steam:1", "gog:2"]);
+        let r = sources.reports();
+        assert_eq!(r[&GameStore::Steam].summary(), "1 jogo instalado");
         assert_eq!(
-            reports[&GameStore::Gog].summary(),
+            r[&GameStore::Gog].summary(),
             "Sem GOG Galaxy: os jogos abrem direto pelo executável · 1 jogo instalado"
         );
         assert_eq!(
-            reports[&GameStore::Xbox].summary(),
+            r[&GameStore::Xbox].summary(),
             "Desligada: os jogos do Xbox não aparecem na biblioteca"
+        );
+        assert_eq!(
+            sources.stores(),
+            [GameStore::Steam, GameStore::Gog, GameStore::Xbox]
         );
     }
 
     #[test]
     fn summaries_name_each_store() {
-        let report = |store, client, notice| {
-            LibrarySourceReport {
-                store,
-                enabled: true,
-                game_count: 0,
-                client_installed: client,
-                notice,
-            }
-            .summary()
+        let report = |store, enabled, count, client, notice: Option<&str>| LibrarySourceReport {
+            store,
+            enabled,
+            game_count: count,
+            client_installed: client,
+            notice: notice.map(Into::into),
         };
         assert_eq!(
-            report(GameStore::Steam, false, Some("não instalada".into())),
-            "não instalada · Nenhum jogo instalado encontrado"
+            report(GameStore::Amazon, false, 0, false, None).summary(),
+            "Desligada: os jogos da Amazon Games não aparecem na biblioteca"
         );
         assert_eq!(
-            report(GameStore::Gog, true, Some("aviso".into())),
-            "Nenhum jogo instalado encontrado · aviso"
+            report(GameStore::Ea, true, 0, false, Some("Só o Origin")).summary(),
+            "Só o Origin · Nenhum jogo instalado encontrado"
+        );
+        assert_eq!(
+            report(GameStore::Steam, true, 3, true, None).summary(),
+            "3 jogos instalados"
         );
     }
 
     #[test]
     fn launch_failure_shows_the_client_notice_only_for_client_stores() {
-        let r = LibrarySourceReport {
-            store: GameStore::Epic,
+        let outdated = "Só o Origin está instalado e ele não abre mais os jogos: instale o EA app";
+        let mut ea = game("ea:1", GameStore::Ea);
+        ea.title = "Arena".into();
+        let report = |store, client, notice: Option<&str>| LibrarySourceReport {
+            store,
             enabled: true,
             game_count: 1,
-            client_installed: false,
-            notice: Some("Epic ausente".into()),
+            client_installed: client,
+            notice: notice.map(Into::into),
         };
-        let mut g = game("epic:x", GameStore::Epic);
-        g.title = "Lanterna".into();
         assert_eq!(
-            client_missing(&g, Some(&r)),
-            Some("Epic ausente (Lanterna)".into())
+            client_missing(&ea, Some(&report(GameStore::Ea, false, Some(outdated)))),
+            Some(format!("{outdated} (Arena)"))
         );
-
-        let gog = game("gog:x", GameStore::Gog);
-        assert_eq!(client_missing(&gog, Some(&r)), None);
+        assert_eq!(
+            client_missing(&ea, Some(&report(GameStore::Ea, true, None))),
+            None
+        );
+        let gog = game("gog:1", GameStore::Gog);
+        assert_eq!(
+            client_missing(&gog, Some(&report(GameStore::Gog, false, Some("x")))),
+            None
+        );
     }
 }
