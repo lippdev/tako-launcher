@@ -689,7 +689,7 @@ component TopBar inherits Vidro {
         }
         HorizontalLayout {
             spacing: 0px;
-            WindowButton { kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
+            WindowButton { native-hover: root.native-hover == 3; native-pressed: root.native-pressed == 3; kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
             WindowButton { native-hover: root.native-hover == 1; native-pressed: root.native-pressed == 1; kind: maximized ? "restore" : "max"; active: root.active; label: maximized ? labels[2] : labels[1]; clicked => { root.action("max"); } }
             WindowButton { native-hover: root.native-hover == 2; native-pressed: root.native-pressed == 2; kind: "close"; active: root.active; label: labels[3]; clicked => { root.action("close"); } }
         }
