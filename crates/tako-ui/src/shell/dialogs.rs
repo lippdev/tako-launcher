@@ -196,8 +196,12 @@ pub fn client_missing(ctx: &Ctx, game: &Game, notice: String) -> MenuLayer {
         v.push(
             MenuItem::new(PanelRow::button("anyway", ctx.t("game.client_try_anyway"))).on(
                 move |ctx| {
-                    ctx.effect(Effect::Launch(id.clone()));
-                    Flow::Close
+                    if !crate::session::effective(ctx, &id).commands_approved {
+                        Flow::Push(Box::new(approve_commands(ctx, &id)))
+                    } else {
+                        ctx.effect(Effect::Launch(id.clone()));
+                        Flow::Close
+                    }
                 },
             ),
         );
@@ -1475,6 +1479,27 @@ mod tests {
             .map(|i| i.row.key)
             .collect();
         assert!(!keys.iter().any(|k| k == "repair"));
+    }
+
+    #[test]
+    fn client_missing_anyway_requires_approval_if_commands_unapproved() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let exe = dir.path().join("jogo.exe");
+        std::fs::write(&exe, "").unwrap();
+        let record = ManualGameRecord::create("Jogo", &exe.to_string_lossy(), chrono::Utc::now());
+        let id = record.id.clone();
+        ctx.library.add_manual(record).unwrap();
+        let store = ctx.game_settings.clone().unwrap();
+        let mut o = store.load(&id).unwrap();
+        o.extra_arguments = Some("--flag".into());
+        store.save(&id, &o).unwrap();
+
+        let game = ctx.library.find(&id).unwrap().clone();
+        let dialog = client_missing(&ctx, &game, "App da loja não encontrado".into());
+        let ask = accept(&mut ctx, &dialog, "anyway");
+        assert!(matches!(ask, Flow::Push(_)), "deve empilhar diálogo de aprovação de comandos");
+        assert!(ctx.effects.is_empty(), "não deve disparar Launch imediatamente");
     }
 
     #[test]
