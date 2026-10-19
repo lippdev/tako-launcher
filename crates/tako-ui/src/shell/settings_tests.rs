@@ -1362,3 +1362,153 @@ fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
     let token = ctx.settings.string(keys::API_TOKEN);
     assert!(tako_core::api::is_valid_token(&token));
 }
+
+#[test]
+fn create_theme_selection_creation_and_apply_flow() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Ação "Criar tema…" existe em Configurações › Aparência
+    let items = rows_of(&ctx, "appearance");
+    let create_opt = find(&items, "create-theme");
+    assert_eq!(
+        create_opt.row.title,
+        ctx.t("settings.appearance.create_theme")
+    );
+
+    // 2. Abre a escolha de tema base
+    let Flow::Push(mut base_panel) = accept(&mut ctx, &create_opt) else {
+        panic!("esperava painel de escolha de tema base");
+    };
+    let base_rows = base_panel.render(&ctx).rows;
+    let base_default_idx = base_rows
+        .iter()
+        .position(|r| r.key == "base-default")
+        .unwrap();
+    assert_eq!(
+        base_rows[base_default_idx].title,
+        ctx.t("settings.appearance.builtin")
+    );
+
+    // 3. Escolhe o tema padrão como base e abre o editor de criação
+    let Flow::Replace(mut editor) = base_panel.click("row", base_default_idx, &mut ctx) else {
+        panic!("esperava editor de criação");
+    };
+    let editor_rows = editor.render(&ctx).rows;
+    let save_new_idx = editor_rows
+        .iter()
+        .position(|r| r.key == "save_new")
+        .unwrap();
+    assert_eq!(
+        editor_rows[save_new_idx].title,
+        ctx.t("settings.appearance.save_as_new_theme")
+    );
+
+    // 4. Modifica o rascunho
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#6C5CE7".into());
+    ctx.theme_draft = Some(d);
+
+    // 5. Clica em "Salvar como novo tema": abre o prompt de nome (KeyboardLayer)
+    let Flow::Push(_) = editor.click("row", save_new_idx, &mut ctx) else {
+        panic!("esperava teclado virtual para nome do tema");
+    };
+
+    // 6. Validação de nome
+    assert!(tako_themes::create::validate_theme_name("").is_err());
+    assert!(tako_themes::create::validate_theme_name(&"x".repeat(55)).is_err());
+    assert!(tako_themes::create::validate_theme_name("Nome/Invalido").is_err());
+    assert!(tako_themes::create::validate_theme_name("Novo Tema Incrivel").is_ok());
+
+    // 7. Salva o tema através do finish_create_theme
+    let flow = finish_create_theme(&mut ctx, "Novo Tema Incrivel", None, false);
+    let Flow::Replace(mut apply_dialog) = flow else {
+        panic!("esperava diálogo para aplicar tema");
+    };
+
+    let theme_id = "novo-tema-incrivel";
+    let theme_dir = ctx.paths.themes().join(theme_id);
+    assert!(theme_dir.join("theme.toml").is_file());
+    assert!(theme_dir.join("main.slint").is_file());
+    assert!(theme_dir.join("tokens.toml").is_file());
+
+    // 7.1 Confere que o tema criado passa no tako theme check existente
+    let check_res = crate::theme::check(&theme_dir);
+    assert!(
+        check_res.is_ok(),
+        "theme check falhou: {:?}",
+        check_res.err()
+    );
+
+    // 8. Confirma a aplicação do tema recém-criado
+    let dialog_rows = apply_dialog.render(&ctx).rows;
+    let apply_idx = dialog_rows.iter().position(|r| r.key == "apply").unwrap();
+    let apply_flow = apply_dialog.click("row", apply_idx, &mut ctx);
+    assert!(matches!(apply_flow, Flow::CloseAll));
+    assert_eq!(
+        tako_themes::selected(&ctx.paths.themes()).as_deref(),
+        Some(theme_id)
+    );
+}
+
+#[test]
+fn create_theme_duplicate_prompts_overwrite_and_replaces() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Cria o primeiro tema
+    let flow1 = finish_create_theme(&mut ctx, "Tema Duplicado", None, false);
+    assert!(matches!(flow1, Flow::Replace(_)));
+
+    // 2. Tentar criar com o mesmo nome sem overwrite abre diálogo de confirmação
+    let flow2 = finish_create_theme(&mut ctx, "Tema Duplicado", None, false);
+    let Flow::Push(mut confirm_dialog) = flow2 else {
+        panic!("esperava diálogo de confirmação de substituição");
+    };
+    let confirm_rows = confirm_dialog.render(&ctx).rows;
+    let overwrite_idx = confirm_rows
+        .iter()
+        .position(|r| r.key == "overwrite")
+        .unwrap();
+    let cancel_idx = confirm_rows.iter().position(|r| r.key == "cancel").unwrap();
+    assert_eq!(
+        confirm_rows[overwrite_idx].title,
+        ctx.t("settings.appearance.theme_overwrite_button")
+    );
+    assert_eq!(confirm_rows[cancel_idx].title, ctx.t("common.cancel"));
+
+    // 3. Confirmar a substituição substitui com sucesso e abre diálogo de aplicar
+    let flow_overwrite = confirm_dialog.click("row", overwrite_idx, &mut ctx);
+    assert!(matches!(flow_overwrite, Flow::Replace(_)));
+}
+
+#[test]
+fn themes_panel_shows_export_action_and_base_choice_lists_installed_theme() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria um tema baseado em tokens
+    let _ = finish_create_theme(&mut ctx, "Tema Base Customizado", None, false);
+    ctx.reload_theme_cache();
+
+    // 1. Em themes_panel, a ação "Exportar .takotheme…" deve estar presente
+    let t_panel = themes_panel(&ctx);
+    let t_items = t_panel.items(&ctx);
+    let export_opt = find(&t_items, "export-theme");
+    assert_eq!(
+        export_opt.row.title,
+        ctx.t("settings.appearance.export_theme")
+    );
+
+    // 2. Na escolha de base para novo tema, o tema instalado aparece como opção
+    let b_panel = choose_base_theme_panel(&ctx);
+    let b_items = b_panel.items(&ctx);
+    assert!(
+        b_items
+            .iter()
+            .any(|i| i.row.key == "base-tema-base-customizado")
+    );
+}

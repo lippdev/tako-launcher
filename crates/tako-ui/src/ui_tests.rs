@@ -901,6 +901,12 @@ fn desktop_snapshot() {
                 let layer = crate::shell::settings::edit_theme_panel(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("theme-create") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+                let layer = crate::shell::settings::choose_base_theme_panel(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
             Ok("settings-api") => {
                 shell.open_route("settings");
                 shell

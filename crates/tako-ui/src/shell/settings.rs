@@ -587,6 +587,19 @@ pub(crate) fn themes_panel(ctx: &Ctx) -> MenuLayer {
             )
             .on(|ctx| install_from_url(ctx)),
         );
+        let has_exportable = installed
+            .iter()
+            .any(|t| tako_themes::create::is_tokens_only_theme(&t.dir));
+        if has_exportable {
+            v.push(
+                MenuItem::new(
+                    PanelRow::action("export-theme", ctx.t("settings.appearance.export_theme"))
+                        .desc(ctx.t("settings.appearance.export_theme_desc"))
+                        .icon("folder"),
+                )
+                .on(export_theme_panel),
+            );
+        }
         if !sources.is_empty() {
             v.push(
                 MenuItem::new(
@@ -658,9 +671,32 @@ fn current_draft(ctx: &Ctx) -> tako_themes::overrides::ThemeTokensOverride {
         .unwrap_or_default()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ThemeEditorMode {
+    OverrideCurrent,
+    CreateNew { base_id: Option<String> },
+}
+
 pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
-    MenuLayer::panel(ctx.t("settings.appearance.edit_theme"), |ctx| {
+    build_theme_editor_panel(ctx, ThemeEditorMode::OverrideCurrent)
+}
+
+pub(crate) fn create_theme_editor_panel(ctx: &Ctx, base_id: Option<String>) -> MenuLayer {
+    build_theme_editor_panel(ctx, ThemeEditorMode::CreateNew { base_id })
+}
+
+pub(crate) fn build_theme_editor_panel(ctx: &Ctx, mode: ThemeEditorMode) -> MenuLayer {
+    let panel_title = match &mode {
+        ThemeEditorMode::OverrideCurrent => ctx.t("settings.appearance.edit_theme"),
+        ThemeEditorMode::CreateNew { .. } => ctx.t("settings.appearance.create_theme"),
+    };
+    let mode_clone = mode.clone();
+    MenuLayer::panel(panel_title, move |ctx| {
         let draft = current_draft(ctx);
+        let theme_id_opt = match &mode_clone {
+            ThemeEditorMode::OverrideCurrent => tako_themes::selected(&ctx.paths.themes()),
+            ThemeEditorMode::CreateNew { base_id } => base_id.clone(),
+        };
 
         let cur_accent_hex = draft.accent.as_deref().unwrap_or("#2B3A55");
         let accent_label = ACCENT_PRESETS
@@ -954,16 +990,17 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
                 ctx.t("settings.appearance.bg_no_image")
             };
 
+            let theme_id_for_img = theme_id_opt.clone();
             let choose_img_row = MenuItem::new(
                 PanelRow::action("choose_image", ctx.t("settings.appearance.bg_choose_image"))
                     .desc(ctx.t("settings.appearance.bg_choose_image_desc"))
                     .value(img_label),
             )
-            .on(|ctx| {
+            .on(move |ctx| {
                 let title = ctx.t("settings.appearance.bg_choose_image");
                 let filter_name = ctx.t("settings.appearance.bg_filter_images");
                 let themes_root = ctx.paths.themes();
-                let theme_id = tako_themes::selected(&themes_root);
+                let theme_id = theme_id_for_img.clone();
                 crate::tasks::run(
                     ctx,
                     move || {
@@ -1023,129 +1060,174 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
             rows.push(choose_img_row);
         }
 
+        let mode_for_prev = mode_clone.clone();
         let preview_row = MenuItem::new(
             PanelRow::action("preview", ctx.t("settings.appearance.live_preview"))
                 .desc(ctx.t("settings.appearance.live_preview_desc"))
                 .icon("play"),
         )
-        .on(|ctx| {
-            let theme_id = tako_themes::selected(&ctx.paths.themes());
+        .on(move |ctx| {
             let draft = current_draft(ctx);
-            super::theme_preview::start_override(ctx, theme_id.as_deref(), draft)
+            match &mode_for_prev {
+                ThemeEditorMode::OverrideCurrent => {
+                    let theme_id = tako_themes::selected(&ctx.paths.themes());
+                    super::theme_preview::start_override(ctx, theme_id.as_deref(), draft)
+                }
+                ThemeEditorMode::CreateNew { base_id } => {
+                    super::theme_preview::start_override_create(ctx, base_id.as_deref(), draft)
+                }
+            }
         });
         rows.push(preview_row);
 
-        let save_row = MenuItem::new(
-            PanelRow::action("save", ctx.t("settings.appearance.save_theme")).style("primary"),
-        )
-        .on(|ctx| {
-            let theme_id = tako_themes::selected(&ctx.paths.themes());
-            let mut draft = current_draft(ctx);
-            if let Some(ref bg_draft) = draft.background_image {
-                match tako_themes::overrides::promote_background_draft(
-                    &ctx.paths.themes(),
-                    theme_id.as_deref(),
-                    bg_draft,
-                ) {
-                    Ok(final_name) => {
-                        draft.background_image = Some(final_name);
-                    }
-                    Err(e) => {
-                        tracing::error!("promover rascunho de fundo: {e}");
-                        ctx.toast(ctx.t("settings.appearance.save_override_error"));
-                        return Flow::Stay;
-                    }
-                }
-            } else {
-                let _ = tako_themes::overrides::clean_background_orphans(
-                    &ctx.paths.themes(),
-                    theme_id.as_deref(),
-                    None,
-                );
+        match &mode_clone {
+            ThemeEditorMode::CreateNew { base_id } => {
+                let base_clone = base_id.clone();
+                let save_new_row = MenuItem::new(
+                    PanelRow::action("save_new", ctx.t("settings.appearance.save_as_new_theme"))
+                        .desc(ctx.t("settings.appearance.save_as_new_theme_desc"))
+                        .style("primary"),
+                )
+                .on(move |ctx| Flow::Push(Box::new(prompt_theme_name(ctx, base_clone.clone()))));
+                rows.push(save_new_row);
             }
-            let toml_str = draft.to_toml_string();
-            match tako_themes::overrides::save_override(
-                &ctx.paths.themes(),
-                theme_id.as_deref(),
-                &toml_str,
-            ) {
-                Ok(_) => {
-                    let text = ctx.t("settings.appearance.theme_customized_saved");
-                    ctx.toast(text);
-                    ctx.theme_draft = None;
-                    ctx.reload_theme_cache();
-                    let apply_id = theme_id.unwrap_or_else(|| BUILTIN_THEME.to_owned());
-                    ctx.effect(Effect::ApplyTheme(apply_id));
-                    Flow::Close
-                }
-                Err(e) => {
-                    tracing::error!("salvar sobreposição: {e}");
-                    ctx.toast(ctx.t("settings.appearance.save_override_error"));
-                    Flow::Stay
-                }
-            }
-        });
-        rows.push(save_row);
+            ThemeEditorMode::OverrideCurrent => {
+                let save_row = MenuItem::new(
+                    PanelRow::action("save", ctx.t("settings.appearance.save_theme")).style("primary"),
+                )
+                .on(|ctx| {
+                    let theme_id = tako_themes::selected(&ctx.paths.themes());
+                    let mut draft = current_draft(ctx);
+                    if let Some(ref bg_draft) = draft.background_image {
+                        match tako_themes::overrides::promote_background_draft(
+                            &ctx.paths.themes(),
+                            theme_id.as_deref(),
+                            bg_draft,
+                        ) {
+                            Ok(final_name) => {
+                                draft.background_image = Some(final_name);
+                            }
+                            Err(e) => {
+                                tracing::error!("promover rascunho de fundo: {e}");
+                                ctx.toast(ctx.t("settings.appearance.save_override_error"));
+                                return Flow::Stay;
+                            }
+                        }
+                    } else {
+                        let _ = tako_themes::overrides::clean_background_orphans(
+                            &ctx.paths.themes(),
+                            theme_id.as_deref(),
+                            None,
+                        );
+                    }
+                    let toml_str = draft.to_toml_string();
+                    match tako_themes::overrides::save_override(
+                        &ctx.paths.themes(),
+                        theme_id.as_deref(),
+                        &toml_str,
+                    ) {
+                        Ok(_) => {
+                            let text = ctx.t("settings.appearance.theme_customized_saved");
+                            ctx.toast(text);
+                            ctx.theme_draft = None;
+                            ctx.reload_theme_cache();
+                            let apply_id = theme_id.unwrap_or_else(|| BUILTIN_THEME.to_owned());
+                            ctx.effect(Effect::ApplyTheme(apply_id));
+                            Flow::Close
+                        }
+                        Err(e) => {
+                            tracing::error!("salvar sobreposição: {e}");
+                            ctx.toast(ctx.t("settings.appearance.save_override_error"));
+                            Flow::Stay
+                        }
+                    }
+                });
+                rows.push(save_row);
 
-        let has_ov = tako_themes::overrides::has_override(
-            &ctx.paths.themes(),
-            tako_themes::selected(&ctx.paths.themes()).as_deref(),
-        );
-        if has_ov || ctx.theme_draft.is_some() {
-            let reset_row = MenuItem::new(
-                PanelRow::action("reset", ctx.t("settings.appearance.reset_theme"))
-                    .desc(ctx.t("settings.appearance.reset_theme_desc"))
-                    .style("danger"),
-            )
-            .on(|ctx| {
-                Flow::Push(Box::new(
-                    MenuLayer::dialog(
-                        ctx.t("settings.appearance.reset_theme_confirm_title"),
-                        |ctx| {
-                            vec![
-                                MenuItem::new(
-                                    PanelRow::button(
-                                        "reset",
-                                        ctx.t("settings.appearance.reset_theme_confirm_button"),
-                                    )
-                                    .danger(),
-                                )
-                                .on(|ctx| {
-                                    let theme_id = tako_themes::selected(&ctx.paths.themes());
-                                    ctx.discard_theme_draft();
-                                    match tako_themes::overrides::reset_override(
-                                        &ctx.paths.themes(),
-                                        theme_id.as_deref(),
-                                    ) {
-                                        Ok(_) => {
-                                            let text =
-                                                ctx.t("settings.appearance.theme_reset_applied");
-                                            ctx.toast(text);
-                                            ctx.reload_theme_cache();
-                                            let apply_id = theme_id
-                                                .unwrap_or_else(|| BUILTIN_THEME.to_owned());
-                                            ctx.effect(Effect::ApplyTheme(apply_id));
-                                            Flow::CloseAll
-                                        }
-                                        Err(e) => {
-                                            tracing::error!("restaurar sobreposição: {e}");
-                                            ctx.toast(
-                                                ctx.t("settings.appearance.reset_override_error"),
-                                            );
-                                            Flow::Stay
-                                        }
-                                    }
-                                }),
-                                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
-                                    .on(|_| Flow::Close),
-                            ]
-                        },
+                let theme_id_for_new = theme_id_opt.clone();
+                let save_as_new_row = MenuItem::new(
+                    PanelRow::action("save_as_new", ctx.t("settings.appearance.save_as_new_theme"))
+                        .desc(ctx.t("settings.appearance.save_as_new_theme_desc")),
+                )
+                .on(move |ctx| Flow::Push(Box::new(prompt_theme_name(ctx, theme_id_for_new.clone()))));
+                rows.push(save_as_new_row);
+
+                if let Some(ref id) = theme_id_opt {
+                    let theme_dir = ctx.paths.themes().join(id);
+                    if tako_themes::create::is_tokens_only_theme(&theme_dir) {
+                        let id_export = id.clone();
+                        rows.push(
+                            MenuItem::new(
+                                PanelRow::action("export", ctx.t("settings.appearance.export_theme"))
+                                    .desc(ctx.t("settings.appearance.export_theme_desc"))
+                                    .icon("folder"),
+                            )
+                            .on(move |ctx| run_export_theme(ctx, &id_export)),
+                        );
+                    }
+                }
+
+                let has_ov = tako_themes::overrides::has_override(
+                    &ctx.paths.themes(),
+                    tako_themes::selected(&ctx.paths.themes()).as_deref(),
+                );
+                if has_ov || ctx.theme_draft.is_some() {
+                    let reset_row = MenuItem::new(
+                        PanelRow::action("reset", ctx.t("settings.appearance.reset_theme"))
+                            .desc(ctx.t("settings.appearance.reset_theme_desc"))
+                            .style("danger"),
                     )
-                    .text(ctx.t("settings.appearance.reset_theme_confirm_text"))
-                    .focus_at(1),
-                ))
-            });
-            rows.push(reset_row);
+                    .on(|ctx| {
+                        Flow::Push(Box::new(
+                            MenuLayer::dialog(
+                                ctx.t("settings.appearance.reset_theme_confirm_title"),
+                                |ctx| {
+                                    vec![
+                                        MenuItem::new(
+                                            PanelRow::button(
+                                                "reset",
+                                                ctx.t("settings.appearance.reset_theme_confirm_button"),
+                                            )
+                                            .danger(),
+                                        )
+                                        .on(|ctx| {
+                                            let theme_id = tako_themes::selected(&ctx.paths.themes());
+                                            ctx.discard_theme_draft();
+                                            match tako_themes::overrides::reset_override(
+                                                &ctx.paths.themes(),
+                                                theme_id.as_deref(),
+                                            ) {
+                                                Ok(_) => {
+                                                    let text =
+                                                        ctx.t("settings.appearance.theme_reset_applied");
+                                                    ctx.toast(text);
+                                                    ctx.reload_theme_cache();
+                                                    let apply_id = theme_id
+                                                        .unwrap_or_else(|| BUILTIN_THEME.to_owned());
+                                                    ctx.effect(Effect::ApplyTheme(apply_id));
+                                                    Flow::CloseAll
+                                                }
+                                                Err(e) => {
+                                                    tracing::error!("restaurar sobreposição: {e}");
+                                                    ctx.toast(
+                                                        ctx.t("settings.appearance.reset_override_error"),
+                                                    );
+                                                    Flow::Stay
+                                                }
+                                            }
+                                        }),
+                                        MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                                            .on(|_| Flow::Close),
+                                    ]
+                                },
+                            )
+                            .text(ctx.t("settings.appearance.reset_theme_confirm_text"))
+                            .focus_at(1),
+                        ))
+                    });
+                    rows.push(reset_row);
+                }
+            }
         }
 
         rows
@@ -1154,6 +1236,338 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
         ctx.discard_theme_draft();
         Flow::Close
     })
+}
+
+pub(crate) fn choose_base_theme_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("settings.appearance.choose_base_theme"), |ctx| {
+        let mut rows = vec![
+            MenuItem::new(
+                PanelRow::action("base-default", ctx.t("settings.appearance.builtin"))
+                    .desc(ctx.t("settings.appearance.builtin_desc"))
+                    .icon("palette"),
+            )
+            .on(|ctx| start_create_from_base(ctx, None)),
+        ];
+
+        let installed = installed_themes(ctx);
+        for theme in installed.iter() {
+            if tako_themes::create::uses_default_ui(&theme.dir) {
+                let id = theme.id();
+                let (title, desc) = match &theme.manifest {
+                    Ok(m) => (
+                        m.name.clone(),
+                        ctx.tf(
+                            "settings.appearance.theme_by",
+                            &[("version", &m.version), ("author", &m.author)],
+                        ),
+                    ),
+                    Err(_) => (id.clone(), String::new()),
+                };
+                let id_clone = id.clone();
+                rows.push(
+                    MenuItem::new(
+                        PanelRow::action(format!("base-{id}"), title)
+                            .desc(desc)
+                            .icon("palette"),
+                    )
+                    .on(move |ctx| start_create_from_base(ctx, Some(&id_clone))),
+                );
+            }
+        }
+        rows
+    })
+}
+
+pub(crate) fn start_create_from_base(ctx: &mut Ctx, base_id: Option<&str>) -> Flow {
+    ctx.discard_theme_draft();
+    let themes_root = ctx.paths.themes();
+
+    let draft = match base_id {
+        Some(id) => {
+            let theme_dir = themes_root.join(id);
+            let text = std::fs::read_to_string(theme_dir.join("tokens.toml")).unwrap_or_default();
+            let mut d = tako_themes::overrides::ThemeTokensOverride::from_toml_str(&text);
+            if let Some(ref bg_img) = d.background_image {
+                let src_path = theme_dir.join(bg_img);
+                if let Ok(draft_name) = tako_themes::overrides::copy_draft_background_image(
+                    &themes_root,
+                    Some(id),
+                    &src_path,
+                ) {
+                    d.background_image = Some(draft_name);
+                }
+            }
+            d
+        }
+        None => tako_themes::overrides::ThemeTokensOverride::default(),
+    };
+
+    ctx.theme_draft = Some(draft);
+    Flow::Replace(Box::new(create_theme_editor_panel(
+        ctx,
+        base_id.map(str::to_owned),
+    )))
+}
+
+pub(crate) fn prompt_theme_name(
+    ctx: &Ctx,
+    base_id: Option<String>,
+) -> super::keyboard::KeyboardLayer {
+    let base_clone = base_id.clone();
+    super::keyboard::KeyboardLayer::new(
+        ctx,
+        ctx.t("settings.appearance.theme_name_title"),
+        "",
+        move |ctx, name| finish_create_theme(ctx, name, base_clone.as_deref(), false),
+    )
+    .hint(ctx.t("settings.appearance.theme_name_hint"))
+    .check(
+        |ctx, name| match tako_themes::create::validate_theme_name(name) {
+            Ok(()) => None,
+            Err(tako_themes::create::ThemeNameProblem::Empty) => {
+                Some(ctx.t("settings.appearance.theme_name_err_empty"))
+            }
+            Err(tako_themes::create::ThemeNameProblem::TooLong(_)) => {
+                Some(ctx.t("settings.appearance.theme_name_err_too_long"))
+            }
+            Err(tako_themes::create::ThemeNameProblem::InvalidCharacters) => {
+                Some(ctx.t("settings.appearance.theme_name_err_invalid"))
+            }
+        },
+    )
+}
+
+pub(crate) fn finish_create_theme(
+    ctx: &mut Ctx,
+    name: &str,
+    base_id: Option<&str>,
+    overwrite: bool,
+) -> Flow {
+    let name = name.trim().to_owned();
+    if let Err(e) = tako_themes::create::validate_theme_name(&name) {
+        let msg = match e {
+            tako_themes::create::ThemeNameProblem::Empty => {
+                ctx.t("settings.appearance.theme_name_err_empty")
+            }
+            tako_themes::create::ThemeNameProblem::TooLong(_) => {
+                ctx.t("settings.appearance.theme_name_err_too_long")
+            }
+            tako_themes::create::ThemeNameProblem::InvalidCharacters => {
+                ctx.t("settings.appearance.theme_name_err_invalid")
+            }
+        };
+        ctx.toast(msg);
+        return Flow::Stay;
+    }
+
+    let id = tako_themes::create::derive_theme_id(&name);
+    let themes_root = ctx.paths.themes();
+    if themes_root.join(&id).exists() && !overwrite {
+        let name_clone = name.clone();
+        let base_clone = base_id.map(str::to_owned);
+        return Flow::Push(Box::new(
+            MenuLayer::dialog(
+                ctx.t("settings.appearance.theme_overwrite_title"),
+                move |ctx| {
+                    let name_sub = name_clone.clone();
+                    let base_sub = base_clone.clone();
+                    vec![
+                        MenuItem::new(
+                            PanelRow::button(
+                                "overwrite",
+                                ctx.t("settings.appearance.theme_overwrite_button"),
+                            )
+                            .danger(),
+                        )
+                        .on(move |ctx| {
+                            finish_create_theme(ctx, &name_sub, base_sub.as_deref(), true)
+                        }),
+                        MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                            .on(|_| Flow::Close),
+                    ]
+                },
+            )
+            .text(ctx.tf(
+                "settings.appearance.theme_overwrite_confirm",
+                &[("name", &name)],
+            ))
+            .focus_at(1),
+        ));
+    }
+
+    let draft = current_draft(ctx);
+    let bg_source = if let Some(ref bg_file) = draft.background_image {
+        let p1 = tako_themes::overrides::override_dir(&themes_root, base_id).join(bg_file);
+        let p2 = tako_themes::overrides::override_dir(&themes_root, None).join(bg_file);
+        if p1.is_file() {
+            Some(p1)
+        } else if p2.is_file() {
+            Some(p2)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let opts = tako_themes::create::CreateThemeOptions {
+        name: &name,
+        author: None,
+        version: Some("1.0.0"),
+        description: None,
+        tokens: &draft,
+        background_image_source: bg_source.as_deref(),
+        overwrite,
+    };
+
+    match tako_themes::create::create_theme(&themes_root, &opts) {
+        Ok(installed) => {
+            let created_id = installed.id();
+            ctx.discard_theme_draft();
+            ctx.reload_theme_cache();
+
+            let id_apply = created_id.clone();
+            let name_apply = name.clone();
+            let name_dialog = name.clone();
+            Flow::Replace(Box::new(
+                MenuLayer::dialog(
+                    ctx.t("settings.appearance.theme_created_title"),
+                    move |ctx| {
+                        let id_now = id_apply.clone();
+                        let name_now = name_apply.clone();
+                        let name_keep = name_apply.clone();
+                        vec![
+                            MenuItem::new(
+                                PanelRow::button(
+                                    "apply",
+                                    ctx.t("settings.appearance.theme_apply_now"),
+                                )
+                                .primary(),
+                            )
+                            .on(move |ctx| {
+                                match tako_themes::select(&ctx.paths.themes(), Some(&id_now)) {
+                                    Ok(()) => {
+                                        ctx.reload_theme_cache();
+                                        ctx.effect(Effect::ApplyTheme(id_now.clone()));
+                                        ctx.toast(ctx.tf(
+                                            "settings.appearance.theme_created_applied",
+                                            &[("name", &name_now)],
+                                        ));
+                                        Flow::CloseAll
+                                    }
+                                    Err(e) => {
+                                        ctx.toast(e.to_string());
+                                        Flow::CloseAll
+                                    }
+                                }
+                            }),
+                            MenuItem::new(PanelRow::button(
+                                "keep",
+                                ctx.t("settings.appearance.theme_keep_current"),
+                            ))
+                            .on(move |ctx| {
+                                ctx.toast(ctx.tf(
+                                    "settings.appearance.theme_created",
+                                    &[("name", &name_keep)],
+                                ));
+                                Flow::CloseAll
+                            }),
+                        ]
+                    },
+                )
+                .text(ctx.tf(
+                    "settings.appearance.theme_created_apply_prompt",
+                    &[("name", &name_dialog)],
+                )),
+            ))
+        }
+        Err(e) => {
+            tracing::error!("erro ao criar tema: {e}");
+            ctx.toast(ctx.tf(
+                "settings.appearance.theme_create_error",
+                &[("error", &e.to_string())],
+            ));
+            Flow::Stay
+        }
+    }
+}
+
+pub(crate) fn export_theme_panel(ctx: &mut Ctx) -> Flow {
+    let installed = installed_themes(ctx);
+    let exportable: Vec<_> = installed
+        .into_iter()
+        .filter(|t| tako_themes::create::is_tokens_only_theme(&t.dir))
+        .collect();
+
+    if exportable.is_empty() {
+        return Flow::Stay;
+    }
+
+    if exportable.len() == 1 {
+        let id = exportable[0].id();
+        return run_export_theme(ctx, &id);
+    }
+
+    Flow::Push(Box::new(
+        MenuLayer::dialog(
+            ctx.t("settings.appearance.export_theme_title"),
+            move |_ctx| {
+                let installed = installed_themes(_ctx);
+                installed
+                    .into_iter()
+                    .filter(|t| tako_themes::create::is_tokens_only_theme(&t.dir))
+                    .map(|t| {
+                        let id = t.id();
+                        let name = t
+                            .manifest
+                            .as_ref()
+                            .map_or_else(|_| id.clone(), |m| m.name.clone());
+                        let id_run = id.clone();
+                        MenuItem::new(PanelRow::action(id, name).icon("folder"))
+                            .on(move |ctx| run_export_theme(ctx, &id_run))
+                    })
+                    .collect()
+            },
+        )
+        .text(ctx.t("settings.appearance.export_theme_choose")),
+    ))
+}
+
+pub(crate) fn run_export_theme(ctx: &mut Ctx, theme_id: &str) -> Flow {
+    let theme_dir = ctx.paths.themes().join(theme_id);
+    let default_filename = format!("{theme_id}.takotheme");
+    let dialog_title = ctx.t("settings.appearance.export_theme_title");
+
+    crate::tasks::run(
+        ctx,
+        move || {
+            rfd::FileDialog::new()
+                .set_title(&dialog_title)
+                .set_file_name(&default_filename)
+                .add_filter("Tako Theme", &["takotheme"])
+                .save_file()
+        },
+        move |ctx, picked| {
+            let Some(dest_path) = picked else {
+                return;
+            };
+            match tako_themes::export::export_theme(&theme_dir, &dest_path) {
+                Ok(()) => {
+                    let path_str = dest_path.display().to_string();
+                    ctx.toast(ctx.tf("settings.appearance.theme_exported", &[("path", &path_str)]));
+                }
+                Err(e) => {
+                    tracing::error!("falha ao exportar tema: {e}");
+                    let err_str = e.to_string();
+                    ctx.toast(ctx.tf(
+                        "settings.appearance.theme_export_error",
+                        &[("error", &err_str)],
+                    ));
+                }
+            }
+        },
+    );
+    Flow::Close
 }
 
 fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
@@ -1192,6 +1606,14 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             .on(|ctx| Flow::Push(Box::new(edit_theme_panel(ctx)))),
         );
     }
+    items.push(
+        MenuItem::new(
+            PanelRow::action("create-theme", ctx.t("settings.appearance.create_theme"))
+                .desc(ctx.t("settings.appearance.create_theme_desc"))
+                .icon("palette"),
+        )
+        .on(|ctx| Flow::Push(Box::new(choose_base_theme_panel(ctx)))),
+    );
     items.extend([
         toggle(
             ctx,
