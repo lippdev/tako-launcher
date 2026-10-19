@@ -79,27 +79,27 @@ impl SteamArtResolver {
                         "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/{app}/{hash}.jpg"
                     )));
                 }
-                out.extend(self.local(app, &["icon.jpg", "icon.png"]));
+                out.extend(self.local(app, local_names(kind)));
             }
             "logo" => {
                 from_api(&["library_logo_2x", "library_logo"], &mut out);
                 out.push(ArtSource::Url(format!("{LEGACY_BASE}{app}/logo_2x.png")));
                 out.push(ArtSource::Url(format!("{LEGACY_BASE}{app}/logo.png")));
-                out.extend(self.local(app, &["logo.png"]));
+                out.extend(self.local(app, local_names(kind)));
             }
             "hero" => {
                 from_api(&["library_hero_2x", "library_hero"], &mut out);
                 out.push(ArtSource::Url(format!(
                     "{LEGACY_BASE}{app}/library_hero_2x.jpg"
                 )));
-                out.extend(self.local(app, &["library_hero.jpg"]));
+                out.extend(self.local(app, local_names(kind)));
             }
             _ => {
                 from_api(&["library_capsule_2x", "library_capsule"], &mut out);
                 out.push(ArtSource::Url(format!(
                     "{LEGACY_BASE}{app}/library_600x900_2x.jpg"
                 )));
-                out.extend(self.local(app, &["library_600x900.jpg", "library_capsule.jpg"]));
+                out.extend(self.local(app, local_names(kind)));
             }
         }
         out
@@ -163,12 +163,44 @@ impl SteamArtResolver {
                 return None;
             }
         };
-        parse_json(&r.body)?
-            .get("response")?
-            .get("store_items")?
-            .get(0)?
-            .get("assets")
-            .cloned()
+        // A API respondeu: sem artes vira `Null`, para `answered` separar "não existe" de "sem rede".
+        let assets = parse_json(&r.body).and_then(|v| {
+            v.get("response")?
+                .get("store_items")?
+                .get(0)?
+                .get("assets")
+                .cloned()
+        });
+        Some(assets.unwrap_or(Value::Null))
+    }
+
+    /// Só o cache local da Steam para a arte, sem rede.
+    pub fn local_files(&self, uri: &str) -> Vec<PathBuf> {
+        let Some((app, kind)) = parse_uri(uri) else {
+            return Vec::new();
+        };
+        self.local(app, local_names(kind))
+            .into_iter()
+            .filter_map(|c| match c {
+                ArtSource::File(p) => Some(p),
+                ArtSource::Url(_) => None,
+            })
+            .collect()
+    }
+
+    /// A API da Steam respondeu sobre o `app` (com ou sem artes) nesta sessão.
+    pub fn answered(&self, app: u32) -> bool {
+        self.lock().get(&app).is_some_and(Option::is_some)
+    }
+}
+
+/// Nomes da arte no cache local da Steam, por tipo.
+fn local_names(kind: &str) -> &'static [&'static str] {
+    match kind {
+        "icon" => &["icon.jpg", "icon.png"],
+        "logo" => &["logo.png"],
+        "hero" => &["library_hero.jpg"],
+        _ => &["library_600x900.jpg", "library_capsule.jpg"],
     }
 }
 

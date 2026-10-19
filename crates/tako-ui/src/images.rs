@@ -108,6 +108,9 @@ struct State {
     pending: HashSet<String>,
     failed: HashSet<String>,
     tx: Option<Sender<Request>>,
+    /// Fila só dos ícones da lista: centenas deles, muitos pela rede, não podem passar à frente da capa e do
+    /// fundo que estão na tela (regressão da alpha.15).
+    icon_tx: Option<Sender<Request>>,
     on_ready: Option<Box<dyn Fn()>>,
 }
 
@@ -118,25 +121,31 @@ thread_local! {
         pending: HashSet::new(),
         failed: HashSet::new(),
         tx: None,
+        icon_tx: None,
         on_ready: None,
     });
 }
 
 /// Liga o carregador (na thread da UI). `on_ready` é chamado na thread da UI quando uma imagem chega.
 pub fn init(resolver: Resolver, workers: usize, on_ready: impl Fn() + 'static) {
-    let (tx, rx) = channel::<Request>();
-    let rx = Arc::new(Mutex::new(rx));
-    for _ in 0..workers.max(1) {
-        let rx = rx.clone();
-        let resolver = resolver.clone();
-        std::thread::Builder::new()
-            .name("tako-images".into())
-            .spawn(move || worker(rx, resolver))
-            .ok();
-    }
+    let pool = |name: &str| {
+        let (tx, rx) = channel::<Request>();
+        let rx = Arc::new(Mutex::new(rx));
+        for _ in 0..workers.max(1) {
+            let rx = rx.clone();
+            let resolver = resolver.clone();
+            std::thread::Builder::new()
+                .name(name.into())
+                .spawn(move || worker(rx, resolver))
+                .ok();
+        }
+        tx
+    };
+    let (tx, icon_tx) = (pool("tako-images"), pool("tako-icons"));
     STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.tx = Some(tx);
+        s.icon_tx = Some(icon_tx);
         s.on_ready = Some(Box::new(on_ready));
     });
 }
@@ -190,7 +199,8 @@ fn request(uri: &str, max_w: u32, max_h: u32, glass: bool, icon: bool) -> Option
             glass,
             icon,
         };
-        if let Some(tx) = &s.tx
+        let tx = if icon { &s.icon_tx } else { &s.tx };
+        if let Some(tx) = tx
             && tx.send(request).is_ok()
         {
             s.pending.insert(key);
@@ -285,8 +295,10 @@ fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
                 }
             });
         });
+        // Sem event loop (fechando o app, ou nos testes) a resposta se perde, mas a thread segue até a fila fechar:
+        // parar aqui deixaria os pedidos seguintes pendentes para sempre.
         if sent.is_err() {
-            return;
+            continue;
         }
     }
 }
@@ -471,6 +483,33 @@ fn percent_decode(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Regressão da alpha.15: com 300 ícones na fila (cada um ~20 ms de rede), o fundo do jogo em destaque
+    /// esperava atrás de todos (~4 s aqui; com a rede de verdade, minutos). Os ícones têm a fila deles.
+    /// Sem event loop no teste, as threads seguem vivas (ver `worker`), então a espera é a da fila.
+    #[test]
+    fn icons_do_not_hold_back_the_art_on_screen() {
+        let (seen, hero) = channel::<()>();
+        let seen = Mutex::new(seen);
+        let resolver: Resolver = Arc::new(move |uri: &str| {
+            if uri.starts_with("icon") {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            } else if let Ok(tx) = seen.lock() {
+                let _ = tx.send(());
+            }
+            None
+        });
+        init(resolver, 2, || {});
+        for i in 0..300 {
+            assert!(icon(&format!("icon://{i}"), 56).is_none());
+        }
+        let asked = std::time::Instant::now();
+        assert!(get("hero://destaque", 1600, 900).is_none());
+        let waited = hero.recv_timeout(std::time::Duration::from_secs(2));
+        let ms = asked.elapsed().as_millis();
+        eprintln!("fundo resolvido {ms} ms depois do pedido, com 300 ícones na fila");
+        assert!(waited.is_ok() && ms < 500, "fundo esperou {ms} ms");
+    }
 
     #[test]
     fn local_paths() {
