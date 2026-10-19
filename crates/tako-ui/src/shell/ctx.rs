@@ -200,6 +200,9 @@ pub mod keys {
     pub const DISCORD_PRESENCE: &str = "DiscordRichPresence";
     pub const FIRST_RUN_DONE: &str = "FirstRunCompleted";
     pub const SMART_COLLECTIONS: &str = "SmartCollections";
+    pub const API_ENABLED: &str = tako_core::api::API_ENABLED;
+    pub const API_PORT: &str = tako_core::api::API_PORT;
+    pub const API_TOKEN: &str = tako_core::api::API_TOKEN;
 }
 
 /// O que o "Desfazer" de um aviso faz.

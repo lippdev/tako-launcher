@@ -3,6 +3,7 @@
 //! Regra (PRD §5.1): nada aqui depende de UI nem de SO. Código específico de sistema fica em
 //! `tako-platform` e `tako-sources`.
 
+pub mod api;
 pub mod devices;
 pub mod diagnostics;
 pub mod i18n;

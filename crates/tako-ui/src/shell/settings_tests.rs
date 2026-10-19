@@ -824,3 +824,48 @@ fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
     let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
     assert_eq!(volume(&ctx.settings), 65);
 }
+
+#[test]
+fn api_settings_panel_toggles_and_regenerates_token() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    assert!(!ctx.settings.bool(keys::API_ENABLED, false));
+
+    let rows = rows_of(&ctx, "system");
+    let api_row = find(&rows, "settings.system.api");
+    assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
+
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+
+    let panel_rows = panel.render(&ctx).rows;
+    let enabled_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-enabled")
+        .unwrap();
+    for _ in 0..enabled_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    assert!(ctx.settings.bool(keys::API_ENABLED, false));
+    let token1 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token1.is_empty());
+
+    let regen_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-regenerate")
+        .unwrap();
+    let current_pos = enabled_pos;
+    if regen_pos > current_pos {
+        for _ in current_pos..regen_pos {
+            panel.handle(Cmd::Down, &mut ctx);
+        }
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    let token2 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token2.is_empty());
+    assert_ne!(token1, token2);
+    assert!(ctx.toast.is_some());
+}

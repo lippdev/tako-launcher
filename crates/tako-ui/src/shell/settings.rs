@@ -885,10 +885,10 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             .desc(ctx.t("settings.system.safemode_off_desc")),
         )
     });
+    v.push(MenuItem::new(PanelRow::header(
+        ctx.t("settings.system.integrations_header"),
+    )));
     if crate::discord::available() {
-        v.push(MenuItem::new(PanelRow::header(
-            ctx.t("settings.system.integrations_header"),
-        )));
         v.push(toggle(
             ctx,
             "settings.system.discord",
@@ -896,6 +896,19 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             false,
         ));
     }
+    let api_on = ctx.settings.bool(keys::API_ENABLED, false);
+    v.push(
+        MenuItem::new(
+            PanelRow::action("settings.system.api", ctx.t("settings.system.api"))
+                .desc(ctx.t("settings.system.api_desc"))
+                .value(ctx.t(if api_on {
+                    "settings.system.api_on"
+                } else {
+                    "settings.system.api_off"
+                })),
+        )
+        .on(|ctx| Flow::Push(Box::new(api_panel(ctx)))),
+    );
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.system.advanced_header"),
     )));
@@ -916,6 +929,71 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
         );
     }
     v
+}
+
+fn api_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("settings.system.api_panel_title"), |ctx| {
+        let enabled = ctx.settings.bool(keys::API_ENABLED, false);
+        let port = ctx.settings.get(keys::API_PORT).unwrap_or("47774");
+        let token = ctx.settings.string(keys::API_TOKEN);
+        let token_preview = if token.is_empty() {
+            ctx.t("settings.metadata.not_set")
+        } else {
+            format!("{}…", &token[..token.len().min(8)])
+        };
+
+        vec![
+            MenuItem::new(
+                PanelRow::toggle("api-enabled", ctx.t("settings.system.api_enabled"), enabled)
+                    .desc(ctx.t("settings.system.api_enabled_desc")),
+            )
+            .on(|ctx| {
+                let on = ctx.settings.toggle(keys::API_ENABLED, false);
+                if on && ctx.settings.string(keys::API_TOKEN).is_empty() {
+                    let token = tako_core::api::generate_token();
+                    ctx.settings.set(keys::API_TOKEN, &token);
+                }
+                crate::local_api::sync(ctx);
+                Flow::Stay
+            }),
+            MenuItem::new(
+                PanelRow::info("api-port", ctx.t("settings.system.api_port"), port)
+                    .desc(ctx.t("settings.system.api_port_desc")),
+            ),
+            MenuItem::new(
+                PanelRow::action("api-token", ctx.t("settings.system.api_token"))
+                    .desc(ctx.t("settings.system.api_token_desc"))
+                    .value(token_preview),
+            )
+            .on(|ctx| {
+                let mut token = ctx.settings.string(keys::API_TOKEN);
+                if token.is_empty() {
+                    token = tako_core::api::generate_token();
+                    ctx.settings.set(keys::API_TOKEN, &token);
+                    crate::local_api::sync(ctx);
+                }
+                let title = ctx.t("settings.system.api_token_dialog_title");
+                let desc = ctx.t("settings.system.api_token_dialog_desc");
+                let text = format!(
+                    "{desc}
+
+{token}"
+                );
+                Flow::Push(Box::new(text_dialog(title, text)))
+            }),
+            MenuItem::new(
+                PanelRow::action("api-regenerate", ctx.t("settings.system.api_regenerate"))
+                    .desc(ctx.t("settings.system.api_regenerate_desc")),
+            )
+            .on(|ctx| {
+                let new_token = tako_core::api::generate_token();
+                ctx.settings.set(keys::API_TOKEN, &new_token);
+                crate::local_api::sync(ctx);
+                ctx.toast(ctx.t("settings.system.api_token_regenerated"));
+                Flow::Stay
+            }),
+        ]
+    })
 }
 
 // ---------------------------------------------------------------- Sobre

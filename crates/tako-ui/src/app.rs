@@ -292,6 +292,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                     s.ctx.check_installs(); // avisa o que acabou de instalar
                     s.apply_pending_link();
                     s.ctx.dirty = true;
+                    crate::local_api::sync(&mut s.ctx);
                 }
             });
             measure_sizes(&found, to_measure);
@@ -1198,6 +1199,7 @@ impl App {
         drop(ui);
         self.end_intro_later();
         rescan(&self.shell, true); // ao abrir: a lista de não instalados da Steam vem fresca
+        crate::local_api::sync(&mut self.shell.borrow_mut().ctx);
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
     }
 

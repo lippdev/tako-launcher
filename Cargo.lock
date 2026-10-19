@@ -5051,6 +5051,7 @@ dependencies = [
  "tempfile",
  "toml",
  "tracing",
+ "ureq",
 ]
 
 [[package]]
