@@ -45,6 +45,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use zip::read::ZipFile;
 use zip::write::SimpleFileOptions;
 use zip::{ZipArchive, ZipWriter};
 
@@ -667,13 +668,7 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
             .map_err(|e| BackupError::CorruptZip(e.to_string()))?
             .into_owned();
 
-        println!(
-            "DEBUG ENTRY {i}: name={}, is_symlink={}, mode={:?}",
-            raw_name,
-            entry.is_symlink(),
-            entry.unix_mode()
-        );
-        if entry.is_symlink() {
+        if is_symlink_entry(&entry) {
             return Err(BackupError::UnsafePath {
                 entry: raw_name,
                 reason: i18n::t("backup.error.symlink_not_allowed"),
@@ -785,7 +780,7 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
             .map_err(|e| BackupError::CorruptZip(e.to_string()))?
             .to_string();
 
-        if entry.is_symlink() {
+        if is_symlink_entry(&entry) {
             return Err(BackupError::UnsafePath {
                 entry: raw_name,
                 reason: i18n::t("backup.error.symlink_not_allowed"),
@@ -961,6 +956,14 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
         manifest,
         auto_backup_path,
     })
+}
+
+fn is_symlink_entry<R: io::Read>(entry: &ZipFile<'_, R>) -> bool {
+    if entry.is_symlink() {
+        return true;
+    }
+    let unix_mode = entry.external_attributes() >> 16;
+    (unix_mode & 0o170000) == 0o120000
 }
 
 fn is_known_secret_file(name: &str) -> bool {
@@ -1745,7 +1748,9 @@ mod tests {
         {
             let file = File::create(&symlink_zip).unwrap();
             let mut zip = ZipWriter::new(file);
-            let opts = SimpleFileOptions::default().external_attributes(0o120777 << 16);
+            let opts = SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .external_attributes(0o120777 << 16);
 
             let manifest = BackupManifest {
                 version: CURRENT_BACKUP_VERSION,
@@ -1753,6 +1758,60 @@ mod tests {
                 database_version: migrator::latest_version(),
                 created_at: format_date(Utc::now()),
                 os: "Linux".into(),
+                description: None,
+            };
+            zip.start_file(MANIFEST_FILE, SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(toml::to_string(&manifest).unwrap().as_bytes())
+                .unwrap();
+
+            zip.start_file("tako.db", SimpleFileOptions::default())
+                .unwrap();
+            let mut f = File::open(&valid_db_path).unwrap();
+            io::copy(&mut f, &mut zip).unwrap();
+
+            zip.start_file("themes/symlink", opts).unwrap();
+            zip.write_all(b"/etc/passwd").unwrap();
+
+            zip.finish().unwrap();
+        }
+
+        let err = restore_backup(&paths, &symlink_zip).unwrap_err();
+        assert!(matches!(err, BackupError::UnsafePath { .. }));
+        let msg = err.to_string();
+        assert!(
+            msg.contains("links simbólicos") || msg.contains("symbolic links"),
+            "mensagem de erro: {msg}"
+        );
+    }
+
+    #[test]
+    fn symlink_with_dos_system_attribute_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = make_test_paths(dir.path());
+        let symlink_zip = dir.path().join("dos_symlink.takobackup");
+
+        let valid_db_path = dir.path().join("valid.db");
+        {
+            let conn = Connection::open(&valid_db_path).unwrap();
+            migrator::migrate(&conn, None).unwrap();
+            conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+                .unwrap();
+        }
+
+        {
+            let file = File::create(&symlink_zip).unwrap();
+            let mut zip = ZipWriter::new(file);
+            let opts = SimpleFileOptions::default()
+                .system(zip::System::Dos)
+                .external_attributes(0o120777 << 16);
+
+            let manifest = BackupManifest {
+                version: CURRENT_BACKUP_VERSION,
+                tako_version: "0.2.0".into(),
+                database_version: migrator::latest_version(),
+                created_at: format_date(Utc::now()),
+                os: "Windows".into(),
                 description: None,
             };
             zip.start_file(MANIFEST_FILE, SimpleFileOptions::default())
