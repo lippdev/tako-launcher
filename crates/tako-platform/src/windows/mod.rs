@@ -9,6 +9,7 @@ mod audio;
 mod autostart;
 mod display;
 pub mod dpapi;
+pub mod exe_icon;
 mod hidhide;
 pub mod hotkey;
 mod pointer;

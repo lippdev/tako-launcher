@@ -3,6 +3,7 @@
 //! e tempo jogado / última vez em `userdata/<conta>/config/localconfig.vdf` (da conta usada por último).
 //! Jogos não Steam adicionados à Steam ficam em [`shortcuts`].
 
+pub mod appinfo;
 pub mod owned;
 pub mod shortcuts;
 pub mod vdf;
@@ -13,7 +14,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use tako_core::i18n::{Lang, lang, t};
-use tako_core::library::{Game, GameStore, InstallProgress};
+use tako_core::library::{Game, GameStore, InstallProgress, media};
 
 /// Esquema das artes resolvidas pelo launcher (API da Steam, CDN e cache local da Steam).
 pub const ART_SCHEME: &str = "steam-art";
@@ -61,6 +62,8 @@ pub struct SteamApp {
     pub installing: Option<InstallProgress>,
     /// Tamanho da instalação pedida, enquanto baixa (o `SizeOnDisk` ainda está crescendo).
     pub install_size: Option<u64>,
+    /// Ícone do jogo (`file:///` do `.ico` da Steam ou JPG da CDN), quando o `appinfo.vdf` o informa.
+    pub icon: Option<String>,
 }
 
 /// Jogos instalados (e os que a Steam está instalando) em todas as bibliotecas de `steam_root`, por nome.
@@ -86,7 +89,36 @@ pub fn scan(steam_root: &Path) -> Vec<SteamApp> {
         }
     }
     apps.sort_by_cached_key(|a| crate::text::fold(&a.name));
+    let wanted = apps.iter().map(|a| a.app_id).collect();
+    let icons = appinfo::read(&steam_root.join("appcache").join("appinfo.vdf"), &wanted);
+    for app in &mut apps {
+        app.icon = icons
+            .get(&app.app_id)
+            .and_then(|i| icon_uri(steam_root, app.app_id, i));
+    }
     apps
+}
+
+/// Ícone da loja do app: o `.ico` do cliente, que a Steam já guarda em `steam/games` (vários tamanhos, sem
+/// rede), ou o JPG 32x32 da CDN. Os dois nomes vêm do `appinfo.vdf` (dado externo, hash validado).
+fn icon_uri(steam_root: &Path, app_id: u32, icons: &appinfo::AppIcons) -> Option<String> {
+    let local = icons.client_icon.as_deref().map(|h| {
+        steam_root
+            .join("steam")
+            .join("games")
+            .join(format!("{h}.ico"))
+    });
+    match local {
+        Some(file) if file.is_file() => Some(crate::file_uri(&file)),
+        _ => icons.icon.as_deref().and_then(|h| icon_url(app_id, h)),
+    }
+}
+
+/// JPG do ícone (32x32) na CDN da Steam; `None` se o hash não é de arquivo.
+pub fn icon_url(app_id: u32, hash: &str) -> Option<String> {
+    appinfo::valid_hash(hash).then(|| {
+        format!("https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{hash}.jpg")
+    })
 }
 
 /// Pastas de biblioteca: a da própria Steam e as de `libraryfolders.vdf` (formatos novo e antigo).
@@ -170,6 +202,7 @@ fn read_manifest(
         play_time,
         installing,
         install_size,
+        icon: None,
     })
 }
 
@@ -267,6 +300,15 @@ pub fn to_game(app: &SteamApp) -> Game {
         installing: app.installing,
         install_size: app.install_size,
         steam_app_id: Some(id),
+        media: app
+            .icon
+            .iter()
+            .map(|i| (media::ICON.to_owned(), i.clone()))
+            .collect(),
+        icon_origin: app
+            .icon
+            .as_ref()
+            .map(|_| tako_core::library::IconOrigin::Store),
         ..Default::default()
     }
 }
@@ -475,6 +517,39 @@ mod tests {
                 "\"AppState\"\n{{\n \"appid\" \"{app_id}\"\n \"name\" \"{name}\"\n \"StateFlags\" \"{flags}\"\n \"installdir\" \"{name}\"\n \"SizeOnDisk\" \"{size}\"\n}}"
             ),
         );
+    }
+
+    #[test]
+    fn installed_game_icon_is_the_local_client_icon_then_the_cdn_jpg() {
+        let dir = tempfile::tempdir().unwrap();
+        let steam = dir.path().join("Steam");
+        manifest(&steam, 570, "Dota 2", 4, 1);
+        manifest(&steam, 620, "Portal 2", 4, 1);
+        manifest(&steam, 730, "Sem appinfo", 4, 1);
+        // 570 tem o .ico no disco; 620 não (só o JPG da CDN); 730 nem aparece no appinfo.
+        write(&steam, "steam/games/d00d.ico", "x");
+        let info =
+            appinfo::tests::apps_file(0x0756_4428, &[(570, "c0ffee", "d00d"), (620, "e1", "e2")]);
+        fs::create_dir_all(steam.join("appcache")).unwrap();
+        fs::write(steam.join("appcache/appinfo.vdf"), info).unwrap();
+
+        let games: Vec<Game> = scan(&steam).iter().map(to_game).collect();
+
+        let icon = |title: &str| {
+            games
+                .iter()
+                .find(|g| g.title == title)
+                .and_then(|g| g.media.get(media::ICON).cloned())
+        };
+        assert!(icon("Dota 2").unwrap().ends_with("/steam/games/d00d.ico"));
+        assert!(icon("Dota 2").unwrap().starts_with("file://"));
+        assert_eq!(
+            icon("Portal 2").as_deref(),
+            Some(
+                "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/620/e1.jpg"
+            )
+        );
+        assert_eq!(icon("Sem appinfo"), None);
     }
 
     #[test]

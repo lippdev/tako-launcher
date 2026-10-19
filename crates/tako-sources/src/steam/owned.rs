@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use std::path::Path;
 use std::time::Duration;
-use tako_core::library::{Game, GameStore};
+use tako_core::library::{Game, GameStore, media};
 
 pub const OWNED_URL: &str = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/";
 /// Página onde o usuário cria a própria chave da Web API.
@@ -23,6 +23,8 @@ pub struct OwnedApp {
     pub name: String,
     pub play_time: Duration,
     pub last_played: Option<DateTime<Utc>>,
+    /// JPG 32x32 do ícone na CDN, do `img_icon_url` da API.
+    pub icon: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -45,6 +47,8 @@ struct RawGame {
     playtime_forever: u64,
     #[serde(default)]
     rtime_last_played: i64,
+    #[serde(default)]
+    img_icon_url: String,
 }
 
 pub fn steam_id(account_id: u32) -> u64 {
@@ -85,6 +89,7 @@ pub fn parse(json: &str) -> Option<Vec<OwnedApp>> {
                 last_played: (g.rtime_last_played > 0)
                     .then(|| DateTime::from_timestamp(g.rtime_last_played, 0))
                     .flatten(),
+                icon: super::icon_url(g.appid, &g.img_icon_url),
             })
             .collect(),
     )
@@ -123,6 +128,15 @@ pub fn to_game(app: &OwnedApp) -> Game {
         last_played_at: app.last_played,
         play_time: app.play_time,
         steam_app_id: Some(id),
+        media: app
+            .icon
+            .iter()
+            .map(|i| (media::ICON.to_owned(), i.clone()))
+            .collect(),
+        icon_origin: app
+            .icon
+            .as_ref()
+            .map(|_| tako_core::library::IconOrigin::Store),
         ..Default::default()
     }
 }
@@ -144,7 +158,7 @@ mod tests {
 
     const ANSWER: &str = r#"{"response":{"game_count":4,"games":[
         {"appid":570,"name":"Dota 2","playtime_forever":600,"rtime_last_played":1700000000,"img_icon_url":"x"},
-        {"appid":1145360,"name":" Hades ","playtime_forever":0,"rtime_last_played":0},
+        {"appid":1145360,"name":" Hades ","playtime_forever":0,"rtime_last_played":0,"img_icon_url":"1f2e3d"},
         {"appid":228980,"name":"Steamworks Common Redistributables"},
         {"appid":7,"name":""}
     ]}}"#;
@@ -157,6 +171,27 @@ mod tests {
         assert_eq!(apps[0].last_played.unwrap().timestamp(), 1_700_000_000);
         assert_eq!(apps[1].name, "Hades");
         assert_eq!(apps[1].last_played, None);
+        // Ícone 32x32 da CDN pelo hash da API; hash que não é nome de arquivo ou ausente = sem ícone.
+        assert!(
+            apps[1]
+                .icon
+                .as_deref()
+                .unwrap()
+                .ends_with("/apps/1145360/1f2e3d.jpg")
+        );
+        assert_eq!(
+            to_game(&apps[1]).media["icon"],
+            apps[1].icon.clone().unwrap()
+        );
+        assert_eq!(
+            apps[0].icon.as_deref().map(|u| u.ends_with("/570/x.jpg")),
+            Some(true)
+        );
+        let bad = parse(r#"{"response":{"games":[{"appid":1,"name":"A","img_icon_url":"../x"},{"appid":2,"name":"B"}]}}"#).unwrap();
+        assert!(
+            bad.iter()
+                .all(|a| a.icon.is_none() && to_game(a).media.is_empty())
+        );
         // Perfil privado: resposta sem jogos.
         assert_eq!(parse(r#"{"response":{}}"#), Some(Vec::new()));
         assert_eq!(parse("<html>"), None);

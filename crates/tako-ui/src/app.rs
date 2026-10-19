@@ -241,13 +241,28 @@ pub(crate) static SCAN_PROGRESS: AtomicU32 = AtomicU32::new(0);
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar. `force`: busca a lista de jogos da conta
 /// Steam agora, sem esperar o cache de 1 hora (abrir o Tako e "Procurar jogos instalados").
 pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
-    let (found, disabled, simulate, steam_key, steam_cache, emulators) = {
+    let (found, disabled, simulate, steam_key, steam_cache, emulators, exe_icons, manual_targets) = {
         let mut s = shell.borrow_mut();
         if s.ctx.scanning {
             return;
         }
         s.ctx.scanning = true;
         SCAN_PROGRESS.store(0, Ordering::Relaxed);
+        let manual_targets: Vec<std::path::PathBuf> = s
+            .ctx
+            .library
+            .games()
+            .iter()
+            .filter(|g| g.store() == tako_core::library::GameStore::Manual && g.is_installed)
+            .filter_map(|g| {
+                let target = g.launch_target.as_deref()?;
+                if target.to_ascii_lowercase().ends_with(".exe") {
+                    Some(std::path::PathBuf::from(target))
+                } else {
+                    None
+                }
+            })
+            .collect();
         (
             s.ctx.found.clone(),
             s.ctx
@@ -257,6 +272,8 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
             s.ctx.platform.secrets.get(crate::steam_owned::SECRET),
             crate::steam_owned::cache(&s.ctx.paths),
             crate::sources::emulator_config(&s.ctx.settings),
+            s.ctx.paths.cache().join("exe-icons"),
+            manual_targets,
         )
     };
     std::thread::Builder::new()
@@ -270,7 +287,19 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                 }
                 steam_cache
             });
-            let reports = scan_into(&found, &disabled, simulate, steam_owned, emulators);
+            let reports = scan_into(
+                &found,
+                &disabled,
+                simulate,
+                steam_owned,
+                emulators,
+                &exe_icons,
+            );
+            if !simulate {
+                for exe in &manual_targets {
+                    tako_platform::exe_icon::icon_file(exe, &exe_icons);
+                }
+            }
             let free_space = (!simulate).then(default_free_space).flatten();
             let to_measure: Vec<(String, String)> = found
                 .lock()
@@ -372,13 +401,20 @@ fn scan_into(
     simulate: bool,
     steam_owned: Option<PathBuf>,
     emulators: tako_sources::emulators::Config,
+    exe_icons: &std::path::Path,
 ) -> Vec<tako_sources::report::LibrarySourceReport> {
     if simulate {
         return Vec::new();
     }
-    let (games, reports) = crate::sources::scan(disabled, steam_owned, emulators, |done, total| {
-        SCAN_PROGRESS.store((done * 1000 / total.max(1)) as u32, Ordering::Relaxed);
-    });
+    let (games, reports) = crate::sources::scan(
+        disabled,
+        steam_owned,
+        emulators,
+        exe_icons,
+        |done, total| {
+            SCAN_PROGRESS.store((done * 1000 / total.max(1)) as u32, Ordering::Relaxed);
+        },
+    );
     if let Ok(mut f) = found.lock() {
         *f = games;
     }
@@ -1786,7 +1822,17 @@ mod tests {
             })
             .collect();
         let found = Mutex::new(bench);
-        assert!(scan_into(&found, "", true, None, Default::default()).is_empty());
+        assert!(
+            scan_into(
+                &found,
+                "",
+                true,
+                None,
+                Default::default(),
+                std::path::Path::new("")
+            )
+            .is_empty()
+        );
         assert_eq!(found.lock().unwrap().len(), 1000);
     }
 
