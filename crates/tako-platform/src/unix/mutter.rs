@@ -2,7 +2,7 @@
 //! (a parte D-Bus fica em `linux::displays`) e a montagem do `ApplyMonitorsConfig`.
 
 use super::outputs::{Output, OutputMode};
-use tako_core::devices::HdrStatus;
+use tako_core::devices::{HdrStatus, VrrStatus};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MutterMode {
@@ -83,6 +83,7 @@ pub fn outputs(state: &MutterState) -> Vec<Output> {
                     (false, None) => current.map_or(1.0, |m| m.preferred_scale),
                 },
                 hdr: HdrStatus::Unsupported,
+                vrr: VrrStatus::Unsupported,
             }
         })
         .collect()

@@ -15,18 +15,48 @@ fn io_error(what: &str, e: io::Error) -> DeviceError {
     }
 }
 
+/// Quanto uma leitura (`kscreen-doctor -j`, `wlr-randr --json`, pactl) pode demorar antes de travar a interface.
+const TOOL_LIMIT: Duration = Duration::from_secs(10);
+/// Aplicar telas espera o compositor e a TV trocarem de modo: bem mais lento que ler.
+const APPLY_LIMIT: Duration = Duration::from_secs(30);
+
 /// Roda uma ferramenta e devolve a saída padrão. Ferramenta ausente = `Unsupported`.
 pub fn tool(program: &str, args: &[String]) -> DeviceResult<String> {
-    let out = Command::new(program)
+    tool_within(program, args, TOOL_LIMIT)
+}
+
+/// Como [`tool`], para comandos que aplicam mudanças nas telas.
+pub fn apply_tool(program: &str, args: &[String]) -> DeviceResult<String> {
+    tool_within(program, args, APPLY_LIMIT)
+}
+
+fn tool_within(program: &str, args: &[String], limit: Duration) -> DeviceResult<String> {
+    let child = Command::new(program)
         .args(args)
         .stdin(Stdio::null())
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| match e.kind() {
             io::ErrorKind::NotFound => {
                 DeviceError::Unsupported(format!("{program} não está instalado"))
             }
             _ => io_error(program, e),
         })?;
+    let pid = child.id();
+    let (tx, rx) = std::sync::mpsc::channel();
+    // A espera fica numa thread: travada, é morta e a thread recolhe o processo.
+    std::thread::spawn(move || tx.send(child.wait_with_output()));
+    let out = match rx.recv_timeout(limit) {
+        Ok(out) => out.map_err(|e| io_error(program, e))?,
+        Err(_) => {
+            let _ = kill(&[pid]);
+            return Err(DeviceError::Failed(format!(
+                "{program} não respondeu em {} s",
+                limit.as_secs_f32()
+            )));
+        }
+    };
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
         let err: String = err.trim().chars().take(500).collect();
@@ -278,6 +308,9 @@ mod tests {
             Err(DeviceError::Unsupported(_))
         ));
         assert!(has_tool("sh"));
+        let slow = tool_within("sleep", &["5".into()], Duration::from_millis(300));
+        assert!(slow.unwrap_err().to_string().contains("não respondeu"));
+        assert_eq!(tool("echo", &["oi".into()]).unwrap(), "oi\n");
         assert!(!has_tool("tako-no-such-tool"));
         let pid = spawn(Command::new("sh").args(["-c", "sleep 30"])).unwrap();
         terminate(&[pid, 0, 1, u32::MAX]).unwrap();

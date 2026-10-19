@@ -4,14 +4,18 @@
 //! A captura guarda a configuração ativa inteira (caminhos e modos CCD) em `platform_data`; `apply` a devolve ao
 //! `SetDisplayConfig`. Se falhar (ex.: depois de reiniciar, os LUIDs dos adaptadores mudam), restaura monitor a
 //! monitor: religa/desconecta pela CCD e aplica modo, posição e principal pelo GDI.
+//!
+//! VRR: o Windows não tem API pública para ler nem ligar (só o painel de cada driver e chaves de registro não
+//! documentadas, que o Tako não usa). A tela informa `Unsupported` e a interface mostra o motivo.
 
 use crate::windows_identity::{self as identity, SourceRequest};
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 use tako_core::devices::{
     ConnectedDisplay, DeviceError, DeviceResult, DisplayMode, DisplayTopology, Displays, HdrStatus,
-    MonitorState, ScreenBounds,
+    MonitorState, ScreenBounds, VrrStatus,
 };
+use tako_core::i18n::t;
 use windows::Win32::Devices::Display::*;
 use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS, LUID};
 use windows::Win32::Graphics::Gdi::*;
@@ -582,6 +586,7 @@ impl Displays for WindowsDisplays {
                 } else {
                     HdrStatus::Unknown
                 },
+                vrr: VrrStatus::Unsupported,
                 bounds: m.bounds,
                 current_mode: m.mode,
                 is_active: m.active,
@@ -692,6 +697,10 @@ impl Displays for WindowsDisplays {
                 m.name
             ))),
         }
+    }
+
+    fn vrr_limitation(&self) -> Option<String> {
+        Some(t("vrr.platform.windows"))
     }
 
     fn capture(&self) -> DeviceResult<DisplayTopology> {

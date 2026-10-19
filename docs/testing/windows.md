@@ -122,7 +122,9 @@ Preset por monitor:
 7. Deixe a TV como tela de jogo. No jogo do passo 2, com o monitor como tela própria e "Resolução e taxa" em Padrão: a
    linha mostra "Padrão: 1920 × 1080 · 60 Hz" (o preset do monitor) e o HDR "Padrão: Desligado". Abra o jogo: o
    monitor fica em 1080p 60 Hz. Escolhendo "manter a atual" no jogo, a resolução não muda.
-8. VRR (G-Sync/FreeSync) não entra no preset: o Windows não tem API pública para ligá-lo por tela.
+8. VRR (G-Sync/FreeSync): o Windows não tem API pública para ler nem ligar por tela. Em Configurações › Tela de jogo, a
+   linha "Ligar o VRR" aparece desligada, com o motivo ("O Windows não tem API pública..."); em Configurações deste
+   jogo, a linha "VRR" também fica indisponível com o mesmo motivo. Abrir o jogo não mexe no VRR do driver.
 
 ## 15. Tema por endereço (THEME-004)
 

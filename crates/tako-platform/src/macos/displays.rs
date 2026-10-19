@@ -11,7 +11,7 @@ use objc2_core_graphics::{
     CGDisplayMirrorsDisplay, CGDisplayMode, CGDisplayModelNumber, CGDisplayRotation,
     CGDisplaySerialNumber, CGDisplayVendorNumber, CGError, CGGetOnlineDisplayList,
 };
-use tako_core::devices::{DeviceError, DeviceResult, HdrStatus};
+use tako_core::devices::{DeviceError, DeviceResult, HdrStatus, VrrStatus};
 use tako_core::i18n::{t, tf};
 
 pub struct CoreGraphics;
@@ -116,9 +116,15 @@ impl OutputBackend for CoreGraphics {
                     rotation: (CGDisplayRotation(d).round() as i64).rem_euclid(360) as u16,
                     scale: 1.0,
                     hdr: HdrStatus::Unsupported,
+                    vrr: VrrStatus::Unsupported,
                 }
             })
             .collect())
+    }
+
+    /// ProMotion e Adaptive Sync só mudam em Ajustes do Sistema: nada público no CoreGraphics nem no IOKit.
+    fn vrr_limitation(&self) -> Option<String> {
+        Some(t("vrr.platform.macos"))
     }
 
     fn commit(&self, desired: &[Output]) -> DeviceResult<()> {

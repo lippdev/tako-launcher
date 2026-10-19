@@ -12,6 +12,7 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] Jogar e sair: telas voltam como estavam; restaurar duas vezes não muda nada na segunda.
 - [ ] Depois de sair e entrar de novo na sessão, a configuração do sistema é a original (`ForSession`).
 - [ ] Ids das telas iguais entre duas execuções do Tako (e depois de reiniciar o Mac).
+- [ ] VRR (PERF-002): o macOS não tem API pública para ler nem ligar o ProMotion ou o Adaptive Sync. Com qualquer tela (de preferência um MacBook Pro com ProMotion ou um monitor Adaptive Sync no macOS 14+), Configurações › Tela de jogo mostra "Ligar o VRR" desligado com o motivo, e Configurações deste jogo › "VRR" fica indisponível com o mesmo texto. Ajustes do Sistema › Telas › Taxa de atualização continua sendo o caminho; abrir um jogo não muda essa escolha.
 
 ## Áudio
 

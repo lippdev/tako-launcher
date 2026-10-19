@@ -1,0 +1,15 @@
+# VRR (variable refresh rate: FreeSync, G-Sync, Adaptive Sync), PERF-002.
+[vrr]
+toggle = "Turn on VRR"
+toggle_desc = "Turns variable refresh (FreeSync, G-Sync) on for the game display and off when you quit"
+unsupported = "This display doesn't report VRR"
+game = "VRR"
+
+[vrr.session]
+unavailable = "VRR is not available on {screen}"
+
+[vrr.platform]
+windows = "Windows has no public API to turn VRR on. Use your graphics driver's control panel (AMD, NVIDIA or Intel)."
+x11 = "On X11, VRR is turned on in the driver configuration (Option \"VariableRefresh\"), not by Tako."
+gnome = "On GNOME, Tako can't turn VRR on yet. Use Settings › Displays."
+macos = "macOS has no public API to turn VRR on. Pick the variable refresh rate in System Settings › Displays."

@@ -37,6 +37,7 @@ Legenda: **Sim** = implementado e testado na lógica; **a validar** = implementa
 | Tela principal | Sim | a validar | a validar | a validar | Não existe | Não | a validar (a da origem) |
 | Rotação na restauração | Sim | a validar | a validar | a validar | a validar | Não | Não |
 | HDR | Sim | Não | a validar (Plasma 6) | Não | Não | Não | Não |
+| VRR (PERF-002) | Não: sem API pública | Não: é do driver (`VariableRefresh`) | a validar (`vrrpolicy`) | Não (ainda) | a validar (`--adaptive-sync`) | Não | Não: sem API pública |
 | Capturar e restaurar telas | Sim | a validar | a validar | a validar | a validar | Não precisa | a validar |
 | Saída padrão, volume e mudo | Sim (`IPolicyConfig`) | a validar (`pactl`/`wpctl`) | igual ao X11 | igual ao X11 | igual ao X11 | a validar | a validar (CoreAudio) |
 | Esconder o cursor sobre o jogo | Sim | a validar (XFixes) | Não: só sobre a janela do Tako | Não: idem | Não: idem | a validar (XFixes no Xwayland) | a validar com o jogo na frente |
@@ -50,6 +51,7 @@ Legenda: **Sim** = implementado e testado na lógica; **a validar** = implementa
 - macOS: "No macOS, o cursor pode voltar a aparecer quando outro app fica na frente." (`platform.unix.cursor_macos`).
 - Sem acesso ao `/dev/uinput`: orientação para instalar a regra udev e entrar de novo na sessão (`platform.unix.uinput_denied`).
 - macOS sem Acessibilidade: caminho em Ajustes do Sistema (`platform.unix.accessibility_denied`).
+- VRR ligado para o jogo: o Tako grava a tela e o valor de antes no `session-environment.json` antes de ligar, e a restauração desliga no fim (também depois de uma queda). Com "Restaurar tela e som ao sair do jogo" desligada, o VRR fica ligado, como a resolução e as telas.
 - gamescope: a resolução é da sessão (`is_managed_by_session`); a UI só informa.
 - Compositor Wayland desconhecido: telas `Unsupported`; a UI esconde as opções de tela.
 

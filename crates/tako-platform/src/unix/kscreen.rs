@@ -2,7 +2,7 @@
 
 use super::outputs::{Output, OutputMode};
 use serde_json::Value;
-use tako_core::devices::HdrStatus;
+use tako_core::devices::{HdrStatus, VrrStatus};
 
 const MAX_JSON: usize = 4 << 20;
 
@@ -92,9 +92,21 @@ pub fn parse(json: &str) -> Result<Vec<Output>, String> {
                     Some(false) => HdrStatus::Off,
                     None => HdrStatus::Unsupported,
                 },
+                // Só vem quando a tela aceita VRR: 0 = nunca, 1 = sempre, 2 = automático (jogos em tela cheia).
+                vrr: match o.get("vrrPolicy").and_then(Value::as_i64) {
+                    Some(0) => VrrStatus::Off,
+                    Some(_) => VrrStatus::On,
+                    None => VrrStatus::Unsupported,
+                },
             })
         })
         .collect())
+}
+
+/// Argumento de `kscreen-doctor` para ligar (automático: só em tela cheia, como o Plasma) ou desligar o VRR.
+pub fn vrr_arg(id: &str, enabled: bool) -> String {
+    let policy = if enabled { "automatic" } else { "never" };
+    format!("output.{id}.vrrpolicy.{policy}")
 }
 
 /// Argumentos de `kscreen-doctor` para o estado inteiro (aplicado de uma vez).
@@ -124,11 +136,11 @@ mod tests {
 
     const SAMPLE: &str = r#"{"outputs":[
       {"id":1,"name":"DP-1","enabled":true,"connected":true,"priority":1,"pos":{"x":0,"y":0},
-       "rotation":1,"scale":1.25,"currentModeId":"2","hdr":false,
+       "rotation":1,"scale":1.25,"currentModeId":"2","hdr":false,"vrrPolicy":2,
        "modes":[{"id":"1","name":"2560x1440@60","refreshRate":59.95,"size":{"width":2560,"height":1440}},
                 {"id":"2","name":"2560x1440@144","refreshRate":143.91,"size":{"width":2560,"height":1440}}]},
       {"id":2,"name":"HDMI-A-1","enabled":false,"connected":true,"priority":0,"pos":{"x":2048,"y":0},
-       "rotation":2,"currentModeId":"",
+       "rotation":2,"currentModeId":"","vrrPolicy":0,
        "modes":[{"id":"5","name":"3840x2160@60","refreshRate":60.0,"size":{"width":3840,"height":2160}},
                 {"id":"6","name":"broken","size":{"width":0,"height":0}}]},
       {"id":3,"name":"DP-2","enabled":false,"connected":false,"modes":[]}
@@ -146,12 +158,16 @@ mod tests {
         assert!(o[1].current.is_none() && !o[1].primary);
         assert_eq!(o[1].rotation, 90);
         assert_eq!(o[1].hdr, HdrStatus::Unsupported);
+        assert_eq!((o[0].vrr, o[1].vrr), (VrrStatus::On, VrrStatus::Off));
+        assert_eq!(vrr_arg("DP-1", true), "output.DP-1.vrrpolicy.automatic");
+        assert_eq!(vrr_arg("DP-1", false), "output.DP-1.vrrpolicy.never");
     }
 
     #[test]
     fn plasma5_primary_flag() {
         let o = parse(r#"{"outputs":[{"name":"eDP-1","enabled":true,"primary":true}]}"#).unwrap();
         assert!(o[0].primary && o[0].modes.is_empty());
+        assert_eq!(o[0].vrr, VrrStatus::Unsupported);
     }
 
     #[test]
