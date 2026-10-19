@@ -903,6 +903,9 @@ impl Shell {
                 .map(|(t, _)| t.clone())
                 .unwrap_or_default(),
         );
+        if self.ctx.desktop {
+            out.set("desk-toast-kind", self.ctx.toast_kind.key());
+        }
         out.set(
             "input-icon",
             if self.ctx.input == InputKind::Keyboard {

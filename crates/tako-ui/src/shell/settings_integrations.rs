@@ -88,11 +88,18 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         }
     };
 
+    let status_style = match cached.as_ref() {
+        Some(ConsoleModeStatus::Incompativel { .. }) => "warning",
+        Some(ConsoleModeStatus::Erro) => "error",
+        _ => "",
+    };
     let mut rows = vec![
         MenuItem::new(
             PanelRow::action("console-mode", ctx.t("settings.integrations.console_mode"))
-                .desc(status_text)
-                .value(ctx.t("settings.integrations.console_mode_check_again")),
+                .value(status_text)
+                .style(status_style)
+                .action_btn(ctx.t("settings.integrations.console_mode_check_again"))
+                .enabled(!checking),
         )
         .on(|ctx| {
             check_now(ctx);

@@ -301,6 +301,7 @@ fn neighbor(entries: &[Entry], from: Option<usize>, forward: bool) -> Option<usi
 const BAR_ITEMS: usize = 5;
 const BAR_PROFILE: usize = 2;
 const BAR_ACCOUNT: usize = 3;
+const BAR_DOWNLOADS: usize = 3;
 
 /// Rota que abre a biblioteca numa coleção (`desk:collection:m:<id>` ou `s:<id>`, a chave do SeletorDeColecao).
 pub const COLLECTION_ROUTE: &str = "desk:collection:";
@@ -1453,15 +1454,32 @@ impl Page for DesktopLibrary {
                 }
             }
             (Zone::Bar, Cmd::Left) => self.index = self.index.saturating_sub(1),
-            (Zone::Bar, Cmd::Right) => self.index = (self.index + 1).min(BAR_ITEMS - 1),
+            (Zone::Bar, Cmd::Right) => {
+                let count = BAR_ITEMS + usize::from(super::downloads::pill(ctx).is_some());
+                self.index = (self.index + 1).min(count - 1);
+            }
             (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
-            (Zone::Bar, Cmd::Accept) => match self.index {
-                0 => return Nav::Layer(Box::new(brand_menu())),
-                BAR_PROFILE => return Nav::Push(Box::new(super::profile::ProfilePage::new())),
-                BAR_ACCOUNT => return Nav::Layer(Box::new(profile_menu())),
-                4 => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
-                _ => self.zone = Zone::List,
-            },
+            (Zone::Bar, Cmd::Accept) => {
+                let downloads_on = super::downloads::pill(ctx).is_some();
+                if downloads_on && self.index == BAR_DOWNLOADS {
+                    return Nav::Layer(Box::new(super::downloads::panel(ctx)));
+                }
+                match self.index {
+                    0 => return Nav::Layer(Box::new(brand_menu())),
+                    BAR_PROFILE => return Nav::Push(Box::new(super::profile::ProfilePage::new())),
+                    BAR_ACCOUNT if !downloads_on => return Nav::Layer(Box::new(profile_menu())),
+                    index if downloads_on && index == BAR_ACCOUNT + 1 => {
+                        return Nav::Layer(Box::new(profile_menu()));
+                    }
+                    4 if !downloads_on => {
+                        ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture))
+                    }
+                    5 if downloads_on => {
+                        ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture))
+                    }
+                    _ => self.zone = Zone::List,
+                }
+            }
             (Zone::Tabs, Cmd::Up) => {
                 self.zone = Zone::Bar;
                 self.index = 0;
@@ -2733,6 +2751,27 @@ mod tests {
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Accept);
+        assert!(shell.has_layers());
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+    }
+
+    #[test]
+    fn downloads_pill_is_in_the_keyboard_bar_order() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        crate::shell::downloads::demo(&mut shell.ctx);
+
+        while page(&shell).zone() != Zone::Tabs {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        shell.handle(Cmd::Up);
+        for _ in 0..BAR_DOWNLOADS {
+            shell.handle(Cmd::Right);
+        }
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+        shell.handle(Cmd::Accept);
+
         assert!(shell.has_layers());
         assert_eq!(page(&shell).zone(), Zone::Bar);
     }

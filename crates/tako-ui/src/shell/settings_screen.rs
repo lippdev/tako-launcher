@@ -321,8 +321,32 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     ));
 
     v.push(MenuItem::new(PanelRow::header(
-        ctx.t("settings.screen.audio_header"),
+        ctx.t("settings.screen.during_header"),
     )));
+    v.push(toggle(
+        ctx,
+        "settings.screen.restore",
+        keys::RESTORE_ENVIRONMENT,
+        true,
+    ));
+    let mut cursor = toggle(ctx, "settings.screen.cursor", keys::HIDE_CURSOR, false);
+    if let Some(why) = ctx.platform.cursor.limitation() {
+        cursor.row.description = why;
+    }
+    v.push(cursor);
+    let mut mouse = toggle(ctx, "settings.screen.mouse", keys::CONTROLLER_MOUSE, false);
+    if let Err(e) = ctx.platform.pointer.check_access() {
+        mouse.row.description = e.to_string();
+    }
+    v.push(mouse);
+    v
+}
+
+/// A saída de áudio do jogo fica em Som, junto dos outros controles de áudio.
+pub(crate) fn audio_rows(ctx: &Ctx) -> Vec<MenuItem> {
+    let mut v = vec![MenuItem::new(PanelRow::header(
+        ctx.t("settings.screen.audio_header"),
+    ))];
     let audio_name = ctx.settings.string(keys::GAME_AUDIO_NAME);
     let mut audio_row = PanelRow::choice(
         "audio",
@@ -389,26 +413,6 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                 (picks, cur)
             }),
     );
-
-    v.push(MenuItem::new(PanelRow::header(
-        ctx.t("settings.screen.during_header"),
-    )));
-    v.push(toggle(
-        ctx,
-        "settings.screen.restore",
-        keys::RESTORE_ENVIRONMENT,
-        true,
-    ));
-    let mut cursor = toggle(ctx, "settings.screen.cursor", keys::HIDE_CURSOR, false);
-    if let Some(why) = ctx.platform.cursor.limitation() {
-        cursor.row.description = why;
-    }
-    v.push(cursor);
-    let mut mouse = toggle(ctx, "settings.screen.mouse", keys::CONTROLLER_MOUSE, false);
-    if let Err(e) = ctx.platform.pointer.check_access() {
-        mouse.row.description = e.to_string();
-    }
-    v.push(mouse);
     v
 }
 

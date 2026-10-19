@@ -120,7 +120,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     let reset = MenuItem::new({
         let row = PanelRow::action("reset", ctx.t("settings.controls.reset"))
             .desc(defaults)
-            .value(ctx.t("settings.controls.reset_value"));
+            .action_btn(ctx.t("settings.controls.reset_value"));
         if ctx.desktop { row.danger() } else { row }
     })
     .on(|ctx| {
@@ -329,7 +329,7 @@ fn button_rows(ctx: &Ctx, v: &mut Vec<MenuItem>) {
         MenuItem::new(
             PanelRow::action("buttons-reset", ctx.t("settings.controls.buttons_reset"))
                 .desc(reset_desc)
-                .value(ctx.t("settings.controls.reset_value"))
+                .action_btn(ctx.t("settings.controls.reset_value"))
                 .enabled(profile.buttons != default),
         )
         .on(|ctx| {

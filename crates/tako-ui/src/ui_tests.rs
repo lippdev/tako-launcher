@@ -881,6 +881,30 @@ fn desktop_snapshot() {
                 let layer = crate::shell::settings::sunshine::preview_dialog(&shell.ctx, false);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("api-regenerate") => {
+                shell.open_route("settings");
+                let layer = crate::shell::settings::confirm_regenerate_token(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("cancel-download") => {
+                crate::shell::downloads::demo(&mut shell.ctx);
+                if let Some(download) = shell
+                    .ctx
+                    .downloads
+                    .manager
+                    .as_ref()
+                    .and_then(|manager| manager.list().get(1))
+                {
+                    let layer = crate::shell::downloads::confirm_cancel(&shell.ctx, download.id);
+                    shell.push_layer(Box::new(layer));
+                }
+            }
+            Ok("toast-success") => shell.ctx.toast_success(
+                "Backup criado com sucesso e salvo na pasta escolhida para esta instalação do Tako",
+            ),
+            Ok("toast-error") => shell.ctx.toast_error(
+                "Falha ao restaurar o backup: o arquivo está incompleto e a cópia anterior não pôde ser validada",
+            ),
             Ok("integrations") => {
                 shell.open_route("settings:integrations");
                 if let Ok(st) = std::env::var("TAKO_SNAP_CONSOLE_MODE") {
@@ -915,35 +939,65 @@ fn desktop_snapshot() {
             }
             Ok("appearance") => {
                 shell.open_route("settings");
-                shell.click("category", 3);
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
             }
             Ok("theme-edit") => {
                 shell.open_route("settings");
-                shell.click("category", 3);
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
                 let layer = crate::shell::settings::edit_theme_panel(&mut shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
             Ok("theme-create") => {
                 shell.open_route("settings");
-                shell.click("category", 3);
-                let layer = crate::shell::settings::choose_base_theme_panel(&shell.ctx);
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
+                let layer = crate::shell::settings::create_theme_editor_panel(&shell.ctx, None);
                 shell.push_layer(Box::new(layer));
             }
             Ok("theme-create-editor") => {
                 shell.open_route("settings");
-                shell.click("category", 3);
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
                 let layer = crate::shell::settings::create_theme_editor_panel(&shell.ctx, None);
                 shell.push_layer(Box::new(layer));
             }
             Ok("theme-name") => {
                 shell.open_route("settings");
-                shell.click("category", 3);
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
                 let layer = crate::shell::settings::prompt_theme_name(&shell.ctx, None, false);
                 shell.push_layer(Box::new(layer));
             }
             Ok("theme-overwrite") => {
                 shell.open_route("settings");
-                shell.click("category", 3);
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
                 let theme_id = "meu-tema";
                 let t_dir = shell.ctx.paths.themes().join(theme_id);
                 let _ = std::fs::create_dir_all(&t_dir);
@@ -1246,6 +1300,13 @@ created-by-tako = true
                 crate::shell::desktop::ask_big_picture(&mut shell, std::time::Duration::ZERO);
             }
             Ok("restore-confirm") => {
+                shell.open_route("settings");
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "system")
+                {
+                    shell.click("category", index);
+                }
                 let backup_path = shell
                     .ctx
                     .paths
@@ -1286,6 +1347,15 @@ created-by-tako = true
             .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
             .collect();
         let apply = |shell: &mut Shell, art: Option<&(slint::Image, slint::Image, Value)>| {
+            match std::env::var("TAKO_SNAP_PAGE").as_deref() {
+                Ok("toast-success") => shell.ctx.toast_success(
+                    "Backup criado com sucesso e salvo na pasta escolhida para esta instalação do Tako",
+                ),
+                Ok("toast-error") => shell.ctx.toast_error(
+                    "Falha ao restaurar o backup: o arquivo está incompleto e a cópia anterior não pôde ser validada",
+                ),
+                _ => {}
+            }
             // Como o app: a grade conta linhas por coluna, e as colunas vêm da largura da janela.
             if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
                 shell.ctx.grid_columns = (n as usize).max(1);

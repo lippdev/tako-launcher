@@ -228,7 +228,7 @@ pub fn sync(ctx: &mut Ctx) {
         token = generate_token();
         ctx.settings.set(keys::API_TOKEN, &token);
         if had_invalid {
-            ctx.toast(ctx.t("settings.system.api_invalid_token"));
+            ctx.toast_error(ctx.t("settings.system.api_invalid_token"));
         }
     }
 
@@ -272,7 +272,7 @@ pub fn sync(ctx: &mut Ctx) {
                 .unwrap_or_else(|e| e.into_inner());
             if *warned != Some(port) {
                 *warned = Some(port);
-                ctx.toast(ctx.tf(
+                ctx.toast_error(ctx.tf(
                     "settings.system.api_start_failed",
                     &[("error", &e.to_string())],
                 ));

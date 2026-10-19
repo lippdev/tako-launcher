@@ -331,7 +331,7 @@ fn download_row(ctx: &Ctx, d: &Download, style: &str) -> MenuItem {
     item
 }
 
-fn confirm_cancel(ctx: &Ctx, id: u64) -> MenuLayer {
+pub(crate) fn confirm_cancel(ctx: &Ctx, id: u64) -> MenuLayer {
     let title = ctx
         .downloads
         .manager
@@ -349,7 +349,12 @@ fn confirm_cancel(ctx: &Ctx, id: u64) -> MenuLayer {
             Flow::Close
         }
     };
-    MenuLayer::dialog(ctx.t("downloads.cancel_title"), move |ctx| {
+    let dialog_title = if title.is_empty() {
+        ctx.t("downloads.cancel_title")
+    } else {
+        ctx.tf("downloads.cancel_title_game", &[("title", &title)])
+    };
+    MenuLayer::dialog(dialog_title, move |ctx| {
         vec![
             MenuItem::new(PanelRow::button("keep", ctx.t("downloads.cancel_keep")).link())
                 .on(|_| Flow::Close),
@@ -362,7 +367,6 @@ fn confirm_cancel(ctx: &Ctx, id: u64) -> MenuLayer {
                 .on(cancel(true)),
         ]
     })
-    .overline(title.to_uppercase())
     .text(ctx.t("downloads.cancel_text"))
 }
 
@@ -514,10 +518,10 @@ fn panel_rows(ctx: &Ctx) -> Vec<MenuItem> {
         )));
         v.extend(done.into_iter().map(|d| completed_row(ctx, d)));
         v.push(
-            MenuItem::new(PanelRow::action(
-                "clear-completed",
-                ctx.t("downloads.clear_completed"),
-            ))
+            MenuItem::new(
+                PanelRow::action("clear-completed", ctx.t("downloads.clear_completed"))
+                    .style("link"),
+            )
             .on(clear_completed),
         );
     }
@@ -744,22 +748,26 @@ pub fn settings_rows(ctx: &Ctx) -> Vec<MenuItem> {
             }
             Flow::Push(Box::new(legal_dialog(ctx)))
         }),
-        MenuItem::new(
-            PanelRow::info("privacy", ctx.t("downloads.privacy"), "")
-                .desc(ctx.t("downloads.privacy_desc")),
-        ),
+        MenuItem::new(PanelRow::note(
+            ctx.t("downloads.privacy"),
+            ctx.t("downloads.privacy_desc"),
+        )),
     ];
     if !on {
         return v;
     }
-    v.push(MenuItem::new(
-        PanelRow::info(
-            "folder",
-            ctx.t("downloads.folder"),
-            root().display().to_string(),
+    let download_dir = root().display().to_string();
+    v.push(
+        MenuItem::new(
+            PanelRow::action("folder", ctx.t("downloads.folder"))
+                .desc(ctx.t("downloads.folder_desc"))
+                .action_btn(ctx.t("downloads.open_folder_short")),
         )
-        .desc(ctx.t("downloads.folder_desc")),
-    ));
+        .on(move |ctx| {
+            ctx.effect(Effect::OpenFolder(download_dir.clone()));
+            Flow::Stay
+        }),
+    );
     let label = |kib: i64, ctx: &Ctx| {
         if kib == 0 {
             ctx.t("downloads.upload_none")
@@ -819,9 +827,10 @@ pub fn settings_rows(ctx: &Ctx) -> Vec<MenuItem> {
         )
         .on(|ctx| Flow::Push(Box::new(add_source(ctx)))),
     );
-    v.push(MenuItem::new(
-        PanelRow::info("tool", ctx.t("downloads.tool"), "").desc(ctx.t("downloads.tool_desc")),
-    ));
+    v.push(MenuItem::new(PanelRow::note(
+        ctx.t("downloads.tool"),
+        ctx.t("downloads.tool_desc"),
+    )));
     v
 }
 

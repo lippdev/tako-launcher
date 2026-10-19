@@ -170,7 +170,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(
             PanelRow::action("review", ctx.t("art_review.title"))
                 .desc(ctx.t("art_review.desc"))
-                .value(ctx.t("art_review.open")),
+                .action_btn(ctx.t("art_review.open")),
         )
         .on(|ctx| Flow::Push(Box::new(crate::shell::art_review::panel(ctx)))),
         MenuItem::new(described(ctx, "settings.metadata.clear").value(format_bytes(cache_size)))
@@ -263,7 +263,7 @@ fn test_row<R: Send + 'static>(
             } else {
                 value
             })
-            .value(ctx.t("settings.metadata.test_value")),
+            .action_btn(ctx.t("settings.metadata.test_value")),
     )
     .on(move |ctx| {
         if let Some(p) = &problem {
