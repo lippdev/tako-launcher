@@ -803,6 +803,21 @@ fn desktop_snapshot() {
                     shell.edited("overlay-input", &t);
                 }
             }
+            // ConfiguracoesDoJogo com ferramentas junto do jogo (EXT-001).
+            Ok("game-settings") => {
+                let id = shell.ctx.library.games()[0].id.clone();
+                shell.ctx.game_overrides.insert(
+                    id.clone(),
+                    tako_core::session::settings::GameSettingsOverride {
+                        before_command: Some("montar.bat".into()),
+                        tools: Some("C:\\Ferramentas\\fps.exe".into()),
+                        close_tools: Some(true),
+                        ..Default::default()
+                    },
+                );
+                let layer = crate::shell::game_settings::panel(&shell.ctx, &id);
+                shell.push_layer(layer);
+            }
             // SRC-005, destaque de jogo não instalado: `install` (uma loja), `install-multi` (Steam e GOG),
             // `install-nospace`, `install-busy` (42%), `install-busy-nofrac` e `install-menu` (o "Instalar pela" aberto).
             // O jogo é o 5º da fixture; clique nele com `TAKO_SNAP_CLICK=game:<posição na lista>`.

@@ -23,17 +23,17 @@ pub struct Pixels {
 static FAILED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<PathBuf>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
 
-/// PNG do ícone do `exe` no cache `dir` se já existir no disco.
-/// Não tenta extrair nem chama APIs de plataforma (seguro para rodar na thread da UI).
+type CachedIcons = std::collections::HashMap<(PathBuf, PathBuf), PathBuf>;
+static CACHED: std::sync::LazyLock<std::sync::Mutex<CachedIcons>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(CachedIcons::new()));
+
+/// Resultado publicado pelo scan em segundo plano, sem consultar o executável nem o disco na UI.
 pub fn cached_icon_file(exe: &Path, dir: &Path) -> Option<PathBuf> {
-    let meta = std::fs::metadata(exe).ok().filter(|m| m.is_file())?;
-    let modified = meta
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0, |d| d.as_secs());
-    let file = dir.join(cache_name(exe, meta.len(), modified));
-    if file.is_file() { Some(file) } else { None }
+    CACHED
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&(exe.to_path_buf(), dir.to_path_buf()))
+        .cloned()
 }
 
 /// PNG do ícone do `exe` no cache `dir` (criado se preciso), pronto para virar `file:///`. Reaproveita o que já
@@ -55,6 +55,23 @@ fn extract(_: &Path) -> Option<Pixels> {
 }
 
 fn icon_file_with(
+    exe: &Path,
+    dir: &Path,
+    failed: &std::sync::Mutex<std::collections::HashSet<PathBuf>>,
+    extract: impl Fn(&Path) -> Option<Pixels>,
+) -> Option<PathBuf> {
+    let file = extract_file_with(exe, dir, failed, extract);
+    let mut cached = CACHED.lock().unwrap_or_else(|e| e.into_inner());
+    let key = (exe.to_path_buf(), dir.to_path_buf());
+    if let Some(file) = &file {
+        cached.insert(key, file.clone());
+    } else {
+        cached.remove(&key);
+    }
+    file
+}
+
+fn extract_file_with(
     exe: &Path,
     dir: &Path,
     failed: &std::sync::Mutex<std::collections::HashSet<PathBuf>>,
@@ -328,6 +345,19 @@ mod tests {
         let failed = std::sync::Mutex::new(std::collections::HashSet::new());
         let fake = |_: &Path| Some(square(8, [0, 0, 255, 255]));
         let file = icon_file_with(&exe, &cache, &failed, fake).unwrap();
+        assert_eq!(cached_icon_file(&exe, &cache), Some(file));
+    }
+
+    #[test]
+    fn ui_icon_lookup_does_not_need_to_access_the_executable() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("Jogo.exe");
+        std::fs::write(&exe, b"MZ").unwrap();
+        let cache = dir.path().join("cache");
+        let failed = std::sync::Mutex::new(std::collections::HashSet::new());
+        let file =
+            icon_file_with(&exe, &cache, &failed, |_| Some(square(8, [0, 0, 255, 255]))).unwrap();
+        std::fs::remove_file(&exe).unwrap();
         assert_eq!(cached_icon_file(&exe, &cache), Some(file));
     }
 

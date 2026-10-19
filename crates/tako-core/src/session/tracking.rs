@@ -113,6 +113,36 @@ pub fn is_inside_with(path: Option<&str>, folder: &str, ignore_case: bool) -> bo
     same && rest.starts_with(['\\', '/'])
 }
 
+/// Processos de um destes programas (EXT-001): o executável é o caminho, ou está dentro dele (`.app` do macOS).
+/// Pelo caminho e não pelo PID: o PID pode já ser de outro processo no fim do jogo, e o `open` não dá o do app.
+pub fn processes_of(snapshot: &[ProcessEntry], programs: &[String]) -> Vec<u32> {
+    processes_of_with(snapshot, programs, cfg!(target_os = "windows"))
+}
+
+pub fn processes_of_with(
+    snapshot: &[ProcessEntry],
+    programs: &[String],
+    ignore_case: bool,
+) -> Vec<u32> {
+    snapshot
+        .iter()
+        .filter(|p| {
+            let exe = p.exe_path.as_deref();
+            programs.iter().any(|t| {
+                let same = exe.is_some_and(|e| {
+                    if ignore_case {
+                        e.eq_ignore_ascii_case(t)
+                    } else {
+                        e == t
+                    }
+                });
+                same || is_inside_with(exe, t, ignore_case)
+            })
+        })
+        .map(|p| p.pid)
+        .collect()
+}
+
 /// Executáveis e scripts (a pasta deles é a do jogo); atalhos e URIs não.
 fn is_executable(target: Option<&str>) -> bool {
     let Some(t) = target.filter(|t| !t.contains("://")) else {
@@ -446,6 +476,32 @@ pub fn exit_code_text_in(lang: crate::i18n::Lang, code: u32) -> String {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn tool_processes_are_found_by_path_or_inside_an_app_bundle() {
+        let entry = |pid, path: &str| ProcessEntry {
+            pid,
+            parent_pid: None,
+            exe_path: Some(path.into()),
+            started_at: None,
+        };
+        let snapshot = [
+            entry(1, "C:\\FPS\\Fps.exe"),
+            entry(2, "/Applications/Mods.app/Contents/MacOS/Mods"),
+            entry(3, "C:\\FPS\\Fps.exe.bak"),
+            ProcessEntry {
+                exe_path: None,
+                ..entry(4, "")
+            },
+        ];
+        let tools = [
+            "C:\\FPS\\fps.exe".to_owned(),
+            "/Applications/Mods.app".to_owned(),
+        ];
+        assert_eq!(processes_of_with(&snapshot, &tools, true), [1, 2]);
+        assert_eq!(processes_of_with(&snapshot, &tools, false), [2]);
+        assert!(processes_of_with(&snapshot, &[], true).is_empty());
+    }
+
     use super::*;
     use GameTrackingStrategy as S;
 

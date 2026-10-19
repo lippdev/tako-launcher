@@ -1,0 +1,58 @@
+# Maintainer: Tako <https://github.com/lippdev/tako-launcher>
+# Pacote do AUR (PLAT-002): instala o binário já compilado da release do GitHub (Tako-Linux-<arch>.tar.gz).
+# Para compilar do código-fonte, use o `tako-launcher`. Roteiro de publicação: docs/packaging-linux.md.
+pkgname=tako-launcher-bin
+pkgver=0.2.0_alpha.14
+pkgrel=1
+pkgdesc='Game launcher for the TV and the controller (prebuilt binary)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/lippdev/tako-launcher'
+license=('AGPL-3.0-only')
+# O SDL3 vai estático dentro do binário; o que ele abre em tempo de execução (GL, X11, Wayland, xkbcommon) vem daqui.
+depends=('glibc' 'gcc-libs' 'fontconfig' 'libxkbcommon' 'libglvnd' 'wayland'
+         'libx11' 'libxcursor' 'libxext' 'libxfixes' 'libxi' 'libxrandr')
+optdepends=('libpulse: audio devices and volume (pactl)'
+            'pipewire-pulse: audio on PipeWire systems'
+            'xdg-utils: open store links and folders'
+            'kscreen: display switching on KDE Wayland (kscreen-doctor)'
+            'wlr-randr: display switching on wlroots compositors'
+            'libdecor: window decorations on Wayland')
+provides=("tako-launcher=$pkgver")
+conflicts=('tako-launcher')
+options=('!strip' '!debug')
+_tag="v${pkgver//_/-}"
+source=("LICENSE-$pkgver::https://raw.githubusercontent.com/lippdev/tako-launcher/$_tag/LICENSE"
+        "tako-$pkgver.png::https://raw.githubusercontent.com/lippdev/tako-launcher/$_tag/packaging/tako-mark.png")
+source_x86_64=("Tako-Linux-x64-$pkgver.tar.gz::$url/releases/download/$_tag/Tako-Linux-x64.tar.gz")
+source_aarch64=("Tako-Linux-arm64-$pkgver.tar.gz::$url/releases/download/$_tag/Tako-Linux-arm64.tar.gz")
+sha256sums=('8d56b405468aad11f87ab5763f901e276e08d9646ff5c8481b1762b6b789e9ed'
+            'eb3d861a790b86e200de29a4e2ef481583ef78cc4b35b1037a6b1b23d45f56e7')
+sha256sums_x86_64=('ea35f90a8220e672844283c6e990b1bfe56f97505e7249f472835cd16014b6f0')
+sha256sums_aarch64=('4b284eaba2f9fe8dd166d30648c8d02bd8ca7711826fb315431092777cf804a2')
+noextract=("Tako-Linux-x64-$pkgver.tar.gz" "Tako-Linux-arm64-$pkgver.tar.gz")
+
+package() {
+  # A pasta Tako_Data do .tar.gz liga o modo portátil; instalado, os dados ficam em ~/.local/share/tako.
+  # Extrai só o binário e a regra udev, sem a pasta "Tako/" (e sem a Tako_Data).
+  bsdtar -xf "$srcdir"/Tako-Linux-*-"$pkgver".tar.gz -C "$srcdir" --strip-components=1 Tako/tako Tako/60-tako-uinput.rules
+
+  install -Dm755 tako "$pkgdir/usr/bin/tako"
+  # Regra udev do cursor pelo controle (/dev/uinput; ADR-0024).
+  install -Dm644 60-tako-uinput.rules "$pkgdir/usr/lib/udev/rules.d/60-tako-uinput.rules"
+  install -Dm644 "tako-$pkgver.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/tako.png"
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+  # Mesmo atalho do .deb (build/rust/package.sh). O MimeType registra o esquema tako:// (EXT-005).
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/tako.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Tako
+Comment=Game launcher for the TV and the controller
+Comment[pt_BR]=Launcher de jogos para a TV e o controle
+Exec=tako --open-url %u
+MimeType=x-scheme-handler/tako;
+Icon=tako
+Categories=Game;
+Terminal=false
+DESKTOP
+}

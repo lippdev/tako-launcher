@@ -287,3 +287,17 @@ Precisa de Steam, Epic e GOG Galaxy com contas, de um jogo adicionado à mão (u
 8. Escolher um ícone em seletor de imagens › Ícone: vale o escolhido em todas as listas; "Restaurar" volta ao da loja.
 9. Alta densidade (escala do Windows em 200 %): o ícone continua nítido e com o mesmo raio proporcional; sem serrilhado
    nos cantos.
+
+## 25. Ferramentas junto do jogo (EXT-001)
+
+- [ ] Em Configurações deste jogo › Ferramentas junto do jogo, informe um `.exe` (ex.: `C:\Windows\System32\notepad.exe`).
+  Ao jogar, o pedido de permissão mostra "Abrir junto do jogo: …"; sem permitir, nada abre.
+- [ ] Permitido: a ferramenta abre antes do jogo e a interface não trava (o supervisor não reinicia a interface).
+- [ ] Com "Fechar as ferramentas no fim" em Sim, a ferramenta fecha quando o jogo termina; em Não, continua aberta.
+- [ ] Caminho que não existe: aviso "Não foi possível abrir…" e o jogo abre do mesmo jeito.
+- [ ] Atalho `.lnk` abre, mas não fecha no fim (o processo não tem o caminho do atalho).
+- [ ] Com a ferramenta já aberta antes de jogar (ex.: OBS gravando), o Tako abre outra se o programa permitir e, no
+  fim, fecha só a que ele abriu: a do usuário continua aberta.
+- [ ] Eventos de sessão: cada "Jogar" registra `GameStarting` e `GameExited` no log (nível debug). Se o supervisor
+  cair no meio do jogo (encerrar `tako.exe` pelo Gerenciador de Tarefas), o `GameExited` não sai: o comportamento
+  esperado é a próxima execução só restaurar tela e áudio.

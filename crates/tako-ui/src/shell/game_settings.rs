@@ -761,6 +761,62 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
             .on(move |ctx| edit_text(ctx, &a, text, hint, get, set)),
         );
     }
+    let tools = tako_core::session::settings::parse_tools(c.tools.as_deref());
+    let a = i();
+    v.push(
+        MenuItem::new(row(
+            ctx,
+            "tools",
+            ctx.t("game_settings.tools"),
+            match tools.as_slice() {
+                [] => ctx.t("game_settings.none"),
+                [one] => one.clone(),
+                many => tako_core::i18n::tn("game_settings.tools_count", many.len() as i64, &[]),
+            },
+            (!tools.is_empty()).then(|| default_of(ctx, &ctx.t("game_settings.none"))),
+        ))
+        .on(move |ctx| {
+            edit_text(
+                ctx,
+                &a,
+                "game_settings.tools",
+                "game_settings.tools_hint",
+                |o| o.tools.clone(),
+                |o, v| o.tools = v,
+            )
+        }),
+    );
+    // Só faz sentido com ferramentas; sem padrão do Tako, é um select de sim/não.
+    if !tools.is_empty() {
+        let close = c.close_tools == Some(true);
+        let (a, b) = (i(), i());
+        let set_close = move |ctx: &mut Ctx, _dir: i32, id: &str| {
+            let next = current(ctx, id).close_tools != Some(true);
+            change(ctx, id, |o| o.close_tools = next.then_some(true));
+            Flow::Stay
+        };
+        v.push(
+            MenuItem::new(row(
+                ctx,
+                "close_tools",
+                ctx.t("game_settings.close_tools"),
+                yes_no(ctx, close),
+                close.then(|| default_of(ctx, &yes_no(ctx, false))),
+            ))
+            .on(move |ctx| set_close(ctx, 1, &a))
+            .on_adjust(move |ctx, d| set_close(ctx, d, &b))
+            .options({
+                let id = i();
+                move |ctx| {
+                    let close = current(ctx, &id).close_tools == Some(true);
+                    (
+                        vec![Pick::new(yes_no(ctx, false)), Pick::new(yes_no(ctx, true))],
+                        usize::from(close),
+                    )
+                }
+            }),
+        );
+    }
 
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("game_settings.defaults"),
@@ -831,6 +887,34 @@ mod tests {
             .find(|r| r.0 == key)
             .map(|r| (r.1, r.2))
             .unwrap()
+    }
+
+    #[test]
+    fn tools_row_counts_programs_and_the_close_choice_appears_only_with_tools() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        ctx.library = tako_core::library::GameLibrary::in_memory(
+            crate::demo::games(),
+            tako_core::library::system_clock(),
+        );
+        let id = ctx.library.games()[0].id.clone();
+        let mut layer = panel(&ctx, &id);
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "tools").0, "Nenhum");
+        assert!(!rows_of(&o).iter().any(|r| r.0 == "close_tools"));
+
+        change(&mut ctx, &id, |o| o.tools = Some("fps.exe;mods.exe".into()));
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "tools"), ("2 ferramentas".into(), true));
+        assert_eq!(value(&o, "close_tools"), ("Não".into(), false));
+        let close = o.rows.iter().position(|r| r.key == "close_tools").unwrap();
+        layer.hover("row", close);
+        layer.handle(Cmd::Accept, &mut ctx);
+        assert_eq!(
+            value(&layer.render(&ctx), "close_tools"),
+            ("Sim".into(), true)
+        );
+        assert_eq!(current(&ctx, &id).close_tools, Some(true));
     }
 
     #[test]

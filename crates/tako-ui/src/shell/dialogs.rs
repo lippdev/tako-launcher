@@ -314,6 +314,12 @@ pub fn approve_commands(ctx: &Ctx, id: &str) -> MenuLayer {
     if let Some(c) = &eff.after_command {
         text.push(ctx.tf("session.commands_after", &[("command", c)]));
     }
+    for tool in &eff.tools {
+        text.push(ctx.tf("session.commands_tool", &[("tool", tool)]));
+    }
+    if eff.close_tools && !eff.tools.is_empty() {
+        text.push(ctx.t("session.commands_close_tools"));
+    }
     let id = id.to_owned();
     MenuLayer::dialog(ctx.t("session.commands_title"), move |ctx| {
         let id = id.clone();
@@ -1463,6 +1469,16 @@ mod tests {
         let out = dialog.render(&ctx);
         assert_eq!(out.title, "Permitir os comandos deste jogo?");
         let ask = approve_commands(&ctx, &id);
+        // Ferramentas (EXT-001) entram na mesma permissão, com o caminho à vista.
+        o.tools = Some("/Ferramentas/fps".into());
+        o.close_tools = Some(true);
+        store.save(&id, &o).unwrap();
+        let text = approve_commands(&ctx, &id).render(&ctx).text;
+        assert!(
+            text.contains("Abrir junto do jogo: /Ferramentas/fps"),
+            "{text}"
+        );
+        assert!(text.contains("fecham quando o jogo terminar"), "{text}");
         assert!(matches!(accept(&mut ctx, &ask, "allow"), Flow::Close));
         assert!(matches!(&ctx.effects[..], [Effect::Launch(g)] if g == &id));
         assert!(crate::session::effective(&ctx, &id).commands_approved);

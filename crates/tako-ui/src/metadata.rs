@@ -190,7 +190,7 @@ fn install_enrich(ctx: &mut Ctx) {
     let exe_icons = ctx.paths.cache().join("exe-icons");
     let enrich = move |g: &mut Game| {
         // Jogo adicionado à mão não passa pela leitura das lojas: se o ícone do .exe já foi extraído,
-        // confere se o arquivo existe (sem extrair nada na UI).
+        // usa o índice publicado pelo scan, sem acessar o executável nem extrair na UI.
         if g.store() == tako_core::library::GameStore::Manual {
             crate::sources::fill_exe_icon(g, &exe_icons, tako_platform::exe_icon::cached_icon_file);
         }
@@ -415,7 +415,7 @@ mod tests {
             !exe_icons_dir.exists() || std::fs::read_dir(&exe_icons_dir).unwrap().next().is_none()
         );
 
-        // Se o PNG já estiver gerado no cache, o enrich apenas confere a existência e associa
+        // O scan em segundo plano publica o PNG existente; o enrich só lê o índice em memória.
         std::fs::create_dir_all(&exe_icons_dir).unwrap();
         let meta = std::fs::metadata(&exe).unwrap();
         let modified = meta
@@ -429,6 +429,10 @@ mod tests {
             modified,
         ));
         std::fs::write(&expected_file, b"PNG fake").unwrap();
+        assert_eq!(
+            tako_platform::exe_icon::icon_file(&exe, &exe_icons_dir),
+            Some(expected_file.clone())
+        );
 
         ctx.library.refresh();
         let g = ctx.library.find(id).unwrap();

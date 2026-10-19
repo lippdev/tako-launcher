@@ -1,0 +1,130 @@
+name: Packaging
+
+# PLAT-002: valida os pacotes do AUR e o Flatpak do Linux. Nada é publicado (AUR e Flathub exigem a conta do
+# mantenedor; roteiro em docs/packaging-linux.md).
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "packaging/aur/**"
+      - "packaging/flatpak/**"
+      - "packaging/tako-mark.png"
+      - "Cargo.lock"
+      - "crates/**"
+      - ".github/workflows/packaging.yml"
+  push:
+    branches: [develop, main]
+    paths:
+      - "packaging/aur/**"
+      - "packaging/flatpak/**"
+      - "packaging/tako-mark.png"
+      - "Cargo.lock"
+      - "crates/**"
+      - ".github/workflows/packaging.yml"
+
+concurrency:
+  group: packaging-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # PKGBUILDs: .SRCINFO, sha256 das fontes, namcap e o pacote de verdade. O makepkg não roda como root.
+  aur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    container: archlinux:base-devel
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: [tako-launcher-bin, tako-launcher]
+    steps:
+      - name: Tools
+        run: |
+          pacman -Syu --noconfirm --needed git namcap sudo
+          useradd -m builder
+      - uses: actions/checkout@v4
+      - name: Prepare the package folder
+        run: |
+          cp -r "packaging/aur/${{ matrix.pkg }}" /home/builder/pkg
+          chown -R builder:builder /home/builder/pkg
+      - name: Install build dependencies and check the sources
+        run: |
+          sudo -u builder bash -c 'cd ~/pkg && makepkg --printsrcinfo > .SRCINFO && cat .SRCINFO'
+          # makedepends do .SRCINFO (cargo, cmake, cabeçalhos do SDL3...) para o pacman, depois verifica o sha256.
+          sed -n 's/^\s*makedepends = \([^ :<>=]*\).*/\1/p' /home/builder/pkg/.SRCINFO | sort -u | xargs -r pacman -S --noconfirm --needed
+          sudo -u builder bash -c 'cd ~/pkg && makepkg --verifysource'
+      - name: Build the package
+        run: sudo -u builder bash -c 'cd ~/pkg && makepkg -f --noconfirm --nodeps'
+      - name: namcap
+        run: |
+          namcap /home/builder/pkg/PKGBUILD
+          namcap /home/builder/pkg/*.pkg.tar.zst
+          pacman -Qlp /home/builder/pkg/*.pkg.tar.zst
+      - name: Install and check the files
+        run: |
+          pacman -U --noconfirm /home/builder/pkg/*.pkg.tar.zst
+          test -x /usr/bin/tako
+          grep -q 'x-scheme-handler/tako' /usr/share/applications/tako.desktop
+          test -f /usr/lib/udev/rules.d/60-tako-uinput.rules
+          # Só as bibliotecas ligadas na carga; as que o SDL3 e o winit abrem depois vêm das dependências.
+          ! ldd /usr/bin/tako | grep 'not found'
+
+  flatpak-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream desktop-file-utils flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.flatpak.Builder
+      - name: Desktop file and AppStream
+        working-directory: packaging/flatpak
+        run: |
+          desktop-file-validate io.github.lippdev.Tako.desktop
+          appstreamcli validate --no-net io.github.lippdev.Tako.metainfo.xml
+      - name: Manifest
+        working-directory: packaging/flatpak
+        run: |
+          # O cargo-sources.json real é gerado no job de compilação; aqui basta um vazio para o manifesto abrir.
+          echo '[]' > cargo-sources.json
+          flatpak-builder --show-manifest io.github.lippdev.Tako.yml >/dev/null
+      # Só informa: as regras do Flathub (ID verificável, acesso às pastas de outros apps) são decididas na revisão de
+      # lá, com pedido de exceção do mantenedor; ver docs/packaging-linux.md.
+      - name: Flathub linter (report only)
+        continue-on-error: true
+        working-directory: packaging/flatpak
+        run: |
+          {
+            echo '### flatpak-builder-lint (informativo)'; echo '```json'
+            flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.lippdev.Tako.yml || true
+            flatpak run --command=flatpak-builder-lint org.flatpak.Builder appstream io.github.lippdev.Tako.metainfo.xml || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Compila de verdade (SDL3 e Slint do zero, pesado). Não publica nem guarda o pacote.
+  flatpak-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargo sources
+        run: |
+          pip install --break-system-packages aiohttp tomlkit \
+            || pip install aiohttp tomlkit
+          # Fixo num commit (o gerador roda sobre o Cargo.lock do repositório).
+          curl -fsSL -o /tmp/flatpak-cargo-generator.py \
+            https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/74697c75b630d7330e77250fc13cb5ea688d9479/cargo/flatpak-cargo-generator.py
+          python3 /tmp/flatpak-cargo-generator.py Cargo.lock -o packaging/flatpak/cargo-sources.json
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: tako.flatpak
+          manifest-path: packaging/flatpak/io.github.lippdev.Tako.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
