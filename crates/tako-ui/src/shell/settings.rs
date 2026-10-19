@@ -964,10 +964,10 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             .desc(ctx.t("settings.system.safemode_off_desc")),
         )
     });
+    v.push(MenuItem::new(PanelRow::header(
+        ctx.t("settings.system.integrations_header"),
+    )));
     if crate::discord::available() {
-        v.push(MenuItem::new(PanelRow::header(
-            ctx.t("settings.system.integrations_header"),
-        )));
         v.push(toggle(
             ctx,
             "settings.system.discord",
@@ -975,6 +975,19 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             false,
         ));
     }
+    let api_on = ctx.settings.bool(keys::API_ENABLED, false);
+    v.push(
+        MenuItem::new(
+            PanelRow::action("settings.system.api", ctx.t("settings.system.api"))
+                .desc(ctx.t("settings.system.api_desc"))
+                .value(ctx.t(if api_on {
+                    "settings.system.api_on"
+                } else {
+                    "settings.system.api_off"
+                })),
+        )
+        .on(|ctx| Flow::Push(Box::new(api_panel(ctx)))),
+    );
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.system.advanced_header"),
     )));
@@ -995,6 +1008,104 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
         );
     }
     v
+}
+
+pub(crate) fn confirm_regenerate_token(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::dialog(ctx.t("settings.system.api_regenerate"), |ctx| {
+        vec![
+            MenuItem::new(
+                PanelRow::button(
+                    "regenerate",
+                    ctx.t("settings.system.api_regenerate_confirm_btn"),
+                )
+                .danger(),
+            )
+            .on(|ctx| {
+                let new_token = tako_core::api::generate_token();
+                ctx.settings.set(keys::API_TOKEN, &new_token);
+                crate::local_api::sync(ctx);
+                ctx.toast(ctx.t("settings.system.api_token_regenerated"));
+                Flow::Close
+            }),
+            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(ctx.t("settings.system.api_regenerate_confirm_desc"))
+}
+
+pub(crate) fn token_dialog(ctx: &Ctx, token: String) -> MenuLayer {
+    let token_for_copy = token.clone();
+    let title = ctx.t("settings.system.api_token_dialog_title");
+    let desc = ctx.t("settings.system.api_token_dialog_desc");
+    let text = format!("{desc}\n\n{token}");
+    MenuLayer::dialog(title, move |ctx| {
+        let token = token_for_copy.clone();
+        vec![
+            MenuItem::new(
+                PanelRow::button("copy", ctx.t("settings.system.api_token_copy")).emphasized(true),
+            )
+            .on(move |ctx| {
+                if tako_platform::copy_to_clipboard(&token) {
+                    ctx.toast(ctx.t("settings.system.api_token_copied"));
+                } else {
+                    ctx.toast(ctx.t("settings.system.api_token_copy_failed"));
+                }
+                Flow::Stay
+            }),
+            MenuItem::new(PanelRow::button("close", ctx.t("hint.close"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(text)
+    .wide()
+}
+
+pub(crate) fn api_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("settings.system.api_panel_title"), |ctx| {
+        let enabled = ctx.settings.bool(keys::API_ENABLED, false);
+        let port = ctx.settings.get(keys::API_PORT).unwrap_or("47774");
+        vec![
+            MenuItem::new(
+                PanelRow::toggle("api-enabled", ctx.t("settings.system.api_enabled"), enabled)
+                    .desc(ctx.t("settings.system.api_enabled_desc")),
+            )
+            .on(|ctx| {
+                let on = ctx.settings.toggle(keys::API_ENABLED, false);
+                let current_token = ctx.settings.string(keys::API_TOKEN);
+                if on
+                    && (current_token.is_empty() || !tako_core::api::is_valid_token(&current_token))
+                {
+                    let token = tako_core::api::generate_token();
+                    ctx.settings.set(keys::API_TOKEN, &token);
+                }
+                crate::local_api::sync(ctx);
+                Flow::Stay
+            }),
+            MenuItem::new(
+                PanelRow::info("api-port", ctx.t("settings.system.api_port"), port)
+                    .desc(ctx.t("settings.system.api_port_desc")),
+            ),
+            MenuItem::new(
+                PanelRow::action("api-token", ctx.t("settings.system.api_token"))
+                    .desc(ctx.t("settings.system.api_token_desc"))
+                    .value(ctx.t("settings.system.api_token_show")),
+            )
+            .on(|ctx| {
+                let mut token = ctx.settings.string(keys::API_TOKEN);
+                if token.is_empty() || !tako_core::api::is_valid_token(&token) {
+                    token = tako_core::api::generate_token();
+                    ctx.settings.set(keys::API_TOKEN, &token);
+                    crate::local_api::sync(ctx);
+                }
+                Flow::Push(Box::new(token_dialog(ctx, token)))
+            }),
+            MenuItem::new(
+                PanelRow::action("api-regenerate", ctx.t("settings.system.api_regenerate"))
+                    .desc(ctx.t("settings.system.api_regenerate_desc"))
+                    .danger(),
+            )
+            .on(|ctx| Flow::Push(Box::new(confirm_regenerate_token(ctx)))),
+        ]
+    })
 }
 
 // ---------------------------------------------------------------- Sobre

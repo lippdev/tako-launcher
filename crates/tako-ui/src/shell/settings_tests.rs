@@ -883,3 +883,96 @@ fn sound_settings_persist_and_adjust_volumes_and_toggle_music() {
     }
     assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 30);
 }
+
+#[test]
+fn api_settings_panel_toggles_and_regenerates_token() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    assert!(!ctx.settings.bool(keys::API_ENABLED, false));
+
+    let rows = rows_of(&ctx, "system");
+    let api_row = find(&rows, "settings.system.api");
+    assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
+
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+
+    let panel_rows = panel.render(&ctx).rows;
+    let enabled_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-enabled")
+        .unwrap();
+    for _ in 0..enabled_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    assert!(ctx.settings.bool(keys::API_ENABLED, false));
+    let token1 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token1.is_empty());
+
+    let regen_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-regenerate")
+        .unwrap();
+    let current_pos = enabled_pos;
+    if regen_pos > current_pos {
+        for _ in current_pos..regen_pos {
+            panel.handle(Cmd::Down, &mut ctx);
+        }
+    }
+    let regen_flow = panel.handle(Cmd::Accept, &mut ctx);
+    let mut confirm_dialog = match regen_flow {
+        Flow::Push(l) => l,
+        _ => panic!("esperava diálogo de confirmação"),
+    };
+    confirm_dialog.handle(Cmd::Accept, &mut ctx);
+    let token2 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token2.is_empty());
+    assert_ne!(token1, token2);
+    assert!(ctx.toast.is_some());
+}
+
+#[test]
+fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Linha do token segue padrão Botão ("Mostrar") e abre diálogo com botão Copiar
+    let valid_token = tako_core::api::generate_token();
+    ctx.settings.set(keys::API_TOKEN, &valid_token);
+    let rows = rows_of(&ctx, "system");
+    let api_row = find(&rows, "settings.system.api");
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+    let panel_rows = panel.render(&ctx).rows;
+    let token_row = panel_rows.iter().find(|r| r.key == "api-token").unwrap();
+    assert_eq!(token_row.value, ctx.t("settings.system.api_token_show"));
+    let token_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-token")
+        .unwrap();
+    for _ in 0..token_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    let token_dialog = match panel.handle(Cmd::Accept, &mut ctx) {
+        Flow::Push(l) => l,
+        _ => panic!("esperava diálogo do token"),
+    };
+    let dialog_rendered = token_dialog.render(&ctx);
+    assert!(dialog_rendered.text.contains(&valid_token));
+    assert!(dialog_rendered.rows.iter().any(|r| r.key == "copy"));
+
+    // 2. Token inválido (não-hex) ao ser ativado é regenerado com formato válido (32 hex)
+    ctx.settings.set(keys::API_TOKEN, "invalido");
+    ctx.settings.set_bool(keys::API_ENABLED, false);
+    for _ in 0..token_pos {
+        panel.handle(Cmd::Up, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    let token = ctx.settings.string(keys::API_TOKEN);
+    assert!(tako_core::api::is_valid_token(&token));
+}

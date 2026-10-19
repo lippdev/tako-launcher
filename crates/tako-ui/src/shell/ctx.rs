@@ -200,6 +200,12 @@ pub mod keys {
     pub const DISCORD_PRESENCE: &str = "DiscordRichPresence";
     pub const FIRST_RUN_DONE: &str = "FirstRunCompleted";
     pub const SMART_COLLECTIONS: &str = "SmartCollections";
+    // Marcados para exclusão no CLOUD-001 (PR #137):
+    // LocalApiToken nunca deve entrar em backup nem export (segredo local da máquina).
+    // LocalApiEnabled não pode ser importado como consentimento (opt-in estrito por máquina).
+    pub const API_ENABLED: &str = tako_core::api::API_ENABLED;
+    pub const API_PORT: &str = tako_core::api::API_PORT;
+    pub const API_TOKEN: &str = tako_core::api::API_TOKEN;
 }
 
 /// O que o "Desfazer" de um aviso faz.

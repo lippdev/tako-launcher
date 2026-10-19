@@ -9,6 +9,7 @@ pub mod discord;
 pub mod effects;
 pub mod gamepad;
 pub mod images;
+pub mod local_api;
 pub mod metadata;
 pub mod mode;
 pub mod model;
