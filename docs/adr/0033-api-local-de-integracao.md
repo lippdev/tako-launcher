@@ -41,17 +41,19 @@ Implementar a API local de integração com a seguinte especificação:
   gerados a partir de UUID v4 criptográfico).
 - Validação estrita do token: tokens fora do formato esperado (32 caracteres hexadecimais) são invalidados e regenerados.
 - O token é armazenado no banco local de configurações (`LocalApiToken` na tabela `settings`).
-- Toda requisição HTTP (exceto pre-flight OPTIONS) deve enviar o cabeçalho:
+- Toda requisição HTTP deve enviar o cabeçalho:
   ```http
   Authorization: Bearer <token>
   ```
+- A comparação do token recebido com o token esperado é feita estritamente em tempo constante (constant-time, via XOR acumulado com validação prévia de tamanho), mitigando ataques de temporização (timing attacks).
 - Requisições sem cabeçalho `Authorization`, com formato incorreto ou com token inválido recebem `401 Unauthorized`
   com corpo JSON `{"error": "Unauthorized"}`.
-- O usuário pode visualizar o token gerado e regenerá-lo a qualquer momento em Configurações > Sistema > Integrações > API local.
-  A regeneração invalida imediatamente o token antigo e incrementa a geração do servidor.
-- Ao desligar o servidor ou regenerar o token, conexões já aceitas são encerradas de imediato (`stream.shutdown`)
-  e o despacho de ações revalida a geração/sessão ativa, impedindo que workers remanescentes executem ações após a API ser desligada.
-  O desligamento não bloqueia a interface do usuário.
+- **Proteção contra DNS Rebinding:** O cabeçalho `Host` é rigorosamente validado e deve corresponder a `127.0.0.1:<porta>` ou `localhost:<porta>`. Requisições com qualquer outro `Host` ou sem o cabeçalho são rejeitadas imediatamente com `421 Misdirected Request`.
+- **CORS e pre-flight desativados:** A API local não libera origens de navegadores (`Access-Control-Allow-Origin: *` removido) e requisições HTTP `OPTIONS` respondem `405 Method Not Allowed`. Ferramentas e integrações locais comunicam-se via HTTP direto sem preflight de browser.
+- **Proteção do banco `tako.db`:** No Unix, ao ligar a API local, o arquivo de banco de dados `tako.db` tem suas permissões restritas a `0600` (leitura e gravação exclusivas do usuário proprietário).
+  - *Risco residual registrado:* Em sistemas de arquivos sem suporte a atributos POSIX (como partições FAT32/exFAT) ou em sistemas não-Unix (Windows), permissões numéricas não são aplicadas pelo SO desta forma, exigindo que o controle de acesso seja garantido pelas permissões de pasta do perfil do usuário.
+- O usuário pode visualizar o token gerado (via diálogo com botão de cópia rápida) e regenerá-lo a qualquer momento em Configurações > Sistema > Integrações > API local (com confirmação em diálogo de perigo).
+- O servidor só incrementa a geração quando o token efetivamente mudar (`set_token`). Quando o token mudar ou ao desligar o servidor, conexões já aceitas são encerradas de imediato (`stream.shutdown`) e o despacho de ações revalida a geração/sessão ativa, impedindo que workers remanescentes executem ações desatualizadas. O desligamento não bloqueia a interface do usuário.
 
 ### 3. Privacidade, Backup e Restauração (Integração com CLOUD-001)
 - O token (`LocalApiToken`) é um segredo local específico do dispositivo: **não pode entrar em backup nem em exportação**.
@@ -75,10 +77,10 @@ Implementar a API local de integração com a seguinte especificação:
   ```json
   [
     {
-      \"id\": \"steam:570\",
-      \"title\": \"Dota 2\",
-      \"store\": \"Steam\",
-      \"installed\": true
+      "id": "steam:570",
+      "title": "Dota 2",
+      "store": "Steam",
+      "installed": true
     }
   ]
   ```
@@ -88,19 +90,20 @@ Implementar a API local de integração com a seguinte especificação:
   Resposta `200 OK`:
   ```json
   {
-    \"is_game_running\": true,
-    \"running_game\": {
-      \"id\": \"steam:570\",\n      \"title\": \"Dota 2\",
-      \"pid\": 12345,
-      \"started_at\": \"2026-10-18T20:30:00Z\"
+    "is_game_running": true,
+    "running_game": {
+      "id": "steam:570",
+      "title": "Dota 2",
+      "pid": 12345,
+      "started_at": "2026-10-18T20:30:00Z"
     }
   }
   ```
   Se nenhum jogo estiver rodando:
   ```json
   {
-    \"is_game_running\": false,
-    \"running_game\": null
+    "is_game_running": false,
+    "running_game": null
   }
   ```
 
