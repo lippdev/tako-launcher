@@ -20,6 +20,8 @@ struct Request {
     max_h: u32,
     /// Cópia de vidro da arte (`glass`): desfocada, saturada e com a grade de luminância.
     glass: bool,
+    /// Ícone do jogo (`icon`): quadrado de `max_w` px, já com os cantos redondos e o contorno.
+    icon: bool,
 }
 
 /// Grade de luminância da cópia de vidro (colunas × linhas sobre a arte inteira).
@@ -141,24 +143,34 @@ pub fn init(resolver: Resolver, workers: usize, on_ready: impl Fn() + 'static) {
 
 /// Imagem pronta, ou `None` (e o pedido entra na fila). `max_w`/`max_h` em pixels físicos.
 pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
-    request(uri, max_w, max_h, false)
+    request(uri, max_w, max_h, false, false)
+}
+
+/// Ícone do jogo (UX-005, `Game::shown_icon`): quadrado de `size_px` pixels físicos (28 na tela normal, 56 em
+/// alta densidade), decodificado nesse tamanho e guardado já com os cantos redondos (raio 6/28 do lado) e o
+/// contorno de `#ffffff1a`, para a lista só desenhar a imagem, sem recorte em tempo real. Aceita `.ico`, PNG,
+/// JPG e WebP. `None` até ficar pronto (ou se a imagem não carrega): a lista desenha a inicial do nome.
+pub fn icon(uri: &str, size_px: u32) -> Option<Image> {
+    request(uri, size_px, size_px, false, true)
 }
 
 /// Cópia de vidro da arte do desktop (Liquid Glass sem desfoque em tempo real): desfocada e saturada uma vez,
 /// em thread de fundo, com a luminância média em `GLASS_GRID` (linhas de cima para baixo). `None` até ficar pronta.
 pub fn glass(uri: &str) -> Option<(Image, Vec<f32>)> {
-    let img = request(uri, 0, GLASS_HEIGHT, true)?;
+    let img = request(uri, 0, GLASS_HEIGHT, true, false)?;
     let key = format!("glass|{uri}");
     let lum = STATE.with(|s| s.borrow().lum.get(&key).cloned())?;
     Some((img, lum))
 }
 
-fn request(uri: &str, max_w: u32, max_h: u32, glass: bool) -> Option<Image> {
+fn request(uri: &str, max_w: u32, max_h: u32, glass: bool, icon: bool) -> Option<Image> {
     if uri.is_empty() {
         return None;
     }
     let key = if glass {
         format!("glass|{uri}")
+    } else if icon {
+        format!("icon{max_w}|{uri}")
     } else {
         format!("{max_w}x{max_h}|{uri}")
     };
@@ -176,6 +188,7 @@ fn request(uri: &str, max_w: u32, max_h: u32, glass: bool) -> Option<Image> {
             max_w,
             max_h,
             glass,
+            icon,
         };
         if let Some(tx) = &s.tx
             && tx.send(request).is_ok()
@@ -319,6 +332,13 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
         let buf = SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height());
         return Some((buf, Some(lum)));
     }
+    if req.icon {
+        let rgba = round_icon(&img, req.max_w);
+        return Some((
+            SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height()),
+            None,
+        ));
+    }
     let img = if img.width() > req.max_w || img.height() > req.max_h {
         img.resize(
             req.max_w.max(1),
@@ -333,6 +353,39 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
         SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height()),
         None,
     ))
+}
+
+/// Ícone quadrado de `size` px (recorte central do meio da imagem), com os cantos redondos (raio 6/28 do lado,
+/// anti-serrilhado) e o contorno de 1 px a cada 28 de `#ffffff1a` por cima da borda. Fora do arredondado o pixel
+/// fica transparente.
+pub(crate) fn round_icon(img: &image::DynamicImage, size: u32) -> image::RgbaImage {
+    let size = size.clamp(8, 256);
+    let mut out = img
+        .resize_to_fill(size, size, image::imageops::FilterType::Lanczos3)
+        .to_rgba8();
+    let half = size as f32 / 2.0;
+    let radius = size as f32 * 6.0 / 28.0;
+    let border = (size / 28).max(1) as f32;
+    for (x, y, p) in out.enumerate_pixels_mut() {
+        // Distância (negativa por dentro) até a borda do retângulo arredondado.
+        let (dx, dy) = ((x as f32 + 0.5 - half).abs(), (y as f32 + 0.5 - half).abs());
+        let (qx, qy) = (dx - (half - radius), dy - (half - radius));
+        let d = qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - radius;
+        let inside = (0.5 - d).clamp(0.0, 1.0);
+        let ring = (d + border + 0.5).clamp(0.0, 1.0) * (26.0 / 255.0);
+        let pa = f32::from(p.0[3]) / 255.0;
+        // O contorno (branco, alfa `ring`) por cima da imagem.
+        let alpha = ring + pa * (1.0 - ring);
+        for c in &mut p.0[..3] {
+            *c = if alpha > 0.0 {
+                ((255.0 * ring + f32::from(*c) * pa * (1.0 - ring)) / alpha).round() as u8
+            } else {
+                0
+            };
+        }
+        p.0[3] = (alpha * inside * 255.0).round() as u8;
+    }
+    out
 }
 
 /// Reduz, satura e desfoca a arte; mede a luminância relativa (WCAG) de cada célula da grade.
@@ -449,6 +502,83 @@ mod tests {
         // Desfocada: a borda entre o branco e o preto vira um degradê.
         let mid = copy.get_pixel(200, GLASS_HEIGHT / 2).0[0];
         assert!(mid > 20 && mid < 235, "{mid}");
+    }
+
+    fn load_icon(path: &std::path::Path, size: u32) -> image::RgbaImage {
+        let req = Request {
+            key: String::new(),
+            uri: path.to_string_lossy().into_owned(),
+            max_w: size,
+            max_h: size,
+            glass: false,
+            icon: true,
+        };
+        let (buf, _) = load(&req, &(Arc::new(|_: &str| None) as Resolver)).unwrap();
+        image::RgbaImage::from_raw(buf.width(), buf.height(), buf.as_bytes().to_vec()).unwrap()
+    }
+
+    #[test]
+    fn icon_is_cached_round_with_a_faint_border_at_both_densities() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("icone.png");
+        // Vermelho puro e opaco, maior que o tamanho de exibição e não quadrado: recorta no centro.
+        image::RgbaImage::from_pixel(100, 80, image::Rgba([200, 0, 0, 255]))
+            .save(&file)
+            .unwrap();
+        for size in [28u32, 56] {
+            let icon = load_icon(&file, size);
+            assert_eq!(icon.dimensions(), (size, size));
+            let last = size - 1;
+            // Os quatro cantos são transparentes; o miolo é a imagem intacta.
+            for (x, y) in [(0, 0), (last, 0), (0, last), (last, last)] {
+                assert_eq!(icon.get_pixel(x, y).0[3], 0, "canto {x},{y} a {size}px");
+            }
+            assert_eq!(icon.get_pixel(size / 2, size / 2).0, [200, 0, 0, 255]);
+            // No meio de cada lado o contorno clareia o pixel (branco a 10 %), sem deixá-lo transparente.
+            let edge = icon.get_pixel(size / 2, 0).0;
+            assert_eq!(edge[3], 255);
+            assert!(edge[1] > 15 && edge[1] < 40, "contorno {edge:?} a {size}px");
+            // Logo depois do contorno a imagem volta ao normal (1 px a 28, 2 px a 56).
+            let inner = icon.get_pixel(size / 2, size / 28 + 1).0;
+            assert_eq!(inner, [200, 0, 0, 255]);
+        }
+    }
+
+    #[test]
+    fn icon_decodes_ico_and_survives_broken_files() {
+        use image::ImageEncoder;
+        let dir = tempfile::tempdir().unwrap();
+        let ico = dir.path().join("jogo.ico");
+        let mut bytes = Vec::new();
+        image::codecs::ico::IcoEncoder::new(&mut bytes)
+            .write_image(
+                &[0, 128, 0, 255].repeat(32 * 32),
+                32,
+                32,
+                image::ExtendedColorType::Rgba8,
+            )
+            .unwrap();
+        std::fs::write(&ico, bytes).unwrap();
+        assert_eq!(load_icon(&ico, 28).get_pixel(14, 14).0, [0, 128, 0, 255]);
+        // Lixo, arquivo vazio e arquivo ausente: sem imagem, sem pânico.
+        let req = |p: &std::path::Path| Request {
+            key: String::new(),
+            uri: p.to_string_lossy().into_owned(),
+            max_w: 28,
+            max_h: 28,
+            glass: false,
+            icon: true,
+        };
+        let none: Resolver = Arc::new(|_: &str| None);
+        for (name, content) in [
+            ("lixo.ico", &b"isto nao e uma imagem"[..]),
+            ("vazio.png", b""),
+        ] {
+            let f = dir.path().join(name);
+            std::fs::write(&f, content).unwrap();
+            assert!(load(&req(&f), &none).is_none(), "{name}");
+        }
+        assert!(load(&req(&dir.path().join("nao-existe.png")), &none).is_none());
     }
 
     #[test]

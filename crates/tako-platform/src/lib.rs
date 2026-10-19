@@ -11,6 +11,7 @@ use tako_core::devices::{
 };
 
 pub mod downloads;
+pub mod exe_icon;
 pub mod secrets;
 pub mod space;
 pub mod usage;

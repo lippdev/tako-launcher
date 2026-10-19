@@ -33,7 +33,7 @@ crc32fast = "1"
 regex = "1"
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "ico"] }
 zip = { version = "9", default-features = false, features = ["deflate"] }
 keyring = "4"
 tempfile = "3"
