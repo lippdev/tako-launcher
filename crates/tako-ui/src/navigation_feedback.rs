@@ -200,7 +200,8 @@ pub fn decode_wav_to_mono_48k(bytes: &[u8]) -> Option<Vec<f32>> {
     }
     let frame_size = (channels as usize) * bytes_per_sample;
     let num_frames = data_len / frame_size;
-    if num_frames == 0 {
+    // Duração pelos quadros reais, antes de alocar: o `byte_rate` do cabeçalho pode mentir.
+    if num_frames == 0 || num_frames as u64 > 2 * freq as u64 {
         return None;
     }
 
@@ -928,6 +929,10 @@ mod tests {
             v.extend_from_slice(data);
             v
         }
+
+        // 0. `freq` minúsculo com muitos quadros não pode virar uma alocação gigante.
+        let huge = make_wav(1, 1, 1, 8, &vec![128u8; 1 << 20]);
+        assert!(decode_wav_to_mono_48k(&huge).is_none());
 
         // 1. PCM 8-bit mono, 48 kHz
         let pcm8_data = [128u8, 255u8, 0u8, 128u8];
