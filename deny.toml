@@ -1,8 +1,17 @@
-# Política mínima de dependências (DL-001, ADR-0028): só licenças compatíveis com a AGPL-3.0-only (ADR-0014).
-# Rodar: `cargo deny check licenses`.
+# Política de dependências (DL-001, ADR-0028): licenças compatíveis com a AGPL-3.0-only (ADR-0014) e fontes restritas a crates.io.
+# Rodar: `cargo deny check licenses` e `cargo deny check sources`.
 
 [graph]
 all-features = false
+
+[advisories]
+ignore = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
 
 [licenses]
 confidence-threshold = 0.9
