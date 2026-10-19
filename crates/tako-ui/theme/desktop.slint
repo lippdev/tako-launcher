@@ -846,10 +846,8 @@ component IconBtn inherits Rectangle {
         if badge != "": Text { text: badge; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 700; vertical-alignment: center; }
     }
     ita := TouchArea {
-        width: max(parent.width, 44px);
-        height: max(parent.height, 44px);
-        x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
+        width: parent.width;
+        height: parent.height;
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
@@ -3925,6 +3923,23 @@ component DeskRow inherits Rectangle {
                 Rectangle { width: 14px; DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
             }
         }
+        // Pasta de ROMs: a ação é um link sublinhado ("Trocar").
+        if card && data.value != "": Rectangle {
+            width: cl.preferred-width;
+            cl := Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 500; }
+            Rectangle { y: (parent.height + cl.preferred-height) / 2; height: 1px; background: Ui.on-accent; }
+        }
+        if !card && data.value != "" && data.value != data.action && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download": Text {
+            text: data.value;
+            color: data.style == "warning" ? Ui.warning : (data.style == "error" ? Ui.error : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted));
+            // Resumo do onboarding: a quantidade em 15/600.
+            font-size: bare ? Ui.desk-label : Ui.desk-label-sm;
+            font-weight: data.emphasized ? 600 : 500;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+            max-width: 260px;
+            overflow: elide;
+        }
         // Nas Configurações a ação com botão em pílula ("Trocar", "Procurar", "Verificar de novo").
         if data.action != "" && DeskArt.gray: Rectangle {
             y: (parent.height - self.height) / 2;
@@ -3937,23 +3952,6 @@ component DeskRow inherits Rectangle {
             accessible-label: data.title + (data.value != "" ? (": " + data.value + ". ") : ": ") + data.action;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             al := Text { text: data.action; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
-        }
-        // Pasta de ROMs: a ação é um link sublinhado ("Trocar").
-        if card && data.value != "": Rectangle {
-            width: cl.preferred-width;
-            cl := Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 500; }
-            Rectangle { y: (parent.height + cl.preferred-height) / 2; height: 1px; background: Ui.on-accent; }
-        }
-        if !card && data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download": Text {
-            text: data.value;
-            color: data.style == "warning" ? Ui.warning : (data.style == "error" ? Ui.error : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted));
-            // Resumo do onboarding: a quantidade em 15/600.
-            font-size: bare ? Ui.desk-label : Ui.desk-label-sm;
-            font-weight: data.emphasized ? 600 : 500;
-            vertical-alignment: center;
-            horizontal-alignment: right;
-            max-width: 260px;
-            overflow: elide;
         }
         if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && data.action == "": Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
@@ -4182,6 +4180,101 @@ component PopupFooter inherits Rectangle {
             btn-h := PopupButton {
                 x: root.has-btn-before(i) ? 10px : 0px;
                 data: r;
+                focused: key-focus && i == sel;
+                clicked => { root.clicked(i); }
+            }
+        }
+    }
+}
+
+// Rodapé dos diálogos: mede a largura necessária e empilha verticalmente quando os botões não cabem,
+// mantendo a ordem invertida do Tako.
+component DialogFooter inherits Rectangle {
+    in property <[PanelRow]> rows;
+    in property <bool> footer;
+    in property <int> sel;
+    in property <bool> key-focus;
+    callback clicked(int);
+
+    pure function has-btn-before(i: int) -> bool {
+        return i > 0 && rows[i - 1].kind == "button";
+    }
+
+    pure function btn-at(k: int) -> bool {
+        return k >= 0 && k < rows.length && rows[footer ? rows.length - 1 - k : k].kind == "button";
+    }
+
+    measure := HorizontalLayout {
+        visible: false;
+        height: 0px;
+        spacing: 0px;
+        for r[i] in rows: Rectangle {
+            width: r.kind == "button" ? (
+                (r.key == "skip" || r.style == "link")
+                    ? fl-m.preferred-width
+                    : (btn-m.preferred-width + (root.has-btn-before(i) ? 10px : 0px))
+            ) : 0px;
+            fl-m := FooterLink {
+                title: r.title;
+            }
+            btn-m := PopupButton {
+                data: r;
+            }
+        }
+    }
+
+    property <bool> stack: measure.preferred-width > root.width;
+
+    height: stack ? vl.preferred-height : Ui.control-height;
+
+    vl := VerticalLayout {
+        visible: stack;
+        width: root.width;
+        alignment: end;
+        spacing: 0px;
+        for k in rows.length: Rectangle {
+            property <int> i: footer ? rows.length - 1 - k : k;
+            property <bool> mine: rows[i].kind == "button";
+            property <bool> has-prev: k > 0 && root.btn-at(k - 1);
+            visible: mine;
+            height: mine ? (Ui.control-height + (has-prev ? 8px : 0px)) : 0px;
+            if mine && (rows[i].key == "skip" || rows[i].style == "link"): FooterLink {
+                y: has-prev ? 8px : 0px;
+                x: (parent.width - self.width) / 2;
+                title: rows[i].title;
+                focused: key-focus && i == sel;
+                clicked => { root.clicked(i); }
+            }
+            if mine && rows[i].key != "skip" && rows[i].style != "link": PopupButton {
+                y: has-prev ? 8px : 0px;
+                width: parent.width;
+                height: Ui.control-height;
+                data: rows[i];
+                focused: key-focus && i == sel;
+                clicked => { root.clicked(i); }
+            }
+        }
+    }
+
+    if !stack: HorizontalLayout {
+        width: root.width;
+        padding-top: 4px;
+        for r[i] in rows: HorizontalLayout {
+            visible: r.kind == "button" && (r.key == "skip" || r.style == "link");
+            if r.kind == "button" && (r.key == "skip" || r.style == "link"): FooterLink {
+                title: r.title;
+                focused: key-focus && i == sel;
+                clicked => { root.clicked(i); }
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        for k in rows.length: HorizontalLayout {
+            property <int> i: footer ? rows.length - 1 - k : k;
+            property <bool> mine: rows[i].kind == "button" && rows[i].key != "skip" && rows[i].style != "link";
+            visible: mine;
+            padding-left: self.visible ? 10px : 0;
+            if mine: PopupButton {
+                data: rows[i];
                 focused: key-focus && i == sel;
                 clicked => { root.clicked(i); }
             }
@@ -5148,28 +5241,12 @@ component DeskOverlay inherits Rectangle {
                 }
                 // Rodapé (PadraoPopup): ação de texto à esquerda ("Pular" nos passos, estilo "link"); à direita as outras,
                 // com a principal por último (nos passos, a ordem já vem pronta; nos demais, a lista vem na ordem do Tako).
-                if ov.tabs.length > 0 || ov.footer: HorizontalLayout {
-                    padding-top: 4px;
-                    for r[i] in ov.rows: HorizontalLayout {
-                        visible: r.kind == "button" && (r.key == "skip" || r.style == "link");
-                        if r.kind == "button" && (r.key == "skip" || r.style == "link"): FooterLink {
-                            title: r.title;
-                            focused: focus-visible && top-most && i == ov.sel;
-                            clicked => { root.clicked("row", i); }
-                        }
-                    }
-                    Rectangle { horizontal-stretch: 1; }
-                    for k in ov.rows.length: HorizontalLayout {
-                        property <int> i: ov.footer ? ov.rows.length - 1 - k : k;
-                        property <bool> mine: ov.rows[i].kind == "button" && ov.rows[i].key != "skip" && ov.rows[i].style != "link";
-                        visible: mine;
-                        padding-left: self.visible ? 10px : 0;
-                        if mine: PopupButton {
-                            data: ov.rows[i];
-                            focused: focus-visible && top-most && i == ov.sel;
-                            clicked => { root.clicked("row", i); }
-                        }
-                    }
+                if ov.tabs.length > 0 || ov.footer: DialogFooter {
+                    rows: ov.rows;
+                    footer: ov.footer;
+                    sel: top-most ? ov.sel : -1;
+                    key-focus: focus-visible;
+                    clicked(i) => { root.clicked("row", i); }
                 }
             }
         }
