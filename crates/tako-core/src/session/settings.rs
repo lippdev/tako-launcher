@@ -37,16 +37,42 @@ pub struct GameSettingsOverride {
     /// de novo: comandos vindos de fora (importação, extensão) nunca rodam sem o usuário ver.
     #[serde(default)]
     pub approved_commands: Option<String>,
+    /// Programas abertos junto do jogo (EXT-001), separados por `;` ou por linha. Entram na permissão dos comandos.
+    #[serde(default)]
+    pub tools: Option<String>,
+    /// Fechar esses programas quando o jogo terminar.
+    #[serde(default)]
+    pub close_tools: Option<bool>,
 }
 
 /// Quanto o comando de antes pode demorar antes de o jogo abrir mesmo assim.
 pub const BEFORE_COMMAND_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Os dois comandos num texto só, para comparar com o que foi permitido; `None` sem nenhum comando.
-pub fn commands_text(before: Option<&str>, after: Option<&str>) -> Option<String> {
+/// Os comandos e as ferramentas num texto só, para comparar com o que foi permitido; `None` sem nenhum.
+/// Sem ferramentas o texto é o do SESSION-004, então o que já foi permitido continua valendo.
+pub fn commands_text(
+    before: Option<&str>,
+    after: Option<&str>,
+    tools: Option<&str>,
+) -> Option<String> {
     let before = normalize_arguments(before).unwrap_or_default();
     let after = normalize_arguments(after).unwrap_or_default();
-    (!before.is_empty() || !after.is_empty()).then(|| format!("{before}\n{after}"))
+    let mut text = format!("{before}\n{after}");
+    for t in parse_tools(tools) {
+        text = format!("{text}\n{t}");
+    }
+    (text != "\n").then_some(text)
+}
+
+/// Caminhos das ferramentas, separados por `;` ou por linha, sem os vazios.
+// shortcut: caminho com `;` não cabe; trocar por uma lista própria se alguém precisar.
+pub fn parse_tools(text: Option<&str>) -> Vec<String> {
+    text.unwrap_or_default()
+        .split(['\n', ';'])
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(Into::into)
+        .collect()
 }
 
 /// `NOME=valor` separados por `;` ou por linha. Nome inválido (vazio, com espaço ou `=`) é ignorado.
@@ -88,6 +114,8 @@ impl GameSettingsOverride {
             !parse_environment(self.environment.as_deref()).is_empty(),
             normalize_arguments(self.before_command.as_deref()).is_some(),
             normalize_arguments(self.after_command.as_deref()).is_some(),
+            !parse_tools(self.tools.as_deref()).is_empty(),
+            self.close_tools == Some(true),
         ]
         .into_iter()
         .filter(|b| *b)
@@ -104,6 +132,7 @@ impl GameSettingsOverride {
         self.approved_commands = commands_text(
             self.before_command.as_deref(),
             self.after_command.as_deref(),
+            self.tools.as_deref(),
         );
     }
 }
@@ -243,6 +272,9 @@ pub struct EffectiveSessionSettings {
     pub after_command: Option<String>,
     /// Sem comandos, ou com os comandos já permitidos como estão.
     pub commands_approved: bool,
+    /// Programas abertos junto do jogo (EXT-001); só com `commands_approved`.
+    pub tools: Vec<String>,
+    pub close_tools: bool,
 }
 
 impl EffectiveSessionSettings {
@@ -312,10 +344,13 @@ pub fn resolve(
         commands_approved: match commands_text(
             game.before_command.as_deref(),
             game.after_command.as_deref(),
+            game.tools.as_deref(),
         ) {
             None => true,
             current => game.approved_commands == current,
         },
+        tools: parse_tools(game.tools.as_deref()),
+        close_tools: game.close_tools == Some(true),
     }
 }
 
@@ -423,6 +458,27 @@ mod tests {
         assert!(!resolve(&global(), Some(&o)).commands_approved);
         // Sem comandos não há o que permitir.
         assert!(resolve(&global(), None).commands_approved);
+    }
+
+    #[test]
+    fn tools_need_the_same_permission_and_old_approvals_still_hold() {
+        let mut o = with(|o| o.before_command = Some("mount.bat".into()));
+        o.approve_commands();
+        // O texto sem ferramentas é o do SESSION-004: quem já permitiu não é perguntado de novo.
+        assert_eq!(o.approved_commands.as_deref(), Some("mount.bat\n"));
+        o.tools = Some(" C:\\FPS\\fps.exe ; ;\nC:\\Mods\\mods.exe".into());
+        let e = resolve(&global(), Some(&o));
+        assert!(!e.commands_approved);
+        assert_eq!(e.tools, ["C:\\FPS\\fps.exe", "C:\\Mods\\mods.exe"]);
+        assert!(!e.close_tools);
+        o.approve_commands();
+        o.close_tools = Some(true);
+        let e = resolve(&global(), Some(&o));
+        assert!(e.commands_approved && e.close_tools);
+        assert_eq!(o.changed_count(), 3);
+        // Só ferramentas também pede permissão.
+        let tools_only = with(|o| o.tools = Some("fps.exe".into()));
+        assert!(!resolve(&global(), Some(&tools_only)).commands_approved);
     }
 
     #[test]

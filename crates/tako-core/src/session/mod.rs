@@ -3,6 +3,7 @@
 //! Tudo aqui é regra pura sobre os traits de [`crate::devices`]; testes rodam com [`crate::devices::fake`].
 
 pub mod audio;
+pub mod events;
 pub mod restore;
 pub mod screen;
 pub mod settings;

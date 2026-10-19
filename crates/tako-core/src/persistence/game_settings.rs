@@ -22,7 +22,7 @@ impl GameSettingsStore {
             .query_row(
                 "SELECT use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
                         extra_arguments, working_directory, environment, before_command, after_command,
-                        approved_commands, screen_id, screen_name
+                        approved_commands, screen_id, screen_name, tools, close_tools
                  FROM game_settings WHERE game_id = ?1;",
                 [game_id],
                 |r| {
@@ -44,6 +44,8 @@ impl GameSettingsStore {
                         approved_commands: r.get(12)?,
                         screen_id: r.get(13)?,
                         screen_name: r.get(14)?,
+                        tools: r.get(15)?,
+                        close_tools: r.get::<_, Option<i64>>(16)?.map(|v| v != 0),
                     })
                 },
             )
@@ -67,8 +69,8 @@ impl GameSettingsStore {
             "INSERT OR REPLACE INTO game_settings
                 (game_id, use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
                  extra_arguments, working_directory, environment, before_command, after_command, approved_commands,
-                 screen_id, screen_name)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16);",
+                 screen_id, screen_name, tools, close_tools)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18);",
             params![
                 game_id,
                 settings.use_game_screen,
@@ -86,6 +88,8 @@ impl GameSettingsStore {
                 settings.approved_commands,
                 normalize(settings.screen_id.as_deref()),
                 settings.screen_name,
+                normalize(settings.tools.as_deref()),
+                settings.close_tools,
             ],
         )?;
         Ok(())
@@ -123,6 +127,8 @@ mod tests {
             before_command: Some(" antes.bat ".into()),
             after_command: None,
             approved_commands: Some("antes.bat\n".into()),
+            tools: Some(" C:/FPS/fps.exe ".into()),
+            close_tools: Some(true),
         };
 
         assert_eq!(
@@ -135,6 +141,7 @@ mod tests {
             extra_arguments: Some("-dx11".into()),
             working_directory: None,
             before_command: Some("antes.bat".into()),
+            tools: Some("C:/FPS/fps.exe".into()),
             ..settings
         };
         assert_eq!(store.load("steam:570").unwrap(), expected);

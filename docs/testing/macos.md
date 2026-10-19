@@ -43,6 +43,8 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] Comando antes de jogar (por `sh -c`, ex.: `say antes; sleep 2`): o jogo só abre depois que ele termina; comando
   que sai com erro ou passa do limite mostra o aviso e o jogo abre do mesmo jeito. Comando depois de jogar roda ao
   fechar o jogo.
+- [ ] Ferramentas junto do jogo (EXT-001, ex.: `/System/Applications/Calculator.app`): pedem permissão, abrem antes do jogo sem travar a interface e,
+  com "Fechar as ferramentas no fim", fecham quando o jogo termina.
 
 ## Abrir com o sistema
 

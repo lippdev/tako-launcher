@@ -225,3 +225,12 @@ Precisa de Steam, Epic e GOG Galaxy com conta, e da chave da Web API da Steam em
 7. Jogo da conta em duas lojas (ex.: Steam e GOG) não instalado: as duas lojas aparecem como opção de instalar.
 8. O espaço livre mostrado é o do disco da Steam (biblioteca padrão) e bate com o Explorador de Arquivos; sem Steam, é o do `C:`.
    Com a Steam em outro disco (ex.: `D:\Steam`), mostra `D:`.
+
+## 21. Ferramentas junto do jogo (EXT-001)
+
+- [ ] Em Configurações deste jogo › Ferramentas junto do jogo, informe um `.exe` (ex.: `C:\Windows\System32\notepad.exe`).
+  Ao jogar, o pedido de permissão mostra "Abrir junto do jogo: …"; sem permitir, nada abre.
+- [ ] Permitido: a ferramenta abre antes do jogo e a interface não trava (o supervisor não reinicia a interface).
+- [ ] Com "Fechar as ferramentas no fim" em Sim, a ferramenta fecha quando o jogo termina; em Não, continua aberta.
+- [ ] Caminho que não existe: aviso "Não foi possível abrir…" e o jogo abre do mesmo jeito.
+- [ ] Atalho `.lnk` abre, mas não fecha no fim (o processo não tem o caminho do atalho).

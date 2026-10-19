@@ -711,6 +711,21 @@ fn desktop_snapshot() {
                     shell.edited("overlay-input", &t);
                 }
             }
+            // ConfiguracoesDoJogo com ferramentas junto do jogo (EXT-001).
+            Ok("game-settings") => {
+                let id = shell.ctx.library.games()[0].id.clone();
+                shell.ctx.game_overrides.insert(
+                    id.clone(),
+                    tako_core::session::settings::GameSettingsOverride {
+                        before_command: Some("montar.bat".into()),
+                        tools: Some("C:\\Ferramentas\\fps.exe".into()),
+                        close_tools: Some(true),
+                        ..Default::default()
+                    },
+                );
+                let layer = crate::shell::game_settings::panel(&shell.ctx, &id);
+                shell.push_layer(layer);
+            }
             Ok("ask") => {
                 shell.ctx.pads_connected = 1;
                 shell.ask_big_picture = true;
