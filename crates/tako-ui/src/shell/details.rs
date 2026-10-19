@@ -644,6 +644,27 @@ mod tests {
     }
 
     #[test]
+    fn the_addresses_the_sources_generate_pass_the_check() {
+        use tako_sources::heroic::{Runner, launch_uri};
+        let mut made = vec![
+            tako_sources::steam::owned::install_uri(570),
+            tako_sources::gog::owned::install_uri("1207658924"),
+            tako_sources::amazon::owned::install_uri("amzn1.adg.product.0a1b-2c3d_4e"),
+        ];
+        for r in [
+            Runner::Legendary,
+            Runner::Gog,
+            Runner::Nile,
+            Runner::Sideload,
+        ] {
+            made.push(launch_uri(r, "amzn1.adg.product.2222-3333"));
+        }
+        for uri in made {
+            assert!(is_install_uri(&uri, false), "{uri}");
+        }
+    }
+
+    #[test]
     fn the_default_offer_is_the_items_own_store_not_the_first_of_the_list() {
         let offers = [
             offer(GameStore::Steam, "steam://install/1", None),
