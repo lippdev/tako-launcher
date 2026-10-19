@@ -12,14 +12,14 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tako_core::i18n::{self, Lang};
 use tako_core::input::profiles::Profiles;
 use tako_core::input::shortcut::{ButtonChordDetector, KeyModifiers, chord};
 use tako_core::input::{AppCommand, GamepadInterpreter, GamepadSnapshot};
-use tako_core::library::{CollectionLibrary, Game, GameLibrary, system_clock};
+use tako_core::library::{CollectionLibrary, Game, GameLibrary, GameStore, system_clock};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{self as db, TakoDatabase};
 use tako_core::presentation::color::AccentPalette;
@@ -187,6 +187,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         sources: Vec::new(),
         update_status: String::new(),
         update_ready: None,
+        free_space: None,
         app_update: Default::default(),
         safe_mode: false,
         scanning: false,
@@ -232,8 +233,9 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
 /// Lojas lidas na leitura em curso, em milésimos (a barra da TelaCarregamento).
 pub(crate) static SCAN_PROGRESS: AtomicU32 = AtomicU32::new(0);
 
-/// Lê as lojas numa thread e atualiza a biblioteca quando terminar.
-pub fn rescan(shell: &Rc<RefCell<Shell>>) {
+/// Lê as lojas numa thread e atualiza a biblioteca quando terminar. `force`: busca a lista de jogos da conta
+/// Steam agora, sem esperar o cache de 1 hora (abrir o Tako e "Procurar jogos instalados").
+pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
     let (found, disabled, simulate, steam_key, steam_cache, emulators) = {
         let mut s = shell.borrow_mut();
         if s.ctx.scanning {
@@ -257,13 +259,14 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
         .spawn(move || {
             // Jogos da conta Steam (SRC-005): só com a chave; sem ela, nem o cache antigo entra.
             let steam_owned = steam_key.map(|key| {
-                if !simulate && let Err(e) = crate::steam_owned::refresh(&key, &steam_cache, false)
+                if !simulate && let Err(e) = crate::steam_owned::refresh(&key, &steam_cache, force)
                 {
                     tracing::warn!("jogos da conta Steam: {e}");
                 }
                 steam_cache
             });
             let reports = scan_into(&found, &disabled, simulate, steam_owned, emulators);
+            let free_space = (!simulate).then(default_free_space).flatten();
             let to_measure: Vec<(String, String)> = found
                 .lock()
                 .map(|f| {
@@ -279,7 +282,9 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
                     s.ctx.library.refresh();
                     s.ctx.sync_collections();
                     s.ctx.sources = reports;
+                    s.ctx.free_space = free_space.or(s.ctx.free_space.take());
                     s.ctx.scanning = false;
+                    s.ctx.check_installs(); // avisa o que acabou de instalar
                     s.apply_pending_link();
                     s.ctx.dirty = true;
                 }
@@ -287,6 +292,70 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>) {
             measure_sizes(&found, to_measure);
         })
         .ok();
+}
+
+/// Espaço livre no disco onde as lojas instalam por padrão (SRC-005): a biblioteca padrão da Steam e, sem Steam,
+/// o disco do sistema.
+fn default_free_space() -> Option<tako_core::devices::FreeSpace> {
+    let base = tako_sources::steam::find_root().unwrap_or_else(|| {
+        if cfg!(windows) {
+            let drive = std::env::var_os("SystemDrive").unwrap_or_else(|| "C:".into());
+            PathBuf::from(format!("{}\\", drive.to_string_lossy()))
+        } else {
+            std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from)
+        }
+    });
+    tako_platform::space::free_space(&base)
+}
+
+/// Acompanha as instalações da Steam (SRC-005): relê só os `appmanifest` dos jogos instalando e atualiza o
+/// progresso; quando um termina, faz a leitura completa para ele virar instalado. Fora da thread da UI.
+fn follow_installs(shell: &Rc<RefCell<Shell>>) {
+    static BUSY: AtomicBool = AtomicBool::new(false);
+    let (found, watch) = {
+        let s = shell.borrow();
+        if s.ctx.simulated() || s.ctx.scanning {
+            return;
+        }
+        // Os que a loja já está instalando e os que o usuário mandou instalar (o manifest ainda pode não existir).
+        let watch: Vec<String> = s
+            .ctx
+            .library
+            .games()
+            .iter()
+            .filter(|g| g.installing.is_some())
+            .map(|g| g.id.clone())
+            .chain(s.ctx.installing.iter().map(|(id, _)| id.clone()))
+            .collect();
+        (s.ctx.found.clone(), watch)
+    };
+    if watch.is_empty() || BUSY.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("tako-installs".into())
+        .spawn(move || {
+            let followed = tako_sources::steam::find_root()
+                .zip(found.lock().ok())
+                .map(|(root, mut f)| tako_sources::steam::follow_installs(&root, &mut f, &watch))
+                .unwrap_or_default();
+            let _ = slint::invoke_from_event_loop(move || {
+                BUSY.store(false, Ordering::Release);
+                let Some(shell) = crate::tasks::shell() else {
+                    return;
+                };
+                if followed.finished {
+                    rescan(&shell, false);
+                } else if followed.changed {
+                    let mut s = shell.borrow_mut();
+                    s.ctx.library.refresh();
+                    s.ctx.dirty = true;
+                }
+            });
+        });
+    if spawned.is_err() {
+        BUSY.store(false, Ordering::Release);
+    }
 }
 
 /// Lê as lojas e troca os jogos encontrados. Em simulação a lista é a que o ctx já tem (a demonstração ou os
@@ -849,6 +918,7 @@ impl App {
         let mut last_clock = String::new();
         let mut next_battery = Duration::ZERO;
         let mut next_install_check = Duration::ZERO;
+        let mut next_install_poll = Duration::ZERO;
         let mut next_live = Duration::ZERO;
         // Só registra enquanto há jogo; ao fechar a UI, o supervisor assume o mesmo atalho.
         let mut hotkey = None;
@@ -961,11 +1031,36 @@ impl App {
                         c => s.handle(c),
                     }
                 }
-                // Instalando pela loja (SRC-005): relê a biblioteca a cada 30 s até o jogo aparecer instalado.
+                // Instalando pela loja (SRC-005): a Steam é acompanhada a cada 3 s pelos próprios manifests; as outras
+                // lojas não dão o andamento, então a biblioteca toda é relida a cada 30 s até o jogo aparecer instalado.
+                if now >= next_install_poll {
+                    next_install_poll = now + Duration::from_secs(3);
+                    follow_installs(&app.shell);
+                }
                 if now >= next_install_check {
                     next_install_check = now + Duration::from_secs(30);
-                    if app.shell.borrow_mut().ctx.check_installs() {
-                        rescan(&app.shell);
+                    let mut s = app.shell.borrow_mut();
+                    s.ctx.check_installs();
+                    let ctx = &s.ctx;
+                    let other_store = ctx
+                        .installing
+                        .iter()
+                        .map(|(id, _)| id)
+                        .chain(
+                            ctx.library
+                                .games()
+                                .iter()
+                                .filter(|g| g.installing.is_some())
+                                .map(|g| &g.id),
+                        )
+                        .any(|id| {
+                            ctx.library
+                                .find(id)
+                                .is_some_and(|g| g.store() != GameStore::Steam)
+                        });
+                    drop(s);
+                    if other_store {
+                        rescan(&app.shell, false);
                     }
                 }
                 let action = {
@@ -988,6 +1083,12 @@ impl App {
                     }
                     if now >= next_live && s.live() {
                         next_live = now + Duration::from_secs(1);
+                        s.ctx.dirty = true;
+                    }
+                    // A grade do desktop soma linhas por coluna (seção NÃO INSTALADOS): mudou a largura, mudou a conta.
+                    if let Ok(Value::Number(n)) = app.ui.borrow().get_property("library-columns")
+                        && (n as usize).max(1) != s.ctx.grid_columns
+                    {
                         s.ctx.dirty = true;
                     }
                 }
@@ -1066,7 +1167,7 @@ impl App {
             None => ui.show().map_err(|e| e.to_string())?,
         }
         drop(ui);
-        rescan(&self.shell);
+        rescan(&self.shell, true); // ao abrir: a lista de não instalados da Steam vem fresca
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
     }
 
@@ -1237,7 +1338,8 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
             s.ctx.effects.remove(0)
         };
         if effect == Effect::Rescan || effect == Effect::ReloadLibrary {
-            rescan(shell);
+            // "Procurar jogos instalados" também atualiza a lista de não instalados.
+            rescan(shell, effect == Effect::Rescan);
             continue;
         }
         if effect == Effect::EndGame {
@@ -1571,6 +1673,12 @@ mod tests {
         let found = Mutex::new(bench);
         assert!(scan_into(&found, "", true, None, Default::default()).is_empty());
         assert_eq!(found.lock().unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn free_space_of_the_default_store_disk_is_known() {
+        let space = default_free_space().unwrap();
+        assert!(space.bytes > 0 && !space.drive.is_empty());
     }
 
     #[test]

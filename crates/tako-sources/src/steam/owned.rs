@@ -102,6 +102,11 @@ pub fn load(cache: &Path) -> Vec<OwnedApp> {
         .unwrap_or_default()
 }
 
+/// Abre a instalação do jogo na Steam (o cliente pergunta a pasta e baixa).
+pub fn install_uri(app_id: u32) -> String {
+    format!("steam://install/{app_id}")
+}
+
 /// Jogo não instalado: o mesmo id do instalado (`steam:<appid>`), para virar instalado no lugar quando a Steam
 /// terminar de baixar.
 pub fn to_game(app: &OwnedApp) -> Game {
@@ -114,6 +119,7 @@ pub fn to_game(app: &OwnedApp) -> Game {
         cover_uri: Some(format!("{ART_SCHEME}://{id}/cover")),
         hero_uri: Some(format!("{ART_SCHEME}://{id}/hero")),
         is_installed: false,
+        install_uri: Some(install_uri(id)),
         last_played_at: app.last_played,
         play_time: app.play_time,
         steam_app_id: Some(id),

@@ -128,11 +128,15 @@ pub fn load(file: &Path) -> Vec<EpicOwned> {
 
 /// `com.epicgames.launcher://apps/<Namespace>%3A<CatalogItemId>%3A<AppName>?action=install`.
 pub fn install_uri(o: &EpicOwned) -> String {
+    install_uri_of(&o.namespace, &o.catalog_item_id, &o.app_name)
+}
+
+pub(super) fn install_uri_of(namespace: &str, catalog_item_id: &str, app_name: &str) -> String {
     format!(
         "com.epicgames.launcher://apps/{}%3A{}%3A{}?action=install",
-        escape_data(&o.namespace),
-        escape_data(&o.catalog_item_id),
-        escape_data(&o.app_name)
+        escape_data(namespace),
+        escape_data(catalog_item_id),
+        escape_data(app_name)
     )
 }
 

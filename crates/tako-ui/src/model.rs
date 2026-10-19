@@ -233,6 +233,19 @@ theme_struct! {
         pub checked: bool,
         // Posição na lista que o tema avisa nos cliques (nas categorias, na lista achatada das fileiras).
         pub index: i32,
+        // Rótulo acessível inteiro (título, loja e, se for o caso, "não instalado" e o progresso).
+        pub label: String,
+        // "" = jogo; "section" = NÃO INSTALADOS; "group" = cabeçalho de uma loja (`index` = ordem do grupo).
+        pub kind: String,
+        // Cabeçalhos: quantos jogos; o grupo aberto.
+        pub count: String,
+        pub open: bool,
+        // Instalação pela loja em andamento: fração de 0 a 1 (negativa = a loja não informa), "42%" e os rótulos
+        // do botão "Instalar <jogo>" e do anel.
+        pub installing: bool,
+        pub progress: f32,
+        pub percent: String,
+        pub install_label: String,
     }
 }
 
@@ -286,6 +299,27 @@ theme_struct! {
         pub sessions: Vec<DeskInfo>,
         // Capturas de tela da fonte de metadados (só com a fase aberta).
         pub shots: Vec<Image>,
+    }
+}
+
+theme_struct! {
+    /// Trecho da grade com a seção de não instalados: capas soltas, a divisória NÃO INSTALADOS ou uma loja com as
+    /// capas dela. `*_before` dizem quantas linhas de capas e cabeçalhos vêm antes (o tema soma as alturas).
+    pub struct DeskBlock {
+        // "covers" | "section" | "group"
+        pub kind: String,
+        pub title: String,
+        pub count: String,
+        pub label: String,
+        pub icon: String,
+        pub open: bool,
+        pub games: Vec<DeskGame>,
+        // Índice (na lista de jogos) da primeira capa, para o `scrolled`; e a ordem do grupo, para o clique.
+        pub first: i32,
+        pub index: i32,
+        pub rows_before: i32,
+        pub sections_before: i32,
+        pub groups_before: i32,
     }
 }
 

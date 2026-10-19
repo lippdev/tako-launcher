@@ -208,7 +208,25 @@ Precisa de um executável que feche com erro. Crie `C:\TakoTeste\dll.bat` com `e
 5. Um jogo aberto pela loja (Steam, Epic) que feche sozinho em poucos segundos: o aviso de antes, sem código.
 6. Em `logs\`, a linha "terminou fora do normal" traz o código em hex.
 
-## 20. Interface que fecha e reabre ao jogar (BUG-001)
+## 20. Jogos não instalados: instalando e espaço livre (SRC-005)
+
+Precisa de Steam, Epic e GOG Galaxy com conta, e da chave da Web API da Steam em Configurações › Biblioteca e lojas.
+
+1. Abrir o Tako: a lista de não instalados da Steam já vem atualizada (sem esperar 1 hora). Em "Procurar jogos instalados" também.
+2. Escolher um jogo pequeno da Steam › Instalar. A Steam abre a janela de instalação; confirme. Em até 3 s o jogo passa a
+   "instalando" com a porcentagem andando (pausar na Steam congela o número; cancelar volta a "não instalado").
+3. Quando a Steam termina, o jogo vira instalado sozinho, com o aviso "foi instalado", sem reiniciar o Tako.
+4. Se a Steam estiver numa fila de downloads (jogo esperando a vez), conferir se o Tako mostra "instalando" sem porcentagem ou
+   ainda "não instalado" (o `StateFlags` dessa fila não foi confirmado; anotar o valor do `appmanifest_<id>.acf`).
+5. Epic: Instalar abre o Launcher na página do jogo. Durante a instalação, conferir se o jogo aparece como "instalando"
+   (depende do `bIsIncompleteInstall` do `.item` aparecer logo no começo; sem porcentagem) e se vira instalado no fim.
+6. GOG: Instalar abre o Galaxy na página do jogo (`goggalaxy://openGameView/<id>`). O Tako não vê o andamento do
+   Galaxy: o jogo só vira instalado quando a releitura de 30 s encontra o jogo instalado.
+7. Jogo da conta em duas lojas (ex.: Steam e GOG) não instalado: as duas lojas aparecem como opção de instalar.
+8. O espaço livre mostrado é o do disco da Steam (biblioteca padrão) e bate com o Explorador de Arquivos; sem Steam, é o do `C:`.
+   Com a Steam em outro disco (ex.: `D:\Steam`), mostra `D:`.
+
+## 21. Interface que fecha e reabre ao jogar (BUG-001)
 
 Diagnóstico em [`docs/bugs/BUG-001.md`](../bugs/BUG-001.md). Anote o modo (desktop ou tela cheia) em cada passo.
 

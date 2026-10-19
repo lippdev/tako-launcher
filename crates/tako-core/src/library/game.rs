@@ -197,6 +197,20 @@ pub mod media {
     pub const VIDEO: &str = "video";
 }
 
+/// Progresso de uma instalação feita pelo cliente da loja. `fraction` em 0..=1; `None` = a loja não informa.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+pub struct InstallProgress {
+    pub fraction: Option<f32>,
+}
+
+/// Uma loja por onde instalar o jogo: o endereço que abre a instalação no cliente e o tamanho, se conhecido.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InstallOffer {
+    pub store: GameStore,
+    pub install_uri: String,
+    pub size: Option<u64>,
+}
+
 /// Jogo da biblioteca. Dados de catálogo vêm da fonte; metadados e estado do usuário chegam depois.
 ///
 /// Arte e mídia são URIs em texto: `file:///…`, `https://…`, ou esquemas internos (`steam-art://`, `ssmedia://`).
@@ -259,6 +273,16 @@ pub struct Game {
     pub steam_app_id: Option<u32>,
     /// Outras lojas em que o mesmo jogo está instalado.
     pub also_installed_in: Vec<GameStore>,
+    /// Instalação em andamento disparada na loja (SRC-005); `None` = nenhuma.
+    #[serde(default)]
+    pub installing: Option<InstallProgress>,
+    /// Tamanho da instalação em bytes, quando a loja informa.
+    #[serde(default)]
+    pub install_size: Option<u64>,
+    /// Lojas da conta por onde o jogo não instalado pode ser instalado, a da compra mais antiga primeiro (SRC-005).
+    /// Vazio = só a loja do jogo, pelo `install_uri`.
+    #[serde(default)]
+    pub install_offers: Vec<InstallOffer>,
 
     pub added_at: Option<DateTime<Utc>>,
     pub is_favorite: bool,

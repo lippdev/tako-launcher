@@ -34,3 +34,10 @@ pub enum DeviceError {
 }
 
 pub type DeviceResult<T> = Result<T, DeviceError>;
+
+/// Espaço livre no disco onde as lojas instalam por padrão (SRC-005): a letra ou o ponto de montagem e os bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FreeSpace {
+    pub drive: String,
+    pub bytes: u64,
+}
