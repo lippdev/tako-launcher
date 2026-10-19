@@ -310,6 +310,15 @@ pub fn apply_tokens_with_override(
 /// Detecta os tokens que a entrada do tema realmente consulta para mostrar só opções eficazes.
 pub fn token_capabilities(entry: &Path) -> (bool, bool) {
     let source = std::fs::read_to_string(entry).unwrap_or_default();
+    let reexports_main_theme = source.lines().any(|line| {
+        line.contains("export {")
+            && line.contains("App")
+            && line.contains("Ui")
+            && line.contains("@tako/main.slint")
+    });
+    if reexports_main_theme {
+        return (true, true);
+    }
     (
         source.contains("Ui.font-"),
         source.contains("Ui.canvas")
@@ -563,6 +572,22 @@ mod tests {
             token_capabilities(&builtin.join("main.slint")),
             (true, true)
         );
+        assert_eq!(
+            token_capabilities(&tmp.path().join("tako-alto-contraste/main.slint")),
+            (true, true)
+        );
+    }
+
+    #[test]
+    fn embedded_extra_theme_ids_match_the_themes_catalog() {
+        let embedded_ids: std::collections::BTreeSet<&str> = embedded::FILES
+            .iter()
+            .filter_map(|(name, _)| name.strip_prefix("extras/"))
+            .filter_map(|path| path.split_once('/').map(|(id, _)| id))
+            .collect();
+        let catalog_ids: std::collections::BTreeSet<&str> =
+            tako_themes::BUILTIN_EXTRA_THEME_IDS.into_iter().collect();
+        assert_eq!(embedded_ids, catalog_ids);
     }
 
     #[test]
