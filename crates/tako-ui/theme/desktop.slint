@@ -656,15 +656,18 @@ component TopBar inherits Vidro {
         }
         if download-on: Rectangle {
             y: (parent.height - self.height) / 2;
-            height: 32px;
+            height: 40px;
             width: dlay.preferred-width;
-            border-radius: self.height / 2;
+            border-radius: Ui.radius-control;
+            transform-scale: dta.pressed ? Ui.escala-pressionado : 1;
+            animate transform-scale { duration: Ui.focus-time; }
             background: dta.pressed ? Ui.glass-pressed : (dta.has-hover ? Ui.glass-hover : Ui.glass-control);
             border-width: 1px;
             border-color: Ui.glass-edge;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: button;
             accessible-label: download-label != "" ? download-tip + ": " + download-label : download-tip;
+            if focus-index == 1 + items.length: FocusRing { radius: Ui.radius-control; }
             dlay := HorizontalLayout {
                 padding-left: 10px;
                 padding-right: download-label != "" ? 12px : 10px;
@@ -683,7 +686,7 @@ component TopBar inherits Vidro {
             background: pta.pressed ? Ui.glass-pressed : pta.has-hover ? Ui.glass-hover : Ui.glass-control;
             accessible-role: button;
             accessible-label: profile-name;
-            if focus-index == 1 + items.length: FocusRing { radius: Ui.radius-control; }
+            if focus-index == 1 + items.length + (download-on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
             pl := HorizontalLayout {
                 padding-left: 6px; padding-right: 10px; spacing: 8px;
                 Rectangle {
@@ -714,7 +717,7 @@ component TopBar inherits Vidro {
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: button;
             accessible-label: big-picture-label;
-            if focus-index == 2 + items.length: FocusRing { radius: Ui.radius-control; }
+            if focus-index == 2 + items.length + (download-on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
             DeskIcon { name: "gamepad"; size: 22px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
             fta := TouchArea {
                 mouse-cursor: pointer;
@@ -826,8 +829,8 @@ component IconBtn inherits Rectangle {
     in property <bool> on;
     in property <bool> focused;
     callback clicked();
-    height: 30px;
-    width: badge != "" ? il.preferred-width : self.height;
+    height: 44px;
+    width: badge != "" ? il.preferred-width : 44px;
     border-radius: Ui.radius-thumb;
     background: ita.has-hover ? Ui.glass-hover : transparent;
     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -3590,7 +3593,7 @@ component DeskRow inherits Rectangle {
     property <bool> emu: data.icon == "emu-retroarch" || data.icon == "emu-dolphin" || data.icon == "emu-pcsx2" || data.icon == "emu-duckstation" || data.icon == "emu-ppsspp" || data.icon == "emu-ryujinx" || data.icon == "emu-cemu" || data.icon == "emu-rpcs3";
     // A linha da fila cresce com o motivo (texto essencial: quebra em vez de cortar). Onboarding (`bare`): linhas de
     // 12 em cima e embaixo, sem a altura mínima das Configurações.
-    out property <length> row-h: is-header ? 40px : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : Ui.settings-row-height, lay.preferred-height) + card-gap);
+    out property <length> row-h: is-header ? 40px : (data.kind == "note" ? 52px : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : Ui.settings-row-height, lay.preferred-height) + card-gap));
     callback clicked();
     // Ação dentro da linha: 0 = Aceitar, 1 = Escolher outra.
     callback act(int);
@@ -3599,7 +3602,7 @@ component DeskRow inherits Rectangle {
     // Canto inferior direito da pílula do select, para a lista nascer embaixo dela, alinhada à direita.
     callback anchor(length, length);
     property <bool> is-header: data.kind == "header";
-    property <color> group-bg: DeskArt.gray ? Ui.settings-surface : Ui.glass-control;
+    property <color> group-bg: DeskArt.gray ? Ui.settings-control : Ui.glass-control;
     // Grupos das Configurações usam o raio dos cartões; nos painéis de vidro, o dos controles.
     property <length> group-r: DeskArt.gray ? Ui.radius-card : Ui.radius-control;
     property <color> fg: data.style == "danger" ? Ui.error : Ui.on-accent;
@@ -3640,7 +3643,7 @@ component DeskRow inherits Rectangle {
     }
     ta := TouchArea {
         // A linha de download só reage aos botões dela (um clique solto não pausa nada).
-        enabled: !is-header && !is-cover && data.kind != "download";
+        enabled: !is-header && !is-cover && data.kind != "download" && data.kind != "note";
         mouse-cursor: data.enabled ? pointer : default;
         clicked => {
             if (data.kind == "choice") {
@@ -3744,7 +3747,7 @@ component DeskRow inherits Rectangle {
         }
     }
     lay := HorizontalLayout {
-        visible: !is-header && !is-cover;
+        visible: !is-header && !is-cover && data.kind != "note";
         y: root.card-gap;
         height: parent.height - root.card-gap;
         padding-left: card ? 16px : loose || bare ? 4px : 18px;
@@ -3817,7 +3820,7 @@ component DeskRow inherits Rectangle {
                 Rectangle {
                     height: 4px;
                     border-radius: 2px;
-                    background: Ui.glass-selected;
+                    background: Ui.glass-control;
                     Rectangle {
                         x: 0;
                         width: parent.width * clamp(data.value.to-float(), 0, 1);
@@ -3831,22 +3834,31 @@ component DeskRow inherits Rectangle {
         // Pausar/continuar/baixar agora (ação 0) e cancelar (ação 1), só ícones com dica. Na loja, os dois abrem o
         // cliente dela.
         if data.kind == "download": HorizontalLayout {
-            spacing: 2px;
+            width: 92px;
+            spacing: 4px;
             alignment: center;
-            if data.style == "completed": IconBtn {
-                icon: "folder";
-                label: DeskText.dl-open-folder;
-                clicked => { root.act(0); }
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                if data.style == "completed": IconBtn {
+                    icon: "folder";
+                    label: DeskText.dl-open-folder;
+                    clicked => { root.act(0); }
+                }
+                if data.style != "completed": IconBtn {
+                    icon: data.style == "active" || data.style == "store" ? "pause" : (data.style == "queued" ? "download" : (data.style == "failed" ? "refresh" : "play"));
+                    label: data.style == "active" ? DeskText.dl-pause : (data.style == "store" ? DeskText.dl-store : (data.style == "queued" ? DeskText.dl-start-now : (data.style == "failed" ? DeskText.dl-retry : DeskText.dl-resume)));
+                    clicked => { root.act(0); }
+                }
             }
-            if data.style != "completed": IconBtn {
-                icon: data.style == "active" || data.style == "store" ? "pause" : (data.style == "queued" ? "download" : (data.style == "failed" ? "refresh" : "play"));
-                label: data.style == "active" ? DeskText.dl-pause : (data.style == "store" ? DeskText.dl-store : (data.style == "queued" ? DeskText.dl-start-now : (data.style == "failed" ? DeskText.dl-retry : DeskText.dl-resume)));
-                clicked => { root.act(0); }
-            }
-            if data.style != "queued": IconBtn {
-                icon: "close";
-                label: data.style == "completed" ? DeskText.dl-remove : (data.style == "store" ? DeskText.dl-store : DeskText.dl-cancel);
-                clicked => { root.act(1); }
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                if data.style != "queued": IconBtn {
+                    icon: "close";
+                    label: data.style == "completed" ? DeskText.dl-remove : (data.style == "store" ? DeskText.dl-store : DeskText.dl-cancel);
+                    clicked => { root.act(1); }
+                }
             }
         }
         if data.kind == "toggle" && !as-check: DeskToggle { on: data.on; y: (parent.height - self.height) / 2; }
@@ -3927,7 +3939,7 @@ component DeskRow inherits Rectangle {
         }
         if !card && data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download" && !(data.kind == "action" && DeskArt.gray): Text {
             text: data.value;
-            color: data.style == "warning" ? Ui.warning : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted);
+            color: data.style == "warning" ? Ui.warning : (data.style == "error" ? Ui.error : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted));
             // Resumo do onboarding: a quantidade em 15/600.
             font-size: bare ? Ui.desk-label : Ui.desk-label-sm;
             font-weight: data.emphasized ? 600 : 500;
@@ -3936,7 +3948,16 @@ component DeskRow inherits Rectangle {
             max-width: 260px;
             overflow: elide;
         }
-        if (data.kind == "action" || data.kind == "button") && !as-check && !card && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
+        if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
+    }
+    if data.kind == "note": VerticalLayout {
+        x: 18px;
+        width: parent.width - 36px;
+        height: parent.height;
+        alignment: center;
+        spacing: 2px;
+        Text { text: data.title; color: Ui.on-accent-muted; font-size: Ui.desk-label-sm; font-weight: 600; }
+        if data.description != "": Text { text: data.description; color: Ui.on-accent-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
     }
 }
 
@@ -3955,9 +3976,9 @@ component PopupButton inherits Rectangle {
     border-radius: self.height / 2;
     background: primary
         ? @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%)
-        : (pta.pressed ? Ui.glass-pressed : (pta.has-hover ? Ui.glass-hover : Ui.glass-control));
+        : (data.style == "danger" && DeskArt.gray ? transparent : (pta.pressed ? Ui.glass-pressed : (pta.has-hover ? Ui.glass-hover : Ui.glass-control)));
     border-width: primary ? 0 : 1px;
-    border-color: Ui.glass-edge;
+    border-color: data.style == "danger" && DeskArt.gray ? Ui.glass-edge-strong : Ui.glass-edge;
     opacity: data.enabled ? 1 : 0.5;
     accessible-role: button;
     accessible-label: data.title;
@@ -4099,11 +4120,31 @@ component PopupFooter inherits HorizontalLayout {
     in property <int> sel;
     in property <bool> key-focus;
     callback clicked(int);
+    horizontal-stretch: 1;
     alignment: end;
-    for r[i] in rows: HorizontalLayout {
-        visible: r.kind == "button";
-        padding-left: self.visible ? 10px : 0;
-        if r.kind == "button": PopupButton {
+    if rows.length >= 3 || self.width < 440px: VerticalLayout {
+        width: root.width;
+        alignment: end;
+        spacing: 8px;
+        for r[i] in rows: Rectangle {
+            height: r.kind == "button" ? Ui.control-height : 0px;
+            width: parent.width;
+            visible: r.kind == "button";
+            if r.kind == "button": PopupButton {
+                width: parent.width;
+                height: parent.height;
+                data: r;
+                focused: key-focus && i == sel;
+                clicked => { root.clicked(i); }
+            }
+        }
+    }
+    if rows.length < 3 && self.width >= 440px: HorizontalLayout {
+        width: root.width;
+        alignment: end;
+        spacing: 10px;
+        for r[i] in rows: PopupButton {
+            visible: r.kind == "button";
             data: r;
             focused: key-focus && i == sel;
             clicked => { root.clicked(i); }
@@ -4143,6 +4184,20 @@ component DeskSettings inherits Rectangle {
     changed category-focus => {
         rows-in = false;
         rows-timer.running = true;
+        category-scroll-timer.running = true;
+    }
+    category-scroll-timer := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+        if (category-focus * category-row-h + cf.viewport-y < 0) {
+            cf.viewport-y = -category-focus * category-row-h;
+        }
+        if ((category-focus + 1) * category-row-h + cf.viewport-y > cf.height) {
+            cf.viewport-y = cf.height - (category-focus + 1) * category-row-h;
+        }
+        }
     }
     rows-timer := Timer {
         interval: max(1ms, Ui.focus-time / 2);
@@ -4165,11 +4220,12 @@ component DeskSettings inherits Rectangle {
     callback clicked(string, int);
     callback menu(length, length);
     property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
+    property <length> category-row-h: (small ? Ui.control-height : Ui.list-row-height) + (Ui.text-scale - 1) * 32px;
     HorizontalLayout {
         spacing: small ? Ui.space-20 : Ui.space-28;
         Vidro {
             width: list-w;
-            height: cl.preferred-height;
+            height: min(parent.height, cl.preferred-height);
             cl := VerticalLayout {
                 padding-top: Ui.space-16;
                 padding-left: Ui.space-12;
@@ -4196,11 +4252,15 @@ component DeskSettings inherits Rectangle {
                     vertical-alignment: center;
                     }
                 }
+                cf := Flickable {
+                    vertical-stretch: 1;
+                    viewport-height: cats.preferred-height;
+                    cats := VerticalLayout {
+                        width: cf.width;
                 for c[i] in categories: Rectangle {
                     // Na busca, a categoria sem nada que combine fica apagada.
                     opacity: c.count == "0" ? 0.4 : 1;
-                    // Na janela pequena as oito categorias cabem em 600 de altura.
-                    height: (small ? Ui.control-height : Ui.list-row-height) + (Ui.text-scale - 1) * 32px;
+                    height: category-row-h;
                     border-radius: Ui.radius-row;
                     background: !c.selected && cta.has-hover ? Ui.glass-hover : transparent;
                     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -4234,6 +4294,8 @@ component DeskSettings inherits Rectangle {
                     cta := TouchArea {
                         mouse-cursor: pointer;
                         clicked => { root.clicked("category", i); }
+                    }
+                }
                     }
                 }
             }
@@ -5048,7 +5110,7 @@ component DeskOverlay inherits Rectangle {
                 }
                 // Rodapé (PadraoPopup): ação de texto à esquerda ("Pular" nos passos, estilo "link"); à direita as outras,
                 // com a principal por último (nos passos, a ordem já vem pronta; nos demais, a lista vem na ordem do Tako).
-                if ov.tabs.length > 0 || ov.footer: HorizontalLayout {
+                if ov.tabs.length > 0: HorizontalLayout {
                     padding-top: 4px;
                     for r[i] in ov.rows: HorizontalLayout {
                         visible: r.kind == "button" && (r.key == "skip" || r.style == "link");
@@ -5070,6 +5132,12 @@ component DeskOverlay inherits Rectangle {
                             clicked => { root.clicked("row", i); }
                         }
                     }
+                }
+                if ov.tabs.length == 0 && ov.footer: PopupFooter {
+                    rows: ov.rows;
+                    sel: top-most ? ov.sel : -1;
+                    key-focus: focus-visible;
+                    clicked(i) => { root.clicked("row", i); }
                 }
             }
         }
@@ -6497,10 +6565,10 @@ component ArtLayer inherits Rectangle {
             height: parent.height;
             source: Ui.custom-background;
             image-fit: cover;
-            opacity: 0.55;
+            opacity: Ui.custom-background-opacity;
         }
         if Ui.has-custom-background && Ui.custom-background.width > 0: Rectangle {
-            background: #000000.with-alpha(0.5);
+            background: Ui.custom-background-scrim;
         }
         if !Ui.has-custom-background && !DeskArt.has-art: Rectangle {
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
@@ -6617,6 +6685,7 @@ export component Desktop inherits Window {
     in property <string> desk-search-esc;
     in property <string> desk-cancel-label;
     in property <string> desk-toast-undo;
+    in property <string> desk-toast-kind: "info";
     // "Bem-vindo de volta": o polvo no lugar do ✓ do aviso (BRAND-001).
     in property <bool> desk-toast-mascot;
     in property <string> desk-ok-label;
@@ -7071,16 +7140,21 @@ export component Desktop inherits Window {
         animate y { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
         animate opacity { duration: Ui.toast-fade(toast-on); easing: toast-on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
         height: Ui.control-height;
-        width: tl.preferred-width;
+        width: min(tl.preferred-width, root.width - 72px);
         // Ponteiro por cima pausa o tempo do aviso (PainelEAviso); o "Desfazer" tem a própria zona.
-        TouchArea { changed has-hover => { root.hovered("toast", self.has-hover ? 1 : 0); } }
+        toast-hover := TouchArea { changed has-hover => { root.hovered("toast", self.has-hover ? 1 : 0); } }
         tl := HorizontalLayout {
             padding-left: Ui.space-20;
             padding-right: Ui.space-20;
             spacing: 10px;
-            if !desk-toast-mascot: DeskIcon { name: "check"; size: 18px; tint: Ui.success; y: (parent.height - self.height) / 2; }
+            if !desk-toast-mascot: DeskIcon {
+                name: desk-toast-kind == "success" ? "check" : (desk-toast-kind == "warning" ? "alert" : (desk-toast-kind == "error" ? "close" : "info"));
+                size: 18px;
+                tint: desk-toast-kind == "success" ? Ui.success : (desk-toast-kind == "warning" ? Ui.warning : (desk-toast-kind == "error" ? Ui.error : Ui.on-accent));
+                y: (parent.height - self.height) / 2;
+            }
             if desk-toast-mascot: Octopus { y: (parent.height - self.height) / 2; width: 34px; with-name: false; self-assemble: true; accessible-role: none; }
-            Text { text: toast-shown; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+            Text { text: toast-shown; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
             // "Desfazer" das ações em lote: texto clicável à direita, sem roubar o foco.
             if desk-toast-undo != "": Rectangle {
                 width: ut.preferred-width + 16px;
@@ -7098,6 +7172,7 @@ export component Desktop inherits Window {
                 }
             }
         }
+        Tip { text: toast-shown; hovering: toast-hover.has-hover; }
     }
     bar := TopBar {
         y: 0px;
