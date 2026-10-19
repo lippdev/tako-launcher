@@ -251,7 +251,14 @@ fn every_row_has_text() {
                     rows: vec![item.row.clone()],
                     ..Default::default()
                 });
-                // Painéis e diálogos que as linhas abrem.
+                // Painéis e diálogos que as linhas abrem. Backup e restauração abrem o seletor de arquivos
+                // do sistema, que no Windows (com área de trabalho no CI) espera um clique para sempre.
+                if matches!(
+                    item.row.key.as_str(),
+                    "settings.system.backup" | "settings.system.restore"
+                ) {
+                    continue;
+                }
                 if let Some(f) = item.accept.clone()
                     && let Flow::Push(l) = f(&mut ctx)
                 {
