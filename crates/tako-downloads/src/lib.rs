@@ -78,6 +78,7 @@ enum Cmd {
     Pause(EngineId),
     Resume(EngineId),
     Remove(EngineId, bool),
+    Finish(EngineId),
 }
 
 #[derive(Default)]
@@ -146,6 +147,10 @@ impl Downloader for TorrentEngine {
         lock(&self.state).status.remove(&id);
         self.send(Cmd::Remove(id, delete_files));
     }
+    fn finish(&mut self, id: EngineId) {
+        lock(&self.state).status.remove(&id);
+        self.send(Cmd::Finish(id));
+    }
     fn status(&self, id: EngineId) -> Option<EngineStatus> {
         lock(&self.state).status.get(&id).cloned()
     }
@@ -209,6 +214,14 @@ async fn run(mut rx: mpsc::UnboundedReceiver<Cmd>, state: State, options: Engine
                         let h = { let mut g = lock(&state); g.removed.insert(id, delete); g.handles.remove(&id) };
                         if let (Some(s), Some(h)) = (&current, h)
                             && s.delete(TorrentIdOrHash::Id(h.id()), delete).await.is_ok() && delete
+                        {
+                            clear_owner(h.output_folder());
+                        }
+                    }
+                    Cmd::Finish(id) => {
+                        let h = { let mut g = lock(&state); g.handles.remove(&id) };
+                        if let (Some(s), Some(h)) = (&current, h)
+                            && s.delete(TorrentIdOrHash::Id(h.id()), false).await.is_ok()
                         {
                             clear_owner(h.output_folder());
                         }

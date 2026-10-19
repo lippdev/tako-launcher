@@ -52,6 +52,10 @@ pub trait Downloader: Send {
     fn resume(&mut self, id: EngineId);
     /// Tira do motor (sem semear depois) e, se pedido, apaga os arquivos.
     fn remove(&mut self, id: EngineId, delete_files: bool);
+    /// Tira um download concluído do motor e limpa metadados privados da pasta, sem apagar os arquivos.
+    fn finish(&mut self, id: EngineId) {
+        self.remove(id, false);
+    }
     fn status(&self, id: EngineId) -> Option<EngineStatus>;
 }
 
@@ -185,12 +189,14 @@ impl Downloads {
                 d
             })
             .collect();
-        Downloads {
+        let mut downloads = Downloads {
             engine,
             items,
             root,
             max_active: 1,
-        }
+        };
+        downloads.fill_queue();
+        downloads
     }
 
     pub fn list(&self) -> &[Download] {
@@ -379,7 +385,7 @@ impl Downloads {
                 d.state = DownloadState::Failed(err.to_string());
                 changed = true;
             } else if s.finished {
-                self.engine.remove(e, false);
+                self.engine.finish(e);
                 d.engine = None;
                 d.speed = 0;
                 if let Some(t) = d.total {
@@ -579,5 +585,43 @@ mod tests {
         let s = suggest("Jogo Exemplo", [("F", &src)], 5);
         assert_eq!(s.len(), 1);
         assert_eq!(s[0].1.title, "Jogo Exemplo Deluxe Edition");
+    }
+
+    #[test]
+    fn reopening_resumes_queued_downloads_automatically() {
+        let saved = vec![
+            Download::stored(
+                1,
+                "A".into(),
+                None,
+                "f".into(),
+                A.into(),
+                "/d/Tako/A".into(),
+                DownloadState::Downloading,
+                10,
+                Some(100),
+            ),
+            Download::stored(
+                2,
+                "B".into(),
+                None,
+                "f".into(),
+                B.into(),
+                "/d/Tako/B".into(),
+                DownloadState::Queued,
+                0,
+                Some(200),
+            ),
+        ];
+        let engine = MemoryDownloader::default();
+        let d = Downloads::new(Box::new(engine.clone()), "/d/Tako".into(), saved);
+        assert_eq!(d.get(1).unwrap().state, DownloadState::Paused);
+        assert_eq!(d.get(2).unwrap().state, DownloadState::Downloading);
+        assert_eq!(engine.started().len(), 1);
+        assert_eq!(
+            engine.started()[0],
+            (B.to_string(), PathBuf::from("/d/Tako/B"))
+        );
+        assert_eq!(engine.resumes(), vec![false]);
     }
 }
