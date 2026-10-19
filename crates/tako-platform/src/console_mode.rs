@@ -1,14 +1,12 @@
 //! Detecção de instalação, versão e capacidades do Console Mode (ADR-0025, CMI-002).
 //!
-//! Conecta-se estritamente em socket local (named pipe no Windows, socket Unix no Linux e macOS)
-//! ou lê o arquivo de descoberta local (`discovery.json`). Timeout curto (≤ 500 ms), sem conexões
-//! externas ou de rede não-loopback.
+//! Conecta-se estritamente em socket local (named pipe no Windows, socket Unix no Linux e macOS).
+//! Timeout curto (≤ 500 ms), sem conexões externas ou de rede não-loopback.
 
-use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tako_core::console_mode::{ConsoleModeStatus, parse_discovery_content, perform_handshake};
+use tako_core::console_mode::{ConsoleModeStatus, perform_handshake};
 
 /// Timeout máximo para conexão e aperto de mão com o Console Mode (500 ms).
 pub const DETECTION_TIMEOUT: Duration = Duration::from_millis(500);
@@ -16,8 +14,6 @@ pub const DETECTION_TIMEOUT: Duration = Duration::from_millis(500);
 /// Caminhos padrão por SO para o Console Mode.
 pub trait ConsoleModePaths {
     fn socket_path(&self) -> Option<PathBuf>;
-    fn discovery_path(&self) -> Option<PathBuf>;
-    fn app_paths(&self) -> Vec<PathBuf>;
 }
 
 /// Implementação dos caminhos reais do sistema operacional atual.
@@ -30,7 +26,7 @@ impl ConsoleModePaths for PlatformPaths {
         {
             let user = std::env::var("USERNAME")
                 .or_else(|_| std::env::var("USER"))
-                .unwrap_or_else(|_| "default".into());
+                .ok()?;
             Some(PathBuf::from(format!(r"\\.\pipe\consolemode-api-{user}")))
         }
         #[cfg(target_os = "macos")]
@@ -46,99 +42,13 @@ impl ConsoleModePaths for PlatformPaths {
         }
         #[cfg(target_os = "linux")]
         {
-            if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
-                Some(PathBuf::from(runtime_dir).join("consolemode-api.sock"))
-            } else {
-                Some(PathBuf::from("/tmp/consolemode-api.sock"))
-            }
+            let runtime_dir = std::env::var_os("XDG_RUNTIME_DIR")?;
+            Some(PathBuf::from(runtime_dir).join("consolemode-api.sock"))
         }
         #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
         {
             None
         }
-    }
-
-    fn discovery_path(&self) -> Option<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            let local_app_data = std::env::var_os("LOCALAPPDATA")?;
-            Some(
-                PathBuf::from(local_app_data)
-                    .join("ConsoleMode")
-                    .join("discovery.json"),
-            )
-        }
-        #[cfg(target_os = "macos")]
-        {
-            let home = std::env::var_os("HOME")?;
-            Some(
-                PathBuf::from(home)
-                    .join("Library")
-                    .join("Application Support")
-                    .join("ConsoleMode")
-                    .join("discovery.json"),
-            )
-        }
-        #[cfg(target_os = "linux")]
-        {
-            let base = if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
-                PathBuf::from(config_home)
-            } else if let Some(home) = std::env::var_os("HOME") {
-                PathBuf::from(home).join(".config")
-            } else {
-                return None;
-            };
-            Some(base.join("consolemode").join("discovery.json"))
-        }
-        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-        {
-            None
-        }
-    }
-
-    fn app_paths(&self) -> Vec<PathBuf> {
-        let mut paths = Vec::new();
-        #[cfg(target_os = "windows")]
-        {
-            if let Some(lad) = std::env::var_os("LOCALAPPDATA") {
-                paths.push(
-                    PathBuf::from(lad)
-                        .join("ConsoleMode")
-                        .join("ConsoleMode.exe"),
-                );
-            }
-            if let Some(pf) = std::env::var_os("ProgramFiles") {
-                paths.push(
-                    PathBuf::from(pf)
-                        .join("ConsoleMode")
-                        .join("ConsoleMode.exe"),
-                );
-            }
-        }
-        #[cfg(target_os = "macos")]
-        {
-            paths.push(PathBuf::from("/Applications/ConsoleMode.app"));
-            if let Some(home) = std::env::var_os("HOME") {
-                let h = PathBuf::from(home);
-                paths.push(h.join("Applications").join("ConsoleMode.app"));
-                paths.push(
-                    h.join("Library")
-                        .join("Application Support")
-                        .join("ConsoleMode"),
-                );
-            }
-        }
-        #[cfg(target_os = "linux")]
-        {
-            paths.push(PathBuf::from("/usr/bin/consolemode"));
-            paths.push(PathBuf::from("/usr/local/bin/consolemode"));
-            if let Some(home) = std::env::var_os("HOME") {
-                let h = PathBuf::from(home);
-                paths.push(h.join(".local").join("bin").join("consolemode"));
-                paths.push(h.join(".config").join("consolemode"));
-            }
-        }
-        paths
     }
 }
 
@@ -154,7 +64,7 @@ fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
 
 #[cfg(windows)]
 fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
-    let file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let file = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
     Ok(Box::new(file))
 }
 
@@ -170,70 +80,59 @@ fn connect_local_socket(_path: &Path) -> io::Result<Box<dyn ReadWrite>> {
 pub trait ReadWrite: Read + Write {}
 impl<T: Read + Write + ?Sized> ReadWrite for T {}
 
-/// Detecção nativa do Console Mode no ambiente atual.
+/// Detecção nativa do Console Mode no ambiente atual com timeout garantido por thread.
 pub fn detect() -> ConsoleModeStatus {
-    detect_internal(&PlatformPaths, connect_local_socket)
+    detect_with(&PlatformPaths, connect_local_socket, DETECTION_TIMEOUT)
 }
 
-/// Lógica de detecção desacoplada para testes com fixtures e fakes.
+/// Detecção com caminhos, conector e timeout desacoplados para testes.
+pub fn detect_with<P, C>(paths: &P, connector: C, timeout: Duration) -> ConsoleModeStatus
+where
+    P: ConsoleModePaths + Clone + Send + 'static,
+    C: Fn(&Path) -> io::Result<Box<dyn ReadWrite>> + Send + 'static,
+{
+    let (tx, rx) = std::sync::mpsc::channel();
+    let paths_clone = paths.clone();
+    let handle = std::thread::Builder::new()
+        .name("console-mode-detect".into())
+        .spawn(move || {
+            let res = detect_internal(&paths_clone, connector);
+            let _ = tx.send(res);
+        });
+
+    match handle {
+        Ok(_) => match rx.recv_timeout(timeout) {
+            Ok(status) => status,
+            Err(_) => {
+                tracing::warn!("tempo limite esgotado ao detectar o Console Mode");
+                ConsoleModeStatus::Erro
+            }
+        },
+        Err(e) => {
+            tracing::warn!("falha ao criar thread para detecção do Console Mode: {e}");
+            ConsoleModeStatus::Erro
+        }
+    }
+}
+
+/// Lógica de detecção síncrona interna.
 pub fn detect_internal<P: ConsoleModePaths, C>(paths: &P, connector: C) -> ConsoleModeStatus
 where
     C: Fn(&Path) -> io::Result<Box<dyn ReadWrite>>,
 {
-    // 1. Tenta conectar no socket ou named pipe
-    if let Some(socket_path) = paths.socket_path() {
-        match connector(&socket_path) {
-            Ok(mut stream) => {
-                let status = perform_handshake(&mut stream);
-                return status;
-            }
-            Err(e) => {
-                // Caso não encontre o socket ou a conexão seja recusada, continua para arquivos locais
-                if e.kind() != io::ErrorKind::NotFound
-                    && e.kind() != io::ErrorKind::ConnectionRefused
-                {
-                    tracing::debug!(
-                        path = %socket_path.display(),
-                        "não foi possível conectar ao socket do Console Mode: {e}"
-                    );
-                }
-            }
-        }
-    }
+    let Some(socket_path) = paths.socket_path() else {
+        return ConsoleModeStatus::NaoInstalado;
+    };
 
-    // 2. Tenta ler o arquivo de descoberta local (ex.: se o processo deixou metadados de API)
-    if let Some(discovery_path) = paths.discovery_path()
-        && discovery_path.is_file()
-    {
-        match fs::read(&discovery_path) {
-            Ok(bytes) => match parse_discovery_content(&bytes) {
-                Ok(status) => return status,
-                Err(e) => {
-                    tracing::warn!(
-                        path = %discovery_path.display(),
-                        "arquivo de descoberta do Console Mode inválido: {e}"
-                    );
-                    return ConsoleModeStatus::Erro;
-                }
-            },
-            Err(e) => {
-                tracing::warn!(
-                    path = %discovery_path.display(),
-                    "erro ao ler arquivo de descoberta do Console Mode: {e}"
-                );
-                return ConsoleModeStatus::Erro;
-            }
+    match connector(&socket_path) {
+        Ok(mut stream) => perform_handshake(&mut stream),
+        Err(e) => {
+            tracing::debug!(
+                path = %socket_path.display(),
+                "não foi possível conectar ao socket do Console Mode: {e}"
+            );
+            ConsoleModeStatus::NaoInstalado
         }
-    }
-
-    // 3. Verifica se há indícios de instalação
-    let installed_on_disk = paths.app_paths().iter().any(|p| p.exists());
-    if installed_on_disk {
-        // Conforme ADR-0025: sem resposta no socket e sem arquivo de descoberta válido,
-        // o Console Mode não está ativo ou não expõe API. Retorna NaoInstalado.
-        ConsoleModeStatus::NaoInstalado
-    } else {
-        ConsoleModeStatus::NaoInstalado
     }
 }
 
@@ -242,23 +141,15 @@ mod tests {
     use super::*;
     use std::io::Cursor;
     use tako_core::console_mode::CURRENT_API_VERSION;
-    use tempfile::tempdir;
 
+    #[derive(Clone)]
     struct TestPaths {
         socket: Option<PathBuf>,
-        discovery: Option<PathBuf>,
-        apps: Vec<PathBuf>,
     }
 
     impl ConsoleModePaths for TestPaths {
         fn socket_path(&self) -> Option<PathBuf> {
             self.socket.clone()
-        }
-        fn discovery_path(&self) -> Option<PathBuf> {
-            self.discovery.clone()
-        }
-        fn app_paths(&self) -> Vec<PathBuf> {
-            self.apps.clone()
         }
     }
 
@@ -318,8 +209,6 @@ mod tests {
     fn detect_returns_nao_instalado_when_empty() {
         let paths = TestPaths {
             socket: Some(PathBuf::from("/nonexistent/api.sock")),
-            discovery: Some(PathBuf::from("/nonexistent/discovery.json")),
-            apps: vec![PathBuf::from("/nonexistent/bin")],
         };
         let status = detect_internal(&paths, |_| {
             Err(io::Error::new(
@@ -331,11 +220,16 @@ mod tests {
     }
 
     #[test]
+    fn detect_returns_nao_instalado_when_no_socket_path() {
+        let paths = TestPaths { socket: None };
+        let status = detect_internal(&paths, |_| unreachable!());
+        assert_eq!(status, ConsoleModeStatus::NaoInstalado);
+    }
+
+    #[test]
     fn detect_returns_instalado_from_socket() {
         let paths = TestPaths {
             socket: Some(PathBuf::from("/tmp/fake-consolemode.sock")),
-            discovery: None,
-            apps: vec![],
         };
         let json = br#"{"type":"hello","server":"consolemode","api":1,"version":"1.0.0","capabilities":["tv","fps"]}"#;
         let status = detect_internal(&paths, |_| Ok(Box::new(MockSocketStream::new(json))));
@@ -352,8 +246,6 @@ mod tests {
     fn detect_returns_incompativel_from_socket() {
         let paths = TestPaths {
             socket: Some(PathBuf::from("/tmp/fake-consolemode.sock")),
-            discovery: None,
-            apps: vec![],
         };
         let json = br#"{"type":"hello","server":"consolemode","api":99,"version":"99.0.0","capabilities":[]}"#;
         let status = detect_internal(&paths, |_| Ok(Box::new(MockSocketStream::new(json))));
@@ -369,80 +261,32 @@ mod tests {
     fn detect_returns_erro_on_timeout() {
         let paths = TestPaths {
             socket: Some(PathBuf::from("/tmp/fake-consolemode.sock")),
-            discovery: None,
-            apps: vec![],
         };
         let status = detect_internal(&paths, |_| Ok(Box::new(TimeoutStream)));
         assert_eq!(status, ConsoleModeStatus::Erro);
     }
 
+    #[cfg(unix)]
     #[test]
-    fn detect_returns_instalado_from_discovery_file() {
-        let dir = tempdir().unwrap();
-        let disc = dir.path().join("discovery.json");
-        fs::write(
-            &disc,
-            br#"{"api":1,"version":"1.1.2","capabilities":["windows","fps"]}"#,
-        )
-        .unwrap();
+    fn detect_with_fake_server_that_accepts_and_does_not_respond_times_out() {
+        use std::os::unix::net::UnixListener;
+        let dir = tempfile::tempdir().unwrap();
+        let sock_path = dir.path().join("fake_hang.sock");
+        let listener = UnixListener::bind(&sock_path).unwrap();
 
-        let paths = TestPaths {
-            socket: None,
-            discovery: Some(disc),
-            apps: vec![],
-        };
-        let status = detect_internal(&paths, |_| {
-            Err(io::Error::new(io::ErrorKind::NotFound, "sem socket"))
-        });
-        assert_eq!(
-            status,
-            ConsoleModeStatus::Instalado {
-                versao_api: 1,
-                capacidades: vec!["windows".into(), "fps".into()],
+        let handle = std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                std::thread::sleep(Duration::from_millis(400));
+                let _ = stream.write_all(b"tardio");
             }
-        );
-    }
-
-    #[test]
-    fn detect_returns_incompativel_from_discovery_file() {
-        let dir = tempdir().unwrap();
-        let disc = dir.path().join("discovery.json");
-        fs::write(
-            &disc,
-            br#"{"api":2,"version":"2.0.0-beta","capabilities":[]}"#,
-        )
-        .unwrap();
+        });
 
         let paths = TestPaths {
-            socket: None,
-            discovery: Some(disc),
-            apps: vec![],
+            socket: Some(sock_path),
         };
-        let status = detect_internal(&paths, |_| {
-            Err(io::Error::new(io::ErrorKind::NotFound, "sem socket"))
-        });
-        assert_eq!(
-            status,
-            ConsoleModeStatus::Incompativel {
-                versao: "2.0.0-beta".into(),
-            }
-        );
-    }
-
-    #[test]
-    fn detect_returns_erro_from_malformed_discovery_file() {
-        let dir = tempdir().unwrap();
-        let disc = dir.path().join("discovery.json");
-        fs::write(&disc, b"conteudo invalido nao json").unwrap();
-
-        let paths = TestPaths {
-            socket: None,
-            discovery: Some(disc),
-            apps: vec![],
-        };
-        let status = detect_internal(&paths, |_| {
-            Err(io::Error::new(io::ErrorKind::NotFound, "sem socket"))
-        });
+        let status = detect_with(&paths, connect_local_socket, Duration::from_millis(50));
         assert_eq!(status, ConsoleModeStatus::Erro);
+
+        let _ = handle.join();
     }
 }
