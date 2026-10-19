@@ -1108,6 +1108,7 @@ component FitaRowView inherits Rectangle {
         padding-left: 24 * Ui.u;
         padding-right: 24 * Ui.u;
         spacing: 16 * Ui.u;
+        alignment: center;
 
         if data.kind == "radio" || data.kind == "check": Rectangle {
             width: 24 * Ui.u;
@@ -1229,7 +1230,82 @@ component FitaSettingsPage inherits Rectangle {
     property <int> shown-row;
     init => { shown-row = row-focus; }
     changed row-focus => { if (!Ui.pointer) { shown-row = row-focus; } }
-    property <length> scroll: min(0, max(view-h - rows.length * row-h, -(max(0, shown-row) * row-h) + (view-h - row-h) / 2));
+
+    pure function headers-before(idx: int) -> int {
+        return (idx > 0 && rows.length > 0 && rows[0].kind == "header" ? 1 : 0)
+            + (idx > 1 && rows.length > 1 && rows[1].kind == "header" ? 1 : 0)
+            + (idx > 2 && rows.length > 2 && rows[2].kind == "header" ? 1 : 0)
+            + (idx > 3 && rows.length > 3 && rows[3].kind == "header" ? 1 : 0)
+            + (idx > 4 && rows.length > 4 && rows[4].kind == "header" ? 1 : 0)
+            + (idx > 5 && rows.length > 5 && rows[5].kind == "header" ? 1 : 0)
+            + (idx > 6 && rows.length > 6 && rows[6].kind == "header" ? 1 : 0)
+            + (idx > 7 && rows.length > 7 && rows[7].kind == "header" ? 1 : 0)
+            + (idx > 8 && rows.length > 8 && rows[8].kind == "header" ? 1 : 0)
+            + (idx > 9 && rows.length > 9 && rows[9].kind == "header" ? 1 : 0)
+            + (idx > 10 && rows.length > 10 && rows[10].kind == "header" ? 1 : 0)
+            + (idx > 11 && rows.length > 11 && rows[11].kind == "header" ? 1 : 0)
+            + (idx > 12 && rows.length > 12 && rows[12].kind == "header" ? 1 : 0)
+            + (idx > 13 && rows.length > 13 && rows[13].kind == "header" ? 1 : 0)
+            + (idx > 14 && rows.length > 14 && rows[14].kind == "header" ? 1 : 0)
+            + (idx > 15 && rows.length > 15 && rows[15].kind == "header" ? 1 : 0)
+            + (idx > 16 && rows.length > 16 && rows[16].kind == "header" ? 1 : 0)
+            + (idx > 17 && rows.length > 17 && rows[17].kind == "header" ? 1 : 0)
+            + (idx > 18 && rows.length > 18 && rows[18].kind == "header" ? 1 : 0)
+            + (idx > 19 && rows.length > 19 && rows[19].kind == "header" ? 1 : 0)
+            + (idx > 20 && rows.length > 20 && rows[20].kind == "header" ? 1 : 0)
+            + (idx > 21 && rows.length > 21 && rows[21].kind == "header" ? 1 : 0)
+            + (idx > 22 && rows.length > 22 && rows[22].kind == "header" ? 1 : 0)
+            + (idx > 23 && rows.length > 23 && rows[23].kind == "header" ? 1 : 0)
+            + (idx > 24 && rows.length > 24 && rows[24].kind == "header" ? 1 : 0)
+            + (idx > 25 && rows.length > 25 && rows[25].kind == "header" ? 1 : 0)
+            + (idx > 26 && rows.length > 26 && rows[26].kind == "header" ? 1 : 0)
+            + (idx > 27 && rows.length > 27 && rows[27].kind == "header" ? 1 : 0)
+            + (idx > 28 && rows.length > 28 && rows[28].kind == "header" ? 1 : 0)
+            + (idx > 29 && rows.length > 29 && rows[29].kind == "header" ? 1 : 0)
+            + (idx > 30 && rows.length > 30 && rows[30].kind == "header" ? 1 : 0)
+            + (idx > 31 && rows.length > 31 && rows[31].kind == "header" ? 1 : 0)
+            + (idx > 32 && rows.length > 32 && rows[32].kind == "header" ? 1 : 0)
+            + (idx > 33 && rows.length > 33 && rows[33].kind == "header" ? 1 : 0)
+            + (idx > 34 && rows.length > 34 && rows[34].kind == "header" ? 1 : 0)
+            + (idx > 35 && rows.length > 35 && rows[35].kind == "header" ? 1 : 0)
+            + (idx > 36 && rows.length > 36 && rows[36].kind == "header" ? 1 : 0)
+            + (idx > 37 && rows.length > 37 && rows[37].kind == "header" ? 1 : 0)
+            + (idx > 38 && rows.length > 38 && rows[38].kind == "header" ? 1 : 0)
+            + (idx > 39 && rows.length > 39 && rows[39].kind == "header" ? 1 : 0)
+            + (idx > 40 && rows.length > 40 && rows[40].kind == "header" ? 1 : 0)
+            + (idx > 41 && rows.length > 41 && rows[41].kind == "header" ? 1 : 0)
+            + (idx > 42 && rows.length > 42 && rows[42].kind == "header" ? 1 : 0)
+            + (idx > 43 && rows.length > 43 && rows[43].kind == "header" ? 1 : 0)
+            + (idx > 44 && rows.length > 44 && rows[44].kind == "header" ? 1 : 0)
+            + (idx > 45 && rows.length > 45 && rows[45].kind == "header" ? 1 : 0)
+            + (idx > 46 && rows.length > 46 && rows[46].kind == "header" ? 1 : 0)
+            + (idx > 47 && rows.length > 47 && rows[47].kind == "header" ? 1 : 0)
+            + (idx > 48 && rows.length > 48 && rows[48].kind == "header" ? 1 : 0)
+            + (idx > 49 && rows.length > 49 && rows[49].kind == "header" ? 1 : 0)
+            + (idx > 50 && rows.length > 50 && rows[50].kind == "header" ? 1 : 0)
+            + (idx > 51 && rows.length > 51 && rows[51].kind == "header" ? 1 : 0)
+            + (idx > 52 && rows.length > 52 && rows[52].kind == "header" ? 1 : 0)
+            + (idx > 53 && rows.length > 53 && rows[53].kind == "header" ? 1 : 0)
+            + (idx > 54 && rows.length > 54 && rows[54].kind == "header" ? 1 : 0)
+            + (idx > 55 && rows.length > 55 && rows[55].kind == "header" ? 1 : 0)
+            + (idx > 56 && rows.length > 56 && rows[56].kind == "header" ? 1 : 0)
+            + (idx > 57 && rows.length > 57 && rows[57].kind == "header" ? 1 : 0)
+            + (idx > 58 && rows.length > 58 && rows[58].kind == "header" ? 1 : 0)
+            + (idx > 59 && rows.length > 59 && rows[59].kind == "header" ? 1 : 0)
+            + (idx > 60 && rows.length > 60 && rows[60].kind == "header" ? 1 : 0)
+            + (idx > 61 && rows.length > 61 && rows[61].kind == "header" ? 1 : 0)
+            + (idx > 62 && rows.length > 62 && rows[62].kind == "header" ? 1 : 0)
+            + (idx > 63 && rows.length > 63 && rows[63].kind == "header" ? 1 : 0);
+    }
+
+    pure function row-y(idx: int) -> length {
+        return 8 * Ui.u + idx * row-h - headers-before(idx) * (row-h - 64 * Ui.u);
+    }
+
+    property <length> total-content-h: rows.length > 0 ? (row-y(rows.length - 1) + (rows[rows.length - 1].kind == "header" ? 48 * Ui.u : (row-h - 16 * Ui.u)) + 8 * Ui.u) : 0;
+    property <length> shown-row-h: shown-row >= 0 && shown-row < rows.length && rows[shown-row].kind == "header" ? 48 * Ui.u : (row-h - 16 * Ui.u);
+    property <length> shown-row-y: row-y(max(0, shown-row));
+    property <length> scroll: min(0, max(view-h - total-content-h, -shown-row-y + (view-h - shown-row-h) / 2));
 
     Text {
         x: 80 * Ui.u;
@@ -1320,7 +1396,7 @@ component FitaSettingsPage inherits Rectangle {
                 for r[i] in rows: FitaRowView {
                     x: 8 * Ui.u;
                     width: parent.width - 16 * Ui.u;
-                    y: i * row-h + 8 * Ui.u;
+                    y: row-y(i);
                     height: r.kind == "header" ? 48 * Ui.u : (row-h - 16 * Ui.u);
                     data: r;
                     focused: i == row-focus;

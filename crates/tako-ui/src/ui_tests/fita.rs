@@ -557,3 +557,60 @@ fn fita_tab_hover_changes_row_without_resetting_column() {
     .join()
     .unwrap();
 }
+
+#[test]
+fn fita_settings_gap_between_header_and_next_row() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let mut f = Fixture::new("tako-fita");
+        let w = 1920;
+        let h = 1080;
+        f.shell.open_route("settings");
+        f.shell.handle(Cmd::Right);
+        let pixels = f.draw(w, h);
+
+        // A viewport de configurações tem o cabeçalho 'Modo' (linha 0, kind = "header")
+        // seguido pela linha 1 (focada com fundo claro #F5F7FA).
+        let mut modo_header_bottom = 0;
+        let mut modo_header_top = 0;
+        let mut card_top = 0;
+
+        for y in 230..400 {
+            // Fundo claro do cartão focado da linha 1 (#F5F7FA)
+            let p_card = pixels[(y * w + 600) as usize];
+            if card_top == 0 && p_card.r > 240 && p_card.g > 240 && p_card.b > 240 {
+                card_top = y;
+            }
+
+            // Texto do cabeçalho Modo #94A3B8 (RGB: 148, 163, 184)
+            for x in 550..650 {
+                let p = pixels[(y * w + x) as usize];
+                if p.r > 130 && p.g > 140 && p.b > 160 && p.r < 170 && card_top == 0 {
+                    if modo_header_top == 0 {
+                        modo_header_top = y;
+                    }
+                    modo_header_bottom = modo_header_bottom.max(y);
+                }
+            }
+        }
+
+        assert!(modo_header_bottom > 0, "texto do cabeçalho Modo encontrado");
+        assert!(card_top > 0, "topo do cartão da linha seguinte encontrado");
+        assert!(
+            card_top > modo_header_bottom,
+            "cartão fica abaixo do cabeçalho"
+        );
+
+        let gap = card_top - modo_header_bottom;
+        // Na rodada anterior com slot fixo de 96u, o vão entre o texto do cabeçalho
+        // e o cartão seguinte era de ~80px (deixando ~50px de vão ocioso).
+        // Com o y acumulado respeitando os 48u do cabeçalho, o cartão seguinte começa
+        // a apenas ~35px do texto do cabeçalho (espaçamento de slot de 16px).
+        assert!(
+            gap <= 40,
+            "vão entre cabeçalho Modo e linha seguinte deve ser reduzido e menor que 40px: {gap}px"
+        );
+    })
+    .join()
+    .unwrap();
+}
