@@ -168,9 +168,8 @@ fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
         .filter(|_| load)
         .and_then(|u| crate::images::icon(u, ICON.0))
         .unwrap_or_default();
-    // Enquanto o ícone carrega, não pisca a inicial; ela só aparece sem ícone ou se a carga falhou.
-    let waiting = uri.is_some_and(|u| !load || crate::images::is_pending(u));
-    let initial = if icon.size().width > 0 || waiting {
+    // A inicial fica por baixo enquanto o ícone espera na fila (pode demorar: vem da rede); o ícone a cobre ao chegar.
+    let initial = if icon.size().width > 0 {
         String::new()
     } else {
         g.title
@@ -1068,10 +1067,14 @@ fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let time = DeskInfo {
         icon: "clock".into(),
         label: ctx.t("desktop.play_time"),
-        value: if g.play_time.is_zero() {
-            ctx.t("desktop.strip.not_played")
-        } else {
-            game_text::play_time(lang, g.play_time)
+        // Jogo com sessão registrada nunca é "Ainda não jogado": vale a soma das sessões ou "Não registrado".
+        value: match g
+            .play_time
+            .max(ctx.library.sessions(&g.id).iter().map(|s| s.duration).sum())
+        {
+            t if !t.is_zero() => game_text::play_time(lang, t),
+            _ if last.or(g.last_played_at).is_some() => ctx.t("desktop.strip.time_unknown"),
+            _ => ctx.t("desktop.strip.not_played"),
         },
         ..Default::default()
     };
@@ -2663,13 +2666,14 @@ mod tests {
         };
         assert_eq!(row_icon(&game("  ori"), true).1, "O");
         assert_eq!(row_icon(&game(""), true).1, "");
-        // Com ícone na lista, mas fora da área visível: espera a carga, sem piscar a inicial.
+        // Com ícone ainda a caminho (ou fora da área visível), a linha mostra a inicial, nunca fica vazia.
         let mut far = game("Celeste");
         far.pinned_art.insert(
             tako_core::library::ArtKind::Icon,
             "steam-art://1/icon".into(),
         );
-        assert_eq!(row_icon(&far, false).1, "");
+        assert_eq!(row_icon(&far, false).1, "C");
+        assert_eq!(row_icon(&far, true).1, "C");
     }
 
     fn page(shell: &Shell) -> &DesktopLibrary {
@@ -2774,6 +2778,13 @@ mod tests {
         let mut sem_nota = g.clone();
         sem_nota.metacritic_score = None;
         assert_eq!(strip(&shell.ctx, &sem_nota).len(), 2);
+        // Com uma sessão (última vez conhecida) e tempo 0, o tempo não diz "Ainda não jogado".
+        let time = |g: &Game| strip(&shell.ctx, g)[1].value.to_string();
+        sem_nota.play_time = std::time::Duration::ZERO;
+        sem_nota.last_played_at = None;
+        assert_eq!(time(&sem_nota), "Ainda não jogado");
+        sem_nota.last_played_at = Some(chrono::Utc::now());
+        assert_eq!(time(&sem_nota), "Não registrado");
     }
 
     #[test]
