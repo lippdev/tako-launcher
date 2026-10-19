@@ -1,6 +1,10 @@
 // Tema oficial Fita (THEME-008): Console Moderno.
 // Arte imersiva em tela cheia no topo, HUD minimalista e fita horizontal
 // de cartões compactos ancorada no terço inferior da tela.
+//
+// Nota: `ControlCenter`, `OverlayView` e `RowView` são componentes auxiliares internos
+// importados da biblioteca padrão `@tako/` para suporte a camadas, central rápida e opções,
+// mas não fazem parte do contrato formal da API v1 de temas.
 
 import "@tako/fonts/Poppins-Bold.ttf";
 import "@tako/fonts/Poppins-ExtraBold.ttf";
@@ -32,13 +36,13 @@ component FitaBackdrop inherits Rectangle {
         image-fit: cover;
         opacity: 0.65;
     }
-    // Gradiente horizontal: mais escuro à esquerda para leitura do título, logo e metadados
+    // Gradiente horizontal reforçado: escuro à esquerda para leitura garantida (≥ 4,5:1) mesmo sobre arte clara
     Rectangle {
-        background: @linear-gradient(90deg, #0D0F14f5 0%, (dim-left ? #0D0F14f0 : #0D0F14b3) 40%, #0D0F144d 100%);
+        background: @linear-gradient(90deg, #0D0F14fc 0%, (dim-left ? #0D0F14f8 : #0D0F14ee) 42%, #0D0F1499 75%, #0D0F1466 100%);
     }
     // Gradiente vertical: escurece o topo (HUD) e a base (fita de cartões)
     Rectangle {
-        background: @linear-gradient(180deg, #0D0F14b3 0%, transparent 18%, transparent 55%, #0D0F14e6 85%, #0D0F14 100%);
+        background: @linear-gradient(180deg, #0D0F14cc 0%, transparent 18%, transparent 55%, #0D0F14f0 85%, #0D0F14 100%);
     }
     // Halo sutil no centro com a cor de destaque do jogo
     Rectangle {
@@ -100,7 +104,7 @@ component FitaStatusCorner inherits HorizontalLayout {
         }
     }
 
-    Rectangle {
+    if clock != "": Rectangle {
         height: 34 * Ui.u;
         border-radius: 17 * Ui.u;
         background: #14182180;
@@ -196,22 +200,31 @@ component FitaCard inherits Rectangle {
 
         Rectangle {
             y: parent.height - self.height;
-            height: 60 * Ui.u;
-            background: @linear-gradient(180deg, transparent 0%, #0D0F14d9 100%);
-            opacity: focused ? 1.0 : 0.0;
-            animate opacity { duration: Ui.focus-time; }
+            height: 72 * Ui.u;
+            background: @linear-gradient(180deg, transparent 0%, #0D0F14e6 60%, #0D0F14 100%);
         }
 
-        if focused: Text {
+        VerticalLayout {
             x: 10 * Ui.u;
             y: parent.height - self.height - 8 * Ui.u;
             width: parent.width - 20 * Ui.u;
-            text: tile.title;
-            color: #FFFFFF;
-            font-family: "Plus Jakarta Sans";
-            font-weight: 600;
-            font-size: 13 * Ui.u * Ui.text-scale;
-            overflow: elide;
+            spacing: 2 * Ui.u;
+            Text {
+                text: tile.title;
+                color: #FFFFFF;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 600;
+                font-size: 13 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+            if tile.meta != "": Text {
+                text: tile.meta;
+                color: #CBD5E1;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+                font-size: 11 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
         }
     }
 
@@ -233,7 +246,7 @@ component FitaButton inherits Rectangle {
     animate s { duration: Ui.focus-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
 
     height: 52 * Ui.u;
-    width: content.preferred-width + 44 * Ui.u;
+    width: max(52 * Ui.u, content.preferred-width + (label != "" ? 36 * Ui.u : 20 * Ui.u));
     border-radius: 16 * Ui.u;
     border-width: focused ? 2.5 * Ui.u : 1 * Ui.u;
     border-color: focused ? #F5F7FA : (primary ? #ffffff2e : #ffffff1a);
@@ -245,9 +258,9 @@ component FitaButton inherits Rectangle {
     drop-shadow-color: focused ? #ffffff40 : transparent;
 
     content := HorizontalLayout {
-        padding-left: 20 * Ui.u;
-        padding-right: 20 * Ui.u;
-        spacing: 12 * Ui.u;
+        padding-left: label != "" ? 18 * Ui.u : 14 * Ui.u;
+        padding-right: label != "" ? 18 * Ui.u : 14 * Ui.u;
+        spacing: 10 * Ui.u;
         alignment: center;
         if icon != "": Icon {
             name: icon;
@@ -260,8 +273,9 @@ component FitaButton inherits Rectangle {
             color: focused ? #0D0F14 : #FFFFFF;
             font-family: "Plus Jakarta Sans";
             font-weight: 700;
-            font-size: 16 * Ui.u * Ui.text-scale;
+            font-size: 15 * Ui.u * Ui.text-scale;
             vertical-alignment: center;
+            overflow: elide;
         }
     }
 
@@ -304,7 +318,7 @@ component FitaHome inherits Rectangle {
         }
         Text {
             text: empty-text;
-            color: #94A3B8;
+            color: #CBD5E1;
             font-size: 16 * Ui.u * Ui.text-scale;
             font-family: "Plus Jakarta Sans";
             wrap: word-wrap;
@@ -325,21 +339,43 @@ component FitaHome inherits Rectangle {
     }
 
     if !empty: Rectangle {
+        // Scrim dedicado reforçado atrás do bloco de texto para leitura garantida (≥ 4,5:1)
+        Rectangle {
+            x: 60 * Ui.u;
+            y: 70 * Ui.u;
+            width: min(1000 * Ui.u, parent.width - 120 * Ui.u);
+            height: 320 * Ui.u;
+            background: @linear-gradient(90deg, #0D0F14f8 0%, #0D0F14d9 65%, transparent 100%);
+            border-radius: 16 * Ui.u;
+        }
+
         // Destaque Cinematográfico no terço superior/médio
         VerticalLayout {
             x: 80 * Ui.u;
             y: 90 * Ui.u;
-            width: min(1100 * Ui.u, root.width - 160 * Ui.u);
+            width: min(1100 * Ui.u, parent.width - 160 * Ui.u);
             spacing: 12 * Ui.u;
             alignment: start;
 
-            if hero.overline != "": Text {
-                text: hero.overline;
-                color: Ui.accent;
-                font-family: "Plus Jakarta Sans";
-                font-weight: 700;
-                font-size: 14 * Ui.u * Ui.text-scale;
-                letter-spacing: 0.12 * 14 * Ui.u;
+            if hero.overline != "": HorizontalLayout {
+                spacing: 8 * Ui.u;
+                alignment: start;
+                Rectangle {
+                    width: 4 * Ui.u;
+                    height: 14 * Ui.u * Ui.text-scale;
+                    border-radius: 2 * Ui.u;
+                    background: Ui.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+                Text {
+                    text: hero.overline;
+                    color: #E2E8F0;
+                    font-family: "Plus Jakarta Sans";
+                    font-weight: 700;
+                    font-size: 14 * Ui.u * Ui.text-scale;
+                    letter-spacing: 0.12 * 14 * Ui.u;
+                    vertical-alignment: center;
+                }
             }
 
             if hero.logo.width > 0: Image {
@@ -371,7 +407,7 @@ component FitaHome inherits Rectangle {
 
             if hero.description != "": Text {
                 text: hero.description;
-                color: #94A3B8;
+                color: #CBD5E1;
                 font-size: 14 * Ui.u * Ui.text-scale;
                 font-family: "Plus Jakarta Sans";
                 wrap: word-wrap;
@@ -394,7 +430,6 @@ component FitaHome inherits Rectangle {
                 }
 
                 FitaButton {
-                    label: "Detalhes";
                     icon: "info";
                     primary: false;
                     focused: row-focus < 0 && hero-focus == 1;
@@ -408,7 +443,7 @@ component FitaHome inherits Rectangle {
         Rectangle {
             y: root.height - self.height - Ui.hint-bar - 16 * Ui.u;
             height: 340 * Ui.u;
-            width: root.width;
+            width: parent.width;
 
             HorizontalLayout {
                 x: 80 * Ui.u;
@@ -438,7 +473,7 @@ component FitaHome inherits Rectangle {
                         border-color: ri == max(0, row-focus) ? #ffffff40 : #ffffff14;
                         rtitle := Text {
                             text: r.title;
-                            color: ri == max(0, row-focus) ? #FFFFFF : #94A3B8;
+                            color: ri == max(0, row-focus) ? #FFFFFF : #CBD5E1;
                             font-size: 12 * Ui.u * Ui.text-scale;
                             font-family: "Plus Jakarta Sans";
                             font-weight: 600;
@@ -446,7 +481,7 @@ component FitaHome inherits Rectangle {
                             horizontal-alignment: center;
                         }
                         TouchArea {
-                            clicked => { root.clicked("row-" + ri, 0); }
+                            clicked => { root.hovered("row-" + ri, 0); }
                             changed has-hover => { if (self.has-hover) { root.hovered("row-" + ri, 0); } }
                         }
                     }
@@ -465,11 +500,11 @@ component FitaHome inherits Rectangle {
                 property <length> step: card-w + card-gap;
 
                 rail := Rectangle {
-                    x: 80 * Ui.u - root.anchor * step;
+                    x: (parent.width - card-w) / 2 - root.anchor * step;
                     animate x { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
 
                     for t[i] in curr-row.tiles: FitaCard {
-                        visible: i >= root.anchor - 2 && i <= root.anchor + 12;
+                        visible: i >= root.anchor - 6 && i <= root.anchor + 6;
                         x: i * step;
                         y: 8 * Ui.u;
                         tile: t;
@@ -479,6 +514,7 @@ component FitaHome inherits Rectangle {
                     }
 
                     if curr-row.see-all: Rectangle {
+                        visible: curr-row.tiles.length >= root.anchor - 6 && curr-row.tiles.length <= root.anchor + 6;
                         x: curr-row.tiles.length * step;
                         y: 8 * Ui.u;
                         width: card-w;
@@ -527,8 +563,8 @@ component FitaGridCard inherits Rectangle {
     callback clicked();
     callback hovered();
 
-    width: 204 * Ui.u;
-    height: 306 * Ui.u;
+    width: 290 * Ui.u;
+    height: 435 * Ui.u;
 
     property <float> s: focused ? 1.08 : 1.0;
     animate s { duration: Ui.focus-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
@@ -595,22 +631,31 @@ component FitaGridCard inherits Rectangle {
 
         Rectangle {
             y: parent.height - self.height;
-            height: 60 * Ui.u;
-            background: @linear-gradient(180deg, transparent 0%, #0D0F14e6 100%);
-            opacity: focused ? 1.0 : 0.0;
-            animate opacity { duration: Ui.focus-time; }
+            height: 76 * Ui.u;
+            background: @linear-gradient(180deg, transparent 0%, #0D0F14e6 60%, #0D0F14 100%);
         }
 
-        if focused: Text {
+        VerticalLayout {
             x: 12 * Ui.u;
             y: parent.height - self.height - 10 * Ui.u;
             width: parent.width - 24 * Ui.u;
-            text: tile.title;
-            color: #FFFFFF;
-            font-family: "Plus Jakarta Sans";
-            font-weight: 600;
-            font-size: 14 * Ui.u * Ui.text-scale;
-            overflow: elide;
+            spacing: 2 * Ui.u;
+            Text {
+                text: tile.title;
+                color: #FFFFFF;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 600;
+                font-size: 14 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+            if tile.meta != "": Text {
+                text: tile.meta;
+                color: #CBD5E1;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+                font-size: 12 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
         }
     }
 
@@ -629,14 +674,14 @@ component FitaLibrary inherits Rectangle {
     in property <int> sel;
     in property <string> empty-title;
     in property <string> empty-text;
-    out property <int> columns: max(1, floor((self.width - 160 * Ui.u + 24 * Ui.u) / (204 * Ui.u + 24 * Ui.u)));
+    out property <int> columns: max(1, floor((self.width - 80 * Ui.u) / (320 * Ui.u)));
 
     callback clicked(string, int);
     callback hovered(string, int);
 
-    property <length> cell-w: 228 * Ui.u;
-    property <length> cell-h: 340 * Ui.u;
-    property <length> top: 160 * Ui.u;
+    property <length> cell-w: 320 * Ui.u;
+    property <length> cell-h: 460 * Ui.u;
+    property <length> top: 120 * Ui.u + 60 * Ui.u * Ui.text-scale;
     property <int> rows: ceil(tiles.length / columns);
     property <int> shown;
     init => { shown = sel; }
@@ -644,12 +689,12 @@ component FitaLibrary inherits Rectangle {
     property <int> focus-row: shown < 0 ? 0 : floor(shown / columns);
     property <length> view-h: self.height - top - Ui.hint-bar;
     property <length> scroll: min(0, max(view-h - rows * cell-h, -(focus-row * cell-h) + (view-h - cell-h) / 2));
+    property <length> grid-x: max(40 * Ui.u, (self.width - columns * cell-w) / 2);
 
     VerticalLayout {
-        x: 80 * Ui.u;
-        y: 64 * Ui.u;
-        width: root.width - 160 * Ui.u;
-        height: top - 70 * Ui.u;
+        x: grid-x;
+        y: 48 * Ui.u;
+        width: parent.width - 2 * grid-x;
         spacing: 16 * Ui.u;
 
         HorizontalLayout {
@@ -664,7 +709,7 @@ component FitaLibrary inherits Rectangle {
             }
             if count != "": Text {
                 text: "(" + count + ")";
-                color: #94A3B8;
+                color: #CBD5E1;
                 font-size: 18 * Ui.u * Ui.text-scale;
                 font-family: "Plus Jakarta Sans";
                 font-weight: 500;
@@ -717,13 +762,13 @@ component FitaLibrary inherits Rectangle {
     }
 
     if tiles.length == 0: VerticalLayout {
-        x: 80 * Ui.u;
+        x: grid-x;
         y: top + 40 * Ui.u;
-        width: root.width - 160 * Ui.u;
+        width: parent.width - 2 * grid-x;
         spacing: 12 * Ui.u;
         alignment: start;
         Text { text: empty-title; color: #FFFFFF; font-size: 24 * Ui.u * Ui.text-scale; font-family: "Poppins"; font-weight: 700; }
-        Text { text: empty-text; color: #94A3B8; font-size: 15 * Ui.u * Ui.text-scale; font-family: "Plus Jakarta Sans"; wrap: word-wrap; }
+        Text { text: empty-text; color: #CBD5E1; font-size: 15 * Ui.u * Ui.text-scale; font-family: "Plus Jakarta Sans"; wrap: word-wrap; }
     }
 
     Rectangle {
@@ -737,13 +782,13 @@ component FitaLibrary inherits Rectangle {
             for r in rows: Rectangle {
                 property <length> ry: r * cell-h;
                 property <bool> near: ry + scroll > -2 * cell-h && ry + scroll < view-h + cell-h;
-                x: 80 * Ui.u;
+                x: grid-x;
                 y: ry + 16 * Ui.u;
                 height: cell-h;
 
                 if near: Rectangle {
                     for c in min(columns, tiles.length - r * columns): FitaGridCard {
-                        x: c * cell-w;
+                        x: c * cell-w + (cell-w - self.width) / 2;
                         tile: tiles[r * columns + c];
                         focused: r * columns + c == sel;
                         clicked => { root.clicked("grid", r * columns + c); }
@@ -762,8 +807,8 @@ component FitaSidebar inherits Rectangle {
     callback clicked(int);
     callback hovered(int);
 
-    width: expanded ? 380 * Ui.u : 0;
-    visible: self.width > 0;
+    width: expanded ? 380 * Ui.u : 100 * Ui.u;
+    visible: true;
     animate width { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
     background: #10131af5;
     clip: true;
@@ -778,8 +823,8 @@ component FitaSidebar inherits Rectangle {
 
     VerticalLayout {
         padding-top: 40 * Ui.u;
-        padding-left: 28 * Ui.u;
-        padding-right: 28 * Ui.u;
+        padding-left: 24 * Ui.u;
+        padding-right: 24 * Ui.u;
         padding-bottom: Ui.hint-bar;
         spacing: 6 * Ui.u;
 
@@ -787,7 +832,7 @@ component FitaSidebar inherits Rectangle {
             spacing: 14 * Ui.u;
             padding-bottom: 24 * Ui.u;
             Image { source: @image-url("@tako/tako-mark.png"); height: 48 * Ui.u; width: 48 * Ui.u; image-fit: contain; }
-            Text {
+            if expanded: Text {
                 text: "TAKO";
                 color: #FFFFFF;
                 font-family: "Poppins";
@@ -801,7 +846,7 @@ component FitaSidebar inherits Rectangle {
             spacing: 6 * Ui.u;
             if it.section != "" && expanded: Text {
                 text: it.section;
-                color: #64748B;
+                color: #94A3B8;
                 font-size: 12 * Ui.u * Ui.text-scale;
                 font-weight: 700;
                 letter-spacing: 0.16 * 12 * Ui.u;
@@ -817,8 +862,8 @@ component FitaSidebar inherits Rectangle {
                 background: i == sel ? #F5F7FA : (it.selected ? #1e2433cc : transparent);
                 animate background { duration: Ui.focus-time; }
                 HorizontalLayout {
-                    padding-left: 18 * Ui.u;
-                    padding-right: 18 * Ui.u;
+                    padding-left: 16 * Ui.u;
+                    padding-right: 16 * Ui.u;
                     spacing: 16 * Ui.u;
                     Icon {
                         name: it.icon;
@@ -838,7 +883,7 @@ component FitaSidebar inherits Rectangle {
                     }
                     if expanded && it.count != "": Text {
                         text: it.count;
-                        color: i == sel ? #475569 : #94A3B8;
+                        color: i == sel ? #475569 : #CBD5E1;
                         font-size: 13 * Ui.u * Ui.text-scale;
                         font-family: "Plus Jakarta Sans";
                         vertical-alignment: center;
@@ -884,13 +929,25 @@ component FitaDetailsPage inherits Rectangle {
             alignment: start;
             horizontal-stretch: 1;
 
-            if details.overline != "": Text {
-                text: details.overline;
-                color: Ui.accent;
-                font-family: "Plus Jakarta Sans";
-                font-weight: 700;
-                font-size: 14 * Ui.u * Ui.text-scale;
-                letter-spacing: 0.12 * 14 * Ui.u;
+            if details.overline != "": HorizontalLayout {
+                spacing: 8 * Ui.u;
+                alignment: start;
+                Rectangle {
+                    width: 4 * Ui.u;
+                    height: 14 * Ui.u * Ui.text-scale;
+                    border-radius: 2 * Ui.u;
+                    background: Ui.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+                Text {
+                    text: details.overline;
+                    color: #E2E8F0;
+                    font-family: "Plus Jakarta Sans";
+                    font-weight: 700;
+                    font-size: 14 * Ui.u * Ui.text-scale;
+                    letter-spacing: 0.12 * 14 * Ui.u;
+                    vertical-alignment: center;
+                }
             }
 
             if details.logo.width > 0: Image {
@@ -923,7 +980,7 @@ component FitaDetailsPage inherits Rectangle {
                 spacing: 16 * Ui.u;
                 alignment: start;
                 for a[i] in actions: FitaButton {
-                    label: a.title;
+                    label: (i == 0 || a.icon == "" || Ui.text-scale <= 1.2) ? a.title : "";
                     icon: a.icon;
                     primary: i == 0;
                     focused: i == sel;
@@ -942,7 +999,7 @@ component FitaDetailsPage inherits Rectangle {
 
             Text {
                 text: details.description;
-                color: #94A3B8;
+                color: #CBD5E1;
                 font-size: 15 * Ui.u * Ui.text-scale;
                 font-family: "Plus Jakarta Sans";
                 wrap: word-wrap;
@@ -957,7 +1014,7 @@ component FitaDetailsPage inherits Rectangle {
                 Text {
                     text: s.label;
                     width: 240 * Ui.u;
-                    color: #64748B;
+                    color: #94A3B8;
                     font-size: 14 * Ui.u * Ui.text-scale;
                     font-family: "Plus Jakarta Sans";
                 }
@@ -988,7 +1045,8 @@ component FitaSettingsPage inherits Rectangle {
 
     property <length> top: 160 * Ui.u;
     property <length> row-h: 100 * Ui.u;
-    property <length> view-h: self.height - top - Ui.hint-bar - 100 * Ui.u;
+    property <length> header-h: 60 * Ui.u + 45 * Ui.u * Ui.text-scale;
+    property <length> view-h: self.height - top - Ui.hint-bar - header-h;
     property <int> shown-row;
     init => { shown-row = row-focus; }
     changed row-focus => { if (!Ui.pointer) { shown-row = row-focus; } }
@@ -1048,12 +1106,11 @@ component FitaSettingsPage inherits Rectangle {
     Rectangle {
         x: 80 * Ui.u + 320 * Ui.u + 48 * Ui.u;
         y: top;
-        width: root.width - self.x - 80 * Ui.u;
-        height: root.height - top - Ui.hint-bar;
+        width: parent.width - self.x - 80 * Ui.u;
+        height: parent.height - top - Ui.hint-bar;
 
         VerticalLayout {
             y: 0;
-            height: 100 * Ui.u;
             spacing: 6 * Ui.u;
             alignment: start;
             Text {
@@ -1065,7 +1122,7 @@ component FitaSettingsPage inherits Rectangle {
             }
             Text {
                 text: subtitle;
-                color: #94A3B8;
+                color: #CBD5E1;
                 font-size: 14 * Ui.u * Ui.text-scale;
                 font-family: "Plus Jakarta Sans";
                 wrap: word-wrap;
@@ -1073,7 +1130,7 @@ component FitaSettingsPage inherits Rectangle {
         }
 
         Rectangle {
-            y: 110 * Ui.u;
+            y: header-h + 10 * Ui.u;
             height: view-h;
             clip: true;
 
@@ -1098,25 +1155,24 @@ component FitaSettingsPage inherits Rectangle {
 }
 
 export component App inherits Window {
-    // Geral
+    in property <bool> transparent-background: false;
     in property <string> page: "home";
     in property <image> backdrop;
     in property <string> clock;
     in property <string> input-label;
-    in property <string> input-icon: "gamepad";
+    in property <string> input-icon;
     in property <string> pad-battery;
-    in property <string> toast;
     in property <[Hint]> hints;
-    in property <bool> transparent-background;
+    in property <string> toast;
     in property <bool> leaving;
     in property <bool> intro;
 
-    // Barra lateral
+    // Barra lateral.
     in property <[NavItem]> sidebar;
     in property <int> sidebar-focus: -1;
     in property <bool> sidebar-visible: true;
 
-    // Início
+    // Início.
     in property <Hero> hero;
     in property <int> hero-focus;
     in property <[HomeRow]> home-rows;
@@ -1128,7 +1184,7 @@ export component App inherits Window {
     in property <[PanelRow]> home-empty-actions;
     in property <string> see-all-label;
 
-    // Biblioteca
+    // Biblioteca.
     in property <string> library-title;
     in property <string> library-count;
     in property <[PanelRow]> library-chips;
@@ -1139,13 +1195,13 @@ export component App inherits Window {
     in property <string> library-empty-text;
     out property <int> library-columns: library.columns;
 
-    // Detalhes
+    // Detalhes.
     in property <Details> details;
     in property <[Stat]> details-stats;
     in property <[PanelRow]> details-actions;
     in property <int> details-focus;
 
-    // Configurações
+    // Configurações.
     in property <string> settings-title;
     in property <[NavItem]> settings-categories;
     in property <int> settings-category-focus;
@@ -1154,7 +1210,7 @@ export component App inherits Window {
     in property <[PanelRow]> settings-rows;
     in property <int> settings-row-focus: -1;
 
-    // Central rápida
+    // Central rápida.
     in property <bool> control-center;
     in property <[PanelRow]> cc-icons;
     in property <int> cc-icon-focus;
@@ -1164,10 +1220,9 @@ export component App inherits Window {
     in property <string> cc-game-title;
     in property <string> cc-game-meta;
 
-    // Camadas
+    // Camadas abertas.
     in property <[Overlay]> overlays;
 
-    // Callbacks
     callback clicked(string, int);
     callback hovered(string, int);
     callback hint-clicked(int);
@@ -1191,7 +1246,7 @@ export component App inherits Window {
 
     property <bool> over-game: control-center && transparent-background;
     property <bool> show-tako: !(transparent-background && (control-center || leaving));
-    property <length> content-x: sidebar-visible && page != "details" ? (sidebar-focus >= 0 ? 380 * Ui.u : 0) : 0;
+    property <length> content-x: sidebar-visible && page != "details" ? (sidebar-focus >= 0 ? 380 * Ui.u : 100 * Ui.u) : 0;
 
     if show-tako: FitaBackdrop {
         art: backdrop;
@@ -1267,12 +1322,12 @@ export component App inherits Window {
 
     // HUD Superior Minimalista
     if !control-center && show-tako: HorizontalLayout {
-        x: 80 * Ui.u;
+        x: content-x + 40 * Ui.u;
         y: 20 * Ui.u;
-        width: root.width - 160 * Ui.u;
+        width: root.width - content-x - 80 * Ui.u;
         height: 40 * Ui.u;
 
-        HorizontalLayout {
+        if !sidebar-visible || page == "details": HorizontalLayout {
             spacing: 12 * Ui.u;
             alignment: start;
             Image {

@@ -203,7 +203,7 @@ fn principal_screens_bind_and_render_in_the_slint_software_backend() {
         let game = shell.ctx.library.games()[0].id.clone();
         for lang in [Lang::PtBr, Lang::EnUs] {
             i18n::set_lang(lang);
-            for scale in [1.0, 1.25] {
+            for scale in [1.0, 1.25, 1.5] {
                 ui.set_global_property("Ui", "text-scale", Value::Number(scale))
                     .unwrap();
                 for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
@@ -259,38 +259,64 @@ fn fita_theme_binds_and_renders_in_the_slint_software_backend() {
             tako_platform::Platform::simulated(),
             true,
         );
+        let mut all_games = crate::demo::games();
+        for i in 12..60 {
+            all_games.push(tako_core::library::Game {
+                id: format!("steam:extra{i}"),
+                title: format!("Game Extra {i}"),
+                store: Some(tako_core::library::GameStore::Steam),
+                accent: "#3B4A6B".into(),
+                is_installed: true,
+                launch_target: Some(format!("demo://extra{i}")),
+                added_at: Some(chrono::Utc::now()),
+                last_played_at: Some(chrono::Utc::now()),
+                play_time: std::time::Duration::from_secs(3600),
+                ..Default::default()
+            });
+        }
+        ctx.library = tako_core::library::GameLibrary::in_memory(
+            all_games,
+            tako_core::library::system_clock(),
+        );
         ctx.library.refresh();
         let mut shell = Shell::new(ctx);
         let game = shell.ctx.library.games()[0].id.clone();
         for lang in [Lang::PtBr, Lang::EnUs] {
             i18n::set_lang(lang);
-            for scale in [1.0, 1.25] {
-                ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+            for reduce_motion in [false, true] {
+                ui.set_global_property("Ui", "reduce-motion", Value::Bool(reduce_motion))
                     .unwrap();
-                for (width, height) in [(1280, 720), (1920, 1080)] {
-                    window.set_size(slint::PhysicalSize::new(width, height));
-                    for route in ["home", "library:all", "settings", "details"] {
-                        shell.open_route(if route == "details" {
-                            "library:all"
-                        } else {
-                            route
-                        });
-                        if route == "details" {
-                            shell.ctx.open_details = Some(game.clone());
-                            shell.after_action();
+                for scale in [1.0, 1.25, 1.5] {
+                    ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+                        .unwrap();
+                    for (width, height) in [(1280, 720), (1920, 1080)] {
+                        window.set_size(slint::PhysicalSize::new(width, height));
+                        for route in ["home", "library:all", "settings", "details"] {
+                            shell.open_route(if route == "details" {
+                                "library:all"
+                            } else {
+                                route
+                            });
+                            if route == "home" {
+                                shell.handle(crate::shell::Cmd::Down);
+                            }
+                            if route == "details" {
+                                shell.ctx.open_details = Some(game.clone());
+                                shell.after_action();
+                            }
+                            for (name, value) in shell.render(Instant::now()).props {
+                                crate::bridge::set(&ui, name, value);
+                            }
+                            let mut pixels = vec![Rgb8Pixel::default(); (width * height) as usize];
+                            ui.window().request_redraw();
+                            assert!(window.draw_if_needed(|renderer| {
+                                renderer.render(&mut pixels, width as usize);
+                            }));
+                            assert!(
+                                pixels.iter().any(|p| p.r != 0 || p.g != 0 || p.b != 0),
+                                "tela vazia no fita: {route}/{width}/{lang:?}"
+                            );
                         }
-                        for (name, value) in shell.render(Instant::now()).props {
-                            crate::bridge::set(&ui, name, value);
-                        }
-                        let mut pixels = vec![Rgb8Pixel::default(); (width * height) as usize];
-                        ui.window().request_redraw();
-                        assert!(window.draw_if_needed(|renderer| {
-                            renderer.render(&mut pixels, width as usize);
-                        }));
-                        assert!(
-                            pixels.iter().any(|p| p.r != 0 || p.g != 0 || p.b != 0),
-                            "tela vazia no fita: {route}/{width}/{lang:?}"
-                        );
                     }
                 }
             }
@@ -668,38 +694,80 @@ fn fullscreen_snapshot() {
             .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
             .collect();
 
-        for (page_name, route) in [("inicio", "home"), ("biblioteca", "library:all")] {
-            shell.open_route(route);
-            for &(w, h) in &sizes {
-                window.set_size(slint::PhysicalSize::new(w, h));
-                if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
-                    shell.ctx.grid_columns = (n as usize).max(1);
-                }
-                let out = shell.render(Instant::now());
-                for (name, value) in &out.props {
-                    crate::bridge::set(&ui, name, value.clone());
-                }
-                let id = shell.focused_game();
-                let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
-                let p = tako_core::presentation::color::AccentPalette::for_accent(
-                    g.map(|g| g.accent.as_str()),
-                    true,
-                );
-                for (name, c) in [("accent", p.accent), ("accent-deep", p.deep)] {
-                    let c = slint::Color::from_rgb_u8(c.r, c.g, c.b);
-                    crate::bridge::set_global(&ui, "Ui", name, Value::Brush(c.into()));
-                }
-                slint::platform::update_timers_and_animations();
-                let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
-                ui.window().request_redraw();
-                window.draw_if_needed(|r| {
-                    r.render(&mut pixels, w as usize);
-                });
-                let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
-                image::RgbImage::from_raw(w, h, raw)
-                    .unwrap()
-                    .save(format!("{out_dir}/fita-{page_name}-{w}x{h}.png"))
+        i18n::set_lang(Lang::EnUs);
+
+        // Arte clara simulada para demonstrar contraste (>= 4.5:1)
+        let mut bright_art = image::RgbImage::new(1920, 1080);
+        for (x, y, pixel) in bright_art.enumerate_pixels_mut() {
+            let r = (235 + (x % 20)) as u8;
+            let g = (240 + (y % 15)) as u8;
+            let b = 250;
+            *pixel = image::Rgb([r, g, b]);
+        }
+        let bright_art_path = dir.path().join("bright_art.png");
+        bright_art.save(&bright_art_path).unwrap();
+        let art_img = slint::Image::load_from_path(&bright_art_path).unwrap();
+
+        let game = shell.ctx.library.games()[0].id.clone();
+        for (page_name, route, scales, focus_ribbon) in [
+            ("inicio", "home", vec![1.0], true),
+            ("biblioteca", "library:all", vec![1.0, 1.25, 1.5], false),
+            ("configuracoes", "settings", vec![1.0, 1.25, 1.5], false),
+            ("detalhes", "details", vec![1.0, 1.25, 1.5], false),
+        ] {
+            for scale in scales {
+                ui.set_global_property("Ui", "text-scale", Value::Number(scale))
                     .unwrap();
+                shell.open_route(if route == "details" {
+                    "library:all"
+                } else {
+                    route
+                });
+                if focus_ribbon {
+                    shell.handle(crate::shell::Cmd::Down);
+                }
+                if route == "details" {
+                    shell.ctx.open_details = Some(game.clone());
+                    shell.after_action();
+                }
+                for &(w, h) in &sizes {
+                    window.set_size(slint::PhysicalSize::new(w, h));
+                    if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
+                        shell.ctx.grid_columns = (n as usize).max(1);
+                    }
+                    let out = shell.render(Instant::now());
+                    for (name, value) in &out.props {
+                        crate::bridge::set(&ui, name, value.clone());
+                    }
+                    ui.set_property("backdrop", Value::Image(art_img.clone()))
+                        .unwrap();
+                    let id = shell.focused_game();
+                    let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
+                    let p = tako_core::presentation::color::AccentPalette::for_accent(
+                        g.map(|g| g.accent.as_str()),
+                        true,
+                    );
+                    for (name, c) in [("accent", p.accent), ("accent-deep", p.deep)] {
+                        let c = slint::Color::from_rgb_u8(c.r, c.g, c.b);
+                        crate::bridge::set_global(&ui, "Ui", name, Value::Brush(c.into()));
+                    }
+                    slint::platform::update_timers_and_animations();
+                    let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+                    ui.window().request_redraw();
+                    window.draw_if_needed(|r| {
+                        r.render(&mut pixels, w as usize);
+                    });
+                    let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+                    let file_name = if (scale - 1.0).abs() < 0.01 {
+                        format!("{out_dir}/fita-{page_name}-{w}x{h}.png")
+                    } else {
+                        format!("{out_dir}/fita-{page_name}-{scale}-{w}x{h}.png")
+                    };
+                    image::RgbImage::from_raw(w, h, raw)
+                        .unwrap()
+                        .save(&file_name)
+                        .unwrap();
+                }
             }
         }
         ui.hide().unwrap();
