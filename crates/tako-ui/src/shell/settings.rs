@@ -5,6 +5,8 @@
 pub(crate) mod controls;
 #[path = "settings_emulators.rs"]
 pub(crate) mod emulators;
+#[path = "settings_integrations.rs"]
+pub(crate) mod integrations;
 #[path = "settings_library.rs"]
 pub(crate) mod library;
 #[path = "settings_metadata.rs"]
@@ -76,7 +78,7 @@ pub fn categories() -> Vec<Category> {
         Category {
             id: "integrations",
             icon: "tv",
-            rows: sunshine::rows,
+            rows: integrations::rows,
         },
         Category {
             id: "downloads",
@@ -1524,6 +1526,7 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             .desc(ctx.t("settings.system.safemode_off_desc")),
         )
     });
+
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.system.advanced_header"),
     )));

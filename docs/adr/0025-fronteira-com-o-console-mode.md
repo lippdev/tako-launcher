@@ -49,3 +49,7 @@ O Tako não depende dela para funcionar. Quando existir, deve seguir isto:
 - As ADRs 0016 (TV e Steam na bandeja), 0017 (FPS) e 0018 (limite de FPS) passam a ser histórico.
 - Configurações por jogo de FPS (`game_settings.fps_limit`, `show_fps`) ficam no banco, sem uso, para não perder
   dados das alphas.
+
+## Detecção da API (CMI-002)
+
+Socket Unix ou named pipe inexistente, ou conexão recusada, resulta conservadoramente em `NaoInstalado`. Se a conexão é aceita mas não há resposta em 500 ms, o resultado é `Erro`. Não há transporte alternativo por TCP nem arquivos locais de descoberta (`discovery.json`).

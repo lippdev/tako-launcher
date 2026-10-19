@@ -425,7 +425,14 @@ performance_value = "Ver"
 
 [settings.integrations]
 title = "Integrações"
-subtitle = "Streaming local e serviços conectados ao Tako."
+subtitle = "Console Mode, streaming local e serviços conectados ao Tako."
+console_mode = "Console Mode"
+console_mode_not_installed = "Não instalado"
+console_mode_installed = "Instalado · API v{version}"
+console_mode_incompatible = "Versão incompatível"
+console_mode_error = "Erro ao verificar"
+console_mode_checking = "Verificando…"
+console_mode_check_again = "Verificar de novo"
 
 [settings.performance]
 title = "Desempenho do Tako"

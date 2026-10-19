@@ -1362,3 +1362,109 @@ fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
     let token = ctx.settings.string(keys::API_TOKEN);
     assert!(tako_core::api::is_valid_token(&token));
 }
+
+#[test]
+fn console_mode_row_displays_status_and_triggers_check() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Estado inicial: não instalado
+    super::integrations::set_status_for_test(
+        tako_core::console_mode::ConsoleModeStatus::NaoInstalado,
+    );
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.title,
+        ctx.t("settings.integrations.console_mode")
+    );
+    assert_eq!(
+        cm_row.row.description,
+        ctx.t("settings.integrations.console_mode_not_installed")
+    );
+    assert_eq!(
+        cm_row.row.value,
+        ctx.t("settings.integrations.console_mode_check_again")
+    );
+
+    // 2. Estado instalado com API v1
+    super::integrations::set_status_for_test(
+        tako_core::console_mode::ConsoleModeStatus::Instalado {
+            versao_api: 1,
+            capacidades: vec!["tv".into(), "fps".into()],
+        },
+    );
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.tf(
+            "settings.integrations.console_mode_installed",
+            &[("version", "1")]
+        )
+    );
+
+    // 3. Estado incompatível
+    super::integrations::set_status_for_test(
+        tako_core::console_mode::ConsoleModeStatus::Incompativel {
+            versao: "2.0".into(),
+        },
+    );
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.t("settings.integrations.console_mode_incompatible")
+    );
+
+    // 4. Estado de erro
+    super::integrations::set_status_for_test(tako_core::console_mode::ConsoleModeStatus::Erro);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.t("settings.integrations.console_mode_error")
+    );
+
+    // 5. Ação de verificar de novo
+    let flow = accept(&mut ctx, &cm_row);
+    assert!(matches!(flow, Flow::Stay));
+}
+
+#[test]
+fn console_mode_row_displays_checking_when_verifying() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+
+    super::integrations::set_checking_for_test(true);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.t("settings.integrations.console_mode_checking")
+    );
+    super::integrations::set_checking_for_test(false);
+}
+
+#[test]
+fn console_mode_custom_detector_is_invoked() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    super::integrations::set_detector_for_test(|| {
+        tako_core::console_mode::ConsoleModeStatus::Instalado {
+            versao_api: 1,
+            capacidades: vec!["custom".into()],
+        }
+    });
+    super::integrations::check_now(&mut ctx);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.tf(
+            "settings.integrations.console_mode_installed",
+            &[("version", "1")]
+        )
+    );
+}
