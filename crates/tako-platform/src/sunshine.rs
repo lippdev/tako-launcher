@@ -7,6 +7,49 @@ const MARKER: &str = "[Tako] ";
 const MAX_APPS_JSON: u64 = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SunshineError {
+    InvalidGameId,
+    InvalidExecutablePath,
+    ExecutableNotFound(String),
+    AppsJsonMalformed(String),
+    AppsJsonNotAnObject,
+    AppsListMissing,
+    InvalidAppEntry,
+    AppsJsonTooLarge,
+    CannotReadAppsJson(String),
+    CannotCreateBackup(String),
+    CannotCreateFolder(String),
+    PermissionDenied,
+    CannotWriteAppsJson(String),
+    SerializationFailed(String),
+    SunshineFolderMissing,
+}
+
+impl std::fmt::Display for SunshineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidGameId => write!(f, "Identificador de jogo inválido para o link do Tako"),
+            Self::InvalidExecutablePath => write!(f, "Caminho do executável contém aspas duplas"),
+            Self::ExecutableNotFound(e) => write!(f, "Executável do Tako não encontrado: {e}"),
+            Self::AppsJsonMalformed(e) => write!(f, "apps.json malformado: {e}"),
+            Self::AppsJsonNotAnObject => write!(f, "apps.json precisa ser um objeto JSON"),
+            Self::AppsListMissing => write!(f, "apps.json precisa conter uma lista 'apps'"),
+            Self::InvalidAppEntry => write!(f, "Entrada inválida em apps.json"),
+            Self::AppsJsonTooLarge => write!(f, "apps.json excede o limite de 4 MB"),
+            Self::CannotReadAppsJson(e) => write!(f, "Não foi possível ler apps.json: {e}"),
+            Self::CannotCreateBackup(e) => write!(f, "Não foi possível criar backup: {e}"),
+            Self::CannotCreateFolder(e) => write!(f, "Não foi possível criar pasta: {e}"),
+            Self::PermissionDenied => write!(f, "Sem permissão de gravação"),
+            Self::CannotWriteAppsJson(e) => write!(f, "Não foi possível gravar apps.json: {e}"),
+            Self::SerializationFailed(e) => write!(f, "Falha na serialização do JSON: {e}"),
+            Self::SunshineFolderMissing => write!(f, "Pasta do Sunshine não encontrada"),
+        }
+    }
+}
+
+impl std::error::Error for SunshineError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct App {
     pub id: String,
     pub title: String,
@@ -18,6 +61,29 @@ pub struct Detection {
     pub installed: bool,
     pub running: bool,
     pub apps_json: Option<PathBuf>,
+}
+
+/// Identifica se o processo está em uma sandbox Flatpak.
+pub fn is_flatpak() -> bool {
+    std::env::var_os("FLATPAK_ID").is_some() || Path::new("/.flatpak-info").exists()
+}
+
+/// Caminho ou comando de execução do Tako para registrar no Sunshine.
+/// No AppImage reaproveita $APPIMAGE; no Flatpak usa `flatpak run <app-id>`.
+pub fn tako_executable() -> Result<String, SunshineError> {
+    if is_flatpak() {
+        let id = std::env::var("FLATPAK_ID")
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .unwrap_or_else(|| "dev.tako.Tako".to_owned());
+        return Ok(format!("flatpak run {id}"));
+    }
+    if let Some(appimage) = std::env::var_os("APPIMAGE").filter(|v| !v.is_empty()) {
+        return Ok(appimage.to_string_lossy().into_owned());
+    }
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| SunshineError::ExecutableNotFound(e.to_string()))
 }
 
 /// Locais padrão da configuração usada pelo Sunshine e pelo Apollo.
@@ -40,20 +106,35 @@ pub fn apps_json_candidates() -> Vec<PathBuf> {
     }
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     if let Some(home) = std::env::var_os("HOME") {
-        paths.push(PathBuf::from(&home).join(".config/sunshine/apps.json"));
-        paths.push(PathBuf::from(home).join(".config/Apollo/apps.json"));
+        let home_path = PathBuf::from(home);
+        paths.push(home_path.join(".config/sunshine/apps.json"));
+        paths.push(home_path.join(".config/Apollo/apps.json"));
+        #[cfg(target_os = "linux")]
+        paths
+            .push(home_path.join(".var/app/dev.lizardbyte.app.Sunshine/config/sunshine/apps.json"));
     }
     paths
 }
 
-/// Estado local. A checagem de processo não abre conexões nem consulta serviços remotos.
-pub fn detect() -> Detection {
-    let apps_json = apps_json_candidates()
+/// Localiza o primeiro apps.json existente entre os locais padrão, sem checar processos.
+pub fn find_apps_json() -> Option<PathBuf> {
+    apps_json_candidates()
         .into_iter()
-        .find(|path| path.is_file());
+        .find(|path| path.is_file())
+}
+
+/// Detecção rápida (apenas caminhos no disco e no PATH), sem verificação de processos.
+pub fn detect_quick() -> (bool, Option<PathBuf>) {
+    let apps_json = find_apps_json();
     let installed = apps_json.is_some()
         || known_executable_paths().iter().any(|p| p.is_file())
         || executable_on_path();
+    (installed, apps_json)
+}
+
+/// Estado local. A checagem de processo não abre conexões nem consulta serviços remotos.
+pub fn detect() -> Detection {
+    let (installed, apps_json) = detect_quick();
     Detection {
         installed,
         running: process_running(),
@@ -63,9 +144,14 @@ pub fn detect() -> Detection {
 
 fn executable_on_path() -> bool {
     #[cfg(target_os = "windows")]
-    let command = std::process::Command::new("where.exe")
-        .args(["Sunshine.exe", "Apollo.exe"])
-        .output();
+    let command = {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        std::process::Command::new("where.exe")
+            .args(["Sunshine.exe", "Apollo.exe"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+    };
     #[cfg(not(target_os = "windows"))]
     let command = std::process::Command::new("which")
         .args(["sunshine", "apollo"])
@@ -95,13 +181,21 @@ fn known_executable_paths() -> Vec<PathBuf> {
         }
     }
     #[cfg(target_os = "linux")]
-    paths.extend([
-        PathBuf::from("/usr/bin/sunshine"),
-        PathBuf::from("/usr/local/bin/sunshine"),
-        PathBuf::from("/app/bin/sunshine"),
-        PathBuf::from("/usr/bin/apollo"),
-        PathBuf::from("/usr/local/bin/apollo"),
-    ]);
+    {
+        paths.extend([
+            PathBuf::from("/usr/bin/sunshine"),
+            PathBuf::from("/usr/local/bin/sunshine"),
+            PathBuf::from("/app/bin/sunshine"),
+            PathBuf::from("/usr/bin/apollo"),
+            PathBuf::from("/usr/local/bin/apollo"),
+            PathBuf::from("/var/lib/flatpak/app/dev.lizardbyte.app.Sunshine"),
+        ]);
+        if let Some(home) = std::env::var_os("HOME") {
+            paths.push(
+                PathBuf::from(home).join(".local/share/flatpak/app/dev.lizardbyte.app.Sunshine"),
+            );
+        }
+    }
     #[cfg(target_os = "macos")]
     paths.extend([
         PathBuf::from("/Applications/Sunshine.app"),
@@ -145,9 +239,12 @@ fn process_running() -> bool {
 
 #[cfg(target_os = "windows")]
 fn process_running() -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     ["Sunshine.exe", "Apollo.exe"].iter().any(|name| {
         std::process::Command::new("tasklist")
             .args(["/FI", &format!("IMAGENAME eq {name}"), "/NH"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .is_ok_and(|output| {
                 output.status.success()
@@ -159,7 +256,7 @@ fn process_running() -> bool {
 }
 
 /// Constrói um registro de `apps.json`; a identidade do jogo segue pela rota validada do Tako.
-pub fn app_entry(app: &App) -> Result<Value, String> {
+pub fn app_entry(app: &App) -> Result<Value, SunshineError> {
     if app.id.is_empty()
         || app.id.len() > 256
         || !app
@@ -167,50 +264,64 @@ pub fn app_entry(app: &App) -> Result<Value, String> {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
     {
-        return Err("O identificador do jogo não pode ser aberto por um link do Tako".into());
+        return Err(SunshineError::InvalidGameId);
     }
     if app.executable.contains('"') {
-        return Err(
-            "O caminho do executável contém aspas duplas, não suportadas pelo Sunshine".into(),
-        );
+        return Err(SunshineError::InvalidExecutablePath);
     }
     let uri = format!("tako://play/{}", app.id);
-    let command = format!(
-        "{} --open-url {}",
-        quote_argument(&app.executable, cfg!(windows)),
-        quote_argument(&uri, cfg!(windows))
-    );
+    let (command, working_dir) = if app.executable.starts_with("flatpak run ") {
+        (
+            format!(
+                "{} --open-url {}",
+                app.executable,
+                quote_argument(&uri, false)
+            ),
+            None,
+        )
+    } else {
+        (
+            format!(
+                "{} --open-url {}",
+                quote_argument(&app.executable, cfg!(windows)),
+                quote_argument(&uri, cfg!(windows))
+            ),
+            Path::new(&app.executable)
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(|p| p.to_string_lossy().into_owned()),
+        )
+    };
     Ok(json!({
         "name": format!("{MARKER}{}", app.title),
         "cmd": command,
-        "working-dir": Path::new(&app.executable)
-            .parent()
-            .map(|p| p.to_string_lossy().into_owned())
+        "working-dir": working_dir,
     }))
 }
 
 /// Mantém todos os campos da configuração e todas as entradas que não pertencem ao Tako.
-pub fn merge_apps_json(contents: &str, entries: &[Value]) -> Result<String, String> {
+pub fn merge_apps_json(contents: &str, entries: &[Value]) -> Result<String, SunshineError> {
     let mut root = if contents.trim().is_empty() {
         json!({"env": {}, "apps": []})
     } else {
-        serde_json::from_str::<Value>(contents).map_err(|e| format!("apps.json inválido: {e}"))?
+        serde_json::from_str::<Value>(contents)
+            .map_err(|e| SunshineError::AppsJsonMalformed(e.to_string()))?
     };
     let object = root
         .as_object_mut()
-        .ok_or_else(|| "apps.json precisa ser um objeto JSON".to_owned())?;
+        .ok_or(SunshineError::AppsJsonNotAnObject)?;
     let apps = object
         .entry("apps")
         .or_insert_with(|| Value::Array(Vec::new()))
         .as_array_mut()
-        .ok_or_else(|| "apps.json precisa ter uma lista 'apps'".to_owned())?;
+        .ok_or(SunshineError::AppsListMissing)?;
     if apps.iter().any(|item| !item.is_object()) {
-        return Err("apps.json contém uma entrada de aplicativo inválida".into());
+        return Err(SunshineError::InvalidAppEntry);
     }
     apps.retain(|item| !is_tako_entry(item));
     apps.extend(entries.iter().cloned());
     serde_json::to_string_pretty(&root)
-        .map_err(|e| format!("Não foi possível gerar apps.json: {e}"))
+        .map_err(|e| SunshineError::SerializationFailed(e.to_string()))
 }
 
 fn is_tako_entry(value: &Value) -> bool {
@@ -228,46 +339,69 @@ fn is_tako_entry(value: &Value) -> bool {
 }
 
 /// Faz backup sem substituir uma cópia anterior e grava apenas depois da validação do documento inteiro.
-pub fn export(path: &Path, entries: &[Value]) -> Result<PathBuf, String> {
+pub fn export(path: &Path, entries: &[Value]) -> Result<PathBuf, SunshineError> {
     let bytes = if path.exists() {
-        let metadata =
-            std::fs::metadata(path).map_err(|e| format!("Não foi possível ler apps.json: {e}"))?;
+        let metadata = std::fs::metadata(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                SunshineError::PermissionDenied
+            } else {
+                SunshineError::CannotReadAppsJson(e.to_string())
+            }
+        })?;
         if metadata.len() > MAX_APPS_JSON {
-            return Err("apps.json excede o limite de 4 MB".into());
+            return Err(SunshineError::AppsJsonTooLarge);
         }
-        std::fs::read_to_string(path).map_err(|e| format!("Não foi possível ler apps.json: {e}"))?
+        std::fs::read_to_string(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                SunshineError::PermissionDenied
+            } else {
+                SunshineError::CannotReadAppsJson(e.to_string())
+            }
+        })?
     } else {
         String::new()
     };
     let merged = merge_apps_json(&bytes, entries)?;
     if path.exists() {
         let backup = backup_path(path);
-        std::fs::copy(path, &backup)
-            .map_err(|e| format!("Não foi possível criar o backup de apps.json: {e}"))?;
+        std::fs::copy(path, &backup).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                SunshineError::PermissionDenied
+            } else {
+                SunshineError::CannotCreateBackup(e.to_string())
+            }
+        })?;
     }
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Não foi possível criar a pasta do Sunshine: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                SunshineError::PermissionDenied
+            } else {
+                SunshineError::CannotCreateFolder(e.to_string())
+            }
+        })?;
     }
-    std::fs::write(path, merged).map_err(|e| format!("Não foi possível gravar apps.json: {e}"))?;
+    tako_core::metadata::cache::write_atomic(path, merged.as_bytes()).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::PermissionDenied {
+            SunshineError::PermissionDenied
+        } else {
+            SunshineError::CannotWriteAppsJson(e.to_string())
+        }
+    })?;
     Ok(path.to_path_buf())
 }
 
+/// Guarda apenas o primeiro backup (.bak) e o último (.bak.last).
 fn backup_path(path: &Path) -> PathBuf {
     let first = path.with_extension("json.bak");
     if !first.exists() {
-        return first;
+        first
+    } else {
+        path.with_extension("json.bak.last")
     }
-    for index in 1..10_000 {
-        let candidate = path.with_extension(format!("json.bak.{index}"));
-        if !candidate.exists() {
-            return candidate;
-        }
-    }
-    path.with_extension("json.bak.last")
 }
 
-/// Aspas próprias do shell/comando do SO que executará `cmd`.
+/// Aspas duplas usadas pelo Sunshine em todos os sistemas (boost.process).
 pub fn quote_argument(value: &str, windows: bool) -> String {
     if windows {
         let mut output = String::from("\"");
@@ -360,6 +494,21 @@ mod tests {
     }
 
     #[test]
+    fn command_formats_flatpak_executable_without_quotes() {
+        let flat = app_entry(&App {
+            id: "manual:game-1".into(),
+            title: "Jogo".into(),
+            executable: "flatpak run dev.tako.Tako".into(),
+        })
+        .unwrap();
+        assert_eq!(
+            flat["cmd"],
+            "flatpak run dev.tako.Tako --open-url \"tako://play/manual:game-1\""
+        );
+        assert!(flat["working-dir"].is_null());
+    }
+
+    #[test]
     fn rejects_malformed_json_without_touching_the_file() {
         let fixture = include_str!("../tests/fixtures/sunshine_malformed.json");
         assert!(merge_apps_json(fixture, &[entry("Jogo")]).is_err());
@@ -378,12 +527,12 @@ mod tests {
     }
 
     #[test]
-    fn export_backs_up_existing_file_before_replacing_it() {
+    fn export_backs_up_first_and_last_before_replacing_it() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("apps.json");
         let original = include_str!("../tests/fixtures/sunshine_apps.json");
         std::fs::write(&path, original).unwrap();
-        let backup = export(&path, &[entry("Jogo")]).unwrap();
+        let backup = export(&path, &[entry("Jogo 1")]).unwrap();
         assert_eq!(
             std::fs::read_to_string(backup.with_extension("json.bak")).unwrap(),
             original
@@ -392,18 +541,25 @@ mod tests {
         assert!(
             std::fs::read_to_string(&path)
                 .unwrap()
-                .contains("[Tako] Jogo")
+                .contains("[Tako] Jogo 1")
         );
+
+        // Segundo export: grava .bak.last e não .bak.1
+        export(&path, &[entry("Jogo 2")]).unwrap();
+        assert!(path.with_extension("json.bak").exists());
+        assert!(path.with_extension("json.bak.last").exists());
+        assert!(!path.with_extension("json.bak.1").exists());
     }
+
     #[test]
     fn rejects_executable_path_with_double_quotes() {
-        assert!(
+        assert_eq!(
             app_entry(&App {
                 id: "manual:game-1".into(),
                 title: "Jogo".into(),
                 executable: r#"/path/with/"quotes"/tako"#.into(),
-            })
-            .is_err()
+            }),
+            Err(SunshineError::InvalidExecutablePath)
         );
     }
 }

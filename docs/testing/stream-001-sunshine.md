@@ -27,7 +27,7 @@ Execute em Windows, Linux e macOS. O Tako nunca envia a biblioteca para a rede: 
 ## Particularidades por plataforma
 
 - **Windows:** faça o teste numa instalação cuja pasta de configuração permita gravação pelo usuário; confirme que a falha de permissão aparece sem perder o backup.
-- **Linux:** valide a instalação nativa e, se disponível, a instalação Flatpak; a lista padrão fica em `~/.config/sunshine/apps.json`.
+- **Linux:** valide a instalação nativa e a instalação Flatpak (`~/.var/app/dev.lizardbyte.app.Sunshine/config/sunshine/apps.json`); a lista padrão nativa fica em `~/.config/sunshine/apps.json`. Se o Tako rodar como Flatpak ou AppImage, valide o comando gerado (`flatpak run <app-id>` ou `$APPIMAGE`) e o aviso de permissão caso a sandbox não possa gravar na pasta do Sunshine.
 - **macOS:** valide Sunshine/Apollo em `/Applications` e a lista padrão em `~/.config/sunshine/apps.json`.
 
 ## Referência visual

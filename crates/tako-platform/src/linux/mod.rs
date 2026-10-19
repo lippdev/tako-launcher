@@ -34,15 +34,7 @@ fn autostart() -> run::FileAutostart {
         .map(std::path::PathBuf::from)
         .or_else(|| run::home().map(|h| h.join(".config")));
     // Num AppImage, o executável atual está numa montagem temporária; o arquivo certo é `$APPIMAGE`.
-    let exe = std::env::var("APPIMAGE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .map(|p| p.to_string_lossy().into_owned())
-        })
-        .unwrap_or_else(|| "tako".into());
+    let exe = crate::sunshine::tako_executable().unwrap_or_else(|_| "tako".into());
     run::FileAutostart {
         path: config.map(|c| c.join("autostart/tako.desktop")),
         content: text::autostart_desktop_entry(&exe),

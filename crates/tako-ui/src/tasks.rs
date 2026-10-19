@@ -63,3 +63,41 @@ pub fn run<R: Send + 'static>(
         });
     });
 }
+
+/// Roda `job` fora da thread da UI e devolve o resultado para `done` na thread da UI.
+pub fn run_bg<R: Send + 'static>(
+    job: impl FnOnce() -> R + Send + 'static,
+    done: impl FnOnce(&mut Ctx, R) + 'static,
+) {
+    if shell().is_none() {
+        return;
+    }
+    let id = PENDING.with(|p| {
+        let mut p = p.borrow_mut();
+        p.0 += 1;
+        let id = p.0;
+        p.1.insert(
+            id,
+            Box::new(move |ctx: &mut Ctx, any: Box<dyn Any + Send>| {
+                if let Ok(r) = any.downcast::<R>() {
+                    done(ctx, *r);
+                }
+            }),
+        );
+        id
+    });
+    std::thread::spawn(move || {
+        let result: Box<dyn Any + Send> = Box::new(job());
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(done) = PENDING.with(|p| p.borrow_mut().1.remove(&id)) else {
+                return;
+            };
+            if let Some(shell) = shell() {
+                let mut s = shell.borrow_mut();
+                done(&mut s.ctx, result);
+                s.after_action();
+                s.ctx.dirty = true;
+            }
+        });
+    });
+}

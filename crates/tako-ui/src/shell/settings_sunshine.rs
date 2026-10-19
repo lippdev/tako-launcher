@@ -3,20 +3,48 @@
 use super::super::ctx::{Ctx, keys};
 use super::super::layer::{Flow, MenuItem, MenuLayer};
 use crate::model::PanelRow;
+use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
-use tako_platform::sunshine::{self, App};
+use std::time::{Duration, Instant};
+use tako_platform::sunshine::{self, App, SunshineError};
+
+thread_local! {
+    static CACHED_DETECTION: RefCell<Option<(Instant, sunshine::Detection)>> = const { RefCell::new(None) };
+    static CHECKING: Cell<bool> = const { Cell::new(false) };
+}
 
 pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
-    let detection = super::cached(
-        "sunshine-detection",
-        std::time::Duration::from_secs(5),
-        sunshine::detect,
-    );
+    let (quick_installed, quick_path) = sunshine::detect_quick();
+    let detection = CACHED_DETECTION.with(|cell| {
+        let borrow = cell.borrow_mut();
+        if let Some((at, det)) = borrow.as_ref() {
+            if at.elapsed() < Duration::from_secs(5) {
+                return det.clone();
+            }
+        }
+        if !CHECKING.get() {
+            CHECKING.set(true);
+            crate::tasks::run_bg(sunshine::detect, |_, det| {
+                CHECKING.set(false);
+                CACHED_DETECTION.with(|c| *c.borrow_mut() = Some((Instant::now(), det)));
+            });
+        }
+        borrow
+            .as_ref()
+            .map(|(_, det)| det.clone())
+            .unwrap_or(sunshine::Detection {
+                installed: quick_installed,
+                running: false,
+                apps_json: quick_path,
+            })
+    });
+
     let status = match (detection.installed, detection.running) {
         (true, true) => ctx.t("settings.system.sunshine_running"),
         (true, false) => ctx.t("settings.system.sunshine_installed"),
         (false, _) => ctx.t("settings.system.sunshine_missing"),
     };
+    let export_enabled = detection.installed || detection.apps_json.is_some();
     let mut rows = vec![
         MenuItem::new(
             PanelRow::info("sunshine-status", ctx.t("settings.system.sunshine"), status)
@@ -25,9 +53,17 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(
             PanelRow::action("sunshine-export", ctx.t("settings.system.sunshine_export"))
                 .desc(ctx.t("settings.system.sunshine_export_desc"))
-                .value(ctx.t("settings.system.sunshine_export_value")),
+                .value(ctx.t("settings.system.sunshine_export_value"))
+                .enabled(export_enabled),
         )
-        .on(|ctx| Flow::Push(Box::new(preview_dialog(ctx, false)))),
+        .on(|ctx| {
+            if sunshine::find_apps_json().is_none() && !sunshine::detect_quick().0 {
+                ctx.toast(ctx.t("settings.system.sunshine_missing"));
+                Flow::Stay
+            } else {
+                Flow::Push(Box::new(preview_dialog(ctx, false)))
+            }
+        }),
         MenuItem::new(
             PanelRow::toggle(
                 "sunshine-sync",
@@ -64,29 +100,79 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     rows
 }
 
-fn apps(ctx: &Ctx) -> Result<Vec<sunshine::App>, String> {
-    let executable = std::env::current_exe()
-        .map_err(|e| format!("Não foi possível localizar o executável do Tako: {e}"))?
-        .to_string_lossy()
-        .into_owned();
-    ctx.library
+fn apps(ctx: &Ctx) -> Result<Vec<sunshine::App>, SunshineError> {
+    let executable = sunshine::tako_executable()?;
+    Ok(ctx
+        .library
         .games()
         .iter()
-        .map(|game| {
-            Ok(App {
-                id: game.id.clone(),
-                title: game.title.clone(),
-                executable: executable.clone(),
-            })
+        .map(|game| App {
+            id: game.id.clone(),
+            title: game.title.clone(),
+            executable: executable.clone(),
         })
-        .collect()
+        .collect())
+}
+
+fn format_sunshine_error(ctx: &Ctx, error: &SunshineError) -> String {
+    match error {
+        SunshineError::PermissionDenied => {
+            if sunshine::is_flatpak() {
+                ctx.t("settings.system.sunshine_err_flatpak_permission")
+            } else if cfg!(windows) {
+                ctx.t("settings.system.sunshine_err_windows_permission")
+            } else {
+                ctx.t("settings.system.sunshine_err_permission")
+            }
+        }
+        SunshineError::InvalidGameId => ctx.t("settings.system.sunshine_err_invalid_id"),
+        SunshineError::InvalidExecutablePath => ctx.t("settings.system.sunshine_err_invalid_path"),
+        SunshineError::ExecutableNotFound(e) => {
+            ctx.tf("settings.system.sunshine_err_no_exe", &[("detail", e)])
+        }
+        SunshineError::AppsJsonMalformed(_) => ctx.t("settings.system.sunshine_err_malformed"),
+        SunshineError::AppsJsonNotAnObject
+        | SunshineError::AppsListMissing
+        | SunshineError::InvalidAppEntry => ctx.t("settings.system.sunshine_err_invalid_format"),
+        SunshineError::AppsJsonTooLarge => ctx.t("settings.system.sunshine_err_too_large"),
+        SunshineError::CannotReadAppsJson(_) => ctx.t("settings.system.sunshine_err_read"),
+        SunshineError::CannotCreateBackup(_) => ctx.t("settings.system.sunshine_err_backup"),
+        SunshineError::CannotCreateFolder(_) => ctx.t("settings.system.sunshine_err_folder"),
+        SunshineError::CannotWriteAppsJson(_) => ctx.t("settings.system.sunshine_err_write"),
+        SunshineError::SerializationFailed(_) => ctx.t("settings.system.sunshine_err_generate"),
+        SunshineError::SunshineFolderMissing => ctx.t("settings.system.sunshine_path_missing"),
+    }
+}
+
+fn collect_entries(ctx: &mut Ctx, apps: &[App]) -> (Vec<serde_json::Value>, usize) {
+    let mut entries = Vec::new();
+    let mut skipped = 0;
+    for app in apps {
+        match sunshine::app_entry(app) {
+            Ok(entry) => entries.push(entry),
+            Err(e) => {
+                tracing::warn!(game_id = %app.id, title = %app.title, "jogo ignorado ao exportar para o Sunshine: {e}");
+                skipped += 1;
+            }
+        }
+    }
+    if skipped > 0 {
+        ctx.toast(ctx.tf(
+            "settings.system.sunshine_skipped_games",
+            &[("count", &skipped.to_string())],
+        ));
+    }
+    (entries, skipped)
 }
 
 fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
     let apps = match apps(ctx) {
         Ok(apps) => apps,
         Err(error) => {
-            return super::text_dialog(ctx.t("settings.system.sunshine_export"), error);
+            return super::text_dialog(
+                ctx.t("settings.system.sunshine_export"),
+                format_sunshine_error(ctx, &error),
+            );
         }
     };
     let titles = apps
@@ -131,7 +217,7 @@ fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
                                 ctx.tf("settings.system.sunshine_exported", &[("path", &path)]),
                             );
                         }
-                        Err(error) => ctx.toast(error),
+                        Err(error) => ctx.toast(format_sunshine_error(ctx, &error)),
                     }
                     Flow::Close
                 }),
@@ -142,16 +228,9 @@ fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
     .wide()
 }
 
-fn export(ctx: &Ctx, apps: &[App]) -> Result<PathBuf, String> {
-    let entries = apps
-        .iter()
-        .map(sunshine::app_entry)
-        .collect::<Result<Vec<_>, _>>()?;
-    let detection = sunshine::detect();
-    let path = detection
-        .apps_json
-        .or_else(|| sunshine::apps_json_candidates().into_iter().next())
-        .ok_or_else(|| ctx.t("settings.system.sunshine_path_missing"))?;
+fn export(ctx: &mut Ctx, apps: &[App]) -> Result<PathBuf, SunshineError> {
+    let (entries, _) = collect_entries(ctx, apps);
+    let path = sunshine::find_apps_json().ok_or(SunshineError::SunshineFolderMissing)?;
     sunshine::export(&path, &entries)
 }
 
@@ -160,14 +239,28 @@ pub(crate) fn sync_after_rescan(ctx: &mut Ctx) {
     if !ctx.settings.bool(keys::SUNSHINE_SYNC, false) {
         return;
     }
-    let result = apps(ctx).and_then(|apps| export(ctx, &apps));
-    match result {
-        Ok(path) => {
-            tracing::info!(path = %path.display(), "apps do Sunshine sincronizados após reexaminar a biblioteca")
+    let Some(path) = sunshine::find_apps_json() else {
+        return;
+    };
+    let apps = match apps(ctx) {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::warn!("não foi possível obter apps do Tako para o Sunshine: {e}");
+            return;
         }
-        Err(error) => {
-            tracing::warn!("não foi possível sincronizar os apps do Sunshine: {error}");
-            ctx.toast(error);
-        }
-    }
+    };
+    let (entries, _) = collect_entries(ctx, &apps);
+    crate::tasks::run(
+        ctx,
+        move || sunshine::export(&path, &entries),
+        |ctx, result| match result {
+            Ok(p) => {
+                tracing::info!(path = %p.display(), "apps do Sunshine sincronizados após reexaminar a biblioteca")
+            }
+            Err(e) => {
+                tracing::warn!("não foi possível sincronizar os apps do Sunshine: {e}");
+                ctx.toast(format_sunshine_error(ctx, &e));
+            }
+        },
+    );
 }
