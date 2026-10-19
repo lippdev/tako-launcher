@@ -181,7 +181,7 @@ pub fn check(package: &Path) -> Result<tako_themes::ThemeManifest, Vec<String>> 
                     .collect()
             })
             .unwrap_or_default();
-        let problems = token_problems(&text, &colors);
+        let problems = token_problems_with_dir(&text, &colors, Some(&installed.dir));
         if !problems.is_empty() {
             return Err(problems);
         }
@@ -189,14 +189,70 @@ pub fn check(package: &Path) -> Result<tako_themes::ThemeManifest, Vec<String>> 
     Ok(manifest)
 }
 
-fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
+fn token_problems_with_dir(text: &str, colors: &[String], dir: Option<&Path>) -> Vec<String> {
     let table: toml::Table = match text.parse() {
         Ok(t) => t,
         Err(e) => return vec![tf("themes.check.tokens_invalid", &[("error", e.message())])],
     };
     let mut problems = Vec::new();
-    if let Err(probs) = tako_themes::parse_tokens_audio(text) {
-        problems.extend(probs.into_iter().map(|p| p.message));
+    match tako_themes::parse_tokens_audio(text) {
+        Ok(audio) => {
+            if let Some(dir) = dir {
+                if let Some(ref m) = audio.music {
+                    let p = dir.join(m);
+                    if !p.exists() {
+                        problems.push(tf("themes.package.missing_audio", &[("path", m)]));
+                    } else if let Ok(meta) = p.metadata() {
+                        if meta.len() == 0 {
+                            problems.push(tf("themes.package.audio_invalid", &[("path", m)]));
+                        } else if meta.len() > tako_themes::MAX_THEME_MUSIC_BYTES {
+                            problems.push(tf(
+                                "themes.package.audio_too_large",
+                                &[
+                                    ("path", m),
+                                    (
+                                        "max",
+                                        &format!("{} MB", tako_themes::MAX_THEME_MUSIC_BYTES / (1024 * 1024)),
+                                    ),
+                                ],
+                            ));
+                        } else if tako_themes::wav_duration(&p).is_none() {
+                            problems.push(tf("themes.package.audio_invalid", &[("path", m)]));
+                        }
+                    }
+                }
+                for sound in [&audio.move_sound, &audio.accept_sound, &audio.back_sound]
+                    .into_iter()
+                    .flatten()
+                {
+                    let p = dir.join(sound);
+                    if !p.exists() {
+                        problems.push(tf("themes.package.missing_audio", &[("path", sound)]));
+                    } else {
+                        match tako_themes::wav_duration(&p) {
+                            None => problems.push(tf("themes.package.audio_invalid", &[("path", sound)])),
+                            Some(dur) if dur <= 0.0 => {
+                                problems.push(tf("themes.package.audio_invalid", &[("path", sound)]));
+                            }
+                            Some(dur) if dur > tako_themes::MAX_NAV_SOUND_DURATION_SECS => {
+                                problems.push(tf(
+                                    "themes.package.sound_too_long",
+                                    &[
+                                        ("path", sound),
+                                        ("duration", &format!("{dur:.1}s")),
+                                        ("max", "2s"),
+                                    ],
+                                ));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        Err(probs) => {
+            problems.extend(probs.into_iter().map(|p| p.message));
+        }
     }
     for (name, value) in &table {
         if is_audio_key(name) {
@@ -209,6 +265,10 @@ fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
         }
     }
     problems
+}
+
+pub fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
+    token_problems_with_dir(text, colors, None)
 }
 
 #[cfg(test)]
@@ -337,6 +397,56 @@ nada = \"#000000\"
         assert!(check(&alt).is_err());
     }
 
+
+    #[test]
+    fn theme_check_validates_audio_limits() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let tmp = tempfile::tempdir().unwrap();
+        install_builtin(tmp.path()).unwrap();
+        let alt = tmp.path().join("tako-alto-contraste");
+
+        let sample_rate = 44100u32;
+        let channels = 1u16;
+        let bits_per_sample = 16u16;
+        let byte_rate = sample_rate * channels as u32 * (bits_per_sample as u32 / 8);
+        let block_align = channels * (bits_per_sample / 8);
+        let data_len = (2.5 * byte_rate as f64).round() as u32;
+        let riff_size = 36 + data_len;
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&riff_size.to_le_bytes());
+        wav.extend_from_slice(b"WAVE");
+        wav.extend_from_slice(b"fmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&channels.to_le_bytes());
+        wav.extend_from_slice(&sample_rate.to_le_bytes());
+        wav.extend_from_slice(&byte_rate.to_le_bytes());
+        wav.extend_from_slice(&block_align.to_le_bytes());
+        wav.extend_from_slice(&bits_per_sample.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&data_len.to_le_bytes());
+        wav.resize(44 + data_len as usize, 0);
+
+        std::fs::write(alt.join("long_click.wav"), &wav).unwrap();
+        std::fs::write(
+            alt.join("tokens.toml"),
+            "confirmar = \"long_click.wav\"\n",
+        )
+        .unwrap();
+        let e = check(&alt).unwrap_err();
+        assert!(e.iter().any(|msg| msg.contains("2s")), "{e:?}");
+
+        std::fs::write(alt.join("bad.wav"), b"NOT_WAV").unwrap();
+        std::fs::write(
+            alt.join("tokens.toml"),
+            "confirmar = \"bad.wav\"\n",
+        )
+        .unwrap();
+        let e2 = check(&alt).unwrap_err();
+        assert!(e2.iter().any(|msg| msg.contains("WAV") || msg.contains("corrompido")), "{e2:?}");
+    }
     #[test]
     fn broken_theme_reports_errors() {
         let tmp = tempfile::tempdir().unwrap();

@@ -129,9 +129,16 @@ pub fn parse_audio_table(table: &toml::Table, problems: &mut Vec<Problem>) -> Th
 /// Calcula a duração em segundos de um arquivo WAV a partir de seu cabeçalho RIFF.
 /// Retorna `None` se o arquivo não for um WAV válido ou estiver corrompido.
 pub fn wav_duration(path: &std::path::Path) -> Option<f64> {
-    use std::io::{Read, Seek, SeekFrom};
     let file = std::fs::File::open(path).ok()?;
     let mut reader = std::io::BufReader::new(file);
+    wav_duration_from_reader(&mut reader)
+}
+
+/// Calcula a duração em segundos de um arquivo WAV a partir de um leitor que suporte `Read + Seek`.
+/// Lê apenas os 16 bytes necessários do chunk `fmt ` e pula o restante com `seek`, sem alocar memória
+/// com base no tamanho informado no arquivo. Chunks com tamanho excessivo (> 64 MB) são recusados.
+pub fn wav_duration_from_reader<R: std::io::Read + std::io::Seek>(reader: &mut R) -> Option<f64> {
+    use std::io::SeekFrom;
     let mut header = [0u8; 12];
     reader.read_exact(&mut header).ok()?;
     if &header[0..4] != b"RIFF" || &header[8..12] != b"WAVE" {
@@ -141,6 +148,8 @@ pub fn wav_duration(path: &std::path::Path) -> Option<f64> {
     let mut data_len = 0u32;
     let mut found_fmt = false;
     let mut found_data = false;
+
+    const MAX_METADATA_CHUNK_SIZE: u32 = 64 * 1024 * 1024;
 
     let mut chunk_header = [0u8; 8];
     while reader.read_exact(&mut chunk_header).is_ok() {
@@ -152,23 +161,31 @@ pub fn wav_duration(path: &std::path::Path) -> Option<f64> {
             chunk_header[7],
         ]);
         if chunk_id == b"fmt " {
-            if chunk_size < 16 {
+            if chunk_size < 16 || chunk_size > MAX_METADATA_CHUNK_SIZE {
                 return None;
             }
-            let mut fmt_data = vec![0u8; chunk_size as usize];
-            reader.read_exact(&mut fmt_data).ok()?;
-            byte_rate = u32::from_le_bytes([fmt_data[8], fmt_data[9], fmt_data[10], fmt_data[11]]);
+            let mut fmt_16 = [0u8; 16];
+            reader.read_exact(&mut fmt_16).ok()?;
+            byte_rate = u32::from_le_bytes([fmt_16[8], fmt_16[9], fmt_16[10], fmt_16[11]]);
             found_fmt = true;
+            let remaining = (chunk_size - 16) as i64 + (chunk_size & 1) as i64;
+            if remaining > 0 && reader.seek(SeekFrom::Current(remaining)).is_err() {
+                return None;
+            }
         } else if chunk_id == b"data" {
             data_len = chunk_size;
             found_data = true;
             if found_fmt {
                 break;
             }
-            if reader.seek(SeekFrom::Current(chunk_size as i64)).is_err() {
+            let skip = chunk_size as i64 + (chunk_size & 1) as i64;
+            if reader.seek(SeekFrom::Current(skip)).is_err() {
                 break;
             }
         } else {
+            if chunk_size > MAX_METADATA_CHUNK_SIZE {
+                return None;
+            }
             let skip = (chunk_size + (chunk_size & 1)) as i64;
             if reader.seek(SeekFrom::Current(skip)).is_err() {
                 break;
@@ -405,6 +422,27 @@ mod tests {
         assert_eq!(codes(&bad_fmt), ["manifest.unsupported-audio-format"]);
     }
 
+
+    #[test]
+    fn rejects_giant_declared_chunk_without_allocating() {
+        let mut v = Vec::new();
+        v.extend_from_slice(b"RIFF");
+        v.extend_from_slice(&100u32.to_le_bytes());
+        v.extend_from_slice(b"WAVE");
+        v.extend_from_slice(b"fmt ");
+        v.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        let mut cursor = std::io::Cursor::new(v);
+        assert_eq!(wav_duration_from_reader(&mut cursor), None);
+
+        let mut v2 = Vec::new();
+        v2.extend_from_slice(b"RIFF");
+        v2.extend_from_slice(&100u32.to_le_bytes());
+        v2.extend_from_slice(b"WAVE");
+        v2.extend_from_slice(b"junk");
+        v2.extend_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
+        let mut cursor2 = std::io::Cursor::new(v2);
+        assert_eq!(wav_duration_from_reader(&mut cursor2), None);
+    }
     #[test]
     fn calculates_wav_duration_and_rejects_invalid() {
         let dir = tempfile::tempdir().unwrap();

@@ -17,7 +17,7 @@ use tako_core::i18n::tf;
 pub use manifest::{
     DEFAULT_ENTRY, MANIFEST_FILE, MAX_MANIFEST_BYTES, MAX_NAV_SOUND_DURATION_SECS,
     MAX_THEME_MUSIC_BYTES, THEME_API_VERSION, ThemeAudio, ThemeManifest, is_safe_id,
-    parse_audio_table, validate_audio_path, wav_duration,
+    parse_audio_table, validate_audio_path, wav_duration, wav_duration_from_reader,
 };
 pub use package::{
     ALLOWED_EXTENSIONS, EXTENSION, Limits, normalize_entry, validate_package, validate_package_with,

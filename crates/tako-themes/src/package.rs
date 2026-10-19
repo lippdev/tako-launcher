@@ -10,7 +10,7 @@ use tako_core::i18n::{t, tf};
 use zip::ZipArchive;
 
 use crate::Problem;
-use crate::manifest::{MANIFEST_FILE, MAX_MANIFEST_BYTES, ThemeManifest};
+use crate::manifest::{ThemeAudio, MANIFEST_FILE, MAX_MANIFEST_BYTES, ThemeManifest};
 
 pub const EXTENSION: &str = "takotheme";
 pub const MAX_PATH_LEN: usize = 240;
@@ -167,45 +167,30 @@ impl Package {
                 ),
             ));
         }
-        for audio_path in [
-            &manifest.audio.music,
-            &manifest.audio.move_sound,
-            &manifest.audio.accept_sound,
-            &manifest.audio.back_sound,
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if !files.iter().any(|e| e.path == *audio_path) {
-                return Err(one(
-                    "package.missing-audio",
-                    tf("themes.package.missing_audio", &[("path", audio_path)]),
-                ));
+        let validate_audio = |source: &mut Source, audio: &ThemeAudio| -> Result<(), Vec<Problem>> {
+            if let Some(ref p) = audio.music {
+                validate_audio_file(source, &files, p, true).map_err(|e| vec![e])?;
             }
-        }
+            for p in [&audio.move_sound, &audio.accept_sound, &audio.back_sound]
+                .into_iter()
+                .flatten()
+            {
+                validate_audio_file(source, &files, p, false).map_err(|e| vec![e])?;
+            }
+            Ok(())
+        };
+
+        validate_audio(&mut source, &manifest.audio)?;
+
         if let Some(tokens_entry) = files.iter().find(|e| e.path == "tokens.toml") {
             let mut reader = open_entry(&mut source, tokens_entry).map_err(|e| io_problem(&e))?;
-            if let Some(bytes) =
-                read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))?
+            let bytes_opt = read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))?;
+            drop(reader);
+            if let Some(bytes) = bytes_opt
                 && let Ok(text) = String::from_utf8(bytes)
                 && let Ok(tokens_audio) = crate::parse_tokens_audio(&text)
             {
-                for audio_path in [
-                    &tokens_audio.music,
-                    &tokens_audio.move_sound,
-                    &tokens_audio.accept_sound,
-                    &tokens_audio.back_sound,
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    if !files.iter().any(|e| e.path == *audio_path) {
-                        return Err(one(
-                            "package.missing-audio",
-                            tf("themes.package.missing_audio", &[("path", audio_path)]),
-                        ));
-                    }
-                }
+                validate_audio(&mut source, &tokens_audio)?;
             }
         }
         Ok(Package {
@@ -246,6 +231,84 @@ impl Package {
         }
         Ok((self.files.len(), total))
     }
+}
+
+fn validate_audio_file(
+    source: &mut Source,
+    files: &[Entry],
+    rel_path: &str,
+    is_music: bool,
+) -> Result<(), Problem> {
+    let entry = files.iter().find(|e| e.path == rel_path).ok_or_else(|| {
+        Problem::new(
+            "package.missing-audio",
+            tf("themes.package.missing_audio", &[("path", rel_path)]),
+        )
+    })?;
+
+    if entry.size == 0 {
+        return Err(Problem::new(
+            "package.audio-invalid",
+            tf("themes.package.audio_invalid", &[("path", rel_path)]),
+        ));
+    }
+
+    if is_music && entry.size > crate::MAX_THEME_MUSIC_BYTES {
+        return Err(Problem::new(
+            "package.audio-too-large",
+            tf(
+                "themes.package.audio_too_large",
+                &[
+                    ("path", rel_path),
+                    (
+                        "max",
+                        &format!("{} MB", crate::MAX_THEME_MUSIC_BYTES / (1024 * 1024)),
+                    ),
+                ],
+            ),
+        ));
+    }
+
+    let dur = match source {
+        Source::Dir => crate::manifest::wav_duration(&entry.file),
+        Source::Zip(zip) => {
+            let mut seekable = zip
+                .by_index_seek(entry.zip_index)
+                .map_err(|e| extract_problem(&io::Error::other(e)))?;
+            crate::manifest::wav_duration_from_reader(&mut seekable)
+        }
+    };
+
+    let Some(duration) = dur else {
+        return Err(Problem::new(
+            "package.audio-invalid",
+            tf("themes.package.audio_invalid", &[("path", rel_path)]),
+        ));
+    };
+
+    if !is_music {
+        if duration <= 0.0 {
+            return Err(Problem::new(
+                "package.audio-invalid",
+                tf("themes.package.audio_invalid", &[("path", rel_path)]),
+            ));
+        }
+        if duration > crate::MAX_NAV_SOUND_DURATION_SECS {
+            return Err(Problem::new(
+                "package.sound-too-long",
+                tf(
+                    "themes.package.sound_too_long",
+                    &[
+                        ("path", rel_path),
+                        ("duration", &format!("{duration:.1}s")),
+                        ("max", &format!("{:.0}s", crate::MAX_NAV_SOUND_DURATION_SECS)),
+                    ],
+                ),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 fn open_entry<'a>(source: &'a mut Source, e: &Entry) -> io::Result<Box<dyn Read + 'a>> {
@@ -554,10 +617,53 @@ mod tests {
         let err = validate_package(dir).unwrap_err();
         assert_eq!(err[0].code, "package.missing-audio");
 
-        // Present bgm.wav
-        std::fs::write(dir.join("bgm.wav"), b"RIFF....WAVE").unwrap();
+        // Present valid bgm.wav
+        let wav = make_test_wav(1.0);
+        std::fs::write(dir.join("bgm.wav"), &wav).unwrap();
         let manifest = validate_package(dir).unwrap();
         assert_eq!(manifest.audio.music.as_deref(), Some("bgm.wav"));
+
+        // Invalid WAV rejected
+        std::fs::write(dir.join("bgm.wav"), b"NOT_A_WAV").unwrap();
+        let err = validate_package(dir).unwrap_err();
+        assert_eq!(err[0].code, "package.audio-invalid");
+
+        // Sound duration > 2s rejected
+        std::fs::write(
+            dir.join("theme.toml"),
+            "id = \"meu.tema\"\nname = \"Tema\"\nversion = \"1.0\"\nauthor = \"Eu\"\napi = 1\nentry = \"main.slint\"\n[audio]\nmove = \"long.wav\"\n",
+        ).unwrap();
+        let long_wav = make_test_wav(2.5);
+        std::fs::write(dir.join("long.wav"), &long_wav).unwrap();
+        let err = validate_package(dir).unwrap_err();
+        assert_eq!(err[0].code, "package.sound-too-long");
+    }
+
+    fn make_test_wav(duration_secs: f64) -> Vec<u8> {
+        let sample_rate = 44100u32;
+        let channels = 1u16;
+        let bits_per_sample = 16u16;
+        let byte_rate = sample_rate * channels as u32 * (bits_per_sample as u32 / 8);
+        let block_align = channels * (bits_per_sample / 8);
+        let data_len = (duration_secs * byte_rate as f64).round() as u32;
+        let riff_size = 36 + data_len;
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"RIFF");
+        buf.extend_from_slice(&riff_size.to_le_bytes());
+        buf.extend_from_slice(b"WAVE");
+        buf.extend_from_slice(b"fmt ");
+        buf.extend_from_slice(&16u32.to_le_bytes());
+        buf.extend_from_slice(&1u16.to_le_bytes());
+        buf.extend_from_slice(&channels.to_le_bytes());
+        buf.extend_from_slice(&sample_rate.to_le_bytes());
+        buf.extend_from_slice(&byte_rate.to_le_bytes());
+        buf.extend_from_slice(&block_align.to_le_bytes());
+        buf.extend_from_slice(&bits_per_sample.to_le_bytes());
+        buf.extend_from_slice(b"data");
+        buf.extend_from_slice(&data_len.to_le_bytes());
+        buf.resize(44 + data_len as usize, 0);
+        buf
     }
 
     #[test]
@@ -576,8 +682,9 @@ mod tests {
         let err = validate_package(dir).unwrap_err();
         assert_eq!(err[0].code, "package.missing-audio");
 
-        // Present click.wav
-        std::fs::write(dir.join("click.wav"), b"RIFF....WAVE").unwrap();
+        // Present valid click.wav
+        let wav = make_test_wav(0.5);
+        std::fs::write(dir.join("click.wav"), &wav).unwrap();
         let manifest = validate_package(dir).unwrap();
         assert_eq!(manifest.id, "meu.tema");
     }
