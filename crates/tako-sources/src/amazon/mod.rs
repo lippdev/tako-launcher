@@ -102,8 +102,8 @@ impl AmazonLibrarySource {
     }
 
     /// Liga a leitura dos jogos da conta (o DPAPI do Windows); sem ela, só os instalados.
-    pub fn with_unprotect(mut self, unprotect: Option<owned::Unprotect>) -> Self {
-        self.unprotect = unprotect;
+    pub fn with_unprotect(mut self, unprotect: owned::Unprotect) -> Self {
+        self.unprotect = Some(unprotect);
         self
     }
 
@@ -230,7 +230,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let reg = || Arc::new(MemoryRegistry::default().with(PROTOCOL_KEY, "", "x"));
         let mut source = AmazonLibrarySource::new(reg(), root.path())
-            .with_unprotect(Some(owned::tests::fake_unprotect));
+            .with_unprotect(owned::tests::fake_unprotect);
         source.fs = fake::folders(&[r"C:\Amazon Games\Library\Ilha"]);
         let db = source.database_path();
         std::fs::create_dir_all(db.parent().unwrap()).unwrap();
@@ -263,7 +263,7 @@ mod tests {
         plain.fs = fake::folders(&[r"C:\Amazon Games\Library\Ilha"]);
         assert_eq!(plain.scan().games.len(), 1);
         let mut no_app = AmazonLibrarySource::new(Arc::new(MemoryRegistry::default()), root.path())
-            .with_unprotect(Some(owned::tests::fake_unprotect));
+            .with_unprotect(owned::tests::fake_unprotect);
         no_app.fs = fake::folders(&[r"C:\Amazon Games\Library\Ilha"]);
         assert!(no_app.scan().games.iter().all(|g| g.is_installed));
     }

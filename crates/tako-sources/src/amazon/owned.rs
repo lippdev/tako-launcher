@@ -27,24 +27,35 @@ pub struct AmazonOwned {
     pub title: String,
 }
 
-/// Jogos da conta. Linha que não decifra, não é JSON ou não tem id e título é pulada; banco inválido ou sem a
+/// O id vai direto no endereço de instalar: só o formato real (`amzn1.adg.product.<uuid>`), nada de `/`, `?` ou `#`.
+fn valid_id(id: &str) -> bool {
+    id.bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+}
+
+/// Jogos da conta. Linha que não decifra, não é JSON, não tem id e título ou tem id fora do formato é pulada; banco inválido ou sem a
 /// tabela é `Err`.
 pub fn read(database: &Path, unprotect: Unprotect) -> Result<Vec<AmazonOwned>, rusqlite::Error> {
-    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-    let conn = Connection::open_with_flags(database, flags)?;
-    let mut stmt = conn.prepare("SELECT value FROM game_entitlements")?;
-    let mut rows = stmt.query([])?;
-    let mut out: Vec<AmazonOwned> = Vec::new();
-    while let Some(row) = rows.next()? {
-        // O plugin lê como bytes; aceita texto também, caso o app grave assim.
-        let cipher = match row.get_ref(0)? {
-            ValueRef::Blob(b) | ValueRef::Text(b) => b,
-            _ => continue,
-        };
-        if cipher.len() > MAX_ROW {
-            continue;
+    // Junta as linhas e solta o banco antes de decifrar: o DPAPI não segura o bloqueio de leitura do SQLite.
+    let ciphers = {
+        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+        let conn = Connection::open_with_flags(database, flags)?;
+        let mut stmt = conn.prepare("SELECT value FROM game_entitlements")?;
+        let mut rows = stmt.query([])?;
+        let mut ciphers: Vec<Vec<u8>> = Vec::new();
+        while let Some(row) = rows.next()? {
+            // O plugin lê como bytes; aceita texto também, caso o app grave assim.
+            if let ValueRef::Blob(b) | ValueRef::Text(b) = row.get_ref(0)?
+                && b.len() <= MAX_ROW
+            {
+                ciphers.push(b.to_vec());
+            }
         }
-        let Some(plain) = unprotect(cipher) else {
+        ciphers
+    };
+    let mut out: Vec<AmazonOwned> = Vec::new();
+    for cipher in ciphers {
+        let Some(plain) = unprotect(&cipher) else {
             continue;
         };
         let Ok(value) = serde_json::from_slice::<serde_json::Value>(&plain) else {
@@ -58,6 +69,7 @@ pub fn read(database: &Path, unprotect: Unprotect) -> Result<Vec<AmazonOwned>, r
                 .map(str::to_owned)
         };
         if let (Some(product_id), Some(title)) = (text("ProductIdStr"), text("ProductTitle"))
+            && valid_id(&product_id)
             && !out.iter().any(|o| o.product_id == product_id)
         {
             out.push(AmazonOwned { product_id, title });
@@ -145,6 +157,7 @@ pub(crate) mod tests {
             seal(r#"{"ProductIdStr":"amzn1.adg.product.farol","ProductTitle":"Farol (cópia)"}"#),
             seal(r#"{"ProductIdStr":"amzn1.adg.product.semnome","ProductTitle":null}"#),
             seal(r#"{"ProductTitle":"Sem Id"}"#),
+            seal(r#"{"ProductIdStr":"x/../y?z=1#w","ProductTitle":"Id Estranho"}"#),
             seal("{quebrado"),
             b"cifrado por outro usuario".to_vec(),
             [SEAL, &vec![b' '; MAX_ROW]].concat(),
