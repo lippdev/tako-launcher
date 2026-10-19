@@ -8,6 +8,7 @@ clicks and keys through callbacks. This page describes **theme API version 1**.
 
 - Default theme (complete reference): [`crates/tako-ui/theme/`](../../crates/tako-ui/theme/)
 - Sample theme that only changes colors: [`crates/tako-ui/theme/extras/tako-alto-contraste/`](../../crates/tako-ui/theme/extras/tako-alto-contraste/)
+- Official Ribbon / Fita theme (modern console): [`crates/tako-ui/theme/extras/tako-fita/`](../../crates/tako-ui/theme/extras/tako-fita/) and [`fita.en-US.md`](fita.en-US.md)
 - Language of the screen files: [Slint](https://slint.dev/docs) (Tako uses the Slint 1.x interpreter)
 
 ## 1. Quick start
@@ -282,6 +283,34 @@ Slint: `name = "#RRGGBB"` or `"#RRGGBBAA"` (except `canvas`, which requires 6-di
 `on-surface-solid-muted`, `control-track-off`, `control-off`, `control-on-on-solid`, `control-off-on-solid`,
 `control-track-on-solid`, `value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. It also accepts fonts (`font`, `font-title`, `font-text`, `font-heading`, `font-desk`, `font-wordmark`) and background image (`custom-background`, `background-image`). Inside Tako (Settings › Appearance), users can customize the current theme, storing an override without altering original theme files. When loading, Tako ignores (with a log entry) an invalid key or value. `tako theme check` reports both.
 
+
+### Background music and navigation sounds
+
+A theme can include background music and custom sounds for navigation in Tako. These can be declared in either `theme.toml` or `tokens.toml`:
+
+```toml
+[audio]
+music = "audio/bgm.wav"
+move = "audio/move.wav"
+accept = "audio/accept.wav"
+back = "audio/back.wav"
+```
+
+Portuguese keys (`musica`, `mover`, `confirmar`, `voltar`) are also accepted, as well as declarations directly at the root level of the file.
+
+- **Supported format:** `.wav` (PCM). Because Tako's audio engine uses the native SDL3 library directly without heavy external decoders, formats like `.ogg` and `.opus` are not natively decoded by the library and are rejected during validation.
+- **Path validation:** Files must remain inside the theme directory, without absolute paths or `..` (leaving the theme folder is not permitted).
+- **Size and duration limits:** Music up to 32 MB (`MAX_THEME_MUSIC_BYTES`); navigation sound effects with a duration of up to 2 seconds (`MAX_NAV_SOUND_DURATION_SECS`).
+- **Music playback behavior:**
+  - Plays exclusively in full screen (Big Picture), in a seamless loop with smooth fade (fade-in on start/resume and fade-out on pause).
+  - Pauses with a fade when launching a game, stays completely stopped while the game runs, and restarts from the beginning when the game exits.
+  - Pauses when Tako's window loses focus or is minimized, restarting from the beginning when focus returns.
+  - In desktop mode, theme music does not play.
+- **Settings › Sound:**
+  - **Theme music volume:** 0 to 100% volume slider/selector, separate from the navigation sound volume. At 0%, music is muted and does not play.
+  - **Theme background music:** toggle to enable or disable background music at any time.
+  - **Navigation sound volume:** dedicated volume (0 to 100%) for move, accept, and back sound effects.
+
 ### The `@tako` library
 
 `@tako/...` points to the default theme files of the installed Tako version:
@@ -309,7 +338,7 @@ Limits (third-party data is checked before any file is written):
 | One file | 64 MB |
 | Files and folders | 5,000 |
 | Path | 240 characters, no `..`, no absolute path, no reserved Windows names |
-| File types | `.slint`, `.toml`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.ttf`, `.otf`, `.txt`, `.md` |
+| File types | `.slint`, `.toml`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.ttf`, `.otf`, `.txt`, `.md`, `.wav` |
 
 Images and fonts come in through Slint itself (`@image-url("background.png")`, `import "fonts/Mine.ttf";`), with
 paths relative to the `.slint` file.

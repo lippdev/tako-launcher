@@ -1,0 +1,7 @@
+id = "tako-fita"
+name = "Fita"
+version = "1.0.0"
+author = "Tako"
+api = 1
+entry = "main.slint"
+description = "Console moderno: arte imersiva em tela cheia, HUD minimalista e fita horizontal de jogos no terço inferior."

@@ -57,6 +57,11 @@ pub fn categories() -> Vec<Category> {
             rows: appearance,
         },
         Category {
+            id: "sound",
+            icon: "volume",
+            rows: sound,
+        },
+        Category {
             id: "screen",
             icon: "monitor",
             rows: screen::rows,
@@ -1168,38 +1173,6 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             (picks, cur)
         }),
         MenuItem::new(
-            PanelRow {
-                // Volume é contínuo: no desktop, controle deslizante (o valor vai em 0–100).
-                kind: if ctx.desktop { "slider" } else { "choice" }.into(),
-                ..PanelRow::choice(
-                    "navigation-volume",
-                    ctx.t("accessibility.sound_volume"),
-                    if ctx.desktop {
-                        // O controle mostra "70%"; em 0, "Mudo" (o valor que ele lê vira 0).
-                        match crate::navigation_feedback::volume(&ctx.settings) {
-                            0 => ctx.t("accessibility.sound_muted"),
-                            v => v.to_string(),
-                        }
-                    } else {
-                        format!("{}%", crate::navigation_feedback::volume(&ctx.settings))
-                    },
-                )
-            }
-            .desc(ctx.t("accessibility.sound_desc")),
-        )
-        .on(|ctx| change_navigation_volume(ctx, 1))
-        .on_adjust(change_navigation_volume)
-        .on_slide(|ctx, v, done| {
-            use crate::navigation_feedback as feedback;
-            ctx.settings.set(feedback::SOUND_VOLUME, &v.to_string());
-            ctx.dirty = true;
-            // Ao soltar, um som de amostra no volume novo.
-            if done {
-                feedback::play(ctx, Cmd::Right);
-            }
-            Flow::Stay
-        }),
-        MenuItem::new(
             PanelRow::action("theme", ctx.t("settings.appearance.theme"))
                 .desc(ctx.t("settings.appearance.theme_desc"))
                 .value(theme_name(ctx)),
@@ -1329,6 +1302,107 @@ fn change_text_size(ctx: &mut Ctx, direction: i32) -> Flow {
     let next = (index + direction.signum()).rem_euclid(TEXT_SIZES.len() as i32) as usize;
     ctx.settings
         .set(feedback::TEXT_SIZE, &TEXT_SIZES[next].to_string());
+    ctx.dirty = true;
+    Flow::Stay
+}
+
+fn sound(ctx: &Ctx) -> Vec<MenuItem> {
+    use crate::navigation_feedback as feedback;
+    vec![
+        toggle(
+            ctx,
+            "settings.sound.music_enabled",
+            feedback::THEME_MUSIC_ENABLED,
+            true,
+        ),
+        MenuItem::new(
+            PanelRow {
+                kind: if ctx.desktop { "slider" } else { "choice" }.into(),
+                ..PanelRow::choice(
+                    "theme-music-volume",
+                    ctx.t("settings.sound.music_volume"),
+                    if ctx.desktop {
+                        match feedback::music_volume(&ctx.settings) {
+                            0 => ctx.t("settings.sound.music_muted"),
+                            v => v.to_string(),
+                        }
+                    } else {
+                        format!("{}%", feedback::music_volume(&ctx.settings))
+                    },
+                )
+            }
+            .desc(ctx.t("settings.sound.music_volume_desc")),
+        )
+        .on(|ctx| change_theme_music_volume(ctx, 1))
+        .on_adjust(change_theme_music_volume)
+        .on_slide(|ctx, v, _done| {
+            use crate::navigation_feedback as feedback;
+            ctx.settings
+                .set(feedback::THEME_MUSIC_VOLUME, &v.to_string());
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            use crate::navigation_feedback as feedback;
+            let now = feedback::music_volume(&ctx.settings);
+            let steps: Vec<u8> = (0..=100).step_by(10).collect();
+            let cur = steps.iter().position(|v| *v == now).unwrap_or(7);
+            let picks = steps
+                .into_iter()
+                .map(|v| Pick::new(format!("{v}%")))
+                .collect();
+            (picks, cur)
+        }),
+        MenuItem::new(
+            PanelRow {
+                kind: if ctx.desktop { "slider" } else { "choice" }.into(),
+                ..PanelRow::choice(
+                    "navigation-volume",
+                    ctx.t("settings.sound.navigation_volume"),
+                    if ctx.desktop {
+                        match feedback::volume(&ctx.settings) {
+                            0 => ctx.t("accessibility.sound_muted"),
+                            v => v.to_string(),
+                        }
+                    } else {
+                        format!("{}%", feedback::volume(&ctx.settings))
+                    },
+                )
+            }
+            .desc(ctx.t("settings.sound.navigation_volume_desc")),
+        )
+        .on(|ctx| change_navigation_volume(ctx, 1))
+        .on_adjust(change_navigation_volume)
+        .on_slide(|ctx, v, done| {
+            use crate::navigation_feedback as feedback;
+            ctx.settings.set(feedback::SOUND_VOLUME, &v.to_string());
+            ctx.dirty = true;
+            if done {
+                feedback::play(ctx, Cmd::Right);
+            }
+            Flow::Stay
+        })
+        .options(|ctx| {
+            use crate::navigation_feedback as feedback;
+            let now = feedback::volume(&ctx.settings);
+            let steps: Vec<u8> = (0..=100).step_by(10).collect();
+            let cur = steps.iter().position(|v| *v == now).unwrap_or(0);
+            let picks = steps
+                .into_iter()
+                .map(|v| Pick::new(format!("{v}%")))
+                .collect();
+            (picks, cur)
+        }),
+    ]
+}
+
+fn change_theme_music_volume(ctx: &mut Ctx, direction: i32) -> Flow {
+    use crate::navigation_feedback as feedback;
+    let step = if ctx.desktop { 5 } else { 10 };
+    let next = (i32::from(feedback::music_volume(&ctx.settings)) + direction.signum() * step)
+        .clamp(0, 100);
+    ctx.settings
+        .set(feedback::THEME_MUSIC_VOLUME, &next.to_string());
     ctx.dirty = true;
     Flow::Stay
 }

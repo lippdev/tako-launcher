@@ -80,6 +80,16 @@ fn start(
     working_dir: Option<&str>,
     env: &[(String, String)],
 ) -> DeviceResult<Option<u32>> {
+    let args = arguments.map(text::split_args).unwrap_or_default();
+    start_with_args(target, &args, working_dir, env)
+}
+
+fn start_with_args(
+    target: &str,
+    args: &[String],
+    working_dir: Option<&str>,
+    env: &[(String, String)],
+) -> DeviceResult<Option<u32>> {
     match classify_target(target) {
         LaunchTarget::Empty => Err(DeviceError::NotFound("alvo vazio".into())),
         LaunchTarget::Uri(uri) => {
@@ -90,7 +100,6 @@ fn start(
         LaunchTarget::DesktopFile(path) => {
             let target_str = target.trim();
             warn_env_ignored(env, target_str);
-            let args = arguments.map(text::split_args).unwrap_or_default();
             if run::has_tool("gio") {
                 let mut c = Command::new("gio");
                 c.arg("launch").arg(path).args(args);
@@ -99,8 +108,7 @@ fn start(
             open_with_system(target_str)
         }
         LaunchTarget::Command(path) => {
-            let args = arguments.map(text::split_args).unwrap_or_default();
-            let mut cmd = command_for(path, args);
+            let mut cmd = command_for(path, args.to_vec());
             if let Some(dir) = working_dir
                 .filter(|d| !d.trim().is_empty())
                 .map(PathBuf::from)
@@ -133,6 +141,16 @@ impl ProcessLauncher for LinuxProcesses {
         env: &[(String, String)],
     ) -> DeviceResult<Option<u32>> {
         start(target, arguments, working_dir, env)
+    }
+
+    fn launch_args_with_env(
+        &self,
+        target: &str,
+        arguments: &[String],
+        working_dir: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        start_with_args(target, arguments, working_dir, env)
     }
 
     fn run_command(&self, command: &str, wait: Option<Duration>) -> DeviceResult<()> {

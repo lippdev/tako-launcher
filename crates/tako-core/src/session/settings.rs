@@ -46,6 +46,12 @@ pub struct GameSettingsOverride {
     /// Fechar esses programas quando o jogo terminar.
     #[serde(default)]
     pub close_tools: Option<bool>,
+    /// Runtime de compatibilidade (SESSION-005, Linux): Sistema (`None`), Wine ou Proton.
+    #[serde(default)]
+    pub wine_runtime: Option<String>,
+    /// Prefixo do Wine/Proton (SESSION-005, Linux); `None` = pasta do Tako por jogo.
+    #[serde(default)]
+    pub wine_prefix: Option<String>,
 }
 
 /// Quanto o comando de antes pode demorar antes de o jogo abrir mesmo assim.
@@ -126,6 +132,8 @@ impl GameSettingsOverride {
             normalize_arguments(self.after_command.as_deref()).is_some(),
             !parse_tools(self.tools.as_deref()).is_empty(),
             self.close_tools == Some(true),
+            normalize_arguments(self.wine_runtime.as_deref()).is_some(),
+            normalize_arguments(self.wine_prefix.as_deref()).is_some(),
         ]
         .into_iter()
         .filter(|b| *b)
@@ -300,6 +308,10 @@ pub struct EffectiveSessionSettings {
     /// Programas abertos junto do jogo (EXT-001); só com `commands_approved`.
     pub tools: Vec<String>,
     pub close_tools: bool,
+    /// Runtime de compatibilidade (SESSION-005, Linux): Sistema (`None`), Wine ou Proton.
+    pub wine_runtime: Option<String>,
+    /// Prefixo do Wine/Proton (SESSION-005, Linux); `None` = pasta do Tako por jogo.
+    pub wine_prefix: Option<String>,
 }
 
 impl EffectiveSessionSettings {
@@ -377,6 +389,8 @@ pub fn resolve(
         },
         tools: parse_tools(game.tools.as_deref()),
         close_tools: game.close_tools == Some(true),
+        wine_runtime: normalize_arguments(game.wine_runtime.as_deref()),
+        wine_prefix: normalize_arguments(game.wine_prefix.as_deref()),
     }
 }
 
@@ -818,5 +832,18 @@ mod tests {
         }
         assert_eq!(saved.split('\n').count(), MAX_REMEMBERED);
         assert_eq!(saved.split('\n').next(), Some("tv|19"));
+    }
+
+    #[test]
+    fn wine_runtime_and_prefix_change_count_and_resolve() {
+        let o = with(|o| {
+            o.wine_runtime = Some("proton:8.0".into());
+            o.wine_prefix = Some("/tmp/prefix".into());
+        });
+        assert_eq!(o.changed_count(), 2);
+        assert!(!o.is_default());
+        let e = resolve(&global(), Some(&o));
+        assert_eq!(e.wine_runtime.as_deref(), Some("proton:8.0"));
+        assert_eq!(e.wine_prefix.as_deref(), Some("/tmp/prefix"));
     }
 }

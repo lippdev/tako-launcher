@@ -46,6 +46,22 @@ pub trait ProcessLauncher: Send + Sync {
         }
         self.launch(target, arguments, working_dir)
     }
+    /// Como [`Self::launch_with_env`], mas passando os argumentos já separados como lista (evita re-escapar ou perder caracteres).
+    fn launch_args_with_env(
+        &self,
+        target: &str,
+        arguments: &[String],
+        working_dir: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        let joined = arguments.join(" ");
+        self.launch_with_env(
+            target,
+            (!joined.is_empty()).then_some(&joined),
+            working_dir,
+            env,
+        )
+    }
     /// Roda um comando do usuário pelo shell do SO (SESSION-004). `wait`: esperar terminar até esse tempo; erro se
     /// sair com falha ou passar do tempo (o comando continua rodando).
     fn run_command(&self, command: &str, wait: Option<std::time::Duration>) -> DeviceResult<()> {

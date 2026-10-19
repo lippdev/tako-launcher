@@ -197,6 +197,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         safe_mode: false,
         scanning: false,
         restoring: false,
+        pending_link: None,
         grid_columns: 7,
         pointer: false,
         pending_layer: None,
@@ -559,6 +560,7 @@ impl App {
         ctx.theme_supports_ui = def.global_properties("Ui").is_some();
         let ui = def.create().map_err(|e| e.to_string())?;
         apply_theme_tokens(&ui, &ctx, dir.as_deref());
+        crate::navigation_feedback::set_theme(dir.as_deref());
         // Entrada do app (só na abertura, não na volta da tela cheia): começa apagado e acende depois do 1º quadro.
         if mode == UiMode::Desktop {
             bridge::set(&ui, "desk-intro", Value::Bool(true));
@@ -567,7 +569,7 @@ impl App {
         if mode == UiMode::Desktop {
             shell.enter_desktop();
         }
-        shell.pending_link = opts.link.clone();
+        shell.ctx.pending_link = opts.link.clone();
         if let Some((id, title)) = &opts.running {
             shell.ctx.running = Some(crate::shell::RunningGame {
                 id: id.clone(),
@@ -649,6 +651,7 @@ impl App {
         match action {
             HostAction::Stay => {}
             HostAction::Close => {
+                crate::navigation_feedback::stop_theme_music();
                 let _ = self.ui.borrow().hide();
                 let _ = slint::quit_event_loop();
             }
@@ -755,6 +758,7 @@ impl App {
         self.shell.borrow_mut().ctx.reload_theme_cache();
         self.shell.borrow_mut().ctx.theme_supports_ui = def.global_properties("Ui").is_some();
         apply_theme_tokens(&new, &self.shell.borrow().ctx, dir.as_deref());
+        crate::navigation_feedback::set_theme(dir.as_deref());
         new.window()
             .set_fullscreen(self.ui.borrow().window().is_fullscreen());
         let old = self.ui.replace(new);
@@ -1232,6 +1236,21 @@ impl App {
                 let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {
                     app.shell.borrow_mut().ctx.dirty = true;
+                }
+                {
+                    let ui = app.ui.borrow();
+                    let window = ui.window();
+                    let window_minimized = window.is_minimized();
+                    use slint::winit_030::WinitWindowAccessor;
+                    let window_focused =
+                        window.with_winit_window(|w| w.has_focus()).unwrap_or(false);
+                    crate::navigation_feedback::tick_theme_music(
+                        &app.shell.borrow().ctx,
+                        app.mode.get() == UiMode::BigPicture,
+                        window_focused,
+                        window_minimized,
+                        Instant::now(),
+                    );
                 }
                 let pending = {
                     let s = app.shell.borrow();

@@ -86,6 +86,9 @@ pub mod windows_hidhide;
 pub mod windows_identity;
 #[path = "windows/startup.rs"]
 pub mod windows_startup;
+// Partes puras do Linux, compiladas e testadas em todo SO (SESSION-005).
+#[path = "linux/compatibility.rs"]
+pub mod linux_compatibility;
 
 /// Conjunto de funções de plataforma usado pela sessão e pela UI.
 #[derive(Clone)]

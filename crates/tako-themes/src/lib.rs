@@ -16,7 +16,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tako_core::i18n::tf;
 
 pub use manifest::{
-    DEFAULT_ENTRY, MANIFEST_FILE, MAX_MANIFEST_BYTES, THEME_API_VERSION, ThemeManifest, is_safe_id,
+    DEFAULT_ENTRY, MANIFEST_FILE, MAX_MANIFEST_BYTES, MAX_NAV_SOUND_DURATION_SECS,
+    MAX_THEME_MUSIC_BYTES, THEME_API_VERSION, ThemeAudio, ThemeManifest, is_safe_id,
+    parse_audio_table, validate_audio_path, wav_duration, wav_duration_from_reader,
 };
 pub use package::{
     ALLOWED_EXTENSIONS, EXTENSION, Limits, normalize_entry, validate_package, validate_package_with,
@@ -244,6 +246,92 @@ pub fn record_fault(themes_root: &Path, now: SystemTime) -> bool {
     let _ = fs::create_dir_all(themes_root);
     let _ = fs::write(&file, text.join("\n"));
     false
+}
+
+/// Caminhos resolvidos e validados dos arquivos de áudio do tema em uso.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ThemeAudioPaths {
+    pub music: Option<PathBuf>,
+    pub move_sound: Option<PathBuf>,
+    pub accept_sound: Option<PathBuf>,
+    pub back_sound: Option<PathBuf>,
+}
+
+/// Extrai e valida declarações de áudio do `tokens.toml`.
+pub fn parse_tokens_audio(text: &str) -> Result<ThemeAudio, Vec<Problem>> {
+    let table: toml::Table = text.parse().map_err(|e: toml::de::Error| {
+        vec![Problem::new(
+            "manifest.invalid",
+            tf("themes.manifest.invalid", &[("error", e.message())]),
+        )]
+    })?;
+    let mut problems = Vec::new();
+    let audio = parse_audio_table(&table, &mut problems);
+    if problems.is_empty() {
+        Ok(audio)
+    } else {
+        Err(problems)
+    }
+}
+
+/// Resolve os arquivos de áudio do tema a partir da pasta instalada.
+/// Lê `theme.toml` e `tokens.toml` (que pode sobrescrever), validando que os arquivos existem
+/// e não saem da pasta do tema.
+pub fn resolve_theme_audio(theme_dir: &Path) -> ThemeAudioPaths {
+    let manifest_audio = fs::read_to_string(theme_dir.join(MANIFEST_FILE))
+        .ok()
+        .and_then(|text| ThemeManifest::parse(&text).ok())
+        .map(|manifest| manifest.audio)
+        .unwrap_or_default();
+    let tokens_audio = fs::read_to_string(theme_dir.join("tokens.toml"))
+        .ok()
+        .and_then(|text| parse_tokens_audio(&text).ok())
+        .unwrap_or_default();
+    let resolve_file = |rel_opt: Option<String>, is_music: bool| -> Option<PathBuf> {
+        let rel = rel_opt?;
+        let clean = validate_audio_path(&rel).ok()?;
+        let full = theme_dir.join(clean);
+        if !full.is_file() {
+            return None;
+        }
+        let canon_dir = theme_dir.canonicalize().ok()?;
+        let canon_full = full.canonicalize().ok()?;
+        if !canon_full.starts_with(&canon_dir) {
+            return None;
+        }
+        if is_music {
+            let size = full.metadata().ok()?.len();
+            if size > MAX_THEME_MUSIC_BYTES || size == 0 {
+                return None;
+            }
+        } else {
+            let dur = wav_duration(&full)?;
+            if dur > MAX_NAV_SOUND_DURATION_SECS || dur <= 0.0 {
+                return None;
+            }
+        }
+        Some(full)
+    };
+
+    let resolve_merged = |token_rel: Option<String>,
+                          manifest_rel: Option<String>,
+                          is_music: bool|
+     -> Option<PathBuf> {
+        token_rel
+            .and_then(|t| resolve_file(Some(t), is_music))
+            .or_else(|| manifest_rel.and_then(|m| resolve_file(Some(m), is_music)))
+    };
+
+    ThemeAudioPaths {
+        music: resolve_merged(tokens_audio.music, manifest_audio.music, true),
+        move_sound: resolve_merged(tokens_audio.move_sound, manifest_audio.move_sound, false),
+        accept_sound: resolve_merged(
+            tokens_audio.accept_sound,
+            manifest_audio.accept_sound,
+            false,
+        ),
+        back_sound: resolve_merged(tokens_audio.back_sound, manifest_audio.back_sound, false),
+    }
 }
 
 #[cfg(test)]

@@ -265,6 +265,7 @@ pub struct Ctx {
     pub scanning: bool,
     /// Restauração de backup em andamento (bloqueia jogar, varrer, restaurar e salvar configurações).
     pub restoring: bool,
+    pub pending_link: Option<tako_core::links::Link>,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
     pub grid_columns: usize,
     /// Camada que uma página pediu para abrir junto com ela.

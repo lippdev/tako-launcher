@@ -323,6 +323,7 @@ pub struct FakeProcesses {
     pub steam_app: Mutex<u32>,
     /// Variáveis da última abertura com `launch_with_env`.
     pub env: Mutex<Vec<(String, String)>>,
+    pub cwd: Mutex<Option<String>>,
     /// Comandos rodados por `run_command`.
     pub commands: Mutex<Vec<String>>,
     /// Códigos de saída dos processos que terminaram com [`FakeProcesses::exit_with`].
@@ -347,8 +348,9 @@ impl ProcessLauncher for FakeProcesses {
         &self,
         target: &str,
         args: Option<&str>,
-        _cwd: Option<&str>,
+        cwd: Option<&str>,
     ) -> DeviceResult<Option<u32>> {
+        *lock(&self.cwd) = cwd.map(str::to_owned);
         let mut n = lock(&self.next_pid);
         *n += 1;
         let pid = 1000 + *n;
@@ -370,6 +372,17 @@ impl ProcessLauncher for FakeProcesses {
     ) -> DeviceResult<Option<u32>> {
         *lock(&self.env) = env.to_vec();
         self.launch(target, args, cwd)
+    }
+    fn launch_args_with_env(
+        &self,
+        target: &str,
+        args: &[String],
+        cwd: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        *lock(&self.env) = env.to_vec();
+        let joined = args.join(" ");
+        self.launch(target, (!joined.is_empty()).then_some(&joined), cwd)
     }
     fn run_command(&self, command: &str, _wait: Option<std::time::Duration>) -> DeviceResult<()> {
         lock(&self.commands).push(command.to_owned());

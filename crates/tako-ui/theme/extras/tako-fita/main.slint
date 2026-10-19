@@ -1,0 +1,1699 @@
+// Tema oficial Fita (THEME-008): Console Moderno.
+// Arte imersiva em tela cheia no topo, HUD minimalista e fita horizontal
+// de cartões compactos ancorada no terço inferior da tela.
+//
+// Nota: `ControlCenter`, `OverlayView` e `RowView` são componentes auxiliares internos
+// importados da biblioteca padrão `@tako/` para suporte a camadas, central rápida e opções,
+// mas não fazem parte do contrato formal da API v1 de temas.
+
+import "@tako/fonts/Poppins-Bold.ttf";
+import "@tako/fonts/Poppins-ExtraBold.ttf";
+import "@tako/fonts/Poppins-Medium.ttf";
+import "@tako/fonts/Poppins-Regular.ttf";
+import "@tako/fonts/Poppins-SemiBold.ttf";
+import "@tako/fonts/PlusJakartaSans-Bold.ttf";
+import "@tako/fonts/PlusJakartaSans-ExtraBold.ttf";
+import "@tako/fonts/PlusJakartaSans-Medium.ttf";
+import "@tako/fonts/PlusJakartaSans-Regular.ttf";
+import "@tako/fonts/PlusJakartaSans-SemiBold.ttf";
+
+import { Ui } from "@tako/tokens.slint";
+import { Icons } from "@tako/icons.slint";
+import { Hint, PanelRow, Icon, Glyph, HintBar, Pill, Toggle, RowView } from "@tako/widgets.slint";
+import { Tile, Key, Overlay, OverlayView } from "@tako/overlay.slint";
+import { HomeRow, NavItem, Hero, Stat, Details, ControlCenter } from "@tako/main.slint";
+
+export { Ui, Hint, PanelRow, Tile, Key, Overlay, HomeRow, NavItem, Hero, Stat, Details }
+
+component FitaBackdrop inherits Rectangle {
+    in property <image> art;
+    in property <bool> dim-left;
+    background: #0D0F14;
+    if art.width > 0: Image {
+        width: parent.width;
+        height: parent.height;
+        source: art;
+        image-fit: cover;
+        opacity: 0.65;
+    }
+    // Gradiente horizontal reforçado: escuro à esquerda para leitura garantida (≥ 4,5:1) mesmo sobre arte clara
+    Rectangle {
+        background: @linear-gradient(90deg, #0D0F14fc 0%, (dim-left ? #0D0F14f8 : #0D0F14ee) 42%, #0D0F1499 75%, #0D0F1466 100%);
+    }
+    // Gradiente vertical: escurece o topo (HUD) e a base (fita de cartões)
+    Rectangle {
+        background: @linear-gradient(180deg, #0D0F14cc 0%, transparent 18%, transparent 55%, #0D0F14f0 85%, #0D0F14 100%);
+    }
+    // Halo sutil no centro com a cor de destaque do jogo
+    Rectangle {
+        opacity: 0.22;
+        background: @radial-gradient(circle, Ui.accent 0%, transparent 75%);
+        animate background { duration: Ui.color-time; }
+    }
+}
+
+component FitaStatusCorner inherits HorizontalLayout {
+    in property <string> clock;
+    in property <string> input-label;
+    in property <string> input-icon;
+    in property <string> pad-battery;
+    spacing: 14 * Ui.u;
+    alignment: end;
+
+    if input-label != "": Rectangle {
+        height: 34 * Ui.u;
+        border-radius: 17 * Ui.u;
+        background: #14182180;
+        border-width: 1px;
+        border-color: #ffffff14;
+        HorizontalLayout {
+            padding-left: 10 * Ui.u;
+            padding-right: 12 * Ui.u;
+            spacing: 6 * Ui.u;
+            Icon { name: input-icon; size: 18 * Ui.u; tint: #E2E8F0; y: (parent.height - self.height) / 2; }
+            Text {
+                text: input-label;
+                color: #E2E8F0;
+                font-size: 13 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    if pad-battery != "": Rectangle {
+        height: 34 * Ui.u;
+        border-radius: 17 * Ui.u;
+        background: #14182180;
+        border-width: 1px;
+        border-color: #ffffff14;
+        HorizontalLayout {
+            padding-left: 10 * Ui.u;
+            padding-right: 12 * Ui.u;
+            spacing: 6 * Ui.u;
+            Icon { name: "battery"; size: 18 * Ui.u; tint: #E2E8F0; y: (parent.height - self.height) / 2; }
+            Text {
+                text: pad-battery;
+                color: #E2E8F0;
+                font-size: 13 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    if clock != "": Rectangle {
+        height: 34 * Ui.u;
+        border-radius: 17 * Ui.u;
+        background: #14182180;
+        border-width: 1px;
+        border-color: #ffffff14;
+        HorizontalLayout {
+            padding-left: 14 * Ui.u;
+            padding-right: 14 * Ui.u;
+            Text {
+                text: clock;
+                color: #FFFFFF;
+                font-size: 14 * Ui.u * Ui.text-scale;
+                font-weight: 600;
+                font-family: "Plus Jakarta Sans";
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+component FitaCard inherits Rectangle {
+    in property <Tile> tile;
+    in property <bool> focused;
+    callback clicked();
+    callback hovered();
+
+    width: 180 * Ui.u;
+    height: 270 * Ui.u;
+
+    property <float> s: focused ? 1.12 : 1.0;
+    animate s { duration: Ui.focus-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+
+    art-box := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: parent.width * root.s;
+        height: parent.height * root.s;
+        border-radius: 14 * Ui.u;
+        clip: true;
+        background: @linear-gradient(160deg, tile.accent 0%, #0D0F14 100%);
+
+        // Borda luminosa branco pérola e halo da cor do jogo
+        border-width: focused ? 3.5 * Ui.u : 1 * Ui.u;
+        border-color: focused ? #F5F7FA : #ffffff1a;
+        drop-shadow-blur: focused ? 32 * Ui.u : 0;
+        drop-shadow-offset-y: focused ? 14 * Ui.u : 0;
+        drop-shadow-color: focused ? tile.accent.with-alpha(0.55) : transparent;
+
+        if tile.cover.width > 0: Image {
+            width: parent.width;
+            height: parent.height;
+            source: tile.cover;
+            image-fit: cover;
+        }
+
+        if tile.cover.width == 0: Rectangle {
+            background: @linear-gradient(160deg, tile.accent 0%, tile.accent.darker(0.6) 100%);
+            VerticalLayout {
+                padding: 16 * Ui.u;
+                alignment: center;
+                Text {
+                    text: tile.title;
+                    color: #FFFFFF;
+                    font-family: "Poppins";
+                    font-weight: 700;
+                    font-size: 20 * Ui.u * Ui.text-scale;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        if tile.running: Rectangle {
+            x: 10 * Ui.u;
+            y: 10 * Ui.u;
+            height: 20 * Ui.u;
+            width: 20 * Ui.u;
+            border-radius: 10 * Ui.u;
+            background: #10B981;
+            drop-shadow-blur: 8 * Ui.u;
+            drop-shadow-color: #10B981;
+        }
+
+        if tile.favorite && !tile.running: Rectangle {
+            x: 10 * Ui.u;
+            y: 10 * Ui.u;
+            Icon {
+                name: "starfill";
+                size: 16 * Ui.u;
+                tint: #F59E0B;
+            }
+        }
+
+        Rectangle {
+            y: parent.height - self.height;
+            height: max(72 * Ui.u, card-caption.preferred-height + 28 * Ui.u);
+            background: @linear-gradient(180deg, transparent 0%, #0D0F14cc 28%, #0D0F14f8 65%, #0D0F14 100%);
+        }
+
+        card-caption := VerticalLayout {
+            x: 10 * Ui.u;
+            y: parent.height - self.height - 8 * Ui.u;
+            width: parent.width - 20 * Ui.u;
+            height: self.preferred-height;
+            spacing: 2 * Ui.u;
+            Text {
+                text: tile.title;
+                color: #FFFFFF;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 600;
+                font-size: 13 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+            if tile.meta != "": Text {
+                text: tile.meta;
+                color: #CBD5E1;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+                font-size: 11 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+        }
+    }
+
+    TouchArea {
+        clicked => { root.clicked(); }
+        changed has-hover => { if (self.has-hover) { root.hovered(); } }
+    }
+}
+
+component FitaButton inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <bool> primary;
+    in property <bool> focused;
+    callback clicked();
+    callback hovered();
+    callback reveal(length, length);
+    changed focused => { if (focused) { root.reveal(self.x, self.width); } }
+    changed x => { if (focused) { root.reveal(self.x, self.width); } }
+    changed width => { if (focused) { root.reveal(self.x, self.width); } }
+    accessible-role: button;
+    accessible-label: label;
+
+    property <float> s: focused ? 1.05 : 1.0;
+    animate s { duration: Ui.focus-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+
+    height: 52 * Ui.u;
+    width: max(52 * Ui.u, content.preferred-width + (label != "" ? 36 * Ui.u : 20 * Ui.u));
+    border-radius: 16 * Ui.u;
+    border-width: focused ? 2.5 * Ui.u : 1 * Ui.u;
+    border-color: focused ? #F5F7FA : (primary ? #ffffff59 : #ffffff66);
+    background: focused ? #F5F7FA : (primary ? #141821f0 : #141821d9);
+    animate background, border-color { duration: Ui.focus-time; }
+
+    drop-shadow-blur: focused ? 24 * Ui.u : 0;
+    drop-shadow-offset-y: focused ? 8 * Ui.u : 0;
+    drop-shadow-color: focused ? #ffffff40 : transparent;
+
+    content := HorizontalLayout {
+        padding-left: label != "" ? 18 * Ui.u : 14 * Ui.u;
+        padding-right: label != "" ? 18 * Ui.u : 14 * Ui.u;
+        spacing: 10 * Ui.u;
+        alignment: center;
+        if icon != "": Icon {
+            name: icon;
+            size: 20 * Ui.u;
+            y: (parent.height - self.height) / 2;
+            tint: focused ? #0D0F14 : #FFFFFF;
+        }
+        if label != "": Text {
+            text: label;
+            color: focused ? #0D0F14 : #FFFFFF;
+            font-family: "Plus Jakarta Sans";
+            font-weight: 700;
+            font-size: 15 * Ui.u * Ui.text-scale;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    TouchArea {
+        clicked => { root.clicked(); }
+        changed has-hover => { if (self.has-hover) { root.hovered(); } }
+    }
+}
+
+component FitaHome inherits Rectangle {
+    in property <Hero> hero;
+    in property <int> hero-focus;
+    in property <[HomeRow]> rows;
+    in property <int> row-focus;
+    in property <int> col-focus;
+    in property <bool> empty;
+    in property <string> empty-title;
+    in property <string> empty-text;
+    in property <[PanelRow]> empty-actions;
+    in property <string> see-all-label;
+
+    callback clicked(string, int);
+    callback hovered(string, int);
+
+    property <int> anchor;
+    init => { anchor = max(0, col-focus); }
+    changed col-focus => { if (!Ui.pointer) { anchor = max(0, col-focus); } }
+    changed row-focus => { anchor = max(0, col-focus); }
+
+    if empty: VerticalLayout {
+        x: 80 * Ui.u;
+        width: min(1000 * Ui.u, parent.width - 160 * Ui.u);
+        alignment: center;
+        spacing: 20 * Ui.u;
+        Text {
+            text: empty-title;
+            color: #FFFFFF;
+            font-size: 32 * Ui.u * Ui.text-scale;
+            font-family: "Poppins";
+            font-weight: 700;
+        }
+        Text {
+            text: empty-text;
+            color: #CBD5E1;
+            font-size: 16 * Ui.u * Ui.text-scale;
+            font-family: "Plus Jakarta Sans";
+            wrap: word-wrap;
+        }
+        HorizontalLayout {
+            spacing: 16 * Ui.u;
+            alignment: start;
+            padding-top: 16 * Ui.u;
+            for a[i] in empty-actions: FitaButton {
+                label: a.title;
+                icon: a.icon;
+                primary: i == 0;
+                focused: i == hero-focus;
+                clicked => { root.clicked("empty", i); }
+                hovered => { root.hovered("empty", i); }
+            }
+        }
+    }
+
+    if !empty: Rectangle {
+        // Scrim dedicado atrás do bloco de texto para leitura garantida (≥ 4,5:1),
+        // com gradiente vertical na borda de baixo e sem borda retangular.
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: max(380 * Ui.u, hero-block.preferred-height + 140 * Ui.u);
+            background: @linear-gradient(180deg, #0D0F14f8 0%, #0D0F14e6 55%, transparent 100%);
+        }
+
+        // Destaque Cinematográfico no terço superior/médio
+        hero-block := VerticalLayout {
+            x: 80 * Ui.u;
+            y: 90 * Ui.u;
+            width: min(1100 * Ui.u, parent.width - 160 * Ui.u);
+            height: self.preferred-height;
+            spacing: 12 * Ui.u;
+            alignment: start;
+
+            if hero.overline != "": HorizontalLayout {
+                spacing: 8 * Ui.u;
+                alignment: start;
+                Rectangle {
+                    width: 4 * Ui.u;
+                    height: 14 * Ui.u * Ui.text-scale;
+                    border-radius: 2 * Ui.u;
+                    background: Ui.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+                Text {
+                    text: hero.overline;
+                    color: #E2E8F0;
+                    font-family: "Plus Jakarta Sans";
+                    font-weight: 700;
+                    font-size: 14 * Ui.u * Ui.text-scale;
+                    letter-spacing: 0.12 * 14 * Ui.u;
+                    vertical-alignment: center;
+                }
+            }
+
+            if hero.logo.width > 0: Image {
+                source: hero.logo;
+                height: 120 * Ui.u;
+                image-fit: contain;
+                horizontal-alignment: left;
+            }
+
+            if hero.logo.width == 0: Text {
+                text: hero.title;
+                color: #FFFFFF;
+                font-family: "Poppins";
+                font-weight: 800;
+                font-size: 44 * Ui.u * Ui.text-scale;
+                letter-spacing: -0.02 * 44 * Ui.u;
+                wrap: word-wrap;
+                overflow: elide;
+                max-height: 2 * 1.2 * 44 * Ui.u * Ui.text-scale;
+            }
+
+            if hero.meta != "": Text {
+                text: hero.meta;
+                color: #CBD5E1;
+                font-size: 16 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+            }
+
+            if hero.description != "": Text {
+                text: hero.description;
+                color: #CBD5E1;
+                font-size: 14 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                wrap: word-wrap;
+                max-height: 2 * 1.4 * 14 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+
+            HorizontalLayout {
+                padding-top: 14 * Ui.u;
+                spacing: 16 * Ui.u;
+                alignment: start;
+
+                FitaButton {
+                    label: hero.play-label;
+                    icon: "play";
+                    primary: true;
+                    focused: row-focus < 0 && hero-focus == 0;
+                    clicked => { root.clicked("hero", 0); }
+                    hovered => { root.hovered("hero", 0); }
+                }
+
+                FitaButton {
+                    label: "";
+                    icon: "info";
+                    primary: false;
+                    focused: row-focus < 0 && hero-focus == 1;
+                    accessible-role: button;
+                    accessible-label: hero.title;
+                    accessible-description: hero.meta;
+                    clicked => { root.clicked("hero", 1); }
+                    hovered => { root.hovered("hero", 1); }
+                }
+            }
+        }
+
+        // TERÇO INFERIOR: A FITA HORIZONTAL (RIBBON)
+        Rectangle {
+            y: root.height - self.height - Ui.hint-bar - 16 * Ui.u;
+            height: 340 * Ui.u;
+            width: parent.width;
+
+            Rectangle {
+                x: 80 * Ui.u;
+                y: 0;
+                height: 38 * Ui.u;
+                width: parent.width - 160 * Ui.u;
+                clip: true;
+
+                HorizontalLayout {
+                    x: 0;
+                    y: 0;
+                    height: parent.height;
+                    spacing: 20 * Ui.u;
+                    alignment: start;
+
+                    Text {
+                        text: rows.length > 0 ? (rows[max(0, row-focus)].title + (rows[max(0, row-focus)].count != "" ? " (" + rows[max(0, row-focus)].count + ")" : "")) : "";
+                        color: #FFFFFF;
+                        font-size: 18 * Ui.u * Ui.text-scale;
+                        font-family: "Poppins";
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+
+                    if rows.length > 1: HorizontalLayout {
+                        spacing: 8 * Ui.u;
+                        alignment: start;
+                        for r[ri] in rows: Rectangle {
+                            height: 28 * Ui.u;
+                            width: rtitle.preferred-width + 24 * Ui.u;
+                            border-radius: 14 * Ui.u;
+                            background: ri == max(0, row-focus) ? #ffffff2e : #14182180;
+                            border-width: 1px;
+                            border-color: ri == max(0, row-focus) ? #ffffff40 : #ffffff14;
+                            rtitle := Text {
+                                text: r.title;
+                                color: ri == max(0, row-focus) ? #FFFFFF : #CBD5E1;
+                                font-size: 12 * Ui.u * Ui.text-scale;
+                                font-family: "Plus Jakarta Sans";
+                                font-weight: 600;
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                            }
+                            TouchArea {
+                                clicked => { root.hovered("tab-" + ri, 0); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                y: 44 * Ui.u;
+                width: parent.width;
+                height: 290 * Ui.u;
+                clip: false;
+
+                property <int> active-row: max(0, row-focus);
+                property <HomeRow> curr-row: rows.length > 0 ? rows[active-row] : { title: "", count: "", tiles: [], see-all: false };
+                property <length> card-w: 180 * Ui.u;
+                property <length> card-gap: 22 * Ui.u;
+                property <length> step: card-w + card-gap;
+
+                rail := Rectangle {
+                    x: (parent.width - card-w) / 2 - root.anchor * step;
+                    animate x { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+
+                    for t[i] in curr-row.tiles: FitaCard {
+                        visible: i >= root.anchor - 6 && i <= root.anchor + 6;
+                        x: i * step;
+                        y: 8 * Ui.u;
+                        tile: t;
+                        focused: row-focus >= 0 && i == col-focus;
+                        clicked => { root.clicked("row-" + active-row, i); }
+                        hovered => { root.hovered("row-" + active-row, i); }
+                    }
+
+                    if curr-row.see-all: Rectangle {
+                        visible: curr-row.tiles.length >= root.anchor - 6 && curr-row.tiles.length <= root.anchor + 6;
+                        x: curr-row.tiles.length * step;
+                        y: 8 * Ui.u;
+                        width: card-w;
+                        height: 270 * Ui.u;
+                        border-radius: 14 * Ui.u;
+                        border-width: (row-focus >= 0 && col-focus == curr-row.tiles.length) ? 3.5 * Ui.u : 1 * Ui.u;
+                        border-color: (row-focus >= 0 && col-focus == curr-row.tiles.length) ? #F5F7FA : #ffffff1a;
+                        background: (row-focus >= 0 && col-focus == curr-row.tiles.length) ? #F5F7FA : #141821a6;
+                        animate background, border-color { duration: Ui.focus-time; }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 12 * Ui.u;
+                            HorizontalLayout {
+                                alignment: center;
+                                Icon {
+                                    name: "grid";
+                                    size: 36 * Ui.u;
+                                    tint: (row-focus >= 0 && col-focus == curr-row.tiles.length) ? #0D0F14 : #FFFFFF;
+                                }
+                            }
+                            Text {
+                                text: see-all-label;
+                                color: (row-focus >= 0 && col-focus == curr-row.tiles.length) ? #0D0F14 : #FFFFFF;
+                                font-size: 15 * Ui.u * Ui.text-scale;
+                                font-weight: 700;
+                                font-family: "Plus Jakarta Sans";
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        TouchArea {
+                            clicked => { root.clicked("row-" + active-row, curr-row.tiles.length); }
+                            changed has-hover => { if (self.has-hover) { root.hovered("row-" + active-row, curr-row.tiles.length); } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component FitaGridCard inherits Rectangle {
+    in property <Tile> tile;
+    in property <bool> focused;
+    callback clicked();
+    callback hovered();
+
+    width: 290 * Ui.u;
+    height: 435 * Ui.u;
+
+    property <float> s: focused ? 1.08 : 1.0;
+    animate s { duration: Ui.focus-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+
+    art-box := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: parent.width * root.s;
+        height: parent.height * root.s;
+        border-radius: 14 * Ui.u;
+        clip: true;
+        background: @linear-gradient(160deg, tile.accent 0%, #0D0F14 100%);
+
+        border-width: focused ? 3.5 * Ui.u : 1 * Ui.u;
+        border-color: focused ? #F5F7FA : #ffffff1a;
+        drop-shadow-blur: focused ? 32 * Ui.u : 0;
+        drop-shadow-offset-y: focused ? 14 * Ui.u : 0;
+        drop-shadow-color: focused ? tile.accent.with-alpha(0.55) : transparent;
+
+        if tile.cover.width > 0: Image {
+            width: parent.width;
+            height: parent.height;
+            source: tile.cover;
+            image-fit: cover;
+        }
+
+        if tile.cover.width == 0: Rectangle {
+            background: @linear-gradient(160deg, tile.accent 0%, tile.accent.darker(0.6) 100%);
+            VerticalLayout {
+                padding: 16 * Ui.u;
+                alignment: center;
+                Text {
+                    text: tile.title;
+                    color: #FFFFFF;
+                    font-family: "Poppins";
+                    font-weight: 700;
+                    font-size: 22 * Ui.u * Ui.text-scale;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        if tile.running: Rectangle {
+            x: 10 * Ui.u;
+            y: 10 * Ui.u;
+            height: 20 * Ui.u;
+            width: 20 * Ui.u;
+            border-radius: 10 * Ui.u;
+            background: #10B981;
+            drop-shadow-blur: 8 * Ui.u;
+            drop-shadow-color: #10B981;
+        }
+
+        if tile.favorite && !tile.running: Rectangle {
+            x: 10 * Ui.u;
+            y: 10 * Ui.u;
+            Icon {
+                name: "starfill";
+                size: 16 * Ui.u;
+                tint: #F59E0B;
+            }
+        }
+
+        Rectangle {
+            y: parent.height - self.height;
+            height: max(76 * Ui.u, grid-caption.preferred-height + 30 * Ui.u);
+            background: @linear-gradient(180deg, transparent 0%, #0D0F14cc 28%, #0D0F14f8 65%, #0D0F14 100%);
+        }
+
+        grid-caption := VerticalLayout {
+            x: 12 * Ui.u;
+            y: parent.height - self.height - 10 * Ui.u;
+            width: parent.width - 24 * Ui.u;
+            height: self.preferred-height;
+            spacing: 2 * Ui.u;
+            Text {
+                text: tile.title;
+                color: #FFFFFF;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 600;
+                font-size: 14 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+            if tile.meta != "": Text {
+                text: tile.meta;
+                color: #CBD5E1;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+                font-size: 12 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+        }
+    }
+
+    TouchArea {
+        clicked => { root.clicked(); }
+        changed has-hover => { if (self.has-hover) { root.hovered(); } }
+    }
+}
+
+component FitaLibrary inherits Rectangle {
+    in property <string> title;
+    in property <string> count;
+    in property <[PanelRow]> chips;
+    in property <int> chip-focus;
+    in property <[Tile]> tiles;
+    in property <int> sel;
+    in property <string> empty-title;
+    in property <string> empty-text;
+    out property <int> columns: max(1, floor((self.width - 80 * Ui.u) / (320 * Ui.u)));
+
+    callback clicked(string, int);
+    callback hovered(string, int);
+
+    property <length> cell-w: 320 * Ui.u;
+    property <length> cell-h: 460 * Ui.u;
+    property <length> top: 120 * Ui.u + 60 * Ui.u * Ui.text-scale;
+    property <int> rows: ceil(tiles.length / columns);
+    property <int> shown;
+    init => { shown = sel; }
+    changed sel => { if (!Ui.pointer) { shown = sel; } }
+    property <int> focus-row: shown < 0 ? 0 : floor(shown / columns);
+    property <length> view-h: self.height - top - Ui.hint-bar;
+    property <length> scroll: min(0, max(view-h - rows * cell-h, -(focus-row * cell-h) + (view-h - cell-h) / 2));
+    property <length> grid-x: max(40 * Ui.u, (self.width - columns * cell-w) / 2);
+
+    VerticalLayout {
+        x: grid-x;
+        y: 48 * Ui.u;
+        width: parent.width - 2 * grid-x;
+        height: self.preferred-height;
+        alignment: start;
+        spacing: 16 * Ui.u;
+
+        HorizontalLayout {
+            spacing: 16 * Ui.u;
+            Text {
+                text: title;
+                color: #FFFFFF;
+                font-size: 28 * Ui.u * Ui.text-scale;
+                font-family: "Poppins";
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            if count != "": Text {
+                text: "(" + count + ")";
+                color: #CBD5E1;
+                font-size: 18 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                font-weight: 500;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12 * Ui.u;
+            alignment: start;
+            for c[i] in chips: Rectangle {
+                height: 44 * Ui.u;
+                width: ct.preferred-width + 40 * Ui.u + (c.icon != "" ? 28 * Ui.u : 0);
+                border-radius: 22 * Ui.u;
+                background: i == chip-focus ? #F5F7FA : #141821a6;
+                border-width: i == chip-focus ? 2 * Ui.u : 1 * Ui.u;
+                border-color: i == chip-focus ? #F5F7FA : #ffffff1a;
+                animate background, border-color { duration: Ui.focus-time; }
+
+                drop-shadow-blur: i == chip-focus ? 16 * Ui.u : 0;
+                drop-shadow-color: i == chip-focus ? #ffffff33 : transparent;
+
+                HorizontalLayout {
+                    padding-left: 18 * Ui.u;
+                    padding-right: 18 * Ui.u;
+                    spacing: 8 * Ui.u;
+                    if c.icon != "": Icon {
+                        name: c.icon;
+                        size: 18 * Ui.u;
+                        y: (parent.height - self.height) / 2;
+                        tint: i == chip-focus ? #0D0F14 : #CBD5E1;
+                    }
+                    ct := Text {
+                        text: c.title;
+                        color: i == chip-focus ? #0D0F14 : #FFFFFF;
+                        font-size: 14 * Ui.u * Ui.text-scale;
+                        font-weight: 600;
+                        font-family: "Plus Jakarta Sans";
+                        vertical-alignment: center;
+                    }
+                }
+
+                TouchArea {
+                    clicked => { root.clicked("chip", i); }
+                    changed has-hover => { if (self.has-hover) { root.hovered("chip", i); } }
+                }
+            }
+        }
+    }
+
+    if tiles.length == 0: VerticalLayout {
+        x: grid-x;
+        y: top + 40 * Ui.u;
+        width: parent.width - 2 * grid-x;
+        spacing: 12 * Ui.u;
+        alignment: start;
+        Text { text: empty-title; color: #FFFFFF; font-size: 24 * Ui.u * Ui.text-scale; font-family: "Poppins"; font-weight: 700; }
+        Text { text: empty-text; color: #CBD5E1; font-size: 15 * Ui.u * Ui.text-scale; font-family: "Plus Jakarta Sans"; wrap: word-wrap; }
+    }
+
+    Rectangle {
+        y: top;
+        height: view-h;
+        clip: true;
+        Rectangle {
+            y: scroll;
+            animate y { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+
+            for r in rows: Rectangle {
+                property <length> ry: r * cell-h;
+                property <bool> near: ry + scroll > -2 * cell-h && ry + scroll < view-h + cell-h;
+                x: grid-x;
+                y: ry + 16 * Ui.u;
+                height: cell-h;
+
+                if near: Rectangle {
+                    for c in min(columns, tiles.length - r * columns): FitaGridCard {
+                        x: c * cell-w + (cell-w - self.width) / 2;
+                        tile: tiles[r * columns + c];
+                        focused: r * columns + c == sel;
+                        clicked => { root.clicked("grid", r * columns + c); }
+                        hovered => { root.hovered("grid", r * columns + c); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component FitaSidebar inherits Rectangle {
+    in property <[NavItem]> items;
+    in property <int> sel;
+    in property <bool> expanded;
+    callback clicked(int);
+    callback hovered(int);
+
+    width: expanded ? 380 * Ui.u : 100 * Ui.u;
+    visible: true;
+    animate width { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+    background: #10131af5;
+    clip: true;
+
+    // Linha de borda direita
+    Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        height: parent.height;
+        background: #ffffff14;
+    }
+
+    VerticalLayout {
+        padding-top: 40 * Ui.u;
+        padding-left: 24 * Ui.u;
+        padding-right: 24 * Ui.u;
+        padding-bottom: Ui.hint-bar;
+        spacing: 6 * Ui.u;
+
+        HorizontalLayout {
+            spacing: 14 * Ui.u;
+            padding-bottom: 24 * Ui.u;
+            Image { source: @image-url("@tako/tako-mark.png"); height: 48 * Ui.u; width: 48 * Ui.u; image-fit: contain; }
+            if expanded: Text {
+                text: "TAKO";
+                color: #FFFFFF;
+                font-family: "Poppins";
+                font-weight: 800;
+                font-size: 24 * Ui.u * Ui.text-scale;
+                vertical-alignment: center;
+            }
+        }
+
+        for it[i] in items: VerticalLayout {
+            spacing: 6 * Ui.u;
+            if it.section != "" && expanded: Text {
+                text: it.section;
+                color: #94A3B8;
+                font-size: 12 * Ui.u * Ui.text-scale;
+                font-weight: 700;
+                letter-spacing: 0.16 * 12 * Ui.u;
+                font-family: "Plus Jakarta Sans";
+                height: 40 * Ui.u;
+                vertical-alignment: bottom;
+            }
+            if it.id == "spacer": Rectangle { vertical-stretch: 1; }
+            if it.id != "spacer": Rectangle {
+                property <bool> solid: it.selected && !(i == sel);
+                height: 56 * Ui.u;
+                border-radius: 14 * Ui.u;
+                background: i == sel ? #F5F7FA : (it.selected ? #1e2433cc : transparent);
+                animate background { duration: Ui.focus-time; }
+                HorizontalLayout {
+                    padding-left: 16 * Ui.u;
+                    padding-right: 16 * Ui.u;
+                    spacing: 16 * Ui.u;
+                    Icon {
+                        name: it.icon;
+                        size: 20 * Ui.u;
+                        y: (parent.height - self.height) / 2;
+                        tint: i == sel ? #0D0F14 : #FFFFFF;
+                    }
+                    if expanded: Text {
+                        text: it.label;
+                        color: i == sel ? #0D0F14 : #FFFFFF;
+                        font-size: 15 * Ui.u * Ui.text-scale;
+                        font-weight: 600;
+                        font-family: "Plus Jakarta Sans";
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    if expanded && it.count != "": Text {
+                        text: it.count;
+                        color: i == sel ? #475569 : #CBD5E1;
+                        font-size: 13 * Ui.u * Ui.text-scale;
+                        font-family: "Plus Jakarta Sans";
+                        vertical-alignment: center;
+                    }
+                }
+                TouchArea {
+                    clicked => { root.clicked(i); }
+                    changed has-hover => { if (self.has-hover) { root.hovered(i); } }
+                }
+            }
+        }
+    }
+}
+
+component FitaDetailsPage inherits Rectangle {
+    in property <Details> details;
+    in property <[Stat]> stats;
+    in property <[PanelRow]> actions;
+    in property <int> sel;
+    callback clicked(string, int);
+    callback hovered(string, int);
+
+    HorizontalLayout {
+        x: 80 * Ui.u;
+        y: 80 * Ui.u;
+        width: root.width - 160 * Ui.u;
+        height: root.height - 80 * Ui.u - Ui.hint-bar;
+        spacing: 56 * Ui.u;
+
+        Rectangle {
+            width: 340 * Ui.u;
+            height: 510 * Ui.u;
+            border-radius: 18 * Ui.u;
+            clip: true;
+            border-width: 1px;
+            border-color: #ffffff26;
+            background: @linear-gradient(160deg, Ui.accent 0%, #0D0F14 100%);
+            Image { source: details.cover; width: parent.width; height: parent.height; image-fit: cover; }
+        }
+
+        VerticalLayout {
+            spacing: 14 * Ui.u;
+            alignment: start;
+            horizontal-stretch: 1;
+
+            if details.overline != "": HorizontalLayout {
+                spacing: 8 * Ui.u;
+                alignment: start;
+                Rectangle {
+                    width: 4 * Ui.u;
+                    height: 14 * Ui.u * Ui.text-scale;
+                    border-radius: 2 * Ui.u;
+                    background: Ui.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+                Text {
+                    text: details.overline;
+                    color: #E2E8F0;
+                    font-family: "Plus Jakarta Sans";
+                    font-weight: 700;
+                    font-size: 14 * Ui.u * Ui.text-scale;
+                    letter-spacing: 0.12 * 14 * Ui.u;
+                    vertical-alignment: center;
+                }
+            }
+
+            if details.logo.width > 0: Image {
+                source: details.logo;
+                height: 140 * Ui.u;
+                image-fit: contain;
+                horizontal-alignment: left;
+            }
+
+            if details.logo.width == 0: Text {
+                text: details.title;
+                color: #FFFFFF;
+                font-family: "Poppins";
+                font-weight: 800;
+                font-size: 40 * Ui.u * Ui.text-scale;
+                wrap: word-wrap;
+                overflow: elide;
+            }
+
+            Text {
+                text: details.meta;
+                color: #CBD5E1;
+                font-size: 16 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+            }
+
+            action-scroll := Flickable {
+                height: 80 * Ui.u;
+                min-width: 0px;
+                viewport-width: action-layout.preferred-width;
+                viewport-height: self.height;
+                function reveal(x: length, w: length) {
+                    if (!Ui.pointer) {
+                        self.viewport-x = clamp(clamp(self.viewport-x,
+                            self.width - x - w - 4 * Ui.u, -x + 4 * Ui.u),
+                            min(0px, self.width - self.viewport-width), 0px);
+                    }
+                }
+                action-layout := HorizontalLayout {
+                    y: 14 * Ui.u;
+                    width: self.preferred-width;
+                    height: 52 * Ui.u;
+                    padding-left: 4 * Ui.u;
+                    padding-right: 4 * Ui.u;
+                    spacing: 16 * Ui.u;
+                    for a[i] in actions: FitaButton {
+                        label: a.title;
+                        icon: a.icon;
+                        primary: i == 0;
+                        focused: i == sel;
+                        clicked => { root.clicked("action", i); }
+                        hovered => { root.hovered("action", i); }
+                        reveal(x, w) => { action-scroll.reveal(x, w); }
+                    }
+                }
+            }
+
+            if details.hint != "": Text {
+                text: details.hint;
+                color: #F59E0B;
+                font-size: 14 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: details.description;
+                color: #CBD5E1;
+                font-size: 15 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                wrap: word-wrap;
+                max-height: 4 * 1.45 * 15 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+
+            Rectangle { height: 16 * Ui.u; }
+
+            for s[i] in stats: HorizontalLayout {
+                spacing: 24 * Ui.u;
+                Text {
+                    text: s.label;
+                    width: 240 * Ui.u;
+                    color: #94A3B8;
+                    font-size: 14 * Ui.u * Ui.text-scale;
+                    font-family: "Plus Jakarta Sans";
+                }
+                Text {
+                    text: s.value;
+                    color: #FFFFFF;
+                    font-size: 14 * Ui.u * Ui.text-scale;
+                    font-weight: 600;
+                    font-family: "Plus Jakarta Sans";
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}
+
+component FitaRowView inherits Rectangle {
+    in property <PanelRow> data;
+    in property <bool> focused;
+    callback clicked();
+    callback hovered();
+
+    property <bool> is-header: data.kind == "header";
+    property <color> fg: focused ? #0D0F14 : #FFFFFF;
+    property <color> fg-muted: focused ? #0D0F14a6 : #CBD5E1;
+
+    border-radius: 16 * Ui.u;
+    background: is-header ? transparent : (focused ? #F5F7FA : #14182180);
+    border-width: is-header ? 0 : 1px;
+    border-color: focused ? #F5F7FA : #ffffff14;
+    opacity: data.enabled || is-header ? 1.0 : 0.45;
+    animate background, border-color { duration: Ui.focus-time; }
+
+    drop-shadow-blur: focused && !is-header ? 20 * Ui.u : 0;
+    drop-shadow-color: focused && !is-header ? #ffffff26 : transparent;
+
+    if is-header: Text {
+        x: 16 * Ui.u;
+        y: (parent.height - self.height) / 2;
+        text: data.title;
+        color: #94A3B8;
+        font-size: 13 * Ui.u * Ui.text-scale;
+        font-weight: 700;
+        letter-spacing: 0.12 * 13 * Ui.u;
+        font-family: "Plus Jakarta Sans";
+        vertical-alignment: center;
+    }
+
+    if !is-header: HorizontalLayout {
+        padding-left: 24 * Ui.u;
+        padding-right: 24 * Ui.u;
+        spacing: 16 * Ui.u;
+        alignment: center;
+
+        if data.kind == "radio" || data.kind == "check": Rectangle {
+            width: 24 * Ui.u;
+            height: 24 * Ui.u;
+            y: (parent.height - self.height) / 2;
+            border-radius: data.kind == "radio" ? self.height / 2 : 6 * Ui.u;
+            border-width: 2 * Ui.u;
+            border-color: focused ? #0D0F14 : #94A3B8;
+            Rectangle {
+                width: 12 * Ui.u;
+                height: 12 * Ui.u;
+                border-radius: data.kind == "radio" ? self.height / 2 : 3 * Ui.u;
+                background: focused ? #0D0F14 : #FFFFFF;
+                visible: data.on;
+            }
+        }
+
+        if data.icon != "": Icon {
+            name: data.icon;
+            size: 20 * Ui.u;
+            y: (parent.height - self.height) / 2;
+            tint: fg;
+        }
+
+        if data.image.width > 0: Image {
+            source: data.image;
+            width: 40 * Ui.u;
+            height: 40 * Ui.u;
+            image-fit: contain;
+            y: (parent.height - self.height) / 2;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 4 * Ui.u;
+            horizontal-stretch: 1;
+
+            Text {
+                text: data.title;
+                color: data.style == "danger" && !focused ? #EF4444 : fg;
+                font-size: 16 * Ui.u * Ui.text-scale;
+                font-weight: data.emphasized ? 700 : 600;
+                font-family: "Plus Jakarta Sans";
+                overflow: elide;
+            }
+            if data.description != "": Text {
+                text: data.description;
+                color: fg-muted;
+                font-size: 13 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                wrap: word-wrap;
+                max-height: 2 * 18 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+        }
+
+        if data.kind == "toggle": Toggle {
+            on: data.on;
+            solid: focused;
+            y: (parent.height - self.height) / 2;
+        }
+
+        if data.value != "" && data.kind != "toggle": Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 40 * Ui.u;
+            width: pill-lay.preferred-width + 28 * Ui.u;
+            border-radius: 20 * Ui.u;
+            background: focused ? #0D0F141a : #ffffff14;
+            border-width: 1px;
+            border-color: focused ? #0D0F1426 : #ffffff1f;
+
+            pill-lay := HorizontalLayout {
+                padding-left: 14 * Ui.u;
+                padding-right: 14 * Ui.u;
+                spacing: 8 * Ui.u;
+                alignment: center;
+
+                Text {
+                    text: data.value;
+                    color: focused ? #0D0F14 : #FFFFFF;
+                    font-size: 13 * Ui.u * Ui.text-scale;
+                    font-weight: 600;
+                    font-family: "Plus Jakarta Sans";
+                    vertical-alignment: center;
+                }
+
+                if data.kind == "action" || data.kind == "choice": Icon {
+                    name: "chevron";
+                    size: 14 * Ui.u;
+                    tint: focused ? #0D0F14 : #CBD5E1;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+    }
+
+    TouchArea {
+        enabled: !is-header;
+        clicked => { root.clicked(); }
+        changed has-hover => { if (self.has-hover) { root.hovered(); } }
+    }
+}
+
+component FitaSettingsPage inherits Rectangle {
+    in property <string> title;
+    in property <[NavItem]> categories;
+    in property <int> category-focus;
+    in property <string> heading;
+    in property <string> subtitle;
+    in property <[PanelRow]> rows;
+    in property <int> row-focus;
+    callback clicked(string, int);
+    callback hovered(string, int);
+
+    property <length> top: 160 * Ui.u;
+    property <length> row-h: max(96 * Ui.u, 96 * Ui.u * Ui.text-scale);
+    property <length> header-h: heading-block.preferred-height + 16 * Ui.u;
+    property <length> view-h: self.height - top - Ui.hint-bar - header-h;
+    property <int> shown-row;
+    init => { shown-row = row-focus; }
+    changed row-focus => { if (!Ui.pointer) { shown-row = row-focus; } }
+
+    pure function headers-before(idx: int) -> int {
+        return (idx > 0 && rows.length > 0 && rows[0].kind == "header" ? 1 : 0)
+            + (idx > 1 && rows.length > 1 && rows[1].kind == "header" ? 1 : 0)
+            + (idx > 2 && rows.length > 2 && rows[2].kind == "header" ? 1 : 0)
+            + (idx > 3 && rows.length > 3 && rows[3].kind == "header" ? 1 : 0)
+            + (idx > 4 && rows.length > 4 && rows[4].kind == "header" ? 1 : 0)
+            + (idx > 5 && rows.length > 5 && rows[5].kind == "header" ? 1 : 0)
+            + (idx > 6 && rows.length > 6 && rows[6].kind == "header" ? 1 : 0)
+            + (idx > 7 && rows.length > 7 && rows[7].kind == "header" ? 1 : 0)
+            + (idx > 8 && rows.length > 8 && rows[8].kind == "header" ? 1 : 0)
+            + (idx > 9 && rows.length > 9 && rows[9].kind == "header" ? 1 : 0)
+            + (idx > 10 && rows.length > 10 && rows[10].kind == "header" ? 1 : 0)
+            + (idx > 11 && rows.length > 11 && rows[11].kind == "header" ? 1 : 0)
+            + (idx > 12 && rows.length > 12 && rows[12].kind == "header" ? 1 : 0)
+            + (idx > 13 && rows.length > 13 && rows[13].kind == "header" ? 1 : 0)
+            + (idx > 14 && rows.length > 14 && rows[14].kind == "header" ? 1 : 0)
+            + (idx > 15 && rows.length > 15 && rows[15].kind == "header" ? 1 : 0)
+            + (idx > 16 && rows.length > 16 && rows[16].kind == "header" ? 1 : 0)
+            + (idx > 17 && rows.length > 17 && rows[17].kind == "header" ? 1 : 0)
+            + (idx > 18 && rows.length > 18 && rows[18].kind == "header" ? 1 : 0)
+            + (idx > 19 && rows.length > 19 && rows[19].kind == "header" ? 1 : 0)
+            + (idx > 20 && rows.length > 20 && rows[20].kind == "header" ? 1 : 0)
+            + (idx > 21 && rows.length > 21 && rows[21].kind == "header" ? 1 : 0)
+            + (idx > 22 && rows.length > 22 && rows[22].kind == "header" ? 1 : 0)
+            + (idx > 23 && rows.length > 23 && rows[23].kind == "header" ? 1 : 0)
+            + (idx > 24 && rows.length > 24 && rows[24].kind == "header" ? 1 : 0)
+            + (idx > 25 && rows.length > 25 && rows[25].kind == "header" ? 1 : 0)
+            + (idx > 26 && rows.length > 26 && rows[26].kind == "header" ? 1 : 0)
+            + (idx > 27 && rows.length > 27 && rows[27].kind == "header" ? 1 : 0)
+            + (idx > 28 && rows.length > 28 && rows[28].kind == "header" ? 1 : 0)
+            + (idx > 29 && rows.length > 29 && rows[29].kind == "header" ? 1 : 0)
+            + (idx > 30 && rows.length > 30 && rows[30].kind == "header" ? 1 : 0)
+            + (idx > 31 && rows.length > 31 && rows[31].kind == "header" ? 1 : 0)
+            + (idx > 32 && rows.length > 32 && rows[32].kind == "header" ? 1 : 0)
+            + (idx > 33 && rows.length > 33 && rows[33].kind == "header" ? 1 : 0)
+            + (idx > 34 && rows.length > 34 && rows[34].kind == "header" ? 1 : 0)
+            + (idx > 35 && rows.length > 35 && rows[35].kind == "header" ? 1 : 0)
+            + (idx > 36 && rows.length > 36 && rows[36].kind == "header" ? 1 : 0)
+            + (idx > 37 && rows.length > 37 && rows[37].kind == "header" ? 1 : 0)
+            + (idx > 38 && rows.length > 38 && rows[38].kind == "header" ? 1 : 0)
+            + (idx > 39 && rows.length > 39 && rows[39].kind == "header" ? 1 : 0)
+            + (idx > 40 && rows.length > 40 && rows[40].kind == "header" ? 1 : 0)
+            + (idx > 41 && rows.length > 41 && rows[41].kind == "header" ? 1 : 0)
+            + (idx > 42 && rows.length > 42 && rows[42].kind == "header" ? 1 : 0)
+            + (idx > 43 && rows.length > 43 && rows[43].kind == "header" ? 1 : 0)
+            + (idx > 44 && rows.length > 44 && rows[44].kind == "header" ? 1 : 0)
+            + (idx > 45 && rows.length > 45 && rows[45].kind == "header" ? 1 : 0)
+            + (idx > 46 && rows.length > 46 && rows[46].kind == "header" ? 1 : 0)
+            + (idx > 47 && rows.length > 47 && rows[47].kind == "header" ? 1 : 0)
+            + (idx > 48 && rows.length > 48 && rows[48].kind == "header" ? 1 : 0)
+            + (idx > 49 && rows.length > 49 && rows[49].kind == "header" ? 1 : 0)
+            + (idx > 50 && rows.length > 50 && rows[50].kind == "header" ? 1 : 0)
+            + (idx > 51 && rows.length > 51 && rows[51].kind == "header" ? 1 : 0)
+            + (idx > 52 && rows.length > 52 && rows[52].kind == "header" ? 1 : 0)
+            + (idx > 53 && rows.length > 53 && rows[53].kind == "header" ? 1 : 0)
+            + (idx > 54 && rows.length > 54 && rows[54].kind == "header" ? 1 : 0)
+            + (idx > 55 && rows.length > 55 && rows[55].kind == "header" ? 1 : 0)
+            + (idx > 56 && rows.length > 56 && rows[56].kind == "header" ? 1 : 0)
+            + (idx > 57 && rows.length > 57 && rows[57].kind == "header" ? 1 : 0)
+            + (idx > 58 && rows.length > 58 && rows[58].kind == "header" ? 1 : 0)
+            + (idx > 59 && rows.length > 59 && rows[59].kind == "header" ? 1 : 0)
+            + (idx > 60 && rows.length > 60 && rows[60].kind == "header" ? 1 : 0)
+            + (idx > 61 && rows.length > 61 && rows[61].kind == "header" ? 1 : 0)
+            + (idx > 62 && rows.length > 62 && rows[62].kind == "header" ? 1 : 0)
+            + (idx > 63 && rows.length > 63 && rows[63].kind == "header" ? 1 : 0);
+    }
+
+    pure function row-y(idx: int) -> length {
+        return 8 * Ui.u + idx * row-h - headers-before(idx) * (row-h - 64 * Ui.u);
+    }
+
+    property <length> total-content-h: rows.length > 0 ? (row-y(rows.length - 1) + (rows[rows.length - 1].kind == "header" ? 48 * Ui.u : (row-h - 16 * Ui.u)) + 8 * Ui.u) : 0;
+    property <length> shown-row-h: shown-row >= 0 && shown-row < rows.length && rows[shown-row].kind == "header" ? 48 * Ui.u : (row-h - 16 * Ui.u);
+    property <length> shown-row-y: row-y(max(0, shown-row));
+    property <length> scroll: min(0, max(view-h - total-content-h, -shown-row-y + (view-h - shown-row-h) / 2));
+
+    Text {
+        x: 80 * Ui.u;
+        y: 64 * Ui.u;
+        text: title;
+        color: #FFFFFF;
+        font-size: 28 * Ui.u * Ui.text-scale;
+        font-family: "Poppins";
+        font-weight: 700;
+    }
+
+    VerticalLayout {
+        x: 80 * Ui.u;
+        y: top;
+        width: 320 * Ui.u;
+        spacing: 8 * Ui.u;
+        alignment: start;
+
+        for c[i] in categories: Rectangle {
+            height: 60 * Ui.u;
+            border-radius: 14 * Ui.u;
+            background: i == category-focus && row-focus < 0 ? #F5F7FA : (c.selected ? #1e2433cc : transparent);
+            border-width: 1px;
+            border-color: i == category-focus && row-focus < 0 ? #F5F7FA : #ffffff14;
+            animate background, border-color { duration: Ui.focus-time; }
+
+            HorizontalLayout {
+                padding-left: 18 * Ui.u;
+                spacing: 14 * Ui.u;
+                Icon {
+                    name: c.icon;
+                    size: 20 * Ui.u;
+                    y: (parent.height - self.height) / 2;
+                    tint: i == category-focus && row-focus < 0 ? #0D0F14 : #FFFFFF;
+                }
+                Text {
+                    text: c.label;
+                    color: i == category-focus && row-focus < 0 ? #0D0F14 : #FFFFFF;
+                    font-size: 15 * Ui.u * Ui.text-scale;
+                    font-weight: 600;
+                    font-family: "Plus Jakarta Sans";
+                    vertical-alignment: center;
+                }
+            }
+
+            TouchArea {
+                clicked => { root.clicked("category", i); }
+                changed has-hover => { if (self.has-hover) { root.hovered("category", i); } }
+            }
+        }
+    }
+
+    Rectangle {
+        x: 80 * Ui.u + 320 * Ui.u + 48 * Ui.u;
+        y: top;
+        width: parent.width - self.x - 80 * Ui.u;
+        height: parent.height - top - Ui.hint-bar;
+
+        heading-block := VerticalLayout {
+            y: 0;
+            spacing: 6 * Ui.u;
+            alignment: start;
+            Text {
+                text: heading;
+                color: #FFFFFF;
+                font-size: 22 * Ui.u * Ui.text-scale;
+                font-weight: 700;
+                font-family: "Poppins";
+            }
+            Text {
+                text: subtitle;
+                color: #CBD5E1;
+                font-size: 14 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                wrap: word-wrap;
+            }
+        }
+
+        Rectangle {
+            y: header-h;
+            height: view-h;
+            clip: true;
+
+            Rectangle {
+                y: scroll;
+                animate y { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+
+                for r[i] in rows: FitaRowView {
+                    x: 8 * Ui.u;
+                    width: parent.width - 16 * Ui.u;
+                    y: row-y(i);
+                    height: r.kind == "header" ? 48 * Ui.u : (row-h - 16 * Ui.u);
+                    data: r;
+                    focused: i == row-focus;
+                    clicked => { root.clicked("row", i); }
+                    hovered => { root.hovered("row", i); }
+                }
+            }
+        }
+    }
+}
+
+export component App inherits Window {
+    in property <bool> transparent-background: false;
+    in property <string> page: "home";
+    in property <image> backdrop;
+    in property <string> clock;
+    in property <string> input-label;
+    in property <string> input-icon;
+    in property <string> pad-battery;
+    in property <[Hint]> hints;
+    in property <string> toast;
+    in property <bool> leaving;
+    in property <bool> intro;
+
+    // Barra lateral.
+    in property <[NavItem]> sidebar;
+    in property <int> sidebar-focus: -1;
+    in property <bool> sidebar-visible: true;
+
+    // Início.
+    in property <Hero> hero;
+    in property <int> hero-focus;
+    in property <[HomeRow]> home-rows;
+    in property <int> home-row-focus: -1;
+    in property <int> home-col-focus;
+    in property <bool> home-empty;
+    in property <string> home-empty-title;
+    in property <string> home-empty-text;
+    in property <[PanelRow]> home-empty-actions;
+    in property <string> see-all-label;
+
+    // Biblioteca.
+    in property <string> library-title;
+    in property <string> library-count;
+    in property <[PanelRow]> library-chips;
+    in property <int> library-chip-focus: -1;
+    in property <[Tile]> library-tiles;
+    in property <int> library-focus: -1;
+    in property <string> library-empty-title;
+    in property <string> library-empty-text;
+    out property <int> library-columns: library.columns;
+
+    // Detalhes.
+    in property <Details> details;
+    in property <[Stat]> details-stats;
+    in property <[PanelRow]> details-actions;
+    in property <int> details-focus;
+
+    // Configurações.
+    in property <string> settings-title;
+    in property <[NavItem]> settings-categories;
+    in property <int> settings-category-focus;
+    in property <string> settings-heading;
+    in property <string> settings-subtitle;
+    in property <[PanelRow]> settings-rows;
+    in property <int> settings-row-focus: -1;
+
+    // Central rápida.
+    in property <bool> control-center;
+    in property <[PanelRow]> cc-icons;
+    in property <int> cc-icon-focus;
+    in property <int> cc-panel-for: -1;
+    in property <[PanelRow]> cc-panel;
+    in property <int> cc-panel-focus: -1;
+    in property <string> cc-game-title;
+    in property <string> cc-game-meta;
+
+    // Camadas abertas.
+    in property <[Overlay]> overlays;
+
+    callback clicked(string, int);
+    callback hovered(string, int);
+    callback hint-clicked(int);
+    callback key(string, bool, bool, bool, bool) -> bool;
+    callback key-released(string);
+
+    title: "Tako";
+    icon: @image-url("@tako/tako-mark.png");
+    preferred-width: 1280px;
+    preferred-height: 720px;
+    min-width: 640px;
+    min-height: 360px;
+    background: transparent-background ? transparent : #0D0F14;
+    default-font-family: "Plus Jakarta Sans";
+
+    init => {
+        Ui.u = self.height / 1080;
+        fs.focus();
+    }
+    changed height => { Ui.u = self.height / 1080; }
+
+    property <bool> over-game: control-center && transparent-background;
+    property <bool> show-tako: !(transparent-background && (control-center || leaving));
+    property <length> content-x: sidebar-visible && page != "details" ? (sidebar-focus >= 0 ? 380 * Ui.u : 100 * Ui.u) : 0;
+
+    if show-tako: FitaBackdrop {
+        art: backdrop;
+        dim-left: page == "settings";
+    }
+
+    Rectangle {
+        x: content-x;
+        visible: show-tako;
+        width: root.width - content-x;
+        animate x, width { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+
+        if page == "home": FitaHome {
+            hero: hero;
+            hero-focus: sidebar-focus >= 0 ? -1 : hero-focus;
+            rows: home-rows;
+            row-focus: sidebar-focus >= 0 ? -1 : home-row-focus;
+            col-focus: home-col-focus;
+            empty: home-empty;
+            empty-title: home-empty-title;
+            empty-text: home-empty-text;
+            empty-actions: home-empty-actions;
+            see-all-label: see-all-label;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+
+        library := FitaLibrary {
+            width: parent.width;
+            height: parent.height;
+            visible: page == "library";
+            title: library-title;
+            count: library-count;
+            chips: library-chips;
+            chip-focus: sidebar-focus >= 0 ? -1 : library-chip-focus;
+            tiles: page == "library" ? library-tiles : [];
+            sel: sidebar-focus >= 0 ? -1 : library-focus;
+            empty-title: library-empty-title;
+            empty-text: library-empty-text;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+
+        if page == "details": FitaDetailsPage {
+            details: details;
+            stats: details-stats;
+            actions: details-actions;
+            sel: details-focus;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+
+        if page == "settings": FitaSettingsPage {
+            title: settings-title;
+            categories: settings-categories;
+            category-focus: settings-category-focus;
+            heading: settings-heading;
+            subtitle: settings-subtitle;
+            rows: settings-rows;
+            row-focus: sidebar-focus >= 0 ? -2 : settings-row-focus;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+    }
+
+    if sidebar-visible && page != "details" && !control-center && show-tako: FitaSidebar {
+        x: 0;
+        height: root.height;
+        items: sidebar;
+        sel: sidebar-focus;
+        expanded: sidebar-focus >= 0;
+        clicked(i) => { root.clicked("sidebar", i); }
+        hovered(i) => { root.hovered("sidebar", i); }
+    }
+
+    // HUD Superior Minimalista
+    if !control-center && show-tako: HorizontalLayout {
+        x: content-x + 40 * Ui.u;
+        y: 20 * Ui.u;
+        width: root.width - content-x - 80 * Ui.u;
+        height: 40 * Ui.u;
+
+        if !sidebar-visible || page == "details": HorizontalLayout {
+            spacing: 12 * Ui.u;
+            alignment: start;
+            Image {
+                source: @image-url("@tako/tako-mark.png");
+                height: 32 * Ui.u;
+                width: 32 * Ui.u;
+                image-fit: contain;
+                y: (parent.height - self.height) / 2;
+            }
+            Text {
+                text: "TAKO";
+                color: #FFFFFF;
+                font-family: "Poppins";
+                font-weight: 800;
+                font-size: 20 * Ui.u * Ui.text-scale;
+                vertical-alignment: center;
+            }
+        }
+
+        FitaStatusCorner {
+            horizontal-stretch: 1;
+            clock: clock;
+            input-label: input-label;
+            input-icon: input-icon;
+            pad-battery: pad-battery;
+        }
+    }
+
+    if control-center: ControlCenter {
+        icons: cc-icons;
+        icon-focus: cc-icon-focus;
+        panel-for: cc-panel-for;
+        panel: cc-panel;
+        panel-focus: cc-panel-focus;
+        game-title: cc-game-title;
+        game-meta: cc-game-meta;
+        overlay: over-game;
+        clicked(z, i) => { root.clicked("cc-" + z, i); }
+        hovered(z, i) => { root.hovered("cc-" + z, i); }
+    }
+
+    for ov[i] in overlays: OverlayView {
+        ov: ov;
+        art: backdrop;
+        leaving: leaving;
+        top-most: i == overlays.length - 1;
+        clicked(z, idx) => { if (i == overlays.length - 1) { root.clicked("overlay-" + z, idx); } }
+        hovered(z, idx) => { if (i == overlays.length - 1) { root.hovered("overlay-" + z, idx); } }
+    }
+
+    HintBar {
+        visible: show-tako;
+        y: root.height - self.height;
+        width: root.width;
+        hints: hints;
+        activate(i) => { root.hint-clicked(i); }
+    }
+
+    if toast != "": Rectangle {
+        x: (root.width - self.width) / 2;
+        y: root.height - Ui.hint-bar - self.height - 24 * Ui.u;
+        height: 56 * Ui.u;
+        width: tt.preferred-width + 56 * Ui.u;
+        border-radius: 28 * Ui.u;
+        background: #141821f5;
+        border-width: 1px;
+        border-color: #ffffff26;
+        drop-shadow-blur: 24 * Ui.u;
+        drop-shadow-color: #00000080;
+        tt := Text {
+            text: toast;
+            color: #FFFFFF;
+            font-size: 15 * Ui.u * Ui.text-scale;
+            font-weight: 600;
+            font-family: "Plus Jakarta Sans";
+        }
+    }
+
+    // Entrada do app
+    property <bool> intro-play;
+    Timer {
+        interval: 16ms;
+        running: root.intro && !root.intro-play;
+        triggered => { root.intro-play = true; }
+    }
+    Rectangle {
+        visible: root.intro || self.opacity > 0;
+        background: #000000;
+        opacity: root.intro ? 1 : 0;
+        animate opacity { duration: Ui.intro-fade(root.intro); easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        accessible-role: image;
+        accessible-label: "Tako";
+        TouchArea { visible: root.intro; clicked => { root.clicked("intro", 0); } }
+        Rectangle {
+            height: 120 * Ui.u;
+            width: 120 * Ui.u;
+            x: (root.width - self.width) / 2;
+            y: (root.height - self.height) / 2;
+            Image { width: parent.width; height: parent.height; source: @image-url("@tako/tako-mark.png"); }
+        }
+    }
+
+    fs := FocusScope {
+        key-pressed(e) => {
+            if (root.key(e.text, e.repeat, e.modifiers.control, e.modifiers.shift, e.modifiers.alt)) { return accept; }
+            reject
+        }
+        key-released(e) => {
+            root.key-released(e.text);
+            accept
+        }
+    }
+}
