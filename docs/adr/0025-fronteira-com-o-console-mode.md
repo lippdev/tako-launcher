@@ -52,4 +52,4 @@ O Tako não depende dela para funcionar. Quando existir, deve seguir isto:
 
 ## Detecção da API (CMI-002)
 
-Socket Unix ou named pipe sem resposta resulta conservadoramente em `NaoInstalado`. Não há transporte alternativo por TCP nem arquivos locais de descoberta (`discovery.json`).
+Socket Unix ou named pipe inexistente, ou conexão recusada, resulta conservadoramente em `NaoInstalado`. Se a conexão é aceita mas não há resposta em 500 ms, o resultado é `Erro`. Não há transporte alternativo por TCP nem arquivos locais de descoberta (`discovery.json`).

@@ -5,6 +5,7 @@
 
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tako_core::console_mode::{ConsoleModeStatus, perform_handshake};
 
@@ -85,7 +86,15 @@ impl<T: Read + Write + ?Sized> ReadWrite for T {}
 
 /// Detecção nativa do Console Mode no ambiente atual com timeout garantido por thread.
 pub fn detect() -> ConsoleModeStatus {
-    detect_with(&PlatformPaths, connect_local_socket, DETECTION_TIMEOUT)
+    // No Windows o pipe não tem timeout de leitura: a thread pode ficar presa num servidor mudo.
+    // Enquanto ela viver, não abre outra (senão cada "Verificar de novo" deixaria mais uma presa).
+    static IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+    detect_guarded(
+        &PlatformPaths,
+        connect_local_socket,
+        DETECTION_TIMEOUT,
+        Some(&IN_FLIGHT),
+    )
 }
 
 /// Detecção com caminhos, conector e timeout desacoplados para testes.
@@ -94,14 +103,38 @@ where
     P: ConsoleModePaths + Clone + Send + 'static,
     C: Fn(&Path) -> io::Result<Box<dyn ReadWrite>> + Send + 'static,
 {
+    detect_guarded(paths, connector, timeout, None)
+}
+
+fn detect_guarded<P, C>(
+    paths: &P,
+    connector: C,
+    timeout: Duration,
+    in_flight: Option<&'static AtomicBool>,
+) -> ConsoleModeStatus
+where
+    P: ConsoleModePaths + Clone + Send + 'static,
+    C: Fn(&Path) -> io::Result<Box<dyn ReadWrite>> + Send + 'static,
+{
+    if in_flight.is_some_and(|f| f.swap(true, Ordering::AcqRel)) {
+        return ConsoleModeStatus::Erro;
+    }
     let (tx, rx) = std::sync::mpsc::channel();
     let paths_clone = paths.clone();
     let handle = std::thread::Builder::new()
         .name("console-mode-detect".into())
         .spawn(move || {
             let res = detect_internal(&paths_clone, connector);
+            if let Some(f) = in_flight {
+                f.store(false, Ordering::Release);
+            }
             let _ = tx.send(res);
         });
+    if handle.is_err()
+        && let Some(f) = in_flight
+    {
+        f.store(false, Ordering::Release);
+    }
 
     match handle {
         Ok(_) => match rx.recv_timeout(timeout) {
