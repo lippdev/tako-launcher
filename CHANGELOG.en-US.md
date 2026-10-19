@@ -20,6 +20,15 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **`tako://` links on macOS:** shortcuts and Stream Deck open games and Tako screens on the Mac too.
 - **Linux packages:** AUR PKGBUILDs and a Flatpak in the repository (not published yet).
 - **Bottles and itch.io on Linux:** games installed through Bottles and the itch.io app show up in the library.
+- **Local API:** other programs on your computer (Stream Deck, scripts) can read the library and open games through an API on 127.0.0.1 with a token. Off by default.
+- **Edit the theme:** accent color, font and background (color or image) of the current theme, with a live preview and "Restore default".
+- **Create a theme:** start from the default theme or an installed one, adjust colors, font and background, name it and save it as a new theme; export it as `.takotheme` to share.
+- **Theme music and sounds:** in full screen, a theme can bring background music and navigation sounds, with their own volume in Settings › Sound. They never play during a game.
+- **Fita theme:** a new official full-screen theme, with games in a horizontal carousel and the art filling the screen.
+- **Proton and Wine on Linux:** Windows games added by hand can open with the system Wine, Steam's Proton (including GE-Proton) or a Lutris runner, with their own prefix.
+- **Backup and restore:** Settings › System creates a `.takobackup` with the library, settings, themes and chosen covers. Restoring saves a copy of the current state first; permissions and the local API token never go into the backup.
+- **Sunshine and Moonlight:** in Settings › Integrations, export your games to Sunshine/Apollo and open them from Moonlight. Tako shows a preview, backs up `apps.json` and never touches the apps you already had.
+- **Console Mode:** Settings › Integrations shows whether Console Mode is installed and which API version it offers.
 
 ### Fixes
 - **Slow list and images not loading (alpha.15):** list icons have their own queue and no longer hold up covers and backgrounds; the UI only redraws when an image arrives, and art the store doesn't have isn't requested again on every launch.

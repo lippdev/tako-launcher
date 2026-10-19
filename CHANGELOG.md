@@ -20,6 +20,15 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 - **Links `tako://` no macOS:** atalhos e o Stream Deck abrem jogos e telas do Tako também no Mac.
 - **Pacotes Linux:** PKGBUILDs para o AUR e Flatpak no repositório (ainda não publicados).
 - **Bottles e itch.io no Linux:** os jogos instalados pelo Bottles e pelo app do itch.io aparecem na biblioteca.
+- **API local:** outros programas da sua máquina (Stream Deck, scripts) podem ler a biblioteca e abrir jogos por uma API em 127.0.0.1 com token. Vem desligada.
+- **Editar o tema:** cor de destaque, fonte e fundo (cor ou imagem) do tema atual, com prévia ao vivo e "Restaurar padrão".
+- **Criar tema:** parta do tema padrão ou de um instalado, ajuste cores, fonte e fundo, dê um nome e salve como tema novo; exporte como `.takotheme` para compartilhar.
+- **Música e sons do tema:** na tela cheia, o tema pode trazer música de fundo e sons de navegação, com volume próprio em Configurações › Som. Nunca tocam durante o jogo.
+- **Tema Fita:** tema oficial novo para a tela cheia, com os jogos num carrossel horizontal e a arte em tela inteira.
+- **Proton e Wine no Linux:** jogos de Windows adicionados à mão podem abrir com o Wine do sistema, o Proton da Steam (inclusive GE-Proton) ou um runner do Lutris, com prefixo próprio.
+- **Backup e restauração:** Configurações › Sistema gera um `.takobackup` com a biblioteca, as configurações, os temas e as capas escolhidas. Restaurar guarda antes uma cópia do estado atual; permissões e o token da API local nunca entram no backup.
+- **Sunshine e Moonlight:** em Configurações › Integrações, exporte os jogos para o Sunshine/Apollo e abra-os pelo Moonlight. O Tako mostra a prévia, faz backup do `apps.json` e nunca mexe nos apps que você já tinha.
+- **Console Mode:** Configurações › Integrações mostra se o Console Mode está instalado e qual versão da API ele oferece.
 
 ### Correções
 - **Lista lenta e imagens que não carregavam (alpha.15):** os ícones da lista têm fila própria e não seguram mais as capas e os fundos; a interface só redesenha quando uma imagem chega, e arte que a loja não tem não é pedida de novo a cada abertura.
