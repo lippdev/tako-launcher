@@ -128,7 +128,7 @@ Roteiro de publicação e permissões em [packaging-linux.md](../packaging-linux
 ### Flatpak (`io.github.lippdev.Tako`)
 
 - [ ] Gerar o `cargo-sources.json` e compilar como em packaging-linux.md; `flatpak run io.github.lippdev.Tako` abre.
-- [ ] Biblioteca: Steam nativa e Steam Flatpak, Heroic nativo e Flatpak, Lutris nativo e Flatpak, Bottles nativo e Flatpak, itch.io nativo e Flatpak aparecem (um de cada que houver). Biblioteca da Steam em `/mnt`, `/media` ou `/run/media` aparece; em outro caminho não aparece até `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
+- [ ] Biblioteca: Steam nativa e Steam Flatpak, Heroic nativo e Flatpak, Lutris nativo e Flatpak, itch.io nativo e Flatpak aparecem (um de cada que houver; o Bottles fica oculto no Flatpak). Biblioteca da Steam e do itch.io em `/mnt`, `/media` ou `/run/media` aparece; em outro caminho não aparece até `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
 - [ ] Abrir um jogo da Steam e do Heroic/Lutris pelo Tako: abre no host (link da loja pelo portal). Anotar se o Tako acompanha o jogo até fechar (esperado: só a Steam pelo `RunningAppID`).
 - [ ] Controle: o controle é reconhecido e navega; o cursor pelo controle move o mouse (precisa de `--device=all` e da regra udev no host).
 - [ ] Áudio: lista de saídas, troca da padrão, volume e mudo. Segredos: salvar uma chave de API e reabrir.

@@ -66,7 +66,9 @@ O `Cargo.toml` pede Rust 1.97; o `rust-stable` do SDK acompanha o estável, ent�
 - Tela: só XRandR (X11) e Mutter (GNOME). `kscreen-doctor` e `wlr-randr` não existem na sandbox: nesses ambientes as opções de tela somem (`Unsupported`).
 - "Abrir com o sistema" grava no `~/.var/app/<id>/config/autostart`, que o sistema não lê; precisa do portal Background (não implementado).
 - Atualizador interno desligado (o Tako reconhece a sandbox por `FLATPAK_ID` ou `/.flatpak-info`); atualiza pelo Flatpak.
-- Cada fonte lê `XDG_*_HOME` da sandbox e também a pasta padrão do usuário (`~/.config/heroic`, `~/.local/share/lutris`), então Heroic, Lutris, Bottles e itch.io nativos aparecem. Já a descoberta de emuladores nativos e "Adicionar jogo" por `.desktop` do usuário olham só o `XDG_*_HOME` da sandbox.
+- A fonte Bottles fica oculta dentro do Flatpak porque a sandbox não inclui `bottles-cli` nem `flatpak` para disparar os programas das garrafas.
+- Jogos do itch.io instalados em locais fora das pastas padrão precisam de permissão do usuário: `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
+- Cada fonte lê `XDG_*_HOME` da sandbox e também a pasta padrão do usuário (`~/.config/heroic`, `~/.local/share/lutris`, `~/.config/itch`), então Heroic, Lutris e itch.io nativos aparecem. Já a descoberta de emuladores nativos e "Adicionar jogo" por `.desktop` do usuário olham só o `XDG_*_HOME` da sandbox.
 - Uma saída para tudo isso é um backend `flatpak-spawn --host` em `tako-platform`: decisão de produto do mantenedor (amplia a permissão); não está nesta entrega.
 
 ### O que o linter do Flathub aponta (resultado do `flatpak-builder-lint`)
