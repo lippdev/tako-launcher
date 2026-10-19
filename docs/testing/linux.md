@@ -136,3 +136,14 @@ Roteiro de publicação e permissões em [packaging-linux.md](../packaging-linux
 - [ ] `tako://settings` pelo navegador abre o Flatpak (`flatpak run` pelo `.desktop` exportado); Atualizações não oferece instalar.
 - [ ] Anotar o que quebrou por causa da sandbox (executável, emulador, "Abrir com o sistema") para decidir sobre o backend `flatpak-spawn --host`.
 - [ ] Com o Flatseal: `flatpak info --show-permissions io.github.lippdev.Tako` bate com o manifesto (sem `home` nem `org.freedesktop.Flatpak`).
+
+## Downloads por torrent (DL-001)
+
+- [ ] A pasta padrão é `$XDG_DOWNLOAD_DIR/Tako` (ou `~/Downloads/Tako`).
+- [ ] Configurações › Downloads vem desligado. Ligar mostra o aviso legal e de IP; Cancelar mantém desligado; "Entendi e aceito" liga e não pergunta de novo.
+- [ ] Adicionar fonte com `http://` é recusado; com uma fonte `https://` sua de teste (só itens fictícios ou de conteúdo livre), a linha mostra o número de itens. Remover apaga a fonte e o cache.
+- [ ] Num jogo não instalado, ⋯ › "Baixar de uma fonte" lista só itens parecidos; confirmar vincula ao jogo, a pílula "↓ N%" aparece antes do perfil e o jogo mostra o progresso na lista.
+- [ ] No painel: pausar para na hora (sem confirmação); cancelar pede confirmação e "Cancelar e apagar" remove a pasta. Com uma instalação da Steam em andamento, ela aparece em BAIXANDO "pela Steam" e os botões abrem o cliente.
+- [ ] Ao terminar: aviso, item em CONCLUÍDOS com "Abrir pasta"; o gerenciador de arquivos abre na pasta e nada é executado. O envio para (sem semear).
+- [ ] Reabrir o Tako com um download em andamento: ele volta pausado e continua ao retomar.
+- [ ] Durante um jogo com a janela minimizada, o download segue (confira o tamanho da pasta) e nada anima.

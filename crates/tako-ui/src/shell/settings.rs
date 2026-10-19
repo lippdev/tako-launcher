@@ -72,6 +72,11 @@ pub fn categories() -> Vec<Category> {
             rows: controls::rows,
         },
         Category {
+            id: "downloads",
+            icon: "download",
+            rows: super::downloads::settings_rows,
+        },
+        Category {
             id: "system",
             icon: "alert",
             rows: system,
@@ -1040,6 +1045,19 @@ impl Default for SettingsPage {
 }
 
 impl SettingsPage {
+    fn sync_categories(&mut self, ctx: &Ctx) {
+        if self.cats.iter().any(|c| c.id == "downloads") == ctx.desktop {
+            return;
+        }
+        let selected = self.cats[self.cat].id;
+        self.cats = categories()
+            .into_iter()
+            .filter(|c| ctx.desktop || c.id != "downloads")
+            .collect();
+        self.cat = self.cats.iter().position(|c| c.id == selected).unwrap_or(0);
+        self.row = None;
+    }
+
     pub fn new() -> SettingsPage {
         SettingsPage {
             cats: categories(),
@@ -1149,6 +1167,7 @@ impl Page for SettingsPage {
     }
 
     fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
+        self.sync_categories(ctx);
         let items = self.items(ctx);
         let n = self.cats.len();
         match (self.row, cmd) {
@@ -1215,6 +1234,7 @@ impl Page for SettingsPage {
     }
 
     fn render(&mut self, ctx: &Ctx, out: &mut Out) {
+        self.sync_categories(ctx);
         let items = self.items(ctx);
         if let Some(r) = self.row
             && r >= items.len()

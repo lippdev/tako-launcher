@@ -20,6 +20,20 @@ fn rows_of(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     (cat.rows)(ctx)
 }
 
+#[test]
+fn downloads_settings_only_appear_on_desktop() {
+    let _g = LOCK.lock().unwrap();
+    let (_dir, mut ctx) = ctx();
+    let mut page = SettingsPage::at("downloads");
+    ctx.desktop = false;
+    page.render(&ctx, &mut Out::default());
+    assert!(!page.cats.iter().any(|c| c.id == "downloads"));
+    assert!(page.cat < page.cats.len());
+    ctx.desktop = true;
+    page.render(&ctx, &mut Out::default());
+    assert!(page.cats.iter().any(|c| c.id == "downloads"));
+}
+
 fn find(items: &[MenuItem], key: &str) -> MenuItem {
     items
         .iter()

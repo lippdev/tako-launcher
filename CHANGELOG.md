@@ -4,6 +4,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 ### Novidades
+- **Downloads por torrent:** baixe jogos das fontes que você mesmo adiciona, num painel com pausa, retomada e fila. Vem desligado.
 - **Jogos não instalados:** os jogos da sua conta nas lojas que não estão no PC aparecem depois dos instalados, agrupados por loja, na lista e na grade. Cada grupo abre e fecha, e o Tako lembra como você deixou.
 - **Instalar pela loja:** o botão ⬇ na linha, na capa e no destaque abre a instalação no cliente da loja, mostrando a loja e o tamanho. Jogo comprado em mais de uma loja deixa escolher por qual instalar.
 - **Progresso da instalação:** na Steam, o Tako mostra a porcentagem com um anel na lista e na grade e "Baixando… 42%" no destaque. Quando termina, o jogo vira instalado sem reiniciar. Na Epic aparece "Instalando" sem número.

@@ -489,6 +489,10 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
             .len()
             .min(1 + usize::from(v.iter().any(|i| i.row.key == "install-from")));
         v.splice(at..at, extra);
+        // DL-001: baixar de uma fonte do usuário (ou ver o download deste jogo).
+        if let Some(item) = super::downloads::game_action(ctx, &id) {
+            v.insert(at, item);
+        }
         v
     })
 }
