@@ -14,54 +14,92 @@ Na rodada de 17/10/2026, a issue #102 levantou os requisitos iniciais e o manten
 
 ### Princípios mandatórios
 
-1. **Privacidade absoluta (100% offline):** nenhum fragmento de áudio, forma de onda ou texto reconhecido pode ser transmitido para a rede (CONTRIBUTING §5). O reconhecimento deve ocorrer exclusivamente no dispositivo do usuário.
-2. **Suporte bilíngue de primeira classe:** reconhecimento preciso em português do Brasil (pt-BR) e inglês (en-US).
+1. **Privacidade absoluta (100% offline):** nenhum fragmento de áudio, forma de onda ou texto reconhecido pode ser transmitido para a rede (CONTRIBUTING §5). O reconhecimento deve ocorrer exclusivamente no dispositivo local.
+2. **Suporte bilíngue de primeira classe:** reconhecimento em português do Brasil (pt-BR) e inglês (en-US).
 3. **Multiplataforma:** funcionamento uniforme nos três sistemas operacionais suportados pelo Tako (Windows, Linux e macOS).
-4. **Sem escuta passiva:** não deve existir ativação contínua ("wake word" ou hotword em segundo plano), evitando preocupações de privacidade e consumo constante de bateria e CPU. A captura deve ocorrer apenas mediante ação explícita (Push-to-Talk / atalho de controle ou teclado).
-5. **Arquitetura desacoplada:** o motor de fala deve ficar isolado sob um trait em `tako-core::devices` (`SpeechRecognizer`), com implementação simulada (mock) para testes unitários sem microfone ou modelos reais.
+4. **Sem escuta passiva:** não deve existir ativação contínua ("wake word" ou hotword em segundo plano), evitando preocupações de privacidade e consumo constante de bateria e CPU. A captura deve ocorrer apenas mediante ação explícita (Push-to-Talk / botão no controle ou atalho no teclado).
+5. **Arquitetura desacoplada e isolamento de FFI:**
+   - O contrato abstrato fica em `tako-core::devices` (`SpeechRecognizer`), com implementação simulada (mock) para testes unitários no CI sem hardware de áudio nem modelos.
+   - Todo código inseguro (`unsafe`) e vinculações FFI com a biblioteca C nativa `libvosk` e chamadas de captura de áudio com `cpal` residem **estritamente em `tako-platform`**.
+6. **Governança de dependências:** qualquer dependência externa (`cpal`, `vosk`, etc.) deve ser declarada centralizadamente na seção `[workspace.dependencies]` do `Cargo.toml` raiz do repositório.
+
+---
+
+## O desafio da gramática dinâmica do Vosk e o vocabulário fechado
+
+O Vosk permite definir uma gramática restrita em formato JSON contendo a lista finita de palavras e frases válidas. Ao restringir o espaço de busca acústica aos verbos de comando ("abrir", "jogar", "filtrar") e títulos cadastrados, busca-se evitar erros de sintaxe.
+
+Entretanto, **a gramática dinâmica do Vosk possui uma limitação severa de vocabulário (OOV — *Out-Of-Vocabulary*): ela descarta sumariamente qualquer palavra que não conste no léxico/dicionário pré-compilado do modelo Kaldi base.**
+Títulos de jogos estrangeiros, inventados, abreviados ou estilizados (como *"Balatro"*, *"NieR"*, *"Cyberpunk"*, *"Bayonetta"*, *"Hades"*, *"Shin Megami Tensei"*) simplesmente não existem no vocabulário padrão do modelo pt-BR ou en-US. Quando o usuário pronuncia essas palavras sob uma gramática estrita, o motor as descarta ou produz silêncio, inviabilizando a busca.
+
+### Plano B de contingência: Casamento aproximado e fonético
+
+Para contornar a limitação de palavras fora do vocabulário, o Tako não dependerá exclusivamente da gramática estrita fechada:
+1. **Modelo Híbrido:**
+   - A gramática estrita é utilizada prioritariamente para comandos operacionais do sistema ("abrir", "filtrar", "favoritos", "instalados").
+   - Para busca de títulos, caso a gramática estrita não identifique o título ou se o nome contiver termos fora do vocabulário, o motor recorrerá à **transcrição aberta (texto livre)** gerada pelo modelo acústico.
+2. **Casamento Fonético e por Similaridade:**
+   - O texto bruto transcrito é submetido a um pipeline de comparação em memória no `tako-core` contra os títulos da biblioteca local do usuário utilizando:
+     - Algoritmos de distância de edição (Levenshtein e Jaro-Winkler normalizados);
+     - Codificação fonética adaptada (como Metaphone / Double Metaphone ou Soundex pt-BR) para comparar como a palavra soa foneticamente em relação ao título real do jogo cadastrado na biblioteca.
+
+### Condição de aceite: Experimento prévio com títulos reais
+
+A escolha definitiva do motor fica expressamente condicionada à realização de um **experimento prático obrigatório com títulos reais da biblioteca** antes de qualquer implementação de código no Tako:
+- Testar o modelo com títulos populares com grafias atípicas (*"Balatro"*, *"NieR:Automata"*, *"Hades"*, *"BioShock"*, *"Stardew Valley"*);
+- Medir a taxa de descarte da gramática dinâmica e validar a assertividade do algoritmo de casamento fonético aproximado com falantes reais em pt-BR e en-US.
 
 ---
 
 ## Alternativas consideradas
 
-### 1. Vosk com gramática restrita (`libvosk` / crate `vosk`) (Recomendada)
+### 1. Vosk com gramática dinâmica e fallback fonético (`libvosk` / crate `vosk`) (Recomendada sob condição)
 
 O Vosk é um motor de reconhecimento de fala de código aberto baseado no toolkit Kaldi, distribuído sob licença Apache-2.0.
 
-- **Modelos:** modelos compactos específicos para inferência local rápida em CPUs:
-  - pt-BR: `vosk-model-small-pt-0.3` (~45 MB descompactado).
+- **Modelos oficiais (Licença Apache-2.0):**
+  - pt-BR: `vosk-model-small-pt-0.3` (**31 MB** descompactado).
   - en-US: `vosk-model-small-en-us-0.15` (~40 MB descompactado).
-- **Recurso de Gramática Dinâmica:** o Vosk permite definir uma gramática restrita em formato JSON contendo a lista finita de palavras e frases válidas. Ao alimentar a gramática com os verbos de comando ("abrir", "jogar", "filtrar", "categoria") e a lista exata dos títulos de jogos presentes na biblioteca local do usuário, a taxa de precisão atinge níveis excepcionais, eliminando alucinações fonéticas comuns com nomes estrangeiros ou inventados (ex.: "Balatro", "Hades", "NieR", "Cyberpunk").
-- **Desempenho e latência:** latência de resposta extremamente baixa (< 100 ms após o fim da fala) e uso de memória moderado (~60 a 90 MB de RAM durante a sessão de reconhecimento).
-- **Licença:** Apache-2.0 (totalmente compatível com a licença AGPL-3.0 do Tako).
-- **Dependências:** crate `vosk` em Rust + biblioteca dinâmica C `libvosk` (fornecida para Windows x64, Linux x64/aarch64 e macOS x64/arm64).
+- **Taxa oficial de erro de palavras (Word Error Rate - WER):**
+  - No modelo pt-BR pequeno (`vosk-model-small-pt-0.3`), os benchmarks oficiais reportam:
+    - **68,9% de WER no corpus CORAA** (áudio espontâneo e conversacional);
+    - **32,6% de WER no corpus Common Voice**.
+  - Os números evidenciam que a precisão em linguagem natural aberta é modesta, reforçando a dependência de comandos bem definidos e do algoritmo de casamento fonético da biblioteca.
+- **Latência e consumo de recursos:**
+  - Latência de resposta: *a medir em hardware*.
+  - Uso de memória RAM: *a medir em hardware* (estimativa típica de ~60 a 90 MB de RAM durante a inferência).
+- **Risco da crate `vosk` (v0.3.1):**
+  - O wrapper Rust `vosk` (versão 0.3.1 no crates.io) possui manutenção escassa e pouca atividade recente. Caso surjam incompatibilidades com novas versões do toolchain Rust ou sistemas operacionais, a equipe do Tako precisará manter bindings FFI diretos com a `libvosk` em C dentro de `tako-platform`.
+- **Download opt-in com SHA-256:**
+  - O download dos modelos acústicos nunca deve ser embutido forçadamente no instalador nem baixado sem permissão. O download é estritamente **opt-in**, com confirmação explícita do usuário nas Configurações, validando o hash **SHA-256** antes de extrair.
+- **Empacotamento da `libvosk` no ecossistema Linux:**
+  - **Flatpak:** inclusão de um módulo no manifesto do Flatpak (`com.lippdev.tako.json` / `.yaml`) que baixa a biblioteca pré-compilada upstream da `libvosk` e instala os binários em `/app/lib/`.
+  - **AUR (Arch Linux):** declaração no PKGBUILD de dependência do pacote `vosk-api` ou embutimento da biblioteca compartilhada `libvosk.so` no diretório privado da aplicação (`/usr/lib/tako/`).
 
 ### 2. `whisper.cpp` (`whisper-rs`)
 
 Port em C/C++ da arquitetura OpenAI Whisper por Georgi Gerganov.
 
 - **Modelos:** modelo `tiny` (~75 MB) ou `base` (~140 MB).
-- **Prós:** motor de estado da arte para fala natural genérica, excelente com sotaques variados; licença MIT.
-- **Contras:** não oferece suporte nativo a restrição rígida por gramática com vocabulário fechado, o que frequentemente leva à grafia incorreta ou alucinações ao transcrever títulos de jogos pouco usuais; alto consumo de CPU e memória RAM (200-400 MB) em inferência por CPU; impacto severo de latência em dispositivos portáteis operando em bateria (Steam Deck, ROG Ally); requer ferramenta de compilação C++ pesada (CMake) no ambiente de CI para os 3 SOs.
+- **Prós:** motor de arquitetura neural contemporânea para fala natural; licença MIT; boa resiliência a sotaques.
+- **Contras:**
+  - Não possui mecanismo nativo de restrição rígida de vocabulário ou gramática;
+  - Latência de inferência e uso de memória: *a medir em hardware* (alta dependência de aceleração vetorial AVX/NEON na CPU, com sobrecarga estimada sensivelmente superior ao Kaldi em CPUs modestas);
+  - Requer toolchain C++ pesado (CMake / compilador C++17) no ambiente de CI para os 3 SOs.
 
 ### 3. APIs nativas do sistema operacional
 
-Utilizar as APIs embutidas de cada SO (`Windows.Media.SpeechRecognition` / SAPI no Windows; `SFSpeechRecognizer` / Speech Framework no macOS; Speech Dispatcher no Linux).
+Utilizar as APIs embutidas de cada SO (`Windows.Media.SpeechRecognition` / SAPI no Windows; `SFSpeechRecognizer` no macOS; Speech Dispatcher no Linux).
 
-- **Prós:** não adiciona peso de modelos nem binários externos ao instalador do Tako.
-- **Contras:**
-  - **Comportamento heterogêneo:** cada SO possui formatos, capacidades e taxas de erro completamente divergentes.
-  - **Windows:** a API de reconhecimento offline depende de pacotes opcionais de idioma que o usuário precisa ter instalado manualmente nas configurações do Windows; caso ausente, falha silenciosamente.
-  - **macOS:** a API moderna `SFSpeechRecognizer` exige permissões de sistema específicas e, por padrão, envia dados de voz aos servidores da Apple a menos que configurada explicitamente com `requiresOnDeviceRecognition = true` (disponível apenas em versões recentes e se o modelo estiver baixado localmente).
-  - **Linux:** não há um subsistema nativo padrão de reconhecimento de fala offline de alta qualidade distribuído entre as diferentes distros.
-  - **Testabilidade:** inviabiliza testes automatizados determinísticos entre plataformas.
+- **Prós:** 0 MB de download de modelos no Tako.
+- **Contras:** comportamento heterogêneo entre plataformas; no macOS há risco de envio de áudio aos servidores da Apple caso o modelo local não esteja presente; no Linux não há padrão consolidado offline entre distribuições; inviabiliza testes automatizados padronizados.
 
 ### 4. PocketSphinx
 
 Motor tradicional de reconhecimento contínuo de fala (CMU Sphinx).
 
-- **Prós:** biblioteca muito leve e rápida em C puro.
-- **Contras:** modelos acústicos legados e taxa de precisão muito inferior em português do Brasil comparado a modelos neurais ou Kaldi contemporâneos; desenvolvimento em ritmo de manutenção legada.
+- **Prós:** extremamente leve em C puro.
+- **Contras:** modelos acústicos legados com precisão substancialmente inferior aos modelos Kaldi contemporâneos em português do Brasil.
 
 ---
 
@@ -70,44 +108,51 @@ Motor tradicional de reconhecimento contínuo de fala (CMU Sphinx).
 | Critério | Vosk (Kaldi) | whisper.cpp | APIs nativas do SO | PocketSphinx |
 |---|---|---|---|---|
 | **Privacidade 100% offline auditável** | Sim (código aberto e verificável) | Sim (código aberto e verificável) | Risco no macOS (Apple Speech) | Sim |
-| **Precisão com nomes de jogos** | **Excelente** (com gramática dinâmica) | Média (sem gramática fechada) | Média/Baixa | Baixa |
-| **Latência de resposta** | **< 100 ms** | 500 ms – 1500 ms | 200 ms – 500 ms | < 100 ms |
-| **Uso de RAM / CPU** | Baixo (~75 MB RAM / CPU leve) | Alto (~250 MB RAM / CPU pesada) | Baixo (gerenciado pelo SO) | Mínimo |
+| **Taxa de erro oficial (pt-BR)** | CORAA: 68,9% WER / Common Voice: 32,6% WER | *a medir* | Não documentada de forma aberta | Elevada taxa de erro |
+| **Palavras fora do vocabulário (OOV)** | Descarta na gramática estrita; exige plano B fonético | Transcreve aproximação livre | Transcreve aproximação livre | Descarta |
+| **Latência de resposta** | *a medir* | *a medir* | *a medir* | *a medir* |
+| **Uso de RAM / CPU** | *a medir* | *a medir* | Gerenciado pelo SO | Mínimo |
 | **Consistência nos 3 SOs** | Idêntica | Idêntica | Fragmentada | Idêntica |
-| **Tamanho dos modelos (pt-BR + en-US)** | ~85 MB total | ~150-280 MB | 0 MB no Tako (usa do SO) | ~60 MB |
-| **Complexidade de build** | Média (`libvosk` dinâmica) | Alta (CMake + C++14/17) | Média (bindings nativos) | Média |
-| **Licença** | Apache-2.0 | MIT | Proprietária do SO | BSD-2 |
+| **Tamanho dos modelos (pt-BR + en-US)** | ~71 MB total (pt-BR: 31 MB, en-US: ~40 MB) | ~150-280 MB | 0 MB no Tako (usa do SO) | ~60 MB |
+| **Licença do motor e modelos** | Apache-2.0 (código e modelos) | MIT | Proprietária do SO | BSD-2 |
+| **Manutenção da crate Rust** | Risco: crate `vosk` 0.3.1 estagnada | Ativa (`whisper-rs`) | N/A (bindings nativos) | Estagnada |
 
 ---
 
 ## Decisão proposta
 
-1. **Motor de Reconhecimento:** adotar **Vosk com gramática dinâmica** como motor padrão de transcrição de fala para o VOICE-001.
-2. **Captura de Áudio:** utilizar a crate `cpal` (Apache-2.0 / MIT) no `tako-platform` para captura de áudio PCM monocal via WASAPI (Windows), ALSA/PulseAudio/PipeWire (Linux) e CoreAudio (macOS).
-3. **Contrato de Abstração:** criação do trait `tako_core::devices::SpeechRecognizer` com métodos assíncronos de inicialização, alimentação de fluxo PCM e notificação de eventos de transcrição. A implementação pura aceita simulação de fluxo em memória para testes do CI sem dependência de hardware.
-4. **Construção Dinâmica da Gramática:** ao iniciar uma sessão de voz, o Tako gera dinamicamente uma gramática com:
-   - Verbos e termos de comando em pt-BR e en-US ("abrir", "iniciar", "jogar", "pesquisar", "filtrar", "gênero", "instalados", "favoritos", etc.).
-   - Os títulos exatos de todos os jogos cadastrados na biblioteca local do usuário.
-5. **Garantia Técnica de Privacidade:**
-   - O módulo de voz não possui dependências de rede e é isolado de sockets.
-   - A captura de microfone é disparada **exclusivamente** via ação explícita (Push-to-Talk).
-   - O buffer de áudio é mantido temporariamente em memória RAM e imediatamente sobrescrito e liberado após o encerramento do reconhecimento, sem gravação de arquivos de áudio em disco.
-6. **Interface e Feedback:** enquanto o botão de voz estiver pressionado, a interface exibirá uma sobreposição sutil ("Ouvindo...") com indicador visual de nível de áudio e atualização instantânea do texto reconhecido na barra de pesquisa.
+1. **Condicionamento a Experimento Real:** a adoção do Vosk com gramática dinâmica fica condicionada ao resultado do experimento prático com títulos reais da biblioteca e validação do algoritmo de contingência fonética.
+2. **Plano B de Contingência Fonética:** incorporar no `tako-core` rotinas de casamento aproximado (Levenshtein e Metaphone/Soundex) sobre a saída de texto livre para jogos com títulos fora do vocabulário do modelo.
+3. **Distribuição dos Modelos via Download Opt-in:**
+   - Os modelos acústicos oficiais Apache 2.0 (pt-BR de **31 MB** e en-US de ~40 MB) não virão embutidos no instalador.
+   - O download ocorrerá sob demanda, estritamente *opt-in*, com confirmação prévia do usuário nas Configurações e conferência de integridade via **hash SHA-256**.
+4. **Isolamento de Código FFI e Áudio:**
+   - Captura de áudio PCM via crate `cpal` e vinculação com `libvosk` restritas exclusivamente a **`tako-platform`**.
+   - Trait de abstração pura `SpeechRecognizer` em `tako-core::devices`.
+5. **Governança de Dependências:**
+   - Dependências (`cpal`, `vosk`) registradas centralizadamente em `[workspace.dependencies]`.
+   - Ciente do risco de pouca manutenção da crate `vosk` 0.3.1, com plano de FFI manual se necessário.
+6. **Empacotamento nos Canais Linux:**
+   - Inclusão da `libvosk` no manifesto Flatpak (`/app/lib/`) e no PKGBUILD do AUR.
+7. **Privacidade e Acionamento:**
+   - Captura estritamente orientada a Push-to-Talk (sem escuta contínua de fundo).
+   - Áudio descartado imediatamente da memória RAM após a transcrição; sem escrita em disco ou transmissão de rede.
 
 ---
 
 ## Consequências
 
-- Inclusão da dependência de áudio `cpal` e da biblioteca nativa `libvosk`.
-- O tamanho dos artefatos de distribuição ou da primeira execução sofrerá acréscimo de aproximadamente 85 MB para acomodar os modelos de linguagem e acústica de pt-BR e en-US.
-- A biblioteca só necessitará reconstruir a gramática quando jogos forem adicionados, renomeados ou removidos da coleção.
-- Caso o usuário não possua microfone ou recuse a permissão de acesso ao dispositivo no sistema operacional, o Tako manterá a busca por texto tradicional sem qualquer degradação.
+- A biblioteca ganha busca por voz 100% offline e privada, sem expor nenhum dado do usuário à rede.
+- Usuários que optarem pelo recurso farão o download verificado via SHA-256 dos modelos (~71 MB no total para ambos os idiomas).
+- A adição do módulo exige a inclusão da `libvosk` empacotada no Flatpak e AUR.
+- O experimento com títulos reais definirá a viabilidade final antes da escrita de código de integração.
 
 ---
 
 ## Perguntas para o mantenedor
 
-1. **Distribuição dos modelos de voz:** Os modelos compactos de pt-BR e en-US (~85 MB no total) devem vir embutidos diretamente no instalador oficial do Tako, ou devem ser baixados sob demanda na primeira vez que o usuário acionar o recurso de voz nas configurações (com confirmação explícita)?
-2. **Modo de acionamento preferido:** O design da entrada por voz deve adotar Push-to-Talk estrito (segurar botão no controle/atalho de teclado enquanto fala) ou modo de alternância (clicar para iniciar escuta e clicar para encerrar ou parar por detecção de silêncio de 1.5 s)?
-3. **Empacotamento da `libvosk`:** Preferir distribuir a biblioteca dinâmica pré-compilada (`libvosk.so` / `vosk.dll` / `libvosk.dylib`) empacotada na pasta do executável do Tako, ou configurá-la como dependência de sistema nos pacotes Linux (AUR, Flatpak, deb)?
-4. **Tratamento de múltiplos idiomas simultâneos:** O reconhecimento deve carregar o modelo de acordo com o idioma da interface escolhido pelo usuário no Tako (ex.: interface em pt-BR carrega modelo pt-BR) ou manter ambos os modelos carregados simultaneamente para aceitar comandos bilíngues a qualquer momento?
+1. **Aprovação do Vosk com Plano B e experimento:** O projeto aceita a adoção do Vosk mesmo com o descarte de nomes fora do vocabulário na gramática estrita, aprovando a estratégia de contingência com casamento fonético e exigindo o experimento prévio com títulos reais antes de codar?
+2. **Distribuição e integridade dos modelos:** Concorda com a distribuição dos modelos pt-BR (31 MB) e en-US (~40 MB) de forma estritamente *opt-in* sob demanda com confirmação do usuário e validação de hash SHA-256?
+3. **Modo de acionamento do microfone:** Preferir Push-to-Talk estrito (segurar botão no controle ou atalho no teclado enquanto fala) ou modo de alternância (clicar para iniciar escuta e parar por clique ou detecção de silêncio após 1.5 s)?
+4. **Empacotamento da `libvosk` no Linux:** Concorda com o empacotamento da `libvosk` compartilhada no Flatpak (`/app/lib/`) e via AUR?
+5. **Gerenciamento de idiomas em memória:** O reconhecimento deve carregar o modelo de acordo com o idioma da interface configurado no Tako ou manter ambos os modelos carregados em memória para comandos bilíngues instantâneos?
