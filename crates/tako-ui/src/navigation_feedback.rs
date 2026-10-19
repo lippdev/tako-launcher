@@ -260,8 +260,7 @@ fn load_wav_samples(path: &Path) -> Option<Vec<f32>> {
         return None;
     }
     let samples = decode_wav_to_mono_48k(&bytes)?;
-    (samples.len().checked_mul(std::mem::size_of::<f32>())? <= MAX_DECODED_MUSIC_BYTES)
-        .then_some(samples)
+    Some(samples)
 }
 
 thread_local! {
@@ -357,6 +356,10 @@ pub struct DecodedMusic {
     pub buffer: Arc<[u8]>,
 }
 
+fn decoded_music_size_allowed(size: usize) -> bool {
+    size <= MAX_DECODED_MUSIC_BYTES
+}
+
 fn load_music_file(path: &Path) -> Result<DecodedMusic, String> {
     let meta = std::fs::metadata(path).map_err(|e| e.to_string())?;
     if meta.len() == 0 {
@@ -369,6 +372,12 @@ fn load_music_file(path: &Path) -> Result<DecodedMusic, String> {
         ));
     }
     let wav = AudioSpecWAV::load_wav(path).map_err(|e| e.to_string())?;
+    if !decoded_music_size_allowed(wav.buffer().len()) {
+        return Err(format!(
+            "música decodificada excede limite de {} MB",
+            MAX_DECODED_MUSIC_BYTES / (1024 * 1024)
+        ));
+    }
     let buffer: Arc<[u8]> = Arc::from(wav.buffer());
     Ok(DecodedMusic {
         freq: wav.freq,
@@ -988,6 +997,12 @@ mod tests {
 
         // 7. Invalid header -> returns None
         assert!(decode_wav_to_mono_48k(b"NOT_A_WAV").is_none());
+    }
+
+    #[test]
+    fn decoded_music_size_limit_accepts_128_mib_and_rejects_larger_buffers() {
+        assert!(decoded_music_size_allowed(MAX_DECODED_MUSIC_BYTES));
+        assert!(!decoded_music_size_allowed(MAX_DECODED_MUSIC_BYTES + 1));
     }
 
     #[test]
