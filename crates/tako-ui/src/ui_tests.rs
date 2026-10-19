@@ -881,6 +881,28 @@ fn desktop_snapshot() {
                 let layer = crate::shell::settings::sunshine::preview_dialog(&shell.ctx, false);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("integrations") => {
+                shell.open_route("settings:integrations");
+                if let Ok(st) = std::env::var("TAKO_SNAP_CONSOLE_MODE") {
+                    match st.as_str() {
+                        "verificando" => {
+                            crate::shell::settings::integrations::set_checking_for_test(true)
+                        }
+                        "instalado" => crate::shell::settings::integrations::set_status_for_test(
+                            tako_core::console_mode::ConsoleModeStatus::Instalado {
+                                versao_api: 1,
+                                capacidades: vec!["tv".into(), "fps".into()],
+                            },
+                        ),
+                        "nao-instalado" => {
+                            crate::shell::settings::integrations::set_status_for_test(
+                                tako_core::console_mode::ConsoleModeStatus::NaoInstalado,
+                            )
+                        }
+                        _ => {}
+                    }
+                }
+            }
             Ok("settings") => {
                 shell.open_route("settings");
                 if let Ok(category) = std::env::var("TAKO_SNAP_SETTINGS_CATEGORY")
@@ -1335,11 +1357,12 @@ created-by-tako = true
                 r.render(&mut pixels, w as usize);
             });
             let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+            let file_suffix = std::env::var("TAKO_SNAP_FILE_SUFFIX").unwrap_or_default();
             image::RgbImage::from_raw(w, h, raw)
                 .unwrap()
                 .save({
                     let prefix = std::env::var("TAKO_SNAP_NAME").unwrap_or_else(|_| "desktop".into());
-                    format!("{out_dir}/{prefix}-{w}x{h}.png")
+                    format!("{out_dir}/{prefix}{file_suffix}-{w}x{h}.png")
                 })
                 .unwrap();
             // Quadros de 40 ms no relógio das animações, a partir de agora.
