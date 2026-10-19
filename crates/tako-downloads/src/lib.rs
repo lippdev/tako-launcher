@@ -39,8 +39,14 @@ impl std::error::Error for FetchError {}
 impl std::fmt::Display for FetchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FetchError::NotHttps => write!(f, "{}", tako_core::i18n::t("downloads.error.not_https")),
-            FetchError::TooLarge => write!(f, "{}", tako_core::i18n::t("downloads.error.source_too_large")),
+            FetchError::NotHttps => {
+                write!(f, "{}", tako_core::i18n::t("downloads.error.not_https"))
+            }
+            FetchError::TooLarge => write!(
+                f,
+                "{}",
+                tako_core::i18n::t("downloads.error.source_too_large")
+            ),
             FetchError::Http(err) => write!(
                 f,
                 "{}",
@@ -415,9 +421,9 @@ fn check_folder(
         return Err(DownloadError::UnsafePaths);
     }
     if !resume && std::fs::symlink_metadata(folder).is_ok() {
-        return Err(DownloadError::Engine(
-            tako_core::i18n::t("downloads.error.folder_exists"),
-        ));
+        return Err(DownloadError::Engine(tako_core::i18n::t(
+            "downloads.error.folder_exists",
+        )));
     }
     if resume && folder.exists() {
         let mut owner = Vec::new();
@@ -450,7 +456,9 @@ fn prepare_folder(folder: &Path, uri: &str) -> Result<(), DownloadError> {
             Err(e) => Err(e),
         }
     };
-    create().map_err(|_| DownloadError::Engine(tako_core::i18n::t("downloads.error.reserve_folder_failed")))
+    create().map_err(|_| {
+        DownloadError::Engine(tako_core::i18n::t("downloads.error.reserve_folder_failed"))
+    })
 }
 
 fn clear_owner(folder: &Path) {

@@ -101,14 +101,21 @@ impl std::fmt::Display for ApiServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ApiServerError::NonLoopbackAddress => {
-                write!(f, "{}", crate::i18n::t("settings.system.api_error.non_loopback"))
+                write!(
+                    f,
+                    "{}",
+                    crate::i18n::t("settings.system.api_error.non_loopback")
+                )
             }
             ApiServerError::Io(e) => {
                 let err_str = e.to_string();
                 write!(
                     f,
                     "{}",
-                    crate::i18n::tf("settings.system.api_error.bind_failed", &[("error", &err_str)])
+                    crate::i18n::tf(
+                        "settings.system.api_error.bind_failed",
+                        &[("error", &err_str)]
+                    )
                 )
             }
         }

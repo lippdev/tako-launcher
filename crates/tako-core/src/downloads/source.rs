@@ -30,9 +30,15 @@ impl std::error::Error for SourceError {}
 impl std::fmt::Display for SourceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SourceError::TooLarge => write!(f, "{}", crate::i18n::t("downloads.error.source_too_large")),
-            SourceError::InvalidJson => write!(f, "{}", crate::i18n::t("downloads.error.invalid_json")),
-            SourceError::MissingDownloads => write!(f, "{}", crate::i18n::t("downloads.error.missing_downloads")),
+            SourceError::TooLarge => {
+                write!(f, "{}", crate::i18n::t("downloads.error.source_too_large"))
+            }
+            SourceError::InvalidJson => {
+                write!(f, "{}", crate::i18n::t("downloads.error.invalid_json"))
+            }
+            SourceError::MissingDownloads => {
+                write!(f, "{}", crate::i18n::t("downloads.error.missing_downloads"))
+            }
         }
     }
 }

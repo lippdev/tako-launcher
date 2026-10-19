@@ -410,7 +410,7 @@ fn completed_row(ctx: &Ctx, d: &Download) -> MenuItem {
     row.image = thumb(ctx, d.game_id.as_deref());
     // Só abre a pasta no gerenciador de arquivos: nada de dentro dela é aberto ou executado.
     let mut item = MenuItem::new(row).on(move |ctx| {
-        let inside_root = match folder.strip_prefix(&root()) {
+        let inside_root = match folder.strip_prefix(root()) {
             Ok(rel) => {
                 let mut comps = rel.components();
                 match comps.next() {
