@@ -1053,6 +1053,7 @@ mod tests {
         // 2. Com Wine do sistema e prefixo padrão
         let mut o = store.load(&manual.id).unwrap();
         o.wine_runtime = Some("system-wine".into());
+        o.approve_commands();
         store.save(&manual.id, &o).unwrap();
 
         let Started::Tracking(req) = start(&mut ctx, &manual.id).unwrap() else {
@@ -1068,6 +1069,7 @@ mod tests {
 
         // 3. Com prefixo proibido (/ ou $HOME): recusa a abertura
         o.wine_prefix = Some("/".into());
+        o.approve_commands();
         store.save(&manual.id, &o).unwrap();
         assert!(start(&mut ctx, &manual.id).is_err());
     }
