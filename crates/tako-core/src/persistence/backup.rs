@@ -970,9 +970,12 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
     if extracted_themes.is_dir() {
         if had_old_themes {
             if themes_old.exists() {
-                if let Err(e) = fs::remove_dir_all(&themes_old) {
-                    rollback(db_swapped, false, false);
-                    return Err(e.into());
+                match fs::remove_dir_all(&themes_old) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        rollback(db_swapped, false, false);
+                        return Err(e.into());
+                    }
                 }
             }
             if let Err(e) = fs::rename(&dest_themes, &themes_old) {
@@ -993,9 +996,12 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
     if extracted_art.is_dir() {
         if had_old_art {
             if art_old.exists() {
-                if let Err(e) = fs::remove_dir_all(&art_old) {
-                    rollback(db_swapped, themes_swapped, false);
-                    return Err(e.into());
+                match fs::remove_dir_all(&art_old) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        rollback(db_swapped, themes_swapped, false);
+                        return Err(e.into());
+                    }
                 }
             }
             if let Err(e) = fs::rename(&dest_art, &art_old) {
