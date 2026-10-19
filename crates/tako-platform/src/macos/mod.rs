@@ -3,7 +3,10 @@
 mod audio;
 mod displays;
 mod input;
+mod links;
 mod processes;
+
+pub use links::on_open_url;
 
 use crate::Platform;
 use crate::unix::outputs::OutputDisplays;

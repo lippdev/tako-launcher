@@ -264,6 +264,12 @@ fn main() {
             });
         });
     }
+    // macOS: com o Tako aberto, o sistema entrega o link à janela por Apple Event, não por argumento.
+    #[cfg(target_os = "macos")]
+    tako_platform::macos::on_open_url(|url| {
+        tracing::info!("link recebido do sistema");
+        tako_ui::app::open_current_link(&url);
+    });
     if let Err(e) = app.run() {
         eprintln!("tako: {e}");
         std::process::exit(1);
