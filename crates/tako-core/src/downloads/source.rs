@@ -205,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_hydra_format_and_ignores_extra_fields() {
+    fn reads_the_source_format_and_ignores_extra_fields() {
         let s = parse(&source(&format!(
             r#"{{"title":"Jogo de Teste","uris":["{}"],"uploadDate":"2026-01-01","fileSize":"1.2 GB","extra":1}}"#,
             magnet()

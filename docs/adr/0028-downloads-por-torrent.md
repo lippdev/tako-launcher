@@ -5,7 +5,7 @@
 
 ## Contexto
 
-O DL-001 (PRD §9) pede baixar jogos por torrent a partir de fontes `.json` que o próprio usuário adiciona, no estilo do Hydra Launcher, vinculando o download ao jogo da biblioteca quando ele já existe ("Baixando Batman: Arkham Knight" com progresso, sem criar jogo novo). Ao terminar, "o jogo fica instalado e jogável pelo Tako". O DL-002 (Real-Debrid) vem depois.
+O DL-001 (PRD §9) pede baixar jogos por torrent a partir de fontes `.json` que o próprio usuário adiciona, em formato de fonte .json, vinculando o download ao jogo da biblioteca quando ele já existe ("Baixando Batman: Arkham Knight" com progresso, sem criar jogo novo). Ao terminar, "o jogo fica instalado e jogável pelo Tako". O DL-002 (Real-Debrid) vem depois.
 
 Restrições que valem para qualquer solução:
 
@@ -22,7 +22,7 @@ O ponto difícil é o "instalado e jogável": a maioria dos torrents de jogos tr
 ### 1. Fontes `.json`
 
 - O usuário adiciona uma fonte por URL `https://` (ou arquivo local) em Configurações › Downloads. Sem fontes embutidas, sem sugestões, sem texto de exemplo com endereços reais. Primeiro uso mostra o aviso legal (seção 8) e exige confirmação, gravada nas configurações.
-- Formato aceito (compatível com o do Hydra): `{ "name": string, "downloads": [ { "title": string, "uris": [string], "uploadDate": string, "fileSize": string } ] }`. Campos extras são ignorados.
+- Formato aceito (formato de fonte .json): `{ "name": string, "downloads": [ { "title": string, "uris": [string], "uploadDate": string, "fileSize": string } ] }`. Campos extras são ignorados.
 - Validação (parser puro em `tako-core`, sem rede):
   - resposta de até 5 MiB, no máximo 20 000 itens, `title` até 200 caracteres, até 8 `uris` por item, cada uma até 4 KiB; o que passar do limite é descartado com contagem no log, não derruba a fonte;
   - só `magnet:?xt=urn:btih:` (hash de 40 hex ou 32 base32) ou URL `https://` de arquivo `.torrent`; qualquer outro esquema (`file:`, `javascript:`, caminho local) é rejeitado;
@@ -35,7 +35,7 @@ O ponto difícil é o "instalado e jogável": a maioria dos torrents de jogos tr
 
 Recomendado: **`librqbit`** (Rust puro, Apache-2.0, compatível com AGPL-3.0): leitura de magnet, DHT, seleção de arquivos, pausa/retomada, verificação de partes, API de progresso. Custo: traz o `tokio` (hoje o workspace não tem runtime assíncrono); ele roda numa thread própria do módulo de downloads, com canal simples para a UI, sem espalhar `async` pelo resto. Entra em `[workspace.dependencies]` e em um crate novo `tako-downloads` (depende de `tako-core`; a UI só conversa por um trait de `tako_core`, com versão em memória para testes, como em `devices`). Antes de aceitar a dependência: conferir licença da árvore (`cargo deny`), tamanho do binário e manutenção ativa.
 
-Sem recursos de risco: sem UPnP/NAT-PMP por padrão (a porta só é aberta se o usuário ligar), sem execução de scripts ou plugins, sem "seed depois de concluir" por padrão (seção 7).
+Sem recursos de risco: só a porta UDP do DHT, sem porta TCP de escuta e sem UPnP, sem execução de scripts ou plugins, sem "seed depois de concluir" por padrão (seção 7).
 
 ### 3. Onde salva
 
