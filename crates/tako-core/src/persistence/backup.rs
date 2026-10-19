@@ -53,6 +53,10 @@ pub const BACKUP_EXTENSION: &str = "takobackup";
 pub const MANIFEST_FILE: &str = "backup.toml";
 pub const CURRENT_BACKUP_VERSION: u32 = 1;
 
+#[cfg(test)]
+pub(crate) static INJECT_RESTORE_DB_RENAME_FAIL: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 /// Limites razoáveis de proteção contra bombas de descompressão e arquivos maliciosos.
 pub const MAX_BACKUP_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
 pub const MAX_FILE_BYTES: u64 = 256 * 1024 * 1024; // 256 MB por arquivo
@@ -952,8 +956,13 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
             return Err(e.into());
         }
     }
+    #[cfg(test)]
+    if INJECT_RESTORE_DB_RENAME_FAIL.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        rollback(had_old_db, false, false);
+        return Err(io::Error::other("simulated db rename failure").into());
+    }
     if let Err(e) = fs::rename(&extracted_db, &db_path) {
-        rollback(false, false, false);
+        rollback(had_old_db, false, false);
         return Err(e.into());
     }
     let db_swapped = true;
@@ -2123,6 +2132,93 @@ mod tests {
         assert!(
             dest_theme_dir.join("theme.toml").exists(),
             "tema original deve continuar intacto"
+        );
+    }
+
+    #[test]
+    fn restore_rollback_on_database_swap_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = make_test_paths(dir.path());
+
+        // 1. Cria destino com banco e jogo existente
+        let db = TakoDatabase::new(paths.database());
+        let _ = db.open().unwrap();
+        let store = LibraryStore::new(db, None);
+        let mut data = store.load().unwrap();
+        data.manual.push(ManualGameRow {
+            id: "manual:antigo".into(),
+            title: "Antigo".into(),
+            path: "/path/antigo".into(),
+            arguments: None,
+            working_directory: None,
+            platform: None,
+            cover_path: None,
+            hero_path: None,
+            added_at: Utc::now(),
+            track_by: None,
+        });
+        store.save(&data).unwrap();
+
+        // 2. Cria origem com banco e jogo novo
+        let src_dir = tempfile::tempdir().unwrap();
+        let src_paths = make_test_paths(src_dir.path());
+        let src_db = TakoDatabase::new(src_paths.database());
+        let _ = src_db.open().unwrap();
+        let src_store = LibraryStore::new(src_db, None);
+        let mut src_data = src_store.load().unwrap();
+        src_data.manual.push(ManualGameRow {
+            id: "manual:novo".into(),
+            title: "Novo".into(),
+            path: "/path/novo".into(),
+            arguments: None,
+            working_directory: None,
+            platform: None,
+            cover_path: None,
+            hero_path: None,
+            added_at: Utc::now(),
+            track_by: None,
+        });
+        src_store.save(&src_data).unwrap();
+
+        let backup_file = dir.path().join("backup.takobackup");
+        create_backup(&src_paths, &backup_file).unwrap();
+
+        // 3. Força falha simulada na troca do banco de dados (rename staging -> tako.db)
+        INJECT_RESTORE_DB_RENAME_FAIL.store(true, std::sync::atomic::Ordering::SeqCst);
+
+        let res = restore_backup(&paths, &backup_file);
+        assert!(
+            res.is_err(),
+            "restore_backup deve falhar quando a troca do banco de dados falha"
+        );
+
+        // 4. Verifica que o banco de dados original foi devolvido
+        assert!(
+            paths.database().exists(),
+            "o banco de dados original deve existir apos o rollback"
+        );
+        let conn = Connection::open(paths.database()).unwrap();
+        let count_orig: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM manual_games WHERE id = 'manual:antigo';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let count_novo: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM manual_games WHERE id = 'manual:novo';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count_orig, 1,
+            "o banco deve ter sido revertido para o original com o jogo antigo"
+        );
+        assert_eq!(
+            count_novo, 0,
+            "o jogo novo do backup nao deve existir no banco apos o rollback"
         );
     }
 
