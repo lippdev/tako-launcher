@@ -12,7 +12,7 @@ use tako_core::input::profiles::{Profile, Profiles};
 use tako_core::input::{AppCommand, GamepadButtons};
 use tako_core::library::{CollectionLibrary, GameLibrary};
 use tako_core::paths::DataPaths;
-use tako_core::persistence::{GameChoicesStore, GameSettingsStore, SettingsStore};
+use tako_core::persistence::{GameChoicesStore, GameSettingsStore, SettingsStore, TakoDatabase};
 use tako_platform::Platform;
 
 /// Pedido da interface ao app (tarefas longas, outras janelas, sair).
@@ -320,6 +320,21 @@ pub type ArtPins = std::collections::BTreeMap<tako_core::library::ArtKind, Strin
 
 impl Ctx {
     /// Sem banco nem lojas (`--simulate`).
+    /// Recarrega banco, configurações, biblioteca e coleções após restaurar backup.
+    pub fn reload_data(&mut self) {
+        if self.simulated() {
+            return;
+        }
+        let db = TakoDatabase::new(self.paths.database());
+        self.settings = Settings::new(Some(SettingsStore::new(db.clone())));
+        self.game_settings = Some(GameSettingsStore::new(db.clone()));
+        self.choices = Some(GameChoicesStore::new(db));
+        self.library.load();
+        let _ = self.collections.load();
+        self.sync_collections();
+        self.dirty = true;
+    }
+
     pub fn simulated(&self) -> bool {
         self.game_settings.is_none()
     }

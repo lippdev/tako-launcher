@@ -5,6 +5,7 @@
 
 mod adapters;
 pub mod alpha_migration;
+pub mod backup;
 mod choices;
 mod collections;
 mod database;
@@ -16,6 +17,10 @@ mod settings;
 #[cfg(test)]
 mod alpha_compat_tests;
 
+pub use backup::{
+    BACKUP_EXTENSION, BackupError, BackupManifest, CURRENT_BACKUP_VERSION, MANIFEST_FILE,
+    RestoreResult, create_backup, inspect_backup, restore_backup,
+};
 pub use choices::GameChoicesStore;
 pub use collections::{CollectionRow, CollectionStore};
 pub use database::TakoDatabase;

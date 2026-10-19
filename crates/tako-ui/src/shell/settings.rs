@@ -885,6 +885,21 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             .desc(ctx.t("settings.system.safemode_off_desc")),
         )
     });
+    v.push(MenuItem::new(PanelRow::header(
+        ctx.t("settings.system.backup_header"),
+    )));
+    v.push(
+        MenuItem::new(action(ctx, "settings.system.backup")).on(|ctx| {
+            choose_backup(ctx);
+            Flow::Stay
+        }),
+    );
+    v.push(
+        MenuItem::new(action(ctx, "settings.system.restore")).on(|ctx| {
+            choose_restore(ctx);
+            Flow::Stay
+        }),
+    );
     if crate::discord::available() {
         v.push(MenuItem::new(PanelRow::header(
             ctx.t("settings.system.integrations_header"),
@@ -916,6 +931,104 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
         );
     }
     v
+}
+
+fn choose_backup(ctx: &mut Ctx) {
+    let title = ctx.t("settings.system.backup_choose_title");
+    let file_name = format!(
+        "tako-backup-{}.takobackup",
+        chrono::Utc::now().format("%Y%m%d-%H%M%S")
+    );
+    super::add_game::pick(
+        ctx,
+        move || {
+            rfd::FileDialog::new()
+                .set_title(&title)
+                .set_file_name(&file_name)
+                .add_filter("Tako Backup", &["takobackup"])
+                .save_file()
+        },
+        |ctx, path| match tako_core::persistence::backup::create_backup(&ctx.paths, &path) {
+            Ok(_) => {
+                ctx.toast(ctx.tf(
+                    "settings.system.backup_done",
+                    &[("path", &path.display().to_string())],
+                ));
+            }
+            Err(e) => {
+                ctx.toast(ctx.tf(
+                    "settings.system.backup_failed",
+                    &[("error", &e.to_string())],
+                ));
+            }
+        },
+    );
+}
+
+fn choose_restore(ctx: &mut Ctx) {
+    let title = ctx.t("settings.system.restore_choose_title");
+    super::add_game::pick(
+        ctx,
+        move || {
+            rfd::FileDialog::new()
+                .set_title(&title)
+                .add_filter("Tako Backup", &["takobackup"])
+                .pick_file()
+        },
+        |ctx, path| {
+            let layer = Box::new(confirm_restore_layer(ctx, path));
+            super::add_game::open_layer(ctx, layer);
+        },
+    );
+}
+
+pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> MenuLayer {
+    let title = ctx.t("settings.system.restore_confirm_title");
+    let file_name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let desc = ctx.tf(
+        "settings.system.restore_confirm_desc",
+        &[("file", &file_name)],
+    );
+    let confirm_btn = ctx.t("settings.system.restore_confirm_button");
+    let cancel_btn = ctx.t("common.cancel");
+    MenuLayer::dialog(title, move |_ctx| {
+        let p = path.clone();
+        vec![
+            MenuItem::new(PanelRow::info("confirm-desc", desc.clone(), "")),
+            MenuItem::new(PanelRow::button("confirm", confirm_btn.clone()).danger()).on(
+                move |ctx| match tako_core::persistence::backup::restore_backup(&ctx.paths, &p) {
+                    Ok(res) => {
+                        ctx.reload_data();
+                        let msg = if let Some(auto) = &res.auto_backup_path {
+                            let auto_name = auto
+                                .file_name()
+                                .map(|n| n.to_string_lossy().into_owned())
+                                .unwrap_or_default();
+                            ctx.tf(
+                                "settings.system.restore_done_with_auto",
+                                &[("auto", &auto_name)],
+                            )
+                        } else {
+                            ctx.t("settings.system.restore_done")
+                        };
+                        ctx.toast(msg);
+                        Flow::Close
+                    }
+                    Err(e) => {
+                        ctx.toast(ctx.tf(
+                            "settings.system.restore_failed",
+                            &[("error", &e.to_string())],
+                        ));
+                        Flow::Close
+                    }
+                },
+            ),
+            MenuItem::new(PanelRow::button("cancel", cancel_btn.clone())).on(|_| Flow::Close),
+        ]
+    })
 }
 
 // ---------------------------------------------------------------- Sobre

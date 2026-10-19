@@ -814,3 +814,29 @@ fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
     let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
     assert_eq!(volume(&ctx.settings), 65);
 }
+
+#[test]
+fn system_category_includes_backup_and_restore_options() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let rows = rows_of(&ctx, "system");
+    let backup_row = find(&rows, "settings.system.backup");
+    let restore_row = find(&rows, "settings.system.restore");
+
+    assert_eq!(backup_row.row.title, ctx.t("settings.system.backup"));
+    assert_eq!(backup_row.row.value, ctx.t("settings.system.backup_value"));
+    assert_eq!(restore_row.row.title, ctx.t("settings.system.restore"));
+    assert_eq!(
+        restore_row.row.value,
+        ctx.t("settings.system.restore_value")
+    );
+
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path);
+    let items = dialog.render(&ctx);
+    assert_eq!(
+        items.rows[1].title,
+        ctx.t("settings.system.restore_confirm_button")
+    );
+    assert_eq!(items.rows[2].title, ctx.t("common.cancel"));
+}
