@@ -20,13 +20,17 @@ pub enum GameStore {
     Heroic,
     /// Lutris (Linux).
     Lutris,
+    /// Bottles (Linux).
+    Bottles,
+    /// itch.io (Linux).
+    Itch,
     /// ROMs abertas por emuladores (SRC-001): RetroArch, ES-DE, emuladores avulsos e as pastas do usuário.
     Emulators,
     Manual,
 }
 
 impl GameStore {
-    pub const ALL: [GameStore; 12] = [
+    pub const ALL: [GameStore; 14] = [
         GameStore::Steam,
         GameStore::Epic,
         GameStore::Gog,
@@ -37,6 +41,8 @@ impl GameStore {
         GameStore::Amazon,
         GameStore::Heroic,
         GameStore::Lutris,
+        GameStore::Bottles,
+        GameStore::Itch,
         GameStore::Emulators,
         GameStore::Manual,
     ];
@@ -54,6 +60,8 @@ impl GameStore {
             GameStore::Amazon => "Amazon",
             GameStore::Heroic => "Heroic",
             GameStore::Lutris => "Lutris",
+            GameStore::Bottles => "Bottles",
+            GameStore::Itch => "Itch",
             GameStore::Emulators => "Emulators",
             GameStore::Manual => "Manual",
         }
@@ -78,6 +86,8 @@ impl GameStore {
             GameStore::Amazon => "amazon",
             GameStore::Heroic => "heroic",
             GameStore::Lutris => "lutris",
+            GameStore::Bottles => "bottles",
+            GameStore::Itch => "itch",
             GameStore::Emulators => "emulator",
             GameStore::Manual => "manual",
         }
@@ -139,7 +149,6 @@ impl PlayStatus {
         PlayStatus::Wishlist,
     ];
 
-    /// Chave gravada em `game_state.status` e usada nos textos (`play_status.<chave>`).
     pub fn key(self) -> &'static str {
         match self {
             PlayStatus::Playing => "playing",
@@ -229,7 +238,8 @@ pub struct InstallOffer {
 pub struct Game {
     /// `steam:<appid>`, `epic:<AppName>`, `gog:<id>`, `xbox:<PackageFamily>`, `ubisoft:<installId>`,
     /// `ea:<contentId>`, `battlenet:<uid>`, `amazon:<productId>`, `heroic:<runner>:<appName>`,
-    /// `lutris:<slug>`, `emulator:<hash do caminho da ROM>`, `manual:<guid>`.
+    /// `lutris:<slug>`, `bottles:<bottle>:<program>`, `itch:<gameId>`,
+    /// `emulator:<hash do caminho da ROM>`, `manual:<guid>`.
     pub id: String,
     pub title: String,
     pub store: Option<GameStore>,
@@ -263,6 +273,16 @@ pub struct Game {
     pub players: Option<String>,
 
     pub is_installed: bool,
+    /// Progresso de instalação (SRC-005); `None` = instalado ou não está instalando.
+    #[serde(default)]
+    pub installing: Option<InstallProgress>,
+    /// Endereço para instalar no cliente da loja (SRC-005); `None` = instalado ou a loja não abre instalação.
+    pub install_uri: Option<String>,
+    /// Tamanho de download informado pela loja (SRC-005).
+    pub install_size: Option<u64>,
+    /// Lojas em que o jogo existe para instalar (SRC-005), ordenadas por prioridade.
+    #[serde(default)]
+    pub install_offers: Vec<InstallOffer>,
     /// URI (`steam://rungameid/570`) ou caminho do executável/atalho/script. `None` = jogo de demonstração.
     pub launch_target: Option<String>,
     pub launch_arguments: Option<String>,
@@ -271,15 +291,13 @@ pub struct Game {
     pub tracking: Option<GameTrackingStrategy>,
     /// Id do produto na loja quando difere do `id` (Epic: CatalogItemId; Xbox: StoreId).
     pub store_product_id: Option<String>,
-    /// Endereço que abre a instalação no cliente da loja, nos jogos da conta que não estão instalados (SRC-005).
-    pub install_uri: Option<String>,
     /// Sistema da ROM ("snes", "ps2"); `None` = PC.
     pub platform: Option<String>,
     pub rom_path: Option<String>,
 
     /// Outras mídias por tipo (chaves em [`media`]).
     pub media: BTreeMap<String, String>,
-    /// Origem do ícone atual (`media["icon"]`): loja, provedor ou executável (UX-005).
+    /// Origem do ícone atual (`media[media::ICON]`).
     #[serde(default)]
     pub icon_origin: Option<IconOrigin>,
     /// Artes escolhidas pelo usuário: valem mais que as automáticas e os metadados nunca as trocam.
@@ -287,16 +305,6 @@ pub struct Game {
     pub steam_app_id: Option<u32>,
     /// Outras lojas em que o mesmo jogo está instalado.
     pub also_installed_in: Vec<GameStore>,
-    /// Instalação em andamento disparada na loja (SRC-005); `None` = nenhuma.
-    #[serde(default)]
-    pub installing: Option<InstallProgress>,
-    /// Tamanho da instalação em bytes, quando a loja informa.
-    #[serde(default)]
-    pub install_size: Option<u64>,
-    /// Lojas da conta por onde o jogo não instalado pode ser instalado, a da compra mais antiga primeiro (SRC-005).
-    /// Vazio = só a loja do jogo, pelo `install_uri`.
-    #[serde(default)]
-    pub install_offers: Vec<InstallOffer>,
 
     pub added_at: Option<DateTime<Utc>>,
     pub is_favorite: bool,

@@ -95,6 +95,21 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Heroic (Epic/GOG/Amazon): o jogo mandado instalar só vira instalado na releitura de 30 s (o Tako não vê o andamento do Heroic).
 - [ ] O espaço livre mostrado é o do disco da Steam (ou de `~` sem Steam), com o ponto de montagem certo (ex.: `/`, `/home`, `/mnt/jogos`) e o número igual ao de `df -h`. Biblioteca da Steam em outro disco montado: mostra o ponto de montagem dele.
 
+## Bottles e itch.io (SRC-002)
+
+### Bottles
+- [ ] Garrafas nativas (`~/.local/share/bottles/bottles`) e do Flatpak `com.usebottles.bottles` (`~/.var/app/com.usebottles.bottles/data/bottles/bottles`) são descobertas.
+- [ ] Programas adicionados a cada garrafa (`External_Programs` do `bottle.yml`) aparecem na biblioteca com a loja Bottles.
+- [ ] O comando de lançamento usa `bottles-cli run -b <garrafa> -p <programa>` (nativo) ou `flatpak run --command=bottles-cli com.usebottles.bottles run -b <garrafa> -p <programa>` (Flatpak).
+- [ ] Arquivo `bottle.yml` malformado ou corrompido não causa pânico e mantém a integridade da leitura.
+
+### itch.io
+- [ ] Banco `butler.db` em `~/.config/itch/db/` (ou Flatpak `~/.var/app/io.itch.itch/config/itch/db/`) é lido via SQLite em modo somente leitura.
+- [ ] Jogos instalados (`caves` com `install_location` e `game`) aparecem na biblioteca com o título, capa e tempo de jogo.
+- [ ] Executável do jogo é resolvido automaticamente ou via `.itch.toml`; quando encontrado, o Tako inicia o processo diretamente e rastreia o ciclo de vida e tempo de jogo.
+- [ ] Na ausência do binário direto, o jogo faz fallback para lançamento via protocolo `itch://install?game_id=<id>&launch`.
+- [ ] Banco ausente ou corrompido não causa pânico e emite aviso na tela quando o cliente não estiver instalado.
+
 ## Pacotes do AUR e Flatpak (PLAT-002)
 
 Roteiro de publicação e permissões em [packaging-linux.md](../packaging-linux.md). O CI valida os arquivos; isto é o que só máquina real mostra.
@@ -113,7 +128,7 @@ Roteiro de publicação e permissões em [packaging-linux.md](../packaging-linux
 ### Flatpak (`io.github.lippdev.Tako`)
 
 - [ ] Gerar o `cargo-sources.json` e compilar como em packaging-linux.md; `flatpak run io.github.lippdev.Tako` abre.
-- [ ] Biblioteca: Steam nativa e Steam Flatpak, Heroic nativo e Flatpak, Lutris nativo e Flatpak aparecem (um de cada que houver). Biblioteca da Steam em `/mnt`, `/media` ou `/run/media` aparece; em outro caminho não aparece até `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
+- [ ] Biblioteca: Steam nativa e Steam Flatpak, Heroic nativo e Flatpak, Lutris nativo e Flatpak, Bottles nativo e Flatpak, itch.io nativo e Flatpak aparecem (um de cada que houver). Biblioteca da Steam em `/mnt`, `/media` ou `/run/media` aparece; em outro caminho não aparece até `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
 - [ ] Abrir um jogo da Steam e do Heroic/Lutris pelo Tako: abre no host (link da loja pelo portal). Anotar se o Tako acompanha o jogo até fechar (esperado: só a Steam pelo `RunningAppID`).
 - [ ] Controle: o controle é reconhecido e navega; o cursor pelo controle move o mouse (precisa de `--device=all` e da regra udev no host).
 - [ ] Áudio: lista de saídas, troca da padrão, volume e mudo. Segredos: salvar uma chave de API e reabrir.

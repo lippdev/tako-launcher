@@ -52,9 +52,23 @@ fn start(
         return open_with_system(target);
     }
     let path = Path::new(target);
-    if !path.exists() {
+    let path_buf;
+    let path = if path.exists() {
+        path
+    } else if !target.contains('/') {
+        if let Some(found) = std::env::var_os("PATH").and_then(|p| {
+            std::env::split_paths(&p)
+                .map(|d| d.join(target))
+                .find(|p| p.is_file())
+        }) {
+            path_buf = found;
+            &path_buf
+        } else {
+            return Err(DeviceError::NotFound(target.into()));
+        }
+    } else {
         return Err(DeviceError::NotFound(target.into()));
-    }
+    };
     let args = arguments.map(text::split_args).unwrap_or_default();
     if path.extension().is_some_and(|e| e == "desktop") {
         warn_env_ignored(env, target);
@@ -200,5 +214,13 @@ mod tests {
         let failed = p.run_command("exit 3", Some(Duration::from_secs(10)));
         assert!(failed.unwrap_err().to_string().contains("saiu com"));
         assert!(p.run_command("true", Some(Duration::from_secs(10))).is_ok());
+    }
+
+    #[test]
+    fn resolves_executable_in_path() {
+        let p = LinuxProcesses;
+        // "sh" está no PATH
+        let launched = p.launch("sh", Some("-c 'exit 0'"), None);
+        assert!(launched.is_ok());
     }
 }

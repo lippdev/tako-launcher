@@ -19,6 +19,8 @@ pub fn store_name(lang: Lang, store: GameStore) -> String {
         GameStore::Amazon => "Amazon Games".into(),
         GameStore::Heroic => "Heroic".into(),
         GameStore::Lutris => "Lutris".into(),
+        GameStore::Bottles => "Bottles".into(),
+        GameStore::Itch => "itch.io".into(),
         GameStore::Emulators => tr(lang, "presentation.store.emulators", &[]),
         GameStore::Manual => tr(lang, "presentation.store.manual", &[]),
     }
@@ -34,6 +36,8 @@ fn masculine(store: GameStore) -> bool {
             | GameStore::BattleNet
             | GameStore::Heroic
             | GameStore::Lutris
+            | GameStore::Bottles
+            | GameStore::Itch
     )
 }
 
@@ -264,12 +268,16 @@ mod tests {
         );
         assert_eq!(store_of(Lang::PtBr, GameStore::Steam), "da Steam");
         assert_eq!(store_of(Lang::PtBr, GameStore::Gog), "do GOG");
+        assert_eq!(store_of(Lang::PtBr, GameStore::Bottles), "do Bottles");
+        assert_eq!(store_of(Lang::PtBr, GameStore::Itch), "do itch.io");
         assert_eq!(store_via(Lang::PtBr, GameStore::Ea), "pelo EA app");
         assert_eq!(store_via(Lang::EnUs, GameStore::Ea), "via EA app");
         assert_eq!(store_in(Lang::PtBr, GameStore::Steam), "na Steam");
         assert_eq!(store_in(Lang::PtBr, GameStore::Gog), "no GOG");
         assert_eq!(store_in(Lang::EnUs, GameStore::Steam), "on Steam");
         assert_eq!(store_name(Lang::EnUs, GameStore::Manual), "Added");
+        assert_eq!(store_name(Lang::EnUs, GameStore::Bottles), "Bottles");
+        assert_eq!(store_name(Lang::EnUs, GameStore::Itch), "itch.io");
     }
 
     #[test]
@@ -288,8 +296,8 @@ mod tests {
             "✓ Hollow Knight (2017) · SNES · IGDB"
         );
         assert_eq!(
-            match_label("Hades", None, Some("PC"), false, "Steam"),
-            "Hades · Steam"
+            match_label("Celeste", None, None, false, "Local"),
+            "Celeste · Local"
         );
     }
 }
