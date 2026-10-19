@@ -334,7 +334,8 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [ ] **THEME-005:** galeria comunitária de temas.
 - [ ] **THEME-006:** criar o próprio tema pelo Tako, sem editar arquivos: partir do tema padrão (ou de um instalado), escolher cores, fonte e fundo com prévia ao vivo, dar nome, salvar como tema instalado e exportar como `.takotheme` para compartilhar. Base: os `tokens.toml` (temas que só trocam a paleta) e THEME-002/003.
 - [ ] **THEME-007:** música de fundo e sons de navegação por tema (o tema traz os arquivos; volume próprio e opção de desligar; nunca toca durante o jogo).
-- [ ] **THEME-008:** cinco temas oficiais bem diferentes entre si (layout, navegação e identidade, não só cores), começando por uma lista de propostas para escolher.
+- [ ] **THEME-008:** primeiro tema oficial alternativo, o **Fita** (carrossel horizontal com arte em tela cheia), escolhido entre as propostas de `docs/themes/THEME-008-propostas.md`. _Estado: propostas feitas e escolhidas; o Fita está em revisão; os outros temas foram para o THEME-011._
+- [ ] **THEME-011 (futuro):** os outros quatro temas oficiais escolhidos em `docs/themes/THEME-008-propostas.md`: Deck Handheld, Lista & Cinema, Console Retrô CRT e Estante Clássica. Fica para depois do Fita, reaproveitando o que ele ensinar (contraste sobre a arte, texto em 1,5x).
 - [x] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil. _Estado: estudado (`docs/spikes/AI-001-THEME-010-estudo.md`): só as cores convertem, então não segue._
 
 ### Épico LIB — Organização da biblioteca (P2)
