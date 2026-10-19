@@ -67,6 +67,12 @@ O `Cargo.toml` pede Rust 1.97; o `rust-stable` do SDK acompanha o estável, ent�
 - Cada fonte lê `XDG_*_HOME` da sandbox e também a pasta padrão do usuário (`~/.config/heroic`, `~/.local/share/lutris`), então Heroic e Lutris nativos aparecem. Já a descoberta de emuladores nativos e "Adicionar jogo" por `.desktop` do usuário olham só o `XDG_*_HOME` da sandbox.
 - Uma saída para tudo isso é um backend `flatpak-spawn --host` em `tako-platform`: decisão de produto do mantenedor (amplia a permissão); não está nesta entrega.
 
+### O que o linter do Flathub aponta (resultado do `flatpak-builder-lint`)
+
+- `appid-url-not-reachable`: para `io.github.lippdev.<X>` o Flathub espera um repositório `lippdev/<x>`; o repositório se chama `tako-launcher`. Opções: ID `io.github.lippdev.tako_launcher`, ou espelhar/renomear o repositório, ou um ID por domínio próprio. Decisão do mantenedor, antes de submeter.
+- `finish-args-flatpak-appdata-folder-*` e `finish-args-unnecessary-xdg-*-ro-access`: o Flathub não aceita, por regra, ler as pastas de outros apps (Steam, Heroic e Lutris). É preciso pedir exceção na submissão, explicando que é um launcher que só lista a biblioteca (somente leitura).
+- Runtime: o linter sugere o 26.08; trocar `runtime-version` (e o `rust-stable`) quando for compilar para o Flathub.
+
 ### Publicar no Flathub (mantenedor)
 
 1. Conta no GitHub com acesso para abrir PR em `flathub/flathub` (branch `new-pr`), seguindo https://docs.flathub.org/docs/for-app-authors/submission.
@@ -79,7 +85,7 @@ O `Cargo.toml` pede Rust 1.97; o `rust-stable` do SDK acompanha o estável, ent�
 `packaging.yml` roda ao mexer em `packaging/aur`, `packaging/flatpak`, no ícone ou no próprio arquivo:
 
 - `aur` (contêiner `archlinux:base-devel`, por pacote): `makepkg --printsrcinfo`, `--verifysource` (confere o sha256 contra o GitHub), `makepkg` do pacote, `namcap`, instala o `.pkg.tar.zst` e confere binário, `.desktop` com `x-scheme-handler/tako`, regra udev e `ldd`.
-- `flatpak-lint`: `desktop-file-validate`, `appstreamcli validate`, `flatpak-builder --show-manifest` e `flatpak-builder-lint` (manifesto e AppStream).
+- `flatpak-lint`: `desktop-file-validate`, `appstreamcli validate` e `flatpak-builder --show-manifest` reprovam; o `flatpak-builder-lint` (regras do Flathub) só informa no resumo do job.
 - `flatpak-build`: compila o Flatpak de verdade (demora; sem publicar nem guardar o pacote).
 
 Quando a release mudar (`pkgver`), o `verifysource` quebra de propósito se o sha256 não foi atualizado.
