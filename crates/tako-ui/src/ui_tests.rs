@@ -242,6 +242,66 @@ fn principal_screens_bind_and_render_in_the_slint_software_backend() {
 }
 
 #[test]
+fn fita_theme_binds_and_renders_in_the_slint_software_backend() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let fita = dir.path().join("tako-fita");
+        let def = crate::theme::compile(&fita.join("main.slint"), &builtin).unwrap();
+        let ui = def.create().unwrap();
+        crate::theme::apply_tokens(&ui, Some(&fita));
+        ui.show().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        let game = shell.ctx.library.games()[0].id.clone();
+        for lang in [Lang::PtBr, Lang::EnUs] {
+            i18n::set_lang(lang);
+            for scale in [1.0, 1.25] {
+                ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+                    .unwrap();
+                for (width, height) in [(1280, 720), (1920, 1080)] {
+                    window.set_size(slint::PhysicalSize::new(width, height));
+                    for route in ["home", "library:all", "settings", "details"] {
+                        shell.open_route(if route == "details" {
+                            "library:all"
+                        } else {
+                            route
+                        });
+                        if route == "details" {
+                            shell.ctx.open_details = Some(game.clone());
+                            shell.after_action();
+                        }
+                        for (name, value) in shell.render(Instant::now()).props {
+                            crate::bridge::set(&ui, name, value);
+                        }
+                        let mut pixels = vec![Rgb8Pixel::default(); (width * height) as usize];
+                        ui.window().request_redraw();
+                        assert!(window.draw_if_needed(|renderer| {
+                            renderer.render(&mut pixels, width as usize);
+                        }));
+                        assert!(
+                            pixels.iter().any(|p| p.r != 0 || p.g != 0 || p.b != 0),
+                            "tela vazia no fita: {route}/{width}/{lang:?}"
+                        );
+                    }
+                }
+            }
+        }
+        ui.hide().unwrap();
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
 fn solid_panel_text_meets_wcag_aa_contrast() {
     fn luminance(rgb: [u8; 3]) -> f64 {
         let c = rgb.map(|v| {
@@ -566,6 +626,81 @@ fn splash_snapshot() {
                 .unwrap()
                 .save(format!("{out_dir}/splash-{p}.png"))
                 .unwrap();
+        }
+        ui.hide().unwrap();
+    })
+    .join()
+    .unwrap();
+}
+
+/// Captura da tela cheia do tema (Início e Biblioteca): `TAKO_SNAP_OUT=<pasta>`.
+#[test]
+#[ignore = "ferramenta manual de captura"]
+fn fullscreen_snapshot() {
+    let Ok(out_dir) = std::env::var("TAKO_SNAP_OUT") else {
+        return;
+    };
+    std::thread::spawn(move || {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let theme_name = std::env::var("TAKO_SNAP_THEME").unwrap_or_else(|_| "tako-fita".into());
+        let theme_dir = dir.path().join(&theme_name);
+        let entry = theme_dir.join("main.slint");
+        let def = crate::theme::compile(&entry, &builtin).unwrap_or_else(|e| panic!("{e:?}"));
+        let ui = def.create().unwrap();
+        crate::theme::apply_tokens(&ui, Some(&theme_dir));
+        ui.show().unwrap();
+
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+
+        let sizes: Vec<(u32, u32)> = std::env::var("TAKO_SNAP_SIZES")
+            .unwrap_or_else(|_| "1920x1080,1280x720".into())
+            .split(',')
+            .filter_map(|s| s.split_once('x'))
+            .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
+            .collect();
+
+        for (page_name, route) in [("inicio", "home"), ("biblioteca", "library:all")] {
+            shell.open_route(route);
+            for &(w, h) in &sizes {
+                window.set_size(slint::PhysicalSize::new(w, h));
+                if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
+                    shell.ctx.grid_columns = (n as usize).max(1);
+                }
+                let out = shell.render(Instant::now());
+                for (name, value) in &out.props {
+                    crate::bridge::set(&ui, name, value.clone());
+                }
+                let id = shell.focused_game();
+                let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
+                let p = tako_core::presentation::color::AccentPalette::for_accent(
+                    g.map(|g| g.accent.as_str()),
+                    true,
+                );
+                for (name, c) in [("accent", p.accent), ("accent-deep", p.deep)] {
+                    let c = slint::Color::from_rgb_u8(c.r, c.g, c.b);
+                    crate::bridge::set_global(&ui, "Ui", name, Value::Brush(c.into()));
+                }
+                slint::platform::update_timers_and_animations();
+                let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+                ui.window().request_redraw();
+                window.draw_if_needed(|r| {
+                    r.render(&mut pixels, w as usize);
+                });
+                let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+                image::RgbImage::from_raw(w, h, raw)
+                    .unwrap()
+                    .save(format!("{out_dir}/fita-{page_name}-{w}x{h}.png"))
+                    .unwrap();
+            }
         }
         ui.hide().unwrap();
     })

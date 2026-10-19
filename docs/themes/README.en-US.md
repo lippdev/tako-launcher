@@ -8,6 +8,7 @@ clicks and keys through callbacks. This page describes **theme API version 1**.
 
 - Default theme (complete reference): [`crates/tako-ui/theme/`](../../crates/tako-ui/theme/)
 - Sample theme that only changes colors: [`crates/tako-ui/theme/extras/tako-alto-contraste/`](../../crates/tako-ui/theme/extras/tako-alto-contraste/)
+- Official Ribbon / Fita theme (modern console): [`crates/tako-ui/theme/extras/tako-fita/`](../../crates/tako-ui/theme/extras/tako-fita/) and [`fita.en-US.md`](fita.en-US.md)
 - Language of the screen files: [Slint](https://slint.dev/docs) (Tako uses the Slint 1.x interpreter)
 
 ## 1. Quick start

@@ -235,31 +235,33 @@ mod tests {
     fn bundled_alternative_theme_installs_and_compiles() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = install_builtin(tmp.path()).unwrap();
-        let alt = tmp.path().join("tako-alto-contraste");
-        let def = compile(&alt.join("main.slint"), &dir).unwrap_or_else(|e| panic!("{e}"));
-        assert!(def.properties().any(|(n, _)| n == "library-tiles"));
-        // Os tokens do tema são todos cores válidas.
-        let tokens: toml::Table = std::fs::read_to_string(alt.join("tokens.toml"))
-            .unwrap()
-            .parse()
-            .unwrap();
-        assert!(
-            tokens
-                .values()
-                .all(|v| v.as_str().and_then(parse_color).is_some())
-        );
+        for theme_id in ["tako-alto-contraste", "tako-fita"] {
+            let alt = tmp.path().join(theme_id);
+            let def = compile(&alt.join("main.slint"), &dir).unwrap_or_else(|e| panic!("{e}"));
+            assert!(def.properties().any(|(n, _)| n == "library-tiles"));
+            // Os tokens do tema são todos cores válidas.
+            let tokens: toml::Table = std::fs::read_to_string(alt.join("tokens.toml"))
+                .unwrap()
+                .parse()
+                .unwrap();
+            assert!(
+                tokens
+                    .values()
+                    .all(|v| v.as_str().and_then(parse_color).is_some())
+            );
+            assert_eq!(
+                tako_themes::InstalledTheme::scan(tmp.path())
+                    .iter()
+                    .filter(|t| t.id() == theme_id)
+                    .count(),
+                1
+            );
+        }
         assert_eq!(
             parse_color("#11223344"),
             Some(slint::Color::from_argb_u8(0x44, 0x11, 0x22, 0x33))
         );
         assert_eq!(parse_color("red"), None);
-        assert_eq!(
-            tako_themes::InstalledTheme::scan(tmp.path())
-                .iter()
-                .filter(|t| t.id() == "tako-alto-contraste")
-                .count(),
-            1
-        );
     }
 
     #[test]
@@ -292,6 +294,9 @@ mod tests {
         let alt = tmp.path().join("tako-alto-contraste");
         let m = check(&alt).unwrap_or_else(|e| panic!("{e:?}"));
         assert_eq!(m.id, "tako-alto-contraste");
+        let fita = tmp.path().join("tako-fita");
+        let mf = check(&fita).unwrap_or_else(|e| panic!("{e:?}"));
+        assert_eq!(mf.id, "tako-fita");
         // Token que não existe e cor quebrada.
         std::fs::write(
             alt.join("tokens.toml"),

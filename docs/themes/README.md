@@ -8,6 +8,7 @@ avisa cliques e teclas por callbacks. Esta página descreve a **API de temas ver
 
 - Tema padrão (referência completa): [`crates/tako-ui/theme/`](../../crates/tako-ui/theme/)
 - Tema de exemplo que só troca cores: [`crates/tako-ui/theme/extras/tako-alto-contraste/`](../../crates/tako-ui/theme/extras/tako-alto-contraste/)
+- Tema oficial Fita (console moderno): [`crates/tako-ui/theme/extras/tako-fita/`](../../crates/tako-ui/theme/extras/tako-fita/) e [`fita.md`](fita.md)
 - Linguagem dos arquivos de tela: [Slint](https://slint.dev/docs) (o Tako usa o interpretador do Slint 1.x)
 
 ## 1. Começo rápido
