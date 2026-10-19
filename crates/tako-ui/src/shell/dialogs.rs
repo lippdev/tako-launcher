@@ -320,6 +320,24 @@ pub fn approve_commands(ctx: &Ctx, id: &str) -> MenuLayer {
     if eff.close_tools && !eff.tools.is_empty() {
         text.push(ctx.t("session.commands_close_tools"));
     }
+    if let Some(args) = &eff.extra_arguments {
+        text.push(ctx.tf("session.commands_extra_args", &[("args", args)]));
+    }
+    if !eff.environment.is_empty() {
+        let env_str = eff
+            .environment
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join("; ");
+        text.push(ctx.tf("session.commands_env", &[("env", &env_str)]));
+    }
+    if let Some(runtime) = &eff.wine_runtime {
+        text.push(ctx.tf("session.commands_wine_runtime", &[("runtime", runtime)]));
+    }
+    if let Some(prefix) = &eff.wine_prefix {
+        text.push(ctx.tf("session.commands_wine_prefix", &[("prefix", prefix)]));
+    }
     let id = id.to_owned();
     MenuLayer::dialog(ctx.t("session.commands_title"), move |ctx| {
         let id = id.clone();

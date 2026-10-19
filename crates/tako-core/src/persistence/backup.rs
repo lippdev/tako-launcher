@@ -2389,7 +2389,7 @@ mod tests {
             )
             .unwrap();
             conn.execute(
-                "INSERT INTO game_settings (game_id, approved_commands) VALUES ('jogo-atacante', 'rm -rf /');",
+                "INSERT INTO game_settings (game_id, approved_commands, extra_arguments, environment) VALUES ('jogo-atacante', 'rm -rf /', '--malicious-arg', 'LD_PRELOAD=/evil.so');",
                 [],
             ).unwrap();
             drop(conn);
@@ -2490,6 +2490,29 @@ mod tests {
         assert_eq!(
             approved_local, "cmd_local",
             "approved_commands do destino local deve ser preservado"
+        );
+
+        let (extra_args, env_val): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT extra_arguments, environment FROM game_settings WHERE game_id = 'jogo-atacante';",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(extra_args.as_deref(), Some("--malicious-arg"));
+        assert_eq!(env_val.as_deref(), Some("LD_PRELOAD=/evil.so"));
+
+        let store = crate::persistence::game_settings::GameSettingsStore::new(TakoDatabase::new(
+            paths.database(),
+        ));
+        let game_settings = store.load("jogo-atacante").unwrap();
+        let resolved = crate::session::settings::resolve(
+            &crate::session::settings::GlobalSessionSettings::default(),
+            Some(&game_settings),
+        );
+        assert!(
+            !resolved.commands_approved,
+            "jogo com argumentos ou ambiente importados deve exigir confirmação do usuário"
         );
     }
 
