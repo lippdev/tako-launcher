@@ -23,3 +23,4 @@ Ordem de verdade (PRD v0.2 §0): o PRD, depois as ADRs a partir da 0023. As ADRs
 - [ADR-0029](0029-jogos-da-conta-ubisoft-ea-amazon-windows.md): jogos da conta não instalados da Amazon no Windows pelo DPAPI do usuário; Ubisoft depois de um spike com arquivos reais; EA sem lista legível offline (Proposta).
 - [ADR-0030](0030-controle-virtual-e-suspensao-de-jogos.md): controle virtual nos jogos (INPUT-002) via ViGEmBus/uinput e suspensão de processos para retomada rápida (SESSION-001) com exclusão de anti-cheat e jogos online (Proposta).
 - [ADR-0031](0031-motor-de-reconhecimento-de-voz-local.md): motor de reconhecimento de fala local (VOICE-001) via Vosk com gramática restrita, suporte a pt-BR e en-US e garantia 100% offline (Proposta).
+- [ADR-0032](0032-protocolo-e-integracao-com-steamgriddb.md): protocolo próprio estilo SGDBoop para aplicação de arte com um clique (ART-002) e dilema do token de aplicativo versus chave de usuário (Proposta).
