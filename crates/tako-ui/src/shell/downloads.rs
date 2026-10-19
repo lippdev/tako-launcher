@@ -401,12 +401,12 @@ fn store_row(ctx: &Ctx, g: &tako_core::library::Game) -> MenuItem {
 
 fn completed_row(ctx: &Ctx, d: &Download) -> MenuItem {
     let (id, folder) = (d.id, d.folder.clone());
-    let mut row = PanelRow::action(format!("dl-{id}"), d.title.clone())
-        .desc(ctx.tf("downloads.done_in", &[("source", &d.source)]))
-        .value(ctx.t("downloads.open_folder"));
+    let mut row = PanelRow::new(format!("dl-{id}"), "download", d.title.clone())
+        .desc(ctx.tf("downloads.done_in", &[("source", &d.source)]));
+    row.style = "completed".into();
     row.image = thumb(ctx, d.game_id.as_deref());
     // Só abre a pasta no gerenciador de arquivos: nada de dentro dela é aberto ou executado.
-    MenuItem::new(row).on(move |ctx| {
+    let mut item = MenuItem::new(row).on(move |ctx| {
         if folder.is_dir() {
             if let Err(e) = ctx
                 .platform
@@ -418,9 +418,42 @@ fn completed_row(ctx: &Ctx, d: &Download) -> MenuItem {
         } else {
             ctx.toast(ctx.t("downloads.folder_missing"));
         }
-        let _ = id;
         Flow::Stay
-    })
+    });
+    item.alt = Some(std::rc::Rc::new(move |ctx: &mut Ctx| {
+        if let Some(m) = manager(ctx) {
+            let _ = m.cancel(id, false);
+        }
+        save(ctx);
+        sync_games(ctx);
+        ctx.dirty = true;
+        Flow::Stay
+    }));
+    item
+}
+
+fn clear_completed(ctx: &mut Ctx) -> Flow {
+    let ids = ctx
+        .downloads
+        .manager
+        .as_ref()
+        .map(|m| {
+            m.list()
+                .iter()
+                .filter(|d| d.state == DownloadState::Completed)
+                .map(|d| d.id)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if let Some(m) = manager(ctx) {
+        for id in ids {
+            let _ = m.cancel(id, false);
+        }
+    }
+    save(ctx);
+    sync_games(ctx);
+    ctx.dirty = true;
+    Flow::Stay
 }
 
 fn panel_rows(ctx: &Ctx) -> Vec<MenuItem> {
@@ -474,6 +507,13 @@ fn panel_rows(ctx: &Ctx) -> Vec<MenuItem> {
             ctx.t("downloads.group_done"),
         )));
         v.extend(done.into_iter().map(|d| completed_row(ctx, d)));
+        v.push(
+            MenuItem::new(PanelRow::action(
+                "clear-completed",
+                ctx.t("downloads.clear_completed"),
+            ))
+            .on(clear_completed),
+        );
     }
     if v.is_empty() {
         v.push(MenuItem::new(
@@ -1033,8 +1073,9 @@ mod tests {
         assert!(k.contains(&("download".into(), "queued".into())));
         let store = rows.iter().find(|i| i.row.style == "store").unwrap();
         assert!(store.row.description.contains("pela Steam"));
-        let done = rows.iter().find(|i| i.row.value == "Abrir pasta").unwrap();
-        assert_eq!(done.row.kind, "action");
+        let done = rows.iter().find(|i| i.row.style == "completed").unwrap();
+        assert_eq!(done.row.kind, "download");
+        assert!(rows.iter().any(|i| i.row.key == "clear-completed"));
         assert_eq!(rows.last().unwrap().row.key, "sources");
         // (42% da loja + 42% do torrent + fila sem tamanho) / 2.
         assert_eq!(pill(&ctx), Some("42%".into()));
@@ -1164,5 +1205,44 @@ mod tests {
             host("https://exemplo.invalid/a/b.json?x"),
             "exemplo.invalid"
         );
+    }
+
+    #[test]
+    fn remove_completed_and_clear_completed() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_d, mut ctx) = ctx();
+        let engine = demo(&mut ctx);
+        let rows = panel_rows(&ctx);
+        let done = rows.iter().find(|i| i.row.style == "completed").unwrap();
+        assert_eq!(done.row.kind, "download");
+        assert!(
+            done.alt.is_some(),
+            "linha concluída tem ação secundária para remover da lista"
+        );
+
+        // Remover da lista usando o botão secundário (alt)
+        let alt = done.alt.clone().unwrap();
+        let flow = alt(&mut ctx);
+        assert!(matches!(flow, Flow::Stay));
+        assert_eq!(ctx.downloads.manager.as_ref().unwrap().get(1), None);
+        assert!(
+            !engine.removed().contains(&(1, true)),
+            "não apaga os arquivos ao remover da lista"
+        );
+
+        // Limpar concluídos
+        demo(&mut ctx);
+        let rows_before = panel_rows(&ctx);
+        let clear_item = rows_before
+            .iter()
+            .find(|i| i.row.key == "clear-completed")
+            .unwrap();
+        let accept = clear_item.accept.clone().unwrap();
+        let flow = accept(&mut ctx);
+        assert!(matches!(flow, Flow::Stay));
+        let rows_after = panel_rows(&ctx);
+        assert!(!rows_after.iter().any(|i| i.row.style == "completed"));
+        assert!(!rows_after.iter().any(|i| i.row.key == "clear-completed"));
     }
 }

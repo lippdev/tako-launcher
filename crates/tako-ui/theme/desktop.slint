@@ -103,6 +103,8 @@ export global DeskText {
     in-out property <string> dl-start-now: "Baixar agora";
     in-out property <string> dl-retry: "Tentar de novo";
     in-out property <string> dl-store: "Abrir na loja";
+    in-out property <string> dl-open-folder: "Abrir pasta";
+    in-out property <string> dl-remove: "Remover da lista";
 }
 
 // Entrada do app: falso enquanto o primeiro quadro não sai (o Tako liga `desk-intro` só na abertura); ao virar
@@ -667,7 +669,7 @@ component TopBar inherits Vidro {
                 padding-left: 10px;
                 padding-right: download-label != "" ? 12px : 10px;
                 spacing: 6px;
-                DeskIcon { name: "download"; size: 16px; y: (parent.height - self.height) / 2; }
+                DeskIcon { name: "download"; size: 18px; y: (parent.height - self.height) / 2; }
                 if download-label != "": Text { text: download-label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
             }
             dta := TouchArea { mouse-cursor: pointer; clicked => { root.action("downloads"); } }
@@ -3808,18 +3810,21 @@ component DeskRow inherits Rectangle {
                 line-height-factor: 1.07;
                 wrap: word-wrap;
             }
-            // Barra do download: `primary-top` sobre `glass-control`, 4 de altura, sem animação listrada. A fração
-            // vem em `value`; sem fração (loja que não informa), sem barra.
-            if data.kind == "download" && data.value.is-float(): Rectangle {
-                height: 4px;
-                border-radius: 2px;
-                background: Ui.glass-control;
+            // Barra do download: `primary-top` sobre `glass-selected`, 4 de altura, a 8 px do texto (.dk-progress do tako-design).
+            // A fração vem em `value`; sem fração (loja que não informa), sem barra.
+            if data.kind == "download" && data.value.is-float(): VerticalLayout {
+                padding-top: 5px;
                 Rectangle {
-                    x: 0;
-                    width: parent.width * clamp(data.value.to-float(), 0, 1);
-                    height: parent.height;
+                    height: 4px;
                     border-radius: 2px;
-                    background: Ui.primary-top;
+                    background: Ui.glass-selected;
+                    Rectangle {
+                        x: 0;
+                        width: parent.width * clamp(data.value.to-float(), 0, 1);
+                        height: parent.height;
+                        border-radius: 2px;
+                        background: Ui.primary-top;
+                    }
                 }
             }
         }
@@ -3828,14 +3833,19 @@ component DeskRow inherits Rectangle {
         if data.kind == "download": HorizontalLayout {
             spacing: 2px;
             alignment: center;
-            IconBtn {
+            if data.style == "completed": IconBtn {
+                icon: "folder";
+                label: DeskText.dl-open-folder;
+                clicked => { root.act(0); }
+            }
+            if data.style != "completed": IconBtn {
                 icon: data.style == "active" || data.style == "store" ? "pause" : (data.style == "queued" ? "download" : (data.style == "failed" ? "refresh" : "play"));
                 label: data.style == "active" ? DeskText.dl-pause : (data.style == "store" ? DeskText.dl-store : (data.style == "queued" ? DeskText.dl-start-now : (data.style == "failed" ? DeskText.dl-retry : DeskText.dl-resume)));
                 clicked => { root.act(0); }
             }
             if data.style != "queued": IconBtn {
                 icon: "close";
-                label: data.style == "store" ? DeskText.dl-store : DeskText.dl-cancel;
+                label: data.style == "completed" ? DeskText.dl-remove : (data.style == "store" ? DeskText.dl-store : DeskText.dl-cancel);
                 clicked => { root.act(1); }
             }
         }

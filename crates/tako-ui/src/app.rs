@@ -1557,6 +1557,8 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         ("dl-start-now", "downloads.start_now"),
         ("dl-retry", "downloads.retry"),
         ("dl-store", "downloads.open_store"),
+        ("dl-open-folder", "downloads.open_folder"),
+        ("dl-remove", "downloads.remove_from_list"),
     ] {
         bridge::set_global(ui, "DeskText", name, s.ctx.t(key).to_value());
     }
