@@ -254,9 +254,13 @@ pub fn promote_background_draft(
         let final_name = format!("{BACKGROUND_PREFIX}{ext}");
         let draft_path = dir.join(draft_filename);
         let final_path = dir.join(&final_name);
-        if draft_path.is_file() {
-            fs::rename(&draft_path, &final_path)?;
+        if !draft_path.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("Rascunho não encontrado: {}", draft_path.display()),
+            ));
         }
+        fs::rename(&draft_path, &final_path)?;
         clean_background_orphans(themes_root, theme_id, Some(&final_name))?;
         Ok(final_name)
     } else {
@@ -282,6 +286,7 @@ pub struct ThemeTokensOverride {
     pub font: Option<String>,
     pub canvas: Option<String>,
     pub background_image: Option<String>,
+    pub background_source_name: Option<String>,
     pub background_mode: Option<BackgroundMode>,
     pub extra: toml::Table,
 }
@@ -303,6 +308,8 @@ impl ThemeTokensOverride {
         let background_image = get_str(&table, "custom-background")
             .or_else(|| get_str(&table, "background-image"))
             .filter(|p| is_safe_background_path(p));
+        let background_source_name = get_str(&table, "custom-background-name")
+            .or_else(|| get_str(&table, "background-source-name"));
 
         table.remove("accent");
         table.remove("font");
@@ -311,6 +318,8 @@ impl ThemeTokensOverride {
         table.remove("canvas");
         table.remove("custom-background");
         table.remove("background-image");
+        table.remove("custom-background-name");
+        table.remove("background-source-name");
 
         let background_mode = if background_image.is_some() {
             Some(BackgroundMode::Image)
@@ -325,6 +334,7 @@ impl ThemeTokensOverride {
             font,
             canvas,
             background_image,
+            background_source_name,
             background_mode,
             extra: table,
         }
@@ -357,6 +367,15 @@ impl ThemeTokensOverride {
         } else {
             table.remove("custom-background");
             table.remove("background-image");
+        }
+        if let Some(ref name) = self.background_source_name {
+            table.insert(
+                "custom-background-name".into(),
+                toml::Value::String(name.clone()),
+            );
+        } else {
+            table.remove("custom-background-name");
+            table.remove("background-source-name");
         }
         toml::to_string_pretty(&table)
             .unwrap_or_else(|_| toml::to_string(&table).unwrap_or_default())
@@ -491,6 +510,14 @@ mod tests {
                 .join("background.png")
                 .exists()
         );
+
+        // Se o rascunho sumir (não existe), a promoção deve falhar com erro e NÃO apagar o fundo salvo
+        assert!(promote_background_draft(&themes_root, None, "background.draft.png").is_err());
+        assert!(
+            override_dir(&themes_root, None)
+                .join("background.jpg")
+                .is_file()
+        );
     }
 
     #[test]
@@ -533,6 +560,7 @@ mod tests {
             font: Some("Plus Jakarta Sans".into()),
             canvas: Some("#0B1A33".into()),
             background_image: Some("background.jpg".into()),
+            background_source_name: Some("minha_foto.png".into()),
             background_mode: Some(BackgroundMode::Image),
             extra,
         };
@@ -542,6 +570,7 @@ mod tests {
         assert_eq!(parsed.font, tokens.font);
         assert_eq!(parsed.canvas, tokens.canvas);
         assert_eq!(parsed.background_image, tokens.background_image);
+        assert_eq!(parsed.background_source_name, tokens.background_source_name);
         assert_eq!(
             parsed
                 .extra
