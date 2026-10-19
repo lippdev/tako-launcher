@@ -1,9 +1,11 @@
 //! Links `tako://` (EXT-005): o macOS entrega a URL por Apple Event (kAEGetURL), não por argumento, e o winit não
 //! repassa esse evento. O handler fica no `NSAppleEventManager`, que não depende do delegate do app.
+//! Ele só sobrevive porque o delegate do winit 0.30 não implementa `application:openURLs:`: se um winit novo
+//! implementar, o AppKit troca o handler de GURL pelo dele e os links param. Conferir ao atualizar o winit.
 
 use objc2::rc::Retained;
 use objc2::runtime::NSObject;
-use objc2::{AnyThread, DefinedClass, define_class, msg_send, sel};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_foundation::{NSAppleEventDescriptor, NSAppleEventManager};
 
 /// 'GURL': classe e ID do evento de abrir URL (kInternetEventClass / kAEGetURL).
@@ -13,6 +15,7 @@ const DIRECT: u32 = u32::from_be_bytes(*b"----");
 
 define_class!(
     #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
     #[name = "TakoUrlHandler"]
     #[ivars = Box<dyn Fn(String)>]
     struct UrlHandler;
@@ -31,10 +34,12 @@ define_class!(
     }
 );
 
-/// Chama `f` com cada URL aberta pelo sistema. Chamar na thread principal antes do laço de eventos, para pegar
-/// também o link que abriu o app; `f` roda na thread principal, dentro do laço.
-pub fn on_open_url(f: impl Fn(String) + 'static) {
-    let handler = UrlHandler::alloc().set_ivars(Box::new(f) as Box<dyn Fn(String)>);
+/// Chama `f` com cada URL aberta pelo sistema. Chamar antes do laço de eventos, para pegar também o link que
+/// abriu o app; `f` roda na thread principal, dentro do laço.
+pub fn on_open_url(mtm: MainThreadMarker, f: impl Fn(String) + 'static) {
+    let handler = mtm
+        .alloc::<UrlHandler>()
+        .set_ivars(Box::new(f) as Box<dyn Fn(String)>);
     // SAFETY: `init` de NSObject numa instância recém-alocada com os ivars já postos.
     let handler: Retained<UrlHandler> = unsafe { msg_send![super(handler), init] };
     // SAFETY: o seletor existe em `UrlHandler` com a assinatura que o NSAppleEventManager espera

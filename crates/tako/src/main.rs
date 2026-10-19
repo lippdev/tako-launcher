@@ -264,12 +264,16 @@ fn main() {
             });
         });
     }
-    // macOS: com o Tako aberto, o sistema entrega o link à janela por Apple Event, não por argumento.
+    // macOS: o sistema entrega o link à interface por Apple Event, não por argumento (Tako fechado ou aberto).
     #[cfg(target_os = "macos")]
-    tako_platform::macos::on_open_url(|url| {
-        tracing::info!("link recebido do sistema");
-        tako_ui::app::open_current_link(&url);
-    });
+    match tako_platform::macos::MainThreadMarker::new() {
+        // Fora do handler Objective-C, como o `SupMsg::OpenLink`: um pânico na interface não atravessa o AppKit.
+        Some(mtm) => tako_platform::macos::on_open_url(mtm, |url| {
+            tracing::info!("link recebido do sistema");
+            let _ = slint::invoke_from_event_loop(move || tako_ui::app::open_current_link(&url));
+        }),
+        None => tracing::warn!("links tako:// desligados: main fora da thread principal"),
+    }
     if let Err(e) = app.run() {
         eprintln!("tako: {e}");
         std::process::exit(1);
