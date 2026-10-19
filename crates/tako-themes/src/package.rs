@@ -185,7 +185,9 @@ impl Package {
         }
         if let Some(tokens_entry) = files.iter().find(|e| e.path == "tokens.toml") {
             let mut reader = open_entry(&mut source, tokens_entry).map_err(|e| io_problem(&e))?;
-            if let Some(bytes) = read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))? {
+            if let Some(bytes) =
+                read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))?
+            {
                 if let Ok(text) = String::from_utf8(bytes) {
                     if let Ok(tokens_audio) = crate::parse_tokens_audio(&text) {
                         for audio_path in [
@@ -570,11 +572,7 @@ mod tests {
         )
         .unwrap();
         std::fs::write(dir.join("main.slint"), "").unwrap();
-        std::fs::write(
-            dir.join("tokens.toml"),
-            "[audio]\naccept = \"click.wav\"\n",
-        )
-        .unwrap();
+        std::fs::write(dir.join("tokens.toml"), "[audio]\naccept = \"click.wav\"\n").unwrap();
 
         // Missing click.wav declared in tokens.toml
         let err = validate_package(dir).unwrap_err();

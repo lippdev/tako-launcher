@@ -495,7 +495,10 @@ pub fn set_theme(theme_dir: Option<&Path>) {
         let move_p = audio_paths.move_sound;
 
         std::thread::spawn(move || {
-            let accept = accept_p.as_deref().and_then(load_wav_samples).map(Arc::from);
+            let accept = accept_p
+                .as_deref()
+                .and_then(load_wav_samples)
+                .map(Arc::from);
             let back = back_p.as_deref().and_then(load_wav_samples).map(Arc::from);
             let move_sound = move_p.as_deref().and_then(load_wav_samples).map(Arc::from);
 

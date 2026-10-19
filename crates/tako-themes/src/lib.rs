@@ -285,7 +285,7 @@ pub fn resolve_theme_audio(theme_dir: &Path) -> ThemeAudioPaths {
         .ok()
         .and_then(|text| parse_tokens_audio(&text).ok())
         .unwrap_or_default();
-        let resolve_file = |rel_opt: Option<String>, is_music: bool| -> Option<PathBuf> {
+    let resolve_file = |rel_opt: Option<String>, is_music: bool| -> Option<PathBuf> {
         let rel = rel_opt?;
         let clean = validate_audio_path(&rel).ok()?;
         let full = theme_dir.join(clean);
@@ -311,7 +311,10 @@ pub fn resolve_theme_audio(theme_dir: &Path) -> ThemeAudioPaths {
         Some(full)
     };
 
-    let resolve_merged = |token_rel: Option<String>, manifest_rel: Option<String>, is_music: bool| -> Option<PathBuf> {
+    let resolve_merged = |token_rel: Option<String>,
+                          manifest_rel: Option<String>,
+                          is_music: bool|
+     -> Option<PathBuf> {
         token_rel
             .and_then(|t| resolve_file(Some(t), is_music))
             .or_else(|| manifest_rel.and_then(|m| resolve_file(Some(m), is_music)))
@@ -320,7 +323,11 @@ pub fn resolve_theme_audio(theme_dir: &Path) -> ThemeAudioPaths {
     ThemeAudioPaths {
         music: resolve_merged(tokens_audio.music, manifest_audio.music, true),
         move_sound: resolve_merged(tokens_audio.move_sound, manifest_audio.move_sound, false),
-        accept_sound: resolve_merged(tokens_audio.accept_sound, manifest_audio.accept_sound, false),
+        accept_sound: resolve_merged(
+            tokens_audio.accept_sound,
+            manifest_audio.accept_sound,
+            false,
+        ),
         back_sound: resolve_merged(tokens_audio.back_sound, manifest_audio.back_sound, false),
     }
 }

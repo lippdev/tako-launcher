@@ -70,7 +70,11 @@ fn text_size_and_navigation_volume_persist_and_are_bounded() {
     let (_guard, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
     let text = find(&rows_of(&ctx, "appearance"), "text-size");
     let sound = find(&rows_of(&ctx, "sound"), "navigation-volume");
-    assert!(!rows_of(&ctx, "appearance").iter().any(|i| i.row.key == "navigation-volume"));
+    assert!(
+        !rows_of(&ctx, "appearance")
+            .iter()
+            .any(|i| i.row.key == "navigation-volume")
+    );
     adjust(&mut ctx, &text, -1);
     assert_eq!(crate::navigation_feedback::text_size(&ctx.settings), 125);
     for _ in 0..20 {

@@ -157,12 +157,7 @@ pub fn wav_duration(path: &std::path::Path) -> Option<f64> {
             }
             let mut fmt_data = vec![0u8; chunk_size as usize];
             reader.read_exact(&mut fmt_data).ok()?;
-            byte_rate = u32::from_le_bytes([
-                fmt_data[8],
-                fmt_data[9],
-                fmt_data[10],
-                fmt_data[11],
-            ]);
+            byte_rate = u32::from_le_bytes([fmt_data[8], fmt_data[9], fmt_data[10], fmt_data[11]]);
             found_fmt = true;
         } else if chunk_id == b"data" {
             data_len = chunk_size;
