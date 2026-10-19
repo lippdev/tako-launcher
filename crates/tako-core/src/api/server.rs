@@ -258,13 +258,28 @@ pub fn start_server<H: ApiHandler>(
                         let stream_id = if let Ok(mut streams) = streams_ref.lock() {
                             let id = streams.next_id;
                             streams.next_id = streams.next_id.wrapping_add(1);
-                            if let Ok(cloned) = stream.try_clone() {
+                            let cloned = stream.try_clone().ok();
+                            let has_stream = if let Some(cloned) = cloned {
                                 streams.map.insert(id, cloned);
-                                Some(id)
+                                true
                             } else {
-                                None
+                                false
+                            };
+                            if !run_flag.load(Ordering::SeqCst) {
+                                if has_stream {
+                                    streams.map.remove(&id);
+                                }
+                                let _ = stream.shutdown(std::net::Shutdown::Both);
+                                conns_ref.fetch_sub(1, Ordering::Relaxed);
+                                break;
                             }
+                            if has_stream { Some(id) } else { None }
                         } else {
+                            if !run_flag.load(Ordering::SeqCst) {
+                                let _ = stream.shutdown(std::net::Shutdown::Both);
+                                conns_ref.fetch_sub(1, Ordering::Relaxed);
+                                break;
+                            }
                             None
                         };
 
@@ -1080,7 +1095,7 @@ mod tests {
         use std::io::Read;
         let _ = write!(
             stream,
-            "POST /api/v1/games/steam:570/play HTTP/1.1\r\nAuthorization: Bearer secret\r\n\r\n"
+            "POST /api/v1/games/steam:570/play HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer secret\r\n\r\n"
         );
         let mut res = String::new();
         let _ = BufReader::new(&mut stream).read_to_string(&mut res);
