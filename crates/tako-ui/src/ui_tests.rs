@@ -907,6 +907,76 @@ fn desktop_snapshot() {
                 let layer = crate::shell::settings::choose_base_theme_panel(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("theme-create-editor") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+                let layer = crate::shell::settings::create_theme_editor_panel(&shell.ctx, None);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("theme-name") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+                let layer = crate::shell::settings::prompt_theme_name(&shell.ctx, None);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("theme-overwrite") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+                let theme_id = "meu-tema";
+                let t_dir = shell.ctx.paths.themes().join(theme_id);
+                let _ = std::fs::create_dir_all(&t_dir);
+                let _ = std::fs::write(
+                    t_dir.join("theme.toml"),
+                    r#"id = "meu-tema"
+name = "Meu Tema"
+version = "1.0.0"
+author = "Tako"
+api = 1
+entry = "main.slint"
+created-by-tako = true
+"#,
+                );
+                let _ = std::fs::write(
+                    t_dir.join("main.slint"),
+                    r#"export { App, Ui, Hint, PanelRow } from "@tako/main.slint";
+"#,
+                );
+                let flow = crate::shell::settings::finish_create_theme(
+                    &mut shell.ctx,
+                    "Meu Tema",
+                    None,
+                    None,
+                    false,
+                );
+                if let crate::shell::layer::Flow::Push(layer) = flow {
+                    shell.push_layer(layer);
+                }
+            }
+            Ok("theme-export") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+                for (id, name) in [("tema-um", "Tema 1"), ("tema-dois", "Tema 2")] {
+                    let t_dir = shell.ctx.paths.themes().join(id);
+                    let _ = std::fs::create_dir_all(&t_dir);
+                    let _ = std::fs::write(
+                        t_dir.join("theme.toml"),
+                        format!(
+                            "id = \"{id}\"\nname = \"{name}\"\nversion = \"1.0.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\ncreated-by-tako = true\n"
+                        ),
+                    );
+                    let _ = std::fs::write(
+                        t_dir.join("main.slint"),
+                        r#"export { App, Ui, Hint, PanelRow } from "@tako/main.slint";
+"#,
+                    );
+                    let _ = std::fs::write(t_dir.join("tokens.toml"), "accent = \"#6C5CE7\"\n");
+                }
+                shell.ctx.reload_theme_cache();
+                let flow = crate::shell::settings::export_theme_panel(&mut shell.ctx);
+                if let crate::shell::layer::Flow::Push(layer) = flow {
+                    shell.push_layer(layer);
+                }
+            }
             Ok("settings-api") => {
                 shell.open_route("settings");
                 shell
@@ -1267,7 +1337,10 @@ fn desktop_snapshot() {
             let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
             image::RgbImage::from_raw(w, h, raw)
                 .unwrap()
-                .save(format!("{out_dir}/desktop-{w}x{h}.png"))
+                .save({
+                    let prefix = std::env::var("TAKO_SNAP_NAME").unwrap_or_else(|_| "desktop".into());
+                    format!("{out_dir}/{prefix}-{w}x{h}.png")
+                })
                 .unwrap();
             // Quadros de 40 ms no relógio das animações, a partir de agora.
             let capture = |prefix: &str, pixels: &mut Vec<Rgb8Pixel>| {

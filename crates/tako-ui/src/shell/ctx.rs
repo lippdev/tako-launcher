@@ -448,6 +448,11 @@ impl Ctx {
 
     /// Descarta o rascunho de personalização de tema e limpa imagens temporárias (`background.draft.*`).
     pub fn discard_theme_draft(&mut self) {
+        if let Some(ref d) = self.theme_draft
+            && let Some(ref dir) = d.draft_dir
+        {
+            let _ = tako_themes::overrides::clean_background_draft_dir(dir);
+        }
         let theme_id = tako_themes::selected(&self.paths.themes());
         let _ = tako_themes::overrides::clean_background_draft(
             &self.paths.themes(),

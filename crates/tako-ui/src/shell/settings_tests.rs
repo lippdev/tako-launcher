@@ -1422,7 +1422,7 @@ fn create_theme_selection_creation_and_apply_flow() {
     assert!(tako_themes::create::validate_theme_name("Novo Tema Incrivel").is_ok());
 
     // 7. Salva o tema através do finish_create_theme
-    let flow = finish_create_theme(&mut ctx, "Novo Tema Incrivel", None, false);
+    let flow = finish_create_theme(&mut ctx, "Novo Tema Incrivel", None, None, false);
     let Flow::Replace(mut apply_dialog) = flow else {
         panic!("esperava diálogo para aplicar tema");
     };
@@ -1459,11 +1459,11 @@ fn create_theme_duplicate_prompts_overwrite_and_replaces() {
     let (_d, mut ctx) = ctx();
 
     // 1. Cria o primeiro tema
-    let flow1 = finish_create_theme(&mut ctx, "Tema Duplicado", None, false);
+    let flow1 = finish_create_theme(&mut ctx, "Tema Duplicado", None, None, false);
     assert!(matches!(flow1, Flow::Replace(_)));
 
     // 2. Tentar criar com o mesmo nome sem overwrite abre diálogo de confirmação
-    let flow2 = finish_create_theme(&mut ctx, "Tema Duplicado", None, false);
+    let flow2 = finish_create_theme(&mut ctx, "Tema Duplicado", None, None, false);
     let Flow::Push(mut confirm_dialog) = flow2 else {
         panic!("esperava diálogo de confirmação de substituição");
     };
@@ -1491,7 +1491,7 @@ fn themes_panel_shows_export_action_and_base_choice_lists_installed_theme() {
     let (_d, mut ctx) = ctx();
 
     // Cria um tema baseado em tokens
-    let _ = finish_create_theme(&mut ctx, "Tema Base Customizado", None, false);
+    let _ = finish_create_theme(&mut ctx, "Tema Base Customizado", None, None, false);
     ctx.reload_theme_cache();
 
     // 1. Em themes_panel, a ação "Exportar .takotheme…" deve estar presente
@@ -1511,4 +1511,132 @@ fn themes_panel_shows_export_action_and_base_choice_lists_installed_theme() {
             .iter()
             .any(|i| i.row.key == "base-tema-base-customizado")
     );
+}
+
+#[test]
+fn create_theme_with_image_passes_theme_check_and_has_no_source_name() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria imagem de teste
+    let src_dir = ctx.paths.themes().join("src_test");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    let img_path = src_dir.join("wallpaper.png");
+    let img = image::RgbaImage::new(16, 16);
+    img.save(&img_path).unwrap();
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some("wallpaper.png".into());
+    d.background_source_name = Some("meu_wallpaper_original.png".into());
+    d.draft_dir = Some(src_dir.clone());
+    ctx.theme_draft = Some(d);
+
+    let flow = finish_create_theme(&mut ctx, "Tema Com Imagem", None, None, false);
+    assert!(matches!(flow, Flow::Replace(_)));
+
+    let theme_dir = ctx.paths.themes().join("tema-com-imagem");
+    assert!(theme_dir.join("background.png").is_file());
+
+    let tokens_text = std::fs::read_to_string(theme_dir.join("tokens.toml")).unwrap();
+    assert!(!tokens_text.contains("custom-background-name"));
+    assert!(!tokens_text.contains("meu_wallpaper_original.png"));
+
+    let check_res = crate::theme::check(&theme_dir);
+    assert!(
+        check_res.is_ok(),
+        "theme check falhou no tema com imagem: {:?}",
+        check_res.err()
+    );
+}
+
+#[test]
+fn discard_theme_draft_cleans_base_overrides_different_from_selected() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Tema ativo é default (ou None)
+    assert_eq!(tako_themes::selected(&ctx.paths.themes()), None);
+
+    let base_id = "tema-base-diferente";
+    let base_ov_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), Some(base_id));
+    std::fs::create_dir_all(&base_ov_dir).unwrap();
+    let draft_file = base_ov_dir.join("background.draft.png");
+    std::fs::write(&draft_file, b"DRAFT_IMAGE_CONTENT").unwrap();
+    assert!(draft_file.is_file());
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some("background.draft.png".into());
+    d.draft_dir = Some(base_ov_dir.clone());
+    ctx.theme_draft = Some(d);
+
+    // Descarta o rascunho
+    ctx.discard_theme_draft();
+    assert!(ctx.theme_draft.is_none());
+
+    // Confere que o arquivo de rascunho na pasta da base foi apagado sem vazar
+    assert!(
+        !draft_file.exists(),
+        "rascunho vazou na pasta da base diferente da selecionada"
+    );
+}
+
+#[test]
+fn overwrite_dialog_shows_existing_theme_name_and_suggests_unique() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    let _ = finish_create_theme(&mut ctx, "Meu Tema Existente", None, None, false);
+
+    // Tenta criar de novo com mesmo nome
+    let flow = finish_create_theme(&mut ctx, "Meu Tema Existente", None, None, false);
+    let Flow::Push(mut confirm_dialog) = flow else {
+        panic!("esperava diálogo de confirmação");
+    };
+
+    let rendered = confirm_dialog.render(&ctx);
+    assert!(
+        rendered.text.contains("Meu Tema Existente"),
+        "diálogo deveria conter o nome do tema existente: {}",
+        rendered.text
+    );
+
+    let rows = rendered.rows;
+    assert!(rows.iter().any(|r| r.key == "overwrite"));
+    let suggest_row = rows.iter().find(|r| r.key == "suggest").unwrap();
+    assert!(suggest_row.title.contains("meu-tema-existente-2"));
+
+    // Clica em suggest para salvar com id livre
+    let suggest_idx = rows.iter().position(|r| r.key == "suggest").unwrap();
+    let flow_suggest = confirm_dialog.click("row", suggest_idx, &mut ctx);
+    assert!(matches!(flow_suggest, Flow::Replace(_)));
+
+    assert!(ctx.paths.themes().join("meu-tema-existente-2").is_dir());
+}
+
+#[test]
+fn cannot_overwrite_reserved_theme_offers_only_suggest() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria tema simulando o extra reservado tako-fita na pasta de temas
+    let fita_dir = ctx.paths.themes().join("tako-fita");
+    std::fs::create_dir_all(&fita_dir).unwrap();
+    std::fs::write(
+        fita_dir.join("theme.toml"),
+        "id = \"tako-fita\"\nname = \"Tako Fita\"\nversion = \"1.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\n",
+    ).unwrap();
+
+    // Tenta criar passando custom_id="tako-fita" ou nome que derive para ele
+    let flow = finish_create_theme(&mut ctx, "Fita", Some("tako-fita"), None, false);
+    let Flow::Push(dlg) = flow else {
+        panic!("esperava diálogo");
+    };
+
+    let rows = dlg.render(&ctx).rows;
+    // Não deve oferecer o botão de sobrescrever!
+    assert!(!rows.iter().any(|r| r.key == "overwrite"));
+    assert!(rows.iter().any(|r| r.key == "suggest"));
 }
