@@ -476,6 +476,48 @@ mod tests {
     }
 
     #[test]
+    fn previewing_theme_override_timeout_returns_to_edit_panel_and_cleans_draft() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, ctx) = setup();
+        let mut shell = Shell::new(ctx);
+
+        let ov_dir = tako_themes::overrides::override_dir(&shell.ctx.paths.themes(), Some(THEME));
+        std::fs::create_dir_all(&ov_dir).unwrap();
+        let prev_img = ov_dir.join("background.png");
+        std::fs::write(&prev_img, b"original").unwrap();
+
+        let draft_img = ov_dir.join("background.draft.jpg");
+        std::fs::write(&draft_img, b"draft").unwrap();
+
+        let draft = tako_themes::overrides::ThemeTokensOverride {
+            accent: Some("#E3161E".into()),
+            background_image: Some("background.draft.jpg".into()),
+            ..Default::default()
+        };
+
+        let Flow::Replace(layer) = start_override(&mut shell.ctx, Some(THEME), draft) else {
+            panic!("esperava Replace");
+        };
+        shell.push_layer(layer);
+
+        // Dispara o timeout da prévia
+        shell.tick_theme_preview(Instant::now() + PREVIEW_TIME);
+
+        // A prévia acabou
+        assert!(shell.ctx.theme_preview.is_none());
+
+        // O rascunho temporário foi limpo
+        assert!(!draft_img.exists(), "background.draft.jpg deveria ter sido removido");
+
+        // A imagem anterior original permaneceu intacta
+        assert!(prev_img.is_file(), "background.png original deveria existir");
+        assert_eq!(std::fs::read(&prev_img).unwrap(), b"original");
+
+        // A camada ativa após o timeout é o painel de edição
+        assert!(shell.has_layers());
+    }
+
+    #[test]
     fn the_hints_count_down_and_the_texts_exist_in_both_languages() {
         let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_d, mut ctx) = setup();
