@@ -17,10 +17,10 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     let (quick_installed, quick_path) = sunshine::detect_quick();
     let detection = CACHED_DETECTION.with(|cell| {
         let borrow = cell.borrow_mut();
-        if let Some((at, det)) = borrow.as_ref() {
-            if at.elapsed() < Duration::from_secs(5) {
-                return det.clone();
-            }
+        if let Some((at, det)) = borrow.as_ref()
+            && at.elapsed() < Duration::from_secs(5)
+        {
+            return det.clone();
         }
         if !CHECKING.get() {
             CHECKING.set(true);
@@ -44,7 +44,7 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         (true, false) => ctx.t("settings.system.sunshine_installed"),
         (false, _) => ctx.t("settings.system.sunshine_missing"),
     };
-    let export_enabled = detection.installed || detection.apps_json.is_some();
+    let export_enabled = ctx.simulated() || detection.installed || detection.apps_json.is_some();
     let mut rows = vec![
         MenuItem::new(
             PanelRow::info("sunshine-status", ctx.t("settings.system.sunshine"), status)
@@ -57,7 +57,10 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                 .enabled(export_enabled),
         )
         .on(|ctx| {
-            if sunshine::find_apps_json().is_none() && !sunshine::detect_quick().0 {
+            if !ctx.simulated()
+                && sunshine::find_apps_json().is_none()
+                && !sunshine::detect_quick().0
+            {
                 ctx.toast(ctx.t("settings.system.sunshine_missing"));
                 Flow::Stay
             } else {
@@ -165,7 +168,7 @@ fn collect_entries(ctx: &mut Ctx, apps: &[App]) -> (Vec<serde_json::Value>, usiz
     (entries, skipped)
 }
 
-fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
+pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
     let apps = match apps(ctx) {
         Ok(apps) => apps,
         Err(error) => {

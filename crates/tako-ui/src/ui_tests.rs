@@ -649,6 +649,17 @@ fn desktop_snapshot() {
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
+            Ok("sunshine-preview") => {
+                shell.open_route("settings");
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "integrations")
+                {
+                    shell.click("category", index);
+                }
+                let layer = crate::shell::settings::sunshine::preview_dialog(&shell.ctx, false);
+                shell.push_layer(Box::new(layer));
+            }
             Ok("settings") => {
                 shell.open_route("settings");
                 if let Ok(category) = std::env::var("TAKO_SNAP_SETTINGS_CATEGORY")

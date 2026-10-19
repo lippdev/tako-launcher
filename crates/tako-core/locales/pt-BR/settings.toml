@@ -291,7 +291,6 @@ safemode_on_desc = "Ligado: temas instalados e mudanças de tela ficam de fora a
 safemode_exit = "Sair do modo seguro"
 safemode_off = "Desligado"
 safemode_off_desc = "O Tako abre em modo seguro sozinho se o tema falhar várias vezes seguidas"
-integrations_header = "Integrações"
 sunshine = "Sunshine / Apollo"
 sunshine_desc = "Streaming local com Sunshine ou Apollo; o Tako não envia dados pela rede."
 sunshine_running = "Em execução"
