@@ -107,7 +107,7 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Banco `butler.db` em `~/.config/itch/db/` (ou Flatpak `~/.var/app/io.itch.itch/config/itch/db/`) é lido via SQLite em modo somente leitura.
 - [ ] Jogos instalados (`caves` com `install_location` e `game`) aparecem na biblioteca com o título, capa e tempo de jogo.
 - [ ] Executável do jogo é resolvido automaticamente ou via `.itch.toml`; quando encontrado, o Tako inicia o processo diretamente e rastreia o ciclo de vida e tempo de jogo.
-- [ ] Na ausência do binário direto, o jogo faz fallback para lançamento via protocolo `itch://install?game_id=<id>&launch`.
+- [ ] Na ausência do binário direto, o jogo faz fallback para lançamento via protocolo `itch://install?game_id=<id>&launch` (requer app itch na versão mínima 26.17.0, que trouxe `&launch`).
 - [ ] Banco ausente ou corrompido não causa pânico e emite aviso na tela quando o cliente não estiver instalado.
 
 ## Pacotes do AUR e Flatpak (PLAT-002)

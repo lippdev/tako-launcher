@@ -174,6 +174,31 @@ External_Programs:
 }
 
 #[test]
+fn scan_bottle_skips_empty_program_uuid() {
+    let dir = tempdir().unwrap();
+    let bottle_dir = dir.path().join("Jogos");
+    fs::create_dir_all(&bottle_dir).unwrap();
+    let yml = r#"
+Name: Garrafa
+External_Programs:
+  "":
+    name: Programa Sem UUID
+    executable: dummy.exe
+  "   ":
+    name: Programa Com Espacos no UUID
+    executable: dummy2.exe
+  valid_uuid:
+    name: Programa Valido
+    executable: app.exe
+"#;
+    fs::write(bottle_dir.join("bottle.yml"), yml).unwrap();
+    let games = scan_bottle(&bottle_dir, false).unwrap();
+    assert_eq!(games.len(), 1);
+    assert_eq!(games[0].title, "Programa Valido");
+    assert_eq!(games[0].id, "bottles:Garrafa:valid_uuid");
+}
+
+#[test]
 fn scan_bottle_rejects_icon_outside_icons_dir() {
     let dir = tempdir().unwrap();
     let bottle_dir = dir.path().join("Garrafa");

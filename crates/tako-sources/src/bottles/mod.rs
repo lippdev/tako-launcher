@@ -234,14 +234,15 @@ pub fn scan_bottle(bottle_dir: &Path, is_flatpak: bool) -> Result<Vec<Game>, Str
 
     for prog in config.programs {
         let prog_name = prog.name.trim();
-        // Não passe -p "" quando prog.name estiver vazio: pule o programa
-        if prog_name.is_empty() {
+        let prog_uuid = prog.id.trim();
+        // Não passe -p "" quando prog.name estiver vazio e pule o programa se o UUID for vazio
+        if prog_name.is_empty() || prog_uuid.is_empty() {
             continue;
         }
 
         let prog_title = prog_name.to_owned();
         // O id do Bottles deve usar a chave UUID de External_Programs (prog.id)
-        let id = format!("bottles:{bottle_slug}:{}", prog.id);
+        let id = format!("bottles:{bottle_slug}:{prog_uuid}");
 
         let (target, args) = if is_flatpak {
             (
