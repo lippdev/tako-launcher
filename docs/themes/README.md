@@ -277,12 +277,11 @@ pode ler os mesmos se exportar o `Ui` do padrão:
 | `text-scale` | Tamanho do texto escolhido (1 = normal). |
 | `pointer` | O último foco veio do mouse: destaque, mas não role listas até o item. |
 
-Num tema que reaproveita o padrão, **`tokens.toml`** troca as cores `in-out` do `Ui` sem escrever Slint: `nome =
-"#RRGGBB"` ou `"#RRGGBBAA"`. Cores disponíveis: `canvas`, `on-accent`, `on-accent-muted`, `on-accent-subtle`,
+Num tema que reaproveita o padrão, **`tokens.toml`** troca as cores `in-out`, fontes e fundo do `Ui` sem escrever Slint: `nome =
+"#RRGGBB"` ou `"#RRGGBBAA"`. Cores disponíveis: `accent`, `canvas`, `on-accent`, `on-accent-muted`, `on-accent-subtle`,
 `surface-1`, `surface-2`, `surface-sidebar`, `surface-solid`, `on-surface-solid`, `on-surface-solid-muted`,
 `control-track-off`, `control-off`, `control-on-on-solid`, `control-off-on-solid`, `control-track-on-solid`,
-`value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. Ao carregar, o Tako ignora (com log) a chave ou a cor
-inválida. O `tako theme check` aponta as duas.
+`value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. Também aceita fontes (`font`, `font-title`, `font-text`, `font-heading`, `font-desk`, `font-wordmark`) e imagem de fundo (`custom-background`, `background-image`). Pelo próprio Tako (Configurações › Aparência), a pessoa usuária pode personalizar o tema atual, gravando uma sobreposição sem modificar os arquivos originais. Ao carregar, o Tako ignora (com log) a chave ou o valor inválido. O `tako theme check` aponta os dois.
 
 ### A biblioteca `@tako`
 

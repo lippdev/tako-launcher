@@ -3,6 +3,7 @@
 //! A compilação do `.slint` fica no `tako-ui` (`tako theme check`).
 
 mod manifest;
+pub mod overrides;
 mod package;
 pub mod remote;
 
