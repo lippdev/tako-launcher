@@ -938,7 +938,7 @@ fn desktop_snapshot() {
             Ok("theme-name") => {
                 shell.open_route("settings");
                 shell.click("category", 3);
-                let layer = crate::shell::settings::prompt_theme_name(&shell.ctx, None);
+                let layer = crate::shell::settings::prompt_theme_name(&shell.ctx, None, false);
                 shell.push_layer(Box::new(layer));
             }
             Ok("theme-overwrite") => {

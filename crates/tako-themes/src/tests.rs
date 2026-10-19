@@ -1163,3 +1163,39 @@ fn test_export_theme_with_override_merges_custom_tokens() {
 
     assert!(validate_package(&installed.dir).is_ok());
 }
+
+#[test]
+fn create_theme_respects_solid_background_over_base_image() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::overrides::{BackgroundMode, ThemeTokensOverride};
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+    let base_dir = themes_root.join("base-com-imagem");
+    std::fs::create_dir_all(&base_dir).unwrap();
+    std::fs::write(
+        base_dir.join("tokens.toml"),
+        "accent = \"#112233\"\ncustom-background = \"background.png\"\n",
+    )
+    .unwrap();
+    let tokens = ThemeTokensOverride {
+        canvas: Some("#101010".into()),
+        background_mode: Some(BackgroundMode::Solid),
+        ..Default::default()
+    };
+    let opts = CreateThemeOptions {
+        name: "Sólido",
+        custom_id: None,
+        author: None,
+        version: None,
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+        base_theme_dir: Some(&base_dir),
+    };
+    let installed = create_theme(&themes_root, &opts).unwrap();
+    let text = std::fs::read_to_string(installed.dir.join("tokens.toml")).unwrap();
+    assert!(!text.contains("background.png"), "{text}");
+    assert!(text.contains("#101010"), "{text}");
+}

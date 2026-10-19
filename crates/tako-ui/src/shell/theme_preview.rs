@@ -235,6 +235,7 @@ impl Layer for OverridePreviewCreateLayer {
                 return Flow::Replace(Box::new(super::settings::prompt_theme_name(
                     ctx,
                     self.base_id.clone(),
+                    true,
                 )));
             }
             Cmd::Back => {

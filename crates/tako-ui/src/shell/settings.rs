@@ -1159,7 +1159,7 @@ pub(crate) fn build_theme_editor_panel(ctx: &Ctx, mode: ThemeEditorMode) -> Menu
                         .desc(ctx.t("settings.appearance.save_as_new_theme_desc"))
                         .style("primary"),
                 )
-                .on(move |ctx| Flow::Push(Box::new(prompt_theme_name(ctx, base_clone.clone()))));
+                .on(move |ctx| Flow::Push(Box::new(prompt_theme_name(ctx, base_clone.clone(), false))));
                 rows.push(save_new_row);
             }
             ThemeEditorMode::OverrideCurrent => {
@@ -1225,7 +1225,7 @@ pub(crate) fn build_theme_editor_panel(ctx: &Ctx, mode: ThemeEditorMode) -> Menu
                         PanelRow::action("save_as_new", ctx.t("settings.appearance.save_as_new_theme"))
                             .desc(ctx.t("settings.appearance.save_as_new_theme_desc")),
                     )
-                    .on(move |ctx| Flow::Push(Box::new(prompt_theme_name(ctx, theme_id_for_new.clone()))));
+                    .on(move |ctx| Flow::Push(Box::new(prompt_theme_name(ctx, theme_id_for_new.clone(), false))));
                     rows.push(save_as_new_row);
                 }
 
@@ -1395,9 +1395,11 @@ pub(crate) fn start_create_from_base(ctx: &mut Ctx, base_id: Option<&str>) -> Fl
     )))
 }
 
+/// `from_preview`: o teclado substituiu a prévia, então não há editor embaixo e cancelar descarta o rascunho.
 pub(crate) fn prompt_theme_name(
     ctx: &Ctx,
     base_id: Option<String>,
+    from_preview: bool,
 ) -> super::keyboard::KeyboardLayer {
     let base_clone = base_id.clone();
     super::keyboard::KeyboardLayer::new(
@@ -1407,8 +1409,10 @@ pub(crate) fn prompt_theme_name(
         move |ctx, name| finish_create_theme(ctx, name, None, base_clone.as_deref(), false),
     )
     .hint(ctx.t("settings.appearance.theme_name_hint"))
-    .on_cancel(|ctx| {
-        ctx.discard_theme_draft();
+    .on_cancel(move |ctx| {
+        if from_preview {
+            ctx.discard_theme_draft();
+        }
     })
     .check(
         |ctx, name| match tako_themes::create::validate_theme_name(name) {

@@ -1936,8 +1936,14 @@ fn test_prompt_theme_name_cancel_discards_draft() {
     });
     assert!(ctx.theme_draft.is_some());
 
-    let mut prompt = prompt_theme_name(&ctx, None);
-    // Usuário cancela o teclado (Cmd::Back ou click "cancel")
+    // Vindo do editor: cancelar o nome volta ao editor com as edições intactas.
+    let mut prompt = prompt_theme_name(&ctx, None, false);
+    let flow = prompt.click("cancel", 0, &mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert!(ctx.theme_draft.is_some(), "o editor ainda usa o rascunho");
+
+    // Vindo da prévia: não há editor embaixo, então o rascunho é descartado.
+    let mut prompt = prompt_theme_name(&ctx, None, true);
     let flow = prompt.click("cancel", 0, &mut ctx);
     assert!(matches!(flow, Flow::Close));
     assert!(

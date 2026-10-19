@@ -330,6 +330,15 @@ pub fn create_theme(
                 for (k, v) in &options.tokens.extra {
                     merged.extra.insert(k.clone(), v.clone());
                 }
+                // O modo de fundo escolhido vence o fundo da base.
+                match options.tokens.background_mode {
+                    Some(crate::overrides::BackgroundMode::Default) => {
+                        merged.canvas = options.tokens.canvas.clone();
+                        merged.background_image = None;
+                    }
+                    Some(crate::overrides::BackgroundMode::Solid) => merged.background_image = None,
+                    _ => {}
+                }
                 merged
             } else {
                 options.tokens.clone()
