@@ -5,14 +5,14 @@
 pub(crate) mod controls;
 #[path = "settings_emulators.rs"]
 pub(crate) mod emulators;
+#[path = "settings_integrations.rs"]
+pub(crate) mod integrations;
 #[path = "settings_library.rs"]
 pub(crate) mod library;
 #[path = "settings_metadata.rs"]
 pub(crate) mod metadata;
 #[path = "settings_screen.rs"]
 pub(crate) mod screen;
-#[path = "settings_integrations.rs"]
-pub(crate) mod integrations;
 #[cfg(test)]
 #[path = "settings_tests.rs"]
 mod tests;

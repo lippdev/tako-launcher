@@ -31,15 +31,11 @@ pub(crate) fn check_now(ctx: &mut Ctx) {
     }
     CHECKING.set(true);
     ctx.dirty = true;
-    crate::tasks::run(
-        ctx,
-        tako_platform::console_mode::detect,
-        |ctx, status| {
-            CHECKING.set(false);
-            CACHED_STATUS.with(|c| *c.borrow_mut() = Some((Instant::now(), status)));
-            ctx.dirty = true;
-        },
-    );
+    crate::tasks::run(ctx, tako_platform::console_mode::detect, |ctx, status| {
+        CHECKING.set(false);
+        CACHED_STATUS.with(|c| *c.borrow_mut() = Some((Instant::now(), status)));
+        ctx.dirty = true;
+    });
 }
 
 pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
@@ -73,15 +69,17 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         }
     };
 
-    let mut rows = vec![MenuItem::new(
-        PanelRow::action("console-mode", ctx.t("settings.integrations.console_mode"))
-            .desc(status_text)
-            .value(ctx.t("settings.integrations.console_mode_check_again")),
-    )
-    .on(|ctx| {
-        check_now(ctx);
-        Flow::Stay
-    })];
+    let mut rows = vec![
+        MenuItem::new(
+            PanelRow::action("console-mode", ctx.t("settings.integrations.console_mode"))
+                .desc(status_text)
+                .value(ctx.t("settings.integrations.console_mode_check_again")),
+        )
+        .on(|ctx| {
+            check_now(ctx);
+            Flow::Stay
+        }),
+    ];
 
     if crate::discord::available() {
         rows.push(super::toggle(

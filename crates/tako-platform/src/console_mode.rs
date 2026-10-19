@@ -154,10 +154,7 @@ fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
 
 #[cfg(windows)]
 fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
-    let file = fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(path)?;
+    let file = fs::OpenOptions::new().read(true).write(true).open(path)?;
     Ok(Box::new(file))
 }
 
@@ -179,10 +176,7 @@ pub fn detect() -> ConsoleModeStatus {
 }
 
 /// Lógica de detecção desacoplada para testes com fixtures e fakes.
-pub fn detect_internal<P: ConsoleModePaths, C>(
-    paths: &P,
-    connector: C,
-) -> ConsoleModeStatus
+pub fn detect_internal<P: ConsoleModePaths, C>(paths: &P, connector: C) -> ConsoleModeStatus
 where
     C: Fn(&Path) -> io::Result<Box<dyn ReadWrite>>,
 {
@@ -305,7 +299,10 @@ mod tests {
     struct TimeoutStream;
     impl Read for TimeoutStream {
         fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
-            Err(io::Error::new(io::ErrorKind::TimedOut, "tempo limite esgotado"))
+            Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "tempo limite esgotado",
+            ))
         }
     }
     impl Write for TimeoutStream {
@@ -325,7 +322,10 @@ mod tests {
             apps: vec![PathBuf::from("/nonexistent/bin")],
         };
         let status = detect_internal(&paths, |_| {
-            Err(io::Error::new(io::ErrorKind::NotFound, "socket inexistente"))
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "socket inexistente",
+            ))
         });
         assert_eq!(status, ConsoleModeStatus::NaoInstalado);
     }
@@ -338,9 +338,7 @@ mod tests {
             apps: vec![],
         };
         let json = br#"{"type":"hello","server":"consolemode","api":1,"version":"1.0.0","capabilities":["tv","fps"]}"#;
-        let status = detect_internal(&paths, |_| {
-            Ok(Box::new(MockSocketStream::new(json)))
-        });
+        let status = detect_internal(&paths, |_| Ok(Box::new(MockSocketStream::new(json))));
         assert_eq!(
             status,
             ConsoleModeStatus::Instalado {
@@ -358,9 +356,7 @@ mod tests {
             apps: vec![],
         };
         let json = br#"{"type":"hello","server":"consolemode","api":99,"version":"99.0.0","capabilities":[]}"#;
-        let status = detect_internal(&paths, |_| {
-            Ok(Box::new(MockSocketStream::new(json)))
-        });
+        let status = detect_internal(&paths, |_| Ok(Box::new(MockSocketStream::new(json))));
         assert_eq!(
             status,
             ConsoleModeStatus::Incompativel {
@@ -376,9 +372,7 @@ mod tests {
             discovery: None,
             apps: vec![],
         };
-        let status = detect_internal(&paths, |_| {
-            Ok(Box::new(TimeoutStream))
-        });
+        let status = detect_internal(&paths, |_| Ok(Box::new(TimeoutStream)));
         assert_eq!(status, ConsoleModeStatus::Erro);
     }
 
