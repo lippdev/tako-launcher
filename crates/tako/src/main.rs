@@ -49,6 +49,13 @@ fn init_logs(paths: &DataPaths, role: &str) {
         .with(stderr)
         .try_init();
     tracing::info!("tako {} ({role}) iniciando", tako_ui::version());
+    // Sem console no Windows publicado, um pânico só aparecia no código de saída que o supervisor vê (BUG-001).
+    let role = role.to_owned();
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        tracing::error!("pânico ({role}): {info}");
+        default(info);
+    }));
 }
 
 /// Definida no Tako reaberto por ele mesmo (saída do modo seguro): espera o anterior soltar a trava.

@@ -22,6 +22,10 @@ SDL é liberada nessas condições. O supervisor não toca sons. O volume regula
 - Ajustar por controle e teclado, reiniciar e conferir persistência; voltar a 100% restaura a tipografia original.
 - Com "Reduzir animações" ligado: foco, troca de página, cor de fundo e o "Abrindo…" ao entrar num jogo mudam sem
   transição, e o jogo aparece logo que a janela dele abre.
+- Entrada da tela cheia (BRAND-002), numa abertura comum: o polvo se monta e some em cerca de 1 s com a primeira tela
+  já pronta por baixo. Qualquer tecla, botão do controle ou clique pula na hora, sem navegar nem acionar nada. Com
+  "Reduzir animações" ligado, a entrada não aparece. Abrir por link, a partir de um jogo ou voltando do desktop não
+  repete. Medir a abertura a frio (PRD §8.1) com e sem a entrada: a primeira tela interativa não pode atrasar.
 - Ligar o som, variar o volume, navegar rapidamente, confirmar/voltar e clicar: sem fila de tons atrasados.
 - Volume zero: silêncio. Abrir jogo, Central durante o jogo e retorno: nenhum tom durante a sessão.
 - Sem saída de áudio ou após desconectar o dispositivo: navegação funciona; desligar/ligar o som permite recuperar.

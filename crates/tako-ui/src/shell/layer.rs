@@ -56,6 +56,10 @@ pub trait Layer {
     fn live(&self) -> bool {
         false
     }
+    /// É a camada da prévia de tema (THEME-002): sem ela na pilha a prévia não pode continuar.
+    fn theme_preview(&self) -> bool {
+        false
+    }
 }
 
 pub type Action = Rc<dyn Fn(&mut Ctx) -> Flow>;

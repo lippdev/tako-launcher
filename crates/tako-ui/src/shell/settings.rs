@@ -394,7 +394,7 @@ fn mode_rows(ctx: &Ctx) -> Vec<MenuItem> {
 
 // ---------------------------------------------------------------- Aparência
 
-const BUILTIN_THEME: &str = tako_themes::DEFAULT_THEME_ID;
+pub(crate) const BUILTIN_THEME: &str = tako_themes::DEFAULT_THEME_ID;
 
 fn theme_name(ctx: &Ctx) -> String {
     let root = ctx.paths.themes();
@@ -496,7 +496,7 @@ fn update_themes(ctx: &mut Ctx) -> Flow {
     Flow::Stay
 }
 
-fn themes_panel(ctx: &Ctx) -> MenuLayer {
+pub(crate) fn themes_panel(ctx: &Ctx) -> MenuLayer {
     MenuLayer::panel(ctx.t("settings.appearance.theme"), |ctx| {
         let installed = installed_themes(ctx);
         let sources = tako_themes::remote::sources(&ctx.paths.themes());
@@ -510,7 +510,10 @@ fn themes_panel(ctx: &Ctx) -> MenuLayer {
                 )
                 .desc(ctx.t("settings.appearance.builtin_desc")),
             )
-            .on(|ctx| pick_theme(ctx, None)),
+            .on(|ctx| {
+                let name = ctx.t("settings.appearance.builtin");
+                pick_theme(ctx, None, &name)
+            }),
         ];
         for theme in installed.iter() {
             let id = theme.id();
@@ -543,13 +546,14 @@ fn themes_panel(ctx: &Ctx) -> MenuLayer {
                 _ => desc,
             };
             let on = selected.as_deref() == Some(id.as_str());
+            let name = title.clone();
             v.push(
                 MenuItem::new(
                     PanelRow::radio(id.clone(), title, on)
                         .desc(desc)
                         .enabled(ok && !ctx.safe_mode),
                 )
-                .on(move |ctx| pick_theme(ctx, Some(&id))),
+                .on(move |ctx| pick_theme(ctx, Some(&id), &name)),
             );
         }
         v.push(
@@ -580,7 +584,15 @@ fn themes_panel(ctx: &Ctx) -> MenuLayer {
     })
 }
 
-fn pick_theme(ctx: &mut Ctx, id: Option<&str>) -> Flow {
+/// Escolher um tema. Na tela cheia ele entra em prévia (THEME-002) e só vira o escolhido ao confirmar; o desktop não
+/// tem tema (ADR-0027), então ali a escolha vale direto, para a próxima tela cheia.
+fn pick_theme(ctx: &mut Ctx, id: Option<&str>, name: &str) -> Flow {
+    if !ctx.desktop {
+        if tako_themes::selected(&ctx.paths.themes()).as_deref() == id {
+            return Flow::Stay;
+        }
+        return super::theme_preview::start(ctx, id, name);
+    }
     match tako_themes::select(&ctx.paths.themes(), id) {
         Ok(()) => ctx.effect(Effect::ApplyTheme(id.unwrap_or(BUILTIN_THEME).to_owned())),
         Err(e) => ctx.toast(e.to_string()),

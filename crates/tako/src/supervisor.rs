@@ -135,6 +135,8 @@ struct UiProc {
     rx: Receiver<UiMsg>,
     /// A interface avisou que vai sair de propósito.
     closing: Option<String>,
+    /// O supervisor encerrou a interface (sem heartbeat).
+    killed: Option<tako_core::supervision::KillReason>,
 }
 
 pub struct Supervisor {
@@ -224,6 +226,7 @@ impl Supervisor {
             stdin,
             rx,
             closing: None,
+            killed: None,
         })
     }
 
@@ -329,6 +332,14 @@ impl Supervisor {
             };
             launch = Launch::default();
             let code = self.watch_ui(&mut ui);
+            // BUG-001: distingue a saída prevista da tela cheia (código 0 com jogo) de queda ou travamento.
+            tracing::info!(
+                "interface saiu: código {code}, aviso {:?}, encerrada {:?}, jogo {:?}, tela cheia {:?}",
+                ui.closing,
+                ui.killed,
+                self.running.as_ref().map(|r| &r.req.game_id),
+                self.big_picture
+            );
             if hidden {
                 self.reveal_pads();
             }
@@ -357,7 +368,7 @@ impl Supervisor {
             if ui.closing.is_some() {
                 return 0;
             }
-            let decision = self.watch.exited(code, None, self.now());
+            let decision = self.watch.exited(code, ui.killed, self.now());
             match decision.action {
                 SupervisorAction::Exit => return 0,
                 SupervisorAction::GiveUp => {
@@ -400,6 +411,7 @@ impl Supervisor {
             }
             if let Some(reason) = self.watch.check(self.now()) {
                 tracing::warn!("interface sem resposta ({reason:?}); encerrando");
+                ui.killed = Some(reason);
                 let _ = ui.child.kill();
             }
             // Jogo rodando com a interface aberta (Início durante o jogo).
@@ -507,7 +519,12 @@ impl Supervisor {
         self.launching = false;
         let end = r.end(&self.platform, played);
         r.finish(&self.platform, &self.paths);
-        tracing::info!("jogo terminou: {} ({})", r.req.game_id, end.key());
+        tracing::info!(
+            "jogo terminou: {} ({}, {} s jogados)",
+            r.req.game_id,
+            end.key(),
+            played.as_secs()
+        );
         (r.req.game_id.clone(), end)
     }
 
