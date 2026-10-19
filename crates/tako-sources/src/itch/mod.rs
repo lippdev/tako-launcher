@@ -3,24 +3,22 @@
 //! O itch.io desktop utiliza o `butler` / `butlerd` como daemon e banco local SQLite em:
 //! `~/.config/itch/db/butler.db` (nativo) ou `~/.var/app/io.itch.itch/config/itch/db/butler.db` (Flatpak).
 //!
-//! O banco guarda:
-//! - `caves`: instâncias de jogos instalados (id, game_id, install_folder, install_location, installed_size, seconds_run, last_touched_at).
+//! O esquema real é definido nos modelos do butler (github.com/itchio/butler, database/models/cave.go e install_location.go):
+//! - `caves`: instâncias de jogos instalados (id, game_id, install_folder_name, install_location_id, custom_install_folder, verdict, installed_size, seconds_run, last_touched_at).
 //! - `games`: metadados da loja (id, title, cover_url, still_cover_url, url).
 //! - `install_locations`: locais base de instalação (id, path).
 //!
 //! ### Formas de abertura e pesquisa de suporte (SRC-002)
-//! 1. **Executável instalado no disco:** O itch extrai os arquivos do jogo sem criptografia na pasta
-//!    `<install_location>/<install_folder>`. Abrir o executável diretamente permite ao Tako acompanhar
-//!    o processo com precisão (`GameTrackingStrategy::Process`), contar o tempo de sessão e fechar
-//!    limpo sem nenhuma janela intermediária.
-//! 2. **Protocolo `itch://`:** O app oficial registra os esquemas `itch://` e `itchio://`. A sintaxe
-//!    oficial para abrir um jogo instalado é `itch://install?game_id=<id>&launch`. Porém, por segurança,
-//!    o cliente do itch sempre exibe uma caixa modal de confirmação para o usuário aceitar antes de rodar
-//!    o binário.
-//! 3. **Estratégia do Tako:** Busca primeiro o executável na pasta instalada (lendo `.itch.toml` se existir
-//!    ou inspecionando binários executáveis na pasta do jogo). Se encontrado, abre diretamente pelo
-//!    executável; se não houver binário identificado (ex.: jogo HTML5 ou pasta movida), utiliza o fallback
-//!    pelo protocolo `itch://install?game_id=<id>&launch`.
+//! 1. **Executável instalado no disco:**
+//!    - Manifesto explícito `.itch.toml` na raiz da pasta do jogo (ações de plataforma Linux ou universais).
+//!    - Candidatos reportados pelo butler em `caves.verdict` (dash.Verdict), utilizado somente quando houver
+//!      exatamente um candidato com sabor Linux.
+//!
+//!    Abrir o executável diretamente permite ao Tako acompanhar o processo (`GameTrackingStrategy::Process`),
+//!    contar o tempo de sessão e fechar limpo sem intermediários.
+//! 2. **Protocolo `itch://`:** Sintaxe oficial do app itch (github.com/itchio/itch e itchio/itch-setup, itch.io app docs):
+//!    `itch://install?game_id=<id>&launch`. O app oficial abre e solicita confirmação do usuário antes da execução.
+//!    Utilizado quando não há binário Linux único identificado, para jogos HTML5 ou quando o executável não é encontrado.
 
 use crate::{LibraryScan, LibrarySource, read_limited};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -61,93 +59,203 @@ fn parse_timestamp(val: Option<rusqlite::types::Value>) -> Option<DateTime<Utc>>
     }
 }
 
+enum ManifestActionPath {
+    Executable(String),
+    Url,
+}
+
+struct ManifestAction {
+    path: Option<ManifestActionPath>,
+    platform: Option<String>,
+}
+
+/// Parser seguro para manifestos `.itch.toml` da especificação do itch.io.
+/// Casa exatamente `path =` e `platform =`, suportando múltiplos blocos `[[actions]]`.
+fn parse_itch_manifest_actions(text: &str) -> Vec<ManifestAction> {
+    let mut actions = Vec::new();
+    let mut current_action: Option<ManifestAction> = None;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if trimmed == "[[actions]]" {
+            if let Some(action) = current_action.take() {
+                actions.push(action);
+            }
+            current_action = Some(ManifestAction {
+                path: None,
+                platform: None,
+            });
+            continue;
+        }
+
+        let action = current_action.get_or_insert(ManifestAction {
+            path: None,
+            platform: None,
+        });
+
+        // Casamento exato de path = ...
+        if let Some(rest) = trimmed.strip_prefix("path") {
+            let rest = rest.trim_start();
+            if let Some(val) = rest.strip_prefix('=') {
+                let raw_val = val.trim().trim_matches('"').trim_matches('\'').trim();
+                if raw_val.starts_with("http://")
+                    || raw_val.starts_with("https://")
+                    || raw_val.starts_with("itch:")
+                    || raw_val.contains("://")
+                {
+                    action.path = Some(ManifestActionPath::Url);
+                } else {
+                    action.path = Some(ManifestActionPath::Executable(raw_val.to_owned()));
+                }
+            }
+        } else if let Some(rest) = trimmed.strip_prefix("platform") {
+            let rest = rest.trim_start();
+            if let Some(val) = rest.strip_prefix('=') {
+                let p = val
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_ascii_lowercase();
+                action.platform = Some(p);
+            }
+        }
+    }
+
+    if let Some(action) = current_action {
+        actions.push(action);
+    }
+
+    actions
+}
+
+/// Avalia o `.itch.toml` na pasta do jogo.
+/// Retorna `Some(Some(path))` quando encontra executável Linux válido.
+/// Retorna `Some(None)` quando encontra ação Linux que é URL (HTML5) ou com caminho inválido (deve cair no protocolo).
+/// Retorna `None` quando o manifesto não existe ou não define ação Linux.
+fn resolve_manifest_executable(game_dir: &Path) -> Option<Option<PathBuf>> {
+    let manifest = game_dir.join(".itch.toml");
+    if !manifest.is_file() {
+        return None;
+    }
+    let Ok(bytes) = read_limited(&manifest, 64 * 1024) else {
+        return None;
+    };
+    let text = String::from_utf8_lossy(&bytes);
+    let actions = parse_itch_manifest_actions(&text);
+
+    // Prioriza ação explícita para Linux, ou ação genérica sem plataforma declarada
+    let action = actions
+        .iter()
+        .find(|a| a.platform.as_deref() == Some("linux"))
+        .or_else(|| actions.iter().find(|a| a.platform.is_none()))?;
+
+    match &action.path {
+        Some(ManifestActionPath::Url) => {
+            // URL (HTML5): cai no protocolo
+            Some(None)
+        }
+        Some(ManifestActionPath::Executable(path_str)) => {
+            // Recusa caminho absoluto ou subida de diretório ".."
+            if path_str.starts_with('/')
+                || Path::new(path_str).is_absolute()
+                || path_str.contains("..")
+            {
+                return Some(None);
+            }
+
+            let rel_path = path_str
+                .split('/')
+                .fold(PathBuf::new(), |acc, part| acc.join(part));
+            let candidate = game_dir.join(&rel_path);
+
+            // Canonicaliza e exige starts_with(game_dir)
+            let (Ok(canonical_game_dir), Ok(canonical_target)) =
+                (game_dir.canonicalize(), candidate.canonicalize())
+            else {
+                return Some(None);
+            };
+
+            if !canonical_target.starts_with(&canonical_game_dir) || !canonical_target.is_file() {
+                return Some(None);
+            }
+
+            Some(Some(candidate))
+        }
+        None => None,
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct DashVerdict {
+    #[serde(rename = "basePath", default)]
+    base_path: Option<String>,
+    #[serde(default)]
+    candidates: Vec<DashCandidate>,
+}
+
+#[derive(serde::Deserialize)]
+struct DashCandidate {
+    #[serde(default)]
+    path: String,
+    #[serde(default)]
+    flavor: Option<String>,
+    #[serde(rename = "linuxInfo")]
+    linux_info: Option<serde_json::Value>,
+}
+
+/// Avalia os `candidates` do JSON em `caves.verdict`.
+/// Usa apenas quando houver exatamente um candidato Linux.
+fn resolve_verdict_executable(game_dir: &Path, verdict_str: &str) -> Option<PathBuf> {
+    let verdict: DashVerdict = serde_json::from_str(verdict_str).ok()?;
+    let linux_candidates: Vec<&DashCandidate> = verdict
+        .candidates
+        .iter()
+        .filter(|c| c.flavor.as_deref() == Some("linux") || c.linux_info.is_some())
+        .collect();
+
+    if linux_candidates.len() != 1 {
+        return None;
+    }
+
+    let candidate = linux_candidates[0];
+    let rel_path = candidate
+        .path
+        .split('/')
+        .fold(PathBuf::new(), |acc, part| acc.join(part));
+
+    let base = verdict
+        .base_path
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| game_dir.to_path_buf());
+
+    let target = base.join(&rel_path);
+    if target.is_file() { Some(target) } else { None }
+}
+
 /// Tenta encontrar o executável principal dentro da pasta do jogo no itch.io.
-pub fn find_executable(game_dir: &Path, title: Option<&str>) -> Option<PathBuf> {
+/// Consulta primeiro o `.itch.toml` e, em seguida, os `candidates` do `verdict` do butler.
+pub fn find_executable(game_dir: &Path, verdict_json: Option<&str>) -> Option<PathBuf> {
     if !game_dir.is_dir() {
         return None;
     }
 
-    // 1. Manifest `.itch.toml` explícito do desenvolvedor
-    let manifest = game_dir.join(".itch.toml");
-    if manifest.is_file()
-        && let Ok(bytes) = read_limited(&manifest, 64 * 1024)
-    {
-        let text = String::from_utf8_lossy(&bytes);
-        for line in text.lines() {
-            let trimmed = line.trim();
-            if let Some(rest) = trimmed.strip_prefix("path")
-                && let Some((_, val)) = rest.split_once('=')
-            {
-                let path_val = val.trim().trim_matches('"').trim_matches('\'');
-                let candidate = game_dir.join(path_val);
-                if candidate.is_file() {
-                    return Some(candidate);
-                }
-            }
-        }
+    // 1. Manifest `.itch.toml` explícito
+    if let Some(manifest_result) = resolve_manifest_executable(game_dir) {
+        return manifest_result;
     }
 
-    // 2. Varredura rasa de arquivos executáveis
-    let Ok(entries) = std::fs::read_dir(game_dir) else {
-        return None;
-    };
-
-    let mut candidates: Vec<(PathBuf, i32)> = Vec::new();
-
-    let title_lower = title.map(|t| t.to_lowercase()).unwrap_or_default();
-    let folder_lower = game_dir
-        .file_name()
-        .map(|f| f.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
-
-    for entry in entries.flatten() {
-        let p = entry.path();
-        if p.is_file() {
-            let name = p
-                .file_name()
-                .map(|s| s.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
-
-            // Ignora desinstaladores e instaladores auxiliares
-            if name.contains("uninstall")
-                || name.contains("setup")
-                || name.contains("crashpad")
-                || name.ends_with(".so")
-                || name.ends_with(".dll")
-            {
-                continue;
-            }
-
-            let mut score = 0;
-            let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
-
-            let is_known_ext = matches!(ext, "x86_64" | "x86" | "bin" | "sh");
-            #[cfg(unix)]
-            let is_exec = {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::metadata(&p).is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
-            };
-            #[cfg(not(unix))]
-            let is_exec = is_known_ext;
-
-            if is_exec || is_known_ext {
-                score += 5;
-                if is_known_ext {
-                    score += 5;
-                }
-                if !title_lower.is_empty() && name.contains(&title_lower) {
-                    score += 20;
-                }
-                if !folder_lower.is_empty() && name.contains(&folder_lower) {
-                    score += 15;
-                }
-                candidates.push((p, score));
-            }
-        }
+    // 2. Candidates em `caves.verdict` (apenas quando houver exatamente um candidato Linux)
+    if let Some(v) = verdict_json.filter(|s| !s.trim().is_empty()) {
+        return resolve_verdict_executable(game_dir, v);
     }
 
-    candidates.sort_by_key(|(_, score)| std::cmp::Reverse(*score));
-    candidates.into_iter().next().map(|(p, _)| p)
+    None
 }
 
 /// Lê todos os jogos instalados registrados em `butler.db`.
@@ -157,6 +265,8 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(|e| e.to_string())?;
+
+    let _ = db.busy_timeout(Duration::from_millis(250));
 
     // Mapeamento de locais de instalação (`install_locations`)
     let mut locations: HashMap<String, PathBuf> = HashMap::new();
@@ -185,8 +295,10 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
                 g.cover_url,
                 g.still_cover_url,
                 g.url,
-                c.install_folder,
-                c.install_location,
+                c.install_folder_name,
+                c.install_location_id,
+                c.custom_install_folder,
+                c.verdict,
                 c.installed_size,
                 c.seconds_run,
                 c.last_touched_at
@@ -206,9 +318,11 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
                 r.get::<_, Option<String>>(5)?,
                 r.get::<_, Option<String>>(6)?,
                 r.get::<_, Option<String>>(7)?,
-                r.get::<_, Option<i64>>(8)?,
-                r.get::<_, Option<i64>>(9)?,
-                r.get::<_, Option<rusqlite::types::Value>>(10)?,
+                r.get::<_, Option<String>>(8)?,
+                r.get::<_, Option<String>>(9)?,
+                r.get::<_, Option<i64>>(10)?,
+                r.get::<_, Option<i64>>(11)?,
+                r.get::<_, Option<rusqlite::types::Value>>(12)?,
             ))
         })
         .map_err(|e| e.to_string())?;
@@ -222,8 +336,10 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
             cover_url,
             still_cover_url,
             _store_url,
-            install_folder,
-            install_location,
+            install_folder_name,
+            install_location_id,
+            custom_install_folder,
+            verdict,
             installed_size,
             seconds_run,
             last_touched_at,
@@ -234,34 +350,26 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
 
         let title = title
             .filter(|t| !t.trim().is_empty())
-            .or_else(|| install_folder.clone())
+            .or_else(|| install_folder_name.clone())
             .unwrap_or_else(|| format!("Jogo itch {game_id}"));
 
-        // Determina o diretório de instalação
-        let game_dir = if let Some(folder) = &install_folder {
-            let folder_path = Path::new(folder);
-            if folder_path.is_absolute() {
-                folder_path.to_path_buf()
-            } else {
-                let base = install_location
-                    .as_deref()
-                    .and_then(|loc| locations.get(loc))
-                    .cloned()
-                    .or_else(|| {
-                        install_location
-                            .as_deref()
-                            .filter(|l| l.starts_with('/'))
-                            .map(PathBuf::from)
-                    })
-                    .unwrap_or_else(|| default_apps_dir.clone());
-                base.join(folder)
-            }
+        // Determina o diretório de instalação com base nos modelos do butler
+        let game_dir = if let Some(custom) = custom_install_folder.filter(|s| !s.trim().is_empty())
+        {
+            PathBuf::from(custom)
+        } else if let Some(folder_name) = install_folder_name.filter(|s| !s.trim().is_empty()) {
+            let base = install_location_id
+                .as_deref()
+                .and_then(|id| locations.get(id))
+                .cloned()
+                .unwrap_or_else(|| default_apps_dir.clone());
+            base.join(folder_name)
         } else {
             default_apps_dir.join(format!("game-{game_id}"))
         };
 
-        // Resolução do alvo de abertura: executável direto com fallback para itch://
-        let exe = find_executable(&game_dir, Some(&title));
+        // Resolução do alvo de abertura: executável direto com fallback para o protocolo oficial itch://
+        let exe = find_executable(&game_dir, verdict.as_deref());
         let (launch_target, working_directory, tracking) = if let Some(target) = exe {
             let cwd = target
                 .parent()
