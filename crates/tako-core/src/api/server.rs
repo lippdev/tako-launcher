@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub const API_ENABLED: &str = "LocalApiEnabled";
 pub const API_PORT: &str = "LocalApiPort";
@@ -22,6 +22,7 @@ pub const MAX_HEADER_LINE_BYTES: usize = 4096;
 pub const MAX_HEADERS_TOTAL_BYTES: usize = 16384;
 pub const READ_TIMEOUT: Duration = Duration::from_secs(5);
 pub const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Chaves de configuração que NÃO podem entrar em backup ou exportação (segredos locais do dispositivo).
 pub const BACKUP_EXCLUDED_SETTINGS: &[&str] = &[API_TOKEN];
@@ -202,11 +203,25 @@ impl Drop for ServerHandle {
 /// Inicia o servidor HTTP local em segundo plano.
 ///
 /// Falha se o IP não for loopback (`127.0.0.1`), garantindo que nenhuma interface externa seja exposta.
+/// Inicia o servidor HTTP local em segundo plano.
+///
+/// Falha se o IP não for loopback (`127.0.0.1`), garantindo que nenhuma interface externa seja exposta.
 pub fn start_server<H: ApiHandler>(
     ip: Ipv4Addr,
     port: u16,
     token: String,
     handler: Arc<H>,
+) -> Result<ServerHandle, ApiServerError> {
+    start_server_with_timeout(ip, port, token, handler, REQUEST_TIMEOUT)
+}
+
+/// Inicia o servidor HTTP local em segundo plano com prazo total por requisição customizável.
+pub fn start_server_with_timeout<H: ApiHandler>(
+    ip: Ipv4Addr,
+    port: u16,
+    token: String,
+    handler: Arc<H>,
+    request_timeout: Duration,
 ) -> Result<ServerHandle, ApiServerError> {
     if !ip.is_loopback() {
         return Err(ApiServerError::NonLoopbackAddress);
@@ -313,7 +328,7 @@ pub fn start_server<H: ApiHandler>(
                                 streams: s_map,
                                 conns: c_counter,
                             };
-                            let _ = handle_connection(stream, h, t, r, g, conn_gen, s_port);
+                            let _ = handle_connection(stream, h, t, r, g, conn_gen, s_port, request_timeout);
                         });
                     }
                     Err(_) => {
@@ -341,18 +356,34 @@ pub fn start_server<H: ApiHandler>(
 enum ReadLineError {
     Io(std::io::Error),
     TooLarge,
+    TimedOut,
 }
 
-fn read_line_limited<R: BufRead>(
-    reader: &mut R,
+fn read_line_limited(
+    reader: &mut BufReader<TcpStream>,
+    deadline: Instant,
     max_bytes: usize,
 ) -> Result<Option<String>, ReadLineError> {
     let mut buf = Vec::new();
     loop {
+        let now = Instant::now();
+        if now >= deadline {
+            return Err(ReadLineError::TimedOut);
+        }
+        let remaining = deadline - now;
+        let timeout = remaining.min(READ_TIMEOUT);
+        let _ = reader.get_ref().set_read_timeout(Some(timeout));
+
         let (done, used) = {
             let available = match reader.fill_buf() {
                 Ok(n) => n,
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e)
+                    if e.kind() == std::io::ErrorKind::TimedOut
+                        || e.kind() == std::io::ErrorKind::WouldBlock =>
+                {
+                    return Err(ReadLineError::TimedOut);
+                }
                 Err(e) => return Err(ReadLineError::Io(e)),
             };
             if available.is_empty() {
@@ -400,13 +431,23 @@ fn handle_connection<H: ApiHandler>(
     gen_flag: Arc<AtomicU64>,
     conn_gen: u64,
     server_port: u16,
+    request_timeout: Duration,
 ) -> std::io::Result<()> {
+    let deadline = Instant::now() + request_timeout;
     let cloned_stream = stream.try_clone()?;
     let mut reader = BufReader::new(cloned_stream);
 
-    let request_line = match read_line_limited(&mut reader, MAX_REQUEST_LINE_BYTES) {
+    let request_line = match read_line_limited(&mut reader, deadline, MAX_REQUEST_LINE_BYTES) {
         Ok(Some(line)) => line,
         Ok(None) => return Ok(()),
+        Err(ReadLineError::TimedOut) => {
+            return send_response(
+                &mut stream,
+                408,
+                "Request Timeout",
+                r#"{"error":"Request timeout"}"#,
+            );
+        }
         Err(ReadLineError::TooLarge) => {
             return send_response(
                 &mut stream,
@@ -417,7 +458,6 @@ fn handle_connection<H: ApiHandler>(
         }
         Err(ReadLineError::Io(e)) => return Err(e),
     };
-
     let parts: Vec<&str> = request_line.split_whitespace().collect();
     if parts.len() < 2 {
         return send_response(
@@ -435,9 +475,25 @@ fn handle_connection<H: ApiHandler>(
     let mut host_header: Option<String> = None;
     let mut total_bytes = 0usize;
     loop {
-        let line = match read_line_limited(&mut reader, MAX_HEADER_LINE_BYTES) {
+        if Instant::now() >= deadline {
+            return send_response(
+                &mut stream,
+                408,
+                "Request Timeout",
+                r#"{"error":"Request timeout"}"#,
+            );
+        }
+        let line = match read_line_limited(&mut reader, deadline, MAX_HEADER_LINE_BYTES) {
             Ok(Some(l)) => l,
             Ok(None) => break,
+            Err(ReadLineError::TimedOut) => {
+                return send_response(
+                    &mut stream,
+                    408,
+                    "Request Timeout",
+                    r#"{"error":"Request timeout"}"#,
+                );
+            }
             Err(ReadLineError::TooLarge) => {
                 return send_response(
                     &mut stream,
@@ -448,7 +504,6 @@ fn handle_connection<H: ApiHandler>(
             }
             Err(ReadLineError::Io(e)) => return Err(e),
         };
-
         if line == "\r\n" || line == "\n" {
             break;
         }
@@ -469,6 +524,15 @@ fn handle_connection<H: ApiHandler>(
                 host_header = Some(val.trim().to_string());
             }
         }
+    }
+
+    if Instant::now() >= deadline {
+        return send_response(
+            &mut stream,
+            408,
+            "Request Timeout",
+            r#"{"error":"Request timeout"}"#,
+        );
     }
 
     // Proteção contra DNS rebinding: rejeita com 421 se Host não for 127.0.0.1:<porta> ou localhost:<porta>
@@ -1199,5 +1263,67 @@ mod tests {
         assert!(!constant_time_eq(b"abcdef", b"abcde"));
         assert!(!constant_time_eq(b"", b"a"));
         assert!(constant_time_eq(b"", b""));
+    }
+
+    #[test]
+    fn request_timeout_terminates_slow_client_and_frees_connection() {
+        let handler = Arc::new(MockHandler::new());
+        let server = start_server_with_timeout(
+            Ipv4Addr::LOCALHOST,
+            0,
+            "secret".into(),
+            handler,
+            Duration::from_millis(150),
+        )
+        .unwrap();
+        let port = server.port();
+
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        // Envia parte da requisição e depois dorme mais do que o prazo total
+        let _ = write!(stream, "GET /api/v1/games HTTP/1.1\r\n");
+        std::thread::sleep(Duration::from_millis(250));
+
+        // Tenta enviar o restante
+        let _ = write!(
+            stream,
+            "Host: 127.0.0.1:{port}\r\nAuthorization: Bearer secret\r\n\r\n"
+        );
+
+        use std::io::Read;
+        let mut res = String::new();
+        let _ = BufReader::new(&mut stream).read_to_string(&mut res);
+        assert!(res.is_empty() || res.starts_with("HTTP/1.1 408 Request Timeout"));
+
+        // A vaga de conexão deve ter sido liberada
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(server.active_connections(), 0);
+    }
+
+    #[test]
+    fn slow_headers_exceeding_total_request_timeout_are_rejected() {
+        let handler = Arc::new(MockHandler::new());
+        let server = start_server_with_timeout(
+            Ipv4Addr::LOCALHOST,
+            0,
+            "secret".into(),
+            handler,
+            Duration::from_millis(200),
+        )
+        .unwrap();
+        let port = server.port();
+
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        let _ = write!(stream, "GET /api/v1/games HTTP/1.1\r\n");
+        let _ = write!(stream, "Host: 127.0.0.1:{port}\r\n");
+        // Dorme além do prazo total da requisição
+        std::thread::sleep(Duration::from_millis(250));
+        let _ = write!(stream, "Authorization: Bearer secret\r\n\r\n");
+
+        use std::io::Read;
+        let mut res = String::new();
+        let _ = BufReader::new(&mut stream).read_to_string(&mut res);
+        assert!(res.is_empty() || res.starts_with("HTTP/1.1 408 Request Timeout"));
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(server.active_connections(), 0);
     }
 }
