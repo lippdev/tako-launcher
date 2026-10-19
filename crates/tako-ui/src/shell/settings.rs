@@ -968,6 +968,8 @@ pub(crate) fn token_dialog(ctx: &Ctx, token: String) -> MenuLayer {
             .on(move |ctx| {
                 if tako_platform::copy_to_clipboard(&token) {
                     ctx.toast(ctx.t("settings.system.api_token_copied"));
+                } else {
+                    ctx.toast(ctx.t("settings.system.api_token_copy_failed"));
                 }
                 Flow::Stay
             }),
