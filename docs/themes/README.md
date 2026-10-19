@@ -288,7 +288,7 @@ Num tema que reaproveita o padrão, **`tokens.toml`** troca as cores `in-out`, f
 
 Pelo próprio Tako (**Configurações › Aparência › Criar tema…**), é possível criar um novo tema sem editar arquivos:
 
-1. **Escolher a base:** escolha partir do tema padrão ou de um tema instalado que utilize o `Ui` padrão.
+1. **Escolher a base:** escolha partir do tema padrão ou de um tema instalado que utilize o `Ui` padrão (o novo tema não herda músicas nem áudios da base).
 2. **Personalizar:** ajuste cores de destaque, fontes e fundo (cor sólida ou imagem local copiada) com prévia ao vivo na tela cheia.
 3. **Salvar como novo tema:** informe um nome válido (até 50 caracteres, sem caracteres de caminho). O Tako deriva um identificador seguro e único, gera o manifesto `theme.toml`, a reexportação limpa do `Ui` em `main.slint`, o arquivo `tokens.toml` com a paleta escolhida e copia a imagem de fundo para dentro do tema. Em seguida, instala o tema e oferece a opção de aplicá-lo imediatamente.
 4. **Exportar:** em qualquer tema criado ou tema instalado baseado em tokens, use a ação **Exportar .takotheme…** para salvar um pacote zip compactado e pronto para distribuição, passando integralmente no `tako theme check`.

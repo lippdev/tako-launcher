@@ -287,7 +287,7 @@ Slint: `name = "#RRGGBB"` or `"#RRGGBBAA"` (except `canvas`, which requires 6-di
 
 Directly in Tako (**Settings › Appearance › Create theme…**), you can create a new theme without manually editing files:
 
-1. **Choose a base:** start from the default theme or any installed theme that uses the default `Ui`.
+1. **Choose a base:** start from the default theme or any installed theme that uses the default `Ui` (the new theme does not inherit music or audio from the base).
 2. **Customize:** adjust accent colors, fonts, and background (solid color or local image) with full-screen live preview.
 3. **Save as new theme:** enter a valid name (up to 50 characters, without path characters). Tako derives a safe and unique ID, generates the `theme.toml` manifest, clean `Ui` re-export in `main.slint`, `tokens.toml` with the chosen palette, and copies the background image into the theme. It then installs the theme and optionally applies it immediately.
 4. **Export:** for any user-created theme or token-based installed theme, use the **Export .takotheme…** action to save a compressed zip package ready to share, fully passing `tako theme check`.
