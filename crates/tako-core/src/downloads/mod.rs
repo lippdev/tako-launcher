@@ -437,12 +437,16 @@ pub fn suggest<'a>(
     sources: impl IntoIterator<Item = (&'a str, &'a source::Source)>,
     limit: usize,
 ) -> Vec<(&'a str, &'a source::SourceItem)> {
+    let game_tokens = crate::library::title_matcher::tokens(game_title);
+    if game_tokens.is_empty() {
+        return Vec::new();
+    }
     let mut scored: Vec<(f64, &str, &source::SourceItem)> = sources
         .into_iter()
         .flat_map(|(name, s)| s.items.iter().map(move |i| (name, i)))
         .map(|(n, i)| {
             (
-                crate::library::title_matcher::score(game_title, &i.title),
+                crate::library::title_matcher::score_tokens(&game_tokens, &i.tokens),
                 n,
                 i,
             )

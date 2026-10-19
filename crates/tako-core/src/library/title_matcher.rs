@@ -50,6 +50,11 @@ pub fn tokens(title: &str) -> Vec<String> {
 pub fn score(local: &str, candidate: &str) -> f64 {
     let a = tokens(local);
     let b = tokens(candidate);
+    score_tokens(&a, &b)
+}
+
+/// Compara fatias de tokens já extraídas (evita re-tokenização repetida).
+pub fn score_tokens(a: &[String], b: &[String]) -> f64 {
     if a.is_empty() || b.is_empty() {
         return 0.0;
     }
@@ -69,7 +74,7 @@ pub fn score(local: &str, candidate: &str) -> f64 {
     let dice = 2.0 * common as f64 / (a.len() + b.len()) as f64;
     // Prefixo ("Hollow Knight" → "Hollow Knight: Silksong") só conta com 2+ palavras: "Minecraft" sozinho não é
     // "Minecraft Dungeons".
-    let prefix = a.len().min(b.len()) >= 2 && (b.starts_with(&a) || a.starts_with(&b));
+    let prefix = a.len().min(b.len()) >= 2 && (b.starts_with(a) || a.starts_with(b));
     (if prefix { dice.max(0.8) } else { dice }).min(0.99)
 }
 
@@ -89,9 +94,14 @@ pub fn best<T>(
     candidates: impl IntoIterator<Item = T>,
     title_of: impl Fn(&T) -> &str,
 ) -> Option<T> {
+    let a = tokens(title);
+    if a.is_empty() {
+        return None;
+    }
     let mut best: Option<(T, f64)> = None;
     for c in candidates {
-        let s = score(title, title_of(&c));
+        let b = tokens(title_of(&c));
+        let s = score_tokens(&a, &b);
         if best.as_ref().is_none_or(|(_, b)| s > *b) {
             best = Some((c, s));
         }

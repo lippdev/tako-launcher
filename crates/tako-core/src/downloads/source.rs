@@ -46,6 +46,8 @@ pub struct SourceItem {
     pub upload_date: String,
     /// Texto livre da fonte ("12.4 GB"): só dica; o tamanho real vem do torrent.
     pub file_size: String,
+    /// Tokens para busca e sugestão pré-calculados ao ler a fonte.
+    pub tokens: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,11 +122,13 @@ fn item(v: &Value) -> Option<SourceItem> {
             .map(|s| clean_text(s, MAX_HINT_CHARS))
             .unwrap_or_default()
     };
+    let tokens = crate::library::title_matcher::tokens(&title);
     Some(SourceItem {
         title,
         uris,
         upload_date: hint("uploadDate"),
         file_size: hint("fileSize"),
+        tokens,
     })
 }
 
@@ -224,7 +228,12 @@ mod tests {
         assert_eq!(s.items.len(), 1);
         assert_eq!(s.items[0].title, "Jogo de Teste");
         assert_eq!(s.items[0].file_size, "1.2 GB");
+        assert_eq!(src_tokens_len(&s.items[0]), 3);
         assert_eq!(s.dropped, 0);
+    }
+
+    fn src_tokens_len(item: &SourceItem) -> usize {
+        item.tokens.len()
     }
 
     #[test]
