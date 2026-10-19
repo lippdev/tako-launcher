@@ -9,6 +9,19 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **Install progress:** on Steam, Tako shows the percentage as a ring in the list and grid and "Downloading… 42%" in the highlight. When it finishes, the game becomes installed without restarting. Epic shows "Installing" without a number.
 - **Free space:** the highlight shows how much space is left on the disk and warns when there isn't enough for the game.
 - "Install" is also in the game menu and in multi-select, which open one at a time in the store.
+- **Game icon in the list:** the list shows the game icon, like Steam (from the store or the Windows executable, or the title's initial); the cover stays in the Grid.
+- **Amazon games:** on Windows, games from your Amazon account show up as not installed and Install opens Amazon Games.
+- **Per-game VRR:** on Linux (KDE and wlroots), the game screen can turn VRR on just for that game and off at the end, even after a crash.
+- **Theme preview:** in full screen, picking a theme shows a 15 s preview; A applies, B goes back.
+- **App intro:** full screen opens with a short octopus animation that any key skips and that "Reduce motion" turns off.
+- **Tako's octopus:** the animated octopus shows up in empty states, while the library loads and in the desktop "Welcome back".
+- **Tools with the game:** in the game settings, extra programs (FPS overlay, mods) open with the game and can close at the end, with your permission.
+- **`tako://` links on macOS:** shortcuts and Stream Deck open games and Tako screens on the Mac too.
+- **Linux packages:** AUR PKGBUILDs and a Flatpak in the repository (not published yet).
+
+### Fixes
+- **Window on Windows:** Minimize, Maximize and Close on the desktop bar respond again; Maximize snap layouts still work.
+- **UI closing and reopening when playing:** new logs to diagnose the issue (BUG-001).
 
 ## [0.2.0-alpha.14]
 ### What's new
