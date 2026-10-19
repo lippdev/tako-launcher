@@ -34,7 +34,7 @@ import { Overlay, Overline, OverlayView, Tile } from "overlay.slint";
 export { Ui }
 
 struct DeskNav { id: string, label: string, icon: string, count: string, section: string, selected: bool }
-struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int, label: string, kind: string, count: string, open: bool, installing: bool, progress: float, percent: string, install-label: string }
+struct DeskGame { id: string, title: string, icon: image, initial: string, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int, label: string, kind: string, count: string, open: bool, installing: bool, progress: float, percent: string, install-label: string }
 struct DeskBlock { kind: string, title: string, count: string, label: string, icon: string, open: bool, games: [DeskGame], first: int, index: int, rows-before: int, sections-before: int, groups-before: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
 struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, install-note: string, install-warn: bool, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string, play-status: string, play-status-label: string }
@@ -901,14 +901,14 @@ component NotInstalledTitle inherits Rectangle {
     }
 }
 
-// Linha da lista (ListaDeJogos): miniatura quadrada, nome, loja de origem e, na escolhida, o ▶ redondo. Na seleção
+// Linha da lista (ListaDeJogos): ícone do jogo (não a capa), nome, loja de origem e, na escolhida, o ▶ redondo. Na seleção
 // múltipla, a caixa redonda à esquerda; Ctrl e Shift no clique marcam.
 component GameRow inherits Rectangle {
     in property <DeskGame> data;
     in property <bool> selected;
     in property <bool> focused;
     in property <bool> selecting;
-    in property <length> thumb: Ui.thumb-size;
+    in property <length> icon-size: Ui.list-icon-size;
     callback clicked();
     callback toggle();
     callback range();
@@ -945,13 +945,13 @@ component GameRow inherits Rectangle {
     }
     HorizontalLayout {
         padding-left: Ui.space-8;
-        padding-right: 6px;
-        spacing: 14px;
+        padding-right: Ui.space-6;
+        spacing: Ui.space-12;
         if selecting: Rectangle {
             y: (parent.height - self.height) / 2;
-            width: 24px;
-            height: 24px;
-            border-radius: 12px;
+            width: Ui.space-24;
+            height: Ui.space-24;
+            border-radius: Ui.space-12;
             background: data.checked ? Ui.primary-top : Ui.glass-control;
             border-width: data.checked ? 0 : 1px;
             border-color: Ui.glass-edge-strong;
@@ -961,18 +961,28 @@ component GameRow inherits Rectangle {
                 clicked => { root.toggle(); }
             }
         }
+        // Ícone do jogo: a imagem já vem recortada (raio 6 e contorno de 1) do cache; nada de clip ao vivo numa linha
+        // que se repete. Sem ícone, a inicial do nome sobre a cor do jogo.
         Rectangle {
             y: (parent.height - self.height) / 2;
-            // 40 na linha comum, 32 na linha compacta da janela pequena.
-            width: root.thumb;
+            // 28 na linha comum, 24 na linha compacta da janela pequena.
+            width: root.icon-size;
             height: self.width;
-            border-radius: Ui.radius-thumb;
-            clip: true;
             opacity: data.installed ? 1 : 0.5;
-            // Sem capa: tons fechados da cor do jogo, nunca a cor pura.
-            background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.55) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
-            // O quadrado do topo da capa (CapaDoJogo), não o meio.
-            Image { width: parent.width; height: parent.height; source: data.thumb; image-fit: cover; vertical-alignment: top; }
+            if data.initial != "": Rectangle {
+                border-radius: Ui.radius-icon;
+                background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.55) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
+                Text {
+                    text: data.initial;
+                    color: #ffffffd9;
+                    font-family: Ui.font-heading;
+                    font-size: 13px;
+                    font-weight: 800;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+            Image { width: parent.width; height: parent.height; source: data.icon; image-fit: contain; }
         }
         nt := Text {
             text: data.title;
@@ -1057,7 +1067,7 @@ component GameList inherits Rectangle {
     callback clicked(string, int);
     callback menu(length, length);
     callback scrolled(int);
-    // Janela pequena (JanelaPequena): linhas compactas de 42 com miniatura de 32.
+    // Janela pequena (JanelaPequena): linhas compactas de 42 com ícone de 24.
     in property <bool> compact;
     property <length> row-h: (compact ? 42px : Ui.game-row-height) + (Ui.text-scale - 1) * 32px + 6px;
     property <int> first: max(0, floor(-fl.viewport-y / row-h));
@@ -1094,7 +1104,7 @@ component GameList inherits Rectangle {
             if r < games.length && games[r].kind == "": GameRow {
                 width: parent.width;
                 height: parent.height;
-                thumb: compact ? 32px : Ui.thumb-size;
+                icon-size: compact ? Ui.list-icon-compact : Ui.list-icon-size;
                 data: games[parent.r];
                 selected: parent.r == root.selected;
                 focused: key-focus && parent.r == root.selected;
@@ -3055,8 +3065,8 @@ component DeskLibrary inherits Rectangle {
                         for i in 8: HorizontalLayout {
                             height: Ui.game-row-height;
                             padding-left: Ui.space-8;
-                            spacing: 14px;
-                            Skeleton { width: Ui.thumb-size; height: Ui.thumb-size; y: 2px; }
+                            spacing: Ui.space-12;
+                            Skeleton { width: Ui.list-icon-size; height: Ui.list-icon-size; y: 8px; radius: Ui.radius-icon; }
                             Skeleton { width: 110px + mod(i * 37, 80) * 1px; height: 14px; y: 15px; radius: 7px; }
                             Rectangle { horizontal-stretch: 1; }
                         }

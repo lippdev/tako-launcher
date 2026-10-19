@@ -4976,6 +4976,7 @@ version = "0.2.0-alpha.1"
 dependencies = [
  "chrono",
  "evdev",
+ "image",
  "keyring",
  "libc",
  "objc2 0.6.5",
@@ -4986,6 +4987,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tako-core",
+ "tempfile",
  "tracing",
  "windows",
  "windows-core",

@@ -227,7 +227,9 @@ theme_struct! {
     pub struct DeskGame {
         pub id: String,
         pub title: String,
-        pub thumb: Image,
+        // Ícone do jogo da linha da lista (`initial` = a inicial do nome quando não há ícone).
+        pub icon: Image,
+        pub initial: String,
         // Capa 2:3 maior, só na grade e nas categorias, perto da área visível.
         pub cover: Image,
         pub accent: Color,
