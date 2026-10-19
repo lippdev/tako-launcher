@@ -26,11 +26,12 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 - **Música e sons do tema:** na tela cheia, o tema pode trazer música de fundo e sons de navegação, com volume próprio em Configurações › Som. Nunca tocam durante o jogo.
 - **Tema Fita:** tema oficial novo para a tela cheia, com os jogos num carrossel horizontal e a arte em tela inteira.
 - **Proton e Wine no Linux:** jogos de Windows adicionados à mão podem abrir com o Wine do sistema, o Proton da Steam (inclusive GE-Proton) ou um runner do Lutris, com prefixo próprio.
-- **Backup e restauração:** Configurações › Sistema gera um `.takobackup` com a biblioteca, as configurações, os temas e as capas escolhidas. Restaurar guarda antes uma cópia do estado atual; permissões e o token da API local nunca entram no backup.
+- **Backup e restauração:** Configurações › Sistema gera um `.takobackup` com a biblioteca, as configurações, os temas e as capas escolhidas. Restaurar guarda antes uma cópia do estado atual; permissões e o token da API local nunca entram no backup, e comandos, argumentos e variáveis de ambiente que vierem dele pedem confirmação antes de valer.
 - **Sunshine e Moonlight:** em Configurações › Integrações, exporte os jogos para o Sunshine/Apollo e abra-os pelo Moonlight. O Tako mostra a prévia, faz backup do `apps.json` e nunca mexe nos apps que você já tinha.
 - **Console Mode:** Configurações › Integrações mostra se o Console Mode está instalado e qual versão da API ele oferece.
 
 ### Correções
+- **Confirmação de argumentos e variáveis:** argumentos extras, variáveis de ambiente e Proton/Wine definidos por jogo agora entram na confirmação, junto dos comandos antes e depois; quem já usava confirma uma vez.
 - **Lista lenta e imagens que não carregavam (alpha.15):** os ícones da lista têm fila própria e não seguram mais as capas e os fundos; a interface só redesenha quando uma imagem chega, e arte que a loja não tem não é pedida de novo a cada abertura.
 - **Tempo de jogo:** jogo com sessão mas sem tempo registrado mostra "Não registrado" em vez de "Ainda não jogado".
 - **Janela no Windows:** Minimizar, Maximizar e Fechar da barra do desktop voltam a responder; o encaixe do Maximizar continua.

@@ -26,11 +26,12 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **Theme music and sounds:** in full screen, a theme can bring background music and navigation sounds, with their own volume in Settings › Sound. They never play during a game.
 - **Fita theme:** a new official full-screen theme, with games in a horizontal carousel and the art filling the screen.
 - **Proton and Wine on Linux:** Windows games added by hand can open with the system Wine, Steam's Proton (including GE-Proton) or a Lutris runner, with their own prefix.
-- **Backup and restore:** Settings › System creates a `.takobackup` with the library, settings, themes and chosen covers. Restoring saves a copy of the current state first; permissions and the local API token never go into the backup.
+- **Backup and restore:** Settings › System creates a `.takobackup` with the library, settings, themes and chosen covers. Restoring saves a copy of the current state first; permissions and the local API token never go into the backup, and commands, arguments and environment variables that come from it ask for confirmation before they apply.
 - **Sunshine and Moonlight:** in Settings › Integrations, export your games to Sunshine/Apollo and open them from Moonlight. Tako shows a preview, backs up `apps.json` and never touches the apps you already had.
 - **Console Mode:** Settings › Integrations shows whether Console Mode is installed and which API version it offers.
 
 ### Fixes
+- **Arguments and variables need confirmation:** extra arguments, environment variables and Proton/Wine set per game now go into the confirmation, together with the before and after commands; if you already used them, you confirm once.
 - **Slow list and images not loading (alpha.15):** list icons have their own queue and no longer hold up covers and backgrounds; the UI only redraws when an image arrives, and art the store doesn't have isn't requested again on every launch.
 - **Play time:** a game with a session but no recorded time shows "Not tracked" instead of "Not played yet".
 - **Window on Windows:** Minimize, Maximize and Close on the desktop bar respond again; Maximize snap layouts still work.
