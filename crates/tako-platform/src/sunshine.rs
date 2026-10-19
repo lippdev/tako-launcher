@@ -305,13 +305,15 @@ pub fn app_entry_for_target(app: &App, target: Option<&Path>) -> Result<Value, S
                 .map(|p| p.to_string_lossy().into_owned()),
         )
     };
-    if target.is_some_and(is_flatpak_sunshine_path)
-        && !command.starts_with("flatpak-spawn --host ")
+    if target.is_some_and(is_flatpak_sunshine_path) && !command.starts_with("flatpak-spawn --host ")
     {
         command = format!("flatpak-spawn --host {command}");
     }
     let mut entry = serde_json::Map::new();
-    entry.insert("name".into(), Value::String(format!("{MARKER}{}", app.title)));
+    entry.insert(
+        "name".into(),
+        Value::String(format!("{MARKER}{}", app.title)),
+    );
     entry.insert("cmd".into(), Value::String(command));
     if let Some(wd) = working_dir {
         entry.insert("working-dir".into(), Value::String(wd));
@@ -526,7 +528,24 @@ mod tests {
             "flatpak run dev.tako.Tako --open-url \"tako://play/manual:game-1\""
         );
         assert!(!flat.as_object().unwrap().contains_key("working-dir"));
-        assert!(!serde_json::to_string(&flat).unwrap().contains("working-dir"));
+        assert!(
+            !serde_json::to_string(&flat)
+                .unwrap()
+                .contains("working-dir")
+        );
+    }
+
+    #[test]
+    fn flatpak_detection_and_executable() {
+        // SAFETY: teste isolado para validar detecção e executável em Flatpak
+        unsafe { std::env::set_var("FLATPAK_ID", "io.github.lippdev.Tako") };
+        assert!(is_flatpak());
+        assert_eq!(
+            tako_executable().unwrap(),
+            "flatpak run io.github.lippdev.Tako"
+        );
+        // SAFETY: restaura o ambiente após o teste
+        unsafe { std::env::remove_var("FLATPAK_ID") };
     }
 
     #[test]
@@ -549,16 +568,14 @@ mod tests {
             title: "Jogo".into(),
             executable: "/usr/bin/tako".into(),
         };
-        let target = Path::new("/home/user/.var/app/dev.lizardbyte.app.Sunshine/config/sunshine/apps.json");
+        let target =
+            Path::new("/home/user/.var/app/dev.lizardbyte.app.Sunshine/config/sunshine/apps.json");
         let entry = app_entry_for_target(&app, Some(target)).unwrap();
         assert_eq!(
             entry["cmd"],
             "flatpak-spawn --host \"/usr/bin/tako\" --open-url \"tako://play/manual:game-1\""
         );
-        assert_eq!(
-            entry["working-dir"],
-            "/usr/bin"
-        );
+        assert_eq!(entry["working-dir"], "/usr/bin");
 
         let flat_app = App {
             id: "manual:game-2".into(),

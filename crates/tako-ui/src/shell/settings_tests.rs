@@ -300,7 +300,11 @@ fn sunshine_preview_filters_invalid_ids() {
 
     let layer = sunshine::preview_dialog(&ctx, false);
     let rendered = layer.render(&ctx);
-    assert!(rendered.text.contains(&format!("{valid_count} jogos serão exportados")));
+    assert!(
+        rendered
+            .text
+            .contains(&format!("{valid_count} jogos serão exportados"))
+    );
     assert!(!rendered.text.contains("Jogo Inválido"));
 }
 

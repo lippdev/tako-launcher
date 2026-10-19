@@ -170,10 +170,7 @@ fn format_sunshine_error(ctx: &Ctx, error: &SunshineError) -> String {
     }
 }
 
-fn collect_entries(
-    apps: &[App],
-    target: Option<&Path>,
-) -> (Vec<serde_json::Value>, usize) {
+fn collect_entries(apps: &[App], target: Option<&Path>) -> (Vec<serde_json::Value>, usize) {
     let mut entries = Vec::new();
     let mut skipped = 0;
     for app in apps {
@@ -208,8 +205,10 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
         .take(40)
         .map(|app| format!("• {}", app.title))
         .collect::<Vec<_>>()
-        .join("
-");
+        .join(
+            "
+",
+        );
     let extra = valid_apps.len().saturating_sub(40);
     let title_list = if extra > 0 {
         format!(
@@ -225,7 +224,10 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
     };
     let text = ctx.tf(
         "settings.system.sunshine_preview",
-        &[("count", &valid_apps.len().to_string()), ("games", &title_list)],
+        &[
+            ("count", &valid_apps.len().to_string()),
+            ("games", &title_list),
+        ],
     );
     MenuLayer::dialog(
         ctx.t("settings.system.sunshine_preview_title"),
@@ -243,7 +245,8 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
                                 ctx.settings.set_bool(keys::SUNSHINE_SYNC, true);
                             }
                             let path = backup.display().to_string();
-                            let exported = ctx.tf("settings.system.sunshine_exported", &[("path", &path)]);
+                            let exported =
+                                ctx.tf("settings.system.sunshine_exported", &[("path", &path)]);
                             if skipped > 0 {
                                 let skipped_msg = ctx.tf(
                                     "settings.system.sunshine_skipped_games",
