@@ -20,6 +20,7 @@ pub struct ThemePreview {
     pub until: Instant,
     /// Sobreposição temporária em teste (THEME-003). Se confirmado, grava em disco; se voltar, descarta.
     pub draft_override: Option<tako_themes::overrides::ThemeTokensOverride>,
+    pub create_base: Option<Option<String>>,
 }
 
 /// Um tema pode chamar `hint-clicked(0)` no `init` e confirmar a própria prévia: Aplicar só vale depois disso.
@@ -35,6 +36,7 @@ pub fn start(ctx: &mut Ctx, id: Option<&str>, name: &str) -> Flow {
         id: id.map(str::to_owned),
         until: Instant::now() + PREVIEW_TIME,
         draft_override: None,
+        create_base: None,
     });
     ctx.effect(Effect::ApplyTheme(id.unwrap_or(BUILTIN_THEME).to_owned()));
     let text = ctx.tf("settings.appearance.preview_started", &[("name", name)]);
@@ -72,6 +74,7 @@ pub fn start_override(
         id: theme_id.map(str::to_owned),
         until: Instant::now() + PREVIEW_TIME,
         draft_override: Some(draft),
+        create_base: None,
     });
     ctx.effect(Effect::ApplyTheme(
         theme_id.unwrap_or(BUILTIN_THEME).to_owned(),
@@ -198,6 +201,7 @@ pub fn start_override_create(
         id: base_id.map(str::to_owned),
         until: Instant::now() + PREVIEW_TIME,
         draft_override: Some(draft),
+        create_base: Some(base_id.map(str::to_owned)),
     });
     ctx.effect(Effect::ApplyTheme(
         base_id.unwrap_or(BUILTIN_THEME).to_owned(),
@@ -502,6 +506,7 @@ mod tests {
             id: None,
             until: Instant::now(),
             draft_override: None,
+            create_base: None,
         });
         assert!(!ctx.theme_preview_wants_installed());
         // O aviso e a saída da prévia.
@@ -510,6 +515,7 @@ mod tests {
             id: Some(THEME.into()),
             until: Instant::now() + PREVIEW_TIME,
             draft_override: None,
+            create_base: None,
         });
         shell.push_layer(Box::new(PreviewLayer { name: "x".into() }));
         shell.ctx.effects.clear();

@@ -10,6 +10,7 @@ use tako_core::presentation::virtual_keyboard::{self as vk, VirtualKey, VirtualK
 type OnChange = Rc<dyn Fn(&mut Ctx, &str)>;
 type OnDone = Rc<dyn Fn(&mut Ctx, &str) -> Flow>;
 type Check = Rc<dyn Fn(&Ctx, &str) -> Option<String>>;
+type OnCancel = Rc<dyn Fn(&mut Ctx)>;
 
 pub struct KeyboardLayer {
     title: String,
@@ -22,6 +23,8 @@ pub struct KeyboardLayer {
     on_change: Option<OnChange>,
     on_done: OnDone,
     check: Option<Check>,
+    on_cancel: Option<OnCancel>,
+    edited: bool,
     /// Campos livres (argumentos, chaves de API) aceitam qualquer caractere; a busca segue as regras dela.
     free_text: bool,
 }
@@ -44,6 +47,8 @@ impl KeyboardLayer {
             on_change: None,
             on_done: Rc::new(on_done),
             check: None,
+            on_cancel: None,
+            edited: false,
             free_text: true,
         }
     }
@@ -71,7 +76,13 @@ impl KeyboardLayer {
         self
     }
 
+    pub fn on_cancel(mut self, f: impl Fn(&mut Ctx) + 'static) -> Self {
+        self.on_cancel = Some(Rc::new(f));
+        self
+    }
+
     fn set_text(&mut self, text: String, ctx: &mut Ctx) {
+        self.edited = true;
         self.text = text;
         if let Some(f) = self.on_change.clone() {
             f(ctx, &self.text);
@@ -160,7 +171,12 @@ impl Layer for KeyboardLayer {
                 self.set_text(t, ctx);
             }
             Cmd::Menu => return self.done(ctx),
-            Cmd::Back => return Flow::Close,
+            Cmd::Back => {
+                if let Some(ref cancel) = self.on_cancel {
+                    cancel(ctx);
+                }
+                return Flow::Close;
+            }
             _ => {}
         }
         Flow::Stay
@@ -182,7 +198,12 @@ impl Layer for KeyboardLayer {
                 });
             }
         }
-        let problem = self.check.as_ref().and_then(|c| c(ctx, &self.text));
+        let problem = if self.edited || !self.text.is_empty() {
+            self.check.as_ref().and_then(|c| c(ctx, &self.text))
+        } else {
+            None
+        };
+        let valid = self.check.as_ref().map_or(true, |c| c(ctx, &self.text).is_none());
         Overlay {
             kind: "keyboard".into(),
             title: self.title.clone(),
@@ -193,18 +214,23 @@ impl Layer for KeyboardLayer {
             input: self.text.clone(),
             input_hint: ctx.t("search.placeholder"),
             secret: self.secret,
+            wide: valid,
             ..Default::default()
         }
     }
 
     fn hints(&self, ctx: &Ctx) -> Vec<Hint> {
-        vec![
+        let valid = self.check.as_ref().map_or(true, |c| c(ctx, &self.text).is_none());
+        let mut hints = vec![
             ctx.hint(Cmd::Accept, &ctx.t("keyboard.type")),
             ctx.hint(Cmd::Favorite, &ctx.t("keyboard.delete")),
             ctx.hint(Cmd::Search, &ctx.t("keyboard.space")),
-            ctx.hint(Cmd::Menu, &ctx.t("keyboard.done")),
-            ctx.hint(Cmd::Back, &ctx.t("hint.close")),
-        ]
+        ];
+        if valid {
+            hints.push(ctx.hint(Cmd::Menu, &ctx.t("keyboard.done")));
+        }
+        hints.push(ctx.hint(Cmd::Back, &ctx.t("hint.close")));
+        hints
     }
 
     fn typing(&self) -> bool {
@@ -234,7 +260,12 @@ impl Layer for KeyboardLayer {
     fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Flow {
         match zone {
             "done" => return self.done(ctx),
-            "cancel" => return Flow::Close,
+            "cancel" => {
+                if let Some(ref cancel) = self.on_cancel {
+                    cancel(ctx);
+                }
+                return Flow::Close;
+            }
             _ => {}
         }
         if zone == "key" {

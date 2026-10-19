@@ -920,7 +920,7 @@ fn desktop_snapshot() {
             Ok("theme-edit") => {
                 shell.open_route("settings");
                 shell.click("category", 3);
-                let layer = crate::shell::settings::edit_theme_panel(&shell.ctx);
+                let layer = crate::shell::settings::edit_theme_panel(&mut shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
             Ok("theme-create") => {
@@ -993,10 +993,14 @@ created-by-tako = true
                     );
                     let _ = std::fs::write(t_dir.join("tokens.toml"), "accent = \"#6C5CE7\"\n");
                 }
+                crate::shell::settings::forget(crate::shell::settings::THEMES_CACHE);
                 shell.ctx.reload_theme_cache();
-                let flow = crate::shell::settings::export_theme_panel(&mut shell.ctx);
-                if let crate::shell::layer::Flow::Push(layer) = flow {
-                    shell.push_layer(layer);
+                let data = crate::shell::settings::cached_themes(&shell.ctx);
+                if data.exportable.len() >= 2 {
+                    let flow = crate::shell::settings::export_theme_panel(&mut shell.ctx);
+                    if let crate::shell::layer::Flow::Push(layer) = flow {
+                        shell.push_layer(layer);
+                    }
                 }
             }
             Ok("settings-api") => {
