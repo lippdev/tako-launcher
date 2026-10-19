@@ -168,11 +168,12 @@ pub fn decode_wav_to_mono_48k(bytes: &[u8]) -> Option<Vec<f32>> {
             ]);
             let bits = u16::from_le_bytes([bytes[offset + 14], bytes[offset + 15]]);
 
-            let effective_fmt = if audio_format == 0xFFFE && chunk_size >= 40 && offset + 26 <= bytes.len() {
-                u16::from_le_bytes([bytes[offset + 24], bytes[offset + 25]])
-            } else {
-                audio_format
-            };
+            let effective_fmt =
+                if audio_format == 0xFFFE && chunk_size >= 40 && offset + 26 <= bytes.len() {
+                    u16::from_le_bytes([bytes[offset + 24], bytes[offset + 25]])
+                } else {
+                    audio_format
+                };
 
             fmt_opt = Some((effective_fmt, channels, freq, bits));
         } else if chunk_id == b"data" {
@@ -632,14 +633,14 @@ pub fn set_theme(theme_dir: Option<&Path>) {
             let back = back_p.as_deref().and_then(load_wav_samples).map(Arc::from);
             let move_sound = move_p.as_deref().and_then(load_wav_samples).map(Arc::from);
 
-            if let Ok(mut sounds) = CUSTOM_SOUNDS.write() {
-                if NAV_GENERATION.load(Ordering::SeqCst) == generation {
-                    *sounds = CustomNavSounds {
-                        accept,
-                        back,
-                        move_sound,
-                    };
-                }
+            if let Ok(mut sounds) = CUSTOM_SOUNDS.write()
+                && NAV_GENERATION.load(Ordering::SeqCst) == generation
+            {
+                *sounds = CustomNavSounds {
+                    accept,
+                    back,
+                    move_sound,
+                };
             }
         });
     }
@@ -940,7 +941,7 @@ mod tests {
         // 2. PCM 16-bit stereo, 44.1 kHz -> resampled to 48 kHz
         let mut pcm16_data = Vec::new();
         for _ in 0..4410 {
-            let left: i16 = 16384;  // ~0.5
+            let left: i16 = 16384; // ~0.5
             let right: i16 = 16384; // ~0.5
             pcm16_data.extend_from_slice(&left.to_le_bytes());
             pcm16_data.extend_from_slice(&right.to_le_bytes());

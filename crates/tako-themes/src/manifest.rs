@@ -161,7 +161,7 @@ pub fn wav_duration_from_reader<R: std::io::Read + std::io::Seek>(reader: &mut R
             chunk_header[7],
         ]);
         if chunk_id == b"fmt " {
-            if chunk_size < 16 || chunk_size > MAX_METADATA_CHUNK_SIZE {
+            if !(16..=MAX_METADATA_CHUNK_SIZE).contains(&chunk_size) {
                 return None;
             }
             let mut fmt_16 = [0u8; 16];
@@ -421,7 +421,6 @@ mod tests {
         let bad_fmt = format!("{OK}[audio]\nmusic = \"music.ogg\"\n");
         assert_eq!(codes(&bad_fmt), ["manifest.unsupported-audio-format"]);
     }
-
 
     #[test]
     fn rejects_giant_declared_chunk_without_allocating() {

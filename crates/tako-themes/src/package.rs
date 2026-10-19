@@ -10,7 +10,7 @@ use tako_core::i18n::{t, tf};
 use zip::ZipArchive;
 
 use crate::Problem;
-use crate::manifest::{ThemeAudio, MANIFEST_FILE, MAX_MANIFEST_BYTES, ThemeManifest};
+use crate::manifest::{MANIFEST_FILE, MAX_MANIFEST_BYTES, ThemeAudio, ThemeManifest};
 
 pub const EXTENSION: &str = "takotheme";
 pub const MAX_PATH_LEN: usize = 240;
@@ -167,24 +167,26 @@ impl Package {
                 ),
             ));
         }
-        let validate_audio = |source: &mut Source, audio: &ThemeAudio| -> Result<(), Vec<Problem>> {
-            if let Some(ref p) = audio.music {
-                validate_audio_file(source, &files, p, true).map_err(|e| vec![e])?;
-            }
-            for p in [&audio.move_sound, &audio.accept_sound, &audio.back_sound]
-                .into_iter()
-                .flatten()
-            {
-                validate_audio_file(source, &files, p, false).map_err(|e| vec![e])?;
-            }
-            Ok(())
-        };
+        let validate_audio =
+            |source: &mut Source, audio: &ThemeAudio| -> Result<(), Vec<Problem>> {
+                if let Some(ref p) = audio.music {
+                    validate_audio_file(source, &files, p, true).map_err(|e| vec![e])?;
+                }
+                for p in [&audio.move_sound, &audio.accept_sound, &audio.back_sound]
+                    .into_iter()
+                    .flatten()
+                {
+                    validate_audio_file(source, &files, p, false).map_err(|e| vec![e])?;
+                }
+                Ok(())
+            };
 
         validate_audio(&mut source, &manifest.audio)?;
 
         if let Some(tokens_entry) = files.iter().find(|e| e.path == "tokens.toml") {
             let mut reader = open_entry(&mut source, tokens_entry).map_err(|e| io_problem(&e))?;
-            let bytes_opt = read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))?;
+            let bytes_opt =
+                read_bounded(&mut reader, MAX_MANIFEST_BYTES).map_err(|e| io_problem(&e))?;
             drop(reader);
             if let Some(bytes) = bytes_opt
                 && let Ok(text) = String::from_utf8(bytes)
@@ -301,7 +303,10 @@ fn validate_audio_file(
                     &[
                         ("path", rel_path),
                         ("duration", &format!("{duration:.1}s")),
-                        ("max", &format!("{:.0}s", crate::MAX_NAV_SOUND_DURATION_SECS)),
+                        (
+                            "max",
+                            &format!("{:.0}s", crate::MAX_NAV_SOUND_DURATION_SECS),
+                        ),
                     ],
                 ),
             ));

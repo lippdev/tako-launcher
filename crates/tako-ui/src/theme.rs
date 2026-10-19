@@ -212,7 +212,10 @@ fn token_problems_with_dir(text: &str, colors: &[String], dir: Option<&Path>) ->
                                     ("path", m),
                                     (
                                         "max",
-                                        &format!("{} MB", tako_themes::MAX_THEME_MUSIC_BYTES / (1024 * 1024)),
+                                        &format!(
+                                            "{} MB",
+                                            tako_themes::MAX_THEME_MUSIC_BYTES / (1024 * 1024)
+                                        ),
                                     ),
                                 ],
                             ));
@@ -230,9 +233,11 @@ fn token_problems_with_dir(text: &str, colors: &[String], dir: Option<&Path>) ->
                         problems.push(tf("themes.package.missing_audio", &[("path", sound)]));
                     } else {
                         match tako_themes::wav_duration(&p) {
-                            None => problems.push(tf("themes.package.audio_invalid", &[("path", sound)])),
+                            None => problems
+                                .push(tf("themes.package.audio_invalid", &[("path", sound)])),
                             Some(dur) if dur <= 0.0 => {
-                                problems.push(tf("themes.package.audio_invalid", &[("path", sound)]));
+                                problems
+                                    .push(tf("themes.package.audio_invalid", &[("path", sound)]));
                             }
                             Some(dur) if dur > tako_themes::MAX_NAV_SOUND_DURATION_SECS => {
                                 problems.push(tf(
@@ -397,7 +402,6 @@ nada = \"#000000\"
         assert!(check(&alt).is_err());
     }
 
-
     #[test]
     fn theme_check_validates_audio_limits() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -430,22 +434,18 @@ nada = \"#000000\"
         wav.resize(44 + data_len as usize, 0);
 
         std::fs::write(alt.join("long_click.wav"), &wav).unwrap();
-        std::fs::write(
-            alt.join("tokens.toml"),
-            "confirmar = \"long_click.wav\"\n",
-        )
-        .unwrap();
+        std::fs::write(alt.join("tokens.toml"), "confirmar = \"long_click.wav\"\n").unwrap();
         let e = check(&alt).unwrap_err();
         assert!(e.iter().any(|msg| msg.contains("2s")), "{e:?}");
 
         std::fs::write(alt.join("bad.wav"), b"NOT_WAV").unwrap();
-        std::fs::write(
-            alt.join("tokens.toml"),
-            "confirmar = \"bad.wav\"\n",
-        )
-        .unwrap();
+        std::fs::write(alt.join("tokens.toml"), "confirmar = \"bad.wav\"\n").unwrap();
         let e2 = check(&alt).unwrap_err();
-        assert!(e2.iter().any(|msg| msg.contains("WAV") || msg.contains("corrompido")), "{e2:?}");
+        assert!(
+            e2.iter()
+                .any(|msg| msg.contains("WAV") || msg.contains("corrompido")),
+            "{e2:?}"
+        );
     }
     #[test]
     fn broken_theme_reports_errors() {
