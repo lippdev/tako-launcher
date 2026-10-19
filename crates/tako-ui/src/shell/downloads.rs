@@ -12,7 +12,7 @@ use crate::shell::keyboard::KeyboardLayer;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use tako_core::downloads::{
-    Download, DownloadState, Downloads, NewDownload, source, source::Source, suggest,
+    Download, DownloadState, Downloads, NewDownload, is_inside_root, source, source::Source, suggest,
 };
 use tako_core::library::{GameStore, InstallProgress};
 use tako_core::metadata::art::format_bytes;
@@ -410,18 +410,7 @@ fn completed_row(ctx: &Ctx, d: &Download) -> MenuItem {
     row.image = thumb(ctx, d.game_id.as_deref());
     // Só abre a pasta no gerenciador de arquivos: nada de dentro dela é aberto ou executado.
     let mut item = MenuItem::new(row).on(move |ctx| {
-        let inside_root = match folder.strip_prefix(root()) {
-            Ok(rel) => {
-                let mut comps = rel.components();
-                match comps.next() {
-                    Some(std::path::Component::Normal(first)) if !first.is_empty() => rel
-                        .components()
-                        .all(|c| matches!(c, std::path::Component::Normal(_))),
-                    _ => false,
-                }
-            }
-            Err(_) => false,
-        };
+        let inside_root = is_inside_root(&root(), &folder);
         if inside_root && folder.is_dir() {
             if let Err(e) = ctx
                 .platform

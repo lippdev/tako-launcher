@@ -81,6 +81,22 @@ pub fn safe_relative<S: AsRef<str>>(parts: &[S]) -> Option<PathBuf> {
     Some(out)
 }
 
+/// Verifica se `folder` é uma subpasta estritamente contida em `root` (sem `..`, raiz própria ou igual a `root`).
+pub fn is_inside_root(root: &Path, folder: &Path) -> bool {
+    match folder.strip_prefix(root) {
+        Ok(rel) => {
+            let mut comps = rel.components();
+            match comps.next() {
+                Some(Component::Normal(first)) if !first.is_empty() => {
+                    rel.components().all(|c| matches!(c, Component::Normal(_)))
+                }
+                _ => false,
+            }
+        }
+        Err(_) => false,
+    }
+}
+
 /// O caminho final fica dentro de `root` (checagem léxica, depois de [`safe_relative`]).
 pub fn inside(root: &Path, relative: &Path) -> bool {
     relative
@@ -208,6 +224,17 @@ mod tests {
             assert_eq!(safe_relative(&bad), None, "{bad:?}");
         }
         assert_eq!(safe_relative::<&str>(&[]), None);
+    }
+
+    #[test]
+    fn is_inside_root_validates_subfolder() {
+        let root = Path::new("/d/Tako");
+        assert!(is_inside_root(root, Path::new("/d/Tako/Jogo")));
+        assert!(is_inside_root(root, Path::new("/d/Tako/Jogo/sub")));
+        assert!(!is_inside_root(root, Path::new("/d/Tako")));
+        assert!(!is_inside_root(root, Path::new("/d/Tako/../outside")));
+        assert!(!is_inside_root(root, Path::new("/etc/passwd")));
+        assert!(!is_inside_root(root, Path::new("relativo")));
     }
 
     #[test]

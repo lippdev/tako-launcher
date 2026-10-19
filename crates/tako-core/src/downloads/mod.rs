@@ -6,6 +6,7 @@
 
 pub mod fake;
 pub mod paths;
+pub use paths::is_inside_root;
 pub mod source;
 
 use std::path::{Path, PathBuf};
@@ -209,19 +210,7 @@ impl Downloads {
         let items = saved
             .into_iter()
             .map(|mut d| {
-                let is_inside_root = match d.folder.strip_prefix(&root) {
-                    Ok(rel) => {
-                        let mut comps = rel.components();
-                        match comps.next() {
-                            Some(std::path::Component::Normal(first)) if !first.is_empty() => rel
-                                .components()
-                                .all(|c| matches!(c, std::path::Component::Normal(_))),
-                            _ => false,
-                        }
-                    }
-                    Err(_) => false,
-                };
-                if !is_inside_root {
+                if !paths::is_inside_root(&root, &d.folder) {
                     d.state = DownloadState::Failed(crate::i18n::t(
                         "downloads.error.folder_outside_root",
                     ));
@@ -330,6 +319,12 @@ impl Downloads {
 
     fn run(&mut self, index: usize) {
         let d = &mut self.items[index];
+        if !paths::is_inside_root(&self.root, &d.folder) {
+            d.engine = None;
+            d.speed = 0;
+            d.state = DownloadState::Failed(crate::i18n::t("downloads.error.folder_outside_root"));
+            return;
+        }
         // Só o que saiu da fila alguma vez já tem arquivos do Tako na pasta.
         let resume = d.state != DownloadState::Queued;
         let started = match d.engine {
@@ -500,6 +495,35 @@ mod tests {
             Downloads::new(Box::new(engine.clone()), PathBuf::from("/d/Tako"), vec![]),
             engine,
         )
+    }
+
+    #[test]
+    fn resume_failed_download_outside_root_does_not_call_engine() {
+        let engine = MemoryDownloader::default();
+        let root = PathBuf::from("/d/Tako");
+        let saved = vec![Download {
+            id: 1,
+            title: "Malicioso".into(),
+            game_id: None,
+            source: "Fonte".into(),
+            uri: A.into(),
+            folder: PathBuf::from("/etc/downloads"),
+            state: DownloadState::Failed("erro anterior".into()),
+            done: 0,
+            total: None,
+            speed: 0,
+            engine: None,
+        }];
+        let mut d = Downloads::new(Box::new(engine.clone()), root, saved);
+        assert!(matches!(d.get(1).unwrap().state, DownloadState::Failed(_)));
+        assert!(engine.started().is_empty());
+
+        d.resume(1).unwrap();
+        assert!(matches!(d.get(1).unwrap().state, DownloadState::Failed(_)));
+        assert!(
+            engine.started().is_empty(),
+            "motor nunca deve ser chamado para downloads fora da raiz"
+        );
     }
 
     #[test]
