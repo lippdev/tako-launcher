@@ -44,6 +44,9 @@ impl PanelRow {
     pub fn header(title: impl Into<String>) -> Self {
         Self::new("", "header", title)
     }
+    pub fn note(title: impl Into<String>, description: impl Into<String>) -> Self {
+        Self::new("", "note", title).desc(description)
+    }
     pub fn toggle(key: impl Into<String>, title: impl Into<String>, on: bool) -> Self {
         PanelRow {
             on,

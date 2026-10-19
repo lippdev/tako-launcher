@@ -223,7 +223,7 @@ pub fn sync(ctx: &mut Ctx) {
         token = generate_token();
         ctx.settings.set(keys::API_TOKEN, &token);
         if had_invalid {
-            ctx.toast(ctx.t("settings.system.api_invalid_token"));
+            ctx.toast_error(ctx.t("settings.system.api_invalid_token"));
         }
     }
 
@@ -258,7 +258,7 @@ pub fn sync(ctx: &mut Ctx) {
         }
         Err(e) => {
             tracing::error!("não foi possível iniciar a API local na porta {port}: {e}");
-            ctx.toast(ctx.tf(
+            ctx.toast_error(ctx.tf(
                 "settings.system.api_start_failed",
                 &[("error", &e.to_string())],
             ));

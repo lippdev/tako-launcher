@@ -187,6 +187,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pad_battery: None,
         input: InputKind::Keyboard,
         toast: None,
+        toast_kind: Default::default(),
         effects: Vec::new(),
         running: None,
         sources: Vec::new(),

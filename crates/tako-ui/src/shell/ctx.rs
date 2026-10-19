@@ -64,6 +64,26 @@ pub enum InputKind {
     Keyboard,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ToastKind {
+    #[default]
+    Info,
+    Success,
+    Warning,
+    Error,
+}
+
+impl ToastKind {
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Success => "success",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+}
+
 /// Jogo rodando em segundo plano (o usuário voltou à Início sem fechar).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunningGame {
@@ -247,6 +267,7 @@ pub struct Ctx {
     pub pad_battery: Option<i32>,
     pub input: InputKind,
     pub toast: Option<(String, Instant)>,
+    pub toast_kind: ToastKind,
     /// "Desfazer" do aviso atual (ações em lote do desktop); some junto com o aviso.
     pub toast_undo: Option<Undo>,
     /// O aviso atual é o "Bem-vindo de volta": no desktop leva o polvo no lugar do ✓.
@@ -390,10 +411,26 @@ impl Ctx {
     pub fn toast(&mut self, text: impl Into<String>) {
         self.app_update.toast_label.clear();
         self.toast = Some((text.into(), Instant::now()));
+        self.toast_kind = ToastKind::Info;
         self.toast_undo = None;
         self.toast_mascot = false;
         self.toast_hover = [false; 2];
         self.dirty = true;
+    }
+
+    pub fn toast_success(&mut self, text: impl Into<String>) {
+        self.toast(text);
+        self.toast_kind = ToastKind::Success;
+    }
+
+    pub fn toast_warning(&mut self, text: impl Into<String>) {
+        self.toast(text);
+        self.toast_kind = ToastKind::Warning;
+    }
+
+    pub fn toast_error(&mut self, text: impl Into<String>) {
+        self.toast(text);
+        self.toast_kind = ToastKind::Error;
     }
 
     /// "Bem-vindo de volta" ao fechar o jogo (BRAND-001).
