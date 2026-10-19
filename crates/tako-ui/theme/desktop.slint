@@ -6412,7 +6412,10 @@ component ArtLayer inherits Rectangle {
             height: parent.height;
             source: Ui.custom-background;
             image-fit: cover;
-            opacity: 0.85;
+            opacity: 0.55;
+        }
+        if Ui.has-custom-background && Ui.custom-background.width > 0: Rectangle {
+            background: #000000.with-alpha(0.5);
         }
         if !Ui.has-custom-background && !DeskArt.has-art: Rectangle {
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);

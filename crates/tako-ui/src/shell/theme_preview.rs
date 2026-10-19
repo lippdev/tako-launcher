@@ -102,7 +102,22 @@ impl Layer for OverridePreviewLayer {
                 return Flow::Stay;
             }
             Cmd::Accept => {
-                if let Some(draft) = p.draft_override {
+                if let Some(mut draft) = p.draft_override {
+                    if let Some(ref bg_draft) = draft.background_image {
+                        if let Ok(final_name) = tako_themes::overrides::promote_background_draft(
+                            &ctx.paths.themes(),
+                            p.id.as_deref(),
+                            bg_draft,
+                        ) {
+                            draft.background_image = Some(final_name);
+                        }
+                    } else {
+                        let _ = tako_themes::overrides::clean_background_orphans(
+                            &ctx.paths.themes(),
+                            p.id.as_deref(),
+                            None,
+                        );
+                    }
                     let toml_str = draft.to_toml_string();
                     match tako_themes::overrides::save_override(
                         &ctx.paths.themes(),
@@ -112,6 +127,7 @@ impl Layer for OverridePreviewLayer {
                         Ok(_) => {
                             let text = ctx.t("settings.appearance.theme_customized_applied");
                             ctx.toast(text);
+                            ctx.theme_draft = None;
                         }
                         Err(e) => {
                             ctx.toast(e.to_string());
@@ -120,7 +136,13 @@ impl Layer for OverridePreviewLayer {
                     }
                 }
             }
-            Cmd::Back => reload_selected(ctx),
+            Cmd::Back => {
+                let _ = tako_themes::overrides::clean_background_draft(
+                    &ctx.paths.themes(),
+                    p.id.as_deref(),
+                );
+                reload_selected(ctx);
+            }
             _ => {
                 ctx.theme_preview = Some(p);
                 return Flow::Stay;
@@ -174,6 +196,7 @@ impl Layer for PreviewLayer {
             Cmd::Accept => match tako_themes::select(&ctx.paths.themes(), p.id.as_deref()) {
                 // A tela já mostra esse tema: não precisa recarregar.
                 Ok(()) => {
+                    ctx.theme_draft = None;
                     let text = ctx.tf(
                         "settings.appearance.preview_applied",
                         &[("name", &self.name)],

@@ -1875,7 +1875,11 @@ impl Page for DesktopLibrary {
                 icon,
                 initial,
                 cover: tiles::image(g.shown_cover().filter(|_| near && cover), COVER),
-                accent: parse_color(&g.accent),
+                accent: if let Some(custom) = crate::theme::custom_theme_accent(ctx) {
+                    slint::Color::from_rgb_u8(custom.r, custom.g, custom.b)
+                } else {
+                    parse_color(&g.accent)
+                },
                 favorite: g.is_favorite,
                 running: ctx.running.as_ref().is_some_and(|r| r.id == g.id),
                 installed: g.is_installed,
@@ -2279,7 +2283,11 @@ impl Page for DesktopLibrary {
                         logo,
                         show_logo,
                         title_pending,
-                        accent: parse_color(&g.accent),
+                        accent: if let Some(custom) = crate::theme::custom_theme_accent(ctx) {
+                            slint::Color::from_rgb_u8(custom.r, custom.g, custom.b)
+                        } else {
+                            parse_color(&g.accent)
+                        },
                         hint,
                         install_note: install
                             .as_ref()

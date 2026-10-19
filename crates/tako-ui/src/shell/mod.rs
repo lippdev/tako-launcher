@@ -271,11 +271,22 @@ impl Shell {
         let Some(p) = self.ctx.theme_preview.take() else {
             return false;
         };
+        if p.draft_override.is_some() {
+            let _ = tako_themes::overrides::clean_background_draft(
+                &self.ctx.paths.themes(),
+                p.id.as_deref(),
+            );
+        }
         let shown = self.layers.iter().any(|l| l.theme_preview());
         self.layers.retain(|l| !l.theme_preview());
         if shown {
-            self.layers
-                .push(Box::new(theme_preview::panel(&self.ctx, p.id.as_deref())));
+            if p.draft_override.is_some() {
+                self.layers
+                    .push(Box::new(settings::edit_theme_panel(&self.ctx)));
+            } else {
+                self.layers
+                    .push(Box::new(theme_preview::panel(&self.ctx, p.id.as_deref())));
+            }
         }
         if reload {
             theme_preview::reload_selected(&mut self.ctx);

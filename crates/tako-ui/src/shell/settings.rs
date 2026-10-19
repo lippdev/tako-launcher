@@ -587,6 +587,7 @@ pub(crate) fn themes_panel(ctx: &Ctx) -> MenuLayer {
 /// Escolher um tema. Na tela cheia ele entra em prévia (THEME-002) e só vira o escolhido ao confirmar; o desktop não
 /// tem tema (ADR-0027), então ali a escolha vale direto, para a próxima tela cheia.
 fn pick_theme(ctx: &mut Ctx, id: Option<&str>, name: &str) -> Flow {
+    ctx.theme_draft = None;
     if !ctx.desktop {
         if tako_themes::selected(&ctx.paths.themes()).as_deref() == id {
             return Flow::Stay;
@@ -736,12 +737,19 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
             (picks, cur_idx)
         });
 
-        let bg_type_idx = if draft.background_image.is_some() {
-            2
-        } else if draft.canvas.is_some() {
-            1
-        } else {
-            0
+        let bg_type_idx = match draft.background_mode {
+            Some(tako_themes::overrides::BackgroundMode::Image) => 2,
+            Some(tako_themes::overrides::BackgroundMode::Solid) => 1,
+            Some(tako_themes::overrides::BackgroundMode::Default) => 0,
+            None => {
+                if draft.background_image.is_some() {
+                    2
+                } else if draft.canvas.is_some() {
+                    1
+                } else {
+                    0
+                }
+            }
         };
         let bg_type_label = ctx.t(&format!("settings.appearance.{}", BG_TYPES[bg_type_idx].1));
 
@@ -755,12 +763,19 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
         )
         .on_adjust(|ctx, dir| {
             let mut d = current_draft(ctx);
-            let cur_idx = if d.background_image.is_some() {
-                2
-            } else if d.canvas.is_some() {
-                1
-            } else {
-                0
+            let cur_idx = match d.background_mode {
+                Some(tako_themes::overrides::BackgroundMode::Image) => 2,
+                Some(tako_themes::overrides::BackgroundMode::Solid) => 1,
+                Some(tako_themes::overrides::BackgroundMode::Default) => 0,
+                None => {
+                    if d.background_image.is_some() {
+                        2
+                    } else if d.canvas.is_some() {
+                        1
+                    } else {
+                        0
+                    }
+                }
             };
             let next_idx = if dir >= 0 {
                 (cur_idx + 1) % BG_TYPES.len()
@@ -769,16 +784,19 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
             };
             match next_idx {
                 0 => {
+                    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Default);
                     d.canvas = None;
                     d.background_image = None;
                 }
                 1 => {
+                    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Solid);
                     d.background_image = None;
                     if d.canvas.is_none() {
                         d.canvas = Some("#0E1116".into());
                     }
                 }
                 _ => {
+                    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Image);
                     d.canvas = None;
                 }
             }
@@ -788,12 +806,19 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
         })
         .options(|ctx| {
             let draft = current_draft(ctx);
-            let cur_idx = if draft.background_image.is_some() {
-                2
-            } else if draft.canvas.is_some() {
-                1
-            } else {
-                0
+            let cur_idx = match draft.background_mode {
+                Some(tako_themes::overrides::BackgroundMode::Image) => 2,
+                Some(tako_themes::overrides::BackgroundMode::Solid) => 1,
+                Some(tako_themes::overrides::BackgroundMode::Default) => 0,
+                None => {
+                    if draft.background_image.is_some() {
+                        2
+                    } else if draft.canvas.is_some() {
+                        1
+                    } else {
+                        0
+                    }
+                }
             };
             let picks = BG_TYPES
                 .iter()
@@ -803,16 +828,22 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
                         let mut d = current_draft(ctx);
                         match mode.as_str() {
                             "default" => {
+                                d.background_mode =
+                                    Some(tako_themes::overrides::BackgroundMode::Default);
                                 d.canvas = None;
                                 d.background_image = None;
                             }
                             "solid" => {
+                                d.background_mode =
+                                    Some(tako_themes::overrides::BackgroundMode::Solid);
                                 d.background_image = None;
                                 if d.canvas.is_none() {
                                     d.canvas = Some("#0E1116".into());
                                 }
                             }
                             "image" => {
+                                d.background_mode =
+                                    Some(tako_themes::overrides::BackgroundMode::Image);
                                 d.canvas = None;
                             }
                             _ => {}
@@ -901,34 +932,56 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
             )
             .on(|ctx| {
                 let title = ctx.t("settings.appearance.bg_choose_image");
+                let filter_name = ctx.t("settings.appearance.bg_filter_images");
                 let themes_root = ctx.paths.themes();
                 let theme_id = tako_themes::selected(&themes_root);
                 crate::tasks::run(
                     ctx,
                     move || {
-                        rfd::FileDialog::new()
+                        let picked = rfd::FileDialog::new()
                             .set_title(&title)
                             .add_filter(
-                                "img",
+                                &filter_name,
                                 tako_themes::overrides::ALLOWED_BACKGROUND_EXTENSIONS,
                             )
-                            .pick_file()
-                            .and_then(|src| {
-                                tako_themes::overrides::copy_background_image(
-                                    &themes_root,
-                                    theme_id.as_deref(),
-                                    &src,
-                                )
-                                .ok()
-                            })
+                            .pick_file();
+                        picked.map(|src| {
+                            tako_themes::overrides::copy_draft_background_image(
+                                &themes_root,
+                                theme_id.as_deref(),
+                                &src,
+                            )
+                        })
                     },
-                    move |ctx, copied| {
-                        if let Some(filename) = copied {
+                    move |ctx, result| match result {
+                        None => {}
+                        Some(Ok(filename)) => {
                             let mut d = current_draft(ctx);
                             d.background_image = Some(filename);
+                            d.background_mode = Some(tako_themes::overrides::BackgroundMode::Image);
                             d.canvas = None;
                             ctx.theme_draft = Some(d);
                             ctx.dirty = true;
+                        }
+                        Some(Err(err)) => {
+                            let msg = match err {
+                                tako_themes::overrides::CopyImageError::NotFound(_) => {
+                                    ctx.t("settings.appearance.bg_image_err_not_found")
+                                }
+                                tako_themes::overrides::CopyImageError::InvalidExtension => {
+                                    ctx.t("settings.appearance.bg_image_err_invalid_ext")
+                                }
+                                tako_themes::overrides::CopyImageError::InvalidContent => {
+                                    ctx.t("settings.appearance.bg_image_err_invalid_header")
+                                }
+                                tako_themes::overrides::CopyImageError::TooLarge => {
+                                    ctx.t("settings.appearance.bg_image_err_too_large")
+                                }
+                                tako_themes::overrides::CopyImageError::Io(e) => {
+                                    ctx.tf("settings.appearance.bg_image_err_io", &[("error", &e)])
+                                }
+                            };
+                            ctx.toast(msg);
                         }
                     },
                 );
@@ -954,7 +1007,22 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
         )
         .on(|ctx| {
             let theme_id = tako_themes::selected(&ctx.paths.themes());
-            let draft = current_draft(ctx);
+            let mut draft = current_draft(ctx);
+            if let Some(ref bg_draft) = draft.background_image {
+                if let Ok(final_name) = tako_themes::overrides::promote_background_draft(
+                    &ctx.paths.themes(),
+                    theme_id.as_deref(),
+                    bg_draft,
+                ) {
+                    draft.background_image = Some(final_name);
+                }
+            } else {
+                let _ = tako_themes::overrides::clean_background_orphans(
+                    &ctx.paths.themes(),
+                    theme_id.as_deref(),
+                    None,
+                );
+            }
             let toml_str = draft.to_toml_string();
             match tako_themes::overrides::save_override(
                 &ctx.paths.themes(),
@@ -989,6 +1057,10 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
             )
             .on(|ctx| {
                 let theme_id = tako_themes::selected(&ctx.paths.themes());
+                let _ = tako_themes::overrides::clean_background_draft(
+                    &ctx.paths.themes(),
+                    theme_id.as_deref(),
+                );
                 match tako_themes::overrides::reset_override(
                     &ctx.paths.themes(),
                     theme_id.as_deref(),
@@ -1012,10 +1084,19 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
 
         rows
     })
+    .on_back(|ctx| {
+        let theme_id = tako_themes::selected(&ctx.paths.themes());
+        let _ = tako_themes::overrides::clean_background_draft(
+            &ctx.paths.themes(),
+            theme_id.as_deref(),
+        );
+        ctx.theme_draft = None;
+        Flow::Close
+    })
 }
 
 fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
-    vec![
+    let mut items = vec![
         MenuItem::new(PanelRow::choice(
             "text-size",
             ctx.t("accessibility.text_size"),
@@ -1071,12 +1152,18 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
                 .value(theme_name(ctx)),
         )
         .on(|ctx| Flow::Push(Box::new(themes_panel(ctx)))),
-        MenuItem::new(
-            PanelRow::action("edit-theme", ctx.t("settings.appearance.edit_theme"))
-                .desc(ctx.t("settings.appearance.edit_theme_desc"))
-                .icon("palette"),
-        )
-        .on(|ctx| Flow::Push(Box::new(edit_theme_panel(ctx)))),
+    ];
+    if ctx.theme_supports_ui {
+        items.push(
+            MenuItem::new(
+                PanelRow::action("edit-theme", ctx.t("settings.appearance.edit_theme"))
+                    .desc(ctx.t("settings.appearance.edit_theme_desc"))
+                    .icon("palette"),
+            )
+            .on(|ctx| Flow::Push(Box::new(edit_theme_panel(ctx)))),
+        );
+    }
+    items.extend([
         toggle(
             ctx,
             "settings.appearance.dynamic",
@@ -1089,33 +1176,35 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             keys::REDUCED_MOTION,
             false,
         ),
-    ]
-    .into_iter()
-    // "Reduzir transparência" só existe no desktop (a tela cheia não tem vidro).
-    .chain(ctx.desktop.then(|| {
-        toggle(
-            ctx,
-            "settings.appearance.transparency",
-            keys::REDUCED_TRANSPARENCY,
-            false,
+    ]);
+    items
+        .into_iter()
+        // "Reduzir transparência" só existe no desktop (a tela cheia não tem vidro).
+        .chain(ctx.desktop.then(|| {
+            toggle(
+                ctx,
+                "settings.appearance.transparency",
+                keys::REDUCED_TRANSPARENCY,
+                false,
+            )
+        }))
+        .chain(ctx.desktop.then(|| title_row(ctx)))
+        // Layout: BarraLateralUnida e a largura da barra lateral (só no desktop).
+        .chain(
+            ctx.desktop.then(|| {
+                MenuItem::new(PanelRow::header(ctx.t("settings.appearance.layout_header")))
+            }),
         )
-    }))
-    .chain(ctx.desktop.then(|| title_row(ctx)))
-    // Layout: BarraLateralUnida e a largura da barra lateral (só no desktop).
-    .chain(
-        ctx.desktop
-            .then(|| MenuItem::new(PanelRow::header(ctx.t("settings.appearance.layout_header")))),
-    )
-    .chain(ctx.desktop.then(|| {
-        toggle(
-            ctx,
-            "settings.appearance.sidebar_unified",
-            keys::SIDEBAR_UNIFIED,
-            false,
-        )
-    }))
-    .chain(ctx.desktop.then(|| sidebar_width_row(ctx)))
-    .collect()
+        .chain(ctx.desktop.then(|| {
+            toggle(
+                ctx,
+                "settings.appearance.sidebar_unified",
+                keys::SIDEBAR_UNIFIED,
+                false,
+            )
+        }))
+        .chain(ctx.desktop.then(|| sidebar_width_row(ctx)))
+        .collect()
 }
 
 /// Largura da barra lateral: Normal (padrão) ou Estreita; vale para a lista flutuante e para a unida.

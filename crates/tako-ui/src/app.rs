@@ -211,6 +211,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         redraw_at: None,
         theme_preview: None,
         theme_draft: None,
+        theme_supports_ui: true,
         launching: false,
         launch_since: None,
         leaving: false,
@@ -524,22 +525,11 @@ fn apply_theme_tokens(
 }
 
 fn theme_accent(ctx: &Ctx) -> Option<tako_core::presentation::Rgb> {
-    if let Some(acc) = ctx
-        .theme_preview
-        .as_ref()
-        .and_then(|p| p.draft_override.as_ref())
-        .and_then(|ov| ov.accent.as_ref())
-    {
-        return tako_core::presentation::Rgb::parse(acc);
+    if let Some(custom) = theme::custom_theme_accent(ctx) {
+        return Some(custom);
     }
     let selected_id = tako_themes::selected(&ctx.paths.themes());
     let theme_id = selected_id.as_deref();
-    if let Some(text) = tako_themes::overrides::load_override(&ctx.paths.themes(), theme_id) {
-        let ov = tako_themes::overrides::ThemeTokensOverride::from_toml_str(&text);
-        if let Some(acc) = ov.accent {
-            return tako_core::presentation::Rgb::parse(&acc);
-        }
-    }
     if let Some(id) = theme_id {
         let dir = ctx.paths.themes().join(id);
         if let Ok(text) = std::fs::read_to_string(dir.join("tokens.toml")) {
@@ -563,6 +553,7 @@ impl App {
         // "Abrir em: tela cheia" (onboarding, Configurações › Geral) vale para a abertura sem argumentos.
         let mode = crate::mode::preferred(opts.mode, opts.ask_big_picture, &ctx.settings);
         let (def, dir) = load_mode(&ctx, &builtin, mode)?;
+        ctx.theme_supports_ui = def.global_properties("Ui").is_some();
         let ui = def.create().map_err(|e| e.to_string())?;
         apply_theme_tokens(&ui, &ctx, dir.as_deref());
         // Entrada do app (só na abertura, não na volta da tela cheia): começa apagado e acende depois do 1º quadro.
@@ -757,6 +748,7 @@ impl App {
                 return;
             }
         };
+        self.shell.borrow_mut().ctx.theme_supports_ui = def.global_properties("Ui").is_some();
         apply_theme_tokens(&new, &self.shell.borrow().ctx, dir.as_deref());
         new.window()
             .set_fullscreen(self.ui.borrow().window().is_fullscreen());
@@ -1548,12 +1540,17 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         .ctx
         .settings
         .bool(crate::shell::ctx::keys::DYNAMIC_COLOR, true);
-    let fallback_accent = theme_accent(&s.ctx);
-    let palette = AccentPalette::for_accent_with_fallback(
-        game.map(|g| g.accent.as_str()),
-        dynamic,
-        fallback_accent,
-    );
+    let custom_accent = theme::custom_theme_accent(&s.ctx);
+    let fallback_accent = custom_accent.or_else(|| theme_accent(&s.ctx));
+    let palette = if let Some(custom) = custom_accent {
+        AccentPalette::for_accent_with_fallback(None, false, Some(custom))
+    } else {
+        AccentPalette::for_accent_with_fallback(
+            game.map(|g| g.accent.as_str()),
+            dynamic,
+            fallback_accent,
+        )
+    };
     let color = |c: tako_core::presentation::color::Rgb| slint::Color::from_rgb_u8(c.r, c.g, c.b);
     bridge::set_global(ui, "Ui", "accent", color(palette.accent).to_value());
     bridge::set_global(ui, "Ui", "accent-deep", color(palette.deep).to_value());

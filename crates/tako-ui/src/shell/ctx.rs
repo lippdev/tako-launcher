@@ -280,6 +280,8 @@ pub struct Ctx {
     pub theme_preview: Option<super::theme_preview::ThemePreview>,
     /// Rascunho de personalização de tema enquanto o usuário edita (THEME-003).
     pub theme_draft: Option<tako_themes::overrides::ThemeTokensOverride>,
+    /// Indica se o tema atual implementa a API padrão do global `Ui` (THEME-003).
+    pub theme_supports_ui: bool,
     /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).
     pub launching: bool,
     /// Desde quando o jogo está abrindo: depois de `LAUNCH_SLOW` o botão vira "Ainda abrindo…" com "Cancelar".

@@ -55,6 +55,56 @@ fn install_extras(themes_dir: &Path) {
     }
 }
 
+/// Destaque personalizado do tema (sobreposição salva, rascunho em teste ou prévia ao vivo).
+pub fn custom_theme_accent(ctx: &crate::shell::Ctx) -> Option<tako_core::presentation::Rgb> {
+    if let Some(acc) = ctx
+        .theme_preview
+        .as_ref()
+        .and_then(|p| p.draft_override.as_ref())
+        .and_then(|ov| ov.accent.as_ref())
+    {
+        return tako_core::presentation::Rgb::parse(acc);
+    }
+    if let Some(ref d) = ctx.theme_draft {
+        if let Some(ref acc) = d.accent {
+            return tako_core::presentation::Rgb::parse(acc);
+        }
+    }
+    let selected_id = tako_themes::selected(&ctx.paths.themes());
+    let theme_id = selected_id.as_deref();
+    if let Some(text) = tako_themes::overrides::load_override(&ctx.paths.themes(), theme_id) {
+        let ov = tako_themes::overrides::ThemeTokensOverride::from_toml_str(&text);
+        if let Some(acc) = ov.accent {
+            return tako_core::presentation::Rgb::parse(&acc);
+        }
+    }
+    None
+}
+
+/// Carrega imagem de fundo com limites defensivos (32 MB, 16384 px, 512 MB de alocação).
+/// Em caso de erro, devolve None para cair no padrão do tema sem travar ou entrar em loop de falha.
+pub fn load_safe_image(path: &Path) -> Option<slint::Image> {
+    let meta = std::fs::metadata(path).ok()?;
+    if meta.len() > tako_themes::overrides::MAX_IMAGE_BYTES {
+        return None;
+    }
+    let reader = image::ImageReader::open(path)
+        .ok()?
+        .with_guessed_format()
+        .ok()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(tako_themes::overrides::MAX_IMAGE_DIMENSION);
+    limits.max_image_height = Some(tako_themes::overrides::MAX_IMAGE_DIMENSION);
+    limits.max_alloc = Some(512 * 1024 * 1024);
+    let mut reader = reader;
+    reader.limits(limits);
+    let img = reader.decode().ok()?;
+    let rgba = img.to_rgba8();
+    let buf =
+        slint::SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height());
+    Some(crate::images::shared(buf))
+}
+
 /// `tokens.toml` opcional na pasta do tema ou na sobreposição: troca cores, fontes e fundo do global `Ui` (THEME-003).
 pub fn apply_tokens(ui: &slint_interpreter::ComponentInstance, dir: Option<&Path>) {
     apply_tokens_with_override(ui, dir, None, None);
@@ -135,6 +185,10 @@ pub fn apply_tokens_with_override(
             }
         } else if name == "custom-background" || name == "background-image" {
             if let Some(bg_path) = value.as_str().filter(|s| !s.trim().is_empty()) {
+                if !tako_themes::overrides::is_safe_background_path(bg_path) {
+                    tracing::warn!("tokens.toml: custom-background inseguro ignorado: {bg_path}");
+                    continue;
+                }
                 let resolved = if let Some(od) = override_dir {
                     let candidate = od.join(bg_path);
                     if candidate.is_file() {
@@ -148,8 +202,8 @@ pub fn apply_tokens_with_override(
 
                 let img_file = resolved.unwrap_or_else(|| PathBuf::from(bg_path));
                 if img_file.is_file() {
-                    match slint::Image::load_from_path(&img_file) {
-                        Ok(img) => {
+                    match load_safe_image(&img_file) {
+                        Some(img) => {
                             crate::bridge::set_global(
                                 ui,
                                 "Ui",
@@ -164,9 +218,9 @@ pub fn apply_tokens_with_override(
                             );
                             has_custom_bg = true;
                         }
-                        Err(e) => {
+                        None => {
                             tracing::warn!(
-                                "falha ao carregar imagem de fundo {}: {e}",
+                                "falha ao carregar imagem de fundo {}: limites excedidos ou arquivo inválido",
                                 img_file.display()
                             );
                         }
@@ -174,6 +228,16 @@ pub fn apply_tokens_with_override(
                 }
             }
         } else {
+            if name == "canvas" {
+                if let Some(c_str) = value.as_str() {
+                    if !tako_themes::overrides::validate_canvas(c_str) {
+                        tracing::warn!(
+                            "tokens.toml: canvas ignorado por contraste insuficiente (< 4.5:1)"
+                        );
+                        continue;
+                    }
+                }
+            }
             match value.as_str().and_then(parse_color) {
                 Some(c) => {
                     crate::bridge::set_global(
@@ -317,18 +381,32 @@ fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
     table
         .iter()
         .filter_map(|(name, value)| {
-            if name == "font"
-                || name.starts_with("font-")
-                || name == "custom-background"
-                || name == "background-image"
-            {
+            if name == "font" || name.starts_with("font-") {
                 if value.as_str().is_none() {
+                    Some(tf("themes.check.token_invalid", &[("name", name)]))
+                } else {
+                    None
+                }
+            } else if name == "custom-background" || name == "background-image" {
+                let Some(s) = value.as_str() else {
+                    return Some(tf("themes.check.token_invalid", &[("name", name)]));
+                };
+                if !tako_themes::overrides::is_safe_background_path(s) {
                     Some(tf("themes.check.token_invalid", &[("name", name)]))
                 } else {
                     None
                 }
             } else if !colors.iter().any(|c| c == name) {
                 Some(tf("themes.check.token_unknown", &[("name", name)]))
+            } else if name == "canvas" {
+                let Some(s) = value.as_str() else {
+                    return Some(tf("themes.check.token_invalid", &[("name", name)]));
+                };
+                if !tako_themes::overrides::validate_canvas(s) {
+                    Some(tf("themes.check.token_invalid", &[("name", name)]))
+                } else {
+                    None
+                }
             } else if value.as_str().and_then(parse_color).is_none() {
                 Some(tf("themes.check.token_invalid", &[("name", name)]))
             } else {
@@ -475,5 +553,59 @@ nada = \"#000000\"
         )
         .unwrap();
         assert!(compile(&bad, &dir).is_err());
+    }
+
+    #[test]
+    fn custom_background_and_canvas_validate_tokens() {
+        let colors = vec!["canvas".to_string(), "accent".to_string()];
+
+        // Caminhos inseguros são rejeitados
+        let problems = token_problems("custom-background = \"/etc/passwd\"\n", &colors);
+        assert!(!problems.is_empty(), "deveria rejeitar caminho absoluto");
+
+        let problems = token_problems("custom-background = \"../secret.png\"\n", &colors);
+        assert!(!problems.is_empty(), "deveria rejeitar caminho com ..");
+
+        // Caminho seguro é aceito
+        let problems = token_problems("custom-background = \"bg.png\"\n", &colors);
+        assert!(
+            problems.is_empty(),
+            "deveria aceitar caminho relativo seguro"
+        );
+
+        // Canvas com contraste insuficiente (< 4.5:1 com branco) é rejeitado
+        let problems = token_problems("canvas = \"#FFFFFF\"\n", &colors);
+        assert!(
+            !problems.is_empty(),
+            "deveria rejeitar canvas sem contraste"
+        );
+
+        // Canvas escuro com bom contraste é aceito
+        let problems = token_problems("canvas = \"#0E1116\"\n", &colors);
+        assert!(
+            problems.is_empty(),
+            "deveria aceitar canvas com bom contraste"
+        );
+    }
+
+    #[test]
+    fn load_safe_image_checks_limits() {
+        let tmp = tempfile::tempdir().unwrap();
+        let valid_path = tmp.path().join("valid.png");
+        let img = image::RgbaImage::new(32, 32);
+        img.save(&valid_path).unwrap();
+
+        // Imagem válida carrega
+        let loaded = load_safe_image(&valid_path);
+        assert!(loaded.is_some());
+
+        // Arquivo corrupto/inválido retorna None sem entrar em loop de falha
+        let bad_path = tmp.path().join("corrupt.png");
+        std::fs::write(&bad_path, b"not an image").unwrap();
+        assert!(load_safe_image(&bad_path).is_none());
+
+        // Arquivo inexistente retorna None
+        let missing = tmp.path().join("nonexistent.png");
+        assert!(load_safe_image(&missing).is_none());
     }
 }
