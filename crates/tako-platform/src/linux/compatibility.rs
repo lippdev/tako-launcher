@@ -691,17 +691,18 @@ mod tests {
         );
 
         // Symlink para home
-        let tmp = tempfile::tempdir().unwrap();
-        let real_home = tmp.path().join("real_home");
-        std::fs::create_dir_all(&real_home).unwrap();
-        let symlink_path = tmp.path().join("symlink_to_home");
         #[cfg(unix)]
-        std::os::unix::fs::symlink(&real_home, &symlink_path).unwrap();
-        #[cfg(unix)]
-        assert_eq!(
-            validate_prefix_path(&symlink_path, Some(&real_home)),
-            Err(PrefixValidationError::HomeNotAllowed)
-        );
+        {
+            let tmp = tempfile::tempdir().unwrap();
+            let real_home = tmp.path().join("real_home");
+            std::fs::create_dir_all(&real_home).unwrap();
+            let symlink_path = tmp.path().join("symlink_to_home");
+            std::os::unix::fs::symlink(&real_home, &symlink_path).unwrap();
+            assert_eq!(
+                validate_prefix_path(&symlink_path, Some(&real_home)),
+                Err(PrefixValidationError::HomeNotAllowed)
+            );
+        }
 
         // Caminhos válidos
         assert!(
