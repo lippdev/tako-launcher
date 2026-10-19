@@ -1430,3 +1430,41 @@ fn console_mode_row_displays_status_and_triggers_check() {
     let flow = accept(&mut ctx, &cm_row);
     assert!(matches!(flow, Flow::Stay));
 }
+
+#[test]
+fn console_mode_row_displays_checking_when_verifying() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+
+    super::integrations::set_checking_for_test(true);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.t("settings.integrations.console_mode_checking")
+    );
+    super::integrations::set_checking_for_test(false);
+}
+
+#[test]
+fn console_mode_custom_detector_is_invoked() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    super::integrations::set_detector_for_test(|| {
+        tako_core::console_mode::ConsoleModeStatus::Instalado {
+            versao_api: 1,
+            capacidades: vec!["custom".into()],
+        }
+    });
+    super::integrations::check_now(&mut ctx);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.tf(
+            "settings.integrations.console_mode_installed",
+            &[("version", "1")]
+        )
+    );
+}
