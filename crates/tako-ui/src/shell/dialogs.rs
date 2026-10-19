@@ -669,7 +669,10 @@ fn confirm_remove(ctx: &Ctx, id: &str) -> MenuLayer {
                 MenuItem::new(PanelRow::button("remove", ctx.t("options.remove")).danger()).on(
                     move |ctx| {
                         match ctx.library.remove_manual(&id) {
-                            Ok(()) => ctx.toast(ctx.t("options.removed")),
+                            Ok(()) => {
+                                crate::local_api::sync(ctx);
+                                ctx.toast(ctx.t("options.removed"));
+                            }
                             Err(e) => ctx.toast(e.to_string()),
                         }
                         ctx.leave_details = true;
@@ -869,10 +872,15 @@ fn confirm_remove_many(ctx: &Ctx, ids: Vec<String>) -> MenuLayer {
             vec![
                 MenuItem::new(PanelRow::button("remove", ctx.t("options.remove")).danger()).on(
                     move |ctx| {
+                        let mut removed = false;
                         for id in &ids {
-                            if let Err(e) = ctx.library.remove_manual(id) {
-                                ctx.toast(e.to_string());
+                            match ctx.library.remove_manual(id) {
+                                Ok(()) => removed = true,
+                                Err(e) => ctx.toast(e.to_string()),
                             }
+                        }
+                        if removed {
+                            crate::local_api::sync(ctx);
                         }
                         ctx.toast(ctx.t("options.removed"));
                         Flow::Close

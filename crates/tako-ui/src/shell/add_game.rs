@@ -202,11 +202,13 @@ fn add(ctx: &mut Ctx, record: ManualGameRecord, system: Option<&str>) {
                         ctx.library.refresh();
                         ctx.sync_collections();
                         ctx.dirty = true;
+                        crate::local_api::sync(ctx);
                     },
                 );
             }
             // A fila de metadados vê a biblioteca mudar e busca capa e informações.
             ctx.sync_collections();
+            crate::local_api::sync(ctx);
             ctx.toast(ctx.tf("add_game.added", &[("game", &title)]));
         }
         Err(e) => ctx.toast(e.to_string()),

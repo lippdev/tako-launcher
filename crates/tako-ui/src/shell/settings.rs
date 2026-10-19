@@ -1716,6 +1716,7 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                                     let theme_id = tako_themes::selected(&ctx.paths.themes())
                                         .unwrap_or_else(|| BUILTIN_THEME.into());
                                     ctx.effect(Effect::ApplyTheme(theme_id));
+                                    crate::local_api::sync(ctx);
 
                                     let msg = if let Some(auto) = &res.auto_backup_path {
                                         let auto_name = auto
@@ -1733,6 +1734,7 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                                 }
                                 Err(e) => {
                                     ctx.reload_data();
+                                    crate::local_api::sync(ctx);
                                     ctx.toast(ctx.tf(
                                         "settings.system.restore_failed",
                                         &[("error", &e.to_string())],
