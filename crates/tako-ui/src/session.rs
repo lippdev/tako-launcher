@@ -773,22 +773,22 @@ mod tests {
         let mine: Vec<_> = events
             .try_iter()
             .filter_map(|e| match e {
-                SessionEvent::GameStarting { game, .. } if game.game_id == id => Some("starting"),
-                SessionEvent::GameStarted { game, .. } if game.game_id == id => Some("started"),
+                SessionEvent::GameStarting { game, .. } if game.game_id == id => {
+                    Some(("starting", None))
+                }
+                SessionEvent::GameStarted { game, .. } if game.game_id == id => {
+                    Some(("started", None))
+                }
                 SessionEvent::GameExited {
                     game, exit_code, ..
-                } if game.game_id == id => {
-                    assert_eq!(exit_code, Some(0));
-                    Some("exited")
-                }
+                } if game.game_id == id => Some(("exited", exit_code)),
                 _ => None,
             })
             .collect();
-        // Outros testes abrem o mesmo jogo em paralelo: confere a ordem da última sessão.
-        assert!(
-            mine.ends_with(&["starting", "started", "exited"]),
-            "{mine:?}"
-        );
+        // Outros testes abrem o mesmo jogo em paralelo e intercalam eventos: a ordem fica nos testes de `events`.
+        for expected in [("starting", None), ("started", None), ("exited", Some(0))] {
+            assert!(mine.contains(&expected), "{mine:?}");
+        }
     }
 
     #[test]

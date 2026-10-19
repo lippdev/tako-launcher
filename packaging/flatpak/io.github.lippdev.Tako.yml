@@ -26,7 +26,7 @@ finish-args:
   - --talk-name=org.freedesktop.secrets
   # Troca de telas no GNOME Wayland (ADR-0024).
   - --talk-name=org.gnome.Mutter.DisplayConfig
-  # Lojas, somente leitura: Steam (nativa e Flatpak), Heroic e Lutris (nativos e Flatpak).
+  # Lojas, somente leitura: Steam (nativa e Flatpak), Heroic, Lutris, Bottles e itch.io (nativos e Flatpak).
   - --filesystem=xdg-data/Steam:ro
   - --filesystem=~/.steam:ro
   - --filesystem=~/.var/app/com.valvesoftware.Steam/.local/share/Steam:ro
@@ -35,6 +35,10 @@ finish-args:
   - --filesystem=~/.var/app/com.heroicgameslauncher.hgl/config/heroic:ro
   - --filesystem=xdg-data/lutris:ro
   - --filesystem=~/.var/app/net.lutris.Lutris/data/lutris:ro
+  - --filesystem=xdg-data/bottles:ro
+  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles:ro
+  - --filesystem=xdg-config/itch:ro
+  - --filesystem=~/.var/app/io.itch.itch/config/itch:ro
   # Bibliotecas em outros discos e a pasta padrão de jogos do Heroic e do Lutris.
   - --filesystem=/mnt:ro
   - --filesystem=/media:ro

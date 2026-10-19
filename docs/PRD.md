@@ -249,6 +249,17 @@ O benchmark (MIG-041) roda no CI, onde os números só servem de tendência, e e
 
 Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo depois; **P2/P3** = futuro.
 
+### Prioridade MoSCoW da rodada de 19/10
+
+Ordem do que falta nesta rodada (decisão do mantenedor de usar MoSCoW). Fora daqui ficam os itens que dependem de hardware (MIG-*), o CMI-001 (no repositório do Console Mode) e os já fechados.
+
+| | Itens | Por quê |
+|---|---|---|
+| **Must** | CLOUD-001, DL-001, EXT-002, SESSION-005, SRC-002, THEME-003 | já estão em PR ou em andamento; protegem dados do usuário (backup) e fecham a paridade no Linux e a base de integração (API local, que o CMI usa) |
+| **Should** | THEME-007, THEME-008 (Fita), STREAM-001, CMI-002, THEME-006 | valor visível com pouco risco; CMI-002 é só detecção sobre a API local; THEME-006 reaproveita o THEME-003 |
+| **Could** | CLOUD-002, DL-002, EXT-003, STREAM-002, THEME-005, UX-002, SOURCE-001, CMI-003, CMI-004, INPUT-002, SESSION-001, ART-002 | maiores ou dependentes de outro item, de ADR aceita (PR #135) ou do Console Mode |
+| **Won't (agora)** | DATA-001, DEALS-001, ART-003, VOICE-001, THEME-011 | precisam de serviço externo, fonte de preços, servidor ou decisão ainda não tomada; os outros temas oficiais ficaram para depois do Fita |
+
 ### Fase 0 — Decisão técnica (P0)
 
 - [ ] **MIG-001 — Spike Slint.** Protótipo com a grade de 1.000 capas, foco animado, controle via SDL3 e um tema `.slint` carregado em tempo de execução, rodando em Windows, Linux (X11, Wayland KDE e gamescope) e macOS. **Gate:** cumpre as metas da §8.1 em pelo menos duas máquinas de referência e carrega o tema em runtime. Resultado num ADR (ADR-0023) com os números. Se não cumprir, parar e levar os números aos mantenedores (D-02). _Estado: código e números do CI prontos (ADR-0023); falta o gate nas duas máquinas de referência._
@@ -301,7 +312,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 ### Épico PLAT — Integrações de sistema (P1)
 
 - [ ] **PLAT-001 (Linux):** sessão gamescope do Tako (entrada no gerenciador de login, como a do Steam).
-- [ ] **PLAT-002 (Linux):** pacotes para Arch/CachyOS (PKGBUILD no AUR) e Flatpak.
+- [x] **PLAT-002 (Linux):** pacotes para Arch/CachyOS (PKGBUILD no AUR) e Flatpak. _Estado: PKGBUILDs `tako-launcher-bin` e `tako-launcher` e Flatpak `io.github.lippdev.Tako` no repositório, validados no CI; publicar no AUR e no Flathub depende da conta do mantenedor e do ID do Flathub._
 - [ ] **PLAT-003 (Windows):** Tako como app inicial da experiência de tela cheia do Xbox, onde a Microsoft permitir (exige SCCD assinado pela Microsoft; ver `docs/spikes/MVP-007-fse.md`).
 - [ ] **PLAT-004 (macOS):** assinatura Developer ID e notarização.
 - [ ] **PLAT-005 (Windows):** assinatura de código (SignPath) e winget.
@@ -312,9 +323,9 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 ### Épico SRC — Mais fontes (P1)
 
 - [x] **SRC-001:** emuladores (RetroArch e standalone), bibliotecas de ROMs do usuário e sistemas, nos três SOs. Inclui importar direto dos principais emuladores e frontends os jogos que eles já conhecem (playlists do RetroArch, listas do ES-DE, bibliotecas do Dolphin, PCSX2, DuckStation, PPSSPP, Ryujinx e afins), com o comando certo para abrir cada jogo no emulador.
-- [ ] **SRC-002 (Linux):** Bottles e itch.io.
+- [ ] **SRC-002 (Linux):** Bottles e itch.io. _Estado: Bottles e itch.io lidos no Linux; falta validar em máquina real (docs/testing/linux.md)._
 - [x] **SRC-003:** detectar cliente de loja ausente e oferecer abri-lo ou instalá-lo pelo caminho oficial.
-- [ ] **SRC-005:** jogos que o usuário possui mas não instalou, e instalar pelo Tako: listar a biblioteca de cada loja (Steam, Epic, GOG e outras, pela conta do usuário ou pelo cliente da loja) com o selo "Não instalado", e o botão Instalar abre a instalação no cliente da loja (por exemplo `steam://install/<appid>`). Quando a instalação termina, o jogo vira instalado sem precisar reiniciar. Pedido do mantenedor no primeiro teste. _Estado: Steam (Web API com a chave do usuário), Epic e GOG lidos do cliente da loja, e Amazon no Linux e no macOS pelo Heroic, entregues (0.2.0-alpha.5); faltam Ubisoft, EA e Amazon no Windows, que não guardam a lista de forma legível offline (motivos no #107). No desktop, seção Não instalados por loja na lista e na grade, Instalar com a escolha da loja, progresso da Steam (Epic sem número), espaço livre no disco e Instalar no menu e na seleção múltipla; GOG e Xbox não informam instalação em andamento._
+- [x] **SRC-005:** jogos que o usuário possui mas não instalou, e instalar pelo Tako: listar a biblioteca de cada loja (Steam, Epic, GOG e outras, pela conta do usuário ou pelo cliente da loja) com o selo "Não instalado", e o botão Instalar abre a instalação no cliente da loja (por exemplo `steam://install/<appid>`). Quando a instalação termina, o jogo vira instalado sem precisar reiniciar. Pedido do mantenedor no primeiro teste. _Estado: Steam, Epic, GOG, Xbox e Amazon (Windows); progresso com porcentagem só na Steam. Ubisoft fica para um estudo e a EA não entra (ADR-0029)._
 - [x] **SRC-004:** jogos não Steam adicionados à Steam (atalhos), nos três SOs.
 
 ### Épico UX (P1)
@@ -323,18 +334,19 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [ ] **UX-002:** arte animada e trailers (libmpv opcional, desligado durante o jogo).
 - [x] **UX-003:** assistente da primeira execução (idioma, lojas detectadas, provedores de metadados; oferece o driver opcional do INPUT-005).
 - [ ] **UX-004:** perfis locais (vários usuários na mesma máquina).
-- [ ] **UX-005:** ícone do jogo na lista, como na Steam; a capa fica só na Grade. O ícone vem da própria loja (Steam, Epic, GOG, Xbox) ou do executável no Windows, com a inicial do título quando não houver.
+- [x] **UX-005:** ícone do jogo na lista, como na Steam; a capa fica só na Grade. O ícone vem da própria loja (Steam, Epic, GOG, Xbox) ou do executável no Windows, com a inicial do título quando não houver.
 
 ### Épico THEME (P2)
 
 - [x] **THEME-001:** documentação pública da API de temas.
-- [ ] **THEME-002:** pré-visualização antes de aplicar.
+- [x] **THEME-002:** pré-visualização antes de aplicar.
 - [ ] **THEME-003:** edição de cores, fontes e fundo pelo próprio Tako.
 - [x] **THEME-004:** instalar tema por URL de repositório, com atualização opcional.
 - [ ] **THEME-005:** galeria comunitária de temas.
 - [ ] **THEME-006:** criar o próprio tema pelo Tako, sem editar arquivos: partir do tema padrão (ou de um instalado), escolher cores, fonte e fundo com prévia ao vivo, dar nome, salvar como tema instalado e exportar como `.takotheme` para compartilhar. Base: os `tokens.toml` (temas que só trocam a paleta) e THEME-002/003.
 - [ ] **THEME-007:** música de fundo e sons de navegação por tema (o tema traz os arquivos; volume próprio e opção de desligar; nunca toca durante o jogo).
-- [ ] **THEME-008:** cinco temas oficiais bem diferentes entre si (layout, navegação e identidade, não só cores), começando por uma lista de propostas para escolher.
+- [ ] **THEME-008:** primeiro tema oficial alternativo, o **Fita** (carrossel horizontal com arte em tela cheia), escolhido entre as propostas de `docs/themes/THEME-008-propostas.md`. _Estado: propostas feitas e escolhidas; o Fita está em revisão; os outros temas foram para o THEME-011._
+- [ ] **THEME-011 (futuro):** os outros quatro temas oficiais escolhidos em `docs/themes/THEME-008-propostas.md`: Deck Handheld, Lista & Cinema, Console Retrô CRT e Estante Clássica. Fica para depois do Fita, reaproveitando o que ele ensinar (contraste sobre a arte, texto em 1,5x).
 - [x] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil. _Estado: estudado (`docs/spikes/AI-001-THEME-010-estudo.md`): só as cores convertem, então não segue._
 
 ### Épico LIB — Organização da biblioteca (P2)
@@ -353,13 +365,13 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 
 ### Épico BRAND — Identidade (P2)
 
-- [ ] **BRAND-001:** animação do Tako (o polvo), usada no app (espera, estados vazios, Bem-vindo de volta).
-- [ ] **BRAND-002:** animação de entrada ao abrir o app, curta, pulável, desligada com "Reduzir animações" e sem atrasar a primeira tela (§8.1).
+- [x] **BRAND-001:** animação do Tako (o polvo), usada no app (espera, estados vazios, Bem-vindo de volta).
+- [x] **BRAND-002:** animação de entrada ao abrir o app, curta, pulável, desligada com "Reduzir animações" e sem atrasar a primeira tela (§8.1).
 
 ### Épico PERF (P2)
 
 - [x] **PERF-001:** painel de diagnóstico do próprio Tako (memória, CPU, tempo de abertura).
-- [ ] **PERF-002:** presets de tela por jogo e por monitor, incluindo HDR e VRR onde o SO expõe. _Estado: tela, resolução e HDR por jogo e por monitor entregues (0.2.0-alpha.5); falta o VRR, que não tem API pública no Windows._
+- [x] **PERF-002:** presets de tela por jogo e por monitor, incluindo HDR e VRR onde o SO expõe. _Estado: VRR por jogo no KDE (kscreen-doctor) e no wlroots (wlr-randr); no Windows e no macOS segue sem API pública._
 
 ### Épico INPUT — Controles (P2)
 
@@ -400,10 +412,10 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 
 ### Épico EXT (P3)
 
-- [ ] **EXT-001:** eventos de sessão (`GameStarting`, `GameStarted`, `GameExited`) e ferramentas externas por jogo (pré e pós-execução), com consentimento.
+- [x] **EXT-001:** eventos de sessão (`GameStarting`, `GameStarted`, `GameExited`) e ferramentas externas por jogo (pré e pós-execução), com consentimento.
 - [ ] **EXT-002:** API local de integração (a mesma base que o Console Mode usará no sentido inverso).
 - [x] **EXT-004:** Discord Rich Presence: mostrar o jogo aberto no Discord, desligado por padrão.
-- [ ] **EXT-005:** links `tako://` para abrir um jogo ou uma tela do Tako de fora (atalhos, Stream Deck, ART-002). _Estado: Windows e Linux entregues (0.2.0-alpha.5); falta o macOS, onde o toolkit ainda não repassa os eventos `OpenURLs`._
+- [x] **EXT-005:** links `tako://` para abrir um jogo ou uma tela do Tako de fora (atalhos, Stream Deck, ART-002). _Estado: Windows e Linux entregues (0.2.0-alpha.5); falta o macOS, onde o toolkit ainda não repassa os eventos `OpenURLs`._
 - [ ] **EXT-003:** plugins de metadados e de fontes, sem acesso privilegiado.
 
 ### Épico STREAM (P3)
