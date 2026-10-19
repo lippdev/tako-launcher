@@ -28,6 +28,7 @@ tempfile.workspace = true
 
 [dev-dependencies]
 slint = { workspace = true, features = ["renderer-software"] }
+ureq.workspace = true
 
 [lints]
 workspace = true
