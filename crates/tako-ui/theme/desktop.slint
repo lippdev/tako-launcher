@@ -96,6 +96,13 @@ component DeskIcon inherits Rectangle {
 export global DeskText {
     in-out property <string> silence: "Silenciar";
     in-out property <string> max: "Volume máximo";
+    // Botões só de ícone da linha de download (PainelDownloads).
+    in-out property <string> dl-pause: "Pausar";
+    in-out property <string> dl-resume: "Continuar";
+    in-out property <string> dl-cancel: "Cancelar";
+    in-out property <string> dl-start-now: "Baixar agora";
+    in-out property <string> dl-retry: "Tentar de novo";
+    in-out property <string> dl-store: "Abrir na loja";
 }
 
 // Entrada do app: falso enquanto o primeiro quadro não sai (o Tako liga `desk-intro` só na abertura); ao virar
@@ -522,6 +529,10 @@ component TopBar inherits Vidro {
     in property <bool> active: true;
     in property <[string]> labels;
     in property <string> update-label;
+    // PainelDownloads: pílula "↓ 42%" antes do perfil, só com download ou instalação ativa.
+    in property <bool> download-on;
+    in property <string> download-label;
+    in property <string> download-tip;
     out property <length> profile-x: profile.absolute-position.x;
     out property <length> drag-start: drag.absolute-position.x;
     out property <length> drag-end: drag.absolute-position.x + drag.width;
@@ -640,6 +651,27 @@ component TopBar inherits Vidro {
                 ul := Text { x: 22px; text: update-label; color: Ui.on-accent; font-size: 12px; font-weight: 600; vertical-alignment: center; }
                 uta := TouchArea { mouse-cursor: pointer; clicked => { root.action("update"); } }
             }
+        }
+        if download-on: Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 32px;
+            width: dlay.preferred-width;
+            border-radius: self.height / 2;
+            background: dta.pressed ? Ui.glass-pressed : (dta.has-hover ? Ui.glass-hover : Ui.glass-control);
+            border-width: 1px;
+            border-color: Ui.glass-edge;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: button;
+            accessible-label: download-label != "" ? download-tip + ": " + download-label : download-tip;
+            dlay := HorizontalLayout {
+                padding-left: 10px;
+                padding-right: download-label != "" ? 12px : 10px;
+                spacing: 6px;
+                DeskIcon { name: "download"; size: 16px; y: (parent.height - self.height) / 2; }
+                if download-label != "": Text { text: download-label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+            }
+            dta := TouchArea { mouse-cursor: pointer; clicked => { root.action("downloads"); } }
+            Tip { text: download-tip; hovering: dta.has-hover; }
         }
         profile := Rectangle {
             y: (parent.height - self.height) / 2;
@@ -3595,7 +3627,8 @@ component DeskRow inherits Rectangle {
         letter-spacing: 0.1 * self.font-size;
     }
     ta := TouchArea {
-        enabled: !is-header && !is-cover;
+        // A linha de download só reage aos botões dela (um clique solto não pausa nada).
+        enabled: !is-header && !is-cover && data.kind != "download";
         mouse-cursor: data.enabled ? pointer : default;
         clicked => {
             if (data.kind == "choice") {
@@ -3730,9 +3763,21 @@ component DeskRow inherits Rectangle {
             if !emu: DeskIcon { name: data.icon; size: 22px; tint: data.style == "danger" ? Ui.error : Ui.desk-on-muted; }
             if emu: EmuLogo { name: data.icon; }
         }
-        if data.image.width > 0: Rectangle {
+        if data.image.width > 0 && data.kind != "download": Rectangle {
             width: 36px;
             Image { source: data.image; width: 36px; height: 36px; image-fit: contain; }
+        }
+        // PainelDownloads: miniatura de 40 do jogo vinculado.
+        if data.image.width > 0 && data.kind == "download": Rectangle {
+            width: 40px;
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: 40px;
+                height: 40px;
+                border-radius: Ui.radius-thumb;
+                clip: true;
+                Image { source: data.image; width: 40px; height: 40px; image-fit: cover; }
+            }
         }
         VerticalLayout {
             alignment: center;
@@ -3752,6 +3797,36 @@ component DeskRow inherits Rectangle {
                 // 13/1,35 das linhas (Plus Jakarta tem 1,26 de natural).
                 line-height-factor: 1.07;
                 wrap: word-wrap;
+            }
+            // Barra do download: `primary-top` sobre `glass-control`, 4 de altura, sem animação listrada. A fração
+            // vem em `value`; sem fração (loja que não informa), sem barra.
+            if data.kind == "download" && data.value.is-float(): Rectangle {
+                height: 4px;
+                border-radius: 2px;
+                background: Ui.glass-control;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * clamp(data.value.to-float(), 0, 1);
+                    height: parent.height;
+                    border-radius: 2px;
+                    background: Ui.primary-top;
+                }
+            }
+        }
+        // Pausar/continuar/baixar agora (ação 0) e cancelar (ação 1), só ícones com dica. Na loja, os dois abrem o
+        // cliente dela.
+        if data.kind == "download": HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+            IconBtn {
+                icon: data.style == "active" || data.style == "store" ? "pause" : (data.style == "queued" ? "download" : (data.style == "failed" ? "refresh" : "play"));
+                label: data.style == "active" ? DeskText.dl-pause : (data.style == "store" ? DeskText.dl-store : (data.style == "queued" ? DeskText.dl-start-now : (data.style == "failed" ? DeskText.dl-retry : DeskText.dl-resume)));
+                clicked => { root.act(0); }
+            }
+            if data.style != "queued": IconBtn {
+                icon: "close";
+                label: data.style == "store" ? DeskText.dl-store : DeskText.dl-cancel;
+                clicked => { root.act(1); }
             }
         }
         if data.kind == "toggle" && !as-check: DeskToggle { on: data.on; y: (parent.height - self.height) / 2; }
@@ -3830,7 +3905,7 @@ component DeskRow inherits Rectangle {
             cl := Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 500; }
             Rectangle { y: (parent.height + cl.preferred-height) / 2; height: 1px; background: Ui.on-accent; }
         }
-        if !card && data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && !(data.kind == "action" && DeskArt.gray): Text {
+        if !card && data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download" && !(data.kind == "action" && DeskArt.gray): Text {
             text: data.value;
             color: data.style == "warning" ? Ui.warning : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted);
             // Resumo do onboarding: a quantidade em 15/600.
@@ -6620,6 +6695,9 @@ export component Desktop inherits Window {
     in property <int> window-native-pressed;
     in property <bool> window-active: true;
     in property <string> desk-update-label;
+    in property <bool> desk-download-on;
+    in property <string> desk-download-label;
+    in property <string> desk-download-tip;
     in property <[string]> desk-window-labels: ["", "", "", ""];
     callback window-action(string);
     preferred-width: 1280px;
@@ -7003,6 +7081,9 @@ export component Desktop inherits Window {
         active: window-active;
         labels: desk-window-labels;
         update-label: desk-update-label;
+        download-on: desk-download-on;
+        download-label: desk-download-label;
+        download-tip: desk-download-tip;
         action(a) => { root.window-action(a); }
         items: desk-nav;
         big-picture-label: desk-big-picture-label;

@@ -11,6 +11,7 @@ tako-core.workspace = true
 tako-themes.workspace = true
 tako-platform.workspace = true
 tako-sources.workspace = true
+tako-downloads.workspace = true
 slint.workspace = true
 slint-interpreter.workspace = true
 i-slint-core.workspace = true
