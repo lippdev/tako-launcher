@@ -634,6 +634,7 @@ pub fn resolve_runtime(
 mod tests {
     use super::*;
 
+    #[cfg(unix)] // Caminhos de prefixo são do Linux; no Windows `/` nem é absoluto.
     #[test]
     fn prefix_validation_rejects_root_and_home() {
         let home = Path::new("/home/usuario");
