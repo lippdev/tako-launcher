@@ -18,7 +18,7 @@ pub fn install_from(ctx: &Ctx, id: &str) -> MenuLayer {
             return Vec::new();
         };
         let lang = ctx.lang();
-        let offers = super::details::install_offers(g);
+        let offers = super::details::install_offers(g, ctx.simulated());
         let current = super::details::chosen_offer(g, &offers, ctx.install_pick.get(&id).copied())
             .map(|o| o.store);
         offers
@@ -448,7 +448,7 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
             v.insert(0, item);
             // Com 2+ lojas, a escolha também fica no menu (a pílula do destaque só abre com o mouse).
             if let Some(g) = ctx.library.find(&id)
-                && super::details::install_offers(g).len() > 1
+                && super::details::install_offers(g, ctx.simulated()).len() > 1
             {
                 let pick = id.clone();
                 v.insert(
@@ -493,7 +493,7 @@ fn install_item(ctx: &Ctx, id: &str) -> Option<MenuItem> {
     if g.is_installed || g.is_upcoming() || g.installing.is_some() {
         return None;
     }
-    super::details::install_offers(g).first()?;
+    super::details::install_offers(g, ctx.simulated()).first()?;
     let id = id.to_owned();
     Some(
         MenuItem::new(PanelRow::button("install", ctx.t("desktop.install.label")).icon("download"))
@@ -1678,6 +1678,25 @@ mod tests {
         // Quem é vigiado é a cópia da loja escolhida, não a do jogo aberto.
         assert_eq!(ctx.installing.len(), 1);
         assert_eq!(ctx.installing[0].0, "steam:7");
+        // A pílula de `gog:7` mostra a instalação da cópia da Steam e Enter não reabre a loja.
+        let g = ctx.library.find("gog:7").unwrap().clone();
+        let stage = super::super::details::install_stage(&ctx, &g).unwrap();
+        assert!(stage.installing);
+        assert_eq!(stage.label, "Instalando na Steam…");
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert!(ctx.install_queue.is_empty());
+        assert_eq!(ctx.toast.as_ref().unwrap().0, "Instalando na Steam…");
+        assert_eq!(
+            super::super::details::install_many(&mut ctx, &["gog:7".to_string()]),
+            0
+        );
+        // Já na fila (antes de sair) também conta: Enter duas vezes seguidas pede uma vez só.
+        ctx.installing.clear();
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert_eq!(queued(&ctx).len(), 1);
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert_eq!(queued(&ctx).len(), 1);
+        ctx.install_queue.clear();
 
         // Pelo menu de contexto e pela seleção múltipla vale a mesma escolha.
         ctx.installing.clear();
@@ -1706,7 +1725,11 @@ mod tests {
             accept(&mut ctx, &menu, "install-from"),
             Flow::Replace(_)
         ));
-        let mut solo = store_game("epic:1", GameStore::Epic, "com.epicgames.launcher://apps/a");
+        let mut solo = store_game(
+            "epic:1",
+            GameStore::Epic,
+            "com.epicgames.launcher://apps/a%3Ab%3Ac?action=install",
+        );
         solo.title = "Solo".into();
         *ctx.found.lock().unwrap() = vec![solo];
         ctx.library.refresh();
