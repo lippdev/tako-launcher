@@ -1,6 +1,6 @@
 # ADR-0029: Jogos da conta não instalados da Ubisoft, da EA e da Amazon no Windows (SRC-005)
 
-- Status: Proposta
+- Status: Aceita para a Amazon (entra) e a EA (não entra); a Ubisoft fica pendente do spike da seção 2
 - Data: 2026-10-18
 
 ## Contexto
@@ -10,7 +10,8 @@ Epic e GOG no Windows e Epic, GOG e Amazon no Linux/macOS pelo Heroic (#107). Fa
 Amazon Games no Windows. O #107 deixou os três de fora; o orquestrador anotou que a Amazon cabia injetando o DPAPI
 que o `tako-platform` já tem.
 
-Regras que valem para qualquer leitura (ADR-0019, CONTRIBUTING §5 e §6.7):
+Regras que valem para qualquer leitura (ADR-0019, que já não usa o `IS` cifrado da EA e abre pelo cliente oficial para
+não contornar login nem DRM; ADR-0028, que repete que o Tako não contorna DRM; e CONTRIBUTING §5):
 
 - biblioteca 100% offline: sem login, sem rede, sem o cliente aberto. API privada da loja está fora;
 - não contornar criptografia nem DRM da loja;
@@ -67,10 +68,11 @@ Regras que valem para qualquer leitura (ADR-0019, CONTRIBUTING §5 e §6.7):
 ### 3. EA app: não entra
 
 - **O que existe no disco:** só os instalados. O `__Installer\installerdata.xml` de cada jogo, que a fonte da EA já
-  lê, e `%ProgramData%\EA Desktop\…\IS`, com o estado de instalação, cifrado pela EA com uma chave que o Windows não
-  dá ao usuário. A lista da conta o EA app busca na conta, pela rede, a cada abertura; não grava um arquivo legível.
-- **Por que não:** decifrar o `IS` é contornar a criptografia da EA, que é proibido, e ele nem é a lista da conta. Não
-  há outra fonte local.
+  lê, e `%ProgramData%\EA Desktop\…\IS`, com o estado de instalação, cifrado pela EA com uma chave que ela própria
+  deriva. A lista da conta o EA app busca na conta, pela rede, a cada abertura; não grava um arquivo legível.
+- **Por que não:** decifrar o `IS` exigiria reimplementar a derivação de chave da própria EA, o que é contornar a
+  criptografia da loja (ADR-0019 e ADR-0028), e ele nem é a lista da conta. Não há outra fonte local. (Diferente do
+  DPAPI da Amazon, que é a função do Windows para o usuário ler os próprios dados.)
 - **Alternativas:**
   1. API da EA com login do usuário (o que fazem o EA app e launchers alternativos como o
      [Maxima](https://github.com/ArmchairDevelopers/Maxima)): privada, sem documentação oficial, exige guardar o token
@@ -85,8 +87,9 @@ Regras que valem para qualquer leitura (ADR-0019, CONTRIBUTING §5 e §6.7):
 
 - Amazon no Windows mostra os jogos da conta não instalados, sem rede e sem login. Se a Amazon mudar o banco ou a
   cifra, só essa leitura fica vazia (com log); os instalados seguem.
-- **Incertezas da Amazon, para o roteiro do Windows (`docs/testing/windows.md` §21):** o plugin não separa DLC, então
-  uma DLC da conta pode aparecer como jogo, e não há arquivo real neste PC para conferir os campos do JSON além dos
-  dois usados.
+- **Incertezas da Amazon, para o roteiro do Windows (`docs/testing/windows.md` §21):** o plugin não separa DLC nem
+  conteúdo do Prime, então um deles pode aparecer como jogo, e não há arquivo real neste PC para conferir os campos do
+  JSON além dos dois usados. **Risco aceito:** o roteiro pede os nomes das chaves do JSON (sem valores) para um filtro
+  futuro. O id também é validado (`[A-Za-z0-9._-]+`) antes de entrar no endereço de instalar.
 - Ubisoft e EA continuam só com os instalados. A Ubisoft volta com o spike; a EA, só com uma API oficial ou um arquivo
   legível.

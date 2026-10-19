@@ -235,8 +235,10 @@ Gaming resgatado).
    versão do app e os arquivos de `Sql\`: a leitura não acha a lista e só os instalados aparecem.
 2. Abrir o Tako: em Amazon, os jogos da conta não instalados aparecem como "Não instalado", com o nome certo; o
    instalado aparece uma vez só, como instalado.
-3. Conferir se aparece alguma DLC ou complemento como jogo (o plugin de origem não separa). Se aparecer, anotar o nome
-   para filtrarmos.
+3. Conferir se aparece alguma DLC, complemento ou item do Prime como jogo (o plugin de origem não separa). Se
+   aparecer, anotar o nome do item e os NOMES das chaves do JSON dele (só os nomes, nunca os valores nem ids da conta),
+   para um filtro futuro. Decifrar uma linha: `[System.Security.Cryptography.ProtectedData]::Unprotect(...)` no
+   PowerShell do mesmo usuário.
 4. Instalar abre o app da Amazon na instalação do jogo (`amazon-games://install/<id>`). Ao terminar, o jogo vira
    instalado sozinho na releitura de 30 s, sem reiniciar o Tako.
 5. Entrar no Windows com outro usuário e copiar o `Entitlements.sqlite` do primeiro para o `%LOCALAPPDATA%` dele: o
