@@ -698,8 +698,6 @@ fn fullscreen_snapshot() {
             .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
             .collect();
 
-        i18n::set_lang(Lang::EnUs);
-
         // Arte clara simulada para demonstrar contraste (>= 4.5:1)
         let mut bright_art = image::RgbImage::new(1920, 1080);
         for (x, y, pixel) in bright_art.enumerate_pixels_mut() {
@@ -713,71 +711,85 @@ fn fullscreen_snapshot() {
         let art_img = slint::Image::load_from_path(&bright_art_path).unwrap();
 
         let game = shell.ctx.library.games()[0].id.clone();
-        for (page_name, route, scales, focus_ribbon) in [
-            ("inicio", "home", vec![1.0, 1.25, 1.5], true),
-            ("biblioteca", "library:all", vec![1.0, 1.25, 1.5], false),
-            ("configuracoes", "settings", vec![1.0, 1.25, 1.5], false),
-            ("detalhes", "details", vec![1.0, 1.25, 1.5], false),
-        ] {
-            for scale in scales {
-                ui.set_global_property("Ui", "text-scale", Value::Number(scale))
-                    .unwrap();
-                shell.open_route(if route == "details" {
-                    "library:all"
-                } else {
-                    route
-                });
-                if focus_ribbon {
-                    shell.handle(crate::shell::Cmd::Down);
-                }
-                if route == "details" {
-                    shell.ctx.open_details = Some(game.clone());
-                    shell.after_action();
-                }
-                for &(w, h) in &sizes {
-                    window.set_size(slint::PhysicalSize::new(w, h));
-                    if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
-                        shell.ctx.grid_columns = (n as usize).max(1);
-                    }
-                    let out = shell.render(Instant::now());
-                    for (name, value) in &out.props {
-                        crate::bridge::set(&ui, name, value.clone());
-                    }
-                    if let Some(art) = &art {
-                        ui.set_property("backdrop", Value::Image(art.clone()))
-                            .unwrap();
-                    } else {
-                        ui.set_property("backdrop", Value::Image(art_img.clone()))
-                            .unwrap();
-                    }
-                    let id = shell.focused_game();
-                    let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
-                    let p = tako_core::presentation::color::AccentPalette::for_accent(
-                        g.map(|g| g.accent.as_str()),
-                        true,
-                    );
-                    for (name, c) in [("accent", p.accent), ("accent-deep", p.deep)] {
-                        let c = slint::Color::from_rgb_u8(c.r, c.g, c.b);
-                        crate::bridge::set_global(&ui, "Ui", name, Value::Brush(c.into()));
-                    }
-                    for _ in 0..10 {
-                        slint::platform::update_timers_and_animations();
-                    }
-                    let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
-                    ui.window().request_redraw();
-                    window.draw_if_needed(|r| {
-                        r.render(&mut pixels, w as usize);
-                    });
-                    let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
-                    let file_name = if (scale - 1.0).abs() < 0.01 {
-                        format!("{out_dir}/fita-{page_name}-{w}x{h}.png")
-                    } else {
-                        format!("{out_dir}/fita-{page_name}-{scale}-{w}x{h}.png")
-                    };
-                    image::RgbImage::from_raw(w, h, raw)
-                        .unwrap()
-                        .save(&file_name)
+        for lang in [Lang::EnUs, Lang::PtBr] {
+            i18n::set_lang(lang);
+            let lang_suffix = match lang {
+                Lang::EnUs => "",
+                Lang::PtBr => "-pt-BR",
+            };
+            for (page_name, route, scales, focus_ribbon) in [
+                ("inicio", "home", vec![1.0, 1.25, 1.5], true),
+                ("biblioteca", "library:all", vec![1.0, 1.25, 1.5], false),
+                ("configuracoes", "settings", vec![1.0, 1.25, 1.5], false),
+                ("detalhes", "details", vec![1.0, 1.25, 1.5], false),
+            ] {
+                for scale in &scales {
+                    let scale = *scale;
+                    ui.set_global_property("Ui", "text-scale", Value::Number(scale))
                         .unwrap();
+                    shell.open_route(if route == "details" {
+                        "library:all"
+                    } else {
+                        route
+                    });
+                    if focus_ribbon {
+                        shell.handle(crate::shell::Cmd::Down);
+                    }
+                    if route == "details" {
+                        shell.ctx.open_details = Some(game.clone());
+                        shell.after_action();
+                    }
+                    for &(w, h) in &sizes {
+                        window.set_size(slint::PhysicalSize::new(w, h));
+                        if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
+                            shell.ctx.grid_columns = (n as usize).max(1);
+                        }
+                        let out = shell.render(Instant::now());
+                        for (name, value) in &out.props {
+                            crate::bridge::set(&ui, name, value.clone());
+                        }
+                        if let Some(art) = &art {
+                            ui.set_property("backdrop", Value::Image(art.clone()))
+                                .unwrap();
+                        } else {
+                            ui.set_property("backdrop", Value::Image(art_img.clone()))
+                                .unwrap();
+                        }
+                        let id = shell.focused_game();
+                        let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
+                        let p = tako_core::presentation::color::AccentPalette::for_accent(
+                            g.map(|g| g.accent.as_str()),
+                            true,
+                        );
+                        for (name, c) in [("accent", p.accent), ("accent-deep", p.deep)] {
+                            let c = slint::Color::from_rgb_u8(c.r, c.g, c.b);
+                            crate::bridge::set_global(&ui, "Ui", name, Value::Brush(c.into()));
+                        }
+                        for _ in 0..10 {
+                            slint::platform::update_timers_and_animations();
+                        }
+                        let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+                        ui.window().request_redraw();
+                        window.draw_if_needed(|r| {
+                            r.render(&mut pixels, w as usize);
+                        });
+                        let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+                        let img = image::RgbImage::from_raw(w, h, raw).unwrap();
+                        let file_name = if (scale - 1.0).abs() < 0.01 {
+                            format!("{out_dir}/fita-{page_name}{lang_suffix}-{w}x{h}.png")
+                        } else {
+                            format!("{out_dir}/fita-{page_name}{lang_suffix}-{scale}-{w}x{h}.png")
+                        };
+                        img.save(&file_name).unwrap();
+                        if lang == Lang::PtBr {
+                            let alt_name = if (scale - 1.0).abs() < 0.01 {
+                                format!("{out_dir}/fita-{page_name}-PtBr-{w}x{h}.png")
+                            } else {
+                                format!("{out_dir}/fita-{page_name}-PtBr-{scale}-{w}x{h}.png")
+                            };
+                            let _ = img.save(&alt_name);
+                        }
+                    }
                 }
             }
         }

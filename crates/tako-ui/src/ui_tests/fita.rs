@@ -440,37 +440,49 @@ fn card_captions_and_library_header_height_and_contrast() {
         f.shell.open_route("library:all");
         let pixels = f.draw(w, h);
 
-        // 1. Cabeçalho da Biblioteca fica contido no topo, nunca sob a grade (y < top).
+        // 1. Cabeçalho da Biblioteca fica contido no topo, nunca sob a grade (base do cabeçalho < topo da grade).
         // top = 120 * u + 60 * u * text_scale = 180px em 1080p escala 1.0.
         let u = h as f32 / 1080.;
         let top = (120. * u + 60. * u) as u32;
-        let mut header_has_pixels = false;
+        let mut header_bottom_y = 0;
         for y in (48. * u) as u32..top {
             for x in (100. * u) as u32..(w - 100) {
                 let p = pixels[(y * w + x) as usize];
                 if p.r > 100 || p.g > 100 || p.b > 100 {
-                    header_has_pixels = true;
-                    break;
+                    header_bottom_y = header_bottom_y.max(y);
                 }
             }
         }
+        assert!(header_bottom_y > 0, "cabeçalho da biblioteca renderizado no topo");
         assert!(
-            header_has_pixels,
-            "cabeçalho da biblioteca renderizado no topo"
+            header_bottom_y < top,
+            "base do cabeçalho da biblioteca ({header_bottom_y}) fica acima do topo da grade ({top})"
         );
 
         // 2. Fita: cartões têm legenda ancorada no fundo com scrim contrastante (>= 4.5:1).
         f.shell.open_route("home");
         f.shell.handle(Cmd::Down);
         let pixels_home = f.draw(w, h);
-        let card_bottom = 1020;
-        let x_center = w / 2;
-        let lower_p = pixels_home[(card_bottom * w + x_center) as usize];
+
+        // Coordenadas reais do cartão focado na fita em 1080p:
+        // ribbon y = 1080 - 340 - 88 - 16 = 636; cards y = 636 + 44 = 680.
+        // Focado com escala 1.12x: art-box vai de y≈672 a y≈974 (bem acima da barra de dicas em y=992).
+        let card_top = 672;
+        let card_bottom = 974;
+        let x_center = w / 2; // 960
+
+        // Amostra o scrim nas coordenadas reais do cartão (14px acima da borda inferior)
+        let sample_y = card_bottom - 14; // 960
+        assert!(
+            sample_y > card_top && sample_y < card_bottom,
+            "base da legenda ({sample_y}) está dentro do cartão ({card_top}..{card_bottom})"
+        );
+        let lower_p = pixels_home[(sample_y * w + x_center) as usize];
         let lum_lower =
             0.2126 * lower_p.r as f32 + 0.7152 * lower_p.g as f32 + 0.0722 * lower_p.b as f32;
         assert!(
             lum_lower < 50.0,
-            "scrim do cartão garante contraste no fundo: {lum_lower}"
+            "scrim do cartão garante contraste no fundo dentro do cartão: {lum_lower}"
         );
     })
     .join()
