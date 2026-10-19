@@ -32,9 +32,11 @@ pub struct CompatibilityRuntime {
 pub enum PrefixValidationError {
     /// O caminho está vazio.
     Empty,
+    /// O caminho não é absoluto.
+    NotAbsolute,
     /// A raiz `/` não é permitida como prefixo por segurança.
     RootNotAllowed,
-    /// A pasta pessoal do usuário (`$HOME` ou `~`) não é permitida como prefixo por segurança.
+    /// A pasta pessoal do usuário (`$HOME` ou `~`) ou ancestral dela não é permitida como prefixo por segurança.
     HomeNotAllowed,
 }
 
@@ -42,9 +44,13 @@ impl std::fmt::Display for PrefixValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Empty => write!(f, "o caminho do prefixo não pode ser vazio"),
+            Self::NotAbsolute => write!(f, "o caminho do prefixo precisa ser absoluto"),
             Self::RootNotAllowed => write!(f, "o prefixo não pode ser a raiz do sistema (/)"),
             Self::HomeNotAllowed => {
-                write!(f, "o prefixo não pode ser a pasta pessoal do usuário (~)")
+                write!(
+                    f,
+                    "o prefixo não pode ser a pasta pessoal do usuário (~) nem uma pasta pai dela"
+                )
             }
         }
     }
@@ -52,31 +58,98 @@ impl std::fmt::Display for PrefixValidationError {
 
 impl std::error::Error for PrefixValidationError {}
 
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::Prefix(p) => out.push(p.as_os_str()),
+            std::path::Component::RootDir => out.push(std::path::MAIN_SEPARATOR.to_string()),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            std::path::Component::Normal(c) => out.push(c),
+        }
+    }
+    out
+}
+
+/// Normaliza `.` e `..` e resolve symlinks da parte existente do caminho.
+pub fn resolve_and_normalize_prefix(path: &Path) -> PathBuf {
+    let norm = normalize_path(path);
+    let mut existing = norm.clone();
+    let mut trailing = Vec::new();
+    while !existing.exists() {
+        if let Some(parent) = existing.parent() {
+            if let Some(file_name) = existing.file_name() {
+                trailing.push(file_name.to_os_string());
+                existing = parent.to_path_buf();
+                continue;
+            }
+        }
+        break;
+    }
+    if existing.exists() {
+        if let Ok(canon) = existing.canonicalize() {
+            let mut resolved = canon;
+            for part in trailing.into_iter().rev() {
+                resolved.push(part);
+            }
+            return normalize_path(&resolved);
+        }
+    }
+    norm
+}
+
 /// Valida um caminho de prefixo do Wine ou Proton.
 ///
 /// # Segurança:
+/// - O caminho precisa ser absoluto;
+/// - Normaliza `.` e `..` e resolve symlinks;
 /// - O prefixo **nunca** pode ser `/` (raiz do sistema);
-/// - O prefixo **nunca** pode ser a pasta pessoal (`$HOME` ou `~`).
+/// - O prefixo **nunca** pode ser a pasta pessoal (`$HOME` ou `~`) nem qualquer diretório pai de `$HOME`.
 pub fn validate_prefix_path(path: &Path, home: Option<&Path>) -> Result<(), PrefixValidationError> {
     let raw = path.to_string_lossy();
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Err(PrefixValidationError::Empty);
     }
-    // Remove barras redundantes no fim
-    let clean = trimmed.trim_end_matches(['/', '\\']);
-    if clean.is_empty() || clean == "/" {
+    let p = Path::new(trimmed);
+    if !p.is_absolute() {
+        return Err(PrefixValidationError::NotAbsolute);
+    }
+
+    let resolved = resolve_and_normalize_prefix(p);
+    let is_root = resolved.parent().is_none()
+        || resolved == Path::new("/")
+        || resolved.as_os_str() == "/"
+        || resolved.as_os_str() == "\\"
+        || resolved.components().count() <= 1;
+    if is_root {
         return Err(PrefixValidationError::RootNotAllowed);
     }
+
     if let Some(h) = home {
-        let clean_home = h
-            .to_string_lossy()
-            .trim_end_matches(['/', '\\'])
-            .to_string();
-        if clean == clean_home || clean == "~" {
+        let norm_home = resolve_and_normalize_prefix(h);
+        if resolved == norm_home {
             return Err(PrefixValidationError::HomeNotAllowed);
         }
+        let mut cur = norm_home.parent();
+        while let Some(parent) = cur {
+            if parent == Path::new("/")
+                || parent.as_os_str() == "/"
+                || parent.as_os_str() == "\\"
+                || parent.components().count() <= 1
+            {
+                break;
+            }
+            if resolved == parent {
+                return Err(PrefixValidationError::HomeNotAllowed);
+            }
+            cur = parent.parent();
+        }
     }
+
     Ok(())
 }
 
@@ -108,7 +181,7 @@ pub fn expand_and_validate_prefix(
         PathBuf::from(trimmed)
     };
     validate_prefix_path(&path, home)?;
-    Ok(path)
+    Ok(normalize_path(&path))
 }
 
 /// Configuração montada para abrir o jogo com o runtime de compatibilidade.
@@ -120,6 +193,18 @@ pub struct LaunchConfig {
 }
 
 impl LaunchConfig {
+    /// Monta o `std::process::Command` diretamente com os argumentos em vetor,
+    /// sem rejuntar em string.
+    pub fn to_command(&self, working_dir: Option<&Path>) -> std::process::Command {
+        let mut cmd = std::process::Command::new(&self.executable);
+        cmd.args(&self.arguments);
+        if let Some(dir) = working_dir {
+            cmd.current_dir(dir);
+        }
+        cmd.envs(self.environment.iter().map(|(k, v)| (k, v)));
+        cmd
+    }
+
     /// Formata os argumentos como uma linha de comando com aspas nos caminhos com espaços.
     pub fn arguments_string(&self) -> String {
         self.arguments
@@ -181,15 +266,24 @@ pub fn prepare_launch(
     }
 
     if let Some(user_args) = game_args {
-        for a in user_args.split_whitespace() {
+        for a in crate::unix::text::split_args(user_args) {
             if !a.is_empty() {
-                args.push(a.to_owned());
+                args.push(a);
             }
         }
     }
 
-    // Variáveis do usuário por cima (podem complementar ou sobrescrever)
+    // Variáveis do usuário por cima (podem complementar ou sobrescrever, exceto as do prefixo e Proton)
+    const PROTECTED_VARS: &[&str] = &[
+        "WINEPREFIX",
+        "STEAM_COMPAT_DATA_PATH",
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH",
+        "STEAM_COMPAT_APP_ID",
+    ];
     for (k, v) in extra_env {
+        if PROTECTED_VARS.contains(&k.as_str()) {
+            continue;
+        }
         env.retain(|(key, _)| key != k);
         env.push((k.clone(), v.clone()));
     }
@@ -552,12 +646,24 @@ mod tests {
             Err(PrefixValidationError::RootNotAllowed)
         );
         assert_eq!(
+            validate_prefix_path(Path::new("/."), Some(home)),
+            Err(PrefixValidationError::RootNotAllowed)
+        );
+        assert_eq!(
             validate_prefix_path(Path::new(""), Some(home)),
             Err(PrefixValidationError::Empty)
         );
         assert_eq!(
             validate_prefix_path(Path::new("   "), Some(home)),
             Err(PrefixValidationError::Empty)
+        );
+        assert_eq!(
+            validate_prefix_path(Path::new("pfx"), Some(home)),
+            Err(PrefixValidationError::NotAbsolute)
+        );
+        assert_eq!(
+            expand_and_validate_prefix("pfx", Some(home)),
+            Err(PrefixValidationError::NotAbsolute)
         );
         assert_eq!(
             validate_prefix_path(Path::new("/home/usuario"), Some(home)),
@@ -568,12 +674,33 @@ mod tests {
             Err(PrefixValidationError::HomeNotAllowed)
         );
         assert_eq!(
+            validate_prefix_path(Path::new("/home/usuario/x/.."), Some(home)),
+            Err(PrefixValidationError::HomeNotAllowed)
+        );
+        assert_eq!(
+            validate_prefix_path(Path::new("/home"), Some(home)),
+            Err(PrefixValidationError::HomeNotAllowed)
+        );
+        assert_eq!(
             expand_and_validate_prefix("~", Some(home)),
             Err(PrefixValidationError::HomeNotAllowed)
         );
         assert_eq!(
             expand_and_validate_prefix("  /  ", Some(home)),
             Err(PrefixValidationError::RootNotAllowed)
+        );
+
+        // Symlink para home
+        let tmp = tempfile::tempdir().unwrap();
+        let real_home = tmp.path().join("real_home");
+        std::fs::create_dir_all(&real_home).unwrap();
+        let symlink_path = tmp.path().join("symlink_to_home");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&real_home, &symlink_path).unwrap();
+        #[cfg(unix)]
+        assert_eq!(
+            validate_prefix_path(&symlink_path, Some(&real_home)),
+            Err(PrefixValidationError::HomeNotAllowed)
         );
 
         // Caminhos válidos
@@ -702,7 +829,10 @@ mod tests {
         };
         let game = Path::new("/jogos/game.exe");
         let prefix = Path::new("/home/user/.local/share/tako/prefixes/manual_1");
-        let extra_env = [("DXVK_HUD".to_string(), "fps".to_string())];
+        let extra_env = [
+            ("DXVK_HUD".to_string(), "fps".to_string()),
+            ("WINEPREFIX".to_string(), "/hacked".to_string()),
+        ];
 
         let cfg = prepare_launch(
             &runtime,
@@ -732,7 +862,24 @@ mod tests {
             "WINEPREFIX".into(),
             "/home/user/.local/share/tako/prefixes/manual_1".into()
         )));
+        assert!(!cfg.environment.iter().any(|(_, v)| v == "/hacked"));
         assert!(cfg.environment.contains(&("DXVK_HUD".into(), "fps".into())));
+
+        // Teste de preservação de caminhos Windows com \ e aspas nos argumentos
+        let cfg_with_args = prepare_launch(
+            &runtime,
+            game,
+            Some(r#"-path "C:\My Games" C:\foo"#),
+            prefix,
+            None,
+            &[],
+        );
+        assert_eq!(
+            cfg_with_args.arguments,
+            vec!["/jogos/game.exe", "-path", "C:\\My Games", "C:\\foo"]
+        );
+        let cmd = cfg_with_args.to_command(Some(Path::new("/jogos")));
+        assert_eq!(cmd.get_program(), "/usr/bin/wine");
     }
 
     #[test]
@@ -746,7 +893,10 @@ mod tests {
         let game = Path::new("/jogos/game.exe");
         let prefix = Path::new("/home/user/.local/share/tako/prefixes/manual_1");
         let steam_root = Path::new("/home/user/.local/share/Steam");
-        let extra_env = [("PROTON_LOG".to_string(), "1".to_string())];
+        let extra_env = [
+            ("PROTON_LOG".to_string(), "1".to_string()),
+            ("STEAM_COMPAT_DATA_PATH".to_string(), "/hacked".to_string()),
+        ];
 
         let cfg = prepare_launch(
             &runtime,
@@ -776,6 +926,7 @@ mod tests {
             "STEAM_COMPAT_DATA_PATH".into(),
             "/home/user/.local/share/tako/prefixes/manual_1".into()
         )));
+        assert!(!cfg.environment.iter().any(|(_, v)| v == "/hacked"));
         assert!(cfg.environment.contains(&(
             "STEAM_COMPAT_CLIENT_INSTALL_PATH".into(),
             "/home/user/.local/share/Steam".into()

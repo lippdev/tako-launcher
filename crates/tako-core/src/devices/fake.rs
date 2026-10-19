@@ -371,6 +371,17 @@ impl ProcessLauncher for FakeProcesses {
         *lock(&self.env) = env.to_vec();
         self.launch(target, args, cwd)
     }
+    fn launch_args_with_env(
+        &self,
+        target: &str,
+        args: &[String],
+        cwd: Option<&str>,
+        env: &[(String, String)],
+    ) -> DeviceResult<Option<u32>> {
+        *lock(&self.env) = env.to_vec();
+        let joined = args.join(" ");
+        self.launch(target, (!joined.is_empty()).then_some(&joined), cwd)
+    }
     fn run_command(&self, command: &str, _wait: Option<std::time::Duration>) -> DeviceResult<()> {
         lock(&self.commands).push(command.to_owned());
         Ok(())

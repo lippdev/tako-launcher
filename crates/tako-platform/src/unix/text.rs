@@ -83,10 +83,21 @@ pub fn split_args(s: &str) -> Vec<String> {
                 quote = Some(c);
                 has = true;
             }
-            (None, '\\') => {
-                cur.extend(chars.next());
-                has = true;
-            }
+            (None, '\\') => match chars.next() {
+                Some(n @ ('"' | '\'' | '\\' | '$' | '`' | ' ' | '\t')) => {
+                    cur.push(n);
+                    has = true;
+                }
+                Some(n) => {
+                    cur.push('\\');
+                    cur.push(n);
+                    has = true;
+                }
+                None => {
+                    cur.push('\\');
+                    has = true;
+                }
+            },
             (None, c) if c.is_whitespace() => {
                 if has || !cur.is_empty() {
                     out.push(std::mem::take(&mut cur));
@@ -211,6 +222,11 @@ mod tests {
         assert!(split_args("   ").is_empty());
         assert_eq!(split_args(r#""unterminated"#), ["unterminated"]);
         assert_eq!(split_args(r#""C:\games""#), [r"C:\games"]);
+        assert_eq!(split_args(r"C:\foo"), [r"C:\foo"]);
+        assert_eq!(
+            split_args(r#"-path "C:\My Games""#),
+            ["-path", r"C:\My Games"]
+        );
     }
 
     #[test]
