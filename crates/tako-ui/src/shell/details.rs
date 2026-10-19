@@ -125,6 +125,7 @@ pub(crate) fn install_offers(g: &Game, demo: bool) -> Vec<InstallOffer> {
 pub(crate) fn is_install_uri(uri: &str, demo: bool) -> bool {
     let word = |s: &str, extra: &[char]| {
         !s.is_empty()
+            && !s.chars().all(|c| c == '.')
             && s.chars()
                 .all(|c| c.is_ascii_alphanumeric() || extra.contains(&c))
     };
@@ -139,6 +140,11 @@ pub(crate) fn is_install_uri(uri: &str, demo: bool) -> bool {
         word(id, &['.', '_', '-'])
     } else if let Some(id) = uri.strip_prefix("amazon-games://install/") {
         word(id, &['.', '_', '-'])
+    } else if let Some(rest) = uri.strip_prefix("heroic://launch/") {
+        // `<runner>/<appName>`: os runners do Heroic que a fonte lê, sem query, `/` extra nem argumentos.
+        rest.split_once('/').is_some_and(|(runner, id)| {
+            ["legendary", "gog", "nile", "sideload"].contains(&runner) && word(id, &['.', '_', '-'])
+        })
     } else if let Some(n) = uri.strip_prefix("demo://install/") {
         demo && digits(n)
     } else {
@@ -572,6 +578,10 @@ mod tests {
             "com.epicgames.launcher://apps/a%3Ab%3Ac?action=install",
             "goggalaxy://openGameView/1",
             "amazon-games://install/amzn1.adg.product.1-2_3",
+            "heroic://launch/legendary/Fennec",
+            "heroic://launch/gog/1207658930",
+            "heroic://launch/nile/amzn1.adg.product.2222-3333",
+            "heroic://launch/sideload/meu_jogo-1.0",
         ] {
             assert!(is_install_uri(ok, false), "{ok}");
         }
@@ -588,12 +598,25 @@ mod tests {
             "steam://rungameid/730",
             "STEAM://install/1",
             " steam://install/1",
-            "heroic://launch/gog/1",
+            "heroic://launch/epic/Fennec",
+            "heroic://launch/Gog/1",
+            "heroic://launch/gog",
+            "heroic://launch/gog/",
+            "heroic://launch/gog/1/extra",
+            "heroic://launch/gog/1?arg=--x",
+            "heroic://launch/gog/1&x=y",
+            "heroic://launch/gog/a b",
+            "heroic://launch//1",
+            "heroic://launch/gog/..",
+            "heroic://launch/gog/../x",
+            "heroic://install/gog/1",
+            "heroic://settings",
             "com.epicgames.launcher://apps/a%3Ab%3Ac?action=launch",
             "com.epicgames.launcher://apps/a?x=1&y=2?action=install",
             "com.epicgames.launcher://apps/a b?action=install",
             "goggalaxy://openGameView/1?x=y",
             "goggalaxy://openGameView/../x",
+            "goggalaxy://openGameView/..",
             "amazon-games://play/x",
             "amazon-games://install/",
             "amazon-games://install/a b",
