@@ -32,13 +32,15 @@ pub struct EpicInstall {
     pub catalog_namespace: String,
     pub catalog_item_id: String,
     pub install_size: u64,
+    /// `bIsIncompleteInstall`: a Epic está instalando (o manifest já existe, o jogo ainda não roda).
+    pub incomplete: bool,
 }
 
-/// Um manifest `.item`; `Ok(None)` quando não é jogo jogável (instalação incompleta, DLC, plugin ou
-/// engine, campos faltando). JSON inválido é `Err`.
+/// Um manifest `.item`; `Ok(None)` quando não é jogo (DLC, plugin ou engine, campos faltando). Instalação
+/// incompleta volta com `incomplete`. JSON inválido é `Err`.
 pub fn parse_manifest(json: &str) -> Result<Option<EpicInstall>, serde_json::Error> {
     let root: Value = serde_json::from_str(json)?;
-    if !root.is_object() || root.get("bIsIncompleteInstall") == Some(&Value::Bool(true)) {
+    if !root.is_object() {
         return Ok(None);
     }
     let (Some(app), Some(display), Some(location), Some(ns), Some(item)) = (
@@ -70,6 +72,7 @@ pub fn parse_manifest(json: &str) -> Result<Option<EpicInstall>, serde_json::Err
         catalog_namespace: ns.to_owned(),
         catalog_item_id: item.to_owned(),
         install_size: root.get("InstallSize").and_then(Value::as_u64).unwrap_or(0),
+        incomplete: root.get("bIsIncompleteInstall") == Some(&Value::Bool(true)),
     }))
 }
 
@@ -119,18 +122,28 @@ pub fn id_for(i: &EpicInstall) -> String {
     format!("epic:{}", i.app_name)
 }
 
+/// Instalação incompleta vira "instalando" sem porcentagem (a Epic não grava o progresso no manifest); o mesmo
+/// id vira instalado no lugar quando a Epic terminar.
 pub fn to_game(i: &EpicInstall, added_at: Option<DateTime<Utc>>) -> Game {
+    let installed = !i.incomplete;
+    let size = (i.install_size > 0).then_some(i.install_size);
     Game {
         id: id_for(i),
         title: i.display_name.clone(),
         store: Some(GameStore::Epic),
-        size_label: crate::steam::size_label(i.install_size),
-        size_bytes: (i.install_size > 0).then_some(i.install_size),
+        size_label: size
+            .filter(|_| installed)
+            .and_then(crate::steam::size_label),
+        size_bytes: size.filter(|_| installed),
         accent: ACCENT.to_owned(),
-        is_installed: true,
+        is_installed: installed,
         added_at,
-        launch_target: Some(launch_uri(i)),
-        install_path: Some(i.install_location.clone()),
+        launch_target: installed.then(|| launch_uri(i)),
+        install_path: installed.then(|| i.install_location.clone()),
+        install_uri: (!installed)
+            .then(|| owned::install_uri_of(&i.catalog_namespace, &i.catalog_item_id, &i.app_name)),
+        installing: (!installed).then(Default::default),
+        install_size: size.filter(|_| !installed),
         store_product_id: Some(i.catalog_item_id.clone()),
         ..Default::default()
     }
@@ -246,6 +259,7 @@ mod tests {
     use super::*;
     use crate::fs::fake;
     use crate::registry::MemoryRegistry;
+    use tako_core::library::InstallProgress;
 
     const FAROL: &str = r"C:\Program Files\Epic Games\Farol";
     const MOVED_CORRIDA: &str = r"E:\Jogos\CorridaNoturna";
@@ -290,7 +304,7 @@ mod tests {
 
     #[test]
     fn manifests_that_are_not_playable_games_are_skipped() {
-        for f in ["1B2C3D4E.item", "2C3D4E5F.item", "3D4E5F60.item"] {
+        for f in ["1B2C3D4E.item", "2C3D4E5F.item"] {
             assert_eq!(parse_manifest(&manifest(f)).unwrap(), None, "{f}");
         }
     }
@@ -321,6 +335,7 @@ mod tests {
             catalog_namespace: "corrida".into(),
             catalog_item_id: "c0ffee".into(),
             install_size: 0,
+            incomplete: false,
         };
         assert_eq!(
             launch_uri(&i),
@@ -355,6 +370,32 @@ mod tests {
         assert_eq!(corrida.size_label.as_deref(), Some("700 MB"));
         assert!(corrida.can_play());
         assert_eq!(corrida.cover_uri, None);
+    }
+
+    #[test]
+    fn incomplete_install_is_a_game_being_installed_without_percentage() {
+        let i = parse_manifest(&manifest("3D4E5F60.item")).unwrap().unwrap();
+        assert!(i.incomplete);
+        let g = to_game(&i, None);
+        assert_eq!(g.id, "epic:Baixando");
+        assert!(!g.is_installed && !g.can_play());
+        assert_eq!(g.installing, Some(InstallProgress { fraction: None }));
+        assert_eq!(g.launch_target, None);
+        assert!(g.install_uri.unwrap().ends_with("?action=install"));
+        // Terminou: o mesmo manifest sem o marcador vira instalado, com o mesmo id.
+        let done = parse_manifest(
+            &manifest("3D4E5F60.item").replace("\"bIsIncompleteInstall\": true,", ""),
+        )
+        .unwrap()
+        .unwrap();
+        let g = to_game(&done, None);
+        assert!(g.is_installed && g.installing.is_none() && g.launch_target.is_some());
+        // Marcador com tipo errado não derruba nada: conta como instalado.
+        assert!(
+            !parse_manifest(r#"{"bIsIncompleteInstall":"sim"}"#)
+                .unwrap()
+                .is_some_and(|i| i.incomplete)
+        );
     }
 
     #[test]

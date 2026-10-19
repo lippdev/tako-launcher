@@ -9,7 +9,7 @@ use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles,
 };
 use crate::model::{
-    DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, Hint, NavItem, PanelRow,
+    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, Hint, NavItem, PanelRow,
 };
 use crate::values::parse_color;
 use std::cell::RefCell;
@@ -139,6 +139,139 @@ const COVER: (u32, u32) = (344, 516);
 // shortcut: fileira sem virtualização horizontal, corta em 24 capas; virtualizar se pedirem a fileira inteira.
 const ROW_COVERS: usize = 24;
 
+/// Lojas fechadas na seção NÃO INSTALADOS (ids separados por vírgula), guardadas por perfil como a escolha de modo.
+pub const CLOSED_KEY: &str = "desktop.closed_stores";
+
+/// Uma vaga da lista: jogo (índice na lista arrumada), a divisória NÃO INSTALADOS ou o cabeçalho de uma loja.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Entry {
+    Game(usize),
+    Section,
+    Group(GameStore),
+}
+
+/// Jogos não instalados de uma mesma loja: `start..end` na lista arrumada.
+struct Run {
+    store: GameStore,
+    start: usize,
+    end: usize,
+}
+
+/// Entra na seção NÃO INSTALADOS: jogo de uma loja que ainda não está no computador. ROM ou arquivo que sumiu e
+/// lançamento futuro não têm o que instalar e ficam onde estavam.
+fn to_install(g: &Game) -> bool {
+    !g.is_installed
+        && !g.is_upcoming()
+        && !matches!(g.store(), GameStore::Manual | GameStore::Emulators)
+}
+
+fn store_slot(store: GameStore) -> usize {
+    GameStore::ALL
+        .iter()
+        .position(|s| *s == store)
+        .unwrap_or_default()
+}
+
+/// Instalados primeiro; depois os não instalados, um trecho por loja, a com mais jogos na frente. A ordenação
+/// escolhida vale dentro de cada trecho (a ordenação é estável).
+fn arrange(mut games: Vec<&Game>) -> Vec<&Game> {
+    let mut count = [0usize; GameStore::ALL.len()];
+    for g in games.iter().filter(|g| to_install(g)) {
+        count[store_slot(g.store())] += 1;
+    }
+    games.sort_by_key(|g| {
+        let slot = store_slot(g.store());
+        if !to_install(g) {
+            (0, std::cmp::Reverse(0), 0)
+        } else {
+            (1, std::cmp::Reverse(count[slot]), slot)
+        }
+    });
+    games
+}
+
+fn runs(games: &[&Game]) -> Vec<Run> {
+    let mut out: Vec<Run> = Vec::new();
+    for (i, g) in games.iter().enumerate().filter(|(_, g)| to_install(g)) {
+        match out.last_mut() {
+            Some(r) if r.store == g.store() => r.end = i + 1,
+            _ => out.push(Run {
+                store: g.store(),
+                start: i,
+                end: i + 1,
+            }),
+        }
+    }
+    out
+}
+
+fn group_closed(ctx: &Ctx, store: GameStore) -> bool {
+    ctx.settings
+        .string(CLOSED_KEY)
+        .split(',')
+        .any(|s| s == store.id_prefix())
+}
+
+/// Abre (`Some(true)`), fecha (`Some(false)`) ou alterna (`None`) a loja da seção.
+fn set_group(ctx: &mut Ctx, store: GameStore, open: Option<bool>) {
+    let key = store.id_prefix();
+    let raw = ctx.settings.string(CLOSED_KEY);
+    let mut closed: Vec<&str> = raw
+        .split(',')
+        .filter(|s| !s.is_empty() && *s != key)
+        .collect();
+    if !open.unwrap_or_else(|| group_closed(ctx, store)) {
+        closed.push(key);
+    }
+    ctx.settings.set(CLOSED_KEY, &closed.join(","));
+}
+
+/// A lista na tela: os instalados, a divisória e, por loja, o cabeçalho com os jogos (se aberta). Sem instalados em
+/// cima a divisória não separa nada e fica de fora (filtro "Só não instalados").
+fn entries(ctx: &Ctx, games: &[&Game]) -> Vec<Entry> {
+    let runs = runs(games);
+    let installed = games.len() - runs.iter().map(|r| r.end - r.start).sum::<usize>();
+    let mut out: Vec<Entry> = (0..installed).map(Entry::Game).collect();
+    if installed > 0 && !runs.is_empty() {
+        out.push(Entry::Section);
+    }
+    for r in &runs {
+        out.push(Entry::Group(r.store));
+        if !group_closed(ctx, r.store) {
+            out.extend((r.start..r.end).map(Entry::Game));
+        }
+    }
+    out
+}
+
+/// A grade em linhas de posições da lista: cada cabeçalho tem a sua e as capas quebram a cada `cols`.
+fn grid_rows(list: &[Entry], cols: usize) -> Vec<Vec<usize>> {
+    let mut rows: Vec<Vec<usize>> = Vec::new();
+    for (i, e) in list.iter().enumerate() {
+        match rows.last_mut() {
+            Some(last)
+                if matches!(e, Entry::Game(_))
+                    && last.len() < cols
+                    && matches!(list[last[0]], Entry::Game(_)) =>
+            {
+                last.push(i)
+            }
+            _ => rows.push(vec![i]),
+        }
+    }
+    rows
+}
+
+/// A vaga vizinha que aceita foco (a divisória não aceita).
+fn neighbor(entries: &[Entry], from: Option<usize>, forward: bool) -> Option<usize> {
+    let focusable = |i: &usize| entries[*i] != Entry::Section;
+    if forward {
+        (from.map_or(0, |f| f + 1)..entries.len()).find(focusable)
+    } else {
+        (0..from.unwrap_or(0)).rev().find(focusable)
+    }
+}
+
 /// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, menu do perfil, Tela cheia.
 const BAR_ITEMS: usize = 5;
 const BAR_PROFILE: usize = 2;
@@ -213,6 +346,8 @@ pub struct DesktopLibrary {
     hero_wait: Option<(String, std::time::Instant)>,
     /// DestaqueFases: o jogo com a fase 2 aberta; trocar de jogo (ou sair da Lista) volta para a fase 1.
     more: Option<String>,
+    /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
+    group_focus: Option<GameStore>,
 }
 
 /// Page Up e Page Down como o Slint manda.
@@ -247,6 +382,7 @@ impl DesktopLibrary {
             hero: None,
             hero_wait: None,
             more: None,
+            group_focus: None,
         }
     }
 
@@ -325,7 +461,7 @@ impl DesktopLibrary {
     pub fn games<'a>(&self, ctx: &'a Ctx) -> Vec<&'a Game> {
         let user = self.criteria.borrow();
         let games = ctx.library.games();
-        match (&self.tab, &self.pick) {
+        arrange(match (&self.tab, &self.pick) {
             (Tab::All, _) => query::apply(games, LibraryFilter::All, &user),
             (Tab::Favorites, _) => query::apply(games, LibraryFilter::Favorites, &user),
             (Tab::Collections, None) => Vec::new(),
@@ -341,7 +477,7 @@ impl DesktopLibrary {
                 }
                 None => Vec::new(),
             },
-        }
+        })
     }
 
     fn active_filters(&self, ctx: &Ctx) -> Vec<PanelRow> {
@@ -471,7 +607,30 @@ impl DesktopLibrary {
         if let Some(id) = ids.get(index) {
             self.selected = Some(id.clone());
         }
+        self.group_focus = None;
         self.zone = Zone::List;
+    }
+
+    /// Onde está o foco na lista: o cabeçalho de loja ou o jogo escolhido.
+    fn focus_pos(&self, list: &[Entry], cur: Option<usize>) -> Option<usize> {
+        let at = self
+            .group_focus
+            .map(Entry::Group)
+            .or(cur.map(Entry::Game))?;
+        list.iter().position(|e| *e == at)
+    }
+
+    fn focus(&mut self, entry: Entry, ids: &[String]) {
+        match entry {
+            Entry::Game(i) => {
+                if let Some(id) = ids.get(i) {
+                    self.selected = Some(id.clone());
+                }
+                self.group_focus = None;
+            }
+            Entry::Group(store) => self.group_focus = Some(store),
+            Entry::Section => {}
+        }
     }
 
     /// Abre a aba Coleções na coleção `key` (o Perfil › Coleções manda para cá).
@@ -749,6 +908,7 @@ impl DesktopLibrary {
     fn set_view(&mut self, view: View, ctx: &mut Ctx) {
         ctx.settings.set(VIEW_KEY, view.key());
         self.zone = Zone::List;
+        self.group_focus = None;
         self.cat_focus = (0, 0);
     }
 
@@ -1107,8 +1267,11 @@ impl Page for DesktopLibrary {
     }
 
     fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
-        let ids = self.ids(ctx);
+        let games = self.games(ctx);
+        let ids: Vec<String> = games.iter().map(|g| g.id.clone()).collect();
+        let list = entries(ctx, &games);
         let cur = self.current(&ids);
+        let to_install_cur = cur.is_some_and(|i| to_install(games[i]));
         let picks = Self::picks(ctx);
         match (self.zone, cmd) {
             (_, Cmd::PrevSection) | (_, Cmd::NextSection) => {
@@ -1116,26 +1279,65 @@ impl Page for DesktopLibrary {
                 let d = if cmd == Cmd::NextSection { 1 } else { -1 };
                 self.open_tab(TABS[(i + d).rem_euclid(TABS.len() as i32) as usize], ctx);
             }
-            // Grade: as setas andam pelas capas (a coluna vem do tema); Enter abre o jogo no destaque.
+            // Cabeçalho de loja (NaoInstalados): Enter alterna, → abre e ← fecha.
+            (Zone::List, Cmd::Accept | Cmd::Left | Cmd::Right)
+                if self.group_focus.is_some() && View::of(ctx) != View::Categories =>
+            {
+                if let Some(store) = self.group_focus {
+                    let open = match cmd {
+                        Cmd::Left => Some(false),
+                        Cmd::Right => Some(true),
+                        _ => None,
+                    };
+                    set_group(ctx, store, open);
+                }
+            }
+            // Grade: as setas andam pelas capas e cabeçalhos (a coluna vem do tema); Enter instala o que falta
+            // instalar e abre os outros no destaque.
             (Zone::List, Cmd::Left | Cmd::Right | Cmd::Up | Cmd::Down | Cmd::Accept)
                 if View::of(ctx) == View::Grid =>
             {
-                let cols = ctx.grid_columns.max(1) as i32;
-                let i = cur.unwrap_or(0) as i32;
-                let to = match cmd {
-                    Cmd::Left => i - 1,
-                    Cmd::Right => i + 1,
-                    Cmd::Up => i - cols,
-                    Cmd::Down => i + cols,
+                let at = self.focus_pos(&list, cur);
+                match cmd {
+                    Cmd::Left | Cmd::Right => match neighbor(&list, at, cmd == Cmd::Right) {
+                        Some(i) => self.focus(list[i], &ids),
+                        None if cmd == Cmd::Left => self.cycle(false),
+                        None => {}
+                    },
+                    Cmd::Up | Cmd::Down => {
+                        let rows = grid_rows(&list, ctx.grid_columns.max(1));
+                        let here = at.and_then(|a| rows.iter().position(|r| r.contains(&a)));
+                        let col = at
+                            .zip(here)
+                            .and_then(|(a, r)| rows[r].iter().position(|i| *i == a))
+                            .unwrap_or(0);
+                        let step = |r: usize| {
+                            let next = if cmd == Cmd::Down {
+                                r.checked_add(1)
+                            } else {
+                                r.checked_sub(1)
+                            };
+                            next.filter(|n| *n < rows.len())
+                        };
+                        // A divisória não recebe foco: a linha dela é pulada.
+                        let mut target = here.map_or(Some(0), step);
+                        while target.is_some_and(|t| list[rows[t][0]] == Entry::Section) {
+                            target = step(target.unwrap_or_default());
+                        }
+                        match target {
+                            Some(t) => {
+                                let row = &rows[t];
+                                self.focus(list[row[col.min(row.len() - 1)]], &ids);
+                            }
+                            None if cmd == Cmd::Up => self.cycle(false),
+                            None => {}
+                        }
+                    }
+                    _ if to_install_cur => return self.run(Action::Play, ctx),
                     _ => {
                         self.set_view(View::List, ctx);
                         return Nav::Stay;
                     }
-                };
-                if to < 0 {
-                    self.cycle(false);
-                } else if let Some(id) = ids.get(to as usize) {
-                    self.selected = Some(id.clone());
                 }
             }
             // Categorias: ←→ dentro da fileira, ↑↓ trocam de fileira mantendo a coluna mais próxima.
@@ -1168,13 +1370,13 @@ impl Page for DesktopLibrary {
                     self.selected = Some(id.clone());
                 }
             }
-            (Zone::List, Cmd::Up) => match cur {
-                Some(0) | None => self.cycle(false),
-                Some(i) => self.selected = Some(ids[i - 1].clone()),
-            },
-            (Zone::List, Cmd::Down) => {
-                if let Some(i) = cur.filter(|i| i + 1 < ids.len()) {
-                    self.selected = Some(ids[i + 1].clone());
+            // Lista: ↑↓ passam pelos jogos e pelos cabeçalhos de loja, não pela divisória.
+            (Zone::List, Cmd::Up | Cmd::Down) => {
+                let at = self.focus_pos(&list, cur);
+                match neighbor(&list, at, cmd == Cmd::Down) {
+                    Some(i) => self.focus(list[i], &ids),
+                    None if cmd == Cmd::Up => self.cycle(false),
+                    None => {}
                 }
             }
             (Zone::List, Cmd::Right) => {
@@ -1183,8 +1385,12 @@ impl Page for DesktopLibrary {
                     self.index = 0;
                 }
             }
-            (Zone::List | Zone::Actions, Cmd::Favorite) => return self.run(Action::Favorite, ctx),
-            (Zone::List | Zone::Actions, Cmd::Menu) => return self.run(Action::More, ctx),
+            (Zone::List | Zone::Actions, Cmd::Favorite) if self.group_focus.is_none() => {
+                return self.run(Action::Favorite, ctx);
+            }
+            (Zone::List | Zone::Actions, Cmd::Menu) if self.group_focus.is_none() => {
+                return self.run(Action::More, ctx);
+            }
             (Zone::List, Cmd::Accept) => return self.run(Action::Play, ctx),
             (Zone::Actions, Cmd::Left) => {
                 if self.index == 0 {
@@ -1307,6 +1513,15 @@ impl Page for DesktopLibrary {
                 self.checked.clear();
                 self.anchor = Some(index);
                 self.select_index(ctx, index);
+            }
+            // Cabeçalho de loja da seção NÃO INSTALADOS: o índice é a ordem do grupo.
+            "group" => {
+                let store = runs(&self.games(ctx)).get(index).map(|r| r.store);
+                if let Some(store) = store {
+                    set_group(ctx, store, None);
+                    self.group_focus = Some(store);
+                    self.zone = Zone::List;
+                }
             }
             "game-toggle" | "game-check" => self.toggle_check(ctx, index),
             "game-range" => self.check_range(ctx, index),
@@ -1470,6 +1685,14 @@ impl Page for DesktopLibrary {
         let ids: Vec<String> = games.iter().map(|g| g.id.clone()).collect();
         let cur = self.current(&ids);
         self.selection_index = cur.unwrap_or(0);
+        let stores = runs(&games);
+        if self
+            .group_focus
+            .is_some_and(|s| !stores.iter().any(|r| r.store == s))
+        {
+            self.group_focus = None;
+        }
+        let list = entries(ctx, &games);
         out.set(
             "desk-tabs",
             vec![
@@ -1575,30 +1798,231 @@ impl Page for DesktopLibrary {
         // Miniaturas e capas só perto da área visível (o tema avisa a primeira linha pelo `scrolled`).
         let first = ctx.list_first;
         let near = first.saturating_sub(NEAR / 3)..first + NEAR;
-        let row = |i: usize, g: &Game, near: bool, cover: bool| DeskGame {
-            id: g.id.clone(),
-            title: g.title.clone(),
-            thumb: tiles::image(g.shown_cover().filter(|_| near && !cover), THUMB),
-            cover: tiles::image(g.shown_cover().filter(|_| near && cover), COVER),
-            accent: parse_color(&g.accent),
-            favorite: g.is_favorite,
-            running: ctx.running.as_ref().is_some_and(|r| r.id == g.id),
-            installed: g.is_installed,
-            store_icon: store_icon(g.store()).into(),
-            store_name: game_text::store_name(lang, g.store()),
-            checked: self.checked.contains(&g.id),
-            index: i as i32,
+        let row = |i: usize, g: &Game, near: bool, cover: bool| {
+            // Instalação pela loja em andamento: a fração vem da loja, então só vale se for um número de 0 a 1.
+            let progress = g.installing.map(|p| {
+                p.fraction
+                    .filter(|f| f.is_finite())
+                    .map_or(-1.0, |f| f.clamp(0.0, 1.0))
+            });
+            let percent = progress
+                .filter(|p| *p >= 0.0)
+                .map(|p| format!("{}%", (p * 100.0).round() as i32))
+                .unwrap_or_default();
+            let store = game_text::store_name(lang, g.store());
+            let title = [("title", g.title.as_str())];
+            let (label, install_label) = if !to_install(g) {
+                (format!("{} · {store}", g.title), String::new())
+            } else if progress.is_some() {
+                let key = if percent.is_empty() {
+                    "desktop.installing_game_unknown"
+                } else {
+                    "desktop.installing_game"
+                };
+                let args = [
+                    ("title", g.title.as_str()),
+                    ("store", store.as_str()),
+                    ("percent", percent.as_str()),
+                ];
+                let label = if percent.is_empty() {
+                    "desktop.game_label_missing"
+                } else {
+                    "desktop.game_label_installing"
+                };
+                (ctx.tf(label, &args), ctx.tf(key, &title))
+            } else {
+                let args = [("title", g.title.as_str()), ("store", store.as_str())];
+                (
+                    ctx.tf("desktop.game_label_missing", &args),
+                    ctx.tf("desktop.install_game", &title),
+                )
+            };
+            DeskGame {
+                id: g.id.clone(),
+                title: g.title.clone(),
+                thumb: tiles::image(g.shown_cover().filter(|_| near && !cover), THUMB),
+                cover: tiles::image(g.shown_cover().filter(|_| near && cover), COVER),
+                accent: parse_color(&g.accent),
+                favorite: g.is_favorite,
+                running: ctx.running.as_ref().is_some_and(|r| r.id == g.id),
+                installed: g.is_installed,
+                store_icon: store_icon(g.store()).into(),
+                store_name: store,
+                checked: self.checked.contains(&g.id),
+                index: i as i32,
+                label,
+                installing: progress.is_some(),
+                progress: progress.unwrap_or_default(),
+                percent,
+                install_label,
+                ..Default::default()
+            }
         };
+        let grid = view == View::Grid;
         let rows: Vec<DeskGame> = if view == View::Categories {
             Vec::new()
         } else {
-            games
-                .iter()
+            let pending: usize = stores.iter().map(|r| r.end - r.start).sum();
+            list.iter()
                 .enumerate()
-                .map(|(i, g)| row(i, g, near.contains(&i), view == View::Grid))
+                .map(|(pos, e)| match *e {
+                    // O tema pede miniatura pela linha e capa pelo jogo (a grade conta jogos, a lista conta linhas).
+                    Entry::Game(i) => row(
+                        i,
+                        games[i],
+                        near.contains(if grid { &i } else { &pos }),
+                        grid,
+                    ),
+                    Entry::Section => DeskGame {
+                        kind: "section".into(),
+                        title: ctx.t("desktop.group.not_installed").to_uppercase(),
+                        count: pending.to_string(),
+                        ..Default::default()
+                    },
+                    Entry::Group(store) => {
+                        let order = stores
+                            .iter()
+                            .position(|r| r.store == store)
+                            .unwrap_or_default();
+                        let n = stores.get(order).map_or(0, |r| r.end - r.start);
+                        let name = game_text::store_name(lang, store);
+                        DeskGame {
+                            kind: "group".into(),
+                            label: ctx.tf(
+                                "desktop.group_label",
+                                &[("store", &name), ("count", &n.to_string())],
+                            ),
+                            title: name,
+                            store_icon: store_icon(store).into(),
+                            count: n.to_string(),
+                            open: !group_closed(ctx, store),
+                            index: order as i32,
+                            ..Default::default()
+                        }
+                    }
+                })
                 .collect()
         };
         out.set("desk-games", rows);
+        // Grade: a mesma lista em trechos (capas soltas, divisória, uma loja com as capas). O tema soma as alturas
+        // pelas contagens `*_before` e só desenha as linhas visíveis de cada trecho.
+        let cols = ctx.grid_columns.max(1);
+        let focus = self
+            .focus_pos(&list, cur)
+            .map(|p| list[p])
+            .filter(|_| view != View::Categories);
+        let mut blocks: Vec<DeskBlock> = Vec::new();
+        let mut focus_at: Vec<i32> = Vec::new();
+        let (mut covered, mut sections, mut headers) = (0i32, 0i32, 0i32);
+        let mut at = 0;
+        while view != View::Categories && at < list.len() {
+            let games_after = |from: usize| {
+                list[from..]
+                    .iter()
+                    .take_while(|e| matches!(e, Entry::Game(_)))
+                    .count()
+            };
+            let (mut block, own, used) = match list[at] {
+                Entry::Section => (
+                    DeskBlock {
+                        kind: "section".into(),
+                        title: ctx.t("desktop.group.not_installed").to_uppercase(),
+                        count: stores
+                            .iter()
+                            .map(|r| r.end - r.start)
+                            .sum::<usize>()
+                            .to_string(),
+                        ..Default::default()
+                    },
+                    0,
+                    1,
+                ),
+                Entry::Group(store) => {
+                    let order = stores
+                        .iter()
+                        .position(|r| r.store == store)
+                        .unwrap_or_default();
+                    let n = stores.get(order).map_or(0, |r| r.end - r.start);
+                    let name = game_text::store_name(lang, store);
+                    (
+                        DeskBlock {
+                            kind: "group".into(),
+                            label: ctx.tf(
+                                "desktop.group_label",
+                                &[("store", &name), ("count", &n.to_string())],
+                            ),
+                            title: name,
+                            count: n.to_string(),
+                            icon: store_icon(store).into(),
+                            open: !group_closed(ctx, store),
+                            index: order as i32,
+                            ..Default::default()
+                        },
+                        1,
+                        1 + games_after(at + 1),
+                    )
+                }
+                Entry::Game(_) => (
+                    DeskBlock {
+                        kind: "covers".into(),
+                        ..Default::default()
+                    },
+                    0,
+                    games_after(at),
+                ),
+            };
+            let first = at + usize::from(block.kind != "covers");
+            let idx: Vec<usize> = list[first..at + used]
+                .iter()
+                .filter_map(|e| match e {
+                    Entry::Game(i) => Some(*i),
+                    _ => None,
+                })
+                .collect();
+            block.first = idx.first().map_or(0, |i| *i as i32);
+            block.rows_before = covered;
+            block.sections_before = sections;
+            block.groups_before = headers;
+            // Onde está o foco, em linhas e cabeçalhos antes dele (para o tema rolar até lá).
+            match focus {
+                Some(Entry::Group(s))
+                    if block.kind == "group" && stores[block.index as usize].store == s =>
+                {
+                    focus_at = vec![covered, sections, headers, 1];
+                }
+                Some(Entry::Game(g)) => {
+                    if let Some(k) = idx.iter().position(|i| *i == g) {
+                        focus_at = vec![covered + (k / cols) as i32, sections, headers + own, 0];
+                    }
+                }
+                _ => {}
+            }
+            block.games = idx
+                .iter()
+                .map(|i| row(*i, games[*i], near.contains(i), true))
+                .collect();
+            covered += idx.len().div_ceil(cols) as i32;
+            sections += i32::from(block.kind == "section");
+            headers += i32::from(block.kind == "group");
+            blocks.push(block);
+            at += used;
+        }
+        out.set("desk-blocks", blocks);
+        out.set("desk-grid-extent", vec![covered, sections, headers]);
+        out.set("desk-grid-focus", focus_at);
+        out.set(
+            "desk-focus-id",
+            match focus {
+                Some(Entry::Game(i)) => games[i].id.clone(),
+                _ => String::new(),
+            },
+        );
+        out.set(
+            "desk-focus-group",
+            self.group_focus
+                .and_then(|s| stores.iter().position(|r| r.store == s))
+                .map_or(-1, |p| p as i32),
+        );
         // Categorias: as fileiras perto da área visível pedem capa (o `scrolled` avisa a primeira fileira).
         let mut cats: Vec<DeskCategory> = Vec::new();
         self.cat_rows.clear();
@@ -1667,7 +2091,10 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.add_game"),
             ],
         );
-        out.set("desk-selected", cur.map(|i| i as i32).unwrap_or(-1));
+        out.set(
+            "desk-selected",
+            self.focus_pos(&list, cur).map_or(-1, |p| p as i32),
+        );
         let hero = self.hero_id(ctx, cur.map(|i| ids[i].clone()));
         // Outro jogo no destaque (ou fora da Lista): volta para a fase 1.
         if self.more != hero || View::of(ctx) != View::List {
@@ -2412,9 +2839,250 @@ mod tests {
         // Inverter a ordem: a mesma lista de trás para a frente.
         page(&shell).criteria.borrow_mut().sources.clear();
         shell.click("reverse", 0);
-        let mut back = page(&shell).ids(&shell.ctx);
+        // Os não instalados continuam depois dos instalados em qualquer ordem: a inversão vale para cada trecho.
+        let installed = |ids: Vec<String>| -> Vec<String> {
+            ids.into_iter()
+                .filter(|id| shell.ctx.library.find(id).is_some_and(|g| g.is_installed))
+                .collect()
+        };
+        let mut back = installed(page(&shell).ids(&shell.ctx));
         back.reverse();
-        assert_eq!(back, ids);
+        assert_eq!(back, installed(ids));
+    }
+
+    /// A biblioteca de demonstração mais os não instalados de três lojas (um baixando).
+    fn shell_with_store_games() -> (tempfile::TempDir, Shell) {
+        let (dir, mut shell) = shell();
+        shell
+            .ctx
+            .found
+            .lock()
+            .unwrap()
+            .extend(crate::demo::not_installed());
+        shell.ctx.library.refresh();
+        (dir, shell)
+    }
+
+    use slint::Model;
+    use slint_interpreter::Value;
+
+    /// Uma linha de `desk-games` como o tema a recebe.
+    struct Row(slint_interpreter::Struct);
+
+    impl Row {
+        fn text(&self, field: &str) -> String {
+            match self.0.get_field(field) {
+                Some(Value::String(s)) => s.to_string(),
+                _ => String::new(),
+            }
+        }
+        fn flag(&self, field: &str) -> bool {
+            matches!(self.0.get_field(field), Some(Value::Bool(true)))
+        }
+        fn number(&self, field: &str) -> i32 {
+            match self.0.get_field(field) {
+                Some(Value::Number(n)) => *n as i32,
+                _ => 0,
+            }
+        }
+    }
+
+    fn rows(shell: &mut Shell) -> Vec<Row> {
+        model(shell, "desk-games")
+    }
+
+    fn model(shell: &mut Shell, prop: &str) -> Vec<Row> {
+        let out = shell.render(std::time::Instant::now());
+        out.props
+            .iter()
+            .find_map(|(n, v)| match (*n, v) {
+                (name, Value::Model(m)) if name == prop => Some(m.clone()),
+                _ => None,
+            })
+            .map(|m| {
+                (0..m.row_count())
+                    .filter_map(|i| match m.row_data(i)? {
+                        Value::Struct(s) => Some(Row(s)),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn the_list_puts_installed_first_then_one_group_per_store_with_the_most_games_first() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell_with_store_games();
+        let games = page(&shell).games(&shell.ctx);
+        let kinds: Vec<(bool, GameStore)> =
+            games.iter().map(|g| (to_install(g), g.store())).collect();
+        let first_pending = kinds.iter().position(|k| k.0).unwrap();
+        assert!(
+            kinds[first_pending..].iter().all(|k| k.0),
+            "instalados antes"
+        );
+        let stores: Vec<GameStore> = runs(&games).iter().map(|r| r.store).collect();
+        // Steam 7 jogos, Epic 5 (4 + o da demonstração), GOG 3, Xbox 1: a com mais jogos primeiro.
+        assert_eq!(
+            stores[..3],
+            [GameStore::Steam, GameStore::Epic, GameStore::Gog]
+        );
+        let list = entries(&shell.ctx, &games);
+        assert_eq!(
+            list.iter().filter(|e| matches!(e, Entry::Section)).count(),
+            1
+        );
+        let rows = rows(&mut shell);
+        let section = rows.iter().find(|r| r.text("kind") == "section").unwrap();
+        assert_eq!(section.text("title"), "NÃO INSTALADOS");
+        let steam = rows.iter().find(|r| r.text("kind") == "group").unwrap();
+        assert_eq!(
+            (
+                steam.text("title").as_str(),
+                steam.text("count").as_str(),
+                steam.flag("open")
+            ),
+            ("Steam", "7", true)
+        );
+        let installing = rows.iter().find(|r| r.flag("installing")).unwrap();
+        assert_eq!(installing.text("percent"), "42%");
+        assert_eq!(installing.text("install-label"), "Baixando Disco Elysium");
+        let waiting = rows.iter().find(|r| r.text("title") == "Tunic").unwrap();
+        assert_eq!(waiting.text("install-label"), "Instalar Tunic");
+    }
+
+    #[test]
+    fn groups_open_and_close_by_keyboard_and_click_and_the_choice_is_saved() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell_with_store_games();
+        let total = rows(&mut shell).len();
+        // ↓ do último instalado passa pelo cabeçalho (a divisória não recebe foco).
+        let installed = rows(&mut shell)
+            .iter()
+            .position(|r| r.text("kind") == "section")
+            .unwrap();
+        shell.click("game", installed - 1);
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).group_focus, Some(GameStore::Steam));
+        let selected = rows(&mut shell);
+        assert_eq!(selected[installed + 1].text("kind"), "group");
+        // Enter fecha o grupo, → abre outra vez.
+        shell.handle(Cmd::Accept);
+        assert_eq!(rows(&mut shell).len(), total - 7);
+        assert!(group_closed(&shell.ctx, GameStore::Steam));
+        shell.handle(Cmd::Right);
+        assert_eq!(rows(&mut shell).len(), total);
+        shell.handle(Cmd::Left);
+        assert!(group_closed(&shell.ctx, GameStore::Steam));
+        // ↓ segue para o próximo cabeçalho; clicar no cabeçalho alterna.
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).group_focus, Some(GameStore::Epic));
+        shell.click("group", 0);
+        assert!(!group_closed(&shell.ctx, GameStore::Steam));
+        // Tirar o cabeçalho do foco volta ao jogo (clique num jogo).
+        shell.click("game", 0);
+        assert_eq!(page(&shell).group_focus, None);
+    }
+
+    #[test]
+    fn the_install_filter_hides_the_section_or_shows_only_the_groups() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell_with_store_games();
+        page(&shell).criteria.borrow_mut().install = InstallFilter::Installed;
+        assert!(rows(&mut shell).iter().all(|r| r.text("kind").is_empty()));
+        page(&shell).criteria.borrow_mut().install = InstallFilter::NotInstalled;
+        let only = rows(&mut shell);
+        assert_eq!(only[0].text("kind"), "group");
+        assert!(only.iter().all(|r| r.text("kind") != "section"));
+    }
+
+    #[test]
+    fn a_broken_progress_from_the_store_never_reaches_the_ring_as_garbage() {
+        use tako_core::library::InstallProgress;
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let mut bad = crate::demo::not_installed();
+        bad.truncate(3);
+        for (g, f) in bad.iter_mut().zip([f32::NAN, 7.0, -3.0]) {
+            g.installing = Some(InstallProgress { fraction: Some(f) });
+        }
+        shell.ctx.found.lock().unwrap().extend(bad);
+        shell.ctx.library.refresh();
+        let rows = rows(&mut shell);
+        let got: Vec<(f32, String)> = rows
+            .iter()
+            .filter(|r| r.flag("installing"))
+            .map(|r| {
+                let p = match r.0.get_field("progress") {
+                    Some(Value::Number(n)) => *n as f32,
+                    _ => f32::NAN,
+                };
+                (p, r.text("percent"))
+            })
+            .collect();
+        assert_eq!(got.len(), 3);
+        // Sem número válido o anel gira (negativo, sem %); fora de 0..1 trava nas pontas.
+        assert!(got.contains(&(-1.0, String::new())));
+        assert!(got.contains(&(1.0, "100%".into())));
+        assert!(got.contains(&(0.0, "0%".into())));
+    }
+
+    #[test]
+    fn the_grid_has_one_block_per_store_and_the_arrows_walk_covers_and_headers() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell_with_store_games();
+        shell.ctx.grid_columns = 4;
+        shell.click("view", 1);
+        let blocks = model(&mut shell, "desk-blocks");
+        let kinds: Vec<String> = blocks.iter().map(|b| b.text("kind")).collect();
+        assert_eq!(kinds[..3], ["covers", "section", "group"]);
+        // 10 instalados em 4 colunas = 3 linhas; a divisória vem depois delas, o primeiro grupo depois da divisória.
+        assert_eq!(blocks[1].number("rows-before"), 3);
+        assert_eq!(blocks[2].number("rows-before"), 3);
+        assert_eq!(blocks[2].number("sections-before"), 1);
+        assert_eq!(blocks[3].number("groups-before"), 1);
+        // Do último instalado, ↓ cai no cabeçalho da Steam (a divisória não recebe foco); ↓ de novo, na primeira capa.
+        let installed = page(&shell)
+            .games(&shell.ctx)
+            .iter()
+            .filter(|g| !to_install(g))
+            .count();
+        shell.click("game", installed - 1);
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).group_focus, Some(GameStore::Steam));
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).group_focus, None);
+        let focused = shell.focused_game().unwrap();
+        assert!(
+            shell
+                .ctx
+                .library
+                .find(&focused)
+                .is_some_and(|g| !g.is_installed)
+        );
+        // Enter numa capa que falta instalar abre a instalação na loja; o jogo não vai para o destaque da lista.
+        shell.handle(Cmd::Accept);
+        assert!(
+            shell
+                .ctx
+                .effects
+                .iter()
+                .any(|e| matches!(e, Effect::OpenUrl(u) if u.starts_with("demo://install/")))
+        );
+        assert_eq!(View::of(&shell.ctx), View::Grid);
+        // ↑ volta ao cabeçalho; Enter fecha o grupo e o trecho fica sem capas.
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).group_focus, Some(GameStore::Steam));
+        shell.handle(Cmd::Accept);
+        let closed = model(&mut shell, "desk-blocks");
+        assert_eq!(closed[2].text("count"), "7");
+        assert!(!closed[2].flag("open"));
     }
 
     /// A fase 2 do destaque está aberta no último desenho.

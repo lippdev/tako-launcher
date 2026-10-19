@@ -241,6 +241,8 @@ pub struct Ctx {
     /// Texto da última verificação de atualização (Configurações › Geral).
     pub update_status: String,
     pub update_ready: Option<String>,
+    /// Espaço livre no disco padrão das lojas, para o destaque de jogo não instalado (SRC-005).
+    pub free_space: Option<tako_core::devices::FreeSpace>,
     pub app_update: crate::app_updates::State,
     pub safe_mode: bool,
     pub scanning: bool,

@@ -209,3 +209,38 @@ Precisa de um executável que feche com erro. Crie `C:\TakoTeste\dll.bat` com `e
 4. Um jogo de verdade que feche normalmente depois de jogar: "Bem-vindo de volta", sem aviso.
 5. Um jogo aberto pela loja (Steam, Epic) que feche sozinho em poucos segundos: o aviso de antes, sem código.
 6. Em `logs\`, a linha "terminou fora do normal" traz o código em hex.
+
+## 20. Jogos não instalados: instalando e espaço livre (SRC-005)
+
+Precisa de Steam, Epic e GOG Galaxy com conta, e da chave da Web API da Steam em Configurações › Biblioteca e lojas.
+
+1. Abrir o Tako: a lista de não instalados da Steam já vem atualizada (sem esperar 1 hora). Em "Procurar jogos instalados" também.
+2. Escolher um jogo pequeno da Steam › Instalar. A Steam abre a janela de instalação; confirme. Em até 3 s o jogo passa a
+   "instalando" com a porcentagem andando (pausar na Steam congela o número; cancelar volta a "não instalado").
+3. Quando a Steam termina, o jogo vira instalado sozinho, com o aviso "foi instalado", sem reiniciar o Tako.
+4. Se a Steam estiver numa fila de downloads (jogo esperando a vez), conferir se o Tako mostra "instalando" sem porcentagem ou
+   ainda "não instalado" (o `StateFlags` dessa fila não foi confirmado; anotar o valor do `appmanifest_<id>.acf`).
+5. Epic: Instalar abre o Launcher na página do jogo. Durante a instalação, conferir se o jogo aparece como "instalando"
+   (depende do `bIsIncompleteInstall` do `.item` aparecer logo no começo; sem porcentagem) e se vira instalado no fim.
+6. GOG: Instalar abre o Galaxy na página do jogo (`goggalaxy://openGameView/<id>`). O Tako não vê o andamento do
+   Galaxy: o jogo só vira instalado quando a releitura de 30 s encontra o jogo instalado.
+7. Jogo da conta em duas lojas (ex.: Steam e GOG) não instalado: as duas lojas aparecem como opção de instalar.
+8. O espaço livre mostrado é o do disco da Steam (biblioteca padrão) e bate com o Explorador de Arquivos; sem Steam, é o do `C:`.
+   Com a Steam em outro disco (ex.: `D:\Steam`), mostra `D:`.
+
+## 21. Interface que fecha e reabre ao jogar (BUG-001)
+
+Diagnóstico em [`docs/bugs/BUG-001.md`](../bugs/BUG-001.md). Anote o modo (desktop ou tela cheia) em cada passo.
+
+1. Com a Steam já aberta, no desktop, jogue um jogo da Steam. Em `logs\`, a linha `acompanhando … pid: …` diz se
+   a URI devolveu processo: `Some(N)` confirma a hipótese H2a.
+2. Siga as linhas `acompanhamento de …: Waiting/Running → …` até `jogo terminou`. Se aparecer `→ Exited` com o
+   jogo ainda aberto, anote os segundos e os `processos`. A lista é logada sempre que muda: na saída pela pasta
+   ela vem vazia na linha `→ Exited`, então olhe as linhas anteriores (`Running → Running`) para ver os processos.
+3. Repita com a Steam fechada (ela abre junto com o jogo) e com um jogo da Epic.
+4. Repita os passos 1 e 2 na tela cheia (F11). Ali a interface fecha quando o jogo aparece e reabre só no fim
+   do jogo, como prevê a ADR-0026. A linha `interface saiu: código 0 … jogo Some(…)` marca essa saída prevista.
+5. Se a interface sumir sozinha, procure `pânico (ui)` e `interface sem resposta` no log. Como o perfil release usa
+   `panic = "abort"`, o código de saída de um pânico não é 101: no Windows é `0xC0000409` (`-1073740791`).
+6. Sintoma de H2a: "Abrindo…" seguido do aviso de jogo que fechou rápido, sem `janela do jogo na tela` antes de
+   `jogo terminou (quick…)`.
