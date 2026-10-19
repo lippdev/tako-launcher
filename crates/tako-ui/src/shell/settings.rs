@@ -118,6 +118,10 @@ pub(crate) fn toggle(ctx: &Ctx, text: &str, key: &'static str, default: bool) ->
             .desc(ctx.t(&format!("{text}_desc"))),
     )
     .on(move |ctx| {
+        if ctx.restoring {
+            ctx.toast(ctx.t("settings.system.restore_busy"));
+            return Flow::Stay;
+        }
         ctx.settings.toggle(key, default);
         Flow::Stay
     })
@@ -895,7 +899,11 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
         }),
     );
     v.push(
-        MenuItem::new(action(ctx, "settings.system.restore")).on(|ctx| {
+        MenuItem::new({
+            let row = action(ctx, "settings.system.restore");
+            if ctx.desktop { row.danger() } else { row }
+        })
+        .on(|ctx| {
             choose_restore(ctx);
             Flow::Stay
         }),
@@ -934,6 +942,10 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
 }
 
 fn choose_backup(ctx: &mut Ctx) {
+    if ctx.restoring {
+        ctx.toast(ctx.t("settings.system.restore_busy"));
+        return;
+    }
     let title = ctx.t("settings.system.backup_choose_title");
     let file_name = format!(
         "tako-backup-{}.takobackup",
@@ -974,6 +986,10 @@ fn choose_backup(ctx: &mut Ctx) {
 }
 
 fn choose_restore(ctx: &mut Ctx) {
+    if ctx.restoring {
+        ctx.toast(ctx.t("settings.system.restore_busy"));
+        return;
+    }
     if ctx.running.is_some() {
         ctx.toast(ctx.t("settings.system.restore_blocked_game_running"));
         return;
@@ -1013,9 +1029,12 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
     MenuLayer::dialog(title, move |_ctx| {
         let p = path.clone();
         vec![
-            MenuItem::new(PanelRow::info("confirm-desc", desc.clone(), "")),
             MenuItem::new(PanelRow::button("confirm", confirm_btn.clone()).danger()).on(
                 move |ctx| {
+                    if ctx.restoring {
+                        ctx.toast(ctx.t("settings.system.restore_busy"));
+                        return Flow::Close;
+                    }
                     if ctx.running.is_some() {
                         ctx.toast(ctx.t("settings.system.restore_blocked_game_running"));
                         return Flow::Close;
@@ -1024,42 +1043,49 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                         ctx.toast(ctx.t("settings.system.restore_blocked_scanning"));
                         return Flow::Close;
                     }
+                    ctx.restoring = true;
+                    ctx.settings.locked = true;
                     let paths = ctx.paths.clone();
                     let p = p.clone();
                     crate::tasks::run(
                         ctx,
                         move || tako_core::persistence::backup::restore_backup(&paths, &p),
-                        move |ctx, res| match res {
-                            Ok(res) => {
-                                ctx.reload_data();
-                                let lang = match ctx.settings.string(keys::LANGUAGE).as_str() {
-                                    "en-US" => Lang::EnUs,
-                                    _ => Lang::PtBr,
-                                };
-                                tako_core::i18n::set_lang(lang);
-                                let theme_id = tako_themes::selected(&ctx.paths.themes())
-                                    .unwrap_or_else(|| BUILTIN_THEME.into());
-                                ctx.effect(Effect::ApplyTheme(theme_id));
+                        move |ctx, res| {
+                            ctx.restoring = false;
+                            ctx.settings.locked = false;
+                            match res {
+                                Ok(res) => {
+                                    ctx.reload_data();
+                                    let lang = match ctx.settings.string(keys::LANGUAGE).as_str() {
+                                        "en-US" => Lang::EnUs,
+                                        _ => Lang::PtBr,
+                                    };
+                                    tako_core::i18n::set_lang(lang);
+                                    let theme_id = tako_themes::selected(&ctx.paths.themes())
+                                        .unwrap_or_else(|| BUILTIN_THEME.into());
+                                    ctx.effect(Effect::ApplyTheme(theme_id));
 
-                                let msg = if let Some(auto) = &res.auto_backup_path {
-                                    let auto_name = auto
-                                        .file_name()
-                                        .map(|n| n.to_string_lossy().into_owned())
-                                        .unwrap_or_default();
-                                    ctx.tf(
-                                        "settings.system.restore_done_with_auto",
-                                        &[("auto", &auto_name)],
-                                    )
-                                } else {
-                                    ctx.t("settings.system.restore_done")
-                                };
-                                ctx.toast(msg);
-                            }
-                            Err(e) => {
-                                ctx.toast(ctx.tf(
-                                    "settings.system.restore_failed",
-                                    &[("error", &e.to_string())],
-                                ));
+                                    let msg = if let Some(auto) = &res.auto_backup_path {
+                                        let auto_name = auto
+                                            .file_name()
+                                            .map(|n| n.to_string_lossy().into_owned())
+                                            .unwrap_or_default();
+                                        ctx.tf(
+                                            "settings.system.restore_done_with_auto",
+                                            &[("auto", &auto_name)],
+                                        )
+                                    } else {
+                                        ctx.t("settings.system.restore_done")
+                                    };
+                                    ctx.toast(msg);
+                                }
+                                Err(e) => {
+                                    ctx.reload_data();
+                                    ctx.toast(ctx.tf(
+                                        "settings.system.restore_failed",
+                                        &[("error", &e.to_string())],
+                                    ));
+                                }
                             }
                         },
                     );
@@ -1069,7 +1095,8 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
             MenuItem::new(PanelRow::button("cancel", cancel_btn.clone())).on(|_| Flow::Close),
         ]
     })
-    .focus_at(2)
+    .text(desc)
+    .focus_at(1)
 }
 
 // ---------------------------------------------------------------- Sobre

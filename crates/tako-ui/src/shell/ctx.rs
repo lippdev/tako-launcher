@@ -81,6 +81,7 @@ pub use tako_sources::report::LibrarySourceReport as SourceReport;
 pub struct Settings {
     store: Option<SettingsStore>,
     values: HashMap<String, String>,
+    pub locked: bool,
 }
 
 impl Settings {
@@ -89,7 +90,11 @@ impl Settings {
             .as_ref()
             .and_then(|s| s.load_all().ok())
             .unwrap_or_default();
-        Settings { store, values }
+        Settings {
+            store,
+            values,
+            locked: false,
+        }
     }
 
     /// Nenhuma configuração gravada (instalação nova).
@@ -112,6 +117,10 @@ impl Settings {
     }
 
     pub fn set(&mut self, key: &str, value: &str) {
+        if self.locked {
+            tracing::warn!(key, "ignorado: configurações travadas durante restauração");
+            return;
+        }
         self.values.insert(key.to_owned(), value.to_owned());
         if let Some(s) = &self.store
             && let Err(e) = s.set(key, value)
@@ -248,6 +257,8 @@ pub struct Ctx {
     pub app_update: crate::app_updates::State,
     pub safe_mode: bool,
     pub scanning: bool,
+    /// Restauração de backup em andamento (bloqueia jogar, varrer, restaurar e salvar configurações).
+    pub restoring: bool,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
     pub grid_columns: usize,
     /// Camada que uma página pediu para abrir junto com ela.
@@ -491,6 +502,15 @@ impl Ctx {
     }
 
     pub fn effect(&mut self, e: Effect) {
+        if self.restoring
+            && matches!(
+                e,
+                Effect::Launch(_) | Effect::ResumeGame | Effect::Rescan | Effect::ReloadLibrary
+            )
+        {
+            self.toast(self.t("settings.system.restore_busy"));
+            return;
+        }
         self.effects.push(e);
     }
 

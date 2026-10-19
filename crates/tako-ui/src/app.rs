@@ -191,6 +191,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         app_update: Default::default(),
         safe_mode: false,
         scanning: false,
+        restoring: false,
         grid_columns: 7,
         pointer: false,
         pending_layer: None,
@@ -243,7 +244,11 @@ pub(crate) static SCAN_PROGRESS: AtomicU32 = AtomicU32::new(0);
 pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
     let (found, disabled, simulate, steam_key, steam_cache, emulators, exe_icons, manual_targets) = {
         let mut s = shell.borrow_mut();
-        if s.ctx.scanning {
+        if s.ctx.scanning || s.ctx.restoring {
+            if s.ctx.restoring {
+                let msg = s.ctx.t("settings.system.restore_busy");
+                s.ctx.toast(msg);
+            }
             return;
         }
         s.ctx.scanning = true;
