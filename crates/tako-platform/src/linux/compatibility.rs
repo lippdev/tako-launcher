@@ -427,6 +427,7 @@ pub fn detect_runtimes() -> Vec<CompatibilityRuntime> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
 
     // Wine do sistema
+    #[cfg(unix)]
     let system_wine = crate::unix::run::has_tool("wine").then(|| {
         for candidate in ["/usr/bin/wine", "/usr/local/bin/wine", "/bin/wine"] {
             let p = PathBuf::from(candidate);
@@ -436,6 +437,8 @@ pub fn detect_runtimes() -> Vec<CompatibilityRuntime> {
         }
         PathBuf::from("wine")
     });
+    #[cfg(not(unix))]
+    let system_wine = None;
     let mut opts = DetectOptions {
         system_wine,
         ..Default::default()
