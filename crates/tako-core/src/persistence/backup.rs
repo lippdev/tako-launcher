@@ -53,6 +53,11 @@ pub const BACKUP_EXTENSION: &str = "takobackup";
 pub const MANIFEST_FILE: &str = "backup.toml";
 pub const CURRENT_BACKUP_VERSION: u32 = 1;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static INJECT_RESTORE_DB_RENAME_FAIL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// Limites razoáveis de proteção contra bombas de descompressão e arquivos maliciosos.
 pub const MAX_BACKUP_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
 pub const MAX_FILE_BYTES: u64 = 256 * 1024 * 1024; // 256 MB por arquivo
@@ -291,20 +296,52 @@ pub struct RestoreResult {
     pub auto_backup_path: Option<PathBuf>,
 }
 
-const SENSITIVE_SETTINGS_SQL: &str = "
-    key IN (
-        'LocalApiEnabled', 'LocalApiToken', 'LocalApiAllowedOrigins',
-        'SteamWebApiKey', 'SteamApiKey', 'IgdbClientId', 'IgdbClientSecret',
-        'ScreenScraperUser', 'ScreenScraperPassword', 'SteamGridDbApiKey',
-        'AnalyticsConsent', 'CrashReportConsent', 'TelemetryConsent'
+/// Chaves de configuração locais e de consentimento que NÃO entram em backup nem são sobrescritas ao restaurar.
+pub const BACKUP_EXCLUDED_SETTINGS: &[&str] = &[
+    "LocalApiEnabled",
+    "LocalApiToken",
+    "LocalApiAllowedOrigins",
+    "DownloadsEnabled",
+    "DownloadsLegalAccepted",
+    "SteamWebApiKey",
+    "SteamApiKey",
+    "IgdbClientId",
+    "IgdbClientSecret",
+    "ScreenScraperUser",
+    "ScreenScraperPassword",
+    "SteamGridDbApiKey",
+    "AnalyticsConsent",
+    "CrashReportConsent",
+    "TelemetryConsent",
+];
+
+/// Diz se uma chave de configuração não pode ser exportada nem importada em backups.
+pub fn is_backup_excluded(key: &str) -> bool {
+    BACKUP_EXCLUDED_SETTINGS.contains(&key)
+        || key.to_ascii_lowercase().contains("token")
+        || key.to_ascii_lowercase().contains("secret")
+        || key.to_ascii_lowercase().contains("password")
+        || key.to_ascii_lowercase().contains("api_key")
+        || key.to_ascii_lowercase().contains("apikey")
+        || key.to_ascii_lowercase().contains("api-key")
+}
+
+fn sensitive_settings_sql() -> String {
+    let keys = BACKUP_EXCLUDED_SETTINGS
+        .iter()
+        .map(|k| format!("'{k}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "key IN ({keys})
+        OR LOWER(key) LIKE '%token%'
+        OR LOWER(key) LIKE '%secret%'
+        OR LOWER(key) LIKE '%password%'
+        OR LOWER(key) LIKE '%api_key%'
+        OR LOWER(key) LIKE '%apikey%'
+        OR LOWER(key) LIKE '%api-key%'"
     )
-    OR LOWER(key) LIKE '%token%'
-    OR LOWER(key) LIKE '%secret%'
-    OR LOWER(key) LIKE '%password%'
-    OR LOWER(key) LIKE '%api_key%'
-    OR LOWER(key) LIKE '%apikey%'
-    OR LOWER(key) LIKE '%api-key%'
-";
+}
 
 /// Zera permissões (`approved_commands`) e segredos/consentimentos no banco fornecido.
 fn sanitize_backup_database(conn: &Connection) -> Result<(), rusqlite::Error> {
@@ -319,6 +356,29 @@ fn sanitize_backup_database(conn: &Connection) -> Result<(), rusqlite::Error> {
         conn.execute("UPDATE game_settings SET approved_commands = NULL;", [])?;
     }
 
+    let has_download_sources: bool = conn
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='download_sources';",
+            [],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
+    if has_download_sources {
+        let mut stmt = conn.prepare("SELECT url FROM download_sources;")?;
+        let urls: Vec<String> = stmt
+            .query_map([], |r| r.get(0))?
+            .filter_map(Result::ok)
+            .collect();
+        for url in urls {
+            if let Some((clean, _)) = url.split_once('?') {
+                conn.execute(
+                    "UPDATE OR REPLACE download_sources SET url = ?1 WHERE url = ?2;",
+                    rusqlite::params![clean, url],
+                )?;
+            }
+        }
+    }
+
     let has_settings: bool = conn
         .query_row(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings';",
@@ -327,7 +387,7 @@ fn sanitize_backup_database(conn: &Connection) -> Result<(), rusqlite::Error> {
         )
         .unwrap_or(false);
     if has_settings {
-        let sql = format!("DELETE FROM settings WHERE {SENSITIVE_SETTINGS_SQL};");
+        let sql = format!("DELETE FROM settings WHERE {};", sensitive_settings_sql());
         conn.execute(&sql, [])?;
     }
     Ok(())
@@ -383,7 +443,10 @@ fn extract_local_permissions(paths: &DataPaths) -> LocalPermissions {
         )
         .unwrap_or(false);
     if has_settings {
-        let sql = format!("SELECT key, value FROM settings WHERE {SENSITIVE_SETTINGS_SQL};");
+        let sql = format!(
+            "SELECT key, value FROM settings WHERE {};",
+            sensitive_settings_sql()
+        );
         if let Ok(mut stmt) = conn.prepare(&sql)
             && let Ok(rows) =
                 stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
@@ -449,6 +512,37 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
     };
 
     let manifest_toml = toml::to_string(&manifest)?;
+    if manifest_toml.len() as u64 > MAX_MANIFEST_BYTES {
+        return Err(BackupError::TooLarge {
+            size: manifest_toml.len() as u64,
+            max: MAX_MANIFEST_BYTES,
+        });
+    }
+
+    let mut entries_count: usize = 0;
+    let mut total_uncompressed: u64 = manifest_toml.len() as u64;
+
+    let db_size = fs::metadata(&temp_db_path)?.len();
+    if db_size > MAX_FILE_BYTES {
+        return Err(BackupError::TooLarge {
+            size: db_size,
+            max: MAX_FILE_BYTES,
+        });
+    }
+    total_uncompressed = total_uncompressed.saturating_add(db_size);
+    if total_uncompressed > MAX_UNCOMPRESSED_BYTES {
+        return Err(BackupError::TooLarge {
+            size: total_uncompressed,
+            max: MAX_UNCOMPRESSED_BYTES,
+        });
+    }
+    entries_count += 2; // manifest + tako.db
+    if entries_count > MAX_ENTRIES {
+        return Err(BackupError::TooLarge {
+            size: entries_count as u64,
+            max: MAX_ENTRIES as u64,
+        });
+    }
 
     // Escreve primeiro em arquivo temporário no mesmo diretório para atomicidade
     let temp_dest = tempfile::Builder::new()
@@ -473,13 +567,25 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
         // 3. Temas instalados pelo usuário
         let themes_root = paths.themes();
         if themes_root.is_dir() {
-            add_directory_to_zip(&themes_root, "themes", &mut zip, file_options)?;
+            add_directory_to_zip(
+                &themes_root,
+                "themes",
+                &mut zip,
+                file_options,
+                Some((&mut entries_count, &mut total_uncompressed)),
+            )?;
         }
 
         // 4. Capas e artes personalizadas escolhidas pelo usuário (art-choices/)
         let art_choices_root = paths.art_choices();
         if art_choices_root.is_dir() {
-            add_directory_to_zip(&art_choices_root, "art-choices", &mut zip, file_options)?;
+            add_directory_to_zip(
+                &art_choices_root,
+                "art-choices",
+                &mut zip,
+                file_options,
+                Some((&mut entries_count, &mut total_uncompressed)),
+            )?;
         }
 
         // Observação sobre updates.json:
@@ -488,6 +594,14 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
         // incluídas no arquivo .takobackup nem restauradas.
 
         zip.finish()?;
+    }
+
+    let zip_size = temp_dest.as_file().metadata()?.len();
+    if zip_size > MAX_BACKUP_BYTES {
+        return Err(BackupError::TooLarge {
+            size: zip_size,
+            max: MAX_BACKUP_BYTES,
+        });
     }
 
     temp_dest
@@ -557,13 +671,19 @@ fn create_raw_auto_backup(paths: &DataPaths, dest_file: &Path) -> Result<(), Bac
         // 3. Temas
         let themes_root = paths.themes();
         if themes_root.is_dir() {
-            let _ = add_directory_to_zip(&themes_root, "themes", &mut zip, file_options);
+            add_directory_to_zip(&themes_root, "themes", &mut zip, file_options, None)?;
         }
 
         // 4. Capas e artes personalizadas (art-choices/)
         let art_choices_root = paths.art_choices();
         if art_choices_root.is_dir() {
-            let _ = add_directory_to_zip(&art_choices_root, "art-choices", &mut zip, file_options);
+            add_directory_to_zip(
+                &art_choices_root,
+                "art-choices",
+                &mut zip,
+                file_options,
+                None,
+            )?;
         }
 
         zip.finish()?;
@@ -952,8 +1072,13 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
             return Err(e.into());
         }
     }
+    #[cfg(test)]
+    if INJECT_RESTORE_DB_RENAME_FAIL.with(|c| c.replace(false)) {
+        rollback(had_old_db, false, false);
+        return Err(io::Error::other("simulated db rename failure").into());
+    }
     if let Err(e) = fs::rename(&extracted_db, &db_path) {
-        rollback(false, false, false);
+        rollback(had_old_db, false, false);
         return Err(e.into());
     }
     let db_swapped = true;
@@ -1066,6 +1191,7 @@ fn add_directory_to_zip(
     prefix: &str,
     zip: &mut ZipWriter<&File>,
     options: SimpleFileOptions,
+    mut limits: Option<(&mut usize, &mut u64)>,
 ) -> Result<(), BackupError> {
     let mut stack = vec![(root.to_path_buf(), prefix.to_string())];
     while let Some((dir, current_prefix)) = stack.pop() {
@@ -1096,9 +1222,32 @@ fn add_directory_to_zip(
 
             if file_type.is_dir() {
                 stack.push((path, entry_name));
-            } else if file_type.is_file()
-                && let Ok(mut f) = File::open(&path)
-            {
+            } else if file_type.is_file() {
+                if let Some((entries_count, total_uncompressed)) = limits.as_mut() {
+                    let file_size = entry.metadata()?.len();
+                    if file_size > MAX_FILE_BYTES {
+                        return Err(BackupError::TooLarge {
+                            size: file_size,
+                            max: MAX_FILE_BYTES,
+                        });
+                    }
+                    **total_uncompressed = total_uncompressed.saturating_add(file_size);
+                    if **total_uncompressed > MAX_UNCOMPRESSED_BYTES {
+                        return Err(BackupError::TooLarge {
+                            size: **total_uncompressed,
+                            max: MAX_UNCOMPRESSED_BYTES,
+                        });
+                    }
+                    **entries_count += 1;
+                    if **entries_count > MAX_ENTRIES {
+                        return Err(BackupError::TooLarge {
+                            size: **entries_count as u64,
+                            max: MAX_ENTRIES as u64,
+                        });
+                    }
+                }
+
+                let mut f = File::open(&path)?;
                 zip.start_file(entry_name, options)?;
                 io::copy(&mut f, zip)?;
             }
@@ -1712,6 +1861,37 @@ mod tests {
     }
 
     #[test]
+    fn raw_auto_backup_does_not_apply_creation_limits_and_includes_large_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = make_test_paths(dir.path());
+        fs::create_dir_all(&paths.root).unwrap();
+
+        let db_path = paths.database();
+        let conn = Connection::open(&db_path).unwrap();
+        migrator::migrate(&conn, None).unwrap();
+        drop(conn);
+
+        let themes_dir = paths.themes();
+        fs::create_dir_all(&themes_dir).unwrap();
+        fs::write(themes_dir.join("theme.json"), b"{\"name\": \"Custom\"}").unwrap();
+
+        let art_dir = paths.art_choices();
+        fs::create_dir_all(&art_dir).unwrap();
+        fs::write(art_dir.join("cover.png"), b"fake image bytes").unwrap();
+
+        let dest = dir.path().join("raw-auto.takobackup");
+        create_raw_auto_backup(&paths, &dest).unwrap();
+        assert!(dest.is_file());
+
+        let file = File::open(&dest).unwrap();
+        let mut zip = ZipArchive::new(file).unwrap();
+        assert!(zip.by_name("themes/theme.json").is_ok());
+        assert!(zip.by_name("art-choices/cover.png").is_ok());
+        assert!(zip.by_name("tako.db").is_ok());
+        assert!(zip.by_name(MANIFEST_FILE).is_ok());
+    }
+
+    #[test]
     fn corrupted_database_triggers_raw_auto_backup_and_prunes_older() {
         let dir = tempfile::tempdir().unwrap();
         let paths = make_test_paths(dir.path());
@@ -2127,6 +2307,121 @@ mod tests {
     }
 
     #[test]
+    fn create_backup_fails_if_file_exceeds_max_file_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = make_test_paths(dir.path());
+
+        let db = TakoDatabase::new(paths.database());
+        let _ = db.open().unwrap();
+
+        // Cria um arquivo esparso em themes que excede MAX_FILE_BYTES
+        let large_theme_dir = paths.themes().join("large_theme");
+        fs::create_dir_all(&large_theme_dir).unwrap();
+        let large_file_path = large_theme_dir.join("data.bin");
+        let f = File::create(&large_file_path).unwrap();
+        f.set_len(MAX_FILE_BYTES + 1024).unwrap();
+
+        let backup_file = dir.path().join("oversized.takobackup");
+        let err = create_backup(&paths, &backup_file).unwrap_err();
+        assert!(
+            matches!(err, BackupError::TooLarge { .. }),
+            "create_backup deve falhar com TooLarge ao exceder MAX_FILE_BYTES: {err:?}"
+        );
+        let msg = err.to_string();
+        assert!(
+            msg.contains("limite") || msg.contains("limit") || msg.contains("passa"),
+            "mensagem de erro deve ser clara: {msg}"
+        );
+    }
+
+    #[test]
+    fn restore_rollback_on_database_swap_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = make_test_paths(dir.path());
+
+        // 1. Cria destino com banco e jogo existente
+        let db = TakoDatabase::new(paths.database());
+        let _ = db.open().unwrap();
+        let store = LibraryStore::new(db, None);
+        let mut data = store.load().unwrap();
+        data.manual.push(ManualGameRow {
+            id: "manual:antigo".into(),
+            title: "Antigo".into(),
+            path: "/path/antigo".into(),
+            arguments: None,
+            working_directory: None,
+            platform: None,
+            cover_path: None,
+            hero_path: None,
+            added_at: Utc::now(),
+            track_by: None,
+        });
+        store.save(&data).unwrap();
+
+        // 2. Cria origem com banco e jogo novo
+        let src_dir = tempfile::tempdir().unwrap();
+        let src_paths = make_test_paths(src_dir.path());
+        let src_db = TakoDatabase::new(src_paths.database());
+        let _ = src_db.open().unwrap();
+        let src_store = LibraryStore::new(src_db, None);
+        let mut src_data = src_store.load().unwrap();
+        src_data.manual.push(ManualGameRow {
+            id: "manual:novo".into(),
+            title: "Novo".into(),
+            path: "/path/novo".into(),
+            arguments: None,
+            working_directory: None,
+            platform: None,
+            cover_path: None,
+            hero_path: None,
+            added_at: Utc::now(),
+            track_by: None,
+        });
+        src_store.save(&src_data).unwrap();
+
+        let backup_file = dir.path().join("backup.takobackup");
+        create_backup(&src_paths, &backup_file).unwrap();
+
+        // 3. Força falha simulada na troca do banco de dados (rename staging -> tako.db)
+        INJECT_RESTORE_DB_RENAME_FAIL.with(|c| c.set(true));
+
+        let res = restore_backup(&paths, &backup_file);
+        assert!(
+            res.is_err(),
+            "restore_backup deve falhar quando a troca do banco de dados falha"
+        );
+
+        // 4. Verifica que o banco de dados original foi devolvido
+        assert!(
+            paths.database().exists(),
+            "o banco de dados original deve existir apos o rollback"
+        );
+        let conn = Connection::open(paths.database()).unwrap();
+        let count_orig: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM manual_games WHERE id = 'manual:antigo';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let count_novo: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM manual_games WHERE id = 'manual:novo';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count_orig, 1,
+            "o banco deve ter sido revertido para o original com o jogo antigo"
+        );
+        assert_eq!(
+            count_novo, 0,
+            "o jogo novo do backup nao deve existir no banco apos o rollback"
+        );
+    }
+
+    #[test]
     fn forged_backup_with_approved_commands_and_local_api_is_sanitized_and_local_settings_preserved()
      {
         let dir = tempfile::tempdir().unwrap();
@@ -2143,6 +2438,16 @@ mod tests {
             .unwrap();
             conn.execute(
                 "INSERT INTO settings (key, value) VALUES ('LocalApiToken', 'token-local-seguro');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('DownloadsEnabled', 'false');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('DownloadsLegalAccepted', 'false');",
                 [],
             )
             .unwrap();
@@ -2173,7 +2478,21 @@ mod tests {
             )
             .unwrap();
             conn.execute(
-                "INSERT INTO game_settings (game_id, approved_commands) VALUES ('jogo-atacante', 'rm -rf /');",
+                "INSERT INTO settings (key, value) VALUES ('DownloadsEnabled', 'true');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('DownloadsLegalAccepted', 'true');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO download_sources (url, name, items, updated_at) VALUES ('https://example.com/source.json?token=secret123', 'Fonte Teste', 10, '2026-10-19');",
+                [],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO game_settings (game_id, approved_commands, extra_arguments, environment) VALUES ('jogo-atacante', 'rm -rf /', '--malicious-arg', 'LD_PRELOAD=/evil.so');",
                 [],
             ).unwrap();
             drop(conn);
@@ -2239,6 +2558,40 @@ mod tests {
             "LocalApiToken local deve permanecer intacto"
         );
 
+        let dl_enabled: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'DownloadsEnabled';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            dl_enabled, "false",
+            "DownloadsEnabled local deve permanecer intacto (false)"
+        );
+
+        let dl_legal: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'DownloadsLegalAccepted';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            dl_legal, "false",
+            "DownloadsLegalAccepted local deve permanecer intacto (false)"
+        );
+
+        let clean_source_url: String = conn
+            .query_row("SELECT url FROM download_sources LIMIT 1;", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            clean_source_url, "https://example.com/source.json",
+            "query string de download_sources deve ser removida"
+        );
+
         let outro_segredo: Option<String> = conn
             .query_row(
                 "SELECT value FROM settings WHERE key = 'OutroSegredoToken';",
@@ -2274,6 +2627,29 @@ mod tests {
         assert_eq!(
             approved_local, "cmd_local",
             "approved_commands do destino local deve ser preservado"
+        );
+
+        let (extra_args, env_val): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT extra_arguments, environment FROM game_settings WHERE game_id = 'jogo-atacante';",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(extra_args.as_deref(), Some("--malicious-arg"));
+        assert_eq!(env_val.as_deref(), Some("LD_PRELOAD=/evil.so"));
+
+        let store = crate::persistence::game_settings::GameSettingsStore::new(TakoDatabase::new(
+            paths.database(),
+        ));
+        let game_settings = store.load("jogo-atacante").unwrap();
+        let resolved = crate::session::settings::resolve(
+            &crate::session::settings::GlobalSessionSettings::default(),
+            Some(&game_settings),
+        );
+        assert!(
+            !resolved.commands_approved,
+            "jogo com argumentos ou ambiente importados deve exigir confirmação do usuário"
         );
     }
 

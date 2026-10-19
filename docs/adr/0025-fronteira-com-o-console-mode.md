@@ -52,4 +52,6 @@ O Tako não depende dela para funcionar. Quando existir, deve seguir isto:
 
 ## Detecção da API (CMI-002)
 
-Socket Unix ou named pipe inexistente, ou conexão recusada, resulta conservadoramente em `NaoInstalado`. Se a conexão é aceita mas não há resposta em 500 ms, o resultado é `Erro`. Não há transporte alternativo por TCP nem arquivos locais de descoberta (`discovery.json`).
+Socket Unix ou named pipe inexistente, ou conexão recusada, resulta conservadoramente em `NaoInstalado`. Se a conexão é aceita mas não há resposta em 500 ms, o resultado é `Erro`. Não há transporte alternativo por TCP nem arquivos locais de descoberta (`discovery.json`). No Windows, se a conexão ao named pipe falhar com `ERROR_PIPE_BUSY` (código 231), o resultado é `Erro`.
+
+A abertura do named pipe no Windows utiliza `SECURITY_IDENTIFICATION` (via `OpenOptionsExt::security_qos_flags`) de modo seguro sem `unsafe`, impedindo que um servidor malicioso faça impersonação do cliente. A conferência do dono do processo servidor do pipe via Win32 FFI fica como melhoria futura.

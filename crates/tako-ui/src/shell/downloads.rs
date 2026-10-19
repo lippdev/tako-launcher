@@ -12,7 +12,8 @@ use crate::shell::keyboard::KeyboardLayer;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use tako_core::downloads::{
-    Download, DownloadState, Downloads, NewDownload, source, source::Source, suggest,
+    Download, DownloadState, Downloads, NewDownload, is_inside_root, source, source::Source,
+    suggest,
 };
 use tako_core::library::{GameStore, InstallProgress};
 use tako_core::metadata::art::format_bytes;
@@ -42,6 +43,8 @@ pub struct State {
     pub(crate) linked: HashSet<String>,
     /// Motor de mentira (`--simulate` e testes): nada sai da máquina.
     pub simulated: bool,
+    /// Falha na inicialização do motor (só tenta de novo por ação do usuário).
+    pub engine_failed: bool,
 }
 
 pub fn enabled(ctx: &Ctx) -> bool {
@@ -66,7 +69,7 @@ fn upload_limit(ctx: &Ctx) -> i64 {
 
 /// O gerenciador, criado na primeira vez com a função ligada (o motor não fala com ninguém até o 1º download).
 pub fn manager(ctx: &mut Ctx) -> Option<&mut Downloads> {
-    if !enabled(ctx) {
+    if !enabled(ctx) || ctx.downloads.engine_failed {
         return None;
     }
     if ctx.downloads.manager.is_none() {
@@ -86,11 +89,13 @@ pub fn manager(ctx: &mut Ctx) -> Option<&mut Downloads> {
                 Ok(e) => Box::new(e),
                 Err(e) => {
                     tracing::error!("motor de downloads: {e}");
+                    ctx.downloads.engine_failed = true;
                     return None;
                 }
             }
         };
         ctx.downloads.manager = Some(Downloads::new(engine, root(), saved));
+        sync_games(ctx);
     }
     ctx.downloads.manager.as_mut()
 }
@@ -407,7 +412,8 @@ fn completed_row(ctx: &Ctx, d: &Download) -> MenuItem {
     row.image = thumb(ctx, d.game_id.as_deref());
     // Só abre a pasta no gerenciador de arquivos: nada de dentro dela é aberto ou executado.
     let mut item = MenuItem::new(row).on(move |ctx| {
-        if folder.is_dir() {
+        let inside_root = is_inside_root(&root(), &folder);
+        if inside_root && folder.is_dir() {
             if let Err(e) = ctx
                 .platform
                 .processes
@@ -723,6 +729,7 @@ pub fn settings_rows(ctx: &Ctx) -> Vec<MenuItem> {
                 .desc(ctx.t("downloads.enable_desc")),
         )
         .on(move |ctx| {
+            ctx.downloads.engine_failed = false;
             if enabled(ctx) {
                 save(ctx);
                 // Solta o motor: os downloads param e voltam pausados quando a função for ligada de novo.
@@ -1033,6 +1040,49 @@ mod tests {
         rows.iter()
             .map(|i| (i.row.kind.clone(), i.row.style.clone()))
             .collect()
+    }
+
+    #[test]
+    fn restore_preserves_store_simulated_and_reloads_downloads() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            false,
+        );
+        ctx.settings.set_bool(ACCEPTED, true);
+        ctx.settings.set_bool(ENABLED, true);
+        ctx.downloads.simulated = true;
+
+        let store = ctx.downloads.store.as_ref().unwrap();
+        let initial_dl = Download::stored(
+            42,
+            "Jogo Restaurado".into(),
+            None,
+            "Fonte".into(),
+            "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567".into(),
+            root().join("Jogo Restaurado"),
+            DownloadState::Paused,
+            100,
+            Some(200),
+        );
+        store.save_downloads(&[initial_dl]).unwrap();
+
+        // Simula o comportamento pós restauração de backup
+        ctx.downloads = State {
+            store: ctx.downloads.store.take(),
+            simulated: ctx.downloads.simulated,
+            ..Default::default()
+        };
+        let (id, title, count) = {
+            let m = manager(&mut ctx).expect("manager deve recarregar");
+            (m.list()[0].id, m.list()[0].title.clone(), m.list().len())
+        };
+        assert_eq!(count, 1);
+        assert_eq!(id, 42);
+        assert_eq!(title, "Jogo Restaurado");
+        assert!(ctx.downloads.simulated, "simulated deve ser preservado");
+        assert!(ctx.downloads.store.is_some(), "store deve ser preservado");
     }
 
     #[test]

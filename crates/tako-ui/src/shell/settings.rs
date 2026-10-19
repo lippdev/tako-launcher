@@ -2365,6 +2365,15 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                         ctx.toast(ctx.t("settings.system.restore_blocked_scanning"));
                         return Flow::Close;
                     }
+                    if ctx
+                        .downloads
+                        .manager
+                        .as_ref()
+                        .is_some_and(|m| m.summary().downloading > 0)
+                    {
+                        ctx.toast(ctx.t("settings.system.restore_blocked_download_active"));
+                        return Flow::Close;
+                    }
                     ctx.restoring = true;
                     ctx.settings.locked = true;
                     let paths = ctx.paths.clone();
@@ -2378,6 +2387,12 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                             match res {
                                 Ok(res) => {
                                     ctx.reload_data();
+                                    ctx.downloads = crate::shell::downloads::State {
+                                        store: ctx.downloads.store.take(),
+                                        simulated: ctx.downloads.simulated,
+                                        ..Default::default()
+                                    };
+                                    let _ = crate::shell::downloads::manager(ctx);
                                     let lang = match ctx.settings.string(keys::LANGUAGE).as_str() {
                                         "en-US" => Lang::EnUs,
                                         _ => Lang::PtBr,
@@ -2386,6 +2401,7 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                                     let theme_id = tako_themes::selected(&ctx.paths.themes())
                                         .unwrap_or_else(|| BUILTIN_THEME.into());
                                     ctx.effect(Effect::ApplyTheme(theme_id));
+                                    crate::local_api::sync(ctx);
 
                                     let msg = if let Some(auto) = &res.auto_backup_path {
                                         let auto_name = auto
@@ -2403,6 +2419,7 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                                 }
                                 Err(e) => {
                                     ctx.reload_data();
+                                    crate::local_api::sync(ctx);
                                     ctx.toast(ctx.tf(
                                         "settings.system.restore_failed",
                                         &[("error", &e.to_string())],

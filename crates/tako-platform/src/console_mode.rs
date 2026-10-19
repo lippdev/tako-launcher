@@ -65,9 +65,15 @@ fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
 
 #[cfg(windows)]
 fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
+    use std::os::windows::fs::OpenOptionsExt;
+    // SECURITY_IDENTIFICATION (0x00010000) com SECURITY_SQOS_PRESENT (0x00100000):
+    // Garante que o servidor do named pipe receba apenas o nível de identificação,
+    // impedindo impersonação do processo cliente pelo servidor (CMI-002).
+    const SECURITY_IDENTIFICATION: u32 = 0x00010000 | 0x00100000;
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
+        .security_qos_flags(SECURITY_IDENTIFICATION)
         .open(path)?;
     Ok(Box::new(file))
 }
@@ -167,6 +173,10 @@ where
                 path = %socket_path.display(),
                 "não foi possível conectar ao socket do Console Mode: {e}"
             );
+            // No Windows, se o pipe está ocupado (ERROR_PIPE_BUSY = 231), o servidor existe mas não pôde atender
+            if e.raw_os_error() == Some(231) {
+                return ConsoleModeStatus::Erro;
+            }
             ConsoleModeStatus::NaoInstalado
         }
     }
@@ -239,6 +249,15 @@ mod tests {
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
         }
+    }
+
+    #[test]
+    fn pipe_busy_returns_error_status() {
+        let paths = TestPaths {
+            socket: Some(PathBuf::from(r"\\.\pipe\test-busy")),
+        };
+        let status = detect_internal(&paths, |_| Err(io::Error::from_raw_os_error(231)));
+        assert_eq!(status, ConsoleModeStatus::Erro);
     }
 
     #[test]
