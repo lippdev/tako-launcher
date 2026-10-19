@@ -278,7 +278,9 @@ impl Shell {
         if shown {
             if let Some(base_id) = p.create_base {
                 self.layers
-                    .push(Box::new(settings::create_theme_editor_panel(&self.ctx, base_id)));
+                    .push(Box::new(settings::create_theme_editor_panel(
+                        &self.ctx, base_id,
+                    )));
             } else if p.draft_override.is_some() {
                 self.layers
                     .push(Box::new(settings::edit_theme_panel(&mut self.ctx)));

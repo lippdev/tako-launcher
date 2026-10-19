@@ -19,8 +19,8 @@ use tako_core::i18n::tf;
 
 pub use create::{
     CreateThemeError, CreateThemeOptions, RESERVED_THEME_IDS, ThemeNameProblem, create_theme,
-    derive_theme_id, is_audio_key, is_reserved_theme_id, is_tako_created_theme, is_tokens_only_theme,
-    unique_theme_id, uses_default_ui, validate_theme_name,
+    derive_theme_id, is_audio_key, is_reserved_theme_id, is_tako_created_theme,
+    is_tokens_only_theme, unique_theme_id, uses_default_ui, validate_theme_name,
 };
 pub use export::{ExportThemeError, export_theme, export_theme_with_override};
 pub use manifest::{

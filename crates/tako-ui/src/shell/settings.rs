@@ -586,7 +586,10 @@ pub(crate) fn themes_panel(ctx: &Ctx) -> MenuLayer {
                 Ok(m) => (
                     m.name.clone(),
                     if m.author.trim().is_empty() {
-                        ctx.tf("settings.appearance.theme_version", &[("version", &m.version)])
+                        ctx.tf(
+                            "settings.appearance.theme_version",
+                            &[("version", &m.version)],
+                        )
                     } else {
                         ctx.tf(
                             "settings.appearance.theme_by",
@@ -729,7 +732,8 @@ pub(crate) enum ThemeEditorMode {
 
 pub(crate) fn edit_theme_panel(ctx: &mut Ctx) -> MenuLayer {
     let theme_id = tako_themes::selected(&ctx.paths.themes());
-    let expected_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), theme_id.as_deref());
+    let expected_dir =
+        tako_themes::overrides::override_dir(&ctx.paths.themes(), theme_id.as_deref());
     if let Some(ref d) = ctx.theme_draft {
         if let Some(ref dir) = d.draft_dir {
             if dir != &expected_dir {
@@ -1329,11 +1333,17 @@ pub(crate) fn choose_base_theme_panel(ctx: &Ctx) -> MenuLayer {
             let id = &candidate.id;
             let title = &candidate.name;
             let desc = if candidate.author.trim().is_empty() {
-                ctx.tf("settings.appearance.theme_version", &[("version", &candidate.version)])
+                ctx.tf(
+                    "settings.appearance.theme_version",
+                    &[("version", &candidate.version)],
+                )
             } else {
                 ctx.tf(
                     "settings.appearance.theme_by",
-                    &[("version", &candidate.version), ("author", &candidate.author)],
+                    &[
+                        ("version", &candidate.version),
+                        ("author", &candidate.author),
+                    ],
                 )
             };
             let id_clone = id.clone();
@@ -1781,9 +1791,10 @@ pub(crate) fn run_export_theme(
                 Err(e) => {
                     tracing::error!("falha ao exportar tema: {e}");
                     let err_str = match e {
-                        tako_themes::export::ExportThemeError::NotFound(p) => {
-                            ctx.tf("settings.appearance.theme_export_err_not_found", &[("path", &p)])
-                        }
+                        tako_themes::export::ExportThemeError::NotFound(p) => ctx.tf(
+                            "settings.appearance.theme_export_err_not_found",
+                            &[("path", &p)],
+                        ),
                         tako_themes::export::ExportThemeError::InvalidPackage(_) => {
                             ctx.t("settings.appearance.theme_err_invalid_package")
                         }

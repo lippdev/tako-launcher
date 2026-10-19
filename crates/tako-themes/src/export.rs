@@ -114,8 +114,9 @@ pub fn export_theme_with_override(
             }
 
             if let Some(src_img) = found_src {
-                let ext = crate::overrides::validate_background_image(&src_img)
-                    .map_err(|_| ExportThemeError::Io(io::Error::other("invalid background image")))?;
+                let ext = crate::overrides::validate_background_image(&src_img).map_err(|_| {
+                    ExportThemeError::Io(io::Error::other("invalid background image"))
+                })?;
                 let dest_name = format!("background.{ext}");
                 fs::copy(&src_img, staging.path().join(&dest_name))?;
                 tokens.background_image = Some(dest_name);

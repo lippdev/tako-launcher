@@ -1,5 +1,5 @@
 use super::*;
-use crate::shell::{theme_preview, Layer, Shell};
+use crate::shell::{Layer, Shell, theme_preview};
 use tako_core::input::GamepadButtons as B;
 use tako_core::input::shortcut::chord;
 use tako_core::library::GameStore;
@@ -1919,7 +1919,10 @@ fn test_create_theme_preview_timeout_returns_to_create_editor_panel() {
     shell.end_theme_preview(true);
 
     // A camada restaurada DEVE ser o editor de criação ("Criar tema"), NÃO o editor de personalização ("Editar tema")
-    assert_eq!(shell.layers.last().unwrap().render(&shell.ctx).title, "Criar tema…");
+    assert_eq!(
+        shell.layers.last().unwrap().render(&shell.ctx).title,
+        "Criar tema…"
+    );
 }
 
 #[test]
@@ -1937,7 +1940,10 @@ fn test_prompt_theme_name_cancel_discards_draft() {
     // Usuário cancela o teclado (Cmd::Back ou click "cancel")
     let flow = prompt.click("cancel", 0, &mut ctx);
     assert!(matches!(flow, Flow::Close));
-    assert!(ctx.theme_draft.is_none(), "rascunho deveria ser descartado no cancel do nome");
+    assert!(
+        ctx.theme_draft.is_none(),
+        "rascunho deveria ser descartado no cancel do nome"
+    );
 }
 
 #[test]
@@ -1955,7 +1961,10 @@ fn test_edit_theme_panel_discards_foreign_draft_dir() {
 
     // Abrir edit_theme_panel deve descartar o rascunho de outro tema
     let _panel = edit_theme_panel(&mut ctx);
-    assert!(ctx.theme_draft.is_none(), "edit_theme_panel não descartou rascunho de outro tema");
+    assert!(
+        ctx.theme_draft.is_none(),
+        "edit_theme_panel não descartou rascunho de outro tema"
+    );
 }
 
 #[test]
@@ -2007,12 +2016,16 @@ fn test_theme_with_empty_author_does_not_show_by_suffix() {
     std::fs::write(
         t_dir.join("main.slint"),
         "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n",
-    ).unwrap();
+    )
+    .unwrap();
     forget(THEMES_CACHE);
 
     let panel = themes_panel(&ctx);
     let items = panel.items(&ctx);
-    let item = items.iter().find(|i| i.row.key == "tema-sem-autor").unwrap();
+    let item = items
+        .iter()
+        .find(|i| i.row.key == "tema-sem-autor")
+        .unwrap();
     assert_eq!(item.row.description, "versão 1.2.3");
     assert!(!item.row.description.contains(" · "));
     assert!(!item.row.description.contains("por "));

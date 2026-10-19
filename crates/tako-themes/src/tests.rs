@@ -1034,7 +1034,8 @@ fn test_create_theme_merges_base_tokens_and_strips_audio() {
     std::fs::write(
         base_dir.join("main.slint"),
         "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n",
-    ).unwrap();
+    )
+    .unwrap();
     std::fs::write(
         base_dir.join("tokens.toml"),
         "accent = \"#112233\"\nfont = \"Inter\"\ncard_bg = \"#445566\"\nmusic = \"bg.mp3\"\naudio = \"sound.wav\"\n",
@@ -1112,7 +1113,7 @@ fn test_clean_old_backups_keeps_only_newest() {
 #[test]
 fn test_export_theme_with_override_merges_custom_tokens() {
     use crate::create::{CreateThemeOptions, create_theme};
-    use crate::export::{export_theme_with_override};
+    use crate::export::export_theme_with_override;
     use crate::overrides::ThemeTokensOverride;
     use crate::package::validate_package;
 
@@ -1142,7 +1143,8 @@ fn test_export_theme_with_override_merges_custom_tokens() {
         font: Some("Poppins".into()),
         ..Default::default()
     };
-    ov.extra.insert("custom_token".into(), toml::Value::String("val".into()));
+    ov.extra
+        .insert("custom_token".into(), toml::Value::String("val".into()));
 
     let export_dir = tmp.path().join("exported");
     std::fs::create_dir_all(&export_dir).unwrap();
