@@ -1098,6 +1098,11 @@ fn sound_settings_persist_and_adjust_volumes_and_toggle_music() {
     // Toggle music off
     accept(&mut ctx, &toggle_music);
     assert!(!crate::navigation_feedback::music_enabled(&ctx.settings));
+    let items_off = rows_of(&ctx, "sound");
+    let music_vol_off = find(&items_off, "theme-music-volume");
+    assert!(!music_vol_off.row.enabled);
+    assert_ne!(music_vol_off.row.value, "45");
+    assert_ne!(music_vol_off.row.value, "45%");
 
     // Toggle music back on
     accept(&mut ctx, &toggle_music);
@@ -1479,7 +1484,7 @@ fn api_settings_panel_toggles_and_regenerates_token() {
 
     let rows = rows_of(&ctx, "integrations");
     let api_row = find(&rows, "settings.system.api");
-    assert!(api_row.row.value.is_empty());
+    assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
 
     let mut panel = match accept(&mut ctx, &api_row) {
         Flow::Push(l) => l,
@@ -1514,7 +1519,7 @@ fn api_settings_panel_toggles_and_regenerates_token() {
         Flow::Push(l) => l,
         _ => panic!("esperava diálogo de confirmação"),
     };
-    confirm_dialog.handle(Cmd::Accept, &mut ctx);
+    confirm_dialog.click("row", 0, &mut ctx);
     let token2 = ctx.settings.string(keys::API_TOKEN);
     assert!(!token2.is_empty());
     assert_ne!(token1, token2);
@@ -1626,8 +1631,8 @@ fn console_mode_row_displays_status_and_triggers_check() {
     assert_eq!(cm_row.row.style, "error");
 
     // 5. Ação de verificar de novo
-    let check_again = find(&rows, "console-mode-check");
-    let flow = accept(&mut ctx, &check_again);
+    assert_eq!(cm_row.row.action, ctx.t("settings.integrations.console_mode_check_again"));
+    let flow = accept(&mut ctx, &cm_row);
     assert!(matches!(flow, Flow::Stay));
 }
 
@@ -1643,7 +1648,8 @@ fn console_mode_row_displays_checking_when_verifying() {
         cm_row.row.value,
         ctx.t("settings.integrations.console_mode_checking")
     );
-    assert!(!find(&rows, "console-mode-check").row.enabled);
+    assert!(!cm_row.row.enabled);
+    assert_eq!(cm_row.row.action, ctx.t("settings.integrations.console_mode_check_again"));
     super::integrations::set_checking_for_test(false);
 }
 

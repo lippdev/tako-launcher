@@ -1329,13 +1329,7 @@ fn sound(ctx: &Ctx) -> Vec<MenuItem> {
                 ..PanelRow::choice(
                     "theme-music-volume",
                     ctx.t("settings.sound.music_volume"),
-                    if !music_on {
-                        if ctx.desktop {
-                            "45".into()
-                        } else {
-                            "45%".into()
-                        }
-                    } else if ctx.desktop {
+                    if ctx.desktop {
                         match feedback::music_volume(&ctx.settings) {
                             0 => ctx.t("settings.sound.music_muted"),
                             v => v.to_string(),
@@ -1831,7 +1825,7 @@ pub(crate) fn api_panel(ctx: &Ctx) -> MenuLayer {
             MenuItem::new(
                 PanelRow::action("api-token", ctx.t("settings.system.api_token"))
                     .desc(ctx.t("settings.system.api_token_desc"))
-                    .value(ctx.t("settings.system.api_token_show")),
+                    .action_btn(ctx.t("settings.system.api_token_show")),
             )
             .on(|ctx| {
                 let mut token = ctx.settings.string(keys::API_TOKEN);

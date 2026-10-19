@@ -16,6 +16,7 @@ theme_struct! {
         pub title: String,
         pub description: String,
         pub value: String,
+        pub action: String,
         pub on: bool,
         pub enabled: bool,
         pub emphasized: bool,
@@ -40,6 +41,14 @@ impl PanelRow {
     }
     pub fn button(key: impl Into<String>, title: impl Into<String>) -> Self {
         Self::new(key, "button", title)
+    }
+    pub fn action_btn(mut self, a: impl Into<String>) -> Self {
+        let text = a.into();
+        self.action = text.clone();
+        if self.value.is_empty() {
+            self.value = text;
+        }
+        self
     }
     pub fn header(title: impl Into<String>) -> Self {
         Self::new("", "header", title)

@@ -118,10 +118,16 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             false,
         ));
     }
+    let api_on = ctx.settings.bool(keys::API_ENABLED, false);
     rows.push(
         MenuItem::new(
             PanelRow::action("settings.system.api", ctx.t("settings.system.api"))
-                .desc(ctx.t("settings.system.api_desc")),
+                .desc(ctx.t("settings.system.api_desc"))
+                .value(ctx.t(if api_on {
+                    "settings.system.api_on"
+                } else {
+                    "settings.system.api_off"
+                })),
         )
         .on(|ctx| Flow::Push(Box::new(super::api_panel(ctx)))),
     );
