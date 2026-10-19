@@ -134,6 +134,22 @@ pub fn unique_theme_id(themes_root: &Path, name: &str) -> String {
     format!("{base}-novo")
 }
 
+/// Verifica se uma chave do `tokens.toml` se refere a áudio (música de fundo ou som de navegação).
+pub fn is_audio_key(key: &str) -> bool {
+    matches!(
+        key,
+        "audio"
+            | "music"
+            | "musica"
+            | "move"
+            | "mover"
+            | "accept"
+            | "confirmar"
+            | "back"
+            | "voltar"
+    )
+}
+
 /// Verifica se um tema instalado usa o `Ui` padrão (reexporta `App` e `Ui` de `@tako/main.slint`).
 pub fn uses_default_ui(theme_dir: &Path) -> bool {
     let Ok(manifest) = validate_package(theme_dir) else {
@@ -197,6 +213,7 @@ pub struct CreateThemeOptions<'a> {
     pub tokens: &'a ThemeTokensOverride,
     pub background_image_source: Option<&'a Path>,
     pub overwrite: bool,
+    pub base_theme_dir: Option<&'a Path>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -215,6 +232,19 @@ pub enum CreateThemeError {
     InvalidImage,
     #[error("pacote gerado inválido: {0:?}")]
     Package(Vec<Problem>),
+}
+
+fn clean_old_backups(themes_root: &Path, id: &str) {
+    let prefix = format!(".old-{id}-bak-");
+    if let Ok(entries) = fs::read_dir(themes_root) {
+        for entry in entries.flatten() {
+            let file_name = entry.file_name();
+            let name = file_name.to_string_lossy();
+            if name.starts_with(&prefix) {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+    }
 }
 
 /// Cria um novo tema instalado a partir de tokens e opções informadas.
@@ -277,9 +307,44 @@ pub fn create_theme(
     let slint_content = "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n";
     fs::write(staging.path().join(DEFAULT_ENTRY), slint_content)?;
 
-    let mut tokens = options.tokens.clone();
+    let mut tokens = if let Some(base_dir) = options.base_theme_dir {
+        if base_dir.is_dir() {
+            let base_tokens_path = base_dir.join("tokens.toml");
+            if let Ok(text) = fs::read_to_string(&base_tokens_path) {
+                let mut merged = ThemeTokensOverride::from_toml_str(&text);
+                if let Some(ref a) = options.tokens.accent {
+                    merged.accent = Some(a.clone());
+                }
+                if let Some(ref f) = options.tokens.font {
+                    merged.font = Some(f.clone());
+                }
+                if let Some(ref c) = options.tokens.canvas {
+                    merged.canvas = Some(c.clone());
+                }
+                if let Some(ref bg) = options.tokens.background_image {
+                    merged.background_image = Some(bg.clone());
+                }
+                if let Some(ref bm) = options.tokens.background_mode {
+                    merged.background_mode = Some(*bm);
+                }
+                for (k, v) in &options.tokens.extra {
+                    merged.extra.insert(k.clone(), v.clone());
+                }
+                merged
+            } else {
+                options.tokens.clone()
+            }
+        } else {
+            options.tokens.clone()
+        }
+    } else {
+        options.tokens.clone()
+    };
+
     // Zera background_source_name antes de gravar para não vazar nome local e não falhar no theme check
     tokens.background_source_name = None;
+    // Remove qualquer chave de áudio do tokens.toml (tema criado não leva música da base)
+    tokens.extra.retain(|k, _| !is_audio_key(k));
 
     // Copia e valida imagem de fundo se informada, usando validate_background_image comum
     if let Some(img_src) = options.background_image_source {
@@ -311,13 +376,9 @@ pub fn create_theme(
         if is_old_copy {
             let _ = fs::remove_dir_all(&old);
         } else {
-            for i in 1..1000 {
-                let backup = themes_root.join(format!(".old-{id}-bak-{i}"));
-                if !backup.exists() {
-                    let _ = fs::rename(&old, &backup);
-                    break;
-                }
-            }
+            clean_old_backups(themes_root, &id);
+            let backup = themes_root.join(format!(".old-{id}-bak-1"));
+            let _ = fs::rename(&old, &backup);
         }
     }
 

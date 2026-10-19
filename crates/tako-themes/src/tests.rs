@@ -666,6 +666,7 @@ fn test_create_theme_from_default_and_installed_and_reject_duplicate() {
         tokens: &tokens,
         background_image_source: None,
         overwrite: false,
+        base_theme_dir: None,
     };
 
     let installed = create_theme(&themes_root, &opts).unwrap();
@@ -695,6 +696,7 @@ fn test_create_theme_from_default_and_installed_and_reject_duplicate() {
         tokens: &tokens,
         background_image_source: None,
         overwrite: true,
+        base_theme_dir: None,
     };
     let updated = create_theme(&themes_root, &opts_overwrite).unwrap();
     let updated_toml = fs::read_to_string(updated.dir.join("tokens.toml")).unwrap();
@@ -714,6 +716,7 @@ fn test_create_theme_from_default_and_installed_and_reject_duplicate() {
         tokens: &derived_tokens,
         background_image_source: None,
         overwrite: false,
+        base_theme_dir: None,
     };
     let derived = create_theme(&themes_root, &opts_derived).unwrap();
     assert_eq!(derived.id(), "tema-derivado");
@@ -753,6 +756,7 @@ fn test_export_and_install_round_trip_with_background_image() {
         tokens: &tokens,
         background_image_source: Some(&img_path),
         overwrite: false,
+        base_theme_dir: None,
     };
 
     let created = create_theme(&themes_root, &opts).unwrap();
@@ -819,6 +823,7 @@ fn test_reserved_theme_ids_and_derivation() {
         tokens: &tokens,
         background_image_source: None,
         overwrite: true,
+        base_theme_dir: None,
     };
     let err = create_theme(&themes_root, &opts_reserved).unwrap_err();
     assert!(matches!(err, CreateThemeError::Reserved(id) if id == "tako-fita"));
@@ -862,6 +867,7 @@ fn test_cannot_overwrite_third_party_or_non_tako_theme() {
         tokens: &tokens,
         background_image_source: None,
         overwrite: true,
+        base_theme_dir: None,
     };
     let err = create_theme(&themes_root, &opts).unwrap_err();
     assert!(matches!(err, CreateThemeError::CannotOverwrite(id) if id == "tema-terceiro"));
@@ -888,6 +894,7 @@ fn test_overwrite_resets_old_overrides_directory() {
         tokens: &tokens,
         background_image_source: None,
         overwrite: false,
+        base_theme_dir: None,
     };
     let created = create_theme(&themes_root, &opts).unwrap();
     let id = created.id();
@@ -899,6 +906,7 @@ fn test_overwrite_resets_old_overrides_directory() {
     // Sobrescreve o tema
     let opts_overwrite = CreateThemeOptions {
         overwrite: true,
+        base_theme_dir: None,
         ..opts
     };
     create_theme(&themes_root, &opts_overwrite).unwrap();
@@ -966,6 +974,7 @@ fn test_old_dir_preserved_if_not_matching() {
         tokens: &tokens,
         background_image_source: None,
         overwrite: false,
+        base_theme_dir: None,
     };
     create_theme(&themes_root, &opts).unwrap();
 
@@ -999,9 +1008,156 @@ fn test_background_source_name_is_zeroed_in_created_theme() {
         tokens: &tokens,
         background_image_source: None,
         overwrite: false,
+        base_theme_dir: None,
     };
     let created = create_theme(&themes_root, &opts).unwrap();
     let tokens_text = fs::read_to_string(created.dir.join("tokens.toml")).unwrap();
     assert!(!tokens_text.contains("custom-background-name"));
     assert!(!tokens_text.contains("minha_foto_privada.png"));
+}
+
+#[test]
+fn test_create_theme_merges_base_tokens_and_strips_audio() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::overrides::ThemeTokensOverride;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+
+    // Cria tema base com tokens próprios e chaves de áudio
+    let base_dir = themes_root.join("tema-base");
+    std::fs::create_dir_all(&base_dir).unwrap();
+    std::fs::write(
+        base_dir.join("theme.toml"),
+        "id = \"tema-base\"\nname = \"Base\"\nversion = \"1.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\ncreated-by-tako = true\n",
+    ).unwrap();
+    std::fs::write(
+        base_dir.join("main.slint"),
+        "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n",
+    ).unwrap();
+    std::fs::write(
+        base_dir.join("tokens.toml"),
+        "accent = \"#112233\"\nfont = \"Inter\"\ncard_bg = \"#445566\"\nmusic = \"bg.mp3\"\naudio = \"sound.wav\"\n",
+    ).unwrap();
+
+    let tokens = ThemeTokensOverride {
+        accent: Some("#AABBCC".into()),
+        ..Default::default()
+    };
+
+    let opts = CreateThemeOptions {
+        name: "Derivado Sem Audio",
+        custom_id: None,
+        author: None,
+        version: None,
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+        base_theme_dir: Some(&base_dir),
+    };
+
+    let created = create_theme(&themes_root, &opts).unwrap();
+    let tokens_text = std::fs::read_to_string(created.dir.join("tokens.toml")).unwrap();
+    // O novo tema deve ter herdado font e card_bg da base
+    assert!(tokens_text.contains("font = \"Inter\""));
+    assert!(tokens_text.contains("card_bg = \"#445566\""));
+    // Deve ter o novo accent
+    assert!(tokens_text.contains("accent = \"#AABBCC\""));
+    // Não pode ter chaves de áudio
+    assert!(!tokens_text.contains("music"));
+    assert!(!tokens_text.contains("audio"));
+    assert!(!tokens_text.contains("bg.mp3"));
+}
+
+#[test]
+fn test_clean_old_backups_keeps_only_newest() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::overrides::ThemeTokensOverride;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+    std::fs::create_dir_all(&themes_root).unwrap();
+
+    // Cria backups pré-existentes
+    let bak1 = themes_root.join(".old-meu-tema-bak-1");
+    let bak2 = themes_root.join(".old-meu-tema-bak-2");
+    std::fs::create_dir_all(&bak1).unwrap();
+    std::fs::create_dir_all(&bak2).unwrap();
+
+    // Cria pasta corrupta .old-meu-tema
+    let old_dir = themes_root.join(".old-meu-tema");
+    std::fs::create_dir_all(&old_dir).unwrap();
+    std::fs::write(old_dir.join("arquivo.txt"), "antigo").unwrap();
+
+    let tokens = ThemeTokensOverride::default();
+    let opts = CreateThemeOptions {
+        name: "Meu Tema",
+        custom_id: None,
+        author: None,
+        version: None,
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+        base_theme_dir: None,
+    };
+    create_theme(&themes_root, &opts).unwrap();
+
+    // Deve existir somente .old-meu-tema-bak-1 e o anterior foi limpo
+    assert!(themes_root.join(".old-meu-tema-bak-1").is_dir());
+    assert!(!themes_root.join(".old-meu-tema-bak-2").exists());
+}
+
+#[test]
+fn test_export_theme_with_override_merges_custom_tokens() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::export::{export_theme_with_override};
+    use crate::overrides::ThemeTokensOverride;
+    use crate::package::validate_package;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+
+    let tokens = ThemeTokensOverride {
+        accent: Some("#6C5CE7".into()),
+        ..Default::default()
+    };
+    let opts = CreateThemeOptions {
+        name: "Tema Exportavel",
+        custom_id: None,
+        author: Some("Autor"),
+        version: Some("1.0.0"),
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+        base_theme_dir: None,
+    };
+    let created = create_theme(&themes_root, &opts).unwrap();
+
+    // Aplica um override com accent diferente
+    let mut ov = ThemeTokensOverride {
+        accent: Some("#123456".into()),
+        font: Some("Poppins".into()),
+        ..Default::default()
+    };
+    ov.extra.insert("custom_token".into(), toml::Value::String("val".into()));
+
+    let export_dir = tmp.path().join("exported");
+    std::fs::create_dir_all(&export_dir).unwrap();
+    let pkg_path = export_dir.join("export-ov.takotheme");
+
+    export_theme_with_override(&created.dir, &pkg_path, Some(&ov), None).unwrap();
+    assert!(pkg_path.is_file());
+
+    // Instala em dest
+    let dest_themes = tmp.path().join("dest_themes");
+    let installed = crate::install(&pkg_path, &dest_themes).unwrap();
+    let tokens_text = std::fs::read_to_string(installed.dir.join("tokens.toml")).unwrap();
+    assert!(tokens_text.contains("accent = \"#123456\""));
+    assert!(tokens_text.contains("font = \"Poppins\""));
+    assert!(tokens_text.contains("custom_token = \"val\""));
+
+    assert!(validate_package(&installed.dir).is_ok());
 }
