@@ -43,7 +43,7 @@ slint-interpreter = { version = "1.18.1", default-features = false, features = [
 i-slint-core = { version = "=1.18.1", default-features = false }
 roxmltree = "0.21"
 rfd = "0.15.4"
-arboard = "3"
+arboard = { version = "3", default-features = false }
 libc = "0.2"
 x11rb = { version = "0.13", features = ["randr", "xfixes"] }
 zbus = "5"
