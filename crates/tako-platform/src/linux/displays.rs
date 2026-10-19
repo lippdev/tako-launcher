@@ -303,7 +303,7 @@ impl OutputBackend for Kscreen {
         kscreen::parse(&run::tool("kscreen-doctor", &["-j".into()])?).map_err(DeviceError::Failed)
     }
     fn commit(&self, desired: &[Output]) -> DeviceResult<()> {
-        run::tool("kscreen-doctor", &kscreen::args(desired)).map(drop)
+        run::apply_tool("kscreen-doctor", &kscreen::args(desired)).map(drop)
     }
     fn set_hdr(&self, id: &str, enabled: bool) -> DeviceResult<()> {
         let o = self
@@ -315,7 +315,7 @@ impl OutputBackend for Kscreen {
             return Err(DeviceError::Unsupported("HDR".into()));
         }
         let state = if enabled { "enable" } else { "disable" };
-        run::tool("kscreen-doctor", &[format!("output.{id}.hdr.{state}")]).map(drop)
+        run::apply_tool("kscreen-doctor", &[format!("output.{id}.hdr.{state}")]).map(drop)
     }
     fn set_vrr(&self, id: &str, enabled: bool) -> DeviceResult<()> {
         if self.outputs()?.iter().find(|o| o.id == id).map(|o| o.vrr)
@@ -323,7 +323,7 @@ impl OutputBackend for Kscreen {
         {
             return Err(DeviceError::Unsupported("VRR".into()));
         }
-        run::tool("kscreen-doctor", &[kscreen::vrr_arg(id, enabled)]).map(drop)
+        run::apply_tool("kscreen-doctor", &[kscreen::vrr_arg(id, enabled)]).map(drop)
     }
 }
 
@@ -336,10 +336,10 @@ impl OutputBackend for Wlr {
         wlr::parse(&run::tool("wlr-randr", &["--json".into()])?).map_err(DeviceError::Failed)
     }
     fn commit(&self, desired: &[Output]) -> DeviceResult<()> {
-        run::tool("wlr-randr", &wlr::args(desired)).map(drop)
+        run::apply_tool("wlr-randr", &wlr::args(desired)).map(drop)
     }
     fn set_vrr(&self, id: &str, enabled: bool) -> DeviceResult<()> {
-        run::tool("wlr-randr", &wlr::vrr_args(id, enabled)).map(drop)
+        run::apply_tool("wlr-randr", &wlr::vrr_args(id, enabled)).map(drop)
     }
 }
 

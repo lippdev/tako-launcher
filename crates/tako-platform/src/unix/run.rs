@@ -15,12 +15,19 @@ fn io_error(what: &str, e: io::Error) -> DeviceError {
     }
 }
 
-/// Quanto uma ferramenta (xrandr, kscreen-doctor, pactl) pode demorar antes de travar a interface.
+/// Quanto uma leitura (`kscreen-doctor -j`, `wlr-randr --json`, pactl) pode demorar antes de travar a interface.
 const TOOL_LIMIT: Duration = Duration::from_secs(10);
+/// Aplicar telas espera o compositor e a TV trocarem de modo: bem mais lento que ler.
+const APPLY_LIMIT: Duration = Duration::from_secs(30);
 
 /// Roda uma ferramenta e devolve a saída padrão. Ferramenta ausente = `Unsupported`.
 pub fn tool(program: &str, args: &[String]) -> DeviceResult<String> {
     tool_within(program, args, TOOL_LIMIT)
+}
+
+/// Como [`tool`], para comandos que aplicam mudanças nas telas.
+pub fn apply_tool(program: &str, args: &[String]) -> DeviceResult<String> {
+    tool_within(program, args, APPLY_LIMIT)
 }
 
 fn tool_within(program: &str, args: &[String], limit: Duration) -> DeviceResult<String> {
