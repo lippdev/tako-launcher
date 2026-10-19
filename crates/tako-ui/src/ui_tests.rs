@@ -678,6 +678,10 @@ fn fullscreen_snapshot() {
         let ui = def.create().unwrap();
         crate::theme::apply_tokens(&ui, Some(&theme_dir));
         ui.show().unwrap();
+        ui.set_global_property("Ui", "reduce-motion", Value::Bool(true))
+            .unwrap();
+        let art = std::env::var_os("TAKO_SNAP_ART")
+            .map(|p| slint::Image::load_from_path(std::path::Path::new(&p)).unwrap());
 
         let mut ctx = crate::app::build_ctx(
             DataPaths::at(dir.path().join("data")),
@@ -688,7 +692,7 @@ fn fullscreen_snapshot() {
         let mut shell = Shell::new(ctx);
 
         let sizes: Vec<(u32, u32)> = std::env::var("TAKO_SNAP_SIZES")
-            .unwrap_or_else(|_| "1920x1080,1280x720".into())
+            .unwrap_or_else(|_| "1920x1080,1280x720,1600x900,960x600".into())
             .split(',')
             .filter_map(|s| s.split_once('x'))
             .filter_map(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
@@ -710,7 +714,7 @@ fn fullscreen_snapshot() {
 
         let game = shell.ctx.library.games()[0].id.clone();
         for (page_name, route, scales, focus_ribbon) in [
-            ("inicio", "home", vec![1.0], true),
+            ("inicio", "home", vec![1.0, 1.25, 1.5], true),
             ("biblioteca", "library:all", vec![1.0, 1.25, 1.5], false),
             ("configuracoes", "settings", vec![1.0, 1.25, 1.5], false),
             ("detalhes", "details", vec![1.0, 1.25, 1.5], false),
@@ -739,8 +743,13 @@ fn fullscreen_snapshot() {
                     for (name, value) in &out.props {
                         crate::bridge::set(&ui, name, value.clone());
                     }
-                    ui.set_property("backdrop", Value::Image(art_img.clone()))
-                        .unwrap();
+                    if let Some(art) = &art {
+                        ui.set_property("backdrop", Value::Image(art.clone()))
+                            .unwrap();
+                    } else {
+                        ui.set_property("backdrop", Value::Image(art_img.clone()))
+                            .unwrap();
+                    }
                     let id = shell.focused_game();
                     let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
                     let p = tako_core::presentation::color::AccentPalette::for_accent(
@@ -751,7 +760,9 @@ fn fullscreen_snapshot() {
                         let c = slint::Color::from_rgb_u8(c.r, c.g, c.b);
                         crate::bridge::set_global(&ui, "Ui", name, Value::Brush(c.into()));
                     }
-                    slint::platform::update_timers_and_animations();
+                    for _ in 0..10 {
+                        slint::platform::update_timers_and_animations();
+                    }
                     let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
                     ui.window().request_redraw();
                     window.draw_if_needed(|r| {
@@ -1329,3 +1340,5 @@ fn desktop_scroll_bench() {
     .join()
     .unwrap();
 }
+
+mod fita;
