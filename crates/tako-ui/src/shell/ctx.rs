@@ -326,7 +326,6 @@ pub struct Ctx {
 pub type ArtPins = std::collections::BTreeMap<tako_core::library::ArtKind, String>;
 
 impl Ctx {
-    /// Sem banco nem lojas (`--simulate`).
     /// Recarrega banco, configurações, biblioteca e coleções após restaurar backup.
     pub fn reload_data(&mut self) {
         if self.simulated() {
@@ -342,6 +341,7 @@ impl Ctx {
         self.dirty = true;
     }
 
+    /// Sem banco nem lojas (`--simulate`).
     pub fn simulated(&self) -> bool {
         self.game_settings.is_none()
     }

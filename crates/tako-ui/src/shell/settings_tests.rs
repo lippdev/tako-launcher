@@ -843,10 +843,50 @@ fn system_category_includes_backup_and_restore_options() {
 
     let backup_path = ctx.paths.root.join("teste.takobackup");
     let dialog = super::confirm_restore_layer(&ctx, backup_path);
+    assert_eq!(dialog.focus, 2, "o foco deve iniciar no botão Cancelar");
     let items = dialog.render(&ctx);
     assert_eq!(
         items.rows[1].title,
         ctx.t("settings.system.restore_confirm_button")
     );
     assert_eq!(items.rows[2].title, ctx.t("common.cancel"));
+}
+
+#[test]
+fn restore_is_blocked_when_game_running_or_scanning() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Bloqueado com jogo rodando
+    ctx.running = Some(crate::shell::RunningGame {
+        id: "steam:123".into(),
+        title: "Test Game".into(),
+        pid: None,
+        started: None,
+    });
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path.clone());
+    // Executa no botão Confirmar (linha 1)
+    let rows = (dialog.build)(&ctx);
+    let action = rows[1].accept.clone().unwrap();
+    let flow = action(&mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(
+            ctx.t("settings.system.restore_blocked_game_running")
+                .as_str()
+        )
+    );
+
+    // 2. Bloqueado com varredura em andamento
+    ctx.running = None;
+    ctx.scanning = true;
+    let action2 = rows[1].accept.clone().unwrap();
+    let flow2 = action2(&mut ctx);
+    assert!(matches!(flow2, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_blocked_scanning").as_str())
+    );
 }
