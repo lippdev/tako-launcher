@@ -824,3 +824,86 @@ fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
     let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
     assert_eq!(volume(&ctx.settings), 65);
 }
+
+#[test]
+fn edit_theme_panel_modifies_saves_and_resets_overrides() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Opção para editar tema existe em Aparência
+    let items = rows_of(&ctx, "appearance");
+    let edit_opt = find(&items, "edit-theme");
+    assert_eq!(edit_opt.row.title, ctx.t("settings.appearance.edit_theme"));
+
+    // 2. Abre o painel de edição de tema
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let accent_row = find(&rows, "accent");
+    let font_row = find(&rows, "font");
+    let bg_type_row = find(&rows, "bg_type");
+
+    assert_eq!(
+        accent_row.row.title,
+        ctx.t("settings.appearance.accent_color")
+    );
+    assert_eq!(font_row.row.title, ctx.t("settings.appearance.font"));
+    assert_eq!(bg_type_row.row.title, ctx.t("settings.appearance.bg_type"));
+
+    // 3. Modifica a cor de destaque (testando com controle/teclado via adjust)
+    adjust(&mut ctx, &accent_row, 1);
+    assert!(ctx.theme_draft.is_some());
+
+    // 4. Modifica a cor e fonte no modo desktop (mouse/select)
+    ctx.desktop = true;
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let accent_row = find(&rows, "accent");
+    let font_row = find(&rows, "font");
+    let save_row = find(&rows, "save");
+
+    let mut accent_select = accent_row.select(&ctx).expect("select");
+    let _ = accent_select.click("row", 2, &mut ctx); // Vermelho (#E3161E)
+    assert_eq!(
+        ctx.theme_draft.as_ref().unwrap().accent.as_deref(),
+        Some("#E3161E")
+    );
+
+    let mut font_select = font_row.select(&ctx).expect("select");
+    let _ = font_select.click("row", 2, &mut ctx); // Poppins
+    assert_eq!(
+        ctx.theme_draft.as_ref().unwrap().font.as_deref(),
+        Some("Poppins")
+    );
+
+    // 5. Salva a sobreposição
+    accept(&mut ctx, &save_row);
+    assert!(ctx.theme_draft.is_none());
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    let loaded = tako_themes::overrides::load_override(&ctx.paths.themes(), None).unwrap();
+    assert!(loaded.contains("#E3161E"));
+    assert!(loaded.contains("Poppins"));
+
+    // 6. Ao reabrir, a opção de restaurar padrão está visível e funcional
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let reset_row = find(&rows, "reset");
+    assert_eq!(
+        reset_row.row.title,
+        ctx.t("settings.appearance.reset_theme")
+    );
+    accept(&mut ctx, &reset_row);
+
+    // 7. A sobreposição foi removida
+    assert!(!tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    assert_eq!(
+        tako_themes::overrides::load_override(&ctx.paths.themes(), None),
+        None
+    );
+}

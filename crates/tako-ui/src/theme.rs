@@ -55,34 +55,172 @@ fn install_extras(themes_dir: &Path) {
     }
 }
 
-/// `tokens.toml` opcional na pasta do tema: troca cores do global `Ui` (`canvas = "#000000"`, com ou sem alfa
-/// `#RRGGBBAA`). Assim um tema reaproveita o padrão inteiro (`export { App } from "@tako/main.slint"`) e só
-/// muda a paleta. Chave ou cor inválida é ignorada com log.
+/// `tokens.toml` opcional na pasta do tema ou na sobreposição: troca cores, fontes e fundo do global `Ui` (THEME-003).
 pub fn apply_tokens(ui: &slint_interpreter::ComponentInstance, dir: Option<&Path>) {
-    let Some(text) = dir.and_then(|d| std::fs::read_to_string(d.join("tokens.toml")).ok()) else {
+    apply_tokens_with_override(ui, dir, None, None);
+}
+
+/// Aplica tokens combinando o `tokens.toml` original do tema e a sobreposição (THEME-003).
+pub fn apply_tokens_with_override(
+    ui: &slint_interpreter::ComponentInstance,
+    theme_dir: Option<&Path>,
+    override_text: Option<&str>,
+    override_dir: Option<&Path>,
+) {
+    let mut table: toml::Table = theme_dir
+        .and_then(|d| std::fs::read_to_string(d.join("tokens.toml")).ok())
+        .and_then(|t| t.parse().ok())
+        .unwrap_or_default();
+
+    let override_table: Option<toml::Table> = if let Some(text) = override_text {
+        text.parse().ok()
+    } else if let Some(d) = override_dir {
+        std::fs::read_to_string(d.join("tokens.toml"))
+            .ok()
+            .and_then(|t| t.parse().ok())
+    } else {
+        None
+    };
+
+    if let Some(ov) = override_table {
+        for (k, v) in ov {
+            table.insert(k, v);
+        }
+    }
+
+    if table.is_empty() {
+        crate::bridge::set_global(
+            ui,
+            "Ui",
+            "has-custom-background",
+            slint_interpreter::Value::Bool(false),
+        );
         return;
-    };
-    let table: toml::Table = match text.parse() {
-        Ok(t) => t,
-        Err(e) => {
-            tracing::warn!("tokens.toml: {e}");
-            return;
-        }
-    };
+    }
+
+    let mut has_custom_bg = false;
+
     for (name, value) in table {
-        match value.as_str().and_then(parse_color) {
-            Some(c) => crate::bridge::set_global(
-                ui,
-                "Ui",
-                &name,
-                slint_interpreter::Value::Brush(slint::Brush::SolidColor(c)),
-            ),
-            None => tracing::warn!("tokens.toml: cor inválida em {name}"),
+        if name == "font"
+            || name == "font-title"
+            || name == "font-text"
+            || name == "font-heading"
+            || name == "font-desk"
+            || name == "font-wordmark"
+        {
+            if let Some(f) = value.as_str() {
+                if name == "font" {
+                    for target in [
+                        "font-title",
+                        "font-text",
+                        "font-heading",
+                        "font-desk",
+                        "font-wordmark",
+                    ] {
+                        crate::bridge::set_global(
+                            ui,
+                            "Ui",
+                            target,
+                            slint_interpreter::Value::String(f.into()),
+                        );
+                    }
+                } else {
+                    crate::bridge::set_global(
+                        ui,
+                        "Ui",
+                        &name,
+                        slint_interpreter::Value::String(f.into()),
+                    );
+                }
+            }
+        } else if name == "custom-background" || name == "background-image" {
+            if let Some(bg_path) = value.as_str().filter(|s| !s.trim().is_empty()) {
+                let resolved = if let Some(od) = override_dir {
+                    let candidate = od.join(bg_path);
+                    if candidate.is_file() {
+                        Some(candidate)
+                    } else {
+                        theme_dir.map(|td| td.join(bg_path))
+                    }
+                } else {
+                    theme_dir.map(|td| td.join(bg_path))
+                };
+
+                let img_file = resolved.unwrap_or_else(|| PathBuf::from(bg_path));
+                if img_file.is_file() {
+                    match slint::Image::load_from_path(&img_file) {
+                        Ok(img) => {
+                            crate::bridge::set_global(
+                                ui,
+                                "Ui",
+                                "custom-background",
+                                slint_interpreter::Value::Image(img),
+                            );
+                            crate::bridge::set_global(
+                                ui,
+                                "Ui",
+                                "has-custom-background",
+                                slint_interpreter::Value::Bool(true),
+                            );
+                            has_custom_bg = true;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "falha ao carregar imagem de fundo {}: {e}",
+                                img_file.display()
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            match value.as_str().and_then(parse_color) {
+                Some(c) => {
+                    crate::bridge::set_global(
+                        ui,
+                        "Ui",
+                        &name,
+                        slint_interpreter::Value::Brush(slint::Brush::SolidColor(c)),
+                    );
+                    if name == "canvas" {
+                        crate::bridge::set_global(
+                            ui,
+                            "Ui",
+                            "desk-canvas",
+                            slint_interpreter::Value::Brush(slint::Brush::SolidColor(c)),
+                        );
+                    }
+                    if name == "accent" {
+                        let deep = slint::Color::from_argb_u8(
+                            c.alpha(),
+                            (c.red() as f32 * 0.55) as u8,
+                            (c.green() as f32 * 0.55) as u8,
+                            (c.blue() as f32 * 0.55) as u8,
+                        );
+                        crate::bridge::set_global(
+                            ui,
+                            "Ui",
+                            "accent-deep",
+                            slint_interpreter::Value::Brush(slint::Brush::SolidColor(deep)),
+                        );
+                    }
+                }
+                None => tracing::warn!("tokens.toml: cor inválida em {name}"),
+            }
         }
+    }
+
+    if !has_custom_bg {
+        crate::bridge::set_global(
+            ui,
+            "Ui",
+            "has-custom-background",
+            slint_interpreter::Value::Bool(false),
+        );
     }
 }
 
-fn parse_color(s: &str) -> Option<slint::Color> {
+pub fn parse_color(s: &str) -> Option<slint::Color> {
     let hex = s.strip_prefix('#')?;
     let n = u32::from_str_radix(hex, 16).ok()?;
     let [a, r, g, b] = match hex.len() {
@@ -179,7 +317,17 @@ fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
     table
         .iter()
         .filter_map(|(name, value)| {
-            if !colors.iter().any(|c| c == name) {
+            if name == "font"
+                || name.starts_with("font-")
+                || name == "custom-background"
+                || name == "background-image"
+            {
+                if value.as_str().is_none() {
+                    Some(tf("themes.check.token_invalid", &[("name", name)]))
+                } else {
+                    None
+                }
+            } else if !colors.iter().any(|c| c == name) {
                 Some(tf("themes.check.token_unknown", &[("name", name)]))
             } else if value.as_str().and_then(parse_color).is_none() {
                 Some(tf("themes.check.token_invalid", &[("name", name)]))

@@ -600,6 +600,420 @@ fn pick_theme(ctx: &mut Ctx, id: Option<&str>, name: &str) -> Flow {
     Flow::Stay
 }
 
+const ACCENT_PRESETS: [(&str, &str); 8] = [
+    ("#2B3A55", "accent_blue"),
+    ("#6C5CE7", "accent_purple"),
+    ("#E3161E", "accent_red"),
+    ("#0B7A3B", "accent_green"),
+    ("#E67E22", "accent_orange"),
+    ("#E84393", "accent_pink"),
+    ("#00CEC9", "accent_cyan"),
+    ("#F1C40F", "accent_yellow"),
+];
+
+const FONTS: [&str; 4] = ["Inter", "Source Sans 3", "Poppins", "Plus Jakarta Sans"];
+
+const BG_TYPES: [(&str, &str); 3] = [
+    ("default", "bg_default"),
+    ("solid", "bg_solid"),
+    ("image", "bg_image"),
+];
+
+const BG_COLORS: [(&str, &str); 5] = [
+    ("#0E1116", "bg_black"),
+    ("#1C1C1E", "bg_dark_gray"),
+    ("#0B1A33", "bg_navy"),
+    ("#1B1429", "bg_dark_purple"),
+    ("#0D201A", "bg_dark_green"),
+];
+
+fn current_draft(ctx: &Ctx) -> tako_themes::overrides::ThemeTokensOverride {
+    if let Some(ref d) = ctx.theme_draft {
+        return d.clone();
+    }
+    let theme_id = tako_themes::selected(&ctx.paths.themes());
+    tako_themes::overrides::load_override(&ctx.paths.themes(), theme_id.as_deref())
+        .map(|s| tako_themes::overrides::ThemeTokensOverride::from_toml_str(&s))
+        .unwrap_or_default()
+}
+
+pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("settings.appearance.edit_theme"), |ctx| {
+        let draft = current_draft(ctx);
+
+        let cur_accent_hex = draft.accent.as_deref().unwrap_or("#2B3A55");
+        let accent_label = ACCENT_PRESETS
+            .iter()
+            .find(|(hex, _)| hex.eq_ignore_ascii_case(cur_accent_hex))
+            .map(|(_, l)| ctx.t(&format!("settings.appearance.{l}")))
+            .unwrap_or_else(|| cur_accent_hex.to_owned());
+
+        let accent_row = MenuItem::new(
+            PanelRow::choice(
+                "accent",
+                ctx.t("settings.appearance.accent_color"),
+                accent_label,
+            )
+            .desc(ctx.t("settings.appearance.accent_color_desc")),
+        )
+        .on_adjust(|ctx, dir| {
+            let mut d = current_draft(ctx);
+            let cur_hex = d.accent.as_deref().unwrap_or("#2B3A55");
+            let cur_idx = ACCENT_PRESETS
+                .iter()
+                .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_hex))
+                .unwrap_or(0);
+            let next_idx = if dir >= 0 {
+                (cur_idx + 1) % ACCENT_PRESETS.len()
+            } else {
+                (cur_idx + ACCENT_PRESETS.len() - 1) % ACCENT_PRESETS.len()
+            };
+            d.accent = Some(ACCENT_PRESETS[next_idx].0.to_owned());
+            ctx.theme_draft = Some(d);
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            let draft = current_draft(ctx);
+            let cur_hex = draft.accent.as_deref().unwrap_or("#2B3A55");
+            let cur_idx = ACCENT_PRESETS
+                .iter()
+                .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_hex))
+                .unwrap_or(0);
+            let picks = ACCENT_PRESETS
+                .iter()
+                .map(|(hex, label)| {
+                    let hex = (*hex).to_owned();
+                    Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                        let mut d = current_draft(ctx);
+                        d.accent = Some(hex.clone());
+                        ctx.theme_draft = Some(d);
+                        ctx.dirty = true;
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (picks, cur_idx)
+        });
+
+        let cur_font = draft.font.as_deref().unwrap_or("Inter");
+        let font_label = cur_font.to_owned();
+        let font_row = MenuItem::new(
+            PanelRow::choice("font", ctx.t("settings.appearance.font"), font_label)
+                .desc(ctx.t("settings.appearance.font_desc")),
+        )
+        .on_adjust(|ctx, dir| {
+            let mut d = current_draft(ctx);
+            let cur_f = d.font.as_deref().unwrap_or("Inter");
+            let cur_idx = FONTS.iter().position(|f| *f == cur_f).unwrap_or(0);
+            let next_idx = if dir >= 0 {
+                (cur_idx + 1) % FONTS.len()
+            } else {
+                (cur_idx + FONTS.len() - 1) % FONTS.len()
+            };
+            d.font = Some(FONTS[next_idx].to_owned());
+            ctx.theme_draft = Some(d);
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            let draft = current_draft(ctx);
+            let cur_f = draft.font.as_deref().unwrap_or("Inter");
+            let cur_idx = FONTS.iter().position(|f| *f == cur_f).unwrap_or(0);
+            let picks = FONTS
+                .iter()
+                .map(|font_name| {
+                    let f_name = (*font_name).to_owned();
+                    Pick::new(*font_name).set(move |ctx| {
+                        let mut d = current_draft(ctx);
+                        d.font = Some(f_name.clone());
+                        ctx.theme_draft = Some(d);
+                        ctx.dirty = true;
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (picks, cur_idx)
+        });
+
+        let bg_type_idx = if draft.background_image.is_some() {
+            2
+        } else if draft.canvas.is_some() {
+            1
+        } else {
+            0
+        };
+        let bg_type_label = ctx.t(&format!("settings.appearance.{}", BG_TYPES[bg_type_idx].1));
+
+        let bg_type_row = MenuItem::new(
+            PanelRow::choice(
+                "bg_type",
+                ctx.t("settings.appearance.bg_type"),
+                bg_type_label,
+            )
+            .desc(ctx.t("settings.appearance.bg_type_desc")),
+        )
+        .on_adjust(|ctx, dir| {
+            let mut d = current_draft(ctx);
+            let cur_idx = if d.background_image.is_some() {
+                2
+            } else if d.canvas.is_some() {
+                1
+            } else {
+                0
+            };
+            let next_idx = if dir >= 0 {
+                (cur_idx + 1) % BG_TYPES.len()
+            } else {
+                (cur_idx + BG_TYPES.len() - 1) % BG_TYPES.len()
+            };
+            match next_idx {
+                0 => {
+                    d.canvas = None;
+                    d.background_image = None;
+                }
+                1 => {
+                    d.background_image = None;
+                    if d.canvas.is_none() {
+                        d.canvas = Some("#0E1116".into());
+                    }
+                }
+                _ => {
+                    d.canvas = None;
+                }
+            }
+            ctx.theme_draft = Some(d);
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            let draft = current_draft(ctx);
+            let cur_idx = if draft.background_image.is_some() {
+                2
+            } else if draft.canvas.is_some() {
+                1
+            } else {
+                0
+            };
+            let picks = BG_TYPES
+                .iter()
+                .map(|(mode, label)| {
+                    let mode = (*mode).to_owned();
+                    Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                        let mut d = current_draft(ctx);
+                        match mode.as_str() {
+                            "default" => {
+                                d.canvas = None;
+                                d.background_image = None;
+                            }
+                            "solid" => {
+                                d.background_image = None;
+                                if d.canvas.is_none() {
+                                    d.canvas = Some("#0E1116".into());
+                                }
+                            }
+                            "image" => {
+                                d.canvas = None;
+                            }
+                            _ => {}
+                        }
+                        ctx.theme_draft = Some(d);
+                        ctx.dirty = true;
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (picks, cur_idx)
+        });
+
+        let mut rows = vec![accent_row, font_row, bg_type_row];
+
+        if bg_type_idx == 1 {
+            let cur_canvas = draft.canvas.as_deref().unwrap_or("#0E1116");
+            let bg_color_label = BG_COLORS
+                .iter()
+                .find(|(hex, _)| hex.eq_ignore_ascii_case(cur_canvas))
+                .map(|(_, l)| ctx.t(&format!("settings.appearance.{l}")))
+                .unwrap_or_else(|| cur_canvas.to_owned());
+
+            let bg_color_row = MenuItem::new(
+                PanelRow::choice(
+                    "bg_color",
+                    ctx.t("settings.appearance.bg_color"),
+                    bg_color_label,
+                )
+                .desc(ctx.t("settings.appearance.bg_color_desc")),
+            )
+            .on_adjust(|ctx, dir| {
+                let mut d = current_draft(ctx);
+                let cur_canvas = d.canvas.as_deref().unwrap_or("#0E1116");
+                let cur_idx = BG_COLORS
+                    .iter()
+                    .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_canvas))
+                    .unwrap_or(0);
+                let next_idx = if dir >= 0 {
+                    (cur_idx + 1) % BG_COLORS.len()
+                } else {
+                    (cur_idx + BG_COLORS.len() - 1) % BG_COLORS.len()
+                };
+                d.canvas = Some(BG_COLORS[next_idx].0.to_owned());
+                d.background_image = None;
+                ctx.theme_draft = Some(d);
+                ctx.dirty = true;
+                Flow::Stay
+            })
+            .options(|ctx| {
+                let draft = current_draft(ctx);
+                let cur_canvas = draft.canvas.as_deref().unwrap_or("#0E1116");
+                let cur_idx = BG_COLORS
+                    .iter()
+                    .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_canvas))
+                    .unwrap_or(0);
+                let picks = BG_COLORS
+                    .iter()
+                    .map(|(hex, label)| {
+                        let hex = (*hex).to_owned();
+                        Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                            let mut d = current_draft(ctx);
+                            d.canvas = Some(hex.clone());
+                            d.background_image = None;
+                            ctx.theme_draft = Some(d);
+                            ctx.dirty = true;
+                            Flow::Stay
+                        })
+                    })
+                    .collect();
+                (picks, cur_idx)
+            });
+            rows.push(bg_color_row);
+        } else if bg_type_idx == 2 {
+            let img_val = draft.background_image.as_deref().unwrap_or("");
+            let img_label = if img_val.is_empty() {
+                ctx.t("settings.appearance.bg_no_image")
+            } else {
+                img_val.to_owned()
+            };
+
+            let choose_img_row = MenuItem::new(
+                PanelRow::action("choose_image", ctx.t("settings.appearance.bg_choose_image"))
+                    .desc(ctx.t("settings.appearance.bg_choose_image_desc"))
+                    .value(img_label),
+            )
+            .on(|ctx| {
+                let title = ctx.t("settings.appearance.bg_choose_image");
+                let themes_root = ctx.paths.themes();
+                let theme_id = tako_themes::selected(&themes_root);
+                crate::tasks::run(
+                    ctx,
+                    move || {
+                        rfd::FileDialog::new()
+                            .set_title(&title)
+                            .add_filter(
+                                "img",
+                                tako_themes::overrides::ALLOWED_BACKGROUND_EXTENSIONS,
+                            )
+                            .pick_file()
+                            .and_then(|src| {
+                                tako_themes::overrides::copy_background_image(
+                                    &themes_root,
+                                    theme_id.as_deref(),
+                                    &src,
+                                )
+                                .ok()
+                            })
+                    },
+                    move |ctx, copied| {
+                        if let Some(filename) = copied {
+                            let mut d = current_draft(ctx);
+                            d.background_image = Some(filename);
+                            d.canvas = None;
+                            ctx.theme_draft = Some(d);
+                            ctx.dirty = true;
+                        }
+                    },
+                );
+                Flow::Stay
+            });
+            rows.push(choose_img_row);
+        }
+
+        let preview_row = MenuItem::new(
+            PanelRow::action("preview", ctx.t("settings.appearance.live_preview"))
+                .desc(ctx.t("settings.appearance.live_preview_desc"))
+                .icon("play"),
+        )
+        .on(|ctx| {
+            let theme_id = tako_themes::selected(&ctx.paths.themes());
+            let draft = current_draft(ctx);
+            super::theme_preview::start_override(ctx, theme_id.as_deref(), draft)
+        });
+        rows.push(preview_row);
+
+        let save_row = MenuItem::new(
+            PanelRow::action("save", ctx.t("settings.appearance.save_theme")).style("primary"),
+        )
+        .on(|ctx| {
+            let theme_id = tako_themes::selected(&ctx.paths.themes());
+            let draft = current_draft(ctx);
+            let toml_str = draft.to_toml_string();
+            match tako_themes::overrides::save_override(
+                &ctx.paths.themes(),
+                theme_id.as_deref(),
+                &toml_str,
+            ) {
+                Ok(_) => {
+                    let text = ctx.t("settings.appearance.theme_customized_saved");
+                    ctx.toast(text);
+                    ctx.theme_draft = None;
+                    let apply_id = theme_id.unwrap_or_else(|| BUILTIN_THEME.to_owned());
+                    ctx.effect(Effect::ApplyTheme(apply_id));
+                    Flow::Close
+                }
+                Err(e) => {
+                    ctx.toast(e.to_string());
+                    Flow::Stay
+                }
+            }
+        });
+        rows.push(save_row);
+
+        let has_ov = tako_themes::overrides::has_override(
+            &ctx.paths.themes(),
+            tako_themes::selected(&ctx.paths.themes()).as_deref(),
+        );
+        if has_ov || ctx.theme_draft.is_some() {
+            let reset_row = MenuItem::new(
+                PanelRow::action("reset", ctx.t("settings.appearance.reset_theme"))
+                    .desc(ctx.t("settings.appearance.reset_theme_desc"))
+                    .style("danger"),
+            )
+            .on(|ctx| {
+                let theme_id = tako_themes::selected(&ctx.paths.themes());
+                match tako_themes::overrides::reset_override(
+                    &ctx.paths.themes(),
+                    theme_id.as_deref(),
+                ) {
+                    Ok(_) => {
+                        let text = ctx.t("settings.appearance.theme_reset_applied");
+                        ctx.toast(text);
+                        ctx.theme_draft = None;
+                        let apply_id = theme_id.unwrap_or_else(|| BUILTIN_THEME.to_owned());
+                        ctx.effect(Effect::ApplyTheme(apply_id));
+                        Flow::Close
+                    }
+                    Err(e) => {
+                        ctx.toast(e.to_string());
+                        Flow::Stay
+                    }
+                }
+            });
+            rows.push(reset_row);
+        }
+
+        rows
+    })
+}
+
 fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
     vec![
         MenuItem::new(PanelRow::choice(
@@ -657,6 +1071,12 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
                 .value(theme_name(ctx)),
         )
         .on(|ctx| Flow::Push(Box::new(themes_panel(ctx)))),
+        MenuItem::new(
+            PanelRow::action("edit-theme", ctx.t("settings.appearance.edit_theme"))
+                .desc(ctx.t("settings.appearance.edit_theme_desc"))
+                .icon("palette"),
+        )
+        .on(|ctx| Flow::Push(Box::new(edit_theme_panel(ctx)))),
         toggle(
             ctx,
             "settings.appearance.dynamic",

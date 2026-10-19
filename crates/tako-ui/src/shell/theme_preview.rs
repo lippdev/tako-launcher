@@ -18,6 +18,8 @@ pub struct ThemePreview {
     /// O tema em prévia (`None` = o padrão).
     pub id: Option<String>,
     pub until: Instant,
+    /// Sobreposição temporária em teste (THEME-003). Se confirmado, grava em disco; se voltar, descarta.
+    pub draft_override: Option<tako_themes::overrides::ThemeTokensOverride>,
 }
 
 /// Um tema pode chamar `hint-clicked(0)` no `init` e confirmar a própria prévia: Aplicar só vale depois disso.
@@ -32,6 +34,7 @@ pub fn start(ctx: &mut Ctx, id: Option<&str>, name: &str) -> Flow {
     ctx.theme_preview = Some(ThemePreview {
         id: id.map(str::to_owned),
         until: Instant::now() + PREVIEW_TIME,
+        draft_override: None,
     });
     ctx.effect(Effect::ApplyTheme(id.unwrap_or(BUILTIN_THEME).to_owned()));
     let text = ctx.tf("settings.appearance.preview_started", &[("name", name)]);
@@ -57,6 +60,102 @@ pub fn panel(ctx: &Ctx, id: Option<&str>) -> MenuLayer {
 pub fn reload_selected(ctx: &mut Ctx) {
     let id = tako_themes::selected(&ctx.paths.themes()).unwrap_or_else(|| BUILTIN_THEME.to_owned());
     ctx.effect(Effect::ApplyTheme(id));
+}
+
+/// Inicia a prévia ao vivo de uma sobreposição de tema (THEME-003).
+pub fn start_override(
+    ctx: &mut Ctx,
+    theme_id: Option<&str>,
+    draft: tako_themes::overrides::ThemeTokensOverride,
+) -> Flow {
+    ctx.theme_preview = Some(ThemePreview {
+        id: theme_id.map(str::to_owned),
+        until: Instant::now() + PREVIEW_TIME,
+        draft_override: Some(draft),
+    });
+    ctx.effect(Effect::ApplyTheme(
+        theme_id.unwrap_or(BUILTIN_THEME).to_owned(),
+    ));
+    let text = ctx.t("settings.appearance.theme_edit_preview_started");
+    ctx.toast(text);
+    Flow::Replace(Box::new(OverridePreviewLayer {
+        theme_id: theme_id.map(str::to_owned),
+    }))
+}
+
+struct OverridePreviewLayer {
+    #[allow(dead_code)]
+    theme_id: Option<String>,
+}
+
+impl Layer for OverridePreviewLayer {
+    fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Flow {
+        let Some(p) = ctx.theme_preview.take() else {
+            return Flow::Close;
+        };
+        match cmd {
+            Cmd::Accept
+                if p.until.saturating_duration_since(Instant::now())
+                    > PREVIEW_TIME - ACCEPT_AFTER =>
+            {
+                ctx.theme_preview = Some(p);
+                return Flow::Stay;
+            }
+            Cmd::Accept => {
+                if let Some(draft) = p.draft_override {
+                    let toml_str = draft.to_toml_string();
+                    match tako_themes::overrides::save_override(
+                        &ctx.paths.themes(),
+                        p.id.as_deref(),
+                        &toml_str,
+                    ) {
+                        Ok(_) => {
+                            let text = ctx.t("settings.appearance.theme_customized_applied");
+                            ctx.toast(text);
+                        }
+                        Err(e) => {
+                            ctx.toast(e.to_string());
+                            reload_selected(ctx);
+                        }
+                    }
+                }
+            }
+            Cmd::Back => reload_selected(ctx),
+            _ => {
+                ctx.theme_preview = Some(p);
+                return Flow::Stay;
+            }
+        }
+        Flow::Replace(Box::new(super::settings::edit_theme_panel(ctx)))
+    }
+
+    fn render(&self, _ctx: &Ctx) -> Overlay {
+        Overlay::default()
+    }
+
+    fn hints(&self, ctx: &Ctx) -> Vec<Hint> {
+        let secs = ctx.theme_preview.as_ref().map_or(0, |p| {
+            p.until.saturating_duration_since(Instant::now()).as_secs() + 1
+        });
+        vec![
+            ctx.hint(Cmd::Accept, &ctx.t("settings.appearance.preview_apply")),
+            ctx.hint(
+                Cmd::Back,
+                &ctx.tf(
+                    "settings.appearance.preview_back",
+                    &[("secs", &secs.to_string())],
+                ),
+            ),
+        ]
+    }
+
+    fn live(&self) -> bool {
+        true
+    }
+
+    fn theme_preview(&self) -> bool {
+        true
+    }
 }
 
 impl Layer for PreviewLayer {
@@ -283,6 +382,7 @@ mod tests {
         ctx.theme_preview = Some(ThemePreview {
             id: None,
             until: Instant::now(),
+            draft_override: None,
         });
         assert!(!ctx.theme_preview_wants_installed());
         // O aviso e a saída da prévia.
@@ -290,6 +390,7 @@ mod tests {
         shell.ctx.theme_preview = Some(ThemePreview {
             id: Some(THEME.into()),
             until: Instant::now() + PREVIEW_TIME,
+            draft_override: None,
         });
         shell.push_layer(Box::new(PreviewLayer { name: "x".into() }));
         shell.ctx.effects.clear();
@@ -297,6 +398,57 @@ mod tests {
         assert!(shell.ctx.theme_preview.is_none());
         assert!(shell.ctx.toast.as_ref().unwrap().0.contains("não carregou"));
         assert_eq!(reloads(&shell.ctx), 0);
+    }
+
+    #[test]
+    fn previewing_theme_override_applies_or_reverts() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = setup();
+        let draft = tako_themes::overrides::ThemeTokensOverride {
+            accent: Some("#E3161E".into()),
+            font: Some("Poppins".into()),
+            canvas: Some("#0B1A33".into()),
+            background_image: None,
+        };
+
+        // 1. Inicia a prévia ao vivo de sobreposição
+        let Flow::Replace(mut layer) = start_override(&mut ctx, Some(THEME), draft.clone()) else {
+            panic!("esperava Replace");
+        };
+        assert!(ctx.theme_preview.is_some());
+        assert_eq!(
+            ctx.theme_preview.as_ref().unwrap().draft_override,
+            Some(draft.clone())
+        );
+        assert_eq!(reloads(&ctx), 1);
+
+        // Voltar descarta a sobreposição sem salvar nada no disco
+        let Flow::Replace(_) = layer.handle(Cmd::Back, &mut ctx) else {
+            panic!();
+        };
+        assert!(ctx.theme_preview.is_none());
+        assert!(!tako_themes::overrides::has_override(
+            &ctx.paths.themes(),
+            Some(THEME)
+        ));
+
+        // 2. Prévia e aceitar (Aplicar): salva em disco
+        let Flow::Replace(mut layer) = start_override(&mut ctx, Some(THEME), draft.clone()) else {
+            panic!();
+        };
+        settle(&mut ctx);
+        let Flow::Replace(_) = layer.handle(Cmd::Accept, &mut ctx) else {
+            panic!();
+        };
+        assert!(ctx.theme_preview.is_none());
+        assert!(tako_themes::overrides::has_override(
+            &ctx.paths.themes(),
+            Some(THEME)
+        ));
+        let loaded =
+            tako_themes::overrides::load_override(&ctx.paths.themes(), Some(THEME)).unwrap();
+        assert!(loaded.contains("#E3161E"));
+        assert!(loaded.contains("Poppins"));
     }
 
     #[test]

@@ -11,6 +11,16 @@ import "fonts/SourceSans3-Light.ttf";
 import "fonts/SourceSans3-Regular.ttf";
 import "fonts/SourceSans3-Semibold.ttf";
 import "fonts/SourceSans3-Bold.ttf";
+import "fonts/Poppins-Regular.ttf";
+import "fonts/Poppins-Medium.ttf";
+import "fonts/Poppins-SemiBold.ttf";
+import "fonts/Poppins-Bold.ttf";
+import "fonts/Poppins-ExtraBold.ttf";
+import "fonts/PlusJakartaSans-Regular.ttf";
+import "fonts/PlusJakartaSans-Medium.ttf";
+import "fonts/PlusJakartaSans-SemiBold.ttf";
+import "fonts/PlusJakartaSans-Bold.ttf";
+import "fonts/PlusJakartaSans-ExtraBold.ttf";
 
 import { Ui } from "tokens.slint";
 import { Icons } from "icons.slint";
@@ -53,7 +63,14 @@ component Backdrop inherits Rectangle {
     in property <bool> dim-left;
     background: @linear-gradient(160deg, Ui.accent 0%, Ui.accent-deep 100%);
     animate background { duration: Ui.color-time; }
-    if art.width > 0: Image {
+    if Ui.has-custom-background && Ui.custom-background.width > 0: Image {
+        width: parent.width;
+        height: parent.height;
+        source: Ui.custom-background;
+        image-fit: cover;
+        opacity: 0.85;
+    }
+    if !Ui.has-custom-background && art.width > 0: Image {
         width: parent.width;
         height: parent.height;
         source: art;
