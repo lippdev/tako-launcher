@@ -84,7 +84,7 @@ windows = { version = "0.62", features = [
 ] }
 windows-core = "0.62"
 windows-registry = "0.6"
-# Downloads por torrent (DL-001, ADR-0028): Apache-2.0; sem TLS nativo (rustls) e sem a API HTTP/UPnP.
+# Downloads por torrent (DL-001, ADR-0028): Apache-2.0; sem TLS nativo (rustls) e sem API HTTP (o UPnP é desativado em tempo de execução).
 librqbit = { version = "9", default-features = false, features = ["rust-tls"] }
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 

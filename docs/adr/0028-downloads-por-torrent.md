@@ -67,7 +67,7 @@ As instalações disparadas pelo Tako numa loja (Steam, Epic, GOG...) aparecem n
 ### 7. Privacidade
 
 - Torrent expõe o IP do usuário aos outros pares e ao tracker/DHT, e o enxame (hash e IP) pode ser monitorado por terceiros. Sem VPN isso é inevitável no protocolo. O Tako avisa isso no aviso de primeiro uso e em Configurações › Downloads, em texto simples.
-- Padrões conservadores: DHT ligado (necessário para magnet), sem PEX/LSD além do padrão da biblioteca, **sem semear depois de concluir** (o upload pára ao terminar; opção explícita para semear), limite de velocidade de envio configurável, sem UPnP por padrão.
+- Padrões conservadores: DHT ligado (necessário para magnet), PEX no padrão da biblioteca, LSD desligado, **sem semear depois de concluir**, limite de velocidade de envio configurável, sem UPnP.
 - O Tako não envia telemetria de downloads, não registra hashes nem URLs de fontes em logs (só contagens e códigos de erro), e as URLs das fontes ficam só no banco local.
 - Opção de vincular a uma interface de rede específica (útil com VPN) fica fora da primeira versão (pergunta nº 4).
 
