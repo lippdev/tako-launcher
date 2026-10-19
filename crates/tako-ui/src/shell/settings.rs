@@ -1707,7 +1707,12 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                             match res {
                                 Ok(res) => {
                                     ctx.reload_data();
-                                    ctx.downloads = Default::default();
+                                    ctx.downloads = crate::shell::downloads::State {
+                                        store: ctx.downloads.store.take(),
+                                        simulated: ctx.downloads.simulated,
+                                        ..Default::default()
+                                    };
+                                    let _ = crate::shell::downloads::manager(ctx);
                                     let lang = match ctx.settings.string(keys::LANGUAGE).as_str() {
                                         "en-US" => Lang::EnUs,
                                         _ => Lang::PtBr,

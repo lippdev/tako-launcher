@@ -94,6 +94,7 @@ pub fn manager(ctx: &mut Ctx) -> Option<&mut Downloads> {
             }
         };
         ctx.downloads.manager = Some(Downloads::new(engine, root(), saved));
+        sync_games(ctx);
     }
     ctx.downloads.manager.as_mut()
 }
@@ -1038,6 +1039,49 @@ mod tests {
         rows.iter()
             .map(|i| (i.row.kind.clone(), i.row.style.clone()))
             .collect()
+    }
+
+    #[test]
+    fn restore_preserves_store_simulated_and_reloads_downloads() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            false,
+        );
+        ctx.settings.set_bool(ACCEPTED, true);
+        ctx.settings.set_bool(ENABLED, true);
+        ctx.downloads.simulated = true;
+
+        let store = ctx.downloads.store.as_ref().unwrap();
+        let initial_dl = Download::stored(
+            42,
+            "Jogo Restaurado".into(),
+            None,
+            "Fonte".into(),
+            "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567".into(),
+            root().join("Jogo Restaurado"),
+            DownloadState::Paused,
+            100,
+            Some(200),
+        );
+        store.save_downloads(&[initial_dl]).unwrap();
+
+        // Simula o comportamento pós restauração de backup
+        ctx.downloads = State {
+            store: ctx.downloads.store.take(),
+            simulated: ctx.downloads.simulated,
+            ..Default::default()
+        };
+        let (id, title, count) = {
+            let m = manager(&mut ctx).expect("manager deve recarregar");
+            (m.list()[0].id, m.list()[0].title.clone(), m.list().len())
+        };
+        assert_eq!(count, 1);
+        assert_eq!(id, 42);
+        assert_eq!(title, "Jogo Restaurado");
+        assert!(ctx.downloads.simulated, "simulated deve ser preservado");
+        assert!(ctx.downloads.store.is_some(), "store deve ser preservado");
     }
 
     #[test]
