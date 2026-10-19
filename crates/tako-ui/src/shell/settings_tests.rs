@@ -1990,7 +1990,7 @@ fn test_create_theme_preview_timeout_returns_to_create_editor_panel() {
     // A camada restaurada DEVE ser o editor de criação ("Criar tema"), NÃO o editor de personalização ("Editar tema")
     assert_eq!(
         shell.layers.last().unwrap().render(&shell.ctx).title,
-        "Criar tema…"
+        shell.ctx.t("settings.appearance.create_theme")
     );
 }
 

@@ -153,7 +153,7 @@ pub(crate) fn described(ctx: &Ctx, text: &str) -> PanelRow {
 
 /// Ação com título, descrição e valor fixo (`<text>_value`).
 pub(crate) fn action(ctx: &Ctx, text: &str) -> PanelRow {
-    described(ctx, text).value(ctx.t(&format!("{text}_value")))
+    described(ctx, text).action_btn(ctx.t(&format!("{text}_value")))
 }
 
 /// Diálogo só de leitura com "Fechar".
@@ -304,7 +304,7 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(
             PanelRow::action("updates", ctx.t("settings.general.updates"))
                 .desc(status)
-                .value(ctx.t("settings.general.updates_value")),
+                .action_btn(ctx.t("settings.general.updates_value")),
         )
         .on(effect(Effect::CheckUpdates)),
         update_toggle(
@@ -351,7 +351,7 @@ fn mode_rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(
             PanelRow::action("mode", ctx.t(text))
                 .desc(ctx.t(&format!("{text}_desc")))
-                .value(ctx.t("desktop.mode.go_value")),
+                .action_btn(ctx.t("desktop.mode.go_value")),
         )
         .on(effect(Effect::SwitchMode(to))),
         MenuItem::new(
@@ -658,7 +658,7 @@ pub(crate) fn themes_panel(ctx: &Ctx) -> MenuLayer {
                 MenuItem::new(
                     PanelRow::action("update-themes", ctx.t("settings.appearance.update_themes"))
                         .desc(ctx.t("settings.appearance.update_themes_desc"))
-                        .value(ctx.t("settings.appearance.update_themes_value")),
+                        .action_btn(ctx.t("settings.appearance.update_themes_value")),
                 )
                 .on(update_themes),
             );
@@ -2197,7 +2197,7 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(
             PanelRow::action("safemode", ctx.t("settings.system.safemode"))
                 .desc(ctx.t("settings.system.safemode_on_desc"))
-                .value(ctx.t("settings.system.safemode_exit")),
+                .action_btn(ctx.t("settings.system.safemode_exit")),
         )
         .on(effect(Effect::ExitSafeMode))
     } else {
@@ -2552,13 +2552,19 @@ fn about(ctx: &Ctx) -> Vec<MenuItem> {
             ctx.t("settings.about.version"),
             format!("Tako {}", ctx.version),
         )),
-        MenuItem::new(action(ctx, "settings.about.license")).on(|ctx| {
+        MenuItem::new(
+            described(ctx, "settings.about.license").value(ctx.t("settings.about.license_value")),
+        )
+        .on(|ctx| {
             Flow::Push(Box::new(text_dialog(
                 ctx.t("settings.about.license_title"),
                 ctx.t("settings.about.license_text"),
             )))
         }),
-        MenuItem::new(action(ctx, "settings.about.notices")).on(|ctx| {
+        MenuItem::new(
+            described(ctx, "settings.about.notices").value(ctx.t("settings.about.notices_value")),
+        )
+        .on(|ctx| {
             Flow::Push(Box::new(text_dialog(
                 ctx.t("settings.about.notices"),
                 ctx.t("settings.about.notices_text"),

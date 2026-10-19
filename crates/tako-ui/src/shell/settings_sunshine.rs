@@ -63,7 +63,7 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(
             PanelRow::action("sunshine-export", ctx.t("settings.system.sunshine_export"))
                 .desc(ctx.t("settings.system.sunshine_export_desc"))
-                .value(ctx.t("settings.system.sunshine_export_value"))
+                .action_btn(ctx.t("settings.system.sunshine_export_value"))
                 .enabled(export_enabled),
         )
         .on(|ctx| {

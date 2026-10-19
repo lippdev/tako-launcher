@@ -761,7 +761,7 @@ pub fn settings_rows(ctx: &Ctx) -> Vec<MenuItem> {
         MenuItem::new(
             PanelRow::action("folder", ctx.t("downloads.folder"))
                 .desc(ctx.t("downloads.folder_desc"))
-                .value(ctx.t("downloads.open_folder_short")),
+                .action_btn(ctx.t("downloads.open_folder_short")),
         )
         .on(move |ctx| {
             ctx.effect(Effect::OpenFolder(download_dir.clone()));
