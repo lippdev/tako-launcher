@@ -528,6 +528,23 @@ pub fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn every_bundled_extra_theme_id_is_reserved() {
+        // O `install_extras` regrava esses temas a cada versão: criar um tema com o mesmo id o apagaria.
+        let ids: std::collections::BTreeSet<&str> = embedded::FILES
+            .iter()
+            .filter_map(|(name, _)| name.strip_prefix("extras/")?.split('/').next())
+            .collect();
+        assert!(!ids.is_empty());
+        for id in ids {
+            assert!(
+                tako_themes::create::is_reserved_theme_id(id),
+                "{id} não está reservado"
+            );
+        }
+    }
+
     use super::*;
 
     #[test]

@@ -5717,7 +5717,7 @@ component DeskOverlay inherits Rectangle {
                                 self.select-all();
                             }
                             edited => { root.edited("overlay-input", self.text); }
-                            accepted => { root.clicked("done", 0); }
+                            accepted => { if (ov.wide) { root.clicked("done", 0); } }
                         }
                     }
                 }
@@ -5726,7 +5726,7 @@ component DeskOverlay inherits Rectangle {
                     spacing: 10px;
                     alignment: end;
                     PopupButton { data: { kind: "button", title: cancel-label, enabled: true }; clicked => { root.clicked("cancel", 0); } }
-                    PopupButton { data: { kind: "button", title: ok-label, style: "primary", enabled: true }; clicked => { root.clicked("done", 0); } }
+                    PopupButton { data: { kind: "button", title: ok-label, style: "primary", enabled: ov.wide }; clicked => { if (ov.wide) { root.clicked("done", 0); } } }
                 }
             }
         }

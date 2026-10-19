@@ -276,9 +276,14 @@ impl Shell {
         let shown = self.layers.iter().any(|l| l.theme_preview());
         self.layers.retain(|l| !l.theme_preview());
         if shown {
-            if p.draft_override.is_some() {
+            if let Some(base_id) = p.create_base {
                 self.layers
-                    .push(Box::new(settings::edit_theme_panel(&self.ctx)));
+                    .push(Box::new(settings::create_theme_editor_panel(
+                        &self.ctx, base_id,
+                    )));
+            } else if p.draft_override.is_some() {
+                self.layers
+                    .push(Box::new(settings::edit_theme_panel(&mut self.ctx)));
             } else {
                 self.layers
                     .push(Box::new(theme_preview::panel(&self.ctx, p.id.as_deref())));

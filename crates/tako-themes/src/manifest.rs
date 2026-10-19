@@ -36,6 +36,7 @@ pub struct ThemeManifest {
     /// Arquivo `.slint` principal, relativo à raiz do tema.
     pub entry: String,
     pub audio: ThemeAudio,
+    pub created_by_tako: bool,
 }
 
 /// Valida um caminho de áudio relativo à pasta do tema:
@@ -225,12 +226,17 @@ impl ThemeManifest {
                 None
             }
         };
-        let (id, name, version, author) = (
-            text_field("id"),
-            text_field("name"),
-            text_field("version"),
-            text_field("author"),
-        );
+        let (id, name, version) = (text_field("id"), text_field("name"), text_field("version"));
+        let author = match table.get("author") {
+            Some(toml::Value::String(s)) => Some(s.trim().to_owned()),
+            _ => {
+                problems.push(Problem::new(
+                    "manifest.missing-field",
+                    tf("themes.manifest.missing_field", &[("field", "author")]),
+                ));
+                None
+            }
+        };
         let api = match table.get("api") {
             Some(toml::Value::Integer(n)) => Some(n.to_string()),
             Some(toml::Value::String(s)) => Some(s.trim().to_owned()),
@@ -286,6 +292,11 @@ impl ThemeManifest {
             _ => None,
         };
         let audio = parse_audio_table(&table, &mut problems);
+        let created_by_tako = table
+            .get("created-by-tako")
+            .or_else(|| table.get("created_by_tako"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         match (id, name, version, author, api, entry) {
             (Some(id), Some(name), Some(version), Some(author), Some(api), Some(entry))
                 if problems.is_empty() =>
@@ -299,6 +310,7 @@ impl ThemeManifest {
                     description,
                     entry,
                     audio,
+                    created_by_tako,
                 })
             }
             _ => Err(problems),
@@ -356,6 +368,26 @@ mod tests {
         .unwrap();
         assert_eq!(m.entry, "ui/home.slint");
         assert_eq!(m.description.as_deref(), Some("Escuro"));
+    }
+
+    #[test]
+    fn parses_created_by_tako_flag() {
+        let m1 = ThemeManifest::parse(OK).unwrap();
+        assert!(!m1.created_by_tako);
+
+        let with_flag = format!(
+            "{OK}created-by-tako = true
+"
+        );
+        let m2 = ThemeManifest::parse(&with_flag).unwrap();
+        assert!(m2.created_by_tako);
+
+        let with_snake = format!(
+            "{OK}created_by_tako = true
+"
+        );
+        let m3 = ThemeManifest::parse(&with_snake).unwrap();
+        assert!(m3.created_by_tako);
     }
 
     #[test]

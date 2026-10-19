@@ -283,6 +283,15 @@ Slint: `name = "#RRGGBB"` or `"#RRGGBBAA"` (except `canvas`, which requires 6-di
 `on-surface-solid-muted`, `control-track-off`, `control-off`, `control-on-on-solid`, `control-off-on-solid`,
 `control-track-on-solid`, `value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. It also accepts fonts (`font`, `font-title`, `font-text`, `font-heading`, `font-desk`, `font-wordmark`) and background image (`custom-background`, `background-image`). Inside Tako (Settings › Appearance), users can customize the current theme, storing an override without altering original theme files. When loading, Tako ignores (with a log entry) an invalid key or value. `tako theme check` reports both.
 
+### Creating a theme with Tako
+
+Directly in Tako (**Settings › Appearance › Create theme…**), you can create a new theme without manually editing files:
+
+1. **Choose a base:** start from the default theme or any installed theme that uses the default `Ui` (the new theme does not inherit music or audio from the base).
+2. **Customize:** adjust accent colors, fonts, and background (solid color or local image) with full-screen live preview.
+3. **Save as new theme:** enter a valid name (up to 50 characters, without path characters). Tako derives a safe and unique ID, generates the `theme.toml` manifest, clean `Ui` re-export in `main.slint`, `tokens.toml` with the chosen palette, and copies the background image into the theme. It then installs the theme and optionally applies it immediately.
+4. **Export:** for any user-created theme or token-based installed theme, use the **Export .takotheme…** action to save a compressed zip package ready to share, fully passing `tako theme check`.
+
 
 ### Background music and navigation sounds
 

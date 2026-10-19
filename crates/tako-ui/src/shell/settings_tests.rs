@@ -1,5 +1,5 @@
 use super::*;
-use crate::shell::Layer;
+use crate::shell::{Layer, Shell, theme_preview};
 use tako_core::input::GamepadButtons as B;
 use tako_core::input::shortcut::chord;
 use tako_core::library::GameStore;
@@ -1099,7 +1099,7 @@ fn edit_theme_panel_modifies_saves_and_resets_overrides() {
     assert_eq!(edit_opt.row.title, ctx.t("settings.appearance.edit_theme"));
 
     // 2. Abre o painel de edição de tema
-    let panel = edit_theme_panel(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
     let rows = panel.items(&ctx);
     let accent_row = find(&rows, "accent");
     let font_row = find(&rows, "font");
@@ -1118,7 +1118,7 @@ fn edit_theme_panel_modifies_saves_and_resets_overrides() {
 
     // 4. Modifica a cor e fonte no modo desktop (mouse/select)
     ctx.desktop = true;
-    let panel = edit_theme_panel(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
     let rows = panel.items(&ctx);
     let accent_row = find(&rows, "accent");
     let font_row = find(&rows, "font");
@@ -1150,7 +1150,7 @@ fn edit_theme_panel_modifies_saves_and_resets_overrides() {
     assert!(loaded.contains("Poppins"));
 
     // 6. Ao reabrir, a opção de restaurar padrão está visível e funcional
-    let panel = edit_theme_panel(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
     let rows = panel.items(&ctx);
     let reset_row = find(&rows, "reset");
     assert_eq!(
@@ -1182,19 +1182,19 @@ fn edit_theme_image_full_path_and_promotion() {
     let (dir, mut ctx) = ctx();
 
     // 1. Abre painel
-    let panel = edit_theme_panel(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
     let rows = panel.items(&ctx);
     let bg_type_row = find(&rows, "bg_type");
 
     // 2. Escolhe Imagem (avança de Padrão -> Sólido -> Imagem via adjust)
     adjust(&mut ctx, &bg_type_row, 1);
-    let panel = edit_theme_panel(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
     let rows = panel.items(&ctx);
     let bg_type_row = find(&rows, "bg_type");
     adjust(&mut ctx, &bg_type_row, 1);
 
     // Confirma que bg_type_idx agora é Imagem e a linha choose_image aparece!
-    let panel = edit_theme_panel(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
     let rows = panel.items(&ctx);
     assert_eq!(
         find(&rows, "bg_type").row.value,
@@ -1223,7 +1223,7 @@ fn edit_theme_image_full_path_and_promotion() {
     ctx.theme_draft = Some(d);
 
     // O painel mostra o nome do arquivo de origem (wall.png) e não background.draft.png
-    let panel = edit_theme_panel(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
     let rows = panel.items(&ctx);
     let choose_img_row = find(&rows, "choose_image");
     assert_eq!(choose_img_row.row.value, "wall.png");
@@ -1256,7 +1256,7 @@ fn edit_theme_draft_does_not_leak_on_back_and_theme_switch() {
     assert!(ctx.theme_draft.is_some());
 
     // 2. Sair do painel pelo Back (B) limpa o rascunho
-    let mut panel = edit_theme_panel(&ctx);
+    let mut panel = edit_theme_panel(&mut ctx);
     let flow = panel.handle(Cmd::Back, &mut ctx);
     assert!(matches!(flow, Flow::Close));
     assert!(
@@ -1300,7 +1300,8 @@ fn edit_theme_hides_font_and_background_for_themes_that_do_not_use_them() {
     ctx.theme_supports_font = false;
     ctx.theme_supports_background = false;
 
-    let rows = edit_theme_panel(&ctx).items(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
     assert!(rows.iter().any(|item| item.row.key == "accent"));
     assert!(rows.iter().any(|item| item.row.key == "save"));
     assert!(!rows.iter().any(|item| item.row.key == "font"));
@@ -1390,7 +1391,7 @@ fn reset_theme_opens_danger_dialog_focused_on_cancel_and_confirms() {
         None
     ));
 
-    let mut panel = edit_theme_panel(&ctx);
+    let mut panel = edit_theme_panel(&mut ctx);
     let ov = panel.render(&ctx);
     let reset_idx = ov
         .rows
@@ -1545,6 +1546,275 @@ fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
 }
 
 #[test]
+fn create_theme_selection_creation_and_apply_flow() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Ação "Criar tema…" existe em Configurações › Aparência
+    let items = rows_of(&ctx, "appearance");
+    let create_opt = find(&items, "create-theme");
+    assert_eq!(
+        create_opt.row.title,
+        ctx.t("settings.appearance.create_theme")
+    );
+
+    // 2. Sem temas extras como base, pula a escolha e abre direto o editor de criação
+    let Flow::Replace(mut editor) = accept(&mut ctx, &create_opt) else {
+        panic!("esperava editor de criação direto (pula passo com 1 opção)");
+    };
+    let editor_rows = editor.render(&ctx).rows;
+    let save_new_idx = editor_rows
+        .iter()
+        .position(|r| r.key == "save_new")
+        .unwrap();
+    assert_eq!(
+        editor_rows[save_new_idx].title,
+        ctx.t("settings.appearance.save_as_new_theme")
+    );
+
+    // 4. Modifica o rascunho
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#6C5CE7".into());
+    ctx.theme_draft = Some(d);
+
+    // 5. Clica em "Salvar como novo tema": abre o prompt de nome (KeyboardLayer)
+    let Flow::Push(_) = editor.click("row", save_new_idx, &mut ctx) else {
+        panic!("esperava teclado virtual para nome do tema");
+    };
+
+    // 6. Validação de nome
+    assert!(tako_themes::create::validate_theme_name("").is_err());
+    assert!(tako_themes::create::validate_theme_name(&"x".repeat(55)).is_err());
+    assert!(tako_themes::create::validate_theme_name("Nome/Invalido").is_err());
+    assert!(tako_themes::create::validate_theme_name("Novo Tema Incrivel").is_ok());
+
+    // 7. Salva o tema através do finish_create_theme
+    let flow = finish_create_theme(&mut ctx, "Novo Tema Incrivel", None, None, false);
+    let Flow::Replace(mut apply_dialog) = flow else {
+        panic!("esperava diálogo para aplicar tema");
+    };
+
+    let theme_id = "novo-tema-incrivel";
+    let theme_dir = ctx.paths.themes().join(theme_id);
+    assert!(theme_dir.join("theme.toml").is_file());
+    assert!(theme_dir.join("main.slint").is_file());
+    assert!(theme_dir.join("tokens.toml").is_file());
+
+    // 7.1 Confere que o tema criado passa no tako theme check existente
+    let check_res = crate::theme::check(&theme_dir);
+    assert!(
+        check_res.is_ok(),
+        "theme check falhou: {:?}",
+        check_res.err()
+    );
+
+    // 8. Confirma a aplicação do tema recém-criado
+    let dialog_rows = apply_dialog.render(&ctx).rows;
+    let apply_idx = dialog_rows.iter().position(|r| r.key == "apply").unwrap();
+    let apply_flow = apply_dialog.click("row", apply_idx, &mut ctx);
+    assert!(matches!(apply_flow, Flow::CloseAll));
+    assert_eq!(
+        tako_themes::selected(&ctx.paths.themes()).as_deref(),
+        Some(theme_id)
+    );
+}
+
+#[test]
+fn create_theme_duplicate_prompts_overwrite_and_replaces() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Cria o primeiro tema
+    let flow1 = finish_create_theme(&mut ctx, "Tema Duplicado", None, None, false);
+    assert!(matches!(flow1, Flow::Replace(_)));
+
+    // 2. Tentar criar com o mesmo nome sem overwrite abre diálogo de confirmação
+    let flow2 = finish_create_theme(&mut ctx, "Tema Duplicado", None, None, false);
+    let Flow::Push(mut confirm_dialog) = flow2 else {
+        panic!("esperava diálogo de confirmação de substituição");
+    };
+    let confirm_rows = confirm_dialog.render(&ctx).rows;
+    let overwrite_idx = confirm_rows
+        .iter()
+        .position(|r| r.key == "overwrite")
+        .unwrap();
+    let cancel_idx = confirm_rows.iter().position(|r| r.key == "cancel").unwrap();
+    assert_eq!(
+        confirm_rows[overwrite_idx].title,
+        ctx.t("settings.appearance.theme_overwrite_button")
+    );
+    assert_eq!(confirm_rows[cancel_idx].title, ctx.t("common.cancel"));
+
+    // 3. Confirmar a substituição substitui com sucesso e abre diálogo de aplicar
+    let flow_overwrite = confirm_dialog.click("row", overwrite_idx, &mut ctx);
+    assert!(matches!(flow_overwrite, Flow::Replace(_)));
+}
+
+#[test]
+fn themes_panel_shows_export_action_and_base_choice_lists_installed_theme() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria um tema baseado em tokens
+    let _ = finish_create_theme(&mut ctx, "Tema Base Customizado", None, None, false);
+    ctx.reload_theme_cache();
+
+    // 1. Em themes_panel, a ação "Exportar .takotheme…" deve estar presente
+    let t_panel = themes_panel(&ctx);
+    let t_items = t_panel.items(&ctx);
+    let export_opt = find(&t_items, "export-theme");
+    assert_eq!(
+        export_opt.row.title,
+        ctx.t("settings.appearance.export_theme")
+    );
+
+    // 2. Na escolha de base para novo tema, o tema instalado aparece como opção
+    let b_panel = choose_base_theme_panel(&ctx);
+    let b_items = b_panel.items(&ctx);
+    assert!(
+        b_items
+            .iter()
+            .any(|i| i.row.key == "base-tema-base-customizado")
+    );
+}
+
+#[test]
+fn create_theme_with_image_passes_theme_check_and_has_no_source_name() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria imagem de teste
+    let src_dir = ctx.paths.themes().join("src_test");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    let img_path = src_dir.join("wallpaper.png");
+    let img = image::RgbaImage::new(16, 16);
+    img.save(&img_path).unwrap();
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some("wallpaper.png".into());
+    d.background_source_name = Some("meu_wallpaper_original.png".into());
+    d.draft_dir = Some(src_dir.clone());
+    ctx.theme_draft = Some(d);
+
+    let flow = finish_create_theme(&mut ctx, "Tema Com Imagem", None, None, false);
+    assert!(matches!(flow, Flow::Replace(_)));
+
+    let theme_dir = ctx.paths.themes().join("tema-com-imagem");
+    assert!(theme_dir.join("background.png").is_file());
+
+    let tokens_text = std::fs::read_to_string(theme_dir.join("tokens.toml")).unwrap();
+    assert!(!tokens_text.contains("custom-background-name"));
+    assert!(!tokens_text.contains("meu_wallpaper_original.png"));
+
+    let check_res = crate::theme::check(&theme_dir);
+    assert!(
+        check_res.is_ok(),
+        "theme check falhou no tema com imagem: {:?}",
+        check_res.err()
+    );
+}
+
+#[test]
+fn discard_theme_draft_cleans_base_overrides_different_from_selected() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Tema ativo é default (ou None)
+    assert_eq!(tako_themes::selected(&ctx.paths.themes()), None);
+
+    let base_id = "tema-base-diferente";
+    let base_ov_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), Some(base_id));
+    std::fs::create_dir_all(&base_ov_dir).unwrap();
+    let draft_file = base_ov_dir.join("background.draft.png");
+    std::fs::write(&draft_file, b"DRAFT_IMAGE_CONTENT").unwrap();
+    assert!(draft_file.is_file());
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some("background.draft.png".into());
+    d.draft_dir = Some(base_ov_dir.clone());
+    ctx.theme_draft = Some(d);
+
+    // Descarta o rascunho
+    ctx.discard_theme_draft();
+    assert!(ctx.theme_draft.is_none());
+
+    // Confere que o arquivo de rascunho na pasta da base foi apagado sem vazar
+    assert!(
+        !draft_file.exists(),
+        "rascunho vazou na pasta da base diferente da selecionada"
+    );
+}
+
+#[test]
+fn overwrite_dialog_shows_existing_theme_name_and_suggests_unique() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    let _ = finish_create_theme(&mut ctx, "Meu Tema Existente", None, None, false);
+
+    // Tenta criar de novo com mesmo nome
+    let flow = finish_create_theme(&mut ctx, "Meu Tema Existente", None, None, false);
+    let Flow::Push(mut confirm_dialog) = flow else {
+        panic!("esperava diálogo de confirmação");
+    };
+
+    let rendered = confirm_dialog.render(&ctx);
+    assert!(
+        rendered.text.contains("Meu Tema Existente"),
+        "diálogo deveria conter o nome do tema existente: {}",
+        rendered.text
+    );
+
+    let rows = rendered.rows;
+    assert!(rows.iter().any(|r| r.key == "overwrite"));
+    // O id livre vai no texto; o botão fica curto para caber no painel do diálogo.
+    assert!(
+        rendered.text.contains("meu-tema-existente-2"),
+        "{}",
+        rendered.text
+    );
+    assert!(rows.iter().any(|r| r.key == "suggest"));
+
+    // Clica em suggest para salvar com id livre
+    let suggest_idx = rows.iter().position(|r| r.key == "suggest").unwrap();
+    let flow_suggest = confirm_dialog.click("row", suggest_idx, &mut ctx);
+    assert!(matches!(flow_suggest, Flow::Replace(_)));
+
+    assert!(ctx.paths.themes().join("meu-tema-existente-2").is_dir());
+}
+
+#[test]
+fn cannot_overwrite_reserved_theme_offers_only_suggest() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria tema simulando o extra reservado tako-fita na pasta de temas
+    let fita_dir = ctx.paths.themes().join("tako-fita");
+    std::fs::create_dir_all(&fita_dir).unwrap();
+    std::fs::write(
+        fita_dir.join("theme.toml"),
+        "id = \"tako-fita\"\nname = \"Tako Fita\"\nversion = \"1.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\n",
+    ).unwrap();
+
+    // Tenta criar passando custom_id="tako-fita" ou nome que derive para ele
+    let flow = finish_create_theme(&mut ctx, "Fita", Some("tako-fita"), None, false);
+    let Flow::Push(dlg) = flow else {
+        panic!("esperava diálogo");
+    };
+
+    let rows = dlg.render(&ctx).rows;
+    // Não deve oferecer o botão de sobrescrever!
+    assert!(!rows.iter().any(|r| r.key == "overwrite"));
+    assert!(rows.iter().any(|r| r.key == "suggest"));
+}
+
+#[test]
 fn console_mode_row_displays_status_and_triggers_check() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();
@@ -1648,4 +1918,143 @@ fn console_mode_custom_detector_is_invoked() {
             &[("version", "1")]
         )
     );
+}
+
+#[test]
+fn test_create_theme_preview_timeout_returns_to_create_editor_panel() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, ctx) = ctx();
+    let mut shell = Shell::new(ctx);
+
+    let draft = tako_themes::overrides::ThemeTokensOverride {
+        accent: Some("#6C5CE7".into()),
+        ..Default::default()
+    };
+    let flow = theme_preview::start_override_create(&mut shell.ctx, Some("base-tema"), draft);
+    let Flow::Replace(layer) = flow else {
+        panic!("esperava Flow::Replace ao iniciar prévia");
+    };
+    shell.push_layer(layer);
+
+    // Simula expiração da prévia chamando end_theme_preview
+    shell.end_theme_preview(true);
+
+    // A camada restaurada DEVE ser o editor de criação ("Criar tema"), NÃO o editor de personalização ("Editar tema")
+    assert_eq!(
+        shell.layers.last().unwrap().render(&shell.ctx).title,
+        "Criar tema…"
+    );
+}
+
+#[test]
+fn test_prompt_theme_name_cancel_discards_draft() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    ctx.theme_draft = Some(tako_themes::overrides::ThemeTokensOverride {
+        accent: Some("#FF0000".into()),
+        ..Default::default()
+    });
+    assert!(ctx.theme_draft.is_some());
+
+    // Vindo do editor: cancelar o nome volta ao editor com as edições intactas.
+    let mut prompt = prompt_theme_name(&ctx, None, false);
+    let flow = prompt.click("cancel", 0, &mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert!(ctx.theme_draft.is_some(), "o editor ainda usa o rascunho");
+
+    // Vindo da prévia: não há editor embaixo, então o rascunho é descartado.
+    let mut prompt = prompt_theme_name(&ctx, None, true);
+    let flow = prompt.click("cancel", 0, &mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert!(
+        ctx.theme_draft.is_none(),
+        "rascunho deveria ser descartado no cancel do nome"
+    );
+}
+
+#[test]
+fn test_edit_theme_panel_discards_foreign_draft_dir() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Rascunho com draft_dir apontando para outro tema
+    let foreign_dir = ctx.paths.themes().join("outro-tema").join("overrides");
+    ctx.theme_draft = Some(tako_themes::overrides::ThemeTokensOverride {
+        accent: Some("#00FF00".into()),
+        draft_dir: Some(foreign_dir),
+        ..Default::default()
+    });
+
+    // Abrir edit_theme_panel deve descartar o rascunho de outro tema
+    let _panel = edit_theme_panel(&mut ctx);
+    assert!(
+        ctx.theme_draft.is_none(),
+        "edit_theme_panel não descartou rascunho de outro tema"
+    );
+}
+
+#[test]
+fn test_finish_create_theme_invalidates_themes_cache() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Aquece o cache
+    let before = cached_themes(&ctx);
+    assert!(!before.installed.iter().any(|t| t.id() == "tema-novo-cache"));
+
+    // Cria tema
+    let flow = finish_create_theme(&mut ctx, "Tema Novo Cache", None, None, false);
+    assert!(matches!(flow, Flow::Replace(_)));
+
+    // O cache deve ter sido esquecido e a nova leitura já contém o tema novo imediatamente
+    let after = cached_themes(&ctx);
+    assert!(after.installed.iter().any(|t| t.id() == "tema-novo-cache"));
+}
+
+#[test]
+fn test_desktop_mode_hides_live_preview() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    ctx.desktop = true;
+    let panel_desk = edit_theme_panel(&mut ctx);
+    let items_desk = panel_desk.items(&ctx);
+    assert!(!items_desk.iter().any(|i| i.row.key == "preview"));
+
+    ctx.desktop = false;
+    let panel_bp = edit_theme_panel(&mut ctx);
+    let items_bp = panel_bp.items(&ctx);
+    assert!(items_bp.iter().any(|i| i.row.key == "preview"));
+}
+
+#[test]
+fn test_theme_with_empty_author_does_not_show_by_suffix() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, ctx) = ctx();
+
+    let t_dir = ctx.paths.themes().join("tema-sem-autor");
+    std::fs::create_dir_all(&t_dir).unwrap();
+    std::fs::write(
+        t_dir.join("theme.toml"),
+        "id = \"tema-sem-autor\"\nname = \"Sem Autor\"\nversion = \"1.2.3\"\nauthor = \"\"\napi = 1\nentry = \"main.slint\"\ncreated-by-tako = true\n",
+    ).unwrap();
+    std::fs::write(
+        t_dir.join("main.slint"),
+        "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n",
+    )
+    .unwrap();
+    forget(THEMES_CACHE);
+
+    let panel = themes_panel(&ctx);
+    let items = panel.items(&ctx);
+    let item = items
+        .iter()
+        .find(|i| i.row.key == "tema-sem-autor")
+        .unwrap();
+    assert_eq!(item.row.description, "versão 1.2.3");
+    assert!(!item.row.description.contains(" · "));
+    assert!(!item.row.description.contains("por "));
 }
