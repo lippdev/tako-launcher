@@ -195,7 +195,7 @@ dela.
 
 `sel = -1` quer dizer "sem linha selecionável" (só leitura).
 
-Um `kind` vazio (ou que o tema não conhece) é uma camada sem desenho, como a prévia de tema: desenhe nada e deixe a
+Desde o THEME-002, um `kind` vazio (ou que o tema não conhece) é uma camada sem desenho, como a prévia de tema: desenhe nada e deixe a
 barra de `hints` falar. Nunca cubra a tela com um véu para um `kind` desconhecido.
 
 ### 4.9 Callbacks

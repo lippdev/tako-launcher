@@ -194,7 +194,7 @@ its bar.
 
 `sel = -1` means "no selectable row" (read only).
 
-An empty (or unknown) `kind` is a layer with no drawing, like the theme preview: draw nothing and let the `hints` bar
+Since THEME-002, an empty (or unknown) `kind` is a layer with no drawing, like the theme preview: draw nothing and let the `hints` bar
 do the talking. Never cover the screen with a scrim for an unknown `kind`.
 
 ### 4.9 Callbacks
