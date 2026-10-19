@@ -75,7 +75,7 @@ pub fn tako_executable() -> Result<String, SunshineError> {
         let id = std::env::var("FLATPAK_ID")
             .ok()
             .filter(|v| !v.trim().is_empty())
-            .unwrap_or_else(|| "dev.tako.Tako".to_owned());
+            .unwrap_or_else(|| "io.github.lippdev.Tako".to_owned());
         return Ok(format!("flatpak run {id}"));
     }
     if let Some(appimage) = std::env::var_os("APPIMAGE").filter(|v| !v.is_empty()) {
@@ -123,18 +123,17 @@ pub fn find_apps_json() -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-/// Detecção rápida (apenas caminhos no disco e no PATH), sem verificação de processos.
+/// Detecção rápida (apenas caminhos no disco), sem abrir processos nem verificar PATH.
 pub fn detect_quick() -> (bool, Option<PathBuf>) {
     let apps_json = find_apps_json();
-    let installed = apps_json.is_some()
-        || known_executable_paths().iter().any(|p| p.is_file())
-        || executable_on_path();
+    let installed = apps_json.is_some() || known_executable_paths().iter().any(|p| p.is_file());
     (installed, apps_json)
 }
 
-/// Estado local. A checagem de processo não abre conexões nem consulta serviços remotos.
+/// Estado local. A checagem de processo e PATH roda fora da thread da UI (em segundo plano).
 pub fn detect() -> Detection {
-    let (installed, apps_json) = detect_quick();
+    let (quick_installed, apps_json) = detect_quick();
+    let installed = quick_installed || executable_on_path();
     Detection {
         installed,
         running: process_running(),
@@ -255,22 +254,36 @@ fn process_running() -> bool {
     })
 }
 
-/// Constrói um registro de `apps.json`; a identidade do jogo segue pela rota validada do Tako.
-pub fn app_entry(app: &App) -> Result<Value, SunshineError> {
-    if app.id.is_empty()
-        || app.id.len() > 256
-        || !app
-            .id
+/// Valida se o identificador de jogo é seguro e aceito para a rota do Tako.
+pub fn is_valid_game_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 256
+        && id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
-    {
+}
+
+/// Identifica se o caminho do apps.json pertence a uma instalação Flatpak do Sunshine.
+pub fn is_flatpak_sunshine_path(path: &Path) -> bool {
+    path.to_string_lossy()
+        .contains(".var/app/dev.lizardbyte.app.Sunshine")
+}
+
+/// Constrói um registro de `apps.json`; a identidade do jogo segue pela rota validada do Tako.
+pub fn app_entry(app: &App) -> Result<Value, SunshineError> {
+    app_entry_for_target(app, None)
+}
+
+/// Constrói um registro de `apps.json` ajustando o comando caso o Sunshine alvo esteja em Flatpak.
+pub fn app_entry_for_target(app: &App, target: Option<&Path>) -> Result<Value, SunshineError> {
+    if !is_valid_game_id(&app.id) {
         return Err(SunshineError::InvalidGameId);
     }
     if app.executable.contains('"') {
         return Err(SunshineError::InvalidExecutablePath);
     }
     let uri = format!("tako://play/{}", app.id);
-    let (command, working_dir) = if app.executable.starts_with("flatpak run ") {
+    let (mut command, working_dir) = if app.executable.starts_with("flatpak run ") {
         (
             format!(
                 "{} --open-url {}",
@@ -292,11 +305,18 @@ pub fn app_entry(app: &App) -> Result<Value, SunshineError> {
                 .map(|p| p.to_string_lossy().into_owned()),
         )
     };
-    Ok(json!({
-        "name": format!("{MARKER}{}", app.title),
-        "cmd": command,
-        "working-dir": working_dir,
-    }))
+    if target.is_some_and(is_flatpak_sunshine_path)
+        && !command.starts_with("flatpak-spawn --host ")
+    {
+        command = format!("flatpak-spawn --host {command}");
+    }
+    let mut entry = serde_json::Map::new();
+    entry.insert("name".into(), Value::String(format!("{MARKER}{}", app.title)));
+    entry.insert("cmd".into(), Value::String(command));
+    if let Some(wd) = working_dir {
+        entry.insert("working-dir".into(), Value::String(wd));
+    }
+    Ok(Value::Object(entry))
 }
 
 /// Mantém todos os campos da configuração e todas as entradas que não pertencem ao Tako.
@@ -505,7 +525,52 @@ mod tests {
             flat["cmd"],
             "flatpak run dev.tako.Tako --open-url \"tako://play/manual:game-1\""
         );
-        assert!(flat["working-dir"].is_null());
+        assert!(!flat.as_object().unwrap().contains_key("working-dir"));
+        assert!(!serde_json::to_string(&flat).unwrap().contains("working-dir"));
+    }
+
+    #[test]
+    fn omits_working_dir_key_when_none() {
+        let flat = app_entry(&App {
+            id: "manual:game-1".into(),
+            title: "Jogo".into(),
+            executable: "flatpak run io.github.lippdev.Tako".into(),
+        })
+        .unwrap();
+        assert!(!flat.as_object().unwrap().contains_key("working-dir"));
+        let json_str = serde_json::to_string(&flat).unwrap();
+        assert!(!json_str.contains("working-dir"));
+    }
+
+    #[test]
+    fn generates_flatpak_spawn_host_when_sunshine_is_in_flatpak() {
+        let app = App {
+            id: "manual:game-1".into(),
+            title: "Jogo".into(),
+            executable: "/usr/bin/tako".into(),
+        };
+        let target = Path::new("/home/user/.var/app/dev.lizardbyte.app.Sunshine/config/sunshine/apps.json");
+        let entry = app_entry_for_target(&app, Some(target)).unwrap();
+        assert_eq!(
+            entry["cmd"],
+            "flatpak-spawn --host \"/usr/bin/tako\" --open-url \"tako://play/manual:game-1\""
+        );
+        assert_eq!(
+            entry["working-dir"],
+            "/usr/bin"
+        );
+
+        let flat_app = App {
+            id: "manual:game-2".into(),
+            title: "Jogo 2".into(),
+            executable: "flatpak run io.github.lippdev.Tako".into(),
+        };
+        let flat_entry = app_entry_for_target(&flat_app, Some(target)).unwrap();
+        assert_eq!(
+            flat_entry["cmd"],
+            "flatpak-spawn --host flatpak run io.github.lippdev.Tako --open-url \"tako://play/manual:game-2\""
+        );
+        assert!(!flat_entry.as_object().unwrap().contains_key("working-dir"));
     }
 
     #[test]
