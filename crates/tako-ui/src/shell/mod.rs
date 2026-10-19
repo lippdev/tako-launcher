@@ -28,6 +28,7 @@ pub mod sidebar;
 pub mod smart;
 pub mod source_ids;
 pub mod tags_editor;
+pub mod theme_preview;
 pub mod tiles;
 
 pub use ctx::{Ctx, Effect, InputKind, RunningGame, Settings};
@@ -155,6 +156,8 @@ impl Shell {
         self.ctx.desktop = true;
         self.cc = None;
         self.layers.clear();
+        // A prévia é da tela cheia: sem a camada dela, o tick pediria o tema de volta e avisaria no desktop.
+        self.ctx.theme_preview = None;
         self.sidebar.focus = None;
         self.ctx.pointer = false;
         let mut page = desktop::DesktopLibrary::new();
@@ -240,6 +243,45 @@ impl Shell {
     /// A camada de cima mostra valores que mudam sozinhos (`Layer::live`): o app redesenha a cada segundo.
     pub fn live(&self) -> bool {
         self.layers.last().is_some_and(|l| l.live())
+    }
+
+    /// Prévia de tema vencida, ou sem a camada dela (fechada por outro caminho): volta ao tema que estava valendo.
+    pub fn tick_theme_preview(&mut self, now: Instant) {
+        let due = self
+            .ctx
+            .theme_preview
+            .as_ref()
+            .is_some_and(|p| now >= p.until || !self.layers.iter().any(|l| l.theme_preview()));
+        if due {
+            self.end_theme_preview(true);
+        }
+    }
+
+    /// O tema da prévia não carregou: a tela continua com o anterior e a pessoa é avisada.
+    pub fn fail_theme_preview(&mut self) {
+        if self.end_theme_preview(false) {
+            let text = self.ctx.t("settings.appearance.preview_failed");
+            self.ctx.toast(text);
+        }
+    }
+
+    /// Encerra a prévia sem confirmar e devolve a lista de temas; `reload` = a tela já trocou e precisa voltar.
+    /// Devolve `false` se não havia prévia.
+    fn end_theme_preview(&mut self, reload: bool) -> bool {
+        let Some(p) = self.ctx.theme_preview.take() else {
+            return false;
+        };
+        let shown = self.layers.iter().any(|l| l.theme_preview());
+        self.layers.retain(|l| !l.theme_preview());
+        if shown {
+            self.layers
+                .push(Box::new(theme_preview::panel(&self.ctx, p.id.as_deref())));
+        }
+        if reload {
+            theme_preview::reload_selected(&mut self.ctx);
+        }
+        self.ctx.dirty = true;
+        true
     }
 
     pub fn push_layer(&mut self, layer: Box<dyn Layer>) {
