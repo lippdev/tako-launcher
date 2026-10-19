@@ -369,7 +369,12 @@ pub fn read_games(db_path: &Path) -> Result<Vec<Game>, String> {
         let title = title
             .filter(|t| !t.trim().is_empty())
             .or_else(|| install_folder_name.clone())
-            .unwrap_or_else(|| format!("Jogo itch {game_id}"));
+            .unwrap_or_else(|| {
+                tako_core::i18n::tf(
+                    "sources_unix.itch_fallback",
+                    &[("id", &game_id.to_string())],
+                )
+            });
 
         // Determina o diretório de instalação com base nos modelos do butler
         let game_dir = if let Some(custom) = custom_install_folder.filter(|s| !s.trim().is_empty())
