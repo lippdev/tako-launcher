@@ -77,6 +77,7 @@ impl ApiHandler for LocalApiHandler {
 
 static SERVER: Mutex<Option<ServerHandle>> = Mutex::new(None);
 static RUNNING_PORT: Mutex<Option<u16>> = Mutex::new(None);
+static LAST_WARNED_ERROR_PORT: Mutex<Option<u16>> = Mutex::new(None);
 static SHARED_STATE: std::sync::OnceLock<Arc<SharedState>> = std::sync::OnceLock::new();
 
 fn get_shared_state() -> Arc<SharedState> {
@@ -206,6 +207,10 @@ pub fn sync(ctx: &mut Ctx) {
             s.stop();
         }
         *port_lock = None;
+        let mut warned = LAST_WARNED_ERROR_PORT
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        *warned = None;
         return;
     }
 
@@ -255,13 +260,23 @@ pub fn sync(ctx: &mut Ctx) {
             tracing::info!("API local do Tako escutando em http://127.0.0.1:{actual_port}");
             *server_lock = Some(handle);
             *port_lock = Some(actual_port);
+            let mut warned = LAST_WARNED_ERROR_PORT
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            *warned = None;
         }
         Err(e) => {
             tracing::error!("não foi possível iniciar a API local na porta {port}: {e}");
-            ctx.toast_error(ctx.tf(
-                "settings.system.api_start_failed",
-                &[("error", &e.to_string())],
-            ));
+            let mut warned = LAST_WARNED_ERROR_PORT
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if *warned != Some(port) {
+                *warned = Some(port);
+                ctx.toast_error(ctx.tf(
+                    "settings.system.api_start_failed",
+                    &[("error", &e.to_string())],
+                ));
+            }
         }
     }
 }
@@ -283,6 +298,10 @@ pub fn shutdown() {
     }
     let mut port = RUNNING_PORT.lock().unwrap_or_else(|e| e.into_inner());
     *port = None;
+    let mut warned = LAST_WARNED_ERROR_PORT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    *warned = None;
 }
 
 #[cfg(test)]
@@ -291,6 +310,36 @@ mod tests {
     use tako_core::library::GameStore;
     use tako_core::paths::DataPaths;
     use tako_platform::Platform;
+
+    #[test]
+    fn sync_does_not_repeat_toast_on_busy_port() {
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        shutdown();
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let occupied_port = listener.local_addr().unwrap().port();
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = crate::app::build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        ctx.settings.set_bool(keys::API_ENABLED, true);
+        ctx.settings.set(keys::API_PORT, &occupied_port.to_string());
+
+        // 1ª tentativa com a porta ocupada: deve emitir toast de erro
+        sync(&mut ctx);
+        assert!(!is_running());
+        let first_toast = ctx.toast.take();
+        assert!(first_toast.is_some(), "deve emitir toast na primeira falha");
+
+        // 2ª tentativa (ex: edição subsequente na biblioteca): não deve emitir novo toast
+        sync(&mut ctx);
+        assert!(
+            ctx.toast.is_none(),
+            "não deve repetir o toast com a mesma porta ocupada"
+        );
+
+        drop(listener);
+        shutdown();
+    }
 
     #[test]
     fn local_api_starts_when_enabled_and_stops_when_disabled() {

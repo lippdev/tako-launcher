@@ -67,6 +67,7 @@ fn save(ctx: &mut Ctx, d: &Draft) -> Result<(), String> {
         .update_manual(record)
         .map_err(|e| e.to_string())?;
     ctx.sync_collections();
+    crate::local_api::sync(ctx);
     Ok(())
 }
 

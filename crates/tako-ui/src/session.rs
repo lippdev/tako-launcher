@@ -138,11 +138,14 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
     // Prepara e valida Wine/Proton ANTES de qualquer efeito (tela, áudio, guard, eventos, ferramentas, comando antes)
     let is_windows_exe = target.to_lowercase().ends_with(".exe");
     let is_manual = game.store() == tako_core::library::GameStore::Manual;
-    let runner = eff
-        .wine_runtime
-        .as_deref()
-        .map(str::trim)
-        .filter(|r| !r.is_empty());
+    let runner = if eff.commands_approved {
+        eff.wine_runtime
+            .as_deref()
+            .map(str::trim)
+            .filter(|r| !r.is_empty())
+    } else {
+        None
+    };
     let wine_config = if (cfg!(target_os = "linux") || cfg!(test))
         && !tako_platform::sunshine::is_flatpak()
         && is_manual
@@ -312,6 +315,11 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
                 .run_command(c, Some(tako_core::session::settings::BEFORE_COMMAND_WAIT))
                 .err()
         });
+    let env: &[(String, String)] = if eff.commands_approved {
+        &eff.environment
+    } else {
+        &[]
+    };
     let launched = if let Some(cfg) = &wine_config {
         p.processes.launch_args_with_env(
             &cfg.executable.to_string_lossy(),
@@ -320,12 +328,16 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
             &cfg.environment,
         )
     } else {
-        let args = eff.arguments(game.launch_arguments.as_deref());
+        let args = if eff.commands_approved {
+            eff.arguments(game.launch_arguments.as_deref())
+        } else {
+            game.launch_arguments.clone().unwrap_or_default()
+        };
         p.processes.launch_with_env(
             &target,
             (!args.is_empty()).then_some(&args),
             cwd.as_deref(),
-            &eff.environment,
+            env,
         )
     };
     if let Some(e) = before_failed {
@@ -699,6 +711,64 @@ mod tests {
     use tako_core::session::GameEnd;
 
     #[test]
+    fn unapproved_commands_environment_and_args_are_not_applied_on_launch() {
+        use std::sync::Arc;
+        use tako_core::devices::fake::FakeProcesses;
+        let dir = tempfile::tempdir().unwrap();
+        let fake = Arc::new(FakeProcesses::default());
+        let platform = Platform {
+            processes: fake.clone(),
+            ..Platform::simulated()
+        };
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), platform.clone(), false);
+        ctx.library.refresh();
+        let exe = dir.path().join("jogo.exe");
+        std::fs::write(&exe, "").unwrap();
+        let record = tako_core::library::ManualGameRecord::create(
+            "Jogo",
+            &exe.to_string_lossy(),
+            chrono::Utc::now(),
+        );
+        let id = record.id.clone();
+        ctx.library.add_manual(record).unwrap();
+
+        let store = ctx.game_settings.clone().unwrap();
+        let mut o = store.load(&id).unwrap();
+        o.extra_arguments = Some("--unapproved-arg".into());
+        o.environment = Some("UNAPPROVED_VAR=1".into());
+        o.before_command = Some("unapproved_script.sh".into());
+        o.wine_runtime = Some("proton-ge".into());
+        store.save(&id, &o).unwrap();
+
+        assert!(!effective(&ctx, &id).commands_approved);
+
+        let started = start(&mut ctx, &id).unwrap();
+        if let Started::Tracking(req) = started {
+            assert!(req.after_command.is_none());
+            assert!(req.close_tools.is_empty());
+        }
+
+        let commands = fake.commands.lock().unwrap().clone();
+        assert!(
+            commands.is_empty(),
+            "before_command não deve rodar sem aprovação"
+        );
+
+        let env = fake.env.lock().unwrap().clone();
+        assert!(
+            env.is_empty(),
+            "variáveis de ambiente não aprovadas não devem ser aplicadas"
+        );
+
+        let launched = fake.launched.lock().unwrap().clone();
+        assert!(!launched.is_empty());
+        assert!(
+            !launched[0].contains("--unapproved-arg"),
+            "argumentos não aprovados não devem ser aplicados"
+        );
+    }
+
+    #[test]
     fn successful_desktop_launch_marks_unset_or_wishlist_status_and_preserves_user_choices() {
         use tako_core::library::PlayStatus;
         let dir = tempfile::tempdir().unwrap();
@@ -983,6 +1053,7 @@ mod tests {
         // 2. Com Wine do sistema e prefixo padrão
         let mut o = store.load(&manual.id).unwrap();
         o.wine_runtime = Some("system-wine".into());
+        o.approve_commands();
         store.save(&manual.id, &o).unwrap();
 
         let Started::Tracking(req) = start(&mut ctx, &manual.id).unwrap() else {
@@ -998,6 +1069,7 @@ mod tests {
 
         // 3. Com prefixo proibido (/ ou $HOME): recusa a abertura
         o.wine_prefix = Some("/".into());
+        o.approve_commands();
         store.save(&manual.id, &o).unwrap();
         assert!(start(&mut ctx, &manual.id).is_err());
     }

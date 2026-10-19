@@ -196,8 +196,12 @@ pub fn client_missing(ctx: &Ctx, game: &Game, notice: String) -> MenuLayer {
         v.push(
             MenuItem::new(PanelRow::button("anyway", ctx.t("game.client_try_anyway"))).on(
                 move |ctx| {
-                    ctx.effect(Effect::Launch(id.clone()));
-                    Flow::Close
+                    if !crate::session::effective(ctx, &id).commands_approved {
+                        Flow::Push(Box::new(approve_commands(ctx, &id)))
+                    } else {
+                        ctx.effect(Effect::Launch(id.clone()));
+                        Flow::Close
+                    }
                 },
             ),
         );
@@ -319,6 +323,24 @@ pub fn approve_commands(ctx: &Ctx, id: &str) -> MenuLayer {
     }
     if eff.close_tools && !eff.tools.is_empty() {
         text.push(ctx.t("session.commands_close_tools"));
+    }
+    if let Some(args) = &eff.extra_arguments {
+        text.push(ctx.tf("session.commands_extra_args", &[("args", args)]));
+    }
+    if !eff.environment.is_empty() {
+        let env_str = eff
+            .environment
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join("; ");
+        text.push(ctx.tf("session.commands_env", &[("env", &env_str)]));
+    }
+    if let Some(runtime) = &eff.wine_runtime {
+        text.push(ctx.tf("session.commands_wine_runtime", &[("runtime", runtime)]));
+    }
+    if let Some(prefix) = &eff.wine_prefix {
+        text.push(ctx.tf("session.commands_wine_prefix", &[("prefix", prefix)]));
     }
     let id = id.to_owned();
     MenuLayer::dialog(ctx.t("session.commands_title"), move |ctx| {
@@ -651,7 +673,10 @@ fn confirm_remove(ctx: &Ctx, id: &str) -> MenuLayer {
                 MenuItem::new(PanelRow::button("remove", ctx.t("options.remove")).danger()).on(
                     move |ctx| {
                         match ctx.library.remove_manual(&id) {
-                            Ok(()) => ctx.toast(ctx.t("options.removed")),
+                            Ok(()) => {
+                                crate::local_api::sync(ctx);
+                                ctx.toast(ctx.t("options.removed"));
+                            }
                             Err(e) => ctx.toast(e.to_string()),
                         }
                         ctx.leave_details = true;
@@ -851,10 +876,15 @@ fn confirm_remove_many(ctx: &Ctx, ids: Vec<String>) -> MenuLayer {
             vec![
                 MenuItem::new(PanelRow::button("remove", ctx.t("options.remove")).danger()).on(
                     move |ctx| {
+                        let mut removed = false;
                         for id in &ids {
-                            if let Err(e) = ctx.library.remove_manual(id) {
-                                ctx.toast(e.to_string());
+                            match ctx.library.remove_manual(id) {
+                                Ok(()) => removed = true,
+                                Err(e) => ctx.toast(e.to_string()),
                             }
+                        }
+                        if removed {
+                            crate::local_api::sync(ctx);
                         }
                         ctx.toast(ctx.t("options.removed"));
                         Flow::Close
@@ -1449,6 +1479,33 @@ mod tests {
             .map(|i| i.row.key)
             .collect();
         assert!(!keys.iter().any(|k| k == "repair"));
+    }
+
+    #[test]
+    fn client_missing_anyway_requires_approval_if_commands_unapproved() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let exe = dir.path().join("jogo.exe");
+        std::fs::write(&exe, "").unwrap();
+        let record = ManualGameRecord::create("Jogo", &exe.to_string_lossy(), chrono::Utc::now());
+        let id = record.id.clone();
+        ctx.library.add_manual(record).unwrap();
+        let store = ctx.game_settings.clone().unwrap();
+        let mut o = store.load(&id).unwrap();
+        o.extra_arguments = Some("--flag".into());
+        store.save(&id, &o).unwrap();
+
+        let game = ctx.library.find(&id).unwrap().clone();
+        let dialog = client_missing(&ctx, &game, "App da loja não encontrado".into());
+        let ask = accept(&mut ctx, &dialog, "anyway");
+        assert!(
+            matches!(ask, Flow::Push(_)),
+            "deve empilhar diálogo de aprovação de comandos"
+        );
+        assert!(
+            ctx.effects.is_empty(),
+            "não deve disparar Launch imediatamente"
+        );
     }
 
     #[test]

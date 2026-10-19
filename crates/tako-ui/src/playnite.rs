@@ -196,6 +196,7 @@ fn apply(ctx: &mut Ctx, plan: &import::PlayniteImportPlan) {
         }
     }
     ctx.sync_collections();
+    crate::local_api::sync(ctx);
     tracing::info!(
         new = plan.new.len(),
         matched = plan.matched.len(),

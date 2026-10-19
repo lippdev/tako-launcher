@@ -954,8 +954,108 @@ fn desktop_snapshot() {
                 {
                     shell.click("category", index);
                 }
-                let layer = crate::shell::settings::edit_theme_panel(&shell.ctx);
+                let layer = crate::shell::settings::edit_theme_panel(&mut shell.ctx);
                 shell.push_layer(Box::new(layer));
+            }
+            Ok("theme-create") => {
+                shell.open_route("settings");
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
+                let layer = crate::shell::settings::create_theme_editor_panel(&shell.ctx, None);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("theme-create-editor") => {
+                shell.open_route("settings");
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
+                let layer = crate::shell::settings::create_theme_editor_panel(&shell.ctx, None);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("theme-name") => {
+                shell.open_route("settings");
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
+                let layer = crate::shell::settings::prompt_theme_name(&shell.ctx, None, false);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("theme-overwrite") => {
+                shell.open_route("settings");
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "appearance")
+                {
+                    shell.click("category", index);
+                }
+                let theme_id = "meu-tema";
+                let t_dir = shell.ctx.paths.themes().join(theme_id);
+                let _ = std::fs::create_dir_all(&t_dir);
+                let _ = std::fs::write(
+                    t_dir.join("theme.toml"),
+                    r#"id = "meu-tema"
+name = "Meu Tema"
+version = "1.0.0"
+author = "Tako"
+api = 1
+entry = "main.slint"
+created-by-tako = true
+"#,
+                );
+                let _ = std::fs::write(
+                    t_dir.join("main.slint"),
+                    r#"export { App, Ui, Hint, PanelRow } from "@tako/main.slint";
+"#,
+                );
+                let flow = crate::shell::settings::finish_create_theme(
+                    &mut shell.ctx,
+                    "Meu Tema",
+                    None,
+                    None,
+                    false,
+                );
+                if let crate::shell::layer::Flow::Push(layer) = flow {
+                    shell.push_layer(layer);
+                }
+            }
+            Ok("theme-export") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+                for (id, name) in [("tema-um", "Tema 1"), ("tema-dois", "Tema 2")] {
+                    let t_dir = shell.ctx.paths.themes().join(id);
+                    let _ = std::fs::create_dir_all(&t_dir);
+                    let _ = std::fs::write(
+                        t_dir.join("theme.toml"),
+                        format!(
+                            "id = \"{id}\"\nname = \"{name}\"\nversion = \"1.0.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\ncreated-by-tako = true\n"
+                        ),
+                    );
+                    let _ = std::fs::write(
+                        t_dir.join("main.slint"),
+                        r#"export { App, Ui, Hint, PanelRow } from "@tako/main.slint";
+"#,
+                    );
+                    let _ = std::fs::write(t_dir.join("tokens.toml"), "accent = \"#6C5CE7\"\n");
+                }
+                crate::shell::settings::forget(crate::shell::settings::THEMES_CACHE);
+                shell.ctx.reload_theme_cache();
+                let data = crate::shell::settings::cached_themes(&shell.ctx);
+                if data.exportable.len() >= 2 {
+                    let flow = crate::shell::settings::export_theme_panel(&mut shell.ctx);
+                    if let crate::shell::layer::Flow::Push(layer) = flow {
+                        shell.push_layer(layer);
+                    }
+                }
             }
             Ok("settings-api") => {
                 shell.open_route("settings");

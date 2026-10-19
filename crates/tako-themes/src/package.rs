@@ -274,10 +274,10 @@ fn validate_audio_file(
     let dur = match source {
         Source::Dir => crate::manifest::wav_duration(&entry.file),
         Source::Zip(zip) => {
-            let mut seekable = zip
-                .by_index_seek(entry.zip_index)
+            let mut reader = zip
+                .by_index(entry.zip_index)
                 .map_err(|e| extract_problem(&io::Error::other(e)))?;
-            crate::manifest::wav_duration_from_reader(&mut seekable)
+            crate::manifest::wav_duration_from_reader(&mut reader)
         }
     };
 

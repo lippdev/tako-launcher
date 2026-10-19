@@ -18,14 +18,29 @@ const MAX_NAME_CHARS: usize = 120;
 /// Campos de texto livre (data, tamanho): só dica, cortados.
 const MAX_HINT_CHARS: usize = 40;
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SourceError {
-    #[error("a fonte passa de {} MiB", MAX_SOURCE_BYTES / 1024 / 1024)]
     TooLarge,
-    #[error("a fonte não é um JSON válido")]
     InvalidJson,
-    #[error("a fonte não tem a lista \"downloads\"")]
     MissingDownloads,
+}
+
+impl std::error::Error for SourceError {}
+
+impl std::fmt::Display for SourceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceError::TooLarge => {
+                write!(f, "{}", crate::i18n::t("downloads.error.source_too_large"))
+            }
+            SourceError::InvalidJson => {
+                write!(f, "{}", crate::i18n::t("downloads.error.invalid_json"))
+            }
+            SourceError::MissingDownloads => {
+                write!(f, "{}", crate::i18n::t("downloads.error.missing_downloads"))
+            }
+        }
+    }
 }
 
 /// Um item da fonte. `uris` já validadas; o texto vem da fonte e é mostrado só como texto simples.
@@ -37,6 +52,8 @@ pub struct SourceItem {
     pub upload_date: String,
     /// Texto livre da fonte ("12.4 GB"): só dica; o tamanho real vem do torrent.
     pub file_size: String,
+    /// Tokens para busca e sugestão pré-calculados ao ler a fonte.
+    pub tokens: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,11 +128,13 @@ fn item(v: &Value) -> Option<SourceItem> {
             .map(|s| clean_text(s, MAX_HINT_CHARS))
             .unwrap_or_default()
     };
+    let tokens = crate::library::title_matcher::tokens(&title);
     Some(SourceItem {
         title,
         uris,
         upload_date: hint("uploadDate"),
         file_size: hint("fileSize"),
+        tokens,
     })
 }
 
@@ -215,7 +234,12 @@ mod tests {
         assert_eq!(s.items.len(), 1);
         assert_eq!(s.items[0].title, "Jogo de Teste");
         assert_eq!(s.items[0].file_size, "1.2 GB");
+        assert_eq!(src_tokens_len(&s.items[0]), 3);
         assert_eq!(s.dropped, 0);
+    }
+
+    fn src_tokens_len(item: &SourceItem) -> usize {
+        item.tokens.len()
     }
 
     #[test]

@@ -146,13 +146,12 @@ pub fn reset_override(themes_root: &Path, theme_id: Option<&str>) -> io::Result<
     Ok(true)
 }
 
-/// Limpa qualquer imagem de rascunho (`background.draft.*`) existente na pasta da sobreposição.
-pub fn clean_background_draft(themes_root: &Path, theme_id: Option<&str>) -> io::Result<()> {
-    let dir = override_dir(themes_root, theme_id);
+/// Limpa arquivos de rascunho de fundo (`background.draft.*`) em uma pasta arbitrária.
+pub fn clean_background_draft_dir(dir: &Path) -> io::Result<()> {
     if !dir.is_dir() {
         return Ok(());
     }
-    for entry in fs::read_dir(&dir)? {
+    for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
@@ -161,6 +160,12 @@ pub fn clean_background_draft(themes_root: &Path, theme_id: Option<&str>) -> io:
         }
     }
     Ok(())
+}
+
+/// Limpa qualquer imagem de rascunho (`background.draft.*`) existente na pasta da sobreposição.
+pub fn clean_background_draft(themes_root: &Path, theme_id: Option<&str>) -> io::Result<()> {
+    let dir = override_dir(themes_root, theme_id);
+    clean_background_draft_dir(&dir)
 }
 
 /// Remove arquivos órfãos de fundo (`background.*` e `background.draft.*`), mantendo apenas `keep` se fornecido.
@@ -187,17 +192,13 @@ pub fn clean_background_orphans(
     Ok(())
 }
 
-/// Valida cabeçalho e limites, e copia a imagem para um rascunho `background.draft.<ext>`.
-pub fn copy_draft_background_image(
-    themes_root: &Path,
-    theme_id: Option<&str>,
-    source: &Path,
-) -> Result<String, CopyImageError> {
+/// Valida limites e cabeçalho da imagem de fundo com `image::Limits`, `max_alloc` e `with_guessed_format`.
+pub fn validate_background_image(source: &Path) -> Result<String, CopyImageError> {
     if !source.is_file() {
         return Err(CopyImageError::NotFound(source.to_path_buf()));
     }
     let meta = fs::metadata(source).map_err(|e| CopyImageError::Io(e.to_string()))?;
-    if meta.len() > MAX_IMAGE_BYTES {
+    if meta.len() == 0 || meta.len() > MAX_IMAGE_BYTES {
         return Err(CopyImageError::TooLarge);
     }
     let ext = source
@@ -230,6 +231,17 @@ pub fn copy_draft_background_image(
         }
         Err(_) => return Err(CopyImageError::InvalidContent),
     }
+
+    Ok(ext)
+}
+
+/// Valida cabeçalho e limites, e copia a imagem para um rascunho `background.draft.<ext>`.
+pub fn copy_draft_background_image(
+    themes_root: &Path,
+    theme_id: Option<&str>,
+    source: &Path,
+) -> Result<String, CopyImageError> {
+    let ext = validate_background_image(source)?;
 
     let dir = override_dir(themes_root, theme_id);
     fs::create_dir_all(&dir).map_err(|e| CopyImageError::Io(e.to_string()))?;
@@ -289,6 +301,7 @@ pub struct ThemeTokensOverride {
     pub background_source_name: Option<String>,
     pub background_mode: Option<BackgroundMode>,
     pub extra: toml::Table,
+    pub draft_dir: Option<PathBuf>,
 }
 
 impl ThemeTokensOverride {
@@ -337,6 +350,7 @@ impl ThemeTokensOverride {
             background_source_name,
             background_mode,
             extra: table,
+            draft_dir: None,
         }
     }
 
@@ -563,6 +577,7 @@ mod tests {
             background_source_name: Some("minha_foto.png".into()),
             background_mode: Some(BackgroundMode::Image),
             extra,
+            draft_dir: None,
         };
         let toml_str = tokens.to_toml_string();
         let parsed = ThemeTokensOverride::from_toml_str(&toml_str);

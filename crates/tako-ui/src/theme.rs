@@ -56,6 +56,12 @@ fn install_extras(themes_dir: &Path) {
         let Some(rel) = name.strip_prefix("extras/") else {
             continue;
         };
+        if !rel
+            .split_once('/')
+            .is_some_and(|(id, _)| tako_themes::BUILTIN_EXTRA_THEME_IDS.contains(&id))
+        {
+            continue;
+        }
         let path = themes_dir.join(rel);
         if std::fs::read(&path).is_ok_and(|old| old == *bytes) {
             continue;
@@ -301,6 +307,26 @@ pub fn apply_tokens_with_override(
     }
 }
 
+/// Detecta os tokens que a entrada do tema realmente consulta para mostrar só opções eficazes.
+pub fn token_capabilities(entry: &Path) -> (bool, bool) {
+    let source = std::fs::read_to_string(entry).unwrap_or_default();
+    let reexports_main_theme = source.lines().any(|line| {
+        line.contains("export {")
+            && line.contains("App")
+            && line.contains("Ui")
+            && line.contains("@tako/main.slint")
+    });
+    if reexports_main_theme {
+        return (true, true);
+    }
+    (
+        source.contains("Ui.font-"),
+        source.contains("Ui.canvas")
+            || source.contains("Ui.has-custom-background")
+            || source.contains("Ui.custom-background"),
+    )
+}
+
 pub fn parse_color(s: &str) -> Option<slint::Color> {
     let hex = s.strip_prefix('#')?;
     let n = u32::from_str_radix(hex, 16).ok()?;
@@ -366,14 +392,12 @@ fn compile_named(
 pub fn check(package: &Path) -> Result<tako_themes::ThemeManifest, Vec<String>> {
     let tmp = tempfile::tempdir().map_err(|e| vec![e.to_string()])?;
     let builtin = install_builtin(tmp.path()).map_err(|e| vec![e.to_string()])?;
-    let installed = tako_themes::install(package, &tmp.path().join("check"))
+    let checked = tmp.path().join("checked-theme");
+    let manifest = tako_themes::extract_for_check(package, &checked)
         .map_err(|p| p.into_iter().map(|p| p.message).collect::<Vec<_>>())?;
-    let manifest = installed
-        .manifest
-        .map_err(|p| p.into_iter().map(|p| p.message).collect::<Vec<_>>())?;
-    let def = compile(&installed.dir.join(&manifest.entry), &builtin).map_err(|e| e.messages)?;
+    let def = compile(&checked.join(&manifest.entry), &builtin).map_err(|e| e.messages)?;
     // `tokens.toml`: o Tako ignora a chave ou a cor inválida ao carregar; aqui o autor fica sabendo.
-    if let Ok(text) = std::fs::read_to_string(installed.dir.join("tokens.toml")) {
+    if let Ok(text) = std::fs::read_to_string(checked.join("tokens.toml")) {
         let colors: Vec<String> = def
             .global_properties("Ui")
             .map(|p| {
@@ -382,7 +406,7 @@ pub fn check(package: &Path) -> Result<tako_themes::ThemeManifest, Vec<String>> 
                     .collect()
             })
             .unwrap_or_default();
-        let problems = token_problems_with_dir(&text, &colors, Some(&installed.dir));
+        let problems = token_problems_with_dir(&text, &colors, Some(&checked));
         if !problems.is_empty() {
             return Err(problems);
         }
@@ -504,6 +528,23 @@ pub fn token_problems(text: &str, colors: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn every_bundled_extra_theme_id_is_reserved() {
+        // O `install_extras` regrava esses temas a cada versão: criar um tema com o mesmo id o apagaria.
+        let ids: std::collections::BTreeSet<&str> = embedded::FILES
+            .iter()
+            .filter_map(|(name, _)| name.strip_prefix("extras/")?.split('/').next())
+            .collect();
+        assert!(!ids.is_empty());
+        for id in ids {
+            assert!(
+                tako_themes::create::is_reserved_theme_id(id),
+                "{id} não está reservado"
+            );
+        }
+    }
+
     use super::*;
 
     #[test]
@@ -515,6 +556,55 @@ mod tests {
         for p in ["page", "library-tiles", "overlays", "hints", "sidebar"] {
             assert!(props.iter().any(|x| x == p), "falta a propriedade {p}");
         }
+    }
+
+    #[test]
+    fn token_capabilities_follow_tokens_used_by_the_theme_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = dir.path().join("main.slint");
+        std::fs::write(
+            &entry,
+            r#"import { Ui } from "@tako/tokens.slint"; Text { font-family: Ui.font-text; background: Ui.canvas; }"#,
+        )
+        .unwrap();
+        assert_eq!(token_capabilities(&entry), (true, true));
+
+        std::fs::write(
+            &entry,
+            "export component App inherits Window { Text { color: Ui.accent; } }",
+        )
+        .unwrap();
+        assert_eq!(token_capabilities(&entry), (false, false));
+    }
+
+    #[test]
+    fn fita_exposes_only_tokens_its_entry_uses() {
+        let tmp = tempfile::tempdir().unwrap();
+        let builtin = install_builtin(tmp.path()).unwrap();
+        assert_eq!(
+            token_capabilities(&tmp.path().join("tako-fita/main.slint")),
+            (false, false)
+        );
+        assert_eq!(
+            token_capabilities(&builtin.join("main.slint")),
+            (true, true)
+        );
+        assert_eq!(
+            token_capabilities(&tmp.path().join("tako-alto-contraste/main.slint")),
+            (true, true)
+        );
+    }
+
+    #[test]
+    fn embedded_extra_theme_ids_match_the_themes_catalog() {
+        let embedded_ids: std::collections::BTreeSet<&str> = embedded::FILES
+            .iter()
+            .filter_map(|(name, _)| name.strip_prefix("extras/"))
+            .filter_map(|path| path.split_once('/').map(|(id, _)| id))
+            .collect();
+        let catalog_ids: std::collections::BTreeSet<&str> =
+            tako_themes::BUILTIN_EXTRA_THEME_IDS.into_iter().collect();
+        assert_eq!(embedded_ids, catalog_ids);
     }
 
     #[test]

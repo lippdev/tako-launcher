@@ -57,26 +57,62 @@ pub struct GameSettingsOverride {
 /// Quanto o comando de antes pode demorar antes de o jogo abrir mesmo assim.
 pub const BEFORE_COMMAND_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Os comandos e as ferramentas num texto só, para comparar com o que foi permitido; `None` sem nenhum.
-/// Sem ferramentas o texto é o do SESSION-004, então o que já foi permitido continua valendo.
+/// Os comandos, ferramentas, argumentos extras, variáveis de ambiente e runtime num texto só,
+/// para comparar com o que foi permitido; `None` sem nenhum.
+/// Sem ferramentas nem argumentos adicionais, o texto é o do SESSION-004, então o que já foi permitido continua valendo.
 pub fn commands_text(
     before: Option<&str>,
     after: Option<&str>,
     tools: Option<&str>,
+    extra_arguments: Option<&str>,
+    environment: Option<&str>,
+    wine_runtime: Option<&str>,
+    wine_prefix: Option<&str>,
 ) -> Option<String> {
     let before = normalize_arguments(before).unwrap_or_default();
     let after = normalize_arguments(after).unwrap_or_default();
     let tools = parse_tools(tools);
-    if tools.is_empty() {
-        return (!before.is_empty() || !after.is_empty()).then(|| format!("{before}\n{after}"));
+    let extra = normalize_arguments(extra_arguments);
+    let env = normalize_arguments(environment);
+    let runtime = normalize_arguments(wine_runtime);
+    let prefix = normalize_arguments(wine_prefix);
+
+    if extra.is_none() && env.is_none() && runtime.is_none() && prefix.is_none() {
+        if tools.is_empty() {
+            return (!before.is_empty() || !after.is_empty()).then(|| format!("{before}\n{after}"));
+        }
+        let fields: Vec<&str> = [before.as_str(), after.as_str()]
+            .into_iter()
+            .chain(tools.iter().map(String::as_str))
+            .collect();
+        return serde_json::to_string(&fields).ok();
     }
-    // Com ferramentas, uma lista JSON: sem ambiguidade entre os campos e nunca igual ao texto antigo (que tem
-    // uma quebra de linha crua; o JSON compacto não tem).
-    let fields: Vec<&str> = [before.as_str(), after.as_str()]
-        .into_iter()
-        .chain(tools.iter().map(String::as_str))
-        .collect();
-    serde_json::to_string(&fields).ok()
+
+    #[derive(serde::Serialize)]
+    struct CommandsPayload<'a> {
+        before: &'a str,
+        after: &'a str,
+        tools: Vec<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extra_arguments: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        environment: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        wine_runtime: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        wine_prefix: Option<&'a str>,
+    }
+
+    serde_json::to_string(&CommandsPayload {
+        before: before.as_str(),
+        after: after.as_str(),
+        tools: tools.iter().map(String::as_str).collect(),
+        extra_arguments: extra.as_deref(),
+        environment: env.as_deref(),
+        wine_runtime: runtime.as_deref(),
+        wine_prefix: prefix.as_deref(),
+    })
+    .ok()
 }
 
 /// Caminhos das ferramentas, separados por `;` ou por linha, sem os vazios.
@@ -151,6 +187,10 @@ impl GameSettingsOverride {
             self.before_command.as_deref(),
             self.after_command.as_deref(),
             self.tools.as_deref(),
+            self.extra_arguments.as_deref(),
+            self.environment.as_deref(),
+            self.wine_runtime.as_deref(),
+            self.wine_prefix.as_deref(),
         );
     }
 }
@@ -383,6 +423,10 @@ pub fn resolve(
             game.before_command.as_deref(),
             game.after_command.as_deref(),
             game.tools.as_deref(),
+            game.extra_arguments.as_deref(),
+            game.environment.as_deref(),
+            game.wine_runtime.as_deref(),
+            game.wine_prefix.as_deref(),
         ) {
             None => true,
             current => game.approved_commands == current,
@@ -499,6 +543,49 @@ mod tests {
         assert!(!resolve(&global(), Some(&o)).commands_approved);
         // Sem comandos não há o que permitir.
         assert!(resolve(&global(), None).commands_approved);
+    }
+
+    #[test]
+    fn extra_arguments_and_environment_need_approval_and_change_resets_approval() {
+        // Apenas extra_arguments sem aprovação precisa de confirmação
+        let mut o = with(|o| {
+            o.extra_arguments = Some("--custom-flag".into());
+        });
+        let e = resolve(&global(), Some(&o));
+        assert!(!e.commands_approved, "extra_arguments precisa de aprovação");
+        o.approve_commands();
+        assert!(
+            resolve(&global(), Some(&o)).commands_approved,
+            "deve estar aprovado após approve_commands"
+        );
+
+        // Alteração no argumento extra invalida a aprovação
+        o.extra_arguments = Some("--different-flag".into());
+        assert!(
+            !resolve(&global(), Some(&o)).commands_approved,
+            "alteração de extra_arguments deve resetar aprovação"
+        );
+
+        // Apenas environment sem aprovação precisa de confirmação
+        let mut o_env = with(|o| {
+            o.environment = Some("LD_PRELOAD=/custom.so".into());
+        });
+        assert!(
+            !resolve(&global(), Some(&o_env)).commands_approved,
+            "environment precisa de aprovação"
+        );
+        o_env.approve_commands();
+        assert!(
+            resolve(&global(), Some(&o_env)).commands_approved,
+            "deve estar aprovado após approve_commands"
+        );
+
+        // Alteração em environment invalida a aprovação
+        o_env.environment = Some("LD_PRELOAD=/other.so".into());
+        assert!(
+            !resolve(&global(), Some(&o_env)).commands_approved,
+            "alteração de environment deve resetar aprovação"
+        );
     }
 
     #[test]
