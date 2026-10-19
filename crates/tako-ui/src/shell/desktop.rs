@@ -1068,10 +1068,14 @@ fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let time = DeskInfo {
         icon: "clock".into(),
         label: ctx.t("desktop.play_time"),
-        value: if g.play_time.is_zero() {
-            ctx.t("desktop.strip.not_played")
-        } else {
-            game_text::play_time(lang, g.play_time)
+        // Jogo com sessão registrada nunca é "Ainda não jogado": vale a soma das sessões ou "Não registrado".
+        value: match g
+            .play_time
+            .max(ctx.library.sessions(&g.id).iter().map(|s| s.duration).sum())
+        {
+            t if !t.is_zero() => game_text::play_time(lang, t),
+            _ if last.or(g.last_played_at).is_some() => ctx.t("desktop.strip.time_unknown"),
+            _ => ctx.t("desktop.strip.not_played"),
         },
         ..Default::default()
     };
@@ -2774,6 +2778,13 @@ mod tests {
         let mut sem_nota = g.clone();
         sem_nota.metacritic_score = None;
         assert_eq!(strip(&shell.ctx, &sem_nota).len(), 2);
+        // Com uma sessão (última vez conhecida) e tempo 0, o tempo não diz "Ainda não jogado".
+        let time = |g: &Game| strip(&shell.ctx, g)[1].value.to_string();
+        sem_nota.play_time = std::time::Duration::ZERO;
+        sem_nota.last_played_at = None;
+        assert_eq!(time(&sem_nota), "Ainda não jogado");
+        sem_nota.last_played_at = Some(chrono::Utc::now());
+        assert_eq!(time(&sem_nota), "Não registrado");
     }
 
     #[test]
