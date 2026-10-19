@@ -328,16 +328,16 @@ pub fn start_server_with_timeout<H: ApiHandler>(
                                 streams: s_map,
                                 conns: c_counter,
                             };
-                            let _ = handle_connection(
-                                stream,
-                                h,
-                                t,
-                                r,
-                                g,
+                            let ctx = ConnectionContext {
+                                handler: h,
+                                token_holder: t,
+                                run_flag: r,
+                                gen_flag: g,
                                 conn_gen,
-                                s_port,
+                                server_port: s_port,
                                 request_timeout,
-                            );
+                            };
+                            let _ = handle_connection(stream, ctx);
                         });
                     }
                     Err(_) => {
@@ -432,8 +432,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
-fn handle_connection<H: ApiHandler>(
-    mut stream: TcpStream,
+struct ConnectionContext<H> {
     handler: Arc<H>,
     token_holder: Arc<RwLock<String>>,
     run_flag: Arc<AtomicBool>,
@@ -441,8 +440,13 @@ fn handle_connection<H: ApiHandler>(
     conn_gen: u64,
     server_port: u16,
     request_timeout: Duration,
+}
+
+fn handle_connection<H: ApiHandler>(
+    mut stream: TcpStream,
+    ctx: ConnectionContext<H>,
 ) -> std::io::Result<()> {
-    let deadline = Instant::now() + request_timeout;
+    let deadline = Instant::now() + ctx.request_timeout;
     let cloned_stream = stream.try_clone()?;
     let mut reader = BufReader::new(cloned_stream);
 
@@ -545,8 +549,8 @@ fn handle_connection<H: ApiHandler>(
     }
 
     // Proteção contra DNS rebinding: rejeita com 421 se Host não for 127.0.0.1:<porta> ou localhost:<porta>
-    let expected_host1 = format!("127.0.0.1:{server_port}");
-    let expected_host2 = format!("localhost:{server_port}");
+    let expected_host1 = format!("127.0.0.1:{}", ctx.server_port);
+    let expected_host2 = format!("localhost:{}", ctx.server_port);
     let host_valid = host_header.as_deref().is_some_and(|h| {
         h.eq_ignore_ascii_case(&expected_host1) || h.eq_ignore_ascii_case(&expected_host2)
     });
@@ -570,7 +574,11 @@ fn handle_connection<H: ApiHandler>(
     }
 
     // Validação de autenticação: Bearer <token> em tempo constante
-    let expected_token = token_holder.read().map(|t| t.clone()).unwrap_or_default();
+    let expected_token = ctx
+        .token_holder
+        .read()
+        .map(|t| t.clone())
+        .unwrap_or_default();
 
     let authorized = auth_header.as_deref().is_some_and(|h| {
         if let Some(provided) = h.strip_prefix("Bearer ") {
@@ -601,12 +609,12 @@ fn handle_connection<H: ApiHandler>(
 
     match (method, segments.as_slice()) {
         ("GET", ["api", "v1", "games"]) | ("GET", ["api", "v1", "library"]) => {
-            let games = handler.list_games();
+            let games = ctx.handler.list_games();
             let json = serde_json::to_string(&games).unwrap_or_else(|_| "[]".into());
             send_response(&mut stream, 200, "OK", &json)
         }
         ("GET", ["api", "v1", "state"]) | ("GET", ["api", "v1", "status"]) => {
-            let state = handler.game_state();
+            let state = ctx.handler.game_state();
             let json = serde_json::to_string(&state).unwrap_or_else(|_| "{}".into());
             send_response(&mut stream, 200, "OK", &json)
         }
@@ -621,7 +629,7 @@ fn handle_connection<H: ApiHandler>(
             };
 
             // Revalidação de sessão e geração ativa antes do despacho
-            if !run_flag.load(Ordering::SeqCst) {
+            if !ctx.run_flag.load(Ordering::SeqCst) {
                 return send_response(
                     &mut stream,
                     503,
@@ -629,7 +637,7 @@ fn handle_connection<H: ApiHandler>(
                     r#"{"error":"Interface unavailable"}"#,
                 );
             }
-            if gen_flag.load(Ordering::SeqCst) != conn_gen {
+            if ctx.gen_flag.load(Ordering::SeqCst) != ctx.conn_gen {
                 return send_response(
                     &mut stream,
                     401,
@@ -639,9 +647,9 @@ fn handle_connection<H: ApiHandler>(
             }
 
             let result = if *action == "open" {
-                handler.open_game(&id)
+                ctx.handler.open_game(&id)
             } else {
-                handler.play_game(&id)
+                ctx.handler.play_game(&id)
             };
 
             match result {
