@@ -256,3 +256,26 @@ fn owned_games_that_are_not_installed_come_from_the_library_cache() {
         1
     );
 }
+
+// Caminhos montados a partir do temporário: `is_absolute` depende do SO (no Windows "/home/u" não é absoluto).
+#[test]
+fn linux_roots_do_not_repeat_the_default_folder() {
+    let home = std::env::temp_dir().join("u");
+    let expected = [
+        home.join(".config/heroic"),
+        home.join(".var/app/com.heroicgameslauncher.hgl/config/heroic"),
+    ];
+    for xdg in [None, Some(home.join(".config")), Some(PathBuf::from("rel"))] {
+        assert_eq!(linux_roots(&home, xdg), expected);
+    }
+}
+
+#[test]
+fn linux_roots_add_the_host_folder_when_xdg_is_the_sandbox() {
+    let home = std::env::temp_dir().join("u");
+    let sandbox = home.join(".var/app/io.github.lippdev.Tako/config");
+    let roots = linux_roots(&home, Some(sandbox.clone()));
+    assert_eq!(roots.len(), 3);
+    assert_eq!(roots[0], sandbox.join("heroic"));
+    assert_eq!(roots[2], home.join(".config/heroic"));
+}

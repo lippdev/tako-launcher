@@ -4,7 +4,7 @@
 
 use tako_core::devices::{
     ConnectedDisplay, DeviceError, DeviceResult, DisplayMode, DisplayTopology, Displays, HdrStatus,
-    MonitorState, ScreenBounds,
+    MonitorState, ScreenBounds, VrrStatus,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +37,7 @@ pub struct Output {
     /// Escala lógica (Wayland); 1 no X11 e no macOS.
     pub scale: f64,
     pub hdr: HdrStatus,
+    pub vrr: VrrStatus,
 }
 
 impl Output {
@@ -101,6 +102,13 @@ pub trait OutputBackend: Send + Sync {
     fn commit(&self, desired: &[Output]) -> DeviceResult<()>;
     fn set_hdr(&self, _id: &str, _enabled: bool) -> DeviceResult<()> {
         Err(DeviceError::Unsupported("HDR".into()))
+    }
+    fn set_vrr(&self, _id: &str, _enabled: bool) -> DeviceResult<()> {
+        Err(DeviceError::Unsupported("VRR".into()))
+    }
+    /// Ver [`Displays::vrr_limitation`].
+    fn vrr_limitation(&self) -> Option<String> {
+        None
     }
 }
 
@@ -181,6 +189,7 @@ impl<B: OutputBackend> Displays for OutputDisplays<B> {
                     is_active: active,
                     is_primary: o.primary,
                     hdr: o.hdr,
+                    vrr: o.vrr,
                 }
             })
             .collect())
@@ -243,6 +252,15 @@ impl<B: OutputBackend> Displays for OutputDisplays<B> {
     fn set_hdr(&self, display_id: &str, enabled: bool) -> DeviceResult<()> {
         self.writable()?;
         self.backend.set_hdr(display_id, enabled)
+    }
+
+    fn set_vrr(&self, display_id: &str, enabled: bool) -> DeviceResult<()> {
+        self.writable()?;
+        self.backend.set_vrr(display_id, enabled)
+    }
+
+    fn vrr_limitation(&self) -> Option<String> {
+        self.backend.vrr_limitation()
     }
 
     fn capture(&self) -> DeviceResult<DisplayTopology> {
@@ -367,6 +385,7 @@ pub(crate) mod tests {
             rotation: 0,
             scale: 1.0,
             hdr: HdrStatus::Unsupported,
+            vrr: VrrStatus::Unsupported,
         }
     }
 

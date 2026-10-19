@@ -2,7 +2,7 @@
 
 use super::outputs::{Output, OutputMode};
 use serde_json::Value;
-use tako_core::devices::HdrStatus;
+use tako_core::devices::{HdrStatus, VrrStatus};
 
 const MAX_JSON: usize = 4 << 20;
 
@@ -68,9 +68,22 @@ pub fn parse(json: &str) -> Result<Vec<Output>, String> {
                 rotation: rotation(o.get("transform").and_then(Value::as_str).unwrap_or("")),
                 scale: o.get("scale").and_then(Value::as_f64).unwrap_or(1.0),
                 hdr: HdrStatus::Unsupported,
+                // O protocolo só diz se está ligado, não se a tela aceita: desligado vale tentar.
+                vrr: match o.get("adaptive_sync").and_then(Value::as_bool) {
+                    Some(true) => VrrStatus::On,
+                    Some(false) => VrrStatus::Off,
+                    None => VrrStatus::Unsupported,
+                },
             })
         })
         .collect())
+}
+
+pub fn vrr_args(id: &str, enabled: bool) -> Vec<String> {
+    let state = if enabled { "enabled" } else { "disabled" };
+    ["--output", id, "--adaptive-sync", state]
+        .map(String::from)
+        .to_vec()
 }
 
 pub fn args(desired: &[Output]) -> Vec<String> {
@@ -104,7 +117,7 @@ mod tests {
     use super::*;
 
     const SAMPLE: &str = r#"[
-      {"name":"eDP-1","make":"BOE","model":"0x0BCA","enabled":true,"transform":"normal","scale":1.5,
+      {"name":"eDP-1","make":"BOE","model":"0x0BCA","enabled":true,"transform":"normal","scale":1.5,"adaptive_sync":false,
        "position":{"x":0,"y":0},
        "modes":[{"width":2256,"height":1504,"refresh":59.999,"preferred":true,"current":true},
                 {"width":1920,"height":1200,"refresh":59.885,"preferred":false,"current":false}]},
@@ -123,6 +136,14 @@ mod tests {
         assert_eq!(o[1].name, "HDMI-A-1");
         assert!(o[1].current.is_none());
         assert_eq!(o[1].rotation, 90);
+        assert_eq!(
+            (o[0].vrr, o[1].vrr),
+            (VrrStatus::Off, VrrStatus::Unsupported)
+        );
+        assert_eq!(
+            vrr_args("eDP-1", true).join(" "),
+            "--output eDP-1 --adaptive-sync enabled"
+        );
         assert!(parse("{}").is_err());
         assert!(parse("[").is_err());
     }

@@ -30,7 +30,6 @@ about = "About the game"
 details = "Details"
 add_game = "Add game"
 search_key = "Ctrl + K"
-install_via = "Install {via}"
 install_game = "Install {title}"
 installing_game = "Downloading {title}"
 installing_game_unknown = "Installing {title}"
@@ -103,6 +102,7 @@ empty_text = "Mark Playing, Beaten and other statuses from a game's ⋯ menu, or
 by_store = "Group by Store"
 
 [desktop.bulk]
+installing = "Opening {n} installs in the store, one at a time"
 count = "{n} selected of {total}"
 collection = "Collection"
 tag = "Tag"
@@ -114,6 +114,18 @@ added_to = "{n} games added to {collection}"
 removed_from = "{n} games removed from {collection}"
 beaten = "Mark as beaten"
 remove_title = "Remove {n} games from the library?"
+
+[desktop.install]
+label = "Install"
+progress = "Downloading… {pct}%"
+installing = "Installing {in}…"
+pick_more = "Install from…"
+pick_title = "Install from"
+free = "{size} free on {drive}"
+short = "{size} more needed on {drive}"
+opens = "installation opens {in}"
+opens_alone = "Installation opens {in}"
+more = "Choose the store"
 
 [desktop.empty]
 none_found = "No games found"

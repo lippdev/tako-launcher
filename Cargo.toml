@@ -32,7 +32,7 @@ crc32fast = "1"
 regex = "1"
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "ico"] }
 zip = { version = "9", default-features = false, features = ["deflate"] }
 keyring = "4"
 tempfile = "3"
@@ -50,6 +50,8 @@ evdev = "0.13"
 objc2-core-foundation = "0.3"
 objc2-core-graphics = "0.3"
 objc2-core-audio = "0.3"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSAppleEventDescriptor", "NSAppleEventManager", "NSString"] }
 sdl3 = { version = "0.20.0", features = ["build-from-source-static"] }
 windows = { version = "0.62", features = [
     "ApplicationModel",

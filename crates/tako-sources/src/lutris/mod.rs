@@ -105,6 +105,7 @@ pub fn read_games(data_dir: &Path) -> Result<Vec<Game>, String> {
             .and_then(|d| first_file(d, &[format!("lutris_{slug}.png")]))
         {
             game.media.insert(media::ICON.to_owned(), icon);
+            game.icon_origin = Some(tako_core::library::IconOrigin::Store);
         }
         games.push(game);
     }
@@ -114,6 +115,24 @@ pub fn read_games(data_dir: &Path) -> Result<Vec<Game>, String> {
 /// Fonte do Lutris: junta a instalação nativa e a Flatpak.
 pub struct LutrisSource {
     data_dirs: Vec<PathBuf>,
+}
+
+/// Pastas de dados do Lutris: a do XDG, a do Flatpak do Lutris e a padrão do usuário. Num Flatpak o `XDG_DATA_HOME`
+/// é o da sandbox, então a padrão entra à parte (sem repetir quando for a mesma).
+#[cfg(any(unix, test))]
+fn data_dirs(home: &Path, xdg_data: Option<PathBuf>) -> Vec<PathBuf> {
+    let data = xdg_data
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(|| home.join(".local/share"));
+    let mut dirs = vec![
+        data.join("lutris"),
+        home.join(".var/app/net.lutris.Lutris/data/lutris"),
+    ];
+    let host = home.join(".local/share/lutris");
+    if !dirs.contains(&host) {
+        dirs.push(host);
+    }
+    dirs
 }
 
 impl LutrisSource {
@@ -127,14 +146,10 @@ impl LutrisSource {
         let home = std::env::var_os("HOME")
             .map(PathBuf::from)
             .unwrap_or_default();
-        let data = std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .filter(|p| p.is_absolute())
-            .unwrap_or_else(|| home.join(".local/share"));
-        LutrisSource::new(vec![
-            data.join("lutris"),
-            home.join(".var/app/net.lutris.Lutris/data/lutris"),
-        ])
+        LutrisSource::new(data_dirs(
+            &home,
+            std::env::var_os("XDG_DATA_HOME").map(PathBuf::from),
+        ))
     }
 }
 

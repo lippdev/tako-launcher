@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lippdev.Tako</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <name>Tako</name>
+  <summary>Game launcher for the TV and the controller</summary>
+  <summary xml:lang="pt-BR">Launcher de jogos para a TV e o controle</summary>
+  <description>
+    <p>Tako brings your game libraries together in one place that works with a controller and on the TV: Steam, Heroic, Lutris and games you add yourself.</p>
+    <p xml:lang="pt-BR">O Tako junta as suas bibliotecas de jogos num lugar só, que funciona com controle e na TV: Steam, Heroic, Lutris e os jogos que você adicionar.</p>
+    <p>Tako is only the tool. It does not provide, suggest or list any source of game content.</p>
+    <p xml:lang="pt-BR">O Tako é só a ferramenta. Não traz, não sugere e não lista nenhuma fonte de conteúdo.</p>
+    <p>Limits of the Flatpak: games and emulators that Tako starts from a folder run inside the sandbox, so launching through the store link (for example steam://) is the supported path. Display switching works on X11 and GNOME.</p>
+    <p xml:lang="pt-BR">Limites do Flatpak: jogos e emuladores que o Tako abre a partir de uma pasta rodam dentro da sandbox, então o caminho suportado é abrir pelo link da loja (por exemplo steam://). A troca de tela funciona no X11 e no GNOME.</p>
+  </description>
+  <launchable type="desktop-id">io.github.lippdev.Tako.desktop</launchable>
+  <provides>
+    <binary>tako</binary>
+  </provides>
+  <url type="homepage">https://github.com/lippdev/tako-launcher</url>
+  <url type="bugtracker">https://github.com/lippdev/tako-launcher/issues</url>
+  <developer id="io.github.lippdev">
+    <name>Tako</name>
+  </developer>
+  <categories>
+    <category>Game</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>gamepad</control>
+  </supports>
+  <releases>
+    <release version="0.2.0-alpha.14" date="2026-10-18" type="development"/>
+  </releases>
+</component>

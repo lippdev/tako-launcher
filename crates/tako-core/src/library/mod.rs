@@ -23,8 +23,8 @@ pub use collections::{
 };
 pub use criteria::{InstallFilter, LibraryCriteria, LibraryFacts};
 pub use game::{
-    ArtKind, Game, GameStore, GameTrackingStrategy, InstallOffer, InstallProgress, PlayStatus,
-    media,
+    ArtKind, Game, GameStore, GameTrackingStrategy, IconOrigin, InstallOffer, InstallProgress,
+    PlayStatus, media,
 };
 pub use game_library::{
     GameLibrary, LibraryData, LibraryError, LibraryStore, MAX_SESSIONS, MemoryLibraryStore,

@@ -481,8 +481,9 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     );
 
     // Em outra tela, o padrão é o preset dela (a resolução do Tako é da tela de jogo dele).
-    let (default_mode, default_hdr) =
-        crate::session::global_settings(ctx).screen_defaults(&screen_of(ctx, &c));
+    let screen_id = screen_of(ctx, &c);
+    let defaults = crate::session::global_settings(ctx).screen_defaults(&screen_id);
+    let (default_mode, default_hdr) = (defaults.mode, defaults.hdr);
     let global_mode = default_mode.map(|m| m.key()).unwrap_or_default();
     let default_mode_label = default_of(
         ctx,
@@ -564,6 +565,47 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
             let id = i();
             move |ctx| tri_options(current(ctx, &id).hdr, hdr_default.clone(), on_off, ctx)
         }),
+    );
+
+    let vrr_default = default_of(ctx, &on_off(ctx, defaults.vrr));
+    let vrr_value = match c.vrr {
+        Some(v) => on_off(ctx, v),
+        None => vrr_default.clone(),
+    };
+    let (a, b) = (i(), i());
+    let toggle_vrr = move |ctx: &mut Ctx, dir: i32, id: &str| {
+        let next = cycle(&[None, Some(true), Some(false)], &current(ctx, id).vrr, dir);
+        change(ctx, id, |o| o.vrr = next);
+        Flow::Stay
+    };
+    let mut vrr_row = row(
+        ctx,
+        "vrr",
+        ctx.t("vrr.game"),
+        vrr_value,
+        c.vrr.is_some().then(|| vrr_default.clone()),
+    );
+    // Tela conectada sem VRR (ou SO sem API, como o Windows): indisponível, com o motivo.
+    let unsupported = super::settings::screen::displays(ctx).is_ok_and(|l| {
+        l.iter().any(|d| {
+            d.id.eq_ignore_ascii_case(&screen_id)
+                && d.vrr == tako_core::devices::VrrStatus::Unsupported
+        })
+    });
+    if unsupported {
+        let why = ctx.platform.displays.vrr_limitation();
+        vrr_row = vrr_row
+            .desc(why.unwrap_or_else(|| ctx.t("vrr.unsupported")))
+            .enabled(false);
+    }
+    v.push(
+        MenuItem::new(vrr_row)
+            .on(move |ctx| toggle_vrr(ctx, 1, &a))
+            .on_adjust(move |ctx, d| toggle_vrr(ctx, d, &b))
+            .options({
+                let id = i();
+                move |ctx| tri_options(current(ctx, &id).vrr, vrr_default.clone(), on_off, ctx)
+            }),
     );
 
     v.push(MenuItem::new(PanelRow::header(
@@ -719,6 +761,62 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
             .on(move |ctx| edit_text(ctx, &a, text, hint, get, set)),
         );
     }
+    let tools = tako_core::session::settings::parse_tools(c.tools.as_deref());
+    let a = i();
+    v.push(
+        MenuItem::new(row(
+            ctx,
+            "tools",
+            ctx.t("game_settings.tools"),
+            match tools.as_slice() {
+                [] => ctx.t("game_settings.none"),
+                [one] => one.clone(),
+                many => tako_core::i18n::tn("game_settings.tools_count", many.len() as i64, &[]),
+            },
+            (!tools.is_empty()).then(|| default_of(ctx, &ctx.t("game_settings.none"))),
+        ))
+        .on(move |ctx| {
+            edit_text(
+                ctx,
+                &a,
+                "game_settings.tools",
+                "game_settings.tools_hint",
+                |o| o.tools.clone(),
+                |o, v| o.tools = v,
+            )
+        }),
+    );
+    // Só faz sentido com ferramentas; sem padrão do Tako, é um select de sim/não.
+    if !tools.is_empty() {
+        let close = c.close_tools == Some(true);
+        let (a, b) = (i(), i());
+        let set_close = move |ctx: &mut Ctx, _dir: i32, id: &str| {
+            let next = current(ctx, id).close_tools != Some(true);
+            change(ctx, id, |o| o.close_tools = next.then_some(true));
+            Flow::Stay
+        };
+        v.push(
+            MenuItem::new(row(
+                ctx,
+                "close_tools",
+                ctx.t("game_settings.close_tools"),
+                yes_no(ctx, close),
+                close.then(|| default_of(ctx, &yes_no(ctx, false))),
+            ))
+            .on(move |ctx| set_close(ctx, 1, &a))
+            .on_adjust(move |ctx, d| set_close(ctx, d, &b))
+            .options({
+                let id = i();
+                move |ctx| {
+                    let close = current(ctx, &id).close_tools == Some(true);
+                    (
+                        vec![Pick::new(yes_no(ctx, false)), Pick::new(yes_no(ctx, true))],
+                        usize::from(close),
+                    )
+                }
+            }),
+        );
+    }
 
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("game_settings.defaults"),
@@ -792,6 +890,34 @@ mod tests {
     }
 
     #[test]
+    fn tools_row_counts_programs_and_the_close_choice_appears_only_with_tools() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        ctx.library = tako_core::library::GameLibrary::in_memory(
+            crate::demo::games(),
+            tako_core::library::system_clock(),
+        );
+        let id = ctx.library.games()[0].id.clone();
+        let mut layer = panel(&ctx, &id);
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "tools").0, "Nenhum");
+        assert!(!rows_of(&o).iter().any(|r| r.0 == "close_tools"));
+
+        change(&mut ctx, &id, |o| o.tools = Some("fps.exe;mods.exe".into()));
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "tools"), ("2 ferramentas".into(), true));
+        assert_eq!(value(&o, "close_tools"), ("Não".into(), false));
+        let close = o.rows.iter().position(|r| r.key == "close_tools").unwrap();
+        layer.hover("row", close);
+        layer.handle(Cmd::Accept, &mut ctx);
+        assert_eq!(
+            value(&layer.render(&ctx), "close_tools"),
+            ("Sim".into(), true)
+        );
+        assert_eq!(current(&ctx, &id).close_tools, Some(true));
+    }
+
+    #[test]
     fn rows_start_at_the_tako_default_and_overrides_are_bold_and_saved() {
         let dir = tempfile::tempdir().unwrap();
         // Banco real: as mudanças precisam sobreviver a um novo contexto.
@@ -820,6 +946,14 @@ mod tests {
         layer.handle(Cmd::Down, &mut ctx);
         layer.handle(Cmd::Right, &mut ctx);
         assert_eq!(value(&layer.render(&ctx), "hdr"), ("Ligado".into(), true));
+        // VRR logo abaixo, do mesmo jeito.
+        assert_eq!(value(&o, "vrr"), ("Padrão: Desligado".into(), false));
+        layer.handle(Cmd::Down, &mut ctx);
+        layer.handle(Cmd::Left, &mut ctx);
+        assert_eq!(
+            value(&layer.render(&ctx), "vrr"),
+            ("Desligado".into(), true)
+        );
         // No desktop, a mudança mostra o padrão do Tako embaixo.
         ctx.desktop = true;
         let o = layer.render(&ctx);
@@ -832,7 +966,8 @@ mod tests {
         let saved = current(&fresh, &id);
         assert_eq!(saved.use_game_screen, Some(false));
         assert_eq!(saved.hdr, Some(true));
-        assert_eq!(saved.changed_count(), 2);
+        assert_eq!(saved.vrr, Some(false));
+        assert_eq!(saved.changed_count(), 3);
 
         // "Usar tudo do Tako" volta ao padrão.
         let reset = layer
@@ -911,6 +1046,7 @@ mod tests {
         let preset = MonitorPreset {
             mode: Some(full_hd),
             hdr: true,
+            vrr: true,
         };
         presets.set(&screens[0].id, preset);
         ctx.settings
@@ -921,6 +1057,11 @@ mod tests {
             ("Padrão: 1920 × 1080 · 60 Hz".into(), false)
         );
         assert_eq!(value(&o, "hdr"), ("Padrão: Ligado".into(), false));
+        // Este monitor não tem VRR: a linha mostra o padrão, mas fica indisponível com o motivo.
+        let vrr = o.rows.iter().find(|r| r.key == "vrr").unwrap();
+        assert_eq!(vrr.value, "Padrão: Ligado");
+        assert!(!vrr.enabled);
+        assert_eq!(vrr.description, "Esta tela não informa VRR");
         // O que a sessão usa (no --simulate as escolhas do jogo ficam só na memória).
         let global = crate::session::global_settings(&ctx);
         let s = tako_core::session::settings::resolve(&global, Some(&current(&ctx, &id)));

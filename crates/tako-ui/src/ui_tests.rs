@@ -722,6 +722,14 @@ fn desktop_snapshot() {
                 shell.push_layer(Box::new(layer));
             }
             Ok("toast") => shell.ctx.toast("Cupom copiado"),
+            // BRAND-001: biblioteca vazia (ListaVazia com o polvo) e o aviso "Bem-vindo de volta".
+            Ok("empty") => {
+                shell.ctx.found.lock().unwrap().clear();
+                shell.ctx.library.refresh();
+            }
+            Ok("welcome-back") => shell
+                .ctx
+                .toast_welcome_back("Bem-vindo de volta · Hades · 1 h 20 min"),
             Ok("opening") | Ok("opening-slow") => {
                 let g = shell.ctx.library.games()[0].clone();
                 shell.ctx.running = Some(crate::shell::ctx::RunningGame {
@@ -794,6 +802,66 @@ fn desktop_snapshot() {
                 if let Ok(t) = std::env::var("TAKO_SNAP_TYPE") {
                     shell.edited("overlay-input", &t);
                 }
+            }
+            // ConfiguracoesDoJogo com ferramentas junto do jogo (EXT-001).
+            Ok("game-settings") => {
+                let id = shell.ctx.library.games()[0].id.clone();
+                shell.ctx.game_overrides.insert(
+                    id.clone(),
+                    tako_core::session::settings::GameSettingsOverride {
+                        before_command: Some("montar.bat".into()),
+                        tools: Some("C:\\Ferramentas\\fps.exe".into()),
+                        close_tools: Some(true),
+                        ..Default::default()
+                    },
+                );
+                let layer = crate::shell::game_settings::panel(&shell.ctx, &id);
+                shell.push_layer(layer);
+            }
+            // SRC-005, destaque de jogo não instalado: `install` (uma loja), `install-multi` (Steam e GOG),
+            // `install-nospace`, `install-busy` (42%), `install-busy-nofrac` e `install-menu` (o "Instalar pela" aberto).
+            // O jogo é o 5º da fixture; clique nele com `TAKO_SNAP_CLICK=game:<posição na lista>`.
+            Ok(p) if p.starts_with("install") => {
+                use tako_core::library::{GameStore, InstallOffer, InstallProgress};
+                const GIB: f64 = (1u64 << 30) as f64;
+                let need = (9.1 * GIB) as u64;
+                let offer = |store, uri: &str, gib: f64| InstallOffer {
+                    store,
+                    game_id: String::new(),
+                    install_uri: uri.into(),
+                    size: Some((gib * GIB) as u64),
+                };
+                {
+                    let mut found = shell.ctx.found.lock().unwrap();
+                    let g = &mut found[4];
+                    g.title = "Disco Elysium".into();
+                    g.store = Some(GameStore::Steam);
+                    g.steam_app_id = Some(632470);
+                    g.install_size = Some(need);
+                    g.play_time = std::time::Duration::ZERO;
+                    g.last_played_at = None;
+                    if matches!(p, "install-multi" | "install-menu") {
+                        g.install_offers = vec![
+                            offer(GameStore::Steam, "steam://install/632470", 9.1),
+                            offer(GameStore::Gog, "goggalaxy://openGameView/1", 8.8),
+                        ];
+                    }
+                    if p.starts_with("install-busy") {
+                        g.installing = Some(InstallProgress {
+                            fraction: (p == "install-busy").then_some(0.42),
+                        });
+                    }
+                }
+                shell.ctx.library.refresh();
+                shell.ctx.free_space =
+                    (p != "install-nofree").then(|| tako_core::devices::FreeSpace {
+                        drive: "C:".into(),
+                        bytes: if p == "install-nospace" {
+                            need - (3.2 * GIB) as u64
+                        } else {
+                            120 << 30
+                        },
+                    });
             }
             Ok("ask") => {
                 shell.ctx.pads_connected = 1;

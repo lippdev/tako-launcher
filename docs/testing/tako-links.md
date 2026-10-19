@@ -1,6 +1,7 @@
 # Links externos (EXT-005)
 
-O instalador Windows registra `tako://` para o usuário atual; o pacote Linux declara o handler no `.desktop`.
+O instalador Windows registra `tako://` para o usuário atual; o pacote Linux declara o handler no `.desktop`; o
+`Tako.app` declara o esquema em `CFBundleURLTypes` (roteiro do macOS em [`macos.md`](macos.md#links-tako-ext-005)).
 O portable não altera o registro: pode receber a URL como argumento único no terminal. No Linux, se o ambiente
 não escolher o aplicativo automaticamente, `xdg-mime default tako.desktop x-scheme-handler/tako` seleciona-o.
 
@@ -34,7 +35,9 @@ da biblioteca, o pedido aguarda. Pedidos simultâneos usam a ativação existent
 
 ## Limitações
 
-No macOS, declarar `CFBundleURLTypes` não basta: o toolkit precisa encaminhar eventos Apple `OpenURLs` ao app.
-Esse caminho requer implementação/validação na plataforma; não declaramos uma associação que não funciona.
+No macOS o link chega por Apple Event (kAEGetURL), não por argumento: a interface recebe o evento e abre o
+destino, tanto na abertura quanto com o Tako já aberto. Durante um jogo na tela cheia a interface fica fechada e
+só o supervisor roda; o macOS não tem a quem entregar o evento e o `open` falha (`-600`). Abra o Tako pelo
+controle e use o link de novo.
 Com `--no-supervisor` (diagnóstico/desenvolvimento), o link inicial funciona, mas não há encaminhamento para
 a janela já aberta. O registro/empacotamento dos SOs precisa de teste manual, além do CI Windows local.

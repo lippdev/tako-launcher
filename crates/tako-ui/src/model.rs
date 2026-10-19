@@ -219,7 +219,9 @@ theme_struct! {
     pub struct DeskGame {
         pub id: String,
         pub title: String,
-        pub thumb: Image,
+        // Ícone do jogo da linha da lista (`initial` = a inicial do nome quando não há ícone).
+        pub icon: Image,
+        pub initial: String,
         // Capa 2:3 maior, só na grade e nas categorias, perto da área visível.
         pub cover: Image,
         pub accent: Color,
@@ -347,6 +349,9 @@ theme_struct! {
         pub logo: Image,
         pub accent: Color,
         pub hint: String,
+        // Jogo não instalado: espaço livre e por onde a instalação abre, ou o aviso de falta de espaço (`warn`).
+        pub install_note: String,
+        pub install_warn: bool,
         // Jogando agora: a etiqueta ganha o ponto verde.
         pub running: bool,
         // A descrição foi cortada: o cartão mostra "Mais".

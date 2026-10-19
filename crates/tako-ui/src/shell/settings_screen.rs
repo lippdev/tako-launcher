@@ -1,4 +1,4 @@
-//! Configurações › Tela e áudio (no C# ficava no menu do Console Mode): tela de jogo, resolução, HDR, saída
+//! Configurações › Tela e áudio (no C# ficava no menu do Console Mode): tela de jogo, resolução, HDR, VRR, saída
 //! de áudio e o que muda durante o jogo. Toda chamada ao SO pode falhar: o erro vira texto na linha.
 
 use super::{Ctx, Effect, Flow, MenuItem, cached, toggle};
@@ -6,7 +6,7 @@ use crate::model::PanelRow;
 use crate::shell::ctx::keys;
 use crate::shell::layer::Pick;
 use std::time::Duration;
-use tako_core::devices::{AudioDevice, ConnectedDisplay, DisplayMode, HdrStatus};
+use tako_core::devices::{AudioDevice, ConnectedDisplay, DisplayMode, HdrStatus, VrrStatus};
 use tako_core::session::settings::{MonitorPreset, MonitorPresets};
 
 /// Ler as telas pode rodar programas do SO (xrandr, kscreen): no máximo a cada 3 s.
@@ -15,7 +15,7 @@ const TTL: Duration = Duration::from_secs(3);
 pub const HIDE_DISCONNECT: &str = "Disconnect";
 pub const HIDE_NONE: &str = "None";
 
-fn displays(ctx: &Ctx) -> Result<Vec<ConnectedDisplay>, String> {
+pub(crate) fn displays(ctx: &Ctx) -> Result<Vec<ConnectedDisplay>, String> {
     let d = ctx.platform.displays.clone();
     cached("settings.displays", TTL, move || {
         d.list().map_err(|e| e.to_string())
@@ -53,7 +53,7 @@ pub(crate) fn presets(ctx: &Ctx) -> MonitorPresets {
     MonitorPresets::parse(&ctx.settings.string(keys::GAME_SCREEN_PRESETS))
 }
 
-/// Guarda a resolução e o HDR da tela de jogo como o preset dela, para voltarem quando ela for escolhida de novo.
+/// Guarda a resolução, o HDR e o VRR da tela de jogo como o preset dela, para voltarem quando ela for escolhida de novo.
 fn remember_preset(ctx: &mut Ctx) {
     let id = ctx.settings.string(keys::GAME_SCREEN_ID);
     if id.trim().is_empty() {
@@ -65,6 +65,7 @@ fn remember_preset(ctx: &mut Ctx) {
         MonitorPreset {
             mode: DisplayMode::parse(&ctx.settings.string(keys::GAME_SCREEN_MODE)),
             hdr: ctx.settings.bool(keys::GAME_SCREEN_HDR, false),
+            vrr: ctx.settings.bool(keys::GAME_SCREEN_VRR, false),
         },
     );
     ctx.settings.set(keys::GAME_SCREEN_PRESETS, &all.to_text());
@@ -74,11 +75,12 @@ fn pick_display(ctx: &mut Ctx, d: &ConnectedDisplay) {
     remember_preset(ctx);
     ctx.settings.set(keys::GAME_SCREEN_ID, &d.id);
     ctx.settings.set(keys::GAME_SCREEN_NAME, &d.name);
-    // Volta o que esta tela tinha; sem preset, o padrão (manter a atual, sem HDR).
+    // Volta o que esta tela tinha; sem preset, o padrão (manter a atual, sem HDR nem VRR).
     let p = presets(ctx).get(&d.id).unwrap_or_default();
     let mode = p.mode.map(|m| m.key()).unwrap_or_default();
     ctx.settings.set(keys::GAME_SCREEN_MODE, &mode);
     ctx.settings.set_bool(keys::GAME_SCREEN_HDR, p.hdr);
+    ctx.settings.set_bool(keys::GAME_SCREEN_VRR, p.vrr);
 }
 
 fn pick_mode(ctx: &mut Ctx, m: Option<DisplayMode>) {
@@ -284,6 +286,27 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             Flow::Stay
         });
         v.push(disable(item, usable));
+    }
+    // VRR aparece mesmo sem suporte, desligado e com o motivo (no Windows, falta API pública).
+    let vrr = list
+        .as_ref()
+        .ok()
+        .and_then(|l| l.iter().find(|d| d.id.eq_ignore_ascii_case(&id)))
+        .map(|d| d.vrr);
+    if let Some(status) = vrr {
+        let mut item = toggle(ctx, "vrr.toggle", keys::GAME_SCREEN_VRR, false).on(|ctx| {
+            ctx.settings.toggle(keys::GAME_SCREEN_VRR, false);
+            remember_preset(ctx);
+            Flow::Stay
+        });
+        let supported = status != VrrStatus::Unsupported;
+        if !supported {
+            let why = ctx.platform.displays.vrr_limitation();
+            item.row = item
+                .row
+                .desc(why.unwrap_or_else(|| ctx.t("vrr.unsupported")));
+        }
+        v.push(disable(item, usable && supported));
     }
     v.push(disable(
         MenuItem::new(super::action(ctx, "settings.screen.test")).on(|ctx| {

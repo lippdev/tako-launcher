@@ -310,6 +310,10 @@ fn game_screen_choices_cycle() {
             .iter()
             .any(|i| i.row.key == "settings.screen.hdr")
     );
+    // Nem VRR: a opção aparece desligada, com o motivo.
+    let vrr = find(&screen::rows(&ctx), "vrr.toggle");
+    assert!(!vrr.row.enabled);
+    assert_eq!(vrr.row.description, "Esta tela não informa VRR");
     let hide = find(&screen::rows(&ctx), "hide");
     assert!(hide.row.on);
     accept(&mut ctx, &hide);
@@ -698,13 +702,18 @@ fn each_monitor_gets_back_its_own_resolution_and_hdr() {
     adjust(&mut ctx, &mode, 1);
     let hdr = find(&screen::rows(&ctx), "settings.screen.hdr");
     accept(&mut ctx, &hdr);
+    let vrr = find(&screen::rows(&ctx), "vrr.toggle");
+    assert!(vrr.row.enabled);
+    accept(&mut ctx, &vrr);
     assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "3840x2160@120");
     assert!(ctx.settings.bool(keys::GAME_SCREEN_HDR, false));
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_VRR, false));
     // Monitor sem preset: o padrão (manter a atual, sem HDR); depois, 60 Hz.
     adjust(&mut ctx, &display, -1);
     assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY1");
     assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "");
     assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_VRR, true));
     let mode = find(&screen::rows(&ctx), "mode");
     adjust(&mut ctx, &mode, 1);
     adjust(&mut ctx, &mode, 1);
@@ -713,6 +722,7 @@ fn each_monitor_gets_back_its_own_resolution_and_hdr() {
     adjust(&mut ctx, &display, 1);
     assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "3840x2160@120");
     assert!(ctx.settings.bool(keys::GAME_SCREEN_HDR, false));
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_VRR, false));
     adjust(&mut ctx, &display, 1);
     assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "1920x1080@60");
     assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));

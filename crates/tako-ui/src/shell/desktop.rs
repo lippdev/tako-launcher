@@ -22,7 +22,7 @@ use tako_core::library::{
 use tako_core::presentation::{game_text, library_text};
 
 /// Ícone da loja de origem na linha (ListaDeJogos › Loja de origem): o Xbox tem o logo próprio aqui.
-fn store_icon(store: GameStore) -> &'static str {
+pub(super) fn store_icon(store: GameStore) -> &'static str {
     match store {
         GameStore::Xbox => "store-xbox",
         GameStore::Manual => "store-manual",
@@ -33,8 +33,10 @@ fn store_icon(store: GameStore) -> &'static str {
 /// Rota da biblioteca desktop.
 pub const ROUTE: &str = "desk:library";
 
-/// Miniatura da lista (CapaDoJogo: o quadrado do topo da capa 2:3, mostrado a 40 × 40; 2× para telas densas).
+/// Miniatura de capa do perfil (o quadrado do topo da capa 2:3, a 40 × 40; 2× para telas densas).
 pub(crate) const THUMB: (u32, u32) = (80, 120);
+/// Ícone da linha da lista (28 na tela, 2× para telas densas).
+const ICON: (u32, u32) = (56, 56);
 /// Linhas em volta da primeira visível que pedem miniatura.
 const NEAR: usize = 60;
 
@@ -155,6 +157,30 @@ struct Run {
     store: GameStore,
     start: usize,
     end: usize,
+}
+
+/// Ícone da linha e, se não houver, a inicial do nome. Carrega o ícone recortado via [`crate::images::icon`].
+/// `load: false` = linha fora da área visível (não pede nada).
+fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
+    let uri = g.shown_icon();
+    // 56 px já recortado e com contorno no cache: serve à tela normal e à de alta densidade.
+    let icon = uri
+        .filter(|_| load)
+        .and_then(|u| crate::images::icon(u, ICON.0))
+        .unwrap_or_default();
+    // Enquanto o ícone carrega, não pisca a inicial; ela só aparece sem ícone ou se a carga falhou.
+    let waiting = uri.is_some_and(|u| !load || crate::images::is_pending(u));
+    let initial = if icon.size().width > 0 || waiting {
+        String::new()
+    } else {
+        g.title
+            .trim()
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().collect())
+            .unwrap_or_default()
+    };
+    (icon, initial)
 }
 
 /// Entra na seção NÃO INSTALADOS: jogo de uma loja que ainda não está no computador. ROM ou arquivo que sumiu e
@@ -1625,6 +1651,11 @@ impl Page for DesktopLibrary {
                 self.select_index(ctx, index);
                 return self.run(Action::More, ctx);
             }
+            "install-more" => {
+                if let Some(id) = self.selected(ctx) {
+                    return Nav::Layer(Box::new(dialogs::install_from(ctx, &id)));
+                }
+            }
             "action" => {
                 let action = self
                     .selected(ctx)
@@ -1837,10 +1868,12 @@ impl Page for DesktopLibrary {
                     ctx.tf("desktop.install_game", &title),
                 )
             };
+            let (icon, initial) = row_icon(g, near && !cover);
             DeskGame {
                 id: g.id.clone(),
                 title: g.title.clone(),
-                thumb: tiles::image(g.shown_cover().filter(|_| near && !cover), THUMB),
+                icon,
+                initial,
                 cover: tiles::image(g.shown_cover().filter(|_| near && cover), COVER),
                 accent: parse_color(&g.accent),
                 favorite: g.is_favorite,
@@ -2148,6 +2181,7 @@ impl Page for DesktopLibrary {
                 } else {
                     game_text::status(lang, g)
                 };
+                let install = details::install_stage(ctx, g);
                 let actions: Vec<PanelRow> =
                     self.actions(ctx, g)
                         .into_iter()
@@ -2169,21 +2203,22 @@ impl Page for DesktopLibrary {
                                 row
                             }
                             Action::Play => {
-                                let (label, icon) = if running {
-                                    (ctx.t("game.resume"), "gamepad")
-                                } else if !g.is_installed
-                                    && !g.is_upcoming()
-                                    && g.store() != GameStore::Manual
-                                {
-                                    let via = game_text::store_via(lang, g.store());
-                                    (
-                                        ctx.tf("desktop.install_via", &[("via", &via)]),
-                                        store_icon(g.store()),
-                                    )
-                                } else {
-                                    (tiles::play_label(ctx, g), "play")
+                                let mut row = match (running, &install) {
+                                    (false, Some(i)) => {
+                                        // Instalar: loja e tamanho na linha de baixo da pílula, ⌄ se houver mais de uma loja.
+                                        let icon = if i.installing { "ring" } else { "download" };
+                                        let mut row = PanelRow::button("play", i.label.clone())
+                                            .icon(icon)
+                                            .enabled(!i.installing)
+                                            .desc(i.sub.clone());
+                                        row.on = i.split;
+                                        row
+                                    }
+                                    (true, _) => PanelRow::button("play", ctx.t("game.resume"))
+                                        .icon("gamepad"),
+                                    _ => PanelRow::button("play", tiles::play_label(ctx, g))
+                                        .icon("play"),
                                 };
-                                let mut row = PanelRow::button("play", label).icon(icon);
                                 row.style = "primary".into();
                                 row
                             }
@@ -2246,6 +2281,12 @@ impl Page for DesktopLibrary {
                         title_pending,
                         accent: parse_color(&g.accent),
                         hint,
+                        install_note: install
+                            .as_ref()
+                            .filter(|_| !running)
+                            .map(|i| i.note.clone())
+                            .unwrap_or_default(),
+                        install_warn: install.as_ref().is_some_and(|i| i.warn),
                         running,
                         about_more,
                         genres: g.genres.iter().take(4).cloned().collect(),
@@ -2287,6 +2328,7 @@ impl Page for DesktopLibrary {
             ],
         );
         out.set("desk-about-label", ctx.t("desktop.about"));
+        out.set("desk-install-more-label", ctx.t("desktop.install.more"));
         out.set("desk-details-label", ctx.t("desktop.details"));
         out.set(
             "desk-zone",
@@ -2611,6 +2653,23 @@ mod tests {
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         (dir, shell)
+    }
+
+    #[test]
+    fn a_row_without_icon_shows_the_title_initial() {
+        let game = |title: &str| Game {
+            title: title.into(),
+            ..Default::default()
+        };
+        assert_eq!(row_icon(&game("  ori"), true).1, "O");
+        assert_eq!(row_icon(&game(""), true).1, "");
+        // Com ícone na lista, mas fora da área visível: espera a carga, sem piscar a inicial.
+        let mut far = game("Celeste");
+        far.pinned_art.insert(
+            tako_core::library::ArtKind::Icon,
+            "steam-art://1/icon".into(),
+        );
+        assert_eq!(row_icon(&far, false).1, "");
     }
 
     fn page(shell: &Shell) -> &DesktopLibrary {
@@ -3071,9 +3130,9 @@ mod tests {
         assert!(
             shell
                 .ctx
-                .effects
+                .install_queue
                 .iter()
-                .any(|e| matches!(e, Effect::OpenUrl(u) if u.starts_with("demo://install/")))
+                .any(|(_, o)| o.install_uri.starts_with("demo://install/"))
         );
         assert_eq!(View::of(&shell.ctx), View::Grid);
         // ↑ volta ao cabeçalho; Enter fecha o grupo e o trecho fica sem capas.

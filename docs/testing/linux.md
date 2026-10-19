@@ -19,6 +19,14 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] GNOME: depois de restaurar, nada foi gravado em `~/.config/monitors.xml` (método temporário).
 - [ ] KDE com escala 125%: trocar o modo mantém a escala.
 - [ ] KDE Plasma 6 com tela HDR: ligar e desligar o HDR.
+- [ ] VRR (PERF-002), com uma tela FreeSync/Adaptive Sync:
+  - [ ] KDE: com `kscreen-doctor output.<tela>.vrrpolicy.never`, Configurações › Tela de jogo mostra "Ligar o VRR" disponível. Ligue e abra um jogo: `kscreen-doctor -j` mostra `"vrrPolicy": 2` durante o jogo e `0` depois de fechar. Com a política já em automático antes, o Tako não muda nada ao fechar.
+  - [ ] KDE com uma tela sem VRR: o JSON não traz `vrrPolicy` e a linha aparece desligada com "Esta tela não informa VRR".
+  - [ ] Sway/Hyprland: `wlr-randr --json` traz `adaptive_sync`; com ele `false`, ligar o VRR para o jogo deixa `true` durante o jogo e `false` depois. Sem o campo (wlr-randr antigo), a linha fica indisponível.
+  - [ ] X11: a linha aparece indisponível com o motivo (o VRR é do driver, `Option "VariableRefresh"`); `xrandr --prop` mostra `vrr_capable` só para conferência.
+  - [ ] GNOME: a linha aparece indisponível com o motivo (ainda não implementado).
+  - [ ] Configurações deste jogo › "VRR" em Ligado/Desligado vence o padrão da tela.
+  - [ ] Feche o Tako à força durante o jogo (`kill -9`): ao abrir de novo, o VRR volta a desligado. Com "Restaurar tela e som ao sair do jogo" desligada, o VRR fica ligado depois do jogo (é o esperado).
 - [ ] gamescope: a tela aparece com o tamanho da sessão e as opções de troca ficam indisponíveis.
 - [ ] Compositor sem suporte: as opções de tela somem, sem erro na tela.
 
@@ -57,6 +65,8 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Comando antes de jogar (por `sh -c`, ex.: `notify-send antes; sleep 2`): o jogo só abre depois que ele termina;
   comando que sai com erro ou passa do limite mostra o aviso e o jogo abre do mesmo jeito. Comando depois de jogar
   roda ao fechar o jogo.
+- [ ] Ferramentas junto do jogo (EXT-001, ex.: `/usr/bin/xeyes`): pedem permissão, abrem antes do jogo sem travar a interface e,
+  com "Fechar as ferramentas no fim", fecham quando o jogo termina.
 
 ## Abrir com o sistema
 
@@ -84,3 +94,30 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Cancelar a instalação na Steam: o jogo volta a "não instalado". Pausar: a porcentagem para.
 - [ ] Heroic (Epic/GOG/Amazon): o jogo mandado instalar só vira instalado na releitura de 30 s (o Tako não vê o andamento do Heroic).
 - [ ] O espaço livre mostrado é o do disco da Steam (ou de `~` sem Steam), com o ponto de montagem certo (ex.: `/`, `/home`, `/mnt/jogos`) e o número igual ao de `df -h`. Biblioteca da Steam em outro disco montado: mostra o ponto de montagem dele.
+
+## Pacotes do AUR e Flatpak (PLAT-002)
+
+Roteiro de publicação e permissões em [packaging-linux.md](../packaging-linux.md). O CI valida os arquivos; isto é o que só máquina real mostra.
+
+### AUR (`tako-launcher-bin` e `tako-launcher`) em Arch ou CachyOS
+
+- [ ] `cd packaging/aur/tako-launcher-bin && makepkg -si`: instala sem erro; `pacman -Qi tako-launcher-bin` mostra as dependências; `pacman -Qlp`/`-Ql` lista `/usr/bin/tako`, `tako.desktop`, o ícone, a regra udev e a licença (e **não** `Tako_Data`).
+- [ ] Idem para `packaging/aur/tako-launcher` (compila do código-fonte; anotar o tempo e a versão do Rust do Arch, o projeto pede 1.97).
+- [ ] O Tako abre pelo menu de aplicativos, com o ícone; o dado vai para `~/.local/share/tako` (não para uma pasta ao lado do binário).
+- [ ] `xdg-mime query default x-scheme-handler/tako` mostra `tako.desktop`; `xdg-open "tako://settings"` abre as Configurações (com o Tako fechado e aberto).
+- [ ] Depois do `pacman -U`, o `uinput` já vale sem copiar a regra (preparação acima); sair e entrar na sessão e testar o cursor pelo controle.
+- [ ] Configurações › Atualizações: o Tako só avisa que há versão nova e não oferece instalar (é o pacman que atualiza).
+- [ ] Remover o pacote (`pacman -R`) não apaga `~/.local/share/tako`.
+- [ ] CachyOS (KDE e Hyprland/gamescope): abrir, trocar a tela e o áudio como nas seções acima.
+
+### Flatpak (`io.github.lippdev.Tako`)
+
+- [ ] Gerar o `cargo-sources.json` e compilar como em packaging-linux.md; `flatpak run io.github.lippdev.Tako` abre.
+- [ ] Biblioteca: Steam nativa e Steam Flatpak, Heroic nativo e Flatpak, Lutris nativo e Flatpak aparecem (um de cada que houver). Biblioteca da Steam em `/mnt`, `/media` ou `/run/media` aparece; em outro caminho não aparece até `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
+- [ ] Abrir um jogo da Steam e do Heroic/Lutris pelo Tako: abre no host (link da loja pelo portal). Anotar se o Tako acompanha o jogo até fechar (esperado: só a Steam pelo `RunningAppID`).
+- [ ] Controle: o controle é reconhecido e navega; o cursor pelo controle move o mouse (precisa de `--device=all` e da regra udev no host).
+- [ ] Áudio: lista de saídas, troca da padrão, volume e mudo. Segredos: salvar uma chave de API e reabrir.
+- [ ] Telas: X11 e GNOME trocam o modo; KDE e wlroots escondem as opções de tela sem erro.
+- [ ] `tako://settings` pelo navegador abre o Flatpak (`flatpak run` pelo `.desktop` exportado); Atualizações não oferece instalar.
+- [ ] Anotar o que quebrou por causa da sandbox (executável, emulador, "Abrir com o sistema") para decidir sobre o backend `flatpak-spawn --host`.
+- [ ] Com o Flatseal: `flatpak info --show-permissions io.github.lippdev.Tako` bate com o manifesto (sem `home` nem `org.freedesktop.Flatpak`).

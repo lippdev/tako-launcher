@@ -314,7 +314,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [x] **SRC-001:** emuladores (RetroArch e standalone), bibliotecas de ROMs do usuário e sistemas, nos três SOs. Inclui importar direto dos principais emuladores e frontends os jogos que eles já conhecem (playlists do RetroArch, listas do ES-DE, bibliotecas do Dolphin, PCSX2, DuckStation, PPSSPP, Ryujinx e afins), com o comando certo para abrir cada jogo no emulador.
 - [ ] **SRC-002 (Linux):** Bottles e itch.io.
 - [x] **SRC-003:** detectar cliente de loja ausente e oferecer abri-lo ou instalá-lo pelo caminho oficial.
-- [ ] **SRC-005:** jogos que o usuário possui mas não instalou, e instalar pelo Tako: listar a biblioteca de cada loja (Steam, Epic, GOG e outras, pela conta do usuário ou pelo cliente da loja) com o selo "Não instalado", e o botão Instalar abre a instalação no cliente da loja (por exemplo `steam://install/<appid>`). Quando a instalação termina, o jogo vira instalado sem precisar reiniciar. Pedido do mantenedor no primeiro teste. _Estado: Steam (Web API com a chave do usuário), Epic e GOG lidos do cliente da loja, e Amazon no Linux e no macOS pelo Heroic, entregues (0.2.0-alpha.5); faltam Ubisoft, EA e Amazon no Windows, que não guardam a lista de forma legível offline (motivos no #107)._
+- [ ] **SRC-005:** jogos que o usuário possui mas não instalou, e instalar pelo Tako: listar a biblioteca de cada loja (Steam, Epic, GOG e outras, pela conta do usuário ou pelo cliente da loja) com o selo "Não instalado", e o botão Instalar abre a instalação no cliente da loja (por exemplo `steam://install/<appid>`). Quando a instalação termina, o jogo vira instalado sem precisar reiniciar. Pedido do mantenedor no primeiro teste. _Estado: Steam (Web API com a chave do usuário), Epic e GOG lidos do cliente da loja, e Amazon no Linux e no macOS pelo Heroic, entregues (0.2.0-alpha.5); faltam Ubisoft, EA e Amazon no Windows, que não guardam a lista de forma legível offline (motivos no #107). No desktop, seção Não instalados por loja na lista e na grade, Instalar com a escolha da loja, progresso da Steam (Epic sem número), espaço livre no disco e Instalar no menu e na seleção múltipla; GOG e Xbox não informam instalação em andamento._
 - [x] **SRC-004:** jogos não Steam adicionados à Steam (atalhos), nos três SOs.
 
 ### Épico UX (P1)
@@ -323,6 +323,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [ ] **UX-002:** arte animada e trailers (libmpv opcional, desligado durante o jogo).
 - [x] **UX-003:** assistente da primeira execução (idioma, lojas detectadas, provedores de metadados; oferece o driver opcional do INPUT-005).
 - [ ] **UX-004:** perfis locais (vários usuários na mesma máquina).
+- [ ] **UX-005:** ícone do jogo na lista, como na Steam; a capa fica só na Grade. O ícone vem da própria loja (Steam, Epic, GOG, Xbox) ou do executável no Windows, com a inicial do título quando não houver.
 
 ### Épico THEME (P2)
 

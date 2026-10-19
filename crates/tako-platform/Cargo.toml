@@ -13,6 +13,10 @@ serde_json.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 keyring.workspace = true
+image.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = ["Win32_Graphics_Dwm"] }
@@ -30,6 +34,8 @@ evdev.workspace = true
 objc2-core-foundation.workspace = true
 objc2-core-graphics.workspace = true
 objc2-core-audio.workspace = true
+objc2.workspace = true
+objc2-foundation.workspace = true
 
 [lints.rust]
 # `unsafe` só é permitido aqui (PRD §5.1); cada bloco tem `// SAFETY:`.

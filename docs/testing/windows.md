@@ -122,7 +122,9 @@ Preset por monitor:
 7. Deixe a TV como tela de jogo. No jogo do passo 2, com o monitor como tela própria e "Resolução e taxa" em Padrão: a
    linha mostra "Padrão: 1920 × 1080 · 60 Hz" (o preset do monitor) e o HDR "Padrão: Desligado". Abra o jogo: o
    monitor fica em 1080p 60 Hz. Escolhendo "manter a atual" no jogo, a resolução não muda.
-8. VRR (G-Sync/FreeSync) não entra no preset: o Windows não tem API pública para ligá-lo por tela.
+8. VRR (G-Sync/FreeSync): o Windows não tem API pública para ler nem ligar por tela. Em Configurações › Tela de jogo, a
+   linha "Ligar o VRR" aparece desligada, com o motivo ("O Windows não tem API pública..."); em Configurações deste
+   jogo, a linha "VRR" também fica indisponível com o mesmo motivo. Abrir o jogo não mexe no VRR do driver.
 
 ## 15. Tema por endereço (THEME-004)
 
@@ -262,3 +264,40 @@ Gaming resgatado).
    DPAPI não decifra, nenhum jogo da conta aparece, o Tako não fecha e o log não mostra o conteúdo do banco.
 6. Fechar o app da Amazon e desinstalá-lo: os não instalados somem (sem o app não há como instalar) e o aviso de
    cliente ausente aparece.
+
+## 24. Ícone do jogo na lista (UX-005)
+
+Precisa de Steam, Epic e GOG Galaxy com contas, de um jogo adicionado à mão (um `.exe`) e de um jogo do app Xbox. A ordem do
+ícone é: o escolhido pelo usuário (seletor de imagens › Ícone), o da loja, o dos provedores (SteamGridDB), o do `.exe` e, sem nenhum, a inicial do nome.
+
+1. **Steam instalado**: o ícone da lista é o do jogo, nítido (a Steam guarda o `.ico` em `Steam\steam\games\<hash>.ico`). Conferir
+   que o arquivo existe e que o ícone é o mesmo da Steam. Apagar esse `.ico`, reabrir o Tako e conferir o JPG 32x32 (pode
+   parecer mais mole em tela de alta densidade, é esperado).
+2. **Steam não instalado** (com a chave da Web API): ícone 32x32 da CDN; sem internet, aparece a inicial até a rede voltar.
+3. **Epic** (instalado e não instalado) e **GOG** com o Galaxy instalado (instalado e não instalado): ícone quadrado do
+   catálogo. Anotar quais jogos ficaram só com a inicial: a Epic nem sempre traz imagem quadrada no `catcache.bin` e o
+   nome da peça `originalImages` do banco do Galaxy (`squareIcon`) não foi confirmado em banco real.
+4. **Jogo à mão com `.exe`**: adicionar um `.exe` conhecido (ex.: Notepad++, um jogo). O ícone da lista é o do executável, com
+   cantos redondos e contorno fino. Conferir em `%LOCALAPPDATA%\Tako\cache\exe-icons\` (ao lado do executável na portátil,
+   em `cache\exe-icons`) um `.png` de 128x128 por executável (a API escala para o tamanho pedido), e que reabrir o Tako não gera arquivos novos.
+5. Executáveis de teste: um com ícone de 256 px (a API escala para o tamanho pedido de 128 px), um só com ícone antigo de 32 px sem transparência (a API escala para 128 px; fundo
+   não pode virar preto), um sem ícone (aparece a inicial, sem erro no log) e um com caminho acima de 259 caracteres (idem).
+6. Trocar o executável por outra versão (mesmo caminho): o ícone novo aparece (o nome do PNG muda com tamanho e data).
+7. **Xbox**: o ícone é o logo quadrado do pacote; sem logo, a inicial.
+8. Escolher um ícone em seletor de imagens › Ícone: vale o escolhido em todas as listas; "Restaurar" volta ao da loja.
+9. Alta densidade (escala do Windows em 200 %): o ícone continua nítido e com o mesmo raio proporcional; sem serrilhado
+   nos cantos.
+
+## 25. Ferramentas junto do jogo (EXT-001)
+
+- [ ] Em Configurações deste jogo › Ferramentas junto do jogo, informe um `.exe` (ex.: `C:\Windows\System32\notepad.exe`).
+  Ao jogar, o pedido de permissão mostra "Abrir junto do jogo: …"; sem permitir, nada abre.
+- [ ] Permitido: a ferramenta abre antes do jogo e a interface não trava (o supervisor não reinicia a interface).
+- [ ] Com "Fechar as ferramentas no fim" em Sim, a ferramenta fecha quando o jogo termina; em Não, continua aberta.
+- [ ] Caminho que não existe: aviso "Não foi possível abrir…" e o jogo abre do mesmo jeito.
+- [ ] Atalho `.lnk` abre, mas não fecha no fim (o processo não tem o caminho do atalho).
+- [ ] Com a ferramenta já aberta antes de jogar (ex.: OBS gravando), o Tako abre outra se o programa permitir e, no
+  fim, fecha só a que ele abriu: a do usuário continua aberta.
+- [ ] Eventos de sessão: cada "Jogar" registra `GameStarting` e `GameExited` no log (nível debug). Se o supervisor
+  cair no meio do jogo (encerrar `tako.exe` pelo Gerenciador de Tarefas), o `GameExited` não sai: o comportamento
+  esperado é a próxima execução só restaurar tela e áudio.

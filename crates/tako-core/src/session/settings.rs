@@ -15,6 +15,8 @@ pub struct GameSettingsOverride {
     /// Chave do modo (`1920x1080@60`) ou [`GameSettingsOverride::KEEP_CURRENT_MODE`].
     pub screen_mode: Option<String>,
     pub hdr: Option<bool>,
+    #[serde(default)]
+    pub vrr: Option<bool>,
     /// Id da saída de áudio ou [`GameSettingsOverride::KEEP_AUDIO`].
     pub audio_device_id: Option<String>,
     pub audio_device_name: Option<String>,
@@ -35,18 +37,51 @@ pub struct GameSettingsOverride {
     pub after_command: Option<String>,
     /// Os comandos que o usuário permitiu, exatamente como estavam (ver [`commands_text`]). Mudou o texto, pergunta
     /// de novo: comandos vindos de fora (importação, extensão) nunca rodam sem o usuário ver.
-    #[serde(default)]
+    /// Nunca vem de fora: um `GameSettingsOverride` lido de JSON chega sem permissão.
+    #[serde(skip)]
     pub approved_commands: Option<String>,
+    /// Programas abertos junto do jogo (EXT-001), separados por `;` ou por linha. Entram na permissão dos comandos.
+    #[serde(default)]
+    pub tools: Option<String>,
+    /// Fechar esses programas quando o jogo terminar.
+    #[serde(default)]
+    pub close_tools: Option<bool>,
 }
 
 /// Quanto o comando de antes pode demorar antes de o jogo abrir mesmo assim.
 pub const BEFORE_COMMAND_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Os dois comandos num texto só, para comparar com o que foi permitido; `None` sem nenhum comando.
-pub fn commands_text(before: Option<&str>, after: Option<&str>) -> Option<String> {
+/// Os comandos e as ferramentas num texto só, para comparar com o que foi permitido; `None` sem nenhum.
+/// Sem ferramentas o texto é o do SESSION-004, então o que já foi permitido continua valendo.
+pub fn commands_text(
+    before: Option<&str>,
+    after: Option<&str>,
+    tools: Option<&str>,
+) -> Option<String> {
     let before = normalize_arguments(before).unwrap_or_default();
     let after = normalize_arguments(after).unwrap_or_default();
-    (!before.is_empty() || !after.is_empty()).then(|| format!("{before}\n{after}"))
+    let tools = parse_tools(tools);
+    if tools.is_empty() {
+        return (!before.is_empty() || !after.is_empty()).then(|| format!("{before}\n{after}"));
+    }
+    // Com ferramentas, uma lista JSON: sem ambiguidade entre os campos e nunca igual ao texto antigo (que tem
+    // uma quebra de linha crua; o JSON compacto não tem).
+    let fields: Vec<&str> = [before.as_str(), after.as_str()]
+        .into_iter()
+        .chain(tools.iter().map(String::as_str))
+        .collect();
+    serde_json::to_string(&fields).ok()
+}
+
+/// Caminhos das ferramentas, separados por `;` ou por linha, sem os vazios.
+// shortcut: caminho com `;` não cabe; trocar por uma lista própria se alguém precisar.
+pub fn parse_tools(text: Option<&str>) -> Vec<String> {
+    text.unwrap_or_default()
+        .split(['\n', ';'])
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(Into::into)
+        .collect()
 }
 
 /// `NOME=valor` separados por `;` ou por linha. Nome inválido (vazio, com espaço ou `=`) é ignorado.
@@ -78,6 +113,7 @@ impl GameSettingsOverride {
             normalize_arguments(self.screen_id.as_deref()).is_some(),
             self.screen_mode.is_some(),
             self.hdr.is_some(),
+            self.vrr.is_some(),
             self.audio_device_id.is_some(),
             self.extra_arguments
                 .as_deref()
@@ -88,6 +124,8 @@ impl GameSettingsOverride {
             !parse_environment(self.environment.as_deref()).is_empty(),
             normalize_arguments(self.before_command.as_deref()).is_some(),
             normalize_arguments(self.after_command.as_deref()).is_some(),
+            !parse_tools(self.tools.as_deref()).is_empty(),
+            self.close_tools == Some(true),
         ]
         .into_iter()
         .filter(|b| *b)
@@ -104,6 +142,7 @@ impl GameSettingsOverride {
         self.approved_commands = commands_text(
             self.before_command.as_deref(),
             self.after_command.as_deref(),
+            self.tools.as_deref(),
         );
     }
 }
@@ -120,36 +159,42 @@ pub struct GlobalSessionSettings {
     pub game_screen_id: String,
     pub game_screen_mode: Option<DisplayMode>,
     pub game_screen_hdr: bool,
+    pub game_screen_vrr: bool,
     pub game_audio: Option<AudioOutputChoice>,
     /// O que o Tako lembra de cada monitor (PERF-002).
     pub monitor_presets: MonitorPresets,
 }
 
 impl GlobalSessionSettings {
-    /// Resolução e HDR que valem numa tela quando o jogo não escolhe: na tela de jogo do Tako, os de
+    /// Resolução, HDR e VRR que valem numa tela quando o jogo não escolhe: na tela de jogo do Tako, os de
     /// Configurações; em outra, o preset dela (sem preset, mantém a resolução atual).
-    pub fn screen_defaults(&self, display_id: &str) -> (Option<DisplayMode>, bool) {
+    pub fn screen_defaults(&self, display_id: &str) -> MonitorPreset {
         let display_id = display_id.trim();
+        let tako = MonitorPreset {
+            mode: self.game_screen_mode,
+            hdr: self.game_screen_hdr,
+            vrr: self.game_screen_vrr,
+        };
         if self.game_screen_id.trim().eq_ignore_ascii_case(display_id) {
-            return (self.game_screen_mode, self.game_screen_hdr);
+            return tako;
         }
-        match self.monitor_presets.get(display_id) {
-            Some(p) => (p.mode, p.hdr),
-            None => (None, self.game_screen_hdr),
-        }
+        self.monitor_presets
+            .get(display_id)
+            .unwrap_or(MonitorPreset { mode: None, ..tako })
     }
 }
 
-/// Resolução (com a taxa) e HDR escolhidos para um monitor.
+/// Resolução (com a taxa), HDR e VRR escolhidos para um monitor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct MonitorPreset {
     /// `None` = manter a resolução atual.
     pub mode: Option<DisplayMode>,
     pub hdr: bool,
+    pub vrr: bool,
 }
 
 /// Presets por monitor, gravados como JSON numa configuração:
-/// `{"<id da tela>": {"mode": "1920x1080@60", "hdr": true}}`.
+/// `{"<id da tela>": {"mode": "1920x1080@60", "hdr": true, "vrr": true}}`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MonitorPresets(Vec<(String, MonitorPreset)>);
 
@@ -159,6 +204,8 @@ struct StoredPreset {
     mode: String,
     #[serde(default)]
     hdr: bool,
+    #[serde(default)]
+    vrr: bool,
 }
 
 impl MonitorPresets {
@@ -174,7 +221,14 @@ impl MonitorPresets {
         for (id, value) in map.into_iter().take(Self::MAX) {
             if let Ok(p) = serde_json::from_value::<StoredPreset>(value) {
                 let mode = DisplayMode::parse(&p.mode);
-                presets.set(&id, MonitorPreset { mode, hdr: p.hdr });
+                presets.set(
+                    &id,
+                    MonitorPreset {
+                        mode,
+                        hdr: p.hdr,
+                        vrr: p.vrr,
+                    },
+                );
             }
         }
         presets
@@ -188,7 +242,7 @@ impl MonitorPresets {
                 let mode = p.mode.map(|m| m.key()).unwrap_or_default();
                 (
                     id.clone(),
-                    serde_json::json!({ "mode": mode, "hdr": p.hdr }),
+                    serde_json::json!({ "mode": mode, "hdr": p.hdr, "vrr": p.vrr }),
                 )
             })
             .collect();
@@ -243,6 +297,9 @@ pub struct EffectiveSessionSettings {
     pub after_command: Option<String>,
     /// Sem comandos, ou com os comandos já permitidos como estão.
     pub commands_approved: bool,
+    /// Programas abertos junto do jogo (EXT-001); só com `commands_approved`.
+    pub tools: Vec<String>,
+    pub close_tools: bool,
 }
 
 impl EffectiveSessionSettings {
@@ -275,17 +332,18 @@ pub fn resolve(
             problem = (asked == Some(true)).then_some(GameScreenProblem::NoScreenChosen);
         } else {
             // A resolução do Tako é da tela de jogo dele: em outra tela, sem escolha do jogo, vale o preset dela.
-            let (default_mode, default_hdr) = global.screen_defaults(display_id);
+            let default = global.screen_defaults(display_id);
             let mode = match game.screen_mode.as_deref() {
-                None => default_mode,
+                None => default.mode,
                 Some(GameSettingsOverride::KEEP_CURRENT_MODE) => None,
                 // Valor ilegível volta ao padrão.
-                Some(key) => DisplayMode::parse(key).or(default_mode),
+                Some(key) => DisplayMode::parse(key).or(default.mode),
             };
             screen = Some(GameScreenSettings {
                 display_id: display_id.to_owned(),
                 mode,
-                enable_hdr: game.hdr.unwrap_or(default_hdr),
+                enable_hdr: game.hdr.unwrap_or(default.hdr),
+                enable_vrr: game.vrr.unwrap_or(default.vrr),
             });
         }
     }
@@ -312,10 +370,13 @@ pub fn resolve(
         commands_approved: match commands_text(
             game.before_command.as_deref(),
             game.after_command.as_deref(),
+            game.tools.as_deref(),
         ) {
             None => true,
             current => game.approved_commands == current,
         },
+        tools: parse_tools(game.tools.as_deref()),
+        close_tools: game.close_tools == Some(true),
     }
 }
 
@@ -384,6 +445,7 @@ mod tests {
             game_screen_id: r"\\.\DISPLAY2".into(),
             game_screen_mode: Some(TV_4K),
             game_screen_hdr: true,
+            game_screen_vrr: false,
             game_audio: Some(AudioOutputChoice::new("{tv}", "TV (HDMI)")),
             monitor_presets: MonitorPresets::default(),
         }
@@ -426,12 +488,63 @@ mod tests {
     }
 
     #[test]
+    fn tools_need_the_same_permission_and_old_approvals_still_hold() {
+        let mut o = with(|o| o.before_command = Some("mount.bat".into()));
+        o.approve_commands();
+        // O texto sem ferramentas é o do SESSION-004: quem já permitiu não é perguntado de novo.
+        assert_eq!(o.approved_commands.as_deref(), Some("mount.bat\n"));
+        o.tools = Some(" C:\\FPS\\fps.exe ; ;\nC:\\Mods\\mods.exe".into());
+        let e = resolve(&global(), Some(&o));
+        assert!(!e.commands_approved);
+        assert_eq!(e.tools, ["C:\\FPS\\fps.exe", "C:\\Mods\\mods.exe"]);
+        assert!(!e.close_tools);
+        o.approve_commands();
+        o.close_tools = Some(true);
+        let e = resolve(&global(), Some(&o));
+        assert!(e.commands_approved && e.close_tools);
+        assert_eq!(o.changed_count(), 3);
+        // Com ferramentas, o texto permitido é uma lista JSON (campos sem ambiguidade).
+        assert_eq!(
+            o.approved_commands.as_deref(),
+            Some(r#"["mount.bat","","C:\\FPS\\fps.exe","C:\\Mods\\mods.exe"]"#)
+        );
+        // Só ferramentas também pede permissão.
+        let tools_only = with(|o| o.tools = Some("fps.exe".into()));
+        assert!(!resolve(&global(), Some(&tools_only)).commands_approved);
+    }
+
+    #[test]
+    fn settings_read_from_outside_never_bring_the_permission() {
+        let mut o = with(|o| {
+            o.before_command = Some("mount.bat".into());
+            o.tools = Some("fps.exe".into());
+        });
+        o.approve_commands();
+        assert!(resolve(&global(), Some(&o)).commands_approved);
+        let json = serde_json::to_string(&o).unwrap();
+        assert!(!json.contains("approved_commands"), "{json}");
+        // Um JSON que tente trazer a permissão também é ignorado.
+        let forged = json.replacen(
+            '{',
+            &format!(
+                "{{\"approved_commands\":{:?},",
+                o.approved_commands.clone().unwrap()
+            ),
+            1,
+        );
+        let imported: GameSettingsOverride = serde_json::from_str(&forged).unwrap();
+        assert_eq!(imported.tools, o.tools);
+        assert!(!resolve(&global(), Some(&imported)).commands_approved);
+    }
+
+    #[test]
     fn no_game_settings_means_the_global_ones() {
         let e = resolve(&global(), None);
         let screen = GameScreenSettings {
             display_id: r"\\.\DISPLAY2".into(),
             mode: Some(TV_4K),
             enable_hdr: true,
+            enable_vrr: false,
         };
         assert_eq!(e.game_screen, Some(screen));
         assert_eq!(e.game_screen_problem, None);
@@ -533,11 +646,22 @@ mod tests {
             MonitorPreset {
                 mode: Some(qhd),
                 hdr: false,
+                vrr: true,
             },
         );
         let desk = with(|o| o.screen_id = Some(r"\\.\display1".into()));
         let s = resolve(&g, Some(&desk)).game_screen.unwrap();
-        assert_eq!((s.mode, s.enable_hdr), (Some(qhd), false));
+        assert_eq!(
+            (s.mode, s.enable_hdr, s.enable_vrr),
+            (Some(qhd), false, true)
+        );
+        // O jogo pode desligar o VRR que o preset da tela liga.
+        let no_vrr = with(|o| {
+            o.screen_id = Some(DESK.into());
+            o.vrr = Some(false);
+        });
+        assert!(!resolve(&g, Some(&no_vrr)).game_screen.unwrap().enable_vrr);
+        assert_eq!(no_vrr.changed_count(), 2);
         // A escolha do jogo vence o preset; "manter a atual" continua valendo.
         let chosen = with(|o| {
             o.screen_id = Some(DESK.into());
@@ -573,6 +697,7 @@ mod tests {
         let tv = MonitorPreset {
             mode: Some(TV_4K),
             hdr: true,
+            vrr: true,
         };
         p.set(r"\\.\DISPLAY2", tv);
         p.set("HDMI-1", MonitorPreset::default());
@@ -595,7 +720,8 @@ mod tests {
             p.get("a"),
             Some(MonitorPreset {
                 mode: None,
-                hdr: true
+                hdr: true,
+                vrr: false
             })
         );
         assert_eq!(p.get("B"), None);

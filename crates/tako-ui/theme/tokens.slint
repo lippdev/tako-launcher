@@ -130,6 +130,7 @@ export global Ui {
     out property <length> desk-wordmark: 22px;
 
     out property <length> space-4: 4px;
+    out property <length> space-6: 6px;
     out property <length> space-8: 8px;
     out property <length> space-12: 12px;
     out property <length> space-16: 16px;
@@ -137,6 +138,7 @@ export global Ui {
     out property <length> space-24: 24px;
     out property <length> space-28: 28px;
     out property <length> space-36: 36px;
+    out property <length> radius-icon: 6px;
     out property <length> radius-thumb: 8px;
     out property <length> radius-control: 14px;
     out property <length> radius-row: 14px;
@@ -157,6 +159,8 @@ export global Ui {
     out property <length> focus-ring-width: 4px;
     out property <length> settings-row-height: 56px;
     out property <length> thumb-size: 40px;
+    out property <length> list-icon-size: 28px;
+    out property <length> list-icon-compact: 24px;
     out property <length> glass-light-width: 560px;
     out property <length> glass-light-height: 380px;
     out property <length> glass-highlight-height: 150px;
@@ -223,6 +227,8 @@ export global Ui {
     }
     // TelaCarregamento: cada tentáculo chega em 1 s (ease-out-back); com "Reduzir animações", o polvo já vem pronto.
     out property <duration> tempo-tentaculo: reduce-motion ? 0ms : 1000ms;
+    // BRAND-001: no app o polvo se monta sozinho (sem barra), os sete tentáculos chegando em 1,4 s.
+    out property <duration> tempo-montagem: reduce-motion ? 0ms : 1400ms;
     // Escala: com "Reduzir animações" tudo fica em 1.
     out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;
     out property <float> escala-entrada: reduce-motion ? 1 : 0.98;

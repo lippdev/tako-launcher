@@ -1,0 +1,15 @@
+# VRR (taxa de atualização variável: FreeSync, G-Sync, Adaptive Sync), PERF-002.
+[vrr]
+toggle = "Ligar o VRR"
+toggle_desc = "Liga a taxa variável (FreeSync, G-Sync) na tela de jogo e desliga ao sair"
+unsupported = "Esta tela não informa VRR"
+game = "VRR"
+
+[vrr.session]
+unavailable = "VRR não disponível em {screen}"
+
+[vrr.platform]
+windows = "O Windows não tem API pública para ligar o VRR. Use o painel do driver de vídeo (AMD, NVIDIA ou Intel)."
+x11 = "No X11, o VRR é ligado na configuração do driver (Option \"VariableRefresh\"), não pelo Tako."
+gnome = "No GNOME, o Tako ainda não liga o VRR. Use Configurações › Telas."
+macos = "O macOS não tem API pública para ligar o VRR. Escolha a taxa variável em Ajustes do Sistema › Telas."

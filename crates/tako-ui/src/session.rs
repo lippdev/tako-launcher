@@ -11,12 +11,15 @@ use tako_core::devices::DisplayMode;
 use tako_core::library::GameTrackingStrategy;
 use tako_core::paths::DataPaths;
 use tako_core::session::audio::AudioOutputChoice;
+use tako_core::session::events::{self, SessionEvent, SessionGame};
 use tako_core::session::restore::{Env, PendingEnvironmentStore, SessionEnvironmentGuard};
 use tako_core::session::screen::{GameScreenOutcome, GameScreenSession};
 use tako_core::session::settings::{
     EffectiveSessionSettings, GameSettingsOverride, GlobalSessionSettings, MonitorPresets, resolve,
 };
-use tako_core::session::tracking::{GameRunStatus, GameRunTracker, TrackingPlan, plan};
+use tako_core::session::tracking::{
+    GameRunStatus, GameRunTracker, TrackingPlan, plan, processes_of,
+};
 use tako_platform::Platform;
 
 /// O que o supervisor precisa para acompanhar o jogo depois que a interface fecha.
@@ -39,6 +42,15 @@ pub struct TrackRequest {
     /// Comando permitido para quando o jogo terminar (SESSION-004).
     #[serde(default)]
     pub after_command: Option<String>,
+    /// Loja do jogo, para os eventos de sessão (EXT-001).
+    #[serde(default)]
+    pub store: Option<tako_core::library::GameStore>,
+    /// Ferramentas permitidas para fechar quando o jogo terminar (EXT-001).
+    #[serde(default)]
+    pub close_tools: Vec<String>,
+    /// Processos dessas ferramentas que já rodavam antes do jogo: o usuário abriu, não são fechados.
+    #[serde(default)]
+    pub keep_pids: Vec<u32>,
 }
 
 /// Resultado de abrir um jogo.
@@ -57,6 +69,7 @@ pub fn global_settings(ctx: &Ctx) -> GlobalSessionSettings {
         game_screen_id: s.string(keys::GAME_SCREEN_ID),
         game_screen_mode: s.get(keys::GAME_SCREEN_MODE).and_then(DisplayMode::parse),
         game_screen_hdr: s.bool(keys::GAME_SCREEN_HDR, false),
+        game_screen_vrr: s.bool(keys::GAME_SCREEN_VRR, false),
         monitor_presets: MonitorPresets::parse(&s.string(keys::GAME_SCREEN_PRESETS)),
         game_audio: (!audio_id.trim().is_empty()).then(|| {
             let name = s.string(keys::GAME_AUDIO_NAME);
@@ -116,6 +129,11 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         .clone()
         .ok_or_else(|| ctx.t("game.missing_file"))?;
     let eff = effective(ctx, game_id);
+    let session_game = SessionGame {
+        game_id: game.id.clone(),
+        title: game.title.clone(),
+        store: game.store(),
+    };
     if let Some(p) = eff.game_screen_problem {
         ctx.toast(p.message());
     }
@@ -142,7 +160,13 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
             )
         });
         let mut session = GameScreenSession::default();
-        let result = session.begin(p.displays.as_ref(), screen, confirmed.as_deref());
+        // `session` acaba aqui: quem desliga o VRR no fim é o guard, pelo arquivo gravado antes de ligar.
+        let result = session.begin_with(
+            p.displays.as_ref(),
+            screen,
+            confirmed.as_deref(),
+            &mut |id| g.remember_vrr_turned_on(id),
+        );
         if result.outcome == GameScreenOutcome::Reverted {
             g.discard();
             return Err(result
@@ -163,8 +187,42 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
     {
         tracing::warn!("áudio do jogo: {e}");
     }
+    // Daqui em diante todo `GameStarting` tem o seu `GameExited` (a tela recusada acima não conta como sessão).
+    events::publish(SessionEvent::GameStarting {
+        game: session_game.clone(),
+        at: Utc::now(),
+    });
+    let exited_now = |played: Option<Duration>| {
+        events::publish(SessionEvent::GameExited {
+            game: session_game.clone(),
+            at: Utc::now(),
+            played,
+            exit_code: None,
+        })
+    };
 
-    // Comandos só rodam com a permissão do usuário (a tela pergunta antes de chamar esta função).
+    // Comandos e ferramentas só rodam com a permissão do usuário (a tela pergunta antes de chamar esta função).
+    // Ferramentas só são abertas, sem esperar: não seguram a interface nem o heartbeat do supervisor.
+    let tools: &[String] = if eff.commands_approved {
+        &eff.tools
+    } else {
+        &[]
+    };
+    let keep_pids = if tools.is_empty() {
+        Vec::new()
+    } else {
+        processes_of(&ctx.platform.processes.snapshot(), tools)
+    };
+    for tool in tools {
+        if let Err(e) = ctx.platform.processes.launch(tool, None, None) {
+            tracing::warn!("ferramenta do jogo {tool}: {e}");
+            ctx.toast(ctx.tf(
+                "session.tool_failed",
+                &[("tool", tool), ("error", &e.to_string())],
+            ));
+        }
+    }
+    let p = &ctx.platform;
     let before_failed = eff
         .before_command
         .as_deref()
@@ -190,8 +248,17 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         ctx.toast(ctx.tf("session.before_failed", &[("error", &e.to_string())]));
     }
     let pid = match launched {
-        Ok(pid) => pid,
+        Ok(pid) => {
+            events::publish(SessionEvent::GameStarted {
+                game: session_game.clone(),
+                at: Utc::now(),
+            });
+            pid
+        }
         Err(e) => {
+            // O jogo não abriu: as ferramentas abertas para ele também fecham.
+            close_tools(&ctx.platform, tools, &keep_pids);
+            exited_now(Some(Duration::ZERO));
             restore_now(&ctx.platform, &ctx.paths, recorded);
             return Err(
                 tako_core::presentation::library_text::client_missing(&game, false, None)
@@ -214,6 +281,8 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
     let tp = plan(&game, pid.is_some());
     if tp.strategy == GameTrackingStrategy::None {
         restore_now(&ctx.platform, &ctx.paths, recorded);
+        // Sem acompanhamento não se sabe quando termina: o fim sai agora, sem duração (e as ferramentas ficam).
+        exited_now(None);
         return Ok(Started::Untracked);
     }
     let req = TrackRequest {
@@ -229,8 +298,29 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         restore: recorded,
         discord: crate::discord::available() && ctx.settings.bool(keys::DISCORD_PRESENCE, false),
         after_command: eff.after_command.clone().filter(|_| eff.commands_approved),
+        store: Some(game.store()),
+        close_tools: if eff.close_tools {
+            tools.to_vec()
+        } else {
+            Vec::new()
+        },
+        keep_pids,
     };
     Ok(Started::Tracking(req))
+}
+
+/// Pede para fechar as ferramentas do jogo, menos os processos que já rodavam antes dele (`keep`).
+fn close_tools(platform: &Platform, tools: &[String], keep: &[u32]) {
+    if tools.is_empty() {
+        return;
+    }
+    let mut pids = processes_of(&platform.processes.snapshot(), tools);
+    pids.retain(|p| !keep.contains(p));
+    if !pids.is_empty()
+        && let Err(e) = platform.processes.request_close(&pids)
+    {
+        tracing::warn!("fechar as ferramentas do jogo: {e}");
+    }
 }
 
 /// Volta telas e áudio ao que estava antes do jogo (lido do disco) e mostra o cursor. Idempotente.
@@ -248,13 +338,16 @@ pub fn restore_now(platform: &Platform, paths: &DataPaths, recorded: bool) {
         audio: platform.audio.as_ref(),
     };
     let g = guard(paths);
-    if let Some(snapshot) = store.read() {
-        let report = g.restore_from(env, &snapshot, Utc::now());
-        if !report.succeeded() {
-            tracing::warn!("restauração incompleta: {report:?}");
+    // `restore_from` apaga o arquivo (ou deixa só a marca do VRR de uma tela desconectada).
+    match store.read() {
+        Some(snapshot) => {
+            let report = g.restore_from(env, &snapshot, Utc::now());
+            if !report.succeeded() {
+                tracing::warn!("restauração incompleta: {report:?}");
+            }
         }
+        None => store.delete(),
     }
-    store.delete();
 }
 
 /// Ao abrir: restaura o que uma sessão anterior deixou (queda do Tako ou do PC no meio do jogo).
@@ -272,7 +365,6 @@ pub fn recover_after_crash(platform: &Platform, paths: &DataPaths) {
     if let Some(pending) = g.pending_from_previous_run(env, Utc::now()) {
         tracing::info!("restaurando telas e áudio de uma sessão que não terminou");
         let _ = g.restore_from(env, &pending, Utc::now());
-        PendingEnvironmentStore::new(paths.session_environment()).delete();
     }
 }
 
@@ -399,6 +491,8 @@ impl Running {
         {
             tracing::warn!("comando depois do jogo: {e}");
         }
+        let tools = std::mem::take(&mut self.req.close_tools);
+        close_tools(platform, &tools, &self.req.keep_pids);
         let _ = self.mouse.reset(platform.pointer.as_ref());
         restore_now(platform, paths, self.req.restore);
     }
@@ -432,19 +526,34 @@ impl Running {
         }
     }
 
-    /// Como terminou, depois que [`Self::poll`] devolveu o tempo jogado (SESSION-003). O código de saída é o do
-    /// processo raiz, quando o Tako abriu o executável direto (jogo aberto pela loja não tem).
+    /// Como terminou, depois que [`Self::poll`] devolveu o tempo jogado (SESSION-003), e avisa `GameExited`
+    /// (EXT-001). O código de saída é o do processo raiz, quando o Tako abriu o executável direto (jogo aberto pela
+    /// loja não tem).
     pub fn end(&self, platform: &Platform, played: Duration) -> tako_core::session::GameEnd {
         let code = self
             .req
             .root_pid
             .and_then(|pid| platform.processes.exit_code(pid));
-        tako_core::session::GameEnd::of(
+        let end = tako_core::session::GameEnd::of(
             self.tracker.status,
             self.tracker.close_requested,
             played,
             code,
-        )
+        );
+        events::publish(SessionEvent::GameExited {
+            game: SessionGame {
+                game_id: self.req.game_id.clone(),
+                title: self.req.title.clone(),
+                store: self
+                    .req
+                    .store
+                    .unwrap_or(tako_core::library::GameStore::Manual),
+            },
+            at: Utc::now(),
+            played: Some(played),
+            exit_code: code,
+        });
+        end
     }
 
     /// O jogo não fechou com o pedido: encerra os processos dele à força.
@@ -575,6 +684,139 @@ mod tests {
         restore_now(&platform, &ctx.paths, req.restore);
         assert!(!platform.cursor.is_hidden());
         assert!(!ctx.paths.session_environment().exists());
+    }
+
+    #[test]
+    fn allowed_tools_open_with_the_game_close_at_the_end_and_the_session_is_announced() {
+        use std::sync::Arc;
+        use tako_core::devices::fake::FakeProcesses;
+        let dir = tempfile::tempdir().unwrap();
+        let fake = Arc::new(FakeProcesses::default());
+        let platform = Platform {
+            processes: fake.clone(),
+            ..Platform::simulated()
+        };
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), platform.clone(), true);
+        ctx.library.refresh();
+        let id = ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.is_installed)
+            .unwrap()
+            .id
+            .clone();
+        let store = tako_core::persistence::GameSettingsStore::new(
+            tako_core::persistence::TakoDatabase::new(dir.path().join("tako.db")),
+        );
+        ctx.game_settings = Some(store.clone());
+        let mut o = store.load(&id).unwrap();
+        o.tools = Some("/Ferramentas/fps;/Ferramentas/mods".into());
+        o.close_tools = Some(true);
+        store.save(&id, &o).unwrap();
+        let events = events::subscribe();
+
+        // Sem permissão: nenhuma ferramenta abre (a tela pergunta antes; aqui a sessão não confia nela).
+        let Started::Tracking(req) = start(&mut ctx, &id).unwrap() else {
+            panic!("deveria acompanhar")
+        };
+        assert!(req.close_tools.is_empty());
+        assert!(
+            !fake
+                .launched
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.starts_with("/Ferramentas"))
+        );
+        restore_now(&platform, &ctx.paths, req.restore);
+        fake.exit(req.root_pid.unwrap());
+
+        // O usuário já tinha o "fps" aberto (gravando, por exemplo): esse não fecha no fim.
+        let user_fps = tako_core::devices::ProcessLauncher::launch(
+            fake.as_ref(),
+            "/Ferramentas/fps",
+            None,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        o.approve_commands();
+        store.save(&id, &o).unwrap();
+        let Started::Tracking(req) = start(&mut ctx, &id).unwrap() else {
+            panic!("deveria acompanhar")
+        };
+        let launched = fake.launched.lock().unwrap().clone();
+        assert_eq!(
+            &launched[launched.len() - 3..launched.len() - 1],
+            ["/Ferramentas/fps", "/Ferramentas/mods"]
+        );
+        let mut running = Running::new(req.clone()).unwrap();
+        running.begin(&platform);
+        fake.exit_with(req.root_pid.unwrap(), 0);
+        running.tracker.exit_grace = chrono::TimeDelta::zero();
+        let played = running.poll(&platform).unwrap();
+        running.end(&platform, played);
+        running.finish(&platform, &ctx.paths);
+        let left: Vec<u32> = platform
+            .processes
+            .snapshot()
+            .iter()
+            .map(|p| p.pid)
+            .collect();
+        assert_eq!(
+            left,
+            [user_fps],
+            "as ferramentas abertas pelo Tako fecham; a do usuário fica"
+        );
+
+        let mine: Vec<_> = events
+            .try_iter()
+            .filter_map(|e| match e {
+                SessionEvent::GameStarting { game, .. } if game.game_id == id => Some("starting"),
+                SessionEvent::GameStarted { game, .. } if game.game_id == id => Some("started"),
+                SessionEvent::GameExited {
+                    game, exit_code, ..
+                } if game.game_id == id => {
+                    assert_eq!(exit_code, Some(0));
+                    Some("exited")
+                }
+                _ => None,
+            })
+            .collect();
+        // Outros testes abrem o mesmo jogo em paralelo: confere a ordem da última sessão.
+        assert!(
+            mine.ends_with(&["starting", "started", "exited"]),
+            "{mine:?}"
+        );
+    }
+
+    #[test]
+    fn vrr_turned_on_for_the_game_is_turned_off_after_it() {
+        use tako_core::devices::VrrStatus;
+        let dir = tempfile::tempdir().unwrap();
+        let platform = Platform::simulated();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), platform.clone(), true);
+        ctx.library.refresh();
+        let id = ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.is_installed)
+            .unwrap()
+            .id
+            .clone();
+        // A TV do simulado tem VRR desligado.
+        ctx.settings.set_bool(keys::GAME_SCREEN_ENABLED, true);
+        ctx.settings.set(keys::GAME_SCREEN_ID, "DISPLAY2");
+        ctx.settings.set_bool(keys::GAME_SCREEN_VRR, true);
+        let vrr = || platform.displays.list().unwrap()[1].vrr;
+        let Started::Tracking(req) = start(&mut ctx, &id).unwrap() else {
+            panic!("deveria acompanhar")
+        };
+        assert_eq!(vrr(), VrrStatus::On);
+        restore_now(&platform, &ctx.paths, req.restore);
+        assert_eq!(vrr(), VrrStatus::Off);
     }
 
     #[test]

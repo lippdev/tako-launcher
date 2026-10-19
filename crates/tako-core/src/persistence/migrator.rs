@@ -115,6 +115,14 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         "ALTER TABLE game_settings ADD COLUMN screen_id TEXT;
          ALTER TABLE game_settings ADD COLUMN screen_name TEXT;",
     ),
+    // VRR de cada jogo (PERF-002).
+    (13, "ALTER TABLE game_settings ADD COLUMN vrr INTEGER;"),
+    // Ferramentas abertas junto do jogo e se fecham no fim (EXT-001).
+    (
+        14,
+        "ALTER TABLE game_settings ADD COLUMN tools TEXT;
+         ALTER TABLE game_settings ADD COLUMN close_tools INTEGER;",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).
