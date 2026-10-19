@@ -58,7 +58,7 @@ fn navigates_between_categories_and_rows() {
     let n = page.cats.len();
     assert_eq!(n, 11);
     page.handle(Cmd::NextSection, &mut ctx);
-    assert_eq!(page.cats[page.cat].id, "library");
+    assert_eq!(page.cats[page.cat].id, "appearance");
     page.handle(Cmd::PrevSection, &mut ctx);
     page.handle(Cmd::PrevSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "about");
@@ -75,6 +75,38 @@ fn navigates_between_categories_and_rows() {
     assert_eq!(
         SettingsPage::at("controls").cats[SettingsPage::at("controls").cat].id,
         "controls"
+    );
+}
+
+#[test]
+fn categories_follow_the_review_order_and_audio_is_under_sound() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let ids: Vec<_> = categories()
+        .into_iter()
+        .map(|category| category.id)
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "general",
+            "appearance",
+            "sound",
+            "screen",
+            "controls",
+            "library",
+            "metadata",
+            "downloads",
+            "integrations",
+            "system",
+            "about",
+        ]
+    );
+    assert!(sound(&ctx).iter().any(|item| item.row.key == "audio"));
+    assert!(
+        !screen::rows(&ctx)
+            .iter()
+            .any(|item| item.row.key == "audio")
     );
 }
 
@@ -386,7 +418,7 @@ fn game_screen_choices_cycle() {
     assert!(hide.row.on);
     accept(&mut ctx, &hide);
     assert_eq!(ctx.settings.string(keys::GAME_SCREEN_HIDE_OTHERS), "None");
-    let audio = find(&screen::rows(&ctx), "audio");
+    let audio = find(&screen::audio_rows(&ctx), "audio");
     adjust(&mut ctx, &audio, 1);
     assert_eq!(ctx.settings.string(keys::GAME_AUDIO_NAME), "Alto-falantes");
 }
@@ -1444,7 +1476,7 @@ fn api_settings_panel_toggles_and_regenerates_token() {
 
     let rows = rows_of(&ctx, "integrations");
     let api_row = find(&rows, "settings.system.api");
-    assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
+    assert!(api_row.row.value.is_empty());
 
     let mut panel = match accept(&mut ctx, &api_row) {
         Flow::Push(l) => l,
@@ -1545,12 +1577,8 @@ fn console_mode_row_displays_status_and_triggers_check() {
         ctx.t("settings.integrations.console_mode")
     );
     assert_eq!(
-        cm_row.row.description,
-        ctx.t("settings.integrations.console_mode_not_installed")
-    );
-    assert_eq!(
         cm_row.row.value,
-        ctx.t("settings.integrations.console_mode_check_again")
+        ctx.t("settings.integrations.console_mode_not_installed")
     );
 
     // 2. Estado instalado com API v1
@@ -1563,7 +1591,7 @@ fn console_mode_row_displays_status_and_triggers_check() {
     let rows = rows_of(&ctx, "integrations");
     let cm_row = find(&rows, "console-mode");
     assert_eq!(
-        cm_row.row.description,
+        cm_row.row.value,
         ctx.tf(
             "settings.integrations.console_mode_installed",
             &[("version", "1")]
@@ -1579,21 +1607,24 @@ fn console_mode_row_displays_status_and_triggers_check() {
     let rows = rows_of(&ctx, "integrations");
     let cm_row = find(&rows, "console-mode");
     assert_eq!(
-        cm_row.row.description,
+        cm_row.row.value,
         ctx.t("settings.integrations.console_mode_incompatible")
     );
+    assert_eq!(cm_row.row.style, "warning");
 
     // 4. Estado de erro
     super::integrations::set_status_for_test(tako_core::console_mode::ConsoleModeStatus::Erro);
     let rows = rows_of(&ctx, "integrations");
     let cm_row = find(&rows, "console-mode");
     assert_eq!(
-        cm_row.row.description,
+        cm_row.row.value,
         ctx.t("settings.integrations.console_mode_error")
     );
+    assert_eq!(cm_row.row.style, "error");
 
     // 5. Ação de verificar de novo
-    let flow = accept(&mut ctx, &cm_row);
+    let check_again = find(&rows, "console-mode-check");
+    let flow = accept(&mut ctx, &check_again);
     assert!(matches!(flow, Flow::Stay));
 }
 
@@ -1606,9 +1637,10 @@ fn console_mode_row_displays_checking_when_verifying() {
     let rows = rows_of(&ctx, "integrations");
     let cm_row = find(&rows, "console-mode");
     assert_eq!(
-        cm_row.row.description,
+        cm_row.row.value,
         ctx.t("settings.integrations.console_mode_checking")
     );
+    assert!(!find(&rows, "console-mode-check").row.enabled);
     super::integrations::set_checking_for_test(false);
 }
 
@@ -1627,7 +1659,7 @@ fn console_mode_custom_detector_is_invoked() {
     let rows = rows_of(&ctx, "integrations");
     let cm_row = find(&rows, "console-mode");
     assert_eq!(
-        cm_row.row.description,
+        cm_row.row.value,
         ctx.tf(
             "settings.integrations.console_mode_installed",
             &[("version", "1")]

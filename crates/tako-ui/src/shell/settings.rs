@@ -46,16 +46,6 @@ pub fn categories() -> Vec<Category> {
             rows: general,
         },
         Category {
-            id: "library",
-            icon: "grid",
-            rows: library::rows,
-        },
-        Category {
-            id: "metadata",
-            icon: "image",
-            rows: metadata::rows,
-        },
-        Category {
             id: "appearance",
             icon: "palette",
             rows: appearance,
@@ -76,9 +66,14 @@ pub fn categories() -> Vec<Category> {
             rows: controls::rows,
         },
         Category {
-            id: "integrations",
-            icon: "tv",
-            rows: integrations::rows,
+            id: "library",
+            icon: "grid",
+            rows: library::rows,
+        },
+        Category {
+            id: "metadata",
+            icon: "image",
+            rows: metadata::rows,
         },
         Category {
             id: "downloads",
@@ -86,8 +81,13 @@ pub fn categories() -> Vec<Category> {
             rows: super::downloads::settings_rows,
         },
         Category {
+            id: "integrations",
+            icon: "tv",
+            rows: integrations::rows,
+        },
+        Category {
             id: "system",
-            icon: "alert",
+            icon: "gear",
             rows: system,
         },
         Category {
@@ -1031,8 +1031,7 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
 
         let preview_row = MenuItem::new(
             PanelRow::action("preview", ctx.t("settings.appearance.live_preview"))
-                .desc(ctx.t("settings.appearance.live_preview_desc"))
-                .icon("play"),
+                .desc(ctx.t("settings.appearance.live_preview_desc")),
         )
         .on(|ctx| {
             let theme_id = tako_themes::selected(&ctx.paths.themes());
@@ -1042,7 +1041,7 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
         rows.push(preview_row);
 
         let save_row = MenuItem::new(
-            PanelRow::action("save", ctx.t("settings.appearance.save_theme")).style("primary"),
+            PanelRow::button("save", ctx.t("settings.appearance.save_theme")).primary(),
         )
         .on(|ctx| {
             let theme_id = tako_themes::selected(&ctx.paths.themes());
@@ -1192,8 +1191,7 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
         items.push(
             MenuItem::new(
                 PanelRow::action("edit-theme", ctx.t("settings.appearance.edit_theme"))
-                    .desc(ctx.t("settings.appearance.edit_theme_desc"))
-                    .icon("palette"),
+                    .desc(ctx.t("settings.appearance.edit_theme_desc")),
             )
             .on(|ctx| Flow::Push(Box::new(edit_theme_panel(ctx)))),
         );
@@ -1317,7 +1315,8 @@ fn change_text_size(ctx: &mut Ctx, direction: i32) -> Flow {
 
 fn sound(ctx: &Ctx) -> Vec<MenuItem> {
     use crate::navigation_feedback as feedback;
-    vec![
+    let music_on = ctx.settings.bool(feedback::THEME_MUSIC_ENABLED, true);
+    let mut rows = vec![
         toggle(
             ctx,
             "settings.sound.music_enabled",
@@ -1330,7 +1329,13 @@ fn sound(ctx: &Ctx) -> Vec<MenuItem> {
                 ..PanelRow::choice(
                     "theme-music-volume",
                     ctx.t("settings.sound.music_volume"),
-                    if ctx.desktop {
+                    if !music_on {
+                        if ctx.desktop {
+                            "45".into()
+                        } else {
+                            "45%".into()
+                        }
+                    } else if ctx.desktop {
                         match feedback::music_volume(&ctx.settings) {
                             0 => ctx.t("settings.sound.music_muted"),
                             v => v.to_string(),
@@ -1340,7 +1345,8 @@ fn sound(ctx: &Ctx) -> Vec<MenuItem> {
                     },
                 )
             }
-            .desc(ctx.t("settings.sound.music_volume_desc")),
+            .desc(ctx.t("settings.sound.music_volume_desc"))
+            .enabled(music_on),
         )
         .on(|ctx| change_theme_music_volume(ctx, 1))
         .on_adjust(change_theme_music_volume)
@@ -1402,7 +1408,9 @@ fn sound(ctx: &Ctx) -> Vec<MenuItem> {
                 .collect();
             (picks, cur)
         }),
-    ]
+    ];
+    rows.extend(screen::audio_rows(ctx));
+    rows
 }
 
 fn change_theme_music_volume(ctx: &mut Ctx, direction: i32) -> Flow {
@@ -1599,13 +1607,13 @@ fn choose_backup(ctx: &mut Ctx) {
                 move || tako_core::persistence::backup::create_backup(&paths, &p),
                 move |ctx, res| match res {
                     Ok(_) => {
-                        ctx.toast(ctx.tf(
+                        ctx.toast_success(ctx.tf(
                             "settings.system.backup_done",
                             &[("path", &path.display().to_string())],
                         ));
                     }
                     Err(e) => {
-                        ctx.toast(ctx.tf(
+                        ctx.toast_error(ctx.tf(
                             "settings.system.backup_failed",
                             &[("error", &e.to_string())],
                         ));
@@ -1719,11 +1727,11 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                                     } else {
                                         ctx.t("settings.system.restore_done")
                                     };
-                                    ctx.toast(msg);
+                                    ctx.toast_success(msg);
                                 }
                                 Err(e) => {
                                     ctx.reload_data();
-                                    ctx.toast(ctx.tf(
+                                    ctx.toast_error(ctx.tf(
                                         "settings.system.restore_failed",
                                         &[("error", &e.to_string())],
                                     ));
@@ -1742,25 +1750,29 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
 }
 
 pub(crate) fn confirm_regenerate_token(ctx: &Ctx) -> MenuLayer {
-    MenuLayer::dialog(ctx.t("settings.system.api_regenerate"), |ctx| {
-        vec![
-            MenuItem::new(
-                PanelRow::button(
-                    "regenerate",
-                    ctx.t("settings.system.api_regenerate_confirm_btn"),
+    MenuLayer::dialog(
+        ctx.t("settings.system.api_regenerate_confirm_title"),
+        |ctx| {
+            vec![
+                MenuItem::new(
+                    PanelRow::button(
+                        "regenerate",
+                        ctx.t("settings.system.api_regenerate_confirm_btn"),
+                    )
+                    .danger(),
                 )
-                .danger(),
-            )
-            .on(|ctx| {
-                let new_token = tako_core::api::generate_token();
-                ctx.settings.set(keys::API_TOKEN, &new_token);
-                crate::local_api::sync(ctx);
-                ctx.toast(ctx.t("settings.system.api_token_regenerated"));
-                Flow::Close
-            }),
-            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
-        ]
-    })
+                .on(|ctx| {
+                    let new_token = tako_core::api::generate_token();
+                    ctx.settings.set(keys::API_TOKEN, &new_token);
+                    crate::local_api::sync(ctx);
+                    ctx.toast_success(ctx.t("settings.system.api_token_regenerated"));
+                    Flow::Close
+                }),
+                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                    .on(|_| Flow::Close),
+            ]
+        },
+    )
     .text(ctx.t("settings.system.api_regenerate_confirm_desc"))
 }
 
@@ -1777,9 +1789,9 @@ pub(crate) fn token_dialog(ctx: &Ctx, token: String) -> MenuLayer {
             )
             .on(move |ctx| {
                 if tako_platform::copy_to_clipboard(&token) {
-                    ctx.toast(ctx.t("settings.system.api_token_copied"));
+                    ctx.toast_success(ctx.t("settings.system.api_token_copied"));
                 } else {
-                    ctx.toast(ctx.t("settings.system.api_token_copy_failed"));
+                    ctx.toast_error(ctx.t("settings.system.api_token_copy_failed"));
                 }
                 Flow::Stay
             }),

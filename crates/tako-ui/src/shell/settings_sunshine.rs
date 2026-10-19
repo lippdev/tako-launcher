@@ -76,9 +76,9 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                 || sunshine::detect_quick().0;
             if !ctx.simulated() && !has_sunshine {
                 if sunshine::is_flatpak() {
-                    ctx.toast(ctx.t("settings.system.sunshine_err_flatpak_permission"));
+                    ctx.toast_warning(ctx.t("settings.system.sunshine_err_flatpak_permission"));
                 } else {
-                    ctx.toast(ctx.t("settings.system.sunshine_missing"));
+                    ctx.toast_warning(ctx.t("settings.system.sunshine_missing"));
                 }
                 Flow::Stay
             } else {
@@ -118,16 +118,10 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             false,
         ));
     }
-    let api_on = ctx.settings.bool(keys::API_ENABLED, false);
     rows.push(
         MenuItem::new(
             PanelRow::action("settings.system.api", ctx.t("settings.system.api"))
-                .desc(ctx.t("settings.system.api_desc"))
-                .value(ctx.t(if api_on {
-                    "settings.system.api_on"
-                } else {
-                    "settings.system.api_off"
-                })),
+                .desc(ctx.t("settings.system.api_desc")),
         )
         .on(|ctx| Flow::Push(Box::new(super::api_panel(ctx)))),
     );
@@ -217,14 +211,14 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
         .collect();
     let titles = valid_apps
         .iter()
-        .take(40)
+        .take(6)
         .map(|app| format!("• {}", app.title))
         .collect::<Vec<_>>()
         .join(
             "
 ",
         );
-    let extra = valid_apps.len().saturating_sub(40);
+    let extra = valid_apps.len().saturating_sub(6);
     let title_list = if extra > 0 {
         format!(
             "{titles}
@@ -249,6 +243,8 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
         move |ctx| {
             let all_apps = all_apps.clone();
             vec![
+                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                    .on(|_| Flow::Close),
                 MenuItem::new(PanelRow::button(
                     "sunshine-confirm",
                     ctx.t("settings.system.sunshine_confirm"),
@@ -271,12 +267,12 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
                                         "settings.system.sunshine_skipped_games",
                                         &[("count", &skipped.to_string())],
                                     );
-                                    ctx.toast(format!("{exported} · {skipped_msg}"));
+                                    ctx.toast_success(format!("{exported} · {skipped_msg}"));
                                 } else {
-                                    ctx.toast(exported);
+                                    ctx.toast_success(exported);
                                 }
                             }
-                            Err(error) => ctx.toast(format_sunshine_error(ctx, &error)),
+                            Err(error) => ctx.toast_error(format_sunshine_error(ctx, &error)),
                         },
                     );
                     Flow::Close
@@ -322,7 +318,7 @@ pub(crate) fn sync_after_rescan(ctx: &mut Ctx) {
                 tracing::warn!("não foi possível sincronizar os apps do Sunshine: {e}");
                 SYNC_ERROR_SHOWN.with(|shown| {
                     if !shown.replace(true) {
-                        ctx.toast(format_sunshine_error(ctx, &e));
+                        ctx.toast_error(format_sunshine_error(ctx, &e));
                     }
                 });
             }
