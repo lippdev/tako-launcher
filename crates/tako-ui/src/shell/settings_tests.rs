@@ -1294,7 +1294,23 @@ fn edit_theme_hidden_when_ui_not_supported() {
 }
 
 #[test]
-fn custom_accent_wins_over_game_accent() {
+fn edit_theme_hides_font_and_background_for_themes_that_do_not_use_them() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.theme_supports_font = false;
+    ctx.theme_supports_background = false;
+
+    let rows = edit_theme_panel(&ctx).items(&ctx);
+    assert!(rows.iter().any(|item| item.row.key == "accent"));
+    assert!(rows.iter().any(|item| item.row.key == "save"));
+    assert!(!rows.iter().any(|item| item.row.key == "font"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_type"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_color"));
+    assert!(!rows.iter().any(|item| item.row.key == "choose_image"));
+}
+
+#[test]
+fn desktop_ignores_custom_theme_accent() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();
 
@@ -1318,12 +1334,11 @@ fn custom_accent_wins_over_game_accent() {
         ..Default::default()
     };
 
-    // Ao montar a linha de DeskGame, o accent personalizado (#E3161E) deve vencer o do jogo (#00FF00)
-    // exercitando a função real de desktop.rs
+    // O desktop segue a cor do jogo; o override de tema vale na tela cheia.
     let desk_game_accent = crate::shell::desktop::game_card_accent(&ctx, &g.accent);
     assert_eq!(
         desk_game_accent,
-        slint::Color::from_rgb_u8(0xE3, 0x16, 0x1E)
+        slint::Color::from_rgb_u8(0x00, 0xFF, 0x00)
     );
 }
 

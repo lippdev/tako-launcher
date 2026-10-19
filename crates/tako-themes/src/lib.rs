@@ -26,6 +26,8 @@ pub use package::{
 
 /// Tema embutido no `tako-ui`; nenhum pacote pode usar este id.
 pub const DEFAULT_THEME_ID: &str = "default";
+/// Temas incluídos no app, cujo diretório de instalação é mantido pelo Tako.
+pub const BUILTIN_EXTRA_THEME_IDS: [&str; 2] = ["tako-alto-contraste", "tako-fita"];
 const SELECTED_FILE: &str = ".selected";
 const LOADING_FILE: &str = ".loading";
 const FAULTS_FILE: &str = ".faults";
@@ -99,6 +101,12 @@ fn reserved(id: &str) -> bool {
     id.eq_ignore_ascii_case(DEFAULT_THEME_ID)
 }
 
+fn is_builtin_extra(id: &str) -> bool {
+    BUILTIN_EXTRA_THEME_IDS
+        .iter()
+        .any(|builtin| id.eq_ignore_ascii_case(builtin))
+}
+
 /// Instala o pacote em `<themes_root>/<id>/`, trocando uma versão anterior do mesmo tema só no fim.
 pub fn install(package: &Path, themes_root: &Path) -> Result<InstalledTheme, Vec<Problem>> {
     install_with(package, themes_root, &Limits::default())
@@ -111,7 +119,7 @@ pub fn install_with(
 ) -> Result<InstalledTheme, Vec<Problem>> {
     let mut pkg = package::Package::open(package, limits)?;
     let id = pkg.manifest.id.clone();
-    if reserved(&id) {
+    if reserved(&id) || is_builtin_extra(&id) {
         return Err(vec![Problem::new(
             "package.reserved-id",
             tf("themes.package.reserved_id", &[("id", &id)]),
@@ -155,9 +163,30 @@ pub fn install_with(
     })
 }
 
+/// Valida e extrai um pacote para um diretório temporário novo, sem aplicar regras de instalação.
+/// Usado por `theme check`, que precisa compilar até temas embutidos sem registrá-los no catálogo.
+pub fn extract_for_check(package: &Path, output: &Path) -> Result<ThemeManifest, Vec<Problem>> {
+    let limits = Limits::default();
+    let mut pkg = package::Package::open(package, &limits)?;
+    fs::create_dir(output).map_err(|e| {
+        vec![Problem::new(
+            "package.extract-failed",
+            tf(
+                "themes.package.extract_failed",
+                &[("error", &e.to_string())],
+            ),
+        )]
+    })?;
+    if let Err(problem) = pkg.extract_to(output, &limits) {
+        let _ = fs::remove_dir_all(output);
+        return Err(vec![problem]);
+    }
+    Ok(pkg.manifest)
+}
+
 /// Remove um tema instalado (e a escolha, se era ele). O id seguro impede sair da pasta de temas.
 pub fn uninstall(themes_root: &Path, id: &str) -> io::Result<()> {
-    if !is_safe_id(id) || reserved(id) {
+    if !is_safe_id(id) || reserved(id) || is_builtin_extra(id) {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, id.to_owned()));
     }
     let dir = themes_root.join(id);

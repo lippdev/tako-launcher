@@ -883,9 +883,15 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
             (picks, cur_idx)
         });
 
-        let mut rows = vec![accent_row, font_row, bg_type_row];
+        let mut rows = vec![accent_row];
+        if ctx.theme_supports_font {
+            rows.push(font_row);
+        }
+        if ctx.theme_supports_background {
+            rows.push(bg_type_row);
+        }
 
-        if bg_type_idx == 1 {
+        if ctx.theme_supports_background && bg_type_idx == 1 {
             let cur_canvas = draft.canvas.as_deref().unwrap_or("#0E1116");
             let bg_color_label = BG_COLORS
                 .iter()
@@ -943,7 +949,7 @@ pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
                 (picks, cur_idx)
             });
             rows.push(bg_color_row);
-        } else if bg_type_idx == 2 {
+        } else if ctx.theme_supports_background && bg_type_idx == 2 {
             let img_label = if let Some(ref name) = draft.background_source_name {
                 name.clone()
             } else if let Some(ref img_val) = draft.background_image {
