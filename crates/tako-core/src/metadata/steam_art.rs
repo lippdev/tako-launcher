@@ -163,12 +163,20 @@ impl SteamArtResolver {
                 return None;
             }
         };
-        parse_json(&r.body)?
-            .get("response")?
-            .get("store_items")?
-            .get(0)?
-            .get("assets")
-            .cloned()
+        // A API respondeu: sem artes vira `Null`, para `answered` separar "não existe" de "sem rede".
+        let assets = parse_json(&r.body).and_then(|v| {
+            v.get("response")?
+                .get("store_items")?
+                .get(0)?
+                .get("assets")
+                .cloned()
+        });
+        Some(assets.unwrap_or(Value::Null))
+    }
+
+    /// A API da Steam respondeu sobre o `app` (com ou sem artes) nesta sessão.
+    pub fn answered(&self, app: u32) -> bool {
+        self.lock().get(&app).is_some_and(Option::is_some)
     }
 }
 

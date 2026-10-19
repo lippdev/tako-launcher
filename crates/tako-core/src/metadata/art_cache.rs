@@ -8,6 +8,7 @@ use super::screenscraper::{MEDIA_SCHEME, ScreenScraperClient};
 use super::steam_art::{ArtSource, SteamArtResolver};
 use super::{STEAM_ART_SCHEME, scheme_of};
 use sha2::{Digest, Sha256};
+use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -16,6 +17,8 @@ use std::time::SystemTime;
 pub const DEFAULT_LIMIT: u64 = 1024 * 1024 * 1024;
 /// Imagem maior que isso não é baixada.
 pub const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
+/// Dias em que uma arte que a loja não tem (404, ícone ausente na API) não é pedida de novo.
+const MISS_DAYS: u64 = 7;
 
 pub struct ArtCache {
     dir: PathBuf,
@@ -68,23 +71,54 @@ impl ArtCache {
             touch(&cached);
             return Some(cached);
         }
-        match scheme.as_deref() {
+        // Arte que a loja confirmou não ter (404, ou a API da Steam sem o ícone): não pergunta de novo por
+        // `MISS_DAYS` dias. Falha de rede não marca.
+        let miss = cached.with_extension("miss");
+        let fresh = |p: &Path| {
+            std::fs::metadata(p)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .is_some_and(|age| age.as_secs() < MISS_DAYS * 24 * 3600)
+        };
+        if fresh(&miss) {
+            return None;
+        }
+        let transient = Cell::new(false);
+        let found = match scheme.as_deref() {
             Some(MEDIA_SCHEME) => {
                 let bytes = self
                     .screenscraper
                     .as_ref()?
                     .download_media(uri, MAX_IMAGE_BYTES)
                     .filter(|b| looks_like_image(b))?;
-                self.store(&cached, &bytes)
+                // O ScreenScraper tem cota e credenciais: não marca falta.
+                return self.store(&cached, &bytes);
             }
             // Artes da Steam: o cache vale para o endereço lógico, sem nova consulta à rede.
-            Some(STEAM_ART_SCHEME) => self.steam.resolve(uri).into_iter().find_map(|c| match c {
-                ArtSource::File(p) => Some(p), // cache da própria Steam
-                ArtSource::Url(u) => self.download(&u).and_then(|b| self.store(&cached, &b)),
-            }),
-            Some("https" | "http") => self.download(uri).and_then(|b| self.store(&cached, &b)),
-            _ => None,
+            Some(STEAM_ART_SCHEME) => {
+                let found = self.steam.resolve(uri).into_iter().find_map(|c| match c {
+                    ArtSource::File(p) => Some(p), // cache da própria Steam
+                    ArtSource::Url(u) => self
+                        .download(&u, &transient)
+                        .and_then(|b| self.store(&cached, &b)),
+                });
+                let answered = super::steam_art::parse_uri(uri)
+                    .is_some_and(|(app, _)| self.steam.answered(app));
+                if !answered {
+                    transient.set(true);
+                }
+                found
+            }
+            Some("https" | "http") => self
+                .download(uri, &transient)
+                .and_then(|b| self.store(&cached, &b)),
+            _ => return None,
+        };
+        if found.is_none() && !transient.get() {
+            let _ = write_atomic(&miss, b"");
         }
+        found
     }
 
     /// Nome no cache: hash do endereço lógico + extensão (`.img` para esquemas internos).
@@ -121,16 +155,21 @@ impl ArtCache {
             .sum()
     }
 
-    fn download(&self, url: &str) -> Option<Vec<u8>> {
+    /// `transient` vira `true` quando a falha pode passar (sem rede, 5xx, 429): só as outras marcam falta.
+    fn download(&self, url: &str, transient: &Cell<bool>) -> Option<Vec<u8>> {
         let mut req = HttpRequest::get(url);
         req.max_bytes = MAX_IMAGE_BYTES;
         let r = match self.http.send(&req) {
             Ok(r) => r,
             Err(e) => {
                 tracing::warn!("Arte indisponível: {e}");
+                transient.set(true);
                 return None;
             }
         };
+        if r.status >= 500 || r.status == 408 || r.status == 429 {
+            transient.set(true);
+        }
         let type_ok = r.content_type.as_deref().is_none_or(|c| {
             let c = c.to_ascii_lowercase();
             c.starts_with("image/") || c.starts_with("application/octet-stream")
@@ -261,6 +300,44 @@ mod tests {
 
     fn cache(dir: &Path, http: Arc<FakeHttp>) -> ArtCache {
         ArtCache::new(dir, http.clone(), SteamArtResolver::new(http, None), None)
+    }
+
+    #[test]
+    fn art_the_store_does_not_have_is_not_asked_again_for_a_week() {
+        let dir = tempfile::tempdir().unwrap();
+        // Epic (https) com 404: a segunda abertura não vai à rede.
+        let http = Arc::new(FakeHttp::with_fallback(404, ""));
+        let epic = "https://cdn.epic/icone.png";
+        assert!(cache(dir.path(), http.clone()).locate(epic).is_none());
+        assert!(cache(dir.path(), http.clone()).locate(epic).is_none());
+        assert_eq!(http.sent().len(), 1);
+        // Steam: a API respondeu sem `community_icon`; noutra sessão, nem a API é consultada.
+        let http = Arc::new(FakeHttp::with_fallback(
+            200,
+            r#"{"response":{"store_items":[{"assets":{}}]}}"#,
+        ));
+        let steam = "steam-art://570/icon";
+        assert!(cache(dir.path(), http.clone()).locate(steam).is_none());
+        assert!(cache(dir.path(), http.clone()).locate(steam).is_none());
+        assert_eq!(http.sent().len(), 1);
+        // Passados 7 dias, pergunta de novo.
+        let c = cache(dir.path(), http.clone());
+        let old = SystemTime::now() - std::time::Duration::from_secs(8 * 24 * 3600);
+        std::fs::File::options()
+            .write(true)
+            .open(c.cache_path(steam).with_extension("miss"))
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        assert!(c.locate(steam).is_none());
+        assert_eq!(http.sent().len(), 2);
+        // Falha que pode passar (5xx, ou a API da Steam fora do ar) não marca nada.
+        for uri in ["https://cdn.epic/outro.png", "steam-art://10/icon"] {
+            let http = Arc::new(FakeHttp::with_fallback(503, ""));
+            assert!(cache(dir.path(), http.clone()).locate(uri).is_none());
+            assert!(cache(dir.path(), http.clone()).locate(uri).is_none());
+            assert_eq!(http.sent().len(), 2, "{uri}");
+        }
     }
 
     #[test]
