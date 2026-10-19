@@ -56,7 +56,7 @@ fn navigates_between_categories_and_rows() {
     let (_d, mut ctx) = ctx();
     let mut page = SettingsPage::new();
     let n = page.cats.len();
-    assert_eq!(n, 10);
+    assert_eq!(n, 11);
     page.handle(Cmd::NextSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "library");
     page.handle(Cmd::PrevSection, &mut ctx);
@@ -1239,7 +1239,7 @@ fn api_settings_panel_toggles_and_regenerates_token() {
     let (_d, mut ctx) = ctx();
     assert!(!ctx.settings.bool(keys::API_ENABLED, false));
 
-    let rows = rows_of(&ctx, "system");
+    let rows = rows_of(&ctx, "integrations");
     let api_row = find(&rows, "settings.system.api");
     assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
 
@@ -1291,7 +1291,7 @@ fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
     // 1. Linha do token segue padrão Botão ("Mostrar") e abre diálogo com botão Copiar
     let valid_token = tako_core::api::generate_token();
     ctx.settings.set(keys::API_TOKEN, &valid_token);
-    let rows = rows_of(&ctx, "system");
+    let rows = rows_of(&ctx, "integrations");
     let api_row = find(&rows, "settings.system.api");
     let mut panel = match accept(&mut ctx, &api_row) {
         Flow::Push(l) => l,
@@ -1324,4 +1324,48 @@ fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
     panel.handle(Cmd::Accept, &mut ctx);
     let token = ctx.settings.string(keys::API_TOKEN);
     assert!(tako_core::api::is_valid_token(&token));
+}
+
+#[test]
+fn console_mode_row_displays_status_and_triggers_check() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Estado inicial: não instalado
+    super::integrations::set_status_for_test(tako_core::console_mode::ConsoleModeStatus::NaoInstalado);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(cm_row.row.title, ctx.t("settings.integrations.console_mode"));
+    assert_eq!(cm_row.row.description, ctx.t("settings.integrations.console_mode_not_installed"));
+    assert_eq!(cm_row.row.value, ctx.t("settings.integrations.console_mode_check_again"));
+
+    // 2. Estado instalado com API v1
+    super::integrations::set_status_for_test(tako_core::console_mode::ConsoleModeStatus::Instalado {
+        versao_api: 1,
+        capacidades: vec!["tv".into(), "fps".into()],
+    });
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.description,
+        ctx.tf("settings.integrations.console_mode_installed", &[("version", "1")])
+    );
+
+    // 3. Estado incompatível
+    super::integrations::set_status_for_test(tako_core::console_mode::ConsoleModeStatus::Incompativel {
+        versao: "2.0".into(),
+    });
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(cm_row.row.description, ctx.t("settings.integrations.console_mode_incompatible"));
+
+    // 4. Estado de erro
+    super::integrations::set_status_for_test(tako_core::console_mode::ConsoleModeStatus::Erro);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(cm_row.row.description, ctx.t("settings.integrations.console_mode_error"));
+
+    // 5. Ação de verificar de novo
+    let flow = accept(&mut ctx, &cm_row);
+    assert!(matches!(flow, Flow::Stay));
 }

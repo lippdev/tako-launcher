@@ -390,6 +390,18 @@ performance = "Desempenho do Tako"
 performance_desc = "Memória, CPU e tempo de abertura do próprio Tako, atualizados a cada segundo"
 performance_value = "Ver"
 
+[settings.integrations]
+title = "Integrações"
+subtitle = "Serviços locais e ferramentas conectadas ao Tako."
+console_mode = "Console Mode"
+console_mode_desc = "Integração com o Console Mode para funções de TV, janelas e tela cheia"
+console_mode_not_installed = "Não instalado"
+console_mode_installed = "Instalado · API v{version}"
+console_mode_incompatible = "Versão incompatível"
+console_mode_error = "Erro ao verificar"
+console_mode_checking = "Verificando…"
+console_mode_check_again = "Verificar de novo"
+
 [settings.performance]
 title = "Desempenho do Tako"
 ui = "Interface"

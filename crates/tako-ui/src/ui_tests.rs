@@ -871,6 +871,7 @@ fn desktop_snapshot() {
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("settings") => shell.open_route("settings"),
+            Ok("integrations") => shell.open_route("settings:integrations"),
             Ok("appearance") => {
                 shell.open_route("settings");
                 shell.click("category", 3);
