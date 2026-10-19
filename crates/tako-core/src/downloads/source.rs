@@ -18,14 +18,23 @@ const MAX_NAME_CHARS: usize = 120;
 /// Campos de texto livre (data, tamanho): só dica, cortados.
 const MAX_HINT_CHARS: usize = 40;
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SourceError {
-    #[error("a fonte passa de {} MiB", MAX_SOURCE_BYTES / 1024 / 1024)]
     TooLarge,
-    #[error("a fonte não é um JSON válido")]
     InvalidJson,
-    #[error("a fonte não tem a lista \"downloads\"")]
     MissingDownloads,
+}
+
+impl std::error::Error for SourceError {}
+
+impl std::fmt::Display for SourceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceError::TooLarge => write!(f, "{}", crate::i18n::t("downloads.error.source_too_large")),
+            SourceError::InvalidJson => write!(f, "{}", crate::i18n::t("downloads.error.invalid_json")),
+            SourceError::MissingDownloads => write!(f, "{}", crate::i18n::t("downloads.error.missing_downloads")),
+        }
+    }
 }
 
 /// Um item da fonte. `uris` já validadas; o texto vem da fonte e é mostrado só como texto simples.

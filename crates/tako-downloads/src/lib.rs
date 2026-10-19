@@ -27,14 +27,27 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 const OWNER_FILE: &str = ".tako-download-owner";
 
 /// Erro ao ler uma fonte ou um `.torrent` por `https`.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum FetchError {
-    #[error("só endereços https:// são aceitos")]
     NotHttps,
-    #[error("o arquivo passa do limite")]
     TooLarge,
-    #[error("rede: {0}")]
     Http(String),
+}
+
+impl std::error::Error for FetchError {}
+
+impl std::fmt::Display for FetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FetchError::NotHttps => write!(f, "{}", tako_core::i18n::t("downloads.error.not_https")),
+            FetchError::TooLarge => write!(f, "{}", tako_core::i18n::t("downloads.error.source_too_large")),
+            FetchError::Http(err) => write!(
+                f,
+                "{}",
+                tako_core::i18n::tf("downloads.error.http", &[("error", err)])
+            ),
+        }
+    }
 }
 
 /// GET por `https` sem cookies nem identificação do usuário, com tempo-limite, até 3 redirecionamentos (também só
@@ -291,8 +304,8 @@ async fn add(
         let url = uri.to_owned();
         let bytes = tokio::task::spawn_blocking(move || fetch_https(&url, MAX_TORRENT_BYTES))
             .await
-            .map_err(|_| engine("não deu para baixar o .torrent"))?
-            .map_err(|_| engine("não deu para baixar o .torrent"))?;
+            .map_err(|_| engine(&tako_core::i18n::t("downloads.error.fetch_torrent_failed")))?
+            .map_err(|_| engine(&tako_core::i18n::t("downloads.error.fetch_torrent_failed")))?;
         AddTorrent::from_bytes(bytes)
     };
     let listed = session
@@ -403,7 +416,7 @@ fn check_folder(
     }
     if !resume && std::fs::symlink_metadata(folder).is_ok() {
         return Err(DownloadError::Engine(
-            "a pasta do download já existe".into(),
+            tako_core::i18n::t("downloads.error.folder_exists"),
         ));
     }
     if resume && folder.exists() {
@@ -437,7 +450,7 @@ fn prepare_folder(folder: &Path, uri: &str) -> Result<(), DownloadError> {
             Err(e) => Err(e),
         }
     };
-    create().map_err(|_| DownloadError::Engine("não deu para reservar a pasta".into()))
+    create().map_err(|_| DownloadError::Engine(tako_core::i18n::t("downloads.error.reserve_folder_failed")))
 }
 
 fn clear_owner(folder: &Path) {

@@ -513,3 +513,7 @@ use_detected = "Find it automatically"
 exe_set = "{emulator}: {path}"
 by_system_header = "Emulator for each system"
 auto_with = "Automatic ({emulator})"
+
+[settings.system.api_error]
+non_loopback = "Local API can only listen on loopback address (127.0.0.1)"
+bind_failed = "Failed to bind port: {error}"

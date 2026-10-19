@@ -13,22 +13,36 @@ use std::path::{Path, PathBuf};
 /// Id do download no motor.
 pub type EngineId = u64;
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DownloadError {
-    #[error("endereço de download inválido")]
     InvalidUri,
-    #[error("o torrent tem caminhos de arquivo inseguros")]
     UnsafePaths,
-    #[error("faltam {missing} bytes no disco")]
     NoSpace { missing: u64 },
-    #[error("este jogo já tem um download")]
     GameBusy,
-    #[error("este item já está baixando")]
     Duplicate,
-    #[error("download não encontrado")]
     NotFound,
-    #[error("motor de download: {0}")]
     Engine(String),
+}
+
+impl std::error::Error for DownloadError {}
+
+impl std::fmt::Display for DownloadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DownloadError::InvalidUri => write!(f, "{}", crate::i18n::t("downloads.error.invalid_uri")),
+            DownloadError::UnsafePaths => write!(f, "{}", crate::i18n::t("downloads.error.unsafe_paths")),
+            DownloadError::NoSpace { missing } => {
+                let m = missing.to_string();
+                write!(f, "{}", crate::i18n::tf("downloads.error.no_space", &[("missing", &m)]))
+            }
+            DownloadError::GameBusy => write!(f, "{}", crate::i18n::t("downloads.error.game_busy")),
+            DownloadError::Duplicate => write!(f, "{}", crate::i18n::t("downloads.error.duplicate")),
+            DownloadError::NotFound => write!(f, "{}", crate::i18n::t("downloads.error.not_found")),
+            DownloadError::Engine(err) => {
+                write!(f, "{}", crate::i18n::tf("downloads.error.engine", &[("error", err)]))
+            }
+        }
+    }
 }
 
 /// O que o motor sabe de um download.
@@ -194,7 +208,7 @@ impl Downloads {
                     Err(_) => false,
                 };
                 if !is_inside_root {
-                    d.state = DownloadState::Failed("pasta fora da raiz de downloads".into());
+                    d.state = DownloadState::Failed(crate::i18n::t("downloads.error.folder_outside_root"));
                 } else if d.state == DownloadState::Downloading {
                     d.state = DownloadState::Paused;
                 }

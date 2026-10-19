@@ -76,12 +76,43 @@ pub enum ApiActionError {
     Other(String),
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum ApiServerError {
-    #[error("API local só pode escutar em endereço de loopback (127.0.0.1)")]
     NonLoopbackAddress,
-    #[error("Falha ao vincular porta: {0}")]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
+}
+
+impl std::error::Error for ApiServerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ApiServerError::NonLoopbackAddress => None,
+            ApiServerError::Io(e) => Some(e),
+        }
+    }
+}
+
+impl From<std::io::Error> for ApiServerError {
+    fn from(err: std::io::Error) -> Self {
+        ApiServerError::Io(err)
+    }
+}
+
+impl std::fmt::Display for ApiServerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ApiServerError::NonLoopbackAddress => {
+                write!(f, "{}", crate::i18n::t("settings.system.api_error.non_loopback"))
+            }
+            ApiServerError::Io(e) => {
+                let err_str = e.to_string();
+                write!(
+                    f,
+                    "{}",
+                    crate::i18n::tf("settings.system.api_error.bind_failed", &[("error", &err_str)])
+                )
+            }
+        }
+    }
 }
 
 /// Configurações da API local.
