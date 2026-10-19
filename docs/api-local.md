@@ -1,6 +1,6 @@
 # API Local de Integração (EXT-002)
 
-O Tako oferece uma API HTTP local para integração com Stream Deck, automações locais, Home Assistant, scripts e o Console Mode.
+O Tako oferece uma API HTTP local para integração com Stream Deck, automações locais, Home Assistant, scripts e o Console Mode (ADR-0033).
 
 ## Segurança e Privacidade
 
@@ -9,6 +9,14 @@ O Tako oferece uma API HTTP local para integração com Stream Deck, automaçõe
 - **Autenticação obrigatória:** Todas as requisições exigem um token enviado no cabeçalho `Authorization: Bearer <token>`.
 - O token é gerado localmente na primeira ativação e pode ser consultado ou regenerado a qualquer momento em:
   **Configurações > Sistema > Integrações > API local**.
+- **Backup e exportação:** O token (`LocalApiToken`) é um segredo local do dispositivo e **não é incluído em backups nem exportações**. A ativação da API (`LocalApiEnabled`) **não é importada como consentimento** ao restaurar um backup em outra máquina (CLOUD-001).
+
+## Ciclo de Vida e Interface
+
+- A API local é executada dentro do processo da interface do Tako (`tako-ui`).
+- **A API só responde enquanto a interface estiver aberta:**
+  - No **modo desktop**, a interface permanece aberta ou minimizada durante o jogo, portanto a API continua ativa e reportando o estado da sessão.
+  - No **modo de tela cheia (Big Picture)**, a interface do Tako fecha durante a execução do jogo para liberar recursos da GPU e restaurar a supervisão (ADR-0026, ADR-0027). Durante esse período, a API local fica temporariamente indisponível e volta a responder quando o jogo encerra e a interface reabre.
 
 ## Configuração
 
@@ -57,7 +65,7 @@ Também é aceito no caminho `/api/v1/library`.
 
 ### 2. Consultar o estado atual (jogo aberto ou não)
 
-Informa se existe algum jogo aberto no momento, qual é o jogo e quando a sessão começou.
+Informa se existe algum jogo aberto no momento, qual é o jogo e quando a sessão começou (timestamp UTC real de início).
 
 ```bash
 curl -X GET http://127.0.0.1:47774/api/v1/state \
@@ -84,6 +92,8 @@ curl -X GET http://127.0.0.1:47774/api/v1/state \
   "running_game": null
 }
 ```
+
+Também é aceito no caminho `/api/v1/status`.
 
 ---
 
@@ -143,6 +153,12 @@ Se o ID não existir na biblioteca:
 
 ## Erros comuns
 
+- **`400 Bad Request`:** Requisição mal formatada ou percent-encoding inválido no caminho.
+  ```json
+  {
+    "error": "Invalid percent-encoding"
+  }
+  ```
 - **`401 Unauthorized`:** Token ausente ou inválido no cabeçalho `Authorization: Bearer`.
   ```json
   {
@@ -159,5 +175,17 @@ Se o ID não existir na biblioteca:
   ```json
   {
     "error": "Method not allowed"
+  }
+  ```
+- **`429 Too Many Requests`:** Excesso de conexões simultâneas locais.
+  ```json
+  {
+    "error": "Too many concurrent connections"
+  }
+  ```
+- **`503 Service Unavailable`:** A interface gráfica está indisponível para receber comandos ou a API foi encerrada.
+  ```json
+  {
+    "error": "Interface unavailable"
   }
   ```

@@ -1,12 +1,13 @@
-//! Servidor HTTP local da API de integração (EXT-002, ADR-0030).
+//! Servidor HTTP local da API de integração (EXT-002, ADR-0033).
 //!
 //! Escuta apenas em `127.0.0.1`, exige autenticação `Bearer <token>` e expõe leitura da biblioteca,
 //! estado de execução e ações para abrir e jogar jogos.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
@@ -14,6 +15,34 @@ pub const API_ENABLED: &str = "LocalApiEnabled";
 pub const API_PORT: &str = "LocalApiPort";
 pub const API_TOKEN: &str = "LocalApiToken";
 pub const DEFAULT_PORT: u16 = 47774;
+
+pub const MAX_CONCURRENT_CONNECTIONS: usize = 16;
+pub const MAX_REQUEST_LINE_BYTES: usize = 8192;
+pub const MAX_HEADER_LINE_BYTES: usize = 4096;
+pub const MAX_HEADERS_TOTAL_BYTES: usize = 16384;
+pub const READ_TIMEOUT: Duration = Duration::from_secs(5);
+pub const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Chaves de configuração que NÃO podem entrar em backup ou exportação (segredos locais do dispositivo).
+pub const BACKUP_EXCLUDED_SETTINGS: &[&str] = &[API_TOKEN];
+
+/// Chaves de configuração que NÃO podem ser importadas como consentimento do usuário (opt-in estrito).
+pub const IMPORT_EXCLUDED_SETTINGS: &[&str] = &[API_TOKEN, API_ENABLED];
+
+/// Diz se uma chave de configuração da API deve ser excluída de backups/exportações (CLOUD-001 / PR #137).
+pub fn is_backup_excluded(key: &str) -> bool {
+    BACKUP_EXCLUDED_SETTINGS.contains(&key)
+}
+
+/// Diz se uma chave de configuração não pode ser restaurada/importada como consentimento (CLOUD-001 / PR #137).
+pub fn is_import_excluded(key: &str) -> bool {
+    IMPORT_EXCLUDED_SETTINGS.contains(&key)
+}
+
+/// Valida se uma string é um token de API válido (32 caracteres hexadecimais).
+pub fn is_valid_token(token: &str) -> bool {
+    token.len() == 32 && token.chars().all(|c| c.is_ascii_hexdigit())
+}
 
 /// Um jogo exposto pela API de leitura.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,6 +75,8 @@ pub struct ApiGameState {
 pub enum ApiActionError {
     #[error("Game not found")]
     NotFound,
+    #[error("Interface unavailable")]
+    Unavailable,
     #[error("{0}")]
     Other(String),
 }
@@ -84,10 +115,6 @@ pub fn generate_token() -> String {
 /// Contrato para quem provê os dados e executa as ações da API.
 ///
 /// Mantém `tako-core` desacoplado da UI e do SO.
-///
-/// Ponto de ligação com EXT-001:
-/// Quando `session::events` estiver disponível, o provedor poderá atualizar o estado
-/// automaticamente através dos eventos `GameStarting`, `GameStarted` e `GameExited`.
 pub trait ApiHandler: Send + Sync + 'static {
     fn list_games(&self) -> Vec<ApiGame>;
     fn game_state(&self) -> ApiGameState;
@@ -95,11 +122,19 @@ pub trait ApiHandler: Send + Sync + 'static {
     fn play_game(&self, id: &str) -> Result<(), ApiActionError>;
 }
 
+struct ActiveStreams {
+    next_id: u64,
+    map: HashMap<u64, TcpStream>,
+}
+
 /// Controle do servidor HTTP em execução.
 pub struct ServerHandle {
     addr: SocketAddr,
     running: Arc<AtomicBool>,
+    generation: Arc<AtomicU64>,
     token: Arc<RwLock<String>>,
+    active_streams: Arc<Mutex<ActiveStreams>>,
+    active_conns: Arc<AtomicUsize>,
     thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
@@ -116,16 +151,28 @@ impl ServerHandle {
         self.running.load(Ordering::Relaxed)
     }
 
+    pub fn active_connections(&self) -> usize {
+        self.active_conns.load(Ordering::Relaxed)
+    }
+
     pub fn set_token(&self, new_token: String) {
         if let Ok(mut t) = self.token.write() {
             *t = new_token;
+            self.generation.fetch_add(1, Ordering::SeqCst);
         }
     }
 
     pub fn stop(&self) {
-        if self.running.swap(false, Ordering::Relaxed) {
+        if self.running.swap(false, Ordering::SeqCst) {
+            self.generation.fetch_add(1, Ordering::SeqCst);
+            // Encerra imediatamente conexões ativas para destravar workers sem travar a UI
+            if let Ok(mut streams) = self.active_streams.lock() {
+                for (_, s) in streams.map.drain() {
+                    let _ = s.shutdown(std::net::Shutdown::Both);
+                }
+            }
             // Conecta localmente para destravar o accept() bloqueante
-            let _ = TcpStream::connect_timeout(&self.addr, Duration::from_millis(100));
+            let _ = TcpStream::connect_timeout(&self.addr, Duration::from_millis(50));
             if let Ok(mut lock) = self.thread.lock()
                 && let Some(handle) = lock.take()
             {
@@ -158,26 +205,87 @@ pub fn start_server<H: ApiHandler>(
     let listener = TcpListener::bind(socket_addr)?;
     let actual_addr = listener.local_addr()?;
     let running = Arc::new(AtomicBool::new(true));
+    let generation = Arc::new(AtomicU64::new(1));
     let token_holder = Arc::new(RwLock::new(token));
+    let active_streams = Arc::new(Mutex::new(ActiveStreams {
+        next_id: 1,
+        map: HashMap::new(),
+    }));
+    let active_conns = Arc::new(AtomicUsize::new(0));
 
     let run_flag = running.clone();
+    let gen_flag = generation.clone();
     let token_ref = token_holder.clone();
+    let streams_ref = active_streams.clone();
+    let conns_ref = active_conns.clone();
 
     let thread_handle = std::thread::Builder::new()
         .name("tako-api".into())
         .spawn(move || {
-            // Aceita conexões até que running seja falso
             while run_flag.load(Ordering::Relaxed) {
                 match listener.accept() {
-                    Ok((stream, _)) => {
+                    Ok((mut stream, _)) => {
                         if !run_flag.load(Ordering::Relaxed) {
                             break;
                         }
+                        let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
+                        let _ = stream.set_write_timeout(Some(WRITE_TIMEOUT));
+
+                        if conns_ref.load(Ordering::Relaxed) >= MAX_CONCURRENT_CONNECTIONS {
+                            let _ = send_response(
+                                &mut stream,
+                                429,
+                                "Too Many Requests",
+                                r#"{"error":"Too many concurrent connections"}"#,
+                            );
+                            continue;
+                        }
+
+                        conns_ref.fetch_add(1, Ordering::Relaxed);
+
+                        let stream_id = if let Ok(mut streams) = streams_ref.lock() {
+                            let id = streams.next_id;
+                            streams.next_id = streams.next_id.wrapping_add(1);
+                            if let Ok(cloned) = stream.try_clone() {
+                                streams.map.insert(id, cloned);
+                                Some(id)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
                         let h = handler.clone();
                         let t = token_ref.clone();
-                        // Trata a requisição (leitura e resposta)
+                        let r = run_flag.clone();
+                        let g = gen_flag.clone();
+                        let conn_gen = gen_flag.load(Ordering::SeqCst);
+                        let s_map = streams_ref.clone();
+                        let c_counter = conns_ref.clone();
+
                         std::thread::spawn(move || {
-                            let _ = handle_connection(stream, h, t);
+                            struct ConnGuard {
+                                id: Option<u64>,
+                                streams: Arc<Mutex<ActiveStreams>>,
+                                conns: Arc<AtomicUsize>,
+                            }
+                            impl Drop for ConnGuard {
+                                fn drop(&mut self) {
+                                    self.conns.fetch_sub(1, Ordering::Relaxed);
+                                    if let Some(id) = self.id
+                                        && let Ok(mut s) = self.streams.lock()
+                                    {
+                                        s.map.remove(&id);
+                                    }
+                                }
+                            }
+                            let _guard = ConnGuard {
+                                id: stream_id,
+                                streams: s_map,
+                                conns: c_counter,
+                            };
+                            let _ = handle_connection(stream, h, t, r, g, conn_gen);
                         });
                     }
                     Err(_) => {
@@ -193,24 +301,82 @@ pub fn start_server<H: ApiHandler>(
     Ok(ServerHandle {
         addr: actual_addr,
         running,
+        generation,
         token: token_holder,
+        active_streams,
+        active_conns,
         thread: Mutex::new(Some(thread_handle)),
     })
+}
+
+#[derive(Debug)]
+enum ReadLineError {
+    Io(std::io::Error),
+    TooLarge,
+}
+
+fn read_line_limited<R: BufRead>(
+    reader: &mut R,
+    max_bytes: usize,
+) -> Result<Option<String>, ReadLineError> {
+    let mut buf = Vec::new();
+    loop {
+        let (done, used) = {
+            let available = match reader.fill_buf() {
+                Ok(n) => n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(ReadLineError::Io(e)),
+            };
+            if available.is_empty() {
+                if buf.is_empty() {
+                    return Ok(None);
+                }
+                break;
+            }
+            match available.iter().position(|&b| b == b'\n') {
+                Some(pos) => (true, pos + 1),
+                None => (false, available.len()),
+            }
+        };
+        if buf.len() + used > max_bytes {
+            return Err(ReadLineError::TooLarge);
+        }
+        let available = reader.fill_buf().map_err(ReadLineError::Io)?;
+        buf.extend_from_slice(&available[..used]);
+        reader.consume(used);
+        if done {
+            break;
+        }
+    }
+    let s = String::from_utf8(buf)
+        .map_err(|e| ReadLineError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e)))?;
+    Ok(Some(s))
 }
 
 fn handle_connection<H: ApiHandler>(
     mut stream: TcpStream,
     handler: Arc<H>,
     token_holder: Arc<RwLock<String>>,
+    run_flag: Arc<AtomicBool>,
+    gen_flag: Arc<AtomicU64>,
+    conn_gen: u64,
 ) -> std::io::Result<()> {
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
+    let cloned_stream = stream.try_clone()?;
+    let mut reader = BufReader::new(cloned_stream);
 
-    let mut reader = BufReader::new(stream.try_clone()?);
-    let mut request_line = String::new();
-    if reader.read_line(&mut request_line)? == 0 {
-        return Ok(());
-    }
+    let request_line = match read_line_limited(&mut reader, MAX_REQUEST_LINE_BYTES) {
+        Ok(Some(line)) => line,
+        Ok(None) => return Ok(()),
+        Err(ReadLineError::TooLarge) => {
+            return send_response(
+                &mut stream,
+                414,
+                "URI Too Long",
+                r#"{"error":"Request line too long"}"#,
+            );
+        }
+        Err(ReadLineError::Io(e)) => return Err(e),
+    };
 
     let parts: Vec<&str> = request_line.split_whitespace().collect();
     if parts.len() < 2 {
@@ -224,17 +390,29 @@ fn handle_connection<H: ApiHandler>(
     let method = parts[0];
     let path = parts[1];
 
-    // Lê cabeçalhos (até \r\n vazio ou limite de 16 KB)
+    // Lê cabeçalhos com limites estritos
     let mut auth_header: Option<String> = None;
     let mut total_bytes = 0usize;
     loop {
-        let mut line = String::new();
-        let bytes = reader.read_line(&mut line)?;
-        if bytes == 0 || line == "\r\n" || line == "\n" {
+        let line = match read_line_limited(&mut reader, MAX_HEADER_LINE_BYTES) {
+            Ok(Some(l)) => l,
+            Ok(None) => break,
+            Err(ReadLineError::TooLarge) => {
+                return send_response(
+                    &mut stream,
+                    431,
+                    "Request Header Fields Too Large",
+                    r#"{"error":"Header line too large"}"#,
+                );
+            }
+            Err(ReadLineError::Io(e)) => return Err(e),
+        };
+
+        if line == "\r\n" || line == "\n" {
             break;
         }
-        total_bytes += bytes;
-        if total_bytes > 16 * 1024 {
+        total_bytes += line.len();
+        if total_bytes > MAX_HEADERS_TOTAL_BYTES {
             return send_response(
                 &mut stream,
                 431,
@@ -294,7 +472,33 @@ fn handle_connection<H: ApiHandler>(
             send_response(&mut stream, 200, "OK", &json)
         }
         ("POST", ["api", "v1", "games", raw_id, "open"]) => {
-            let id = decode_path_id(raw_id);
+            let Ok(id) = decode_path_id(raw_id) else {
+                return send_response(
+                    &mut stream,
+                    400,
+                    "Bad Request",
+                    r#"{"error":"Invalid percent-encoding"}"#,
+                );
+            };
+
+            // Revalidação de sessão e geração ativa antes do despacho
+            if !run_flag.load(Ordering::SeqCst) {
+                return send_response(
+                    &mut stream,
+                    503,
+                    "Service Unavailable",
+                    r#"{"error":"Interface unavailable"}"#,
+                );
+            }
+            if gen_flag.load(Ordering::SeqCst) != conn_gen {
+                return send_response(
+                    &mut stream,
+                    401,
+                    "Unauthorized",
+                    r#"{"error":"Unauthorized"}"#,
+                );
+            }
+
             match handler.open_game(&id) {
                 Ok(()) => {
                     let json = serde_json::json!({ "success": true, "id": id }).to_string();
@@ -306,6 +510,12 @@ fn handle_connection<H: ApiHandler>(
                     "Not Found",
                     r#"{"error":"Game not found"}"#,
                 ),
+                Err(ApiActionError::Unavailable) => send_response(
+                    &mut stream,
+                    503,
+                    "Service Unavailable",
+                    r#"{"error":"Interface unavailable"}"#,
+                ),
                 Err(ApiActionError::Other(e)) => {
                     let json = serde_json::json!({ "error": e }).to_string();
                     send_response(&mut stream, 500, "Internal Server Error", &json)
@@ -313,7 +523,33 @@ fn handle_connection<H: ApiHandler>(
             }
         }
         ("POST", ["api", "v1", "games", raw_id, "play"]) => {
-            let id = decode_path_id(raw_id);
+            let Ok(id) = decode_path_id(raw_id) else {
+                return send_response(
+                    &mut stream,
+                    400,
+                    "Bad Request",
+                    r#"{"error":"Invalid percent-encoding"}"#,
+                );
+            };
+
+            // Revalidação de sessão e geração ativa antes do despacho
+            if !run_flag.load(Ordering::SeqCst) {
+                return send_response(
+                    &mut stream,
+                    503,
+                    "Service Unavailable",
+                    r#"{"error":"Interface unavailable"}"#,
+                );
+            }
+            if gen_flag.load(Ordering::SeqCst) != conn_gen {
+                return send_response(
+                    &mut stream,
+                    401,
+                    "Unauthorized",
+                    r#"{"error":"Unauthorized"}"#,
+                );
+            }
+
             match handler.play_game(&id) {
                 Ok(()) => {
                     let json = serde_json::json!({ "success": true, "id": id }).to_string();
@@ -324,6 +560,12 @@ fn handle_connection<H: ApiHandler>(
                     404,
                     "Not Found",
                     r#"{"error":"Game not found"}"#,
+                ),
+                Err(ApiActionError::Unavailable) => send_response(
+                    &mut stream,
+                    503,
+                    "Service Unavailable",
+                    r#"{"error":"Interface unavailable"}"#,
                 ),
                 Err(ApiActionError::Other(e)) => {
                     let json = serde_json::json!({ "error": e }).to_string();
@@ -348,25 +590,22 @@ fn handle_connection<H: ApiHandler>(
 }
 
 /// Decodifica percent-encoding de um identificador na URL (ex: `steam%3A570` -> `steam:570`).
-fn decode_path_id(raw: &str) -> String {
+/// Retorna `Err(())` se houver sequência inválida ou se o resultado não for UTF-8 válido.
+fn decode_path_id(raw: &str) -> Result<String, ()> {
     let mut bytes = raw.bytes();
     let mut decoded = Vec::new();
     while let Some(b) = bytes.next() {
         if b == b'%' {
-            let Some(hi_byte) = bytes.next() else { break };
-            let Some(lo_byte) = bytes.next() else { break };
-            let Some(hi) = (hi_byte as char).to_digit(16) else {
-                break;
-            };
-            let Some(lo) = (lo_byte as char).to_digit(16) else {
-                break;
-            };
+            let hi_byte = bytes.next().ok_or(())?;
+            let lo_byte = bytes.next().ok_or(())?;
+            let hi = (hi_byte as char).to_digit(16).ok_or(())?;
+            let lo = (lo_byte as char).to_digit(16).ok_or(())?;
             decoded.push((hi * 16 + lo) as u8);
         } else {
             decoded.push(b);
         }
     }
-    String::from_utf8(decoded).unwrap_or_else(|_| raw.to_string())
+    String::from_utf8(decoded).map_err(|_| ())
 }
 
 fn send_response(
@@ -408,6 +647,7 @@ mod tests {
         games: Vec<ApiGame>,
         opened: Mutex<Vec<String>>,
         played: Mutex<Vec<String>>,
+        fail_unavailable: AtomicBool,
     }
 
     impl MockHandler {
@@ -429,6 +669,7 @@ mod tests {
                 ],
                 opened: Mutex::new(Vec::new()),
                 played: Mutex::new(Vec::new()),
+                fail_unavailable: AtomicBool::new(false),
             }
         }
     }
@@ -458,6 +699,9 @@ mod tests {
         }
 
         fn open_game(&self, id: &str) -> Result<(), ApiActionError> {
+            if self.fail_unavailable.load(Ordering::Relaxed) {
+                return Err(ApiActionError::Unavailable);
+            }
             if self.games.iter().any(|g| g.id == id) {
                 self.opened.lock().unwrap().push(id.to_string());
                 Ok(())
@@ -467,6 +711,9 @@ mod tests {
         }
 
         fn play_game(&self, id: &str) -> Result<(), ApiActionError> {
+            if self.fail_unavailable.load(Ordering::Relaxed) {
+                return Err(ApiActionError::Unavailable);
+            }
             if self.games.iter().any(|g| g.id == id) {
                 self.played.lock().unwrap().push(id.to_string());
                 Ok(())
@@ -642,5 +889,166 @@ mod tests {
         } else {
             panic!("Esperado 404");
         }
+    }
+
+    #[test]
+    fn invalid_percent_encoding_returns_400() {
+        let handler = Arc::new(MockHandler::new());
+        let server =
+            start_server(Ipv4Addr::LOCALHOST, 0, "secret".into(), handler.clone()).unwrap();
+        let port = server.port();
+
+        // 1. Percent sem dígitos seguintes (% truncado)
+        let err1 = ureq::post(&format!(
+            "http://127.0.0.1:{port}/api/v1/games/steam%3/open"
+        ))
+        .header("Authorization", "Bearer secret")
+        .send_empty()
+        .unwrap_err();
+        if let ureq::Error::StatusCode(code) = err1 {
+            assert_eq!(code, 400);
+        } else {
+            panic!("Esperado 400 para encoding truncado");
+        }
+
+        // 2. Percent com caracteres hexadecimais inválidos
+        let err2 = ureq::post(&format!(
+            "http://127.0.0.1:{port}/api/v1/games/steam%GG/play"
+        ))
+        .header("Authorization", "Bearer secret")
+        .send_empty()
+        .unwrap_err();
+        if let ureq::Error::StatusCode(code) = err2 {
+            assert_eq!(code, 400);
+        } else {
+            panic!("Esperado 400 para hex inválido");
+        }
+
+        // 3. Percent incompleto no final
+        let err3 = ureq::post(&format!("http://127.0.0.1:{port}/api/v1/games/steam%/open"))
+            .header("Authorization", "Bearer secret")
+            .send_empty()
+            .unwrap_err();
+        if let ureq::Error::StatusCode(code) = err3 {
+            assert_eq!(code, 400);
+        } else {
+            panic!("Esperado 400 para % solitário");
+        }
+
+        // Nenhuma ação foi registrada
+        assert!(handler.opened.lock().unwrap().is_empty());
+        assert!(handler.played.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn unavailable_handler_returns_503() {
+        let handler = Arc::new(MockHandler::new());
+        handler.fail_unavailable.store(true, Ordering::Relaxed);
+        let server =
+            start_server(Ipv4Addr::LOCALHOST, 0, "secret".into(), handler.clone()).unwrap();
+        let port = server.port();
+
+        let err = ureq::post(&format!(
+            "http://127.0.0.1:{port}/api/v1/games/steam:570/open"
+        ))
+        .header("Authorization", "Bearer secret")
+        .send_empty()
+        .unwrap_err();
+        if let ureq::Error::StatusCode(code) = err {
+            assert_eq!(code, 503);
+        } else {
+            panic!("Esperado 503");
+        }
+    }
+
+    #[test]
+    fn token_validation_and_backup_exclusion() {
+        assert!(is_valid_token("0123456789abcdef0123456789abcdef"));
+        assert!(!is_valid_token("curto"));
+        assert!(!is_valid_token("0123456789abcdef0123456789abcdeg")); // 'g' não é hex
+        assert!(!is_valid_token("0123456789abcdef0123456789abcdef0")); // 33 chars
+
+        assert!(is_backup_excluded(API_TOKEN));
+        assert!(!is_backup_excluded(API_ENABLED));
+
+        assert!(is_import_excluded(API_TOKEN));
+        assert!(is_import_excluded(API_ENABLED));
+        assert!(!is_import_excluded(API_PORT));
+    }
+
+    #[test]
+    fn concurrent_connections_are_bounded_at_16() {
+        let handler = Arc::new(MockHandler::new());
+        let server = start_server(Ipv4Addr::LOCALHOST, 0, "secret".into(), handler).unwrap();
+        let port = server.port();
+
+        // Abre 16 conexões simultâneas TCP sem enviar nada (fica no read_line)
+        let mut streams = Vec::new();
+        for _ in 0..MAX_CONCURRENT_CONNECTIONS {
+            let s = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+            streams.push(s);
+        }
+
+        // Aguarda workers registrarem
+        std::thread::sleep(Duration::from_millis(50));
+
+        // A 17ª conexão deve ser rejeitada com 429 Too Many Requests
+        let mut rejected = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        let mut response = String::new();
+        let _ = BufReader::new(&mut rejected).read_line(&mut response);
+        assert!(response.starts_with("HTTP/1.1 429 Too Many Requests"));
+
+        drop(streams);
+    }
+
+    #[test]
+    fn limits_request_line_and_header_sizes() {
+        let handler = Arc::new(MockHandler::new());
+        let server = start_server(Ipv4Addr::LOCALHOST, 0, "secret".into(), handler).unwrap();
+        let port = server.port();
+
+        // 1. Linha de requisição acima de 8 KiB -> 414 URI Too Long
+        let mut stream1 = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        let long_uri = "a".repeat(MAX_REQUEST_LINE_BYTES + 100);
+        let _ = write!(stream1, "GET /{long_uri} HTTP/1.1\r\n\r\n");
+        let mut res1 = String::new();
+        let _ = BufReader::new(&mut stream1).read_line(&mut res1);
+        assert!(res1.starts_with("HTTP/1.1 414 URI Too Long"));
+
+        // 2. Cabeçalhos acima de 16 KiB -> 431 Request Header Fields Too Large
+        let mut stream2 = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        let long_header =
+            "X-Padding: ".to_string() + &"x".repeat(MAX_HEADER_LINE_BYTES + 100) + "\r\n";
+        let _ = write!(stream2, "GET /api/v1/games HTTP/1.1\r\n{long_header}\r\n");
+        let mut res2 = String::new();
+        let _ = BufReader::new(&mut stream2).read_line(&mut res2);
+        assert!(res2.starts_with("HTTP/1.1 431 Request Header Fields Too Large"));
+    }
+
+    #[test]
+    fn server_stop_terminates_active_connections_and_revalidates_dispatch() {
+        let handler = Arc::new(MockHandler::new());
+        let server =
+            start_server(Ipv4Addr::LOCALHOST, 0, "secret".into(), handler.clone()).unwrap();
+        let port = server.port();
+
+        // Conecta e para o servidor
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+        server.stop();
+        assert!(!server.is_running());
+
+        // Escrever na stream conectada antes do stop
+        use std::io::Read;
+        let _ = write!(
+            stream,
+            "POST /api/v1/games/steam:570/play HTTP/1.1\r\nAuthorization: Bearer secret\r\n\r\n"
+        );
+        let mut res = String::new();
+        let _ = BufReader::new(&mut stream).read_to_string(&mut res);
+        assert!(res.is_empty() || res.starts_with("HTTP/1.1 503"));
+        assert!(
+            handler.played.lock().unwrap().is_empty(),
+            "nenhuma ação deve ter sido executada"
+        );
     }
 }

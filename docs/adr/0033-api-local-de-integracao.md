@@ -1,7 +1,7 @@
-# ADR-0030: API local de integração (EXT-002)
+# ADR-0033: API local de integração (EXT-002)
 
-- Status: Aceita
-- Data: 2026-10-18
+- Status: Proposta
+- Data: 2026-10-18 (atualizado em 2026-10-19)
 
 ## Contexto
 
@@ -30,10 +30,16 @@ Implementar a API local de integração com a seguinte especificação:
   externos (`0.0.0.0` ou IPs de interfaces de rede) é expressamente rejeitada.
 - Porta: padrão `47774` (configurável pelo usuário via configuração `LocalApiPort`).
 - Estado padrão: **desligada por padrão** (`LocalApiEnabled = false`). Só sobe a thread de escuta quando habilitada.
+- Limites e proteção contra exaustão de recursos:
+  - Limite de conexões concorrentes ativas (máximo de 16 conexões simultâneas).
+  - Timeouts de leitura e escrita curtos (5 segundos).
+  - Limites de tamanho de buffer: linha de requisição limitada a 8 KiB e cabeçalhos limitados a 16 KiB.
+  - Percent-encoding inválido em identificadores na URL é rejeitado com `400 Bad Request` (sem truncamento silencioso).
 
-### 2. Autenticação e Armazenamento do Token
+### 2. Autenticação, Armazenamento do Token e Ciclo de Vida do Servidor
 - Cada instalação do Tako gera localmente um token de autenticação seguro (32 caracteres hexadecimais aleatórios
   gerados a partir de UUID v4 criptográfico).
+- Validação estrita do token: tokens fora do formato esperado (32 caracteres hexadecimais) são invalidados e regenerados.
 - O token é armazenado no banco local de configurações (`LocalApiToken` na tabela `settings`).
 - Toda requisição HTTP (exceto pre-flight OPTIONS) deve enviar o cabeçalho:
   ```http
@@ -42,13 +48,25 @@ Implementar a API local de integração com a seguinte especificação:
 - Requisições sem cabeçalho `Authorization`, com formato incorreto ou com token inválido recebem `401 Unauthorized`
   com corpo JSON `{"error": "Unauthorized"}`.
 - O usuário pode visualizar o token gerado e regenerá-lo a qualquer momento em Configurações > Sistema > Integrações > API local.
-  A regeneração invalida imediatamente o token antigo.
+  A regeneração invalida imediatamente o token antigo e incrementa a geração do servidor.
+- Ao desligar o servidor ou regenerar o token, conexões já aceitas são encerradas de imediato (`stream.shutdown`)
+  e o despacho de ações revalida a geração/sessão ativa, impedindo que workers remanescentes executem ações após a API ser desligada.
+  O desligamento não bloqueia a interface do usuário.
 
-### 3. Versionamento da API
-- Rotas prefixadas por versão: `/api/v1/...`.
-- Alterações futuras que quebrem compatibilidade utilizarão `/api/v2/...`.
+### 3. Privacidade, Backup e Restauração (Integração com CLOUD-001)
+- O token (`LocalApiToken`) é um segredo local específico do dispositivo: **não pode entrar em backup nem em exportação**.
+- O consentimento de ativação (`LocalApiEnabled`) **não pode ser importado** ao restaurar um backup em outra máquina. O opt-in deve ser feito de forma consciente pelo usuário em cada instalação.
+- Essas chaves são explicitamente marcadas em `tako-core` para exclusão pelo módulo de backup (CLOUD-001 / PR #137).
 
-### 4. Escopo dos Endpoints (v1)
+### 4. Ciclo de Vida da Interface e Eventos de Sessão
+- A API é executada no processo da interface (`tako-ui`).
+- **Disponibilidade:** a API **só responde enquanto a interface estiver aberta**.
+  - No **modo desktop**, a interface permanece aberta ou minimizada durante o jogo, portanto a API continua disponível e informando o estado da sessão.
+  - No **modo de tela cheia (Big Picture)**, por regra arquitetural (ADR-0026 e ADR-0027), a interface fecha durante a execução do jogo para liberar recursos da GPU e restaura a supervisão ao supervisor; a API local fecha junto com a interface e só volta a responder quando a interface reabrir após o término da sessão.
+- **Sincronização de Estado via EXT-001:** o estado de jogos em execução (`running_game`) é sincronizado de forma reativa ouvindo os eventos de sessão de `tako_core::session::events` (`GameStarting`, `GameStarted` e `GameExited`).
+  - O campo `started_at` reflete o timestamp real de início da sessão (`DateTime<Utc>`) recebido no evento, sem resetar a cada chamada ou consulta. Quando o início não for conhecido, o campo é emitido como `null`.
+
+### 5. Escopo dos Endpoints (v1)
 
 #### Leitura
 - `GET /api/v1/games` (ou `/api/v1/library`):
@@ -57,39 +75,39 @@ Implementar a API local de integração com a seguinte especificação:
   ```json
   [
     {
-      "id": "steam:570",
-      "title": "Dota 2",
-      "store": "Steam",
-      "installed": true
+      \"id\": \"steam:570\",
+      \"title\": \"Dota 2\",
+      \"store\": \"Steam\",
+      \"installed\": true
     }
   ]
   ```
 
-- `GET /api/v1/state`:
+- `GET /api/v1/state` (ou `/api/v1/status`):
   Retorna o estado atual de execução do Tako: se há um jogo aberto, qual é o jogo, título e quando iniciou.
   Resposta `200 OK`:
   ```json
   {
-    "is_game_running": true,
-    "running_game": {
-      "id": "steam:570",
-      "title": "Dota 2",
-      "pid": 12345,
-      "started_at": "2026-10-18T20:30:00Z"
+    \"is_game_running\": true,
+    \"running_game\": {
+      \"id\": \"steam:570\",\n      \"title\": \"Dota 2\",
+      \"pid\": 12345,
+      \"started_at\": \"2026-10-18T20:30:00Z\"
     }
   }
   ```
   Se nenhum jogo estiver rodando:
   ```json
   {
-    "is_game_running": false,
-    "running_game": null
+    \"is_game_running\": false,
+    \"running_game\": null
   }
   ```
 
 #### Ações
 - `POST /api/v1/games/:id/open`:
   Abre os detalhes do jogo na interface do Tako e traz a janela para a frente (`raise_current`).
+  - Se a interface estiver inacessível (ex: loop de eventos fechado): `503 Service Unavailable`.
   - Jogo encontrado: `200 OK` `{"success": true, "id": "steam:570"}`.
   - Jogo não encontrado: `404 Not Found` `{"error": "Game not found"}`.
 
@@ -98,13 +116,9 @@ Implementar a API local de integração com a seguinte especificação:
   (`details::primary_action` via `open_link(Link::Game { id, play: true })`). Se o jogo exigir confirmações
   (como aprovação de comandos pré/pós-execução ou seleção de instalador/loja), o diálogo de confirmação é exibido
   na tela do Tako exatamente como na navegação interativa.
+  - Se a interface estiver inacessível: `503 Service Unavailable`.
   - Jogo encontrado: `200 OK` `{"success": true, "id": "steam:570"}`.
   - Jogo não encontrado: `404 Not Found` `{"error": "Game not found"}`.
-
-### 5. Ponto de Ligação para Eventos de Sessão (EXT-001)
-- O PR #132 (EXT-001) introduz `tako_core::session::events` com os eventos `GameStarting`, `GameStarted` e `GameExited`.
-- O design da API local isola o estado em um modelo desacoplado (`ApiHandler`), permitindo que a chegada de eventos
-  do EXT-001 atualize o estado de sessão de forma reativa ou exponha endpoints SSE / WebSocket futuros sem refatoração estrutural.
 
 ## Consequências
 
@@ -113,5 +127,7 @@ Implementar a API local de integração com a seguinte especificação:
   - Nenhuma dependência externa adicionada ao workspace: usa `std::net::TcpListener` e `serde_json`.
   - A segurança é garantida por padrão (opt-in explícito, localhost restrito, Bearer token obrigatório).
   - Ações respeitam a política de consentimento do usuário.
+  - Proteção contra DoS local (limite de conexões, timeouts e limites de bytes).
+  - Exclusão do token e de consentimento prévio de backups e exportações.
 - **Negativas:**
-  - Quem usa portas diferentes precisa configurar manualmente caso a porta 47774 já esteja em uso por outro serviço local.
+  - Em modo tela cheia exclusivo, a API fecha enquanto o jogo roda (pois a interface fecha). Caso seja desejada disponibilidade ininterrupta mesmo durante tela cheia, a API precisaria migrar futuramente para o supervisor do Tako.

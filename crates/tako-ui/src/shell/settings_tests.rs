@@ -869,3 +869,34 @@ fn api_settings_panel_toggles_and_regenerates_token() {
     assert_ne!(token1, token2);
     assert!(ctx.toast.is_some());
 }
+
+#[test]
+fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Token com caracteres multi-byte UTF-8 não entra em pânico no preview
+    ctx.settings.set(keys::API_TOKEN, "🦀🎮✨🚀🌟🔥🎉🎯");
+    let rows = rows_of(&ctx, "system");
+    let api_row = find(&rows, "settings.system.api");
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+    let panel_rows = panel.render(&ctx).rows;
+    let token_row = panel_rows.iter().find(|r| r.key == "api-token").unwrap();
+    assert_eq!(token_row.value, "🦀🎮✨🚀🌟🔥🎉🎯…");
+
+    // 2. Token inválido (não-hex) ao ser ativado é regenerado com formato válido (32 hex)
+    ctx.settings.set_bool(keys::API_ENABLED, false);
+    let enabled_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-enabled")
+        .unwrap();
+    for _ in 0..enabled_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    let token = ctx.settings.string(keys::API_TOKEN);
+    assert!(tako_core::api::is_valid_token(&token));
+}

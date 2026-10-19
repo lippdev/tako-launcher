@@ -939,9 +939,9 @@ fn api_panel(ctx: &Ctx) -> MenuLayer {
         let token_preview = if token.is_empty() {
             ctx.t("settings.metadata.not_set")
         } else {
-            format!("{}…", &token[..token.len().min(8)])
+            let prefix: String = token.chars().take(8).collect();
+            format!("{prefix}…")
         };
-
         vec![
             MenuItem::new(
                 PanelRow::toggle("api-enabled", ctx.t("settings.system.api_enabled"), enabled)
@@ -949,7 +949,10 @@ fn api_panel(ctx: &Ctx) -> MenuLayer {
             )
             .on(|ctx| {
                 let on = ctx.settings.toggle(keys::API_ENABLED, false);
-                if on && ctx.settings.string(keys::API_TOKEN).is_empty() {
+                let current_token = ctx.settings.string(keys::API_TOKEN);
+                if on
+                    && (current_token.is_empty() || !tako_core::api::is_valid_token(&current_token))
+                {
                     let token = tako_core::api::generate_token();
                     ctx.settings.set(keys::API_TOKEN, &token);
                 }
@@ -967,7 +970,7 @@ fn api_panel(ctx: &Ctx) -> MenuLayer {
             )
             .on(|ctx| {
                 let mut token = ctx.settings.string(keys::API_TOKEN);
-                if token.is_empty() {
+                if token.is_empty() || !tako_core::api::is_valid_token(&token) {
                     token = tako_core::api::generate_token();
                     ctx.settings.set(keys::API_TOKEN, &token);
                     crate::local_api::sync(ctx);
