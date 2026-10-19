@@ -133,39 +133,130 @@ pub fn tone(cmd: Cmd, volume: u8) -> Vec<f32> {
     base.iter().map(|s| s * mult).collect()
 }
 
-fn load_wav_samples(path: &Path) -> Option<Vec<f32>> {
-    let meta = std::fs::metadata(path).ok()?;
-    if meta.len() == 0 || meta.len() > tako_themes::MAX_THEME_MUSIC_BYTES {
+/// Decodifica um arquivo WAV em Rust puro, convertendo para mono 48 kHz f32.
+/// Suporta PCM de 8, 16, 24 e 32 bits, além de IEEE float de 32 bits.
+/// Não utiliza SDL para garantir execução segura em threads de segundo plano.
+pub fn decode_wav_to_mono_48k(bytes: &[u8]) -> Option<Vec<f32>> {
+    if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
         return None;
     }
-    let wav = AudioSpecWAV::load_wav(path).ok()?;
-    let sdl = sdl3::init().ok()?;
-    let audio = sdl.audio().ok()?;
-    let src_spec = AudioSpec {
-        freq: Some(wav.freq),
-        channels: Some(wav.channels as i32),
-        format: Some(wav.format),
+    let mut offset = 12;
+    let mut fmt_opt: Option<(u16, u16, u32, u16)> = None; // (format, channels, freq, bits)
+    let mut data_opt: Option<(&[u8], usize)> = None;
+
+    while offset + 8 <= bytes.len() {
+        let chunk_id = &bytes[offset..offset + 4];
+        let chunk_size = u32::from_le_bytes([
+            bytes[offset + 4],
+            bytes[offset + 5],
+            bytes[offset + 6],
+            bytes[offset + 7],
+        ]) as usize;
+        offset += 8;
+
+        if chunk_id == b"fmt " {
+            if chunk_size < 16 || offset + 16 > bytes.len() {
+                return None;
+            }
+            let audio_format = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]);
+            let channels = u16::from_le_bytes([bytes[offset + 2], bytes[offset + 3]]);
+            let freq = u32::from_le_bytes([
+                bytes[offset + 4],
+                bytes[offset + 5],
+                bytes[offset + 6],
+                bytes[offset + 7],
+            ]);
+            let bits = u16::from_le_bytes([bytes[offset + 14], bytes[offset + 15]]);
+
+            let effective_fmt = if audio_format == 0xFFFE && chunk_size >= 40 && offset + 26 <= bytes.len() {
+                u16::from_le_bytes([bytes[offset + 24], bytes[offset + 25]])
+            } else {
+                audio_format
+            };
+
+            fmt_opt = Some((effective_fmt, channels, freq, bits));
+        } else if chunk_id == b"data" {
+            let actual_len = chunk_size.min(bytes.len().saturating_sub(offset));
+            data_opt = Some((&bytes[offset..offset + actual_len], actual_len));
+            if fmt_opt.is_some() {
+                break;
+            }
+        }
+
+        offset += chunk_size + (chunk_size & 1);
+    }
+
+    let (format, channels, freq, bits) = fmt_opt?;
+    let (data, data_len) = data_opt?;
+
+    if channels == 0 || channels > 8 || freq == 0 || data_len == 0 {
+        return None;
+    }
+
+    let bytes_per_sample = (bits / 8) as usize;
+    if bytes_per_sample == 0 {
+        return None;
+    }
+    let frame_size = (channels as usize) * bytes_per_sample;
+    let num_frames = data_len / frame_size;
+    if num_frames == 0 {
+        return None;
+    }
+
+    let mut mono_samples = Vec::with_capacity(num_frames);
+    for f in 0..num_frames {
+        let f_bytes = &data[f * frame_size..(f + 1) * frame_size];
+        let mut sum = 0.0f32;
+        for ch in 0..channels as usize {
+            let s = &f_bytes[ch * bytes_per_sample..(ch + 1) * bytes_per_sample];
+            let val = match (format, bits) {
+                (1, 8) => (s[0] as f32 - 128.0) / 128.0,
+                (1, 16) => i16::from_le_bytes([s[0], s[1]]) as f32 / 32768.0,
+                (1, 24) => {
+                    let b = [s[0], s[1], s[2], if s[2] & 0x80 != 0 { 0xFF } else { 0x00 }];
+                    i32::from_le_bytes(b) as f32 / 8388608.0
+                }
+                (1, 32) => i32::from_le_bytes([s[0], s[1], s[2], s[3]]) as f32 / 2147483648.0,
+                (3, 32) => f32::from_le_bytes([s[0], s[1], s[2], s[3]]),
+                _ => return None,
+            };
+            sum += val;
+        }
+        mono_samples.push((sum / channels as f32).clamp(-1.0, 1.0));
+    }
+
+    const TARGET_FREQ: u32 = 48_000;
+    const MAX_NAV_SAMPLES: usize = TARGET_FREQ as usize * 2; // máx 2 segundos
+
+    let out = if freq == TARGET_FREQ {
+        mono_samples
+    } else {
+        let ratio = freq as f64 / TARGET_FREQ as f64;
+        let target_len = ((mono_samples.len() as f64) / ratio).round() as usize;
+        let mut resampled = Vec::with_capacity(target_len);
+        for i in 0..target_len {
+            let src_idx = (i as f64) * ratio;
+            let idx0 = (src_idx.floor() as usize).min(mono_samples.len() - 1);
+            let idx1 = (idx0 + 1).min(mono_samples.len() - 1);
+            let frac = (src_idx - idx0 as f64) as f32;
+            resampled.push(mono_samples[idx0] * (1.0 - frac) + mono_samples[idx1] * frac);
+        }
+        resampled
     };
-    let dst_spec = AudioSpec {
-        freq: Some(48_000),
-        channels: Some(1),
-        format: Some(AudioFormat::f32_sys()),
-    };
-    let mut converter = audio.new_stream(Some(&src_spec), Some(&dst_spec)).ok()?;
-    converter.put_data(wav.buffer()).ok()?;
-    converter.flush().ok()?;
-    let avail = converter.available_bytes().ok()?;
-    if avail <= 0 {
+
+    if out.is_empty() || out.len() > MAX_NAV_SAMPLES {
         return None;
     }
-    let count = (avail as usize) / std::mem::size_of::<f32>();
-    const MAX_NAV_SAMPLES: usize = 48_000 * 2; // máx 2 segundos
-    if count > MAX_NAV_SAMPLES {
-        return None;
-    }
-    let mut out = vec![0.0f32; count];
-    converter.read_f32_samples(&mut out).ok()?;
+
     Some(out)
+}
+
+fn load_wav_samples(path: &Path) -> Option<Vec<f32>> {
+    let bytes = std::fs::read(path).ok()?;
+    if bytes.is_empty() || bytes.len() > tako_themes::MAX_THEME_MUSIC_BYTES as usize {
+        return None;
+    }
+    decode_wav_to_mono_48k(&bytes)
 }
 
 thread_local! {
@@ -291,6 +382,16 @@ pub struct MusicPlayer {
     pub current_gain: f32,
     last_tick: Option<Instant>,
     failed_open_at: Option<Instant>,
+    pub failed_path: Option<PathBuf>,
+}
+
+fn format_sample_bytes(fmt: AudioFormat) -> usize {
+    match fmt {
+        AudioFormat::U8 | AudioFormat::S8 => 1,
+        AudioFormat::S16LE | AudioFormat::S16BE => 2,
+        AudioFormat::S32LE | AudioFormat::S32BE | AudioFormat::F32LE | AudioFormat::F32BE => 4,
+        _ => 2,
+    }
 }
 
 impl MusicPlayer {
@@ -304,6 +405,7 @@ impl MusicPlayer {
             current_gain: 0.0,
             last_tick: None,
             failed_open_at: None,
+            failed_path: None,
         }
     }
 
@@ -319,6 +421,7 @@ impl MusicPlayer {
             self.cursor = 0;
             self.current_gain = 0.0;
             self.failed_open_at = None;
+            self.failed_path = None;
         }
     }
 
@@ -347,6 +450,32 @@ impl MusicPlayer {
             .map_err(|e| e.to_string())
     }
 
+    fn feed_stream(cursor: &mut usize, stream: &AudioStreamOwner, music: &DecodedMusic) {
+        if music.buffer.is_empty() {
+            return;
+        }
+        let queued = stream.queued_bytes().unwrap_or(0);
+        const TARGET_QUEUED_BYTES: i32 = 65_536;
+        const CHUNK_SIZE: usize = 32_768;
+        let frame_bytes = (music.channels as usize).max(1) * format_sample_bytes(music.format);
+        let aligned_chunk = (CHUNK_SIZE - (CHUNK_SIZE % frame_bytes)).max(frame_bytes);
+        if queued < TARGET_QUEUED_BYTES {
+            let remaining = music.buffer.len() - *cursor;
+            let mut chunk_size = aligned_chunk.min(remaining);
+            chunk_size -= chunk_size % frame_bytes;
+            if chunk_size == 0 {
+                *cursor = 0;
+            } else {
+                let chunk = &music.buffer[*cursor..*cursor + chunk_size];
+                let _ = stream.put_data(chunk);
+                *cursor += chunk_size;
+                if *cursor >= music.buffer.len() {
+                    *cursor = 0;
+                }
+            }
+        }
+    }
+
     pub fn tick(
         &mut self,
         ctx: &Ctx,
@@ -367,14 +496,17 @@ impl MusicPlayer {
                 Ok(Ok(decoded)) => {
                     self.music_data = Some(decoded);
                     self.loading_rx = None;
+                    self.failed_path = None;
                 }
                 Ok(Err(e)) => {
                     tracing::warn!("música do tema: falha ao carregar WAV: {e}");
                     self.loading_rx = None;
+                    self.failed_path = self.music_path.clone();
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {}
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.loading_rx = None;
+                    self.failed_path = self.music_path.clone();
                 }
             }
         }
@@ -382,10 +514,11 @@ impl MusicPlayer {
         let can_play = music_allowed(ctx, is_big_picture, window_focused, window_minimized);
 
         if can_play && self.music_path.is_some() {
-            // Carrega em thread de fundo apenas quando for tocar
+            // Carrega em thread de fundo apenas quando for tocar e não tiver falhado para este caminho
             if self.music_data.is_none()
                 && self.loading_rx.is_none()
                 && let Some(path) = self.music_path.clone()
+                && self.failed_path.as_ref() != Some(&path)
             {
                 let (tx, rx) = channel();
                 self.loading_rx = Some(rx);
@@ -439,22 +572,8 @@ impl MusicPlayer {
                 let _ = stream.set_gain(self.current_gain);
                 let _ = stream.resume();
 
-                if let Some(music) = &self.music_data
-                    && !music.buffer.is_empty()
-                {
-                    let queued = stream.queued_bytes().unwrap_or(0);
-                    const TARGET_QUEUED_BYTES: i32 = 65_536;
-                    const CHUNK_SIZE: usize = 32_768;
-                    if queued < TARGET_QUEUED_BYTES {
-                        let remaining = music.buffer.len() - self.cursor;
-                        let chunk_size = CHUNK_SIZE.min(remaining);
-                        let chunk = &music.buffer[self.cursor..self.cursor + chunk_size];
-                        let _ = stream.put_data(chunk);
-                        self.cursor += chunk_size;
-                        if self.cursor >= music.buffer.len() {
-                            self.cursor = 0;
-                        }
-                    }
+                if let Some(music) = &self.music_data {
+                    Self::feed_stream(&mut self.cursor, stream, music);
                 }
             }
         } else {
@@ -462,17 +581,23 @@ impl MusicPlayer {
                 self.current_gain = (self.current_gain - dt / FADE_OUT_TIME).max(0.0);
                 if let Some(stream) = &self.stream {
                     let _ = stream.set_gain(self.current_gain);
+                    let _ = stream.resume();
+
+                    // Continua enfileirando blocos durante o fade-out
+                    if let Some(music) = &self.music_data {
+                        Self::feed_stream(&mut self.cursor, stream, music);
+                    }
                 }
             }
-            if self.current_gain == 0.0
-                && let Some(stream) = self.stream.take()
-            {
-                let _ = stream.pause();
-                let _ = stream.clear();
-            }
-            // Quando a música para (ex.: jogo iniciado ou perdendo foco), recomeça do início
-            if !can_play {
-                self.cursor = 0;
+            if self.current_gain == 0.0 {
+                if let Some(stream) = self.stream.take() {
+                    let _ = stream.pause();
+                    let _ = stream.clear();
+                }
+                // Quando a música para de vez, recomeça do início
+                if !can_play {
+                    self.cursor = 0;
+                }
             }
         }
     }
@@ -776,5 +901,140 @@ mod tests {
             assert!(samples.iter().any(|s| s.abs() > 0.1));
             assert!(tone(cmd, 0).iter().all(|s| *s == 0.));
         }
+    }
+    #[test]
+    fn pure_wav_decoder_supports_pcm_and_float_formats() {
+        fn make_wav(format: u16, channels: u16, freq: u32, bits: u16, data: &[u8]) -> Vec<u8> {
+            let data_len = data.len() as u32;
+            let riff_size = 36 + data_len;
+            let byte_rate = freq * channels as u32 * (bits as u32 / 8);
+            let block_align = channels * (bits / 8);
+
+            let mut v = Vec::new();
+            v.extend_from_slice(b"RIFF");
+            v.extend_from_slice(&riff_size.to_le_bytes());
+            v.extend_from_slice(b"WAVE");
+            v.extend_from_slice(b"fmt ");
+            v.extend_from_slice(&16u32.to_le_bytes());
+            v.extend_from_slice(&format.to_le_bytes());
+            v.extend_from_slice(&channels.to_le_bytes());
+            v.extend_from_slice(&freq.to_le_bytes());
+            v.extend_from_slice(&byte_rate.to_le_bytes());
+            v.extend_from_slice(&block_align.to_le_bytes());
+            v.extend_from_slice(&bits.to_le_bytes());
+            v.extend_from_slice(b"data");
+            v.extend_from_slice(&data_len.to_le_bytes());
+            v.extend_from_slice(data);
+            v
+        }
+
+        // 1. PCM 8-bit mono, 48 kHz
+        let pcm8_data = [128u8, 255u8, 0u8, 128u8];
+        let wav8 = make_wav(1, 1, 48000, 8, &pcm8_data);
+        let decoded8 = decode_wav_to_mono_48k(&wav8).expect("failed pcm 8-bit");
+        assert_eq!(decoded8.len(), 4);
+        assert!((decoded8[0] - 0.0).abs() < 0.01);
+        assert!((decoded8[1] - 0.99).abs() < 0.02);
+        assert!((decoded8[2] - (-1.0)).abs() < 0.02);
+
+        // 2. PCM 16-bit stereo, 44.1 kHz -> resampled to 48 kHz
+        let mut pcm16_data = Vec::new();
+        for _ in 0..4410 {
+            let left: i16 = 16384;  // ~0.5
+            let right: i16 = 16384; // ~0.5
+            pcm16_data.extend_from_slice(&left.to_le_bytes());
+            pcm16_data.extend_from_slice(&right.to_le_bytes());
+        }
+        let wav16 = make_wav(1, 2, 44100, 16, &pcm16_data);
+        let decoded16 = decode_wav_to_mono_48k(&wav16).expect("failed pcm 16-bit");
+        assert!((decoded16.len() as i32 - 4800).abs() <= 2);
+        assert!((decoded16[100] - 0.5).abs() < 0.01);
+
+        // 3. PCM 24-bit mono, 48 kHz
+        let val24 = 0x400000i32;
+        let bytes24 = val24.to_le_bytes();
+        let wav24 = make_wav(1, 1, 48000, 24, &bytes24[0..3]);
+        let decoded24 = decode_wav_to_mono_48k(&wav24).expect("failed pcm 24-bit");
+        assert_eq!(decoded24.len(), 1);
+        assert!((decoded24[0] - 0.5).abs() < 0.01);
+
+        // 4. PCM 32-bit mono, 48 kHz
+        let val32 = 1073741824i32; // 0.5
+        let wav32 = make_wav(1, 1, 48000, 32, &val32.to_le_bytes());
+        let decoded32 = decode_wav_to_mono_48k(&wav32).expect("failed pcm 32-bit");
+        assert_eq!(decoded32.len(), 1);
+        assert!((decoded32[0] - 0.5).abs() < 0.01);
+
+        // 5. IEEE Float 32-bit mono, 48 kHz
+        let val_f32 = 0.75f32;
+        let wav_f32 = make_wav(3, 1, 48000, 32, &val_f32.to_le_bytes());
+        let decoded_f32 = decode_wav_to_mono_48k(&wav_f32).expect("failed float 32-bit");
+        assert_eq!(decoded_f32.len(), 1);
+        assert!((decoded_f32[0] - 0.75).abs() < 0.001);
+
+        // 6. Over 2 seconds -> returns None
+        let long_data = vec![0u8; 48000 * 2 * 2 + 100];
+        let wav_long = make_wav(1, 1, 48000, 16, &long_data);
+        assert!(decode_wav_to_mono_48k(&wav_long).is_none());
+
+        // 7. Invalid header -> returns None
+        assert!(decode_wav_to_mono_48k(b"NOT_A_WAV").is_none());
+    }
+
+    #[test]
+    fn invalid_music_caches_failed_path_and_prevents_retry_loops() {
+        let mut player = MusicPlayer::new();
+        let bad_path = PathBuf::from("/path/to/bad/music.wav");
+        player.music_path = Some(bad_path.clone());
+        assert_eq!(player.failed_path, None);
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        player.loading_rx = Some(rx);
+        tx.send(Err("arquivo corrompido".into())).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let (_guard, ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let t0 = Instant::now();
+        player.tick(&ctx, true, true, false, t0);
+
+        assert!(player.loading_rx.is_none());
+        assert_eq!(player.failed_path, Some(bad_path.clone()));
+
+        let t1 = t0 + Duration::from_millis(16);
+        player.tick(&ctx, true, true, false, t1);
+        assert!(player.loading_rx.is_none());
+
+        player.set_theme_music(Some(PathBuf::from("/path/to/new_music.wav")));
+        assert_eq!(player.failed_path, None);
+    }
+
+    #[test]
+    fn fade_out_continues_enqueuing_blocks_while_gain_above_zero() {
+        let mut player = MusicPlayer::new();
+        let dir = tempfile::tempdir().unwrap();
+        let (_guard, ctx) = crate::metadata::test_ctx(dir.path(), false);
+
+        let buf = vec![0u8; 65536];
+        player.music_data = Some(DecodedMusic {
+            freq: 44100,
+            format: AudioFormat::S16LE,
+            channels: 2,
+            buffer: Arc::from(buf),
+        });
+        player.current_gain = 1.0;
+        player.cursor = 1000;
+
+        let t0 = Instant::now();
+        let t1 = t0 + Duration::from_millis(200);
+        player.last_tick = Some(t0);
+        player.tick(&ctx, false, false, false, t1);
+
+        assert!(player.current_gain > 0.0);
+        assert_eq!(player.cursor, 1000);
+
+        let t2 = t1 + Duration::from_millis(700);
+        player.tick(&ctx, false, false, false, t2);
+        assert_eq!(player.current_gain, 0.0);
+        assert_eq!(player.cursor, 0);
     }
 }
