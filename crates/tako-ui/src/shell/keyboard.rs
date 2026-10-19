@@ -206,7 +206,7 @@ impl Layer for KeyboardLayer {
         let valid = self
             .check
             .as_ref()
-            .map_or(true, |c| c(ctx, &self.text).is_none());
+            .is_none_or(|c| c(ctx, &self.text).is_none());
         Overlay {
             kind: "keyboard".into(),
             title: self.title.clone(),
@@ -226,7 +226,7 @@ impl Layer for KeyboardLayer {
         let valid = self
             .check
             .as_ref()
-            .map_or(true, |c| c(ctx, &self.text).is_none());
+            .is_none_or(|c| c(ctx, &self.text).is_none());
         let mut hints = vec![
             ctx.hint(Cmd::Accept, &ctx.t("keyboard.type")),
             ctx.hint(Cmd::Favorite, &ctx.t("keyboard.delete")),

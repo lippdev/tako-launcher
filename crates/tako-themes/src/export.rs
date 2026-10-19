@@ -98,12 +98,10 @@ pub fn export_theme_with_override(
                     found_src = Some(candidate);
                 }
             }
-            if found_src.is_none() {
-                if let Some(od) = override_dir {
-                    let candidate = od.join(bg_file);
-                    if candidate.is_file() {
-                        found_src = Some(candidate);
-                    }
+            if let (None, Some(od)) = (&found_src, override_dir) {
+                let candidate = od.join(bg_file);
+                if candidate.is_file() {
+                    found_src = Some(candidate);
                 }
             }
             if found_src.is_none() {

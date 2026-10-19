@@ -734,12 +734,13 @@ pub(crate) fn edit_theme_panel(ctx: &mut Ctx) -> MenuLayer {
     let theme_id = tako_themes::selected(&ctx.paths.themes());
     let expected_dir =
         tako_themes::overrides::override_dir(&ctx.paths.themes(), theme_id.as_deref());
-    if let Some(ref d) = ctx.theme_draft {
-        if let Some(ref dir) = d.draft_dir {
-            if dir != &expected_dir {
-                ctx.discard_theme_draft();
-            }
-        }
+    let foreign = ctx
+        .theme_draft
+        .as_ref()
+        .and_then(|d| d.draft_dir.as_ref())
+        .is_some_and(|dir| dir != &expected_dir);
+    if foreign {
+        ctx.discard_theme_draft();
     }
     build_theme_editor_panel(ctx, ThemeEditorMode::OverrideCurrent)
 }
@@ -1764,9 +1765,7 @@ pub(crate) fn run_export_theme(
                 .set_file_name(&default_filename)
                 .add_filter(&filter_name, &["takotheme"])
                 .save_file();
-            let Some(dest_path) = picked else {
-                return None;
-            };
+            let dest_path = picked?;
             let ov_tokens = override_draft.or_else(|| {
                 tako_themes::overrides::load_override(&themes_root, Some(&theme_id_owned))
                     .map(|s| tako_themes::overrides::ThemeTokensOverride::from_toml_str(&s))
