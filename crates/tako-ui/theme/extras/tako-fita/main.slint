@@ -256,7 +256,7 @@ component FitaButton inherits Rectangle {
     width: max(52 * Ui.u, content.preferred-width + (label != "" ? 36 * Ui.u : 20 * Ui.u));
     border-radius: 16 * Ui.u;
     border-width: focused ? 2.5 * Ui.u : 1 * Ui.u;
-    border-color: focused ? #F5F7FA : (primary ? #ffffff40 : #ffffff33);
+    border-color: focused ? #F5F7FA : (primary ? #ffffff59 : #ffffff66);
     background: focused ? #F5F7FA : (primary ? #141821f0 : #141821d9);
     animate background, border-color { duration: Ui.focus-time; }
 
@@ -347,14 +347,14 @@ component FitaHome inherits Rectangle {
     }
 
     if !empty: Rectangle {
-        // Scrim dedicado reforçado atrás do bloco de texto para leitura garantida (≥ 4,5:1)
+        // Scrim dedicado atrás do bloco de texto para leitura garantida (≥ 4,5:1),
+        // com gradiente vertical na borda de baixo e sem borda retangular.
         Rectangle {
-            x: 60 * Ui.u;
-            y: 70 * Ui.u;
-            width: min(1000 * Ui.u, parent.width - 120 * Ui.u);
-            height: max(320 * Ui.u, hero-block.preferred-height + 40 * Ui.u);
-            background: @linear-gradient(90deg, #0D0F14f8 0%, #0D0F14d9 65%, transparent 100%);
-            border-radius: 16 * Ui.u;
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: max(380 * Ui.u, hero-block.preferred-height + 140 * Ui.u);
+            background: @linear-gradient(180deg, #0D0F14f8 0%, #0D0F14e6 55%, transparent 100%);
         }
 
         // Destaque Cinematográfico no terço superior/médio
@@ -1072,6 +1072,146 @@ component FitaDetailsPage inherits Rectangle {
     }
 }
 
+component FitaRowView inherits Rectangle {
+    in property <PanelRow> data;
+    in property <bool> focused;
+    callback clicked();
+    callback hovered();
+
+    property <bool> is-header: data.kind == "header";
+    property <color> fg: focused ? #0D0F14 : #FFFFFF;
+    property <color> fg-muted: focused ? #0D0F14a6 : #CBD5E1;
+
+    border-radius: 16 * Ui.u;
+    background: is-header ? transparent : (focused ? #F5F7FA : #14182180);
+    border-width: is-header ? 0 : 1px;
+    border-color: focused ? #F5F7FA : #ffffff14;
+    opacity: data.enabled || is-header ? 1.0 : 0.45;
+    animate background, border-color { duration: Ui.focus-time; }
+
+    drop-shadow-blur: focused && !is-header ? 20 * Ui.u : 0;
+    drop-shadow-color: focused && !is-header ? #ffffff26 : transparent;
+
+    if is-header: Text {
+        x: 16 * Ui.u;
+        y: (parent.height - self.height) / 2;
+        text: data.title;
+        color: #94A3B8;
+        font-size: 13 * Ui.u * Ui.text-scale;
+        font-weight: 700;
+        letter-spacing: 0.12 * 13 * Ui.u;
+        font-family: "Plus Jakarta Sans";
+        vertical-alignment: center;
+    }
+
+    if !is-header: HorizontalLayout {
+        padding-left: 24 * Ui.u;
+        padding-right: 24 * Ui.u;
+        spacing: 16 * Ui.u;
+        alignment: center;
+
+        if data.kind == "radio" || data.kind == "check": Rectangle {
+            width: 24 * Ui.u;
+            height: 24 * Ui.u;
+            y: (parent.height - self.height) / 2;
+            border-radius: data.kind == "radio" ? self.height / 2 : 6 * Ui.u;
+            border-width: 2 * Ui.u;
+            border-color: focused ? #0D0F14 : #94A3B8;
+            Rectangle {
+                width: 12 * Ui.u;
+                height: 12 * Ui.u;
+                border-radius: data.kind == "radio" ? self.height / 2 : 3 * Ui.u;
+                background: focused ? #0D0F14 : #FFFFFF;
+                visible: data.on;
+            }
+        }
+
+        if data.icon != "": Icon {
+            name: data.icon;
+            size: 20 * Ui.u;
+            y: (parent.height - self.height) / 2;
+            tint: fg;
+        }
+
+        if data.image.width > 0: Image {
+            source: data.image;
+            width: 40 * Ui.u;
+            height: 40 * Ui.u;
+            image-fit: contain;
+            y: (parent.height - self.height) / 2;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 4 * Ui.u;
+            horizontal-stretch: 1;
+
+            Text {
+                text: data.title;
+                color: data.style == "danger" && !focused ? #EF4444 : fg;
+                font-size: 16 * Ui.u * Ui.text-scale;
+                font-weight: data.emphasized ? 700 : 600;
+                font-family: "Plus Jakarta Sans";
+                overflow: elide;
+            }
+            if data.description != "": Text {
+                text: data.description;
+                color: fg-muted;
+                font-size: 13 * Ui.u * Ui.text-scale;
+                font-family: "Plus Jakarta Sans";
+                wrap: word-wrap;
+                max-height: 2 * 18 * Ui.u * Ui.text-scale;
+                overflow: elide;
+            }
+        }
+
+        if data.kind == "toggle": Toggle {
+            on: data.on;
+            solid: focused;
+            y: (parent.height - self.height) / 2;
+        }
+
+        if data.value != "" && data.kind != "toggle": Rectangle {
+            y: (parent.height - self.height) / 2;
+            height: 40 * Ui.u;
+            width: pill-lay.preferred-width + 28 * Ui.u;
+            border-radius: 20 * Ui.u;
+            background: focused ? #0D0F141a : #ffffff14;
+            border-width: 1px;
+            border-color: focused ? #0D0F1426 : #ffffff1f;
+
+            pill-lay := HorizontalLayout {
+                padding-left: 14 * Ui.u;
+                padding-right: 14 * Ui.u;
+                spacing: 8 * Ui.u;
+                alignment: center;
+
+                Text {
+                    text: data.value;
+                    color: focused ? #0D0F14 : #FFFFFF;
+                    font-size: 13 * Ui.u * Ui.text-scale;
+                    font-weight: 600;
+                    font-family: "Plus Jakarta Sans";
+                    vertical-alignment: center;
+                }
+
+                if data.kind == "action" || data.kind == "choice": Icon {
+                    name: "chevron";
+                    size: 14 * Ui.u;
+                    tint: focused ? #0D0F14 : #CBD5E1;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+    }
+
+    TouchArea {
+        enabled: !is-header;
+        clicked => { root.clicked(); }
+        changed has-hover => { if (self.has-hover) { root.hovered(); } }
+    }
+}
+
 component FitaSettingsPage inherits Rectangle {
     in property <string> title;
     in property <[NavItem]> categories;
@@ -1084,8 +1224,8 @@ component FitaSettingsPage inherits Rectangle {
     callback hovered(string, int);
 
     property <length> top: 160 * Ui.u;
-    property <length> row-h: max(100 * Ui.u, 100 * Ui.u * Ui.text-scale);
-    property <length> header-h: 60 * Ui.u + 45 * Ui.u * Ui.text-scale;
+    property <length> row-h: max(96 * Ui.u, 96 * Ui.u * Ui.text-scale);
+    property <length> header-h: heading-block.preferred-height + 16 * Ui.u;
     property <length> view-h: self.height - top - Ui.hint-bar - header-h;
     property <int> shown-row;
     init => { shown-row = row-focus; }
@@ -1149,7 +1289,7 @@ component FitaSettingsPage inherits Rectangle {
         width: parent.width - self.x - 80 * Ui.u;
         height: parent.height - top - Ui.hint-bar;
 
-        VerticalLayout {
+        heading-block := VerticalLayout {
             y: 0;
             spacing: 6 * Ui.u;
             alignment: start;
@@ -1170,7 +1310,7 @@ component FitaSettingsPage inherits Rectangle {
         }
 
         Rectangle {
-            y: header-h + 10 * Ui.u;
+            y: header-h;
             height: view-h;
             clip: true;
 
@@ -1178,14 +1318,13 @@ component FitaSettingsPage inherits Rectangle {
                 y: scroll;
                 animate y { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
 
-                for r[i] in rows: RowView {
+                for r[i] in rows: FitaRowView {
                     x: 8 * Ui.u;
                     width: parent.width - 16 * Ui.u;
                     y: i * row-h + 8 * Ui.u;
-                    height: row-h - 16 * Ui.u;
+                    height: r.kind == "header" ? 48 * Ui.u : (row-h - 16 * Ui.u);
                     data: r;
                     focused: i == row-focus;
-                    panel-style: false;
                     clicked => { root.clicked("row", i); }
                     hovered => { root.hovered("row", i); }
                 }
