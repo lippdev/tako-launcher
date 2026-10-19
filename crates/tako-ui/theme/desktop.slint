@@ -28,6 +28,7 @@ import { Ui } from "tokens.slint";
 import { ControlCenter } from "main.slint";
 import { PanelRow, Icon, Toggle } from "widgets.slint";
 import { Icons } from "icons.slint";
+import { Octopus } from "polvo.slint";
 import { Overlay, Overline, OverlayView, Tile } from "overlay.slint";
 
 export { Ui }
@@ -1186,7 +1187,7 @@ component CollectionSelect inherits Rectangle {
     }
 }
 
-// ListaVazia: nunca um painel em branco; o polvo, o porquê e a saída.
+// ListaVazia: nunca um painel em branco; o polvo (BRAND-001, o da abertura), o porquê e a saída.
 component EmptyList inherits VerticalLayout {
     in property <string> title;
     in property <string> text;
@@ -1199,7 +1200,7 @@ component EmptyList inherits VerticalLayout {
     padding-bottom: Ui.space-36;
     HorizontalLayout {
         alignment: center;
-        Image { source: @image-url("tako-mark.png"); width: 72px; height: 72px; opacity: 0.85; accessible-role: none; }
+        Octopus { width: 94px; with-name: false; self-assemble: true; accessible-role: none; }
     }
     Text { text: title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-label-lg; font-weight: 700; horizontal-alignment: center; wrap: word-wrap; }
     if text != "": Text { text: text; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; horizontal-alignment: center; wrap: word-wrap; }
@@ -3108,7 +3109,12 @@ component DeskLibrary inherits Rectangle {
           }
         }
         if !game.has-game && !loading: Rectangle { horizontal-stretch: 1; }
-        if !game.has-game && loading: LoadingStage { horizontal-stretch: 1; small: small; }
+        // Espera (BRAND-001): o polvo no alto da área livre do destaque, fora do layout, sem tirar largura do texto.
+        if !game.has-game && loading: Rectangle {
+            horizontal-stretch: 1;
+            LoadingStage { x: 0; y: 0; width: parent.width; height: parent.height; small: small; }
+            Octopus { x: 0; y: 0; width: 90px; height: 69px; with-name: false; self-assemble: true; accessible-role: none; }
+        }
         if game.has-game: phases := GamePhases {
             horizontal-stretch: 1;
             more: more;
@@ -6516,6 +6522,8 @@ export component Desktop inherits Window {
     in property <string> desk-search-esc;
     in property <string> desk-cancel-label;
     in property <string> desk-toast-undo;
+    // "Bem-vindo de volta": o polvo no lugar do ✓ do aviso (BRAND-001).
+    in property <bool> desk-toast-mascot;
     in property <string> desk-ok-label;
     in property <int> desk-search-focus;
     in property <bool> desk-focus-visible;
@@ -6972,7 +6980,8 @@ export component Desktop inherits Window {
             padding-left: Ui.space-20;
             padding-right: Ui.space-20;
             spacing: 10px;
-            DeskIcon { name: "check"; size: 18px; tint: Ui.success; y: (parent.height - self.height) / 2; }
+            if !desk-toast-mascot: DeskIcon { name: "check"; size: 18px; tint: Ui.success; y: (parent.height - self.height) / 2; }
+            if desk-toast-mascot: Octopus { y: (parent.height - self.height) / 2; width: 34px; with-name: false; self-assemble: true; accessible-role: none; }
             Text { text: toast-shown; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
             // "Desfazer" das ações em lote: texto clicável à direita, sem roubar o foco.
             if desk-toast-undo != "": Rectangle {

@@ -233,6 +233,8 @@ pub struct Ctx {
     pub toast: Option<(String, Instant)>,
     /// "Desfazer" do aviso atual (ações em lote do desktop); some junto com o aviso.
     pub toast_undo: Option<Undo>,
+    /// O aviso atual é o "Bem-vindo de volta": no desktop leva o polvo no lugar do ✓.
+    pub toast_mascot: bool,
     /// Ponteiro sobre o aviso (pílula, "Desfazer"): o tempo fica parado.
     pub toast_hover: [bool; 2],
     pub effects: Vec<Effect>,
@@ -345,8 +347,15 @@ impl Ctx {
         self.app_update.toast_label.clear();
         self.toast = Some((text.into(), Instant::now()));
         self.toast_undo = None;
+        self.toast_mascot = false;
         self.toast_hover = [false; 2];
         self.dirty = true;
+    }
+
+    /// "Bem-vindo de volta" ao fechar o jogo (BRAND-001).
+    pub fn toast_welcome_back(&mut self, text: impl Into<String>) {
+        self.toast(text);
+        self.toast_mascot = true;
     }
 
     /// Aviso com "Desfazer": `undo` volta o que a ação mudou.
