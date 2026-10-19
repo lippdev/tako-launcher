@@ -251,7 +251,14 @@ fn every_row_has_text() {
                     rows: vec![item.row.clone()],
                     ..Default::default()
                 });
-                // Painéis e diálogos que as linhas abrem.
+                // Painéis e diálogos que as linhas abrem. Backup e restauração abrem o seletor de arquivos
+                // do sistema, que no Windows (com área de trabalho no CI) espera um clique para sempre.
+                if matches!(
+                    item.row.key.as_str(),
+                    "settings.system.backup" | "settings.system.restore"
+                ) {
+                    continue;
+                }
                 if let Some(f) = item.accept.clone()
                     && let Flow::Push(l) = f(&mut ctx)
                 {
@@ -878,6 +885,159 @@ fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
     );
     let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
     assert_eq!(volume(&ctx.settings), 65);
+}
+
+#[test]
+fn system_category_includes_backup_and_restore_options() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let rows = rows_of(&ctx, "system");
+    let backup_row = find(&rows, "settings.system.backup");
+    let restore_row = find(&rows, "settings.system.restore");
+
+    assert_eq!(backup_row.row.title, ctx.t("settings.system.backup"));
+    assert_eq!(backup_row.row.value, ctx.t("settings.system.backup_value"));
+    assert_eq!(restore_row.row.title, ctx.t("settings.system.restore"));
+    assert_eq!(
+        restore_row.row.value,
+        ctx.t("settings.system.restore_value")
+    );
+
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path);
+    assert_eq!(dialog.focus, 1, "o foco deve iniciar no botão Cancelar");
+    assert!(!dialog.text.is_empty(), "diálogo deve usar .text(desc)");
+    let items = dialog.render(&ctx);
+    assert_eq!(
+        items.rows[0].title,
+        ctx.t("settings.system.restore_confirm_button")
+    );
+    assert_eq!(items.rows[1].title, ctx.t("common.cancel"));
+}
+
+#[test]
+fn restore_is_blocked_when_game_running_or_scanning() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Bloqueado com jogo rodando
+    ctx.running = Some(crate::shell::RunningGame {
+        id: "steam:123".into(),
+        title: "Test Game".into(),
+        pid: None,
+        started: None,
+    });
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path.clone());
+    // Executa no botão Confirmar (linha 0, agora que a descrição fica em .text(desc))
+    let rows = (dialog.build)(&ctx);
+    let action = rows[0].accept.clone().unwrap();
+    let flow = action(&mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(
+            ctx.t("settings.system.restore_blocked_game_running")
+                .as_str()
+        )
+    );
+
+    // 2. Bloqueado com varredura em andamento
+    ctx.running = None;
+    ctx.scanning = true;
+    let action2 = rows[0].accept.clone().unwrap();
+    let flow2 = action2(&mut ctx);
+    assert!(matches!(flow2, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_blocked_scanning").as_str())
+    );
+}
+
+#[test]
+fn restoring_blocks_play_rescan_restore_and_settings() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    *ctx.found.lock().unwrap() = vec![tako_core::library::Game {
+        id: "test:game1".into(),
+        title: "Test Game".into(),
+        is_installed: true,
+        ..Default::default()
+    }];
+    ctx.library.refresh();
+
+    ctx.restoring = true;
+    ctx.settings.locked = true;
+
+    // 1. Bloqueia jogar
+    let nav = crate::shell::details::primary_action(&mut ctx, "test:game1");
+    assert!(matches!(nav, crate::shell::Nav::Stay));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+    assert!(
+        ctx.effects.is_empty(),
+        "nenhum efeito de jogo deve ser disparado"
+    );
+
+    // 2. Bloqueia varrer
+    ctx.toast = None;
+    ctx.effect(Effect::Rescan);
+    assert!(
+        ctx.effects.is_empty(),
+        "efeito de rescan deve ser bloqueado"
+    );
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+
+    // 3. Bloqueia restaurar
+    ctx.toast = None;
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path);
+    let rows = (dialog.build)(&ctx);
+    let confirm_action = rows[0].accept.clone().unwrap();
+    let flow = confirm_action(&mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+
+    // 4. Bloqueia salvar configurações
+    ctx.toast = None;
+    let toggle_item = super::toggle(&ctx, "settings.system.developer", keys::DEVELOPER, false);
+    let toggle_action = toggle_item.accept.clone().unwrap();
+    let toggle_flow = toggle_action(&mut ctx);
+    assert!(matches!(toggle_flow, Flow::Stay));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+    assert!(
+        !ctx.settings.bool(keys::DEVELOPER, false),
+        "configuração não deve ter sido alterada"
+    );
+
+    // Confere também que a linha Restaurar no desktop tem estilo danger
+    ctx.desktop = true;
+    let system_rows = rows_of(&ctx, "system");
+    let restore_row = find(&system_rows, "settings.system.restore");
+    assert_eq!(
+        restore_row.row.style, "danger",
+        "linha Restaurar deve ter estilo danger no desktop"
+    );
+
+    // Confere que o diálogo usa .text(desc) e foco inicial em Cancelar (1)
+    let dialog = super::confirm_restore_layer(&ctx, ctx.paths.root.join("meu.takobackup"));
+    assert_eq!(dialog.focus, 1, "foco inicial deve ser Cancelar");
+    assert!(
+        !dialog.text.is_empty(),
+        "corpo do diálogo deve conter .text(desc)"
+    );
 }
 
 #[test]

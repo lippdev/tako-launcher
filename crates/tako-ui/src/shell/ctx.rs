@@ -12,7 +12,7 @@ use tako_core::input::profiles::{Profile, Profiles};
 use tako_core::input::{AppCommand, GamepadButtons};
 use tako_core::library::{CollectionLibrary, GameLibrary};
 use tako_core::paths::DataPaths;
-use tako_core::persistence::{GameChoicesStore, GameSettingsStore, SettingsStore};
+use tako_core::persistence::{GameChoicesStore, GameSettingsStore, SettingsStore, TakoDatabase};
 use tako_platform::Platform;
 
 /// Pedido da interface ao app (tarefas longas, outras janelas, sair).
@@ -81,6 +81,7 @@ pub use tako_sources::report::LibrarySourceReport as SourceReport;
 pub struct Settings {
     store: Option<SettingsStore>,
     values: HashMap<String, String>,
+    pub locked: bool,
 }
 
 impl Settings {
@@ -89,7 +90,11 @@ impl Settings {
             .as_ref()
             .and_then(|s| s.load_all().ok())
             .unwrap_or_default();
-        Settings { store, values }
+        Settings {
+            store,
+            values,
+            locked: false,
+        }
     }
 
     /// Nenhuma configuração gravada (instalação nova).
@@ -112,6 +117,10 @@ impl Settings {
     }
 
     pub fn set(&mut self, key: &str, value: &str) {
+        if self.locked {
+            tracing::warn!(key, "ignorado: configurações travadas durante restauração");
+            return;
+        }
         self.values.insert(key.to_owned(), value.to_owned());
         if let Some(s) = &self.store
             && let Err(e) = s.set(key, value)
@@ -255,6 +264,8 @@ pub struct Ctx {
     pub app_update: crate::app_updates::State,
     pub safe_mode: bool,
     pub scanning: bool,
+    /// Restauração de backup em andamento (bloqueia jogar, varrer, restaurar e salvar configurações).
+    pub restoring: bool,
     pub pending_link: Option<tako_core::links::Link>,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
     pub grid_columns: usize,
@@ -344,6 +355,21 @@ pub struct Ctx {
 pub type ArtPins = std::collections::BTreeMap<tako_core::library::ArtKind, String>;
 
 impl Ctx {
+    /// Recarrega banco, configurações, biblioteca e coleções após restaurar backup.
+    pub fn reload_data(&mut self) {
+        if self.simulated() {
+            return;
+        }
+        let db = TakoDatabase::new(self.paths.database());
+        self.settings = Settings::new(Some(SettingsStore::new(db.clone())));
+        self.game_settings = Some(GameSettingsStore::new(db.clone()));
+        self.choices = Some(GameChoicesStore::new(db));
+        self.library.load();
+        let _ = self.collections.load();
+        self.sync_collections();
+        self.dirty = true;
+    }
+
     /// Sem banco nem lojas (`--simulate`).
     pub fn simulated(&self) -> bool {
         self.game_settings.is_none()
@@ -532,6 +558,15 @@ impl Ctx {
     }
 
     pub fn effect(&mut self, e: Effect) {
+        if self.restoring
+            && matches!(
+                e,
+                Effect::Launch(_) | Effect::ResumeGame | Effect::Rescan | Effect::ReloadLibrary
+            )
+        {
+            self.toast(self.t("settings.system.restore_busy"));
+            return;
+        }
         self.effects.push(e);
     }
 
