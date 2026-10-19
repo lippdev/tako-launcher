@@ -1020,10 +1020,21 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let desc = ctx.tf(
-        "settings.system.restore_confirm_desc",
-        &[("file", &file_name)],
-    );
+    let size_bytes = std::fs::metadata(&path).map(|m| m.len()).ok();
+    let size_str = size_bytes
+        .map(tako_core::metadata::art::format_bytes)
+        .unwrap_or_default();
+    let desc = if size_str.is_empty() {
+        ctx.tf(
+            "settings.system.restore_confirm_desc",
+            &[("file", &file_name)],
+        )
+    } else {
+        ctx.tf(
+            "settings.system.restore_confirm_desc_size",
+            &[("file", &file_name), ("size", &size_str)],
+        )
+    };
     let confirm_btn = ctx.t("settings.system.restore_confirm_button");
     let cancel_btn = ctx.t("common.cancel");
     MenuLayer::dialog(title, move |_ctx| {
