@@ -507,10 +507,16 @@ mod tests {
         assert!(shell.ctx.theme_preview.is_none());
 
         // O rascunho temporário foi limpo
-        assert!(!draft_img.exists(), "background.draft.jpg deveria ter sido removido");
+        assert!(
+            !draft_img.exists(),
+            "background.draft.jpg deveria ter sido removido"
+        );
 
         // A imagem anterior original permaneceu intacta
-        assert!(prev_img.is_file(), "background.png original deveria existir");
+        assert!(
+            prev_img.is_file(),
+            "background.png original deveria existir"
+        );
         assert_eq!(std::fs::read(&prev_img).unwrap(), b"original");
 
         // A camada ativa após o timeout é o painel de edição
