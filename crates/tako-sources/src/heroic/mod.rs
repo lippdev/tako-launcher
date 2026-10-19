@@ -386,6 +386,24 @@ fn to_game(root: &Path, install: HeroicInstall, cached: Option<&CachedInfo>) -> 
     }
 }
 
+/// Raízes do Heroic no Linux: a do XDG, a do Flatpak do Heroic e a pasta padrão do usuário. Num Flatpak o
+/// `XDG_CONFIG_HOME` é o da sandbox, então a pasta padrão entra à parte (sem repetir quando for a mesma).
+#[cfg(any(all(unix, not(target_os = "macos")), test))]
+fn linux_roots(home: &Path, xdg_config: Option<PathBuf>) -> Vec<PathBuf> {
+    let config = xdg_config
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(|| home.join(".config"));
+    let mut roots = vec![
+        config.join("heroic"),
+        home.join(".var/app/com.heroicgameslauncher.hgl/config/heroic"),
+    ];
+    let host = home.join(".config/heroic");
+    if !roots.contains(&host) {
+        roots.push(host);
+    }
+    roots
+}
+
 /// Fonte do Heroic: junta as pastas de configuração encontradas (nativa e Flatpak).
 pub struct HeroicSource {
     roots: Vec<PathBuf>,
@@ -403,22 +421,10 @@ impl HeroicSource {
             .map(PathBuf::from)
             .unwrap_or_default();
         #[cfg(not(target_os = "macos"))]
-        let roots = {
-            let config = std::env::var_os("XDG_CONFIG_HOME")
-                .map(PathBuf::from)
-                .filter(|p| p.is_absolute())
-                .unwrap_or_else(|| home.join(".config"));
-            let mut roots = vec![
-                config.join("heroic"),
-                home.join(".var/app/com.heroicgameslauncher.hgl/config/heroic"),
-            ];
-            // Num Flatpak o XDG_CONFIG_HOME é o da sandbox; o Heroic nativo fica na pasta padrão do usuário.
-            let host = home.join(".config/heroic");
-            if !roots.contains(&host) {
-                roots.push(host);
-            }
-            roots
-        };
+        let roots = linux_roots(
+            &home,
+            std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
+        );
         #[cfg(target_os = "macos")]
         let roots = vec![home.join("Library/Application Support/heroic")];
         HeroicSource::new(roots)

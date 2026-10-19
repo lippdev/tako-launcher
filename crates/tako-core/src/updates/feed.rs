@@ -55,15 +55,22 @@ pub enum Package {
 }
 
 impl Package {
-    /// Regra pura: `appimage` é a variável `APPIMAGE` (definida pelo runtime do AppImage).
-    pub fn detect(os: Os, kind: InstallKind, exe: &Path, appimage: Option<&Path>) -> Package {
+    /// Regra pura: `appimage` é a variável `APPIMAGE` (definida pelo runtime do AppImage); `flatpak` diz que o
+    /// processo roda numa sandbox Flatpak (`FLATPAK_ID` definido ou `/.flatpak-info` presente).
+    pub fn detect(
+        os: Os,
+        kind: InstallKind,
+        exe: &Path,
+        appimage: Option<&Path>,
+        flatpak: bool,
+    ) -> Package {
         match os {
             Os::Windows if kind == InstallKind::Installed => Package::WindowsSetup,
             Os::Windows => Package::WindowsPortable,
             Os::MacOs => Package::MacApp,
             Os::Linux if appimage.is_some() => Package::LinuxAppImage,
-            // /usr: deb e AUR; /app: Flatpak (somente leitura, quem atualiza é o Flatpak).
-            Os::Linux if exe.starts_with("/usr") || exe.starts_with("/app") => Package::LinuxDeb,
+            // Flatpak (somente leitura; quem atualiza é o Flatpak), /usr: deb e AUR.
+            Os::Linux if flatpak || exe.starts_with("/usr") => Package::LinuxDeb,
             Os::Linux => Package::LinuxTarGz,
         }
     }
@@ -494,7 +501,7 @@ mod tests {
     #[test]
     fn detects_the_package() {
         let d = |os, kind, exe: &str, app: Option<&str>| {
-            Package::detect(os, kind, Path::new(exe), app.map(Path::new))
+            Package::detect(os, kind, Path::new(exe), app.map(Path::new), false)
         };
         use InstallKind::*;
         assert_eq!(
@@ -518,9 +525,12 @@ mod tests {
             d(Os::Linux, Installed, "/usr/bin/tako", None),
             Package::LinuxDeb
         );
+        // Flatpak: pela sandbox, não pelo caminho (um tar.gz extraído em /app/... continua sendo tar.gz).
+        let flatpak = |exe: &str| Package::detect(Os::Linux, Installed, Path::new(exe), None, true);
+        assert_eq!(flatpak("/app/bin/tako"), Package::LinuxDeb);
         assert_eq!(
-            d(Os::Linux, Installed, "/app/bin/tako", None),
-            Package::LinuxDeb
+            d(Os::Linux, Portable, "/app/tako", None),
+            Package::LinuxTarGz
         );
         assert_eq!(
             d(Os::Linux, Portable, "/opt/tako/tako", None),

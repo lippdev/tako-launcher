@@ -114,3 +114,37 @@ fn source_merges_dirs_and_reports_missing() {
     assert!(!none.client_installed);
     assert!(none.notice.is_some());
 }
+
+#[test]
+fn data_dirs_do_not_repeat_the_default_folder() {
+    let home = Path::new("/home/u");
+    for xdg in [
+        None,
+        Some(PathBuf::from("/home/u/.local/share")),
+        Some(PathBuf::from("rel")),
+    ] {
+        assert_eq!(
+            data_dirs(home, xdg),
+            [
+                PathBuf::from("/home/u/.local/share/lutris"),
+                PathBuf::from("/home/u/.var/app/net.lutris.Lutris/data/lutris"),
+            ]
+        );
+    }
+}
+
+#[test]
+fn data_dirs_add_the_host_folder_when_xdg_is_the_sandbox() {
+    let dirs = data_dirs(
+        Path::new("/home/u"),
+        Some(PathBuf::from(
+            "/home/u/.var/app/io.github.lippdev.Tako/data",
+        )),
+    );
+    assert_eq!(dirs.len(), 3);
+    assert_eq!(
+        dirs[0],
+        PathBuf::from("/home/u/.var/app/io.github.lippdev.Tako/data/lutris")
+    );
+    assert_eq!(dirs[2], PathBuf::from("/home/u/.local/share/lutris"));
+}

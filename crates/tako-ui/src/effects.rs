@@ -5,7 +5,7 @@ use crate::app::HostAction;
 use crate::shell::layer::{Flow, MenuItem, MenuLayer};
 use crate::shell::{Ctx, Effect, Shell};
 use crate::{images, model::PanelRow, tasks};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tako_core::paths::{DataPaths, Os};
 use tako_core::updates::{self, UpdatePreferences, feed};
 
@@ -70,7 +70,14 @@ pub fn format_bytes(n: u64) -> String {
 fn package(paths: &DataPaths) -> feed::Package {
     let exe = std::env::current_exe().unwrap_or_default();
     let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
-    feed::Package::detect(Os::current(), paths.kind, &exe, appimage.as_deref())
+    let flatpak = std::env::var_os("FLATPAK_ID").is_some() || Path::new("/.flatpak-info").exists();
+    feed::Package::detect(
+        Os::current(),
+        paths.kind,
+        &exe,
+        appimage.as_deref(),
+        flatpak,
+    )
 }
 
 /// Procura (e, se puder instalar, baixa) a próxima versão. `explicit` = pedido do usuário (mostra o resultado).

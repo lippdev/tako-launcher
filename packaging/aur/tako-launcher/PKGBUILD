@@ -21,7 +21,6 @@ optdepends=('libpulse: audio devices and volume (pactl)'
             'kscreen: display switching on KDE Wayland (kscreen-doctor)'
             'wlr-randr: display switching on wlroots compositors'
             'libdecor: window decorations on Wayland')
-provides=('tako-launcher')
 conflicts=('tako-launcher-bin')
 options=('!lto')
 _tag="v${pkgver//_/-}"

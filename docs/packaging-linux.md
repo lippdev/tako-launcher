@@ -29,13 +29,15 @@ A cada release: troque `pkgver`, ponha `pkgrel=1`, rode `updpkgsums` (no `-bin`,
 
 ## Flatpak
 
+**Pendência (ID do Flathub, decisão do mantenedor):** o ID segue `io.github.lippdev.Tako`, mas o linter do Flathub o recusa enquanto o repositório não casar (veja "O que o linter do Flathub aponta"). Não foi trocado.
+
 ID `io.github.lippdev.Tako` (o usado no AUR/Windows/macOS é `dev.lipp.tako`, que no Flathub exigiria provar o domínio `lipp.dev`; o `io.github.<usuário>` é verificado pelo GitHub). **Decisão do mantenedor:** confirme o ID antes de submeter ao Flathub, porque depois não troca.
 
 Compilação local:
 
 ```bash
 pip install aiohttp tomlkit
-curl -fsSLO https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+curl -fsSLO https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/74697c75b630d7330e77250fc13cb5ea688d9479/cargo/flatpak-cargo-generator.py
 python3 flatpak-cargo-generator.py Cargo.lock -o packaging/flatpak/cargo-sources.json   # não versionado
 flatpak install flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.freedesktop.Sdk.Extension.rust-stable//25.08
 flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.lippdev.Tako.yml
@@ -63,7 +65,7 @@ O `Cargo.toml` pede Rust 1.97; o `rust-stable` do SDK acompanha o estável, ent�
 - Jogos abertos por link da loja (`steam://`, `heroic://`, `lutris:`) funcionam: o `xdg-open` passa pelo portal e abre no host. Executáveis, scripts, `.desktop`, AppImages e emuladores iniciados pelo Tako rodam **dentro** da sandbox e quase sempre não abrem; o Tako também não acompanha o processo de um jogo aberto no host (a pasta `/proc` é da sandbox), só o `RunningAppID` da Steam, lido do `registry.vdf`.
 - Tela: só XRandR (X11) e Mutter (GNOME). `kscreen-doctor` e `wlr-randr` não existem na sandbox: nesses ambientes as opções de tela somem (`Unsupported`).
 - "Abrir com o sistema" grava no `~/.var/app/<id>/config/autostart`, que o sistema não lê; precisa do portal Background (não implementado).
-- Atualizador interno desligado (`/app/bin/tako` conta como pacote do sistema); atualiza pelo Flatpak.
+- Atualizador interno desligado (o Tako reconhece a sandbox por `FLATPAK_ID` ou `/.flatpak-info`); atualiza pelo Flatpak.
 - Cada fonte lê `XDG_*_HOME` da sandbox e também a pasta padrão do usuário (`~/.config/heroic`, `~/.local/share/lutris`), então Heroic e Lutris nativos aparecem. Já a descoberta de emuladores nativos e "Adicionar jogo" por `.desktop` do usuário olham só o `XDG_*_HOME` da sandbox.
 - Uma saída para tudo isso é um backend `flatpak-spawn --host` em `tako-platform`: decisão de produto do mantenedor (amplia a permissão); não está nesta entrega.
 
