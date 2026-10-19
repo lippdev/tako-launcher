@@ -50,13 +50,6 @@ O Tako não depende dela para funcionar. Quando existir, deve seguir isto:
 - Configurações por jogo de FPS (`game_settings.fps_limit`, `show_fps`) ficam no banco, sem uso, para não perder
   dados das alphas.
 
-## Questões em aberto (CMI-002)
+## Detecção da API (CMI-002)
 
-- **Detecção quando o serviço não está em execução:** o contrato canônico de descoberta define a conexão
-  ao socket do usuário para aferir a versão e capacidades negociadas. Caso o serviço não esteja rodando,
-  o Tako examina o arquivo de descoberta local (`discovery.json`) se presente. Na ausência de ambos, mesmo
-  que haja executáveis do Console Mode no disco, o estado reportado é conservadoramente `NaoInstalado`
-  (pois a API não está disponível para consultas ou comandos).
-- **Transporte alternativo por loopback:** o transporte oficial é socket local Unix ou named pipe. Se
-  uma implementação do Console Mode utilizar porta loopback (`127.0.0.1`), ela deverá preservar
-  o enquadramento de 4 bytes little-endian, o aperto de mão com timeout ≤ 500 ms e isolamento estrito a loopback.
+Socket Unix ou named pipe sem resposta resulta conservadoramente em `NaoInstalado`. Não há transporte alternativo por TCP nem arquivos locais de descoberta (`discovery.json`).
