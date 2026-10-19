@@ -16,6 +16,7 @@ import { Ui } from "tokens.slint";
 import { Icons } from "icons.slint";
 import { Hint, PanelRow, Icon, Glyph, HintBar, Pill, Toggle, RowView } from "widgets.slint";
 import { Tile, Key, Overlay, Overline, RowList, OverlayView } from "overlay.slint";
+import { Octopus } from "polvo.slint";
 
 export { Ui, Hint, PanelRow, Tile, Key, Overlay }
 
@@ -315,6 +316,8 @@ component HomePage inherits Rectangle {
         width: min(1100 * Ui.u, parent.width - 136 * Ui.u);
         alignment: center;
         spacing: 18 * Ui.u;
+        // O polvo da abertura (BRAND-001), decorativo: o texto abaixo diz o que houve.
+        HorizontalLayout { alignment: start; Octopus { width: 220 * Ui.u; with-name: false; self-assemble: true; accessible-role: none; } }
         Text { text: empty-title; color: Ui.on-accent; font-size: Ui.headline-lg; font-family: Ui.font-title; font-weight: 300; }
         Text { text: empty-text; color: Ui.on-accent-muted; font-size: Ui.body-lg; font-family: Ui.font-text; wrap: word-wrap; }
         HorizontalLayout {
@@ -447,6 +450,7 @@ component LibraryPage inherits Rectangle {
         width: root.width - 136 * Ui.u;
         spacing: 12 * Ui.u;
         alignment: start;
+        HorizontalLayout { alignment: start; Octopus { width: 160 * Ui.u; with-name: false; self-assemble: true; accessible-role: none; } }
         Text { text: empty-title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; }
         Text { text: empty-text; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; wrap: word-wrap; }
     }

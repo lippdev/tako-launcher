@@ -197,6 +197,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         open_details: None,
         open_route: None,
         toast_undo: None,
+        toast_mascot: false,
         toast_hover: [false; 2],
         leave_details: false,
         queued_launch: None,
@@ -1310,7 +1311,7 @@ pub fn welcome_back(shell: &mut Shell, id: &str, played: Duration, end: GameEnd)
             ],
         )
     };
-    shell.ctx.toast(text);
+    shell.ctx.toast_welcome_back(text);
 }
 
 fn arg_str(args: &[Value], i: usize) -> String {
@@ -1601,6 +1602,7 @@ mod tests {
             include_str!("../theme/overlay.slint"),
             include_str!("../theme/desktop.slint"),
             include_str!("../theme/splash.slint"),
+            include_str!("../theme/polvo.slint"),
         ] {
             for line in file.lines().filter(|l| l.contains("animate ")) {
                 assert!(line.contains("duration: Ui."), "{line}");

@@ -638,6 +638,14 @@ fn desktop_snapshot() {
                 shell.push_layer(Box::new(layer));
             }
             Ok("toast") => shell.ctx.toast("Cupom copiado"),
+            // BRAND-001: biblioteca vazia (ListaVazia com o polvo) e o aviso "Bem-vindo de volta".
+            Ok("empty") => {
+                shell.ctx.found.lock().unwrap().clear();
+                shell.ctx.library.refresh();
+            }
+            Ok("welcome-back") => shell
+                .ctx
+                .toast_welcome_back("Bem-vindo de volta · Hades · 1 h 20 min"),
             Ok("opening") | Ok("opening-slow") => {
                 let g = shell.ctx.library.games()[0].clone();
                 shell.ctx.running = Some(crate::shell::ctx::RunningGame {

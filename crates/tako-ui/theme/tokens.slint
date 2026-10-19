@@ -215,6 +215,8 @@ export global Ui {
     out property <length> intro-rise: 12px;
     // TelaCarregamento: cada tentáculo chega em 1 s (ease-out-back); com "Reduzir animações", o polvo já vem pronto.
     out property <duration> tempo-tentaculo: reduce-motion ? 0ms : 1000ms;
+    // BRAND-001: no app o polvo se monta sozinho (sem barra), os sete tentáculos chegando em 1,4 s.
+    out property <duration> tempo-montagem: reduce-motion ? 0ms : 1400ms;
     // Escala: com "Reduzir animações" tudo fica em 1.
     out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;
     out property <float> escala-entrada: reduce-motion ? 1 : 0.98;

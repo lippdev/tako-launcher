@@ -892,6 +892,7 @@ impl Shell {
                 String::new()
             },
         );
+        out.set("desk-toast-mascot", self.ctx.toast_mascot);
         out.set("desk-ok-label", self.ctx.t("common.ok"));
         out.set("desk-focus-visible", self.ctx.focus_visible);
     }
@@ -959,5 +960,27 @@ mod tests {
         shell.hover("toast", 0);
         assert!(!shell.ctx.toast_expired(Instant::now()));
         assert!(shell.ctx.toast_expired(late));
+    }
+
+    #[test]
+    fn only_the_welcome_back_toast_carries_the_mascot() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        let mascot = |s: &mut Shell| {
+            s.render(Instant::now()).props.iter().any(|(n, v)| {
+                *n == "desk-toast-mascot" && matches!(v, slint_interpreter::Value::Bool(true))
+            })
+        };
+        shell.ctx.toast_welcome_back("Bem-vindo de volta");
+        assert!(mascot(&mut shell));
+        // Um aviso comum depois dele volta ao ✓.
+        shell.ctx.toast("Cupom copiado");
+        assert!(!mascot(&mut shell));
     }
 }
