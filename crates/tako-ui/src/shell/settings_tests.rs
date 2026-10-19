@@ -297,7 +297,13 @@ fn sunshine_preview_filters_invalid_ids() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();
     assert!(!ctx.library.games().is_empty());
-    let total = ctx.library.games().len();
+    let installed = ctx
+        .library
+        .games()
+        .iter()
+        .filter(|g| g.is_installed)
+        .count();
+    let first_was_installed = ctx.library.games()[0].is_installed;
     ctx.library.games_mut()[0].id = "invalid id with spaces !@#$".into();
     ctx.library.games_mut()[0].title = "Jogo Inválido".into();
 
@@ -305,9 +311,9 @@ fn sunshine_preview_filters_invalid_ids() {
         .library
         .games()
         .iter()
-        .filter(|g| tako_platform::sunshine::is_valid_game_id(&g.id))
+        .filter(|g| g.is_installed && tako_platform::sunshine::is_valid_game_id(&g.id))
         .count();
-    assert_eq!(valid_count, total - 1);
+    assert_eq!(valid_count, installed - usize::from(first_was_installed));
 
     let layer = sunshine::preview_dialog(&ctx, false);
     let rendered = layer.render(&ctx);

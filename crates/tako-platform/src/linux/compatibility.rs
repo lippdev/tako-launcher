@@ -599,27 +599,8 @@ pub fn resolve_runtime(
     if let Some(found) = detected.iter().find(|r| r.executable == p) {
         return Some(found.clone());
     }
-    // Caso especial: se o executável ainda existe em disco mesmo que não listado no scan
-    if p.is_file() {
-        let name = p
-            .parent()
-            .and_then(|parent| parent.file_name())
-            .map(|f| f.to_string_lossy().into_owned())
-            .unwrap_or_else(|| clean.to_owned());
-        let kind = if clean.starts_with("proton:") || p.ends_with("proton") {
-            RuntimeKind::Proton
-        } else {
-            RuntimeKind::Wine
-        };
-        return Some(CompatibilityRuntime {
-            id: clean.to_owned(),
-            name,
-            kind,
-            executable: p.to_path_buf(),
-        });
-    }
-    // Caso especial: system-wine
-    if clean == "system-wine" || clean == "wine" {
+    // Wine do sistema é um comando fixo do PATH, não um caminho importado da configuração.
+    if clean == "system-wine" {
         return Some(CompatibilityRuntime {
             id: "system-wine".into(),
             name: "Wine do sistema".into(),
@@ -882,6 +863,18 @@ mod tests {
         );
         let cmd = cfg_with_args.to_command(Some(Path::new("/jogos")));
         assert_eq!(cmd.get_program(), "/usr/bin/wine");
+    }
+
+    #[test]
+    fn saved_runtime_path_must_be_detected() {
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("unapproved");
+        std::fs::write(&executable, "not a detected runtime").unwrap();
+        assert!(resolve_runtime(&executable.display().to_string(), &[]).is_none());
+        assert_eq!(
+            resolve_runtime("system-wine", &[]).unwrap().executable,
+            PathBuf::from("wine")
+        );
     }
 
     #[test]
