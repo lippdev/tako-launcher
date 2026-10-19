@@ -650,6 +650,16 @@ fn desktop_snapshot() {
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("settings") => shell.open_route("settings"),
+            Ok("appearance") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+            }
+            Ok("theme-edit") => {
+                shell.open_route("settings");
+                shell.click("category", 3);
+                let layer = crate::shell::settings::edit_theme_panel(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
             Ok("settings-api") => {
                 shell.open_route("settings");
                 shell
