@@ -840,11 +840,10 @@ mod tests {
                 _ => None,
             })
             .collect();
-        // Outros testes (e a primeira sessão deste) abrem o mesmo jogo: confere só a última sessão.
-        assert!(
-            mine.ends_with(&[("starting", None), ("started", None), ("exited", Some(0))]),
-            "{mine:?}"
-        );
+        // Outros testes abrem o mesmo jogo em paralelo e intercalam eventos: a ordem fica nos testes de `events`.
+        for expected in [("starting", None), ("started", None), ("exited", Some(0))] {
+            assert!(mine.contains(&expected), "{mine:?}");
+        }
     }
 
     #[test]

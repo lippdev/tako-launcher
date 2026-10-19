@@ -52,6 +52,8 @@ pub fn client_download(store: GameStore) -> Option<&'static str> {
         GameStore::Ea => Some("https://www.ea.com/ea-app"),
         GameStore::BattleNet => Some("https://download.battle.net/"),
         GameStore::Amazon => Some("https://gaming.amazon.com/"),
+        GameStore::Bottles => Some("https://usebottles.com/"),
+        GameStore::Itch => Some("https://itch.io/app"),
         // App Xbox na Microsoft Store.
         GameStore::Xbox => Some("ms-windows-store://pdp/?productid=9MV0B5HZVK9Z"),
         _ => None,
@@ -68,6 +70,7 @@ pub fn client_missing(game: &Game, report: Option<&LibrarySourceReport>) -> Opti
             | GameStore::Ea
             | GameStore::BattleNet
             | GameStore::Amazon
+            | GameStore::Bottles
     );
     match report {
         Some(r) if needs_client && !r.client_installed => {
