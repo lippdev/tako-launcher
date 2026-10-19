@@ -56,7 +56,19 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
     std::io::Write::write_all(&mut tmp, bytes)?;
     tmp.as_file().sync_all()?;
-    tmp.persist(path).map(|_| ()).map_err(|e| e.error)
+    // No Windows, trocar um arquivo que outra gravação acabou de substituir pode dar "acesso negado" por um instante.
+    let mut tries = 0;
+    loop {
+        match tmp.persist(path) {
+            Ok(_) => return Ok(()),
+            Err(e) if e.error.kind() == io::ErrorKind::PermissionDenied && tries < 20 => {
+                tries += 1;
+                tmp = e.file;
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(e) => return Err(e.error),
+        }
+    }
 }
 
 #[cfg(test)]
