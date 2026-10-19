@@ -530,7 +530,10 @@ impl SessionEnvironmentGuard {
             self.store.delete();
             return None;
         }
-        let snapshot = capture_new(env, Some(context), now);
+        let mut snapshot = capture_new(env, Some(context), now);
+        // VRR de uma tela que estava desconectada no fim de outro jogo: continua esperando por ela.
+        // shortcut: uma marca só; outra tela ligada por este jogo substitui a antiga, raro o bastante.
+        snapshot.vrr = self.store.read().and_then(|s| s.vrr);
         if snapshot.display.is_none() && snapshot.audio.is_none() {
             self.store.delete();
             return None;
@@ -590,7 +593,7 @@ impl SessionEnvironmentGuard {
         };
         let current = capture(env, &pending, now);
         if RestorePlan::new(&pending, &current, env.audio.can_set_default()).is_empty() {
-            self.store.delete();
+            self.finish(env, &pending);
             return None;
         }
         Some(pending)
@@ -610,7 +613,7 @@ impl SessionEnvironmentGuard {
             tracing::info!("restauração após {ctx}: {} mantido ({})", s.what, s.reason);
         }
         if plan.is_empty() {
-            self.store.delete();
+            self.finish(env, expected);
             tracing::info!("restauração após {ctx}: telas e áudio já estavam como antes");
             return RestoreReport {
                 plan,
@@ -653,8 +656,31 @@ impl SessionEnvironmentGuard {
         } else {
             tracing::warn!("restauração após {ctx} incompleta: {:?}", report.remaining);
         }
-        self.store.delete();
+        self.finish(env, expected);
         report
+    }
+
+    /// Apaga o registro, menos a marca do VRR quando a tela dela não está conectada agora: sem ela não dá
+    /// para desligar, então fica para a próxima restauração ou abertura.
+    fn finish(&self, env: Env<'_>, expected: &SessionEnvironmentSnapshot) {
+        let connected = |id: &str| {
+            env.displays
+                .list()
+                .is_ok_and(|l| l.iter().any(|d| d.id.eq_ignore_ascii_case(id)))
+        };
+        let Some(vrr) = expected.vrr.as_ref().filter(|v| !connected(&v.display_id)) else {
+            self.store.delete();
+            return;
+        };
+        tracing::info!("VRR de {} fica para quando a tela voltar", vrr.display_id);
+        let keep = SessionEnvironmentSnapshot {
+            display: None,
+            audio: None,
+            ..expected.clone()
+        };
+        if !self.store.write(&keep) {
+            tracing::warn!("marca do VRR de {} não gravada", vrr.display_id);
+        }
     }
 }
 
@@ -1352,6 +1378,26 @@ mod tests {
                 .nothing_to_do()
         );
         assert_eq!(rig.displays.calls().len(), 1);
+    }
+
+    #[test]
+    fn vrr_mark_of_a_disconnected_screen_is_kept_until_it_comes_back() {
+        let rig = Rig::new();
+        let mut g = rig.guard();
+        g.begin_session(rig.env(), "jogo-1", true, now());
+        rig.displays.inner.set_vrr("DISPLAY2", true).unwrap();
+        g.remember_vrr_turned_on("DISPLAY2");
+        let mut pending = rig.store().read().unwrap();
+        // Outra tela na lista (como se a TV tivesse sido desconectada): nada a fazer, mas a marca fica.
+        pending.vrr.as_mut().unwrap().display_id = "TV-DESCONECTADA".into();
+        rig.store().write(&pending);
+        assert!(g.pending_from_previous_run(rig.env(), now()).is_none());
+        let kept = rig.store().read().unwrap();
+        assert_eq!(kept.vrr, pending.vrr);
+        assert!(kept.display.is_none() && kept.audio.is_none());
+        // Um jogo novo carrega a marca.
+        let s = g.begin_session(rig.env(), "jogo-2", true, now()).unwrap();
+        assert_eq!(s.vrr, pending.vrr);
     }
 
     #[test]
