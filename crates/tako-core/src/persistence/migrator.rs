@@ -115,8 +115,10 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         "ALTER TABLE game_settings ADD COLUMN screen_id TEXT;
          ALTER TABLE game_settings ADD COLUMN screen_name TEXT;",
     ),
+    // VRR de cada jogo (PERF-002).
+    (13, "ALTER TABLE game_settings ADD COLUMN vrr INTEGER;"),
     // Downloads por torrent (DL-001): fontes que o usuário adicionou e os downloads com o jogo vinculado.
-    // A 13 e a 14 são de PRs anteriores na ordem de merge (#126 e #132).
+    // A 14 vem do #132, antes deste na ordem de merge.
     (
         15,
         "CREATE TABLE IF NOT EXISTS download_sources (

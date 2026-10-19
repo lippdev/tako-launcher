@@ -10,7 +10,7 @@ pub(crate) mod library;
 #[path = "settings_metadata.rs"]
 pub(crate) mod metadata;
 #[path = "settings_screen.rs"]
-mod screen;
+pub(crate) mod screen;
 #[cfg(test)]
 #[path = "settings_tests.rs"]
 mod tests;

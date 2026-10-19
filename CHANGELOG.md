@@ -2,6 +2,14 @@
 
 Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CHANGELOG.en-US.md`. Antes de publicar uma versão, adicione uma seção `## [VERSÃO]` com o changelog daquela versão **nos dois arquivos**. O workflow publica a seção correspondente à tag na release (em inglês, com link para esta) e falha se faltar alguma.
 
+## [Unreleased]
+### Novidades
+- **Jogos não instalados:** os jogos da sua conta nas lojas que não estão no PC aparecem depois dos instalados, agrupados por loja, na lista e na grade. Cada grupo abre e fecha, e o Tako lembra como você deixou.
+- **Instalar pela loja:** o botão ⬇ na linha, na capa e no destaque abre a instalação no cliente da loja, mostrando a loja e o tamanho. Jogo comprado em mais de uma loja deixa escolher por qual instalar.
+- **Progresso da instalação:** na Steam, o Tako mostra a porcentagem com um anel na lista e na grade e "Baixando… 42%" no destaque. Quando termina, o jogo vira instalado sem reiniciar. Na Epic aparece "Instalando" sem número.
+- **Espaço livre:** o destaque mostra quanto sobra no disco e avisa quando falta espaço para o jogo.
+- "Instalar" também no menu do jogo e na seleção de vários jogos, que abrem um por vez na loja.
+
 ## [0.2.0-alpha.14]
 ### Novidades
 - **Barra de cima única:** a barra do Tako agora é a própria barra da janela, de borda a borda, com Minimizar, Maximizar e Fechar na ponta direita. No Windows, o vazio da barra arrasta a janela, o duplo clique maximiza e o Maximizar mostra os layouts de encaixe.

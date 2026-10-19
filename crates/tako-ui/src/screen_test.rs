@@ -29,11 +29,12 @@ struct Test {
 }
 
 /// Chaves que a troca de tela ou de resolução da tela de jogo altera.
-pub const SCREEN_KEYS: [&str; 5] = [
+pub const SCREEN_KEYS: [&str; 6] = [
     keys::GAME_SCREEN_ID,
     keys::GAME_SCREEN_NAME,
     keys::GAME_SCREEN_MODE,
     keys::GAME_SCREEN_HDR,
+    keys::GAME_SCREEN_VRR,
     keys::GAME_SCREEN_PRESETS,
 ];
 

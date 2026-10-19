@@ -184,7 +184,8 @@ pub mod keys {
     pub const GAME_SCREEN_HIDE_OTHERS: &str = "GameScreenHideOthers";
     pub const GAME_SCREEN_MODE: &str = "GameScreenMode";
     pub const GAME_SCREEN_HDR: &str = "GameScreenHdr";
-    /// Resolução e HDR de cada monitor (PERF-002), em JSON.
+    pub const GAME_SCREEN_VRR: &str = "GameScreenVrr";
+    /// Resolução, HDR e VRR de cada monitor (PERF-002), em JSON.
     pub const GAME_SCREEN_PRESETS: &str = "GameScreenPresets";
     pub const GAME_SCREEN_CONFIRMED: &str = "GameScreenConfirmedSetup";
     pub const GAME_AUDIO_ID: &str = "GameAudioDeviceId";
@@ -267,6 +268,10 @@ pub struct Ctx {
     pub welcome_back: Option<(String, std::time::Duration, tako_core::session::GameEnd)>,
     /// Jogos mandados instalar pela loja e até quando esperar por eles (SRC-005).
     pub installing: Vec<(String, Instant)>,
+    /// Loja escolhida em "Instalar pela" por jogo; sem escolha vale a loja do próprio jogo (SRC-005).
+    pub install_pick: HashMap<String, tako_core::library::GameStore>,
+    /// Pedidos de instalação à espera da hora de sair (`details::run_install_queue`).
+    pub install_queue: Vec<(Instant, tako_core::library::InstallOffer)>,
     /// Desenhar de novo neste instante mesmo sem entrada (camadas que mudam com o tempo).
     pub redraw_at: Option<Instant>,
     /// Tema em prévia (THEME-002): vale na tela, mas não está salvo; vence o tema escolhido até confirmar ou voltar.

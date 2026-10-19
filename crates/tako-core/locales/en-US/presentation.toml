@@ -7,6 +7,9 @@ store_of.masculine = "from {store}"
 store_of.feminine = "from {store}"
 store_via.masculine = "via {store}"
 store_via.feminine = "via {store}"
+store_in.emulators = "in the emulator"
+store_in.masculine = "on {store}"
+store_in.feminine = "on {store}"
 
 [presentation.last_played]
 never = "Never played"

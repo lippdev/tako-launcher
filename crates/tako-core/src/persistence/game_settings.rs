@@ -22,7 +22,7 @@ impl GameSettingsStore {
             .query_row(
                 "SELECT use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
                         extra_arguments, working_directory, environment, before_command, after_command,
-                        approved_commands, screen_id, screen_name
+                        approved_commands, screen_id, screen_name, vrr
                  FROM game_settings WHERE game_id = ?1;",
                 [game_id],
                 |r| {
@@ -44,6 +44,7 @@ impl GameSettingsStore {
                         approved_commands: r.get(12)?,
                         screen_id: r.get(13)?,
                         screen_name: r.get(14)?,
+                        vrr: r.get::<_, Option<i64>>(15)?.map(|v| v != 0),
                     })
                 },
             )
@@ -67,8 +68,8 @@ impl GameSettingsStore {
             "INSERT OR REPLACE INTO game_settings
                 (game_id, use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
                  extra_arguments, working_directory, environment, before_command, after_command, approved_commands,
-                 screen_id, screen_name)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16);",
+                 screen_id, screen_name, vrr)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17);",
             params![
                 game_id,
                 settings.use_game_screen,
@@ -86,6 +87,7 @@ impl GameSettingsStore {
                 settings.approved_commands,
                 normalize(settings.screen_id.as_deref()),
                 settings.screen_name,
+                settings.vrr,
             ],
         )?;
         Ok(())
@@ -113,6 +115,7 @@ mod tests {
             screen_name: Some("Monitor".into()),
             screen_mode: Some(GameSettingsOverride::KEEP_CURRENT_MODE.into()),
             hdr: Some(false),
+            vrr: Some(true),
             audio_device_id: Some("{fone}".into()),
             audio_device_name: Some("Fone".into()),
             fps_limit: Some(-1),

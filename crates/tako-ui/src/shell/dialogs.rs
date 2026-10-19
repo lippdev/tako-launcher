@@ -9,6 +9,42 @@ use tako_core::i18n::tn;
 use tako_core::library::{Game, GameStore, LibraryFilter, PlayStatus, collections, query, tags};
 use tako_core::presentation::{game_text, library_text};
 
+/// "Instalar pela": uma linha por loja com o tamanho e o ✓ na escolhida (`ctx.install_pick`; sem escolha, a loja
+/// do próprio jogo). Escolher só marca a loja; o clique em Instalar abre o cliente dela.
+pub fn install_from(ctx: &Ctx, id: &str) -> MenuLayer {
+    let id = id.to_owned();
+    MenuLayer::menu(ctx.t("desktop.install.pick_title"), move |ctx| {
+        let Some(g) = ctx.library.find(&id) else {
+            return Vec::new();
+        };
+        let lang = ctx.lang();
+        let offers = super::details::install_offers(g, ctx.simulated());
+        let current = super::details::chosen_offer(g, &offers, ctx.install_pick.get(&id).copied())
+            .map(|o| o.store);
+        offers
+            .iter()
+            .enumerate()
+            .map(|(i, o)| {
+                let on = Some(o.store) == current;
+                let mut row =
+                    PanelRow::button(format!("offer-{i}"), game_text::store_name(lang, o.store))
+                        .icon(super::desktop::store_icon(o.store))
+                        .emphasized(on);
+                row.style = "offer".into();
+                row.on = on;
+                if let Some(size) = super::details::offer_size(g, o) {
+                    row.value = super::details::size_text(size);
+                }
+                let (id, store) = (id.clone(), o.store);
+                MenuItem::new(row).on(move |ctx| {
+                    ctx.install_pick.insert(id.clone(), store);
+                    Flow::Close
+                })
+            })
+            .collect()
+    })
+}
+
 pub fn toggle_favorite(ctx: &mut Ctx, id: &str) {
     match ctx.library.toggle_favorite(id) {
         Ok(()) => {
@@ -407,6 +443,25 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
     let id = id.to_owned();
     MenuLayer::menu(title, move |ctx| {
         let mut v = option_items(ctx, &id);
+        // Jogo da conta que não está no computador: Instalar vem primeiro.
+        if let Some(item) = install_item(ctx, &id) {
+            v.insert(0, item);
+            // Com 2+ lojas, a escolha também fica no menu (a pílula do destaque só abre com o mouse).
+            if let Some(g) = ctx.library.find(&id)
+                && super::details::install_offers(g, ctx.simulated()).len() > 1
+            {
+                let pick = id.clone();
+                v.insert(
+                    1,
+                    MenuItem::new(
+                        PanelRow::button("install-from", ctx.t("desktop.install.pick_more"))
+                            .icon("download")
+                            .value("›"),
+                    )
+                    .on(move |ctx| Flow::Replace(Box::new(install_from(ctx, &pick)))),
+                );
+            }
+        }
         let (c, t, s) = (id.clone(), id.clone(), id.clone());
         let extra = [
             MenuItem::new(
@@ -424,7 +479,9 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
             )
             .on(move |ctx| Flow::Replace(game_settings(ctx, &s))),
         ];
-        let at = v.len().min(1);
+        let at = v
+            .len()
+            .min(1 + usize::from(v.iter().any(|i| i.row.key == "install-from")));
         v.splice(at..at, extra);
         // DL-001: baixar de uma fonte do usuário (ou ver o download deste jogo).
         if let Some(item) = super::downloads::game_action(ctx, &id) {
@@ -432,6 +489,23 @@ pub fn more_actions(ctx: &Ctx, id: &str) -> MenuLayer {
         }
         v
     })
+}
+
+/// "Instalar" do menu de contexto (SRC-005): abre o cliente da loja escolhida (sem escolha, a do próprio jogo); `None` se o jogo não tem o que instalar.
+fn install_item(ctx: &Ctx, id: &str) -> Option<MenuItem> {
+    let g = ctx.library.find(id)?;
+    if g.is_installed || g.is_upcoming() || g.installing.is_some() {
+        return None;
+    }
+    super::details::install_offers(g, ctx.simulated()).first()?;
+    let id = id.to_owned();
+    Some(
+        MenuItem::new(PanelRow::button("install", ctx.t("desktop.install.label")).icon("download"))
+            .on(move |ctx| {
+                super::details::install_many(ctx, std::slice::from_ref(&id));
+                Flow::Close
+            }),
+    )
 }
 
 /// Linhas das Opções do jogo (vazio se o jogo sumiu).
@@ -703,6 +777,26 @@ pub fn bulk_more(ids: Vec<String>) -> MenuLayer {
         let done = ids.clone();
         let status_ids = ids.clone();
         let mut v = Vec::new();
+        // Vários de uma vez: um pedido por jogo ao cliente da loja, um de cada vez.
+        let installable: Vec<String> = ids
+            .iter()
+            .filter(|id| install_item(ctx, id).is_some())
+            .cloned()
+            .collect();
+        if !installable.is_empty() {
+            v.push(
+                MenuItem::new(
+                    PanelRow::button("install", ctx.t("desktop.install.label")).icon("download"),
+                )
+                .on(move |ctx| {
+                    let n = super::details::install_many(ctx, &installable);
+                    if n > 1 {
+                        ctx.toast(ctx.tf("desktop.bulk.installing", &[("n", &n.to_string())]));
+                    }
+                    Flow::Close
+                }),
+            );
+        }
         if ctx.desktop {
             v.push(
                 MenuItem::new(PanelRow::button("status", ctx.t("desktop.define_status")))
@@ -1403,7 +1497,10 @@ mod tests {
         ctx.library.refresh();
 
         super::super::details::primary_action(&mut ctx, &game.id);
-        assert!(matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u == "steam://install/1145360"));
+        assert_eq!(queued(&ctx), ["steam://install/1145360"]);
+        // Só passa a esperar o jogo quando o pedido sai de fato.
+        assert!(ctx.installing.is_empty());
+        send_queue(&mut ctx);
         assert_eq!(ctx.installing.len(), 1);
         assert!(ctx.check_installs());
 
@@ -1431,9 +1528,8 @@ mod tests {
         ctx.library.refresh();
 
         super::super::details::primary_action(&mut ctx, &game.id);
-        assert!(
-            matches!(&ctx.effects[..], [Effect::OpenUrl(u)] if u == "goggalaxy://openGameView/1207658924")
-        );
+        assert_eq!(queued(&ctx), ["goggalaxy://openGameView/1207658924"]);
+        send_queue(&mut ctx);
         assert!(ctx.check_installs());
 
         game.is_installed = true;
@@ -1443,6 +1539,221 @@ mod tests {
         ctx.library.refresh();
         assert!(!ctx.check_installs());
         assert_eq!(ctx.toast.as_ref().unwrap().0, "Tabuleiro foi instalado");
+    }
+
+    /// Endereços à espera na fila de instalação.
+    fn queued(ctx: &Ctx) -> Vec<&str> {
+        ctx.install_queue
+            .iter()
+            .map(|(_, o)| o.install_uri.as_str())
+            .collect()
+    }
+
+    /// Passa o tempo: tudo o que está na fila sai agora.
+    fn send_queue(ctx: &mut Ctx) {
+        let later = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        super::super::details::run_install_queue(ctx, later);
+        assert!(ctx.install_queue.is_empty());
+    }
+
+    fn store_game(id: &str, store: GameStore, uri: &str) -> Game {
+        Game {
+            id: id.into(),
+            title: id.into(),
+            store: Some(store),
+            is_installed: false,
+            install_uri: Some(uri.into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn installing_many_opens_one_store_request_per_game_spaced_apart() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let mut done = store_game("gog:3", GameStore::Gog, "goggalaxy://openGameView/3");
+        done.is_installed = true;
+        let games = vec![
+            store_game("gog:1", GameStore::Gog, "goggalaxy://openGameView/1"),
+            store_game("gog:2", GameStore::Gog, "goggalaxy://openGameView/2"),
+            done,
+            // Sem endereço de instalação e com lixo no lugar: ficam de fora, sem pânico.
+            store_game("gog:4", GameStore::Gog, "  "),
+        ];
+        *ctx.found.lock().unwrap() = games;
+        ctx.library.refresh();
+        let ids: Vec<String> = ["gog:1", "gog:2", "gog:3", "gog:4", "gog:sumiu"]
+            .map(String::from)
+            .into();
+
+        assert_eq!(super::super::details::install_many(&mut ctx, &ids), 2);
+        assert_eq!(
+            queued(&ctx),
+            ["goggalaxy://openGameView/1", "goggalaxy://openGameView/2"]
+        );
+        // O segundo pedido espera o intervalo; um pedido ainda não enviado não é vigiado.
+        assert!(ctx.install_queue[1].0 > ctx.install_queue[0].0);
+        assert!(ctx.effects.is_empty() && ctx.installing.is_empty());
+        // Hora de só o primeiro: o segundo continua na fila.
+        let first = ctx.install_queue[0].0;
+        super::super::details::run_install_queue(&mut ctx, first);
+        assert_eq!(queued(&ctx), ["goggalaxy://openGameView/2"]);
+        assert_eq!(ctx.installing.len(), 1);
+        send_queue(&mut ctx);
+        assert_eq!(ctx.installing.len(), 2);
+    }
+
+    #[test]
+    fn the_same_store_address_is_not_requested_twice() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let mut twin = store_game("gog:2", GameStore::Gog, "goggalaxy://openGameView/1");
+        twin.title = "Gêmeo".into();
+        *ctx.found.lock().unwrap() = vec![
+            store_game("gog:1", GameStore::Gog, "goggalaxy://openGameView/1"),
+            twin,
+        ];
+        ctx.library.refresh();
+        let ids: Vec<String> = ["gog:1", "gog:2"].map(String::from).into();
+        assert_eq!(super::super::details::install_many(&mut ctx, &ids), 1);
+        // Enter de novo antes de o pedido sair também não repete.
+        assert_eq!(super::super::details::install_many(&mut ctx, &ids), 0);
+        assert_eq!(queued(&ctx).len(), 1);
+    }
+
+    /// O mesmo jogo na Steam e no GOG, os dois não instalados (a biblioteca monta as duas ofertas).
+    fn two_store_ctx(dir: &std::path::Path) -> (std::sync::MutexGuard<'static, ()>, Ctx) {
+        let (l, mut ctx) = crate::metadata::test_ctx(dir, false);
+        let mut steam = store_game("steam:7", GameStore::Steam, "steam://install/7");
+        steam.title = "Jogo".into();
+        let mut gog = store_game("gog:7", GameStore::Gog, "goggalaxy://openGameView/7");
+        gog.title = "Jogo".into();
+        *ctx.found.lock().unwrap() = vec![steam, gog];
+        ctx.library.refresh();
+        (l, ctx)
+    }
+
+    #[test]
+    fn without_a_choice_each_copy_installs_from_its_own_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = two_store_ctx(dir.path());
+        for id in ["steam:7", "gog:7"] {
+            assert_eq!(
+                ctx.library.find(id).map(|g| g.install_offers.len()),
+                Some(2)
+            );
+        }
+        // Os Detalhes da tela cheia de `gog:7` abrem o GOG, não a primeira loja da lista.
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert_eq!(queued(&ctx), ["goggalaxy://openGameView/7"]);
+        send_queue(&mut ctx);
+        assert_eq!(ctx.installing[0].0, "gog:7");
+        ctx.installing.clear();
+        super::super::details::primary_action(&mut ctx, "steam:7");
+        assert_eq!(queued(&ctx), ["steam://install/7"]);
+    }
+
+    #[test]
+    fn the_chosen_store_decides_where_install_opens_and_which_copy_is_watched() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = two_store_ctx(dir.path());
+        // O ✓ do menu começa na loja do próprio jogo e a escolha vale por loja.
+        let marked = |ctx: &Ctx, id: &str| -> Vec<(String, bool)> {
+            (install_from(ctx, id).build)(ctx)
+                .into_iter()
+                .map(|i| (i.row.title, i.row.on))
+                .collect()
+        };
+        assert_eq!(
+            marked(&ctx, "gog:7"),
+            [("Steam".into(), false), ("GOG".into(), true)]
+        );
+        let menu = install_from(&ctx, "gog:7");
+        accept(&mut ctx, &menu, "offer-0");
+        assert_eq!(ctx.install_pick.get("gog:7"), Some(&GameStore::Steam));
+        assert_eq!(
+            marked(&ctx, "gog:7"),
+            [("Steam".into(), true), ("GOG".into(), false)]
+        );
+
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert_eq!(queued(&ctx), ["steam://install/7"]);
+        send_queue(&mut ctx);
+        // Quem é vigiado é a cópia da loja escolhida, não a do jogo aberto.
+        assert_eq!(ctx.installing.len(), 1);
+        assert_eq!(ctx.installing[0].0, "steam:7");
+        // A pílula de `gog:7` mostra a instalação da cópia da Steam e Enter não reabre a loja.
+        let g = ctx.library.find("gog:7").unwrap().clone();
+        let stage = super::super::details::install_stage(&ctx, &g).unwrap();
+        assert!(stage.installing);
+        assert_eq!(stage.label, "Instalando na Steam…");
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert!(ctx.install_queue.is_empty());
+        assert_eq!(ctx.toast.as_ref().unwrap().0, "Instalando na Steam…");
+        assert_eq!(
+            super::super::details::install_many(&mut ctx, &["gog:7".to_string()]),
+            0
+        );
+        // Já na fila (antes de sair) também conta: Enter duas vezes seguidas pede uma vez só.
+        ctx.installing.clear();
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert_eq!(queued(&ctx).len(), 1);
+        super::super::details::primary_action(&mut ctx, "gog:7");
+        assert_eq!(queued(&ctx).len(), 1);
+        ctx.install_queue.clear();
+
+        // Pelo menu de contexto e pela seleção múltipla vale a mesma escolha.
+        ctx.installing.clear();
+        super::super::details::install_many(&mut ctx, &["gog:7".to_string()]);
+        assert_eq!(queued(&ctx), ["steam://install/7"]);
+        // A loja escolhida saiu da lista (releitura): volta à do próprio jogo, sem trocar para outra por posição.
+        ctx.install_queue.clear();
+        ctx.install_pick.insert("gog:7".into(), GameStore::Epic);
+        super::super::details::install_many(&mut ctx, &["gog:7".to_string()]);
+        assert_eq!(queued(&ctx), ["goggalaxy://openGameView/7"]);
+    }
+
+    #[test]
+    fn the_more_menu_offers_install_from_only_with_two_or_more_stores() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = two_store_ctx(dir.path());
+        let keys = |ctx: &Ctx, id: &str| -> Vec<String> {
+            (more_actions(ctx, id).build)(ctx)
+                .into_iter()
+                .map(|i| i.row.key)
+                .collect()
+        };
+        assert_eq!(&keys(&ctx, "gog:7")[..2], ["install", "install-from"]);
+        let menu = more_actions(&ctx, "gog:7");
+        assert!(matches!(
+            accept(&mut ctx, &menu, "install-from"),
+            Flow::Replace(_)
+        ));
+        let mut solo = store_game(
+            "epic:1",
+            GameStore::Epic,
+            "com.epicgames.launcher://apps/a%3Ab%3Ac?action=install",
+        );
+        solo.title = "Solo".into();
+        *ctx.found.lock().unwrap() = vec![solo];
+        ctx.library.refresh();
+        let k = keys(&ctx, "epic:1");
+        assert!(k.contains(&"install".into()) && !k.contains(&"install-from".into()));
+    }
+
+    #[test]
+    fn enter_on_a_game_that_is_installing_shows_the_progress() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let mut g = store_game("steam:1", GameStore::Steam, "steam://install/1");
+        g.installing = Some(tako_core::library::InstallProgress {
+            fraction: Some(0.42),
+        });
+        *ctx.found.lock().unwrap() = vec![g];
+        ctx.library.refresh();
+        super::super::details::primary_action(&mut ctx, "steam:1");
+        assert_eq!(ctx.toast.as_ref().unwrap().0, "Baixando… 42%");
+        assert!(ctx.install_queue.is_empty());
     }
 
     #[test]

@@ -36,7 +36,7 @@ struct DeskNav { id: string, label: string, icon: string, count: string, section
 struct DeskGame { id: string, title: string, thumb: image, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int, label: string, kind: string, count: string, open: bool, installing: bool, progress: float, percent: string, install-label: string }
 struct DeskBlock { kind: string, title: string, count: string, label: string, icon: string, open: bool, games: [DeskGame], first: int, index: int, rows-before: int, sections-before: int, groups-before: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string, play-status: string, play-status-label: string }
+struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, install-note: string, install-warn: bool, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string, play-status: string, play-status-label: string }
 struct CoverRow { current: image, has-current: bool, proposed: image, has-proposed: bool, current-label: string, level: int, confidence: string, reason: string, accept: string, other: string }
 struct DeskStat { label: string, value: string }
 struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string], score: int }
@@ -1872,19 +1872,28 @@ component Ring inherits Rectangle {
 component PlayButton inherits Rectangle {
     in property <string> label;
     in property <string> icon;
+    // Texto menor ao lado do rótulo ("Steam · 9,1 GB" no Instalar).
+    in property <string> sub;
+    // Botão dividido (jogo em mais de uma loja): o ⌄ de 48 ao lado, 2 de vão.
+    in property <bool> split;
+    in property <string> more-label;
     in property <bool> enabled: true;
     in property <bool> focused;
     in property <bool> small;
     callback clicked();
+    callback more-clicked(length, length);
     height: small ? 50px : Ui.primary-height;
-    width: max(small ? 180px : 232px, pl.preferred-width);
+    property <length> main-w: split ? pl.preferred-width : max(small ? 180px : 232px, pl.preferred-width);
+    width: split ? main-w + 2px + 48px : main-w;
     accessible-role: button;
-    accessible-label: label;
+    accessible-label: sub != "" ? label + ", " + sub : label;
     property <float> press: pta.pressed && enabled ? Ui.escala-pressionado : 1;
+    // Na ponta de dentro do botão dividido o canto é de 6.
+    property <length> inner-r: split ? 6px : root.height / 2;
     Rectangle {
-        x: (root.width - self.width) / 2;
+        x: (root.main-w - self.width) / 2;
         y: (root.height - self.height) / 2;
-        width: root.width * press;
+        width: root.main-w * press;
         height: root.height * press;
         border-radius: self.height / 2;
         background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%);
@@ -1892,21 +1901,50 @@ component PlayButton inherits Rectangle {
         drop-shadow-blur: Ui.shadow-float-blur;
         drop-shadow-color: Ui.shadow-float-color;
         opacity: enabled ? 1 : 0.7;
+        // Botão dividido: a ponta de dentro é de 6, não redonda; o degradê vertical esconde a emenda.
+        if split: Rectangle { x: parent.width - parent.height / 2; width: parent.height / 2; border-radius: 6px; background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%); }
         // Brilho de 1px no topo.
-        Rectangle { x: parent.height / 2; y: 1px; width: parent.width - parent.height; height: 1px; background: Ui.primary-top; }
+        Rectangle { x: parent.height / 2; y: 1px; width: parent.width - parent.height / 2 - root.inner-r; height: 1px; background: Ui.primary-top; }
         if pta.pressed: Rectangle { border-radius: parent.border-radius; background: Ui.on-primary.with-alpha(0.06); }
+    }
+    if split: Rectangle {
+        x: root.main-w + 2px;
+        y: (root.height - self.height) / 2;
+        width: 48px * more-press;
+        height: root.height * more-press;
+        border-radius: self.height / 2;
+        background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%);
+        drop-shadow-offset-y: Ui.shadow-float-y;
+        drop-shadow-blur: Ui.shadow-float-blur;
+        drop-shadow-color: Ui.shadow-float-color;
+        opacity: enabled ? 1 : 0.7;
+        // A ponta de dentro (esquerda) também é de 6.
+        Rectangle { width: parent.height / 2; border-radius: 6px; background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%); }
+        property <float> more-press: mta.pressed && enabled ? Ui.escala-pressionado : 1;
+        DeskIcon { name: "chevron-down"; size: 20px; tint: Ui.on-primary; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+        mta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            accessible-role: button;
+            accessible-label: more-label;
+            clicked => { root.more-clicked(self.absolute-position.x, self.absolute-position.y + self.height + 8px); }
+        }
     }
     if focused: FocusRing { radius: root.height / 2; background: transparent; }
     pl := HorizontalLayout {
-        padding-left: 32px;
-        padding-right: 32px;
-        spacing: Ui.space-12;
+        x: 0;
+        width: root.main-w;
+        padding-left: split ? 22px : 32px;
+        padding-right: split ? 24px : 32px;
+        spacing: split ? 10px : Ui.space-12;
         alignment: center;
         if icon == "ring": Ring { size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
         if icon != "ring": DeskIcon { name: icon; size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
         Text { text: label; color: Ui.on-primary; font-size: 19px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+        if sub != "": Text { text: sub; color: Ui.on-primary.with-alpha(0.65); font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
     }
     pta := TouchArea {
+        width: root.main-w;
         enabled: root.enabled;
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
@@ -2260,6 +2298,7 @@ component GameStage inherits VerticalLayout {
     in property <[string]> card-labels;
     in property <string> about-label;
     in property <string> details-label;
+    in property <string> more-install-label;
     in property <string> zone;
     in property <int> zone-index;
     in property <bool> focus-visible;
@@ -2403,10 +2442,17 @@ component GameStage inherits VerticalLayout {
                     opacity: intro-actions;
                     label: a.title;
                     icon: a.icon;
+                    sub: a.description;
+                    split: a.on;
+                    more-label: more-install-label;
                     enabled: a.enabled;
                     small: small;
                     focused: focus-visible && zone == "actions" && zone-index == i;
                     clicked => { root.clicked("action", i); }
+                    more-clicked(x, y) => {
+                        root.menu(x, y);
+                        root.clicked("install-more", i);
+                    }
                 }
                 if a.style != "primary": GlassButton {
                     y: (parent.height - self.height) / 2 + (1 - intro-actions) * Ui.intro-rise;
@@ -2424,6 +2470,15 @@ component GameStage inherits VerticalLayout {
                     }
                 }
             }
+        }
+        // Jogo não instalado: espaço livre e por onde a instalação abre; sem espaço, o aviso em `warning`.
+        if game.install-note != "": Text {
+            text: game.install-note;
+            opacity: intro-actions;
+            color: game.install-warn ? Ui.warning : Ui.desk-on-muted;
+            font-size: Ui.desk-label-sm;
+            font-weight: 500;
+            wrap: word-wrap;
         }
         if game.hint != "": Text { text: game.hint; opacity: intro-actions; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
     }
@@ -2793,6 +2848,7 @@ component DeskLibrary inherits Rectangle {
     in property <[string]> card-labels;
     in property <string> about-label;
     in property <string> details-label;
+    in property <string> more-install-label;
     in property <string> zone;
     in property <int> zone-index;
     in property <bool> focus-visible;
@@ -3094,6 +3150,7 @@ component DeskLibrary inherits Rectangle {
             card-labels: card-labels;
             about-label: about-label;
             details-label: details-label;
+            more-install-label: more-install-label;
             zone: zone;
             zone-index: zone-index;
             focus-visible: focus-visible;
@@ -5379,6 +5436,8 @@ component DeskOverlay inherits Rectangle {
                             padding-left: 10px;
                             padding-right: 10px;
                             spacing: 10px;
+                            // "Instalar pela": a coluna do ✓ (16) vem antes do ícone da loja.
+                            if r.style == "offer": Rectangle { width: 16px; if r.on: DeskIcon { name: "tick"; size: 16px; tint: Ui.on-accent; } }
                             // No select, a coluna do ✓ (16) marca a atual, em peso 600.
                             if r.key == "updates" && !r.enabled: Ring { size: 18px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
                             if !ov.wide && (r.key != "updates" || r.enabled): DeskIcon { name: r.icon; size: 18px; tint: r.style == "success" ? Ui.success : (r.style == "warning" ? Ui.warning : (r.style == "danger" ? Ui.error : Ui.desk-on-muted)); y: (parent.height - self.height) / 2; }
@@ -6557,6 +6616,7 @@ export component Desktop inherits Window {
     in property <[string]> desk-card-labels;
     in property <string> desk-about-label;
     in property <string> desk-details-label;
+    in property <string> desk-install-more-label;
     in property <string> desk-zone: "list";
     in property <int> desk-zone-index;
     in property <string> desk-empty-title;
@@ -6809,6 +6869,7 @@ export component Desktop inherits Window {
                 card-labels: desk-card-labels;
                 about-label: desk-about-label;
                 details-label: desk-details-label;
+                more-install-label: desk-install-more-label;
                 zone: desk-zone;
                 zone-index: desk-zone-index;
                 focus-visible: desk-focus-visible;

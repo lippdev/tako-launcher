@@ -30,7 +30,6 @@ about = "Sobre o jogo"
 details = "Detalhes"
 add_game = "Adicionar jogo"
 search_key = "Ctrl + K"
-install_via = "Instalar {via}"
 install_game = "Instalar {title}"
 installing_game = "Baixando {title}"
 installing_game_unknown = "Instalando {title}"
@@ -103,6 +102,7 @@ empty_text = "Marque Jogando, Zerado e outros status pelo menu ⋯ de um jogo, o
 by_store = "Agrupar por Loja"
 
 [desktop.bulk]
+installing = "Abrindo {n} instalações na loja, uma de cada vez"
 count = "{n} selecionados de {total}"
 collection = "Coleção"
 tag = "Etiqueta"
@@ -114,6 +114,18 @@ added_to = "{n} jogos adicionados a {collection}"
 removed_from = "{n} jogos tirados de {collection}"
 beaten = "Marcar como zerado"
 remove_title = "Apagar {n} jogos da biblioteca?"
+
+[desktop.install]
+label = "Instalar"
+progress = "Baixando… {pct}%"
+installing = "Instalando {in}…"
+pick_more = "Instalar pela…"
+pick_title = "Instalar pela"
+free = "Livre no {drive} {size}"
+short = "Faltam {size} no {drive}"
+opens = "a instalação abre {in}"
+opens_alone = "A instalação abre {in}"
+more = "Escolher a loja"
 
 [desktop.empty]
 none_found = "Nenhum jogo encontrado"

@@ -12,6 +12,7 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] Jogar e sair: telas voltam como estavam; restaurar duas vezes não muda nada na segunda.
 - [ ] Depois de sair e entrar de novo na sessão, a configuração do sistema é a original (`ForSession`).
 - [ ] Ids das telas iguais entre duas execuções do Tako (e depois de reiniciar o Mac).
+- [ ] VRR (PERF-002): o macOS não tem API pública para ler nem ligar o ProMotion ou o Adaptive Sync. Com qualquer tela (de preferência um MacBook Pro com ProMotion ou um monitor Adaptive Sync no macOS 14+), Configurações › Tela de jogo mostra "Ligar o VRR" desligado com o motivo, e Configurações deste jogo › "VRR" fica indisponível com o mesmo texto. Ajustes do Sistema › Telas › Taxa de atualização continua sendo o caminho; abrir um jogo não muda essa escolha.
 
 ## Áudio
 
@@ -66,6 +67,31 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] Instalar em um jogo da conta Steam abre `steam://install/<appid>`; em até 3 s o jogo aparece "instalando" com a porcentagem e, ao terminar, vira instalado sozinho.
 - [ ] Cancelar a instalação na Steam: o jogo volta a "não instalado". Pausar: a porcentagem para.
 - [ ] O espaço livre mostrado é o do volume da Steam (`~/Library/Application Support/Steam`) e bate com o do Finder (Obter Informações do disco). No APFS o volume do sistema aparece como `/`.
+
+## Links `tako://` (EXT-005)
+
+Gerar o pacote e testar sem mexer nos dados do Tako instalado (a pasta `Tako_Data` deixa o app portable):
+
+```sh
+build/rust/package.sh macos-arm64 0.0.0-test
+mkdir -p artifacts/linktest && ditto artifacts/rust/macos-arm64/dmg/Tako.app artifacts/linktest/Tako.app
+mkdir artifacts/linktest/Tako.app/Contents/MacOS/Tako_Data && codesign --force --deep --sign - artifacts/linktest/Tako.app
+LS=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+$LS -f artifacts/linktest/Tako.app   # e no fim: $LS -u artifacts/linktest/Tako.app
+```
+
+O Launch Services ignora apps em `/tmp`: registre o pacote numa pasta comum. Cada link recebido gera
+`link recebido do sistema` no log (`Tako_Data/logs`).
+
+- [ ] Tako fechado: `open 'tako://settings'` abre o Tako já em Configurações (só um supervisor e uma interface no `ps`).
+- [ ] Tako aberto: `open 'tako://library/favorites'` leva a janela aberta para Favoritos e a traz para a frente, sem
+  abrir outro processo.
+- [ ] `open 'tako://game/<id>'` abre os detalhes; `tako://play/<id>` pede as confirmações normais; ID inexistente
+  mostra o aviso.
+- [ ] Link inválido (`open 'tako://game/..%2fx'`): nada muda.
+- [ ] Depois de a interface cair e o supervisor reabrir, o próximo link chega à interface nova.
+- [ ] Com um jogo aberto na tela cheia (interface fechada), o `open` falha com `-600` (limitação conhecida).
+- [ ] Um link no Safari pede para abrir o Tako e funciona.
 
 ## Downloads por torrent (DL-001)
 
