@@ -69,22 +69,22 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         });
     }
 
-    let is_checking = checking || cached.is_none();
-    let status_text = if is_checking {
+    let status_text = if checking {
         ctx.t("settings.integrations.console_mode_checking")
     } else {
-        match cached.as_ref().unwrap() {
-            ConsoleModeStatus::NaoInstalado => {
+        match cached.as_ref() {
+            None => ctx.t("settings.integrations.console_mode_checking"),
+            Some(ConsoleModeStatus::NaoInstalado) => {
                 ctx.t("settings.integrations.console_mode_not_installed")
             }
-            ConsoleModeStatus::Instalado { versao_api, .. } => ctx.tf(
+            Some(ConsoleModeStatus::Instalado { versao_api, .. }) => ctx.tf(
                 "settings.integrations.console_mode_installed",
                 &[("version", &versao_api.to_string())],
             ),
-            ConsoleModeStatus::Incompativel { .. } => {
+            Some(ConsoleModeStatus::Incompativel { .. }) => {
                 ctx.t("settings.integrations.console_mode_incompatible")
             }
-            ConsoleModeStatus::Erro => ctx.t("settings.integrations.console_mode_error"),
+            Some(ConsoleModeStatus::Erro) => ctx.t("settings.integrations.console_mode_error"),
         }
     };
 
