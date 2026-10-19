@@ -237,11 +237,66 @@ pub fn start(ctx: &mut Ctx, game_id: &str) -> Result<Started, String> {
         .working_directory
         .clone()
         .or(game.working_directory.clone());
+    let (target_to_launch, args_to_launch, env_to_launch) = {
+        let is_windows_exe = target.to_lowercase().ends_with(".exe");
+        let is_manual = game.store() == tako_core::library::GameStore::Manual;
+        let runner = eff
+            .wine_runtime
+            .as_deref()
+            .map(str::trim)
+            .filter(|r| !r.is_empty());
+        if (cfg!(target_os = "linux") || cfg!(test))
+            && is_manual
+            && is_windows_exe
+            && let Some(runner) = runner
+        {
+            let detected = tako_platform::linux_compatibility::detect_runtimes();
+            let runtime = tako_platform::linux_compatibility::resolve_runtime(runner, &detected)
+                .ok_or_else(|| ctx.tf("session.runtime_not_found", &[("runtime", runner)]))?;
+
+            let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+            let prefix = if let Some(p) =
+                eff.wine_prefix.as_deref().filter(|s| !s.trim().is_empty())
+            {
+                tako_platform::linux_compatibility::expand_and_validate_prefix(p, home.as_deref())
+                    .map_err(|_| ctx.t("session.prefix_invalid"))?
+            } else {
+                let def = ctx.paths.wine_prefix(&game.id);
+                tako_platform::linux_compatibility::validate_prefix_path(&def, home.as_deref())
+                    .map_err(|_| ctx.t("session.prefix_invalid"))?;
+                def
+            };
+            let _ = std::fs::create_dir_all(&prefix);
+
+            let steam_root = tako_platform::linux_compatibility::find_steam_root(home.as_deref());
+
+            let cfg = tako_platform::linux_compatibility::prepare_launch(
+                &runtime,
+                std::path::Path::new(&target),
+                (!args.is_empty()).then_some(args.as_str()),
+                &prefix,
+                steam_root.as_deref(),
+                &eff.environment,
+            );
+            let args_str = cfg.arguments_string();
+            (
+                cfg.executable.to_string_lossy().into_owned(),
+                (!args_str.is_empty()).then_some(args_str),
+                cfg.environment,
+            )
+        } else {
+            (
+                target,
+                (!args.is_empty()).then_some(args),
+                eff.environment.clone(),
+            )
+        }
+    };
     let launched = p.processes.launch_with_env(
-        &target,
-        (!args.is_empty()).then_some(args.as_str()),
+        &target_to_launch,
+        args_to_launch.as_deref(),
         cwd.as_deref(),
-        &eff.environment,
+        &env_to_launch,
     );
     if let Some(e) = before_failed {
         tracing::warn!("comando antes do jogo: {e}");
@@ -857,5 +912,63 @@ mod tests {
             assert_eq!(end, expected, "{played} s, {code:#X}");
             restore_now(&platform, &ctx.paths, req.restore);
         }
+    }
+
+    #[test]
+    fn manual_windows_game_launches_with_proton_or_wine() {
+        use std::sync::Arc;
+        use tako_core::devices::fake::FakeProcesses;
+        use tako_core::library::ManualGameRecord;
+        let dir = tempfile::tempdir().unwrap();
+        let fake = Arc::new(FakeProcesses::default());
+        let platform = Platform {
+            processes: fake.clone(),
+            ..Platform::simulated()
+        };
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), platform.clone(), true);
+        let manual = ctx
+            .library
+            .add_manual(ManualGameRecord::create(
+                "Windows Game",
+                "/jogos/game.exe",
+                Utc::now(),
+            ))
+            .unwrap()
+            .clone();
+
+        let store = tako_core::persistence::GameSettingsStore::new(
+            tako_core::persistence::TakoDatabase::new(dir.path().join("tako.db")),
+        );
+        ctx.game_settings = Some(store.clone());
+
+        // 1. Sem escolha de runtime (Sistema): abre direto sem Wine/Proton ("nunca rode nada sem o usuário escolher")
+        let Started::Tracking(req) = start(&mut ctx, &manual.id).unwrap() else {
+            panic!("deveria acompanhar")
+        };
+        assert_eq!(
+            fake.launched.lock().unwrap().last().unwrap(),
+            "/jogos/game.exe"
+        );
+        restore_now(&platform, &ctx.paths, req.restore);
+
+        // 2. Com Wine do sistema e prefixo padrão
+        let mut o = store.load(&manual.id).unwrap();
+        o.wine_runtime = Some("system-wine".into());
+        store.save(&manual.id, &o).unwrap();
+
+        let Started::Tracking(req) = start(&mut ctx, &manual.id).unwrap() else {
+            panic!("deveria acompanhar")
+        };
+        let last = fake.launched.lock().unwrap().last().unwrap().clone();
+        assert!(
+            last.starts_with("wine /jogos/game.exe")
+                || last.starts_with("/usr/bin/wine /jogos/game.exe")
+        );
+        restore_now(&platform, &ctx.paths, req.restore);
+
+        // 3. Com prefixo proibido (/ ou $HOME): recusa a abertura
+        o.wine_prefix = Some("/".into());
+        store.save(&manual.id, &o).unwrap();
+        assert!(start(&mut ctx, &manual.id).is_err());
     }
 }

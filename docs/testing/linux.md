@@ -68,6 +68,18 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Ferramentas junto do jogo (EXT-001, ex.: `/usr/bin/xeyes`): pedem permissão, abrem antes do jogo sem travar a interface e,
   com "Fechar as ferramentas no fim", fecham quando o jogo termina.
 
+## Proton e Wine para jogos de Windows manuais (SESSION-005)
+
+- [ ] Jogo de Windows (.exe) adicionado à mão: em Detalhes › Configurações deste jogo, a seção ABRIR O JOGO mostra "Rodar com" e "Prefixo". Jogos nativos (.sh, binários ELF, .desktop, ROMs) não mostram essas opções.
+- [ ] "Rodar com": lista "Sistema" (padrão), "Wine do sistema" (se disponível no PATH), versões do Proton da Steam (steamapps/common/Proton* e compatibilitytools.d, incluindo GE-Proton) e runners do Lutris (runners/wine/*/bin/wine).
+- [ ] Segurança: com "Sistema" selecionado, o Tako não roda Wine nem Proton; só executa o runtime explicitamente escolhido pelo usuário.
+- [ ] Prefixo padrão: sem escolher pasta, usa a pasta isolada por jogo do Tako (~/.local/share/tako/prefixes/<jogo>).
+- [ ] Prefixo personalizado: digitar um caminho válido (ex.: ~/meu-prefixo ou /jogos/prefixos/jogo1) salva e aplica para o jogo.
+- [ ] Validação de segurança do prefixo: digitar / ou a pasta pessoal (~ ou $HOME) é recusado com aviso e não permite salvar.
+- [ ] Abrir com Wine: o jogo abre com WINEPREFIX apontando para a pasta do prefixo e o processo é acompanhado até fechar.
+- [ ] Abrir com Proton fora da Steam: o Tako define obrigatoriamente STEAM_COMPAT_DATA_PATH (pasta do prefixo, onde o Proton cria a subpasta pfx), STEAM_COMPAT_CLIENT_INSTALL_PATH (raiz da Steam, ex.: ~/.local/share/Steam) e STEAM_COMPAT_APP_ID=0. O jogo abre por proton run <caminho.exe> e o acompanhamento de processos monitora toda a árvore até o fim.
+- [ ] Encerrar jogo fecha o jogo e o processo do Wine/Proton (SIGTERM) e o Tako volta para a tela normalmente.
+
 ## Abrir com o sistema
 
 - [ ] Ligar a opção cria `~/.config/autostart/tako.desktop`; o Tako abre no próximo login.

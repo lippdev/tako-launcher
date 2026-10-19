@@ -169,6 +169,8 @@ commands_close_tools = "Essas ferramentas fecham quando o jogo terminar."
 commands_allow = "Permitir e jogar"
 before_failed = "O comando antes do jogo falhou: {error}"
 tool_failed = "Não foi possível abrir {tool}: {error}"
+runtime_not_found = "O runtime de compatibilidade escolhido ({runtime}) não foi encontrado"
+prefix_invalid = "A pasta do prefixo do Wine/Proton é inválida (não pode ser / nem a sua pasta pessoal)"
 save_report = "Salvar relatório de diagnóstico"
 welcome_back_played = "Bem-vindo de volta · {game} · {time}"
 

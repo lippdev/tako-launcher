@@ -375,7 +375,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [x] **SESSION-002:** histórico de sessões: data, hora e duração de cada vez que o jogo rodou (hoje só o total e a última vez), nos detalhes do jogo.
 - [x] **SESSION-003:** jogo que fechou sozinho em poucos segundos ou com código de erro gera um aviso com o que se sabe (código, log do Tako, sugestão), em vez de voltar em silêncio. _Estado: o código de saída só existe quando o Tako abre o executável direto; jogos abertos pela loja ficam com o aviso por tempo._
 - [x] **SESSION-004:** por jogo, variáveis de ambiente e comandos antes e depois de jogar (argumentos e pasta de trabalho já existem), com consentimento. Base do EXT-001.
-- [ ] **SESSION-005 (Linux):** escolher Proton ou Wine (versão e prefixo) para jogos de Windows adicionados à mão.
+- [x] **SESSION-005 (Linux):** escolher Proton ou Wine (versão e prefixo) para jogos de Windows adicionados à mão.
 - [x] **SESSION-006:** "Reparar jogo": abrir a verificação de arquivos da loja dona do jogo (Steam, Epic, GOG, etc.) quando ela oferece. _Estado: só a Steam oferece a verificação de fora do app (`steam://validate`)._
 
 ### Épico VOICE e AI — Busca por voz e IA (P3)

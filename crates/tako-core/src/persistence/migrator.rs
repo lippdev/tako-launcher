@@ -123,6 +123,12 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         "ALTER TABLE game_settings ADD COLUMN tools TEXT;
          ALTER TABLE game_settings ADD COLUMN close_tools INTEGER;",
     ),
+    // Runtime e prefixo de Wine/Proton no Linux (SESSION-005).
+    (
+        15,
+        "ALTER TABLE game_settings ADD COLUMN wine_runtime TEXT;
+         ALTER TABLE game_settings ADD COLUMN wine_prefix TEXT;",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).
@@ -236,6 +242,17 @@ pub(crate) mod tests {
         migrate(&conn, None).unwrap();
         conn.execute_batch(
             "INSERT INTO game_settings (game_id, working_directory) VALUES ('steam:1', 'D:/x');",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migration_15_adds_wine_runtime_and_prefix_to_game_settings() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn, Some(14)).unwrap();
+        migrate(&conn, None).unwrap();
+        conn.execute_batch(
+            "INSERT INTO game_settings (game_id, wine_runtime, wine_prefix) VALUES ('manual:1', 'proton:8.0', '/tmp/pfx');",
         )
         .unwrap();
     }

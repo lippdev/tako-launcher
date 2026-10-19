@@ -126,6 +126,20 @@ impl DataPaths {
     pub fn updates(&self) -> PathBuf {
         self.machine.join("updates.json")
     }
+    /// Pasta padrão do prefixo do Wine/Proton para este jogo (SESSION-005).
+    pub fn wine_prefix(&self, game_id: &str) -> PathBuf {
+        let safe = game_id
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>();
+        self.root.join("prefixes").join(safe)
+    }
 }
 
 /// Regra pura, testável: `env` lê variáveis de ambiente, `exists` testa caminhos.
@@ -237,6 +251,15 @@ mod tests {
         assert_eq!(
             p.root,
             Path::new("/Users/a/Library/Application Support/Tako")
+        );
+    }
+
+    #[test]
+    fn wine_prefix_sanitizes_game_id() {
+        let p = DataPaths::at("/home/user/.local/share/tako");
+        assert_eq!(
+            p.wine_prefix("manual:game-1/v2"),
+            PathBuf::from("/home/user/.local/share/tako/prefixes/manual_game-1_v2")
         );
     }
 }

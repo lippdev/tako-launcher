@@ -293,6 +293,93 @@ fn edit_text(
 }
 
 /// Pasta que não existe não é aceita; vazio = a pasta do executável.
+fn is_manual_windows_game(ctx: &Ctx, id: &str) -> bool {
+    ctx.library.find(id).is_some_and(|g| {
+        g.store() == tako_core::library::GameStore::Manual
+            && g.launch_target
+                .as_deref()
+                .is_some_and(|p| p.to_lowercase().ends_with(".exe"))
+    })
+}
+
+fn runner_options(
+    c: &Override,
+) -> (
+    Vec<Option<tako_platform::linux_compatibility::CompatibilityRuntime>>,
+    usize,
+) {
+    let mut detected = tako_platform::linux_compatibility::detect_runtimes();
+    if let Some(saved) = normalize_arguments(c.wine_runtime.as_deref())
+        && !detected.iter().any(|r| r.id == saved)
+    {
+        if let Some(resolved) =
+            tako_platform::linux_compatibility::resolve_runtime(&saved, &detected)
+        {
+            detected.push(resolved);
+        } else {
+            detected.push(tako_platform::linux_compatibility::CompatibilityRuntime {
+                id: saved.clone(),
+                name: saved,
+                kind: tako_platform::linux_compatibility::RuntimeKind::Wine,
+                executable: std::path::PathBuf::from("wine"),
+            });
+        }
+    }
+    let mut options: Vec<Option<tako_platform::linux_compatibility::CompatibilityRuntime>> =
+        vec![None];
+    options.extend(detected.into_iter().map(Some));
+    let cur = options
+        .iter()
+        .position(|o| {
+            o.as_ref().map(|r| &r.id) == normalize_arguments(c.wine_runtime.as_deref()).as_ref()
+        })
+        .unwrap_or(0);
+    (options, cur)
+}
+
+fn set_runner(
+    ctx: &mut Ctx,
+    id: &str,
+    next: Option<tako_platform::linux_compatibility::CompatibilityRuntime>,
+) {
+    change(ctx, id, |o| {
+        o.wine_runtime = next.map(|r| r.id);
+    });
+}
+
+fn cycle_runner(ctx: &mut Ctx, id: &str, dir: i32) -> Flow {
+    let c = current(ctx, id);
+    let (options, cur) = runner_options(&c);
+    let next = cycle(&options, &options[cur], dir);
+    set_runner(ctx, id, next);
+    Flow::Stay
+}
+
+pub fn prefix_problem(ctx: &Ctx, prefix: &str) -> Option<String> {
+    let p = prefix.trim();
+    if p.is_empty() {
+        return None;
+    }
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    tako_platform::linux_compatibility::expand_and_validate_prefix(p, home.as_deref())
+        .err()
+        .map(|_| ctx.t("game_settings.prefix_invalid"))
+}
+
+fn edit_prefix(ctx: &Ctx, id: &str) -> Flow {
+    let text = current(ctx, id).wine_prefix.unwrap_or_default();
+    let id = id.to_owned();
+    Flow::Push(Box::new(
+        KeyboardLayer::new(ctx, ctx.t("game_settings.prefix"), &text, move |ctx, t| {
+            let prefix = normalize_arguments(Some(t));
+            change(ctx, &id, |o| o.wine_prefix = prefix);
+            Flow::Close
+        })
+        .hint(ctx.t("game_settings.prefix_hint"))
+        .check(prefix_problem),
+    ))
+}
+
 pub fn folder_problem(ctx: &Ctx, folder: &str) -> Option<String> {
     let f = folder.trim();
     (!f.is_empty() && !Path::new(f).is_dir())
@@ -673,6 +760,74 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("game_settings.launch"),
     )));
+    let show_compatibility =
+        (cfg!(target_os = "linux") || cfg!(test)) && is_manual_windows_game(ctx, id);
+    if show_compatibility {
+        let runner_default = default_of(ctx, &ctx.t("game_settings.runner_system"));
+        let runner_value = match normalize_arguments(c.wine_runtime.as_deref()) {
+            None => runner_default.clone(),
+            Some(id_str) => {
+                let (opts, _) = runner_options(&c);
+                opts.into_iter()
+                    .flatten()
+                    .find(|r| r.id == id_str)
+                    .map(|r| r.name)
+                    .unwrap_or_else(|| {
+                        ctx.tf("game_settings.runner_missing", &[("runner", &id_str)])
+                    })
+            }
+        };
+        let (a, b) = (i(), i());
+        v.push(
+            MenuItem::new(row(
+                ctx,
+                "runner",
+                ctx.t("game_settings.runner"),
+                runner_value,
+                c.wine_runtime.is_some().then(|| runner_default.clone()),
+            ))
+            .on(move |ctx| cycle_runner(ctx, &a, 1))
+            .on_adjust(move |ctx, d| cycle_runner(ctx, &b, d))
+            .options({
+                let (id, default_label) = (i(), runner_default.clone());
+                move |ctx| {
+                    let (options, cur) = runner_options(&current(ctx, &id));
+                    let picks = options
+                        .into_iter()
+                        .map(|o| {
+                            let label = match &o {
+                                None => default_label.clone(),
+                                Some(r) => r.name.clone(),
+                            };
+                            let id = id.clone();
+                            Pick::new(label).set(move |ctx| {
+                                set_runner(ctx, &id, o.clone());
+                                Flow::Stay
+                            })
+                        })
+                        .collect();
+                    (picks, cur)
+                }
+            }),
+        );
+
+        let prefix_default = default_of(ctx, &ctx.t("game_settings.prefix_default"));
+        let prefix_value = match normalize_arguments(c.wine_prefix.as_deref()) {
+            Some(p) => p,
+            None => prefix_default.clone(),
+        };
+        let a = i();
+        v.push(
+            MenuItem::new(row(
+                ctx,
+                "prefix",
+                ctx.t("game_settings.prefix"),
+                prefix_value,
+                c.wine_prefix.is_some().then(|| prefix_default.clone()),
+            ))
+            .on(move |ctx| edit_prefix(ctx, &a)),
+        );
+    }
     let args = normalize_arguments(c.extra_arguments.as_deref());
     let a = i();
     v.push(
@@ -1096,5 +1251,49 @@ mod tests {
         assert!(folder_problem(&ctx, "").is_none());
         assert!(folder_problem(&ctx, &dir.path().to_string_lossy()).is_none());
         assert!(folder_problem(&ctx, "/nao/existe/mesmo").is_some());
+    }
+
+    #[test]
+    fn manual_windows_game_settings_shows_runner_and_prefix() {
+        use tako_core::library::ManualGameRecord;
+        let dir = tempfile::tempdir().unwrap();
+        let (_l, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+        let manual = ctx
+            .library
+            .add_manual(ManualGameRecord::create(
+                "Windows Game",
+                "/jogos/game.exe",
+                chrono::Utc::now(),
+            ))
+            .unwrap()
+            .clone();
+
+        let layer = panel(&ctx, &manual.id);
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "runner"), ("Padrão: Sistema".into(), false));
+        assert_eq!(
+            value(&o, "prefix"),
+            ("Padrão: Pasta do Tako por jogo".into(), false)
+        );
+
+        // Validação de prefixo recusa / e ~
+        assert!(prefix_problem(&ctx, "").is_none());
+        assert!(prefix_problem(&ctx, "/").is_some());
+        assert!(prefix_problem(&ctx, "~").is_some());
+        assert!(prefix_problem(&ctx, "~/meu-prefixo").is_none());
+
+        // Altera o runner
+        change(&mut ctx, &manual.id, |o| {
+            o.wine_runtime = Some("system-wine".into())
+        });
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "runner"), ("Wine do sistema".into(), true));
+
+        // Altera o prefixo
+        change(&mut ctx, &manual.id, |o| {
+            o.wine_prefix = Some("/tmp/pfx".into())
+        });
+        let o = layer.render(&ctx);
+        assert_eq!(value(&o, "prefix"), ("/tmp/pfx".into(), true));
     }
 }
