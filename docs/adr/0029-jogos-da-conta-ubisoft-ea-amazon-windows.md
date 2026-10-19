@@ -87,7 +87,7 @@ não contornar login nem DRM; ADR-0028, que repete que o Tako não contorna DRM;
 
 - Amazon no Windows mostra os jogos da conta não instalados, sem rede e sem login. Se a Amazon mudar o banco ou a
   cifra, só essa leitura fica vazia (com log); os instalados seguem.
-- **Incertezas da Amazon, para o roteiro do Windows (`docs/testing/windows.md` §21):** o plugin não separa DLC nem
+- **Incertezas da Amazon, para o roteiro do Windows (`docs/testing/windows.md` §22):** o plugin não separa DLC nem
   conteúdo do Prime, então um deles pode aparecer como jogo, e não há arquivo real neste PC para conferir os campos do
   JSON além dos dois usados. **Risco aceito:** o roteiro pede os nomes das chaves do JSON (sem valores) para um filtro
   futuro. O id também é validado (`[A-Za-z0-9._-]+`) antes de entrar no endereço de instalar.

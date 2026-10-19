@@ -301,6 +301,8 @@ pub struct Running {
     presence: Option<crate::discord::Presence>,
     /// Desde quando o jogo mostra uma janela que não cobre a tela (ver [`Running::window_shown`]).
     windowed_since: Option<std::time::Instant>,
+    /// Últimos processos do jogo registrados no log (BUG-001), para logar de novo só quando mudarem.
+    logged_paths: Vec<String>,
 }
 
 impl Running {
@@ -322,6 +324,7 @@ impl Running {
             screen_height: 1080,
             presence: None,
             windowed_since: None,
+            logged_paths: Vec::new(),
         })
     }
 
@@ -404,9 +407,24 @@ impl Running {
     pub fn poll(&mut self, platform: &Platform) -> Option<Duration> {
         let steam =
             (self.req.steam_app_id.is_some()).then(|| platform.processes.steam_running_app_id());
+        let before = self.tracker.status;
         let status = self
             .tracker
             .update(&platform.processes.snapshot(), Utc::now(), steam);
+        let paths = self.tracker.game_executable_paths();
+        if status != before || paths != self.logged_paths.as_slice() {
+            // BUG-001: mostra se a sessão acabou cedo demais (processos fora da pasta, Steam sem confirmar).
+            // Display (join), não Debug: o Debug dobra as barras e o LogRedactor não reconheceria o caminho.
+            tracing::info!(
+                "acompanhamento de {}: {before:?} → {status:?} ({} s desde a abertura, processos {}, steam {:?}, confirmado pela steam {})",
+                self.req.game_id,
+                (Utc::now() - self.req.launched_at).num_seconds(),
+                paths.join(", "),
+                steam,
+                self.tracker.steam_confirmed
+            );
+            self.logged_paths = paths.to_vec();
+        }
         match status {
             GameRunStatus::Exited => Some(self.tracker.play_time().to_std().unwrap_or_default()),
             GameRunStatus::TimedOut => Some(Duration::ZERO),

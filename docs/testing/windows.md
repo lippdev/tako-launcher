@@ -226,7 +226,24 @@ Precisa de Steam, Epic e GOG Galaxy com conta, e da chave da Web API da Steam em
 8. O espaço livre mostrado é o do disco da Steam (biblioteca padrão) e bate com o Explorador de Arquivos; sem Steam, é o do `C:`.
    Com a Steam em outro disco (ex.: `D:\Steam`), mostra `D:`.
 
-## 21. Jogos da conta Amazon não instalados (SRC-005, ADR-0029)
+## 21. Interface que fecha e reabre ao jogar (BUG-001)
+
+Diagnóstico em [`docs/bugs/BUG-001.md`](../bugs/BUG-001.md). Anote o modo (desktop ou tela cheia) em cada passo.
+
+1. Com a Steam já aberta, no desktop, jogue um jogo da Steam. Em `logs\`, a linha `acompanhando … pid: …` diz se
+   a URI devolveu processo: `Some(N)` confirma a hipótese H2a.
+2. Siga as linhas `acompanhamento de …: Waiting/Running → …` até `jogo terminou`. Se aparecer `→ Exited` com o
+   jogo ainda aberto, anote os segundos e os `processos`. A lista é logada sempre que muda: na saída pela pasta
+   ela vem vazia na linha `→ Exited`, então olhe as linhas anteriores (`Running → Running`) para ver os processos.
+3. Repita com a Steam fechada (ela abre junto com o jogo) e com um jogo da Epic.
+4. Repita os passos 1 e 2 na tela cheia (F11). Ali a interface fecha quando o jogo aparece e reabre só no fim
+   do jogo, como prevê a ADR-0026. A linha `interface saiu: código 0 … jogo Some(…)` marca essa saída prevista.
+5. Se a interface sumir sozinha, procure `pânico (ui)` e `interface sem resposta` no log. Como o perfil release usa
+   `panic = "abort"`, o código de saída de um pânico não é 101: no Windows é `0xC0000409` (`-1073740791`).
+6. Sintoma de H2a: "Abrindo…" seguido do aviso de jogo que fechou rápido, sem `janela do jogo na tela` antes de
+   `jogo terminou (quick…)`.
+
+## 22. Jogos da conta Amazon não instalados (SRC-005, ADR-0029)
 
 Precisa do app Amazon Games logado, com ao menos um jogo da conta instalado e outro não instalado (ex.: um do Prime
 Gaming resgatado).
