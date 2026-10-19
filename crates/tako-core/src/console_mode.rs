@@ -12,7 +12,6 @@ pub const CURRENT_API_VERSION: u32 = 1;
 /// Tamanho máximo permitido para um quadro de aperto de mão (64 KiB).
 pub const MAX_HANDSHAKE_FRAME_BYTES: usize = 64 * 1024;
 
-
 /// Resultado tipado da detecção do Console Mode (CMI-002).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "estado", rename_all = "snake_case")]
@@ -61,7 +60,6 @@ pub struct HelloServer {
     #[serde(default)]
     pub capabilities: Vec<String>,
 }
-
 
 /// Codifica a mensagem `hello` do cliente com prefixo de 4 bytes little-endian.
 pub fn encode_hello_frame(api: u32) -> Result<Vec<u8>, ProtocolError> {
@@ -117,7 +115,6 @@ pub fn parse_hello_response(bytes: &[u8]) -> Result<ConsoleModeStatus, ProtocolE
         Ok(ConsoleModeStatus::Incompativel { versao })
     }
 }
-
 
 /// Executa o aperto de mão com o Console Mode através de um fluxo `Read + Write`.
 pub fn perform_handshake<S: Read + Write>(stream: &mut S) -> ConsoleModeStatus {
@@ -326,6 +323,4 @@ mod tests {
         let status = perform_handshake(&mut stream);
         assert_eq!(status, ConsoleModeStatus::Erro);
     }
-
-
 }

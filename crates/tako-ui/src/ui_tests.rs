@@ -885,16 +885,20 @@ fn desktop_snapshot() {
                 shell.open_route("settings:integrations");
                 if let Ok(st) = std::env::var("TAKO_SNAP_CONSOLE_MODE") {
                     match st.as_str() {
-                        "verificando" => crate::shell::settings::integrations::set_checking_for_test(true),
+                        "verificando" => {
+                            crate::shell::settings::integrations::set_checking_for_test(true)
+                        }
                         "instalado" => crate::shell::settings::integrations::set_status_for_test(
                             tako_core::console_mode::ConsoleModeStatus::Instalado {
                                 versao_api: 1,
                                 capacidades: vec!["tv".into(), "fps".into()],
                             },
                         ),
-                        "nao-instalado" => crate::shell::settings::integrations::set_status_for_test(
-                            tako_core::console_mode::ConsoleModeStatus::NaoInstalado,
-                        ),
+                        "nao-instalado" => {
+                            crate::shell::settings::integrations::set_status_for_test(
+                                tako_core::console_mode::ConsoleModeStatus::NaoInstalado,
+                            )
+                        }
                         _ => {}
                     }
                 }

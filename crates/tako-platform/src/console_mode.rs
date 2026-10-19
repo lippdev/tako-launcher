@@ -64,7 +64,10 @@ fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
 
 #[cfg(windows)]
 fn connect_local_socket(path: &Path) -> io::Result<Box<dyn ReadWrite>> {
-    let file = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)?;
     Ok(Box::new(file))
 }
 
