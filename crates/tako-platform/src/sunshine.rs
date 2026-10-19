@@ -169,6 +169,11 @@ pub fn app_entry(app: &App) -> Result<Value, String> {
     {
         return Err("O identificador do jogo não pode ser aberto por um link do Tako".into());
     }
+    if app.executable.contains('"') {
+        return Err(
+            "O caminho do executável contém aspas duplas, não suportadas pelo Sunshine".into(),
+        );
+    }
     let uri = format!("tako://play/{}", app.id);
     let command = format!(
         "{} --open-url {}",
@@ -284,7 +289,7 @@ pub fn quote_argument(value: &str, windows: bool) -> String {
         output.push('"');
         output
     } else {
-        format!("'{}'", value.replace('\'', "'\\''"))
+        format!("\"{value}\"")
     }
 }
 
@@ -331,8 +336,8 @@ mod tests {
     fn command_quotes_paths_and_uri_arguments_for_both_shells() {
         let posix = entry("Ação 'especial'");
         let command = posix["cmd"].as_str().unwrap();
-        assert!(command.contains("'/Applications/Tako Launcher.app/Contents/MacOS/tako'"));
-        assert!(command.ends_with("'tako://play/manual:game-1'"));
+        assert!(command.contains("\"/Applications/Tako Launcher.app/Contents/MacOS/tako\""));
+        assert!(command.ends_with("\"tako://play/manual:game-1\""));
         let encoded = serde_json::to_string(&posix).unwrap();
         let decoded: Value = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded["cmd"], command);
@@ -347,6 +352,10 @@ mod tests {
         assert_eq!(
             quote_argument("tako://play/manual:1", true),
             "\"tako://play/manual:1\""
+        );
+        assert_eq!(
+            quote_argument("/Applications/Tako.app/Contents/MacOS/tako", false),
+            "\"/Applications/Tako.app/Contents/MacOS/tako\""
         );
     }
 
@@ -384,6 +393,17 @@ mod tests {
             std::fs::read_to_string(&path)
                 .unwrap()
                 .contains("[Tako] Jogo")
+        );
+    }
+    #[test]
+    fn rejects_executable_path_with_double_quotes() {
+        assert!(
+            app_entry(&App {
+                id: "manual:game-1".into(),
+                title: "Jogo".into(),
+                executable: r#"/path/with/"quotes"/tako"#.into(),
+            })
+            .is_err()
         );
     }
 }

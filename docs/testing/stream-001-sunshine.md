@@ -13,7 +13,7 @@ Execute em Windows, Linux e macOS. O Tako nunca envia a biblioteca para a rede: 
 1. Escolha **Exportar jogos para o Sunshine**. Confira a lista e a contagem na prévia.
 2. Feche a prévia sem confirmar; confirme que o `apps.json` não mudou.
 3. Abra novamente e confirme. Confira que o Tako criou `apps.json.bak` (ou um sufixo `.bak.N` se já existia) e preservou todas as entradas do usuário.
-4. Confira que os apps Tako abrem o jogo pela rota `tako://play/<id>` e que caminhos com espaços continuam válidos.
+4. Confira no Sunshine real que o `cmd` gerado usa aspas duplas (`"caminho" --open-url "tako://play/<id>"`) em todas as plataformas (Linux, macOS, Windows) e que os apps abrem o jogo pela rota `tako://play/<id>` (o Sunshine separa argumentos via boost.process, que só reconhece aspas duplas, não aspas simples); verifique também caminhos com espaços.
 5. Exporte de novo e confira que não há duplicatas.
 6. Troque `apps.json` por JSON malformado, tente exportar e confirme que o arquivo e o backup anterior continuam intactos.
 
