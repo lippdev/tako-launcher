@@ -52,6 +52,9 @@ tako theme check meu-tema
 ```
 
 Para testar, copie a pasta para `<dados do Tako>/themes/` e escolha o tema em **Configurações › Aparência › Tema**.
+Escolher um tema mostra uma prévia: ele aparece inteiro na tela, mas só vira o tema do Tako se você confirmar com
+**Aplicar**. **Voltar** ou 15 segundos sem resposta devolvem o tema anterior; se o tema não carregar, o anterior
+continua.
 Para distribuir, compacte a pasta como `.takotheme` (veja a [seção 7](#7-pacote-e-distribuição)).
 
 ## 2. O que um tema pode e não pode fazer
@@ -103,6 +106,7 @@ import { Tile, HomeRow, NavItem, Hero, Stat, Details, Overlay, Key } from "@tako
 | `hints` | `[Hint]` | Dicas da barra de baixo (glifo do botão e texto), em ordem. |
 | `transparent-background` | `bool` | A janela está por cima do jogo: desenhe só o necessário, com fundo transparente. |
 | `leaving` | `bool` | Saindo para o jogo: o Tako fecha depois de `Ui.leave-time`. Ideal para um fade. |
+| `intro` | `bool` | Entrada do app: verdadeiro por cerca de 1 s só na abertura, com a primeira tela já pronta por baixo. Cubra-a com uma animação curta e apague ao virar falso. Qualquer tecla, botão ou `clicked` (de qualquer zona) pula a entrada; o tema pode usar a zona `intro` para a área do véu. Nunca fica verdadeiro com "Reduzir animações" nem num tema que não declare a propriedade. |
 
 ### 4.2 Barra lateral
 
@@ -191,6 +195,9 @@ dela.
 | `recovery` | Tela de recuperação | `title`, `text`, `rows`, `sel` |
 
 `sel = -1` quer dizer "sem linha selecionável" (só leitura).
+
+Desde o THEME-002, um `kind` vazio (ou que o tema não conhece) é uma camada sem desenho, como a prévia de tema: desenhe nada e deixe a
+barra de `hints` falar. Nunca cubra a tela com um véu para um `kind` desconhecido.
 
 ### 4.9 Callbacks
 

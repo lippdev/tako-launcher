@@ -242,3 +242,23 @@ Diagnóstico em [`docs/bugs/BUG-001.md`](../bugs/BUG-001.md). Anote o modo (desk
    `panic = "abort"`, o código de saída de um pânico não é 101: no Windows é `0xC0000409` (`-1073740791`).
 6. Sintoma de H2a: "Abrindo…" seguido do aviso de jogo que fechou rápido, sem `janela do jogo na tela` antes de
    `jogo terminou (quick…)`.
+
+## 22. Jogos da conta Amazon não instalados (SRC-005, ADR-0029)
+
+Precisa do app Amazon Games logado, com ao menos um jogo da conta instalado e outro não instalado (ex.: um do Prime
+Gaming resgatado).
+
+1. Conferir que existe `%LOCALAPPDATA%\Amazon Games\Data\Games\Sql\Entitlements.sqlite`. Se não existir, anotar a
+   versão do app e os arquivos de `Sql\`: a leitura não acha a lista e só os instalados aparecem.
+2. Abrir o Tako: em Amazon, os jogos da conta não instalados aparecem como "Não instalado", com o nome certo; o
+   instalado aparece uma vez só, como instalado.
+3. Conferir se aparece alguma DLC, complemento ou item do Prime como jogo (o plugin de origem não separa). Se
+   aparecer, anotar o nome do item e os NOMES das chaves do JSON dele (só os nomes, nunca os valores nem ids da conta),
+   para um filtro futuro. Decifrar uma linha: `[System.Security.Cryptography.ProtectedData]::Unprotect(...)` no
+   PowerShell do mesmo usuário.
+4. Instalar abre o app da Amazon na instalação do jogo (`amazon-games://install/<id>`). Ao terminar, o jogo vira
+   instalado sozinho na releitura de 30 s, sem reiniciar o Tako.
+5. Entrar no Windows com outro usuário e copiar o `Entitlements.sqlite` do primeiro para o `%LOCALAPPDATA%` dele: o
+   DPAPI não decifra, nenhum jogo da conta aparece, o Tako não fecha e o log não mostra o conteúdo do banco.
+6. Fechar o app da Amazon e desinstalá-lo: os não instalados somem (sem o app não há como instalar) e o aviso de
+   cliente ausente aparece.
