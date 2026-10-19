@@ -249,6 +249,17 @@ O benchmark (MIG-041) roda no CI, onde os números só servem de tendência, e e
 
 Legenda: **P0** = necessário para a paridade e o corte do WPF; **P1** = logo depois; **P2/P3** = futuro.
 
+### Prioridade MoSCoW da rodada de 19/10
+
+Ordem do que falta nesta rodada (decisão do mantenedor de usar MoSCoW). Fora daqui ficam os itens que dependem de hardware (MIG-*), o CMI-001 (no repositório do Console Mode) e os já fechados.
+
+| | Itens | Por quê |
+|---|---|---|
+| **Must** | CLOUD-001, DL-001, EXT-002, SESSION-005, SRC-002, THEME-003 | já estão em PR ou em andamento; protegem dados do usuário (backup) e fecham a paridade no Linux e a base de integração (API local, que o CMI usa) |
+| **Should** | THEME-007, THEME-008 (Fita), STREAM-001, CMI-002, THEME-006 | valor visível com pouco risco; CMI-002 é só detecção sobre a API local; THEME-006 reaproveita o THEME-003 |
+| **Could** | CLOUD-002, DL-002, EXT-003, STREAM-002, THEME-005, UX-002, SOURCE-001, CMI-003, CMI-004, INPUT-002, SESSION-001, ART-002 | maiores ou dependentes de outro item, de ADR aceita (PR #135) ou do Console Mode |
+| **Won't (agora)** | DATA-001, DEALS-001, ART-003, VOICE-001, THEME-011 | precisam de serviço externo, fonte de preços, servidor ou decisão ainda não tomada; os outros temas oficiais ficaram para depois do Fita |
+
 ### Fase 0 — Decisão técnica (P0)
 
 - [ ] **MIG-001 — Spike Slint.** Protótipo com a grade de 1.000 capas, foco animado, controle via SDL3 e um tema `.slint` carregado em tempo de execução, rodando em Windows, Linux (X11, Wayland KDE e gamescope) e macOS. **Gate:** cumpre as metas da §8.1 em pelo menos duas máquinas de referência e carrega o tema em runtime. Resultado num ADR (ADR-0023) com os números. Se não cumprir, parar e levar os números aos mantenedores (D-02). _Estado: código e números do CI prontos (ADR-0023); falta o gate nas duas máquinas de referência._
