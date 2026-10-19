@@ -26,6 +26,7 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
   - [ ] X11: a linha aparece indisponível com o motivo (o VRR é do driver, `Option "VariableRefresh"`); `xrandr --prop` mostra `vrr_capable` só para conferência.
   - [ ] GNOME: a linha aparece indisponível com o motivo (ainda não implementado).
   - [ ] Configurações deste jogo › "VRR" em Ligado/Desligado vence o padrão da tela.
+  - [ ] Feche o Tako à força durante o jogo (`kill -9`): ao abrir de novo, o VRR volta a desligado. Com "Restaurar tela e som ao sair do jogo" desligada, o VRR fica ligado depois do jogo (é o esperado).
 - [ ] gamescope: a tela aparece com o tamanho da sessão e as opções de troca ficam indisponíveis.
 - [ ] Compositor sem suporte: as opções de tela somem, sem erro na tela.
 
