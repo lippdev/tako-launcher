@@ -668,7 +668,12 @@ impl App {
             .set_fullscreen(self.ui.borrow().window().is_fullscreen());
         let old = self.ui.replace(new);
         self.wire_ui();
-        let _ = self.ui.borrow().show();
+        // Escondida ou minimizada (jogo em curso): a troca não pode trazer o Tako para a frente do jogo.
+        let (was_visible, was_minimized) = (old.window().is_visible(), old.window().is_minimized());
+        if was_visible {
+            let _ = self.ui.borrow().show();
+            self.ui.borrow().window().set_minimized(was_minimized);
+        }
         let _ = old.hide();
         self.shell.borrow_mut().ctx.dirty = true;
         render(&self.shell, &self.ui.borrow());
@@ -1594,6 +1599,74 @@ mod tests {
                 assert_eq!(app.shell.borrow().has_layers(), end != GameEnd::Normal);
                 app.shell.borrow_mut().close_layers();
             }
+            app.ui.borrow().hide().unwrap();
+        })
+        .join()
+        .unwrap();
+    }
+
+    #[test]
+    fn theme_preview_winning_over_a_hidden_window_does_not_bring_it_back() {
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        std::thread::spawn(|| {
+            use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+            struct Software;
+            impl slint::platform::Platform for Software {
+                fn create_window_adapter(
+                    &self,
+                ) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError>
+                {
+                    Ok(MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer))
+                }
+            }
+            slint::platform::set_platform(Box::new(Software)).unwrap();
+            struct HidingHost;
+            impl Host for HidingHost {
+                fn handle(&mut self, effect: &Effect, _: &mut Ctx) -> HostAction {
+                    if *effect == Effect::ResumeGame {
+                        HostAction::Hide
+                    } else {
+                        HostAction::Stay
+                    }
+                }
+            }
+            i18n::set_lang(Lang::PtBr);
+            let dir = tempfile::tempdir().unwrap();
+            let ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+            let builtin = theme::install_builtin(&ctx.paths.themes()).unwrap();
+            let ui = theme::compile(&builtin.join("main.slint"), &builtin)
+                .unwrap()
+                .create()
+                .unwrap();
+            let app = App {
+                ui: Rc::new(RefCell::new(ui)),
+                shell: Rc::new(RefCell::new(Shell::new(ctx))),
+                host: Rc::new(RefCell::new(HidingHost)),
+                builtin,
+                mode: Rc::new(std::cell::Cell::new(UiMode::BigPicture)),
+            };
+            app.wire_ui();
+            app.ui.borrow().show().unwrap();
+            // Prévia em curso (a do tema padrão), jogo retomado (a janela esconde) e o prazo da prévia vence.
+            {
+                let mut s = app.shell.borrow_mut();
+                let _ = crate::shell::theme_preview::start(&mut s.ctx, None, "Tako (padrão)");
+                s.ctx.effects.clear();
+                s.ctx.effect(Effect::ResumeGame);
+                s.ctx.effect(Effect::ApplyTheme("default".into()));
+            }
+            app.redraw();
+            assert!(!app.ui.borrow().window().is_visible());
+            app.redraw();
+            assert!(app.shell.borrow().ctx.effects.is_empty());
+            assert!(
+                !app.ui.borrow().window().is_visible(),
+                "recarregar o tema não traz o Tako para a frente do jogo"
+            );
+            // Visível, a troca continua mostrando a janela.
+            restore(&app.ui.borrow());
+            app.reload_theme();
+            assert!(app.ui.borrow().window().is_visible());
             app.ui.borrow().hide().unwrap();
         })
         .join()

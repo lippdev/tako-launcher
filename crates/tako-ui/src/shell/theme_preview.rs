@@ -20,6 +20,9 @@ pub struct ThemePreview {
     pub until: Instant,
 }
 
+/// Um tema pode chamar `hint-clicked(0)` no `init` e confirmar a própria prévia: Aplicar só vale depois disso.
+const ACCEPT_AFTER: Duration = Duration::from_millis(500);
+
 struct PreviewLayer {
     name: String,
 }
@@ -62,6 +65,13 @@ impl Layer for PreviewLayer {
             return Flow::Close;
         };
         match cmd {
+            Cmd::Accept
+                if p.until.saturating_duration_since(Instant::now())
+                    > PREVIEW_TIME - ACCEPT_AFTER =>
+            {
+                ctx.theme_preview = Some(p);
+                return Flow::Stay;
+            }
             Cmd::Accept => match tako_themes::select(&ctx.paths.themes(), p.id.as_deref()) {
                 // A tela já mostra esse tema: não precisa recarregar.
                 Ok(()) => {
@@ -147,6 +157,11 @@ mod tests {
         (dir, ctx)
     }
 
+    /// Passa o tempo em que Aplicar é ignorado.
+    fn settle(ctx: &mut Ctx) {
+        ctx.theme_preview.as_mut().unwrap().until -= ACCEPT_AFTER;
+    }
+
     fn reloads(ctx: &Ctx) -> usize {
         ctx.effects
             .iter()
@@ -192,6 +207,7 @@ mod tests {
             panic!();
         };
         ctx.effects.clear();
+        settle(&mut ctx);
         assert!(matches!(
             layer.handle(Cmd::Accept, &mut ctx),
             Flow::Replace(_)
@@ -296,5 +312,48 @@ mod tests {
         i18n::set_lang(Lang::EnUs);
         assert_eq!(layer.hints(&ctx)[0].label, "Apply theme");
         i18n::set_lang(Lang::PtBr);
+    }
+
+    #[test]
+    fn accept_is_ignored_right_after_the_preview_starts() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = setup();
+        let Flow::Replace(mut layer) = start(&mut ctx, Some(THEME), "Meu tema") else {
+            panic!()
+        };
+        // Um tema que chama `hint-clicked(0)` no `init` não confirma a própria prévia.
+        assert!(matches!(layer.handle(Cmd::Accept, &mut ctx), Flow::Stay));
+        assert!(ctx.theme_preview.is_some());
+        assert_eq!(tako_themes::selected(&ctx.paths.themes()), None);
+        settle(&mut ctx);
+        assert!(matches!(
+            layer.handle(Cmd::Accept, &mut ctx),
+            Flow::Replace(_)
+        ));
+        assert_eq!(
+            tako_themes::selected(&ctx.paths.themes()).as_deref(),
+            Some(THEME)
+        );
+    }
+
+    #[test]
+    fn failing_without_a_preview_stays_quiet_and_entering_the_desktop_drops_it() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, ctx) = setup();
+        let mut shell = Shell::new(ctx);
+        shell.fail_theme_preview();
+        assert!(shell.ctx.toast.is_none());
+        // O desktop não mostra temas: a prévia some junto com as camadas, sem pedir tema nem avisar.
+        let Flow::Replace(layer) = start(&mut shell.ctx, Some(THEME), "Meu tema") else {
+            panic!()
+        };
+        shell.push_layer(layer);
+        shell.ctx.toast = None;
+        shell.ctx.effects.clear();
+        shell.enter_desktop();
+        shell.tick_theme_preview(Instant::now());
+        assert!(shell.ctx.theme_preview.is_none());
+        assert_eq!(reloads(&shell.ctx), 0);
+        assert!(shell.ctx.toast.is_none());
     }
 }
