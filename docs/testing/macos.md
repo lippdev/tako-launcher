@@ -94,3 +94,14 @@ O Launch Services ignora apps em `/tmp`: registre o pacote numa pasta comum. Cad
 - [ ] Depois de a interface cair e o supervisor reabrir, o próximo link chega à interface nova.
 - [ ] Com um jogo aberto na tela cheia (interface fechada), o `open` falha com `-600` (limitação conhecida).
 - [ ] Um link no Safari pede para abrir o Tako e funciona.
+
+## Downloads por torrent (DL-001)
+
+- [ ] A pasta padrão é `~/Downloads/Tako`.
+- [ ] Configurações › Downloads vem desligado. Ligar mostra o aviso legal e de IP; Cancelar mantém desligado; "Entendi e aceito" liga e não pergunta de novo.
+- [ ] Adicionar fonte com `http://` é recusado; com uma fonte `https://` sua de teste (só itens fictícios ou de conteúdo livre), a linha mostra o número de itens. Remover apaga a fonte e o cache.
+- [ ] Num jogo não instalado, ⋯ › "Baixar de uma fonte" lista só itens parecidos; confirmar vincula ao jogo, a pílula "↓ N%" aparece antes do perfil e o jogo mostra o progresso na lista.
+- [ ] No painel: pausar para na hora (sem confirmação); cancelar pede confirmação e "Cancelar e apagar" remove a pasta. Com uma instalação da Steam em andamento, ela aparece em BAIXANDO "pela Steam" e os botões abrem o cliente.
+- [ ] Ao terminar: aviso, item em CONCLUÍDOS com "Abrir pasta"; o gerenciador de arquivos abre na pasta e nada é executado. O envio para (sem semear).
+- [ ] Reabrir o Tako com um download em andamento: ele volta pausado e continua ao retomar.
+- [ ] Durante um jogo com a janela minimizada, o download segue (confira o tamanho da pasta) e nada anima.

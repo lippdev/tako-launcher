@@ -123,6 +123,28 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         "ALTER TABLE game_settings ADD COLUMN tools TEXT;
          ALTER TABLE game_settings ADD COLUMN close_tools INTEGER;",
     ),
+    // Downloads por torrent (DL-001): fontes que o usuário adicionou e os downloads com o jogo vinculado.
+    (
+        15,
+        "CREATE TABLE IF NOT EXISTS download_sources (
+            url TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            items INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS downloads (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            game_id TEXT,
+            source TEXT NOT NULL,
+            uri TEXT NOT NULL,
+            folder TEXT NOT NULL,
+            state TEXT NOT NULL,
+            error TEXT NOT NULL,
+            done INTEGER NOT NULL,
+            total INTEGER
+        );",
+    ),
 ];
 
 /// Última versão das alphas C#: banco abaixo da v7 veio delas (ou de antes).
@@ -211,6 +233,35 @@ pub(crate) mod tests {
     fn migrations_are_in_strictly_increasing_order() {
         let versions: Vec<u32> = MIGRATIONS.iter().map(|m| m.0).collect();
         assert_eq!(versions, (1..=MIGRATIONS.len() as u32).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn downloads_upgrade_keeps_vrr_and_tools_from_develop() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn, Some(14)).unwrap();
+        conn.execute_batch(
+            "INSERT INTO game_settings (game_id, vrr, tools, close_tools)
+             VALUES ('manual:a', 1, '/ferramenta', 1);",
+        )
+        .unwrap();
+        migrate(&conn, None).unwrap();
+        assert_eq!(current_version(&conn).unwrap(), 15);
+        let kept = conn
+            .query_row(
+                "SELECT vrr, tools, close_tools FROM game_settings WHERE game_id = 'manual:a';",
+                [],
+                |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, i64>(2)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(kept, (1, "/ferramenta".into(), 1));
+        assert!(table_exists(&conn, "download_sources"));
+        assert!(table_exists(&conn, "downloads"));
     }
 
     #[test]

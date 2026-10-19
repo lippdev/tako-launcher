@@ -327,6 +327,8 @@ pub struct Ctx {
     pub list_first: usize,
     /// O último foco veio do teclado ou do controle: o desktop mostra o anel de foco (o mouse esconde).
     pub focus_visible: bool,
+    /// Downloads por torrent (DL-001): fontes, fila e motor; vazio com a função desligada.
+    pub downloads: super::downloads::State,
 }
 
 pub type ArtPins = std::collections::BTreeMap<tako_core::library::ArtKind, String>;
