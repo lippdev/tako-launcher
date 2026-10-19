@@ -6492,7 +6492,17 @@ component ArtLayer inherits Rectangle {
     Rectangle {
         opacity: DeskArt.gray ? 0 : 1;
         animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-        if !DeskArt.has-art: Rectangle {
+        if Ui.has-custom-background && Ui.custom-background.width > 0: Image {
+            width: parent.width;
+            height: parent.height;
+            source: Ui.custom-background;
+            image-fit: cover;
+            opacity: 0.55;
+        }
+        if Ui.has-custom-background && Ui.custom-background.width > 0: Rectangle {
+            background: #000000.with-alpha(0.5);
+        }
+        if !Ui.has-custom-background && !DeskArt.has-art: Rectangle {
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
             animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             // Brilho suave no alto à direita (EstadoSemArte).
@@ -6504,7 +6514,7 @@ component ArtLayer inherits Rectangle {
                 background: @radial-gradient(circle, Ui.on-accent.with-alpha(0.08) 0%, Ui.on-accent.with-alpha(0) 70%);
             }
         }
-        if DeskArt.has-art: Rectangle {
+        if !Ui.has-custom-background && DeskArt.has-art: Rectangle {
             Image {
                 x: DeskArt.x;
                 y: DeskArt.y;

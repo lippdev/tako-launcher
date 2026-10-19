@@ -216,6 +216,10 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         install_queue: Vec::new(),
         redraw_at: None,
         theme_preview: None,
+        theme_draft: None,
+        theme_supports_ui: true,
+        persisted_theme_accent: None,
+        base_theme_accent: None,
         launching: false,
         launch_since: None,
         leaving: false,
@@ -238,6 +242,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         focus_visible: false,
     };
     ctx.sync_collections();
+    ctx.reload_theme_cache();
     ctx
 }
 
@@ -513,6 +518,33 @@ fn big_picture_fullscreen() -> bool {
     !cfg!(debug_assertions) && std::env::var_os("TAKO_WINDOWED").is_none()
 }
 
+fn apply_theme_tokens(
+    ui: &slint_interpreter::ComponentInstance,
+    ctx: &Ctx,
+    dir: Option<&std::path::Path>,
+) {
+    let selected_id = tako_themes::selected(&ctx.paths.themes());
+    let theme_id = match &ctx.theme_preview {
+        Some(p) => p.id.as_deref(),
+        None => selected_id.as_deref(),
+    };
+    let override_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), theme_id);
+    let draft_text = ctx
+        .theme_preview
+        .as_ref()
+        .and_then(|p| p.draft_override.as_ref())
+        .map(|ov| ov.to_toml_string());
+
+    theme::apply_tokens_with_override(ui, dir, draft_text.as_deref(), Some(&override_dir));
+}
+
+fn theme_accent(ctx: &Ctx) -> Option<tako_core::presentation::Rgb> {
+    if let Some(custom) = theme::custom_theme_accent(ctx) {
+        return Some(custom);
+    }
+    ctx.base_theme_accent
+}
+
 impl App {
     /// Carrega o tema (o escolhido ou o padrão) e liga tudo. `host` recebe os pedidos de sessão e saída.
     pub fn new(ctx: Ctx, opts: &UiOptions, host: Rc<RefCell<dyn Host>>) -> Result<App, String> {
@@ -524,8 +556,9 @@ impl App {
         // "Abrir em: tela cheia" (onboarding, Configurações › Geral) vale para a abertura sem argumentos.
         let mode = crate::mode::preferred(opts.mode, opts.ask_big_picture, &ctx.settings);
         let (def, dir) = load_mode(&ctx, &builtin, mode)?;
+        ctx.theme_supports_ui = def.global_properties("Ui").is_some();
         let ui = def.create().map_err(|e| e.to_string())?;
-        theme::apply_tokens(&ui, dir.as_deref());
+        apply_theme_tokens(&ui, &ctx, dir.as_deref());
         // Entrada do app (só na abertura, não na volta da tela cheia): começa apagado e acende depois do 1º quadro.
         if mode == UiMode::Desktop {
             bridge::set(&ui, "desk-intro", Value::Bool(true));
@@ -633,6 +666,7 @@ impl App {
             HostAction::ReloadTheme if self.mode.get() == UiMode::Desktop => {
                 // O tema é da tela cheia: vale na próxima troca.
                 let mut s = self.shell.borrow_mut();
+                s.ctx.reload_theme_cache();
                 let text = s.ctx.t("desktop.theme_big_picture");
                 s.ctx.toast(text);
             }
@@ -664,7 +698,7 @@ impl App {
         let new =
             load_mode(&self.shell.borrow().ctx, &self.builtin, mode).and_then(|(def, dir)| {
                 let ui = def.create().map_err(|e| e.to_string())?;
-                theme::apply_tokens(&ui, dir.as_deref());
+                apply_theme_tokens(&ui, &self.shell.borrow().ctx, dir.as_deref());
                 Ok(ui)
             });
         let new = match new {
@@ -718,7 +752,9 @@ impl App {
                 return;
             }
         };
-        theme::apply_tokens(&new, dir.as_deref());
+        self.shell.borrow_mut().ctx.reload_theme_cache();
+        self.shell.borrow_mut().ctx.theme_supports_ui = def.global_properties("Ui").is_some();
+        apply_theme_tokens(&new, &self.shell.borrow().ctx, dir.as_deref());
         new.window()
             .set_fullscreen(self.ui.borrow().window().is_fullscreen());
         let old = self.ui.replace(new);
@@ -1541,7 +1577,17 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
         .ctx
         .settings
         .bool(crate::shell::ctx::keys::DYNAMIC_COLOR, true);
-    let palette = AccentPalette::for_accent(game.map(|g| g.accent.as_str()), dynamic);
+    let custom_accent = theme::custom_theme_accent(&s.ctx);
+    let fallback_accent = custom_accent.or_else(|| theme_accent(&s.ctx));
+    let palette = if let Some(custom) = custom_accent {
+        AccentPalette::for_accent_with_fallback(None, false, Some(custom))
+    } else {
+        AccentPalette::for_accent_with_fallback(
+            game.map(|g| g.accent.as_str()),
+            dynamic,
+            fallback_accent,
+        )
+    };
     let color = |c: tako_core::presentation::color::Rgb| slint::Color::from_rgb_u8(c.r, c.g, c.b);
     bridge::set_global(ui, "Ui", "accent", color(palette.accent).to_value());
     bridge::set_global(ui, "Ui", "accent-deep", color(palette.deep).to_value());
