@@ -829,8 +829,8 @@ component IconBtn inherits Rectangle {
     in property <bool> on;
     in property <bool> focused;
     callback clicked();
-    height: 44px;
-    width: badge != "" ? il.preferred-width : 44px;
+    height: 30px;
+    width: badge != "" ? il.preferred-width : 30px;
     border-radius: Ui.radius-thumb;
     background: ita.has-hover ? Ui.glass-hover : transparent;
     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -846,6 +846,10 @@ component IconBtn inherits Rectangle {
         if badge != "": Text { text: badge; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 700; vertical-alignment: center; }
     }
     ita := TouchArea {
+        width: max(parent.width, 44px);
+        height: max(parent.height, 44px);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
@@ -3921,15 +3925,18 @@ component DeskRow inherits Rectangle {
                 Rectangle { width: 14px; DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
             }
         }
-        // Nas Configurações a ação é um botão em pílula com o nome dela ("Trocar", "Procurar").
-        if data.kind == "action" && data.value != "" && DeskArt.gray: Rectangle {
+        // Nas Configurações a ação com botão em pílula ("Trocar", "Procurar", "Verificar de novo").
+        if data.action != "" && DeskArt.gray: Rectangle {
             y: (parent.height - self.height) / 2;
             height: 36px;
             width: al.preferred-width + 32px;
             border-radius: self.height / 2;
-            background: ta.has-hover ? Ui.settings-control-hover : Ui.settings-control;
+            background: !data.enabled ? Ui.settings-control : (ta.has-hover ? Ui.settings-control-hover : Ui.settings-control);
+            opacity: data.enabled ? 1 : 0.5;
+            accessible-role: button;
+            accessible-label: data.title + (data.value != "" ? (": " + data.value + ". ") : ": ") + data.action;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            al := Text { text: data.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
+            al := Text { text: data.action; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
         }
         // Pasta de ROMs: a ação é um link sublinhado ("Trocar").
         if card && data.value != "": Rectangle {
@@ -3937,7 +3944,7 @@ component DeskRow inherits Rectangle {
             cl := Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 500; }
             Rectangle { y: (parent.height + cl.preferred-height) / 2; height: 1px; background: Ui.on-accent; }
         }
-        if !card && data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download" && !(data.kind == "action" && DeskArt.gray): Text {
+        if !card && data.value != "" && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download": Text {
             text: data.value;
             color: data.style == "warning" ? Ui.warning : (data.style == "error" ? Ui.error : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted));
             // Resumo do onboarding: a quantidade em 15/600.
@@ -3948,7 +3955,7 @@ component DeskRow inherits Rectangle {
             max-width: 260px;
             overflow: elide;
         }
-        if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
+        if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && data.action == "": Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
     notel := VerticalLayout {
         visible: data.kind == "note";
@@ -4131,7 +4138,7 @@ component PopupFooter inherits Rectangle {
         height: 0px;
         spacing: 0px;
         for r[i] in rows: Rectangle {
-            width: r.kind == "button" ? (btn-m.width + (root.has-btn-before(i) ? 10px : 0px)) : 0px;
+            width: r.kind == "button" ? (btn-m.preferred-width + (root.has-btn-before(i) ? 10px : 0px)) : 0px;
             btn-m := PopupButton {
                 data: r;
             }
@@ -4151,7 +4158,8 @@ component PopupFooter inherits Rectangle {
             height: r.kind == "button" ? (Ui.control-height + (root.has-btn-before(i) ? 8px : 0px)) : 0px;
             width: parent.width;
             clip: true;
-            if r.kind == "button": PopupButton {
+            visible: r.kind == "button";
+            PopupButton {
                 y: root.has-btn-before(i) ? 8px : 0px;
                 width: parent.width;
                 height: Ui.control-height;
@@ -4167,10 +4175,11 @@ component PopupFooter inherits Rectangle {
         alignment: end;
         spacing: 0px;
         for r[i] in rows: Rectangle {
-            width: r.kind == "button" ? (btn-h.width + (root.has-btn-before(i) ? 10px : 0px)) : 0px;
+            width: r.kind == "button" ? (btn-h.preferred-width + (root.has-btn-before(i) ? 10px : 0px)) : 0px;
             height: Ui.control-height;
             clip: true;
-            if r.kind == "button": btn-h := PopupButton {
+            visible: r.kind == "button";
+            btn-h := PopupButton {
                 x: root.has-btn-before(i) ? 10px : 0px;
                 data: r;
                 focused: key-focus && i == sel;
@@ -4208,24 +4217,25 @@ component DeskSettings inherits Rectangle {
     animate opacity, x { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     // Troca de categoria (abas internas): as linhas saem em 80 e as novas entram em 120, só opacidade.
     property <bool> rows-in: true;
-    // Pela categoria, não pelo título: digitar na busca não pisca as linhas.
-    changed category-focus => {
-        rows-in = false;
-        rows-timer.running = true;
-        category-scroll-timer.running = true;
-    }
-    category-scroll-timer := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            self.running = false;
+    function ensure-category-visible() {
         if (category-focus * category-row-h + cf.viewport-y < 0) {
             cf.viewport-y = -category-focus * category-row-h;
         }
         if ((category-focus + 1) * category-row-h + cf.viewport-y > cf.height) {
             cf.viewport-y = cf.height - (category-focus + 1) * category-row-h;
         }
-        }
+    }
+    init => {
+        root.ensure-category-visible();
+    }
+    // Pela categoria, não pelo título: digitar na busca não pisca as linhas.
+    changed category-focus => {
+        rows-in = false;
+        rows-timer.running = true;
+        root.ensure-category-visible();
+    }
+    changed height => {
+        root.ensure-category-visible();
     }
     rows-timer := Timer {
         interval: max(1ms, Ui.focus-time / 2);
@@ -7170,7 +7180,7 @@ export component Desktop inherits Window {
             padding-right: Ui.space-20;
             spacing: 10px;
             if !desk-toast-mascot: DeskIcon {
-                name: desk-toast-kind == "success" ? "check" : (desk-toast-kind == "warning" ? "alert" : (desk-toast-kind == "error" ? "close" : "info"));
+                name: desk-toast-kind == "success" ? "check" : (desk-toast-kind == "warning" ? "alert" : (desk-toast-kind == "error" ? "error" : "info"));
                 size: 18px;
                 tint: desk-toast-kind == "success" ? Ui.success : (desk-toast-kind == "warning" ? Ui.warning : (desk-toast-kind == "error" ? Ui.error : Ui.on-accent));
                 y: (parent.height - self.height) / 2;
