@@ -114,7 +114,11 @@ pub fn unix_sources() -> Vec<Box<dyn LibrarySource>> {
     let mut out: Vec<Box<dyn LibrarySource>> = vec![Box::new(heroic::HeroicSource::detect())];
     if cfg!(target_os = "linux") {
         out.push(Box::new(lutris::LutrisSource::detect()));
-        out.push(Box::new(bottles::BottlesSource::detect()));
+        let is_flatpak = std::env::var_os("FLATPAK_ID").is_some()
+            || std::path::Path::new("/.flatpak-info").exists();
+        if !is_flatpak {
+            out.push(Box::new(bottles::BottlesSource::detect()));
+        }
         out.push(Box::new(itch::ItchSource::detect()));
     }
     out

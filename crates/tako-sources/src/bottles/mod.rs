@@ -24,7 +24,6 @@ const ACCENT: &str = "#597AC8";
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BottleConfig {
     pub name: String,
-    pub environment: Option<String>,
     pub programs: Vec<BottleProgram>,
 }
 
@@ -83,7 +82,6 @@ fn valid_slug(s: &str) -> String {
 pub fn parse_bottle_yml(content: &str, folder_name: &str) -> BottleConfig {
     let mut config = BottleConfig {
         name: String::new(),
-        environment: None,
         programs: Vec::new(),
     };
 
@@ -114,8 +112,6 @@ pub fn parse_bottle_yml(content: &str, folder_name: &str) -> BottleConfig {
                 let val = v.trim();
                 if key.eq_ignore_ascii_case("Name") {
                     config.name = unquote(val);
-                } else if key.eq_ignore_ascii_case("Environment") {
-                    config.environment = Some(unquote(val));
                 } else if key.eq_ignore_ascii_case("External_Programs") {
                     in_external_programs = true;
                 }
@@ -190,21 +186,24 @@ fn resolve_icon(bottle_dir: &Path, icon_val: Option<&str>) -> Option<String> {
         return None;
     }
 
-    // Caminho absoluto para arquivo existente
+    // Restringe o ícone estritamente à subpasta icons/ da garrafa
     let p = Path::new(icon_val);
-    if p.is_file() {
-        return Some(file_uri(p));
+    if p.is_absolute()
+        || p.components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return None;
     }
 
-    // Arquivo relativo na subpasta icons/ da garrafa
-    let rel = bottle_dir.join("icons").join(icon_val);
+    let icons_dir = bottle_dir.join("icons");
+    let rel = icons_dir.join(icon_val);
     if rel.is_file() {
         return Some(file_uri(&rel));
     }
 
     // Com extensão .png caso tenha vindo sem
     if !icon_val.ends_with(".png") {
-        let with_ext = bottle_dir.join("icons").join(format!("{icon_val}.png"));
+        let with_ext = icons_dir.join(format!("{icon_val}.png"));
         if with_ext.is_file() {
             return Some(file_uri(&with_ext));
         }
@@ -234,16 +233,15 @@ pub fn scan_bottle(bottle_dir: &Path, is_flatpak: bool) -> Result<Vec<Game>, Str
     let mut games = Vec::new();
 
     for prog in config.programs {
-        let prog_title = if !prog.name.trim().is_empty() {
-            prog.name.trim().to_owned()
-        } else if !prog.executable.trim().is_empty() {
-            prog.executable.trim().trim_end_matches(".exe").to_owned()
-        } else {
-            prog.id.clone()
-        };
+        let prog_name = prog.name.trim();
+        // Não passe -p "" quando prog.name estiver vazio: pule o programa
+        if prog_name.is_empty() {
+            continue;
+        }
 
-        let prog_slug = valid_slug(&prog_title);
-        let id = format!("bottles:{bottle_slug}:{prog_slug}");
+        let prog_title = prog_name.to_owned();
+        // O id do Bottles deve usar a chave UUID de External_Programs (prog.id)
+        let id = format!("bottles:{bottle_slug}:{}", prog.id);
 
         let (target, args) = if is_flatpak {
             (
@@ -251,7 +249,7 @@ pub fn scan_bottle(bottle_dir: &Path, is_flatpak: bool) -> Result<Vec<Game>, Str
                 format!(
                     "run --command=bottles-cli com.usebottles.bottles run -b {} -p {}",
                     quote_arg(&config.name),
-                    quote_arg(&prog.name)
+                    quote_arg(prog_name)
                 ),
             )
         } else {
@@ -260,7 +258,7 @@ pub fn scan_bottle(bottle_dir: &Path, is_flatpak: bool) -> Result<Vec<Game>, Str
                 format!(
                     "run -b {} -p {}",
                     quote_arg(&config.name),
-                    quote_arg(&prog.name)
+                    quote_arg(prog_name)
                 ),
             )
         };
