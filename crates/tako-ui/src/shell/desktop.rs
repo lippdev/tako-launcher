@@ -168,9 +168,8 @@ fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
         .filter(|_| load)
         .and_then(|u| crate::images::icon(u, ICON.0))
         .unwrap_or_default();
-    // Enquanto o ícone carrega, não pisca a inicial; ela só aparece sem ícone ou se a carga falhou.
-    let waiting = uri.is_some_and(|u| !load || crate::images::is_pending(u));
-    let initial = if icon.size().width > 0 || waiting {
+    // A inicial fica por baixo enquanto o ícone espera na fila (pode demorar: vem da rede); o ícone a cobre ao chegar.
+    let initial = if icon.size().width > 0 {
         String::new()
     } else {
         g.title
@@ -2667,13 +2666,14 @@ mod tests {
         };
         assert_eq!(row_icon(&game("  ori"), true).1, "O");
         assert_eq!(row_icon(&game(""), true).1, "");
-        // Com ícone na lista, mas fora da área visível: espera a carga, sem piscar a inicial.
+        // Com ícone ainda a caminho (ou fora da área visível), a linha mostra a inicial, nunca fica vazia.
         let mut far = game("Celeste");
         far.pinned_art.insert(
             tako_core::library::ArtKind::Icon,
             "steam-art://1/icon".into(),
         );
-        assert_eq!(row_icon(&far, false).1, "");
+        assert_eq!(row_icon(&far, false).1, "C");
+        assert_eq!(row_icon(&far, true).1, "C");
     }
 
     fn page(shell: &Shell) -> &DesktopLibrary {
