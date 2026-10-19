@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, write::SimpleFileOptions};
 
 use super::*;
 
@@ -27,6 +27,20 @@ impl Work {
         let mut z = zip::ZipWriter::new(fs::File::create(&path).unwrap());
         for (name, content) in entries {
             z.start_file(*name, SimpleFileOptions::default()).unwrap();
+            z.write_all(content).unwrap();
+        }
+        z.finish().unwrap();
+        path
+    }
+    fn zip_deflated(&self, entries: &[(&str, &[u8])]) -> PathBuf {
+        let path = self.dir.path().join("tema.takotheme");
+        let mut z = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+        for (name, content) in entries {
+            z.start_file(
+                *name,
+                SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+            )
+            .unwrap();
             z.write_all(content).unwrap();
         }
         z.finish().unwrap();
@@ -231,15 +245,67 @@ fn refuses_files_that_are_not_zip_or_missing() {
 
 #[test]
 fn refuses_reserved_ids() {
+    for id in ["Default", "TAKO-FITA", "tako-alto-contraste"] {
+        let w = Work::new();
+        let toml = TOML.replace("Autor_TemaTeste", id);
+        assert_eq!(
+            codes(w.install(&[
+                ("theme.toml", toml.as_bytes()),
+                ("main.slint", SLINT.as_bytes())
+            ])),
+            ["package.reserved-id"],
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn validates_deflated_zip_audio_and_rejects_invalid_wav() {
     let w = Work::new();
-    let toml = TOML.replace("Autor_TemaTeste", "Default");
+    let manifest = TOML.to_owned()
+        + "entry = \"main.slint\"\n[audio]\nmusic = \"music.wav\"\nmove = \"move.wav\"\n";
+    let wav = make_test_wav(1.0);
+    let path = w.zip_deflated(&[
+        ("theme.toml", manifest.as_bytes()),
+        ("main.slint", SLINT.as_bytes()),
+        ("music.wav", wav.as_slice()),
+        ("move.wav", wav.as_slice()),
+    ]);
+    let parsed = validate_package(&path).unwrap();
+    assert_eq!(parsed.audio.music.as_deref(), Some("music.wav"));
+    assert_eq!(parsed.audio.move_sound.as_deref(), Some("move.wav"));
+
+    let path = w.zip_deflated(&[
+        ("theme.toml", manifest.as_bytes()),
+        ("main.slint", SLINT.as_bytes()),
+        ("music.wav", b"not a wav"),
+        ("move.wav", wav.as_slice()),
+    ]);
     assert_eq!(
-        codes(w.install(&[
-            ("theme.toml", toml.as_bytes()),
-            ("main.slint", SLINT.as_bytes())
-        ])),
-        ["package.reserved-id"]
+        validate_package(&path).unwrap_err()[0].code,
+        "package.audio-invalid"
     );
+}
+
+fn make_test_wav(duration_secs: f64) -> Vec<u8> {
+    let sample_rate = 44100u32;
+    let byte_rate = sample_rate * 2;
+    let data_len = (duration_secs * byte_rate as f64).round() as u32;
+    let mut buf = Vec::new();
+    buf.extend_from_slice(b"RIFF");
+    buf.extend_from_slice(&(36 + data_len).to_le_bytes());
+    buf.extend_from_slice(b"WAVEfmt ");
+    buf.extend_from_slice(&16u32.to_le_bytes());
+    buf.extend_from_slice(&1u16.to_le_bytes());
+    buf.extend_from_slice(&1u16.to_le_bytes());
+    buf.extend_from_slice(&sample_rate.to_le_bytes());
+    buf.extend_from_slice(&byte_rate.to_le_bytes());
+    buf.extend_from_slice(&2u16.to_le_bytes());
+    buf.extend_from_slice(&16u16.to_le_bytes());
+    buf.extend_from_slice(b"data");
+    buf.extend_from_slice(&data_len.to_le_bytes());
+    buf.resize(44 + data_len as usize, 0);
+    buf
 }
 
 #[test]

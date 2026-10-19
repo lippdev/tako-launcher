@@ -26,6 +26,8 @@ pub use package::{
 
 /// Tema embutido no `tako-ui`; nenhum pacote pode usar este id.
 pub const DEFAULT_THEME_ID: &str = "default";
+/// Temas incluídos no app, cujo diretório de instalação é mantido pelo Tako.
+pub const BUILTIN_EXTRA_THEME_IDS: [&str; 2] = ["tako-alto-contraste", "tako-fita"];
 const SELECTED_FILE: &str = ".selected";
 const LOADING_FILE: &str = ".loading";
 const FAULTS_FILE: &str = ".faults";
@@ -97,6 +99,9 @@ impl InstalledTheme {
 
 fn reserved(id: &str) -> bool {
     id.eq_ignore_ascii_case(DEFAULT_THEME_ID)
+        || BUILTIN_EXTRA_THEME_IDS
+            .iter()
+            .any(|reserved| id.eq_ignore_ascii_case(reserved))
 }
 
 /// Instala o pacote em `<themes_root>/<id>/`, trocando uma versão anterior do mesmo tema só no fim.
@@ -153,6 +158,27 @@ pub fn install_with(
         dir: dest,
         manifest: Ok(pkg.manifest),
     })
+}
+
+/// Valida e extrai um pacote para um diretório temporário novo, sem aplicar regras de instalação.
+/// Usado por `theme check`, que precisa compilar até temas embutidos sem registrá-los no catálogo.
+pub fn extract_for_check(package: &Path, output: &Path) -> Result<ThemeManifest, Vec<Problem>> {
+    let limits = Limits::default();
+    let mut pkg = package::Package::open(package, &limits)?;
+    fs::create_dir(output).map_err(|e| {
+        vec![Problem::new(
+            "package.extract-failed",
+            tf(
+                "themes.package.extract_failed",
+                &[("error", &e.to_string())],
+            ),
+        )]
+    })?;
+    if let Err(problem) = pkg.extract_to(output, &limits) {
+        let _ = fs::remove_dir_all(output);
+        return Err(vec![problem]);
+    }
+    Ok(pkg.manifest)
 }
 
 /// Remove um tema instalado (e a escolha, se era ele). O id seguro impede sair da pasta de temas.
