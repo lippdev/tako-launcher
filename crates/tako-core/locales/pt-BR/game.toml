@@ -55,6 +55,7 @@ prefix = "Prefixo"
 prefix_hint = "Pasta do prefixo Wine ou Proton. Vazio = pasta do Tako por jogo."
 prefix_default = "Pasta do Tako por jogo"
 prefix_invalid = "O prefixo não pode ser / nem a sua pasta pessoal"
+steam_not_found = "Steam não encontrada no sistema; o Proton precisa da instalação da Steam para rodar."
 
 [edit_game]
 title = "Editar jogo"

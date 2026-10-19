@@ -55,6 +55,7 @@ prefix = "Prefix"
 prefix_hint = "Wine or Proton prefix folder. Empty = Tako per-game folder."
 prefix_default = "Tako per-game folder"
 prefix_invalid = "The prefix cannot be / or your home directory"
+steam_not_found = "Steam was not found on the system; Proton requires a Steam installation to run."
 
 [edit_game]
 title = "Edit game"

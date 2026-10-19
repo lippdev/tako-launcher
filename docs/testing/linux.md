@@ -78,6 +78,9 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Validação de segurança do prefixo: digitar / ou a pasta pessoal (~ ou $HOME) é recusado com aviso e não permite salvar.
 - [ ] Abrir com Wine: o jogo abre com WINEPREFIX apontando para a pasta do prefixo e o processo é acompanhado até fechar.
 - [ ] Abrir com Proton fora da Steam: o Tako define obrigatoriamente STEAM_COMPAT_DATA_PATH (pasta do prefixo, onde o Proton cria a subpasta pfx), STEAM_COMPAT_CLIENT_INSTALL_PATH (raiz da Steam, ex.: ~/.local/share/Steam) e STEAM_COMPAT_APP_ID=0. O jogo abre por proton run <caminho.exe> e o acompanhamento de processos monitora toda a árvore até o fim.
+- [ ] Steam necessária para Proton: se o Proton for selecionado mas a Steam não estiver instalada (raiz da Steam não encontrada), as Configurações deste jogo exibem o aviso traduzido "A Steam precisa estar instalada para usar o Proton fora dela."
+- [ ] Rastreamento de processos: o rastreamento por pasta (`InstallFolder`) NÃO funciona com Wine/Proton porque no `/proc` o executável é o runner (`wine`, `wineserver`, `proton`), e não o binário dentro da pasta do jogo; deve-se usar o rastreamento por Processo (padrão).
+- [ ] Sandbox Flatpak: dentro da sandbox Flatpak do Tako, as opções de Wine/Proton ficam ocultas nas configurações do jogo, pois a sandbox não tem acesso aos runtimes do host sem `flatpak-spawn --host`.
 - [ ] Encerrar jogo fecha o jogo e o processo do Wine/Proton (SIGTERM) e o Tako volta para a tela normalmente.
 
 ## Abrir com o sistema
@@ -141,6 +144,7 @@ Roteiro de publicação e permissões em [packaging-linux.md](../packaging-linux
 
 - [ ] Gerar o `cargo-sources.json` e compilar como em packaging-linux.md; `flatpak run io.github.lippdev.Tako` abre.
 - [ ] Biblioteca: Steam nativa e Steam Flatpak, Heroic nativo e Flatpak, Lutris nativo e Flatpak, itch.io nativo e Flatpak aparecem (um de cada que houver; o Bottles fica oculto no Flatpak). Biblioteca da Steam e do itch.io em `/mnt`, `/media` ou `/run/media` aparece; em outro caminho não aparece até `flatpak override --user --filesystem=<pasta>:ro io.github.lippdev.Tako`.
+- [ ] Jogos manuais de Windows (.exe): as linhas de Wine/Proton em Configurações deste jogo ficam ocultas dentro da sandbox Flatpak.
 - [ ] Abrir um jogo da Steam e do Heroic/Lutris pelo Tako: abre no host (link da loja pelo portal). Anotar se o Tako acompanha o jogo até fechar (esperado: só a Steam pelo `RunningAppID`).
 - [ ] Controle: o controle é reconhecido e navega; o cursor pelo controle move o mouse (precisa de `--device=all` e da regra udev no host).
 - [ ] Áudio: lista de saídas, troca da padrão, volume e mudo. Segredos: salvar uma chave de API e reabrir.

@@ -302,13 +302,18 @@ fn is_manual_windows_game(ctx: &Ctx, id: &str) -> bool {
     })
 }
 
+fn is_flatpak() -> bool {
+    std::env::var_os("FLATPAK_ID").is_some() || std::path::Path::new("/.flatpak-info").exists()
+}
+
 fn runner_options(
     c: &Override,
+    detected: &[tako_platform::linux_compatibility::CompatibilityRuntime],
 ) -> (
     Vec<Option<tako_platform::linux_compatibility::CompatibilityRuntime>>,
     usize,
 ) {
-    let mut detected = tako_platform::linux_compatibility::detect_runtimes();
+    let mut detected = detected.to_vec();
     if let Some(saved) = normalize_arguments(c.wine_runtime.as_deref())
         && !detected.iter().any(|r| r.id == saved)
     {
@@ -347,9 +352,14 @@ fn set_runner(
     });
 }
 
-fn cycle_runner(ctx: &mut Ctx, id: &str, dir: i32) -> Flow {
+fn cycle_runner(
+    ctx: &mut Ctx,
+    id: &str,
+    dir: i32,
+    detected: &[tako_platform::linux_compatibility::CompatibilityRuntime],
+) -> Flow {
     let c = current(ctx, id);
-    let (options, cur) = runner_options(&c);
+    let (options, cur) = runner_options(&c, detected);
     let next = cycle(&options, &options[cur], dir);
     set_runner(ctx, id, next);
     Flow::Stay
@@ -426,8 +436,12 @@ pub fn panel(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
         .find(id)
         .and_then(|g| g.shown_cover().map(str::to_owned));
     let id = id.to_owned();
-    let layer = MenuLayer::panel(ctx.t("details.game_settings"), move |ctx| rows(ctx, &id))
-        .overline(overline);
+    let runtimes = std::sync::Arc::new(tako_platform::linux_compatibility::detect_runtimes());
+    let runtimes_for_rows = runtimes.clone();
+    let layer = MenuLayer::panel(ctx.t("details.game_settings"), move |ctx| {
+        rows(ctx, &id, &runtimes_for_rows)
+    })
+    .overline(overline);
     Box::new(if desktop {
         layer
             .wide()
@@ -437,7 +451,11 @@ pub fn panel(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
     })
 }
 
-fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
+fn rows(
+    ctx: &Ctx,
+    id: &str,
+    detected_runtimes: &[tako_platform::linux_compatibility::CompatibilityRuntime],
+) -> Vec<MenuItem> {
     let c = current(ctx, id);
     let s = &ctx.settings;
     let mut v = Vec::new();
@@ -760,55 +778,70 @@ fn rows(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("game_settings.launch"),
     )));
-    let show_compatibility =
-        (cfg!(target_os = "linux") || cfg!(test)) && is_manual_windows_game(ctx, id);
+    let show_compatibility = (cfg!(target_os = "linux") || cfg!(test))
+        && !is_flatpak()
+        && is_manual_windows_game(ctx, id);
     if show_compatibility {
         let runner_default = default_of(ctx, &ctx.t("game_settings.runner_system"));
-        let runner_value = match normalize_arguments(c.wine_runtime.as_deref()) {
-            None => runner_default.clone(),
+        let (opts, _) = runner_options(&c, detected_runtimes);
+        let (runner_value, is_proton) = match normalize_arguments(c.wine_runtime.as_deref()) {
+            None => (runner_default.clone(), false),
             Some(id_str) => {
-                let (opts, _) = runner_options(&c);
-                opts.into_iter()
-                    .flatten()
-                    .find(|r| r.id == id_str)
-                    .map(|r| r.name)
+                let found = opts.iter().flatten().find(|r| r.id == id_str);
+                let name = found
+                    .map(|r| r.name.clone())
                     .unwrap_or_else(|| {
                         ctx.tf("game_settings.runner_missing", &[("runner", &id_str)])
-                    })
+                    });
+                let is_proton = found.is_some_and(|r| {
+                    r.kind == tako_platform::linux_compatibility::RuntimeKind::Proton
+                });
+                (name, is_proton)
             }
         };
+        let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+        let steam_missing = is_proton
+            && tako_platform::linux_compatibility::find_steam_root(home.as_deref()).is_none();
+
+        let mut runner_row = row(
+            ctx,
+            "runner",
+            ctx.t("game_settings.runner"),
+            runner_value,
+            c.wine_runtime.is_some().then(|| runner_default.clone()),
+        );
+        if steam_missing {
+            runner_row = runner_row.desc(ctx.t("game_settings.steam_not_found"));
+        }
         let (a, b) = (i(), i());
+        let r1 = detected_runtimes.to_vec();
+        let r2 = detected_runtimes.to_vec();
+        let r3 = detected_runtimes.to_vec();
         v.push(
-            MenuItem::new(row(
-                ctx,
-                "runner",
-                ctx.t("game_settings.runner"),
-                runner_value,
-                c.wine_runtime.is_some().then(|| runner_default.clone()),
-            ))
-            .on(move |ctx| cycle_runner(ctx, &a, 1))
-            .on_adjust(move |ctx, d| cycle_runner(ctx, &b, d))
-            .options({
-                let (id, default_label) = (i(), runner_default.clone());
-                move |ctx| {
-                    let (options, cur) = runner_options(&current(ctx, &id));
-                    let picks = options
-                        .into_iter()
-                        .map(|o| {
-                            let label = match &o {
-                                None => default_label.clone(),
-                                Some(r) => r.name.clone(),
-                            };
-                            let id = id.clone();
-                            Pick::new(label).set(move |ctx| {
-                                set_runner(ctx, &id, o.clone());
-                                Flow::Stay
+            MenuItem::new(runner_row)
+                .on(move |ctx| cycle_runner(ctx, &a, 1, &r1))
+                .on_adjust(move |ctx, d| cycle_runner(ctx, &b, d, &r2))
+                .options({
+                    let (id, default_label) = (i(), runner_default.clone());
+                    move |ctx| {
+                        let (options, cur) = runner_options(&current(ctx, &id), &r3);
+                        let picks = options
+                            .into_iter()
+                            .map(|o| {
+                                let label = match &o {
+                                    None => default_label.clone(),
+                                    Some(r) => r.name.clone(),
+                                };
+                                let id = id.clone();
+                                Pick::new(label).set(move |ctx| {
+                                    set_runner(ctx, &id, o.clone());
+                                    Flow::Stay
+                                })
                             })
-                        })
-                        .collect();
-                    (picks, cur)
-                }
-            }),
+                            .collect();
+                        (picks, cur)
+                    }
+                }),
         );
 
         let prefix_default = default_of(ctx, &ctx.t("game_settings.prefix_default"));
