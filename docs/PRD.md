@@ -305,7 +305,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 ### Épico CMI — Integração com o Console Mode (BACKLOG, P1, depende do Console Mode)
 
 - [ ] **CMI-001 — API local no Console Mode** (no repositório dele): descoberta, versão, capacidades e comandos (TV, sobreposições, sessão de console). Contrato definido no ADR-0025.
-- [ ] **CMI-002 — Detecção no Tako:** saber se o Console Mode está instalado e qual versão da API ele oferece.
+- [x] **CMI-002 — Detecção no Tako:** saber se o Console Mode está instalado e qual versão da API ele oferece.
 - [ ] **CMI-003 — Ações delegadas:** quando o Console Mode existe, a Central e as Configurações do Tako mostram as funções dele (TV, FPS, janelas), executadas por ele.
 - [ ] **CMI-004 — Tako como launcher do Console Mode:** o Console Mode pode abrir o Tako como interface da sessão, no lugar do Big Picture ou do Playnite.
 
@@ -340,12 +340,12 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 
 - [x] **THEME-001:** documentação pública da API de temas.
 - [x] **THEME-002:** pré-visualização antes de aplicar.
-- [ ] **THEME-003:** edição de cores, fontes e fundo pelo próprio Tako.
+- [x] **THEME-003:** edição de cores, fontes e fundo pelo próprio Tako.
 - [x] **THEME-004:** instalar tema por URL de repositório, com atualização opcional.
 - [ ] **THEME-005:** galeria comunitária de temas.
-- [ ] **THEME-006:** criar o próprio tema pelo Tako, sem editar arquivos: partir do tema padrão (ou de um instalado), escolher cores, fonte e fundo com prévia ao vivo, dar nome, salvar como tema instalado e exportar como `.takotheme` para compartilhar. Base: os `tokens.toml` (temas que só trocam a paleta) e THEME-002/003.
-- [ ] **THEME-007:** música de fundo e sons de navegação por tema (o tema traz os arquivos; volume próprio e opção de desligar; nunca toca durante o jogo).
-- [ ] **THEME-008:** primeiro tema oficial alternativo, o **Fita** (carrossel horizontal com arte em tela cheia), escolhido entre as propostas de `docs/themes/THEME-008-propostas.md`. _Estado: propostas feitas e escolhidas; o Fita está em revisão; os outros temas foram para o THEME-011._
+- [x] **THEME-006:** criar o próprio tema pelo Tako, sem editar arquivos: partir do tema padrão (ou de um instalado), escolher cores, fonte e fundo com prévia ao vivo, dar nome, salvar como tema instalado e exportar como `.takotheme` para compartilhar. Base: os `tokens.toml` (temas que só trocam a paleta) e THEME-002/003.
+- [x] **THEME-007:** música de fundo e sons de navegação por tema (o tema traz os arquivos; volume próprio e opção de desligar; nunca toca durante o jogo).
+- [x] **THEME-008:** primeiro tema oficial alternativo, o **Fita** (carrossel horizontal com arte em tela cheia), escolhido entre as propostas de `docs/themes/THEME-008-propostas.md`.
 - [ ] **THEME-011 (futuro):** os outros quatro temas oficiais escolhidos em `docs/themes/THEME-008-propostas.md`: Deck Handheld, Lista & Cinema, Console Retrô CRT e Estante Clássica. Fica para depois do Fita, reaproveitando o que ele ensinar (contraste sobre a arte, texto em 1,5x).
 - [x] **THEME-010:** estudo de conversor de temas do Playnite 10 para o formato do Tako. Sem compromisso de fidelidade; só segue se o estudo mostrar resultado útil. _Estado: estudado (`docs/spikes/AI-001-THEME-010-estudo.md`): só as cores convertem, então não segue._
 
@@ -387,7 +387,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [x] **SESSION-002:** histórico de sessões: data, hora e duração de cada vez que o jogo rodou (hoje só o total e a última vez), nos detalhes do jogo.
 - [x] **SESSION-003:** jogo que fechou sozinho em poucos segundos ou com código de erro gera um aviso com o que se sabe (código, log do Tako, sugestão), em vez de voltar em silêncio. _Estado: o código de saída só existe quando o Tako abre o executável direto; jogos abertos pela loja ficam com o aviso por tempo._
 - [x] **SESSION-004:** por jogo, variáveis de ambiente e comandos antes e depois de jogar (argumentos e pasta de trabalho já existem), com consentimento. Base do EXT-001.
-- [x] **SESSION-005 (Linux):** escolher Proton ou Wine (versão e prefixo) para jogos de Windows adicionados à mão.
+- [ ] **SESSION-005 (Linux):** escolher Proton ou Wine (versão e prefixo) para jogos de Windows adicionados à mão. _Estado: Proton e Wine escolhidos por jogo manual, com prefixo validado; falta validar em máquina Linux real (docs/testing/linux.md)._
 - [x] **SESSION-006:** "Reparar jogo": abrir a verificação de arquivos da loja dona do jogo (Steam, Epic, GOG, etc.) quando ela oferece. _Estado: só a Steam oferece a verificação de fora do app (`steam://validate`)._
 
 ### Épico VOICE e AI — Busca por voz e IA (P3)
@@ -403,7 +403,7 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 
 Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes são do usuário e ficam a critério dele; o Tako não traz, não recomenda e não lista fontes, nem na interface nem na documentação.
 
-- [ ] **DL-001:** baixar jogos por torrent a partir de fontes `.json` que o próprio usuário adiciona, em formato de fonte .json. Quando um item da fonte é um jogo que já existe numa biblioteca (Steam, Epic, adicionado à mão, etc.), o download se vincula a esse jogo: o card e os detalhes mostram "Baixando Batman: Arkham Knight" com progresso, em vez de criar um jogo novo. Ao terminar, o jogo fica instalado e jogável pelo Tako.
+- [ ] **DL-001:** baixar jogos por torrent a partir de fontes `.json` que o próprio usuário adiciona, em formato de fonte .json. Quando um item da fonte é um jogo que já existe numa biblioteca (Steam, Epic, adicionado à mão, etc.), o download se vincula a esse jogo: o card e os detalhes mostram "Baixando Batman: Arkham Knight" com progresso, em vez de criar um jogo novo. Ao terminar, o jogo fica instalado e jogável pelo Tako. _Estado: downloads por torrent de fontes do usuário, desligados por padrão (ADR-0028); falta validar com rede e fontes reais._
 - [ ] **DL-002:** depois do DL-001, usar serviços de download acelerado como o Real-Debrid, com a conta do próprio usuário.
 
 ### Épico DEALS — Promoções (P3)
@@ -413,19 +413,19 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 ### Épico EXT (P3)
 
 - [x] **EXT-001:** eventos de sessão (`GameStarting`, `GameStarted`, `GameExited`) e ferramentas externas por jogo (pré e pós-execução), com consentimento.
-- [ ] **EXT-002:** API local de integração (a mesma base que o Console Mode usará no sentido inverso).
+- [x] **EXT-002:** API local de integração (a mesma base que o Console Mode usará no sentido inverso).
 - [x] **EXT-004:** Discord Rich Presence: mostrar o jogo aberto no Discord, desligado por padrão.
 - [x] **EXT-005:** links `tako://` para abrir um jogo ou uma tela do Tako de fora (atalhos, Stream Deck, ART-002). _Estado: Windows e Linux entregues (0.2.0-alpha.5); falta o macOS, onde o toolkit ainda não repassa os eventos `OpenURLs`._
 - [ ] **EXT-003:** plugins de metadados e de fontes, sem acesso privilegiado.
 
 ### Épico STREAM (P3)
 
-- [x] **STREAM-001:** integração com Sunshine/Apollo e Moonlight.
+- [ ] **STREAM-001:** integração com Sunshine/Apollo e Moonlight. _Estado: exportação para o Sunshine/Apollo com prévia e backup do apps.json (ADR-0034); falta validar com Sunshine e Moonlight reais (docs/testing/stream-001-sunshine.md)._
 - [ ] **STREAM-002:** controle remoto pelo celular por interface web local autenticada.
 
 ### Épico CLOUD (P3)
 
-- [ ] **CLOUD-001:** backup e restauração da biblioteca e das configurações.
+- [x] **CLOUD-001:** backup e restauração da biblioteca e das configurações.
 - [ ] **CLOUD-002:** sincronização opcional por WebDAV ou S3 compatível.
 
 ### Épico SOURCE (P3)
