@@ -885,6 +885,355 @@ fn sound_settings_persist_and_adjust_volumes_and_toggle_music() {
 }
 
 #[test]
+fn edit_theme_panel_modifies_saves_and_resets_overrides() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Opção para editar tema existe em Aparência
+    let items = rows_of(&ctx, "appearance");
+    let edit_opt = find(&items, "edit-theme");
+    assert_eq!(edit_opt.row.title, ctx.t("settings.appearance.edit_theme"));
+
+    // 2. Abre o painel de edição de tema
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let accent_row = find(&rows, "accent");
+    let font_row = find(&rows, "font");
+    let bg_type_row = find(&rows, "bg_type");
+
+    assert_eq!(
+        accent_row.row.title,
+        ctx.t("settings.appearance.accent_color")
+    );
+    assert_eq!(font_row.row.title, ctx.t("settings.appearance.font"));
+    assert_eq!(bg_type_row.row.title, ctx.t("settings.appearance.bg_type"));
+
+    // 3. Modifica a cor de destaque (testando com controle/teclado via adjust)
+    adjust(&mut ctx, &accent_row, 1);
+    assert!(ctx.theme_draft.is_some());
+
+    // 4. Modifica a cor e fonte no modo desktop (mouse/select)
+    ctx.desktop = true;
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let accent_row = find(&rows, "accent");
+    let font_row = find(&rows, "font");
+    let save_row = find(&rows, "save");
+
+    let mut accent_select = accent_row.select(&ctx).expect("select");
+    let _ = accent_select.click("row", 2, &mut ctx); // Vermelho (#E3161E)
+    assert_eq!(
+        ctx.theme_draft.as_ref().unwrap().accent.as_deref(),
+        Some("#E3161E")
+    );
+
+    let mut font_select = font_row.select(&ctx).expect("select");
+    let _ = font_select.click("row", 2, &mut ctx); // Poppins
+    assert_eq!(
+        ctx.theme_draft.as_ref().unwrap().font.as_deref(),
+        Some("Poppins")
+    );
+
+    // 5. Salva a sobreposição
+    accept(&mut ctx, &save_row);
+    assert!(ctx.theme_draft.is_none());
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    let loaded = tako_themes::overrides::load_override(&ctx.paths.themes(), None).unwrap();
+    assert!(loaded.contains("#E3161E"));
+    assert!(loaded.contains("Poppins"));
+
+    // 6. Ao reabrir, a opção de restaurar padrão está visível e funcional
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let reset_row = find(&rows, "reset");
+    assert_eq!(
+        reset_row.row.title,
+        ctx.t("settings.appearance.reset_theme")
+    );
+    assert_eq!(reset_row.row.style, "danger");
+    let flow = accept(&mut ctx, &reset_row);
+    let Flow::Push(mut dialog) = flow else {
+        panic!("esperava confirmação em diálogo")
+    };
+    dialog.click("row", 0, &mut ctx);
+
+    // 7. A sobreposição foi removida
+    assert!(!tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    assert_eq!(
+        tako_themes::overrides::load_override(&ctx.paths.themes(), None),
+        None
+    );
+}
+
+#[test]
+fn edit_theme_image_full_path_and_promotion() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (dir, mut ctx) = ctx();
+
+    // 1. Abre painel
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let bg_type_row = find(&rows, "bg_type");
+
+    // 2. Escolhe Imagem (avança de Padrão -> Sólido -> Imagem via adjust)
+    adjust(&mut ctx, &bg_type_row, 1);
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let bg_type_row = find(&rows, "bg_type");
+    adjust(&mut ctx, &bg_type_row, 1);
+
+    // Confirma que bg_type_idx agora é Imagem e a linha choose_image aparece!
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    assert_eq!(
+        find(&rows, "bg_type").row.value,
+        ctx.t("settings.appearance.bg_image")
+    );
+    let choose_img_row = find(&rows, "choose_image");
+    assert_eq!(
+        choose_img_row.row.value,
+        ctx.t("settings.appearance.bg_no_image")
+    );
+
+    // 3. Simula seleção de arquivo: copia imagem para rascunho
+    let img_src = dir.path().join("wall.png");
+    let img = image::RgbaImage::new(64, 64);
+    img.save(&img_src).unwrap();
+
+    let draft_name =
+        tako_themes::overrides::copy_draft_background_image(&ctx.paths.themes(), None, &img_src)
+            .unwrap();
+    assert_eq!(draft_name, "background.draft.png");
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some(draft_name);
+    d.background_source_name = Some("wall.png".into());
+    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Image);
+    ctx.theme_draft = Some(d);
+
+    // O painel mostra o nome do arquivo de origem (wall.png) e não background.draft.png
+    let panel = edit_theme_panel(&ctx);
+    let rows = panel.items(&ctx);
+    let choose_img_row = find(&rows, "choose_image");
+    assert_eq!(choose_img_row.row.value, "wall.png");
+
+    // 4. Salva a personalização
+    let save_row = find(&rows, "save");
+    accept(&mut ctx, &save_row);
+
+    // Rascunho foi limpo do contexto
+    assert!(ctx.theme_draft.is_none());
+
+    // Imagem foi promovida para background.png definitivo e rascunho removido
+    let ov_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), None);
+    assert!(ov_dir.join("background.png").is_file());
+    assert!(!ov_dir.join("background.draft.png").exists());
+
+    let loaded = tako_themes::overrides::load_override(&ctx.paths.themes(), None).unwrap();
+    assert!(loaded.contains("custom-background = \"background.png\""));
+}
+
+#[test]
+fn edit_theme_draft_does_not_leak_on_back_and_theme_switch() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Modifica o rascunho
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#E3161E".into());
+    ctx.theme_draft = Some(d);
+    assert!(ctx.theme_draft.is_some());
+
+    // 2. Sair do painel pelo Back (B) limpa o rascunho
+    let mut panel = edit_theme_panel(&ctx);
+    let flow = panel.handle(Cmd::Back, &mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert!(
+        ctx.theme_draft.is_none(),
+        "theme_draft vazou ao sair pelo back"
+    );
+
+    // 3. Ao trocar de tema, o rascunho também é zerado
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#6C5CE7".into());
+    ctx.theme_draft = Some(d);
+    assert!(ctx.theme_draft.is_some());
+
+    pick_theme(&mut ctx, None, "Tako");
+    assert!(
+        ctx.theme_draft.is_none(),
+        "theme_draft vazou ao trocar de tema"
+    );
+}
+
+#[test]
+fn edit_theme_hidden_when_ui_not_supported() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Quando suporta Ui: edit-theme aparece
+    ctx.theme_supports_ui = true;
+    let items = rows_of(&ctx, "appearance");
+    assert!(items.iter().any(|i| i.row.key == "edit-theme"));
+
+    // Quando NÃO suporta Ui: edit-theme fica oculto
+    ctx.theme_supports_ui = false;
+    let items = rows_of(&ctx, "appearance");
+    assert!(!items.iter().any(|i| i.row.key == "edit-theme"));
+}
+
+#[test]
+fn custom_accent_wins_over_game_accent() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Sem personalização, custom_theme_accent retorna None
+    assert_eq!(crate::theme::custom_theme_accent(&ctx), None);
+
+    // Com personalização no draft
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#E3161E".into()); // Vermelho
+    ctx.theme_draft = Some(d);
+
+    let custom = crate::theme::custom_theme_accent(&ctx).expect("custom accent");
+    assert_eq!(custom, tako_core::presentation::Rgb::new(0xE3, 0x16, 0x1E));
+
+    // No desktop, verifica se o DeskGame com personalização usa o custom accent
+    ctx.desktop = true;
+    let g = tako_core::library::Game {
+        id: "game-1".into(),
+        title: "Meu Jogo".into(),
+        accent: "#00FF00".into(), // Jogo tem cor verde
+        ..Default::default()
+    };
+
+    // Ao montar a linha de DeskGame, o accent personalizado (#E3161E) deve vencer o do jogo (#00FF00)
+    // exercitando a função real de desktop.rs
+    let desk_game_accent = crate::shell::desktop::game_card_accent(&ctx, &g.accent);
+    assert_eq!(
+        desk_game_accent,
+        slint::Color::from_rgb_u8(0xE3, 0x16, 0x1E)
+    );
+}
+
+#[test]
+fn desktop_nav_cleans_theme_draft_and_draft_image() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let mut shell = crate::shell::Shell::new(ctx);
+    shell.enter_desktop();
+
+    let ov_dir = tako_themes::overrides::override_dir(&shell.ctx.paths.themes(), None);
+    std::fs::create_dir_all(&ov_dir).unwrap();
+    let draft_img = ov_dir.join("background.draft.png");
+    std::fs::write(&draft_img, b"temp draft").unwrap();
+
+    let mut d = current_draft(&shell.ctx);
+    d.accent = Some("#FF0055".into());
+    d.background_image = Some("background.draft.png".into());
+    shell.ctx.theme_draft = Some(d);
+
+    // No painel, o destaque do rascunho estaria ativo
+    assert_eq!(
+        crate::theme::custom_theme_accent(&shell.ctx),
+        Some(tako_core::presentation::Rgb::new(0xFF, 0x00, 0x55))
+    );
+
+    // Navega pela barra superior do desktop (índice 0: Biblioteca)
+    shell.desktop_nav(0);
+
+    // Rascunho foi limpo
+    assert!(shell.ctx.theme_draft.is_none());
+    // Arquivo temporário no disco foi apagado
+    assert!(!draft_img.exists());
+    // Destaque voltou ao padrão
+    assert_eq!(crate::theme::custom_theme_accent(&shell.ctx), None);
+}
+
+#[test]
+fn reset_theme_opens_danger_dialog_focused_on_cancel_and_confirms() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Cria override existente
+    tako_themes::overrides::save_override(&ctx.paths.themes(), None, "accent = \"#123456\"\n")
+        .unwrap();
+    ctx.reload_theme_cache();
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+
+    let mut panel = edit_theme_panel(&ctx);
+    let ov = panel.render(&ctx);
+    let reset_idx = ov
+        .rows
+        .iter()
+        .position(|r| r.key == "reset")
+        .expect("reset row");
+    assert_eq!(ov.rows[reset_idx].style, "danger");
+
+    // Ao clicar na linha de restaurar, abre o diálogo de confirmação
+    let flow = panel.click("row", reset_idx, &mut ctx);
+    let Flow::Push(mut dialog) = flow else {
+        panic!("esperava Flow::Push do diálogo");
+    };
+
+    // Diálogo com foco em Cancelar (índice 1)
+    let dialog_ov = dialog.render(&ctx);
+    assert_eq!(dialog_ov.rows.len(), 2);
+    assert_eq!(dialog_ov.rows[0].key, "reset");
+    assert_eq!(dialog_ov.rows[0].style, "danger");
+    assert_eq!(dialog_ov.rows[1].key, "cancel");
+
+    // Foco inicial do diálogo é no botão Cancelar (índice 1)
+    assert_eq!(dialog_ov.sel, 1);
+
+    // Cancelar apenas fecha o diálogo sem resetar
+    let cancel_dialog = panel.click("row", reset_idx, &mut ctx);
+    let Flow::Push(mut cancel_dialog_layer) = cancel_dialog else {
+        panic!()
+    };
+    let cancel_flow = cancel_dialog_layer.click("row", 1, &mut ctx);
+    assert!(matches!(cancel_flow, Flow::Close));
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+
+    // Confirmar no botão Restaurar remove a sobreposição e fecha tudo
+    let reset_flow = dialog.click("row", 0, &mut ctx);
+    assert!(matches!(reset_flow, Flow::CloseAll));
+    assert!(!tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    assert_eq!(ctx.persisted_theme_accent, None);
+}
+
+#[test]
+fn load_safe_image_scales_down_to_3840() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = tempfile::tempdir().unwrap();
+    let img_path = dir.path().join("large.png");
+
+    let img = image::RgbImage::new(4000, 2000);
+    img.save(&img_path).unwrap();
+
+    let loaded = crate::theme::load_safe_image(&img_path).expect("load_safe_image");
+    assert!(loaded.size().width <= 3840);
+    assert!(loaded.size().height <= 3840);
+}
+
+#[test]
 fn api_settings_panel_toggles_and_regenerates_token() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();

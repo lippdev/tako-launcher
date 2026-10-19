@@ -12,7 +12,7 @@ pub mod plain_text;
 pub mod virtual_grid;
 pub mod virtual_keyboard;
 
-pub use color::{AccentPalette, Rgb};
+pub use color::{AccentPalette, Rgb, contrast, contrast_rules};
 pub use hint_fit::{Hint, HintLayout};
 pub use lru::SizedLruCache;
 pub use virtual_grid::{ItemRange, VirtualGrid};

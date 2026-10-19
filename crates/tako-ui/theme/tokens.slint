@@ -4,8 +4,8 @@ export global Ui {
     // Unidade do palco; o App atualiza quando a janela muda de tamanho.
     in-out property <length> u: 1px;
     // Cor do jogo em foco e a versão escura (calculadas pelo Tako, AccentPalette).
-    in property <color> accent: #2B3A55;
-    in property <color> accent-deep: #161E2C;
+    in-out property <color> accent: #2B3A55;
+    in-out property <color> accent-deep: #161E2C;
     in property <bool> reduce-motion: false;
     in property <float> text-scale: 1;
     // "xbox", "playstation", "nintendo" ou "keyboard": muda os glifos das dicas.
@@ -51,8 +51,8 @@ export global Ui {
     out property <length> label-md: 20 * u * text-scale;
     out property <length> label-sm: 18 * u * text-scale;
 
-    out property <string> font-title: "Source Sans 3";
-    out property <string> font-text: "Inter";
+    in-out property <string> font-title: "Source Sans 3";
+    in-out property <string> font-text: "Inter";
 
     out property <length> safe-x: 72 * u;
     out property <length> safe-y: 48 * u;
@@ -68,7 +68,7 @@ export global Ui {
     // Valores em px reais da janela (1600×900); "Reduzir transparência" troca o vidro pelo tema sólido.
     in property <bool> reduce-transparency: false;
 
-    out property <color> desk-canvas: #0b0d12;
+    in-out property <color> desk-canvas: #0b0d12;
     out property <color> settings-bg: #1c1c1e;
     out property <color> settings-surface: #2c2c2e;
     out property <color> settings-separator: #ffffff17;
@@ -115,9 +115,12 @@ export global Ui {
     out property <length> shadow-layer-y: 24px;
     out property <length> shadow-layer-blur: 48px;
 
-    out property <string> font-heading: "Poppins";
-    out property <string> font-desk: "Plus Jakarta Sans";
-    out property <string> font-wordmark: "Source Sans 3";
+    in-out property <string> font-heading: "Poppins";
+    in-out property <string> font-desk: "Plus Jakarta Sans";
+    in-out property <string> font-wordmark: "Source Sans 3";
+
+    in-out property <image> custom-background;
+    in-out property <bool> has-custom-background: false;
     out property <length> desk-display: 56px * text-scale;
     out property <length> desk-headline: 28px * text-scale;
     out property <length> desk-title: 20px * text-scale;

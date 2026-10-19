@@ -371,9 +371,13 @@ fn uninstall_only_takes_safe_ids_and_clears_the_selection() {
     assert!(uninstall(&w.root(), "..").is_err());
     assert!(uninstall(&w.root(), "../themes").is_err());
     assert!(uninstall(&w.root(), "default").is_err());
+    overrides::save_override(&w.root(), Some("Autor_TemaTeste"), "accent = \"#112233\"\n").unwrap();
+    assert!(overrides::has_override(&w.root(), Some("Autor_TemaTeste")));
+
     uninstall(&w.root(), "Autor_TemaTeste").unwrap();
     assert!(InstalledTheme::scan(&w.root()).is_empty());
     assert_eq!(selected(&w.root()), None);
+    assert!(!overrides::has_override(&w.root(), Some("Autor_TemaTeste")));
 }
 
 #[test]

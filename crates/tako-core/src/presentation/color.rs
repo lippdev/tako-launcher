@@ -76,9 +76,19 @@ impl AccentPalette {
 
     /// Escurece o accent até garantir contraste 4.5:1 com texto branco; o tom profundo é 55% dele.
     pub fn for_accent(accent_hex: Option<&str>, dynamic_color: bool) -> AccentPalette {
+        Self::for_accent_with_fallback(accent_hex, dynamic_color, None)
+    }
+
+    /// O mesmo que [`for_accent`], mas aceita uma cor de fallback (ex.: cor do tema ou sobreposição).
+    pub fn for_accent_with_fallback(
+        accent_hex: Option<&str>,
+        dynamic_color: bool,
+        fallback: Option<Rgb>,
+    ) -> AccentPalette {
         let mut accent = accent_hex
             .filter(|_| dynamic_color)
             .and_then(Rgb::parse)
+            .or(fallback)
             .unwrap_or(Self::FALLBACK);
         while accent.luminance() > 0.18 {
             accent = accent.scale(0.92);

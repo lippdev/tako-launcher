@@ -276,12 +276,11 @@ can read the same ones if it exports the default `Ui`:
 | `text-scale` | Chosen text size (1 = normal). |
 | `pointer` | The last focus came from the mouse: highlight, but don't scroll lists to the item. |
 
-In a theme that reuses the default one, **`tokens.toml`** changes the `in-out` colors of `Ui` without writing
-Slint: `name = "#RRGGBB"` or `"#RRGGBBAA"`. Available colors: `canvas`, `on-accent`, `on-accent-muted`,
+In a theme that reuses the default one, **`tokens.toml`** changes the `in-out` colors, fonts and background of `Ui` without writing
+Slint: `name = "#RRGGBB"` or `"#RRGGBBAA"` (except `canvas`, which requires 6-digit `"#RRGGBB"` without alpha channel, having >= 4.5:1 contrast against white text). Available colors: `accent`, `canvas`, `on-accent`, `on-accent-muted`,
 `on-accent-subtle`, `surface-1`, `surface-2`, `surface-sidebar`, `surface-solid`, `on-surface-solid`,
 `on-surface-solid-muted`, `control-track-off`, `control-off`, `control-on-on-solid`, `control-off-on-solid`,
-`control-track-on-solid`, `value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. When loading, Tako
-ignores (with a log entry) an invalid key or color. `tako theme check` points out both.
+`control-track-on-solid`, `value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. It also accepts fonts (`font`, `font-title`, `font-text`, `font-heading`, `font-desk`, `font-wordmark`) and background image (`custom-background`, `background-image`). Inside Tako (Settings › Appearance), users can customize the current theme, storing an override without altering original theme files. When loading, Tako ignores (with a log entry) an invalid key or value. `tako theme check` reports both.
 
 
 ### Background music and navigation sounds
