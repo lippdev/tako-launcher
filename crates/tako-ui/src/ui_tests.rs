@@ -870,8 +870,45 @@ fn desktop_snapshot() {
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
-            Ok("settings") => shell.open_route("settings"),
-            Ok("integrations") => shell.open_route("settings:integrations"),
+            Ok("sunshine-preview") => {
+                shell.open_route("settings");
+                if let Some(index) = crate::shell::settings::categories()
+                    .iter()
+                    .position(|item| item.id == "integrations")
+                {
+                    shell.click("category", index);
+                }
+                let layer = crate::shell::settings::sunshine::preview_dialog(&shell.ctx, false);
+                shell.push_layer(Box::new(layer));
+            }
+            Ok("integrations") => {
+                shell.open_route("settings:integrations");
+                if let Ok(st) = std::env::var("TAKO_SNAP_CONSOLE_MODE") {
+                    match st.as_str() {
+                        "verificando" => crate::shell::settings::integrations::set_checking_for_test(true),
+                        "instalado" => crate::shell::settings::integrations::set_status_for_test(
+                            tako_core::console_mode::ConsoleModeStatus::Instalado {
+                                versao_api: 1,
+                                capacidades: vec!["tv".into(), "fps".into()],
+                            },
+                        ),
+                        "nao-instalado" => crate::shell::settings::integrations::set_status_for_test(
+                            tako_core::console_mode::ConsoleModeStatus::NaoInstalado,
+                        ),
+                        _ => {}
+                    }
+                }
+            }
+            Ok("settings") => {
+                shell.open_route("settings");
+                if let Ok(category) = std::env::var("TAKO_SNAP_SETTINGS_CATEGORY")
+                    && let Some(index) = crate::shell::settings::categories()
+                        .iter()
+                        .position(|item| item.id == category)
+                {
+                    shell.click("category", index);
+                }
+            }
             Ok("appearance") => {
                 shell.open_route("settings");
                 shell.click("category", 3);
@@ -1240,9 +1277,10 @@ fn desktop_snapshot() {
                 r.render(&mut pixels, w as usize);
             });
             let raw: Vec<u8> = pixels.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
+            let file_suffix = std::env::var("TAKO_SNAP_FILE_SUFFIX").unwrap_or_default();
             image::RgbImage::from_raw(w, h, raw)
                 .unwrap()
-                .save(format!("{out_dir}/desktop-{w}x{h}.png"))
+                .save(format!("{out_dir}/desktop{file_suffix}-{w}x{h}.png"))
                 .unwrap();
             // Quadros de 40 ms no relógio das animações, a partir de agora.
             let capture = |prefix: &str, pixels: &mut Vec<Rgb8Pixel>| {

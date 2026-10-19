@@ -276,6 +276,43 @@ fn every_row_has_text() {
 }
 
 #[test]
+fn sunshine_sync_starts_off_and_requires_preview_confirmation_to_enable() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let row = find(&rows_of(&ctx, "integrations"), "sunshine-sync");
+    assert!(!row.row.on);
+    assert!(matches!(accept(&mut ctx, &row), Flow::Push(_)));
+    assert!(!ctx.settings.bool(keys::SUNSHINE_SYNC, false));
+}
+
+#[test]
+fn sunshine_preview_filters_invalid_ids() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    assert!(!ctx.library.games().is_empty());
+    let total = ctx.library.games().len();
+    ctx.library.games_mut()[0].id = "invalid id with spaces !@#$".into();
+    ctx.library.games_mut()[0].title = "Jogo Inválido".into();
+
+    let valid_count = ctx
+        .library
+        .games()
+        .iter()
+        .filter(|g| tako_platform::sunshine::is_valid_game_id(&g.id))
+        .count();
+    assert_eq!(valid_count, total - 1);
+
+    let layer = sunshine::preview_dialog(&ctx, false);
+    let rendered = layer.render(&ctx);
+    assert!(
+        rendered
+            .text
+            .contains(&format!("{valid_count} jogos serão exportados"))
+    );
+    assert!(!rendered.text.contains("Jogo Inválido"));
+}
+
+#[test]
 fn provider_keys_go_to_the_vault() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();

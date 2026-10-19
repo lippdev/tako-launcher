@@ -1,28 +1,47 @@
-//! Categoria Integrações das Configurações: Console Mode, Discord e API local.
+//! Categoria Integrações das Configurações: Console Mode e extensões locais.
 
-use super::super::ctx::{Ctx, keys};
+use super::super::ctx::Ctx;
 use super::super::layer::{Flow, MenuItem};
-use super::api_panel;
 use crate::model::PanelRow;
 use std::cell::{Cell, RefCell};
-use std::time::{Duration, Instant};
 use tako_core::console_mode::ConsoleModeStatus;
 
 thread_local! {
-    static CACHED_STATUS: RefCell<Option<(Instant, ConsoleModeStatus)>> = const { RefCell::new(None) };
+    static CACHED_STATUS: RefCell<Option<ConsoleModeStatus>> = const { RefCell::new(None) };
     static CHECKING: Cell<bool> = const { Cell::new(false) };
+    #[cfg(test)]
+    static CUSTOM_DETECTOR: Cell<Option<fn() -> ConsoleModeStatus>> = const { Cell::new(None) };
 }
 
-/// Invalida o cache da detecção (útil em testes ou ao trocar de tela).
-#[allow(dead_code)]
-pub(crate) fn invalidate_cache() {
-    CACHED_STATUS.with(|c| *c.borrow_mut() = None);
-}
-
-/// Define o status em cache diretamente (útil para testes de UI e simulação).
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn set_status_for_test(status: ConsoleModeStatus) {
-    CACHED_STATUS.with(|c| *c.borrow_mut() = Some((Instant::now(), status)));
+    CACHED_STATUS.with(|c| *c.borrow_mut() = Some(status));
+    CHECKING.set(false);
+}
+
+#[cfg(test)]
+pub(crate) fn set_checking_for_test(checking: bool) {
+    CHECKING.set(checking);
+    if checking {
+        CACHED_STATUS.with(|c| *c.borrow_mut() = None);
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn set_detector_for_test(f: fn() -> ConsoleModeStatus) {
+    CUSTOM_DETECTOR.with(|c| c.set(Some(f)));
+}
+
+fn do_detect() -> ConsoleModeStatus {
+    #[cfg(test)]
+    {
+        if let Some(f) = CUSTOM_DETECTOR.get() {
+            return f();
+        }
+        return ConsoleModeStatus::NaoInstalado;
+    }
+    #[allow(unreachable_code)]
+    tako_platform::console_mode::detect()
 }
 
 pub(crate) fn check_now(ctx: &mut Ctx) {
@@ -31,30 +50,30 @@ pub(crate) fn check_now(ctx: &mut Ctx) {
     }
     CHECKING.set(true);
     ctx.dirty = true;
-    crate::tasks::run(ctx, tako_platform::console_mode::detect, |ctx, status| {
+    crate::tasks::run(ctx, do_detect, |ctx, status| {
         CHECKING.set(false);
-        CACHED_STATUS.with(|c| *c.borrow_mut() = Some((Instant::now(), status)));
+        CACHED_STATUS.with(|c| *c.borrow_mut() = Some(status));
         ctx.dirty = true;
     });
 }
 
 pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
+    let cached = CACHED_STATUS.with(|cell| cell.borrow().clone());
     let checking = CHECKING.get();
-    let status = CACHED_STATUS.with(|cell| {
-        let borrow = cell.borrow();
-        if let Some((at, st)) = borrow.as_ref()
-            && at.elapsed() < Duration::from_secs(5)
-        {
-            st.clone()
-        } else {
-            ConsoleModeStatus::NaoInstalado
-        }
-    });
 
-    let status_text = if checking {
+    if cached.is_none() && !checking {
+        CHECKING.set(true);
+        crate::tasks::run_bg(do_detect, |_, status| {
+            CHECKING.set(false);
+            CACHED_STATUS.with(|c| *c.borrow_mut() = Some(status));
+        });
+    }
+
+    let is_checking = checking || cached.is_none();
+    let status_text = if is_checking {
         ctx.t("settings.integrations.console_mode_checking")
     } else {
-        match status {
+        match cached.as_ref().unwrap() {
             ConsoleModeStatus::NaoInstalado => {
                 ctx.t("settings.integrations.console_mode_not_installed")
             }
@@ -81,28 +100,6 @@ pub(crate) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         }),
     ];
 
-    if crate::discord::available() {
-        rows.push(super::toggle(
-            ctx,
-            "settings.system.discord",
-            keys::DISCORD_PRESENCE,
-            false,
-        ));
-    }
-
-    let api_on = ctx.settings.bool(keys::API_ENABLED, false);
-    rows.push(
-        MenuItem::new(
-            PanelRow::action("settings.system.api", ctx.t("settings.system.api"))
-                .desc(ctx.t("settings.system.api_desc"))
-                .value(ctx.t(if api_on {
-                    "settings.system.api_on"
-                } else {
-                    "settings.system.api_off"
-                })),
-        )
-        .on(|ctx| Flow::Push(Box::new(api_panel(ctx)))),
-    );
-
+    rows.extend(super::sunshine::rows(ctx));
     rows
 }

@@ -13,6 +13,8 @@ pub(crate) mod library;
 pub(crate) mod metadata;
 #[path = "settings_screen.rs"]
 pub(crate) mod screen;
+#[path = "settings_sunshine.rs"]
+pub(crate) mod sunshine;
 #[cfg(test)]
 #[path = "settings_tests.rs"]
 mod tests;

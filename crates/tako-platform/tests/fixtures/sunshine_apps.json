@@ -1,0 +1,10 @@
+{
+  "env": {"PATH": "custom path"},
+  "apps": [
+    {"name": "Desktop", "cmd": "", "working-dir": null},
+    {"name": "Ferramenta do usuário", "cmd": "user-app --flag", "custom": {"keep": true}},
+    {"name": "[Tako] Antigo", "cmd": "'/Applications/Tako' --open-url 'tako://play/manual:old'"},
+    {"name": "[Tako] Marcador editado", "cmd": "user-app --open-url https://example.com"}
+  ],
+  "version": 2
+}
