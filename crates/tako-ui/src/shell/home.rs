@@ -385,16 +385,21 @@ impl Page for HomePage {
         self.handle(Cmd::Accept, ctx)
     }
 
-    fn hover(&mut self, zone: &str, index: usize, _ctx: &Ctx) {
+    fn hover(&mut self, zone: &str, index: usize, ctx: &Ctx) {
         if zone == "hero" {
+            self.hero_id = self.hero_game(ctx, &self.rows(ctx)).map(|g| g.id.clone());
             self.row = None;
             self.hero_button = index;
         } else if let Some(r) = zone
             .strip_prefix("row-")
             .and_then(|r| r.parse::<usize>().ok())
         {
-            self.row = Some(r);
-            self.cols.insert(r, index);
+            if self.row != Some(r) {
+                self.row = Some(r);
+                self.cols.entry(r).or_insert(index);
+            } else {
+                self.cols.insert(r, index);
+            }
         }
     }
 

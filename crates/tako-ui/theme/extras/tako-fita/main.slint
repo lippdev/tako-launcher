@@ -242,6 +242,12 @@ component FitaButton inherits Rectangle {
     in property <bool> focused;
     callback clicked();
     callback hovered();
+    callback reveal(length, length);
+    changed focused => { if (focused) { root.reveal(self.x, self.width); } }
+    changed x => { if (focused) { root.reveal(self.x, self.width); } }
+    changed width => { if (focused) { root.reveal(self.x, self.width); } }
+    accessible-role: button;
+    accessible-label: label;
 
     property <float> s: focused ? 1.05 : 1.0;
     animate s { duration: Ui.focus-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
@@ -250,8 +256,8 @@ component FitaButton inherits Rectangle {
     width: max(52 * Ui.u, content.preferred-width + (label != "" ? 36 * Ui.u : 20 * Ui.u));
     border-radius: 16 * Ui.u;
     border-width: focused ? 2.5 * Ui.u : 1 * Ui.u;
-    border-color: focused ? #F5F7FA : (primary ? #ffffff2e : #ffffff1a);
-    background: focused ? #F5F7FA : (primary ? #141821f0 : #141821a6);
+    border-color: focused ? #F5F7FA : (primary ? #ffffff40 : #ffffff33);
+    background: focused ? #F5F7FA : (primary ? #141821f0 : #141821d9);
     animate background, border-color { duration: Ui.focus-time; }
 
     drop-shadow-blur: focused ? 24 * Ui.u : 0;
@@ -304,6 +310,7 @@ component FitaHome inherits Rectangle {
     property <int> anchor;
     init => { anchor = max(0, col-focus); }
     changed col-focus => { if (!Ui.pointer) { anchor = max(0, col-focus); } }
+    changed row-focus => { anchor = max(0, col-focus); }
 
     if empty: VerticalLayout {
         x: 80 * Ui.u;
@@ -432,9 +439,13 @@ component FitaHome inherits Rectangle {
                 }
 
                 FitaButton {
+                    label: "";
                     icon: "info";
                     primary: false;
                     focused: row-focus < 0 && hero-focus == 1;
+                    accessible-role: button;
+                    accessible-label: hero.title;
+                    accessible-description: hero.meta;
                     clicked => { root.clicked("hero", 1); }
                     hovered => { root.hovered("hero", 1); }
                 }
@@ -447,44 +458,51 @@ component FitaHome inherits Rectangle {
             height: 340 * Ui.u;
             width: parent.width;
 
-            HorizontalLayout {
+            Rectangle {
                 x: 80 * Ui.u;
                 y: 0;
                 height: 38 * Ui.u;
-                spacing: 20 * Ui.u;
-                alignment: start;
+                width: parent.width - 160 * Ui.u;
+                clip: true;
 
-                Text {
-                    text: rows.length > 0 ? (rows[max(0, row-focus)].title + (rows[max(0, row-focus)].count != "" ? " (" + rows[max(0, row-focus)].count + ")" : "")) : "";
-                    color: #FFFFFF;
-                    font-size: 18 * Ui.u * Ui.text-scale;
-                    font-family: "Poppins";
-                    font-weight: 700;
-                    vertical-alignment: center;
-                }
-
-                if rows.length > 1: HorizontalLayout {
-                    spacing: 8 * Ui.u;
+                HorizontalLayout {
+                    x: 0;
+                    y: 0;
+                    height: parent.height;
+                    spacing: 20 * Ui.u;
                     alignment: start;
-                    for r[ri] in rows: Rectangle {
-                        height: 28 * Ui.u;
-                        width: rtitle.preferred-width + 24 * Ui.u;
-                        border-radius: 14 * Ui.u;
-                        background: ri == max(0, row-focus) ? #ffffff2e : #14182180;
-                        border-width: 1px;
-                        border-color: ri == max(0, row-focus) ? #ffffff40 : #ffffff14;
-                        rtitle := Text {
-                            text: r.title;
-                            color: ri == max(0, row-focus) ? #FFFFFF : #CBD5E1;
-                            font-size: 12 * Ui.u * Ui.text-scale;
-                            font-family: "Plus Jakarta Sans";
-                            font-weight: 600;
-                            vertical-alignment: center;
-                            horizontal-alignment: center;
-                        }
-                        TouchArea {
-                            clicked => { root.hovered("row-" + ri, 0); }
-                            changed has-hover => { if (self.has-hover) { root.hovered("row-" + ri, 0); } }
+
+                    Text {
+                        text: rows.length > 0 ? (rows[max(0, row-focus)].title + (rows[max(0, row-focus)].count != "" ? " (" + rows[max(0, row-focus)].count + ")" : "")) : "";
+                        color: #FFFFFF;
+                        font-size: 18 * Ui.u * Ui.text-scale;
+                        font-family: "Poppins";
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+
+                    if rows.length > 1: HorizontalLayout {
+                        spacing: 8 * Ui.u;
+                        alignment: start;
+                        for r[ri] in rows: Rectangle {
+                            height: 28 * Ui.u;
+                            width: rtitle.preferred-width + 24 * Ui.u;
+                            border-radius: 14 * Ui.u;
+                            background: ri == max(0, row-focus) ? #ffffff2e : #14182180;
+                            border-width: 1px;
+                            border-color: ri == max(0, row-focus) ? #ffffff40 : #ffffff14;
+                            rtitle := Text {
+                                text: r.title;
+                                color: ri == max(0, row-focus) ? #FFFFFF : #CBD5E1;
+                                font-size: 12 * Ui.u * Ui.text-scale;
+                                font-family: "Plus Jakarta Sans";
+                                font-weight: 600;
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                            }
+                            TouchArea {
+                                clicked => { root.hovered("row-" + ri, 0); }
+                            }
                         }
                     }
                 }
@@ -492,6 +510,7 @@ component FitaHome inherits Rectangle {
 
             Rectangle {
                 y: 44 * Ui.u;
+                width: parent.width;
                 height: 290 * Ui.u;
                 clip: false;
 
@@ -979,18 +998,34 @@ component FitaDetailsPage inherits Rectangle {
                 font-family: "Plus Jakarta Sans";
             }
 
-            HorizontalLayout {
-                padding-top: 14 * Ui.u;
-                padding-bottom: 14 * Ui.u;
-                spacing: 16 * Ui.u;
-                alignment: start;
-                for a[i] in actions: FitaButton {
-                    label: (i == 0 || a.icon == "" || Ui.text-scale <= 1.2) ? a.title : "";
-                    icon: a.icon;
-                    primary: i == 0;
-                    focused: i == sel;
-                    clicked => { root.clicked("action", i); }
-                    hovered => { root.hovered("action", i); }
+            action-scroll := Flickable {
+                height: 80 * Ui.u;
+                min-width: 0px;
+                viewport-width: action-layout.preferred-width;
+                viewport-height: self.height;
+                function reveal(x: length, w: length) {
+                    if (!Ui.pointer) {
+                        self.viewport-x = clamp(clamp(self.viewport-x,
+                            self.width - x - w - 4 * Ui.u, -x + 4 * Ui.u),
+                            min(0px, self.width - self.viewport-width), 0px);
+                    }
+                }
+                action-layout := HorizontalLayout {
+                    y: 14 * Ui.u;
+                    width: self.preferred-width;
+                    height: 52 * Ui.u;
+                    padding-left: 4 * Ui.u;
+                    padding-right: 4 * Ui.u;
+                    spacing: 16 * Ui.u;
+                    for a[i] in actions: FitaButton {
+                        label: a.title;
+                        icon: a.icon;
+                        primary: i == 0;
+                        focused: i == sel;
+                        clicked => { root.clicked("action", i); }
+                        hovered => { root.hovered("action", i); }
+                        reveal(x, w) => { action-scroll.reveal(x, w); }
+                    }
                 }
             }
 
@@ -1280,6 +1315,8 @@ export component App inherits Window {
         }
 
         library := FitaLibrary {
+            width: parent.width;
+            height: parent.height;
             visible: page == "library";
             title: library-title;
             count: library-count;
