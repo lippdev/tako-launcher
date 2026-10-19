@@ -104,12 +104,22 @@ impl Layer for OverridePreviewLayer {
             Cmd::Accept => {
                 if let Some(mut draft) = p.draft_override {
                     if let Some(ref bg_draft) = draft.background_image {
-                        if let Ok(final_name) = tako_themes::overrides::promote_background_draft(
+                        match tako_themes::overrides::promote_background_draft(
                             &ctx.paths.themes(),
                             p.id.as_deref(),
                             bg_draft,
                         ) {
-                            draft.background_image = Some(final_name);
+                            Ok(final_name) => {
+                                draft.background_image = Some(final_name);
+                            }
+                            Err(e) => {
+                                tracing::error!("promover rascunho de fundo: {e}");
+                                ctx.toast(ctx.t("settings.appearance.save_override_error"));
+                                reload_selected(ctx);
+                                return Flow::Replace(Box::new(super::settings::edit_theme_panel(
+                                    ctx,
+                                )));
+                            }
                         }
                     } else {
                         let _ = tako_themes::overrides::clean_background_orphans(
@@ -128,19 +138,17 @@ impl Layer for OverridePreviewLayer {
                             let text = ctx.t("settings.appearance.theme_customized_applied");
                             ctx.toast(text);
                             ctx.theme_draft = None;
+                            ctx.reload_theme_cache();
                         }
                         Err(e) => {
-                            ctx.toast(e.to_string());
+                            tracing::error!("salvar sobreposição: {e}");
+                            ctx.toast(ctx.t("settings.appearance.save_override_error"));
                             reload_selected(ctx);
                         }
                     }
                 }
             }
             Cmd::Back => {
-                let _ = tako_themes::overrides::clean_background_draft(
-                    &ctx.paths.themes(),
-                    p.id.as_deref(),
-                );
                 reload_selected(ctx);
             }
             _ => {
@@ -476,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    fn previewing_theme_override_timeout_returns_to_edit_panel_and_cleans_draft() {
+    fn previewing_theme_override_timeout_returns_to_edit_panel_and_preserves_draft() {
         let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_d, ctx) = setup();
         let mut shell = Shell::new(ctx);
@@ -506,10 +514,10 @@ mod tests {
         // A prévia acabou
         assert!(shell.ctx.theme_preview.is_none());
 
-        // O rascunho temporário foi limpo
+        // O rascunho temporário NÃO é apagado ao expirar (o painel ainda usa)
         assert!(
-            !draft_img.exists(),
-            "background.draft.jpg deveria ter sido removido"
+            draft_img.is_file(),
+            "background.draft.jpg deve continuar existindo para o painel"
         );
 
         // A imagem anterior original permaneceu intacta
@@ -521,6 +529,66 @@ mod tests {
 
         // A camada ativa após o timeout é o painel de edição
         assert!(shell.has_layers());
+    }
+
+    #[test]
+    fn preview_back_save_does_not_lose_previous_background() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_d, mut ctx) = setup();
+        let _ = tako_themes::select(&ctx.paths.themes(), Some(THEME));
+
+        let ov_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), Some(THEME));
+        std::fs::create_dir_all(&ov_dir).unwrap();
+        let prev_img = ov_dir.join("background.png");
+        std::fs::write(&prev_img, b"original").unwrap();
+
+        let draft_img = ov_dir.join("background.draft.jpg");
+        std::fs::write(&draft_img, b"draft").unwrap();
+
+        let draft = tako_themes::overrides::ThemeTokensOverride {
+            accent: Some("#E3161E".into()),
+            background_image: Some("background.draft.jpg".into()),
+            ..Default::default()
+        };
+        ctx.theme_draft = Some(draft.clone());
+
+        // Inicia a prévia ao vivo
+        let Flow::Replace(mut layer) = start_override(&mut ctx, Some(THEME), draft) else {
+            panic!("esperava Replace");
+        };
+        assert!(ctx.theme_preview.is_some());
+
+        // Cancela com Back na prévia: volta ao painel de edição
+        let Flow::Replace(mut edit_panel) = layer.handle(Cmd::Back, &mut ctx) else {
+            panic!("esperava Replace para o painel de edição");
+        };
+        assert!(ctx.theme_preview.is_none());
+
+        // O rascunho NÃO pode ter sido apagado pelo Back
+        assert!(
+            draft_img.is_file(),
+            "background.draft.jpg não deve ser apagado no Back da prévia"
+        );
+
+        // Ao salvar no painel de edição, o rascunho é promovido para background.jpg
+        let ov = edit_panel.render(&ctx);
+        let save_idx = ov
+            .rows
+            .iter()
+            .position(|r| r.key == "save")
+            .expect("linha salvar");
+        let flow = edit_panel.click("row", save_idx, &mut ctx);
+        assert!(matches!(flow, Flow::Close));
+
+        // Novo fundo salvo promovido com sucesso
+        let new_img = ov_dir.join("background.jpg");
+        assert!(new_img.is_file(), "background.jpg deve ter sido promovido");
+        assert!(!draft_img.exists(), "rascunho deve ser consumido");
+        assert!(!prev_img.exists(), "fundo anterior foi limpo");
+
+        let loaded =
+            tako_themes::overrides::load_override(&ctx.paths.themes(), Some(THEME)).unwrap();
+        assert!(loaded.contains("background.jpg"));
     }
 
     #[test]

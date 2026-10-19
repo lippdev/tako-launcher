@@ -199,6 +199,11 @@ save_theme = "Salvar alterações"
 reset_theme = "Restaurar padrão do tema"
 reset_theme_desc = "Desfaz todas as edições e volta ao tema original"
 theme_reset_applied = "Padrão do tema restaurado"
+reset_theme_confirm_title = "Restaurar padrão do tema?"
+reset_theme_confirm_text = "Desfaz todas as edições e volta ao tema original."
+reset_theme_confirm_button = "Restaurar"
+save_override_error = "Não foi possível salvar as alterações do tema"
+reset_override_error = "Não foi possível restaurar o tema padrão"
 
 [settings.screen]
 title = "Tela e áudio"

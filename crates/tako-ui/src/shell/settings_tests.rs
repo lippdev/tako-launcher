@@ -895,7 +895,12 @@ fn edit_theme_panel_modifies_saves_and_resets_overrides() {
         reset_row.row.title,
         ctx.t("settings.appearance.reset_theme")
     );
-    accept(&mut ctx, &reset_row);
+    assert_eq!(reset_row.row.style, "danger");
+    let flow = accept(&mut ctx, &reset_row);
+    let Flow::Push(mut dialog) = flow else {
+        panic!("esperava confirmação em diálogo")
+    };
+    dialog.click("row", 0, &mut ctx);
 
     // 7. A sobreposição foi removida
     assert!(!tako_themes::overrides::has_override(
@@ -951,14 +956,15 @@ fn edit_theme_image_full_path_and_promotion() {
 
     let mut d = current_draft(&ctx);
     d.background_image = Some(draft_name);
+    d.background_source_name = Some("wall.png".into());
     d.background_mode = Some(tako_themes::overrides::BackgroundMode::Image);
     ctx.theme_draft = Some(d);
 
-    // O painel mostra o rascunho
+    // O painel mostra o nome do arquivo de origem (wall.png) e não background.draft.png
     let panel = edit_theme_panel(&ctx);
     let rows = panel.items(&ctx);
     let choose_img_row = find(&rows, "choose_image");
-    assert_eq!(choose_img_row.row.value, "background.draft.png");
+    assert_eq!(choose_img_row.row.value, "wall.png");
 
     // 4. Salva a personalização
     let save_row = find(&rows, "save");
@@ -1051,13 +1057,119 @@ fn custom_accent_wins_over_game_accent() {
     };
 
     // Ao montar a linha de DeskGame, o accent personalizado (#E3161E) deve vencer o do jogo (#00FF00)
-    let desk_game_accent = if let Some(c) = crate::theme::custom_theme_accent(&ctx) {
-        slint::Color::from_rgb_u8(c.r, c.g, c.b)
-    } else {
-        crate::values::parse_color(&g.accent)
-    };
+    // exercitando a função real de desktop.rs
+    let desk_game_accent = crate::shell::desktop::game_card_accent(&ctx, &g.accent);
     assert_eq!(
         desk_game_accent,
         slint::Color::from_rgb_u8(0xE3, 0x16, 0x1E)
     );
+}
+
+#[test]
+fn desktop_nav_cleans_theme_draft_and_draft_image() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let mut shell = crate::shell::Shell::new(ctx);
+    shell.enter_desktop();
+
+    let ov_dir = tako_themes::overrides::override_dir(&shell.ctx.paths.themes(), None);
+    std::fs::create_dir_all(&ov_dir).unwrap();
+    let draft_img = ov_dir.join("background.draft.png");
+    std::fs::write(&draft_img, b"temp draft").unwrap();
+
+    let mut d = current_draft(&shell.ctx);
+    d.accent = Some("#FF0055".into());
+    d.background_image = Some("background.draft.png".into());
+    shell.ctx.theme_draft = Some(d);
+
+    // No painel, o destaque do rascunho estaria ativo
+    assert_eq!(
+        crate::theme::custom_theme_accent(&shell.ctx),
+        Some(tako_core::presentation::Rgb::new(0xFF, 0x00, 0x55))
+    );
+
+    // Navega pela barra superior do desktop (índice 0: Biblioteca)
+    shell.desktop_nav(0);
+
+    // Rascunho foi limpo
+    assert!(shell.ctx.theme_draft.is_none());
+    // Arquivo temporário no disco foi apagado
+    assert!(!draft_img.exists());
+    // Destaque voltou ao padrão
+    assert_eq!(crate::theme::custom_theme_accent(&shell.ctx), None);
+}
+
+#[test]
+fn reset_theme_opens_danger_dialog_focused_on_cancel_and_confirms() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Cria override existente
+    tako_themes::overrides::save_override(&ctx.paths.themes(), None, "accent = \"#123456\"\n")
+        .unwrap();
+    ctx.reload_theme_cache();
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+
+    let mut panel = edit_theme_panel(&ctx);
+    let ov = panel.render(&ctx);
+    let reset_idx = ov
+        .rows
+        .iter()
+        .position(|r| r.key == "reset")
+        .expect("reset row");
+    assert_eq!(ov.rows[reset_idx].style, "danger");
+
+    // Ao clicar na linha de restaurar, abre o diálogo de confirmação
+    let flow = panel.click("row", reset_idx, &mut ctx);
+    let Flow::Push(mut dialog) = flow else {
+        panic!("esperava Flow::Push do diálogo");
+    };
+
+    // Diálogo com foco em Cancelar (índice 1)
+    let dialog_ov = dialog.render(&ctx);
+    assert_eq!(dialog_ov.rows.len(), 2);
+    assert_eq!(dialog_ov.rows[0].key, "reset");
+    assert_eq!(dialog_ov.rows[0].style, "danger");
+    assert_eq!(dialog_ov.rows[1].key, "cancel");
+
+    // Foco inicial do diálogo é no botão Cancelar (índice 1)
+    assert_eq!(dialog_ov.sel, 1);
+
+    // Cancelar apenas fecha o diálogo sem resetar
+    let cancel_dialog = panel.click("row", reset_idx, &mut ctx);
+    let Flow::Push(mut cancel_dialog_layer) = cancel_dialog else {
+        panic!()
+    };
+    let cancel_flow = cancel_dialog_layer.click("row", 1, &mut ctx);
+    assert!(matches!(cancel_flow, Flow::Close));
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+
+    // Confirmar no botão Restaurar remove a sobreposição e fecha tudo
+    let reset_flow = dialog.click("row", 0, &mut ctx);
+    assert!(matches!(reset_flow, Flow::CloseAll));
+    assert!(!tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    assert_eq!(ctx.persisted_theme_accent, None);
+}
+
+#[test]
+fn load_safe_image_scales_down_to_3840() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = tempfile::tempdir().unwrap();
+    let img_path = dir.path().join("large.png");
+
+    let img = image::RgbImage::new(4000, 2000);
+    img.save(&img_path).unwrap();
+
+    let loaded = crate::theme::load_safe_image(&img_path).expect("load_safe_image");
+    assert!(loaded.size().width <= 3840);
+    assert!(loaded.size().height <= 3840);
 }

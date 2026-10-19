@@ -155,6 +155,7 @@ impl Shell {
         let focus = self.focused_game();
         self.ctx.desktop = true;
         self.cc = None;
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         // A prévia é da tela cheia: sem a camada dela, o tick pediria o tema de volta e avisaria no desktop.
         self.ctx.theme_preview = None;
@@ -173,6 +174,7 @@ impl Shell {
         let focus = self.focused_game();
         self.ctx.desktop = false;
         self.ask_big_picture = false;
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         self.pages = vec![Box::new(home::HomePage::new())];
         self.sidebar.focus = None;
@@ -192,6 +194,7 @@ impl Shell {
 
     /// Barra superior do desktop: Biblioteca, Configurações, Tela cheia e Perfil (3).
     fn desktop_nav(&mut self, index: usize) {
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         match index {
             0 => self.pages.truncate(1),
@@ -271,12 +274,6 @@ impl Shell {
         let Some(p) = self.ctx.theme_preview.take() else {
             return false;
         };
-        if p.draft_override.is_some() {
-            let _ = tako_themes::overrides::clean_background_draft(
-                &self.ctx.paths.themes(),
-                p.id.as_deref(),
-            );
-        }
         let shown = self.layers.iter().any(|l| l.theme_preview());
         self.layers.retain(|l| !l.theme_preview());
         if shown {
@@ -306,6 +303,7 @@ impl Shell {
     }
 
     pub fn close_layers(&mut self) {
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         self.ctx.dirty = true;
     }
@@ -675,7 +673,7 @@ impl Shell {
         match flow {
             Flow::Stay => self.layers.push(top),
             Flow::Close => {}
-            Flow::CloseAll => self.layers.clear(),
+            Flow::CloseAll => self.close_layers(),
             Flow::Replace(l) => self.layers.push(l),
             Flow::Push(l) => {
                 self.layers.push(top);

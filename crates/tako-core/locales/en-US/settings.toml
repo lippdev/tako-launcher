@@ -199,6 +199,11 @@ save_theme = "Save changes"
 reset_theme = "Restore theme default"
 reset_theme_desc = "Reverts all edits and returns to the original theme"
 theme_reset_applied = "Theme default restored"
+reset_theme_confirm_title = "Restore theme default?"
+reset_theme_confirm_text = "Reverts all edits and returns to the original theme."
+reset_theme_confirm_button = "Restore"
+save_override_error = "Could not save theme changes"
+reset_override_error = "Could not restore theme default"
 
 [settings.screen]
 title = "Display and audio"

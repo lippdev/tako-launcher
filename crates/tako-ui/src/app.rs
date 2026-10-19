@@ -212,6 +212,8 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         theme_preview: None,
         theme_draft: None,
         theme_supports_ui: true,
+        persisted_theme_accent: None,
+        base_theme_accent: None,
         launching: false,
         launch_since: None,
         leaving: false,
@@ -234,6 +236,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         focus_visible: false,
     };
     ctx.sync_collections();
+    ctx.reload_theme_cache();
     ctx
 }
 
@@ -528,18 +531,7 @@ fn theme_accent(ctx: &Ctx) -> Option<tako_core::presentation::Rgb> {
     if let Some(custom) = theme::custom_theme_accent(ctx) {
         return Some(custom);
     }
-    let selected_id = tako_themes::selected(&ctx.paths.themes());
-    let theme_id = selected_id.as_deref();
-    if let Some(id) = theme_id {
-        let dir = ctx.paths.themes().join(id);
-        if let Ok(text) = std::fs::read_to_string(dir.join("tokens.toml")) {
-            let ov = tako_themes::overrides::ThemeTokensOverride::from_toml_str(&text);
-            if let Some(acc) = ov.accent {
-                return tako_core::presentation::Rgb::parse(&acc);
-            }
-        }
-    }
-    None
+    ctx.base_theme_accent
 }
 
 impl App {
@@ -663,6 +655,7 @@ impl App {
             HostAction::ReloadTheme if self.mode.get() == UiMode::Desktop => {
                 // O tema é da tela cheia: vale na próxima troca.
                 let mut s = self.shell.borrow_mut();
+                s.ctx.reload_theme_cache();
                 let text = s.ctx.t("desktop.theme_big_picture");
                 s.ctx.toast(text);
             }
@@ -748,6 +741,7 @@ impl App {
                 return;
             }
         };
+        self.shell.borrow_mut().ctx.reload_theme_cache();
         self.shell.borrow_mut().ctx.theme_supports_ui = def.global_properties("Ui").is_some();
         apply_theme_tokens(&new, &self.shell.borrow().ctx, dir.as_deref());
         new.window()

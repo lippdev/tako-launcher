@@ -68,15 +68,7 @@ pub fn custom_theme_accent(ctx: &crate::shell::Ctx) -> Option<tako_core::present
     if let Some(acc) = ctx.theme_draft.as_ref().and_then(|d| d.accent.as_ref()) {
         return tako_core::presentation::Rgb::parse(acc);
     }
-    let selected_id = tako_themes::selected(&ctx.paths.themes());
-    let theme_id = selected_id.as_deref();
-    if let Some(text) = tako_themes::overrides::load_override(&ctx.paths.themes(), theme_id) {
-        let ov = tako_themes::overrides::ThemeTokensOverride::from_toml_str(&text);
-        if let Some(acc) = ov.accent {
-            return tako_core::presentation::Rgb::parse(&acc);
-        }
-    }
-    None
+    ctx.persisted_theme_accent
 }
 
 /// Carrega imagem de fundo com limites defensivos (32 MB, 16384 px, 512 MB de alocação).
@@ -97,7 +89,12 @@ pub fn load_safe_image(path: &Path) -> Option<slint::Image> {
     let mut reader = reader;
     reader.limits(limits);
     let img = reader.decode().ok()?;
-    let rgba = img.to_rgba8();
+    let img = if img.width() > 3840 || img.height() > 3840 {
+        img.resize(3840, 3840, image::imageops::FilterType::Triangle)
+    } else {
+        img
+    };
+    let rgba = img.into_rgba8();
     let buf =
         slint::SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height());
     Some(crate::images::shared(buf))
@@ -226,12 +223,15 @@ pub fn apply_tokens_with_override(
                 }
             }
         } else {
+            // canvas exige #RRGGBB de 6 dígitos (sem canal alfa) para cálculo de contraste WCAG com texto branco.
             if name == "canvas"
                 && value
                     .as_str()
                     .is_some_and(|c_str| !tako_themes::overrides::validate_canvas(c_str))
             {
-                tracing::warn!("tokens.toml: canvas ignorado por contraste insuficiente (< 4.5:1)");
+                tracing::warn!(
+                    "tokens.toml: canvas ignorado por formato diferente de #RRGGBB ou contraste insuficiente (< 4.5:1)"
+                );
                 continue;
             }
             match value.as_str().and_then(parse_color) {
