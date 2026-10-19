@@ -3593,7 +3593,7 @@ component DeskRow inherits Rectangle {
     property <bool> emu: data.icon == "emu-retroarch" || data.icon == "emu-dolphin" || data.icon == "emu-pcsx2" || data.icon == "emu-duckstation" || data.icon == "emu-ppsspp" || data.icon == "emu-ryujinx" || data.icon == "emu-cemu" || data.icon == "emu-rpcs3";
     // A linha da fila cresce com o motivo (texto essencial: quebra em vez de cortar). Onboarding (`bare`): linhas de
     // 12 em cima e embaixo, sem a altura mínima das Configurações.
-    out property <length> row-h: is-header ? 40px : (data.kind == "note" ? 52px : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : Ui.settings-row-height, lay.preferred-height) + card-gap));
+    out property <length> row-h: is-header ? 40px : (data.kind == "note" ? notel.preferred-height : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : Ui.settings-row-height, lay.preferred-height) + card-gap));
     callback clicked();
     // Ação dentro da linha: 0 = Aceitar, 1 = Escolher outra.
     callback act(int);
@@ -3621,7 +3621,7 @@ component DeskRow inherits Rectangle {
         Rectangle { y: 0; height: 1px; background: Ui.divider; }
         if last: Rectangle { y: parent.height - 1px; height: 1px; background: Ui.divider; }
     }
-    if !is-header && !loose && !bare: Rectangle {
+    if !is-header && !loose && !bare && data.kind != "note": Rectangle {
         border-top-left-radius: first ? group-r : 0;
         border-top-right-radius: first ? group-r : 0;
         border-bottom-left-radius: last ? group-r : 0;
@@ -3631,7 +3631,7 @@ component DeskRow inherits Rectangle {
         // Divisória entre linhas do mesmo grupo, recuada 18 da esquerda.
         if !first: Rectangle { x: 18px; y: 0; width: parent.width - 18px; height: 1px; background: DeskArt.gray ? Ui.settings-separator : Ui.divider; }
     }
-    if focused && !is-header: FocusRing { radius: Ui.radius-control; }
+    if focused && !is-header && data.kind != "note": FocusRing { radius: Ui.radius-control; }
     if is-header: Text {
         x: 4px;
         y: parent.height - self.height - 8px;
@@ -3950,13 +3950,14 @@ component DeskRow inherits Rectangle {
         }
         if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && !(data.kind == "action" && data.value != "" && DeskArt.gray): Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
-    if data.kind == "note": VerticalLayout {
-        x: 18px;
-        width: parent.width - 36px;
-        height: parent.height;
-        alignment: center;
+    notel := VerticalLayout {
+        visible: data.kind == "note";
+        x: 4px;
+        width: parent.width - 8px;
+        padding-top: 8px;
+        padding-bottom: 8px;
         spacing: 2px;
-        Text { text: data.title; color: Ui.on-accent-muted; font-size: Ui.desk-label-sm; font-weight: 600; }
+        if data.title != "": Text { text: data.title; color: Ui.on-accent-muted; font-size: Ui.desk-label-sm; font-weight: 600; wrap: word-wrap; }
         if data.description != "": Text { text: data.description; color: Ui.on-accent-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
     }
 }
@@ -4025,7 +4026,7 @@ component RowScroll inherits Rectangle {
     callback anchor(length, length);
     pure function body(i: int) -> bool {
         // A caixa da pasta de ROMs (onboarding) fecha o grupo de cima.
-        return i >= 0 && i < rows.length && rows[i].kind != "header" && rows[i].style != "card" && !((footer || inline-buttons) && rows[i].kind == "button");
+        return i >= 0 && i < rows.length && rows[i].kind != "header" && rows[i].kind != "note" && rows[i].style != "card" && !((footer || inline-buttons) && rows[i].kind == "button");
     }
     clip: true;
     changed content-key => { fl.viewport-y = 0; }
