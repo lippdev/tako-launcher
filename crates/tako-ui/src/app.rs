@@ -326,6 +326,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                     s.ctx.check_installs(); // avisa o que acabou de instalar
                     s.apply_pending_link();
                     s.ctx.dirty = true;
+                    crate::local_api::sync(&mut s.ctx);
                 }
             });
             measure_sizes(&found, to_measure);
@@ -1264,6 +1265,7 @@ impl App {
         drop(ui);
         self.end_intro_later();
         rescan(&self.shell, true); // ao abrir: a lista de não instalados da Steam vem fresca
+        crate::local_api::sync(&mut self.shell.borrow_mut().ctx);
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
     }
 
@@ -1319,13 +1321,18 @@ fn restore(ui: &ComponentInstance) {
     window.with_winit_window(|w| w.focus_window());
 }
 
+/// Despacha uma ação de link diretamente para o shell e traz a janela para a frente.
+pub fn dispatch_link(link: tako_core::links::Link) {
+    if let Some(shell) = crate::tasks::shell() {
+        shell.borrow_mut().open_link(link);
+    }
+    raise_current();
+}
+
 /// Um segundo processo encaminhou um link à interface já aberta.
 pub fn open_current_link(url: &str) {
     if let Some(link) = tako_core::links::parse(url) {
-        if let Some(shell) = crate::tasks::shell() {
-            shell.borrow_mut().open_link(link);
-        }
-        raise_current();
+        dispatch_link(link);
     }
 }
 
