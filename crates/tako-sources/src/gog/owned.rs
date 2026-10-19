@@ -134,6 +134,10 @@ pub fn to_game(o: &GogOwned) -> Game {
             .iter()
             .map(|i| (media::ICON.to_owned(), i.clone()))
             .collect(),
+        icon_origin: o
+            .icon
+            .as_ref()
+            .map(|_| tako_core::library::IconOrigin::Store),
         ..Default::default()
     }
 }
@@ -145,10 +149,10 @@ pub fn add_icons(games: &mut [Game], owned: &[GogOwned]) {
             .iter()
             .find(|o| game.id == super::id_for(&o.game_id))
             .and_then(|o| o.icon.as_ref())
+            && !game.media.contains_key(media::ICON)
         {
-            game.media
-                .entry(media::ICON.to_owned())
-                .or_insert_with(|| icon.clone());
+            game.media.insert(media::ICON.to_owned(), icon.clone());
+            game.icon_origin = Some(tako_core::library::IconOrigin::Store);
         }
     }
 }

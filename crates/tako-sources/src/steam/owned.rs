@@ -133,6 +133,10 @@ pub fn to_game(app: &OwnedApp) -> Game {
             .iter()
             .map(|i| (media::ICON.to_owned(), i.clone()))
             .collect(),
+        icon_origin: app
+            .icon
+            .as_ref()
+            .map(|_| tako_core::library::IconOrigin::Store),
         ..Default::default()
     }
 }

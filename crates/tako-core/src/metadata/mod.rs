@@ -182,21 +182,46 @@ impl GameMetadata {
         }
         fill(&mut game.players, &self.players);
         if !self.media.is_empty() {
-            // O ícone que a loja ou o .exe trouxe vale mais que o achado pelos provedores (UX-005).
-            let store_icon = game.media.remove(crate::library::media::ICON);
+            // Ordem do ícone: loja > provedor > exe (UX-005).
+            let prior_icon = game.media.remove(crate::library::media::ICON);
+            let prior_origin = game.icon_origin;
             game.media = self.media.clone();
-            if let Some(icon) = store_icon {
+            if game.media.contains_key(crate::library::media::ICON) {
+                // O provedor trouxe um ícone.
+                if let Some(store_icon) = prior_icon
+                    && prior_origin != Some(crate::library::IconOrigin::Exe)
+                {
+                    // O ícone anterior era da loja: a loja ganha do provedor.
+                    game.media
+                        .insert(crate::library::media::ICON.to_owned(), store_icon);
+                    game.icon_origin = Some(crate::library::IconOrigin::Store);
+                } else {
+                    // O provedor ganha do .exe (ou de jogo sem ícone anterior).
+                    game.icon_origin = Some(crate::library::IconOrigin::Provider);
+                }
+            } else if let Some(icon) = prior_icon {
+                // O provedor não trouxe ícone: mantém o anterior (loja ou exe).
                 game.media
                     .insert(crate::library::media::ICON.to_owned(), icon);
+                game.icon_origin = prior_origin;
             }
         }
         // Logo e ícone da Steam pelo appid quando nenhuma fonte trouxe (ART-001): a tela mostra o nome se a
         // Steam não tiver a imagem.
         if let Some(app) = self.steam_app_id {
             for kind in [crate::library::media::LOGO, crate::library::media::ICON] {
-                game.media
-                    .entry(kind.to_owned())
-                    .or_insert_with(|| steam_art(app, kind));
+                if kind == crate::library::media::ICON {
+                    if !game.media.contains_key(kind)
+                        || game.icon_origin == Some(crate::library::IconOrigin::Exe)
+                    {
+                        game.media.insert(kind.to_owned(), steam_art(app, kind));
+                        game.icon_origin = Some(crate::library::IconOrigin::Provider);
+                    }
+                } else {
+                    game.media
+                        .entry(kind.to_owned())
+                        .or_insert_with(|| steam_art(app, kind));
+                }
             }
         }
         if self.steam_app_id.is_some() {
@@ -556,6 +581,48 @@ mod tests {
         }
         .apply_to(&mut g);
         assert_eq!(g.media[ICON], "steam-art://570/icon");
+    }
+
+    #[test]
+    fn icon_priority_is_store_then_provider_then_exe() {
+        use crate::library::IconOrigin;
+        use crate::library::media::ICON;
+
+        let provider = GameMetadata {
+            media: [(ICON.into(), "https://sgdb/icon.png".into())].into(),
+            ..GameMetadata::new("SteamGridDB")
+        };
+
+        // 1. Ícone da loja ganha do SteamGridDB (provedor)
+        let mut store_game = game(GameStore::Steam);
+        store_game
+            .media
+            .insert(ICON.into(), "https://store/icon.ico".into());
+        store_game.icon_origin = Some(IconOrigin::Store);
+        provider.apply_to(&mut store_game);
+        assert_eq!(store_game.media[ICON], "https://store/icon.ico");
+        assert_eq!(store_game.icon_origin, Some(IconOrigin::Store));
+
+        // 2. Ícone do SteamGridDB (provedor) ganha do .exe
+        let mut exe_game = game(GameStore::Manual);
+        exe_game
+            .media
+            .insert(ICON.into(), "file:///cache/exe.png".into());
+        exe_game.icon_origin = Some(IconOrigin::Exe);
+        provider.apply_to(&mut exe_game);
+        assert_eq!(exe_game.media[ICON], "https://sgdb/icon.png");
+        assert_eq!(exe_game.icon_origin, Some(IconOrigin::Provider));
+
+        // 3. Provedor sem ícone mantém o ícone do .exe
+        let empty_provider = GameMetadata::new("IGDB");
+        let mut exe_game2 = game(GameStore::Manual);
+        exe_game2
+            .media
+            .insert(ICON.into(), "file:///cache/exe.png".into());
+        exe_game2.icon_origin = Some(IconOrigin::Exe);
+        empty_provider.apply_to(&mut exe_game2);
+        assert_eq!(exe_game2.media[ICON], "file:///cache/exe.png");
+        assert_eq!(exe_game2.icon_origin, Some(IconOrigin::Exe));
     }
 
     #[test]

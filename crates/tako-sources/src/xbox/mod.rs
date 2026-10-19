@@ -102,6 +102,9 @@ pub fn to_game(g: &XboxInstalledGame) -> Game {
             .iter()
             .map(|c| (tako_core::library::media::ICON.to_owned(), c.clone()))
             .collect(),
+        icon_origin: cover
+            .as_ref()
+            .map(|_| tako_core::library::IconOrigin::Store),
         cover_uri: cover,
         is_installed: true,
         added_at: g.installed_at,

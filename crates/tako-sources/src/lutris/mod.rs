@@ -105,6 +105,7 @@ pub fn read_games(data_dir: &Path) -> Result<Vec<Game>, String> {
             .and_then(|d| first_file(d, &[format!("lutris_{slug}.png")]))
         {
             game.media.insert(media::ICON.to_owned(), icon);
+            game.icon_origin = Some(tako_core::library::IconOrigin::Store);
         }
         games.push(game);
     }
