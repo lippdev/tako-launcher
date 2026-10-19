@@ -94,6 +94,14 @@ impl PanelRow {
         self.icon = i.into();
         self
     }
+    pub fn primary(mut self) -> Self {
+        self.style = "primary".into();
+        self
+    }
+    pub fn style(mut self, s: impl Into<String>) -> Self {
+        self.style = s.into();
+        self
+    }
     pub fn danger(mut self) -> Self {
         self.style = "danger".into();
         self

@@ -11,6 +11,19 @@ pub const THEME_API_VERSION: u32 = 1;
 pub const DEFAULT_ENTRY: &str = "main.slint";
 pub const MAX_ID_LEN: usize = 128;
 
+/// Limite máximo do tamanho do arquivo de música de fundo (32 MB).
+pub const MAX_THEME_MUSIC_BYTES: u64 = 32 * 1024 * 1024;
+/// Duração máxima de cada som de navegação (2 segundos).
+pub const MAX_NAV_SOUND_DURATION_SECS: f64 = 2.0;
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ThemeAudio {
+    pub music: Option<String>,
+    pub move_sound: Option<String>,
+    pub accept_sound: Option<String>,
+    pub back_sound: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThemeManifest {
     pub id: String,
@@ -22,6 +35,171 @@ pub struct ThemeManifest {
     pub description: Option<String>,
     /// Arquivo `.slint` principal, relativo à raiz do tema.
     pub entry: String,
+    pub audio: ThemeAudio,
+}
+
+/// Valida um caminho de áudio relativo à pasta do tema:
+/// - Deve ser relativo, sem sair da pasta (sem `..`, sem caminhos absolutos, caracteres válidos)
+/// - Deve ser um arquivo `.wav` (formato decodificado nativamente pela biblioteca de áudio do Tako)
+pub fn validate_audio_path(path: &str) -> Result<String, Problem> {
+    if path.trim().is_empty() {
+        return Err(Problem::new(
+            "manifest.invalid-audio-path",
+            tf(
+                "themes.manifest.invalid_audio_path",
+                &[("path", path), ("reason", &t("themes.path.empty"))],
+            ),
+        ));
+    }
+    let norm = match crate::package::normalize_entry(path) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return Err(Problem::new(
+                "manifest.invalid-audio-path",
+                tf(
+                    "themes.manifest.invalid_audio_path",
+                    &[("path", path), ("reason", &t("themes.path.empty"))],
+                ),
+            ));
+        }
+        Err(reason) => {
+            return Err(Problem::new(
+                "manifest.invalid-audio-path",
+                tf(
+                    "themes.manifest.invalid_audio_path",
+                    &[("path", path), ("reason", &t(reason))],
+                ),
+            ));
+        }
+    };
+    let ext = norm
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase())
+        .filter(|e| !e.contains('/'));
+    match ext.as_deref() {
+        Some("wav") => Ok(norm),
+        _ => Err(Problem::new(
+            "manifest.unsupported-audio-format",
+            tf(
+                "themes.manifest.unsupported_audio_format",
+                &[("path", path)],
+            ),
+        )),
+    }
+}
+
+pub fn parse_audio_table(table: &toml::Table, problems: &mut Vec<Problem>) -> ThemeAudio {
+    let mut audio = ThemeAudio::default();
+    let audio_table = table.get("audio").and_then(|v| v.as_table());
+    let get_str = |key: &str, alt_key: &str| -> Option<String> {
+        audio_table
+            .and_then(|t| t.get(key).or_else(|| t.get(alt_key)))
+            .or_else(|| table.get(key).or_else(|| table.get(alt_key)))
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_owned())
+    };
+
+    if let Some(m) = get_str("music", "musica") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.music = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    if let Some(m) = get_str("move", "mover") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.move_sound = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    if let Some(m) = get_str("accept", "confirmar") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.accept_sound = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    if let Some(m) = get_str("back", "voltar") {
+        match validate_audio_path(&m) {
+            Ok(p) => audio.back_sound = Some(p),
+            Err(prob) => problems.push(prob),
+        }
+    }
+    audio
+}
+
+/// Calcula a duração em segundos de um arquivo WAV a partir de seu cabeçalho RIFF.
+/// Retorna `None` se o arquivo não for um WAV válido ou estiver corrompido.
+pub fn wav_duration(path: &std::path::Path) -> Option<f64> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut reader = std::io::BufReader::new(file);
+    wav_duration_from_reader(&mut reader)
+}
+
+/// Calcula a duração em segundos de um arquivo WAV a partir de um leitor que suporte `Read + Seek`.
+/// Lê apenas os 16 bytes necessários do chunk `fmt ` e pula o restante com `seek`, sem alocar memória
+/// com base no tamanho informado no arquivo. Chunks com tamanho excessivo (> 64 MB) são recusados.
+pub fn wav_duration_from_reader<R: std::io::Read + std::io::Seek>(reader: &mut R) -> Option<f64> {
+    use std::io::SeekFrom;
+    let mut header = [0u8; 12];
+    reader.read_exact(&mut header).ok()?;
+    if &header[0..4] != b"RIFF" || &header[8..12] != b"WAVE" {
+        return None;
+    }
+    let mut byte_rate = 0u32;
+    let mut data_len = 0u32;
+    let mut found_fmt = false;
+    let mut found_data = false;
+
+    const MAX_METADATA_CHUNK_SIZE: u32 = 64 * 1024 * 1024;
+
+    let mut chunk_header = [0u8; 8];
+    while reader.read_exact(&mut chunk_header).is_ok() {
+        let chunk_id = &chunk_header[0..4];
+        let chunk_size = u32::from_le_bytes([
+            chunk_header[4],
+            chunk_header[5],
+            chunk_header[6],
+            chunk_header[7],
+        ]);
+        if chunk_id == b"fmt " {
+            if !(16..=MAX_METADATA_CHUNK_SIZE).contains(&chunk_size) {
+                return None;
+            }
+            let mut fmt_16 = [0u8; 16];
+            reader.read_exact(&mut fmt_16).ok()?;
+            byte_rate = u32::from_le_bytes([fmt_16[8], fmt_16[9], fmt_16[10], fmt_16[11]]);
+            found_fmt = true;
+            let remaining = (chunk_size - 16) as i64 + (chunk_size & 1) as i64;
+            if remaining > 0 && reader.seek(SeekFrom::Current(remaining)).is_err() {
+                return None;
+            }
+        } else if chunk_id == b"data" {
+            data_len = chunk_size;
+            found_data = true;
+            if found_fmt {
+                break;
+            }
+            let skip = chunk_size as i64 + (chunk_size & 1) as i64;
+            if reader.seek(SeekFrom::Current(skip)).is_err() {
+                break;
+            }
+        } else {
+            if chunk_size > MAX_METADATA_CHUNK_SIZE {
+                return None;
+            }
+            let skip = (chunk_size + (chunk_size & 1)) as i64;
+            if reader.seek(SeekFrom::Current(skip)).is_err() {
+                break;
+            }
+        }
+        if found_fmt && found_data {
+            break;
+        }
+    }
+    if found_fmt && found_data && byte_rate > 0 {
+        Some(data_len as f64 / byte_rate as f64)
+    } else {
+        None
+    }
 }
 
 impl ThemeManifest {
@@ -104,6 +282,7 @@ impl ThemeManifest {
             Some(toml::Value::String(s)) => Some(s.clone()),
             _ => None,
         };
+        let audio = parse_audio_table(&table, &mut problems);
         match (id, name, version, author, api, entry) {
             (Some(id), Some(name), Some(version), Some(author), Some(api), Some(entry))
                 if problems.is_empty() =>
@@ -116,6 +295,7 @@ impl ThemeManifest {
                     api,
                     description,
                     entry,
+                    audio,
                 })
             }
             _ => Err(problems),
@@ -166,12 +346,138 @@ mod tests {
         assert_eq!(m.id, "autor.tema");
         assert_eq!(m.entry, "main.slint");
         assert_eq!(m.description, None);
+        assert_eq!(m.audio, ThemeAudio::default());
         let m = ThemeManifest::parse(&format!(
             "{OK}description = \"Escuro\"\nentry = \"./ui//home.slint\"\nextra = 3\n"
         ))
         .unwrap();
         assert_eq!(m.entry, "ui/home.slint");
         assert_eq!(m.description.as_deref(), Some("Escuro"));
+    }
+
+    #[test]
+    fn parses_audio_declarations_in_table_and_root() {
+        let text = format!(
+            "{OK}\n[audio]\nmusic = \"audio/bgm.wav\"\nmove = \"sounds/move.wav\"\naccept = \"sounds/accept.wav\"\nback = \"sounds/back.wav\"\n"
+        );
+        let m = ThemeManifest::parse(&text).unwrap();
+        assert_eq!(m.audio.music.as_deref(), Some("audio/bgm.wav"));
+        assert_eq!(m.audio.move_sound.as_deref(), Some("sounds/move.wav"));
+        assert_eq!(m.audio.accept_sound.as_deref(), Some("sounds/accept.wav"));
+        assert_eq!(m.audio.back_sound.as_deref(), Some("sounds/back.wav"));
+
+        // Portuguese keys and top-level
+        let text_pt = format!(
+            "{OK}musica = \"musica.wav\"\nmover = \"mover.wav\"\nconfirmar = \"confirmar.wav\"\nvoltar = \"voltar.wav\"\n"
+        );
+        let m_pt = ThemeManifest::parse(&text_pt).unwrap();
+        assert_eq!(m_pt.audio.music.as_deref(), Some("musica.wav"));
+        assert_eq!(m_pt.audio.move_sound.as_deref(), Some("mover.wav"));
+        assert_eq!(m_pt.audio.accept_sound.as_deref(), Some("confirmar.wav"));
+        assert_eq!(m_pt.audio.back_sound.as_deref(), Some("voltar.wav"));
+    }
+
+    #[test]
+    fn validates_audio_paths_and_rejects_unsafe_and_unsupported_formats() {
+        // Valid WAV
+        assert_eq!(validate_audio_path("bgm.wav").unwrap(), "bgm.wav");
+        assert_eq!(
+            validate_audio_path("audio/bgm.WAV").unwrap(),
+            "audio/bgm.WAV"
+        );
+
+        // Unsafe paths
+        assert_eq!(
+            validate_audio_path("../evil.wav").unwrap_err().code,
+            "manifest.invalid-audio-path"
+        );
+        assert_eq!(
+            validate_audio_path("/abs/evil.wav").unwrap_err().code,
+            "manifest.invalid-audio-path"
+        );
+        assert_eq!(
+            validate_audio_path("").unwrap_err().code,
+            "manifest.invalid-audio-path"
+        );
+
+        // Unsupported formats (e.g. ogg, opus, mp3)
+        assert_eq!(
+            validate_audio_path("audio/bgm.ogg").unwrap_err().code,
+            "manifest.unsupported-audio-format"
+        );
+        assert_eq!(
+            validate_audio_path("audio/bgm.opus").unwrap_err().code,
+            "manifest.unsupported-audio-format"
+        );
+        assert_eq!(
+            validate_audio_path("audio/bgm.mp3").unwrap_err().code,
+            "manifest.unsupported-audio-format"
+        );
+
+        // Rejected in manifest parse
+        let bad = format!("{OK}[audio]\nmusic = \"../outside.wav\"\n");
+        assert_eq!(codes(&bad), ["manifest.invalid-audio-path"]);
+
+        let bad_fmt = format!("{OK}[audio]\nmusic = \"music.ogg\"\n");
+        assert_eq!(codes(&bad_fmt), ["manifest.unsupported-audio-format"]);
+    }
+
+    #[test]
+    fn rejects_giant_declared_chunk_without_allocating() {
+        let mut v = Vec::new();
+        v.extend_from_slice(b"RIFF");
+        v.extend_from_slice(&100u32.to_le_bytes());
+        v.extend_from_slice(b"WAVE");
+        v.extend_from_slice(b"fmt ");
+        v.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        let mut cursor = std::io::Cursor::new(v);
+        assert_eq!(wav_duration_from_reader(&mut cursor), None);
+
+        let mut v2 = Vec::new();
+        v2.extend_from_slice(b"RIFF");
+        v2.extend_from_slice(&100u32.to_le_bytes());
+        v2.extend_from_slice(b"WAVE");
+        v2.extend_from_slice(b"junk");
+        v2.extend_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
+        let mut cursor2 = std::io::Cursor::new(v2);
+        assert_eq!(wav_duration_from_reader(&mut cursor2), None);
+    }
+    #[test]
+    fn calculates_wav_duration_and_rejects_invalid() {
+        let dir = tempfile::tempdir().unwrap();
+        let not_wav = dir.path().join("not.wav");
+        std::fs::write(&not_wav, b"NOT_A_WAV_FILE").unwrap();
+        assert_eq!(wav_duration(&not_wav), None);
+
+        let valid_wav = dir.path().join("valid.wav");
+        let sample_rate: u32 = 44100;
+        let channels: u16 = 1;
+        let bits_per_sample: u16 = 16;
+        let byte_rate = sample_rate * channels as u32 * (bits_per_sample as u32 / 8);
+        let block_align = channels * (bits_per_sample / 8);
+        let num_samples = 44100; // 1.0 second
+        let data_bytes = num_samples * block_align as u32;
+        let riff_size = 36 + data_bytes;
+
+        let mut v = Vec::with_capacity(44 + data_bytes as usize);
+        v.extend_from_slice(b"RIFF");
+        v.extend_from_slice(&riff_size.to_le_bytes());
+        v.extend_from_slice(b"WAVE");
+        v.extend_from_slice(b"fmt ");
+        v.extend_from_slice(&16u32.to_le_bytes());
+        v.extend_from_slice(&1u16.to_le_bytes());
+        v.extend_from_slice(&channels.to_le_bytes());
+        v.extend_from_slice(&sample_rate.to_le_bytes());
+        v.extend_from_slice(&byte_rate.to_le_bytes());
+        v.extend_from_slice(&block_align.to_le_bytes());
+        v.extend_from_slice(&bits_per_sample.to_le_bytes());
+        v.extend_from_slice(b"data");
+        v.extend_from_slice(&data_bytes.to_le_bytes());
+        v.resize(44 + data_bytes as usize, 0);
+
+        std::fs::write(&valid_wav, &v).unwrap();
+        let dur = wav_duration(&valid_wav).unwrap();
+        assert!((dur - 1.0).abs() < 0.01);
     }
 
     #[test]

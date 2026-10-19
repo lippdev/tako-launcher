@@ -6479,6 +6479,7 @@ dependencies = [
 name = "tako-platform"
 version = "0.2.0-alpha.1"
 dependencies = [
+ "arboard",
  "chrono",
  "evdev",
  "image",
@@ -6526,6 +6527,7 @@ dependencies = [
 name = "tako-themes"
 version = "0.2.0-alpha.1"
 dependencies = [
+ "image",
  "serde",
  "serde_json",
  "tako-core",
@@ -6559,6 +6561,7 @@ dependencies = [
  "tempfile",
  "toml",
  "tracing",
+ "ureq",
 ]
 
 [[package]]

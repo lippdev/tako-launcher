@@ -22,7 +22,8 @@ impl GameSettingsStore {
             .query_row(
                 "SELECT use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
                         extra_arguments, working_directory, environment, before_command, after_command,
-                        approved_commands, screen_id, screen_name, vrr, tools, close_tools
+                        approved_commands, screen_id, screen_name, vrr, tools, close_tools,
+                        wine_runtime, wine_prefix
                  FROM game_settings WHERE game_id = ?1;",
                 [game_id],
                 |r| {
@@ -47,6 +48,8 @@ impl GameSettingsStore {
                         vrr: r.get::<_, Option<i64>>(15)?.map(|v| v != 0),
                         tools: r.get(16)?,
                         close_tools: r.get::<_, Option<i64>>(17)?.map(|v| v != 0),
+                        wine_runtime: r.get(18)?,
+                        wine_prefix: r.get(19)?,
                     })
                 },
             )
@@ -70,8 +73,8 @@ impl GameSettingsStore {
             "INSERT OR REPLACE INTO game_settings
                 (game_id, use_game_screen, screen_mode, hdr, audio_device_id, audio_device_name, fps_limit, show_fps,
                  extra_arguments, working_directory, environment, before_command, after_command, approved_commands,
-                 screen_id, screen_name, vrr, tools, close_tools)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19);",
+                 screen_id, screen_name, vrr, tools, close_tools, wine_runtime, wine_prefix)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21);",
             params![
                 game_id,
                 settings.use_game_screen,
@@ -92,6 +95,8 @@ impl GameSettingsStore {
                 settings.vrr,
                 normalize(settings.tools.as_deref()),
                 settings.close_tools,
+                normalize(settings.wine_runtime.as_deref()),
+                normalize(settings.wine_prefix.as_deref()),
             ],
         )?;
         Ok(())
@@ -132,6 +137,8 @@ mod tests {
             approved_commands: Some("antes.bat\n".into()),
             tools: Some(" C:/FPS/fps.exe ".into()),
             close_tools: Some(true),
+            wine_runtime: Some(" proton:8.0 ".into()),
+            wine_prefix: Some(" /tmp/prefix ".into()),
         };
 
         assert_eq!(
@@ -145,6 +152,8 @@ mod tests {
             working_directory: None,
             before_command: Some("antes.bat".into()),
             tools: Some("C:/FPS/fps.exe".into()),
+            wine_runtime: Some("proton:8.0".into()),
+            wine_prefix: Some("/tmp/prefix".into()),
             ..settings
         };
         assert_eq!(store.load("steam:570").unwrap(), expected);

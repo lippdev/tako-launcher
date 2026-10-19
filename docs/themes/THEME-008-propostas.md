@@ -63,6 +63,7 @@ Uma fita horizontal contínua de cartões compactos ancorada no terço inferior 
 
 ### O que a API de temas atual já permite
 - Totalmente compatível com a API v1: consome `hero`, `home-rows`, `library-tiles`, `library-columns`, `library-chips` e `backdrop`.
+- Componentes como `ControlCenter`, `OverlayView` e `RowView` são importados de `@tako/` para suporte a camadas, mas não fazem parte do contrato formal da API v1.
 - Virtualização das capas por fileira já testada e suportada no Slint.
 
 ### O que faltaria na API

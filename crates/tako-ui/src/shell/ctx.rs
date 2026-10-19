@@ -201,6 +201,12 @@ pub mod keys {
     pub const SUNSHINE_SYNC: &str = "SunshineSyncOnRescan";
     pub const FIRST_RUN_DONE: &str = "FirstRunCompleted";
     pub const SMART_COLLECTIONS: &str = "SmartCollections";
+    // Marcados para exclusão no CLOUD-001 (PR #137):
+    // LocalApiToken nunca deve entrar em backup nem export (segredo local da máquina).
+    // LocalApiEnabled não pode ser importado como consentimento (opt-in estrito por máquina).
+    pub const API_ENABLED: &str = tako_core::api::API_ENABLED;
+    pub const API_PORT: &str = tako_core::api::API_PORT;
+    pub const API_TOKEN: &str = tako_core::api::API_TOKEN;
 }
 
 /// O que o "Desfazer" de um aviso faz.
@@ -249,6 +255,7 @@ pub struct Ctx {
     pub app_update: crate::app_updates::State,
     pub safe_mode: bool,
     pub scanning: bool,
+    pub pending_link: Option<tako_core::links::Link>,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
     pub grid_columns: usize,
     /// Camada que uma página pediu para abrir junto com ela.
@@ -279,6 +286,14 @@ pub struct Ctx {
     pub redraw_at: Option<Instant>,
     /// Tema em prévia (THEME-002): vale na tela, mas não está salvo; vence o tema escolhido até confirmar ou voltar.
     pub theme_preview: Option<super::theme_preview::ThemePreview>,
+    /// Rascunho de personalização de tema enquanto o usuário edita (THEME-003).
+    pub theme_draft: Option<tako_themes::overrides::ThemeTokensOverride>,
+    /// Indica se o tema atual implementa a API padrão do global `Ui` (THEME-003).
+    pub theme_supports_ui: bool,
+    /// Destaque personalizado persistido em disco para o tema atual.
+    pub persisted_theme_accent: Option<tako_core::presentation::Rgb>,
+    /// Destaque padrão do tema ativo (lido de tokens.toml do tema).
+    pub base_theme_accent: Option<tako_core::presentation::Rgb>,
     /// "Abrindo…" está na tela (o aviso de que a janela do jogo apareceu só vale com ela).
     pub launching: bool,
     /// Desde quando o jogo está abrindo: depois de `LAUNCH_SLOW` o botão vira "Ainda abrindo…" com "Cancelar".
@@ -429,6 +444,44 @@ impl Ctx {
         }
         self.pads_connected = count;
         self.dirty = true;
+    }
+
+    /// Descarta o rascunho de personalização de tema e limpa imagens temporárias (`background.draft.*`).
+    pub fn discard_theme_draft(&mut self) {
+        let theme_id = tako_themes::selected(&self.paths.themes());
+        let _ = tako_themes::overrides::clean_background_draft(
+            &self.paths.themes(),
+            theme_id.as_deref(),
+        );
+        self.theme_draft = None;
+    }
+
+    /// Atualiza o cache dos destaques do tema lidos do disco.
+    pub fn reload_theme_cache(&mut self) {
+        let selected_id = tako_themes::selected(&self.paths.themes());
+        let theme_id = selected_id.as_deref();
+        self.persisted_theme_accent =
+            tako_themes::overrides::load_override(&self.paths.themes(), theme_id).and_then(
+                |text| {
+                    let ov = tako_themes::overrides::ThemeTokensOverride::from_toml_str(&text);
+                    ov.accent
+                        .as_deref()
+                        .and_then(tako_core::presentation::Rgb::parse)
+                },
+            );
+        self.base_theme_accent = if let Some(id) = theme_id {
+            let dir = self.paths.themes().join(id);
+            std::fs::read_to_string(dir.join("tokens.toml"))
+                .ok()
+                .and_then(|text| {
+                    let ov = tako_themes::overrides::ThemeTokensOverride::from_toml_str(&text);
+                    ov.accent
+                        .as_deref()
+                        .and_then(tako_core::presentation::Rgb::parse)
+                })
+        } else {
+            None
+        };
     }
 
     /// Depois de mudar coleções: os jogos passam a saber em quais estão.

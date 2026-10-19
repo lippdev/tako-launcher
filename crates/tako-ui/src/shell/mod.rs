@@ -125,7 +125,6 @@ pub const LAUNCH_SLOW: Duration = Duration::from_secs(20);
 pub const TOAST_TIME: Duration = Duration::from_millis(2600);
 
 pub struct Shell {
-    pub(crate) pending_link: Option<tako_core::links::Link>,
     pub ctx: Ctx,
     pages: Vec<Box<dyn Page>>,
     layers: Vec<Box<dyn Layer>>,
@@ -139,7 +138,6 @@ pub struct Shell {
 impl Shell {
     pub fn new(ctx: Ctx) -> Shell {
         let mut shell = Shell {
-            pending_link: None,
             ctx,
             pages: vec![Box::new(home::HomePage::new())],
             layers: Vec::new(),
@@ -156,6 +154,7 @@ impl Shell {
         let focus = self.focused_game();
         self.ctx.desktop = true;
         self.cc = None;
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         // A prévia é da tela cheia: sem a camada dela, o tick pediria o tema de volta e avisaria no desktop.
         self.ctx.theme_preview = None;
@@ -174,6 +173,7 @@ impl Shell {
         let focus = self.focused_game();
         self.ctx.desktop = false;
         self.ask_big_picture = false;
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         self.pages = vec![Box::new(home::HomePage::new())];
         self.sidebar.focus = None;
@@ -193,6 +193,7 @@ impl Shell {
 
     /// Barra superior do desktop: Biblioteca, Configurações, Tela cheia e Perfil (3).
     fn desktop_nav(&mut self, index: usize) {
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         match index {
             0 => self.pages.truncate(1),
@@ -275,8 +276,13 @@ impl Shell {
         let shown = self.layers.iter().any(|l| l.theme_preview());
         self.layers.retain(|l| !l.theme_preview());
         if shown {
-            self.layers
-                .push(Box::new(theme_preview::panel(&self.ctx, p.id.as_deref())));
+            if p.draft_override.is_some() {
+                self.layers
+                    .push(Box::new(settings::edit_theme_panel(&self.ctx)));
+            } else {
+                self.layers
+                    .push(Box::new(theme_preview::panel(&self.ctx, p.id.as_deref())));
+            }
         }
         if reload {
             theme_preview::reload_selected(&mut self.ctx);
@@ -296,6 +302,7 @@ impl Shell {
     }
 
     pub fn close_layers(&mut self) {
+        self.ctx.discard_theme_draft();
         self.layers.clear();
         self.ctx.dirty = true;
     }
@@ -320,7 +327,7 @@ impl Shell {
                 return;
             }
             if route == "desk:profile:sessions" {
-                self.layers.clear();
+                self.close_layers();
                 self.pages.truncate(1);
                 let mut p = profile::ProfilePage::new();
                 p.open_tab(profile::Tab::Sessions);
@@ -342,7 +349,7 @@ impl Shell {
             _ => return,
         };
         self.pages = vec![page];
-        self.layers.clear();
+        self.close_layers();
         self.sidebar.focus = None;
         self.ctx.dirty = true;
     }
@@ -650,7 +657,7 @@ impl Shell {
             self.layers.push(l);
         }
         if let Some(id) = self.ctx.open_details.take() {
-            self.layers.clear();
+            self.close_layers();
             if self.ctx.desktop {
                 // O desktop mostra os detalhes no destaque da biblioteca.
                 self.pages.truncate(1);
@@ -663,7 +670,7 @@ impl Shell {
             self.open_route(&route);
         }
         if std::mem::take(&mut self.ctx.leave_details) && self.page().kind() == "details" {
-            self.layers.clear();
+            self.close_layers();
             self.apply_nav_inner(Nav::Back);
         }
     }
@@ -672,7 +679,7 @@ impl Shell {
         match flow {
             Flow::Stay => self.layers.push(top),
             Flow::Close => {}
-            Flow::CloseAll => self.layers.clear(),
+            Flow::CloseAll => self.close_layers(),
             Flow::Replace(l) => self.layers.push(l),
             Flow::Push(l) => {
                 self.layers.push(top);

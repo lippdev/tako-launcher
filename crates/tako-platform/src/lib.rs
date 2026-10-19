@@ -17,6 +17,14 @@ pub mod space;
 pub mod sunshine;
 pub mod usage;
 
+/// Copia um texto para a área de transferência do sistema.
+pub fn copy_to_clipboard(text: &str) -> bool {
+    let Ok(mut clipboard) = arboard::Clipboard::new() else {
+        return false;
+    };
+    clipboard.set_text(text).is_ok()
+}
+
 /// Atalho de teclado global durante o jogo; o retorno mantém o atalho registrado até ser solto. `None` = sem
 /// atalho (tecla sem equivalente, atalho em uso por outro app ou SO sem suporte).
 /// shortcut: só Windows; Linux (portal GlobalShortcuts no Wayland, XGrabKey no X11) e macOS (CGEventTap com
@@ -79,6 +87,9 @@ pub mod windows_hidhide;
 pub mod windows_identity;
 #[path = "windows/startup.rs"]
 pub mod windows_startup;
+// Partes puras do Linux, compiladas e testadas em todo SO (SESSION-005).
+#[path = "linux/compatibility.rs"]
+pub mod linux_compatibility;
 
 /// Conjunto de funções de plataforma usado pela sessão e pela UI.
 #[derive(Clone)]

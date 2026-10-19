@@ -59,6 +59,11 @@ pub fn categories() -> Vec<Category> {
             rows: appearance,
         },
         Category {
+            id: "sound",
+            icon: "volume",
+            rows: sound,
+        },
+        Category {
             id: "screen",
             icon: "monitor",
             rows: screen::rows,
@@ -599,6 +604,7 @@ pub(crate) fn themes_panel(ctx: &Ctx) -> MenuLayer {
 /// Escolher um tema. Na tela cheia ele entra em prévia (THEME-002) e só vira o escolhido ao confirmar; o desktop não
 /// tem tema (ADR-0027), então ali a escolha vale direto, para a próxima tela cheia.
 fn pick_theme(ctx: &mut Ctx, id: Option<&str>, name: &str) -> Flow {
+    ctx.discard_theme_draft();
     if !ctx.desktop {
         if tako_themes::selected(&ctx.paths.themes()).as_deref() == id {
             return Flow::Stay;
@@ -606,14 +612,552 @@ fn pick_theme(ctx: &mut Ctx, id: Option<&str>, name: &str) -> Flow {
         return super::theme_preview::start(ctx, id, name);
     }
     match tako_themes::select(&ctx.paths.themes(), id) {
-        Ok(()) => ctx.effect(Effect::ApplyTheme(id.unwrap_or(BUILTIN_THEME).to_owned())),
+        Ok(()) => {
+            ctx.reload_theme_cache();
+            ctx.effect(Effect::ApplyTheme(id.unwrap_or(BUILTIN_THEME).to_owned()))
+        }
         Err(e) => ctx.toast(e.to_string()),
     }
     Flow::Stay
 }
 
+const ACCENT_PRESETS: [(&str, &str); 8] = [
+    ("#2B3A55", "accent_blue"),
+    ("#6C5CE7", "accent_purple"),
+    ("#E3161E", "accent_red"),
+    ("#0B7A3B", "accent_green"),
+    ("#E67E22", "accent_orange"),
+    ("#E84393", "accent_pink"),
+    ("#00CEC9", "accent_cyan"),
+    ("#F1C40F", "accent_yellow"),
+];
+
+const FONTS: [&str; 4] = ["Inter", "Source Sans 3", "Poppins", "Plus Jakarta Sans"];
+
+const BG_TYPES: [(&str, &str); 3] = [
+    ("default", "bg_default"),
+    ("solid", "bg_solid"),
+    ("image", "bg_image"),
+];
+
+const BG_COLORS: [(&str, &str); 5] = [
+    ("#0E1116", "bg_black"),
+    ("#1C1C1E", "bg_dark_gray"),
+    ("#0B1A33", "bg_navy"),
+    ("#1B1429", "bg_dark_purple"),
+    ("#0D201A", "bg_dark_green"),
+];
+
+fn current_draft(ctx: &Ctx) -> tako_themes::overrides::ThemeTokensOverride {
+    if let Some(ref d) = ctx.theme_draft {
+        return d.clone();
+    }
+    let theme_id = tako_themes::selected(&ctx.paths.themes());
+    tako_themes::overrides::load_override(&ctx.paths.themes(), theme_id.as_deref())
+        .map(|s| tako_themes::overrides::ThemeTokensOverride::from_toml_str(&s))
+        .unwrap_or_default()
+}
+
+pub(crate) fn edit_theme_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("settings.appearance.edit_theme"), |ctx| {
+        let draft = current_draft(ctx);
+
+        let cur_accent_hex = draft.accent.as_deref().unwrap_or("#2B3A55");
+        let accent_label = ACCENT_PRESETS
+            .iter()
+            .find(|(hex, _)| hex.eq_ignore_ascii_case(cur_accent_hex))
+            .map(|(_, l)| ctx.t(&format!("settings.appearance.{l}")))
+            .unwrap_or_else(|| cur_accent_hex.to_owned());
+
+        let accent_row = MenuItem::new(
+            PanelRow::choice(
+                "accent",
+                ctx.t("settings.appearance.accent_color"),
+                accent_label,
+            )
+            .desc(ctx.t("settings.appearance.accent_color_desc")),
+        )
+        .on_adjust(|ctx, dir| {
+            let mut d = current_draft(ctx);
+            let cur_hex = d.accent.as_deref().unwrap_or("#2B3A55");
+            let cur_idx = ACCENT_PRESETS
+                .iter()
+                .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_hex))
+                .unwrap_or(0);
+            let next_idx = if dir >= 0 {
+                (cur_idx + 1) % ACCENT_PRESETS.len()
+            } else {
+                (cur_idx + ACCENT_PRESETS.len() - 1) % ACCENT_PRESETS.len()
+            };
+            d.accent = Some(ACCENT_PRESETS[next_idx].0.to_owned());
+            ctx.theme_draft = Some(d);
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            let draft = current_draft(ctx);
+            let cur_hex = draft.accent.as_deref().unwrap_or("#2B3A55");
+            let cur_idx = ACCENT_PRESETS
+                .iter()
+                .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_hex))
+                .unwrap_or(0);
+            let picks = ACCENT_PRESETS
+                .iter()
+                .map(|(hex, label)| {
+                    let hex = (*hex).to_owned();
+                    Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                        let mut d = current_draft(ctx);
+                        d.accent = Some(hex.clone());
+                        ctx.theme_draft = Some(d);
+                        ctx.dirty = true;
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (picks, cur_idx)
+        });
+
+        let cur_font = draft.font.as_deref().unwrap_or("Inter");
+        let font_label = cur_font.to_owned();
+        let font_row = MenuItem::new(
+            PanelRow::choice("font", ctx.t("settings.appearance.font"), font_label)
+                .desc(ctx.t("settings.appearance.font_desc")),
+        )
+        .on_adjust(|ctx, dir| {
+            let mut d = current_draft(ctx);
+            let cur_f = d.font.as_deref().unwrap_or("Inter");
+            let cur_idx = FONTS.iter().position(|f| *f == cur_f).unwrap_or(0);
+            let next_idx = if dir >= 0 {
+                (cur_idx + 1) % FONTS.len()
+            } else {
+                (cur_idx + FONTS.len() - 1) % FONTS.len()
+            };
+            d.font = Some(FONTS[next_idx].to_owned());
+            ctx.theme_draft = Some(d);
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            let draft = current_draft(ctx);
+            let cur_f = draft.font.as_deref().unwrap_or("Inter");
+            let cur_idx = FONTS.iter().position(|f| *f == cur_f).unwrap_or(0);
+            let picks = FONTS
+                .iter()
+                .map(|font_name| {
+                    let f_name = (*font_name).to_owned();
+                    Pick::new(*font_name).set(move |ctx| {
+                        let mut d = current_draft(ctx);
+                        d.font = Some(f_name.clone());
+                        ctx.theme_draft = Some(d);
+                        ctx.dirty = true;
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (picks, cur_idx)
+        });
+
+        let bg_type_idx = match draft.background_mode {
+            Some(tako_themes::overrides::BackgroundMode::Image) => 2,
+            Some(tako_themes::overrides::BackgroundMode::Solid) => 1,
+            Some(tako_themes::overrides::BackgroundMode::Default) => 0,
+            None => {
+                if draft.background_image.is_some() {
+                    2
+                } else if draft.canvas.is_some() {
+                    1
+                } else {
+                    0
+                }
+            }
+        };
+        let bg_type_label = ctx.t(&format!("settings.appearance.{}", BG_TYPES[bg_type_idx].1));
+
+        let bg_type_row = MenuItem::new(
+            PanelRow::choice(
+                "bg_type",
+                ctx.t("settings.appearance.bg_type"),
+                bg_type_label,
+            )
+            .desc(ctx.t("settings.appearance.bg_type_desc")),
+        )
+        .on_adjust(|ctx, dir| {
+            let mut d = current_draft(ctx);
+            let cur_idx = match d.background_mode {
+                Some(tako_themes::overrides::BackgroundMode::Image) => 2,
+                Some(tako_themes::overrides::BackgroundMode::Solid) => 1,
+                Some(tako_themes::overrides::BackgroundMode::Default) => 0,
+                None => {
+                    if d.background_image.is_some() {
+                        2
+                    } else if d.canvas.is_some() {
+                        1
+                    } else {
+                        0
+                    }
+                }
+            };
+            let next_idx = if dir >= 0 {
+                (cur_idx + 1) % BG_TYPES.len()
+            } else {
+                (cur_idx + BG_TYPES.len() - 1) % BG_TYPES.len()
+            };
+            match next_idx {
+                0 => {
+                    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Default);
+                    d.canvas = None;
+                    d.background_image = None;
+                }
+                1 => {
+                    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Solid);
+                    d.background_image = None;
+                    if d.canvas.is_none() {
+                        d.canvas = Some("#0E1116".into());
+                    }
+                }
+                _ => {
+                    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Image);
+                    d.canvas = None;
+                }
+            }
+            ctx.theme_draft = Some(d);
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            let draft = current_draft(ctx);
+            let cur_idx = match draft.background_mode {
+                Some(tako_themes::overrides::BackgroundMode::Image) => 2,
+                Some(tako_themes::overrides::BackgroundMode::Solid) => 1,
+                Some(tako_themes::overrides::BackgroundMode::Default) => 0,
+                None => {
+                    if draft.background_image.is_some() {
+                        2
+                    } else if draft.canvas.is_some() {
+                        1
+                    } else {
+                        0
+                    }
+                }
+            };
+            let picks = BG_TYPES
+                .iter()
+                .map(|(mode, label)| {
+                    let mode = (*mode).to_owned();
+                    Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                        let mut d = current_draft(ctx);
+                        match mode.as_str() {
+                            "default" => {
+                                d.background_mode =
+                                    Some(tako_themes::overrides::BackgroundMode::Default);
+                                d.canvas = None;
+                                d.background_image = None;
+                            }
+                            "solid" => {
+                                d.background_mode =
+                                    Some(tako_themes::overrides::BackgroundMode::Solid);
+                                d.background_image = None;
+                                if d.canvas.is_none() {
+                                    d.canvas = Some("#0E1116".into());
+                                }
+                            }
+                            "image" => {
+                                d.background_mode =
+                                    Some(tako_themes::overrides::BackgroundMode::Image);
+                                d.canvas = None;
+                            }
+                            _ => {}
+                        }
+                        ctx.theme_draft = Some(d);
+                        ctx.dirty = true;
+                        Flow::Stay
+                    })
+                })
+                .collect();
+            (picks, cur_idx)
+        });
+
+        let mut rows = vec![accent_row, font_row, bg_type_row];
+
+        if bg_type_idx == 1 {
+            let cur_canvas = draft.canvas.as_deref().unwrap_or("#0E1116");
+            let bg_color_label = BG_COLORS
+                .iter()
+                .find(|(hex, _)| hex.eq_ignore_ascii_case(cur_canvas))
+                .map(|(_, l)| ctx.t(&format!("settings.appearance.{l}")))
+                .unwrap_or_else(|| cur_canvas.to_owned());
+
+            let bg_color_row = MenuItem::new(
+                PanelRow::choice(
+                    "bg_color",
+                    ctx.t("settings.appearance.bg_color"),
+                    bg_color_label,
+                )
+                .desc(ctx.t("settings.appearance.bg_color_desc")),
+            )
+            .on_adjust(|ctx, dir| {
+                let mut d = current_draft(ctx);
+                let cur_canvas = d.canvas.as_deref().unwrap_or("#0E1116");
+                let cur_idx = BG_COLORS
+                    .iter()
+                    .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_canvas))
+                    .unwrap_or(0);
+                let next_idx = if dir >= 0 {
+                    (cur_idx + 1) % BG_COLORS.len()
+                } else {
+                    (cur_idx + BG_COLORS.len() - 1) % BG_COLORS.len()
+                };
+                d.canvas = Some(BG_COLORS[next_idx].0.to_owned());
+                d.background_image = None;
+                ctx.theme_draft = Some(d);
+                ctx.dirty = true;
+                Flow::Stay
+            })
+            .options(|ctx| {
+                let draft = current_draft(ctx);
+                let cur_canvas = draft.canvas.as_deref().unwrap_or("#0E1116");
+                let cur_idx = BG_COLORS
+                    .iter()
+                    .position(|(hex, _)| hex.eq_ignore_ascii_case(cur_canvas))
+                    .unwrap_or(0);
+                let picks = BG_COLORS
+                    .iter()
+                    .map(|(hex, label)| {
+                        let hex = (*hex).to_owned();
+                        Pick::new(ctx.t(&format!("settings.appearance.{label}"))).set(move |ctx| {
+                            let mut d = current_draft(ctx);
+                            d.canvas = Some(hex.clone());
+                            d.background_image = None;
+                            ctx.theme_draft = Some(d);
+                            ctx.dirty = true;
+                            Flow::Stay
+                        })
+                    })
+                    .collect();
+                (picks, cur_idx)
+            });
+            rows.push(bg_color_row);
+        } else if bg_type_idx == 2 {
+            let img_label = if let Some(ref name) = draft.background_source_name {
+                name.clone()
+            } else if let Some(ref img_val) = draft.background_image {
+                if img_val.is_empty() {
+                    ctx.t("settings.appearance.bg_no_image")
+                } else if let Some(clean) =
+                    img_val.strip_prefix(tako_themes::overrides::DRAFT_BACKGROUND_PREFIX)
+                {
+                    format!("background.{clean}")
+                } else {
+                    img_val.clone()
+                }
+            } else {
+                ctx.t("settings.appearance.bg_no_image")
+            };
+
+            let choose_img_row = MenuItem::new(
+                PanelRow::action("choose_image", ctx.t("settings.appearance.bg_choose_image"))
+                    .desc(ctx.t("settings.appearance.bg_choose_image_desc"))
+                    .value(img_label),
+            )
+            .on(|ctx| {
+                let title = ctx.t("settings.appearance.bg_choose_image");
+                let filter_name = ctx.t("settings.appearance.bg_filter_images");
+                let themes_root = ctx.paths.themes();
+                let theme_id = tako_themes::selected(&themes_root);
+                crate::tasks::run(
+                    ctx,
+                    move || {
+                        let picked = rfd::FileDialog::new()
+                            .set_title(&title)
+                            .add_filter(
+                                &filter_name,
+                                tako_themes::overrides::ALLOWED_BACKGROUND_EXTENSIONS,
+                            )
+                            .pick_file();
+                        picked.map(|src| {
+                            let orig_name =
+                                src.file_name().and_then(|n| n.to_str()).map(str::to_owned);
+                            tako_themes::overrides::copy_draft_background_image(
+                                &themes_root,
+                                theme_id.as_deref(),
+                                &src,
+                            )
+                            .map(|fname| (fname, orig_name))
+                        })
+                    },
+                    move |ctx, result| match result {
+                        None => {}
+                        Some(Ok((filename, orig_name))) => {
+                            let mut d = current_draft(ctx);
+                            d.background_image = Some(filename);
+                            d.background_source_name = orig_name;
+                            d.background_mode = Some(tako_themes::overrides::BackgroundMode::Image);
+                            d.canvas = None;
+                            ctx.theme_draft = Some(d);
+                            ctx.dirty = true;
+                        }
+                        Some(Err(err)) => {
+                            let msg = match err {
+                                tako_themes::overrides::CopyImageError::NotFound(_) => {
+                                    ctx.t("settings.appearance.bg_image_err_not_found")
+                                }
+                                tako_themes::overrides::CopyImageError::InvalidExtension => {
+                                    ctx.t("settings.appearance.bg_image_err_invalid_ext")
+                                }
+                                tako_themes::overrides::CopyImageError::InvalidContent => {
+                                    ctx.t("settings.appearance.bg_image_err_invalid_header")
+                                }
+                                tako_themes::overrides::CopyImageError::TooLarge => {
+                                    ctx.t("settings.appearance.bg_image_err_too_large")
+                                }
+                                tako_themes::overrides::CopyImageError::Io(e) => {
+                                    ctx.tf("settings.appearance.bg_image_err_io", &[("error", &e)])
+                                }
+                            };
+                            ctx.toast(msg);
+                        }
+                    },
+                );
+                Flow::Stay
+            });
+            rows.push(choose_img_row);
+        }
+
+        let preview_row = MenuItem::new(
+            PanelRow::action("preview", ctx.t("settings.appearance.live_preview"))
+                .desc(ctx.t("settings.appearance.live_preview_desc"))
+                .icon("play"),
+        )
+        .on(|ctx| {
+            let theme_id = tako_themes::selected(&ctx.paths.themes());
+            let draft = current_draft(ctx);
+            super::theme_preview::start_override(ctx, theme_id.as_deref(), draft)
+        });
+        rows.push(preview_row);
+
+        let save_row = MenuItem::new(
+            PanelRow::action("save", ctx.t("settings.appearance.save_theme")).style("primary"),
+        )
+        .on(|ctx| {
+            let theme_id = tako_themes::selected(&ctx.paths.themes());
+            let mut draft = current_draft(ctx);
+            if let Some(ref bg_draft) = draft.background_image {
+                match tako_themes::overrides::promote_background_draft(
+                    &ctx.paths.themes(),
+                    theme_id.as_deref(),
+                    bg_draft,
+                ) {
+                    Ok(final_name) => {
+                        draft.background_image = Some(final_name);
+                    }
+                    Err(e) => {
+                        tracing::error!("promover rascunho de fundo: {e}");
+                        ctx.toast(ctx.t("settings.appearance.save_override_error"));
+                        return Flow::Stay;
+                    }
+                }
+            } else {
+                let _ = tako_themes::overrides::clean_background_orphans(
+                    &ctx.paths.themes(),
+                    theme_id.as_deref(),
+                    None,
+                );
+            }
+            let toml_str = draft.to_toml_string();
+            match tako_themes::overrides::save_override(
+                &ctx.paths.themes(),
+                theme_id.as_deref(),
+                &toml_str,
+            ) {
+                Ok(_) => {
+                    let text = ctx.t("settings.appearance.theme_customized_saved");
+                    ctx.toast(text);
+                    ctx.theme_draft = None;
+                    ctx.reload_theme_cache();
+                    let apply_id = theme_id.unwrap_or_else(|| BUILTIN_THEME.to_owned());
+                    ctx.effect(Effect::ApplyTheme(apply_id));
+                    Flow::Close
+                }
+                Err(e) => {
+                    tracing::error!("salvar sobreposição: {e}");
+                    ctx.toast(ctx.t("settings.appearance.save_override_error"));
+                    Flow::Stay
+                }
+            }
+        });
+        rows.push(save_row);
+
+        let has_ov = tako_themes::overrides::has_override(
+            &ctx.paths.themes(),
+            tako_themes::selected(&ctx.paths.themes()).as_deref(),
+        );
+        if has_ov || ctx.theme_draft.is_some() {
+            let reset_row = MenuItem::new(
+                PanelRow::action("reset", ctx.t("settings.appearance.reset_theme"))
+                    .desc(ctx.t("settings.appearance.reset_theme_desc"))
+                    .style("danger"),
+            )
+            .on(|ctx| {
+                Flow::Push(Box::new(
+                    MenuLayer::dialog(
+                        ctx.t("settings.appearance.reset_theme_confirm_title"),
+                        |ctx| {
+                            vec![
+                                MenuItem::new(
+                                    PanelRow::button(
+                                        "reset",
+                                        ctx.t("settings.appearance.reset_theme_confirm_button"),
+                                    )
+                                    .danger(),
+                                )
+                                .on(|ctx| {
+                                    let theme_id = tako_themes::selected(&ctx.paths.themes());
+                                    ctx.discard_theme_draft();
+                                    match tako_themes::overrides::reset_override(
+                                        &ctx.paths.themes(),
+                                        theme_id.as_deref(),
+                                    ) {
+                                        Ok(_) => {
+                                            let text =
+                                                ctx.t("settings.appearance.theme_reset_applied");
+                                            ctx.toast(text);
+                                            ctx.reload_theme_cache();
+                                            let apply_id = theme_id
+                                                .unwrap_or_else(|| BUILTIN_THEME.to_owned());
+                                            ctx.effect(Effect::ApplyTheme(apply_id));
+                                            Flow::CloseAll
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("restaurar sobreposição: {e}");
+                                            ctx.toast(
+                                                ctx.t("settings.appearance.reset_override_error"),
+                                            );
+                                            Flow::Stay
+                                        }
+                                    }
+                                }),
+                                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                                    .on(|_| Flow::Close),
+                            ]
+                        },
+                    )
+                    .text(ctx.t("settings.appearance.reset_theme_confirm_text"))
+                    .focus_at(1),
+                ))
+            });
+            rows.push(reset_row);
+        }
+
+        rows
+    })
+    .on_back(|ctx| {
+        ctx.discard_theme_draft();
+        Flow::Close
+    })
+}
+
 fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
-    vec![
+    let mut items = vec![
         MenuItem::new(PanelRow::choice(
             "text-size",
             ctx.t("accessibility.text_size"),
@@ -632,43 +1176,23 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             (picks, cur)
         }),
         MenuItem::new(
-            PanelRow {
-                // Volume é contínuo: no desktop, controle deslizante (o valor vai em 0–100).
-                kind: if ctx.desktop { "slider" } else { "choice" }.into(),
-                ..PanelRow::choice(
-                    "navigation-volume",
-                    ctx.t("accessibility.sound_volume"),
-                    if ctx.desktop {
-                        // O controle mostra "70%"; em 0, "Mudo" (o valor que ele lê vira 0).
-                        match crate::navigation_feedback::volume(&ctx.settings) {
-                            0 => ctx.t("accessibility.sound_muted"),
-                            v => v.to_string(),
-                        }
-                    } else {
-                        format!("{}%", crate::navigation_feedback::volume(&ctx.settings))
-                    },
-                )
-            }
-            .desc(ctx.t("accessibility.sound_desc")),
-        )
-        .on(|ctx| change_navigation_volume(ctx, 1))
-        .on_adjust(change_navigation_volume)
-        .on_slide(|ctx, v, done| {
-            use crate::navigation_feedback as feedback;
-            ctx.settings.set(feedback::SOUND_VOLUME, &v.to_string());
-            ctx.dirty = true;
-            // Ao soltar, um som de amostra no volume novo.
-            if done {
-                feedback::play(ctx, Cmd::Right);
-            }
-            Flow::Stay
-        }),
-        MenuItem::new(
             PanelRow::action("theme", ctx.t("settings.appearance.theme"))
                 .desc(ctx.t("settings.appearance.theme_desc"))
                 .value(theme_name(ctx)),
         )
         .on(|ctx| Flow::Push(Box::new(themes_panel(ctx)))),
+    ];
+    if ctx.theme_supports_ui {
+        items.push(
+            MenuItem::new(
+                PanelRow::action("edit-theme", ctx.t("settings.appearance.edit_theme"))
+                    .desc(ctx.t("settings.appearance.edit_theme_desc"))
+                    .icon("palette"),
+            )
+            .on(|ctx| Flow::Push(Box::new(edit_theme_panel(ctx)))),
+        );
+    }
+    items.extend([
         toggle(
             ctx,
             "settings.appearance.dynamic",
@@ -681,33 +1205,35 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             keys::REDUCED_MOTION,
             false,
         ),
-    ]
-    .into_iter()
-    // "Reduzir transparência" só existe no desktop (a tela cheia não tem vidro).
-    .chain(ctx.desktop.then(|| {
-        toggle(
-            ctx,
-            "settings.appearance.transparency",
-            keys::REDUCED_TRANSPARENCY,
-            false,
+    ]);
+    items
+        .into_iter()
+        // "Reduzir transparência" só existe no desktop (a tela cheia não tem vidro).
+        .chain(ctx.desktop.then(|| {
+            toggle(
+                ctx,
+                "settings.appearance.transparency",
+                keys::REDUCED_TRANSPARENCY,
+                false,
+            )
+        }))
+        .chain(ctx.desktop.then(|| title_row(ctx)))
+        // Layout: BarraLateralUnida e a largura da barra lateral (só no desktop).
+        .chain(
+            ctx.desktop.then(|| {
+                MenuItem::new(PanelRow::header(ctx.t("settings.appearance.layout_header")))
+            }),
         )
-    }))
-    .chain(ctx.desktop.then(|| title_row(ctx)))
-    // Layout: BarraLateralUnida e a largura da barra lateral (só no desktop).
-    .chain(
-        ctx.desktop
-            .then(|| MenuItem::new(PanelRow::header(ctx.t("settings.appearance.layout_header")))),
-    )
-    .chain(ctx.desktop.then(|| {
-        toggle(
-            ctx,
-            "settings.appearance.sidebar_unified",
-            keys::SIDEBAR_UNIFIED,
-            false,
-        )
-    }))
-    .chain(ctx.desktop.then(|| sidebar_width_row(ctx)))
-    .collect()
+        .chain(ctx.desktop.then(|| {
+            toggle(
+                ctx,
+                "settings.appearance.sidebar_unified",
+                keys::SIDEBAR_UNIFIED,
+                false,
+            )
+        }))
+        .chain(ctx.desktop.then(|| sidebar_width_row(ctx)))
+        .collect()
 }
 
 /// Largura da barra lateral: Normal (padrão) ou Estreita; vale para a lista flutuante e para a unida.
@@ -779,6 +1305,107 @@ fn change_text_size(ctx: &mut Ctx, direction: i32) -> Flow {
     let next = (index + direction.signum()).rem_euclid(TEXT_SIZES.len() as i32) as usize;
     ctx.settings
         .set(feedback::TEXT_SIZE, &TEXT_SIZES[next].to_string());
+    ctx.dirty = true;
+    Flow::Stay
+}
+
+fn sound(ctx: &Ctx) -> Vec<MenuItem> {
+    use crate::navigation_feedback as feedback;
+    vec![
+        toggle(
+            ctx,
+            "settings.sound.music_enabled",
+            feedback::THEME_MUSIC_ENABLED,
+            true,
+        ),
+        MenuItem::new(
+            PanelRow {
+                kind: if ctx.desktop { "slider" } else { "choice" }.into(),
+                ..PanelRow::choice(
+                    "theme-music-volume",
+                    ctx.t("settings.sound.music_volume"),
+                    if ctx.desktop {
+                        match feedback::music_volume(&ctx.settings) {
+                            0 => ctx.t("settings.sound.music_muted"),
+                            v => v.to_string(),
+                        }
+                    } else {
+                        format!("{}%", feedback::music_volume(&ctx.settings))
+                    },
+                )
+            }
+            .desc(ctx.t("settings.sound.music_volume_desc")),
+        )
+        .on(|ctx| change_theme_music_volume(ctx, 1))
+        .on_adjust(change_theme_music_volume)
+        .on_slide(|ctx, v, _done| {
+            use crate::navigation_feedback as feedback;
+            ctx.settings
+                .set(feedback::THEME_MUSIC_VOLUME, &v.to_string());
+            ctx.dirty = true;
+            Flow::Stay
+        })
+        .options(|ctx| {
+            use crate::navigation_feedback as feedback;
+            let now = feedback::music_volume(&ctx.settings);
+            let steps: Vec<u8> = (0..=100).step_by(10).collect();
+            let cur = steps.iter().position(|v| *v == now).unwrap_or(7);
+            let picks = steps
+                .into_iter()
+                .map(|v| Pick::new(format!("{v}%")))
+                .collect();
+            (picks, cur)
+        }),
+        MenuItem::new(
+            PanelRow {
+                kind: if ctx.desktop { "slider" } else { "choice" }.into(),
+                ..PanelRow::choice(
+                    "navigation-volume",
+                    ctx.t("settings.sound.navigation_volume"),
+                    if ctx.desktop {
+                        match feedback::volume(&ctx.settings) {
+                            0 => ctx.t("accessibility.sound_muted"),
+                            v => v.to_string(),
+                        }
+                    } else {
+                        format!("{}%", feedback::volume(&ctx.settings))
+                    },
+                )
+            }
+            .desc(ctx.t("settings.sound.navigation_volume_desc")),
+        )
+        .on(|ctx| change_navigation_volume(ctx, 1))
+        .on_adjust(change_navigation_volume)
+        .on_slide(|ctx, v, done| {
+            use crate::navigation_feedback as feedback;
+            ctx.settings.set(feedback::SOUND_VOLUME, &v.to_string());
+            ctx.dirty = true;
+            if done {
+                feedback::play(ctx, Cmd::Right);
+            }
+            Flow::Stay
+        })
+        .options(|ctx| {
+            use crate::navigation_feedback as feedback;
+            let now = feedback::volume(&ctx.settings);
+            let steps: Vec<u8> = (0..=100).step_by(10).collect();
+            let cur = steps.iter().position(|v| *v == now).unwrap_or(0);
+            let picks = steps
+                .into_iter()
+                .map(|v| Pick::new(format!("{v}%")))
+                .collect();
+            (picks, cur)
+        }),
+    ]
+}
+
+fn change_theme_music_volume(ctx: &mut Ctx, direction: i32) -> Flow {
+    use crate::navigation_feedback as feedback;
+    let step = if ctx.desktop { 5 } else { 10 };
+    let next = (i32::from(feedback::music_volume(&ctx.settings)) + direction.signum() * step)
+        .clamp(0, 100);
+    ctx.settings
+        .set(feedback::THEME_MUSIC_VOLUME, &next.to_string());
     ctx.dirty = true;
     Flow::Stay
 }
@@ -917,6 +1544,104 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
         );
     }
     v
+}
+
+pub(crate) fn confirm_regenerate_token(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::dialog(ctx.t("settings.system.api_regenerate"), |ctx| {
+        vec![
+            MenuItem::new(
+                PanelRow::button(
+                    "regenerate",
+                    ctx.t("settings.system.api_regenerate_confirm_btn"),
+                )
+                .danger(),
+            )
+            .on(|ctx| {
+                let new_token = tako_core::api::generate_token();
+                ctx.settings.set(keys::API_TOKEN, &new_token);
+                crate::local_api::sync(ctx);
+                ctx.toast(ctx.t("settings.system.api_token_regenerated"));
+                Flow::Close
+            }),
+            MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(ctx.t("settings.system.api_regenerate_confirm_desc"))
+}
+
+pub(crate) fn token_dialog(ctx: &Ctx, token: String) -> MenuLayer {
+    let token_for_copy = token.clone();
+    let title = ctx.t("settings.system.api_token_dialog_title");
+    let desc = ctx.t("settings.system.api_token_dialog_desc");
+    let text = format!("{desc}\n\n{token}");
+    MenuLayer::dialog(title, move |ctx| {
+        let token = token_for_copy.clone();
+        vec![
+            MenuItem::new(
+                PanelRow::button("copy", ctx.t("settings.system.api_token_copy")).emphasized(true),
+            )
+            .on(move |ctx| {
+                if tako_platform::copy_to_clipboard(&token) {
+                    ctx.toast(ctx.t("settings.system.api_token_copied"));
+                } else {
+                    ctx.toast(ctx.t("settings.system.api_token_copy_failed"));
+                }
+                Flow::Stay
+            }),
+            MenuItem::new(PanelRow::button("close", ctx.t("hint.close"))).on(|_| Flow::Close),
+        ]
+    })
+    .text(text)
+    .wide()
+}
+
+pub(crate) fn api_panel(ctx: &Ctx) -> MenuLayer {
+    MenuLayer::panel(ctx.t("settings.system.api_panel_title"), |ctx| {
+        let enabled = ctx.settings.bool(keys::API_ENABLED, false);
+        let port = ctx.settings.get(keys::API_PORT).unwrap_or("47774");
+        vec![
+            MenuItem::new(
+                PanelRow::toggle("api-enabled", ctx.t("settings.system.api_enabled"), enabled)
+                    .desc(ctx.t("settings.system.api_enabled_desc")),
+            )
+            .on(|ctx| {
+                let on = ctx.settings.toggle(keys::API_ENABLED, false);
+                let current_token = ctx.settings.string(keys::API_TOKEN);
+                if on
+                    && (current_token.is_empty() || !tako_core::api::is_valid_token(&current_token))
+                {
+                    let token = tako_core::api::generate_token();
+                    ctx.settings.set(keys::API_TOKEN, &token);
+                }
+                crate::local_api::sync(ctx);
+                Flow::Stay
+            }),
+            MenuItem::new(
+                PanelRow::info("api-port", ctx.t("settings.system.api_port"), port)
+                    .desc(ctx.t("settings.system.api_port_desc")),
+            ),
+            MenuItem::new(
+                PanelRow::action("api-token", ctx.t("settings.system.api_token"))
+                    .desc(ctx.t("settings.system.api_token_desc"))
+                    .value(ctx.t("settings.system.api_token_show")),
+            )
+            .on(|ctx| {
+                let mut token = ctx.settings.string(keys::API_TOKEN);
+                if token.is_empty() || !tako_core::api::is_valid_token(&token) {
+                    token = tako_core::api::generate_token();
+                    ctx.settings.set(keys::API_TOKEN, &token);
+                    crate::local_api::sync(ctx);
+                }
+                Flow::Push(Box::new(token_dialog(ctx, token)))
+            }),
+            MenuItem::new(
+                PanelRow::action("api-regenerate", ctx.t("settings.system.api_regenerate"))
+                    .desc(ctx.t("settings.system.api_regenerate_desc"))
+                    .danger(),
+            )
+            .on(|ctx| Flow::Push(Box::new(confirm_regenerate_token(ctx)))),
+        ]
+    })
 }
 
 // ---------------------------------------------------------------- Sobre
