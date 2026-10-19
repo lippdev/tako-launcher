@@ -278,7 +278,7 @@ pode ler os mesmos se exportar o `Ui` do padrão:
 | `pointer` | O último foco veio do mouse: destaque, mas não role listas até o item. |
 
 Num tema que reaproveita o padrão, **`tokens.toml`** troca as cores `in-out`, fontes e fundo do `Ui` sem escrever Slint: `nome =
-"#RRGGBB"` ou `"#RRGGBBAA"`. Cores disponíveis: `accent`, `canvas`, `on-accent`, `on-accent-muted`, `on-accent-subtle`,
+"#RRGGBB"` ou `"#RRGGBBAA"` (exceto `canvas`, que exige `"#RRGGBB"` de 6 dígitos sem canal alfa, com contraste >= 4.5:1 com texto branco). Cores disponíveis: `accent`, `canvas`, `on-accent`, `on-accent-muted`, `on-accent-subtle`,
 `surface-1`, `surface-2`, `surface-sidebar`, `surface-solid`, `on-surface-solid`, `on-surface-solid-muted`,
 `control-track-off`, `control-off`, `control-on-on-solid`, `control-off-on-solid`, `control-track-on-solid`,
 `value-pill-on-solid`, `scrim`, `success`, `warning`, `error`. Também aceita fontes (`font`, `font-title`, `font-text`, `font-heading`, `font-desk`, `font-wordmark`) e imagem de fundo (`custom-background`, `background-image`). Pelo próprio Tako (Configurações › Aparência), a pessoa usuária pode personalizar o tema atual, gravando uma sobreposição sem modificar os arquivos originais. Ao carregar, o Tako ignora (com log) a chave ou o valor inválido. O `tako theme check` aponta os dois.

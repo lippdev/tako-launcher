@@ -68,7 +68,10 @@ component Backdrop inherits Rectangle {
         height: parent.height;
         source: Ui.custom-background;
         image-fit: cover;
-        opacity: 0.85;
+        opacity: 0.55;
+    }
+    if Ui.has-custom-background && Ui.custom-background.width > 0: Rectangle {
+        background: #000000.with-alpha(0.5);
     }
     if !Ui.has-custom-background && art.width > 0: Image {
         width: parent.width;
