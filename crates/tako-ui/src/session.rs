@@ -724,7 +724,11 @@ mod tests {
         ctx.library.refresh();
         let exe = dir.path().join("jogo.exe");
         std::fs::write(&exe, "").unwrap();
-        let record = tako_core::library::ManualGameRecord::create("Jogo", &exe.to_string_lossy(), chrono::Utc::now());
+        let record = tako_core::library::ManualGameRecord::create(
+            "Jogo",
+            &exe.to_string_lossy(),
+            chrono::Utc::now(),
+        );
         let id = record.id.clone();
         ctx.library.add_manual(record).unwrap();
 
@@ -745,10 +749,16 @@ mod tests {
         }
 
         let commands = fake.commands.lock().unwrap().clone();
-        assert!(commands.is_empty(), "before_command não deve rodar sem aprovação");
+        assert!(
+            commands.is_empty(),
+            "before_command não deve rodar sem aprovação"
+        );
 
         let env = fake.env.lock().unwrap().clone();
-        assert!(env.is_empty(), "variáveis de ambiente não aprovadas não devem ser aplicadas");
+        assert!(
+            env.is_empty(),
+            "variáveis de ambiente não aprovadas não devem ser aplicadas"
+        );
 
         let launched = fake.launched.lock().unwrap().clone();
         assert!(!launched.is_empty());

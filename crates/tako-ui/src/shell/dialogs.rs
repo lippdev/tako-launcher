@@ -1498,8 +1498,14 @@ mod tests {
         let game = ctx.library.find(&id).unwrap().clone();
         let dialog = client_missing(&ctx, &game, "App da loja não encontrado".into());
         let ask = accept(&mut ctx, &dialog, "anyway");
-        assert!(matches!(ask, Flow::Push(_)), "deve empilhar diálogo de aprovação de comandos");
-        assert!(ctx.effects.is_empty(), "não deve disparar Launch imediatamente");
+        assert!(
+            matches!(ask, Flow::Push(_)),
+            "deve empilhar diálogo de aprovação de comandos"
+        );
+        assert!(
+            ctx.effects.is_empty(),
+            "não deve disparar Launch imediatamente"
+        );
     }
 
     #[test]

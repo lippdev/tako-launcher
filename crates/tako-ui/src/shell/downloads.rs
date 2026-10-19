@@ -12,7 +12,8 @@ use crate::shell::keyboard::KeyboardLayer;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use tako_core::downloads::{
-    Download, DownloadState, Downloads, NewDownload, is_inside_root, source, source::Source, suggest,
+    Download, DownloadState, Downloads, NewDownload, is_inside_root, source, source::Source,
+    suggest,
 };
 use tako_core::library::{GameStore, InstallProgress};
 use tako_core::metadata::art::format_bytes;

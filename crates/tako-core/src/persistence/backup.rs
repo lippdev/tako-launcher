@@ -443,7 +443,10 @@ fn extract_local_permissions(paths: &DataPaths) -> LocalPermissions {
         )
         .unwrap_or(false);
     if has_settings {
-        let sql = format!("SELECT key, value FROM settings WHERE {};", sensitive_settings_sql());
+        let sql = format!(
+            "SELECT key, value FROM settings WHERE {};",
+            sensitive_settings_sql()
+        );
         if let Ok(mut stmt) = conn.prepare(&sql)
             && let Ok(rows) =
                 stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
@@ -668,13 +671,7 @@ fn create_raw_auto_backup(paths: &DataPaths, dest_file: &Path) -> Result<(), Bac
         // 3. Temas
         let themes_root = paths.themes();
         if themes_root.is_dir() {
-            add_directory_to_zip(
-                &themes_root,
-                "themes",
-                &mut zip,
-                file_options,
-                None,
-            )?;
+            add_directory_to_zip(&themes_root, "themes", &mut zip, file_options, None)?;
         }
 
         // 4. Capas e artes personalizadas (art-choices/)

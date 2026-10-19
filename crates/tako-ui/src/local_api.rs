@@ -207,7 +207,9 @@ pub fn sync(ctx: &mut Ctx) {
             s.stop();
         }
         *port_lock = None;
-        let mut warned = LAST_WARNED_ERROR_PORT.lock().unwrap_or_else(|e| e.into_inner());
+        let mut warned = LAST_WARNED_ERROR_PORT
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         *warned = None;
         return;
     }
@@ -258,12 +260,16 @@ pub fn sync(ctx: &mut Ctx) {
             tracing::info!("API local do Tako escutando em http://127.0.0.1:{actual_port}");
             *server_lock = Some(handle);
             *port_lock = Some(actual_port);
-            let mut warned = LAST_WARNED_ERROR_PORT.lock().unwrap_or_else(|e| e.into_inner());
+            let mut warned = LAST_WARNED_ERROR_PORT
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             *warned = None;
         }
         Err(e) => {
             tracing::error!("não foi possível iniciar a API local na porta {port}: {e}");
-            let mut warned = LAST_WARNED_ERROR_PORT.lock().unwrap_or_else(|e| e.into_inner());
+            let mut warned = LAST_WARNED_ERROR_PORT
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             if *warned != Some(port) {
                 *warned = Some(port);
                 ctx.toast(ctx.tf(
@@ -292,7 +298,9 @@ pub fn shutdown() {
     }
     let mut port = RUNNING_PORT.lock().unwrap_or_else(|e| e.into_inner());
     *port = None;
-    let mut warned = LAST_WARNED_ERROR_PORT.lock().unwrap_or_else(|e| e.into_inner());
+    let mut warned = LAST_WARNED_ERROR_PORT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     *warned = None;
 }
 
@@ -324,7 +332,10 @@ mod tests {
 
         // 2ª tentativa (ex: edição subsequente na biblioteca): não deve emitir novo toast
         sync(&mut ctx);
-        assert!(ctx.toast.is_none(), "não deve repetir o toast com a mesma porta ocupada");
+        assert!(
+            ctx.toast.is_none(),
+            "não deve repetir o toast com a mesma porta ocupada"
+        );
 
         drop(listener);
         shutdown();
