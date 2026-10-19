@@ -326,21 +326,22 @@ pub fn is_backup_excluded(key: &str) -> bool {
         || key.to_ascii_lowercase().contains("api-key")
 }
 
-const SENSITIVE_SETTINGS_SQL: &str = "
-    key IN (
-        'LocalApiEnabled', 'LocalApiToken', 'LocalApiAllowedOrigins',
-        'DownloadsEnabled', 'DownloadsLegalAccepted',
-        'SteamWebApiKey', 'SteamApiKey', 'IgdbClientId', 'IgdbClientSecret',
-        'ScreenScraperUser', 'ScreenScraperPassword', 'SteamGridDbApiKey',
-        'AnalyticsConsent', 'CrashReportConsent', 'TelemetryConsent'
+fn sensitive_settings_sql() -> String {
+    let keys = BACKUP_EXCLUDED_SETTINGS
+        .iter()
+        .map(|k| format!("'{k}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "key IN ({keys})
+        OR LOWER(key) LIKE '%token%'
+        OR LOWER(key) LIKE '%secret%'
+        OR LOWER(key) LIKE '%password%'
+        OR LOWER(key) LIKE '%api_key%'
+        OR LOWER(key) LIKE '%apikey%'
+        OR LOWER(key) LIKE '%api-key%'"
     )
-    OR LOWER(key) LIKE '%token%'
-    OR LOWER(key) LIKE '%secret%'
-    OR LOWER(key) LIKE '%password%'
-    OR LOWER(key) LIKE '%api_key%'
-    OR LOWER(key) LIKE '%apikey%'
-    OR LOWER(key) LIKE '%api-key%'
-";
+}
 
 /// Zera permissões (`approved_commands`) e segredos/consentimentos no banco fornecido.
 fn sanitize_backup_database(conn: &Connection) -> Result<(), rusqlite::Error> {
@@ -386,7 +387,7 @@ fn sanitize_backup_database(conn: &Connection) -> Result<(), rusqlite::Error> {
         )
         .unwrap_or(false);
     if has_settings {
-        let sql = format!("DELETE FROM settings WHERE {SENSITIVE_SETTINGS_SQL};");
+        let sql = format!("DELETE FROM settings WHERE {};", sensitive_settings_sql());
         conn.execute(&sql, [])?;
     }
     Ok(())
@@ -442,7 +443,7 @@ fn extract_local_permissions(paths: &DataPaths) -> LocalPermissions {
         )
         .unwrap_or(false);
     if has_settings {
-        let sql = format!("SELECT key, value FROM settings WHERE {SENSITIVE_SETTINGS_SQL};");
+        let sql = format!("SELECT key, value FROM settings WHERE {};", sensitive_settings_sql());
         if let Ok(mut stmt) = conn.prepare(&sql)
             && let Ok(rows) =
                 stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
@@ -568,8 +569,7 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
                 "themes",
                 &mut zip,
                 file_options,
-                &mut entries_count,
-                &mut total_uncompressed,
+                Some((&mut entries_count, &mut total_uncompressed)),
             )?;
         }
 
@@ -581,8 +581,7 @@ pub fn create_backup(paths: &DataPaths, dest_file: &Path) -> Result<BackupManife
                 "art-choices",
                 &mut zip,
                 file_options,
-                &mut entries_count,
-                &mut total_uncompressed,
+                Some((&mut entries_count, &mut total_uncompressed)),
             )?;
         }
 
@@ -667,31 +666,27 @@ fn create_raw_auto_backup(paths: &DataPaths, dest_file: &Path) -> Result<(), Bac
         }
 
         // 3. Temas
-        let mut dummy_entries = 0;
-        let mut dummy_uncompressed = 0;
         let themes_root = paths.themes();
         if themes_root.is_dir() {
-            let _ = add_directory_to_zip(
+            add_directory_to_zip(
                 &themes_root,
                 "themes",
                 &mut zip,
                 file_options,
-                &mut dummy_entries,
-                &mut dummy_uncompressed,
-            );
+                None,
+            )?;
         }
 
         // 4. Capas e artes personalizadas (art-choices/)
         let art_choices_root = paths.art_choices();
         if art_choices_root.is_dir() {
-            let _ = add_directory_to_zip(
+            add_directory_to_zip(
                 &art_choices_root,
                 "art-choices",
                 &mut zip,
                 file_options,
-                &mut dummy_entries,
-                &mut dummy_uncompressed,
-            );
+                None,
+            )?;
         }
 
         zip.finish()?;
@@ -1199,8 +1194,7 @@ fn add_directory_to_zip(
     prefix: &str,
     zip: &mut ZipWriter<&File>,
     options: SimpleFileOptions,
-    entries_count: &mut usize,
-    total_uncompressed: &mut u64,
+    mut limits: Option<(&mut usize, &mut u64)>,
 ) -> Result<(), BackupError> {
     let mut stack = vec![(root.to_path_buf(), prefix.to_string())];
     while let Some((dir, current_prefix)) = stack.pop() {
@@ -1232,26 +1226,28 @@ fn add_directory_to_zip(
             if file_type.is_dir() {
                 stack.push((path, entry_name));
             } else if file_type.is_file() {
-                let file_size = entry.metadata()?.len();
-                if file_size > MAX_FILE_BYTES {
-                    return Err(BackupError::TooLarge {
-                        size: file_size,
-                        max: MAX_FILE_BYTES,
-                    });
-                }
-                *total_uncompressed = total_uncompressed.saturating_add(file_size);
-                if *total_uncompressed > MAX_UNCOMPRESSED_BYTES {
-                    return Err(BackupError::TooLarge {
-                        size: *total_uncompressed,
-                        max: MAX_UNCOMPRESSED_BYTES,
-                    });
-                }
-                *entries_count += 1;
-                if *entries_count > MAX_ENTRIES {
-                    return Err(BackupError::TooLarge {
-                        size: *entries_count as u64,
-                        max: MAX_ENTRIES as u64,
-                    });
+                if let Some((entries_count, total_uncompressed)) = limits.as_mut() {
+                    let file_size = entry.metadata()?.len();
+                    if file_size > MAX_FILE_BYTES {
+                        return Err(BackupError::TooLarge {
+                            size: file_size,
+                            max: MAX_FILE_BYTES,
+                        });
+                    }
+                    **total_uncompressed = total_uncompressed.saturating_add(file_size);
+                    if **total_uncompressed > MAX_UNCOMPRESSED_BYTES {
+                        return Err(BackupError::TooLarge {
+                            size: **total_uncompressed,
+                            max: MAX_UNCOMPRESSED_BYTES,
+                        });
+                    }
+                    **entries_count += 1;
+                    if **entries_count > MAX_ENTRIES {
+                        return Err(BackupError::TooLarge {
+                            size: **entries_count as u64,
+                            max: MAX_ENTRIES as u64,
+                        });
+                    }
                 }
 
                 let mut f = File::open(&path)?;
@@ -1865,6 +1861,37 @@ mod tests {
             migrator::latest_version(),
             "o banco antigo deve ter sido migrado para a versão mais recente"
         );
+    }
+
+    #[test]
+    fn raw_auto_backup_does_not_apply_creation_limits_and_includes_large_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = make_test_paths(dir.path());
+        fs::create_dir_all(&paths.root).unwrap();
+
+        let db_path = paths.database();
+        let conn = Connection::open(&db_path).unwrap();
+        migrator::migrate(&conn, None).unwrap();
+        drop(conn);
+
+        let themes_dir = paths.themes();
+        fs::create_dir_all(&themes_dir).unwrap();
+        fs::write(themes_dir.join("theme.json"), b"{\"name\": \"Custom\"}").unwrap();
+
+        let art_dir = paths.art_choices();
+        fs::create_dir_all(&art_dir).unwrap();
+        fs::write(art_dir.join("cover.png"), b"fake image bytes").unwrap();
+
+        let dest = dir.path().join("raw-auto.takobackup");
+        create_raw_auto_backup(&paths, &dest).unwrap();
+        assert!(dest.is_file());
+
+        let file = File::open(&dest).unwrap();
+        let mut zip = ZipArchive::new(file).unwrap();
+        assert!(zip.by_name("themes/theme.json").is_ok());
+        assert!(zip.by_name("art-choices/cover.png").is_ok());
+        assert!(zip.by_name("tako.db").is_ok());
+        assert!(zip.by_name(MANIFEST_FILE).is_ok());
     }
 
     #[test]
