@@ -301,6 +301,7 @@ Também são aceitas as chaves em português (`musica`, `mover`, `confirmar`, `v
 
 - **Formato suportado:** `.wav` (PCM). Como o mecanismo de áudio do Tako usa a biblioteca nativa SDL3 para reprodução direta sem decodificadores externos pesados, formatos como `.ogg` e `.opus` não são decodificados nativamente pela biblioteca e são recusados na validação.
 - **Validação de caminho:** Os arquivos devem ficar dentro da pasta do tema, sem caminhos absolutos e sem `..` (não é permitido sair da pasta do tema).
+- **Limites de tamanho e duração:** Música até 32 MB (`MAX_THEME_MUSIC_BYTES`); sons de navegação com duração de até 2 segundos (`MAX_NAV_SOUND_DURATION_SECS`).
 - **Comportamento da música:**
   - Toca exclusivamente na tela cheia (Big Picture), em loop contínuo e com fade suave (fade-in ao iniciar/retomar e fade-out ao pausar).
   - Pausa com fade ao abrir um jogo, permanece completamente parada durante todo o jogo e recomeça do início ao encerrar o jogo.

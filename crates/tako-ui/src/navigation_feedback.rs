@@ -507,14 +507,14 @@ pub fn set_theme(theme_dir: Option<&Path>) {
             let back = back_p.as_deref().and_then(load_wav_samples).map(Arc::from);
             let move_sound = move_p.as_deref().and_then(load_wav_samples).map(Arc::from);
 
-            if NAV_GENERATION.load(Ordering::SeqCst) == generation
-                && let Ok(mut sounds) = CUSTOM_SOUNDS.write()
-            {
-                *sounds = CustomNavSounds {
-                    accept,
-                    back,
-                    move_sound,
-                };
+            if let Ok(mut sounds) = CUSTOM_SOUNDS.write() {
+                if NAV_GENERATION.load(Ordering::SeqCst) == generation {
+                    *sounds = CustomNavSounds {
+                        accept,
+                        back,
+                        move_sound,
+                    };
+                }
             }
         });
     }

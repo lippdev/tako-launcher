@@ -296,14 +296,15 @@ accept = "audio/accept.wav"
 back = "audio/back.wav"
 ```
 
-Declarations directly at the root level of the file are also accepted.
+Portuguese keys (`musica`, `mover`, `confirmar`, `voltar`) are also accepted, as well as declarations directly at the root level of the file.
 
 - **Supported format:** `.wav` (PCM). Because Tako's audio engine uses the native SDL3 library directly without heavy external decoders, formats like `.ogg` and `.opus` are not natively decoded by the library and are rejected during validation.
 - **Path validation:** Files must remain inside the theme directory, without absolute paths or `..` (leaving the theme folder is not permitted).
+- **Size and duration limits:** Music up to 32 MB (`MAX_THEME_MUSIC_BYTES`); navigation sound effects with a duration of up to 2 seconds (`MAX_NAV_SOUND_DURATION_SECS`).
 - **Music playback behavior:**
   - Plays exclusively in full screen (Big Picture), in a seamless loop with smooth fade (fade-in on start/resume and fade-out on pause).
   - Pauses with a fade when launching a game, stays completely stopped while the game runs, and restarts from the beginning when the game exits.
-  - Pauses when Tako's window loses focus or is minimized, resuming when focus returns.
+  - Pauses when Tako's window loses focus or is minimized, restarting from the beginning when focus returns.
   - In desktop mode, theme music does not play.
 - **Settings › Sound:**
   - **Theme music volume:** 0 to 100% volume slider/selector, separate from the navigation sound volume. At 0%, music is muted and does not play.
