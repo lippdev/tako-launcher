@@ -284,7 +284,7 @@ Slint: `name = "#RRGGBB"` or `"#RRGGBBAA"`. Available colors: `canvas`, `on-acce
 ignores (with a log entry) an invalid key or color. `tako theme check` points out both.
 
 
-### Background music and navigation sounds (THEME-007)
+### Background music and navigation sounds
 
 A theme can include background music and custom sounds for navigation in Tako. These can be declared in either `theme.toml` or `tokens.toml`:
 
@@ -302,7 +302,7 @@ Declarations directly at the root level of the file are also accepted.
 - **Path validation:** Files must remain inside the theme directory, without absolute paths or `..` (leaving the theme folder is not permitted).
 - **Music playback behavior:**
   - Plays exclusively in full screen (Big Picture), in a seamless loop with smooth fade (fade-in on start/resume and fade-out on pause).
-  - Pauses with a fade when launching a game, stays completely stopped while the game runs, and resumes when the game exits.
+  - Pauses with a fade when launching a game, stays completely stopped while the game runs, and restarts from the beginning when the game exits.
   - Pauses when Tako's window loses focus or is minimized, resuming when focus returns.
   - In desktop mode, theme music does not play.
 - **Settings › Sound:**

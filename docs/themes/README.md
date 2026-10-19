@@ -285,7 +285,7 @@ Num tema que reaproveita o padrão, **`tokens.toml`** troca as cores `in-out` do
 inválida. O `tako theme check` aponta as duas.
 
 
-### Música de fundo e sons de navegação (THEME-007)
+### Música de fundo e sons de navegação
 
 Um tema pode trazer música de fundo e sons personalizados para a navegação do Tako. As declarações podem ser feitas no `theme.toml` ou no `tokens.toml`:
 
@@ -303,7 +303,7 @@ Também são aceitas as chaves em português (`musica`, `mover`, `confirmar`, `v
 - **Validação de caminho:** Os arquivos devem ficar dentro da pasta do tema, sem caminhos absolutos e sem `..` (não é permitido sair da pasta do tema).
 - **Comportamento da música:**
   - Toca exclusivamente na tela cheia (Big Picture), em loop contínuo e com fade suave (fade-in ao iniciar/retomar e fade-out ao pausar).
-  - Pausa com fade ao abrir um jogo, permanece completamente parada durante todo o jogo e retorna ao encerrar o jogo.
+  - Pausa com fade ao abrir um jogo, permanece completamente parada durante todo o jogo e recomeça do início ao encerrar o jogo.
   - Pausa também quando a janela do Tako perde o foco ou é minimizada, retornando quando o foco volta.
   - No modo desktop, a música do tema não toca.
 - **Configurações › Som:**
