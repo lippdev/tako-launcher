@@ -355,6 +355,9 @@ fn sunshine_preview_filters_invalid_ids() {
             .contains(&format!("{valid_count} jogos serão exportados"))
     );
     assert!(!rendered.text.contains("Jogo Inválido"));
+    assert_eq!(rendered.rows[0].key, "sunshine-confirm");
+    assert_eq!(rendered.rows[0].style, "primary");
+    assert_eq!(rendered.rows[1].key, "cancel");
 }
 
 #[test]

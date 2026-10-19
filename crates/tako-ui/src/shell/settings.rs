@@ -1774,6 +1774,7 @@ pub(crate) fn confirm_regenerate_token(ctx: &Ctx) -> MenuLayer {
         },
     )
     .text(ctx.t("settings.system.api_regenerate_confirm_desc"))
+    .focus_at(1)
 }
 
 pub(crate) fn token_dialog(ctx: &Ctx, token: String) -> MenuLayer {

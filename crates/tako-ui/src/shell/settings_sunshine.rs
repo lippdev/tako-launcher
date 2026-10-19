@@ -243,12 +243,10 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
         move |ctx| {
             let all_apps = all_apps.clone();
             vec![
-                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
-                    .on(|_| Flow::Close),
                 MenuItem::new(PanelRow::button(
                     "sunshine-confirm",
                     ctx.t("settings.system.sunshine_confirm"),
-                ))
+                ).primary())
                 .on(move |ctx| {
                     let apps = all_apps.clone();
                     crate::tasks::run(
@@ -277,6 +275,8 @@ pub(crate) fn preview_dialog(ctx: &Ctx, enable_sync: bool) -> MenuLayer {
                     );
                     Flow::Close
                 }),
+                MenuItem::new(PanelRow::button("cancel", ctx.t("common.cancel")))
+                    .on(|_| Flow::Close),
             ]
         },
     )

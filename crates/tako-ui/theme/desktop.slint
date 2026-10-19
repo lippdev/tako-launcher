@@ -5110,7 +5110,7 @@ component DeskOverlay inherits Rectangle {
                 }
                 // Rodapé (PadraoPopup): ação de texto à esquerda ("Pular" nos passos, estilo "link"); à direita as outras,
                 // com a principal por último (nos passos, a ordem já vem pronta; nos demais, a lista vem na ordem do Tako).
-                if ov.tabs.length > 0: HorizontalLayout {
+                if ov.tabs.length > 0 || ov.footer: HorizontalLayout {
                     padding-top: 4px;
                     for r[i] in ov.rows: HorizontalLayout {
                         visible: r.kind == "button" && (r.key == "skip" || r.style == "link");
@@ -5132,12 +5132,6 @@ component DeskOverlay inherits Rectangle {
                             clicked => { root.clicked("row", i); }
                         }
                     }
-                }
-                if ov.tabs.length == 0 && ov.footer: PopupFooter {
-                    rows: ov.rows;
-                    sel: top-most ? ov.sel : -1;
-                    key-focus: focus-visible;
-                    clicked(i) => { root.clicked("row", i); }
                 }
             }
         }
