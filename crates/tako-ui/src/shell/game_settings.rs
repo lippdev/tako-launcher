@@ -1284,6 +1284,7 @@ mod tests {
         assert!(folder_problem(&ctx, "/nao/existe/mesmo").is_some());
     }
 
+    #[cfg(unix)] // Prefixo do Wine/Proton só existe no Linux; no Windows `~/` nem é caminho absoluto.
     #[test]
     fn manual_windows_game_settings_shows_runner_and_prefix() {
         use tako_core::library::ManualGameRecord;
