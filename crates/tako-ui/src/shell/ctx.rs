@@ -198,6 +198,7 @@ pub mod keys {
     pub const CONTROLLER_MOUSE: &str = "ControllerMouseDuringGame";
     pub const SAFE_MODE: &str = "SafeMode";
     pub const DISCORD_PRESENCE: &str = "DiscordRichPresence";
+    pub const SUNSHINE_SYNC: &str = "SunshineSyncOnRescan";
     pub const FIRST_RUN_DONE: &str = "FirstRunCompleted";
     pub const SMART_COLLECTIONS: &str = "SmartCollections";
     // Marcados para exclusão no CLOUD-001 (PR #137):

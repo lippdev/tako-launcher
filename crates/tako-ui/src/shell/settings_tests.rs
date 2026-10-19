@@ -56,7 +56,7 @@ fn navigates_between_categories_and_rows() {
     let (_d, mut ctx) = ctx();
     let mut page = SettingsPage::new();
     let n = page.cats.len();
-    assert_eq!(n, 10);
+    assert_eq!(n, 11);
     page.handle(Cmd::NextSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "library");
     page.handle(Cmd::PrevSection, &mut ctx);
@@ -273,6 +273,43 @@ fn every_row_has_text() {
         }
     }
     i18n::set_lang(Lang::PtBr);
+}
+
+#[test]
+fn sunshine_sync_starts_off_and_requires_preview_confirmation_to_enable() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let row = find(&rows_of(&ctx, "integrations"), "sunshine-sync");
+    assert!(!row.row.on);
+    assert!(matches!(accept(&mut ctx, &row), Flow::Push(_)));
+    assert!(!ctx.settings.bool(keys::SUNSHINE_SYNC, false));
+}
+
+#[test]
+fn sunshine_preview_filters_invalid_ids() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    assert!(!ctx.library.games().is_empty());
+    let total = ctx.library.games().len();
+    ctx.library.games_mut()[0].id = "invalid id with spaces !@#$".into();
+    ctx.library.games_mut()[0].title = "Jogo Inválido".into();
+
+    let valid_count = ctx
+        .library
+        .games()
+        .iter()
+        .filter(|g| tako_platform::sunshine::is_valid_game_id(&g.id))
+        .count();
+    assert_eq!(valid_count, total - 1);
+
+    let layer = sunshine::preview_dialog(&ctx, false);
+    let rendered = layer.render(&ctx);
+    assert!(
+        rendered
+            .text
+            .contains(&format!("{valid_count} jogos serão exportados"))
+    );
+    assert!(!rendered.text.contains("Jogo Inválido"));
 }
 
 #[test]
@@ -1239,7 +1276,7 @@ fn api_settings_panel_toggles_and_regenerates_token() {
     let (_d, mut ctx) = ctx();
     assert!(!ctx.settings.bool(keys::API_ENABLED, false));
 
-    let rows = rows_of(&ctx, "system");
+    let rows = rows_of(&ctx, "integrations");
     let api_row = find(&rows, "settings.system.api");
     assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
 
@@ -1291,7 +1328,7 @@ fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
     // 1. Linha do token segue padrão Botão ("Mostrar") e abre diálogo com botão Copiar
     let valid_token = tako_core::api::generate_token();
     ctx.settings.set(keys::API_TOKEN, &valid_token);
-    let rows = rows_of(&ctx, "system");
+    let rows = rows_of(&ctx, "integrations");
     let api_row = find(&rows, "settings.system.api");
     let mut panel = match accept(&mut ctx, &api_row) {
         Flow::Push(l) => l,

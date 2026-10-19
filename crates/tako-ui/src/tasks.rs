@@ -34,6 +34,17 @@ pub fn run<R: Send + 'static>(
         done(ctx, r);
         return;
     }
+    run_bg(job, done);
+}
+
+/// Roda `job` fora da thread da UI e devolve o resultado para `done` na thread da UI.
+pub fn run_bg<R: Send + 'static>(
+    job: impl FnOnce() -> R + Send + 'static,
+    done: impl FnOnce(&mut Ctx, R) + 'static,
+) {
+    if shell().is_none() {
+        return;
+    }
     let id = PENDING.with(|p| {
         let mut p = p.borrow_mut();
         p.0 += 1;
@@ -57,7 +68,7 @@ pub fn run<R: Send + 'static>(
             if let Some(shell) = shell() {
                 let mut s = shell.borrow_mut();
                 done(&mut s.ctx, result);
-                s.after_action(); // um diálogo aberto pelo resultado aparece já, sem esperar uma tecla
+                s.after_action();
                 s.ctx.dirty = true;
             }
         });
