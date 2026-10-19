@@ -123,9 +123,31 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
         "ALTER TABLE game_settings ADD COLUMN tools TEXT;
          ALTER TABLE game_settings ADD COLUMN close_tools INTEGER;",
     ),
-    // Runtime e prefixo de Wine/Proton no Linux (SESSION-005).
+    // Downloads por torrent (DL-001): fontes que o usuário adicionou e os downloads com o jogo vinculado.
     (
         15,
+        "CREATE TABLE IF NOT EXISTS download_sources (
+            url TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            items INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS downloads (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            game_id TEXT,
+            source TEXT NOT NULL,
+            uri TEXT NOT NULL,
+            folder TEXT NOT NULL,
+            state TEXT NOT NULL,
+            error TEXT NOT NULL,
+            done INTEGER NOT NULL,
+            total INTEGER
+        );",
+    ),
+    // Runtime e prefixo de Wine/Proton no Linux (SESSION-005).
+    (
+        16,
         "ALTER TABLE game_settings ADD COLUMN wine_runtime TEXT;
          ALTER TABLE game_settings ADD COLUMN wine_prefix TEXT;",
     ),
@@ -220,6 +242,35 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn downloads_upgrade_keeps_vrr_and_tools_from_develop() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn, Some(14)).unwrap();
+        conn.execute_batch(
+            "INSERT INTO game_settings (game_id, vrr, tools, close_tools)
+             VALUES ('manual:a', 1, '/ferramenta', 1);",
+        )
+        .unwrap();
+        migrate(&conn, None).unwrap();
+        assert_eq!(current_version(&conn).unwrap(), latest_version());
+        let kept = conn
+            .query_row(
+                "SELECT vrr, tools, close_tools FROM game_settings WHERE game_id = 'manual:a';",
+                [],
+                |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, i64>(2)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(kept, (1, "/ferramenta".into(), 1));
+        assert!(table_exists(&conn, "download_sources"));
+        assert!(table_exists(&conn, "downloads"));
+    }
+
+    #[test]
     fn migration_4_adds_collections_and_game_settings_to_a_v3_database() {
         let conn = Connection::open_in_memory().unwrap();
         migrate(&conn, Some(3)).unwrap();
@@ -247,9 +298,9 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn migration_15_adds_wine_runtime_and_prefix_to_game_settings() {
+    fn migration_16_adds_wine_runtime_and_prefix_to_game_settings() {
         let conn = Connection::open_in_memory().unwrap();
-        migrate(&conn, Some(14)).unwrap();
+        migrate(&conn, Some(15)).unwrap();
         migrate(&conn, None).unwrap();
         conn.execute_batch(
             "INSERT INTO game_settings (game_id, wine_runtime, wine_prefix) VALUES ('manual:1', 'proton:8.0', '/tmp/pfx');",
