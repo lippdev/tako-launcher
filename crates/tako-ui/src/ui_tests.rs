@@ -660,6 +660,30 @@ fn desktop_snapshot() {
                 let layer = crate::shell::settings::edit_theme_panel(&shell.ctx);
                 shell.push_layer(Box::new(layer));
             }
+            Ok("settings-api") => {
+                shell.open_route("settings");
+                shell
+                    .ctx
+                    .settings
+                    .set_bool(crate::shell::ctx::keys::API_ENABLED, true);
+                shell.ctx.settings.set(
+                    crate::shell::ctx::keys::API_TOKEN,
+                    "0123456789abcdef0123456789abcdef",
+                );
+                let layer = crate::shell::settings::api_panel(&shell.ctx);
+                shell.push_layer(Box::new(layer));
+            }
+            // PainelDownloads (DL-001): downloads de demonstração e o painel aberto; `TAKO_SNAP_NI=1` traz a
+            // instalação da Steam no mesmo grupo. `downloads-settings`: Configurações › Downloads ligada.
+            Ok("downloads") => {
+                crate::shell::downloads::demo(&mut shell.ctx);
+                crate::shell::downloads::open(&mut shell.ctx);
+                shell.after_action();
+            }
+            Ok("downloads-settings") => {
+                crate::shell::downloads::demo(&mut shell.ctx);
+                shell.open_route("settings:downloads");
+            }
             Ok("grid") => shell.click("view", 1),
             Ok("categories") => shell.click("view", 2),
             Ok("update-ready") | Ok("update-downloading") => {

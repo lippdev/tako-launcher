@@ -15,6 +15,7 @@ tako-sources = { path = "crates/tako-sources" }
 tako-platform = { path = "crates/tako-platform" }
 tako-themes = { path = "crates/tako-themes" }
 tako-ui = { path = "crates/tako-ui" }
+tako-downloads = { path = "crates/tako-downloads" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1"
@@ -43,6 +44,7 @@ slint-interpreter = { version = "1.18.1", default-features = false, features = [
 i-slint-core = { version = "=1.18.1", default-features = false }
 roxmltree = "0.21"
 rfd = "0.15.4"
+arboard = { version = "3", default-features = false }
 libc = "0.2"
 x11rb = { version = "0.13", features = ["randr", "xfixes"] }
 zbus = "5"
@@ -83,6 +85,9 @@ windows = { version = "0.62", features = [
 ] }
 windows-core = "0.62"
 windows-registry = "0.6"
+# Downloads por torrent (DL-001, ADR-0028): Apache-2.0; sem TLS nativo (rustls) e sem API HTTP (o UPnP é desativado em tempo de execução).
+librqbit = { version = "9", default-features = false, features = ["rust-tls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

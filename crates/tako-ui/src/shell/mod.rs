@@ -10,6 +10,7 @@ pub mod ctx;
 pub mod desktop;
 pub mod details;
 pub mod dialogs;
+pub mod downloads;
 pub mod edit_game;
 pub mod first_run;
 pub mod game_settings;
@@ -318,6 +319,13 @@ impl Shell {
                 if let Some(lib) = pages[0].desktop_mut() {
                     lib.open_collection(key, ctx);
                 }
+                return;
+            }
+            if let Some(cat) = route.strip_prefix("settings:") {
+                self.layers.clear();
+                self.pages.truncate(1);
+                self.pages.push(Box::new(settings::SettingsPage::at(cat)));
+                self.ctx.dirty = true;
                 return;
             }
             if route == "desk:profile:sessions" {
@@ -955,6 +963,11 @@ impl Shell {
                 String::new()
             },
         );
+        // PainelDownloads: a pílula só com download ou instalação ativa.
+        let pill = downloads::pill(&self.ctx);
+        out.set("desk-download-on", pill.is_some());
+        out.set("desk-download-label", pill.unwrap_or_default());
+        out.set("desk-download-tip", self.ctx.t("downloads.title"));
         let name = profiles::active_name(&self.ctx);
         let initial = name
             .chars()

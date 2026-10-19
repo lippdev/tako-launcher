@@ -168,6 +168,11 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         collections,
         settings,
         game_settings: database.clone().map(db::GameSettingsStore::new),
+        downloads: crate::shell::downloads::State {
+            store: database.clone().map(db::DownloadStore::new),
+            simulated: simulate,
+            ..Default::default()
+        },
         choices: database.map(db::GameChoicesStore::new),
         platform,
         version: crate::version().to_owned(),
@@ -326,6 +331,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                     s.ctx.check_installs(); // avisa o que acabou de instalar
                     s.apply_pending_link();
                     s.ctx.dirty = true;
+                    crate::local_api::sync(&mut s.ctx);
                 }
             });
             measure_sizes(&found, to_measure);
@@ -921,6 +927,12 @@ impl App {
                         window.set_maximized(max);
                         let _ = ui.set_property("window-maximized", Value::Bool(max));
                     }
+                    "downloads" => {
+                        drop(ui);
+                        crate::shell::downloads::open(&mut app.shell.borrow_mut().ctx);
+                        app.shell.borrow_mut().after_action();
+                        app.redraw();
+                    }
                     "update" => {
                         drop(ui);
                         crate::app_updates::open(&mut app.shell.borrow_mut().ctx);
@@ -976,6 +988,24 @@ impl App {
                 },
             );
             WINDOW_STATE.with(|t| *t.borrow_mut() = Some(timer));
+        }
+        {
+            // Downloads (DL-001): lê o motor a cada segundo; minimizada (durante o jogo), o download segue e o
+            // `redraw` não desenha nada.
+            let app = self.clone();
+            let timer = slint::Timer::default();
+            timer.start(
+                slint::TimerMode::Repeated,
+                Duration::from_secs(1),
+                move || {
+                    let changed = crate::shell::downloads::poll(&mut app.shell.borrow_mut().ctx);
+                    if changed {
+                        app.shell.borrow_mut().ctx.dirty = true;
+                        app.redraw();
+                    }
+                },
+            );
+            DOWNLOADS.with(|t| *t.borrow_mut() = Some(timer));
         }
         let _ = ui.set_callback("key-released", |_| Value::Void);
         // Fechar a janela pelo sistema (Alt+F4, botão da janela) é o mesmo que "Sair para o desktop".
@@ -1271,6 +1301,7 @@ impl App {
         drop(ui);
         self.end_intro_later();
         rescan(&self.shell, true); // ao abrir: a lista de não instalados da Steam vem fresca
+        crate::local_api::sync(&mut self.shell.borrow_mut().ctx);
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
     }
 
@@ -1301,6 +1332,7 @@ impl App {
 thread_local! {
     /// Lê maximizada e em foco para a BarraDaJanela (desktop).
     static WINDOW_STATE: RefCell<Option<slint::Timer>> = const { RefCell::new(None) };
+    static DOWNLOADS: RefCell<Option<slint::Timer>> = const { RefCell::new(None) };
     /// O app rodando nesta thread (a da interface), para pedidos que chegam de fora (outro Tako aberto).
     static CURRENT: RefCell<Option<App>> = const { RefCell::new(None) };
 }
@@ -1325,13 +1357,18 @@ fn restore(ui: &ComponentInstance) {
     window.with_winit_window(|w| w.focus_window());
 }
 
+/// Despacha uma ação de link diretamente para o shell e traz a janela para a frente.
+pub fn dispatch_link(link: tako_core::links::Link) {
+    if let Some(shell) = crate::tasks::shell() {
+        shell.borrow_mut().open_link(link);
+    }
+    raise_current();
+}
+
 /// Um segundo processo encaminhou um link à interface já aberta.
 pub fn open_current_link(url: &str) {
     if let Some(link) = tako_core::links::parse(url) {
-        if let Some(shell) = crate::tasks::shell() {
-            shell.borrow_mut().open_link(link);
-        }
-        raise_current();
+        dispatch_link(link);
     }
 }
 
@@ -1568,6 +1605,14 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     for (name, key) in [
         ("silence", "accessibility.sound_silence"),
         ("max", "accessibility.sound_max"),
+        ("dl-pause", "downloads.pause"),
+        ("dl-resume", "downloads.resume"),
+        ("dl-cancel", "downloads.cancel"),
+        ("dl-start-now", "downloads.start_now"),
+        ("dl-retry", "downloads.retry"),
+        ("dl-store", "downloads.open_store"),
+        ("dl-open-folder", "downloads.open_folder"),
+        ("dl-remove", "downloads.remove_from_list"),
     ] {
         bridge::set_global(ui, "DeskText", name, s.ctx.t(key).to_value());
     }
