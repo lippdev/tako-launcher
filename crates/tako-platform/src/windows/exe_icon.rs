@@ -1,5 +1,5 @@
-//! Ícone embutido num `.exe` (Windows): `PrivateExtractIconsW` escolhe e escala o melhor ícone do arquivo
-//! (o maior até o lado pedido) e `GetDIBits` lê os pixels. O executável é dado externo: tamanho do caminho e do
+//! Ícone embutido num `.exe` (Windows): `PrivateExtractIconsW` extrai e escala o ícone para o tamanho
+//! pedido e `GetDIBits` lê os pixels. O executável é dado externo: tamanho do caminho e do
 //! bitmap limitados, e qualquer falha é "sem ícone".
 
 use crate::exe_icon::Pixels;
@@ -13,7 +13,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, GetIconInfo, HICON, ICONINFO, PrivateExtractIconsW,
 };
 
-/// Ícone de `exe` com o maior lado até `side`; `None` sem ícone, ou caminho com mais de 259 caracteres.
+/// Ícone de `exe` escalado pela API para o tamanho `side`; `None` sem ícone, ou caminho com mais de 259 caracteres.
 pub fn extract(exe: &Path, side: u32) -> Option<Pixels> {
     // A API recebe o caminho num vetor fixo de MAX_PATH (260) caracteres.
     let mut name = [0u16; 260];

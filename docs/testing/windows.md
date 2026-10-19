@@ -268,7 +268,7 @@ Gaming resgatado).
 ## 24. Ícone do jogo na lista (UX-005)
 
 Precisa de Steam, Epic e GOG Galaxy com contas, de um jogo adicionado à mão (um `.exe`) e de um jogo do app Xbox. A ordem do
-ícone é: o escolhido pelo usuário (seletor de imagens › Ícone), o da loja, o do `.exe` e, sem nenhum, a inicial do nome.
+ícone é: o escolhido pelo usuário (seletor de imagens › Ícone), o da loja, o dos provedores (SteamGridDB), o do `.exe` e, sem nenhum, a inicial do nome.
 
 1. **Steam instalado**: o ícone da lista é o do jogo, nítido (a Steam guarda o `.ico` em `Steam\steam\games\<hash>.ico`). Conferir
    que o arquivo existe e que o ícone é o mesmo da Steam. Apagar esse `.ico`, reabrir o Tako e conferir o JPG 32x32 (pode
@@ -279,8 +279,8 @@ Precisa de Steam, Epic e GOG Galaxy com contas, de um jogo adicionado à mão (u
    nome da peça `originalImages` do banco do Galaxy (`squareIcon`) não foi confirmado em banco real.
 4. **Jogo à mão com `.exe`**: adicionar um `.exe` conhecido (ex.: Notepad++, um jogo). O ícone da lista é o do executável, com
    cantos redondos e contorno fino. Conferir em `%LOCALAPPDATA%\Tako\cache\exe-icons\` (ao lado do executável na portátil,
-   em `cache\exe-icons`) um `.png` de até 128x128 por executável, e que reabrir o Tako não gera arquivos novos.
-5. Executáveis de teste: um com ícone de 256 px (PNG no recurso), um só com ícone antigo de 32 px sem transparência (fundo
+   em `cache\exe-icons`) um `.png` de 128x128 por executável (a API escala para o tamanho pedido), e que reabrir o Tako não gera arquivos novos.
+5. Executáveis de teste: um com ícone de 256 px (a API escala para o tamanho pedido de 128 px), um só com ícone antigo de 32 px sem transparência (a API escala para 128 px; fundo
    não pode virar preto), um sem ícone (aparece a inicial, sem erro no log) e um com caminho acima de 259 caracteres (idem).
 6. Trocar o executável por outra versão (mesmo caminho): o ícone novo aparece (o nome do PNG muda com tamanho e data).
 7. **Xbox**: o ícone é o logo quadrado do pacote; sem logo, a inicial.

@@ -20,11 +20,28 @@ pub struct Pixels {
     pub mask: Option<Vec<u8>>,
 }
 
+static FAILED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<PathBuf>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
+
+/// PNG do ícone do `exe` no cache `dir` se já existir no disco.
+/// Não tenta extrair nem chama APIs de plataforma (seguro para rodar na thread da UI).
+pub fn cached_icon_file(exe: &Path, dir: &Path) -> Option<PathBuf> {
+    let meta = std::fs::metadata(exe).ok().filter(|m| m.is_file())?;
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_secs());
+    let file = dir.join(cache_name(exe, meta.len(), modified));
+    if file.is_file() { Some(file) } else { None }
+}
+
 /// PNG do ícone do `exe` no cache `dir` (criado se preciso), pronto para virar `file:///`. Reaproveita o que já
-/// foi extraído: o nome muda quando o executável muda (caminho, tamanho ou data).
+/// foi extraído: o nome muda quando o executável muda (caminho, tamanho ou data). Falhas são guardadas num
+/// `HashSet` para não tentar extrair de novo.
 /// shortcut: o que sai de uso (exe trocado ou removido) fica no cache; limpar junto do cache de artes se pesar.
 pub fn icon_file(exe: &Path, dir: &Path) -> Option<PathBuf> {
-    icon_file_with(exe, dir, extract)
+    icon_file_with(exe, dir, &FAILED, extract)
 }
 
 #[cfg(target_os = "windows")]
@@ -40,9 +57,26 @@ fn extract(_: &Path) -> Option<Pixels> {
 fn icon_file_with(
     exe: &Path,
     dir: &Path,
+    failed: &std::sync::Mutex<std::collections::HashSet<PathBuf>>,
     extract: impl Fn(&Path) -> Option<Pixels>,
 ) -> Option<PathBuf> {
-    let meta = std::fs::metadata(exe).ok().filter(|m| m.is_file())?;
+    if let Ok(f) = failed.lock()
+        && f.contains(exe)
+    {
+        return None;
+    }
+    let record_failure = || {
+        if let Ok(mut f) = failed.lock() {
+            f.insert(exe.to_path_buf());
+        }
+    };
+    let meta = match std::fs::metadata(exe).ok().filter(|m| m.is_file()) {
+        Some(m) => m,
+        None => {
+            record_failure();
+            return None;
+        }
+    };
     let modified = meta
         .modified()
         .ok()
@@ -52,8 +86,16 @@ fn icon_file_with(
     if file.is_file() {
         return Some(file);
     }
-    let png = to_png(&extract(exe)?)?;
-    std::fs::create_dir_all(dir).ok()?;
+    let pixels = extract(exe);
+    let png = pixels.as_ref().and_then(to_png);
+    let Some(png) = png else {
+        record_failure();
+        return None;
+    };
+    if std::fs::create_dir_all(dir).is_err() {
+        record_failure();
+        return None;
+    }
     // Grava e renomeia: leitor nunca vê PNG pela metade (a leitura da biblioteca e a interface podem pedir juntas).
     static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let tmp = file.with_extension(format!(
@@ -64,13 +106,14 @@ fn icon_file_with(
     if let Err(e) = saved {
         tracing::warn!("ícone de {}: {e}", exe.display());
         let _ = std::fs::remove_file(&tmp);
+        record_failure();
         return None;
     }
     Some(file)
 }
 
 /// `<hash do caminho, tamanho e data>.png` (FNV-1a de 64 bits; o caminho sem diferenciar maiúsculas, como o NTFS).
-fn cache_name(exe: &Path, len: u64, modified: u64) -> String {
+pub fn cache_name(exe: &Path, len: u64, modified: u64) -> String {
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
     let path = exe.to_string_lossy().to_lowercase();
     for b in path
@@ -209,16 +252,20 @@ mod tests {
             calls.set(calls.get() + 1);
             Some(square(8, [0, 0, 255, 255]))
         };
-        let file = icon_file_with(&exe, &cache, fake).unwrap();
+        let failed = std::sync::Mutex::new(std::collections::HashSet::new());
+        let file = icon_file_with(&exe, &cache, &failed, fake).unwrap();
         assert_eq!(
             decode(&std::fs::read(&file).unwrap()).get_pixel(0, 0).0,
             [255, 0, 0, 255]
         );
-        assert_eq!(icon_file_with(&exe, &cache, fake), Some(file.clone()));
+        assert_eq!(
+            icon_file_with(&exe, &cache, &failed, fake),
+            Some(file.clone())
+        );
         assert_eq!(calls.get(), 1);
         // Executável mudou (tamanho): outro nome, extrai de novo.
         std::fs::write(&exe, b"MZ mudou").unwrap();
-        assert_ne!(icon_file_with(&exe, &cache, fake), Some(file));
+        assert_ne!(icon_file_with(&exe, &cache, &failed, fake), Some(file));
         assert_eq!(calls.get(), 2);
         // Nenhum .tmp sobra.
         assert!(
@@ -232,14 +279,56 @@ mod tests {
     #[test]
     fn missing_or_unreadable_executables_are_no_icon() {
         let dir = tempfile::tempdir().unwrap();
+        let failed = std::sync::Mutex::new(std::collections::HashSet::new());
         let none = |_: &Path| -> Option<Pixels> { None };
-        assert!(icon_file_with(&dir.path().join("nao-existe.exe"), dir.path(), none).is_none());
+        assert!(
+            icon_file_with(
+                &dir.path().join("nao-existe.exe"),
+                dir.path(),
+                &failed,
+                none
+            )
+            .is_none()
+        );
         // Pasta no lugar do arquivo.
-        assert!(icon_file_with(dir.path(), dir.path(), none).is_none());
+        assert!(icon_file_with(dir.path(), dir.path(), &failed, none).is_none());
         let exe = dir.path().join("sem-icone.exe");
         std::fs::write(&exe, b"MZ").unwrap();
-        assert!(icon_file_with(&exe, &dir.path().join("c"), none).is_none());
+        assert!(icon_file_with(&exe, &dir.path().join("c"), &failed, none).is_none());
         assert!(!dir.path().join("c").exists());
+    }
+
+    #[test]
+    fn failed_extraction_is_cached_in_hashset_and_not_retried() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("SemIcone.exe");
+        std::fs::write(&exe, b"MZ").unwrap();
+        let cache = dir.path().join("cache").join("exe-icons");
+        let failed = std::sync::Mutex::new(std::collections::HashSet::new());
+        let calls = Cell::new(0);
+        let failing = |_: &Path| {
+            calls.set(calls.get() + 1);
+            None
+        };
+        assert!(icon_file_with(&exe, &cache, &failed, failing).is_none());
+        assert_eq!(calls.get(), 1);
+        // Na segunda chamada, não tenta extrair de novo: o HashSet guarda a falha.
+        assert!(icon_file_with(&exe, &cache, &failed, failing).is_none());
+        assert_eq!(calls.get(), 1);
+        assert!(failed.lock().unwrap().contains(&exe));
+    }
+
+    #[test]
+    fn cached_icon_file_only_returns_existing_file_without_extracting() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("Jogo.exe");
+        std::fs::write(&exe, b"MZ").unwrap();
+        let cache = dir.path().join("cache").join("exe-icons");
+        assert!(cached_icon_file(&exe, &cache).is_none());
+        let failed = std::sync::Mutex::new(std::collections::HashSet::new());
+        let fake = |_: &Path| Some(square(8, [0, 0, 255, 255]));
+        let file = icon_file_with(&exe, &cache, &failed, fake).unwrap();
+        assert_eq!(cached_icon_file(&exe, &cache), Some(file));
     }
 
     #[test]
