@@ -295,8 +295,10 @@ fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
                 }
             });
         });
+        // Sem event loop (fechando o app, ou nos testes) a resposta se perde, mas a thread segue até a fila fechar:
+        // parar aqui deixaria os pedidos seguintes pendentes para sempre.
         if sent.is_err() {
-            return;
+            continue;
         }
     }
 }
@@ -484,6 +486,7 @@ mod tests {
 
     /// Regressão da alpha.15: com 300 ícones na fila (cada um ~20 ms de rede), o fundo do jogo em destaque
     /// esperava atrás de todos (~4 s aqui; com a rede de verdade, minutos). Os ícones têm a fila deles.
+    /// Sem event loop no teste, as threads seguem vivas (ver `worker`), então a espera é a da fila.
     #[test]
     fn icons_do_not_hold_back_the_art_on_screen() {
         let (seen, hero) = channel::<()>();
@@ -502,7 +505,7 @@ mod tests {
         }
         let asked = std::time::Instant::now();
         assert!(get("hero://destaque", 1600, 900).is_none());
-        let waited = hero.recv_timeout(std::time::Duration::from_secs(10));
+        let waited = hero.recv_timeout(std::time::Duration::from_secs(2));
         let ms = asked.elapsed().as_millis();
         eprintln!("fundo resolvido {ms} ms depois do pedido, com 300 ícones na fila");
         assert!(waited.is_ok() && ms < 500, "fundo esperou {ms} ms");
