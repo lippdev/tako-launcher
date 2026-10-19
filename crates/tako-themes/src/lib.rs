@@ -18,8 +18,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tako_core::i18n::tf;
 
 pub use create::{
-    CreateThemeError, CreateThemeOptions, ThemeNameProblem, create_theme, derive_theme_id,
-    is_tokens_only_theme, unique_theme_id, uses_default_ui, validate_theme_name,
+    CreateThemeError, CreateThemeOptions, RESERVED_THEME_IDS, ThemeNameProblem, create_theme,
+    derive_theme_id, is_reserved_theme_id, is_tako_created_theme, is_tokens_only_theme,
+    unique_theme_id, uses_default_ui, validate_theme_name,
 };
 pub use export::{ExportThemeError, export_theme};
 pub use manifest::{

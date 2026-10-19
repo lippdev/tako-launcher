@@ -659,6 +659,7 @@ fn test_create_theme_from_default_and_installed_and_reject_duplicate() {
 
     let opts = CreateThemeOptions {
         name: "Meu Tema Púrpura",
+        custom_id: None,
         author: Some("Criador"),
         version: Some("1.0.0"),
         description: Some("Tema criado para testes"),
@@ -687,6 +688,7 @@ fn test_create_theme_from_default_and_installed_and_reject_duplicate() {
     tokens.accent = Some("#0B7A3B".into());
     let opts_overwrite = CreateThemeOptions {
         name: "Meu Tema Púrpura",
+        custom_id: None,
         author: Some("Criador"),
         version: Some("1.0.1"),
         description: Some("Tema atualizado"),
@@ -705,6 +707,7 @@ fn test_create_theme_from_default_and_installed_and_reject_duplicate() {
 
     let opts_derived = CreateThemeOptions {
         name: "Tema Derivado",
+        custom_id: None,
         author: Some("Outro"),
         version: Some("1.0.0"),
         description: None,
@@ -743,6 +746,7 @@ fn test_export_and_install_round_trip_with_background_image() {
 
     let opts = CreateThemeOptions {
         name: "Tema com Wallpaper",
+        custom_id: None,
         author: Some("Artista"),
         version: Some("1.0.0"),
         description: Some("Tema com imagem"),
@@ -777,4 +781,227 @@ fn test_export_and_install_round_trip_with_background_image() {
     let manifest = crate::package::validate_package(&installed.dir).unwrap();
     assert_eq!(manifest.name, "Tema com Wallpaper");
     assert_eq!(manifest.author, "Artista");
+}
+
+#[test]
+fn test_reserved_theme_ids_and_derivation() {
+    use crate::create::{
+        CreateThemeError, CreateThemeOptions, create_theme, derive_theme_id, is_reserved_theme_id,
+        unique_theme_id,
+    };
+    use crate::overrides::ThemeTokensOverride;
+
+    assert!(is_reserved_theme_id("default"));
+    assert!(is_reserved_theme_id("tako-default"));
+    assert!(is_reserved_theme_id("tako-fita"));
+    assert!(is_reserved_theme_id("tako-alto-contraste"));
+    assert!(!is_reserved_theme_id("meu-tema"));
+
+    // Derivação deve desviar de ids reservados
+    assert_eq!(derive_theme_id("default"), "default-tema");
+    assert_eq!(derive_theme_id("Tako Fita"), "tako-fita-tema");
+    assert_eq!(
+        derive_theme_id("Tako Alto Contraste"),
+        "tako-alto-contraste-tema"
+    );
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+    fs::create_dir_all(&themes_root).unwrap();
+
+    let tokens = ThemeTokensOverride::default();
+    let opts_reserved = CreateThemeOptions {
+        name: "Fita Oficial",
+        custom_id: Some("tako-fita"),
+        author: None,
+        version: None,
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: true,
+    };
+    let err = create_theme(&themes_root, &opts_reserved).unwrap_err();
+    assert!(matches!(err, CreateThemeError::Reserved(id) if id == "tako-fita"));
+
+    // unique_theme_id nunca devolve id reservado
+    let u1 = unique_theme_id(&themes_root, "Tako Fita");
+    assert_ne!(u1, "tako-fita");
+    assert_eq!(u1, "tako-fita-tema");
+}
+
+#[test]
+fn test_cannot_overwrite_third_party_or_non_tako_theme() {
+    use crate::create::{
+        CreateThemeError, CreateThemeOptions, create_theme, is_tako_created_theme,
+    };
+    use crate::overrides::ThemeTokensOverride;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+    let third_party = themes_root.join("tema-terceiro");
+    fs::create_dir_all(&third_party).unwrap();
+
+    // Manifesto sem a marca created-by-tako
+    let manifest = "id = \"tema-terceiro\"\nname = \"Terceiro\"\nversion = \"1.0\"\nauthor = \"Autor Externo\"\napi = 1\nentry = \"main.slint\"\n";
+    fs::write(third_party.join("theme.toml"), manifest).unwrap();
+    fs::write(
+        third_party.join("main.slint"),
+        "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n",
+    )
+    .unwrap();
+
+    assert!(!is_tako_created_theme(&third_party));
+
+    let tokens = ThemeTokensOverride::default();
+    let opts = CreateThemeOptions {
+        name: "Tema Terceiro",
+        custom_id: None,
+        author: Some("Outro"),
+        version: Some("2.0.0"),
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: true,
+    };
+    let err = create_theme(&themes_root, &opts).unwrap_err();
+    assert!(matches!(err, CreateThemeError::CannotOverwrite(id) if id == "tema-terceiro"));
+}
+
+#[test]
+fn test_overwrite_resets_old_overrides_directory() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::overrides::{ThemeTokensOverride, save_override};
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+
+    let tokens = ThemeTokensOverride {
+        accent: Some("#6C5CE7".into()),
+        ..Default::default()
+    };
+    let opts = CreateThemeOptions {
+        name: "Tema Sobrescrito",
+        custom_id: None,
+        author: None,
+        version: None,
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+    };
+    let created = create_theme(&themes_root, &opts).unwrap();
+    let id = created.id();
+
+    // Cria sobreposições antigas para este tema
+    save_override(&themes_root, Some(&id), "accent = \"#123456\"\n").unwrap();
+    assert!(themes_root.join(".overrides").join(&id).is_dir());
+
+    // Sobrescreve o tema
+    let opts_overwrite = CreateThemeOptions {
+        overwrite: true,
+        ..opts
+    };
+    create_theme(&themes_root, &opts_overwrite).unwrap();
+
+    // A pasta .overrides/<id> deve ter sido limpa pelo reset_override
+    assert!(!themes_root.join(".overrides").join(&id).exists());
+}
+
+#[test]
+fn test_uses_default_ui_rejects_fita_and_accepts_reexport() {
+    use crate::create::uses_default_ui;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let fita_dir = tmp.path().join("fita");
+    fs::create_dir_all(&fita_dir).unwrap();
+    fs::write(
+        fita_dir.join("theme.toml"),
+        "id = \"fita\"\nname = \"Fita\"\nversion = \"1.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\n",
+    ).unwrap();
+    // Simula o main.slint do Fita: importa do @tako/main.slint mas define seu próprio App
+    fs::write(
+        fita_dir.join("main.slint"),
+        "import { HomeRow } from \"@tako/main.slint\";\nexport component App inherits Window {}\n",
+    )
+    .unwrap();
+
+    assert!(!uses_default_ui(&fita_dir));
+
+    let alto_dir = tmp.path().join("alto");
+    fs::create_dir_all(&alto_dir).unwrap();
+    fs::write(
+        alto_dir.join("theme.toml"),
+        "id = \"alto\"\nname = \"Alto\"\nversion = \"1.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\n",
+    ).unwrap();
+    fs::write(
+        alto_dir.join("main.slint"),
+        "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n",
+    )
+    .unwrap();
+
+    assert!(uses_default_ui(&alto_dir));
+}
+
+#[test]
+fn test_old_dir_preserved_if_not_matching() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::overrides::ThemeTokensOverride;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+    fs::create_dir_all(&themes_root).unwrap();
+
+    // Cria uma pasta .old-meu-tema que NÃO é cópia antiga deste id (ex: pasta de outro tema ou corrompida)
+    let old_dir = themes_root.join(".old-meu-tema");
+    fs::create_dir_all(&old_dir).unwrap();
+    fs::write(old_dir.join("arquivo_importante.txt"), "dados").unwrap();
+
+    let tokens = ThemeTokensOverride::default();
+    let opts = CreateThemeOptions {
+        name: "Meu Tema",
+        custom_id: None,
+        author: None,
+        version: None,
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+    };
+    create_theme(&themes_root, &opts).unwrap();
+
+    // A pasta com dados desconhecidos não deve ter sido destruída, mas sim renomeada com sufixo
+    assert!(themes_root.join(".old-meu-tema-bak-1").is_dir());
+    assert_eq!(
+        fs::read_to_string(themes_root.join(".old-meu-tema-bak-1/arquivo_importante.txt")).unwrap(),
+        "dados"
+    );
+}
+
+#[test]
+fn test_background_source_name_is_zeroed_in_created_theme() {
+    use crate::create::{CreateThemeOptions, create_theme};
+    use crate::overrides::ThemeTokensOverride;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let themes_root = tmp.path().join("themes");
+
+    let tokens = ThemeTokensOverride {
+        background_source_name: Some("minha_foto_privada.png".into()),
+        ..Default::default()
+    };
+
+    let opts = CreateThemeOptions {
+        name: "Tema Sem Vazamento",
+        custom_id: None,
+        author: None,
+        version: None,
+        description: None,
+        tokens: &tokens,
+        background_image_source: None,
+        overwrite: false,
+    };
+    let created = create_theme(&themes_root, &opts).unwrap();
+    let tokens_text = fs::read_to_string(created.dir.join("tokens.toml")).unwrap();
+    assert!(!tokens_text.contains("custom-background-name"));
+    assert!(!tokens_text.contains("minha_foto_privada.png"));
 }

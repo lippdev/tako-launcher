@@ -48,12 +48,12 @@ pub fn export_theme(theme_dir: &Path, output_path: &Path) -> Result<(), ExportTh
         zip.finish()?;
     }
 
+    // Valida que o pacote temporário gerado passa no validate_package existente antes de persistir
+    validate_package(temp_file.path()).map_err(ExportThemeError::InvalidPackage)?;
+
     temp_file
         .persist(output_path)
         .map_err(|e| ExportThemeError::Io(e.error))?;
-
-    // Valida que o pacote gerado passa no validate_package existente
-    validate_package(output_path).map_err(ExportThemeError::InvalidPackage)?;
 
     tracing::info!(
         from = %theme_dir.display(),
