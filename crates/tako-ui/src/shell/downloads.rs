@@ -42,6 +42,8 @@ pub struct State {
     pub(crate) linked: HashSet<String>,
     /// Motor de mentira (`--simulate` e testes): nada sai da máquina.
     pub simulated: bool,
+    /// Falha na inicialização do motor (só tenta de novo por ação do usuário).
+    pub engine_failed: bool,
 }
 
 pub fn enabled(ctx: &Ctx) -> bool {
@@ -66,7 +68,7 @@ fn upload_limit(ctx: &Ctx) -> i64 {
 
 /// O gerenciador, criado na primeira vez com a função ligada (o motor não fala com ninguém até o 1º download).
 pub fn manager(ctx: &mut Ctx) -> Option<&mut Downloads> {
-    if !enabled(ctx) {
+    if !enabled(ctx) || ctx.downloads.engine_failed {
         return None;
     }
     if ctx.downloads.manager.is_none() {
@@ -86,6 +88,7 @@ pub fn manager(ctx: &mut Ctx) -> Option<&mut Downloads> {
                 Ok(e) => Box::new(e),
                 Err(e) => {
                     tracing::error!("motor de downloads: {e}");
+                    ctx.downloads.engine_failed = true;
                     return None;
                 }
             }
@@ -407,7 +410,19 @@ fn completed_row(ctx: &Ctx, d: &Download) -> MenuItem {
     row.image = thumb(ctx, d.game_id.as_deref());
     // Só abre a pasta no gerenciador de arquivos: nada de dentro dela é aberto ou executado.
     let mut item = MenuItem::new(row).on(move |ctx| {
-        if folder.is_dir() {
+        let inside_root = match folder.strip_prefix(&root()) {
+            Ok(rel) => {
+                let mut comps = rel.components();
+                match comps.next() {
+                    Some(std::path::Component::Normal(first)) if !first.is_empty() => rel
+                        .components()
+                        .all(|c| matches!(c, std::path::Component::Normal(_))),
+                    _ => false,
+                }
+            }
+            Err(_) => false,
+        };
+        if inside_root && folder.is_dir() {
             if let Err(e) = ctx
                 .platform
                 .processes
@@ -723,6 +738,7 @@ pub fn settings_rows(ctx: &Ctx) -> Vec<MenuItem> {
                 .desc(ctx.t("downloads.enable_desc")),
         )
         .on(move |ctx| {
+            ctx.downloads.engine_failed = false;
             if enabled(ctx) {
                 save(ctx);
                 // Solta o motor: os downloads param e voltam pausados quando a função for ligada de novo.

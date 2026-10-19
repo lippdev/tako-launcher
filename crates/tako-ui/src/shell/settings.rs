@@ -1685,6 +1685,15 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                         ctx.toast(ctx.t("settings.system.restore_blocked_scanning"));
                         return Flow::Close;
                     }
+                    if ctx
+                        .downloads
+                        .manager
+                        .as_ref()
+                        .is_some_and(|m| m.summary().downloading > 0)
+                    {
+                        ctx.toast(ctx.t("settings.system.restore_blocked_download_active"));
+                        return Flow::Close;
+                    }
                     ctx.restoring = true;
                     ctx.settings.locked = true;
                     let paths = ctx.paths.clone();
@@ -1698,6 +1707,7 @@ pub(crate) fn confirm_restore_layer(ctx: &Ctx, path: std::path::PathBuf) -> Menu
                             match res {
                                 Ok(res) => {
                                     ctx.reload_data();
+                                    ctx.downloads = Default::default();
                                     let lang = match ctx.settings.string(keys::LANGUAGE).as_str() {
                                         "en-US" => Lang::EnUs,
                                         _ => Lang::PtBr,

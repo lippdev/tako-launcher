@@ -181,7 +181,21 @@ impl Downloads {
         let items = saved
             .into_iter()
             .map(|mut d| {
-                if d.state == DownloadState::Downloading {
+                let is_inside_root = match d.folder.strip_prefix(&root) {
+                    Ok(rel) => {
+                        let mut comps = rel.components();
+                        match comps.next() {
+                            Some(std::path::Component::Normal(first)) if !first.is_empty() => rel
+                                .components()
+                                .all(|c| matches!(c, std::path::Component::Normal(_))),
+                            _ => false,
+                        }
+                    }
+                    Err(_) => false,
+                };
+                if !is_inside_root {
+                    d.state = DownloadState::Failed("pasta fora da raiz de downloads".into());
+                } else if d.state == DownloadState::Downloading {
                     d.state = DownloadState::Paused;
                 }
                 d.engine = None;
@@ -452,6 +466,58 @@ mod tests {
             Downloads::new(Box::new(engine.clone()), PathBuf::from("/d/Tako"), vec![]),
             engine,
         )
+    }
+
+    #[test]
+    fn saved_downloads_outside_root_become_failed_and_do_not_start() {
+        let engine = MemoryDownloader::default();
+        let root = PathBuf::from("/d/Tako");
+        let saved = vec![
+            Download {
+                id: 1,
+                title: "Malicioso".into(),
+                game_id: None,
+                source: "Fonte".into(),
+                uri: A.into(),
+                folder: PathBuf::from("/etc"),
+                state: DownloadState::Queued,
+                done: 0,
+                total: None,
+                speed: 0,
+                engine: None,
+            },
+            Download {
+                id: 2,
+                title: "Travessia".into(),
+                game_id: None,
+                source: "Fonte".into(),
+                uri: B.into(),
+                folder: PathBuf::from("/d/Tako/../../outside"),
+                state: DownloadState::Downloading,
+                done: 0,
+                total: None,
+                speed: 0,
+                engine: None,
+            },
+            Download {
+                id: 3,
+                title: "Legítimo".into(),
+                game_id: None,
+                source: "Fonte".into(),
+                uri: A.into(),
+                folder: PathBuf::from("/d/Tako/Jogo C"),
+                state: DownloadState::Downloading,
+                done: 0,
+                total: None,
+                speed: 0,
+                engine: None,
+            },
+        ];
+        let d = Downloads::new(Box::new(engine), root, saved);
+        assert!(matches!(d.get(1).unwrap().state, DownloadState::Failed(_)));
+        assert!(matches!(d.get(2).unwrap().state, DownloadState::Failed(_)));
+        assert_eq!(d.get(3).unwrap().state, DownloadState::Paused);
+        assert_eq!(d.summary().downloading, 0);
     }
 
     #[test]

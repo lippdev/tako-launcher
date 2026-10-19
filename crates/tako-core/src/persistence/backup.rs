@@ -295,9 +295,40 @@ pub struct RestoreResult {
     pub auto_backup_path: Option<PathBuf>,
 }
 
+/// Chaves de configuração locais e de consentimento que NÃO entram em backup nem são sobrescritas ao restaurar.
+pub const BACKUP_EXCLUDED_SETTINGS: &[&str] = &[
+    "LocalApiEnabled",
+    "LocalApiToken",
+    "LocalApiAllowedOrigins",
+    "DownloadsEnabled",
+    "DownloadsLegalAccepted",
+    "SteamWebApiKey",
+    "SteamApiKey",
+    "IgdbClientId",
+    "IgdbClientSecret",
+    "ScreenScraperUser",
+    "ScreenScraperPassword",
+    "SteamGridDbApiKey",
+    "AnalyticsConsent",
+    "CrashReportConsent",
+    "TelemetryConsent",
+];
+
+/// Diz se uma chave de configuração não pode ser exportada nem importada em backups.
+pub fn is_backup_excluded(key: &str) -> bool {
+    BACKUP_EXCLUDED_SETTINGS.contains(&key)
+        || key.to_ascii_lowercase().contains("token")
+        || key.to_ascii_lowercase().contains("secret")
+        || key.to_ascii_lowercase().contains("password")
+        || key.to_ascii_lowercase().contains("api_key")
+        || key.to_ascii_lowercase().contains("apikey")
+        || key.to_ascii_lowercase().contains("api-key")
+}
+
 const SENSITIVE_SETTINGS_SQL: &str = "
     key IN (
         'LocalApiEnabled', 'LocalApiToken', 'LocalApiAllowedOrigins',
+        'DownloadsEnabled', 'DownloadsLegalAccepted',
         'SteamWebApiKey', 'SteamApiKey', 'IgdbClientId', 'IgdbClientSecret',
         'ScreenScraperUser', 'ScreenScraperPassword', 'SteamGridDbApiKey',
         'AnalyticsConsent', 'CrashReportConsent', 'TelemetryConsent'
@@ -321,6 +352,29 @@ fn sanitize_backup_database(conn: &Connection) -> Result<(), rusqlite::Error> {
         .unwrap_or(false);
     if has_game_settings {
         conn.execute("UPDATE game_settings SET approved_commands = NULL;", [])?;
+    }
+
+    let has_download_sources: bool = conn
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='download_sources';",
+            [],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
+    if has_download_sources {
+        let mut stmt = conn.prepare("SELECT url FROM download_sources;")?;
+        let urls: Vec<String> = stmt
+            .query_map([], |r| r.get(0))?
+            .filter_map(Result::ok)
+            .collect();
+        for url in urls {
+            if let Some((clean, _)) = url.split_once('?') {
+                conn.execute(
+                    "UPDATE OR REPLACE download_sources SET url = ?1 WHERE url = ?2;",
+                    rusqlite::params![clean, url],
+                )?;
+            }
+        }
     }
 
     let has_settings: bool = conn
@@ -2363,6 +2417,16 @@ mod tests {
             )
             .unwrap();
             conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('DownloadsEnabled', 'false');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('DownloadsLegalAccepted', 'false');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
                 "INSERT INTO game_settings (game_id, approved_commands) VALUES ('jogo-local', 'cmd_local');",
                 [],
             ).unwrap();
@@ -2388,6 +2452,20 @@ mod tests {
                 [],
             )
             .unwrap();
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('DownloadsEnabled', 'true');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('DownloadsLegalAccepted', 'true');",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO download_sources (url, name, items, updated_at) VALUES ('https://example.com/source.json?token=secret123', 'Fonte Teste', 10, '2026-10-19');",
+                [],
+            ).unwrap();
             conn.execute(
                 "INSERT INTO game_settings (game_id, approved_commands, extra_arguments, environment) VALUES ('jogo-atacante', 'rm -rf /', '--malicious-arg', 'LD_PRELOAD=/evil.so');",
                 [],
@@ -2453,6 +2531,40 @@ mod tests {
         assert_eq!(
             api_token, "token-local-seguro",
             "LocalApiToken local deve permanecer intacto"
+        );
+
+        let dl_enabled: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'DownloadsEnabled';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            dl_enabled, "false",
+            "DownloadsEnabled local deve permanecer intacto (false)"
+        );
+
+        let dl_legal: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'DownloadsLegalAccepted';",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            dl_legal, "false",
+            "DownloadsLegalAccepted local deve permanecer intacto (false)"
+        );
+
+        let clean_source_url: String = conn
+            .query_row("SELECT url FROM download_sources LIMIT 1;", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            clean_source_url, "https://example.com/source.json",
+            "query string de download_sources deve ser removida"
         );
 
         let outro_segredo: Option<String> = conn

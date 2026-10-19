@@ -24,20 +24,14 @@ pub const READ_TIMEOUT: Duration = Duration::from_secs(5);
 pub const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Chaves de configuração que NÃO podem entrar em backup ou exportação (segredos locais do dispositivo).
-pub const BACKUP_EXCLUDED_SETTINGS: &[&str] = &[API_TOKEN];
+pub use crate::persistence::backup::{BACKUP_EXCLUDED_SETTINGS, is_backup_excluded};
 
 /// Chaves de configuração que NÃO podem ser importadas como consentimento do usuário (opt-in estrito).
-pub const IMPORT_EXCLUDED_SETTINGS: &[&str] = &[API_TOKEN, API_ENABLED];
-
-/// Diz se uma chave de configuração da API deve ser excluída de backups/exportações (CLOUD-001 / PR #137).
-pub fn is_backup_excluded(key: &str) -> bool {
-    BACKUP_EXCLUDED_SETTINGS.contains(&key)
-}
+pub const IMPORT_EXCLUDED_SETTINGS: &[&str] = BACKUP_EXCLUDED_SETTINGS;
 
 /// Diz se uma chave de configuração não pode ser restaurada/importada como consentimento (CLOUD-001 / PR #137).
 pub fn is_import_excluded(key: &str) -> bool {
-    IMPORT_EXCLUDED_SETTINGS.contains(&key)
+    is_backup_excluded(key)
 }
 
 /// Valida se uma string é um token de API válido (32 caracteres hexadecimais).
@@ -1040,7 +1034,9 @@ mod tests {
         assert!(!is_valid_token("0123456789abcdef0123456789abcdef0")); // 33 chars
 
         assert!(is_backup_excluded(API_TOKEN));
-        assert!(!is_backup_excluded(API_ENABLED));
+        assert!(is_backup_excluded(API_ENABLED));
+        assert!(is_backup_excluded("DownloadsEnabled"));
+        assert!(is_backup_excluded("DownloadsLegalAccepted"));
 
         assert!(is_import_excluded(API_TOKEN));
         assert!(is_import_excluded(API_ENABLED));

@@ -372,6 +372,7 @@ restore_done_with_auto = "Backup restored successfully (previous state saved to 
 restore_failed = "Could not restore backup: {error}"
 restore_blocked_game_running = "Close the game before restoring the backup"
 restore_blocked_scanning = "Wait for the library scan to finish before restoring the backup"
+restore_blocked_download_active = "Wait for active downloads to finish or pause them before restoring the backup"
 restore_busy = "Wait for the backup restoration to finish"
 sunshine = "Sunshine / Apollo"
 sunshine_desc = "Local streaming with Sunshine or Apollo; Tako does not send data over the network."
