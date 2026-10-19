@@ -535,11 +535,11 @@ fn create_raw_auto_backup(paths: &DataPaths, dest_file: &Path) -> Result<(), Bac
 
         // 2. Cópia bruta do banco tako.db (e wal/shm/journal se existirem)
         let db_path = paths.database();
-        if db_path.is_file()
-            && let Ok(mut f) = File::open(&db_path)
-        {
+        if db_path.is_file() {
+            // Sem o banco a cópia bruta não serve de backup: qualquer falha aqui aborta a restauração.
+            let mut f = File::open(&db_path)?;
             zip.start_file("tako.db", file_options)?;
-            let _ = io::copy(&mut f, &mut zip);
+            io::copy(&mut f, &mut zip)?;
         }
         for suffix in ["-wal", "-shm", "-journal"] {
             let mut aux = db_path.as_os_str().to_owned();
@@ -860,27 +860,21 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
         let timestamp = Utc::now().format("%Y%m%d-%H%M%S-%3f");
         let path = backups_dir.join(format!("auto-backup-{timestamp}.takobackup"));
 
-        let created = if fs::create_dir_all(&backups_dir).is_ok() {
-            match create_backup(paths, &path) {
-                Ok(_) => true,
+        let created = match fs::create_dir_all(&backups_dir) {
+            Ok(()) => match create_backup(paths, &path) {
+                Ok(_) => Ok(()),
                 Err(e) => {
                     tracing::warn!(error = %e, "create_backup falhou no auto-backup; gerando cópia bruta dos arquivos");
-                    create_raw_auto_backup(paths, &path).is_ok()
+                    create_raw_auto_backup(paths, &path).map_err(|e| e.to_string())
                 }
-            }
-        } else {
-            false
+            },
+            Err(e) => Err(e.to_string()),
         };
 
-        if created {
-            prune_auto_backups(&backups_dir, MAX_AUTO_BACKUPS);
-            tracing::info!(auto = %path.display(), "backup automático salvo antes da restauração");
-            Some(path)
-        } else {
-            return Err(BackupError::AutoBackupFailed(i18n::t(
-                "backup.error.auto_backup_failed",
-            )));
-        }
+        created.map_err(BackupError::AutoBackupFailed)?;
+        prune_auto_backups(&backups_dir, MAX_AUTO_BACKUPS);
+        tracing::info!(auto = %path.display(), "backup automático salvo antes da restauração");
+        Some(path)
     } else {
         None
     };
@@ -984,7 +978,8 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
             }
         }
         if let Err(e) = fs::rename(&extracted_themes, &dest_themes) {
-            rollback(db_swapped, false, false);
+            // Os temas antigos já foram para `themes.old`: o rollback precisa devolvê-los.
+            rollback(db_swapped, true, false);
             return Err(e.into());
         }
         themes_swapped = true;
@@ -1010,7 +1005,7 @@ pub fn restore_backup(paths: &DataPaths, backup_file: &Path) -> Result<RestoreRe
             }
         }
         if let Err(e) = fs::rename(&extracted_art, &dest_art) {
-            rollback(db_swapped, themes_swapped, false);
+            rollback(db_swapped, themes_swapped, true);
             return Err(e.into());
         }
         art_swapped = true;
@@ -2004,6 +1999,13 @@ mod tests {
         assert!(
             msg.contains("automático") || msg.contains("automatic"),
             "mensagem esperada em msg: {msg}"
+        );
+        // A causa entra uma vez, sem o texto traduzido repetido nem o marcador cru.
+        assert!(!msg.contains("{error}"), "{msg}");
+        assert_eq!(
+            msg.matches("automátic").count() + msg.matches("automatic").count(),
+            1,
+            "{msg}"
         );
 
         // Garante que o banco de dados do destino NAO foi alterado
