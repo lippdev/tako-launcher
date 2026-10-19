@@ -292,7 +292,6 @@ fn edit_text(
     ))
 }
 
-/// Pasta que não existe não é aceita; vazio = a pasta do executável.
 fn is_manual_windows_game(ctx: &Ctx, id: &str) -> bool {
     ctx.library.find(id).is_some_and(|g| {
         g.store() == tako_core::library::GameStore::Manual
@@ -340,6 +339,17 @@ fn runner_options(
         })
         .unwrap_or(0);
     (options, cur)
+}
+
+fn runner_label(
+    ctx: &Ctx,
+    runtime: &tako_platform::linux_compatibility::CompatibilityRuntime,
+) -> String {
+    if runtime.id == "system-wine" {
+        ctx.t("game_settings.runner_system_wine")
+    } else {
+        runtime.name.clone()
+    }
 }
 
 fn set_runner(
@@ -390,6 +400,7 @@ fn edit_prefix(ctx: &Ctx, id: &str) -> Flow {
     ))
 }
 
+/// Pasta que não existe não é aceita; vazio = a pasta do executável.
 pub fn folder_problem(ctx: &Ctx, folder: &str) -> Option<String> {
     let f = folder.trim();
     (!f.is_empty() && !Path::new(f).is_dir())
@@ -435,11 +446,28 @@ pub fn panel(ctx: &Ctx, id: &str) -> Box<dyn Layer> {
         .library
         .find(id)
         .and_then(|g| g.shown_cover().map(str::to_owned));
+    let show_compatibility = (cfg!(target_os = "linux") || cfg!(test))
+        && !is_flatpak()
+        && is_manual_windows_game(ctx, id);
+    let runtimes = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    if show_compatibility {
+        let loaded = runtimes.clone();
+        crate::tasks::run_bg(
+            tako_platform::linux_compatibility::detect_runtimes,
+            move |_, found| {
+                *loaded
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = found;
+            },
+        );
+    }
     let id = id.to_owned();
-    let runtimes = std::sync::Arc::new(tako_platform::linux_compatibility::detect_runtimes());
     let runtimes_for_rows = runtimes.clone();
     let layer = MenuLayer::panel(ctx.t("details.game_settings"), move |ctx| {
-        rows(ctx, &id, &runtimes_for_rows)
+        let detected = runtimes_for_rows
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        rows(ctx, &id, &detected)
     })
     .overline(overline);
     Box::new(if desktop {
@@ -788,7 +816,7 @@ fn rows(
             None => (runner_default.clone(), false),
             Some(id_str) => {
                 let found = opts.iter().flatten().find(|r| r.id == id_str);
-                let name = found.map(|r| r.name.clone()).unwrap_or_else(|| {
+                let name = found.map(|r| runner_label(ctx, r)).unwrap_or_else(|| {
                     ctx.tf("game_settings.runner_missing", &[("runner", &id_str)])
                 });
                 let is_proton = found.is_some_and(|r| {
@@ -828,7 +856,7 @@ fn rows(
                             .map(|o| {
                                 let label = match &o {
                                     None => default_label.clone(),
-                                    Some(r) => r.name.clone(),
+                                    Some(r) => runner_label(ctx, r),
                                 };
                                 let id = id.clone();
                                 Pick::new(label).set(move |ctx| {
