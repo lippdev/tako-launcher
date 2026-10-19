@@ -331,6 +331,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                     let mut s = shell.borrow_mut();
                     s.ctx.library.refresh();
                     s.ctx.sync_collections();
+                    crate::shell::settings::sunshine::sync_after_rescan(&mut s.ctx);
                     s.ctx.sources = reports;
                     s.ctx.free_space = free_space.or(s.ctx.free_space.take());
                     s.ctx.scanning = false;

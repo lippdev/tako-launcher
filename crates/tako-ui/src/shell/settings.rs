@@ -11,6 +11,8 @@ pub(crate) mod library;
 pub(crate) mod metadata;
 #[path = "settings_screen.rs"]
 pub(crate) mod screen;
+#[path = "settings_sunshine.rs"]
+pub(crate) mod sunshine;
 #[cfg(test)]
 #[path = "settings_tests.rs"]
 mod tests;
@@ -70,6 +72,11 @@ pub fn categories() -> Vec<Category> {
             id: "controls",
             icon: "gamepad",
             rows: controls::rows,
+        },
+        Category {
+            id: "integrations",
+            icon: "tv",
+            rows: sunshine::rows,
         },
         Category {
             id: "downloads",
@@ -1539,30 +1546,6 @@ fn system(ctx: &Ctx) -> Vec<MenuItem> {
             choose_restore(ctx);
             Flow::Stay
         }),
-    );
-    v.push(MenuItem::new(PanelRow::header(
-        ctx.t("settings.system.integrations_header"),
-    )));
-    if crate::discord::available() {
-        v.push(toggle(
-            ctx,
-            "settings.system.discord",
-            keys::DISCORD_PRESENCE,
-            false,
-        ));
-    }
-    let api_on = ctx.settings.bool(keys::API_ENABLED, false);
-    v.push(
-        MenuItem::new(
-            PanelRow::action("settings.system.api", ctx.t("settings.system.api"))
-                .desc(ctx.t("settings.system.api_desc"))
-                .value(ctx.t(if api_on {
-                    "settings.system.api_on"
-                } else {
-                    "settings.system.api_off"
-                })),
-        )
-        .on(|ctx| Flow::Push(Box::new(api_panel(ctx)))),
     );
     v.push(MenuItem::new(PanelRow::header(
         ctx.t("settings.system.advanced_header"),

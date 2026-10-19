@@ -420,7 +420,7 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 
 ### Épico STREAM (P3)
 
-- [ ] **STREAM-001:** integração com Sunshine/Apollo e Moonlight.
+- [x] **STREAM-001:** integração com Sunshine/Apollo e Moonlight.
 - [ ] **STREAM-002:** controle remoto pelo celular por interface web local autenticada.
 
 ### Épico CLOUD (P3)
