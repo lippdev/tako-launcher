@@ -22,7 +22,7 @@ use tako_core::library::{
 use tako_core::presentation::{game_text, library_text};
 
 /// Ícone da loja de origem na linha (ListaDeJogos › Loja de origem): o Xbox tem o logo próprio aqui.
-fn store_icon(store: GameStore) -> &'static str {
+pub(crate) fn store_icon(store: GameStore) -> &'static str {
     match store {
         GameStore::Xbox => "store-xbox",
         GameStore::Manual => "store-manual",

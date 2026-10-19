@@ -84,3 +84,14 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em cad
 - [ ] Cancelar a instalação na Steam: o jogo volta a "não instalado". Pausar: a porcentagem para.
 - [ ] Heroic (Epic/GOG/Amazon): o jogo mandado instalar só vira instalado na releitura de 30 s (o Tako não vê o andamento do Heroic).
 - [ ] O espaço livre mostrado é o do disco da Steam (ou de `~` sem Steam), com o ponto de montagem certo (ex.: `/`, `/home`, `/mnt/jogos`) e o número igual ao de `df -h`. Biblioteca da Steam em outro disco montado: mostra o ponto de montagem dele.
+
+## Downloads por torrent (DL-001)
+
+- [ ] A pasta padrão é `$XDG_DOWNLOAD_DIR/Tako` (ou `~/Downloads/Tako`).
+- [ ] Configurações › Downloads vem desligado. Ligar mostra o aviso legal e de IP; Cancelar mantém desligado; "Entendi e aceito" liga e não pergunta de novo.
+- [ ] Adicionar fonte com `http://` é recusado; com uma fonte `https://` sua de teste (só itens fictícios ou de conteúdo livre), a linha mostra o número de itens. Remover apaga a fonte e o cache.
+- [ ] Num jogo não instalado, ⋯ › "Baixar de uma fonte" lista só itens parecidos; confirmar vincula ao jogo, a pílula "↓ N%" aparece antes do perfil e o jogo mostra o progresso na lista.
+- [ ] No painel: pausar para na hora (sem confirmação); cancelar pede confirmação e "Cancelar e apagar" remove a pasta. Com uma instalação da Steam em andamento, ela aparece em BAIXANDO "pela Steam" e os botões abrem o cliente.
+- [ ] Ao terminar: aviso, item em CONCLUÍDOS com "Abrir pasta"; o gerenciador de arquivos abre na pasta e nada é executado. O envio para (sem semear).
+- [ ] Reabrir o Tako com um download em andamento: ele volta pausado e continua ao retomar.
+- [ ] Durante um jogo com a janela minimizada, o download segue (confira o tamanho da pasta) e nada anima.

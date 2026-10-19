@@ -67,6 +67,11 @@ pub fn categories() -> Vec<Category> {
             rows: controls::rows,
         },
         Category {
+            id: "downloads",
+            icon: "download",
+            rows: super::downloads::settings_rows,
+        },
+        Category {
             id: "system",
             icon: "alert",
             rows: system,

@@ -252,15 +252,16 @@ async fn add(
     uri: &str,
     folder: &Path,
 ) -> Result<(), DownloadError> {
-    let engine = |e: String| DownloadError::Engine(e);
+    // Mensagens fixas: o texto dos erros de rede e do motor pode ter a URL, o hash ou caminhos (fora do log).
+    let engine = |e: &str| DownloadError::Engine(e.to_owned());
     let source = if uri.to_ascii_lowercase().starts_with("magnet:") {
         AddTorrent::from_url(uri.to_owned())
     } else {
         let url = uri.to_owned();
         let bytes = tokio::task::spawn_blocking(move || fetch_https(&url, MAX_TORRENT_BYTES))
             .await
-            .map_err(|e| engine(e.to_string()))?
-            .map_err(|e| engine(e.to_string()))?;
+            .map_err(|_| engine("não deu para baixar o .torrent"))?
+            .map_err(|_| engine("não deu para baixar o .torrent"))?;
         AddTorrent::from_bytes(bytes)
     };
     let listed = session
@@ -273,9 +274,9 @@ async fn add(
             }),
         )
         .await
-        .map_err(|e| engine(e.to_string()))?;
+        .map_err(|_| engine("não deu para ler o torrent"))?;
     let AddTorrentResponse::ListOnly(listed) = listed else {
-        return Err(engine("resposta inesperada do motor".into()));
+        return Err(engine("resposta inesperada do motor"));
     };
     let mut total = 0u64;
     for f in listed.info.iter_file_details() {
@@ -288,7 +289,7 @@ async fn add(
         }
         total = total.saturating_add(f.len);
     }
-    std::fs::create_dir_all(folder).map_err(|e| engine(e.to_string()))?;
+    std::fs::create_dir_all(folder).map_err(|_| engine("não deu para criar a pasta"))?;
     if let Some(free) = tako_platform::space::free_space(folder)
         && free.bytes < total
     {
@@ -312,9 +313,9 @@ async fn add(
             }),
         )
         .await
-        .map_err(|e| engine(e.to_string()))?;
+        .map_err(|_| engine("o motor não aceitou o torrent"))?;
     let Some(handle) = added.into_handle() else {
-        return Err(engine("o motor não aceitou o torrent".into()));
+        return Err(engine("o motor não aceitou o torrent"));
     };
     let removed = {
         let mut g = lock(state);

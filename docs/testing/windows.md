@@ -225,3 +225,14 @@ Precisa de Steam, Epic e GOG Galaxy com conta, e da chave da Web API da Steam em
 7. Jogo da conta em duas lojas (ex.: Steam e GOG) não instalado: as duas lojas aparecem como opção de instalar.
 8. O espaço livre mostrado é o do disco da Steam (biblioteca padrão) e bate com o Explorador de Arquivos; sem Steam, é o do `C:`.
    Com a Steam em outro disco (ex.: `D:\Steam`), mostra `D:`.
+
+## 21. Downloads por torrent (DL-001)
+
+- [ ] A pasta padrão é `Downloads\Tako` da pasta conhecida Downloads (também se ela foi movida para outro disco).
+- [ ] Configurações › Downloads vem desligado. Ligar mostra o aviso legal e de IP; Cancelar mantém desligado; "Entendi e aceito" liga e não pergunta de novo.
+- [ ] Adicionar fonte com `http://` é recusado; com uma fonte `https://` sua de teste (só itens fictícios ou de conteúdo livre), a linha mostra o número de itens. Remover apaga a fonte e o cache.
+- [ ] Num jogo não instalado, ⋯ › "Baixar de uma fonte" lista só itens parecidos; confirmar vincula ao jogo, a pílula "↓ N%" aparece antes do perfil e o jogo mostra o progresso na lista.
+- [ ] No painel: pausar para na hora (sem confirmação); cancelar pede confirmação e "Cancelar e apagar" remove a pasta. Com uma instalação da Steam em andamento, ela aparece em BAIXANDO "pela Steam" e os botões abrem o cliente.
+- [ ] Ao terminar: aviso, item em CONCLUÍDOS com "Abrir pasta"; o gerenciador de arquivos abre na pasta e nada é executado. O envio para (sem semear).
+- [ ] Reabrir o Tako com um download em andamento: ele volta pausado e continua ao retomar.
+- [ ] Durante um jogo com a janela minimizada, o download segue (confira o tamanho da pasta) e nada anima.

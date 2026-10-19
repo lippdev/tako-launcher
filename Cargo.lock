@@ -6546,6 +6546,7 @@ dependencies = [
  "slint-interpreter",
  "spin_on",
  "tako-core",
+ "tako-downloads",
  "tako-platform",
  "tako-sources",
  "tako-themes",

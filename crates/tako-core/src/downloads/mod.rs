@@ -395,12 +395,12 @@ impl Downloads {
 /// quem decide é o usuário.
 pub fn suggest<'a>(
     game_title: &str,
-    sources: &'a [(String, source::Source)],
+    sources: impl IntoIterator<Item = (&'a str, &'a source::Source)>,
     limit: usize,
 ) -> Vec<(&'a str, &'a source::SourceItem)> {
     let mut scored: Vec<(f64, &str, &source::SourceItem)> = sources
-        .iter()
-        .flat_map(|(name, s)| s.items.iter().map(move |i| (name.as_str(), i)))
+        .into_iter()
+        .flat_map(|(name, s)| s.items.iter().map(move |i| (name, i)))
         .map(|(n, i)| {
             (
                 crate::library::title_matcher::score(game_title, &i.title),
@@ -542,8 +542,7 @@ mod tests {
             .as_bytes(),
         )
         .unwrap();
-        let sources = vec![("F".to_owned(), src)];
-        let s = suggest("Jogo Exemplo", &sources, 5);
+        let s = suggest("Jogo Exemplo", [("F", &src)], 5);
         assert_eq!(s.len(), 1);
         assert_eq!(s[0].1.title, "Jogo Exemplo Deluxe Edition");
     }

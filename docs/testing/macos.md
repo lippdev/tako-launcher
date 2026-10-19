@@ -66,3 +66,14 @@ Valida a matriz da [ADR-0024](../adr/0024-matriz-de-plataforma.md). Rodar em App
 - [ ] Instalar em um jogo da conta Steam abre `steam://install/<appid>`; em até 3 s o jogo aparece "instalando" com a porcentagem e, ao terminar, vira instalado sozinho.
 - [ ] Cancelar a instalação na Steam: o jogo volta a "não instalado". Pausar: a porcentagem para.
 - [ ] O espaço livre mostrado é o do volume da Steam (`~/Library/Application Support/Steam`) e bate com o do Finder (Obter Informações do disco). No APFS o volume do sistema aparece como `/`.
+
+## Downloads por torrent (DL-001)
+
+- [ ] A pasta padrão é `~/Downloads/Tako`.
+- [ ] Configurações › Downloads vem desligado. Ligar mostra o aviso legal e de IP; Cancelar mantém desligado; "Entendi e aceito" liga e não pergunta de novo.
+- [ ] Adicionar fonte com `http://` é recusado; com uma fonte `https://` sua de teste (só itens fictícios ou de conteúdo livre), a linha mostra o número de itens. Remover apaga a fonte e o cache.
+- [ ] Num jogo não instalado, ⋯ › "Baixar de uma fonte" lista só itens parecidos; confirmar vincula ao jogo, a pílula "↓ N%" aparece antes do perfil e o jogo mostra o progresso na lista.
+- [ ] No painel: pausar para na hora (sem confirmação); cancelar pede confirmação e "Cancelar e apagar" remove a pasta. Com uma instalação da Steam em andamento, ela aparece em BAIXANDO "pela Steam" e os botões abrem o cliente.
+- [ ] Ao terminar: aviso, item em CONCLUÍDOS com "Abrir pasta"; o gerenciador de arquivos abre na pasta e nada é executado. O envio para (sem semear).
+- [ ] Reabrir o Tako com um download em andamento: ele volta pausado e continua ao retomar.
+- [ ] Durante um jogo com a janela minimizada, o download segue (confira o tamanho da pasta) e nada anima.
