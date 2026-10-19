@@ -57,9 +57,9 @@ A escolha definitiva do motor fica expressamente condicionada à realização de
 
 O Vosk é um motor de reconhecimento de fala de código aberto baseado no toolkit Kaldi, distribuído sob licença Apache-2.0.
 
-- **Modelos oficiais (Licença Apache-2.0):**
-  - pt-BR: `vosk-model-small-pt-0.3` (**31 MB** descompactado).
-  - en-US: `vosk-model-small-en-us-0.15` (~40 MB descompactado).
+- **Dois modelos oficiais selecionados (ambos Apache-2.0; a licença não se aplica automaticamente ao restante do catálogo):**
+  - pt-BR: `vosk-model-small-pt-0.3` (ZIP de aproximadamente **31 MiB**; arquivos extraídos somam **53.552.717 bytes**, aproximadamente 51 MiB).
+  - en-US: `vosk-model-small-en-us-0.15` (ZIP de aproximadamente **39 MiB**; arquivos extraídos somam **70.898.967 bytes**, aproximadamente 68 MiB).
 - **Taxa oficial de erro de palavras (Word Error Rate - WER):**
   - No modelo pt-BR pequeno (`vosk-model-small-pt-0.3`), os benchmarks oficiais reportam:
     - **68,9% de WER no corpus CORAA** (áudio espontâneo e conversacional);
@@ -82,8 +82,8 @@ Port em C/C++ da arquitetura OpenAI Whisper por Georgi Gerganov.
 
 - **Modelos:** modelo `tiny` (~75 MB) ou `base` (~140 MB).
 - **Prós:** motor de arquitetura neural contemporânea para fala natural; licença MIT; boa resiliência a sotaques.
+- **Gramáticas:** suporta restrição de saída por **GBNF desde a versão 1.5.0**, conforme a [release oficial](https://github.com/ggml-org/whisper.cpp/releases/tag/v1.5.0). A qualidade, o custo de inferência e a adequação a comandos curtos precisam ser comparados em experimento.
 - **Contras:**
-  - Não possui mecanismo nativo de restrição rígida de vocabulário ou gramática;
   - Latência de inferência e uso de memória: *a medir em hardware* (alta dependência de aceleração vetorial AVX/NEON na CPU, com sobrecarga estimada sensivelmente superior ao Kaldi em CPUs modestas);
   - Requer toolchain C++ pesado (CMake / compilador C++17) no ambiente de CI para os 3 SOs.
 
@@ -113,8 +113,8 @@ Motor tradicional de reconhecimento contínuo de fala (CMU Sphinx).
 | **Latência de resposta** | *a medir* | *a medir* | *a medir* | *a medir* |
 | **Uso de RAM / CPU** | *a medir* | *a medir* | Gerenciado pelo SO | Mínimo |
 | **Consistência nos 3 SOs** | Idêntica | Idêntica | Fragmentada | Idêntica |
-| **Tamanho dos modelos (pt-BR + en-US)** | ~71 MB total (pt-BR: 31 MB, en-US: ~40 MB) | ~150-280 MB | 0 MB no Tako (usa do SO) | ~60 MB |
-| **Licença do motor e modelos** | Apache-2.0 (código e modelos) | MIT | Proprietária do SO | BSD-2 |
+| **Tamanho dos modelos (pt-BR + en-US)** | ZIPs: ~70 MiB no total; extraídos: 124.451.684 bytes (~119 MiB) | ~150-280 MB | 0 MB no Tako (usa do SO) | ~60 MB |
+| **Licença do motor e modelos** | Apache-2.0 (código e os dois modelos selecionados) | MIT | Proprietária do SO | BSD-2 |
 | **Manutenção da crate Rust** | Risco: crate `vosk` 0.3.1 estagnada | Ativa (`whisper-rs`) | N/A (bindings nativos) | Estagnada |
 
 ---
@@ -124,7 +124,7 @@ Motor tradicional de reconhecimento contínuo de fala (CMU Sphinx).
 1. **Condicionamento a Experimento Real:** a adoção do Vosk com gramática dinâmica fica condicionada ao resultado do experimento prático com títulos reais da biblioteca e validação do algoritmo de contingência fonética.
 2. **Plano B de Contingência Fonética:** incorporar no `tako-core` rotinas de casamento aproximado (Levenshtein e Metaphone/Soundex) sobre a saída de texto livre para jogos com títulos fora do vocabulário do modelo.
 3. **Distribuição dos Modelos via Download Opt-in:**
-   - Os modelos acústicos oficiais Apache 2.0 (pt-BR de **31 MB** e en-US de ~40 MB) não virão embutidos no instalador.
+   - Os modelos acústicos oficiais Apache 2.0 (pt-BR com ZIP de **~31 MiB** e en-US de **~39 MiB**, exigindo juntos cerca de **119 MiB extraídos**) não virão embutidos no instalador.
    - O download ocorrerá sob demanda, estritamente *opt-in*, com confirmação prévia do usuário nas Configurações e conferência de integridade via **hash SHA-256**.
 4. **Isolamento de Código FFI e Áudio:**
    - Captura de áudio PCM via crate `cpal` e vinculação com `libvosk` restritas exclusivamente a **`tako-platform`**.
@@ -152,7 +152,11 @@ Motor tradicional de reconhecimento contínuo de fala (CMU Sphinx).
 ## Perguntas para o mantenedor
 
 1. **Aprovação do Vosk com Plano B e experimento:** O projeto aceita a adoção do Vosk mesmo com o descarte de nomes fora do vocabulário na gramática estrita, aprovando a estratégia de contingência com casamento fonético e exigindo o experimento prévio com títulos reais antes de codar?
-2. **Distribuição e integridade dos modelos:** Concorda com a distribuição dos modelos pt-BR (31 MB) e en-US (~40 MB) de forma estritamente *opt-in* sob demanda com confirmação do usuário e validação de hash SHA-256?
+2. **Distribuição e integridade dos modelos:** Concorda com a distribuição dos modelos pt-BR (ZIP ~31 MiB; extraído ~51 MiB) e en-US (ZIP ~39 MiB; extraído ~68 MiB) de forma estritamente *opt-in* sob demanda com confirmação do usuário e validação de hash SHA-256?
 3. **Modo de acionamento do microfone:** Preferir Push-to-Talk estrito (segurar botão no controle ou atalho no teclado enquanto fala) ou modo de alternância (clicar para iniciar escuta e parar por clique ou detecção de silêncio após 1.5 s)?
 4. **Empacotamento da `libvosk` no Linux:** Concorda com o empacotamento da `libvosk` compartilhada no Flatpak (`/app/lib/`) e via AUR?
 5. **Gerenciamento de idiomas em memória:** O reconhecimento deve carregar o modelo de acordo com o idioma da interface configurado no Tako ou manter ambos os modelos carregados em memória para comandos bilíngues instantâneos?
+
+## Fontes dos tamanhos
+
+[Catálogo oficial do Vosk](https://alphacephei.com/vosk/models). Os tamanhos extraídos acima são as somas dos tamanhos não comprimidos nas entradas dos ZIPs oficiais; não incluem metadados nem arredondamento de blocos do sistema de arquivos. São distintos de consumo de RAM, que continua a medir.

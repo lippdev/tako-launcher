@@ -41,17 +41,11 @@ No entanto, a API v2 pública pesquisa ativos por ID de jogo (`/games/id/...`, `
 
 A intenção original de interceptar links `sgdb://` gerados pelo botão BOOP do site esbarra em diferenças fundamentais na forma como cada sistema operacional gerencia manipuladores de protocolos personalizados:
 
-1. **Windows (Convivência pacífica possível):**
-   - No Registro do Windows (`HKCU\Software\Classes\sgdb\shell\open\command`), o instalador Inno Setup (`tako.iss`) pode inspecionar se já existe uma associação ativa para `sgdb://`.
-   - Se o SGDBoop oficial já estiver instalado, o Tako **não sobrescreve** a chave, preservando o aplicativo do usuário e registrando apenas o esquema nativo `tako://`. Caso o SGDBoop não esteja presente, o Tako pode assumir a manipulação de `sgdb://`.
-2. **Linux (Conflito direto em nível de sistema):**
-   - A associação de protocolos no Linux ocorre declarando `MimeType=x-scheme-handler/sgdb;` no arquivo `.desktop` e registrando no `mimeapps.list` do ambiente de desktop (XDG).
-   - Se o SGDBoop e o Tako estiverem ambos instalados, há um **conflito direto**: o ambiente gráfico atribui prioridade a apenas um deles. Não há como coexistir de forma cortês;
-   - **Com o SGDBoop instalado, o navegador abrirá o SGDBoop oficial.**
-3. **macOS (Conflito direto no LaunchServices):**
-   - No macOS, os esquemas são declarados na chave `CFBundleURLTypes` dentro do `Info.plist` do pacote `Tako.app`.
-   - Quando duas aplicações declaram manipular o mesmo protocolo (`sgdb://`), o LaunchServices da Apple não possui fallback condicional, roteando a ativação para um dos binários conforme a versão e data de registro.
-   - **Com o SGDBoop instalado, o sistema operacional abre o SGDBoop oficial.**
+Um esquema de URL tem um manipulador padrão por usuário, embora vários aplicativos possam se registrar como candidatos. A instalação do SGDBoop não garante que ele seja o padrão. A política proposta é preservar a escolha existente em todos os sistemas e pedir uma decisão explícita antes de alterá-la.
+
+1. **Windows:** consultar a associação efetiva, considerando os registros por usuário e por máquina. A visão combinada de `HKEY_CLASSES_ROOT` pode conter registros de ambos; escrever apenas em `HKCU` também pode disputar uma associação já existente. Ver [documentação da Microsoft](https://learn.microsoft.com/en-us/windows/win32/sysinfo/merged-view-of-hkey-classes-root).
+2. **Linux:** declarar `MimeType=x-scheme-handler/sgdb;` no `.desktop` registra um candidato; o aplicativo padrão é escolhido pelas regras XDG de `mimeapps.list`. É possível acrescentar um candidato preservando a preferência atual, sem forçar o Tako como padrão. Ver [especificação XDG](https://specifications.freedesktop.org/mime-apps/latest/default.html).
+3. **macOS:** `CFBundleURLTypes` declara os esquemas suportados; o LaunchServices mantém o manipulador padrão. Não presumir que a presença ou a data de instalação do SGDBoop determine o resultado, nem alterar a escolha sem consentimento. Ver [API da Apple para associação de esquema](https://developer.apple.com/documentation/coreservices/1447760-lssetdefaulthandlerforurlscheme).
 4. **Localização de código FFI e manipulação de SO:**
    - Todo código nativo para interceptação e escuta de eventos de URL do sistema operacional (como a captura de Apple Events via `NSAppleEventManager` no macOS, conforme viabilizado no EXT-005 / PR #130) reside **estritamente em `tako-platform`**.
 
@@ -78,8 +72,8 @@ A intenção original de interceptar links `sgdb://` gerados pelo botão BOOP do
    - Registrar expressamente o risco de que, se um token de aplicativo for concedido e injetado no CI, ele **poderá ser extraído do binário final compilado** (idêntico à ADR-0022).
 3. **Política de Registro de Protocolos:**
    - Registrar incondicionalmente o protocolo nativo `tako://` em todos os sistemas operacionais.
-   - **Windows:** registrar `sgdb://` apenas se o SGDBoop oficial não estiver associado no Registro.
-   - **Linux e macOS:** reconhecer que o registro de `sgdb://` conflita diretamente com o SGDBoop oficial instalado e submeter ao mantenedor a decisão de registrá-lo ou restringir-se ao protocolo próprio `tako://`.
+   - **Todos os sistemas:** preservar o manipulador padrão existente de `sgdb://`, independentemente de qual aplicativo seja.
+   - Submeter ao mantenedor a decisão de oferecer o Tako como candidato a `sgdb://` ou restringir-se a `tako://`; mudar o padrão exige escolha explícita do usuário.
 4. **Salvaguardas de Aplicação e Isolamento de FFI:**
    - Todo FFI e integração de SO (Apple Events no macOS) fica isolado em **`tako-platform`**.
    - Validação estrita de CDN: apenas imagens originadas de `https://cdn2.steamgriddb.com/` são baixadas.
@@ -91,14 +85,14 @@ A intenção original de interceptar links `sgdb://` gerados pelo botão BOOP do
 ## Consequências
 
 - O recurso permanece desativado na branch principal até que o teste da chave pessoal seja realizado e as tratativas com o SteamGridDB sejam consolidadas.
-- Caso o usuário tenha o SGDBoop oficial instalado, no Linux e macOS o botão BOOP acionará o SGDBoop, mantendo a integridade da ferramenta pré-instalada.
+- O botão BOOP aciona o manipulador padrão escolhido pelo usuário; o Tako não toma a associação de outro aplicativo silenciosamente.
 - O código do Tako permanece transparente e auditável, sem embutimento não autorizado de credenciais de terceiros.
 
 ---
 
 ## Perguntas para o mantenedor
 
-1. **Registro do `sgdb://` no Linux e no macOS:** Diante do conflito direto com o SGDBoop oficial no Linux (`.desktop` / `mimeapps.list`) e no macOS (`CFBundleURLTypes`), o projeto deve registrar o protocolo `sgdb://` nesses sistemas (assumindo o conflito caso o SGDBoop esteja instalado) ou registrar apenas o protocolo proprietário `tako://`?
+1. **Registro do `sgdb://`:** O projeto deve oferecer o Tako como candidato nos três sistemas, preservando o manipulador padrão e exigindo escolha explícita para alterá-lo, ou registrar apenas `tako://`?
 2. **Teste da chave pessoal e contato oficial:** Quem testará a chave pessoal na rota `/api/sgdboop/` (o mantenedor dispõe de chave ativa para validação imediata) e quem fará o contato formal com a equipe do SteamGridDB para tratar do token dedicado ou rota pública?
 3. **Aceite do risco de extração do token no CI:** Caso o SteamGridDB forneça um token de aplicativo exclusivo para o Tako, o projeto aceita o risco conhecido (idêntico ao da ADR-0022 para o ScreenScraper) de que o segredo injetado durante o build de CI acabará embutido no binário executável final e poderá ser extraído por engenharia reversa?
 4. **Disponibilização de Userscript Comunitário:** Vale a pena disponibilizar um userscript comunitário no repositório (`tools/takoboop.user.js`) para usuários que queiram usar o botão com o protocolo `tako://` diretamente, contornando qualquer conflito de sistema?
