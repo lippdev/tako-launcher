@@ -90,7 +90,10 @@ pub fn load_safe_image(path: &Path) -> Option<slint::Image> {
     reader.limits(limits);
     let img = reader.decode().ok()?;
     let img = if img.width() > 3840 || img.height() > 3840 {
-        img.resize(3840, 3840, image::imageops::FilterType::Triangle)
+        let small = img.resize(3840, 3840, image::imageops::FilterType::Triangle);
+        // Solta a original antes de converter: o pico fica em uma cópia grande, não duas.
+        drop(img);
+        small
     } else {
         img
     };

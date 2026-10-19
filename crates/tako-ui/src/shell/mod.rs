@@ -321,7 +321,7 @@ impl Shell {
                 return;
             }
             if route == "desk:profile:sessions" {
-                self.layers.clear();
+                self.close_layers();
                 self.pages.truncate(1);
                 let mut p = profile::ProfilePage::new();
                 p.open_tab(profile::Tab::Sessions);
@@ -343,7 +343,7 @@ impl Shell {
             _ => return,
         };
         self.pages = vec![page];
-        self.layers.clear();
+        self.close_layers();
         self.sidebar.focus = None;
         self.ctx.dirty = true;
     }
@@ -651,7 +651,7 @@ impl Shell {
             self.layers.push(l);
         }
         if let Some(id) = self.ctx.open_details.take() {
-            self.layers.clear();
+            self.close_layers();
             if self.ctx.desktop {
                 // O desktop mostra os detalhes no destaque da biblioteca.
                 self.pages.truncate(1);
@@ -664,7 +664,7 @@ impl Shell {
             self.open_route(&route);
         }
         if std::mem::take(&mut self.ctx.leave_details) && self.page().kind() == "details" {
-            self.layers.clear();
+            self.close_layers();
             self.apply_nav_inner(Nav::Back);
         }
     }
