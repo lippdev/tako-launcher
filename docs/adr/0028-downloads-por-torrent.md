@@ -35,7 +35,7 @@ O ponto difícil é o "instalado e jogável": a maioria dos torrents de jogos tr
 
 Recomendado: **`librqbit`** (Rust puro, Apache-2.0, compatível com AGPL-3.0): leitura de magnet, DHT, seleção de arquivos, pausa/retomada, verificação de partes, API de progresso. Custo: traz o `tokio` (hoje o workspace não tem runtime assíncrono); ele roda numa thread própria do módulo de downloads, com canal simples para a UI, sem espalhar `async` pelo resto. Entra em `[workspace.dependencies]` e em um crate novo `tako-downloads` (depende de `tako-core`; a UI só conversa por um trait de `tako_core`, com versão em memória para testes, como em `devices`). Antes de aceitar a dependência: conferir licença da árvore (`cargo deny`), tamanho do binário e manutenção ativa.
 
-Sem recursos de risco: só a porta UDP do DHT, sem porta TCP de escuta e sem UPnP, sem execução de scripts ou plugins, sem "seed depois de concluir" por padrão (seção 7).
+Sem recursos de risco: só a porta UDP do DHT, sem porta TCP de escuta e sem UPnP, sem execução de scripts ou plugins, sem semear depois de concluir (seção 7).
 
 ### 3. Onde salva
 
