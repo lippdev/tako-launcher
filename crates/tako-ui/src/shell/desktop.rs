@@ -388,12 +388,8 @@ impl Default for DesktopLibrary {
     }
 }
 
-pub(crate) fn game_card_accent(ctx: &Ctx, game_accent: &str) -> slint::Color {
-    if let Some(custom) = crate::theme::custom_theme_accent(ctx) {
-        slint::Color::from_rgb_u8(custom.r, custom.g, custom.b)
-    } else {
-        parse_color(game_accent)
-    }
+pub(crate) fn game_card_accent(_ctx: &Ctx, game_accent: &str) -> slint::Color {
+    parse_color(game_accent)
 }
 
 impl DesktopLibrary {

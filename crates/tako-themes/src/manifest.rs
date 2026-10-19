@@ -134,11 +134,23 @@ pub fn wav_duration(path: &std::path::Path) -> Option<f64> {
     wav_duration_from_reader(&mut reader)
 }
 
-/// Calcula a duração em segundos de um arquivo WAV a partir de um leitor que suporte `Read + Seek`.
-/// Lê apenas os 16 bytes necessários do chunk `fmt ` e pula o restante com `seek`, sem alocar memória
-/// com base no tamanho informado no arquivo. Chunks com tamanho excessivo (> 64 MB) são recusados.
-pub fn wav_duration_from_reader<R: std::io::Read + std::io::Seek>(reader: &mut R) -> Option<f64> {
-    use std::io::SeekFrom;
+/// Calcula a duração em segundos de um WAV lendo em sequência, sem alocar pelo tamanho declarado.
+/// Chunks de metadados excessivos (> 64 MB) são recusados.
+pub fn wav_duration_from_reader<R: std::io::Read>(reader: &mut R) -> Option<f64> {
+    use std::io::Read;
+
+    fn discard(reader: &mut impl Read, mut bytes: u64) -> Option<()> {
+        let mut buf = [0; 8192];
+        while bytes > 0 {
+            let len = bytes.min(buf.len() as u64) as usize;
+            let count = reader.read(&mut buf[..len]).ok()?;
+            if count == 0 {
+                return None;
+            }
+            bytes -= count as u64;
+        }
+        Some(())
+    }
     let mut header = [0u8; 12];
     reader.read_exact(&mut header).ok()?;
     if &header[0..4] != b"RIFF" || &header[8..12] != b"WAVE" {
@@ -168,28 +180,19 @@ pub fn wav_duration_from_reader<R: std::io::Read + std::io::Seek>(reader: &mut R
             reader.read_exact(&mut fmt_16).ok()?;
             byte_rate = u32::from_le_bytes([fmt_16[8], fmt_16[9], fmt_16[10], fmt_16[11]]);
             found_fmt = true;
-            let remaining = (chunk_size - 16) as i64 + (chunk_size & 1) as i64;
-            if remaining > 0 && reader.seek(SeekFrom::Current(remaining)).is_err() {
-                return None;
-            }
+            discard(reader, (chunk_size - 16) as u64 + (chunk_size & 1) as u64)?;
         } else if chunk_id == b"data" {
             data_len = chunk_size;
             found_data = true;
             if found_fmt {
                 break;
             }
-            let skip = chunk_size as i64 + (chunk_size & 1) as i64;
-            if reader.seek(SeekFrom::Current(skip)).is_err() {
-                break;
-            }
+            discard(reader, chunk_size as u64 + (chunk_size & 1) as u64)?;
         } else {
             if chunk_size > MAX_METADATA_CHUNK_SIZE {
                 return None;
             }
-            let skip = (chunk_size + (chunk_size & 1)) as i64;
-            if reader.seek(SeekFrom::Current(skip)).is_err() {
-                break;
-            }
+            discard(reader, chunk_size as u64 + (chunk_size & 1) as u64)?;
         }
         if found_fmt && found_data {
             break;
