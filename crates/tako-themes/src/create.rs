@@ -11,18 +11,14 @@ use crate::{DEFAULT_THEME_ID, InstalledTheme, Problem};
 
 pub const MAX_NAME_LEN: usize = 50;
 
-/// Identificadores de temas reservados pelo sistema (embutidos e extras).
-pub const RESERVED_THEME_IDS: &[&str] = &[
-    DEFAULT_THEME_ID,
-    "tako-default",
-    "tako-fita",
-    "tako-alto-contraste",
-];
+/// Id do tema embutido (a pasta `theme/` do app), fora de `BUILTIN_EXTRA_THEME_IDS`.
+const BUILTIN_DEFAULT_THEME_ID: &str = "tako-default";
 
-/// Confere se um identificador é reservado pelo Tako.
+/// Confere se um identificador é reservado pelo Tako: o padrão, o embutido e os extras que o app regrava.
 pub fn is_reserved_theme_id(id: &str) -> bool {
-    RESERVED_THEME_IDS
+    [DEFAULT_THEME_ID, BUILTIN_DEFAULT_THEME_ID]
         .iter()
+        .chain(crate::BUILTIN_EXTRA_THEME_IDS.iter())
         .any(|r| r.eq_ignore_ascii_case(id))
 }
 

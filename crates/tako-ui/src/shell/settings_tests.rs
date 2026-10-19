@@ -1300,7 +1300,8 @@ fn edit_theme_hides_font_and_background_for_themes_that_do_not_use_them() {
     ctx.theme_supports_font = false;
     ctx.theme_supports_background = false;
 
-    let rows = edit_theme_panel(&ctx).items(&ctx);
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
     assert!(rows.iter().any(|item| item.row.key == "accent"));
     assert!(rows.iter().any(|item| item.row.key == "save"));
     assert!(!rows.iter().any(|item| item.row.key == "font"));
