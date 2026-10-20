@@ -169,49 +169,49 @@ fn collection_tab_only_focuses_the_row() {
 #[test]
 fn hero_actions_keep_the_presented_game_in_both_themes() {
     let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    for theme in ["default", "tako-fita"] {
-        std::thread::spawn(move || {
-            let mut f = Fixture::new(theme);
-            f.draw(1280, 720);
-            let first = f.shell.focused_game();
-            f.shell.hover("row-0", 1);
-            let selected = f.shell.focused_game();
-            assert_ne!(selected, first);
-            f.shell.hover("hero", 1);
-            assert_eq!(
-                f.shell.focused_game(),
-                selected,
-                "{theme}: hover mantém a prévia"
-            );
-            f.shell.click("hero", 1);
-            assert_eq!(f.shell.page().kind(), "details");
-            assert_eq!(f.shell.focused_game(), selected);
-            f.shell.handle(Cmd::Back);
-            f.shell.ctx.running = Some(crate::shell::RunningGame {
-                id: selected.clone().unwrap(),
-                title: "Jogo selecionado".into(),
-                pid: None,
-                started: None,
-            });
-            f.shell.hover("row-0", 1);
-            f.shell.click("hero", 0);
-            assert!(
-                f.shell
-                    .ctx
-                    .effects
-                    .iter()
-                    .any(|e| matches!(e, crate::shell::Effect::ResumeGame))
-            );
-            assert!(!f.shell.has_layers());
-            assert_eq!(
-                f.shell.focused_game(),
-                selected,
-                "{theme}: ação primária mantém o alvo"
-            );
-        })
-        .join()
-        .unwrap();
-    }
+    // Só o Fita (`hero-keep`) mantém o jogo apresentado; o tema padrão segue como antes.
+    let theme = "tako-fita";
+    std::thread::spawn(move || {
+        let mut f = Fixture::new(theme);
+        f.draw(1280, 720);
+        let first = f.shell.focused_game();
+        f.shell.hover("row-0", 1);
+        let selected = f.shell.focused_game();
+        assert_ne!(selected, first);
+        f.shell.hover("hero-keep", 1);
+        assert_eq!(
+            f.shell.focused_game(),
+            selected,
+            "{theme}: hover mantém a prévia"
+        );
+        f.shell.click("hero-keep", 1);
+        assert_eq!(f.shell.page().kind(), "details");
+        assert_eq!(f.shell.focused_game(), selected);
+        f.shell.handle(Cmd::Back);
+        f.shell.ctx.running = Some(crate::shell::RunningGame {
+            id: selected.clone().unwrap(),
+            title: "Jogo selecionado".into(),
+            pid: None,
+            started: None,
+        });
+        f.shell.hover("row-0", 1);
+        f.shell.click("hero-keep", 0);
+        assert!(
+            f.shell
+                .ctx
+                .effects
+                .iter()
+                .any(|e| matches!(e, crate::shell::Effect::ResumeGame))
+        );
+        assert!(!f.shell.has_layers());
+        assert_eq!(
+            f.shell.focused_game(),
+            selected,
+            "{theme}: ação primária mantém o alvo"
+        );
+    })
+    .join()
+    .unwrap();
 }
 
 #[test]
@@ -427,7 +427,7 @@ fn details_icon_uses_game_accessibility_data_without_a_language_literal() {
     assert!(!source.contains("\"Detalhes\""));
     assert!(source.contains("accessible-label: hero.title;"));
     assert!(source.contains("accessible-description: hero.meta;"));
-    assert!(info.contains("root.clicked(\"hero\", 1)"));
+    assert!(info.contains("root.clicked(\"hero-keep\", 1)"));
 }
 
 #[test]
@@ -608,6 +608,23 @@ fn fita_settings_gap_between_header_and_next_row() {
             gap <= 40,
             "vão entre cabeçalho Modo e linha seguinte deve ser reduzido e menor que 40px: {gap}px"
         );
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
+fn default_theme_hero_hover_keeps_the_old_behavior() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let mut f = Fixture::new("default");
+        f.draw(1280, 720);
+        let first = f.shell.focused_game();
+        f.shell.hover("row-0", 1);
+        assert_ne!(f.shell.focused_game(), first);
+        // No tema padrão, voltar ao destaque mostra de novo o jogo do destaque.
+        f.shell.hover("hero", 1);
+        assert_eq!(f.shell.focused_game(), first);
     })
     .join()
     .unwrap();
