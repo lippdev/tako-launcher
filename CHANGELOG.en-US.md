@@ -5,6 +5,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 ## [Unreleased]
 ### What's new
 - **ScreenScraper with your developer account:** anyone with ScreenScraper developer credentials can enter them in Settings and use ScreenScraper even on builds that don't include them.
+- **Windows full screen mode:** use Tako as the home app from Settings.
 - **Torrent downloads:** download games from sources you add yourself, in a panel with pause, resume and a queue. Off by default.
 - **Games not installed:** games from your store accounts that aren't on this PC show up after the installed ones, grouped by store, in the list and the grid. Each group opens and closes, and Tako remembers how you left it.
 - **Install from the store:** the ⬇ button on the row, the cover and the highlight opens the install in the store client, showing the store and the size. Games bought in more than one store let you pick which to install from.
@@ -33,6 +34,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 - **Refresh library:** a new button on the desktop list bar rescans the stores right away.
 ### Fixes
+- **Step instructions:** appear one per line.
 - **Faster startup:** the whole library shows up as soon as Tako opens, from the last store scan, while a fresh scan runs in the background.
 - **Selected game art:** the background and logo now change with the game, installed or not. Steam art opens straight from Steam's own cache, the last game you picked loads first, and Tako no longer holds the previous game's art while the new one arrives. Covers and backgrounds that fail on a slow network are retried, on desktop and in full screen, without restarting.
 - **Steam icons:** Steam game icons show up again in the list and the image picker. Steam moved them and the old address stopped answering.

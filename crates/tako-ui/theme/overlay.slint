@@ -146,7 +146,7 @@ export component OverlayView inherits Rectangle {
                 spacing: 12 * Ui.u;
                 if ov.overline != "": Overline { text: ov.overline; }
                 Text { text: ov.title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; wrap: word-wrap; }
-                if ov.text != "": Text { text: ov.text; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; wrap: word-wrap; }
+                if ov.text != "": Text { text: ov.text; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; horizontal-alignment: left; line-height-factor: 1.25; wrap: word-wrap; }
                 Rectangle { height: 12 * Ui.u; }
                 RowList {
                     vertical-stretch: 1;

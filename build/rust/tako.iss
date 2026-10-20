@@ -106,6 +106,9 @@ begin
   Result := WizardSilent and (ExpandConstant('{param:NOLAUNCH|0}') = '0');
 end;
 
+[UninstallRun]
+Filename: "{app}\{#AppExe}"; Parameters: "--fse-setup disable"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "RestoreFse"
+
 [UninstallDelete]
 Type: files; Name: "{app}\Tako.installed"
 ; User data in %LOCALAPPDATA%\Tako (library, caches) is kept on purpose.

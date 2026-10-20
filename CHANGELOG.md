@@ -5,6 +5,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 ## [Unreleased]
 ### Novidades
 - **ScreenScraper com a sua conta de desenvolvedor:** quem tem credenciais de desenvolvedor do ScreenScraper pode colocá-las nas Configurações e usar o ScreenScraper mesmo em versões que não as trazem.
+- **Modo tela cheia do Windows:** use o Tako como tela inicial nas Configurações.
 - **Downloads por torrent:** baixe jogos das fontes que você mesmo adiciona, num painel com pausa, retomada e fila. Vem desligado.
 - **Jogos não instalados:** os jogos da sua conta nas lojas que não estão no PC aparecem depois dos instalados, agrupados por loja, na lista e na grade. Cada grupo abre e fecha, e o Tako lembra como você deixou.
 - **Instalar pela loja:** o botão ⬇ na linha, na capa e no destaque abre a instalação no cliente da loja, mostrando a loja e o tamanho. Jogo comprado em mais de uma loja deixa escolher por qual instalar.
@@ -33,6 +34,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 - **Atualizar biblioteca:** botão novo na barra da lista do desktop relê as lojas na hora.
 ### Correções
+- **Instruções em passos:** aparecem uma por linha.
 - **Abertura mais rápida:** a biblioteca aparece inteira assim que o Tako abre, com a última leitura das lojas, enquanto a leitura nova roda por trás.
 - **Arte do jogo escolhido:** o fundo e o logo agora trocam junto com o jogo, instalado ou não. A arte da Steam abre direto do cache da própria Steam, o jogo escolhido por último carrega primeiro e o Tako não segura mais a arte do jogo anterior enquanto a nova chega. Capas e fundos que falharem por rede lenta são tentados de novo, no desktop e na tela cheia, sem precisar reiniciar.
 - **Ícones da Steam:** os ícones dos jogos da Steam voltaram a aparecer na lista e no seletor de imagens. A Steam mudou o endereço deles e o antigo deixou de responder.
