@@ -143,7 +143,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
     let found: Arc<Mutex<Vec<Game>>> = Arc::new(Mutex::new(if simulate {
         crate::demo::games()
     } else {
-        Vec::new()
+        load_found(&found_snapshot(&paths))
     }));
     let discover_from = found.clone();
     let mut library = GameLibrary::new(
@@ -257,7 +257,17 @@ pub(crate) static SCAN_PROGRESS: AtomicU32 = AtomicU32::new(0);
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar. `force`: busca a lista de jogos da conta
 /// Steam agora, sem esperar o cache de 1 hora (abrir o Tako e "Procurar jogos instalados").
 pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
-    let (found, disabled, simulate, steam_key, steam_cache, emulators, exe_icons, manual_targets) = {
+    let (
+        found,
+        disabled,
+        simulate,
+        steam_key,
+        steam_cache,
+        emulators,
+        exe_icons,
+        manual_targets,
+        snapshot,
+    ) = {
         let mut s = shell.borrow_mut();
         if s.ctx.scanning || s.ctx.restoring {
             if s.ctx.restoring {
@@ -294,6 +304,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
             crate::sources::emulator_config(&s.ctx.settings),
             s.ctx.paths.cache().join("exe-icons"),
             manual_targets,
+            found_snapshot(&s.ctx.paths),
         )
     };
     std::thread::Builder::new()
@@ -314,6 +325,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                 steam_owned,
                 emulators,
                 &exe_icons,
+                &snapshot,
             );
             if !simulate {
                 for exe in &manual_targets {
@@ -423,6 +435,7 @@ fn scan_into(
     steam_owned: Option<PathBuf>,
     emulators: tako_sources::emulators::Config,
     exe_icons: &std::path::Path,
+    snapshot: &std::path::Path,
 ) -> Vec<tako_sources::report::LibrarySourceReport> {
     if simulate {
         return Vec::new();
@@ -436,10 +449,28 @@ fn scan_into(
             SCAN_PROGRESS.store((done * 1000 / total.max(1)) as u32, Ordering::Relaxed);
         },
     );
+    if let Ok(json) = serde_json::to_vec(&games)
+        && let Err(e) = tako_core::metadata::cache::write_cache_file(snapshot, &json)
+    {
+        tracing::warn!("não foi possível guardar a última leitura das lojas: {e}");
+    }
     if let Ok(mut f) = found.lock() {
         *f = games;
     }
     reports
+}
+
+/// Última leitura das lojas, guardada para a biblioteca aparecer inteira ao abrir enquanto a leitura nova roda.
+fn found_snapshot(paths: &DataPaths) -> PathBuf {
+    paths.cache().join("found-games.json")
+}
+
+/// Jogos da última leitura; vazio sem arquivo ou com arquivo quebrado (a leitura nova o substitui).
+fn load_found(path: &std::path::Path) -> Vec<Game> {
+    std::fs::read(path)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
 }
 
 /// LIB-005: mede a pasta dos jogos sem tamanho da loja (depois da biblioteca já aparecer) e atualiza a biblioteca
@@ -2060,11 +2091,29 @@ mod tests {
                 true,
                 None,
                 Default::default(),
+                std::path::Path::new(""),
                 std::path::Path::new("")
             )
             .is_empty()
         );
         assert_eq!(found.lock().unwrap().len(), 1000);
+    }
+
+    /// A biblioteca abre com a última leitura das lojas; arquivo quebrado ou ausente não impede a abertura.
+    #[test]
+    fn last_store_scan_is_loaded_at_startup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("found-games.json");
+        assert!(load_found(&path).is_empty());
+        let games = vec![Game {
+            id: "steam:570".into(),
+            title: "Dota 2".into(),
+            ..Default::default()
+        }];
+        std::fs::write(&path, serde_json::to_vec(&games).unwrap()).unwrap();
+        assert_eq!(load_found(&path), games);
+        std::fs::write(&path, "{ quebrado").unwrap();
+        assert!(load_found(&path).is_empty());
     }
 
     #[test]

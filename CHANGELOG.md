@@ -32,6 +32,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 - **Atualizar biblioteca:** botão novo na barra da lista do desktop relê as lojas na hora.
 ### Correções
+- **Abertura mais rápida:** a biblioteca aparece inteira assim que o Tako abre, com a última leitura das lojas, enquanto a leitura nova roda por trás.
 - **Arte do jogo escolhido:** o fundo e o logo agora trocam junto com o jogo, instalado ou não. A arte da Steam abre direto do cache da própria Steam, o jogo escolhido por último carrega primeiro e o Tako não segura mais a arte do jogo anterior enquanto a nova chega. Capas e fundos que falharem por rede lenta são tentados de novo, no desktop e na tela cheia, sem precisar reiniciar.
 - **Confirmação de argumentos e variáveis:** argumentos extras, variáveis de ambiente e Proton/Wine definidos por jogo agora entram na confirmação, junto dos comandos antes e depois; quem já usava confirma uma vez.
 - **Lista lenta e imagens que não carregavam (alpha.15):** os ícones da lista têm fila própria e não seguram mais as capas e os fundos; a interface só redesenha quando uma imagem chega, e arte que a loja não tem não é pedida de novo a cada abertura.
