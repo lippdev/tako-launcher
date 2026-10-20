@@ -26,6 +26,8 @@ $env:TAKO_VERSION = $Version
 cargo build --release --locked -p tako --target $triple
 if ($LASTEXITCODE -ne 0) { throw "cargo build falhou" }
 
+# FSE-001: manifesto, SCCD e logo são include_str!/include_bytes! no tako-platform.
+# Instalador e portable carregam os mesmos recursos; extração local só ao ativar.
 $exe = Join-Path $root "target\$triple\release\tako.exe"
 # Tako.exe (maiúsculo), como nas alphas: atalhos e a chave Run continuam valendo.
 Copy-Item -LiteralPath $exe -Destination (Join-Path $stage "Tako.exe") -Force

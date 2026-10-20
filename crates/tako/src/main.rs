@@ -198,7 +198,7 @@ fn main() {
     });
     let running =
         value(&all, "--running").map(|id| (id, value(&all, "--running-title").unwrap_or_default()));
-    // Desktop por padrão; `--big-picture` (modo Xbox/AnyFSE), `--console-session` ou o supervisor decidem (ADR-0027).
+    // Desktop por padrão; `--big-picture` (modo Xbox), `--console-session` ou o supervisor decidem (ADR-0027).
     let start = tako_ui::mode::start(&all);
     let opts = UiOptions {
         link,

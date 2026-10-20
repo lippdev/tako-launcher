@@ -202,39 +202,71 @@ fn update_toggle(
     })
 }
 
-/// Modo Xbox do Windows 11 pelo AnyFSE (PLAT-007): diz se está instalado e ensina a pôr o Tako como app inicial.
-#[cfg(windows)]
 fn xbox_mode_row(ctx: &Ctx) -> MenuItem {
-    let installed = tako_platform::windows::anyfse::installed();
     MenuItem::new(
         PanelRow::action("xbox-mode", ctx.t("settings.general.xbox_mode"))
-            .desc(ctx.t("settings.general.xbox_mode_desc"))
-            .value(ctx.t(if installed {
-                "settings.general.anyfse_installed"
-            } else {
-                "settings.general.anyfse_missing"
-            })),
+            .desc(ctx.t("settings.general.xbox_mode_desc")),
     )
     .on(|ctx| Flow::Push(Box::new(xbox_mode_panel(ctx))))
 }
 
-#[cfg(windows)]
 fn xbox_mode_panel(ctx: &Ctx) -> MenuLayer {
-    let exe = std::env::current_exe()
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_default();
     MenuLayer::panel(ctx.t("settings.general.xbox_mode"), |ctx| {
+        let status = cached(
+            "fse-status",
+            Duration::from_secs(30),
+            tako_platform::fse::status,
+        );
+        let recovering = status == Ok(tako_platform::fse::Status::RecoveryRequired);
+        let enabled = status == Ok(tako_platform::fse::Status::Enabled);
+        let available = matches!(
+            status,
+            Ok(tako_platform::fse::Status::Enabled
+                | tako_platform::fse::Status::Disabled
+                | tako_platform::fse::Status::RecoveryRequired)
+        );
+        let key = if enabled {
+            "fse_on"
+        } else if available {
+            "fse_off"
+        } else {
+            "fse_unavailable"
+        };
         vec![
             MenuItem::new(
-                PanelRow::action("page", ctx.t("settings.general.anyfse_page"))
-                    .value("github.com/ashpynov/AnyFSE"),
+                (if recovering {
+                    PanelRow::button("fse", ctx.t("settings.general.fse_recover"))
+                } else {
+                    PanelRow::toggle("fse", ctx.t("settings.general.fse_toggle"), enabled)
+                })
+                .desc(ctx.t(&format!("settings.general.{key}"))),
             )
-            .on(effect(Effect::OpenUrl(
-                tako_platform::windows::anyfse::PAGE.into(),
-            ))),
+            .on(move |ctx| {
+                if !available {
+                    ctx.toast(ctx.t("settings.general.fse_unavailable"));
+                    return Flow::Stay;
+                }
+                crate::tasks::run(
+                    ctx,
+                    move || {
+                        if enabled || recovering {
+                            tako_platform::fse::disable()
+                        } else {
+                            tako_platform::fse::enable()
+                        }
+                    },
+                    |ctx, result| {
+                        forget("fse-status");
+                        if let Err(error) = result {
+                            ctx.toast(error);
+                        }
+                    },
+                );
+                Flow::Stay
+            }),
         ]
     })
-    .text(ctx.tf("settings.general.xbox_mode_steps", &[("exe", &exe)]))
+    .text(ctx.t("settings.general.fse_notice"))
 }
 
 fn general(ctx: &Ctx) -> Vec<MenuItem> {
@@ -326,8 +358,7 @@ fn general(ctx: &Ctx) -> Vec<MenuItem> {
             |p| p.nightly = !p.nightly,
         ),
     ]);
-    // Antes de "Abrir o Tako ao entrar no sistema" (só no Windows).
-    #[cfg(windows)]
+    // Antes de "Abrir o Tako ao entrar no sistema", quando presente.
     {
         let at = v
             .iter()

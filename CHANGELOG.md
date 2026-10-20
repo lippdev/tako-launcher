@@ -4,6 +4,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 ### Novidades
+- Use o Tako como tela inicial do modo tela cheia do Windows nas Configurações.
 - **Downloads por torrent:** baixe jogos das fontes que você mesmo adiciona, num painel com pausa, retomada e fila. Vem desligado.
 - **Jogos não instalados:** os jogos da sua conta nas lojas que não estão no PC aparecem depois dos instalados, agrupados por loja, na lista e na grade. Cada grupo abre e fecha, e o Tako lembra como você deixou.
 - **Instalar pela loja:** o botão ⬇ na linha, na capa e no destaque abre a instalação no cliente da loja, mostrando a loja e o tamanho. Jogo comprado em mais de uma loja deixa escolher por qual instalar.

@@ -79,7 +79,7 @@ pub mod args {
     /// Abre a UI direto, sem supervisor (diagnóstico).
     pub const NO_SUPERVISOR: &str = "--no-supervisor";
     pub const SAFE_MODE: &str = "--safe-mode";
-    /// Abre direto na tela cheia, sem perguntar (modo Xbox pelo AnyFSE, atalhos do usuário). ADR-0027.
+    /// Abre direto na tela cheia, sem perguntar (modo Xbox, atalhos do usuário). ADR-0027.
     pub const BIG_PICTURE: &str = "--big-picture";
     /// Aberto pelo Console Mode (ADR-0025, CMI-004): também vai direto para a tela cheia.
     pub const CONSOLE_SESSION: &str = "--console-session";
