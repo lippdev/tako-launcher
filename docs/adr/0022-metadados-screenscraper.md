@@ -40,7 +40,7 @@ Ainda não existe importador de ROMs (épico EMU) nem como abrir um jogo no emul
    quiser (é o modelo do ScreenScraper para todos os scrapers); se forem abusadas, os mantenedores pedem outras e só a
    próxima release muda. Valores com `;` ou `%` precisam ser escapados para o MSBuild (`%3B`, `%25`).
 
-   Desde 2026-10-20, o usuário pode informar credenciais de software próprias quando o build não as tiver (guardadas cifradas como a conta). As credenciais do build continuam tendo prioridade quando presentes.
+   Desde 2026-10-20, o usuário pode informar credenciais de software próprias quando o build não as tiver (guardadas cifradas como a conta). As credenciais do build continuam tendo prioridade quando presentes. O `dev_id` e o `dev_password` informados pelo usuário também ficam fora de `ssmedia://` e da chave do cache.
 3. **Consultas** (`ScreenScraperClient`, `GET https://api.screenscraper.fr/api2/{endpoint}.php`, `output=json`):
    - por hash: `jeuInfos.php` com `systemeid`, `romtype` (`rom` ou `iso`), `romnom`, `romtaille` e os hashes calculados;
    - por nome (fallback e "Corrigir correspondência"): `jeuRecherche.php` com `systemeid` e `recherche`;

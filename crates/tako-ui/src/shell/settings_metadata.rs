@@ -368,11 +368,10 @@ fn screenscraper_panel(ctx: &Ctx) -> MenuLayer {
             ),
         ];
         if !ScreenScraperSoftware::from_build().is_available() {
-            rows.push(MenuItem::new(PanelRow::info(
-                "dev_info",
-                ctx.t("settings.metadata.ss_dev_desc"),
-                "",
-            )));
+            rows.push(MenuItem::new(
+                PanelRow::info("dev_info", ctx.t("settings.metadata.ss_dev_title"), "")
+                    .desc(ctx.t("settings.metadata.ss_dev_desc")),
+            ));
             rows.push(field(
                 ctx,
                 "dev_id",

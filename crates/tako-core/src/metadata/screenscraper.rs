@@ -129,18 +129,21 @@ impl ScreenScraperSettings {
         !self.dev_id.trim().is_empty() && !self.dev_password.is_empty()
     }
 
-    pub fn is_active(&self) -> bool {
-        let dev_ok =
-            ScreenScraperSoftware::from_build().is_available() || self.has_dev_credentials();
+    pub fn is_active_with(&self, software: &ScreenScraperSoftware) -> bool {
+        let dev_ok = software.is_available() || self.has_dev_credentials();
         self.enabled && self.has_account() && dev_ok
     }
 
-    pub fn problem(&self) -> Option<String> {
+    pub fn is_active(&self) -> bool {
+        self.is_active_with(&ScreenScraperSoftware::from_build())
+    }
+
+    pub fn problem_with(&self, software: &ScreenScraperSoftware) -> Option<String> {
         if self.user.trim().is_empty() {
             Some(t("metadata.screenscraper.problem.missing_user"))
         } else if self.password.is_empty() {
             Some(t("metadata.screenscraper.problem.missing_password"))
-        } else if !ScreenScraperSoftware::from_build().is_available() {
+        } else if !software.is_available() {
             if self.dev_id.trim().is_empty() {
                 Some(t("metadata.screenscraper.problem.missing_dev_id"))
             } else if self.dev_password.is_empty() {
@@ -151,6 +154,10 @@ impl ScreenScraperSettings {
         } else {
             None
         }
+    }
+
+    pub fn problem(&self) -> Option<String> {
+        self.problem_with(&ScreenScraperSoftware::from_build())
     }
 
     pub fn load(store: &dyn SecretStore) -> Self {
@@ -1109,14 +1116,29 @@ mod tests {
         .unwrap();
         let back = ScreenScraperSettings::load(&store);
         assert_eq!(back, account());
-        assert!(back.is_active());
-        assert_eq!(back.problem(), None);
+        assert_eq!(
+            back.is_active(),
+            back.is_active_with(&ScreenScraperSoftware::from_build())
+        );
+        assert_eq!(
+            back.problem(),
+            back.problem_with(&ScreenScraperSoftware::from_build())
+        );
+
+        let with_dev = software();
+        let without_dev = ScreenScraperSoftware::from_values(None, None, None);
+
+        assert!(back.is_active_with(&without_dev));
+        assert_eq!(back.problem_with(&without_dev), None);
+        assert!(back.is_active_with(&with_dev));
+        assert_eq!(back.problem_with(&with_dev), None);
+
         assert!(
             ScreenScraperSettings {
                 user: String::new(),
                 ..account()
             }
-            .problem()
+            .problem_with(&without_dev)
             .is_some()
         );
         assert!(
@@ -1124,7 +1146,7 @@ mod tests {
                 password: String::new(),
                 ..account()
             }
-            .problem()
+            .problem_with(&without_dev)
             .is_some()
         );
         assert!(
@@ -1132,17 +1154,39 @@ mod tests {
                 dev_id: String::new(),
                 ..account()
             }
-            .problem()
+            .problem_with(&without_dev)
             .is_some()
+        );
+        assert!(
+            !ScreenScraperSettings {
+                dev_id: String::new(),
+                ..account()
+            }
+            .is_active_with(&without_dev)
         );
         assert!(
             ScreenScraperSettings {
                 dev_password: String::new(),
                 ..account()
             }
-            .problem()
+            .problem_with(&without_dev)
             .is_some()
         );
+        assert!(
+            !ScreenScraperSettings {
+                dev_password: String::new(),
+                ..account()
+            }
+            .is_active_with(&without_dev)
+        );
+
+        let no_user_dev = ScreenScraperSettings {
+            dev_id: String::new(),
+            dev_password: String::new(),
+            ..account()
+        };
+        assert!(no_user_dev.is_active_with(&with_dev));
+        assert_eq!(no_user_dev.problem_with(&with_dev), None);
         store.set(SECRET_KEY, "lixo").unwrap();
         assert_eq!(
             ScreenScraperSettings::load(&store),
@@ -1355,6 +1399,39 @@ mod tests {
         assert_eq!(http.sent().len(), 1);
         settings.lock().unwrap().user = "outra".into();
         assert!(!c.is_paused());
+    }
+
+    #[test]
+    fn bad_software_pauses_for_12h_and_unpauses_when_dev_password_changes() {
+        let http = not_found();
+        http.push(
+            403,
+            "Erreur de login : Vérifier vos identifiants développeur !",
+        );
+        let clock = Arc::new(TestClock::at(now()));
+        let settings = Arc::new(Mutex::new(account()));
+        let s = settings.clone();
+        let c = client_with(
+            &http,
+            &clock,
+            Arc::new(move || s.lock().unwrap().clone()),
+            None,
+        );
+        let e = c
+            .get("jeuInfos.php", &[("gameid", "1".into())], true)
+            .unwrap_err();
+        assert_eq!(e.failure, ScreenScraperFailure::BadSoftware);
+        assert!(c.is_paused());
+        assert_eq!(c.pause_reason(), Some(ScreenScraperFailure::BadSoftware));
+        assert!(
+            c.get("jeuInfos.php", &[("gameid", "2".into())], true)
+                .is_err()
+        );
+        assert_eq!(http.sent().len(), 1);
+
+        settings.lock().unwrap().dev_password = "nova_senha_dev".into();
+        assert!(!c.is_paused());
+        assert_eq!(c.pause_reason(), None);
     }
 
     #[test]
