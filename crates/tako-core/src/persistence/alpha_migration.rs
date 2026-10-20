@@ -278,6 +278,7 @@ pub fn migrate_secrets(
             enabled: s.screenscraper_enabled.unwrap_or(false),
             user: s.screenscraper_user.clone().unwrap_or_default(),
             password: s.screenscraper_password.clone().unwrap_or_default(),
+            ..Default::default()
         }
         .save(store)?;
     }

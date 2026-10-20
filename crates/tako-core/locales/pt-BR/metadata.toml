@@ -71,6 +71,8 @@ screenscraper.error.network = "Sem conexão com o ScreenScraper. Confira a inter
 screenscraper.error.unavailable = "O ScreenScraper não respondeu como esperado. Tente mais tarde."
 screenscraper.problem.missing_user = "Escreva ou cole o seu usuário do ScreenScraper (passo 2)."
 screenscraper.problem.missing_password = "Escreva ou cole a sua senha do ScreenScraper (passo 2)."
+screenscraper.problem.missing_dev_id = "Escreva ou cole o ID de desenvolvedor do ScreenScraper."
+screenscraper.problem.missing_dev_password = "Escreva ou cole a senha de desenvolvedor do ScreenScraper."
 
 steamgriddb.error.not_configured = "Cole a chave da API do SteamGridDB e ligue a fonte."
 steamgriddb.error.unauthorized = "O SteamGridDB recusou a chave. Gere uma nova em steamgriddb.com › Preferências › API e cole aqui."

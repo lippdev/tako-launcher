@@ -71,6 +71,8 @@ screenscraper.error.network = "Can't reach ScreenScraper. Check your internet co
 screenscraper.error.unavailable = "ScreenScraper didn't respond as expected. Try again later."
 screenscraper.problem.missing_user = "Type or paste your ScreenScraper username (step 2)."
 screenscraper.problem.missing_password = "Type or paste your ScreenScraper password (step 2)."
+screenscraper.problem.missing_dev_id = "Type or paste your ScreenScraper developer ID."
+screenscraper.problem.missing_dev_password = "Type or paste your ScreenScraper developer password."
 
 steamgriddb.error.not_configured = "Paste your SteamGridDB API key and turn the source on."
 steamgriddb.error.unauthorized = "SteamGridDB rejected the key. Create a new one at steamgriddb.com › Preferences › API and paste it here."

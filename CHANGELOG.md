@@ -4,6 +4,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 ### Novidades
+- **ScreenScraper com a sua conta de desenvolvedor:** quem tem credenciais de desenvolvedor do ScreenScraper pode colocá-las nas Configurações e usar o ScreenScraper mesmo em versões que não as trazem.
 - **Modo tela cheia do Windows:** use o Tako como tela inicial nas Configurações.
 - **Downloads por torrent:** baixe jogos das fontes que você mesmo adiciona, num painel com pausa, retomada e fila. Vem desligado.
 - **Jogos não instalados:** os jogos da sua conta nas lojas que não estão no PC aparecem depois dos instalados, agrupados por loja, na lista e na grade. Cada grupo abre e fecha, e o Tako lembra como você deixou.

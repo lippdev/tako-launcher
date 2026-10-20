@@ -80,8 +80,8 @@ pub(crate) fn update(ctx: &mut Ctx, change: impl FnOnce(&mut Providers)) {
     ctx.dirty = true;
 }
 
-fn software() -> ScreenScraperSoftware {
-    ScreenScraperSoftware::from_build()
+fn software(s: &ScreenScraperSettings) -> ScreenScraperSoftware {
+    ScreenScraperSoftware::from_build().or_user(s)
 }
 
 fn summary(ctx: &Ctx, enabled: bool, active: bool) -> String {
@@ -99,7 +99,7 @@ fn http() -> Arc<UreqHttp> {
 /// IGDB, ScreenScraper e SteamGridDB, cada um abrindo o seu painel (também no assistente da primeira execução).
 pub(crate) fn provider_rows(ctx: &Ctx) -> Vec<MenuItem> {
     let p = providers(ctx);
-    let ss_summary = if software().is_available() {
+    let ss_summary = if software(&p.ss).is_available() {
         summary(ctx, p.ss.enabled, p.ss.is_active())
     } else {
         ctx.t("settings.metadata.unavailable")
@@ -345,18 +345,8 @@ pub(crate) fn igdb_panel(ctx: &Ctx) -> MenuLayer {
 fn screenscraper_panel(ctx: &Ctx) -> MenuLayer {
     let status: Status = Rc::default();
     MenuLayer::panel(ctx.t("settings.metadata.screenscraper"), move |ctx| {
-        if !software().is_available() {
-            return vec![MenuItem::new(
-                PanelRow::info(
-                    "unavailable",
-                    ctx.t("settings.metadata.screenscraper"),
-                    ctx.t("settings.metadata.unavailable"),
-                )
-                .desc(ctx.t("settings.metadata.unavailable_desc")),
-            )];
-        }
         let p = providers(ctx).ss;
-        vec![
+        let mut rows = vec![
             enabled_row(ctx, "settings.metadata.ss_enabled", p.enabled, |p| {
                 p.ss.enabled = !p.ss.enabled
             }),
@@ -376,28 +366,52 @@ fn screenscraper_panel(ctx: &Ctx) -> MenuLayer {
                 true,
                 |p, v| p.ss.password = v.into(),
             ),
-            test_row(
+        ];
+        if !ScreenScraperSoftware::from_build().is_available() {
+            rows.push(MenuItem::new(
+                PanelRow::info("dev_info", ctx.t("settings.metadata.ss_dev_title"), "")
+                    .desc(ctx.t("settings.metadata.ss_dev_desc")),
+            ));
+            rows.push(field(
                 ctx,
-                &status,
-                p.problem(),
-                |p| {
-                    ScreenScraperClient::test(http(), software(), &p.ss, Arc::new(SystemClock))
-                        .map_err(|e| e.failure.message())
-                },
-                |ctx, r| match r {
-                    Ok(a) => ctx.tf(
-                        "settings.metadata.ss_ok",
-                        &[
-                            ("user", &a.user),
-                            ("level", &a.level.to_string()),
-                            ("left", &a.remaining_today().to_string()),
-                            ("max", &a.max_requests_per_day.to_string()),
-                            ("threads", &a.max_threads.to_string()),
-                        ],
-                    ),
-                    Err(e) => e,
-                },
-            ),
+                "dev_id",
+                ctx.t("settings.metadata.ss_dev_id"),
+                &p.dev_id,
+                false,
+                |p, v| p.ss.dev_id = v.into(),
+            ));
+            rows.push(field(
+                ctx,
+                "dev_password",
+                ctx.t("settings.metadata.ss_dev_password"),
+                &p.dev_password,
+                true,
+                |p, v| p.ss.dev_password = v.into(),
+            ));
+        }
+        rows.push(test_row(
+            ctx,
+            &status,
+            p.problem(),
+            |p| {
+                ScreenScraperClient::test(http(), software(&p.ss), &p.ss, Arc::new(SystemClock))
+                    .map_err(|e| e.failure.message())
+            },
+            |ctx, r| match r {
+                Ok(a) => ctx.tf(
+                    "settings.metadata.ss_ok",
+                    &[
+                        ("user", &a.user),
+                        ("level", &a.level.to_string()),
+                        ("left", &a.remaining_today().to_string()),
+                        ("max", &a.max_requests_per_day.to_string()),
+                        ("threads", &a.max_threads.to_string()),
+                    ],
+                ),
+                Err(e) => e,
+            },
+        ));
+        rows.push(
             MenuItem::new(
                 PanelRow::action("site", ctx.t("settings.metadata.ss_site"))
                     .value("screenscraper.fr"),
@@ -405,7 +419,8 @@ fn screenscraper_panel(ctx: &Ctx) -> MenuLayer {
             .on(super::effect(Effect::OpenUrl(
                 "https://www.screenscraper.fr/membreinscription.php".into(),
             ))),
-        ]
+        );
+        rows
     })
     .text(ctx.t("settings.metadata.ss_steps"))
 }
