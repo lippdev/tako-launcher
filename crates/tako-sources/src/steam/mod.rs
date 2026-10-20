@@ -117,7 +117,9 @@ fn icon_uri(steam_root: &Path, app_id: u32, icons: &appinfo::AppIcons) -> Option
 /// JPG do ícone (32x32) na CDN da Steam; `None` se o hash não é de arquivo.
 pub fn icon_url(app_id: u32, hash: &str) -> Option<String> {
     appinfo::valid_hash(hash).then(|| {
-        format!("https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{hash}.jpg")
+        format!(
+            "https://shared.akamai.steamstatic.com/community_assets/images/apps/{app_id}/{hash}.jpg"
+        )
     })
 }
 
@@ -545,9 +547,7 @@ mod tests {
         assert!(icon("Dota 2").unwrap().starts_with("file://"));
         assert_eq!(
             icon("Portal 2").as_deref(),
-            Some(
-                "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/620/e1.jpg"
-            )
+            Some("https://shared.akamai.steamstatic.com/community_assets/images/apps/620/e1.jpg")
         );
         assert_eq!(icon("Sem appinfo"), None);
     }
