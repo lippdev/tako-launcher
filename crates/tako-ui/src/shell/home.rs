@@ -386,8 +386,11 @@ impl Page for HomePage {
     }
 
     fn hover(&mut self, zone: &str, index: usize, ctx: &Ctx) {
-        if zone == "hero" {
-            self.hero_id = self.hero_game(ctx, &self.rows(ctx)).map(|g| g.id.clone());
+        if zone == "hero" || zone == "hero-keep" {
+            // `hero-keep` (Fita): o destaque fica com o jogo apresentado, como o ↑ do teclado.
+            if zone == "hero-keep" {
+                self.hero_id = self.hero_game(ctx, &self.rows(ctx)).map(|g| g.id.clone());
+            }
             self.row = None;
             self.hero_button = index;
         } else if let Some(r) = zone

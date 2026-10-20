@@ -434,8 +434,8 @@ component FitaHome inherits Rectangle {
                     icon: "play";
                     primary: true;
                     focused: row-focus < 0 && hero-focus == 0;
-                    clicked => { root.clicked("hero", 0); }
-                    hovered => { root.hovered("hero", 0); }
+                    clicked => { root.clicked("hero-keep", 0); }
+                    hovered => { root.hovered("hero-keep", 0); }
                 }
 
                 FitaButton {
@@ -446,8 +446,8 @@ component FitaHome inherits Rectangle {
                     accessible-role: button;
                     accessible-label: hero.title;
                     accessible-description: hero.meta;
-                    clicked => { root.clicked("hero", 1); }
-                    hovered => { root.hovered("hero", 1); }
+                    clicked => { root.clicked("hero-keep", 1); }
+                    hovered => { root.hovered("hero-keep", 1); }
                 }
             }
         }
