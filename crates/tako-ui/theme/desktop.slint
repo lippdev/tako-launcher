@@ -5173,13 +5173,13 @@ component DeskOverlay inherits Rectangle {
                             HorizontalLayout {
                                 spacing: 10px;
                                 PopupButton {
-                                    horizontal-stretch: 1;
+                                    width: (parent.width - 10px) / 2;
                                     custom-height: 44px;
                                     data: ov.rows[4];
                                     clicked => { root.clicked("original", 0); }
                                 }
                                 PopupButton {
-                                    horizontal-stretch: 1;
+                                    width: (parent.width - 10px) / 2;
                                     custom-height: 44px;
                                     data: ov.rows[5];
                                     clicked => { root.clicked("cancel", 0); }
