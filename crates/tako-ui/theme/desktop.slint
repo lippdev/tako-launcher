@@ -5573,7 +5573,7 @@ component DeskOverlay inherits Rectangle {
                     }
                     CloseButton { label: close-label; size: 40px; clicked => { root.clicked("outside", 0); } }
                 }
-                if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
+                if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; horizontal-alignment: left; line-height-factor: 1.23; wrap: word-wrap; }
                 RowScroll {
                     vertical-stretch: 1;
                     preferred-height: self.content-h;

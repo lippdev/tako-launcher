@@ -450,3 +450,29 @@ fn steamgriddb_panel(ctx: &Ctx) -> MenuLayer {
     })
     .text(ctx.t("settings.metadata.sgdb_steps"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shell::Layer;
+    use tako_core::paths::DataPaths;
+    use tako_platform::Platform;
+
+    #[test]
+    fn metadata_panels_have_multiline_step_instructions() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        for panel in [
+            igdb_panel(&ctx),
+            screenscraper_panel(&ctx),
+            steamgriddb_panel(&ctx),
+        ] {
+            let overlay = panel.render(&ctx);
+            assert!(
+                overlay.text.contains('\n'),
+                "painel deve conter instruções com quebra de linha: {:?}",
+                overlay.text
+            );
+        }
+    }
+}
