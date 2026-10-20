@@ -104,6 +104,8 @@ pub struct ScreenScraperSettings {
     pub enabled: bool,
     pub user: String,
     pub password: String,
+    pub dev_id: String,
+    pub dev_password: String,
 }
 
 impl std::fmt::Debug for ScreenScraperSettings {
@@ -112,6 +114,8 @@ impl std::fmt::Debug for ScreenScraperSettings {
             .field("enabled", &self.enabled)
             .field("user", &self.user)
             .field("password", &mask(&self.password))
+            .field("dev_id", &self.dev_id)
+            .field("dev_password", &mask(&self.dev_password))
             .finish()
     }
 }
@@ -121,8 +125,14 @@ impl ScreenScraperSettings {
         !self.user.trim().is_empty() && !self.password.is_empty()
     }
 
+    pub fn has_dev_credentials(&self) -> bool {
+        !self.dev_id.trim().is_empty() && !self.dev_password.is_empty()
+    }
+
     pub fn is_active(&self) -> bool {
-        self.enabled && self.has_account()
+        let dev_ok =
+            ScreenScraperSoftware::from_build().is_available() || self.has_dev_credentials();
+        self.enabled && self.has_account() && dev_ok
     }
 
     pub fn problem(&self) -> Option<String> {
@@ -130,6 +140,14 @@ impl ScreenScraperSettings {
             Some(t("metadata.screenscraper.problem.missing_user"))
         } else if self.password.is_empty() {
             Some(t("metadata.screenscraper.problem.missing_password"))
+        } else if !ScreenScraperSoftware::from_build().is_available() {
+            if self.dev_id.trim().is_empty() {
+                Some(t("metadata.screenscraper.problem.missing_dev_id"))
+            } else if self.dev_password.is_empty() {
+                Some(t("metadata.screenscraper.problem.missing_dev_password"))
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -145,6 +163,7 @@ impl ScreenScraperSettings {
     pub fn save(&self, store: &dyn SecretStore) -> Result<(), String> {
         let clean = ScreenScraperSettings {
             user: self.user.trim().into(),
+            dev_id: self.dev_id.trim().into(),
             ..self.clone()
         };
         store.set(
@@ -197,6 +216,15 @@ impl ScreenScraperSoftware {
 
     pub fn is_available(&self) -> bool {
         !self.dev_id.is_empty() && !self.dev_password.is_empty()
+    }
+
+    /// Usa as credenciais do build se existirem; se o build não as tiver, usa as do usuário.
+    pub fn or_user(&self, s: &ScreenScraperSettings) -> Self {
+        if self.is_available() {
+            self.clone()
+        } else {
+            Self::from_values(Some(&s.dev_id), Some(&s.dev_password), None)
+        }
     }
 }
 
@@ -394,11 +422,12 @@ impl ScreenScraperClient {
     }
 
     pub fn has_software_access(&self) -> bool {
-        self.software.is_available()
+        self.software.or_user(&(self.settings)()).is_available()
     }
 
     pub fn is_configured(&self) -> bool {
-        self.software.is_available() && (self.settings)().is_active()
+        let settings = (self.settings)();
+        self.software.or_user(&settings).is_available() && settings.is_active()
     }
 
     /// Pausado (cota, servidor fechado, sem rede): volta sozinho no prazo ou quando a conta muda.
@@ -433,13 +462,14 @@ impl ScreenScraperClient {
         query: &[(&str, String)],
         use_cache: bool,
     ) -> Result<Option<Value>, ScreenScraperError> {
-        if !self.software.is_available() {
+        let settings = (self.settings)();
+        let software = self.software.or_user(&settings);
+        if !software.is_available() {
             return Err(err(
                 ScreenScraperFailure::NoSoftwareAccess,
                 "Sem credenciais do software",
             ));
         }
-        let settings = (self.settings)();
         if !settings.has_account() {
             return Err(err(ScreenScraperFailure::NotConfigured, "Sem conta"));
         }
@@ -486,10 +516,11 @@ impl ScreenScraperClient {
     /// existe ou falhou (a interface usa a arte de reserva).
     pub fn download_media(&self, media: &str, max_bytes: u64) -> Option<Vec<u8>> {
         let settings = (self.settings)();
-        if !self.software.is_available() || self.is_paused() {
+        let software = self.software.or_user(&settings);
+        if !software.is_available() || self.is_paused() {
             return None;
         }
-        let url = media_to_download(media, &self.software, &settings)?;
+        let url = media_to_download(media, &software, &settings)?;
         let _one_at_a_time = self.queue.lock().unwrap_or_else(|e| e.into_inner());
         self.wait_rate();
         self.network.fetch_add(1, Ordering::SeqCst);
@@ -507,6 +538,7 @@ impl ScreenScraperClient {
         settings: &ScreenScraperSettings,
         clock: Arc<dyn Clock>,
     ) -> Result<ScreenScraperAccount, ScreenScraperError> {
+        let software = software.or_user(settings);
         let account = ScreenScraperSettings {
             enabled: true,
             ..settings.clone()
@@ -531,10 +563,11 @@ impl ScreenScraperClient {
         query: &[(&str, String)],
         settings: &ScreenScraperSettings,
     ) -> String {
+        let software = self.software.or_user(settings);
         let mut all: Vec<(&str, &str)> = vec![
-            ("devid", &self.software.dev_id),
-            ("devpassword", &self.software.dev_password),
-            ("softname", &self.software.soft_name),
+            ("devid", &software.dev_id),
+            ("devpassword", &software.dev_password),
+            ("softname", &software.soft_name),
             ("output", "json"),
             ("ssid", &settings.user),
             ("sspassword", &settings.password),
@@ -896,6 +929,8 @@ mod tests {
             enabled: true,
             user: "jogador".into(),
             password: "senha secreta".into(),
+            dev_id: "dev".into(),
+            dev_password: "pass".into(),
         }
     }
 
@@ -1092,6 +1127,22 @@ mod tests {
             .problem()
             .is_some()
         );
+        assert!(
+            ScreenScraperSettings {
+                dev_id: String::new(),
+                ..account()
+            }
+            .problem()
+            .is_some()
+        );
+        assert!(
+            ScreenScraperSettings {
+                dev_password: String::new(),
+                ..account()
+            }
+            .problem()
+            .is_some()
+        );
         store.set(SECRET_KEY, "lixo").unwrap();
         assert_eq!(
             ScreenScraperSettings::load(&store),
@@ -1103,10 +1154,16 @@ mod tests {
     fn without_software_credentials_nothing_goes_to_the_network() {
         let http = not_found();
         let clock = Arc::new(TestClock::at(now()));
+        let no_dev = ScreenScraperSettings {
+            dev_id: String::new(),
+            dev_password: String::new(),
+            ..account()
+        };
+        let no_dev_clone = no_dev.clone();
         let c = Arc::new(ScreenScraperClient::new(
             http.clone(),
             ScreenScraperSoftware::from_values(None, None, None),
-            Arc::new(account),
+            Arc::new(move || no_dev_clone.clone()),
             clock.clone(),
             None,
         ));
@@ -1119,7 +1176,7 @@ mod tests {
         let test = ScreenScraperClient::test(
             http.clone(),
             ScreenScraperSoftware::from_values(None, None, None),
-            &account(),
+            &no_dev,
             clock.clone(),
         );
         assert_eq!(
@@ -1127,7 +1184,74 @@ mod tests {
             ScreenScraperFailure::NoSoftwareAccess
         );
         assert!(http.sent().is_empty());
-        assert!(!ScreenScraperProvider::new(c, RomHashCache::new(None), clock).is_enabled());
+        assert!(
+            !ScreenScraperProvider::new(c, RomHashCache::new(None), clock.clone()).is_enabled()
+        );
+
+        // Com as credenciais de dev informadas pelo usuário, o cliente funciona mesmo sem build
+        let c_with_dev = Arc::new(ScreenScraperClient::new(
+            http,
+            ScreenScraperSoftware::from_values(None, None, None),
+            Arc::new(account),
+            clock,
+            None,
+        ));
+        assert!(c_with_dev.has_software_access());
+        assert!(c_with_dev.is_configured());
+    }
+
+    #[test]
+    fn or_user_prefers_build_and_falls_back_to_user() {
+        let build =
+            ScreenScraperSoftware::from_values(Some("b_id"), Some("b_pass"), Some("CustomSoft"));
+        let user_settings = ScreenScraperSettings {
+            dev_id: "u_id".into(),
+            dev_password: "u_pass".into(),
+            ..Default::default()
+        };
+        let resolved_build = build.or_user(&user_settings);
+        assert_eq!(resolved_build.dev_id, "b_id");
+        assert_eq!(resolved_build.dev_password, "b_pass");
+        assert_eq!(resolved_build.soft_name, "CustomSoft");
+
+        let empty_build = ScreenScraperSoftware::from_values(None, None, None);
+        assert!(!empty_build.is_available());
+        let resolved_user = empty_build.or_user(&user_settings);
+        assert_eq!(resolved_user.dev_id, "u_id");
+        assert_eq!(resolved_user.dev_password, "u_pass");
+        assert_eq!(resolved_user.soft_name, "Tako");
+        assert!(resolved_user.is_available());
+
+        let empty_settings = ScreenScraperSettings::default();
+        let resolved_empty = empty_build.or_user(&empty_settings);
+        assert!(!resolved_empty.is_available());
+    }
+
+    #[test]
+    fn old_settings_without_dev_credentials_deserialize_cleanly() {
+        let legacy_json = r#"{"enabled":true,"user":"jogador","password":"123"}"#;
+        let s: ScreenScraperSettings = serde_json::from_str(legacy_json).unwrap();
+        assert!(s.enabled);
+        assert_eq!(s.user, "jogador");
+        assert_eq!(s.password, "123");
+        assert_eq!(s.dev_id, "");
+        assert_eq!(s.dev_password, "");
+    }
+
+    #[test]
+    fn debug_does_not_leak_dev_password() {
+        let s = ScreenScraperSettings {
+            enabled: true,
+            user: "jogador".into(),
+            password: "super_secret_user_pass".into(),
+            dev_id: "my_dev_id".into(),
+            dev_password: "super_secret_dev_pass".into(),
+        };
+        let debug_str = format!("{s:?}");
+        assert!(!debug_str.contains("super_secret_user_pass"));
+        assert!(!debug_str.contains("super_secret_dev_pass"));
+        assert!(debug_str.contains("***"));
+        assert!(debug_str.contains("my_dev_id"));
     }
 
     #[test]
