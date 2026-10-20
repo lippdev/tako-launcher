@@ -428,7 +428,7 @@ fn details_icon_uses_game_accessibility_data_without_a_language_literal() {
     assert!(!source.contains("\"Detalhes\""));
     assert!(source.contains("accessible-label: hero.title;"));
     assert!(source.contains("accessible-description: hero.meta;"));
-    assert!(info.contains("root.clicked(\"hero\", 1)"));
+    assert!(info.contains("root.clicked(\"hero-keep\", 1)"));
 }
 
 #[test]
