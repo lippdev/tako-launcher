@@ -159,6 +159,32 @@ mod tests {
     }
 
     #[test]
+    fn step_instructions_are_multiline_and_numbered() {
+        for lang in [Lang::PtBr, Lang::EnUs] {
+            for key in [
+                "settings.metadata.igdb_steps",
+                "settings.metadata.ss_steps",
+                "settings.metadata.sgdb_steps",
+            ] {
+                let val = t_in(lang, key);
+                let lines: Vec<&str> = val.lines().collect();
+                assert!(
+                    lines.len() >= 3,
+                    "{key} in {lang:?} should have >=3 lines, got {val:?}"
+                );
+                for (i, line) in lines.iter().enumerate() {
+                    let expected_prefix = format!("{}.", i + 1);
+                    assert!(
+                        line.starts_with(&expected_prefix),
+                        "{key} in {lang:?} line {} should start with '{expected_prefix}': {line}",
+                        i + 1
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn plural_forms() {
         set_lang(Lang::PtBr);
         assert_eq!(tn("common.games", 1, &[]), "1 jogo");
