@@ -617,7 +617,7 @@ impl Supervisor {
     }
 }
 
-/// Modo pedido na linha de comando: `--big-picture` (modo Xbox/AnyFSE) e `--console-session` (Console Mode) vão
+/// Modo pedido na linha de comando: `--big-picture` (modo Xbox) e `--console-session` (Console Mode) vão
 /// direto para a tela cheia; sem eles a interface decide (desktop, com a pergunta do controle).
 fn initial_mode(all_args: &[String]) -> Option<bool> {
     if args::has(all_args, args::BIG_PICTURE) || args::has(all_args, args::CONSOLE_SESSION) {

@@ -17,7 +17,7 @@ pub struct Start {
     pub ask: bool,
 }
 
-/// `--big-picture` (modo Xbox/AnyFSE) e `--console-session` (Console Mode) vão direto para a tela cheia;
+/// `--big-picture` (modo Xbox) e `--console-session` (Console Mode) vão direto para a tela cheia;
 /// `--desktop` é o supervisor reabrindo no modo em que estava. Sem nada, desktop com a pergunta.
 pub fn start(all: &[String]) -> Start {
     if args::has(all, args::BIG_PICTURE) || args::has(all, args::CONSOLE_SESSION) {

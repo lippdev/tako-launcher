@@ -2105,3 +2105,51 @@ fn test_theme_with_empty_author_does_not_show_by_suffix() {
     assert!(!item.row.description.contains(" · "));
     assert!(!item.row.description.contains("por "));
 }
+
+#[test]
+fn fse_status_cache_keeps_last_success_and_retries_transient_results() {
+    use tako_platform::fse::Status;
+    let mut state = super::FseState::default();
+    assert!(state.begin());
+    assert!(!state.begin(), "only one status query at a time");
+    state.finish(Ok(Status::Enabled));
+    assert!(!state.begin(), "successful status is cached");
+    state.checked = None;
+    assert!(state.begin());
+    state.finish(Err("busy".into()));
+    assert_eq!(state.status, Some(Status::Enabled));
+    assert!(state.checked.expect("retry time").elapsed() >= std::time::Duration::from_secs(29));
+    state.checked = Some(std::time::Instant::now() - std::time::Duration::from_secs(31));
+    assert!(state.begin());
+    state.finish(Ok(Status::Applying));
+    assert_eq!(state.status, Some(Status::Applying));
+    assert!(state.checked.expect("retry time").elapsed() >= std::time::Duration::from_secs(29));
+}
+
+#[test]
+fn fse_panel_keeps_status_and_ignores_clicks_while_applying() {
+    let _guard = LOCK.lock().unwrap();
+    let (_dir, mut ctx) = ctx();
+    FSE.with(|state| {
+        *state.borrow_mut() = FseState {
+            status: Some(tako_platform::fse::Status::Enabled),
+            pending: true,
+            ..Default::default()
+        };
+    });
+    let panel = xbox_mode_panel(&ctx);
+    let rows = (panel.build)(&ctx);
+    assert_eq!(
+        rows[0].row.description,
+        ctx.t("settings.general.fse_applying")
+    );
+    assert!(matches!(accept(&mut ctx, &rows[0]), Flow::Stay));
+    FSE.with(|state| {
+        assert!(state.borrow().pending);
+        assert_eq!(
+            state.borrow().status,
+            Some(tako_platform::fse::Status::Enabled)
+        );
+        *state.borrow_mut() = FseState::default();
+    });
+}

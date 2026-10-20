@@ -13,6 +13,7 @@ use tako_core::devices::{
 pub mod console_mode;
 pub mod downloads;
 pub mod exe_icon;
+pub mod fse;
 pub mod secrets;
 pub mod space;
 pub mod sunshine;

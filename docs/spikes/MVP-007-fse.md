@@ -113,3 +113,42 @@ Voltar o app inicial para o Xbox app, rodar `.\packaging\fse-dev\Register-FsePro
 - Tom's Hardware, [Microsoft begins rolling out Xbox Mode to Windows 11 desktops and laptops](https://www.tomshardware.com/video-games/xbox/microsoft-begins-rolling-out-xbox-mode-to-windows-11-desktops-and-laptops)
 - Windows Latest, [Xbox mode rollout expands (13/05/2026)](https://www.windowslatest.com/2026/05/13/microsoft-warns-windows-11s-xbox-mode-wont-show-up-yet-even-as-the-rollout-expands-to-more-users-today/)
 - Projetos da comunidade (manifestos e SCCD lidos no código): [AnyFSE](https://github.com/ashpynov/AnyFSE), [Playnite-FSE-Launcher](https://github.com/leeson865/Playnite-FSE-Launcher), [OmniConsole](https://github.com/8bit2qubit/OmniConsole)
+
+
+## Decisão FSE-001 (2026-10-20)
+
+O dono autorizou integração opt-in pelo caminho de desenvolvimento. Essa decisão
+substitui a recomendação anterior de oferecer apenas instruções para terceiros.
+A implementação é própria e não baixa nem reutiliza código do AnyFSE.
+
+Escolhido registro solto de identidade esparsa (`Add-AppxPackage -Register
+-ExternalLocation`), com `AllowExternalContent`, extensão `windows.gamingApp`,
+SCCD FFFF e `--big-picture`. O manifesto Win32 embutido no Tako.exe associa
+`packageName`/`publisher`/`applicationId` à identidade esparsa; `win32App`,
+`mediumIL` e `unvirtualizedResources` preservam o comportamento Win32. Não exige SDK, certificado ou alteração na confiança
+de certificados. A aceitação desse conjunto pela capability gamingHome precisa
+ser confirmada no Windows real; não há fallback silencioso para pacote assinado.
+Se o Windows rejeitar o registro, a ativação falha e tenta restaurar o estado.
+Referência: [identidade com localização externa](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/grant-identity-to-nonpackaged-apps).
+
+Manifesto, SCCD e logo são embutidos no binário Rust, inclusive no portable e no
+instalador. Os logos AppX são derivados do logo existente ao ativar. O layout
+persistente fica em `%LOCALAPPDATA%\Tako\GamingHome`; mover o executável exige
+desativar antes e ativar novamente depois. A desinstalação deve ser precedida
+pela desativação desta opção para restaurar a escolha anterior.
+
+Somente a escrita HKLM do Modo de Desenvolvedor usa PowerShell elevado com comando
+fixo codificado. Registro AppX, backup CLIXML e HKCU permanecem no usuário original.
+O backup conserva valor/tipo de GamingHomeApp e valor (ou ausência) da configuração
+de desenvolvimento; só é removido após recuperação completa. Falha parcial mantém
+o backup para tentar novamente desligando a opção. Nenhum dado sai da máquina.
+
+A detecção é conservadora: Windows build >= 26100 e chave GamingConfiguration.
+Esse é um sinal não documentado, não prova a disponibilidade no rollout. Sem o
+sinal mostramos indisponível; com backup ainda permitimos recuperação.
+
+Validar em Windows real: registro e catálogo FFFF; seleção e inicialização pelo
+FSE; retorno após jogo; x64/ARM64; portable com espaços/caracteres especiais;
+UAC cancelado, conta distinta no UAC, modo de desenvolvimento previamente ligado,
+GamingHomeApp ausente ou existente e recuperação após falha parcial. Em especial,
+confirmar o sinal de disponibilidade em máquinas sem FSE antes de liberar.
