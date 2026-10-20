@@ -49,13 +49,25 @@ impl MetadataCache {
 
 /// Grava num temporário único e renomeia: gravações concorrentes não se atropelam.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    write_replacing(path, bytes, true)
+}
+
+/// `write_atomic` sem esperar o disco (`sync_all`): para cache que se baixa de novo se uma queda o perder. Com
+/// centenas de capas, esperar o disco a cada uma atrasava as artes no Windows.
+pub fn write_cache_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    write_replacing(path, bytes, false)
+}
+
+fn write_replacing(path: &Path, bytes: &[u8], sync: bool) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
     let dir = path.parent().unwrap_or_else(|| Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
     std::io::Write::write_all(&mut tmp, bytes)?;
-    tmp.as_file().sync_all()?;
+    if sync {
+        tmp.as_file().sync_all()?;
+    }
     // No Windows, trocar um arquivo que outra gravação acabou de substituir pode dar "acesso negado" por um instante.
     let mut tries = 0;
     loop {

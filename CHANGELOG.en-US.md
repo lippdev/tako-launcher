@@ -30,7 +30,9 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **Sunshine and Moonlight:** in Settings › Integrations, export your games to Sunshine/Apollo and open them from Moonlight. Tako shows a preview, backs up `apps.json` and never touches the apps you already had.
 - **Console Mode:** Settings › Integrations shows whether Console Mode is installed and which API version it offers.
 
+- **Refresh library:** a new button on the desktop list bar rescans the stores right away.
 ### Fixes
+- **Selected game art:** the background and logo now change with the game, installed or not. Steam art opens straight from Steam's own cache, the last game you picked loads first, and Tako no longer holds the previous game's art while the new one arrives. Covers and backgrounds that fail on a slow network are retried, on desktop and in full screen, without restarting.
 - **Arguments and variables need confirmation:** extra arguments, environment variables and Proton/Wine set per game now go into the confirmation, together with the before and after commands; if you already used them, you confirm once.
 - **Slow list and images not loading (alpha.15):** list icons have their own queue and no longer hold up covers and backgrounds; the UI only redraws when an image arrives, and art the store doesn't have isn't requested again on every launch.
 - **Play time:** a game with a session but no recorded time shows "Not tracked" instead of "Not played yet".

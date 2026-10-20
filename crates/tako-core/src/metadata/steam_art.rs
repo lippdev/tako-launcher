@@ -1,6 +1,6 @@
 //! Port de `SteamArtResolver.cs`: endereços das artes de um jogo da Steam (`steam-art://570/cover`,
-//! `/hero`, `/logo`, `/icon`), do melhor ao pior: arquivos 2x informados pela API da loja, o caminho
-//! antigo da CDN e, sem rede, o cache local da própria Steam (`appcache/librarycache`).
+//! `/hero`, `/logo`, `/icon`): o cache local da própria Steam (`appcache/librarycache`) quando tem a arte, que abre
+//! na hora; senão os arquivos 2x informados pela API da loja e o caminho antigo da CDN.
 
 use super::STEAM_ART_SCHEME;
 use super::http::{Http, HttpRequest, escape, parse_json};
@@ -51,6 +51,12 @@ impl SteamArtResolver {
         let Some((app, kind)) = parse_uri(uri) else {
             return Vec::new();
         };
+        // A Steam já tem a arte de quase toda a biblioteca no disco: sem consulta nem download (a API e a CDN
+        // custavam segundos por jogo, e a arte do jogo escolhido demorava a aparecer).
+        let local = self.local(app, local_names(kind));
+        if !local.is_empty() {
+            return local;
+        }
         let assets = self.assets(app);
         let mut out = Vec::new();
         let from_api = |keys: &[&str], out: &mut Vec<ArtSource>| {
@@ -79,27 +85,23 @@ impl SteamArtResolver {
                         "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/{app}/{hash}.jpg"
                     )));
                 }
-                out.extend(self.local(app, local_names(kind)));
             }
             "logo" => {
                 from_api(&["library_logo_2x", "library_logo"], &mut out);
                 out.push(ArtSource::Url(format!("{LEGACY_BASE}{app}/logo_2x.png")));
                 out.push(ArtSource::Url(format!("{LEGACY_BASE}{app}/logo.png")));
-                out.extend(self.local(app, local_names(kind)));
             }
             "hero" => {
                 from_api(&["library_hero_2x", "library_hero"], &mut out);
                 out.push(ArtSource::Url(format!(
                     "{LEGACY_BASE}{app}/library_hero_2x.jpg"
                 )));
-                out.extend(self.local(app, local_names(kind)));
             }
             _ => {
                 from_api(&["library_capsule_2x", "library_capsule"], &mut out);
                 out.push(ArtSource::Url(format!(
                     "{LEGACY_BASE}{app}/library_600x900_2x.jpg"
                 )));
-                out.extend(self.local(app, local_names(kind)));
             }
         }
         out
@@ -224,7 +226,7 @@ mod tests {
     use crate::metadata::test_support::FakeHttp;
 
     #[test]
-    fn api_assets_come_first_then_legacy_cdn_then_local_cache() {
+    fn local_cache_comes_first_then_api_assets_then_legacy_cdn() {
         let dir = tempfile::tempdir().unwrap();
         let cache = dir.path().join("appcache/librarycache");
         std::fs::create_dir_all(cache.join("570/abc")).unwrap();
@@ -238,16 +240,17 @@ mod tests {
         let r = SteamArtResolver::new(http.clone(), Some(dir.path().into()));
         assert_eq!(
             r.resolve("steam-art://570/cover"),
-            [
-                ArtSource::Url(format!("{ASSET_BASE}steam/apps/570/cap2x.jpg?t=1")),
-                ArtSource::Url(format!("{LEGACY_BASE}570/library_600x900_2x.jpg")),
-                ArtSource::File(cache.join("570/abc/library_600x900.jpg")),
-            ]
+            [ArtSource::File(cache.join("570/abc/library_600x900.jpg"))]
         );
-        let hero = r.resolve("steam-art://570/hero");
         assert_eq!(
-            hero.last(),
-            Some(&ArtSource::File(cache.join("570_library_hero.jpg")))
+            r.resolve("steam-art://570/hero"),
+            [ArtSource::File(cache.join("570_library_hero.jpg"))]
+        );
+        // Arte local: nenhuma consulta à rede.
+        assert!(http.sent().is_empty());
+        assert_eq!(
+            r.resolve("steam-art://570/logo")[0],
+            ArtSource::Url(format!("{LEGACY_BASE}570/logo_2x.png"))
         );
         assert!(
             matches!(&r.resolve("steam-art://570/icon")[0], ArtSource::Url(u) if u.ends_with("/570/deadbeef.jpg"))

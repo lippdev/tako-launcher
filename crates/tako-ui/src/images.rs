@@ -4,10 +4,10 @@
 
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
 
 /// Converte uma URI de arte (`https://`, `steam-art://`, `ssmedia://`...) num arquivo local, baixando se
 /// preciso. Roda nas threads de trabalho.
@@ -101,16 +101,49 @@ impl Lru {
     }
 }
 
+/// Fila de pedidos servida do mais novo para o mais antigo: o jogo que a pessoa acabou de escolher passa à frente
+/// dos que ela já deixou para trás (com a fila na ordem, a arte nova esperava a de todos os jogos anteriores).
+#[derive(Clone, Default)]
+struct Queue(Arc<(Mutex<Vec<Request>>, Condvar)>);
+
+impl Queue {
+    fn push(&self, req: Request) {
+        let (list, ready) = &*self.0;
+        list.lock().unwrap_or_else(|e| e.into_inner()).push(req);
+        ready.notify_one();
+    }
+    fn pop(&self) -> Request {
+        let (list, ready) = &*self.0;
+        let mut list = list.lock().unwrap_or_else(|e| e.into_inner());
+        loop {
+            if let Some(req) = list.pop() {
+                return req;
+            }
+            list = ready.wait(list).unwrap_or_else(|e| e.into_inner());
+        }
+    }
+}
+
+/// Por quanto tempo a troca de jogo segura a arte anterior esperando a nova (`is_pending`). Passou disso, a tela
+/// mostra o jogo novo sem arte até ela chegar, em vez de ficar com o fundo e o logo de outro jogo.
+pub const HOLD: Duration = Duration::from_millis(350);
+
+/// Espera antes de pedir de novo uma imagem que falhou (rede fora, CDN lenta). Arte que não existe não custa rede
+/// na nova tentativa: o `ArtCache` lembra a falta.
+const RETRY: Duration = Duration::from_secs(30);
+
 struct State {
     lru: Lru,
     /// Grade de luminância de cada cópia de vidro (pela mesma chave do LRU); poucos bytes por arte.
     lum: HashMap<String, Vec<f32>>,
-    pending: HashSet<String>,
-    failed: HashSet<String>,
-    tx: Option<Sender<Request>>,
+    /// Pedido na fila e quando foi feito.
+    pending: HashMap<String, Instant>,
+    /// Falhou e quando: tenta de novo depois de `RETRY` (uma falha de rede na abertura apagava as artes até reiniciar).
+    failed: HashMap<String, Instant>,
+    tx: Option<Queue>,
     /// Fila só dos ícones da lista: centenas deles, muitos pela rede, não podem passar à frente da capa e do
     /// fundo que estão na tela (regressão da alpha.15).
-    icon_tx: Option<Sender<Request>>,
+    icon_tx: Option<Queue>,
     on_ready: Option<Box<dyn Fn()>>,
 }
 
@@ -118,8 +151,8 @@ thread_local! {
     static STATE: RefCell<State> = RefCell::new(State {
         lru: Lru::new(LIMIT),
         lum: HashMap::new(),
-        pending: HashSet::new(),
-        failed: HashSet::new(),
+        pending: HashMap::new(),
+        failed: HashMap::new(),
         tx: None,
         icon_tx: None,
         on_ready: None,
@@ -129,17 +162,16 @@ thread_local! {
 /// Liga o carregador (na thread da UI). `on_ready` é chamado na thread da UI quando uma imagem chega.
 pub fn init(resolver: Resolver, workers: usize, on_ready: impl Fn() + 'static) {
     let pool = |name: &str| {
-        let (tx, rx) = channel::<Request>();
-        let rx = Arc::new(Mutex::new(rx));
+        let queue = Queue::default();
         for _ in 0..workers.max(1) {
-            let rx = rx.clone();
+            let queue = queue.clone();
             let resolver = resolver.clone();
             std::thread::Builder::new()
                 .name(name.into())
-                .spawn(move || worker(rx, resolver))
+                .spawn(move || worker(queue, resolver))
                 .ok();
         }
-        tx
+        queue
     };
     let (tx, icon_tx) = (pool("tako-images"), pool("tako-icons"));
     STATE.with(|s| {
@@ -188,7 +220,7 @@ fn request(uri: &str, max_w: u32, max_h: u32, glass: bool, icon: bool) -> Option
         if let Some(img) = s.lru.get(&key) {
             return Some(img);
         }
-        if s.pending.contains(&key) || s.failed.contains(&key) {
+        if s.pending.contains_key(&key) || s.failed.get(&key).is_some_and(|t| t.elapsed() < RETRY) {
             return None;
         }
         let request = Request {
@@ -200,16 +232,26 @@ fn request(uri: &str, max_w: u32, max_h: u32, glass: bool, icon: bool) -> Option
             icon,
         };
         let tx = if icon { &s.icon_tx } else { &s.tx };
-        if let Some(tx) = tx
-            && tx.send(request).is_ok()
-        {
-            s.pending.insert(key);
+        if let Some(tx) = tx.clone() {
+            tx.push(request);
+            s.pending.insert(key, Instant::now());
+            if !icon {
+                // Fim do `HOLD`: redesenha para a tela largar a arte anterior se esta ainda não chegou.
+                slint::Timer::single_shot(HOLD, || {
+                    STATE.with(|s| {
+                        let cb = s.borrow_mut().on_ready.take();
+                        if let Some(cb) = cb {
+                            cb();
+                            s.borrow_mut().on_ready = Some(cb);
+                        }
+                    });
+                });
+            }
         }
         None
     })
 }
 
-/// A imagem (em qualquer tamanho, ou a cópia de vidro) ainda está a caminho.
 /// Luminância relativa (WCAG) média dos pixels visíveis de uma imagem já decodificada (o logo do jogo), medida
 /// uma vez por URI. `None` se a imagem não tem pixels legíveis ou é toda transparente.
 pub fn mean_luminance(uri: &str, img: &Image) -> Option<f32> {
@@ -233,9 +275,15 @@ pub fn mean_luminance(uri: &str, img: &Image) -> Option<f32> {
     lum
 }
 
+/// A imagem (em qualquer tamanho, ou a cópia de vidro) ainda está a caminho, pedida há menos de `HOLD`: depois disso a tela não espera mais por ela (ver `HOLD`).
 pub fn is_pending(uri: &str) -> bool {
     let tail = format!("|{uri}");
-    STATE.with(|s| s.borrow().pending.iter().any(|k| k.ends_with(&tail)))
+    STATE.with(|s| {
+        s.borrow()
+            .pending
+            .iter()
+            .any(|(k, since)| k.ends_with(&tail) && since.elapsed() < HOLD)
+    })
 }
 
 /// Chamar depois de montar cada quadro (todas as `get` da tela já feitas).
@@ -258,15 +306,9 @@ pub fn clear() {
     });
 }
 
-fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
+fn worker(queue: Queue, resolver: Resolver) {
     loop {
-        let req = {
-            let Ok(rx) = rx.lock() else { return };
-            match rx.recv() {
-                Ok(r) => r,
-                Err(_) => return,
-            }
-        };
+        let req = queue.pop();
         let buf = load(&req, &resolver);
         let key = req.key;
         let sent = slint::invoke_from_event_loop(move || {
@@ -282,7 +324,7 @@ fn worker(rx: Arc<Mutex<Receiver<Request>>>, resolver: Resolver) {
                         s.lru.insert(key, shared(buf), bytes);
                     }
                     None => {
-                        s.failed.insert(key);
+                        s.failed.insert(key, Instant::now());
                     }
                 }
             });
@@ -483,6 +525,25 @@ fn percent_decode(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc::channel;
+
+    /// O jogo escolhido por último é servido primeiro: os pedidos dos jogos que a pessoa já passou ficam para depois.
+    #[test]
+    fn the_newest_request_is_served_first() {
+        let q = Queue::default();
+        for key in ["a", "b", "c"] {
+            q.push(Request {
+                key: key.into(),
+                uri: key.into(),
+                max_w: 1,
+                max_h: 1,
+                glass: false,
+                icon: false,
+            });
+        }
+        assert_eq!(q.pop().key, "c");
+        assert_eq!(q.pop().key, "b");
+    }
 
     /// Regressão da alpha.15: com 300 ícones na fila (cada um ~20 ms de rede), o fundo do jogo em destaque
     /// esperava atrás de todos (~4 s aqui; com a rede de verdade, minutos). Os ícones têm a fila deles.

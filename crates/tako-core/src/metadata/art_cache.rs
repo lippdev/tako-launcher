@@ -2,7 +2,7 @@
 //! passa do total (1 GiB por padrão), apaga os arquivos usados há mais tempo. Aceita `https://`,
 //! arquivos locais, `steam-art://` (vários candidatos) e `ssmedia://` (credenciais só na hora).
 
-use super::cache::write_atomic;
+use super::cache::write_cache_file;
 use super::http::{Http, HttpRequest, hex};
 use super::screenscraper::{MEDIA_SCHEME, ScreenScraperClient};
 use super::steam_art::{ArtSource, SteamArtResolver};
@@ -116,7 +116,7 @@ impl ArtCache {
             _ => return None,
         };
         if found.is_none() && !transient.get() {
-            let _ = write_atomic(&miss, b"");
+            let _ = write_cache_file(&miss, b"");
         }
         found
     }
@@ -180,7 +180,7 @@ impl ArtCache {
     }
 
     fn store(&self, path: &Path, bytes: &[u8]) -> Option<PathBuf> {
-        if let Err(e) = write_atomic(path, bytes) {
+        if let Err(e) = write_cache_file(path, bytes) {
             tracing::warn!("Não foi possível gravar a arte no cache: {e}");
             return None;
         }
@@ -393,7 +393,7 @@ mod tests {
         );
         let uri = "steam-art://570/icon";
         // Marcado como sem ícone; depois a Steam baixou o dela.
-        write_atomic(&miss_of(&c, uri), b"").unwrap();
+        write_cache_file(&miss_of(&c, uri), b"").unwrap();
         std::fs::write(library.join("570_icon.jpg"), [0xFF, 0xD8, 0xFF]).unwrap();
         assert_eq!(c.locate(uri), Some(library.join("570_icon.jpg")));
         assert!(http.sent().is_empty());
