@@ -2157,6 +2157,7 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.filter_sort"),
                 ctx.t("desktop.view.menu"),
                 ctx.t("desktop.add_game"),
+                ctx.t("desktop.refresh_library"),
             ],
         );
         out.set(

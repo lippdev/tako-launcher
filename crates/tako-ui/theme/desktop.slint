@@ -3008,6 +3008,12 @@ component DeskLibrary inherits Rectangle {
                     }
                     IconBtn {
                         y: (parent.height - self.height) / 2;
+                        icon: "refresh";
+                        label: view-labels[7];
+                        clicked => { root.clicked("rescan", 0); }
+                    }
+                    IconBtn {
+                        y: (parent.height - self.height) / 2;
                         icon: "plus";
                         label: view-labels[6];
                         clicked => { root.clicked("add-game", 0); }

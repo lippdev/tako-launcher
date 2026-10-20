@@ -10,7 +10,8 @@ use tako_core::metadata::steam_art::SteamArtResolver;
 use tako_core::paths::DataPaths;
 
 pub fn cache(paths: &DataPaths) -> Arc<ArtCache> {
-    let http = Arc::new(UreqHttp::new(Duration::from_secs(20)));
+    // Arte é para a tela de agora: uma CDN lenta não pode prender o worker (cada arte tenta até três endereços).
+    let http = Arc::new(UreqHttp::new(Duration::from_secs(8)));
     let steam = SteamArtResolver::new(http.clone(), tako_sources::steam::find_root());
     Arc::new(ArtCache::new(paths.art_cache(), http, steam, None))
 }
