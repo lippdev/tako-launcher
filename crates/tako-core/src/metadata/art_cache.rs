@@ -19,6 +19,9 @@ pub const DEFAULT_LIMIT: u64 = 1024 * 1024 * 1024;
 pub const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
 /// Dias em que uma arte que a loja não tem (404, ícone ausente na API) não é pedida de novo.
 const MISS_DAYS: u64 = 7;
+/// Conteúdo do marcador de falta; marcador com outro conteúdo (versões antigas, gravadas quando o ícone da
+/// Steam vinha de um endereço que dava 404) não vale e a arte é procurada de novo.
+const MISS_MARK: &[u8] = b"2";
 
 pub struct ArtCache {
     dir: PathBuf,
@@ -76,11 +79,12 @@ impl ArtCache {
         let mut miss = cached.clone().into_os_string();
         miss.push(".miss");
         let miss = PathBuf::from(miss);
-        let fresh = std::fs::metadata(&miss)
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|t| t.elapsed().ok())
-            .is_some_and(|age| age.as_secs() < MISS_DAYS * 24 * 3600);
+        let fresh = std::fs::read(&miss).is_ok_and(|b| b == MISS_MARK)
+            && std::fs::metadata(&miss)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .is_some_and(|age| age.as_secs() < MISS_DAYS * 24 * 3600);
         if fresh {
             return self.steam.local_files(uri).into_iter().next();
         }
@@ -116,7 +120,7 @@ impl ArtCache {
             _ => return None,
         };
         if found.is_none() && !transient.get() {
-            let _ = write_cache_file(&miss, b"");
+            let _ = write_cache_file(&miss, MISS_MARK);
         }
         found
     }
@@ -333,6 +337,10 @@ mod tests {
             .unwrap();
         assert!(c.locate(steam).is_none());
         assert_eq!(http.sent().len(), 2);
+        // Marcador das versões antigas (vazio) não vale: pergunta de novo.
+        std::fs::write(miss_of(&c, steam), b"").unwrap();
+        assert!(cache(dir.path(), http.clone()).locate(steam).is_none());
+        assert_eq!(http.sent().len(), 3);
         // 410 também marca; o marcador vai ao lado do arquivo, com a extensão dele.
         let http = Arc::new(FakeHttp::with_fallback(410, ""));
         let gone = "https://cdn.epic/sumiu.png";

@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex};
 
 const ASSET_BASE: &str = "https://shared.akamai.steamstatic.com/store_item_assets/";
 const LEGACY_BASE: &str = "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/";
+/// Ícones da comunidade: o endereço antigo (`steamcommunity/public/images/apps`) passou a dar 404.
+const ICON_BASE: &str = "https://shared.akamai.steamstatic.com/community_assets/images/apps/";
 
 /// Onde buscar uma arte: na rede ou num arquivo do cache da Steam.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,9 +83,7 @@ impl SteamArtResolver {
                     .and_then(Value::as_str)
                     .filter(|h| !h.is_empty() && h.bytes().all(|b| b.is_ascii_alphanumeric()))
                 {
-                    out.push(ArtSource::Url(format!(
-                        "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/{app}/{hash}.jpg"
-                    )));
+                    out.push(ArtSource::Url(format!("{ICON_BASE}{app}/{hash}.jpg")));
                 }
             }
             "logo" => {
@@ -253,7 +253,7 @@ mod tests {
             ArtSource::Url(format!("{LEGACY_BASE}570/logo_2x.png"))
         );
         assert!(
-            matches!(&r.resolve("steam-art://570/icon")[0], ArtSource::Url(u) if u.ends_with("/570/deadbeef.jpg"))
+            matches!(&r.resolve("steam-art://570/icon")[0], ArtSource::Url(u) if u == "https://shared.akamai.steamstatic.com/community_assets/images/apps/570/deadbeef.jpg")
         );
         assert_eq!(http.sent().len(), 1); // uma consulta por jogo
         assert!(r.resolve("https://x/570/cover").is_empty());
