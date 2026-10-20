@@ -6,11 +6,13 @@ pub enum Status {
     Disabled,
     RecoveryRequired,
     Unavailable,
+    Applying,
 }
 
 #[cfg(any(windows, test))]
 fn parse_status(output: &str) -> Result<Status, String> {
     match output.trim() {
+        "applying" => Ok(Status::Applying),
         "enabled" => Ok(Status::Enabled),
         "disabled" => Ok(Status::Disabled),
         "recovery" => Ok(Status::RecoveryRequired),
@@ -71,7 +73,12 @@ mod native {
             .write(true)
             .open(layout.join("launcher.lock"))
             .map_err(|e| e.to_string())?;
-        lock.try_lock().map_err(|e| e.to_string())?;
+        if let Err(error) = lock.try_lock() {
+            if action == "status" && matches!(error, std::fs::TryLockError::WouldBlock) {
+                return Ok("applying".into());
+            }
+            return Err(error.to_string());
+        }
         let script = layout.join("Setup.ps1");
         std::fs::write(&script, include_str!("fse.ps1")).map_err(|e| e.to_string())?;
         if action == "enable" && !layout.join("previous.clixml").exists() {
@@ -159,6 +166,7 @@ mod tests {
     fn statuses_fail_closed() {
         assert_eq!(parse_status("enabled\r\n"), Ok(Status::Enabled));
         assert_eq!(parse_status("disabled"), Ok(Status::Disabled));
+        assert_eq!(parse_status("applying"), Ok(Status::Applying));
         assert_eq!(parse_status("unavailable"), Ok(Status::Unavailable));
         assert!(parse_status("garbage").is_err());
     }
@@ -182,6 +190,7 @@ mod tests {
     #[test]
     fn identity_has_home_extension_and_development_catalog() {
         assert!(MANIFEST.contains("windows.gamingApp"));
+        assert!(!MANIFEST.contains("EntryPoint="));
         assert!(MANIFEST.contains("uap10:Parameters=\"--big-picture\""));
         assert!(MANIFEST.contains("<uap10:AllowExternalContent>true"));
         assert!(SCCD.contains("<Catalog>FFFF</Catalog>"));

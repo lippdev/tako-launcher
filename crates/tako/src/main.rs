@@ -92,6 +92,14 @@ fn main() {
     let started = std::time::Instant::now();
     tako_platform::tune_allocator();
     let all: Vec<String> = std::env::args().collect();
+    if all.len() == 3 && all[1] == "--fse-setup" && all[2] == "disable" {
+        let paths = DataPaths::detect();
+        init_logs(&paths, "fse-setup");
+        if let Err(error) = tako_platform::fse::disable() {
+            tracing::error!(%error, "Falha ao restaurar modo tela cheia do Windows");
+        }
+        return;
+    }
     let link_url = tako_core::links::argument(&all).map(str::to_owned);
     let link = link_url.as_deref().and_then(tako_core::links::parse);
     // Uma URL do navegador não pode injetar opções como --data-dir por aspas na linha do Windows.

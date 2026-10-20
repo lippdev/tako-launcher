@@ -4,7 +4,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 ### What's new
-- Use Tako as the Windows full screen experience home app from Settings.
+- **Windows full screen mode:** use Tako as the home app from Settings.
 - **Torrent downloads:** download games from sources you add yourself, in a panel with pause, resume and a queue. Off by default.
 - **Games not installed:** games from your store accounts that aren't on this PC show up after the installed ones, grouped by store, in the list and the grid. Each group opens and closes, and Tako remembers how you left it.
 - **Install from the store:** the ⬇ button on the row, the cover and the highlight opens the install in the store client, showing the store and the size. Games bought in more than one store let you pick which to install from.

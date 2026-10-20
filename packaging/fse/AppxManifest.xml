@@ -27,6 +27,7 @@
   </Resources>
 
   <Applications>
+    <!-- Sparse win32App must not declare EntryPoint: microsoft/winappCli docs/guides/sparse.md. -->
     <Application Id="App" Executable="__EXECUTABLE__" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App" uap10:Parameters="--big-picture">
       <uap:VisualElements
         DisplayName="Tako"

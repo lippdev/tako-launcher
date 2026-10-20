@@ -28,7 +28,7 @@ function Get-Item {
     $o | Add-Member ScriptMethod GetValue { param($name,$fallback,$options) $script:GamingHome }
     $o
 }
-function New-Item { param($Path,[switch]$Force) }
+function New-Item { param($Path,[switch]$Force) if ($Force) { $script:OtherValue = $null } }
 function New-ItemProperty {
     param($LiteralPath,$Name,$Value,$PropertyType,[switch]$Force)
     Assert ($LiteralPath -like 'HKCU:*') 'HKLM must only be elevated'
@@ -41,6 +41,7 @@ function Start-Process {
     if ($script:Cancel) { throw 'UAC cancelled' }
     $code = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
     Assert ($code -notmatch 'GamingHomeApp|Add-AppxPackage') 'user operation elevated'
+    Assert ($code -notmatch 'New-Item -Path [^;]+ -Force') 'HKLM key must preserve other values'
     $script:Elevations++
     if ($code -match '-Value (\d+)') { $script:Dev = [int]$Matches[1] } else { $script:Dev = $null }
     [pscustomobject]@{ExitCode=0}
@@ -48,7 +49,7 @@ function Start-Process {
 function Run($action) { & ([scriptblock]::Create($source)) -Action $action -Layout $script:Layout -Executable (Join-Path $script:AppRoot 'Tako.exe') }
 function Reset($gamingHome,$dev) {
     Microsoft.PowerShell.Management\Remove-Item "$script:Layout/*" -Force -ErrorAction SilentlyContinue
-    $script:GamingHome=$gamingHome; $script:Dev=$dev; $script:Package=$false; $script:Build=26100
+    $script:OtherValue='preserved'; $script:GamingHome=$gamingHome; $script:Dev=$dev; $script:Package=$false; $script:Build=26100
     $script:Supported=$true; $script:FailRegister=$false; $script:FailRemove=$false; $script:Cancel=$false; $script:Elevations=0
 }
 try {
@@ -69,11 +70,21 @@ try {
             Assert ($script:Dev -eq 1) 'developer mode enabled'
             Run disable
             Assert ($script:GamingHome -eq $oldHome) 'home restored'
+            Assert ($script:OtherValue -eq 'preserved') 'other registry values survive'
             Assert ($script:Dev -eq $oldDev) 'developer mode restored'
             Assert (-not $script:Package) 'package removed'
             Assert (-not (Test-Path "$script:Layout/previous.clixml")) 'backup cleaned'
             if ($oldDev -eq 1) { Assert ($script:Elevations -eq 0) 'existing developer mode requires no UAC' }
         }
+    }
+    foreach ($laterHome in @('Later!App', $null)) {
+        Reset 'Original!App' 0
+        Run enable
+        $script:GamingHome=$laterHome
+        Run disable
+        Assert ($script:GamingHome -eq $laterHome) 'later user choice preserved'
+        Assert (-not $script:Package -and $script:Dev -eq 0) 'later choice cleanup'
+        Assert (-not (Test-Path "$script:Layout/previous.clixml")) 'later choice backup cleaned'
     }
     Reset 'Original!App' 0
     $script:FailRegister=$true

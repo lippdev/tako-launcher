@@ -10,7 +10,7 @@ function Set-DeveloperMode($value) {
     $operation = if ($null -eq $value) {
         "if ((Get-ItemProperty -LiteralPath '$dev').PSObject.Properties.Name -contains 'AllowDevelopmentWithoutDevLicense') { Remove-ItemProperty -LiteralPath '$dev' -Name AllowDevelopmentWithoutDevLicense }"
     } else {
-        "New-Item -Path '$dev' -Force | Out-Null; New-ItemProperty -LiteralPath '$dev' -Name AllowDevelopmentWithoutDevLicense -PropertyType DWord -Value $([int]$value) -Force | Out-Null"
+        "if (-not (Test-Path -LiteralPath '$dev')) { New-Item -Path '$dev' | Out-Null }; New-ItemProperty -LiteralPath '$dev' -Name AllowDevelopmentWithoutDevLicense -PropertyType DWord -Value $([int]$value) -Force | Out-Null"
     }
     $code = "try { `$ErrorActionPreference='Stop'; $operation; exit 0 } catch { exit 1 }"
     $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
@@ -18,13 +18,16 @@ function Set-DeveloperMode($value) {
     if ($p.ExitCode -ne 0) { throw 'Developer Mode setup failed.' }
 }
 function Restore-Previous($state) {
-    if ($null -eq $state.Home) {
-        if ($null -ne (Get-ItemProperty -LiteralPath $gaming -ErrorAction SilentlyContinue).GamingHomeApp) {
+    $package = Get-AppxPackage -Name $name
+    $currentHome = (Get-ItemProperty -LiteralPath $gaming -ErrorAction SilentlyContinue).GamingHomeApp
+    # Preserve a later user choice, including removing GamingHomeApp.
+    if ($package -and $currentHome -eq "$($package.PackageFamilyName)!App") {
+        if ($null -eq $state.Home) {
             Remove-ItemProperty -LiteralPath $gaming -Name GamingHomeApp
+        } else {
+            if (-not (Test-Path -LiteralPath $gaming)) { New-Item -Path $gaming | Out-Null }
+            New-ItemProperty -LiteralPath $gaming -Name GamingHomeApp -Value $state.Home -PropertyType $state.HomeKind -Force | Out-Null
         }
-    } else {
-        New-Item -Path $gaming -Force | Out-Null
-        New-ItemProperty -LiteralPath $gaming -Name GamingHomeApp -Value $state.Home -PropertyType $state.HomeKind -Force | Out-Null
     }
     Get-AppxPackage -Name $name | Remove-AppxPackage
     if ($state.Dev -ne 1) {
