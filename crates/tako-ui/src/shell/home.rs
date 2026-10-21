@@ -161,7 +161,7 @@ impl Page for HomePage {
                     ctx.effect(if self.hero_button == 0 {
                         Effect::AddGame
                     } else {
-                        Effect::Rescan
+                        Effect::UserRescan
                     });
                     Nav::Stay
                 }

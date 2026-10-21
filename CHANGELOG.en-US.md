@@ -38,6 +38,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 ### Fixes
 - **Steam icon fallback:** when a Steam game's primary icon address fails on the CDN, Tako falls back to the community icon from Steam's API and avoids caching the failure indefinitely.
 - **Update checks:** slow connections keep going while receiving data, with gzip compression and a clear failure when the network stalls.
+- **Library refresh feedback:** while the library refreshes, the button spins and the bar shows "Updating…"; clicking again says it is already running, and at the end a notice shows the game count, new games and any store that failed.
 - **Desktop background and glass:** the dark vertical band in the middle of light artwork is gone: the side darkening only decreases and the ellipse behind the text reaches zero before its edge. The bars and glass cards blur the already-darkened artwork and use the solid tint until the blurred copy arrives (UI-GLASS-001).
 - **Step instructions:** appear one per line.
 - **Faster startup:** the whole library shows up as soon as Tako opens, from the last store scan, while a fresh scan runs in the background.
