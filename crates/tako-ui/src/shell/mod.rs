@@ -1,6 +1,7 @@
 //! Estado da interface (o `ShellViewModel` do WPF): páginas com histórico, barra lateral, camadas, dicas e
 //! avisos. Puro Rust e testável sem janela: `render` produz as propriedades do tema, o `bridge` as aplica.
 
+pub mod activities;
 pub mod add_game;
 pub mod art;
 pub(crate) mod art_review;
@@ -585,6 +586,19 @@ impl Shell {
             self.ctx.dirty = true;
             return;
         }
+        if zone == "desk-activity" {
+            activities::open(&mut self.ctx, Instant::now());
+            self.after_action();
+            self.ctx.dirty = true;
+            return;
+        }
+        if zone == "desk-activity-action" {
+            if let Some(a) = self.ctx.activity.list.shown(Instant::now()) {
+                let key = a.activity.key.clone();
+                activities::run_action(&mut self.ctx, &key);
+            }
+            return;
+        }
         if zone == "desk-brand" {
             self.layers.push(Box::new(desktop::brand_menu()));
             self.ctx.dirty = true;
@@ -931,14 +945,14 @@ impl Shell {
         );
         out.set("see-all-label", self.ctx.t("home.see_all"));
         if self.ctx.desktop {
-            self.render_desktop_bar(&mut out);
+            self.render_desktop_bar(&mut out, now);
         }
         out
     }
 
     /// Barra de cima do desktop: as guias das áreas (Biblioteca e Perfil; Loja quando existir), a busca e o botão
     /// da tela cheia. Configurações fica no menu da marca.
-    fn render_desktop_bar(&self, out: &mut Out) {
+    fn render_desktop_bar(&self, out: &mut Out, now: Instant) {
         let kind = self.page().kind();
         let item = |id: &str, label: &str, icon: &str, selected: bool| crate::model::NavItem {
             id: id.into(),
@@ -961,19 +975,8 @@ impl Shell {
                 .map(|k| self.ctx.t(&format!("desktop.window.{k}")))
                 .to_vec(),
         );
-        out.set(
-            "desk-update-label",
-            if self.ctx.update_ready.is_some() {
-                self.ctx.t("desktop.window.update_ready")
-            } else {
-                String::new()
-            },
-        );
-        // PainelDownloads: a pílula só com download ou instalação ativa.
-        let pill = downloads::pill(&self.ctx);
-        out.set("desk-download-on", pill.is_some());
-        out.set("desk-download-label", pill.unwrap_or_default());
-        out.set("desk-download-tip", self.ctx.t("downloads.title"));
+        // AtividadeNaBarra: downloads, biblioteca, capas e atualização numa pílula só, antes do perfil.
+        activities::render(&self.ctx, out, now);
         let name = profiles::active_name(&self.ctx);
         let initial = name
             .chars()

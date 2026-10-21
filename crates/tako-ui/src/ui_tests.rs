@@ -1171,6 +1171,50 @@ created-by-tako = true
                 );
                 shell.after_action();
             }
+            // AtividadeNaBarra (UX-006): `atividade-<estado>` = giro, download, concluida, erro, varias, pronta, lista.
+            Ok(p) if p.starts_with("atividade-") => {
+                use tako_core::activities::{Action, Kind};
+                let now = Instant::now();
+                let list = &mut shell.ctx.activity.list;
+                let page = &p["atividade-".len()..];
+                let spin = |l: &mut tako_core::activities::Activities| {
+                    l.start("library", Kind::LibraryRefresh, "Atualizando biblioteca", "Steam · 3 de 5 lojas", now)
+                };
+                let download = |l: &mut tako_core::activities::Activities| {
+                    l.start("download:1", Kind::Download, "Hades II", "", now);
+                    l.progress("download:1", Some(42), "42% · faltam 4 min");
+                };
+                match page {
+                    "giro" => spin(list),
+                    "download" => download(list),
+                    "concluida" => {
+                        spin(list);
+                        list.finish("library", "Biblioteca atualizada", "4 jogos novos", now);
+                    }
+                    "erro" => {
+                        list.start("update-check", Kind::UpdateCheck, "", "", now);
+                        list.fail("update-check", "Não deu para procurar atualizações", Some(Action::Retry), now);
+                    }
+                    "pronta" => shell.ctx.update_ready = Some("snapshot-only".into()),
+                    _ => {
+                        spin(list);
+                        download(list);
+                        list.start("covers", Kind::Covers, "Buscando capas", "12 de 24 jogos", now);
+                        list.progress("covers", None, "12 de 24 jogos");
+                        list.start("cloud", Kind::CloudSync, "Sincronizando a nuvem", "Hades II", now);
+                        list.finish("cloud", "Nuvem sincronizada", "Hades II", now);
+                    }
+                }
+                if page == "pronta" {
+                    crate::shell::activities::tick(&mut shell.ctx, now);
+                }
+                if matches!(page, "varias" | "lista") {
+                    shell.click("desk-activity", 0);
+                    if page == "varias" {
+                        shell.close_layers();
+                    }
+                }
+            }
             Ok("update-menu") => {
                 shell.ctx.app_update.check = crate::app_updates::Check::Searching;
                 shell.click("desk-brand", 0);

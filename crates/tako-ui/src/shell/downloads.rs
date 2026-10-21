@@ -11,6 +11,7 @@ use crate::model::{Hint, Overlay, PanelRow};
 use crate::shell::keyboard::KeyboardLayer;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::Instant;
 use tako_core::downloads::{
     Download, DownloadState, Downloads, NewDownload, is_inside_root, source, source::Source,
     suggest,
@@ -143,8 +144,14 @@ fn load_sources(ctx: &mut Ctx) {
     );
 }
 
-/// Lê o motor (a cada segundo, pelo app) e põe o progresso nos jogos vinculados. `true` = redesenhar.
+/// Lê o motor (a cada segundo, pelo app) e põe o progresso nos jogos vinculados e na AtividadeNaBarra.
+/// `true` = redesenhar.
 pub fn poll(ctx: &mut Ctx) -> bool {
+    let changed = poll_engine(ctx);
+    sync_activities(ctx, Instant::now()) || changed
+}
+
+fn poll_engine(ctx: &mut Ctx) -> bool {
     if enabled(ctx) {
         load_sources(ctx);
     }
@@ -154,20 +161,8 @@ pub fn poll(ctx: &mut Ctx) -> bool {
     let states: Vec<_> = m.list().iter().map(|d| d.state.clone()).collect();
     let changed = m.poll();
     let state_changed = states != m.list().iter().map(|d| d.state.clone()).collect::<Vec<_>>();
-    let finished: Vec<String> = m
-        .list()
-        .iter()
-        .zip(states.iter())
-        .filter(|(d, before)| {
-            d.state == DownloadState::Completed && **before != DownloadState::Completed
-        })
-        .map(|(d, _)| d.title.clone())
-        .collect();
     if state_changed {
         save(ctx);
-    }
-    for title in finished {
-        ctx.toast(ctx.tf("downloads.finished", &[("title", &title)]));
     }
     sync_games(ctx);
     changed
@@ -213,37 +208,91 @@ fn store_installs(ctx: &Ctx) -> Vec<&tako_core::library::Game> {
         .collect()
 }
 
-/// Texto da pílula da barra ("42%", ou vazio sem nada ativo). Soma downloads e instalações das lojas.
-pub fn pill(ctx: &Ctx) -> Option<String> {
-    let (mut done, mut total, mut any) = (0f64, 0f64, false);
-    if let Some(m) = &ctx.downloads.manager {
-        for d in m.list().iter().filter(|d| {
-            matches!(
-                d.state,
-                DownloadState::Downloading | DownloadState::Paused | DownloadState::Queued
+/// Downloads e instalações das lojas na AtividadeNaBarra: a mais antiga primeiro, com "42% · faltam 4 min".
+/// `true` = a fila mudou.
+fn sync_activities(ctx: &mut Ctx, now: Instant) -> bool {
+    use tako_core::activities::{Action, Kind, State as Phase};
+    let before = ctx.activity.list.all().to_vec();
+    let pct = |f: Option<f32>| f.map(|f| (f * 100.).round() as u8);
+    // (chave, título, estado, fração, restante)
+    let mut items: Vec<(String, String, DownloadState, Option<f32>, String)> = ctx
+        .downloads
+        .manager
+        .iter()
+        .flat_map(|m| m.list())
+        .map(|d| {
+            let left = remaining(ctx, d);
+            (
+                format!("download:{}", d.id),
+                d.title.clone(),
+                d.state.clone(),
+                d.fraction(),
+                left,
             )
-        }) {
-            any = true;
-            if let Some(f) = d.fraction() {
-                done += f as f64;
-                total += 1.;
+        })
+        .collect();
+    items.extend(store_installs(ctx).iter().map(|g| {
+        let f = g.installing.and_then(|p| p.fraction);
+        (
+            format!("install:{}", g.id),
+            g.title.clone(),
+            DownloadState::Downloading,
+            f,
+            String::new(),
+        )
+    }));
+    let seen: HashSet<String> = items.iter().map(|i| i.0.clone()).collect();
+    for (key, title, state, fraction, left) in items {
+        let running = ctx
+            .activity
+            .list
+            .get(&key)
+            .is_some_and(|a| a.state == Phase::Running);
+        let args = [("title", title.as_str())];
+        let (finished, failed, paused) = (
+            ctx.tf("downloads.finished", &args),
+            ctx.tf("desktop.activity.download_failed", &args),
+            ctx.t("downloads.paused"),
+        );
+        let list = &mut ctx.activity.list;
+        match state {
+            DownloadState::Completed | DownloadState::Failed(_) if !running => {}
+            DownloadState::Completed => list.finish(&key, &finished, "", now),
+            DownloadState::Failed(_) => list.fail(&key, &failed, Some(Action::Retry), now),
+            state => {
+                let percent = pct(fraction);
+                let paused = (state == DownloadState::Paused).then_some(paused);
+                let detail = [paused, percent.map(|p| format!("{p}%")), Some(left)]
+                    .into_iter()
+                    .flatten()
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(" · ");
+                if !running {
+                    list.start(&key, Kind::Download, &title, &detail, now);
+                }
+                list.progress(&key, percent, &detail);
             }
         }
     }
-    for g in store_installs(ctx) {
-        any = true;
-        if let Some(f) = g.installing.and_then(|p| p.fraction) {
-            done += f as f64;
-            total += 1.;
+    // Sumiram da lista: a instalação da loja acabou (resumo); o download removido ou cancelado só sai.
+    let gone: Vec<(String, String)> = ctx
+        .activity
+        .list
+        .all()
+        .iter()
+        .filter(|a| a.kind == Kind::Download && a.state == Phase::Running && !seen.contains(&a.key))
+        .map(|a| (a.key.clone(), a.title.clone()))
+        .collect();
+    for (key, title) in gone {
+        if key.starts_with("install:") {
+            let done = ctx.tf("desktop.activity.install_done", &[("title", &title)]);
+            ctx.activity.list.finish(&key, &done, "", now);
+        } else {
+            ctx.activity.list.dismiss(&key);
         }
     }
-    any.then(|| {
-        if total > 0. {
-            format!("{}%", (done / total * 100.).round() as i32)
-        } else {
-            String::new()
-        }
-    })
+    ctx.activity.list.all() != before.as_slice()
 }
 
 fn speed(bps: u64) -> String {
@@ -1022,6 +1071,7 @@ pub(crate) fn demo(ctx: &mut Ctx) -> tako_core::downloads::fake::MemoryDownloade
     ctx.downloads.manager = Some(m);
     ctx.downloads.sources_loaded = true;
     sync_games(ctx);
+    sync_activities(ctx, Instant::now());
     engine
 }
 
@@ -1118,11 +1168,15 @@ mod tests {
     }
 
     #[test]
-    fn panel_groups_downloads_and_store_installs_and_the_pill_sums_them() {
+    fn panel_groups_downloads_and_store_installs_and_feed_the_activities() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_d, mut ctx) = ctx();
-        assert_eq!(pill(&ctx), Some("42%".into()), "só a instalação da loja");
+        let now = Instant::now();
+        sync_activities(&mut ctx, now);
+        let all = ctx.activity.list.all();
+        assert_eq!(all.len(), 1, "só a instalação da loja");
+        assert_eq!((all[0].progress, all[0].detail.as_str()), (Some(42), "42%"));
         demo(&mut ctx);
         let rows = panel_rows(&ctx);
         let k = keys(&rows);
@@ -1136,8 +1190,16 @@ mod tests {
         assert_eq!(done.row.kind, "download");
         assert!(rows.iter().any(|i| i.row.key == "clear-completed"));
         assert_eq!(rows.last().unwrap().row.key, "sources");
-        // (42% da loja + 42% do torrent + fila sem tamanho) / 2.
-        assert_eq!(pill(&ctx), Some("42%".into()));
+        // Uma atividade para cada instalação ativa: a da loja, a do torrent a 42% e a da fila.
+        let list = &ctx.activity.list;
+        assert_eq!(list.all().len(), 3);
+        assert!(
+            list.all()
+                .iter()
+                .any(|a| a.progress == Some(42) && a.key.starts_with("download:"))
+        );
+        assert_eq!(list.running_count(), 3);
+        assert!(!sync_activities(&mut ctx, now), "nada mudou: não redesenha");
         let ov = panel(&mut ctx).render(&ctx);
         assert!(ov.overline.starts_with("2 baixando · 1 na fila"));
     }
@@ -1160,7 +1222,10 @@ mod tests {
         engine.set(2, 9_800_000_000, Some(9_800_000_000), true);
         assert!(poll(&mut ctx));
         assert_eq!(progress(&ctx), None);
-        assert!(ctx.toast.is_some());
+        // O fim do download vira o ✓ da pílula (e não mais um aviso).
+        let done = ctx.activity.list.get("download:2").unwrap();
+        assert_eq!(done.state, tako_core::activities::State::Done);
+        assert!(done.title.contains("terminou de baixar") || done.title.contains("finished"));
         // O da fila começa sozinho.
         let m = ctx.downloads.manager.as_ref().unwrap();
         assert_eq!(m.list()[2].state, DownloadState::Downloading);

@@ -535,6 +535,121 @@ component WindowButton inherits Rectangle {
 }
 
 // BarraSuperior é também a barra da janela: marca, guias, perfil, Tela cheia e controles nativos.
+// Anel de progresso da instalação (NaoInstalados): trilha fraca e o arco da fração; a loja que não informa a
+// fração (negativa) mostra um arco girando, parado com "reduzir animações".
+component ProgressRing inherits Rectangle {
+    in property <length> size: 36px;
+    in property <length> thickness: 3.5px;
+    in property <float> fraction: -1;
+    in property <color> tint: Ui.on-accent;
+    in property <color> track: #ffffff26;
+    width: size;
+    height: size;
+    property <float> box: size / 1px;
+    property <float> r: box / 2 - thickness / 2px;
+    property <angle> sweep: (fraction < 0 ? 0.25 : min(max(fraction, 0.01), 0.999)) * 360deg;
+    Rectangle {
+        border-radius: parent.width / 2;
+        border-width: root.thickness;
+        border-color: root.track;
+    }
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: root.box;
+        viewbox-height: root.box;
+        commands: "M " + root.box / 2 + " " + (root.box / 2 - root.r) + " A " + root.r + " " + root.r + " 0 " + (root.sweep > 180deg ? "1" : "0") + " 1 " + (root.box / 2 + root.r * Math.sin(root.sweep)) + " " + (root.box / 2 - root.r * Math.cos(root.sweep));
+        stroke: root.tint;
+        stroke-width: root.thickness;
+        fill: transparent;
+        transform-rotation: fraction < 0 && !Ui.reduce-motion ? animation-tick() / 900ms * 360deg : 0deg;
+    }
+}
+
+// Anel de progresso (JogarEAbrir): trilha fraca e um arco girando; com "reduzir animações" fica parado.
+component Ring inherits Rectangle {
+    in property <length> size: 22px;
+    in property <color> tint: Ui.on-primary;
+    width: size;
+    height: size;
+    Rectangle {
+        border-radius: parent.width / 2;
+        border-width: 2px;
+        border-color: tint.with-alpha(0.25);
+    }
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: "M 12 2 A 10 10 0 0 1 22 12";
+        stroke: tint;
+        stroke-width: 2px;
+        fill: transparent;
+        transform-rotation: Ui.reduce-motion ? 0deg : animation-tick() / 900ms * 360deg;
+    }
+}
+
+struct ActivityData {
+    id: string,
+    title: string,
+    detail: string,
+    icon: string,
+    progress: float,
+    action: string,
+}
+
+// AtividadeNaBarra (UX-006): ícone da pílula e das linhas da lista. Giro de 16 (tarefa sem %), anel de 18 (com %),
+// ✓ em success (concluída), ⚠ em warning (erro) e ponto success de 8 (atualização pronta). O giro e o anel
+// seguem "Reduzir animações" (Ring e ProgressRing já param).
+component ActivityIcon inherits Rectangle {
+    in property <string> icon;
+    // 0 a 100
+    in property <float> progress;
+    width: 18px;
+    height: 18px;
+    if icon == "spin": Ring { size: 16px; x: 1px; y: 1px; tint: Ui.on-accent; }
+    if icon == "ring": ProgressRing { size: 18px; thickness: 2.5px; fraction: progress / 100; }
+    if icon == "done": DeskIcon { name: "check"; size: 18px; tint: Ui.success; }
+    if icon == "warn": DeskIcon { name: "alert"; size: 18px; tint: Ui.warning; }
+    if icon == "dot": Rectangle { x: 5px; y: 5px; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
+}
+
+// Um lado do crossfade da pílula: ícone, as duas linhas e a ação do erro. Janela pequena: só o ícone.
+component ActivityFace inherits Rectangle {
+    in property <ActivityData> data;
+    in property <bool> small;
+    in property <bool> active;
+    callback act();
+    // 8 de folga: o texto cortado (…) por diferença de medida da fonte fica pior que um respiro a mais.
+    out property <length> pw: row.preferred-width + (small ? 0px : 8px);
+    opacity: active ? 1 : 0;
+    animate opacity { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    row := HorizontalLayout {
+        spacing: 10px;
+        // O lado que acabou de sair deixa de desenhar (e de girar) quando termina de sumir.
+        if active || root.opacity > 0: ActivityIcon { icon: data.icon; progress: data.progress; y: (parent.height - self.height) / 2; }
+        if !small: VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            Text { text: data.title; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; overflow: elide; }
+            if data.detail != "": Text { text: data.detail; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; overflow: elide; }
+        }
+        if !small && active && data.action != "": Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: at.preferred-width + 16px;
+            height: 28px;
+            border-radius: 8px;
+            background: aa.has-hover ? Ui.glass-hover : #ffffff14;
+            accessible-role: button;
+            accessible-label: data.action;
+            accessible-action-default => { root.act(); }
+            at := Text { text: data.action; color: Ui.on-accent; font-size: 12.5px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            aa := TouchArea { mouse-cursor: pointer; clicked => { root.act(); } }
+        }
+    }
+}
+
 component TopBar inherits Vidro {
     in property <[DeskNav]> items;
     in property <string> big-picture-label;
@@ -547,11 +662,38 @@ component TopBar inherits Vidro {
     in property <int> native-pressed;
     in property <bool> active: true;
     in property <[string]> labels;
-    in property <string> update-label;
-    // PainelDownloads: pílula "↓ 42%" antes do perfil, só com download ou instalação ativa.
-    in property <bool> download-on;
-    in property <string> download-label;
-    in property <string> download-tip;
+    // AtividadeNaBarra: a atividade em segundo plano mais importante, antes do perfil (some com a fila vazia).
+    in property <bool> activity-on;
+    in property <string> activity-id;
+    in property <string> activity-title;
+    in property <string> activity-detail;
+    // spin | ring | done | warn | dot
+    in property <string> activity-icon;
+    in property <float> activity-progress;
+    in property <string> activity-action;
+    in property <int> activity-more;
+    in property <string> activity-tip;
+    in property <string> activity-label;
+    in property <string> activity-announce;
+    // A lista Atividades está aberta (o pill fica no destaque do hover).
+    in property <bool> activity-open;
+    // Crossfade da AtividadeNaBarra: dois lados; a atividade nova vai para o lado escondido e os lados trocam.
+    property <ActivityData> activity-data: {
+        id: activity-id, title: activity-title, detail: activity-detail,
+        icon: activity-icon, progress: activity-progress, action: activity-action,
+    };
+    property <ActivityData> slot-a;
+    property <ActivityData> slot-b;
+    property <bool> on-b;
+    changed activity-data => {
+        // Mesma atividade (só a % ou o detalhe mudou): atualiza no lado visível, sem troca.
+        if (activity-data.id == (on-b ? slot-b : slot-a).id) {
+            if (on-b) { slot-b = activity-data; } else { slot-a = activity-data; }
+        } else {
+            if (on-b) { slot-a = activity-data; } else { slot-b = activity-data; }
+            on-b = !on-b;
+        }
+    }
     out property <length> profile-x: profile.absolute-position.x;
     out property <length> drag-start: drag.absolute-position.x;
     out property <length> drag-end: drag.absolute-position.x + drag.width;
@@ -653,47 +795,78 @@ component TopBar inherits Vidro {
                 double-clicked => { root.action("max"); }
             }
         }
-        if update-label != "": Rectangle {
-            width: ul.preferred-width + 26px + 8px;
-            Rectangle {
-                y: (parent.height - self.height) / 2;
-                width: parent.width - 8px;
-                height: 24px;
-                border-radius: self.height / 2;
-                background: uta.has-hover ? Ui.glass-hover : Ui.glass-control;
-                border-width: 1px;
-                border-color: Ui.glass-edge;
-                animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                accessible-role: button;
-                accessible-label: update-label;
-                Rectangle { x: 10px; y: (parent.height - self.height) / 2; width: 6px; height: 6px; border-radius: 3px; background: Ui.success; }
-                ul := Text { x: 22px; text: update-label; color: Ui.on-accent; font-size: 12px; font-weight: 600; vertical-alignment: center; }
-                uta := TouchArea { mouse-cursor: pointer; clicked => { root.action("update"); } }
-            }
-        }
-        if download-on: Rectangle {
+        if activity-on: Rectangle {
+            // 4 de espaço antes do perfil.
+            width: pill.width + 4px;
+            pill := Rectangle {
+            x: 0px;
             y: (parent.height - self.height) / 2;
             height: 40px;
-            width: dlay.preferred-width;
+            // 11 / 12 de respiro, o texto (até 340 no total) e o "+N" depois (que já traz os 10 de espaço).
+            width: min(340px, 23px + (on-b ? fb.pw : fa.pw) + more-box.width);
             border-radius: Ui.radius-control;
-            transform-scale: dta.pressed ? Ui.escala-pressionado : 1;
+            transform-scale: ata.pressed ? Ui.escala-pressionado : 1;
             animate transform-scale { duration: Ui.focus-time; }
-            background: dta.pressed ? Ui.glass-pressed : (dta.has-hover ? Ui.glass-hover : Ui.glass-control);
+            background: ata.pressed ? Ui.glass-pressed : (ata.has-hover || activity-open ? Ui.glass-hover : Ui.glass-control);
             border-width: 1px;
             border-color: Ui.glass-edge;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: button;
-            accessible-label: download-label != "" ? download-tip + ": " + download-label : download-tip;
+            accessible-label: activity-label;
+            accessible-action-default => { root.clicked("desk-activity", 0); }
             if focus-index == 1 + items.length: FocusRing { radius: Ui.radius-control; }
-            dlay := HorizontalLayout {
-                padding-left: 10px;
-                padding-right: download-label != "" ? 12px : 10px;
-                spacing: 6px;
-                DeskIcon { name: "download"; size: 18px; y: (parent.height - self.height) / 2; }
-                if download-label != "": Text { text: download-label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+            ata := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked("desk-activity", 0); }
             }
-            dta := TouchArea { mouse-cursor: pointer; clicked => { root.action("downloads"); } }
-            Tip { text: download-tip; hovering: dta.has-hover; }
+            HorizontalLayout {
+                padding-left: 11px;
+                padding-right: 12px;
+                spacing: 0px;
+                // Crossfade: a atividade nova entra num lado enquanto a anterior sai pelo outro.
+                Rectangle {
+                    horizontal-stretch: 1;
+                    fa := ActivityFace {
+                        width: parent.width;
+                        height: parent.height;
+                        data: slot-a;
+                        small: root.small;
+                        active: !on-b;
+                        act => { root.clicked("desk-activity-action", 0); }
+                    }
+                    fb := ActivityFace {
+                        width: parent.width;
+                        height: parent.height;
+                        data: slot-b;
+                        small: root.small;
+                        active: on-b;
+                        act => { root.clicked("desk-activity-action", 0); }
+                    }
+                }
+                more-box := Rectangle {
+                    visible: activity-more > 0;
+                    width: activity-more > 0 ? more-text.preferred-width + 12px + 10px : 0px;
+                    Rectangle {
+                        x: 10px;
+                        y: (parent.height - self.height) / 2;
+                        width: parent.width - 10px;
+                        height: 20px;
+                        border-radius: 10px;
+                        background: #ffffff1f;
+                        more-text := Text { text: "+" + activity-more; color: Ui.on-accent; font-size: 12px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+            // Leitor de tela: anuncia início, conclusão e erro; o texto não traz a porcentagem.
+            Rectangle {
+                width: 1px;
+                height: 1px;
+                accessible-role: text;
+                accessible-label: activity-announce;
+                accessible-live-region: polite;
+            }
+            Tip { text: activity-tip; hovering: ata.has-hover; }
+            }
         }
         profile := Rectangle {
             y: (parent.height - self.height) / 2;
@@ -703,7 +876,7 @@ component TopBar inherits Vidro {
             background: pta.pressed ? Ui.glass-pressed : pta.has-hover ? Ui.glass-hover : Ui.glass-control;
             accessible-role: button;
             accessible-label: profile-name;
-            if focus-index == 1 + items.length + (download-on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
+            if focus-index == 1 + items.length + (activity-on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
             pl := HorizontalLayout {
                 padding-left: 6px; padding-right: 10px; spacing: 8px;
                 Rectangle {
@@ -734,7 +907,7 @@ component TopBar inherits Vidro {
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: button;
             accessible-label: big-picture-label;
-            if focus-index == 2 + items.length + (download-on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
+            if focus-index == 2 + items.length + (activity-on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
             DeskIcon { name: "gamepad"; size: 22px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
             fta := TouchArea {
                 mouse-cursor: pointer;
@@ -871,36 +1044,6 @@ component IconBtn inherits Rectangle {
     Tip { text: label; hovering: ita.has-hover; }
 }
 
-// Anel de progresso da instalação (NaoInstalados): trilha fraca e o arco da fração; a loja que não informa a
-// fração (negativa) mostra um arco girando, parado com "reduzir animações".
-component ProgressRing inherits Rectangle {
-    in property <length> size: 36px;
-    in property <length> thickness: 3.5px;
-    in property <float> fraction: -1;
-    in property <color> tint: Ui.on-accent;
-    in property <color> track: #ffffff26;
-    width: size;
-    height: size;
-    property <float> box: size / 1px;
-    property <float> r: box / 2 - thickness / 2px;
-    property <angle> sweep: (fraction < 0 ? 0.25 : min(max(fraction, 0.01), 0.999)) * 360deg;
-    Rectangle {
-        border-radius: parent.width / 2;
-        border-width: root.thickness;
-        border-color: root.track;
-    }
-    Path {
-        width: parent.width;
-        height: parent.height;
-        viewbox-width: root.box;
-        viewbox-height: root.box;
-        commands: "M " + root.box / 2 + " " + (root.box / 2 - root.r) + " A " + root.r + " " + root.r + " 0 " + (root.sweep > 180deg ? "1" : "0") + " 1 " + (root.box / 2 + root.r * Math.sin(root.sweep)) + " " + (root.box / 2 - root.r * Math.cos(root.sweep));
-        stroke: root.tint;
-        stroke-width: root.thickness;
-        fill: transparent;
-        transform-rotation: fraction < 0 && !Ui.reduce-motion ? animation-tick() / 900ms * 360deg : 0deg;
-    }
-}
 
 // Cabeçalho de uma loja na seção NÃO INSTALADOS (lista e grade): ícone, nome, quantos jogos e ⌄ (aberto) ou › (fechado).
 component StoreGroup inherits Rectangle {
@@ -1880,30 +2023,6 @@ component StatusStrip inherits Vidro {
 }
 
 // Pílula principal (Jogar, Voltar ao jogo, Instalar): branca, a única por tela. Responde no pressionar (0,97).
-// Anel de progresso (JogarEAbrir): trilha fraca e um arco girando; com "reduzir animações" fica parado.
-component Ring inherits Rectangle {
-    in property <length> size: 22px;
-    in property <color> tint: Ui.on-primary;
-    width: size;
-    height: size;
-    Rectangle {
-        border-radius: parent.width / 2;
-        border-width: 2px;
-        border-color: tint.with-alpha(0.25);
-    }
-    Path {
-        width: parent.width;
-        height: parent.height;
-        viewbox-width: 24;
-        viewbox-height: 24;
-        commands: "M 12 2 A 10 10 0 0 1 22 12";
-        stroke: tint;
-        stroke-width: 2px;
-        fill: transparent;
-        transform-rotation: Ui.reduce-motion ? 0deg : animation-tick() / 900ms * 360deg;
-    }
-}
-
 component PlayButton inherits Rectangle {
     in property <string> label;
     in property <string> icon;
@@ -4817,7 +4936,7 @@ component DeskOverlay inherits Rectangle {
     callback edited(string, string);
     callback hovered(string, int);
     property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
-        && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress" && ov.kind != "update";
+        && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress" && ov.kind != "update" && ov.kind != "activities";
     property <bool> has-buttons: ov.rows.length > 0 && ov.rows[ov.rows.length - 1].kind == "button";
     if ov.kind == "splash" || ov.kind == "launch" || ov.kind == "progress": OverlayView {
         ov: ov;
@@ -5690,6 +5809,80 @@ component DeskOverlay inherits Rectangle {
                             enabled: r.kind != "separator";
                             mouse-cursor: pointer;
                             clicked => { root.clicked("row", i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Atividades (AtividadeNaBarra): a lista do que roda em segundo plano, camada de 400 ancorada 8 abaixo da pílula.
+    // `ov.rows`: ícone (`icon`), nome, detalhe e % (`value`, com a fração em `action`); `ov.tabs` = rodapé.
+    if ov.kind == "activities": Rectangle {
+        TouchArea { clicked => { root.clicked("outside", 0); } }
+        Vidro {
+            layer: true;
+            opacity: shown ? 1 : 0;
+            transform-scale: shown ? 1 : Ui.escala-menu;
+            transform-origin: { x: self.width, y: 0 };
+            animate opacity, transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+            radius: Ui.radius-card;
+            width: 400px;
+            height: min(al.preferred-height, root.height - 40px);
+            x: clamp(menu-x - self.width, 12px, root.width - self.width - 12px);
+            y: menu-y;
+            TouchArea { }
+            af := Flickable {
+                viewport-height: al.preferred-height;
+                al := VerticalLayout {
+                    width: af.width;
+                    padding: 8px;
+                    spacing: 2px;
+                    HorizontalLayout {
+                        padding: 10px;
+                        padding-bottom: 8px;
+                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: 15px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+                        Rectangle { horizontal-stretch: 1; }
+                        Text { text: ov.overline; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
+                    }
+                    for r[i] in ov.rows: Rectangle {
+                        height: r.description != "" ? 54px : 40px;
+                        border-radius: 10px;
+                        background: arow.has-hover ? Ui.glass-hover : transparent;
+                        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                        if focus-visible && i == ov.sel && top-most: FocusRing { radius: 10px; }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            ActivityIcon { icon: r.icon; progress: r.action.to-float(); y: (parent.height - self.height) / 2; }
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                spacing: 4px;
+                                Text { text: r.title; color: r.style == "done" ? Ui.on-accent-muted : Ui.on-accent; font-size: 13.5px * Ui.text-scale; font-weight: 600; overflow: elide; }
+                                if r.description != "": Text { text: r.description; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; overflow: elide; }
+                            }
+                            if r.value != "": Text { text: r.value; color: Ui.on-accent; font-size: 12.5px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+                        }
+                        arow := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("row", i); } }
+                    }
+                    Rectangle { height: 1px; background: Ui.divider; }
+                    HorizontalLayout {
+                        padding: 6px;
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+                        for label[j] in ov.tabs: Rectangle {
+                            width: ft.preferred-width + 16px;
+                            height: 30px;
+                            border-radius: 8px;
+                            background: fta.has-hover ? Ui.glass-hover : transparent;
+                            if focus-visible && ov.rows.length + j == ov.sel && top-most: FocusRing { radius: 8px; }
+                            accessible-role: button;
+                            accessible-label: label;
+                            accessible-action-default => { root.clicked("footer", j); }
+                            ft := Text { text: label; color: Ui.on-accent-muted; font-size: 12.5px * Ui.text-scale; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                            fta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("footer", j); } }
                         }
                     }
                 }
@@ -6915,10 +7108,17 @@ export component Desktop inherits Window {
     in property <int> window-native-hover;
     in property <int> window-native-pressed;
     in property <bool> window-active: true;
-    in property <string> desk-update-label;
-    in property <bool> desk-download-on;
-    in property <string> desk-download-label;
-    in property <string> desk-download-tip;
+    in property <bool> desk-activity-on;
+    in property <string> desk-activity-id;
+    in property <string> desk-activity-title;
+    in property <string> desk-activity-detail;
+    in property <string> desk-activity-icon;
+    in property <float> desk-activity-progress;
+    in property <string> desk-activity-action;
+    in property <int> desk-activity-more;
+    in property <string> desk-activity-tip;
+    in property <string> desk-activity-label;
+    in property <string> desk-activity-announce;
     in property <[string]> desk-window-labels: ["", "", "", ""];
     callback window-action(string);
     preferred-width: 1280px;
@@ -7213,8 +7413,10 @@ export component Desktop inherits Window {
         property <bool> brand-menu: ov.kind == "menu" && ov.rows[0].key == "settings" && ov.title == "";
         property <bool> profile-menu: ov.kind == "menu" && ov.rows[0].key == "view-profile";
         bar-menu: brand-menu || profile-menu;
-        menu-x: brand-menu ? (small ? Ui.space-20 : Ui.space-36) : profile-menu ? bar.profile-x : root.menu-x;
-        menu-y: brand-menu || profile-menu ? Ui.space-8 : root.menu-y - Ui.topbar-height;
+        property <bool> activities: ov.kind == "activities";
+        // A lista Atividades acaba onde a pílula acaba: 12 (8 na janela pequena) + 4 antes do perfil.
+        menu-x: brand-menu ? (small ? Ui.space-20 : Ui.space-36) : profile-menu ? bar.profile-x : activities ? bar.profile-x - (small ? 12px : 16px) : root.menu-x;
+        menu-y: brand-menu || profile-menu || activities ? Ui.space-8 : root.menu-y - Ui.topbar-height;
         art: desk-game.art;
         leaving: leaving;
         clicked(z, idx) => {
@@ -7307,10 +7509,18 @@ export component Desktop inherits Window {
         native-pressed: window-native-pressed;
         active: window-active;
         labels: desk-window-labels;
-        update-label: desk-update-label;
-        download-on: desk-download-on;
-        download-label: desk-download-label;
-        download-tip: desk-download-tip;
+        activity-on: desk-activity-on;
+        activity-id: desk-activity-id;
+        activity-title: desk-activity-title;
+        activity-detail: desk-activity-detail;
+        activity-icon: desk-activity-icon;
+        activity-progress: desk-activity-progress;
+        activity-action: desk-activity-action;
+        activity-more: desk-activity-more;
+        activity-tip: desk-activity-tip;
+        activity-label: desk-activity-label;
+        activity-announce: desk-activity-announce;
+        activity-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "activities";
         action(a) => { root.window-action(a); }
         items: desk-nav;
         big-picture-label: desk-big-picture-label;
