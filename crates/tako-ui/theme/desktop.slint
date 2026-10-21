@@ -5862,7 +5862,7 @@ component DeskOverlay inherits Rectangle {
                                 alignment: center;
                                 spacing: 4px;
                                 Text { text: r.title; color: r.style == "done" ? Ui.on-accent-muted : Ui.on-accent; font-size: 13.5px * Ui.text-scale; font-weight: 600; overflow: elide; }
-                                if r.description != "": Text { text: r.description; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; overflow: elide; }
+                                if r.description != "": Text { text: r.description; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
                             }
                             if r.value != "": Text { text: r.value; color: Ui.on-accent; font-size: 12.5px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
                             // O erro fica até resolver ou fechar: o "fechar" é um gesto à parte (→ no teclado).

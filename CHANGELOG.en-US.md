@@ -6,6 +6,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 - Fix Windows full screen mode registration with a signed MSIX and certificate restoration (FSE-002).
 ### What's new
+- **Activities in the top bar:** a pill before the profile shows what Tako is doing in the background (library refresh, update check, downloads, covers), with progress, a summary when done and "Try again" on errors; clicking it opens the "Activities" list.
 - **ScreenScraper with your developer account:** anyone with ScreenScraper developer credentials can enter them in Settings and use ScreenScraper even on builds that don't include them.
 - **Windows full screen mode:** use Tako as the home app from Settings.
 - **Torrent downloads:** download games from sources you add yourself, in a panel with pause, resume and a queue. Off by default.

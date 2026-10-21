@@ -6,6 +6,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 - Corrija o registro do modo tela cheia do Windows com MSIX assinado e restauração do certificado (FSE-002).
 ### Novidades
+- **Atividades na barra de cima:** uma pílula antes do perfil mostra o que o Tako faz em segundo plano (atualizar a biblioteca, procurar atualização, downloads, capas), com o andamento, o resumo ao concluir e "Tentar de novo" no erro; clicar abre a lista "Atividades".
 - **ScreenScraper com a sua conta de desenvolvedor:** quem tem credenciais de desenvolvedor do ScreenScraper pode colocá-las nas Configurações e usar o ScreenScraper mesmo em versões que não as trazem.
 - **Modo tela cheia do Windows:** use o Tako como tela inicial nas Configurações.
 - **Downloads por torrent:** baixe jogos das fontes que você mesmo adiciona, num painel com pausa, retomada e fila. Vem desligado.

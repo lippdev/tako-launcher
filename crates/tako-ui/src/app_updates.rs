@@ -162,7 +162,13 @@ pub(crate) fn finish_check(ctx: &mut Ctx, state: Check, explicit: bool, error: &
     });
     if explicit && !ctx.app_update.menu_open {
         if ctx.app_update.check == Check::Failed {
-            retry_toast(ctx, "updates.desktop.failed_toast");
+            // Na pílula cabe só o curto (até 340 com o botão); o aviso da tela cheia leva o texto inteiro.
+            let key = if ctx.desktop {
+                "updates.desktop.check_failed"
+            } else {
+                "updates.desktop.failed_toast"
+            };
+            retry_toast(ctx, key);
         } else if ctx.desktop {
             // Com o menu fechado, o resultado vai para a pílula (o menu aberto já mostra o dele).
             let (title, detail) = (
@@ -656,7 +662,7 @@ mod tests {
             (failed.state, failed.action),
             (Phase::Failed, Some(Action::Retry))
         );
-        assert_eq!(failed.title, ctx.t("updates.desktop.failed_toast"));
+        assert_eq!(failed.title, ctx.t("updates.desktop.check_failed"));
         // "Tentar de novo" na pílula refaz a busca.
         crate::shell::activities::run_action(&mut ctx, UPDATE_CHECK);
         assert!(ctx.activity.list.get(UPDATE_CHECK).is_none());

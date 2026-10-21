@@ -426,7 +426,10 @@ pub(crate) fn notify_rescan_finished(
         ctx.tn("common.games", current_games.len() as i64, &[])
     };
     if warnings.is_empty() {
-        ctx.toast_success(format!("{updated} · {detail}"));
+        // No desktop o ✓ da pílula já traz o resultado; o aviso fica para a tela cheia.
+        if !ctx.desktop {
+            ctx.toast_success(format!("{updated} · {detail}"));
+        }
     } else {
         let warn_str = warnings.join(" · ");
         ctx.toast_warning(format!("{updated} · {detail} · {warn_str}"));
@@ -2157,6 +2160,19 @@ mod tests {
             .is_empty()
         );
         assert_eq!(found.lock().unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn desktop_rescan_result_goes_to_the_pill_not_a_toast() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        ctx.desktop = true;
+        let previous_ids: HashSet<String> =
+            ctx.library.games().iter().map(|g| g.id.clone()).collect();
+        notify_rescan_finished(&mut ctx, &previous_ids, false);
+        assert!(ctx.toast.is_none());
+        notify_rescan_finished(&mut ctx, &previous_ids, true);
+        assert!(ctx.toast.is_some(), "loja com falha ainda avisa no desktop");
     }
 
     #[test]
