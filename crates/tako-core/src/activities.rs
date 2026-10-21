@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 /// Quanto tempo uma atividade concluída fica na pílula, com o resumo.
 pub const DONE_VISIBLE: Duration = Duration::from_secs(4);
 
-/// Tipos de atividade. A ordem das variantes é a prioridade da pílula (menor = mais importante).
+/// Tipos de atividade; a prioridade da pílula está em [`rank`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
     Download,
@@ -132,7 +132,7 @@ impl Activities {
         let activity = visible
             .iter()
             .copied()
-            .min_by_key(|a| (a.state != State::Failed, a.kind))?;
+            .min_by_key(|a| (a.state != State::Failed, rank(a.kind)))?;
         Some(Shown {
             activity,
             more: visible.len() - 1,
@@ -148,10 +148,16 @@ impl Activities {
             .min()
     }
 
+    /// Só o que está em andamento muda: um aviso atrasado da rede não apaga um erro nem estica uma conclusão.
     fn running(&mut self, key: &str) -> Option<&mut Activity> {
-        self.0
+        let found = self
+            .0
             .iter_mut()
-            .find(|a| a.key == key && a.state == State::Running)
+            .find(|a| a.key == key && a.state == State::Running);
+        if found.is_none() {
+            tracing::warn!(key, "atividade inexistente ou já encerrada");
+        }
+        found
     }
 
     fn end(
@@ -163,7 +169,7 @@ impl Activities {
         action: Option<Action>,
         now: Instant,
     ) {
-        if let Some(a) = self.0.iter_mut().find(|a| a.key == key) {
+        if let Some(a) = self.running(key) {
             a.state = state;
             a.title = title.into();
             a.detail = detail.into();
@@ -171,6 +177,16 @@ impl Activities {
             a.action = action;
             a.since = now;
         }
+    }
+}
+
+/// Prioridade da pílula (menor = mais importante); capas e nuvem empatam e vale a ordem de chegada.
+fn rank(kind: Kind) -> u8 {
+    match kind {
+        Kind::Download => 0,
+        Kind::LibraryRefresh => 1,
+        Kind::UpdateCheck | Kind::UpdateReady => 2,
+        Kind::Covers | Kind::CloudSync => 3,
     }
 }
 
@@ -193,7 +209,7 @@ mod tests {
         let mut q = Activities::default();
         q.start("cloud", Kind::CloudSync, "Nuvem", "", t0);
         q.start("covers", Kind::Covers, "Capas", "", t0);
-        assert_eq!(q.shown(t0).unwrap().activity.key, "covers");
+        assert_eq!(q.shown(t0).unwrap().activity.key, "cloud");
         q.start("check", Kind::UpdateCheck, "Procurando", "", t0);
         assert_eq!(q.shown(t0).unwrap().activity.key, "check");
         q.start("library", Kind::LibraryRefresh, "Biblioteca", "", t0);
@@ -277,6 +293,20 @@ mod tests {
         q.start("covers", Kind::Covers, "Capas", "12 de 24 jogos", t0);
         assert_eq!(q.all().len(), 1);
         assert_eq!(q.get("covers").unwrap().state, State::Running);
+    }
+
+    #[test]
+    fn late_finish_neither_clears_an_error_nor_extends_a_done() {
+        let t0 = Instant::now();
+        let mut q = Activities::default();
+        q.start("download:1", Kind::Download, "Jogo", "", t0);
+        q.fail("download:1", "Sem espaço", Some(Action::Retry), t0);
+        q.finish("download:1", "Jogo instalado", "", secs(t0, 1));
+        assert_eq!(q.get("download:1").unwrap().state, State::Failed);
+        q.start("library", Kind::LibraryRefresh, "Biblioteca", "", t0);
+        q.finish("library", "Biblioteca atualizada", "", t0);
+        q.finish("library", "Biblioteca atualizada", "", secs(t0, 3));
+        assert_eq!(q.next_expiry(t0), Some(secs(t0, 4)));
     }
 
     #[test]
