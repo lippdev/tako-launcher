@@ -250,6 +250,7 @@ component Vidro inherits Rectangle {
             }
             Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%); }
         }
+
         if !DeskArt.gray: Rectangle {
             background: layer || dense || bright ? Ui.glass-panel-dense : Ui.glass-panel;
             animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -6762,16 +6763,32 @@ component ArtLayer inherits Rectangle {
                 }
             }
         }
-        // Escurecimento: leve atrás da lista (a arte aparece pelo vidro), 70% atrás do título, nada à direita.
-        Rectangle {
-            background: DeskArt.small
-                ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
-                    Ui.art-scrim-left 36%, Ui.art-scrim-left 74%, Ui.art-scrim-left.with-alpha(0) 90%)
-                : @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
-                    Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
-        }
-        Rectangle {
-            background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%);
+        // Escurecimento da arte (sem faixa vertical): lateral que só desce + elipse atrás do texto + embaixo
+        scrim := Rectangle {
+            width: parent.width;
+            height: parent.height;
+            // Lateral: da esquerda para a direita só desce (nunca sobe nem fica parado no meio).
+            Rectangle {
+                width: parent.width;
+                height: parent.height;
+                background: DeskArt.small
+                    ? @linear-gradient(90deg, #0b0d1259 0%, #0b0d1252 32%, #0b0d1238 52%, #0b0d1214 70%, #0b0d1200 86%)
+                    : @linear-gradient(90deg, #0b0d1259 0%, #0b0d1252 22%, #0b0d1238 40%, #0b0d1214 56%, #0b0d1200 72%);
+            }
+            // Atrás do texto: elipse ancorada embaixo à esquerda.
+            Rectangle {
+                x: parent.width * (DeskArt.small ? 0.40 : 0.24) - self.width / 2;
+                y: parent.height * (DeskArt.small ? 0.92 : 0.90) - self.height / 2;
+                width: parent.width * (DeskArt.small ? 0.70 : 0.52);
+                height: parent.height * (DeskArt.small ? 0.72 : 0.64);
+                background: @radial-gradient(circle, Ui.art-scrim-left 0%, #0b0d1266 55%, #0b0d1200 100%);
+            }
+            // Embaixo: atrás dos cartões.
+            Rectangle {
+                width: parent.width;
+                height: parent.height;
+                background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, #0b0d1200 40%);
+            }
         }
     }
 }
