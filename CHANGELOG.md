@@ -38,6 +38,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 ### Correções
 - **Ícones da Steam com falha no endereço:** quando o endereço principal do ícone de um jogo da Steam não responde na CDN, o Tako busca o ícone da comunidade pela API da loja e não mantém a falha gravada para sempre.
 - **Busca de atualizações:** conexões lentas continuam enquanto recebem dados, com compressão gzip e falha clara quando a rede para.
+- **Fundo e vidro no desktop:** some a faixa escura vertical no meio do fundo sobre arte clara: o escurecimento lateral só desce e a elipse atrás do texto chega a zero antes da borda. As barras e os cartões de vidro desfocam a arte já escurecida e usam a tinta sólida até a cópia desfocada chegar (UI-GLASS-001).
 - **Instruções em passos:** aparecem uma por linha.
 - **Abertura mais rápida:** a biblioteca aparece inteira assim que o Tako abre, com a última leitura das lojas, enquanto a leitura nova roda por trás.
 - **Arte do jogo escolhido:** o fundo e o logo agora trocam junto com o jogo, instalado ou não. A arte da Steam abre direto do cache da própria Steam, o jogo escolhido por último carrega primeiro e o Tako não segura mais a arte do jogo anterior enquanto a nova chega. Capas e fundos que falharem por rede lenta são tentados de novo, no desktop e na tela cheia, sem precisar reiniciar.
