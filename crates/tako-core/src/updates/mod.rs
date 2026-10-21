@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 
 pub use apply::{UpdateApplyPlan, installer_args, mac_bundle_of, portable_swap_script};
 pub use download::{
-    STALL_TIMEOUT, UpdateError, agent, check, download, download_dir, fetch_highlight, verify_file,
+    CHECK_TIMEOUT, STALL_TIMEOUT, UpdateError, agent, check, download, download_dir,
+    fetch_highlight, verify_file,
 };
 pub use feed::{Arch, Asset, Channel, Package, UpdateInfo};
 pub use semver::SemVer;

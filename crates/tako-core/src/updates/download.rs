@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use sha2::{Digest, Sha256};
 
@@ -14,7 +14,9 @@ use super::SemVer;
 use super::feed::{self, Arch, Package, RELEASES_URL, REPOSITORY, UpdateInfo};
 use crate::i18n::{Lang, t};
 
-const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(10);
+/// Teto da consulta, compartilhado com o relógio da UI.
+pub const CHECK_TIMEOUT: Duration = Duration::from_secs(60);
 /// Sem tempo total: o limite é por falta de dados, para não cortar downloads lentos que ainda progridem.
 pub const STALL_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_FEED_BYTES: u64 = 4 * 1024 * 1024;
@@ -50,8 +52,8 @@ pub fn agent() -> ureq::Agent {
             "Tako/{} (+https://github.com/{REPOSITORY})",
             SemVer::current()
         ))
-        .timeout_connect(Some(CHECK_TIMEOUT))
-        .timeout_recv_response(Some(CHECK_TIMEOUT))
+        .timeout_connect(Some(RESPONSE_TIMEOUT))
+        .timeout_recv_response(Some(RESPONSE_TIMEOUT))
         .build()
         .into()
 }
@@ -64,35 +66,80 @@ pub fn check(
     package: Package,
     arch: Arch,
 ) -> Result<Option<UpdateInfo>, UpdateError> {
-    let json = agent
-        .get(RELEASES_URL)
-        .header("Accept", "application/vnd.github+json")
-        .config()
-        .timeout_global(Some(CHECK_TIMEOUT))
-        .build()
-        .call()?
-        .body_mut()
-        .with_config()
-        .limit(MAX_FEED_BYTES)
-        .read_to_string()?;
+    let json = fetch_text(
+        agent,
+        RELEASES_URL,
+        MAX_FEED_BYTES,
+        CHECK_TIMEOUT,
+        STALL_TIMEOUT,
+    )?;
     Ok(feed::pick(&json, current, channel, package, arch))
 }
 
 /// Primeiro item da versão no changelog do idioma; sem ele, `None` (o aviso usa as notas da release).
 pub fn fetch_highlight(agent: &ureq::Agent, update: &UpdateInfo, lang: Lang) -> Option<String> {
-    let text = agent
-        .get(feed::changelog_url(&update.version, lang))
-        .config()
-        .timeout_global(Some(CHECK_TIMEOUT))
-        .build()
-        .call()
-        .ok()?
-        .body_mut()
-        .with_config()
-        .limit(MAX_CHANGELOG_BYTES)
-        .read_to_string()
-        .ok()?;
+    let text = fetch_text(
+        agent,
+        &feed::changelog_url(&update.version, lang),
+        MAX_CHANGELOG_BYTES,
+        CHECK_TIMEOUT,
+        STALL_TIMEOUT,
+    )
+    .ok()?;
     feed::first_note(&feed::changelog_section(&text, &update.version)?)
+}
+
+/// Cada leitura reinicia a espera por dados; o teto global também encerra a thread de rede.
+fn fetch_text(
+    agent: &ureq::Agent,
+    url: &str,
+    limit: u64,
+    total_timeout: Duration,
+    stall_timeout: Duration,
+) -> Result<String, UpdateError> {
+    let start = Instant::now();
+    let (tx, rx) = mpsc::channel();
+    let (agent, url) = (agent.clone(), url.to_owned());
+    std::thread::spawn(move || {
+        let run = || -> Result<Option<String>, UpdateError> {
+            let mut response = agent
+                .get(&url)
+                .header("Accept", "application/vnd.github+json")
+                .config()
+                .timeout_global(Some(total_timeout))
+                .build()
+                .call()?;
+            let mut reader = response.body_mut().with_config().limit(limit).reader();
+            let mut bytes = Vec::new();
+            let mut buf = [0; 8192];
+            loop {
+                let n = reader.read(&mut buf)?;
+                if n == 0 {
+                    break;
+                }
+                bytes.extend_from_slice(&buf[..n]);
+                if tx.send(Ok(None)).is_err() {
+                    return Ok(None);
+                }
+            }
+            String::from_utf8(bytes)
+                .map(Some)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e).into())
+        };
+        let _ = tx.send(run());
+    });
+    loop {
+        let remaining = total_timeout.saturating_sub(start.elapsed());
+        match rx.recv_timeout(stall_timeout.min(remaining)) {
+            Ok(Ok(None)) => {}
+            Ok(Ok(Some(text))) => return Ok(text),
+            Ok(Err(e)) => return Err(e),
+            Err(mpsc::RecvTimeoutError::Timeout) if start.elapsed() >= total_timeout => {
+                return Err(UpdateError::Http("timeout: global".into()));
+            }
+            Err(_) => return Err(UpdateError::Stalled),
+        }
+    }
 }
 
 /// Pasta onde o arquivo é baixado (`<temp>/TakoUpdate`, como no C#).
@@ -232,6 +279,146 @@ fn decode_hex(s: &str) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn slow_server(
+        chunks: Vec<Vec<u8>>,
+        delay: Duration,
+        gzip: bool,
+    ) -> (String, std::thread::JoinHandle<String>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let thread = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                let mut byte = [0];
+                stream.read_exact(&mut byte).unwrap();
+                request.push(byte[0]);
+            }
+            let length: usize = chunks.iter().map(Vec::len).sum();
+            let encoding = if gzip {
+                "Content-Encoding: gzip\r\n"
+            } else {
+                ""
+            };
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {length}\r\n{encoding}Connection: close\r\n\r\n"
+            )
+            .unwrap();
+            for chunk in chunks {
+                if stream.write_all(&chunk).is_err() {
+                    break;
+                }
+                stream.flush().unwrap();
+                std::thread::sleep(delay);
+            }
+            String::from_utf8(request).unwrap()
+        });
+        (url, thread)
+    }
+
+    #[test]
+    fn check_body_can_progress_beyond_the_old_global_budget() {
+        let (url, server) = slow_server(
+            vec![b" ".to_vec(); 8]
+                .into_iter()
+                .chain([br#"[{"tag_name":"v0.2.0-alpha.19","prerelease":true}]"#.to_vec()])
+                .collect(),
+            Duration::from_millis(40),
+            false,
+        );
+        let result = fetch_text(
+            &agent(),
+            &url,
+            MAX_FEED_BYTES,
+            Duration::from_secs(2),
+            Duration::from_millis(200),
+        );
+        server.join().unwrap();
+        let update = feed::pick(
+            &result.unwrap(),
+            &SemVer::parse("0.2.0-alpha.16"),
+            feed::Channel::Testing,
+            Package::WindowsSetup,
+            Arch::X64,
+        )
+        .unwrap();
+        assert_eq!(update.version, "0.2.0-alpha.19");
+    }
+
+    #[test]
+    fn check_body_stops_when_data_stalls() {
+        let (url, server) = slow_server(
+            vec![b"[".to_vec(), b"]".to_vec()],
+            Duration::from_millis(300),
+            false,
+        );
+        let result = fetch_text(
+            &agent(),
+            &url,
+            MAX_FEED_BYTES,
+            Duration::from_secs(2),
+            Duration::from_millis(100),
+        );
+        server.join().unwrap();
+        assert!(matches!(result, Err(UpdateError::Stalled)), "{result:?}");
+    }
+
+    #[test]
+    fn check_body_has_a_total_ceiling_even_with_progress() {
+        let (url, server) = slow_server(vec![b" ".to_vec(); 20], Duration::from_millis(40), false);
+        let result = fetch_text(
+            &agent(),
+            &url,
+            MAX_FEED_BYTES,
+            Duration::from_millis(150),
+            Duration::from_millis(300),
+        );
+        server.join().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn check_requests_and_decodes_gzip() {
+        // gzip de `[]`, para verificar negociação e descompressão sem outra dependência.
+        let gzip = vec![
+            31, 139, 8, 0, 0, 0, 0, 0, 2, 3, 139, 142, 5, 0, 41, 187, 76, 13, 2, 0, 0, 0,
+        ];
+        let (url, server) = slow_server(vec![gzip], Duration::ZERO, true);
+        let result = fetch_text(
+            &agent(),
+            &url,
+            MAX_FEED_BYTES,
+            Duration::from_secs(2),
+            Duration::from_millis(200),
+        );
+        let request = server.join().unwrap().to_ascii_lowercase();
+        assert!(
+            request
+                .lines()
+                .any(|line| line.starts_with("accept-encoding:") && line.contains("gzip")),
+            "{request}"
+        );
+        assert_eq!(result.unwrap(), "[]");
+    }
+
+    #[test]
+    fn check_body_preserves_the_size_limit() {
+        let (url, server) = slow_server(vec![b"[]".to_vec()], Duration::ZERO, false);
+        let result = fetch_text(
+            &agent(),
+            &url,
+            1,
+            Duration::from_secs(2),
+            Duration::from_millis(200),
+        );
+        server.join().unwrap();
+        assert!(result.is_err());
+    }
 
     #[test]
     fn verifies_downloaded_file_against_digest() {
