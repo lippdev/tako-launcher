@@ -24,7 +24,10 @@ function Set-DescriptorFiles($Descriptors, [string]$Content, [switch]$Remove) {
     foreach ($descriptor in $Descriptors) {
         if ([IO.Path]::GetFileName($descriptor.Path) -ne 'CustomCapability.SCCD' -or $descriptor.Hash -notmatch '^[A-Fa-f0-9]{64}$') { throw 'Invalid saved SCCD metadata.' }
         if (Test-Path -LiteralPath $descriptor.Path) {
-            if ((Get-FileHash -LiteralPath $descriptor.Path -Algorithm SHA256).Hash -ne $descriptor.Hash) {
+            # Sem Get-FileHash: o módulo dele some quando o PSModulePath vem do PowerShell 7.
+            $sha = [Security.Cryptography.SHA256]::Create()
+            try { $current = ([BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($descriptor.Path)))).Replace('-', '') } finally { $sha.Dispose() }
+            if ($current -ne $descriptor.Hash) {
                 if ($Remove) { continue } # Preserve uma substituicao posterior feita por outro app/usuario.
                 throw 'An unrelated CustomCapability.SCCD already exists beside the executable.'
             }
@@ -144,7 +147,9 @@ try {
     $descriptorPath = Join-Path (Split-Path -Parent $Executable) 'CustomCapability.SCCD'
     $newDescriptors = @()
     if (Test-Path -LiteralPath $descriptorPath) {
-        if ((Get-FileHash -LiteralPath $descriptorPath -Algorithm SHA256).Hash -ne $descriptorHash) { throw 'An unrelated CustomCapability.SCCD already exists beside the executable.' }
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $current = ([BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($descriptorPath)))).Replace('-', '') } finally { $sha.Dispose() }
+        if ($current -ne $descriptorHash) { throw 'An unrelated CustomCapability.SCCD already exists beside the executable.' }
     } else { $newDescriptors = @([pscustomobject]@{ Path = $descriptorPath; Hash = $descriptorHash }) }
     $descriptors = @($state.Descriptors | Where-Object { $_ })
     if (-not @($descriptors | Where-Object { $_.Path -eq $descriptorPath }).Count) { $descriptors += $newDescriptors }

@@ -4,6 +4,7 @@ param([Parameter(Mandatory=$true)][string]$PayloadDirectory)
 $ErrorActionPreference = 'Stop'
 $windows = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 Write-Host "Windows: $($windows.ProductName), build $($windows.CurrentBuild).$($windows.UBR)"
+function Get-Sha256($path) { $sha = [Security.Cryptography.SHA256]::Create(); try { ([BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $path).Path)))).Replace('-', '') } finally { $sha.Dispose() } }
 function Assert($condition, $message) { if (-not $condition) { throw $message } }
 $layout = Join-Path $env:TEMP ('Tako FSE ' + [guid]::NewGuid())
 $gaming = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'
@@ -31,7 +32,7 @@ try {
     Assert ($enableExitCode -eq 0) 'Enable real falhou; consulte o erro AppX e a versão do Windows do runner.'
     $externalSccd = Join-Path $layout 'CustomCapability.SCCD'
     Assert (Test-Path -LiteralPath $externalSccd) 'SCCD ausente em ExternalLocation.'
-    Assert ((Get-FileHash -LiteralPath $externalSccd).Hash -eq (Get-FileHash (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD')).Hash) 'SCCD externo diferente do empacotado.'
+    Assert ((Get-Sha256 $externalSccd) -eq (Get-Sha256 (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD'))) 'SCCD externo diferente do empacotado.'
     $package = Get-AppxPackage -Name Tako.GamingHome
     Assert ($null -ne $package) 'Identidade não registrada.'
     $manifest = Get-AppxPackageManifest -Package $package.PackageFullName

@@ -13,6 +13,7 @@ Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::Open($fixture, [IO.Compression.ZipArchiveMode]::Create)
 try { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD'), 'CustomCapability.SCCD') | Out-Null } finally { $zip.Dispose() }
 $fixtureBytes = [IO.File]::ReadAllBytes($fixture)
+function Get-Sha256($path) { $sha = [Security.Cryptography.SHA256]::Create(); try { ([BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $path).Path)))).Replace('-', '') } finally { $sha.Dispose() } }
 function Assert($condition, $message) { if (-not $condition) { throw $message } }
 function Get-AppxPackage { param($Name) if ($script:Package) { [pscustomobject]@{PackageFamilyName='Tako.GamingHome_test'} } }
 function Add-AppxPackage {
@@ -73,7 +74,7 @@ function Reset($gamingHome,$dev) {
     $script:Supported=$true; $script:FailRegister=$false; $script:FailRemove=$false; $script:Cancel=$false; $script:Elevations=0
 }
 try {
-    Assert ((Get-FileHash (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD')).Hash -eq 'BBB4C60FBFAF00B462C197458CAAD19FB2828D87B1D95CDFD2292314CDDC6446') 'SCCD must preserve the AnyFSE bytes accepted by AppX'
+    Assert ((Get-Sha256 (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD')) -eq 'BBB4C60FBFAF00B462C197458CAAD19FB2828D87B1D95CDFD2292314CDDC6446') 'SCCD must preserve the AnyFSE bytes accepted by AppX'
     $appx = [xml](Get-Content (Join-Path $PSScriptRoot '../../../packaging/fse/AppxManifest.xml') -Raw)
     $win32 = [xml](Get-Content (Join-Path $PSScriptRoot '../../../packaging/fse/Tako.manifest') -Raw)
     Assert ($appx.Package.Identity.Name -eq $win32.assembly.msix.packageName) 'package identity mismatch'
