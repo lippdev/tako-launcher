@@ -105,14 +105,15 @@ impl LibrarySources {
 
     /// Jogos de todas as lojas ligadas (ids distintos; o primeiro vence).
     pub fn discover(&mut self, is_enabled: impl Fn(GameStore) -> bool) -> Vec<Game> {
-        self.discover_with(is_enabled, |_, _| {})
+        self.discover_with(is_enabled, |_, _, _| {})
     }
 
-    /// Igual a [`Self::discover`], avisando `(lidas, total)` a cada loja lida (a barra da abertura).
+    /// Igual a [`Self::discover`], avisando `(loja, lidas, total)` a cada loja lida (a barra da abertura e a
+    /// AtividadeNaBarra).
     pub fn discover_with(
         &mut self,
         is_enabled: impl Fn(GameStore) -> bool,
-        mut progress: impl FnMut(usize, usize),
+        mut progress: impl FnMut(GameStore, usize, usize),
     ) -> Vec<Game> {
         let mut games = Vec::new();
         let mut ids = HashSet::new();
@@ -138,7 +139,7 @@ impl LibrarySources {
                     notice: if enabled { scan.notice } else { None },
                 },
             );
-            progress(done + 1, total);
+            progress(store, done + 1, total);
         }
         games
     }

@@ -195,6 +195,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         update_ready: None,
         free_space: None,
         app_update: Default::default(),
+        activity: Default::default(),
         safe_mode: false,
         scanning: false,
         restoring: false,
@@ -253,6 +254,9 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
 
 /// Lojas lidas na leitura em curso, em milésimos (a barra da TelaCarregamento).
 pub(crate) static SCAN_PROGRESS: AtomicU32 = AtomicU32::new(0);
+/// Última loja lida, quantas já foram e o total ("Steam · 3 de 5 lojas" da AtividadeNaBarra).
+pub(crate) static SCAN_STEP: Mutex<Option<(tako_core::library::GameStore, usize, usize)>> =
+    Mutex::new(None);
 
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar. `force`: busca a lista de jogos da conta
 /// Steam agora, sem esperar o cache de 1 hora. `user_requested`: atualização pedida pelo usuário (mostra toast
@@ -294,6 +298,7 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool, user_requested: bool) {
         }
         s.ctx.scanning = true;
         SCAN_PROGRESS.store(0, Ordering::Relaxed);
+        *SCAN_STEP.lock().unwrap_or_else(|p| p.into_inner()) = None;
         let manual_targets: Vec<std::path::PathBuf> = s
             .ctx
             .library
@@ -421,7 +426,10 @@ pub(crate) fn notify_rescan_finished(
         ctx.tn("common.games", current_games.len() as i64, &[])
     };
     if warnings.is_empty() {
-        ctx.toast_success(format!("{updated} · {detail}"));
+        // No desktop o ✓ da pílula já traz o resultado; o aviso fica para a tela cheia.
+        if !ctx.desktop {
+            ctx.toast_success(format!("{updated} · {detail}"));
+        }
     } else {
         let warn_str = warnings.join(" · ");
         ctx.toast_warning(format!("{updated} · {detail} · {warn_str}"));
@@ -511,8 +519,9 @@ fn scan_into(
         steam_owned,
         emulators,
         exe_icons,
-        |done, total| {
+        |store, done, total| {
             SCAN_PROGRESS.store((done * 1000 / total.max(1)) as u32, Ordering::Relaxed);
+            *SCAN_STEP.lock().unwrap_or_else(|p| p.into_inner()) = Some((store, done, total));
         },
     );
     if let Ok(json) = serde_json::to_vec(&games)
@@ -1115,18 +1124,6 @@ impl App {
                         window.set_maximized(max);
                         let _ = ui.set_property("window-maximized", Value::Bool(max));
                     }
-                    "downloads" => {
-                        drop(ui);
-                        crate::shell::downloads::open(&mut app.shell.borrow_mut().ctx);
-                        app.shell.borrow_mut().after_action();
-                        app.redraw();
-                    }
-                    "update" => {
-                        drop(ui);
-                        crate::app_updates::open(&mut app.shell.borrow_mut().ctx);
-                        app.shell.borrow_mut().after_action();
-                        app.redraw();
-                    }
                     menu if menu.starts_with("menu:") => {
                         use slint::winit_030::WinitWindowAccessor;
                         let mut xy = menu["menu:".len()..]
@@ -1385,6 +1382,7 @@ impl App {
                 let action = {
                     let mut s = app.shell.borrow_mut();
                     crate::app_updates::tick(&mut s.ctx, Instant::now());
+                    crate::shell::activities::tick(&mut s.ctx, Instant::now());
                     app.host.borrow_mut().tick(&mut s.ctx, &pad_state, now)
                 };
                 app.apply(action);
@@ -2162,6 +2160,19 @@ mod tests {
             .is_empty()
         );
         assert_eq!(found.lock().unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn desktop_rescan_result_goes_to_the_pill_not_a_toast() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        ctx.desktop = true;
+        let previous_ids: HashSet<String> =
+            ctx.library.games().iter().map(|g| g.id.clone()).collect();
+        notify_rescan_finished(&mut ctx, &previous_ids, false);
+        assert!(ctx.toast.is_none());
+        notify_rescan_finished(&mut ctx, &previous_ids, true);
+        assert!(ctx.toast.is_some(), "loja com falha ainda avisa no desktop");
     }
 
     #[test]

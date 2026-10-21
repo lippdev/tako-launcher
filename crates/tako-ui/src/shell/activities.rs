@@ -1,0 +1,827 @@
+//! AtividadeNaBarra (UX-006): alimenta a fila de `tako_core::activities` com o que o Tako faz em segundo plano
+//! (biblioteca, capas, atualização), monta a pílula da barra de cima e a lista "Atividades". Os downloads e a
+//! busca de atualização alimentam a fila nos próprios módulos (`downloads.rs`, `app_updates.rs`).
+
+use super::layer::{Flow, Layer};
+use super::{Cmd, Ctx, Effect, Out};
+use crate::model::{Hint, Overlay, PanelRow};
+use std::time::Instant;
+use tako_core::activities::{Action, Activity, Kind, Shown, State as Phase};
+use tako_core::library::GameStore;
+use tako_core::presentation::game_text;
+
+const LIBRARY: &str = "library";
+const COVERS: &str = "covers";
+const UPDATE_READY: &str = "update-ready";
+/// A busca de atualização do Tako (e a falha do download dela) usa uma chave só.
+pub(crate) const UPDATE_CHECK: &str = "update-check";
+
+crate::theme_struct! {
+    /// A pílula da barra de cima (`desk-activity`); `announce` vale mesmo com a pílula fora.
+    pub struct ActivityData {
+        pub on: bool,
+        pub id: String,
+        pub title: String,
+        pub detail: String,
+        pub icon: String,
+        pub progress: f32,
+        pub action: String,
+        pub more: i32,
+        pub label: String,
+        pub announce: String,
+    }
+}
+
+#[derive(Default)]
+pub struct State {
+    pub list: tako_core::activities::Activities,
+    /// Jogos na biblioteca quando a atualização começou (para o "N jogos novos" do resumo).
+    library_games: usize,
+    /// O último passo (feitos, total) de cada [`Job`], para só montar o texto quando ele muda.
+    steps: [(usize, usize); 2],
+}
+
+/// Ícone da pílula e das linhas: `spin` sem %, `ring` com %, `done`, `warn` e `dot` (atualização pronta).
+fn icon(a: &Activity) -> &'static str {
+    match (a.state, a.kind, a.progress) {
+        (Phase::Failed, ..) => "warn",
+        (Phase::Done, ..) => "done",
+        (_, Kind::UpdateReady, _) => "dot",
+        (_, _, Some(_)) => "ring",
+        _ => "spin",
+    }
+}
+
+fn action_label(ctx: &Ctx, action: Action) -> String {
+    match action {
+        Action::Retry => ctx.t("updates.desktop.retry"),
+    }
+}
+
+/// O que o leitor de tela anuncia: início, conclusão e erro, nunca a porcentagem.
+fn announcement(ctx: &Ctx, a: &Activity) -> String {
+    match a.state {
+        Phase::Running => a.title.clone(),
+        Phase::Done => [a.title.as_str(), a.detail.as_str()]
+            .iter()
+            .filter(|s| !s.is_empty())
+            .copied()
+            .collect::<Vec<_>>()
+            .join(". "),
+        Phase::Failed => ctx.tf("desktop.activity.error", &[("reason", &a.title)]),
+    }
+}
+
+/// A pílula da barra de cima: some com a fila vazia.
+pub fn render(ctx: &Ctx, out: &mut Out, now: Instant) {
+    let announce = (ctx.activity.list.last_event())
+        .map(|a| announcement(ctx, a))
+        .unwrap_or_default();
+    let data = match ctx.activity.list.shown(now) {
+        Some(Shown { activity: a, more }) => ActivityData {
+            on: true,
+            id: format!("{}:{:?}", a.key, a.state),
+            title: a.title.clone(),
+            detail: a.detail.clone(),
+            icon: icon(a).into(),
+            progress: f32::from(a.progress.unwrap_or(0)),
+            action: a.action.map(|x| action_label(ctx, x)).unwrap_or_default(),
+            more: more as i32,
+            label: match more {
+                0 => a.title.clone(),
+                n => format!(
+                    "{}, {}",
+                    a.title,
+                    ctx.tf("desktop.activity.more", &[("n", &n.to_string())])
+                ),
+            },
+            announce,
+        },
+        None => ActivityData {
+            announce,
+            ..Default::default()
+        },
+    };
+    out.set("desk-activity", data);
+}
+
+/// Há pílula na barra agora (entra na ordem do teclado).
+pub fn visible(ctx: &Ctx, now: Instant) -> bool {
+    ctx.activity.list.shown(now).is_some()
+}
+
+/// A lista "Atividades" é a camada de cima (clicar na pílula de novo a fecha).
+pub fn list_is_open(layers: &[Box<dyn Layer>], ctx: &Ctx) -> bool {
+    layers
+        .last()
+        .is_some_and(|l| l.render(ctx).kind == "activities")
+}
+
+/// Clique na pílula: o destino da atividade mostrada; com várias, erro ou concluída, a lista.
+pub fn open(ctx: &mut Ctx, now: Instant) {
+    let Some(Shown { activity: a, more }) = ctx.activity.list.shown(now) else {
+        return;
+    };
+    let kind = (more == 0 && a.state == Phase::Running).then_some(a.kind);
+    open_kind(ctx, kind);
+}
+
+/// Aceitar na pílula (teclado e controle, sem o botão do mouse): num erro com ação, refaz o trabalho; no resto,
+/// o mesmo que o clique. A lista fica no botão de menu.
+pub fn accept(ctx: &mut Ctx, now: Instant) {
+    match ctx.activity.list.shown(now) {
+        Some(Shown { activity: a, .. }) if a.state == Phase::Failed && a.action.is_some() => {
+            let key = a.key.clone();
+            run_action(ctx, &key);
+        }
+        _ => open(ctx, now),
+    }
+}
+
+/// Abre a lista "Atividades".
+pub fn open_list(ctx: &mut Ctx) {
+    open_kind(ctx, None);
+}
+
+fn open_kind(ctx: &mut Ctx, kind: Option<Kind>) {
+    let layer: Box<dyn Layer> = match kind {
+        Some(Kind::Download) => {
+            super::downloads::open(ctx);
+            return;
+        }
+        Some(Kind::UpdateReady) => {
+            crate::app_updates::open(ctx);
+            return;
+        }
+        Some(Kind::UpdateCheck) => Box::new(super::desktop::brand_menu()),
+        Some(Kind::Covers) => Box::new(super::art_review::panel(ctx)),
+        _ => Box::<ListLayer>::default(),
+    };
+    ctx.pending_layer = Some(layer);
+}
+
+/// A ação do erro mostrado ("Tentar de novo"): refaz o trabalho e tira o erro; quem alimenta a fila começa outro.
+pub fn run_action(ctx: &mut Ctx, key: &str) {
+    if ctx
+        .activity
+        .list
+        .get(key)
+        .is_none_or(|a| a.action.is_none())
+    {
+        return;
+    }
+    ctx.activity.list.dismiss(key);
+    if key == UPDATE_CHECK {
+        ctx.effect(Effect::CheckUpdates);
+    } else if let Some(id) = key.strip_prefix("download:").and_then(|i| i.parse().ok())
+        && let Some(m) = super::downloads::manager(ctx)
+    {
+        let _ = m.resume(id);
+    }
+    ctx.dirty = true;
+}
+
+/// Relógio da UI (por quadro, só compara): biblioteca, capas e "Atualização pronta".
+pub fn tick(ctx: &mut Ctx, now: Instant) {
+    if !ctx.desktop {
+        return;
+    }
+    let scan = *crate::app::SCAN_STEP
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    sync_library(ctx, now, scan);
+    sync_covers(ctx, now);
+    let ready = ctx.update_ready.is_some();
+    if ready != ctx.activity.list.get(UPDATE_READY).is_some() {
+        if ready {
+            let title = ctx.t("desktop.window.update_ready");
+            ctx.activity
+                .list
+                .start(UPDATE_READY, Kind::UpdateReady, &title, "", now);
+        } else {
+            ctx.activity.list.dismiss(UPDATE_READY);
+        }
+        ctx.dirty = true;
+    }
+    // A conclusão sai da pílula sozinha: redesenha no instante.
+    if let Some(t) = ctx.activity.list.next_expiry(now) {
+        ctx.redraw_at = Some(ctx.redraw_at.map_or(t, |r| r.min(t)));
+    }
+}
+
+fn is_running(ctx: &Ctx, key: &str) -> bool {
+    ctx.activity
+        .list
+        .get(key)
+        .is_some_and(|a| a.state == Phase::Running)
+}
+
+/// Uma atividade que o app acompanha pelo estado (biblioteca, capas): começa, avança por passos e termina.
+struct Job {
+    key: &'static str,
+    kind: Kind,
+    /// Chave do título em andamento.
+    title: &'static str,
+    /// Onde o último passo fica em [`State::steps`].
+    slot: usize,
+}
+
+const LIBRARY_JOB: Job = Job {
+    key: LIBRARY,
+    kind: Kind::LibraryRefresh,
+    title: "desktop.activity.library",
+    slot: 0,
+};
+const COVERS_JOB: Job = Job {
+    key: COVERS,
+    kind: Kind::Covers,
+    title: "desktop.activity.covers",
+    slot: 1,
+};
+
+/// `step` = (feitos, total) enquanto trabalha, `None` quando parou. Compara os números antes de montar o texto:
+/// `detail` (andamento) e `end` (título e resumo) só rodam quando algo muda, não a cada quadro.
+fn sync_job(
+    ctx: &mut Ctx,
+    now: Instant,
+    job: &Job,
+    step: Option<(usize, usize)>,
+    detail: impl FnOnce(&Ctx) -> String,
+    end: impl FnOnce(&Ctx) -> (String, String),
+) {
+    let running = is_running(ctx, job.key);
+    match step {
+        Some(step) if running && ctx.activity.steps[job.slot] == step => return,
+        Some(step) => {
+            ctx.activity.steps[job.slot] = step;
+            let detail = detail(ctx);
+            if running {
+                ctx.activity.list.progress(job.key, None, &detail);
+            } else {
+                let title = ctx.t(job.title);
+                ctx.activity
+                    .list
+                    .start(job.key, job.kind, &title, &detail, now);
+            }
+        }
+        None if running => {
+            let (title, detail) = end(ctx);
+            ctx.activity.list.finish(job.key, &title, &detail, now);
+        }
+        None => return,
+    }
+    ctx.dirty = true;
+}
+
+/// "Steam · 3 de 5 lojas": a última loja lida pela leitura em curso (`scan`).
+fn sync_library(ctx: &mut Ctx, now: Instant, scan: Option<(GameStore, usize, usize)>) {
+    if ctx.scanning && !is_running(ctx, LIBRARY) {
+        ctx.activity.library_games = ctx.library.games().len();
+    }
+    let step = ctx
+        .scanning
+        .then(|| scan.map_or((0, 0), |(_, done, total)| (done, total)));
+    sync_job(
+        ctx,
+        now,
+        &LIBRARY_JOB,
+        step,
+        |ctx| {
+            scan.map(|(store, done, total)| {
+                ctx.tf(
+                    "desktop.activity.library_step",
+                    &[
+                        ("store", &game_text::store_name(ctx.lang(), store)),
+                        ("done", &done.to_string()),
+                        ("total", &total.to_string()),
+                    ],
+                )
+            })
+            .unwrap_or_default()
+        },
+        |ctx| {
+            let new = (ctx.library.games().len()).saturating_sub(ctx.activity.library_games);
+            let detail = if new > 0 {
+                tako_core::i18n::tn("desktop.activity.library_new", new as i64, &[])
+            } else {
+                String::new()
+            };
+            (ctx.t("desktop.activity.library_done"), detail)
+        },
+    );
+}
+
+/// "12 de 24 jogos": a rodada da fila de metadados e capas.
+fn sync_covers(ctx: &mut Ctx, now: Instant) {
+    let Some((done, total)) = (ctx.metadata.as_ref())
+        .and_then(|m| m.worker.as_ref())
+        .map(|w| w.progress())
+    else {
+        return;
+    };
+    let step = |ctx: &Ctx, n: usize| {
+        ctx.tf(
+            "desktop.activity.covers_step",
+            &[("done", &n.to_string()), ("total", &total.to_string())],
+        )
+    };
+    sync_job(
+        ctx,
+        now,
+        &COVERS_JOB,
+        (done < total).then_some((done, total)),
+        |ctx| step(ctx, done),
+        |ctx| (ctx.t("desktop.activity.covers_done"), step(ctx, total)),
+    );
+}
+
+/// A lista "Atividades" (camada de 400, ancorada na pílula).
+#[derive(Default)]
+pub struct ListLayer {
+    sel: usize,
+    /// O foco está no "fechar" da linha com erro (→ chega lá, ← volta à linha).
+    close: bool,
+}
+
+impl ListLayer {
+    /// Linhas e depois as duas ações do rodapé.
+    fn total(ctx: &Ctx) -> usize {
+        ctx.activity.list.all().len() + 2
+    }
+
+    fn row_is_failed(&self, ctx: &Ctx) -> bool {
+        (ctx.activity.list.ordered().get(self.sel)).is_some_and(|a| a.state == Phase::Failed)
+    }
+}
+
+impl Layer for ListLayer {
+    fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Flow {
+        match cmd {
+            Cmd::Back => return Flow::Close,
+            Cmd::Up => self.sel = self.sel.saturating_sub(1),
+            Cmd::Down => self.sel = (self.sel + 1).min(Self::total(ctx) - 1),
+            Cmd::Right if self.row_is_failed(ctx) => {
+                self.close = true;
+                return Flow::Stay;
+            }
+            Cmd::Left => self.close = false,
+            Cmd::Accept => {
+                let rows = ctx.activity.list.all().len();
+                return match self.sel.checked_sub(rows) {
+                    None if self.close => self.click("close", self.sel, ctx),
+                    None => self.click("row", self.sel, ctx),
+                    Some(i) => self.click("footer", i, ctx),
+                };
+            }
+            _ => return Flow::Stay,
+        }
+        self.close = false;
+        Flow::Stay
+    }
+
+    fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Flow {
+        let row = (ctx.activity.list.ordered().get(index))
+            .map(|a| (a.key.clone(), a.kind, a.state, a.action));
+        let flow = match (zone, row) {
+            // O erro: a linha refaz o trabalho (ou fecha, sem ação) e o "fechar" tira o erro.
+            ("row", Some((key, _, Phase::Failed, Some(_)))) => {
+                run_action(ctx, &key);
+                Flow::Stay
+            }
+            ("row" | "close", Some((key, _, Phase::Failed, _))) => {
+                ctx.activity.list.dismiss(&key);
+                Flow::Stay
+            }
+            ("row", Some((_, kind, ..))) => {
+                open_kind(ctx, Some(kind));
+                Flow::Close
+            }
+            ("footer", _) if index == 0 => {
+                super::downloads::open(ctx);
+                Flow::Close
+            }
+            ("footer", _) => {
+                ctx.activity.list.clear_done();
+                Flow::Stay
+            }
+            ("outside", _) => Flow::Close,
+            _ => Flow::Stay,
+        };
+        self.sel = self.sel.min(Self::total(ctx) - 1);
+        self.close = false;
+        flow
+    }
+
+    fn hints(&self, _ctx: &Ctx) -> Vec<Hint> {
+        Vec::new()
+    }
+
+    fn render(&self, ctx: &Ctx) -> Overlay {
+        let running = ctx.activity.list.running_count();
+        let rows: Vec<PanelRow> = ctx
+            .activity
+            .list
+            .ordered()
+            .into_iter()
+            .enumerate()
+            .map(|(i, a)| {
+                let mut row = PanelRow::new(a.key.clone(), "activity", a.title.clone())
+                    .desc(a.detail.clone());
+                row.icon = icon(a).into();
+                row.action = a.progress.map(|p| p.to_string()).unwrap_or_default();
+                // O erro oferece a ação no lugar da %.
+                row.value = match (a.action, a.progress) {
+                    (Some(x), _) => action_label(ctx, x),
+                    (None, p) => p.map(|p| format!("{p}%")).unwrap_or_default(),
+                };
+                row.on = self.close && i == self.sel;
+                row.style = match a.state {
+                    Phase::Done => "done",
+                    Phase::Failed => "warning",
+                    Phase::Running => "",
+                }
+                .into();
+                row
+            })
+            .collect();
+        Overlay {
+            kind: "activities".into(),
+            title: ctx.t("desktop.activity.title"),
+            overline: if running > 0 {
+                ctx.tf("desktop.activity.running", &[("n", &running.to_string())])
+            } else {
+                ctx.t("desktop.activity.idle")
+            },
+            rows,
+            tabs: vec![
+                ctx.t("desktop.activity.view_downloads"),
+                ctx.t("desktop.activity.clear_done"),
+            ],
+            // O nome do "fechar" das linhas com erro.
+            text: ctx.t("desktop.activity.close"),
+            sel: self.sel as i32,
+            ..Default::default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shell::Shell;
+    use slint_interpreter::Value;
+    use std::time::Duration;
+
+    fn shell() -> (tempfile::TempDir, Shell) {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        (dir, shell)
+    }
+
+    /// Um campo da pílula (`desk-activity`), como a janela o recebe.
+    fn prop(shell: &mut Shell, name: &str, now: Instant) -> Value {
+        let out = shell.render(now);
+        let Value::Struct(pill) = out
+            .props
+            .into_iter()
+            .rev()
+            .find(|(n, _)| *n == "desk-activity")
+            .expect("sem desk-activity")
+            .1
+        else {
+            panic!("desk-activity não é struct");
+        };
+        pill.get_field(name)
+            .unwrap_or_else(|| panic!("sem {name}"))
+            .clone()
+    }
+
+    fn text(v: Value) -> String {
+        match v {
+            Value::String(s) => s.to_string(),
+            other => panic!("não é texto: {other:?}"),
+        }
+    }
+
+    fn top(shell: &Shell) -> Overlay {
+        shell.layers.last().unwrap().render(&shell.ctx)
+    }
+
+    #[test]
+    fn pill_follows_the_queue_and_shows_the_most_important_with_more() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        assert_eq!(prop(&mut shell, "on", now), Value::Bool(false));
+
+        let list = &mut shell.ctx.activity.list;
+        list.start(
+            LIBRARY,
+            Kind::LibraryRefresh,
+            "Atualizando biblioteca",
+            "Steam · 3 de 5 lojas",
+            now,
+        );
+        assert_eq!(prop(&mut shell, "on", now), Value::Bool(true));
+        assert_eq!(text(prop(&mut shell, "icon", now)), "spin");
+        assert_eq!(
+            text(prop(&mut shell, "detail", now)),
+            "Steam · 3 de 5 lojas"
+        );
+
+        let list = &mut shell.ctx.activity.list;
+        list.start("download:1", Kind::Download, "Hades II", "", now);
+        list.progress("download:1", Some(42), "42% · faltam 4 min");
+        assert_eq!(text(prop(&mut shell, "title", now)), "Hades II");
+        assert_eq!(text(prop(&mut shell, "icon", now)), "ring");
+        assert_eq!(prop(&mut shell, "more", now), Value::Number(1.));
+        assert!(text(prop(&mut shell, "label", now)).ends_with("e mais 1"));
+        // O leitor de tela não ouve a porcentagem.
+        assert!(!text(prop(&mut shell, "announce", now)).contains('%'));
+
+        let list = &mut shell.ctx.activity.list;
+        list.fail(
+            "download:1",
+            "Não baixou Hades II",
+            Some(Action::Retry),
+            now,
+        );
+        assert_eq!(text(prop(&mut shell, "icon", now)), "warn");
+        assert_eq!(text(prop(&mut shell, "action", now)), "Tentar de novo");
+        assert_eq!(
+            text(prop(&mut shell, "announce", now)),
+            "Erro: Não baixou Hades II"
+        );
+    }
+
+    #[test]
+    fn finished_activity_leaves_the_pill_in_four_seconds_and_tick_asks_for_the_redraw() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        let list = &mut shell.ctx.activity.list;
+        list.start(
+            LIBRARY,
+            Kind::LibraryRefresh,
+            "Atualizando biblioteca",
+            "",
+            now,
+        );
+        list.finish(LIBRARY, "Biblioteca atualizada", "4 jogos novos", now);
+        assert_eq!(text(prop(&mut shell, "icon", now)), "done");
+        tick(&mut shell.ctx, now);
+        assert_eq!(shell.ctx.redraw_at, Some(now + Duration::from_secs(4)));
+        let later = now + Duration::from_secs(4);
+        assert_eq!(prop(&mut shell, "on", later), Value::Bool(false));
+    }
+
+    #[test]
+    fn clicking_the_pill_opens_the_target_of_each_kind() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let now = Instant::now();
+        let open = |kind: Kind, state: Phase| {
+            let (_dir, mut shell) = shell();
+            let list = &mut shell.ctx.activity.list;
+            list.start("k", kind, "Tarefa", "", now);
+            match state {
+                Phase::Done => list.finish("k", "Pronto", "", now),
+                Phase::Failed => list.fail("k", "Erro", None, now),
+                Phase::Running => {}
+            }
+            shell.click("desk-activity", 0);
+            let layer = shell.layers.last().map(|l| l.render(&shell.ctx));
+            layer.map(|o| {
+                (
+                    o.kind,
+                    o.rows.first().map(|r| r.key.clone()).unwrap_or_default(),
+                )
+            })
+        };
+        assert_eq!(
+            open(Kind::LibraryRefresh, Phase::Running).unwrap().0,
+            "activities"
+        );
+        assert_eq!(
+            open(Kind::CloudSync, Phase::Running).unwrap().0,
+            "activities"
+        );
+        assert_eq!(open(Kind::Download, Phase::Failed).unwrap().0, "activities");
+        assert_eq!(open(Kind::Covers, Phase::Done).unwrap().0, "activities");
+        // Procurando atualizações → MenuDoTako; Atualização pronta → o diálogo; download → PainelDownloads.
+        assert_eq!(
+            open(Kind::UpdateCheck, Phase::Running).unwrap().1,
+            "settings"
+        );
+        assert_eq!(open(Kind::UpdateReady, Phase::Running).unwrap().0, "update");
+        assert_eq!(open(Kind::Download, Phase::Running).unwrap().0, "panel");
+        assert!(open(Kind::Covers, Phase::Running).is_some());
+    }
+
+    #[test]
+    fn list_shows_rows_by_importance_clears_done_and_closes_with_back() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        let list = &mut shell.ctx.activity.list;
+        list.start(
+            "covers",
+            Kind::Covers,
+            "Buscando capas",
+            "12 de 24 jogos",
+            now,
+        );
+        list.start(
+            LIBRARY,
+            Kind::LibraryRefresh,
+            "Atualizando biblioteca",
+            "",
+            now,
+        );
+        list.start("check", Kind::UpdateCheck, "Procurando", "", now);
+        list.finish("check", "Você está em dia", "", now);
+        shell.click("desk-activity", 0);
+        let o = top(&shell);
+        assert_eq!(
+            (o.kind.as_str(), o.title.as_str()),
+            ("activities", "Atividades")
+        );
+        assert_eq!(o.overline, "2 em andamento");
+        let titles: Vec<_> = o.rows.iter().map(|r| r.title.as_str()).collect();
+        assert_eq!(
+            titles,
+            [
+                "Atualizando biblioteca",
+                "Você está em dia",
+                "Buscando capas"
+            ]
+        );
+        assert_eq!(o.rows[1].style, "done");
+        assert_eq!(o.tabs, ["Ver downloads", "Limpar concluídas"]);
+        // "Limpar concluídas" tira só a concluída; a lista continua aberta.
+        shell.click("overlay-footer", 1);
+        assert_eq!(top(&shell).rows.len(), 2);
+        shell.handle(Cmd::Back);
+        assert!(!shell.has_layers());
+    }
+
+    #[test]
+    fn closing_an_error_row_removes_it_and_the_retry_runs_from_the_pill() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        let list = &mut shell.ctx.activity.list;
+        list.start(UPDATE_CHECK, Kind::UpdateCheck, "x", "", now);
+        list.fail(
+            UPDATE_CHECK,
+            "Não deu para procurar",
+            Some(Action::Retry),
+            now,
+        );
+        shell.click("desk-activity-action", 0);
+        assert!(shell.ctx.activity.list.all().is_empty());
+        assert!(matches!(
+            shell.ctx.effects.last(),
+            Some(Effect::CheckUpdates)
+        ));
+        let list = &mut shell.ctx.activity.list;
+        list.start("cloud", Kind::CloudSync, "x", "", now);
+        list.fail("cloud", "Sem rede", None, now);
+        shell.click("desk-activity", 0);
+        shell.click("overlay-row", 0);
+        assert!(shell.ctx.activity.list.all().is_empty(), "fechar o erro");
+    }
+
+    #[test]
+    fn library_scan_feeds_the_pill_with_the_store_step_and_a_summary() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        let ctx = &mut shell.ctx;
+        let games = ctx.library.games().len();
+        ctx.scanning = true;
+        // O passo entra pelo parâmetro: `SCAN_STEP` é global e outros testes de `app.rs` o escrevem.
+        sync_library(ctx, now, Some((tako_core::library::GameStore::Steam, 3, 5)));
+        let a = ctx.activity.list.get(LIBRARY).unwrap();
+        assert_eq!(
+            (a.title.as_str(), a.detail.as_str()),
+            ("Atualizando biblioteca", "Steam · 3 de 5 lojas")
+        );
+        ctx.scanning = false;
+        ctx.found
+            .lock()
+            .unwrap()
+            .extend(crate::demo::not_installed());
+        ctx.library.refresh();
+        sync_library(ctx, now, None);
+        let a = ctx.activity.list.get(LIBRARY).unwrap();
+        assert_eq!(
+            (a.state, a.title.as_str()),
+            (Phase::Done, "Biblioteca atualizada")
+        );
+        assert_eq!(
+            a.detail,
+            format!("{} jogos novos", ctx.library.games().len() - games)
+        );
+    }
+
+    #[test]
+    fn update_ready_shows_a_dot_until_the_update_goes_away() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        shell.ctx.update_ready = Some("x".into());
+        tick(&mut shell.ctx, now);
+        assert_eq!(text(prop(&mut shell, "icon", now)), "dot");
+        shell.ctx.update_ready = None;
+        tick(&mut shell.ctx, now);
+        assert_eq!(prop(&mut shell, "on", now), Value::Bool(false));
+    }
+
+    #[test]
+    fn accepting_a_failed_pill_with_an_action_retries_it_and_the_list_row_too() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let now = Instant::now();
+        let failed = |shell: &mut Shell| {
+            let list = &mut shell.ctx.activity.list;
+            list.start(UPDATE_CHECK, Kind::UpdateCheck, "x", "", now);
+            list.fail(UPDATE_CHECK, "Sem rede", Some(Action::Retry), now);
+        };
+        // Teclado/controle (sem o botão do mouse): Aceitar na pílula refaz o trabalho.
+        let (_dir, mut shell) = shell();
+        failed(&mut shell);
+        accept(&mut shell.ctx, now);
+        assert!(shell.ctx.activity.list.all().is_empty());
+        assert!(matches!(
+            shell.ctx.effects.last(),
+            Some(Effect::CheckUpdates)
+        ));
+        // Erro sem ação: Aceitar abre a lista, onde o "fechar" alcança o erro pelo teclado.
+        let list = &mut shell.ctx.activity.list;
+        list.start("cloud", Kind::CloudSync, "x", "", now);
+        list.fail("cloud", "Sem rede", None, now);
+        accept(&mut shell.ctx, now);
+        shell.after_action();
+        assert_eq!(top(&shell).kind, "activities");
+        shell.handle(Cmd::Right);
+        assert!(top(&shell).rows[0].on, "o foco foi para o fechar");
+        shell.handle(Cmd::Accept);
+        assert!(shell.ctx.activity.list.all().is_empty());
+        // Na lista, Aceitar na linha com ação refaz o trabalho.
+        failed(&mut shell);
+        open_list(&mut shell.ctx);
+        shell.after_action();
+        shell.handle(Cmd::Accept);
+        assert!(shell.ctx.activity.list.all().is_empty());
+    }
+
+    #[test]
+    fn the_live_region_exists_without_activities_and_announces_any_queue_event() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        assert_eq!(text(prop(&mut shell, "announce", now)), "");
+        let list = &mut shell.ctx.activity.list;
+        list.start(
+            LIBRARY,
+            Kind::LibraryRefresh,
+            "Atualizando biblioteca",
+            "",
+            now,
+        );
+        list.start("download:1", Kind::Download, "Hades II", "", now);
+        list.progress("download:1", Some(10), "10%");
+        // A biblioteca termina atrás do download: a pílula mostra o download, o leitor ouve a conclusão.
+        list.finish(LIBRARY, "Biblioteca atualizada", "4 jogos novos", now);
+        assert_eq!(text(prop(&mut shell, "title", now)), "Hades II");
+        assert_eq!(
+            text(prop(&mut shell, "announce", now)),
+            "Biblioteca atualizada. 4 jogos novos"
+        );
+    }
+
+    #[test]
+    fn clicking_the_pill_with_the_list_open_closes_it_instead_of_stacking_another() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let (_dir, mut shell) = shell();
+        let now = Instant::now();
+        let list = &mut shell.ctx.activity.list;
+        list.start(LIBRARY, Kind::LibraryRefresh, "Biblioteca", "", now);
+        list.start(COVERS, Kind::Covers, "Capas", "", now);
+        shell.click("desk-activity", 0);
+        assert_eq!(top(&shell).kind, "activities");
+        shell.click("desk-activity", 0);
+        assert!(!shell.has_layers(), "o segundo clique fecha a lista");
+    }
+}

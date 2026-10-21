@@ -4,8 +4,8 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ## [Unreleased]
 
-- Corrija o registro do modo tela cheia do Windows com MSIX assinado e restauração do certificado (FSE-002).
 ### Novidades
+- **Atividades na barra de cima:** uma pílula antes do perfil mostra o que o Tako faz em segundo plano (atualizar a biblioteca, procurar atualização, downloads, capas), com o andamento, o resumo ao concluir e "Tentar de novo" no erro; clicar abre a lista "Atividades".
 - **ScreenScraper com a sua conta de desenvolvedor:** quem tem credenciais de desenvolvedor do ScreenScraper pode colocá-las nas Configurações e usar o ScreenScraper mesmo em versões que não as trazem.
 - **Modo tela cheia do Windows:** use o Tako como tela inicial nas Configurações.
 - **Downloads por torrent:** baixe jogos das fontes que você mesmo adiciona, num painel com pausa, retomada e fila. Vem desligado.
@@ -36,6 +36,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 - **Atualizar biblioteca:** botão novo na barra da lista do desktop relê as lojas na hora.
 ### Correções
+- **Modo tela cheia do Windows:** ligar o Tako como tela inicial volta a funcionar; antes o Windows recusava o pacote (0x80073CF6).
 - **Ícones da Steam com falha no endereço:** quando o endereço principal do ícone de um jogo da Steam não responde na CDN, o Tako busca o ícone da comunidade pela API da loja e não mantém a falha gravada para sempre.
 - **Busca de atualizações:** conexões lentas continuam enquanto recebem dados, com compressão gzip e falha clara quando a rede para.
 - **Retorno ao atualizar a biblioteca:** enquanto a biblioteca atualiza, o botão gira e a barra mostra "Atualizando…"; clicar de novo avisa que já está em andamento, e no fim um aviso traz o total de jogos, os novos e a loja que falhou.

@@ -6,6 +6,8 @@ use super::agent::{MetadataAgent, PinnedIds};
 use super::cache::MetadataCache;
 use crate::library::Game;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
@@ -32,6 +34,7 @@ enum Command {
 
 pub struct MetadataWorker {
     tx: Sender<Command>,
+    progress: Arc<[AtomicUsize; 2]>,
 }
 
 impl MetadataWorker {
@@ -43,6 +46,8 @@ impl MetadataWorker {
     ) -> (MetadataWorker, Receiver<MetadataUpdated>) {
         let (tx, rx) = mpsc::channel();
         let (out, results) = mpsc::channel();
+        let progress = Arc::new([AtomicUsize::new(0), AtomicUsize::new(0)]);
+        let shared = progress.clone();
         let spawned = std::thread::Builder::new()
             .name("tako-metadata".into())
             .spawn(move || {
@@ -54,13 +59,14 @@ impl MetadataWorker {
                     out,
                     paused: false,
                     pending: None,
+                    progress: shared,
                 }
                 .run();
             });
         if let Err(e) = spawned {
             tracing::error!("Metadados: não foi possível iniciar a fila: {e}");
         }
-        (MetadataWorker { tx }, results)
+        (MetadataWorker { tx, progress }, results)
     }
 
     /// Atualiza os jogos sem dados ou com dados velhos (`force` = todos). `pinned` = ids fixados
@@ -71,6 +77,14 @@ impl MetadataWorker {
             force,
             pinned,
         });
+    }
+
+    /// Jogos já consultados e total da rodada em curso (AtividadeNaBarra); `feitos == total` = parada.
+    pub fn progress(&self) -> (usize, usize) {
+        (
+            self.progress[0].load(Ordering::Relaxed),
+            self.progress[1].load(Ordering::Relaxed),
+        )
     }
 
     /// Para depois do jogo atual (ex.: durante uma partida); [`resume`](Self::resume) continua.
@@ -100,6 +114,8 @@ struct Loop {
     out: Sender<MetadataUpdated>,
     paused: bool,
     pending: Option<Round>,
+    /// Feitos e total da rodada, lidos por [`MetadataWorker::progress`].
+    progress: Arc<[AtomicUsize; 2]>,
 }
 
 impl Loop {
@@ -182,6 +198,9 @@ impl Loop {
         if due.is_empty() {
             return true;
         }
+        // O andamento vai antes do lote do IGDB: a pílula aparece já no começo da rodada.
+        self.progress[0].store(0, Ordering::Relaxed);
+        self.progress[1].store(due.len(), Ordering::Relaxed);
         // IGDB: a biblioteca inteira em poucas consultas em lote, antes de ir jogo a jogo.
         self.agent.prefetch(&due);
         for game in &due {
@@ -204,6 +223,7 @@ impl Loop {
                     metadata: m,
                 });
             }
+            self.progress[0].fetch_add(1, Ordering::Relaxed);
             if update.queried && !self.wait(Instant::now() + self.spacing) {
                 return false;
             }
@@ -257,6 +277,12 @@ mod tests {
         got.sort();
         assert_eq!(got, ["steam:1", "steam:2"]);
         assert!(MetadataCache::new(dir.path()).read("steam:2").is_some());
+        // O andamento da rodada (AtividadeNaBarra) termina com todos feitos.
+        let start = Instant::now();
+        while worker.progress() != (2, 2) && start.elapsed() < Duration::from_secs(5) {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(worker.progress(), (2, 2));
 
         // Cache em dia: a próxima rodada não consulta ninguém.
         worker.refresh(games, false, HashMap::new());

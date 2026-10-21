@@ -286,6 +286,8 @@ pub struct Ctx {
     /// Espaço livre no disco padrão das lojas, para o destaque de jogo não instalado (SRC-005).
     pub free_space: Option<tako_core::devices::FreeSpace>,
     pub app_update: crate::app_updates::State,
+    /// AtividadeNaBarra: o que roda em segundo plano (UX-006).
+    pub activity: super::activities::State,
     pub safe_mode: bool,
     pub scanning: bool,
     /// Restauração de backup em andamento (bloqueia jogar, varrer, restaurar e salvar configurações).

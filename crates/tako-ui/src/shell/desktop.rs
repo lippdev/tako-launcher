@@ -1455,14 +1455,25 @@ impl Page for DesktopLibrary {
             }
             (Zone::Bar, Cmd::Left) => self.index = self.index.saturating_sub(1),
             (Zone::Bar, Cmd::Right) => {
-                let count = BAR_ITEMS + usize::from(super::downloads::pill(ctx).is_some());
+                let count = BAR_ITEMS
+                    + usize::from(super::activities::visible(ctx, std::time::Instant::now()));
                 self.index = (self.index + 1).min(count - 1);
+            }
+            // Menu na pílula: a lista de atividades (Aceitar num erro refaz o trabalho).
+            (Zone::Bar, Cmd::Menu)
+                if self.index == BAR_DOWNLOADS
+                    && super::activities::visible(ctx, std::time::Instant::now()) =>
+            {
+                super::activities::open_list(ctx);
+                return Nav::Stay;
             }
             (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
             (Zone::Bar, Cmd::Accept) => {
-                let downloads_on = super::downloads::pill(ctx).is_some();
+                let now = std::time::Instant::now();
+                let downloads_on = super::activities::visible(ctx, now);
                 if downloads_on && self.index == BAR_DOWNLOADS {
-                    return Nav::Layer(Box::new(super::downloads::panel(ctx)));
+                    super::activities::accept(ctx, now);
+                    return Nav::Stay;
                 }
                 match self.index {
                     0 => return Nav::Layer(Box::new(brand_menu())),
@@ -2772,7 +2783,7 @@ mod tests {
     }
 
     #[test]
-    fn downloads_pill_is_in_the_keyboard_bar_order() {
+    fn activity_pill_is_in_the_keyboard_bar_order() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
@@ -2790,6 +2801,11 @@ mod tests {
 
         assert!(shell.has_layers());
         assert_eq!(page(&shell).zone(), Zone::Bar);
+        // Esc fecha e o foco continua na pílula.
+        shell.handle(Cmd::Back);
+        assert!(!shell.has_layers());
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+        assert_eq!(page(&shell).index, BAR_DOWNLOADS);
     }
 
     #[test]
