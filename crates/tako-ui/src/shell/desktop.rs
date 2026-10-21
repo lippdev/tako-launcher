@@ -1634,7 +1634,7 @@ impl Page for DesktopLibrary {
                 } else if ctx.scanning {
                     ctx.toast(ctx.t("library.rescan.already_running"));
                 } else {
-                    ctx.effect(Effect::Rescan);
+                    ctx.effect(Effect::UserRescan);
                 }
             }
             // DestaqueFases: 1 abre a fase 2 (roda para baixo, "Mais sobre o jogo"), 0 volta para a fase 1.
@@ -3485,15 +3485,16 @@ mod tests {
         let busy = out.props.iter().find(|(n, _)| *n == "desk-rescan-busy");
         assert_eq!(busy.map(|(_, v)| v), Some(&Value::Bool(false)));
         let labels = out.props.iter().find(|(n, _)| *n == "desk-view-labels");
-        if let Some((_, Value::Model(m))) = labels {
-            assert_eq!(
-                m.row_data(7).and_then(|v| match v {
-                    Value::String(s) => Some(s.to_string()),
-                    _ => None,
-                }),
-                Some("Atualizar biblioteca".to_string())
-            );
-        }
+        let Some((_, Value::Model(m))) = labels else {
+            panic!("desk-view-labels não encontrado ou não é Model");
+        };
+        assert_eq!(
+            m.row_data(7).and_then(|v| match v {
+                Value::String(s) => Some(s.to_string()),
+                _ => None,
+            }),
+            Some("Atualizar biblioteca".to_string())
+        );
 
         // Enquanto atualiza com a biblioteca preenchida:
         shell.ctx.scanning = true;
@@ -3511,15 +3512,16 @@ mod tests {
             Some(&Value::String("Atualizando…".into()))
         );
         let labels = out.props.iter().find(|(n, _)| *n == "desk-view-labels");
-        if let Some((_, Value::Model(m))) = labels {
-            assert_eq!(
-                m.row_data(7).and_then(|v| match v {
-                    Value::String(s) => Some(s.to_string()),
-                    _ => None,
-                }),
-                Some("Atualizando biblioteca…".to_string())
-            );
-        }
+        let Some((_, Value::Model(m))) = labels else {
+            panic!("desk-view-labels não encontrado ou não é Model");
+        };
+        assert_eq!(
+            m.row_data(7).and_then(|v| match v {
+                Value::String(s) => Some(s.to_string()),
+                _ => None,
+            }),
+            Some("Atualizando biblioteca…".to_string())
+        );
 
         // Clicar novamente durante atualização exibe toast e não duplica efeito
         shell.click("rescan", 0);
@@ -3527,6 +3529,11 @@ mod tests {
             shell.ctx.toast.as_ref().map(|(t, _)| t.as_str()),
             Some("A biblioteca já está sendo atualizada")
         );
-        assert!(!shell.ctx.effects.contains(&Effect::Rescan));
+        assert!(!shell.ctx.effects.contains(&Effect::UserRescan));
+
+        // Clicar em repouso enfileira UserRescan
+        shell.ctx.scanning = false;
+        shell.click("rescan", 0);
+        assert!(shell.ctx.effects.contains(&Effect::UserRescan));
     }
 }

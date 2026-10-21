@@ -30,7 +30,10 @@ pub enum Effect {
     GoHomeKeepingGame,
     /// O usuário mudou o ponteiro na Central (esconder / mover com o analógico).
     PointerChanged,
+    /// Releitura da biblioteca disparada internamente (mudança de emulador, chave da Steam, primeiro uso).
     Rescan,
+    /// Releitura da biblioteca pedida pelo usuário (botão no desktop, tela cheia ou configurações).
+    UserRescan,
     /// Escolher um arquivo para "Adicionar jogo".
     AddGame,
     OpenFolder(String),
@@ -612,7 +615,11 @@ impl Ctx {
         if self.restoring
             && matches!(
                 e,
-                Effect::Launch(_) | Effect::ResumeGame | Effect::Rescan | Effect::ReloadLibrary
+                Effect::Launch(_)
+                    | Effect::ResumeGame
+                    | Effect::Rescan
+                    | Effect::UserRescan
+                    | Effect::ReloadLibrary
             )
         {
             self.toast(self.t("settings.system.restore_busy"));
