@@ -158,7 +158,8 @@ try {
         if ($package) { $package | Remove-AppxPackage }
         if ($oldDev -ne 1 -or $import -or $retired.Count -gt 0 -or $newDescriptors.Count -gt 0) { Set-MachineState 1 -ImportCertificate $(if ($import) { $certificatePath } else { '' }) -RemoveThumbprints $retired -Descriptors $newDescriptors -DescriptorContent $descriptorContent }
         Write-Host "FSE pre-install: exe=$(Test-Path -LiteralPath $Executable); DevMode=$((Get-ItemProperty -LiteralPath $dev).AllowDevelopmentWithoutDevLicense); AllowAllTrustedApps=$((Get-ItemProperty -LiteralPath $dev).AllowAllTrustedApps); TrustedPeople=$(Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"); Root=$(Test-Path -LiteralPath "Cert:\LocalMachine\Root\$($certificate.Thumbprint)")"
-        Add-AppxPackage -Path $msix -ExternalLocation (Split-Path -Parent $Executable) -ForceUpdateFromAnyVersion -ForceApplicationShutdown -ForceTargetApplicationShutdown
+        # O cmdlet rejeita ambas as flags: ForceApplicationShutdown ja inclui o pacote e dependencias.
+        Add-AppxPackage -Path $msix -ExternalLocation (Split-Path -Parent $Executable) -ForceUpdateFromAnyVersion -ForceApplicationShutdown
         $package = Get-AppxPackage -Name $name
         if (-not $package) { throw 'Package registration did not produce an identity.' }
         $state.AssignedHome = "$($package.PackageFamilyName)!App"

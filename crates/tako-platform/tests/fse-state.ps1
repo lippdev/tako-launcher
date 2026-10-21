@@ -17,11 +17,12 @@ function Assert($condition, $message) { if (-not $condition) { throw $message } 
 function Get-AppxPackage { param($Name) if ($script:Package) { [pscustomobject]@{PackageFamilyName='Tako.GamingHome_test'} } }
 function Add-AppxPackage {
     param($Path,$ExternalLocation,[switch]$ForceUpdateFromAnyVersion,[switch]$ForceApplicationShutdown,[switch]$ForceTargetApplicationShutdown)
+    if ($ForceApplicationShutdown -and $ForceTargetApplicationShutdown) { throw 'ForceApplicationShutdown and ForceTargetApplicationShutdown cannot be specified at the same time' }
     if ($script:FailRegister) { throw 'registration rejected' }
     Assert (Microsoft.PowerShell.Management\Test-Path -LiteralPath (Join-Path $script:AppRoot 'CustomCapability.SCCD')) 'SCCD must exist in ExternalLocation before registration'
     Assert ($Path -eq (Join-Path $script:Layout 'Tako-GamingHome.msix')) 'signed package path'
     Assert ($ExternalLocation -eq $script:AppRoot) 'external location'
-    Assert ($ForceUpdateFromAnyVersion -and $ForceApplicationShutdown -and $ForceTargetApplicationShutdown) 'AnyFSE deployment options'
+    Assert ($ForceUpdateFromAnyVersion -and $ForceApplicationShutdown -and -not $ForceTargetApplicationShutdown) 'equivalent AnyFSE shutdown scope without conflicting cmdlet switches'
     $script:Package = $true
 }
 function Remove-AppxPackage { param([Parameter(ValueFromPipeline)]$InputObject) process { if ($script:FailRemove) { throw 'remove failed' }; $script:Package = $false } }
