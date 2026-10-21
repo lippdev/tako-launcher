@@ -73,6 +73,7 @@ function Reset($gamingHome,$dev) {
     $script:Supported=$true; $script:FailRegister=$false; $script:FailRemove=$false; $script:Cancel=$false; $script:Elevations=0
 }
 try {
+    Assert ((Get-FileHash (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD')).Hash -eq 'BBB4C60FBFAF00B462C197458CAAD19FB2828D87B1D95CDFD2292314CDDC6446') 'SCCD must preserve the AnyFSE bytes accepted by AppX'
     $appx = [xml](Get-Content (Join-Path $PSScriptRoot '../../../packaging/fse/AppxManifest.xml') -Raw)
     $win32 = [xml](Get-Content (Join-Path $PSScriptRoot '../../../packaging/fse/Tako.manifest') -Raw)
     Assert ($appx.Package.Identity.Name -eq $win32.assembly.msix.packageName) 'package identity mismatch'
