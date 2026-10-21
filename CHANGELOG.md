@@ -34,6 +34,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 - **Atualizar biblioteca:** botão novo na barra da lista do desktop relê as lojas na hora.
 ### Correções
+- **Ícones da Steam com falha no endereço:** quando o endereço principal do ícone de um jogo da Steam não responde na CDN, o Tako busca o ícone da comunidade pela API da loja e não mantém a falha gravada para sempre.
 - **Busca de atualizações:** conexões lentas continuam enquanto recebem dados, com compressão gzip e falha clara quando a rede para.
 - **Instruções em passos:** aparecem uma por linha.
 - **Abertura mais rápida:** a biblioteca aparece inteira assim que o Tako abre, com a última leitura das lojas, enquanto a leitura nova roda por trás.

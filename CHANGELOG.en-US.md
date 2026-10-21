@@ -34,6 +34,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 - **Refresh library:** a new button on the desktop list bar rescans the stores right away.
 ### Fixes
+- **Steam icon fallback:** when a Steam game's primary icon address fails on the CDN, Tako falls back to the community icon from Steam's API and avoids caching the failure indefinitely.
 - **Update checks:** slow connections keep going while receiving data, with gzip compression and a clear failure when the network stalls.
 - **Step instructions:** appear one per line.
 - **Faster startup:** the whole library shows up as soon as Tako opens, from the last store scan, while a fresh scan runs in the background.

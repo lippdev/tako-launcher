@@ -86,7 +86,18 @@ impl ArtCache {
                 .and_then(|t| t.elapsed().ok())
                 .is_some_and(|age| age.as_secs() < MISS_DAYS * 24 * 3600);
         if fresh {
-            return self.steam.local_files(uri).into_iter().next();
+            if let Some(file) = self.steam.local_files(uri).into_iter().next() {
+                return Some(file);
+            }
+            if let Some(app) = steam_app_from_icon_url(uri) {
+                let fallback_uri = format!("{STEAM_ART_SCHEME}://{app}/icon");
+                if let Some(fallback) = self.locate(&fallback_uri) {
+                    let _ = std::fs::remove_file(&miss);
+                    let _ = std::fs::copy(&fallback, &cached);
+                    return Some(fallback);
+                }
+            }
+            return None;
         }
         let transient = Cell::new(false);
         let found = match scheme.as_deref() {
@@ -114,9 +125,23 @@ impl ArtCache {
                 }
                 found
             }
-            Some("https" | "http") => self
-                .download(uri, &transient)
-                .and_then(|b| self.store(&cached, &b)),
+            Some("https" | "http") => {
+                let downloaded = self
+                    .download(uri, &transient)
+                    .and_then(|b| self.store(&cached, &b));
+                if downloaded.is_some() {
+                    downloaded
+                } else if let Some(app) = steam_app_from_icon_url(uri) {
+                    let fallback_uri = format!("{STEAM_ART_SCHEME}://{app}/icon");
+                    let fallback = self.locate(&fallback_uri);
+                    if let Some(ref path) = fallback {
+                        let _ = std::fs::copy(path, &cached);
+                    }
+                    fallback
+                } else {
+                    None
+                }
+            }
             _ => return None,
         };
         if found.is_none() && !transient.get() {
@@ -229,6 +254,16 @@ impl ArtCache {
             })
             .collect()
     }
+}
+
+/// Appid da Steam quando o endereço é de um ícone da comunidade (`community_assets/images/apps/<appid>/...`).
+fn steam_app_from_icon_url(url: &str) -> Option<u32> {
+    if !url.contains("steamstatic.com") {
+        return None;
+    }
+    let (_, tail) = url.split_once("/images/apps/")?;
+    let (app, _) = tail.split_once('/')?;
+    app.parse().ok()
 }
 
 // Marca o uso (a data de acesso do disco não é confiável: `noatime`, `relatime`).
@@ -521,5 +556,55 @@ mod tests {
         assert!(c.locate("file:///nao/existe.png").is_none());
         assert!(c.locate("ssmedia://neoclone.screenscraper.fr/x").is_none()); // sem cliente
         assert_eq!(file_path("file:///a%2"), Some(PathBuf::from("/a%2")));
+    }
+
+    #[test]
+    fn steam_icon_falls_back_to_api_when_primary_cdn_url_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let primary = "https://shared.akamai.steamstatic.com/community_assets/images/apps/3669870/badhash.jpg";
+        let valid_icon_url = "https://shared.akamai.steamstatic.com/community_assets/images/apps/3669870/f9f541b67c42a9503467f44072ef9193c135ff33.jpg";
+        let mut http = FakeHttp::with_fallback(404, "");
+        http.rule = Some(Box::new(move |req| {
+            if req.url.contains("IStoreBrowseService/GetItems") {
+                Some(HttpResponse {
+                    status: 200,
+                    body: r#"{"response":{"store_items":[{"assets":{"community_icon":"f9f541b67c42a9503467f44072ef9193c135ff33"}}]}}"#.as_bytes().to_vec(),
+                    content_type: Some("application/json".into()),
+                    retry_after: None,
+                })
+            } else if req.url == valid_icon_url {
+                Some(HttpResponse {
+                    status: 200,
+                    body: PNG.to_vec(),
+                    content_type: Some("image/jpeg".into()),
+                    retry_after: None,
+                })
+            } else {
+                None
+            }
+        }));
+        let http = Arc::new(http);
+        let c = cache(dir.path(), http.clone());
+
+        let p = c
+            .locate(primary)
+            .expect("deve encontrar o ícone pelo fallback da API");
+        assert!(p.is_file());
+        assert!(
+            !miss_of(&c, primary).exists(),
+            "não pode deixar marcador .miss permanente quando o fallback funciona"
+        );
+
+        write_cache_file(&miss_of(&c, primary), MISS_MARK).unwrap();
+        std::fs::remove_file(c.cache_path(primary)).ok();
+        let c2 = cache(dir.path(), http.clone());
+        let p2 = c2
+            .locate(primary)
+            .expect("marcador .miss antigo não pode bloquear o fallback");
+        assert!(p2.is_file());
+        assert!(
+            !miss_of(&c2, primary).exists(),
+            "marcador .miss stale deve ser removido após sucesso"
+        );
     }
 }
