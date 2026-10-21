@@ -3,6 +3,8 @@
 English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Before publishing a version, add a `## [VERSION]` section to **both** files: the workflow publishes the section matching the tag (this file's, with a link to the Portuguese one) and fails if either is missing.
 
 ## [Unreleased]
+
+- Fix Windows full screen mode registration with a signed MSIX and certificate restoration (FSE-002).
 ### What's new
 - **ScreenScraper with your developer account:** anyone with ScreenScraper developer credentials can enter them in Settings and use ScreenScraper even on builds that don't include them.
 - **Windows full screen mode:** use Tako as the home app from Settings.

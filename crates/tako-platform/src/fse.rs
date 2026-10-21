@@ -1,4 +1,4 @@
-//! Identidade local de desenvolvimento para o Windows Full Screen Experience (FSE-001).
+//! Identidade esparsa assinada para o Windows Full Screen Experience (FSE-002).
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
@@ -55,7 +55,8 @@ fn native_run(action: &str) -> Result<String, String> {
 
 #[cfg(windows)]
 mod native {
-    use std::{io::Cursor, os::windows::process::CommandExt, process::Command};
+    use super::{CERTIFICATE, INSTALLED, PORTABLE, package_variant};
+    use std::{os::windows::process::CommandExt, process::Command};
 
     pub(super) fn run(action: &str) -> Result<String, String> {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -65,7 +66,7 @@ mod native {
         .join("Tako")
         .join("GamingHome");
         std::fs::create_dir_all(&layout).map_err(|e| e.to_string())?;
-        // Protect extraction too: two launcher instances must not replace a live manifest.
+        // A extração também fica protegida contra outra instância do launcher.
         let lock = std::fs::OpenOptions::new()
             .create(true)
             .truncate(false)
@@ -81,38 +82,21 @@ mod native {
         }
         let script = layout.join("Setup.ps1");
         std::fs::write(&script, include_str!("fse.ps1")).map_err(|e| e.to_string())?;
-        if action == "enable" && !layout.join("previous.clixml").exists() {
-            let filename = exe
-                .file_name()
-                .ok_or("Executável inválido")?
-                .to_string_lossy();
-            let escaped = super::xml_escape(&filename);
-            std::fs::write(
-                layout.join("AppxManifest.xml"),
-                super::MANIFEST.replace("__EXECUTABLE__", &escaped),
-            )
-            .map_err(|e| e.to_string())?;
-            std::fs::write(layout.join("CustomCapability.SCCD"), super::SCCD)
-                .map_err(|e| e.to_string())?;
-            std::fs::create_dir_all(layout.join("Public")).map_err(|e| e.to_string())?;
-            std::fs::create_dir_all(layout.join("Assets")).map_err(|e| e.to_string())?;
-            let logo = image::load_from_memory(include_bytes!("../../tako-ui/theme/tako-logo.png"))
-                .map_err(|e| e.to_string())?;
-            for (name, size) in [
-                ("StoreLogo", 50),
-                ("Square150x150Logo", 150),
-                ("Square44x44Logo", 44),
-            ] {
-                let mut png = Cursor::new(Vec::new());
-                logo.resize_exact(size, size, image::imageops::FilterType::Lanczos3)
-                    .write_to(&mut png, image::ImageFormat::Png)
-                    .map_err(|e| e.to_string())?;
-                std::fs::write(
-                    layout.join("Assets").join(format!("{name}.png")),
-                    png.into_inner(),
-                )
-                .map_err(|e| e.to_string())?;
+        if action == "enable" {
+            let portable = package_variant(exe.file_name().and_then(|s| s.to_str()).unwrap_or(""))?;
+            let (msix, cer) = if portable {
+                (PORTABLE, CERTIFICATE)
+            } else {
+                (INSTALLED, CERTIFICATE)
+            };
+            if msix.is_empty() || cer.is_empty() {
+                return Err(
+                    "Pacote FSE assinado ausente neste build; use uma distribuição Windows oficial"
+                        .into(),
+                );
             }
+            std::fs::write(layout.join("Tako-GamingHome.msix"), msix).map_err(|e| e.to_string())?;
+            std::fs::write(layout.join("Tako-GamingHome.cer"), cer).map_err(|e| e.to_string())?;
         }
         let powershell = std::path::PathBuf::from(
             std::env::var_os("SystemRoot").ok_or("SystemRoot indisponível")?,
@@ -144,18 +128,18 @@ mod native {
     }
 }
 
+#[cfg(windows)]
+include!(concat!(env!("OUT_DIR"), "/fse_payload.rs"));
+
 #[cfg(any(windows, test))]
-const MANIFEST: &str = include_str!("../../../packaging/fse/AppxManifest.xml");
-#[cfg(any(windows, test))]
-const SCCD: &str = include_str!("../../../packaging/fse/CustomCapability.SCCD");
-#[cfg(any(windows, test))]
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
+fn package_variant(filename: &str) -> Result<bool, String> {
+    if filename.eq_ignore_ascii_case("Tako.exe") {
+        Ok(false)
+    } else if filename.eq_ignore_ascii_case("Tako-Portable-x64.exe") {
+        Ok(true)
+    } else {
+        Err("Para ativar o FSE, mantenha o nome Tako.exe ou Tako-Portable-x64.exe".into())
+    }
 }
 
 #[cfg(test)]
@@ -189,12 +173,23 @@ mod tests {
 
     #[test]
     fn identity_has_home_extension_and_development_catalog() {
-        assert!(MANIFEST.contains("windows.gamingApp"));
-        assert!(!MANIFEST.contains("EntryPoint="));
-        assert!(MANIFEST.contains("uap10:Parameters=\"--big-picture\""));
-        assert!(MANIFEST.contains("<uap10:AllowExternalContent>true"));
-        assert!(SCCD.contains("<Catalog>FFFF</Catalog>"));
-        assert!(SCCD.contains("Microsoft.appCategory.gamingHome_8wekyb3d8bbwe"));
-        assert_eq!(xml_escape("a&\"'<>.exe"), "a&amp;&quot;&apos;&lt;&gt;.exe");
+        let manifest = include_str!("../../../packaging/fse/AppxManifest.xml");
+        assert!(manifest.contains("windows.gamingApp"));
+        assert!(manifest.contains("EntryPoint=\"Windows.FullTrustApplication\""));
+        assert!(manifest.contains("uap18:RuntimeBehavior=\"win32App\""));
+        assert!(manifest.contains("MinVersion=\"10.0.26100.8039\""));
+        assert!(
+            include_str!("../../../packaging/fse/CustomCapability.SCCD")
+                .contains("<Catalog>FFFF</Catalog>")
+        );
+    }
+
+    #[test]
+    fn package_matches_actual_executable() {
+        assert_eq!(package_variant("Tako.exe"), Ok(false));
+        assert_eq!(package_variant("tako.EXE"), Ok(false));
+        assert_eq!(package_variant("Tako-Portable-x64.exe"), Ok(true));
+        assert!(package_variant("renamed.exe").is_err());
+        assert!(package_variant("../Tako.exe").is_err());
     }
 }

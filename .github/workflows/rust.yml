@@ -49,8 +49,26 @@ jobs:
             libxcursor-dev libxrandr-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
             libdrm-dev libgbm-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libfontconfig-dev
       - uses: Swatinem/rust-cache@v2
+      - name: Gerar MSIX FSE assinado
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          ./build/rust/Package-Fse.ps1 -OutputDirectory "$env:RUNNER_TEMP/fse"
+          "TAKO_FSE_PAYLOAD_DIR=$env:RUNNER_TEMP/fse" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - run: cargo clippy --workspace --all-targets --locked
       - run: cargo test --workspace --locked
+
+  # Isolado: Windows Server do runner pode não oferecer a capability gamingHome.
+  fse-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gerar MSIX FSE assinado
+        shell: powershell
+        run: ./build/rust/Package-Fse.ps1 -OutputDirectory "$env:RUNNER_TEMP/fse"
+      - name: Validar instalação e restauração reais
+        shell: powershell
+        run: ./crates/tako-platform/tests/fse-integration.ps1 -PayloadDirectory "$env:RUNNER_TEMP/fse"
 
   # MIG-041 (PRD §8.1): números de tendência do app de verdade (1.000 jogos, renderizador por software, Xvfb).
   # Não reprova por número; só se o Tako não abrir ou travar.

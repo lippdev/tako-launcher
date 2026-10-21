@@ -1,7 +1,8 @@
-# Run with pwsh -NoProfile -File crates/tako-platform/tests/fse-state.ps1.
-# All registry, AppX and elevation calls are fakes; CLIXML persistence uses a temporary directory.
+# Execute com pwsh -NoProfile -File crates/tako-platform/tests/fse-state.ps1.
+# Registro, AppX e elevação são fakes; CLIXML persiste numa pasta temporária.
 $ErrorActionPreference = 'Stop'
 $source = Get-Content (Join-Path $PSScriptRoot '../src/fse.ps1') -Raw
+$source = $source.Replace('[Security.Cryptography.X509Certificates.X509Certificate2]::new($path)', "[pscustomobject]@{Subject='CN=Tako Dev';Thumbprint=`$script:Thumbprint}")
 $source = $source.Replace('[Environment]::OSVersion.Version.Build', '$script:Build').Replace('exit 0', 'return').Replace('exit 1', 'throw ''setup failed''')
 $script:AppRoot = Join-Path ([IO.Path]::GetTempPath()) 'Tako FSE app'
 $script:Layout = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
@@ -9,13 +10,14 @@ $script:Layout = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToStrin
 function Assert($condition, $message) { if (-not $condition) { throw $message } }
 function Get-AppxPackage { param($Name) if ($script:Package) { [pscustomobject]@{PackageFamilyName='Tako.GamingHome_test'} } }
 function Add-AppxPackage {
-    param($Register,$ExternalLocation,[switch]$ForceUpdateFromAnyVersion)
+    param($Path,$ExternalLocation,[switch]$ForceUpdateFromAnyVersion)
     if ($script:FailRegister) { throw 'registration rejected' }
+    Assert ($Path -eq (Join-Path $script:Layout 'Tako-GamingHome.msix')) 'signed package path'
     Assert ($ExternalLocation -eq $script:AppRoot) 'external location'
     $script:Package = $true
 }
 function Remove-AppxPackage { param([Parameter(ValueFromPipeline)]$InputObject) process { if ($script:FailRemove) { throw 'remove failed' }; $script:Package = $false } }
-function Test-Path { param($LiteralPath) if ($LiteralPath -like 'HKCU:*') { return $script:Supported }; Microsoft.PowerShell.Management\Test-Path -LiteralPath $LiteralPath }
+function Test-Path { param($LiteralPath) if ($LiteralPath -like 'Cert:*') { return $script:Trusted.Contains(($LiteralPath -split '\\')[-1]) }; if ($LiteralPath -like 'HKCU:*') { return $script:Supported }; Microsoft.PowerShell.Management\Test-Path -LiteralPath $LiteralPath }
 function Get-ItemProperty {
     param($LiteralPath,$ErrorAction)
     if ($LiteralPath -like 'HKCU:*') { [pscustomobject]@{GamingHomeApp=$script:GamingHome} }
@@ -42,6 +44,8 @@ function Start-Process {
     $code = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
     Assert ($code -notmatch 'GamingHomeApp|Add-AppxPackage') 'user operation elevated'
     Assert ($code -notmatch 'New-Item -Path [^;]+ -Force') 'HKLM key must preserve other values'
+    if ($code -match 'Import-Certificate') { $script:Trusted.Add($script:Thumbprint) | Out-Null }
+    foreach ($match in [regex]::Matches($code, "Remove-Item 'Cert:.*?([A-F0-9]{40})'")) { $script:Trusted.Remove($match.Groups[1].Value) | Out-Null }
     $script:Elevations++
     if ($code -match '-Value (\d+)') { $script:Dev = [int]$Matches[1] } else { $script:Dev = $null }
     [pscustomobject]@{ExitCode=0}
@@ -49,7 +53,7 @@ function Start-Process {
 function Run($action) { & ([scriptblock]::Create($source)) -Action $action -Layout $script:Layout -Executable (Join-Path $script:AppRoot 'Tako.exe') }
 function Reset($gamingHome,$dev) {
     Microsoft.PowerShell.Management\Remove-Item "$script:Layout/*" -Force -ErrorAction SilentlyContinue
-    $script:OtherValue='preserved'; $script:GamingHome=$gamingHome; $script:Dev=$dev; $script:Package=$false; $script:Build=26100
+    $script:Thumbprint='A'*40; $script:Trusted=[Collections.Generic.HashSet[string]]::new(); $script:OtherValue='preserved'; $script:GamingHome=$gamingHome; $script:Dev=$dev; $script:Package=$false; $script:Build=26100
     $script:Supported=$true; $script:FailRegister=$false; $script:FailRemove=$false; $script:Cancel=$false; $script:Elevations=0
 }
 try {
@@ -74,9 +78,34 @@ try {
             Assert ($script:Dev -eq $oldDev) 'developer mode restored'
             Assert (-not $script:Package) 'package removed'
             Assert (-not (Test-Path "$script:Layout/previous.clixml")) 'backup cleaned'
-            if ($oldDev -eq 1) { Assert ($script:Elevations -eq 0) 'existing developer mode requires no UAC' }
+            Assert ($script:Elevations -eq 2) 'one elevation each for enable and disable'
+            Assert ($script:Trusted.Count -eq 0) 'imported certificate removed'
         }
     }
+    Reset 'Original!App' 1
+    $script:Trusted.Add($script:Thumbprint) | Out-Null
+    Run enable
+    Run disable
+    Assert ($script:Trusted.Contains($script:Thumbprint)) 'preexisting certificate retained'
+    Assert ($script:Elevations -eq 0) 'existing trust and developer mode need no UAC'
+    Reset 'Original!App' 0
+    Run enable
+    $oldThumbprint = $script:Thumbprint
+    $script:Thumbprint='B'*40
+    Run enable
+    Assert (-not $script:Trusted.Contains($oldThumbprint)) 'old build trust removed'
+    Assert ($script:Trusted.Contains($script:Thumbprint)) 'new build trusted'
+    Assert ($script:Elevations -eq 2) 'rotation uses one additional UAC prompt'
+    Run disable
+    Assert ($script:GamingHome -eq 'Original!App' -and $script:Dev -eq 0) 'rotation baseline restored'
+    Assert ($script:Trusted.Count -eq 0) 'rotation trust cleaned'
+    Reset 'Original!App' 0
+    Run enable
+    $script:Thumbprint='B'*40
+    $script:FailRegister=$true
+    try { Run enable; throw 'expected rotation failure' } catch { Assert ($_.ToString() -ne 'expected rotation failure') 'rotation should fail' }
+    Assert ($script:GamingHome -eq 'Original!App' -and $script:Dev -eq 0) 'rotation failure restores baseline'
+    Assert ($script:Trusted.Count -eq 0) 'rotation failure cleans both certificates'
     foreach ($laterHome in @('Later!App', $null)) {
         Reset 'Original!App' 0
         Run enable
