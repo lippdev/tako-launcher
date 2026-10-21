@@ -9,7 +9,7 @@ $script:AppRoot = Join-Path ([IO.Path]::GetTempPath()) ('Tako FSE app ' + [guid]
 $script:Layout = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
 [IO.Directory]::CreateDirectory($script:Layout) | Out-Null
 $fixture = Join-Path $script:AppRoot 'fixture.msix'
-Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::Open($fixture, [IO.Compression.ZipArchiveMode]::Create)
 try { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD'), 'CustomCapability.SCCD') | Out-Null } finally { $zip.Dispose() }
 $fixtureBytes = [IO.File]::ReadAllBytes($fixture)

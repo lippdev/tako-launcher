@@ -9,7 +9,7 @@ function Read-PackageCertificate($path) {
     [Security.Cryptography.X509Certificates.X509Certificate2]::new($path)
 }
 function Read-PackageDescriptor($path) {
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($path)
     try {
         $entry = $zip.GetEntry('CustomCapability.SCCD')
