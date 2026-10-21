@@ -561,6 +561,11 @@ impl Shell {
             }
             return;
         }
+        if zone == "desk-activity" && activities::list_is_open(&self.layers, &self.ctx) {
+            // A pílula abre e fecha a lista (as outras camadas ignoram o clique na barra).
+            self.layers.pop();
+            return;
+        }
         if !self.layers.is_empty() {
             return;
         }

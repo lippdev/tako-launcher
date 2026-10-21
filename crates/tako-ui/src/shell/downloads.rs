@@ -148,7 +148,8 @@ fn load_sources(ctx: &mut Ctx) {
 /// `true` = redesenhar.
 pub fn poll(ctx: &mut Ctx) -> bool {
     let changed = poll_engine(ctx);
-    sync_activities(ctx, Instant::now()) || changed
+    // A tela cheia não tem a barra de cima: lá o fim do download continua sendo um aviso.
+    ctx.desktop && sync_activities(ctx, Instant::now()) || changed
 }
 
 fn poll_engine(ctx: &mut Ctx) -> bool {
@@ -161,8 +162,22 @@ fn poll_engine(ctx: &mut Ctx) -> bool {
     let states: Vec<_> = m.list().iter().map(|d| d.state.clone()).collect();
     let changed = m.poll();
     let state_changed = states != m.list().iter().map(|d| d.state.clone()).collect::<Vec<_>>();
+    let finished: Vec<String> = m
+        .list()
+        .iter()
+        .zip(states.iter())
+        .filter(|(d, before)| {
+            d.state == DownloadState::Completed && **before != DownloadState::Completed
+        })
+        .map(|(d, _)| d.title.clone())
+        .collect();
     if state_changed {
         save(ctx);
+    }
+    if !ctx.desktop {
+        for title in finished {
+            ctx.toast(ctx.tf("downloads.finished", &[("title", &title)]));
+        }
     }
     sync_games(ctx);
     changed
@@ -275,7 +290,7 @@ fn sync_activities(ctx: &mut Ctx, now: Instant) -> bool {
             }
         }
     }
-    // Sumiram da lista: a instalação da loja acabou (resumo); o download removido ou cancelado só sai.
+    // Sumiram da lista: a instalação da loja que terminou ganha o resumo; cancelada, falha ou download removido só saem.
     let gone: Vec<(String, String)> = ctx
         .activity
         .list
@@ -285,7 +300,11 @@ fn sync_activities(ctx: &mut Ctx, now: Instant) -> bool {
         .map(|a| (a.key.clone(), a.title.clone()))
         .collect();
     for (key, title) in gone {
-        if key.starts_with("install:") {
+        let installed = key
+            .strip_prefix("install:")
+            .and_then(|id| ctx.library.find(id))
+            .is_some_and(|g| g.is_installed);
+        if installed {
             let done = ctx.tf("desktop.activity.install_done", &[("title", &title)]);
             ctx.activity.list.finish(&key, &done, "", now);
         } else {
@@ -1229,6 +1248,50 @@ mod tests {
         // O da fila começa sozinho.
         let m = ctx.downloads.manager.as_ref().unwrap();
         assert_eq!(m.list()[2].state, DownloadState::Downloading);
+    }
+
+    #[test]
+    fn fullscreen_still_toasts_the_finished_download_and_keeps_the_queue_empty() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_d, mut ctx) = ctx();
+        let engine = demo(&mut ctx);
+        ctx.desktop = false;
+        ctx.activity = Default::default();
+        engine.set(2, 9_800_000_000, Some(9_800_000_000), true);
+        assert!(poll(&mut ctx));
+        let (toast, _) = ctx.toast.clone().expect("aviso de download pronto");
+        assert!(toast.contains("terminou de baixar"), "{toast}");
+        assert!(
+            ctx.activity.list.all().is_empty(),
+            "sem pílula na tela cheia"
+        );
+    }
+
+    #[test]
+    fn a_store_install_only_finishes_when_the_game_is_really_installed() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let now = Instant::now();
+        for installed in [false, true] {
+            let (_d, mut ctx) = ctx();
+            sync_activities(&mut ctx, now);
+            let key = ctx.activity.list.all()[0].key.clone();
+            let id = key.strip_prefix("install:").unwrap().to_owned();
+            let game = ctx
+                .library
+                .games_mut()
+                .iter_mut()
+                .find(|g| g.id == id)
+                .unwrap();
+            game.installing = None;
+            game.is_installed = installed;
+            assert!(sync_activities(&mut ctx, now));
+            match ctx.activity.list.get(&key) {
+                Some(a) => assert!(installed && a.state == tako_core::activities::State::Done),
+                None => assert!(!installed, "cancelada ou falha: só sai da fila"),
+            }
+        }
     }
 
     #[test]

@@ -1173,7 +1173,7 @@ created-by-tako = true
             }
             // AtividadeNaBarra (UX-006): `atividade-<estado>` = giro, download, concluida, erro, varias, pronta, lista.
             Ok(p) if p.starts_with("atividade-") => {
-                use tako_core::activities::{Action, Kind};
+                use tako_core::activities::Kind;
                 let now = Instant::now();
                 let list = &mut shell.ctx.activity.list;
                 let page = &p["atividade-".len()..];
@@ -1192,8 +1192,14 @@ created-by-tako = true
                         list.finish("library", "Biblioteca atualizada", "4 jogos novos", now);
                     }
                     "erro" => {
-                        list.start("update-check", Kind::UpdateCheck, "", "", now);
-                        list.fail("update-check", "Não deu para procurar atualizações", Some(Action::Retry), now);
+                        // O caminho de produção: a busca explícita que falha, com o menu fechado.
+                        shell.ctx.app_update.menu_open = false;
+                        crate::app_updates::finish_check(
+                            &mut shell.ctx,
+                            crate::app_updates::Check::Failed,
+                            true,
+                            "updates.desktop.connection",
+                        );
                     }
                     "pronta" => shell.ctx.update_ready = Some("snapshot-only".into()),
                     _ => {

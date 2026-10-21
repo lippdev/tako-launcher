@@ -1459,12 +1459,20 @@ impl Page for DesktopLibrary {
                     + usize::from(super::activities::visible(ctx, std::time::Instant::now()));
                 self.index = (self.index + 1).min(count - 1);
             }
+            // Menu na pílula: a lista de atividades (Aceitar num erro refaz o trabalho).
+            (Zone::Bar, Cmd::Menu)
+                if self.index == BAR_DOWNLOADS
+                    && super::activities::visible(ctx, std::time::Instant::now()) =>
+            {
+                super::activities::open_list(ctx);
+                return Nav::Stay;
+            }
             (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
             (Zone::Bar, Cmd::Accept) => {
                 let now = std::time::Instant::now();
                 let downloads_on = super::activities::visible(ctx, now);
                 if downloads_on && self.index == BAR_DOWNLOADS {
-                    super::activities::open(ctx, now);
+                    super::activities::accept(ctx, now);
                     return Nav::Stay;
                 }
                 match self.index {

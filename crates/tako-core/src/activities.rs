@@ -54,7 +54,11 @@ pub struct Shown<'a> {
 }
 
 #[derive(Debug, Default)]
-pub struct Activities(Vec<Activity>);
+pub struct Activities {
+    list: Vec<Activity>,
+    /// O último início, conclusão ou erro: é o que o leitor de tela anuncia.
+    event: Option<Activity>,
+}
 
 impl Activities {
     /// Começa (ou reinicia) uma atividade em andamento.
@@ -69,9 +73,10 @@ impl Activities {
             action: None,
             since: now,
         };
-        match self.0.iter_mut().find(|a| a.key == key) {
+        self.event = Some(activity.clone());
+        match self.list.iter_mut().find(|a| a.key == key) {
             Some(a) => *a = activity,
-            None => self.0.push(activity),
+            None => self.list.push(activity),
         }
     }
 
@@ -95,26 +100,39 @@ impl Activities {
 
     /// Tira da fila (erro fechado ou resolvido; atividade que deixou de existir).
     pub fn dismiss(&mut self, key: &str) {
-        self.0.retain(|a| a.key != key);
+        self.list.retain(|a| a.key != key);
     }
 
     /// "Limpar concluídas": as com erro ficam.
     pub fn clear_done(&mut self) {
-        self.0.retain(|a| a.state != State::Done);
+        self.list.retain(|a| a.state != State::Done);
     }
 
     /// Todas, na ordem de chegada (a lista "Atividades").
     pub fn all(&self) -> &[Activity] {
-        &self.0
+        &self.list
+    }
+
+    /// O último início, conclusão ou erro, mesmo que a atividade já tenha saído da pílula.
+    pub fn last_event(&self) -> Option<&Activity> {
+        self.event.as_ref()
+    }
+
+    /// Da mais importante à menos: erro, depois pelo tipo (download → biblioteca → atualização do Tako → o
+    /// resto); entre iguais, a que chegou primeiro.
+    pub fn ordered(&self) -> Vec<&Activity> {
+        let mut all: Vec<&Activity> = self.list.iter().collect();
+        all.sort_by_key(|a| (a.state != State::Failed, rank(a.kind)));
+        all
     }
 
     pub fn get(&self, key: &str) -> Option<&Activity> {
-        self.0.iter().find(|a| a.key == key)
+        self.list.iter().find(|a| a.key == key)
     }
 
     /// Em andamento de verdade ("N em andamento"); "Atualização pronta" espera o usuário, não trabalha.
     pub fn running_count(&self) -> usize {
-        self.0
+        self.list
             .iter()
             .filter(|a| a.state == State::Running && a.kind != Kind::UpdateReady)
             .count()
@@ -125,23 +143,20 @@ impl Activities {
         a.state != State::Done || now.saturating_duration_since(a.since) < DONE_VISIBLE
     }
 
-    /// A mais importante: erro, depois pelo tipo (download → biblioteca → atualização do Tako → o resto); entre
-    /// iguais, a que chegou primeiro. `None` = a pílula some.
+    /// A primeira da [`ordered`](Self::ordered) que ainda está na pílula. `None` = a pílula some.
     pub fn shown(&self, now: Instant) -> Option<Shown<'_>> {
-        let visible: Vec<&Activity> = self.0.iter().filter(|a| Self::is_visible(a, now)).collect();
-        let activity = visible
-            .iter()
-            .copied()
-            .min_by_key(|a| (a.state != State::Failed, rank(a.kind)))?;
+        let visible: Vec<&Activity> = (self.ordered().into_iter())
+            .filter(|a| Self::is_visible(a, now))
+            .collect();
         Some(Shown {
-            activity,
+            activity: *visible.first()?,
             more: visible.len() - 1,
         })
     }
 
     /// Quando a pílula muda sozinha pelo relógio (uma conclusão expirando); `None` = nada a esperar.
     pub fn next_expiry(&self, now: Instant) -> Option<Instant> {
-        self.0
+        self.list
             .iter()
             .filter(|a| a.state == State::Done && Self::is_visible(a, now))
             .map(|a| a.since + DONE_VISIBLE)
@@ -151,7 +166,7 @@ impl Activities {
     /// Só o que está em andamento muda: um aviso atrasado da rede não apaga um erro nem estica uma conclusão.
     fn running(&mut self, key: &str) -> Option<&mut Activity> {
         let found = self
-            .0
+            .list
             .iter_mut()
             .find(|a| a.key == key && a.state == State::Running);
         if found.is_none() {
@@ -176,6 +191,7 @@ impl Activities {
             a.progress = None;
             a.action = action;
             a.since = now;
+            self.event = Some(a.clone());
         }
     }
 }
@@ -220,6 +236,37 @@ mod tests {
         let shown = q.shown(t0).unwrap();
         assert_eq!(shown.activity.key, "covers");
         assert_eq!(shown.activity.action, Some(Action::Retry));
+    }
+
+    #[test]
+    fn ordered_puts_errors_first_then_by_priority_then_by_arrival() {
+        let t0 = Instant::now();
+        let mut q = Activities::default();
+        q.start("cloud", Kind::CloudSync, "Nuvem", "", t0);
+        q.start("covers", Kind::Covers, "Capas", "", t0);
+        q.start("library", Kind::LibraryRefresh, "Biblioteca", "", t0);
+        q.start("check", Kind::UpdateCheck, "Procurando", "", t0);
+        q.fail("check", "Sem rede", None, t0);
+        let keys: Vec<_> = q.ordered().iter().map(|a| a.key.as_str()).collect();
+        assert_eq!(keys, ["check", "library", "cloud", "covers"]);
+    }
+
+    #[test]
+    fn last_event_is_the_latest_start_finish_or_error_and_never_a_percentage() {
+        let t0 = Instant::now();
+        let mut q = Activities::default();
+        assert_eq!(q.last_event(), None);
+        q.start("library", Kind::LibraryRefresh, "Biblioteca", "", t0);
+        q.start("download:1", Kind::Download, "Jogo", "", t0);
+        q.progress("download:1", Some(40), "40%");
+        assert_eq!(q.last_event().unwrap().key, "download:1");
+        assert_eq!(q.last_event().unwrap().progress, None);
+        // A biblioteca termina com um download na frente: a conclusão dela é o evento.
+        q.finish("library", "Biblioteca atualizada", "", t0);
+        let e = q.last_event().unwrap();
+        assert_eq!((e.key.as_str(), e.state), ("library", State::Done));
+        q.fail("download:1", "Sem rede", None, t0);
+        assert_eq!(q.last_event().unwrap().state, State::Failed);
     }
 
     #[test]

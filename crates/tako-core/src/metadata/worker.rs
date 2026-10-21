@@ -198,10 +198,11 @@ impl Loop {
         if due.is_empty() {
             return true;
         }
-        // IGDB: a biblioteca inteira em poucas consultas em lote, antes de ir jogo a jogo.
-        self.agent.prefetch(&due);
+        // O andamento vai antes do lote do IGDB: a pílula aparece já no começo da rodada.
         self.progress[0].store(0, Ordering::Relaxed);
         self.progress[1].store(due.len(), Ordering::Relaxed);
+        // IGDB: a biblioteca inteira em poucas consultas em lote, antes de ir jogo a jogo.
+        self.agent.prefetch(&due);
         for game in &due {
             if !self.wait(Instant::now()) {
                 return false;

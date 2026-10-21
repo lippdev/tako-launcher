@@ -113,35 +113,41 @@ pub fn check(ctx: &mut Ctx, explicit: bool, pkg: feed::Package, arch: feed::Arch
                     tracing::warn!("atualizações: {e}");
                     finish_check(ctx, Check::Failed, explicit, "updates.desktop.connection");
                 }
-                Ok(Some(info)) => {
-                    ctx.activity.list.dismiss(UPDATE_CHECK);
-                    ctx.app_update.check = Check::Idle;
-                    ctx.app_update.close_menu = ctx.app_update.menu_open;
-                    let installable = info.can_install() && pkg.self_updates();
-                    let version = info.version.clone();
-                    let page = info.page_url.clone();
-                    ctx.app_update.info = Some(info);
-                    ctx.app_update.error.clear();
-                    if installable {
-                        download(ctx, ctx.app_update.menu_open || !explicit);
-                    } else {
-                        ctx.update_status =
-                            ctx.tf("updates.available_page", &[("version", &version)]);
-                        if explicit {
-                            ctx.effect(Effect::OpenUrl(page));
-                        }
-                    }
-                    if explicit && !ctx.app_update.menu_open {
-                        let text = ctx.tf("updates.desktop.found", &[("version", &version)]);
-                        toast_action(ctx, text, "updates.desktop.view", open);
-                    }
-                }
+                Ok(Some(info)) => found(ctx, info, pkg, explicit),
             }
         },
     );
 }
 
-fn finish_check(ctx: &mut Ctx, state: Check, explicit: bool, error: &str) {
+/// Chegou uma versão nova. Com o menu fechado o aviso vai para a pílula (no desktop) ou para o toast.
+fn found(ctx: &mut Ctx, info: UpdateInfo, pkg: feed::Package, explicit: bool) {
+    ctx.activity.list.dismiss(UPDATE_CHECK);
+    ctx.app_update.check = Check::Idle;
+    ctx.app_update.close_menu = ctx.app_update.menu_open;
+    let installable = info.can_install() && pkg.self_updates();
+    let version = info.version.clone();
+    let page = info.page_url.clone();
+    ctx.app_update.info = Some(info);
+    ctx.app_update.error.clear();
+    if installable {
+        download(ctx, ctx.app_update.menu_open || !explicit);
+    } else {
+        ctx.update_status = ctx.tf("updates.available_page", &[("version", &version)]);
+        if explicit {
+            ctx.effect(Effect::OpenUrl(page));
+        }
+    }
+    if explicit && !ctx.app_update.menu_open {
+        let text = ctx.tf("updates.desktop.found", &[("version", &version)]);
+        if ctx.desktop {
+            result_on_pill(ctx, &text, "");
+        } else {
+            toast_action(ctx, text, "updates.desktop.view", open);
+        }
+    }
+}
+
+pub(crate) fn finish_check(ctx: &mut Ctx, state: Check, explicit: bool, error: &str) {
     ctx.app_update.check = state;
     ctx.app_update.changed = Some(Instant::now());
     ctx.app_update.error = if error.is_empty() {
@@ -156,7 +162,7 @@ fn finish_check(ctx: &mut Ctx, state: Check, explicit: bool, error: &str) {
     });
     if explicit && !ctx.app_update.menu_open {
         if ctx.app_update.check == Check::Failed {
-            retry_toast(ctx, "updates.desktop.check_failed");
+            retry_toast(ctx, "updates.desktop.failed_toast");
         } else if ctx.desktop {
             // Com o menu fechado, o resultado vai para a pílula (o menu aberto já mostra o dele).
             let (title, detail) = (
@@ -166,9 +172,7 @@ fn finish_check(ctx: &mut Ctx, state: Check, explicit: bool, error: &str) {
                     &[("version", &ctx.version)],
                 ),
             );
-            let list = &mut ctx.activity.list;
-            list.start(UPDATE_CHECK, Kind::UpdateCheck, &title, "", Instant::now());
-            list.finish(UPDATE_CHECK, &title, &detail, Instant::now());
+            result_on_pill(ctx, &title, &detail);
         } else {
             let text = ctx.tf(
                 "updates.desktop.current_toast",
@@ -180,6 +184,14 @@ fn finish_check(ctx: &mut Ctx, state: Check, explicit: bool, error: &str) {
         ctx.activity.list.dismiss(UPDATE_CHECK);
     }
     ctx.dirty = true;
+}
+
+/// O resultado da busca na pílula: ✓ por 4 s (a pílula cuida do resto).
+fn result_on_pill(ctx: &mut Ctx, title: &str, detail: &str) {
+    let now = Instant::now();
+    let list = &mut ctx.activity.list;
+    list.start(UPDATE_CHECK, Kind::UpdateCheck, title, "", now);
+    list.finish(UPDATE_CHECK, title, detail, now);
 }
 
 /// Falha com "Tentar de novo": na pílula do desktop; fora dele, no aviso.
@@ -644,6 +656,7 @@ mod tests {
             (failed.state, failed.action),
             (Phase::Failed, Some(Action::Retry))
         );
+        assert_eq!(failed.title, ctx.t("updates.desktop.failed_toast"));
         // "Tentar de novo" na pílula refaz a busca.
         crate::shell::activities::run_action(&mut ctx, UPDATE_CHECK);
         assert!(ctx.activity.list.get(UPDATE_CHECK).is_none());
@@ -653,6 +666,39 @@ mod tests {
         ctx.app_update.menu_open = true;
         finish_check(&mut ctx, Check::Failed, true, "updates.desktop.connection");
         assert!(ctx.toast.is_none());
+    }
+
+    #[test]
+    fn a_new_version_found_with_the_menu_closed_goes_to_the_pill_not_a_toast() {
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let info = || UpdateInfo {
+            version: "9.9.9".into(),
+            name: String::new(),
+            notes: String::new(),
+            page_url: "https://example.com".into(),
+            asset: None,
+            is_prerelease: false,
+        };
+        let (_dir, mut ctx) = desktop_ctx();
+        ctx.app_update.menu_open = false;
+        found(&mut ctx, info(), feed::Package::WindowsSetup, true);
+        assert!(ctx.toast.is_none());
+        let a = ctx.activity.list.get(UPDATE_CHECK).unwrap();
+        assert_eq!(a.state, Phase::Done);
+        assert_eq!(
+            a.title,
+            ctx.tf("updates.desktop.found", &[("version", "9.9.9")])
+        );
+        // Menu aberto: o item do menu mostra, a pílula não.
+        let (_dir, mut ctx) = desktop_ctx();
+        ctx.app_update.menu_open = true;
+        found(&mut ctx, info(), feed::Package::WindowsSetup, true);
+        assert!(ctx.activity.list.all().is_empty() && ctx.toast.is_none());
+        // Tela cheia não tem a barra: continua o aviso com "Ver".
+        let (_dir, mut ctx) = desktop_ctx();
+        ctx.desktop = false;
+        found(&mut ctx, info(), feed::Package::WindowsSetup, true);
+        assert!(ctx.toast.is_some() && ctx.activity.list.all().is_empty());
     }
 
     #[test]
