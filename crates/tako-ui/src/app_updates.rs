@@ -16,7 +16,8 @@ use tako_core::updates::{
 
 pub const BRAND_MENU: &str = "tako-brand";
 const MIN_CHECK: Duration = Duration::from_millis(600);
-const MAX_CHECK: Duration = Duration::from_secs(10);
+// A rede aplica o teto; a UI dá tempo para o resultado chegar antes de invalidá-lo.
+const MAX_CHECK: Duration = updates::CHECK_TIMEOUT.saturating_add(Duration::from_secs(1));
 
 #[derive(Default, Debug, PartialEq, Eq)]
 pub enum Check {
@@ -235,7 +236,7 @@ pub fn tick(ctx: &mut Ctx, now: Instant) {
             .is_some_and(|t| now.duration_since(t) >= MAX_CHECK)
     {
         ctx.app_update.generation += 1;
-        finish_check(ctx, Check::Failed, true, "updates.desktop.timeout");
+        finish_check(ctx, Check::Failed, true, "updates.desktop.connection");
     } else if ctx.app_update.check == Check::Current
         && ctx
             .app_update
@@ -507,12 +508,15 @@ mod tests {
         ctx.app_update.changed = Some(start);
         ctx.app_update.generation = 3;
         ctx.app_update.menu_open = true;
+        tick(&mut ctx, start + Duration::from_secs(11));
+        assert_eq!(ctx.app_update.check, Check::Searching);
         tick(&mut ctx, start + MAX_CHECK - Duration::from_millis(1));
         assert_eq!(ctx.app_update.check, Check::Searching);
         assert!(!menu_row(&ctx).enabled);
         tick(&mut ctx, start + MAX_CHECK);
         assert_eq!(ctx.app_update.check, Check::Failed);
         assert_eq!(ctx.app_update.generation, 4);
+        assert_eq!(ctx.app_update.error, ctx.t("updates.desktop.connection"));
         assert!(ctx.toast.is_none());
         assert!(menu_row(&ctx).enabled);
         ctx.app_update.menu_open = false;

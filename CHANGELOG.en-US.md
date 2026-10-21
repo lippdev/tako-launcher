@@ -35,6 +35,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **Refresh library:** a new button on the desktop list bar rescans the stores right away.
 ### Fixes
 - **Steam icon fallback:** when a Steam game's primary icon address fails on the CDN, Tako falls back to the community icon from Steam's API and avoids caching the failure indefinitely.
+- **Update checks:** slow connections keep going while receiving data, with gzip compression and a clear failure when the network stalls.
 - **Step instructions:** appear one per line.
 - **Faster startup:** the whole library shows up as soon as Tako opens, from the last store scan, while a fresh scan runs in the background.
 - **Selected game art:** the background and logo now change with the game, installed or not. Steam art opens straight from Steam's own cache, the last game you picked loads first, and Tako no longer holds the previous game's art while the new one arrives. Covers and backgrounds that fail on a slow network are retried, on desktop and in full screen, without restarting.

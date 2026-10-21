@@ -385,6 +385,21 @@ mod tests {
     }
 
     #[test]
+    fn ten_entries_can_hide_the_latest_alpha_behind_nightlies_and_drafts() {
+        let mut entries = vec![("v0.3.0-nightly.20261017", true, false, true); 5];
+        entries.extend(vec![("v0.3.0-alpha.1", true, true, true); 5]);
+        entries.push(("v0.2.0-alpha.19", true, false, true));
+        assert!(pick_win(&feed(&entries[..10]), "0.2.0-alpha.16", true, true).is_none());
+        assert_eq!(
+            pick_win(&feed(&entries), "0.2.0-alpha.16", true, true)
+                .unwrap()
+                .version,
+            "0.2.0-alpha.19"
+        );
+        assert!(RELEASES_URL.ends_with("per_page=15"));
+    }
+
+    #[test]
     fn picks_the_newest_newer_release_with_the_right_file() {
         let f = feed(&[
             ("v0.1.0-alpha.7", true, false, true),
