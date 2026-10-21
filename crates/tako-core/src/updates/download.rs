@@ -14,7 +14,7 @@ use super::SemVer;
 use super::feed::{self, Arch, Package, RELEASES_URL, REPOSITORY, UpdateInfo};
 use crate::i18n::{Lang, t};
 
-const RESPONSE_TIMEOUT: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Teto da consulta, compartilhado com o relógio da UI.
 pub const CHECK_TIMEOUT: Duration = Duration::from_secs(60);
 /// Sem tempo total: o limite é por falta de dados, para não cortar downloads lentos que ainda progridem.
@@ -52,8 +52,9 @@ pub fn agent() -> ureq::Agent {
             "Tako/{} (+https://github.com/{REPOSITORY})",
             SemVer::current()
         ))
-        .timeout_connect(Some(RESPONSE_TIMEOUT))
-        .timeout_recv_response(Some(RESPONSE_TIMEOUT))
+        .timeout_connect(Some(CONNECT_TIMEOUT))
+        // A API do GitHub chega a levar mais de 10 s para começar a responder, mesmo em rede rápida.
+        .timeout_recv_response(Some(STALL_TIMEOUT))
         .build()
         .into()
 }
