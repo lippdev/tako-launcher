@@ -125,6 +125,10 @@ jobs:
           TAKO_SCREENSCRAPER_SOFT_NAME: ${{ secrets.SCREENSCRAPER_SOFTNAME }}
         run: .\build\rust\Package-Tako.ps1 -Arch ${{ matrix.arch }} -Version "${{ needs.resolve.outputs.version }}"
 
+      - name: Validar FSE real (enable e disable)
+        shell: powershell
+        run: ./crates/tako-platform/tests/fse-integration.ps1 -PayloadDirectory "artifacts/rust/windows-${{ matrix.arch }}/fse"
+
       # Assinatura de código (PLAT-005). Desligada até existirem as variáveis do SignPath no repositório.
       - name: Upload unsigned build for signing
         id: unsigned

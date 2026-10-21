@@ -206,6 +206,7 @@ fn update_toggle(
 #[derive(Default)]
 struct FseState {
     status: Option<tako_platform::fse::Status>,
+    error: Option<String>,
     checked: Option<Instant>,
     pending: bool,
 }
@@ -269,6 +270,25 @@ fn xbox_mode_row(ctx: &Ctx) -> MenuItem {
 }
 
 #[cfg(any(windows, test))]
+fn fse_error_code(error: &str) -> Option<String> {
+    error.as_bytes().windows(10).find_map(|code| {
+        (code.starts_with(b"0x") && code[2..].iter().all(u8::is_ascii_hexdigit))
+            .then(|| String::from_utf8_lossy(code).into_owned())
+    })
+}
+
+#[cfg(test)]
+#[test]
+fn fse_error_only_extracts_hresult() {
+    assert_eq!(
+        fse_error_code("HRESULT: 0x80073CF6, detalhes"),
+        Some("0x80073CF6".into())
+    );
+    assert_eq!(fse_error_code("0xbroken!!"), None);
+    assert_eq!(fse_error_code("UAC cancelado"), None);
+}
+
+#[cfg(any(windows, test))]
 fn xbox_mode_panel(ctx: &Ctx) -> MenuLayer {
     MenuLayer::panel(ctx.t("settings.general.xbox_mode"), |ctx| {
         let (status, pending) = fse_status();
@@ -295,7 +315,8 @@ fn xbox_mode_panel(ctx: &Ctx) -> MenuLayer {
                 } else if !available {
                     ctx.t("settings.general.fse_unavailable")
                 } else {
-                    String::new()
+                    FSE.with(|state| state.borrow().error.clone())
+                        .unwrap_or_default()
                 }),
             )
             .on(move |ctx| {
@@ -321,6 +342,13 @@ fn xbox_mode_panel(ctx: &Ctx) -> MenuLayer {
                             let mut state = state.borrow_mut();
                             state.pending = false;
                             state.checked = None;
+                            state.error = result.as_ref().err().map(|error| {
+                                if let Some(code) = fse_error_code(error) {
+                                    ctx.tf("settings.general.fse_package_error", &[("code", &code)])
+                                } else {
+                                    ctx.t("settings.general.fse_error_detail")
+                                }
+                            });
                         });
                         if let Err(error) = result {
                             tracing::error!(%error, "Falha ao alterar modo tela cheia do Windows");
