@@ -2,3 +2,6 @@
 *.sln text eol=crlf
 *.png binary
 *.pthm binary
+
+# Fixture de diagnostico: preservar os bytes originais do AnyFSE.
+crates/tako-platform/tests/fixtures/AnyFSE-CustomCapability.SCCD -text

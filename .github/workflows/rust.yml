@@ -73,6 +73,20 @@ jobs:
         shell: powershell
         run: ./crates/tako-platform/tests/fse-integration.ps1 -PayloadDirectory "$env:RUNNER_TEMP/fse"
 
+      - name: Diagnosticar SCCD com os bytes exatos do AnyFSE
+        if: failure()
+        shell: powershell
+        run: |
+          $path = Join-Path $pwd 'packaging/fse/CustomCapability.SCCD'
+          $original = [IO.File]::ReadAllBytes($path)
+          try {
+            $fixture = 'crates/tako-platform/tests/fixtures/AnyFSE-CustomCapability.SCCD'
+            if ((Get-FileHash $fixture).Hash -ne 'BBB4C60FBFAF00B462C197458CAAD19FB2828D87B1D95CDFD2292314CDDC6446') { throw 'Bytes do SCCD AnyFSE alterados no checkout.' }
+            Copy-Item $fixture $path -Force
+            ./build/rust/Package-Fse.ps1 -OutputDirectory "$env:RUNNER_TEMP/fse-anyfse-sccd"
+            ./crates/tako-platform/tests/fse-integration.ps1 -PayloadDirectory "$env:RUNNER_TEMP/fse-anyfse-sccd"
+          } finally { [IO.File]::WriteAllBytes($path, $original) }
+
   # MIG-041 (PRD §8.1): números de tendência do app de verdade (1.000 jogos, renderizador por software, Xvfb).
   # Não reprova por número; só se o Tako não abrir ou travar.
   bench:
