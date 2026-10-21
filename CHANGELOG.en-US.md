@@ -4,7 +4,6 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ## [Unreleased]
 
-- Fix Windows full screen mode registration with a signed MSIX and certificate restoration (FSE-002).
 ### What's new
 - **Activities in the top bar:** a pill before the profile shows what Tako is doing in the background (library refresh, update check, downloads, covers), with progress, a summary when done and "Try again" on errors; clicking it opens the "Activities" list.
 - **ScreenScraper with your developer account:** anyone with ScreenScraper developer credentials can enter them in Settings and use ScreenScraper even on builds that don't include them.
@@ -37,6 +36,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 - **Refresh library:** a new button on the desktop list bar rescans the stores right away.
 ### Fixes
+- **Windows full screen mode:** setting Tako as the home app works again; Windows used to reject the package (0x80073CF6).
 - **Steam icon fallback:** when a Steam game's primary icon address fails on the CDN, Tako falls back to the community icon from Steam's API and avoids caching the failure indefinitely.
 - **Update checks:** slow connections keep going while receiving data, with gzip compression and a clear failure when the network stalls.
 - **Library refresh feedback:** while the library refreshes, the button spins and the bar shows "Updating…"; clicking again says it is already running, and at the end a notice shows the game count, new games and any store that failed.
