@@ -66,6 +66,9 @@ jobs:
       - name: Gerar MSIX FSE assinado
         shell: powershell
         run: ./build/rust/Package-Fse.ps1 -OutputDirectory "$env:RUNNER_TEMP/fse"
+      - name: Validar estado e recuperação do FSE
+        shell: powershell
+        run: ./crates/tako-platform/tests/fse-state.ps1
       - name: Validar instalação e restauração reais
         shell: powershell
         run: ./crates/tako-platform/tests/fse-integration.ps1 -PayloadDirectory "$env:RUNNER_TEMP/fse"

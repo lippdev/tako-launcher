@@ -8,7 +8,38 @@ $name = 'Tako.GamingHome'
 function Read-PackageCertificate($path) {
     [Security.Cryptography.X509Certificates.X509Certificate2]::new($path)
 }
-function Set-MachineState($value, [string]$ImportCertificate = '', [string[]]$RemoveThumbprints = @()) {
+function Read-PackageDescriptor($path) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead($path)
+    try {
+        $entry = $zip.GetEntry('CustomCapability.SCCD')
+        if (-not $entry) { throw 'CustomCapability.SCCD missing from signed package.' }
+        $stream = $entry.Open()
+        $buffer = [IO.MemoryStream]::new()
+        try { $stream.CopyTo($buffer); return ,$buffer.ToArray() }
+        finally { $stream.Dispose(); $buffer.Dispose() }
+    } finally { $zip.Dispose() }
+}
+function Set-DescriptorFiles($Descriptors, [string]$Content, [switch]$Remove) {
+    foreach ($descriptor in $Descriptors) {
+        if ([IO.Path]::GetFileName($descriptor.Path) -ne 'CustomCapability.SCCD' -or $descriptor.Hash -notmatch '^[A-Fa-f0-9]{64}$') { throw 'Invalid saved SCCD metadata.' }
+        if (Test-Path -LiteralPath $descriptor.Path) {
+            if ((Get-FileHash -LiteralPath $descriptor.Path -Algorithm SHA256).Hash -ne $descriptor.Hash) {
+                if ($Remove) { continue } # Preserve uma substituicao posterior feita por outro app/usuario.
+                throw 'An unrelated CustomCapability.SCCD already exists beside the executable.'
+            }
+            if ($Remove) { Remove-Item -LiteralPath $descriptor.Path }
+        } elseif (-not $Remove) {
+            $bytes = [Convert]::FromBase64String($Content)
+            $sha = [Security.Cryptography.SHA256]::Create()
+            try { $hash = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '') } finally { $sha.Dispose() }
+            if ($hash -ne $descriptor.Hash) { throw 'SCCD content changed during elevation.' }
+            $file = [IO.File]::Open($descriptor.Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            try { $file.Write($bytes, 0, $bytes.Length) } finally { $file.Dispose() }
+        }
+    }
+}
+function Set-MachineState($value, [string]$ImportCertificate = '', [string[]]$RemoveThumbprints = @(), [object[]]$Descriptors = @(), [string]$DescriptorContent = '', [switch]$RemoveDescriptors) {
     # Uma elevação reúne confiança e Dev Mode; HKCU e AppX ficam no usuário original.
     foreach ($thumbprint in $RemoveThumbprints) {
         if ($thumbprint -notmatch '^[A-Fa-f0-9]{40}$') { throw 'Invalid saved certificate thumbprint.' }
@@ -25,10 +56,15 @@ function Set-MachineState($value, [string]$ImportCertificate = '', [string[]]$Re
         $operation += "; if (([Security.Cryptography.X509Certificates.X509Certificate2]::new('$escaped')).Thumbprint -ne '$expected') { throw 'Certificate changed during elevation' }; Import-Certificate -FilePath '$escaped' -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null"
     }
     foreach ($thumbprint in $RemoveThumbprints) { $operation += "; if (Test-Path 'Cert:\LocalMachine\TrustedPeople\$thumbprint') { Remove-Item 'Cert:\LocalMachine\TrustedPeople\$thumbprint' }" }
+    if ($Descriptors.Count -gt 0) {
+        $json = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @($Descriptors) -Compress)))
+        if ($DescriptorContent -notmatch '^[A-Za-z0-9+/]*={0,2}$') { throw 'Invalid SCCD encoding.' }
+        $operation += "; function Set-DescriptorFiles { ${function:Set-DescriptorFiles} }; Set-DescriptorFiles -Descriptors ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$json')) | ConvertFrom-Json) -Content '$DescriptorContent' -Remove:`$$([bool]$RemoveDescriptors)"
+    }
     $code = "try { `$ErrorActionPreference='Stop'; $operation; exit 0 } catch { exit 1 }"
     $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
     $p = Start-Process -FilePath "$PSHOME\powershell.exe" -Verb RunAs -ArgumentList @('-NoProfile','-NonInteractive','-EncodedCommand',$encoded) -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw 'Developer Mode/certificate setup failed.' }
+    if ($p.ExitCode -ne 0) { throw 'Developer Mode/certificate/SCCD setup failed.' }
 }
 function Save-Previous($state) {
     $state | Export-Clixml -LiteralPath "$backup.tmp"
@@ -54,8 +90,9 @@ function Restore-Previous($state) {
     Get-AppxPackage -Name $name | Remove-AppxPackage
     $current = (Get-ItemProperty -LiteralPath $dev -ErrorAction SilentlyContinue).AllowDevelopmentWithoutDevLicense
     $remove = @(Owned-Certificates $state | Where-Object { Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$_" })
-    if ($current -ne $state.Dev -or $remove.Count -gt 0) {
-        Set-MachineState $state.Dev -RemoveThumbprints $remove
+    $descriptors = @($state.Descriptors | Where-Object { $_ -and (Test-Path -LiteralPath $_.Path) })
+    if ($current -ne $state.Dev -or $remove.Count -gt 0 -or $descriptors.Count -gt 0) {
+        Set-MachineState $state.Dev -RemoveThumbprints $remove -Descriptors $descriptors -RemoveDescriptors
     }
     Remove-Item -LiteralPath $backup
 }
@@ -98,6 +135,20 @@ try {
         $kind = if ($null -ne $gamingHome) { $gamingKey.GetValueKind('GamingHomeApp').ToString() } else { 'String' }
         $state = [pscustomobject]@{ Home = $gamingHome; HomeKind = $kind; Dev = $oldDev }
     }
+    $msix = Join-Path $Layout 'Tako-GamingHome.msix'
+    $descriptorBytes = Read-PackageDescriptor $msix
+    $descriptorContent = [Convert]::ToBase64String($descriptorBytes)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $descriptorHash = ([BitConverter]::ToString($sha.ComputeHash($descriptorBytes))).Replace('-', '') } finally { $sha.Dispose() }
+    # AppX busca *.sccd em ExternalLocation mesmo quando o SCCD esta no MSIX.
+    $descriptorPath = Join-Path (Split-Path -Parent $Executable) 'CustomCapability.SCCD'
+    $newDescriptors = @()
+    if (Test-Path -LiteralPath $descriptorPath) {
+        if ((Get-FileHash -LiteralPath $descriptorPath -Algorithm SHA256).Hash -ne $descriptorHash) { throw 'An unrelated CustomCapability.SCCD already exists beside the executable.' }
+    } else { $newDescriptors = @([pscustomobject]@{ Path = $descriptorPath; Hash = $descriptorHash }) }
+    $descriptors = @($state.Descriptors | Where-Object { $_ })
+    if (-not @($descriptors | Where-Object { $_.Path -eq $descriptorPath }).Count) { $descriptors += $newDescriptors }
+    $state | Add-Member -NotePropertyName Descriptors -NotePropertyValue $descriptors -Force
     $owned = @($retired)
     if ($import -or (@(Owned-Certificates $state) -contains $certificate.Thumbprint)) { $owned += $certificate.Thumbprint }
     # Salvar ambos os certificados antes de remover o pacote: falhas continuam recuperáveis.
@@ -105,10 +156,9 @@ try {
     Save-Previous $state
     try {
         if ($package) { $package | Remove-AppxPackage }
-        if ($oldDev -ne 1 -or $import -or $retired.Count -gt 0) { Set-MachineState 1 -ImportCertificate $(if ($import) { $certificatePath } else { '' }) -RemoveThumbprints $retired }
-        $msix = Join-Path $Layout 'Tako-GamingHome.msix'
+        if ($oldDev -ne 1 -or $import -or $retired.Count -gt 0 -or $newDescriptors.Count -gt 0) { Set-MachineState 1 -ImportCertificate $(if ($import) { $certificatePath } else { '' }) -RemoveThumbprints $retired -Descriptors $newDescriptors -DescriptorContent $descriptorContent }
         Write-Host "FSE pre-install: exe=$(Test-Path -LiteralPath $Executable); DevMode=$((Get-ItemProperty -LiteralPath $dev).AllowDevelopmentWithoutDevLicense); AllowAllTrustedApps=$((Get-ItemProperty -LiteralPath $dev).AllowAllTrustedApps); TrustedPeople=$(Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"); Root=$(Test-Path -LiteralPath "Cert:\LocalMachine\Root\$($certificate.Thumbprint)")"
-        Add-AppxPackage -Path $msix -ExternalLocation (Split-Path -Parent $Executable) -ForceUpdateFromAnyVersion
+        Add-AppxPackage -Path $msix -ExternalLocation (Split-Path -Parent $Executable) -ForceUpdateFromAnyVersion -ForceApplicationShutdown -ForceTargetApplicationShutdown
         $package = Get-AppxPackage -Name $name
         if (-not $package) { throw 'Package registration did not produce an identity.' }
         $state.AssignedHome = "$($package.PackageFamilyName)!App"

@@ -29,6 +29,9 @@ try {
     $ErrorActionPreference = 'Stop'
     $enableOutput | ForEach-Object { Write-Host $_.ToString() }
     Assert ($enableExitCode -eq 0) 'Enable real falhou; consulte o erro AppX e a versão do Windows do runner.'
+    $externalSccd = Join-Path $layout 'CustomCapability.SCCD'
+    Assert (Test-Path -LiteralPath $externalSccd) 'SCCD ausente em ExternalLocation.'
+    Assert ((Get-FileHash -LiteralPath $externalSccd).Hash -eq (Get-FileHash (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD')).Hash) 'SCCD externo diferente do empacotado.'
     $package = Get-AppxPackage -Name Tako.GamingHome
     Assert ($null -ne $package) 'Identidade não registrada.'
     $manifest = Get-AppxPackageManifest -Package $package.PackageFullName
@@ -60,6 +63,7 @@ try {
     $ErrorActionPreference = 'Stop'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Action disable -Layout $layout -Executable "$layout\Tako.exe"
     Assert ($LASTEXITCODE -eq 0) 'Disable real falhou.'
+    Assert (-not (Test-Path -LiteralPath (Join-Path $layout 'CustomCapability.SCCD'))) 'SCCD externo permaneceu depois do disable.'
     Assert (-not (Get-AppxPackage -Name Tako.GamingHome)) 'Pacote permaneceu registrado.'
     Assert ((Get-ItemProperty $gaming -ErrorAction SilentlyContinue).GamingHomeApp -eq $oldHome) 'GamingHomeApp não restaurado.'
     Assert ((Get-ItemProperty $dev -ErrorAction SilentlyContinue).AllowDevelopmentWithoutDevLicense -eq $oldDev) 'Dev Mode não restaurado.'

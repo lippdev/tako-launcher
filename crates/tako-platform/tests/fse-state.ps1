@@ -4,16 +4,24 @@ $ErrorActionPreference = 'Stop'
 $source = Get-Content (Join-Path $PSScriptRoot '../src/fse.ps1') -Raw
 $source = $source.Replace('[Security.Cryptography.X509Certificates.X509Certificate2]::new($path)', "[pscustomobject]@{Subject='CN=Tako Dev';Thumbprint=`$script:Thumbprint}")
 $source = $source.Replace('[Environment]::OSVersion.Version.Build', '$script:Build').Replace('exit 0', 'return').Replace('exit 1', 'throw ''setup failed''')
-$script:AppRoot = Join-Path ([IO.Path]::GetTempPath()) 'Tako FSE app'
+$script:AppRoot = Join-Path ([IO.Path]::GetTempPath()) ('Tako FSE app ' + [guid]::NewGuid())
+[IO.Directory]::CreateDirectory($script:AppRoot) | Out-Null
 $script:Layout = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
 [IO.Directory]::CreateDirectory($script:Layout) | Out-Null
+$fixture = Join-Path $script:AppRoot 'fixture.msix'
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [IO.Compression.ZipFile]::Open($fixture, [IO.Compression.ZipArchiveMode]::Create)
+try { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD'), 'CustomCapability.SCCD') | Out-Null } finally { $zip.Dispose() }
+$fixtureBytes = [IO.File]::ReadAllBytes($fixture)
 function Assert($condition, $message) { if (-not $condition) { throw $message } }
 function Get-AppxPackage { param($Name) if ($script:Package) { [pscustomobject]@{PackageFamilyName='Tako.GamingHome_test'} } }
 function Add-AppxPackage {
-    param($Path,$ExternalLocation,[switch]$ForceUpdateFromAnyVersion)
+    param($Path,$ExternalLocation,[switch]$ForceUpdateFromAnyVersion,[switch]$ForceApplicationShutdown,[switch]$ForceTargetApplicationShutdown)
     if ($script:FailRegister) { throw 'registration rejected' }
+    Assert (Microsoft.PowerShell.Management\Test-Path -LiteralPath (Join-Path $script:AppRoot 'CustomCapability.SCCD')) 'SCCD must exist in ExternalLocation before registration'
     Assert ($Path -eq (Join-Path $script:Layout 'Tako-GamingHome.msix')) 'signed package path'
     Assert ($ExternalLocation -eq $script:AppRoot) 'external location'
+    Assert ($ForceUpdateFromAnyVersion -and $ForceApplicationShutdown -and $ForceTargetApplicationShutdown) 'AnyFSE deployment options'
     $script:Package = $true
 }
 function Remove-AppxPackage { param([Parameter(ValueFromPipeline)]$InputObject) process { if ($script:FailRemove) { throw 'remove failed' }; $script:Package = $false } }
@@ -46,13 +54,20 @@ function Start-Process {
     Assert ($code -notmatch 'New-Item -Path [^;]+ -Force') 'HKLM key must preserve other values'
     if ($code -match 'Import-Certificate') { $script:Trusted.Add($script:Thumbprint) | Out-Null }
     foreach ($match in [regex]::Matches($code, "Remove-Item 'Cert:.*?([A-F0-9]{40})'")) { $script:Trusted.Remove($match.Groups[1].Value) | Out-Null }
+    $descriptorStart = $code.IndexOf('; function Set-DescriptorFiles')
+    if ($descriptorStart -ge 0) {
+        # Executar o trecho real de arquivos; somente registro/certificado/UAC sao fakes.
+        & ([scriptblock]::Create($code.Substring($descriptorStart + 2, $code.LastIndexOf('; return') - $descriptorStart - 2)))
+    }
     $script:Elevations++
     if ($code -match '-Value (\d+)') { $script:Dev = [int]$Matches[1] } else { $script:Dev = $null }
     [pscustomobject]@{ExitCode=0}
 }
 function Run($action) { & ([scriptblock]::Create($source)) -Action $action -Layout $script:Layout -Executable (Join-Path $script:AppRoot 'Tako.exe') }
 function Reset($gamingHome,$dev) {
+    Microsoft.PowerShell.Management\Remove-Item "$script:AppRoot/*" -Force -ErrorAction SilentlyContinue
     Microsoft.PowerShell.Management\Remove-Item "$script:Layout/*" -Force -ErrorAction SilentlyContinue
+    [IO.File]::WriteAllBytes((Join-Path $script:Layout 'Tako-GamingHome.msix'), $fixtureBytes)
     $script:Thumbprint='A'*40; $script:Trusted=[Collections.Generic.HashSet[string]]::new(); $script:OtherValue='preserved'; $script:GamingHome=$gamingHome; $script:Dev=$dev; $script:Package=$false; $script:Build=26100
     $script:Supported=$true; $script:FailRegister=$false; $script:FailRemove=$false; $script:Cancel=$false; $script:Elevations=0
 }
@@ -77,17 +92,37 @@ try {
             Assert ($script:OtherValue -eq 'preserved') 'other registry values survive'
             Assert ($script:Dev -eq $oldDev) 'developer mode restored'
             Assert (-not $script:Package) 'package removed'
+            Assert (-not (Test-Path -LiteralPath (Join-Path $script:AppRoot 'CustomCapability.SCCD'))) 'owned external SCCD removed'
             Assert (-not (Test-Path "$script:Layout/previous.clixml")) 'backup cleaned'
             Assert ($script:Elevations -eq 2) 'one elevation each for enable and disable'
             Assert ($script:Trusted.Count -eq 0) 'imported certificate removed'
         }
     }
     Reset 'Original!App' 1
+    $descriptorPath = Join-Path $script:AppRoot 'CustomCapability.SCCD'
+    $descriptorSource = Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD'
+    Copy-Item -LiteralPath $descriptorSource -Destination $descriptorPath
+    $script:Trusted.Add($script:Thumbprint) | Out-Null
+    Run enable
+    Run disable
+    Assert (Test-Path -LiteralPath $descriptorPath) 'preexisting external SCCD retained'
+    Assert ($script:Elevations -eq 0) 'preexisting trust, descriptor and Dev Mode need no elevation'
+    Reset 'Original!App' 0
+    [IO.File]::WriteAllText($descriptorPath, 'another app')
+    try { Run enable; throw 'expected failure' } catch { Assert ($_.ToString() -ne 'expected failure') 'conflicting SCCD must fail' }
+    Assert ([IO.File]::ReadAllText($descriptorPath) -eq 'another app') 'conflicting SCCD preserved'
+    Assert ($script:Elevations -eq 0 -and -not $script:Package) 'conflict detected before mutation'
+    Reset 'Original!App' 0
+    Run enable
+    [IO.File]::WriteAllText($descriptorPath, 'later user replacement')
+    Run disable
+    Assert ([IO.File]::ReadAllText($descriptorPath) -eq 'later user replacement') 'later SCCD replacement preserved'
+    Reset 'Original!App' 1
     $script:Trusted.Add($script:Thumbprint) | Out-Null
     Run enable
     Run disable
     Assert ($script:Trusted.Contains($script:Thumbprint)) 'preexisting certificate retained'
-    Assert ($script:Elevations -eq 0) 'existing trust and developer mode need no UAC'
+    Assert ($script:Elevations -eq 2) 'external SCCD setup and removal use elevation'
     Reset 'Original!App' 0
     Run enable
     $oldThumbprint = $script:Thumbprint
@@ -136,5 +171,5 @@ try {
     Assert ((Run status) -eq 'unavailable') 'unsupported status'
     'FSE: all fake state/restore/elevation tests passed.'
 } finally {
-    Microsoft.PowerShell.Management\Remove-Item -LiteralPath $script:Layout -Recurse -Force
+    Microsoft.PowerShell.Management\Remove-Item -LiteralPath $script:Layout, $script:AppRoot -Recurse -Force
 }
