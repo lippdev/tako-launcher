@@ -19,9 +19,16 @@ Copy-Item "$PayloadDirectory\Tako-GamingHome.msix", "$PayloadDirectory\Tako-Gami
 if (-not $hadGaming) { New-Item -Path $gaming -Force | Out-Null }
 # ExternalLocation deve conter o exe fixo; não é necessário iniciar a UI.
 Copy-Item "$env:WINDIR\System32\whoami.exe" "$layout\Tako.exe"
+$started = (Get-Date).AddMinutes(-2)
+$enableOutput = @()
 try {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Action enable -Layout $layout -Executable "$layout\Tako.exe"
-    Assert ($LASTEXITCODE -eq 0) 'Enable real falhou; consulte o erro AppX e a versão do Windows do runner.'
+    # Capturar stderr nativo sem interromper antes de ler o ActivityId.
+    $ErrorActionPreference = 'Continue'
+    $enableOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Action enable -Layout $layout -Executable "$layout\Tako.exe" 2>&1)
+    $enableExitCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    $enableOutput | ForEach-Object { Write-Host $_.ToString() }
+    Assert ($enableExitCode -eq 0) 'Enable real falhou; consulte o erro AppX e a versão do Windows do runner.'
     $package = Get-AppxPackage -Name Tako.GamingHome
     Assert ($null -ne $package) 'Identidade não registrada.'
     $manifest = Get-AppxPackageManifest -Package $package.PackageFullName
@@ -35,7 +42,22 @@ try {
     $task = $asTask.MakeGenericMethod($resultType).Invoke($null, @($operation))
     $task.Wait()
     Assert (@($task.Result | Where-Object { $_.Package.Id.FamilyName -eq $package.PackageFamilyName }).Count -eq 1) 'Catálogo WinRT não publicou o Tako.'
+} catch {
+    $failure = $_
+    try {
+        $activityIds = [regex]::Matches(($enableOutput -join "`n"), '(?i)(?:ActivityId\]?\s+|ActivityID\s+)([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+        foreach ($activityId in $activityIds) {
+            Write-Host "Get-AppPackageLog -ActivityID $activityId"
+            Get-AppPackageLog -ActivityID $activityId | Format-List * | Out-String -Width 4096 | Write-Host
+        }
+    } catch { Write-Warning "Falha ao consultar ActivityId AppX: $_" }
+    try {
+        Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-AppXDeploymentServer/Operational'; StartTime = $started } |
+            Format-List TimeCreated, Id, ActivityId, Message | Out-String -Width 4096 | Write-Host
+    } catch { Write-Warning "Falha ao consultar diagnostico AppX: $_" }
+    throw $failure
 } finally {
+    $ErrorActionPreference = 'Stop'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Action disable -Layout $layout -Executable "$layout\Tako.exe"
     Assert ($LASTEXITCODE -eq 0) 'Disable real falhou.'
     Assert (-not (Get-AppxPackage -Name Tako.GamingHome)) 'Pacote permaneceu registrado.'
