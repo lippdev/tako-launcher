@@ -35,6 +35,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 - **Atualizar biblioteca:** botão novo na barra da lista do desktop relê as lojas na hora.
 ### Correções
 - **Busca de atualizações:** conexões lentas continuam enquanto recebem dados, com compressão gzip e falha clara quando a rede para.
+- **Retorno ao atualizar a biblioteca:** o botão de atualizar mostra quando a busca está em andamento com ícone girando e texto "Atualizando…", avisa se uma atualização já estiver em curso, notifica o resultado ao concluir e alerta quando uma loja falhar sem apagar jogos da lista. (fix(ui): avisa ao atualizar a biblioteca e quando uma loja falha)
 - **Instruções em passos:** aparecem uma por linha.
 - **Abertura mais rápida:** a biblioteca aparece inteira assim que o Tako abre, com a última leitura das lojas, enquanto a leitura nova roda por trás.
 - **Arte do jogo escolhido:** o fundo e o logo agora trocam junto com o jogo, instalado ou não. A arte da Steam abre direto do cache da própria Steam, o jogo escolhido por último carrega primeiro e o Tako não segura mais a arte do jogo anterior enquanto a nova chega. Capas e fundos que falharem por rede lenta são tentados de novo, no desktop e na tela cheia, sem precisar reiniciar.

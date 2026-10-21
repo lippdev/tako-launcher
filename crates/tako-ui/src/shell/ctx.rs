@@ -413,6 +413,10 @@ impl Ctx {
         i18n::tf(key, args)
     }
 
+    pub fn tn(&self, key: &str, n: i64, args: &[(&str, &str)]) -> String {
+        i18n::tn(key, n, args)
+    }
+
     pub fn toast(&mut self, text: impl Into<String>) {
         self.app_update.toast_label.clear();
         self.toast = Some((text.into(), Instant::now()));

@@ -828,6 +828,7 @@ component IconBtn inherits Rectangle {
     in property <string> badge;
     in property <bool> on;
     in property <bool> focused;
+    in property <bool> busy;
     callback clicked();
     height: 30px;
     width: badge != "" ? il.preferred-width : 30px;
@@ -842,7 +843,13 @@ component IconBtn inherits Rectangle {
         padding-right: badge != "" ? 8px : 0;
         spacing: 5px;
         alignment: center;
-        DeskIcon { name: icon; size: 17px; tint: on || ita.has-hover ? Ui.on-accent : Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+        DeskIcon {
+            name: icon;
+            size: 17px;
+            tint: on || ita.has-hover ? Ui.on-accent : Ui.desk-on-muted;
+            y: (parent.height - self.height) / 2;
+            transform-rotation: busy && !Ui.reduce-motion ? animation-tick() / 900ms * 360deg : 0deg;
+        }
         if badge != "": Text { text: badge; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 700; vertical-alignment: center; }
     }
     ita := TouchArea {
@@ -2885,6 +2892,7 @@ component DeskLibrary inherits Rectangle {
     in property <[PanelRow]> bulk;
     in property <bool> loading;
     in property <string> loading-label;
+    in property <bool> rescan-busy;
     // Lista, Grade, Categorias, Inverter ordem, Filtrar e ordenar, Modo de exibição (dicas e rótulos acessíveis).
     in property <[string]> view-labels;
     in property <[DeskCategory]> categories;
@@ -3010,6 +3018,7 @@ component DeskLibrary inherits Rectangle {
                         y: (parent.height - self.height) / 2;
                         icon: "refresh";
                         label: view-labels[7];
+                        busy: rescan-busy;
                         clicked => { root.clicked("rescan", 0); }
                     }
                     IconBtn {
@@ -6857,6 +6866,7 @@ export component Desktop inherits Window {
     in property <[PanelRow]> desk-bulk;
     in property <bool> desk-loading;
     in property <string> desk-loading-label;
+    in property <bool> desk-rescan-busy;
     in property <[string]> desk-view-labels;
     in property <[DeskCategory]> desk-categories;
     in property <int> desk-cat-focus-row;
@@ -7110,6 +7120,7 @@ export component Desktop inherits Window {
                 bulk: desk-bulk;
                 loading: desk-loading;
                 loading-label: desk-loading-label;
+                rescan-busy: desk-rescan-busy;
                 view-labels: desk-view-labels;
                 categories: page == "desk-library" ? desk-categories : [];
                 cat-focus-row: desk-cat-focus-row;
