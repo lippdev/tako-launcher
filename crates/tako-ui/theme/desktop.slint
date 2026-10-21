@@ -182,7 +182,8 @@ component Vidro inherits Rectangle {
         + DeskArt.lum-at(ax + self.width / 4, ay + self.height * 3 / 4)
         + DeskArt.lum-at(ax + self.width * 3 / 4, ay + self.height * 3 / 4)) / 5 > 0.18;
     property <bool> lens: !DeskArt.gray && !Ui.reduce-transparency;
-    property <brush> base-fill: DeskArt.gray ? Ui.settings-surface : Ui.glass-solid;
+    // Tinta sólida só com "Reduzir transparência" ligada (tema Sólido) ou nas Configurações (superfície cinza).
+    property <brush> base-fill: DeskArt.gray ? Ui.settings-surface : (Ui.reduce-transparency ? Ui.glass-solid : transparent);
     border-radius: radius;
     background: bare || cut-x > 0 ? transparent : base-fill;
     drop-shadow-offset-y: layer ? Ui.shadow-layer-y : Ui.shadow-float-y;
@@ -230,25 +231,6 @@ component Vidro inherits Rectangle {
             image-fit: fill;
             opacity: DeskArt.blur.width > 0 && DeskArt.blur-in ? 1 : 0;
             animate opacity { duration: Ui.art-fade(DeskArt.blur-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-        }
-        // O vidro desfoca o que está atrás dele: a arte já com a luz da cor do jogo e os escurecimentos da janela.
-        if lens && DeskArt.has-art: Rectangle {
-            x: -ax;
-            y: -ay;
-            width: DeskArt.win-w;
-            height: DeskArt.win-h;
-            Rectangle {
-                background: DeskArt.accent.with-alpha(0.22);
-                animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            }
-            Rectangle {
-                background: DeskArt.small
-                    ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
-                        Ui.art-scrim-left 36%, Ui.art-scrim-left 74%, Ui.art-scrim-left.with-alpha(0) 90%)
-                    : @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
-                        Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
-            }
-            Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%); }
         }
 
         if !DeskArt.gray: Rectangle {
