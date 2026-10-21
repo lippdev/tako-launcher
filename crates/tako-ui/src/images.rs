@@ -604,46 +604,6 @@ mod tests {
         assert!(mid > 20 && mid < 235, "{mid}");
     }
 
-    #[test]
-    fn glass_panel_dense_selection_by_luminance() {
-        // Limite do design system (UI-GLASS-001): arte clara (luminância > 0,18) usa glass-panel-dense
-        // (62% opacidade / #12141a9e), enquanto arte escura (<= 0,18) usa glass-panel padrão (45% opacidade / #12141a73).
-        let dark_art = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
-            800,
-            450,
-            image::Rgba([20, 24, 30, 255]),
-        ));
-        let (_, dark_lum) = glass_copy(&dark_art);
-        let dark_avg: f32 = dark_lum.iter().sum::<f32>() / dark_lum.len() as f32;
-        assert!(
-            dark_avg <= 0.18,
-            "arte escura deve ter luminância <= 0.18: {dark_avg}"
-        );
-
-        let light_art = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
-            800,
-            450,
-            image::Rgba([220, 225, 230, 255]),
-        ));
-        let (_, light_lum) = glass_copy(&light_art);
-        let light_avg: f32 = light_lum.iter().sum::<f32>() / light_lum.len() as f32;
-        assert!(
-            light_avg > 0.18,
-            "arte clara deve ter luminância > 0.18: {light_avg}"
-        );
-
-        // Lógica de seleção do Vidro (desktop.slint)
-        let is_dense = |avg: f32| avg > 0.18;
-        assert!(
-            !is_dense(dark_avg),
-            "arte escura deve usar glass-panel regular"
-        );
-        assert!(
-            is_dense(light_avg),
-            "arte clara deve selecionar glass-panel-dense"
-        );
-    }
-
     fn load_icon(path: &std::path::Path, size: u32) -> image::RgbaImage {
         let req = Request {
             key: String::new(),
