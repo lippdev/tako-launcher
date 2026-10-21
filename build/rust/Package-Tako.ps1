@@ -23,10 +23,13 @@ $stage = Join-Path $root "artifacts\rust\windows-$Arch"
 New-Item -ItemType Directory -Force -Path $dist, $stage | Out-Null
 rustup target add $triple | Out-Null
 $env:TAKO_VERSION = $Version
+if ($Arch -ne 'x64') { throw 'O pacote FSE suporta somente x64.' }
+$env:TAKO_FSE_PAYLOAD_DIR = Join-Path $stage 'fse'
+& (Join-Path $PSScriptRoot 'Package-Fse.ps1') -OutputDirectory $env:TAKO_FSE_PAYLOAD_DIR
 cargo build --release --locked -p tako --target $triple
 if ($LASTEXITCODE -ne 0) { throw "cargo build falhou" }
 
-# FSE-001: manifesto, SCCD e logo são include_str!/include_bytes! no tako-platform.
+# FSE-002: MSIX e certificado público são embutidos no tako-platform.
 # Instalador e portable carregam os mesmos recursos; extração local só ao ativar.
 $exe = Join-Path $root "target\$triple\release\tako.exe"
 # Tako.exe (maiúsculo), como nas alphas: atalhos e a chave Run continuam valendo.

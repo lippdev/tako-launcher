@@ -152,6 +152,31 @@ global DeskArt {
     }
 }
 
+// Escurecimento da arte (FundoDoJogo › Escurecimento), num lugar só: o fundo e a lente do `Vidro` usam as mesmas
+// camadas. Sem faixa vertical: a lateral só desce, o forte fica numa elipse atrás do texto e embaixo vai até 40%.
+export component ArtScrim inherits Rectangle {
+    in property <bool> small;
+    // Raios (52% × 64% da janela; 70% × 72% na pequena) e centro (24% / 90%; 40% / 92%) da elipse.
+    property <length> rx: self.width * (small ? 0.70 : 0.52);
+    property <length> ry: self.height * (small ? 0.72 : 0.64);
+    Rectangle {
+        background: small
+            ? @linear-gradient(90deg, #0b0d1259 0%, #0b0d1252 32%, #0b0d1238 52%, #0b0d1214 70%, #0b0d1200 86%)
+            : @linear-gradient(90deg, #0b0d1259 0%, #0b0d1252 22%, #0b0d1238 40%, #0b0d1214 56%, #0b0d1200 72%);
+    }
+    // O Slint só tem gradiente radial redondo: um quadrado de lado 2·rx com raio `rx`, achatado em y para virar a
+    // elipse. Chega a 0 na borda do círculo (dentro do quadrado), então não sobra aresta dura.
+    Rectangle {
+        x: root.width * (small ? 0.40 : 0.24) - root.rx;
+        y: root.height * (small ? 0.92 : 0.90) - root.rx;
+        width: 2 * root.rx;
+        height: 2 * root.rx;
+        transform-scale-y: root.ry / root.rx;
+        background: @radial-gradient(circle root.rx, Ui.art-scrim-left 0%, #0b0d1266 55%, #0b0d1200 100%);
+    }
+    Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, #0b0d1200 40%); }
+}
+
 // Liquid Glass: a cópia desfocada da arte atrás do painel, a tinta grafite (densa sobre arte clara), a luz da cor do
 // jogo a partir do canto superior esquerdo, o brilho de cima, o contorno e o reflexo na borda. Sem cópia pronta, a
 // tinta sólida; com "Reduzir transparência", tudo opaco. Nas Configurações, `settings-surface` sem vidro.
@@ -182,7 +207,9 @@ component Vidro inherits Rectangle {
         + DeskArt.lum-at(ax + self.width / 4, ay + self.height * 3 / 4)
         + DeskArt.lum-at(ax + self.width * 3 / 4, ay + self.height * 3 / 4)) / 5 > 0.18;
     property <bool> lens: !DeskArt.gray && !Ui.reduce-transparency;
-    property <brush> base-fill: DeskArt.gray ? Ui.settings-surface : Ui.glass-solid;
+    // Tinta sólida até a cópia desfocada chegar (e com "Reduzir transparência"); com ela visível, o painel é transparente.
+    property <brush> base-fill: DeskArt.gray ? Ui.settings-surface
+        : (lens && DeskArt.has-art && DeskArt.blur.width > 0 && DeskArt.blur-in ? transparent : Ui.glass-solid);
     border-radius: radius;
     background: bare || cut-x > 0 ? transparent : base-fill;
     drop-shadow-offset-y: layer ? Ui.shadow-layer-y : Ui.shadow-float-y;
@@ -231,24 +258,14 @@ component Vidro inherits Rectangle {
             opacity: DeskArt.blur.width > 0 && DeskArt.blur-in ? 1 : 0;
             animate opacity { duration: Ui.art-fade(DeskArt.blur-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
-        // O vidro desfoca o que está atrás dele: a arte já com a luz da cor do jogo e os escurecimentos da janela.
-        if lens && DeskArt.has-art: Rectangle {
+        // O vidro desfoca a arte já escurecida (o `backdrop-filter` do protótipo): o mesmo escurecimento do fundo,
+        // alinhado pela janela.
+        if lens && DeskArt.has-art: ArtScrim {
             x: -ax;
             y: -ay;
             width: DeskArt.win-w;
             height: DeskArt.win-h;
-            Rectangle {
-                background: DeskArt.accent.with-alpha(0.22);
-                animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            }
-            Rectangle {
-                background: DeskArt.small
-                    ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
-                        Ui.art-scrim-left 36%, Ui.art-scrim-left 74%, Ui.art-scrim-left.with-alpha(0) 90%)
-                    : @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
-                        Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
-            }
-            Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%); }
+            small: DeskArt.small;
         }
         if !DeskArt.gray: Rectangle {
             background: layer || dense || bright ? Ui.glass-panel-dense : Ui.glass-panel;
@@ -6771,17 +6788,7 @@ component ArtLayer inherits Rectangle {
                 }
             }
         }
-        // Escurecimento: leve atrás da lista (a arte aparece pelo vidro), 70% atrás do título, nada à direita.
-        Rectangle {
-            background: DeskArt.small
-                ? @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 30%,
-                    Ui.art-scrim-left 36%, Ui.art-scrim-left 74%, Ui.art-scrim-left.with-alpha(0) 90%)
-                : @linear-gradient(90deg, Ui.art-scrim-left.with-alpha(0.35) 0%, Ui.art-scrim-left.with-alpha(0.35) 20%,
-                    Ui.art-scrim-left 27%, Ui.art-scrim-left 50%, Ui.art-scrim-left.with-alpha(0) 66%);
-        }
-        Rectangle {
-            background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 40%);
-        }
+        ArtScrim { width: parent.width; height: parent.height; small: DeskArt.small; }
     }
 }
 

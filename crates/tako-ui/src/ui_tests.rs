@@ -609,6 +609,87 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
 /// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
 /// TelaCarregamento: `TAKO_SNAP_OUT=<pasta>` grava `splash-<progresso>.png` (440 × 600) para cada valor de
 /// `TAKO_SNAP_PROGRESS` (padrão `-1,0.42,1`; negativo = barra indeterminada), depois dos tentáculos assentarem.
+/// O escurecimento da arte (UI-GLASS-001) não pode ter aresta dura: sobre fundo branco, a luminância muda de um pixel
+/// para o outro só pelo degradê, inclusive no topo e na direita da elipse atrás do texto.
+#[test]
+fn art_scrim_has_no_hard_edge_around_the_ellipse() {
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let entry = builtin.join("scrim_test.slint");
+        std::fs::write(
+            &entry,
+            "import { ArtScrim } from \"desktop.slint\";\n\
+             export component App inherits Window {\n\
+                 in property <bool> small;\n\
+                 background: white;\n\
+                 ArtScrim { width: parent.width; height: parent.height; small: root.small; }\n\
+             }\n",
+        )
+        .unwrap();
+        let ui = crate::theme::compile(&entry, &builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        // (janela, pequena, centro em fração, raios em fração): 52% × 64% em 24% / 90%; 70% × 72% em 40% / 92%.
+        let cases = [
+            (
+                (1600u32, 900u32),
+                false,
+                (0.24f32, 0.90f32),
+                (0.52f32, 0.64f32),
+            ),
+            ((960, 600), true, (0.40, 0.92), (0.70, 0.72)),
+        ];
+        for ((w, h), small, (cx, cy), (rx, ry)) in cases {
+            ui.set_property("small", Value::Bool(small)).unwrap();
+            window.set_size(slint::PhysicalSize::new(w, h));
+            let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
+            ui.window().request_redraw();
+            assert!(window.draw_if_needed(|r| {
+                r.render(&mut pixels, w as usize);
+            }));
+            let at = |x: u32, y: u32| pixels[(y * w + x) as usize].r as i32;
+            // Salto máximo entre pixels vizinhos: o degradê mais íngreme tem menos de 2 níveis por pixel; o círculo
+            // que não chegava a 0 na borda deixava um degrau de dezenas de níveis.
+            let jump = |from: (u32, u32), to: (u32, u32)| {
+                let (dx, dy) = (to.0 as i32 - from.0 as i32, to.1 as i32 - from.1 as i32);
+                let steps = dx.abs().max(dy.abs());
+                (0..steps)
+                    .map(|i| {
+                        let p = |k: i32| {
+                            at(
+                                (from.0 as i32 + dx.signum() * k) as u32,
+                                (from.1 as i32 + dy.signum() * k) as u32,
+                            )
+                        };
+                        (p(i + 1) - p(i)).abs()
+                    })
+                    .max()
+                    .unwrap()
+            };
+            let (wf, hf) = (w as f32, h as f32);
+            let (x0, y0) = ((cx * wf) as u32, (cy * hf) as u32);
+            // Topo da elipse: coluna do centro, de 60 pixels acima a 60 abaixo da borda.
+            let top = y0 - (ry * hf) as u32;
+            assert!(jump((x0, top - 60), (x0, top + 60)) <= 3, "topo, {w}x{h}");
+            // Borda direita (só cabe na janela grande): linha do centro, 60 pixels de cada lado.
+            let right = x0 + (rx * wf) as u32;
+            if right + 60 < w {
+                assert!(
+                    jump((right - 60, y0), (right + 60, y0)) <= 3,
+                    "direita, {w}x{h}"
+                );
+            }
+        }
+    })
+    .join()
+    .unwrap();
+}
+
 #[test]
 #[ignore = "ferramenta manual de captura"]
 fn splash_snapshot() {
