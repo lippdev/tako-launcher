@@ -257,6 +257,17 @@ pub(crate) static SCAN_PROGRESS: AtomicU32 = AtomicU32::new(0);
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar. `force`: busca a lista de jogos da conta
 /// Steam agora, sem esperar o cache de 1 hora. `user_requested`: atualização pedida pelo usuário (mostra toast
 /// com o resultado ao terminar ou aviso caso já esteja atualizando).
+/// `(force, user_requested)` de um efeito de leitura das lojas; só o pedido do usuário mostra o resultado.
+/// "Procurar jogos instalados" também atualiza a lista de não instalados (`force`).
+fn rescan_mode(effect: &Effect) -> Option<(bool, bool)> {
+    match effect {
+        Effect::UserRescan => Some((true, true)),
+        Effect::Rescan => Some((true, false)),
+        Effect::ReloadLibrary => Some((false, false)),
+        _ => None,
+    }
+}
+
 pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool, user_requested: bool) {
     let (
         found,
@@ -1683,13 +1694,7 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
             }
             s.ctx.effects.remove(0)
         };
-        if effect == Effect::UserRescan
-            || effect == Effect::Rescan
-            || effect == Effect::ReloadLibrary
-        {
-            // "Procurar jogos instalados" também atualiza a lista de não instalados.
-            let user_requested = effect == Effect::UserRescan;
-            let force = effect == Effect::UserRescan || effect == Effect::Rescan;
+        if let Some((force, user_requested)) = rescan_mode(&effect) {
             rescan(shell, force, user_requested);
             continue;
         }
@@ -2273,11 +2278,13 @@ mod tests {
         assert!(!ctx.effects.contains(&Effect::UserRescan));
         assert!(ctx.toast.is_none());
 
-        // Rescan interno não solicitado pelo usuário não gera toast
-        let shell = Rc::new(RefCell::new(Shell::new(ctx)));
-        rescan(&shell, true, false);
-        assert!(shell.borrow().ctx.toast.is_none());
+        // Só o pedido do usuário chega ao rescan como `user_requested`.
+        assert_eq!(rescan_mode(&Effect::Rescan), Some((true, false)));
+        assert_eq!(rescan_mode(&Effect::UserRescan), Some((true, true)));
+        assert_eq!(rescan_mode(&Effect::ReloadLibrary), Some((false, false)));
+        assert_eq!(rescan_mode(&Effect::EndGame), None);
 
+        let shell = Rc::new(RefCell::new(Shell::new(ctx)));
         // Atualização pedida pelo usuário (UserRescan) gera toast ao concluir
         let previous_ids: HashSet<String> = shell
             .borrow()
