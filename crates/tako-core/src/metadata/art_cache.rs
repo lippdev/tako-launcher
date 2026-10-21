@@ -135,7 +135,6 @@ impl ArtCache {
                     let fallback_uri = format!("{STEAM_ART_SCHEME}://{app}/icon");
                     let fallback = self.locate(&fallback_uri);
                     if let Some(ref path) = fallback {
-                        transient.set(true);
                         let _ = std::fs::copy(path, &cached);
                     }
                     fallback
@@ -257,7 +256,6 @@ impl ArtCache {
     }
 }
 
-// Marca o uso (a data de acesso do disco não é confiável: `noatime`, `relatime`).
 /// Appid da Steam quando o endereço é de um ícone da comunidade (`community_assets/images/apps/<appid>/...`).
 fn steam_app_from_icon_url(url: &str) -> Option<u32> {
     if !url.contains("steamstatic.com") {
@@ -268,6 +266,7 @@ fn steam_app_from_icon_url(url: &str) -> Option<u32> {
     app.parse().ok()
 }
 
+// Marca o uso (a data de acesso do disco não é confiável: `noatime`, `relatime`).
 fn touch(path: &Path) {
     if let Ok(f) = std::fs::File::options().write(true).open(path) {
         let _ = f.set_modified(SystemTime::now());
