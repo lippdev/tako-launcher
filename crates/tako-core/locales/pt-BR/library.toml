@@ -32,6 +32,13 @@ none_found = "Nenhum jogo {stores} encontrado neste PC"
 found.one = "{list} encontrado"
 found.other = "{list} encontrados"
 
+[library.rescan]
+already_running = "A biblioteca já está sendo atualizada"
+updated = "Biblioteca atualizada"
+new_games.one = "{n} novo"
+new_games.other = "{n} novos"
+steam_owned_failed = "não foi possível ler os jogos da conta"
+
 [library.collection]
 name_empty = "Dê um nome à coleção."
 name_too_long = "Use até {n} letras."

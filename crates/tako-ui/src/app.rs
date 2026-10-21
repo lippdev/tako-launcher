@@ -9,7 +9,7 @@ use crate::{bridge, images, theme, values::ToValue};
 use slint::ComponentHandle;
 use slint_interpreter::{ComponentDefinition, ComponentInstance, Value};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -259,8 +259,20 @@ pub(crate) static SCAN_STEP: Mutex<Option<(tako_core::library::GameStore, usize,
     Mutex::new(None);
 
 /// Lê as lojas numa thread e atualiza a biblioteca quando terminar. `force`: busca a lista de jogos da conta
-/// Steam agora, sem esperar o cache de 1 hora (abrir o Tako e "Procurar jogos instalados").
-pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
+/// Steam agora, sem esperar o cache de 1 hora. `user_requested`: atualização pedida pelo usuário (mostra toast
+/// com o resultado ao terminar ou aviso caso já esteja atualizando).
+/// `(force, user_requested)` de um efeito de leitura das lojas; só o pedido do usuário mostra o resultado.
+/// "Procurar jogos instalados" também atualiza a lista de não instalados (`force`).
+fn rescan_mode(effect: &Effect) -> Option<(bool, bool)> {
+    match effect {
+        Effect::UserRescan => Some((true, true)),
+        Effect::Rescan => Some((true, false)),
+        Effect::ReloadLibrary => Some((false, false)),
+        _ => None,
+    }
+}
+
+pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool, user_requested: bool) {
     let (
         found,
         disabled,
@@ -271,11 +283,15 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
         exe_icons,
         manual_targets,
         snapshot,
+        previous_ids,
     ) = {
         let mut s = shell.borrow_mut();
         if s.ctx.scanning || s.ctx.restoring {
             if s.ctx.restoring {
                 let msg = s.ctx.t("settings.system.restore_busy");
+                s.ctx.toast(msg);
+            } else if s.ctx.scanning && user_requested {
+                let msg = s.ctx.t("library.rescan.already_running");
                 s.ctx.toast(msg);
             }
             return;
@@ -298,6 +314,8 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                 }
             })
             .collect();
+        let previous_ids: HashSet<String> =
+            s.ctx.library.games().iter().map(|g| g.id.clone()).collect();
         (
             s.ctx.found.clone(),
             s.ctx
@@ -310,16 +328,19 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
             s.ctx.paths.cache().join("exe-icons"),
             manual_targets,
             found_snapshot(&s.ctx.paths),
+            previous_ids,
         )
     };
     std::thread::Builder::new()
         .name("tako-scan".into())
         .spawn(move || {
             // Jogos da conta Steam (SRC-005): só com a chave; sem ela, nem o cache antigo entra.
+            let mut steam_error = false;
             let steam_owned = steam_key.map(|key| {
                 if !simulate && let Err(e) = crate::steam_owned::refresh(&key, &steam_cache, force)
                 {
                     tracing::warn!("jogos da conta Steam: {e}");
+                    steam_error = true;
                 }
                 steam_cache
             });
@@ -358,6 +379,9 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
                     s.ctx.scanning = false;
                     s.ctx.check_installs(); // avisa o que acabou de instalar
                     s.apply_pending_link();
+                    if user_requested {
+                        notify_rescan_finished(&mut s.ctx, &previous_ids, steam_error);
+                    }
                     s.ctx.dirty = true;
                     crate::local_api::sync(&mut s.ctx);
                 }
@@ -365,6 +389,48 @@ pub fn rescan(shell: &Rc<RefCell<Shell>>, force: bool) {
             measure_sizes(&found, to_measure);
         })
         .ok();
+}
+
+/// Notifica o resultado de uma atualização de biblioteca pedida pelo usuário.
+pub(crate) fn notify_rescan_finished(
+    ctx: &mut Ctx,
+    previous_ids: &HashSet<String>,
+    steam_error: bool,
+) {
+    let mut warnings = Vec::new();
+    if steam_error {
+        let steam_name =
+            tako_core::presentation::game_text::store_name(ctx.lang(), GameStore::Steam);
+        warnings.push(format!(
+            "{steam_name}: {}",
+            ctx.t("library.rescan.steam_owned_failed")
+        ));
+    }
+    for r in &ctx.sources {
+        if r.enabled
+            && let Some(notice) = &r.notice
+        {
+            let name = tako_core::presentation::game_text::store_name(ctx.lang(), r.store);
+            warnings.push(format!("{name}: {notice}"));
+        }
+    }
+    let current_games = ctx.library.games();
+    let new_count = current_games
+        .iter()
+        .filter(|g| !previous_ids.contains(&g.id))
+        .count();
+    let updated = ctx.t("library.rescan.updated");
+    let detail = if new_count > 0 {
+        ctx.tn("library.rescan.new_games", new_count as i64, &[])
+    } else {
+        ctx.tn("common.games", current_games.len() as i64, &[])
+    };
+    if warnings.is_empty() {
+        ctx.toast_success(format!("{updated} · {detail}"));
+    } else {
+        let warn_str = warnings.join(" · ");
+        ctx.toast_warning(format!("{updated} · {detail} · {warn_str}"));
+    }
 }
 
 /// Espaço livre no disco onde as lojas instalam por padrão (SRC-005): a biblioteca padrão da Steam e, sem Steam,
@@ -418,7 +484,7 @@ fn follow_installs(shell: &Rc<RefCell<Shell>>) {
                     return;
                 };
                 if followed.finished {
-                    rescan(&shell, false);
+                    rescan(&shell, false, false);
                 } else if followed.changed {
                     let mut s = shell.borrow_mut();
                     s.ctx.library.refresh();
@@ -1307,7 +1373,7 @@ impl App {
                         });
                     drop(s);
                     if other_store {
-                        rescan(&app.shell, false);
+                        rescan(&app.shell, false, false);
                     }
                 }
                 let action = {
@@ -1432,7 +1498,7 @@ impl App {
         }
         drop(ui);
         self.end_intro_later();
-        rescan(&self.shell, true); // ao abrir: a lista de não instalados da Steam vem fresca
+        rescan(&self.shell, true, false); // ao abrir: a lista de não instalados da Steam vem fresca
         crate::local_api::sync(&mut self.shell.borrow_mut().ctx);
         slint::run_event_loop_until_quit().map_err(|e| e.to_string())
     }
@@ -1623,9 +1689,8 @@ fn pump_effects(shell: &Rc<RefCell<Shell>>, host: &Rc<RefCell<dyn Host>>) -> Hos
             }
             s.ctx.effects.remove(0)
         };
-        if effect == Effect::Rescan || effect == Effect::ReloadLibrary {
-            // "Procurar jogos instalados" também atualiza a lista de não instalados.
-            rescan(shell, effect == Effect::Rescan);
+        if let Some((force, user_requested)) = rescan_mode(&effect) {
+            rescan(shell, force, user_requested);
             continue;
         }
         if effect == Effect::EndGame {
@@ -2092,6 +2157,144 @@ mod tests {
             .is_empty()
         );
         assert_eq!(found.lock().unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn rescan_finished_shows_toast_with_game_count_and_new_games() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        i18n::set_lang(Lang::PtBr);
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+
+        // Caso 1: sem jogos novos, mostra o total de jogos
+        let previous_ids: HashSet<String> =
+            ctx.library.games().iter().map(|g| g.id.clone()).collect();
+        let total = ctx.library.games().len();
+        notify_rescan_finished(&mut ctx, &previous_ids, false);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some(format!("Biblioteca atualizada · {total} jogos").as_str())
+        );
+
+        // Caso 2: 2 jogos novos
+        let mut partial_ids = previous_ids.clone();
+        let removed: Vec<String> = partial_ids.iter().take(2).cloned().collect();
+        for id in &removed {
+            partial_ids.remove(id);
+        }
+        notify_rescan_finished(&mut ctx, &partial_ids, false);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some("Biblioteca atualizada · 2 novos")
+        );
+
+        // Caso 3: 1 jogo novo
+        let mut single_missing = previous_ids.clone();
+        single_missing.remove(&removed[0]);
+        notify_rescan_finished(&mut ctx, &single_missing, false);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some("Biblioteca atualizada · 1 novo")
+        );
+
+        // Caso 4: em inglês
+        i18n::set_lang(Lang::EnUs);
+        notify_rescan_finished(&mut ctx, &previous_ids, false);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some(format!("Library updated · {total} games").as_str())
+        );
+        notify_rescan_finished(&mut ctx, &partial_ids, false);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some("Library updated · 2 new")
+        );
+        i18n::set_lang(Lang::PtBr);
+    }
+
+    #[test]
+    fn rescan_finished_shows_toast_warning_on_store_notice_or_steam_failure() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        i18n::set_lang(Lang::PtBr);
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+        let previous_ids: HashSet<String> =
+            ctx.library.games().iter().map(|g| g.id.clone()).collect();
+        let total = ctx.library.games().len();
+
+        // Falha na leitura dos jogos da conta Steam gera aviso mantendo a contagem
+        notify_rescan_finished(&mut ctx, &previous_ids, true);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some(format!("Biblioteca atualizada · {total} jogos · Steam: não foi possível ler os jogos da conta").as_str())
+        );
+
+        // Loja ligada com aviso (notice) gera aviso mantendo a contagem
+        ctx.sources = vec![tako_sources::report::LibrarySourceReport {
+            store: GameStore::Epic,
+            enabled: true,
+            game_count: 0,
+            client_installed: false,
+            notice: Some(
+                "Epic Games Launcher não encontrado: instale-o para abrir estes jogos".into(),
+            ),
+        }];
+        notify_rescan_finished(&mut ctx, &previous_ids, false);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some(
+                format!("Biblioteca atualizada · {total} jogos · Epic Games: Epic Games Launcher não encontrado: instale-o para abrir estes jogos").as_str()
+            )
+        );
+
+        // Em inglês
+        i18n::set_lang(Lang::EnUs);
+        notify_rescan_finished(&mut ctx, &previous_ids, true);
+        assert_eq!(
+            ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some(
+                format!("Library updated · {total} games · Steam: could not read account games · Epic Games: Epic Games Launcher não encontrado: instale-o para abrir estes jogos").as_str()
+            )
+        );
+        i18n::set_lang(Lang::PtBr);
+    }
+
+    #[test]
+    fn saving_emulators_does_not_toast_while_user_rescan_does() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        i18n::set_lang(Lang::PtBr);
+        let dir = tempfile::tempdir().unwrap();
+        let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+
+        // Salvar emuladores enfileira Effect::Rescan (interno) e não dá toast
+        let config = tako_sources::emulators::Config::default();
+        crate::shell::settings::emulators::save(&mut ctx, &config);
+        assert!(ctx.effects.contains(&Effect::Rescan));
+        assert!(!ctx.effects.contains(&Effect::UserRescan));
+        assert!(ctx.toast.is_none());
+
+        // Só o pedido do usuário chega ao rescan como `user_requested`.
+        assert_eq!(rescan_mode(&Effect::Rescan), Some((true, false)));
+        assert_eq!(rescan_mode(&Effect::UserRescan), Some((true, true)));
+        assert_eq!(rescan_mode(&Effect::ReloadLibrary), Some((false, false)));
+        assert_eq!(rescan_mode(&Effect::EndGame), None);
+
+        let shell = Rc::new(RefCell::new(Shell::new(ctx)));
+        // Atualização pedida pelo usuário (UserRescan) gera toast ao concluir
+        let previous_ids: HashSet<String> = shell
+            .borrow()
+            .ctx
+            .library
+            .games()
+            .iter()
+            .map(|g| g.id.clone())
+            .collect();
+        let total = shell.borrow().ctx.library.games().len();
+        notify_rescan_finished(&mut shell.borrow_mut().ctx, &previous_ids, false);
+        assert_eq!(
+            shell.borrow().ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some(format!("Biblioteca atualizada · {total} jogos").as_str())
+        );
     }
 
     /// A biblioteca abre com a última leitura das lojas; arquivo quebrado ou ausente não impede a abertura.

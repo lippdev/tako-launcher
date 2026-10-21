@@ -1642,8 +1642,10 @@ impl Page for DesktopLibrary {
             "rescan" => {
                 if ctx.restoring {
                     ctx.toast(ctx.t("settings.system.restore_busy"));
+                } else if ctx.scanning {
+                    ctx.toast(ctx.t("library.rescan.already_running"));
                 } else {
-                    ctx.effect(Effect::Rescan);
+                    ctx.effect(Effect::UserRescan);
                 }
             }
             // DestaqueFases: 1 abre a fase 2 (roda para baixo, "Mais sobre o jogo"), 0 volta para a fase 1.
@@ -1835,12 +1837,19 @@ impl Page for DesktopLibrary {
             )
         });
         let total = library_text::game_count(lang, ids.len());
-        out.set(
-            "desk-count",
+        let count_text = if ctx.scanning {
+            ctx.t("desktop.updating")
+        } else {
             bulk.clone()
-                .unwrap_or_else(|| format!("{total} · {}", library_text::sort_label(lang, c.sort))),
-        );
-        out.set("desk-count-short", bulk.unwrap_or(total));
+                .unwrap_or_else(|| format!("{total} · {}", library_text::sort_label(lang, c.sort)))
+        };
+        let count_short_text = if ctx.scanning {
+            ctx.t("desktop.updating")
+        } else {
+            bulk.unwrap_or(total)
+        };
+        out.set("desk-count", count_text);
+        out.set("desk-count-short", count_short_text);
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
@@ -1872,6 +1881,7 @@ impl Page for DesktopLibrary {
             "desk-loading",
             ctx.scanning && ctx.library.games().is_empty(),
         );
+        out.set("desk-rescan-busy", ctx.scanning);
         // Miniaturas e capas só perto da área visível (o tema avisa a primeira linha pelo `scrolled`).
         let first = ctx.list_first;
         let near = first.saturating_sub(NEAR / 3)..first + NEAR;
@@ -2158,6 +2168,11 @@ impl Page for DesktopLibrary {
             ),
         );
         out.set("desk-loading-label", ctx.t("desktop.empty.loading"));
+        let refresh_label = if ctx.scanning {
+            ctx.t("desktop.refresh_busy")
+        } else {
+            ctx.t("desktop.refresh_library")
+        };
         out.set(
             "desk-view-labels",
             vec![
@@ -2168,7 +2183,7 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.filter_sort"),
                 ctx.t("desktop.view.menu"),
                 ctx.t("desktop.add_game"),
-                ctx.t("desktop.refresh_library"),
+                refresh_label,
             ],
         );
         out.set(
@@ -3472,5 +3487,69 @@ mod tests {
         assert_eq!(page(&shell).ids(&shell.ctx), vec![first.clone()]);
         shell.click("collection", 1);
         assert_eq!(page(&shell).ids(&shell.ctx).len(), favorites);
+    }
+
+    #[test]
+    fn rescan_busy_shows_busy_state_when_library_not_empty_and_toasts_if_clicked_again() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        assert!(!shell.ctx.library.games().is_empty());
+
+        // Estado normal sem varredura: não ocupado e rótulo padrão
+        let out = shell.render(std::time::Instant::now());
+        let busy = out.props.iter().find(|(n, _)| *n == "desk-rescan-busy");
+        assert_eq!(busy.map(|(_, v)| v), Some(&Value::Bool(false)));
+        let labels = out.props.iter().find(|(n, _)| *n == "desk-view-labels");
+        let Some((_, Value::Model(m))) = labels else {
+            panic!("desk-view-labels não encontrado ou não é Model");
+        };
+        assert_eq!(
+            m.row_data(7).and_then(|v| match v {
+                Value::String(s) => Some(s.to_string()),
+                _ => None,
+            }),
+            Some("Atualizar biblioteca".to_string())
+        );
+
+        // Enquanto atualiza com a biblioteca preenchida:
+        shell.ctx.scanning = true;
+        let out = shell.render(std::time::Instant::now());
+        let busy = out.props.iter().find(|(n, _)| *n == "desk-rescan-busy");
+        assert_eq!(busy.map(|(_, v)| v), Some(&Value::Bool(true)));
+        let count = out.props.iter().find(|(n, _)| *n == "desk-count");
+        assert_eq!(
+            count.map(|(_, v)| v),
+            Some(&Value::String("Atualizando…".into()))
+        );
+        let count_short = out.props.iter().find(|(n, _)| *n == "desk-count-short");
+        assert_eq!(
+            count_short.map(|(_, v)| v),
+            Some(&Value::String("Atualizando…".into()))
+        );
+        let labels = out.props.iter().find(|(n, _)| *n == "desk-view-labels");
+        let Some((_, Value::Model(m))) = labels else {
+            panic!("desk-view-labels não encontrado ou não é Model");
+        };
+        assert_eq!(
+            m.row_data(7).and_then(|v| match v {
+                Value::String(s) => Some(s.to_string()),
+                _ => None,
+            }),
+            Some("Atualizando biblioteca…".to_string())
+        );
+
+        // Clicar novamente durante atualização exibe toast e não duplica efeito
+        shell.click("rescan", 0);
+        assert_eq!(
+            shell.ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+            Some("A biblioteca já está sendo atualizada")
+        );
+        assert!(!shell.ctx.effects.contains(&Effect::UserRescan));
+
+        // Clicar em repouso enfileira UserRescan
+        shell.ctx.scanning = false;
+        shell.click("rescan", 0);
+        assert!(shell.ctx.effects.contains(&Effect::UserRescan));
     }
 }

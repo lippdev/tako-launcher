@@ -221,7 +221,7 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     }
     let mut v = vec![
         MenuItem::new(action(ctx, "settings.library.add")).on(effect(Effect::AddGame)),
-        MenuItem::new(rescan).on(effect(Effect::Rescan)),
+        MenuItem::new(rescan).on(effect(Effect::UserRescan)),
         MenuItem::new(PanelRow::header(ctx.t("settings.library.stores_header"))),
     ];
     v.extend(store_rows_with_accounts(ctx));
