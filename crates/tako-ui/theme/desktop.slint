@@ -52,7 +52,7 @@ struct DeskMore { on: bool, labels: [string], description: string, details: [Des
 // como os SVG das prévias. A tela cheia continua com o `Icon` dela.
 component DeskIcon inherits Rectangle {
     in property <string> name;
-    in property <color> tint: Ui.on-accent;
+    in property <color> tint: Ui.desk-text;
     in property <length> size: 20px;
     width: size;
     height: size;
@@ -365,7 +365,7 @@ component Tip inherits Rectangle {
         drop-shadow-offset-y: Ui.shadow-float-y;
         drop-shadow-blur: Ui.shadow-float-blur;
         drop-shadow-color: Ui.shadow-float-color;
-        tl := Text { text: root.text; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 500; }
+        tl := Text { text: root.text; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 500; }
     }
 }
 
@@ -382,7 +382,7 @@ component DeskButton inherits Rectangle {
     // Botão quadrado (só ícone ou um símbolo).
     in property <bool> square: label == "";
     callback clicked();
-    property <color> fg: primary ? Ui.on-surface-solid : (danger ? Ui.error : (on ? Ui.warning : Ui.on-accent));
+    property <color> fg: primary ? Ui.on-surface-solid : (danger ? Ui.desk-error : (on ? Ui.desk-warning : Ui.desk-text));
     height: 56 * Ui.u;
     width: max(min-w, square ? self.height : lay.preferred-width);
     border-radius: Ui.radius-md;
@@ -472,12 +472,12 @@ component SearchBox inherits Rectangle {
                     width: parent.width;
                     height: parent.height;
                     text: root.text;
-                    color: Ui.on-accent;
+                    color: Ui.desk-text;
                     font-size: Ui.desk-label;
                     vertical-alignment: center;
                     single-line: true;
                     selection-background-color: Ui.glass-pressed;
-                    selection-foreground-color: Ui.on-accent;
+                    selection-foreground-color: Ui.desk-text;
                     edited => { root.edited(self.text); }
                     accepted => { root.leave(); }
                 }
@@ -527,7 +527,7 @@ component WindowButton inherits Rectangle {
             : kind == "max" ? "M 0.5 0.5 H 9.5 V 9.5 H 0.5 Z"
             : kind == "restore" ? "M 2.5 0.5 H 9.5 V 7.5 M 0.5 2.5 H 7.5 V 9.5 H 0.5 Z"
             : "M 0 0 L 10 10 M 10 0 L 0 10";
-        stroke: (ta.has-hover || native-hover) ? Ui.on-accent : (active ? Ui.desk-on-muted : Ui.on-accent-subtle);
+        stroke: (ta.has-hover || native-hover) ? Ui.desk-text : (active ? Ui.desk-on-muted : Ui.desk-on-subtle);
         stroke-width: 1px;
         fill: transparent;
     }
@@ -541,7 +541,7 @@ component ProgressRing inherits Rectangle {
     in property <length> size: 36px;
     in property <length> thickness: 3.5px;
     in property <float> fraction: -1;
-    in property <color> tint: Ui.on-accent;
+    in property <color> tint: Ui.desk-text;
     in property <color> track: #ffffff26;
     width: size;
     height: size;
@@ -614,10 +614,10 @@ component ActivityIcon inherits Rectangle {
     in property <float> progress;
     width: 18px;
     height: 18px;
-    if icon == "spin": Ring { size: 16px; x: 1px; y: 1px; tint: Ui.on-accent; }
+    if icon == "spin": Ring { size: 16px; x: 1px; y: 1px; tint: Ui.desk-text; }
     if icon == "ring": ProgressRing { size: 18px; thickness: 2.5px; fraction: progress / 100; }
     if icon == "done": DeskIcon { name: "check"; size: 18px; tint: Ui.success; }
-    if icon == "warn": DeskIcon { name: "alert"; size: 18px; tint: Ui.warning; }
+    if icon == "warn": DeskIcon { name: "alert"; size: 18px; tint: Ui.desk-warning; }
     if icon == "dot": Rectangle { x: 5px; y: 5px; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
 }
 
@@ -638,8 +638,8 @@ component ActivityFace inherits Rectangle {
         if !small: VerticalLayout {
             alignment: center;
             spacing: 3px;
-            Text { text: data.title; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; overflow: elide; }
-            if data.detail != "": Text { text: data.detail; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
+            Text { text: data.title; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; overflow: elide; }
+            if data.detail != "": Text { text: data.detail; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
         }
         if !small && active && data.action != "": Rectangle {
             y: (parent.height - self.height) / 2;
@@ -650,7 +650,7 @@ component ActivityFace inherits Rectangle {
             accessible-role: button;
             accessible-label: data.action;
             accessible-action-default => { root.act(); }
-            at := Text { text: data.action; color: Ui.on-accent; font-size: 12.5px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            at := Text { text: data.action; color: Ui.desk-text; font-size: 12.5px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
             aa := TouchArea { mouse-cursor: pointer; clicked => { root.act(); } }
         }
     }
@@ -776,7 +776,7 @@ component TopBar inherits Vidro {
                 if focus-index == 1 + i: FocusRing { radius: Ui.radius-thumb; }
                 gt := Text {
                     text: it.label.to-uppercase();
-                    color: it.selected || gta.has-hover || focus-index == 1 + i ? Ui.on-accent : Ui.desk-on-muted;
+                    color: it.selected || gta.has-hover || focus-index == 1 + i ? Ui.desk-text : Ui.desk-on-muted;
                     font-size: Ui.desk-label;
                     font-weight: 700;
                     letter-spacing: 0.04 * self.font-size;
@@ -787,7 +787,7 @@ component TopBar inherits Vidro {
                     y: parent.height - 12px - self.height;
                     height: 2px;
                     border-radius: 1px;
-                    background: Ui.on-accent;
+                    background: Ui.desk-text;
                 }
                 gta := TouchArea {
                     mouse-cursor: pointer;
@@ -866,7 +866,7 @@ component TopBar inherits Vidro {
                         height: 20px;
                         border-radius: 10px;
                         background: #ffffff1f;
-                        more-text := Text { text: "+" + activity.more; color: Ui.on-accent; font-size: 12px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                        more-text := Text { text: "+" + activity.more; color: Ui.desk-text; font-size: 12px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
                     }
                 }
             }
@@ -887,9 +887,9 @@ component TopBar inherits Vidro {
                 Rectangle {
                     width: 28px; height: 28px; y: (parent.height - self.height) / 2;
                     border-radius: 14px; background: Ui.glass-hover;
-                    Text { text: profile-initial; color: Ui.on-accent; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: profile-initial; color: Ui.desk-text; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
                 }
-                if !small: Text { text: profile-name; max-width: 160px; overflow: elide; font-size: 14px; font-weight: 600; color: Ui.on-accent; vertical-alignment: center; }
+                if !small: Text { text: profile-name; max-width: 160px; overflow: elide; font-size: 14px; font-weight: 600; color: Ui.desk-text; vertical-alignment: center; }
                 DeskIcon { name: "chevron-down"; size: 12px; y: (parent.height - self.height) / 2; }
             }
             pta := TouchArea {
@@ -967,7 +967,7 @@ component Selected inherits Rectangle {
         y: 1px;
         width: parent.width - root.radius;
         height: 1px;
-        background: Ui.on-accent.with-alpha(0.2);
+        background: Ui.desk-text.with-alpha(0.2);
     }
 }
 
@@ -1004,7 +1004,7 @@ component Tabs inherits Rectangle {
         if i == focus-index: FocusRing { radius: 11px; }
         Text {
             text: t;
-            color: i == current ? Ui.on-accent : Ui.desk-on-muted;
+            color: i == current ? Ui.desk-text : Ui.desk-on-muted;
             font-size: 14px * Ui.text-scale;
             font-weight: i == current ? 600 : 500;
             overflow: elide;
@@ -1041,11 +1041,11 @@ component IconBtn inherits Rectangle {
         DeskIcon {
             name: icon;
             size: 17px;
-            tint: on || ita.has-hover ? Ui.on-accent : Ui.desk-on-muted;
+            tint: on || ita.has-hover ? Ui.desk-text : Ui.desk-on-muted;
             y: (parent.height - self.height) / 2;
             transform-rotation: busy && !Ui.reduce-motion ? animation-tick() / 900ms * 360deg : 0deg;
         }
-        if badge != "": Text { text: badge; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 700; vertical-alignment: center; }
+        if badge != "": Text { text: badge; color: Ui.desk-text; font-size: Ui.desk-overline; font-weight: 700; vertical-alignment: center; }
     }
     ita := TouchArea {
         width: parent.width;
@@ -1080,11 +1080,11 @@ component StoreGroup inherits Rectangle {
         padding-left: 12px;
         padding-right: 10px;
         spacing: 10px;
-        DeskIcon { name: icon; size: 16px; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
-        Text { text: title; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
-        Text { text: count; color: Ui.on-accent-subtle; font-size: 13px * Ui.text-scale; vertical-alignment: center; }
+        DeskIcon { name: icon; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+        Text { text: title; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
+        Text { text: count; color: Ui.desk-on-subtle; font-size: 13px * Ui.text-scale; vertical-alignment: center; }
         Rectangle { horizontal-stretch: 1; }
-        DeskIcon { name: open ? "chevron-down" : "chevron"; size: 16px; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+        DeskIcon { name: open ? "chevron-down" : "chevron"; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
     }
     ta := TouchArea {
         mouse-cursor: pointer;
@@ -1107,8 +1107,8 @@ component NotInstalledTitle inherits Rectangle {
         height: 16px * Ui.text-scale;
         spacing: 8px;
         alignment: start;
-        Text { text: title; color: Ui.on-accent-subtle; font-size: Ui.desk-overline; font-weight: 700; letter-spacing: 0.08 * self.font-size; vertical-alignment: center; }
-        Text { text: count; color: Ui.on-accent-subtle; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
+        Text { text: title; color: Ui.desk-on-subtle; font-size: Ui.desk-overline; font-weight: 700; letter-spacing: 0.08 * self.font-size; vertical-alignment: center; }
+        Text { text: count; color: Ui.desk-on-subtle; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
     }
 }
 
@@ -1197,7 +1197,7 @@ component GameRow inherits Rectangle {
         }
         nt := Text {
             text: data.title;
-            color: data.installed ? Ui.on-accent : Ui.on-accent-muted;
+            color: data.installed ? Ui.desk-text : Ui.desk-on-muted;
             font-size: Ui.desk-label;
             font-weight: picked ? 600 : 500;
             vertical-alignment: center;
@@ -1230,7 +1230,7 @@ component GameRow inherits Rectangle {
                 accessible-role: button;
                 accessible-label: data.install-label;
                 accessible-action-default => { root.install(); }
-                DeskIcon { name: "download"; size: 18px; tint: Ui.on-accent; }
+                DeskIcon { name: "download"; size: 18px; tint: Ui.desk-text; }
                 ita := TouchArea {
                     mouse-cursor: pointer;
                     clicked => { root.install(); }
@@ -1256,7 +1256,7 @@ component GameRow inherits Rectangle {
             border-color: Ui.glass-edge-strong;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: button;
-            DeskIcon { name: "play"; size: 18px; tint: Ui.on-accent; }
+            DeskIcon { name: "play"; size: 18px; tint: Ui.desk-text; }
             pta := TouchArea {
                 mouse-cursor: pointer;
                 clicked => { root.play(); }
@@ -1383,7 +1383,7 @@ component CollectionSelect inherits Rectangle {
         padding-right: 12px;
         spacing: 10px;
         DeskIcon { name: "layers"; size: 18px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
-        Text { text: current.label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+        Text { text: current.label; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
         Text { text: current.count; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
         DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
     }
@@ -1413,7 +1413,7 @@ component EmptyList inherits VerticalLayout {
         alignment: center;
         Octopus { width: 94px; with-name: false; self-assemble: true; accessible-role: none; }
     }
-    Text { text: title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-label-lg; font-weight: 700; horizontal-alignment: center; wrap: word-wrap; }
+    Text { text: title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-label-lg; font-weight: 700; horizontal-alignment: center; wrap: word-wrap; }
     if text != "": Text { text: text; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; horizontal-alignment: center; wrap: word-wrap; }
     if action != "": HorizontalLayout {
         alignment: center;
@@ -1430,7 +1430,7 @@ component EmptyList inherits VerticalLayout {
             al := HorizontalLayout {
                 padding-left: 18px;
                 padding-right: 18px;
-                Text { text: action; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; vertical-alignment: center; }
+                Text { text: action; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 500; vertical-alignment: center; }
             }
             ata := TouchArea {
                 mouse-cursor: pointer;
@@ -1476,8 +1476,8 @@ component BulkBar inherits Vidro {
                     padding-right: i < 2 ? 10px : 0;
                     spacing: 8px;
                     alignment: center;
-                    DeskIcon { name: a.icon; size: 18px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
-                    if i < 2: Text { text: a.title; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+                    DeskIcon { name: a.icon; size: 18px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
+                    if i < 2: Text { text: a.title; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
                 }
                 bta := TouchArea {
                     mouse-cursor: pointer;
@@ -1529,7 +1529,7 @@ component CoverCard inherits Rectangle {
             y: -parent.height * 0.6;
             width: parent.width * 1.2;
             height: parent.height * 1.4;
-            background: @radial-gradient(circle, Ui.on-accent.with-alpha(0.12) 0%, Ui.on-accent.with-alpha(0) 60%);
+            background: @radial-gradient(circle, Ui.desk-text.with-alpha(0.12) 0%, Ui.desk-text.with-alpha(0) 60%);
         }
         if data.cover.width == 0: Text {
             x: 14px;
@@ -1537,7 +1537,7 @@ component CoverCard inherits Rectangle {
             text: data.title;
             opacity: covered ? 0 : 1;
             animate opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            color: Ui.on-accent;
+            color: Ui.desk-text;
             font-family: Ui.font-heading;
             font-size: 19px * Ui.text-scale;
             font-weight: 700;
@@ -1578,7 +1578,7 @@ component CoverCard inherits Rectangle {
         height: 28px;
         border-radius: 14px;
         background: Ui.desk-canvas.with-alpha(0.6);
-        DeskIcon { name: "starfill"; size: 16px; tint: Ui.warning; }
+        DeskIcon { name: "starfill"; size: 16px; tint: Ui.desk-warning; }
     }
     if data.running: Rectangle {
         x: root.width - 25px;
@@ -1595,7 +1595,7 @@ component CoverCard inherits Rectangle {
         spacing: Ui.space-8;
         Text {
             text: data.title;
-            color: data.installed ? Ui.on-accent : Ui.on-accent-muted;
+            color: data.installed ? Ui.desk-text : Ui.desk-on-muted;
             font-size: 14px * Ui.text-scale;
             font-weight: data.installed ? 600 : 500;
             horizontal-stretch: 1;
@@ -1662,7 +1662,7 @@ component CoverCard inherits Rectangle {
         accessible-value-maximum: 100;
         Rectangle { border-radius: 32px; background: #000b; }
         ProgressRing { size: 64px; thickness: 5px; fraction: data.progress; track: #ffffff33; }
-        Text { text: data.percent; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+        Text { text: data.percent; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
     }
 }
 
@@ -1802,7 +1802,7 @@ component CategoryRows inherits Rectangle {
                 y: 0;
                 height: 24px;
                 spacing: 12px;
-                Text { text: cat.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; vertical-alignment: center; }
+                Text { text: cat.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; vertical-alignment: center; }
                 Text { text: cat.count; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; vertical-alignment: center; }
                 Rectangle { horizontal-stretch: 1; }
                 Rectangle {
@@ -1855,7 +1855,7 @@ component CategoryRows inherits Rectangle {
                 background: Ui.glass-panel-dense;
                 border-width: 1px;
                 border-color: Ui.glass-edge-strong;
-                DeskIcon { name: "chevron-left"; size: 16px; tint: Ui.on-accent; }
+                DeskIcon { name: "chevron-left"; size: 16px; tint: Ui.desk-text; }
                 TouchArea {
                     mouse-cursor: pointer;
                     clicked => { hf.viewport-x = min(0, hf.viewport-x + hf.width * 0.8); }
@@ -1871,7 +1871,7 @@ component CategoryRows inherits Rectangle {
                 background: Ui.glass-panel-dense;
                 border-width: 1px;
                 border-color: Ui.glass-edge-strong;
-                DeskIcon { name: "chevron"; size: 16px; tint: Ui.on-accent; }
+                DeskIcon { name: "chevron"; size: 16px; tint: Ui.desk-text; }
                 TouchArea {
                     mouse-cursor: pointer;
                     clicked => { hf.viewport-x = max(hf.width - hf.viewport-width, hf.viewport-x - hf.width * 0.8); }
@@ -1898,7 +1898,7 @@ component Badge inherits Rectangle {
         if live: Rectangle { y: 9px; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
         Text {
             text: root.text;
-            color: Ui.on-accent;
+            color: Ui.desk-text;
             font-size: Ui.desk-overline;
             font-weight: 700;
             letter-spacing: 0.1 * self.font-size;
@@ -1911,7 +1911,7 @@ component Badge inherits Rectangle {
 component PlayStatusDot inherits Rectangle {
     in property <string> status;
     property <bool> hollow: status == "" || status == "none" || status == "wishlist";
-    property <color> tint: status == "playing" ? Ui.success : (status == "paused" ? Ui.warning : (status == "beaten" ? Ui.on-accent : (status == "wishlist" ? Ui.desk-on-muted : Ui.desk-on-subtle)));
+    property <color> tint: status == "playing" ? Ui.success : (status == "paused" ? Ui.desk-warning : (status == "beaten" ? Ui.desk-text : (status == "wishlist" ? Ui.desk-on-muted : Ui.desk-on-subtle)));
     width: 8px;
     height: 8px;
     border-radius: 4px;
@@ -1940,7 +1940,7 @@ component PlayStatusSelect inherits Rectangle {
         PlayStatusDot { status: root.status; y: (parent.height - self.height) / 2; }
         Text {
             text: label;
-            color: status == "" ? Ui.desk-on-muted : Ui.on-accent;
+            color: status == "" ? Ui.desk-on-muted : Ui.desk-text;
             font-size: 13px * Ui.text-scale;
             font-weight: 600;
             vertical-alignment: center;
@@ -1972,8 +1972,8 @@ component StorePill inherits Rectangle {
         padding-left: Ui.space-12;
         padding-right: Ui.space-12;
         spacing: 6px;
-        DeskIcon { name: icon; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+        DeskIcon { name: icon; size: 16px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
     }
 }
 
@@ -2003,7 +2003,7 @@ component StatusStrip inherits Vidro {
                 height: 22px;
                 border-radius: 6px;
                 y: (parent.height - self.height) / 2;
-                background: it.score >= 75 ? Ui.success : (it.score >= 50 ? Ui.warning : Ui.error);
+                background: it.score >= 75 ? Ui.success : (it.score >= 50 ? Ui.desk-warning : Ui.desk-error);
                 Text {
                     text: it.score;
                     font-family: Ui.font-text;
@@ -2027,7 +2027,7 @@ component StatusStrip inherits Vidro {
                 HorizontalLayout {
                     spacing: 7px;
                     if it.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-                    Text { text: it.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; }
+                    Text { text: it.value; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 500; }
                 }
             }
         }
@@ -2150,10 +2150,10 @@ component GlassButton inherits Vidro {
         DeskIcon {
             name: icon;
             size: 22px;
-            tint: danger ? Ui.error : (on ? Ui.warning : Ui.on-accent);
+            tint: danger ? Ui.desk-error : (on ? Ui.desk-warning : Ui.desk-text);
             y: (parent.height - self.height) / 2;
         }
-        if show-label: Text { text: label; color: danger ? Ui.error : Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+        if show-label: Text { text: label; color: danger ? Ui.desk-error : Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
     }
     gta := TouchArea {
         mouse-cursor: pointer;
@@ -2164,7 +2164,7 @@ component GlassButton inherits Vidro {
 
 // Título de cartão (Poppins, `title`).
 component CardTitle inherits Text {
-    color: Ui.on-accent;
+    color: Ui.desk-text;
     font-family: Ui.font-heading;
     font-size: Ui.desk-title;
     font-weight: 700;
@@ -2210,7 +2210,7 @@ component AboutCard inherits Vidro {
                     background: mta.has-hover ? Ui.glass-hover : transparent;
                     accessible-role: button;
                     accessible-label: more-label;
-                    ml := Text { text: more-label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; }
+                    ml := Text { text: more-label; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; }
                     mta := TouchArea {
                         mouse-cursor: pointer;
                         clicked => { root.more-clicked(); }
@@ -2278,7 +2278,7 @@ component DetailsCard inherits Vidro {
                     // Valor cortado com "…": o inteiro aparece na dica ao passar o mouse.
                     Rectangle {
                         horizontal-stretch: 1;
-                        vt := Text { width: parent.width; height: parent.height; text: r.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; overflow: elide; }
+                        vt := Text { width: parent.width; height: parent.height; text: r.value; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; overflow: elide; }
                         vta := TouchArea { }
                         Tip { text: vt.preferred-width > vt.width ? r.value : ""; hovering: vta.has-hover; }
                     }
@@ -2294,7 +2294,7 @@ component DetailsCard inherits Vidro {
                         background: Ui.glass-control;
                         border-width: 1px;
                         border-color: Ui.glass-edge;
-                        cl := Text { width: parent.width - 16px; text: c; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 600; overflow: elide; horizontal-alignment: center; }
+                        cl := Text { width: parent.width - 16px; text: c; color: Ui.desk-text; font-size: Ui.desk-overline; font-weight: 600; overflow: elide; horizontal-alignment: center; }
                     }
                     if r.value != "": Text { text: r.value; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; vertical-alignment: center; }
                     Rectangle { horizontal-stretch: 1; }
@@ -2344,9 +2344,9 @@ component SessionsCard inherits Vidro {
             HorizontalLayout {
                 spacing: Ui.space-8;
                 if r.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-                Text { text: r.label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 700; vertical-alignment: center; }
+                Text { text: r.label; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 700; vertical-alignment: center; }
                 Text { text: r.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
-                Text { text: r.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+                Text { text: r.value; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
             }
         }
     }
@@ -2574,7 +2574,7 @@ component GameStage inherits VerticalLayout {
                 text: game.title;
                 y: (1 - intro-title) * Ui.intro-rise;
                 opacity: intro-title;
-                color: Ui.on-accent;
+                color: Ui.desk-text;
                 font-family: Ui.font-heading;
                 font-size: max(min(base, fit), 36px * Ui.text-scale);
                 // Entrelinha 1,04 do `display` (Poppins tem 1,5 de natural).
@@ -2641,12 +2641,12 @@ component GameStage inherits VerticalLayout {
         if game.install-note != "": Text {
             text: game.install-note;
             opacity: intro-actions;
-            color: game.install-warn ? Ui.warning : Ui.desk-on-muted;
+            color: game.install-warn ? Ui.desk-warning : Ui.desk-on-muted;
             font-size: Ui.desk-label-sm;
             font-weight: 500;
             wrap: word-wrap;
         }
-        if game.hint != "": Text { text: game.hint; opacity: intro-actions; color: Ui.warning; font-size: Ui.desk-label; wrap: word-wrap; }
+        if game.hint != "": Text { text: game.hint; opacity: intro-actions; color: Ui.desk-warning; font-size: Ui.desk-label; wrap: word-wrap; }
     }
     // Fileira Sobre · Detalhes · Sessões da fase 1 (o trailer fica na fase 2).
     // 248 (190 na janela pequena), crescendo se o conteúdo pedir mais: nada passa da borda do cartão.
@@ -2681,9 +2681,9 @@ component MoreRow inherits Rectangle {
         spacing: Ui.space-12;
         if info.icon != "": DeskIcon { name: info.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
         if info.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-        Text { text: info.label; width: root.label-w; color: info.icon != "" ? Ui.desk-on-subtle : Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: info.icon != "" ? 500 : 700; vertical-alignment: center; overflow: elide; }
+        Text { text: info.label; width: root.label-w; color: info.icon != "" ? Ui.desk-on-subtle : Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: info.icon != "" ? 500 : 700; vertical-alignment: center; overflow: elide; }
         if info.detail != "": Text { text: info.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
-        Text { text: info.value; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; horizontal-alignment: info.icon != "" ? left : right; }
+        Text { text: info.value; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; horizontal-alignment: info.icon != "" ? left : right; }
     }
 }
 
@@ -2739,8 +2739,8 @@ component GameMore inherits Rectangle {
             padding-left: Ui.space-12;
             padding-right: Ui.space-16;
             spacing: 6px;
-            DeskIcon { name: "chevron-up"; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
-            Text { text: more.labels[1]; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+            DeskIcon { name: "chevron-up"; size: 16px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
+            Text { text: more.labels[1]; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
         }
         bta := TouchArea {
             mouse-cursor: pointer;
@@ -3148,7 +3148,7 @@ component DeskLibrary inherits Rectangle {
                     spacing: 2px;
                     Text {
                         text: loading ? loading-label : (small ? count-short : count);
-                        color: selecting ? Ui.on-accent : Ui.desk-on-subtle;
+                        color: selecting ? Ui.desk-text : Ui.desk-on-subtle;
                         font-size: Ui.desk-label-sm;
                         font-weight: selecting ? 700 : 500;
                         vertical-alignment: center;
@@ -3207,7 +3207,7 @@ component DeskLibrary inherits Rectangle {
                                     spacing: 2px;
                                     Text {
                                         text: chip.title;
-                                        color: Ui.on-accent;
+                                        color: Ui.desk-text;
                                         font-size: 12px * Ui.text-scale;
                                         font-weight: 600;
                                         vertical-alignment: center;
@@ -3243,7 +3243,7 @@ component DeskLibrary inherits Rectangle {
                             text: clear-label;
                             font-size: 12px * Ui.text-scale;
                             font-weight: 600;
-                            color: Ui.on-accent;
+                            color: Ui.desk-text;
                             vertical-alignment: center;
                         }
                         TouchArea {
@@ -3381,7 +3381,7 @@ component DeskLibrary inherits Rectangle {
             if view == "grid": Text {
                 width: small ? 64px : self.preferred-width;
                 text: small ? count-short : count;
-                color: selecting ? Ui.on-accent : Ui.desk-on-muted;
+                color: selecting ? Ui.desk-text : Ui.desk-on-muted;
                 font-size: Ui.desk-label;
                 font-weight: selecting ? 700 : 500;
                 vertical-alignment: center;
@@ -3397,7 +3397,7 @@ component DeskLibrary inherits Rectangle {
                     padding-right: 14px;
                     spacing: 6px;
                     if !small: Text { text: group-prefix; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
-                    if !small: Text { text: group-label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+                    if !small: Text { text: group-label; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
                     DeskIcon { name: "updown"; size: 16px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                 }
                 TouchArea {
@@ -3433,7 +3433,7 @@ component DeskLibrary inherits Rectangle {
                         accessible-role: button;
                         accessible-label: view-labels[i];
                         if v == view: Selected { radius: 10px; }
-                        DeskIcon { name: i == 0 ? "list" : (i == 1 ? "grid" : "layers"); size: 18px; tint: v == view ? Ui.on-accent : Ui.desk-on-muted; }
+                        DeskIcon { name: i == 0 ? "list" : (i == 1 ? "grid" : "layers"); size: 18px; tint: v == view ? Ui.desk-text : Ui.desk-on-muted; }
                         vta := TouchArea {
                             mouse-cursor: pointer;
                             clicked => { root.clicked("view", i); }
@@ -3616,7 +3616,7 @@ component DeskSlider inherits Rectangle {
                     x: 0;
                     width: parent.width * root.shown / 100;
                     border-radius: 3px;
-                    background: root.muted ? Ui.on-accent-subtle : Ui.on-accent;
+                    background: root.muted ? Ui.desk-on-subtle : Ui.desk-text;
                 }
             }
             if root.focused: Rectangle {
@@ -3652,7 +3652,7 @@ component DeskSlider inherits Rectangle {
                 background: Ui.settings-surface;
                 border-width: 1px;
                 border-color: Ui.glass-edge-strong;
-                tipv := Text { text: round(root.drag-v) + "%"; color: Ui.on-accent; font-size: 12px; font-weight: 600; }
+                tipv := Text { text: round(root.drag-v) + "%"; color: Ui.desk-text; font-size: 12px; font-weight: 600; }
             }
             tta := TouchArea {
                 mouse-cursor: pointer;
@@ -3688,7 +3688,7 @@ component DeskSlider inherits Rectangle {
         Text {
             width: 40px;
             text: root.muted ? root.value : round(root.level) + "%";
-            color: Ui.on-accent;
+            color: Ui.desk-text;
             font-size: 13px * Ui.text-scale;
             font-weight: 600;
             horizontal-alignment: right;
@@ -3720,7 +3720,7 @@ component EmuLogo inherits Rectangle {
         border-color: Ui.glass-edge;
         Text {
             text: name == "emu-ppsspp" ? "PSP" : name == "emu-ryujinx" ? "RY" : name == "emu-cemu" ? "CE" : name == "emu-rpcs3" ? "RP" : "";
-            color: Ui.on-accent;
+            color: Ui.desk-text;
             font-size: 11px;
             font-weight: 700;
         }
@@ -3763,7 +3763,7 @@ component DeskRow inherits Rectangle {
     property <color> group-bg: DeskArt.gray ? Ui.settings-control : Ui.glass-control;
     // Grupos das Configurações usam o raio dos cartões; nos painéis de vidro, o dos controles.
     property <length> group-r: DeskArt.gray ? Ui.radius-card : Ui.radius-control;
-    property <color> fg: data.style == "danger" ? Ui.error : Ui.on-accent;
+    property <color> fg: data.style == "danger" ? Ui.desk-error : Ui.desk-text;
     height: row-h;
     opacity: data.enabled || is-header ? 1 : 0.45;
     if card: Rectangle {
@@ -3827,7 +3827,7 @@ component DeskRow inherits Rectangle {
             preferred-width: 170px;
             min-width: 70px;
             max-width: 170px;
-            Text { text: data.title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 500; wrap: word-wrap; }
+            Text { text: data.title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 500; wrap: word-wrap; }
             Text { text: data.description; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; }
         }
         // Capa atual, ou "Sem capa" tracejado (o Slint não tem traço; contorno fino).
@@ -3878,10 +3878,10 @@ component DeskRow inherits Rectangle {
                         height: h;
                         y: 12px - h;
                         border-radius: 1px;
-                        background: k < cv.level ? (cv.level == 3 ? Ui.success : (cv.level == 2 ? Ui.warning : Ui.error)) : (DeskArt.gray ? Ui.settings-separator : Ui.glass-edge-strong);
+                        background: k < cv.level ? (cv.level == 3 ? Ui.success : (cv.level == 2 ? Ui.desk-warning : Ui.desk-error)) : (DeskArt.gray ? Ui.settings-separator : Ui.glass-edge-strong);
                     }
                 }
-                Text { text: cv.confidence; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
+                Text { text: cv.confidence; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
             }
             Text { text: cv.reason; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; line-height-factor: 1.07; wrap: word-wrap; }
         }
@@ -3899,7 +3899,7 @@ component DeskRow inherits Rectangle {
                 animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                 accessible-role: button;
                 accessible-label: label + ": " + data.title;
-                pl := Text { x: 14px; text: label; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; height: parent.height; }
+                pl := Text { x: 14px; text: label; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; height: parent.height; }
                 pta := TouchArea { mouse-cursor: pointer; clicked => { root.act(k); } }
             }
         }
@@ -3920,8 +3920,8 @@ component DeskRow inherits Rectangle {
                 height: 20px;
                 border-radius: data.kind == "radio" ? self.height / 2 : 6px;
                 border-width: 2px;
-                border-color: data.on ? Ui.on-accent : Ui.desk-on-muted;
-                background: data.on ? Ui.on-accent : transparent;
+                border-color: data.on ? Ui.desk-text : Ui.desk-on-muted;
+                background: data.on ? Ui.desk-text : transparent;
                 if data.on: Rectangle {
                     width: 8px;
                     height: 8px;
@@ -3933,7 +3933,7 @@ component DeskRow inherits Rectangle {
         if data.icon != "": Rectangle {
             width: emu ? 24px : 22px;
             // Logos de loja em SVG (LojaEncontrada); os outros nomes caem no ícone comum; emuladores com o logo.
-            if !emu: DeskIcon { name: data.icon; size: 22px; tint: data.style == "danger" ? Ui.error : Ui.desk-on-muted; }
+            if !emu: DeskIcon { name: data.icon; size: 22px; tint: data.style == "danger" ? Ui.desk-error : Ui.desk-on-muted; }
             if emu: EmuLogo { name: data.icon; }
         }
         if data.image.width > 0 && data.kind != "download": Rectangle {
@@ -4039,13 +4039,13 @@ component DeskRow inherits Rectangle {
                 height: 12px;
                 border-radius: 3px;
                 border-width: 1.5px;
-                border-color: level < 0.2 ? Ui.warning : Ui.desk-on-muted;
+                border-color: level < 0.2 ? Ui.desk-warning : Ui.desk-on-muted;
                 Rectangle {
                     x: 2px;
                     width: (parent.width - 4px) * battery.level;
                     height: parent.height - 4px;
                     border-radius: 1.5px;
-                    background: battery.level < 0.2 ? Ui.warning : Ui.on-accent;
+                    background: battery.level < 0.2 ? Ui.desk-warning : Ui.desk-text;
                 }
             }
             Rectangle { x: 29px; width: 2px; height: 5px; border-radius: 1px; background: Ui.desk-on-muted; }
@@ -4075,19 +4075,19 @@ component DeskRow inherits Rectangle {
                 padding-left: 14px;
                 padding-right: 12px;
                 spacing: 12px;
-                Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                Text { text: data.value; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
                 Rectangle { width: 14px; DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
             }
         }
         // Pasta de ROMs: a ação é um link sublinhado ("Trocar").
         if card && data.value != "": Rectangle {
             width: cl.preferred-width;
-            cl := Text { text: data.value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 500; }
-            Rectangle { y: (parent.height + cl.preferred-height) / 2; height: 1px; background: Ui.on-accent; }
+            cl := Text { text: data.value; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 500; }
+            Rectangle { y: (parent.height + cl.preferred-height) / 2; height: 1px; background: Ui.desk-text; }
         }
         if !card && data.value != "" && data.value != data.action && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download": Text {
             text: data.value;
-            color: data.style == "warning" ? Ui.warning : (data.style == "error" ? Ui.error : (data.emphasized ? Ui.on-accent : Ui.desk-on-muted));
+            color: data.style == "warning" ? Ui.desk-warning : (data.style == "error" ? Ui.desk-error : (data.emphasized ? Ui.desk-text : Ui.desk-on-muted));
             // Resumo do onboarding: a quantidade em 15/600.
             font-size: bare ? Ui.desk-label : Ui.desk-label-sm;
             font-weight: data.emphasized ? 600 : 500;
@@ -4107,7 +4107,7 @@ component DeskRow inherits Rectangle {
             accessible-role: button;
             accessible-label: data.title + (data.value != "" ? (": " + data.value + ". ") : ": ") + data.action;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            al := Text { text: data.action; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
+            al := Text { text: data.action; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; }
         }
         if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && data.action == "": Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
@@ -4118,8 +4118,8 @@ component DeskRow inherits Rectangle {
         padding-top: 8px;
         padding-bottom: 8px;
         spacing: 2px;
-        if data.title != "": Text { text: data.title; color: Ui.on-accent-muted; font-size: Ui.desk-label-sm; font-weight: 600; wrap: word-wrap; }
-        if data.description != "": Text { text: data.description; color: Ui.on-accent-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
+        if data.title != "": Text { text: data.title; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 600; wrap: word-wrap; }
+        if data.description != "": Text { text: data.description; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
     }
 }
 
@@ -4150,10 +4150,10 @@ component PopupButton inherits Rectangle {
         padding-right: 18px;
         spacing: 8px;
         alignment: center;
-        if data.icon != "": DeskIcon { name: data.icon; size: 18px; tint: primary ? Ui.on-primary : (data.style == "danger" ? Ui.error : Ui.on-accent); y: (parent.height - self.height) / 2; }
+        if data.icon != "": DeskIcon { name: data.icon; size: 18px; tint: primary ? Ui.on-primary : (data.style == "danger" ? Ui.desk-error : Ui.desk-text); y: (parent.height - self.height) / 2; }
         Text {
             text: data.title;
-            color: primary ? Ui.on-primary : (data.style == "danger" ? Ui.error : Ui.on-accent);
+            color: primary ? Ui.on-primary : (data.style == "danger" ? Ui.desk-error : Ui.desk-text);
             font-size: Ui.desk-label;
             font-weight: primary ? 700 : 600;
             vertical-alignment: center;
@@ -4250,7 +4250,7 @@ component CloseButton inherits Rectangle {
     background: cta.has-hover ? Ui.glass-hover : Ui.glass-control;
     accessible-role: button;
     accessible-label: label;
-    DeskIcon { name: "close"; size: 18px; tint: Ui.on-accent; }
+    DeskIcon { name: "close"; size: 18px; tint: Ui.desk-text; }
     cta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
@@ -4269,7 +4269,7 @@ component FooterLink inherits Rectangle {
     accessible-role: button;
     accessible-label: title;
     if focused: FocusRing { radius: Ui.radius-thumb; }
-    sk := Text { text: title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; }
+    sk := Text { text: title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; }
     ska := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
@@ -4561,11 +4561,11 @@ component DeskSettings inherits Rectangle {
                         // Ícone sem fundo no lugar da miniatura do jogo, para os nomes alinharem como na lista.
                         Rectangle {
                             width: Ui.thumb-size;
-                            DeskIcon { name: c.icon; size: 22px; tint: c.selected ? Ui.on-accent : Ui.desk-on-muted; }
+                            DeskIcon { name: c.icon; size: 22px; tint: c.selected ? Ui.desk-text : Ui.desk-on-muted; }
                         }
                         Text {
                             text: c.label;
-                            color: Ui.on-accent;
+                            color: Ui.desk-text;
                             font-size: Ui.desk-label;
                             font-weight: c.selected ? 600 : 500;
                             vertical-alignment: center;
@@ -4606,12 +4606,12 @@ component DeskSettings inherits Rectangle {
                     spacing: 18px;
                     Rectangle {
                         width: 34px;
-                        DeskIcon { name: categories[category-focus].icon; size: 34px; tint: Ui.on-accent; }
+                        DeskIcon { name: categories[category-focus].icon; size: 34px; tint: Ui.desk-text; }
                     }
                     VerticalLayout {
                         alignment: center;
                         spacing: 6px;
-                        Text { text: heading; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-headline; font-weight: 700; letter-spacing: -0.01 * self.font-size; }
+                        Text { text: heading; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-headline; font-weight: 700; letter-spacing: -0.01 * self.font-size; }
                         Text { text: subtitle; color: Ui.desk-on-muted; font-size: Ui.desk-label; wrap: word-wrap; }
                     }
                 }
@@ -4653,7 +4653,7 @@ component Stepper inherits HorizontalLayout {
                 if i < current: DeskIcon { name: "tick"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                 Text {
                     text: name;
-                    color: i == current ? Ui.on-accent : (i < current ? Ui.desk-on-muted : Ui.desk-on-subtle);
+                    color: i == current ? Ui.desk-text : (i < current ? Ui.desk-on-muted : Ui.desk-on-subtle);
                     font-size: Ui.desk-label-sm;
                     font-weight: i == current ? 600 : 500;
                     vertical-alignment: center;
@@ -4676,7 +4676,7 @@ component OnbLink inherits Rectangle {
     if focused: FocusRing { radius: Ui.radius-thumb; background: transparent; }
     lt := Text {
         text: root.text;
-        color: lta.has-hover ? Ui.on-accent : Ui.desk-on-muted;
+        color: lta.has-hover ? Ui.desk-text : Ui.desk-on-muted;
         font-size: 14px * Ui.text-scale;
         font-weight: 500;
     }
@@ -4735,7 +4735,7 @@ component OnbRadio inherits Rectangle {
         VerticalLayout {
             spacing: 4px;
             horizontal-stretch: 1;
-            Text { text: data.title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; wrap: word-wrap; }
+            Text { text: data.title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; wrap: word-wrap; }
             if data.description != "": Text { text: data.description; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; wrap: word-wrap; }
         }
     }
@@ -4762,7 +4762,7 @@ component OnbCover inherits VerticalLayout {
             x: 8px;
             width: parent.width - 16px;
             text: tile.title;
-            color: Ui.on-accent;
+            color: Ui.desk-text;
             font-size: 14px;
             font-weight: 700;
             horizontal-alignment: center;
@@ -4906,7 +4906,7 @@ component ModeCard inherits Rectangle {
         width: parent.width - 36px;
         height: self.preferred-height;
         spacing: 6px;
-        Text { text: data.title; color: Ui.on-accent; font-size: 18px * Ui.text-scale; font-weight: 700; }
+        Text { text: data.title; color: Ui.desk-text; font-size: 18px * Ui.text-scale; font-weight: 700; }
         Text { text: data.description; color: Ui.desk-on-muted; font-size: 14px * Ui.text-scale; wrap: word-wrap; }
         // Para quem é cada modo, em uma linha (OnboardingModo).
         if data.value != "" && !root.compact: Text { text: data.value; color: Ui.desk-on-muted; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
@@ -4989,18 +4989,18 @@ component DeskOverlay inherits Rectangle {
                         }
                         VerticalLayout {
                             spacing: 6px; alignment: start;
-                            Text { text: ov.title; color: Ui.on-accent; font-size: 20px * Ui.text-scale; font-weight: 700; overflow: elide; }
+                            Text { text: ov.title; color: Ui.desk-text; font-size: 20px * Ui.text-scale; font-weight: 700; overflow: elide; }
                             HorizontalLayout {
                                 spacing: 4px; alignment: start;
-                                Text { text: ov.overline; color: Ui.on-accent; font-size: 13px * Ui.text-scale; font-weight: 600; }
-                                Text { text: ov.tabs2.length > 0 ? ov.tabs2[0] : ""; color: Ui.on-accent-muted; font-size: 13px * Ui.text-scale; font-weight: 500; overflow: elide; }
+                                Text { text: ov.overline; color: Ui.desk-text; font-size: 13px * Ui.text-scale; font-weight: 600; }
+                                Text { text: ov.tabs2.length > 0 ? ov.tabs2[0] : ""; color: Ui.desk-on-muted; font-size: 13px * Ui.text-scale; font-weight: 500; overflow: elide; }
                             }
                         }
                         Rectangle {
                             width: 32px; height: 32px; border-radius: 16px; background: Ui.glass-control;
                             accessible-role: button; accessible-label: root.close-label;
                             if focus-visible && ov.sel == 2: FocusRing { radius: 16px; }
-                            DeskIcon { name: "close"; size: 14px; x: 9px; y: 9px; tint: Ui.on-accent-muted; }
+                            DeskIcon { name: "close"; size: 14px; x: 9px; y: 9px; tint: Ui.desk-on-muted; }
                             TouchArea { mouse-cursor: pointer; clicked => { root.clicked("outside", 0); } }
                         }
                     }
@@ -5008,11 +5008,11 @@ component DeskOverlay inherits Rectangle {
                         spacing: 8px;
                         Rectangle {
                             height: 6px; background: #ffffff1f; border-radius: 3px; clip: true;
-                            Rectangle { width: parent.width * ov.tab / 1000; background: Ui.on-accent; border-radius: 3px; }
+                            Rectangle { width: parent.width * ov.tab / 1000; background: Ui.desk-text; border-radius: 3px; }
                         }
                         HorizontalLayout {
-                            Text { text: ov.text; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; horizontal-stretch: 1; }
-                            Text { text: ov.tabs2.length > 2 ? ov.tabs2[2] : ""; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; }
+                            Text { text: ov.text; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; horizontal-stretch: 1; }
+                            Text { text: ov.tabs2.length > 2 ? ov.tabs2[2] : ""; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; }
                         }
                     }
                     if ov.tabs.length > 0: Rectangle {
@@ -5025,11 +5025,11 @@ component DeskOverlay inherits Rectangle {
                             Text { text: ov.input-hint.to-uppercase(); color: Ui.desk-on-subtle; font-size: Ui.desk-overline; font-weight: 700; letter-spacing: 0.04 * self.font-size; }
                             VerticalLayout {
                                 spacing: 6px;
-                                for note in ov.tabs: Text { text: "•  " + note; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 500; overflow: elide; }
+                                for note in ov.tabs: Text { text: "•  " + note; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 500; overflow: elide; }
                             }
                             Rectangle {
                                 height: 24px;
-                                Text { text: ov.preview-text; color: Ui.on-accent-muted; font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; horizontal-alignment: left; width: parent.width; }
+                                Text { text: ov.preview-text; color: Ui.desk-on-muted; font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; horizontal-alignment: left; width: parent.width; }
                                 TouchArea { mouse-cursor: pointer; clicked => { root.clicked("notes", 0); } }
                             }
                         }
@@ -5037,20 +5037,20 @@ component DeskOverlay inherits Rectangle {
                     if ov.input != "": Rectangle {
                         height: warn-layout.preferred-height + 20px;
                         border-radius: Ui.radius-control;
-                        background: Ui.warning.with-alpha(0.14);
-                        border-width: 1px; border-color: Ui.warning.with-alpha(0.4);
+                        background: Ui.desk-warning.with-alpha(0.14);
+                        border-width: 1px; border-color: Ui.desk-warning.with-alpha(0.4);
                         accessible-role: text; accessible-label: ov.input;
                         warn-layout := HorizontalLayout {
                             padding: 10px; padding-left: 12px; padding-right: 12px; spacing: 10px;
-                            DeskIcon { name: "alert"; size: 18px; tint: Ui.warning; y: 1px; }
-                            Text { text: ov.input; color: Ui.on-accent; font-size: 13px * Ui.text-scale; font-weight: 500; wrap: word-wrap; horizontal-stretch: 1; }
+                            DeskIcon { name: "alert"; size: 18px; tint: Ui.desk-warning; y: 1px; }
+                            Text { text: ov.input; color: Ui.desk-text; font-size: 13px * Ui.text-scale; font-weight: 500; wrap: word-wrap; horizontal-stretch: 1; }
                         }
                     }
                     HorizontalLayout {
                         spacing: 12px; alignment: end;
                         Text {
                             text: ov.tabs2.length > 1 ? ov.tabs2[1] : "";
-                            color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500;
+                            color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500;
                             wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1;
                         }
                         for r[i] in ov.rows: PopupButton {
@@ -5099,7 +5099,7 @@ component DeskOverlay inherits Rectangle {
                         alignment: center;
                         spacing: 2px;
                         horizontal-stretch: 1;
-                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: 22px * Ui.text-scale; font-weight: 700; overflow: elide; }
+                        Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 22px * Ui.text-scale; font-weight: 700; overflow: elide; }
                         if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; }
                     }
                     CloseButton { label: close-label; y: 4px; size: 40px; clicked => { root.clicked("cancel", 0); } }
@@ -5128,7 +5128,7 @@ component DeskOverlay inherits Rectangle {
                             padding-left: 14px;
                             padding-right: 12px;
                             spacing: 8px;
-                            Text { text: ov.tab2 >= 0 && ov.tab2 < ov.tabs2.length ? ov.tabs2[ov.tab2] : ""; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                            Text { text: ov.tab2 >= 0 && ov.tab2 < ov.tabs2.length ? ov.tabs2[ov.tab2] : ""; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
                             DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                         }
                         srcta := TouchArea { mouse-cursor: pointer; clicked => { srcpop.show(); } }
@@ -5155,8 +5155,8 @@ component DeskOverlay inherits Rectangle {
                                             padding-left: 8px;
                                             padding-right: 12px;
                                             spacing: 8px;
-                                            Rectangle { width: 18px; if i == ov.tab2: DeskIcon { name: "tick"; size: 16px; tint: Ui.on-accent; } }
-                                            Text { text: s; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: i == ov.tab2 ? 600 : 500; vertical-alignment: center; }
+                                            Rectangle { width: 18px; if i == ov.tab2: DeskIcon { name: "tick"; size: 16px; tint: Ui.desk-text; } }
+                                            Text { text: s; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: i == ov.tab2 ? 600 : 500; vertical-alignment: center; }
                                         }
                                         sta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("tab2", i); } }
                                     }
@@ -5180,7 +5180,7 @@ component DeskOverlay inherits Rectangle {
                             padding-left: 14px;
                             padding-right: 12px;
                             spacing: 8px;
-                            Text { text: ov.rows[1].title + ": " + ov.rows[1].value; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                            Text { text: ov.rows[1].title + ": " + ov.rows[1].value; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
                             DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                         }
                         stta := TouchArea {
@@ -5256,7 +5256,7 @@ component DeskOverlay inherits Rectangle {
                                 height: parent.height + 8px;
                                 border-radius: 16px;
                                 border-width: 2px;
-                                border-color: Ui.on-accent;
+                                border-color: Ui.desk-text;
                             }
                             if i == ov.sel: Rectangle {
                                 x: parent.width - self.width - 8px;
@@ -5274,7 +5274,7 @@ component DeskOverlay inherits Rectangle {
                                 width: cur.preferred-width + 16px;
                                 border-radius: 11px;
                                 background: Ui.desk-canvas.with-alpha(0.85);
-                                cur := Text { text: ov.rows[6].title; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 600; }
+                                cur := Text { text: ov.rows[6].title; color: Ui.desk-text; font-size: Ui.desk-overline; font-weight: 600; }
                             }
                             tta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("thumb", i); } }
                         }
@@ -5306,7 +5306,7 @@ component DeskOverlay inherits Rectangle {
                         }
                         if ov.tab == 2 && ov.rows.length > 9 && ov.rows[9].value != "": Text {
                             text: ov.rows[9].value;
-                            color: Ui.warning;
+                            color: Ui.desk-warning;
                             font-size: Ui.desk-label-sm;
                             wrap: word-wrap;
                         }
@@ -5375,7 +5375,7 @@ component DeskOverlay inherits Rectangle {
                             font-weight: 700;
                             letter-spacing: 0.1 * self.font-size;
                         }
-                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
+                        Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
                         if ov.text != "": Text { text: ov.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; }
                     }
                     CloseButton { label: close-label; clicked => { root.clicked("outside", 0); } }
@@ -5443,7 +5443,7 @@ component DeskOverlay inherits Rectangle {
                         x: 14px;
                         width: parent.width - 28px;
                         text: t.title;
-                        color: Ui.on-accent;
+                        color: Ui.desk-text;
                         font-size: 20px;
                         font-weight: 700;
                         horizontal-alignment: center;
@@ -5479,7 +5479,7 @@ component DeskOverlay inherits Rectangle {
                 osk := HorizontalLayout {
                     padding-left: 18px;
                     padding-right: 18px;
-                    Text { text: r.title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
+                    Text { text: r.title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
                 }
                 TouchArea {
                     mouse-cursor: pointer;
@@ -5528,7 +5528,7 @@ component DeskOverlay inherits Rectangle {
                     height: 20px;
                     bt := Text {
                         text: ov.tab > 0 && bta.has-hover && ov.tabs2.length > 0 ? "‹ " + ov.tabs2[0] : ov.overline;
-                        color: bta.has-hover && ov.tab > 0 ? Ui.on-accent : Ui.desk-on-muted;
+                        color: bta.has-hover && ov.tab > 0 ? Ui.desk-text : Ui.desk-on-muted;
                         font-size: Ui.desk-label-sm;
                         font-weight: 600;
                     }
@@ -5546,12 +5546,12 @@ component DeskOverlay inherits Rectangle {
                         width: 24px;
                         height: 3px;
                         border-radius: 1.5px;
-                        background: Ui.on-accent.with-alpha(0.15);
+                        background: Ui.desk-text.with-alpha(0.15);
                         Rectangle {
                             x: 0;
                             width: i <= ov.tab ? parent.width : 0;
                             border-radius: 1.5px;
-                            background: Ui.on-accent;
+                            background: Ui.desk-text;
                             animate width { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
                         }
                     }
@@ -5560,7 +5560,7 @@ component DeskOverlay inherits Rectangle {
             // Título em duas linhas (a quebra vem do texto), 56/700.
             Text {
                 text: ov.title;
-                color: Ui.on-accent;
+                color: Ui.desk-text;
                 font-family: Ui.font-heading;
                 // Janela baixa: o título cai para 40, como no destaque da janela pequena.
                 font-size: low ? 40px * Ui.text-scale : Ui.desk-display;
@@ -5635,7 +5635,7 @@ component DeskOverlay inherits Rectangle {
                     spacing: 10px;
                     DeskIcon { y: (parent.height - self.height) / 2; name: r.icon; size: 18px; tint: Ui.desk-on-muted; }
                     Text { text: r.title; color: Ui.desk-on-muted; font-size: Ui.desk-label; font-weight: 500; vertical-alignment: center; }
-                    Text { text: r.value; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 700; vertical-alignment: center; }
+                    Text { text: r.value; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 700; vertical-alignment: center; }
                     OnbLink {
                         text: r.description;
                         underline: true;
@@ -5717,7 +5717,7 @@ component DeskOverlay inherits Rectangle {
                             letter-spacing: 0.1 * self.font-size;
                             overflow: elide;
                         }
-                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
+                        Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
                         // No largo, o jogo e as mudanças vão embaixo do título.
                         if ov.overline != "" && ov.wide: Text { text: ov.overline; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; }
                     }
@@ -5796,16 +5796,16 @@ component DeskOverlay inherits Rectangle {
                             padding-right: 10px;
                             spacing: 10px;
                             // "Instalar pela": a coluna do ✓ (16) vem antes do ícone da loja.
-                            if r.style == "offer": Rectangle { width: 16px; if r.on: DeskIcon { name: "tick"; size: 16px; tint: Ui.on-accent; } }
+                            if r.style == "offer": Rectangle { width: 16px; if r.on: DeskIcon { name: "tick"; size: 16px; tint: Ui.desk-text; } }
                             // No select, a coluna do ✓ (16) marca a atual, em peso 600.
-                            if r.key == "updates" && !r.enabled: Ring { size: 18px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
-                            if !ov.wide && (r.key != "updates" || r.enabled): DeskIcon { name: r.icon; size: 18px; tint: r.style == "success" ? Ui.success : (r.style == "warning" ? Ui.warning : (r.style == "danger" ? Ui.error : Ui.desk-on-muted)); y: (parent.height - self.height) / 2; }
-                            if ov.wide: Rectangle { width: 18px; DeskIcon { name: r.icon; size: 16px; tint: Ui.on-accent; } }
+                            if r.key == "updates" && !r.enabled: Ring { size: 18px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
+                            if !ov.wide && (r.key != "updates" || r.enabled): DeskIcon { name: r.icon; size: 18px; tint: r.style == "success" ? Ui.success : (r.style == "warning" ? Ui.desk-warning : (r.style == "danger" ? Ui.desk-error : Ui.desk-on-muted)); y: (parent.height - self.height) / 2; }
+                            if ov.wide: Rectangle { width: 18px; DeskIcon { name: r.icon; size: 16px; tint: Ui.desk-text; } }
                             if r.style == "play-status": PlayStatusDot { status: r.value; y: (parent.height - self.height) / 2; }
                             VerticalLayout {
                                 horizontal-stretch: 1; spacing: 2px; alignment: center;
                                 Text {
-                                    text: r.title; color: r.style == "danger" ? Ui.error : Ui.on-accent;
+                                    text: r.title; color: r.style == "danger" ? Ui.desk-error : Ui.desk-text;
                                     font-size: ov.wide ? 14px * Ui.text-scale : Ui.desk-label;
                                     font-weight: r.emphasized ? 600 : 500; overflow: elide;
                                 }
@@ -5854,9 +5854,9 @@ component DeskOverlay inherits Rectangle {
                     HorizontalLayout {
                         padding: 10px;
                         padding-top: 8px;
-                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: 15px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+                        Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
                         Rectangle { horizontal-stretch: 1; }
-                        Text { text: ov.overline; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
+                        Text { text: ov.overline; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
                     }
                     for r[i] in ov.rows: Rectangle {
                         height: r.description != "" ? 54px : 40px;
@@ -5874,10 +5874,10 @@ component DeskOverlay inherits Rectangle {
                                 horizontal-stretch: 1;
                                 alignment: center;
                                 spacing: 4px;
-                                Text { text: r.title; color: r.style == "done" ? Ui.on-accent-muted : Ui.on-accent; font-size: 13.5px * Ui.text-scale; font-weight: 600; overflow: elide; }
-                                if r.description != "": Text { text: r.description; color: Ui.on-accent-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
+                                Text { text: r.title; color: r.style == "done" ? Ui.desk-on-muted : Ui.desk-text; font-size: 13.5px * Ui.text-scale; font-weight: 600; overflow: elide; }
+                                if r.description != "": Text { text: r.description; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
                             }
-                            if r.value != "": Text { text: r.value; color: Ui.on-accent; font-size: 12.5px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+                            if r.value != "": Text { text: r.value; color: Ui.desk-text; font-size: 12.5px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
                             // O erro fica até resolver ou fechar: o "fechar" é um gesto à parte (→ no teclado).
                             if r.style == "warning": Rectangle {
                                 y: (parent.height - self.height) / 2;
@@ -5889,7 +5889,7 @@ component DeskOverlay inherits Rectangle {
                                 accessible-label: ov.text;
                                 accessible-action-default => { root.clicked("close", i); }
                                 if focus-visible && i == ov.sel && top-most && r.on: FocusRing { radius: 8px; }
-                                DeskIcon { name: "close"; size: 14px; tint: Ui.on-accent-muted; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                                DeskIcon { name: "close"; size: 14px; tint: Ui.desk-on-muted; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
                                 cta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("close", i); } }
                             }
                         }
@@ -5910,7 +5910,7 @@ component DeskOverlay inherits Rectangle {
                             accessible-role: button;
                             accessible-label: label;
                             accessible-action-default => { root.clicked("footer", j); }
-                            ft := Text { text: label; color: Ui.on-accent-muted; font-size: 12.5px * Ui.text-scale; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                            ft := Text { text: label; color: Ui.desk-on-muted; font-size: 12.5px * Ui.text-scale; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
                             fta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("footer", j); } }
                         }
                     }
@@ -5951,7 +5951,7 @@ component DeskOverlay inherits Rectangle {
                             letter-spacing: 0.1 * self.font-size;
                             overflow: elide;
                         }
-                        Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
+                        Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; }
                     }
                     CloseButton { label: close-label; size: 40px; clicked => { root.clicked("outside", 0); } }
                 }
@@ -5974,7 +5974,7 @@ component DeskOverlay inherits Rectangle {
                                 ctxt := Text {
                                     x: 14px;
                                     text: t;
-                                    color: Ui.on-accent;
+                                    color: Ui.desk-text;
                                     font-size: Ui.desk-label-sm;
                                     font-weight: 500;
                                     vertical-alignment: center;
@@ -6040,7 +6040,7 @@ component DeskOverlay inherits Rectangle {
                         tti := TextInput {
                             width: parent.width;
                             height: parent.height;
-                            color: Ui.on-accent;
+                            color: Ui.desk-text;
                             font-size: Ui.desk-label;
                             vertical-alignment: center;
                             single-line: true;
@@ -6073,8 +6073,8 @@ component DeskOverlay inherits Rectangle {
                                 padding-left: 12px;
                                 padding-right: 12px;
                                 spacing: 8px;
-                                if r.icon != "": DeskIcon { name: r.icon; size: 16px; tint: Ui.on-accent; y: (parent.height - self.height) / 2; }
-                                Text { text: r.title; color: Ui.on-accent; font-size: 14px * Ui.text-scale; font-weight: r.key == "create" ? 600 : 500; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                                if r.icon != "": DeskIcon { name: r.icon; size: 16px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
+                                Text { text: r.title; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: r.key == "create" ? 600 : 500; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
                                 if r.value != "": Text { text: r.value; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
                             }
                             rta := TouchArea {
@@ -6105,7 +6105,7 @@ component DeskOverlay inherits Rectangle {
                 padding: Ui.space-24;
                 spacing: 14px;
                 HorizontalLayout {
-                    Text { text: ov.title; color: Ui.on-accent; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; horizontal-stretch: 1; }
+                    Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; horizontal-stretch: 1; }
                     CloseButton { label: close-label; clicked => { root.clicked("cancel", 0); } }
                 }
                 Rectangle {
@@ -6127,7 +6127,7 @@ component DeskOverlay inherits Rectangle {
                         ki := TextInput {
                             width: parent.width;
                             height: parent.height;
-                            color: Ui.on-accent;
+                            color: Ui.desk-text;
                             font-size: Ui.desk-label;
                             vertical-alignment: center;
                             single-line: true;
@@ -6202,7 +6202,7 @@ component ProfileSessionRow inherits Rectangle {
             alignment: center;
             spacing: 6px;
             horizontal-stretch: 1;
-            Text { text: data.title; color: Ui.on-accent; font-size: Ui.desk-label-lg; font-weight: 600; overflow: elide; }
+            Text { text: data.title; color: Ui.desk-text; font-size: Ui.desk-label-lg; font-weight: 600; overflow: elide; }
             HorizontalLayout {
                 spacing: 8px;
                 if data.dot: Rectangle {
@@ -6228,7 +6228,7 @@ component ProfileSessionRow inherits Rectangle {
         Text {
             width: small ? 96px : 120px;
             text: data.value;
-            color: Ui.on-accent;
+            color: Ui.desk-text;
             font-size: Ui.desk-label;
             font-weight: 600;
             horizontal-alignment: right;
@@ -6269,7 +6269,7 @@ component ProfileTile inherits Vidro {
         VerticalLayout {
             spacing: 6px;
             Text { text: info.label; color: Ui.desk-on-muted; font-size: Ui.desk-label; font-weight: 500; overflow: elide; }
-            Text { text: info.value; color: Ui.on-accent; font-size: small ? Ui.desk-title : Ui.desk-headline; font-weight: 700; overflow: elide; }
+            Text { text: info.value; color: Ui.desk-text; font-size: small ? Ui.desk-title : Ui.desk-headline; font-weight: 700; overflow: elide; }
         }
     }
 }
@@ -6323,7 +6323,7 @@ component ProfileCard inherits Vidro {
             VerticalLayout {
                 spacing: 5px;
                 horizontal-stretch: 1;
-                Text { text: card.title; color: Ui.on-accent; font-size: Ui.desk-label-lg; font-weight: 650; overflow: elide; }
+                Text { text: card.title; color: Ui.desk-text; font-size: Ui.desk-label-lg; font-weight: 650; overflow: elide; }
                 Text { text: card.count; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; overflow: elide; }
             }
             if card.auto: Rectangle {
@@ -6339,7 +6339,7 @@ component ProfileCard inherits Vidro {
                     padding-right: 9px;
                     spacing: 5px;
                     DeskIcon { name: "layers"; size: 13px; y: (parent.height - self.height) / 2; }
-                    Text { text: auto-label; color: Ui.on-accent; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
+                    Text { text: auto-label; color: Ui.desk-text; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
                 }
             }
         }
@@ -6429,7 +6429,7 @@ component DeskProfileScreen inherits Rectangle {
                         animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                         border-width: 1px;
                         border-color: #ffffff2e;
-                        Text { text: p.initial; color: Ui.on-accent; font-size: avatar * 0.42; font-weight: 700; }
+                        Text { text: p.initial; color: Ui.desk-text; font-size: avatar * 0.42; font-weight: 700; }
                     }
                     if p.playing: Rectangle {
                         x: parent.width - self.width - 6px;
@@ -6450,7 +6450,7 @@ component DeskProfileScreen inherits Rectangle {
                         text: p.name;
                         accessible-role: text;
                         accessible-label: p.name;
-                        color: Ui.on-accent;
+                        color: Ui.desk-text;
                         font-size: small ? Ui.desk-headline * 1.3 : Ui.desk-display;
                         font-weight: 800;
                         letter-spacing: -0.025 * self.font-size;
@@ -6471,7 +6471,7 @@ component DeskProfileScreen inherits Rectangle {
                             }
                             Text {
                                 text: it.label;
-                                color: it.dot ? Ui.on-accent : Ui.desk-on-muted;
+                                color: it.dot ? Ui.desk-text : Ui.desk-on-muted;
                                 font-size: small ? Ui.desk-label : Ui.desk-label-lg;
                                 font-weight: 500;
                                 vertical-alignment: center;
@@ -6494,7 +6494,7 @@ component DeskProfileScreen inherits Rectangle {
                     tt := Text {
                         y: 10px;
                         text: t;
-                        color: i == p.tab || tta.has-hover || focused ? Ui.on-accent : Ui.desk-on-muted;
+                        color: i == p.tab || tta.has-hover || focused ? Ui.desk-text : Ui.desk-on-muted;
                         font-size: small ? Ui.desk-label-lg : Ui.desk-title;
                         font-weight: i == p.tab ? 650 : 500;
                         animate color { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
@@ -6503,7 +6503,7 @@ component DeskProfileScreen inherits Rectangle {
                         y: parent.height - self.height;
                         height: 3px;
                         border-radius: 2px;
-                        background: Ui.on-accent;
+                        background: Ui.desk-text;
                     }
                     tta := TouchArea {
                         mouse-cursor: pointer;
@@ -6538,7 +6538,7 @@ component DeskProfileScreen inherits Rectangle {
                         background: Ui.glass-panel-dense;
                         border-width: 1px;
                         border-color: Ui.glass-edge-strong;
-                        an := Text { text: a.label; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 600; }
+                        an := Text { text: a.label; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; }
                     }
                 }
             }
@@ -6564,7 +6564,7 @@ component DeskProfileScreen inherits Rectangle {
                             spacing: 14px;
                             HorizontalLayout {
                                 Text { text: p.week-label; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-stretch: 1; }
-                                Text { text: p.week-total; color: Ui.on-accent; font-size: Ui.desk-label-sm; font-weight: 650; }
+                                Text { text: p.week-total; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 650; }
                             }
                             Rectangle {
                                 vertical-stretch: 1;
@@ -6583,7 +6583,7 @@ component DeskProfileScreen inherits Rectangle {
                                     Text {
                                         y: parent.height - self.height;
                                         text: b.label;
-                                        color: b.today ? Ui.on-accent : Ui.desk-on-muted;
+                                        color: b.today ? Ui.desk-text : Ui.desk-on-muted;
                                         font-size: Ui.desk-overline * 0.92;
                                         font-weight: 600;
                                     }
@@ -6604,7 +6604,7 @@ component DeskProfileScreen inherits Rectangle {
                                         x: max(-parent.x, min((parent.width - self.width) / 2, parent.right-room - self.width));
                                         y: parent.height - parent.label-h - 14px - parent.room * b.fraction - self.height;
                                         text: b.value;
-                                        color: Ui.on-accent;
+                                        color: Ui.desk-text;
                                         font-size: Ui.desk-overline;
                                         font-weight: 700;
                                         wrap: no-wrap;
@@ -6631,7 +6631,7 @@ component DeskProfileScreen inherits Rectangle {
                                     spacing: 8px;
                                     HorizontalLayout {
                                         spacing: 8px;
-                                        Text { text: e.title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                                        Text { text: e.title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
                                         Text { text: e.value; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; }
                                     }
                                     Rectangle {
@@ -6680,7 +6680,7 @@ component DeskProfileScreen inherits Rectangle {
                 HorizontalLayout {
                     padding-top: small ? 20px : 34px;
                     padding-bottom: 12px;
-                    Text { text: p.recent-title; color: Ui.on-accent; font-size: Ui.desk-title; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; accessible-role: text; }
+                    Text { text: p.recent-title; color: Ui.desk-text; font-size: Ui.desk-title; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; accessible-role: text; }
                     if p.recent.length > 0: Rectangle {
                         width: sl.preferred-width + 12px;
                         border-radius: Ui.radius-thumb;
@@ -6690,7 +6690,7 @@ component DeskProfileScreen inherits Rectangle {
                         sl := HorizontalLayout {
                             alignment: center;
                             spacing: 2px;
-                            Text { text: p.see-all; color: sla.has-hover ? Ui.on-accent : Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
+                            Text { text: p.see-all; color: sla.has-hover ? Ui.desk-text : Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
                             DeskIcon { name: "chevron"; size: 15px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
                         }
                         sla := TouchArea {
@@ -6777,7 +6777,7 @@ component DeskProfileScreen inherits Rectangle {
                                 padding-top: 18px;
                                 padding-bottom: 8px;
                                 spacing: 10px;
-                                Text { text: e.title; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 700; }
+                                Text { text: e.title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 700; }
                                 Text { text: e.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-stretch: 1; }
                                 Text { text: e.value; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 600; }
                             }
@@ -6852,7 +6852,7 @@ component DeskProfileScreen inherits Rectangle {
                                 alignment: center;
                                 DeskIcon { name: "plus"; size: 24px; }
                             }
-                            Text { text: p.new-label; color: Ui.on-accent; font-size: Ui.desk-label-lg; font-weight: 650; horizontal-alignment: center; overflow: elide; }
+                            Text { text: p.new-label; color: Ui.desk-text; font-size: Ui.desk-label-lg; font-weight: 650; horizontal-alignment: center; overflow: elide; }
                             Text { text: p.new-text; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-alignment: center; wrap: word-wrap; }
                         }
                         nta := TouchArea {
@@ -6933,7 +6933,7 @@ component ArtLayer inherits Rectangle {
                 y: -parent.height * 0.35;
                 width: parent.width * 0.7;
                 height: parent.width * 0.7;
-                background: @radial-gradient(circle, Ui.on-accent.with-alpha(0.08) 0%, Ui.on-accent.with-alpha(0) 70%);
+                background: @radial-gradient(circle, Ui.desk-text.with-alpha(0.08) 0%, Ui.desk-text.with-alpha(0) 70%);
             }
         }
         if !Ui.has-custom-background && DeskArt.has-art: Rectangle {
@@ -7496,11 +7496,11 @@ export component Desktop inherits Window {
             if !desk-toast-mascot: DeskIcon {
                 name: desk-toast-kind == "success" ? "check" : (desk-toast-kind == "warning" ? "alert" : (desk-toast-kind == "error" ? "error" : "info"));
                 size: 18px;
-                tint: desk-toast-kind == "success" ? Ui.success : (desk-toast-kind == "warning" ? Ui.warning : (desk-toast-kind == "error" ? Ui.error : Ui.on-accent));
+                tint: desk-toast-kind == "success" ? Ui.success : (desk-toast-kind == "warning" ? Ui.desk-warning : (desk-toast-kind == "error" ? Ui.desk-error : Ui.desk-text));
                 y: (parent.height - self.height) / 2;
             }
             if desk-toast-mascot: Octopus { y: (parent.height - self.height) / 2; width: 34px; with-name: false; self-assemble: true; accessible-role: none; }
-            Text { text: toast-shown; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+            Text { text: toast-shown; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
             // "Desfazer" das ações em lote: texto clicável à direita, sem roubar o foco.
             if desk-toast-undo != "": Rectangle {
                 width: ut.preferred-width + 16px;
@@ -7510,7 +7510,7 @@ export component Desktop inherits Window {
                 background: uta.has-hover ? Ui.glass-hover : transparent;
                 accessible-role: button;
                 accessible-label: desk-toast-undo;
-                ut := Text { text: desk-toast-undo; color: Ui.on-accent; font-size: Ui.desk-label; font-weight: 700; }
+                ut := Text { text: desk-toast-undo; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 700; }
                 uta := TouchArea {
                     mouse-cursor: pointer;
                     changed has-hover => { root.hovered("toast", self.has-hover ? 3 : 2); }

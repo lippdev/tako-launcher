@@ -5,6 +5,7 @@ pub(crate) mod app_updates;
 pub mod art;
 pub mod bridge;
 pub mod demo;
+pub mod desk_theme;
 pub mod discord;
 pub mod effects;
 pub mod gamepad;

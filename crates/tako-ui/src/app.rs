@@ -712,7 +712,11 @@ fn custom_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presenta
 }
 
 fn fallback_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presentation::Rgb> {
-    (mode != UiMode::Desktop && !ctx.theme_loaded_from_fallback)
+    // No desktop, o fundo sem arte tinge com a cor de destaque escolhida.
+    if mode == UiMode::Desktop {
+        return Some(crate::desk_theme::accent(&ctx.settings));
+    }
+    (!ctx.theme_loaded_from_fallback)
         .then(|| theme_accent(ctx))
         .flatten()
 }
@@ -1791,6 +1795,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     let color = |c: tako_core::presentation::color::Rgb| slint::Color::from_rgb_u8(c.r, c.g, c.b);
     bridge::set_global(ui, "Ui", "accent", color(palette.accent).to_value());
     bridge::set_global(ui, "Ui", "accent-deep", color(palette.deep).to_value());
+    crate::desk_theme::apply(ui, &s.ctx.settings);
     bridge::set_global(ui, "Ui", "pointer", s.ctx.pointer.to_value());
     bridge::set_global(
         ui,
@@ -1868,7 +1873,11 @@ mod tests {
         ctx.persisted_theme_accent = Some(tako_core::presentation::Rgb::new(255, 0, 0));
         ctx.base_theme_accent = Some(tako_core::presentation::Rgb::new(0, 255, 0));
         assert_eq!(custom_accent_for_mode(&ctx, UiMode::Desktop), None);
-        assert_eq!(fallback_accent_for_mode(&ctx, UiMode::Desktop), None);
+        // O desktop ignora a cor do tema da tela cheia e usa a do tema do desktop (pedra, no TAKO).
+        assert_eq!(
+            fallback_accent_for_mode(&ctx, UiMode::Desktop),
+            Some(crate::desk_theme::STONE)
+        );
         assert_eq!(
             custom_accent_for_mode(&ctx, UiMode::BigPicture),
             ctx.persisted_theme_accent
