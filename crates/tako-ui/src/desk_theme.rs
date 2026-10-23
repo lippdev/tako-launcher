@@ -7,8 +7,8 @@ use tako_core::presentation::Rgb;
 
 pub const THEME: &str = "DesktopTheme";
 pub const ACCENT: &str = "DesktopAccent";
-/// "Cores da arte do jogo" (só no TAKO): é o mesmo ajuste da antiga "Cor dinâmica".
-pub const ART_COLORS: &str = crate::shell::ctx::keys::DYNAMIC_COLOR;
+/// "Cores da arte do jogo" (só no TAKO, ligado por padrão); a "Cor dinâmica" da tela cheia é outro ajuste.
+pub const ART_COLORS: &str = crate::shell::ctx::keys::DESKTOP_ART_COLORS;
 pub const GLASS_AMBIENT: &str = "DesktopGlassAmbient";
 pub const GLASS_OPACITY: &str = "DesktopGlassOpacity";
 pub const GLASS_PILL: &str = "DesktopGlassPill";
@@ -78,11 +78,14 @@ fn on_accent(accent: Rgb) -> Rgb {
     }
 }
 
-/// O destaque que vale na tela: no TAKO com "Cores da arte do jogo" ligado (padrão) e arte com cor, a cor da arte;
-/// senão a escolhida (a pedra, por padrão).
+/// O destaque que vale na tela. No TAKO é a cor da arte do jogo (com "Cores da arte do jogo" ligado e arte com cor)
+/// ou a pedra do logo; nos outros temas, a escolhida.
 pub fn effective_accent(settings: &Settings, art: Option<Rgb>) -> Rgb {
-    let from_art = theme(settings) == 0 && settings.bool(ART_COLORS, true);
-    art.filter(|_| from_art).unwrap_or_else(|| accent(settings))
+    if theme(settings) != 0 {
+        return accent(settings);
+    }
+    art.filter(|_| settings.bool(ART_COLORS, true))
+        .unwrap_or(STONE)
 }
 
 /// Entrega ao Slint o que o tema escolhe; o `Ui` calcula as cores. `art` é a cor da arte do jogo na tela.
@@ -147,9 +150,29 @@ mod tests {
             effective_accent(&settings(&[(ART_COLORS, "false")]), art),
             STONE
         );
+        // No TAKO a cor escolhida não vale: é a da arte ou a pedra.
+        let orange = (ACCENT, "#ff8a3d");
+        assert_eq!(effective_accent(&settings(&[orange]), art), blue);
+        assert_eq!(effective_accent(&settings(&[orange]), None), STONE);
+        assert_eq!(
+            effective_accent(&settings(&[orange, (ART_COLORS, "false")]), art),
+            STONE
+        );
+        // A tela cheia desligar a "Cor dinâmica" não mexe nas cores da arte do desktop.
+        assert_eq!(
+            effective_accent(
+                &settings(&[(crate::shell::ctx::keys::DYNAMIC_COLOR, "false")]),
+                art
+            ),
+            blue
+        );
         assert_eq!(
             effective_accent(&settings(&[(THEME, "dark")]), art),
             ACCENTS[5].0
+        );
+        assert_eq!(
+            effective_accent(&settings(&[(THEME, "glass"), orange]), art),
+            ACCENTS[1].0
         );
     }
 

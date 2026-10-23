@@ -198,6 +198,8 @@ pub fn button_glyph(pad: PadFamily, b: GamepadButtons) -> &'static str {
 /// Nomes das configurações (iguais aos das alphas C#, para a migração).
 pub mod keys {
     pub const DYNAMIC_COLOR: &str = "DynamicColor";
+    /// Desktop, tema TAKO: "Cores da arte do jogo" (a tela cheia tem a sua, `DYNAMIC_COLOR`). Ligado por padrão.
+    pub const DESKTOP_ART_COLORS: &str = "DesktopArtColors";
     pub const REDUCED_MOTION: &str = "ReducedMotion";
     /// Modo desktop: sem vidro (tema `solido`), para quem prefere superfícies opacas.
     pub const REDUCED_TRANSPARENCY: &str = "ReducedTransparency";

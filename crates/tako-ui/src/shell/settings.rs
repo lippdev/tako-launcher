@@ -2002,13 +2002,7 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             }
         }),
     );
-    items.extend([toggle(
-        ctx,
-        "settings.appearance.motion",
-        keys::REDUCED_MOTION,
-        false,
-    )]);
-    // "Cor dinâmica" da tela cheia; no desktop vira "Cores da arte do jogo", só no TAKO (desk_theme).
+    // "Cor dinâmica" é da tela cheia; o desktop tem "Cores da arte do jogo" no tema TAKO (desk_theme).
     if !ctx.desktop {
         items.push(toggle(
             ctx,
@@ -2017,6 +2011,12 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             true,
         ));
     }
+    items.push(toggle(
+        ctx,
+        "settings.appearance.motion",
+        keys::REDUCED_MOTION,
+        false,
+    ));
     items
         .into_iter()
         // Tema, cor de destaque e Liquid Glass (só no desktop).
