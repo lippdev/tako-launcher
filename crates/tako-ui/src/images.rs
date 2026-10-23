@@ -47,6 +47,8 @@ struct Lru {
     bytes: usize,
     limit: usize,
     frame: u64,
+    /// Chaves tiradas pelo teto, até o `State` apagar o que guarda delas (luminância e cor de destaque).
+    evicted: Vec<String>,
 }
 
 impl Lru {
@@ -57,6 +59,7 @@ impl Lru {
             bytes: 0,
             limit,
             frame: 0,
+            evicted: Vec::new(),
         }
     }
     fn get(&mut self, key: &str) -> Option<Image> {
@@ -97,6 +100,7 @@ impl Lru {
                 && let Some((_, b, _)) = self.map.remove(&old)
             {
                 self.bytes -= b;
+                self.evicted.push(old);
             }
         }
     }
@@ -148,6 +152,16 @@ struct State {
     /// fundo que estão na tela (regressão da alpha.15).
     icon_tx: Option<Queue>,
     on_ready: Option<Box<dyn Fn()>>,
+}
+
+impl State {
+    /// Quem saiu do LRU leva junto a luminância e a cor de destaque: os mapas não crescem sem limite.
+    fn forget_evicted(&mut self) {
+        for key in self.lru.evicted.drain(..) {
+            self.lum.remove(&key);
+            self.accent.remove(&key);
+        }
+    }
 }
 
 thread_local! {
@@ -303,7 +317,11 @@ pub fn is_pending(uri: &str) -> bool {
 
 /// Chamar depois de montar cada quadro (todas as `get` da tela já feitas).
 pub fn frame_done() {
-    STATE.with(|s| s.borrow_mut().lru.frame_done());
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.lru.frame_done();
+        s.forget_evicted();
+    });
 }
 
 /// Esquece falhas (ex.: depois de baixar novas artes).
@@ -339,6 +357,7 @@ fn worker(queue: Queue, resolver: Resolver) {
                             s.accent.insert(key.clone(), accent);
                         }
                         s.lru.insert(key, shared(buf), bytes);
+                        s.forget_evicted();
                     }
                     None => {
                         s.failed.insert(key, Instant::now());
@@ -757,5 +776,23 @@ mod tests {
         assert!(l.get("c").is_some());
         l.frame_done();
         assert_eq!((l.map.contains_key("b"), l.bytes), (false, 6));
+    }
+
+    #[test]
+    fn evicted_images_take_their_luminance_and_accent_with_them() {
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.lru = Lru::new(10);
+            for key in ["a", "b"] {
+                s.lum.insert(key.into(), vec![0.5]);
+                s.accent.insert(key.into(), None);
+                s.lru.insert(key.into(), Image::default(), 6);
+                s.lru.frame_done();
+            }
+            s.lru.frame_done();
+            s.forget_evicted();
+            assert_eq!(s.lum.keys().collect::<Vec<_>>(), ["b"]);
+            assert_eq!(s.accent.keys().collect::<Vec<_>>(), ["b"]);
+        });
     }
 }
