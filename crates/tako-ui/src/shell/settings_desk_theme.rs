@@ -24,6 +24,14 @@ pub(super) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
         )
         .on(custom_accent),
     ];
+    if theme == 0 {
+        rows.push(toggle(
+            ctx,
+            "settings.appearance.art_colors",
+            dt::ART_COLORS,
+            true,
+        ));
+    }
     if theme == GLASS {
         rows.extend([
             toggle(

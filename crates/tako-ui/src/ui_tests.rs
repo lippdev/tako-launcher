@@ -910,6 +910,10 @@ fn desktop_snapshot() {
             )
         };
         let art = std::env::var("TAKO_SNAP_ART").ok().map(load_art);
+        let art_accent = std::env::var("TAKO_SNAP_ART")
+            .ok()
+            .and_then(|p| image::open(p).ok())
+            .and_then(|img| crate::images::sample_accent(&img));
         // `TAKO_SNAP_SWITCH=game:3` (com `TAKO_SNAP_ART2=<imagem>`): depois da captura, troca de jogo e grava
         // `TAKO_SNAP_FRAMES` quadros (padrão 24) em `desktop-<w>x<h>-sNN.png`, com o accent de cada jogo;
         // `TAKO_SNAP_SWITCH=intro` grava a entrada do app em `iNN`.
@@ -1548,7 +1552,7 @@ created-by-tako = true
                 crate::bridge::set(&ui, name, value);
             }
             // O que o `App` entrega ao `Ui` fora do `render`.
-            crate::desk_theme::apply(&ui, &shell.ctx.settings);
+            crate::desk_theme::apply(&ui, &shell.ctx.settings, art_accent);
             let motion = shell
                 .ctx
                 .settings

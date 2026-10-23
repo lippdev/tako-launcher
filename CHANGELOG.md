@@ -6,6 +6,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 ### Novidades
 - **Marca nova no desktop:** o polvo, a palavra TAKO e タコ na barra de cima, o polvo como ícone do app (janela do desktop, instalador e pacotes, sobre uma placa escura) e ícones novos de traço fino na interface do desktop. A tela cheia não muda.
+- **Cores da arte do jogo (TAKO):** no tema TAKO, o destaque e os brilhos de canto da janela pegam a cor mais forte da arte do jogo na tela e deslizam para a nova em 1 s. Dá para desligar em Configurações › Aparência; desligado (ou sem arte), vale a cor escolhida, a pedra do logo por padrão.
 - **Temas e cor de destaque no desktop:** em Configurações › Aparência, escolha TAKO (o novo padrão), Escuro, Meia-noite, Preto OLED ou Liquid Glass (com arte como luz ambiente, opacidade e controles em pílula) e a cor de destaque, inclusive uma cor própria. As cores, os raios e os tempos de animação seguem o novo design system; a tela cheia não muda.
 - **Atividades na barra de cima:** uma pílula antes do perfil mostra o que o Tako faz em segundo plano (atualizar a biblioteca, procurar atualização, downloads, capas), com o andamento, o resumo ao concluir e "Tentar de novo" no erro; clicar abre a lista "Atividades".
 - **ScreenScraper com a sua conta de desenvolvedor:** quem tem credenciais de desenvolvedor do ScreenScraper pode colocá-las nas Configurações e usar o ScreenScraper mesmo em versões que não as trazem.

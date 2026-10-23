@@ -1798,7 +1798,11 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     let color = |c: tako_core::presentation::color::Rgb| slint::Color::from_rgb_u8(c.r, c.g, c.b);
     bridge::set_global(ui, "Ui", "accent", color(palette.accent).to_value());
     bridge::set_global(ui, "Ui", "accent-deep", color(palette.deep).to_value());
-    crate::desk_theme::apply(ui, &s.ctx.settings);
+    // A cor da arte do jogo na tela (já amostrada junto da cópia de vidro, na thread de fundo).
+    let art_accent = game
+        .and_then(|g| g.shown_hero())
+        .and_then(images::art_accent);
+    crate::desk_theme::apply(ui, &s.ctx.settings, art_accent);
     bridge::set_global(ui, "Ui", "pointer", s.ctx.pointer.to_value());
     bridge::set_global(
         ui,
