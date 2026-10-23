@@ -106,8 +106,8 @@ begin
   Result := WizardSilent and (ExpandConstant('{param:NOLAUNCH|0}') = '0');
 end;
 
-; O disable compartilhado restaura HKCU/Dev Mode e remove apenas o certificado salvo.
 [UninstallRun]
+; O disable compartilhado restaura HKCU/Dev Mode e remove apenas o certificado salvo.
 Filename: "{app}\{#AppExe}"; Parameters: "--fse-setup disable"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "RestoreFse"
 
 [UninstallDelete]
