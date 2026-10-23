@@ -69,9 +69,13 @@ fn opacity(position: i32) -> f64 {
     f64::from(2 + position * 18 / 100) / 100.0
 }
 
-/// Texto sobre o destaque: escuro (#14110f) quando ele é claro (luminância > 0,6), branco nos outros.
+/// Texto sobre o destaque: escuro (#14110f) quando ele é claro (luma > 0,6), branco nos outros. Luma perceptual
+/// (0,299 R + 0,587 G + 0,114 B) como nas prévias: pela luminância WCAG a pedra daria texto branco a 1,7:1.
 fn on_accent(accent: Rgb) -> Rgb {
-    if accent.luminance() > 0.6 {
+    let luma =
+        (0.299 * f64::from(accent.r) + 0.587 * f64::from(accent.g) + 0.114 * f64::from(accent.b))
+            / 255.0;
+    if luma > 0.6 {
         Rgb::new(0x14, 0x11, 0x0f)
     } else {
         Rgb::WHITE
@@ -188,10 +192,10 @@ mod tests {
     #[test]
     fn light_accents_get_dark_text() {
         let dark = Rgb::new(0x14, 0x11, 0x0f);
-        assert_eq!(on_accent(STONE), Rgb::WHITE); // luminância 0,58: ainda abaixo de 0,6
+        assert_eq!(on_accent(STONE), dark); // luma 0,80
         assert_eq!(on_accent(ACCENTS[2].0), dark); // ouro
         assert_eq!(on_accent(ACCENTS[8].0), dark); // branco
-        assert_eq!(on_accent(ACCENTS[1].0), Rgb::WHITE); // laranja
+        assert_eq!(on_accent(ACCENTS[1].0), dark); // laranja, luma 0,64
         assert_eq!(on_accent(ACCENTS[5].0), Rgb::WHITE); // azul
     }
 }

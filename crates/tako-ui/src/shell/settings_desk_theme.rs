@@ -14,17 +14,21 @@ pub(super) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     let mut rows = vec![
         MenuItem::new(PanelRow::header(ctx.t(&format!("{T}desk_header")))),
         theme_row(ctx, theme),
-        accent_row(ctx),
-        MenuItem::new(
-            PanelRow::action(
-                "desk-accent-custom",
-                ctx.t(&format!("{T}desk_accent_custom")),
-            )
-            .value(dt::accent(&ctx.settings).to_string()),
-        )
-        .on(custom_accent),
     ];
-    if theme == 0 {
+    // No TAKO o destaque vem da arte (ou é a pedra); a cor escolhida só vale nos outros temas.
+    if theme != 0 {
+        rows.push(accent_row(ctx));
+        rows.push(
+            MenuItem::new(
+                PanelRow::action(
+                    "desk-accent-custom",
+                    ctx.t(&format!("{T}desk_accent_custom")),
+                )
+                .value(dt::accent(&ctx.settings).to_string()),
+            )
+            .on(custom_accent),
+        );
+    } else {
         rows.push(toggle(
             ctx,
             "settings.appearance.art_colors",
