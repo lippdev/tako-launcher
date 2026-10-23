@@ -32,7 +32,6 @@ pub(super) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                 dt::GLASS_AMBIENT,
                 true,
             ),
-            slider_row(ctx, "glass-blur", "glass_blur", dt::GLASS_BLUR, 34),
             slider_row(ctx, "glass-opacity", "glass_opacity", dt::GLASS_OPACITY, 28),
             toggle(ctx, "settings.appearance.glass_pill", dt::GLASS_PILL, true),
         ]);
@@ -119,7 +118,7 @@ fn custom_accent(ctx: &mut Ctx) -> Flow {
     ))
 }
 
-/// Deslizante de 0 a 100 que o `desk_theme` converte para a faixa do design (desfoque 12–60, opacidade 2–20%).
+/// Deslizante de 0 a 100 que o `desk_theme` converte para a faixa do design (opacidade 2–20%).
 fn slider_row(ctx: &Ctx, id: &str, text: &str, key: &'static str, default: i32) -> MenuItem {
     let value = dt::slider(&ctx.settings, key, default);
     MenuItem::new(
@@ -131,6 +130,15 @@ fn slider_row(ctx: &Ctx, id: &str, text: &str, key: &'static str, default: i32) 
     )
     .on_slide(move |ctx, v, _done| {
         ctx.settings.set(key, &v.to_string());
+        ctx.dirty = true;
+        Flow::Stay
+    })
+    // ← → andam 10.
+    .on_adjust(move |ctx, direction| {
+        let next =
+            (dt::slider(&ctx.settings, key, default) + direction.signum() * 10).clamp(0, 100);
+        ctx.settings.set(key, &next.to_string());
+        ctx.dirty = true;
         Flow::Stay
     })
 }

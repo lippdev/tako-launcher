@@ -712,11 +712,7 @@ fn custom_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presenta
 }
 
 fn fallback_accent_for_mode(ctx: &Ctx, mode: UiMode) -> Option<tako_core::presentation::Rgb> {
-    // No desktop, o fundo sem arte tinge com a cor de destaque escolhida.
-    if mode == UiMode::Desktop {
-        return Some(crate::desk_theme::accent(&ctx.settings));
-    }
-    (!ctx.theme_loaded_from_fallback)
+    (mode != UiMode::Desktop && !ctx.theme_loaded_from_fallback)
         .then(|| theme_accent(ctx))
         .flatten()
 }
@@ -1783,7 +1779,14 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     };
     let custom_accent = custom_accent_for_mode(&s.ctx, mode);
     let fallback_accent = custom_accent.or_else(|| fallback_accent_for_mode(&s.ctx, mode));
-    let palette = if let Some(custom) = custom_accent {
+    let palette = if s.ctx.desktop {
+        // No desktop a cor vem só do tema do desktop (a escolhida): a do jogo e a da tela cheia não entram.
+        AccentPalette::for_accent_with_fallback(
+            None,
+            false,
+            Some(crate::desk_theme::accent(&s.ctx.settings)),
+        )
+    } else if let Some(custom) = custom_accent {
         AccentPalette::for_accent_with_fallback(None, false, Some(custom))
     } else {
         AccentPalette::for_accent_with_fallback(
@@ -1873,11 +1876,7 @@ mod tests {
         ctx.persisted_theme_accent = Some(tako_core::presentation::Rgb::new(255, 0, 0));
         ctx.base_theme_accent = Some(tako_core::presentation::Rgb::new(0, 255, 0));
         assert_eq!(custom_accent_for_mode(&ctx, UiMode::Desktop), None);
-        // O desktop ignora a cor do tema da tela cheia e usa a do tema do desktop (pedra, no TAKO).
-        assert_eq!(
-            fallback_accent_for_mode(&ctx, UiMode::Desktop),
-            Some(crate::desk_theme::STONE)
-        );
+        assert_eq!(fallback_accent_for_mode(&ctx, UiMode::Desktop), None);
         assert_eq!(
             custom_accent_for_mode(&ctx, UiMode::BigPicture),
             ctx.persisted_theme_accent

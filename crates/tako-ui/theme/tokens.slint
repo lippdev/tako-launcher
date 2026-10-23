@@ -70,9 +70,9 @@ export global Ui {
     // colunas do tokens.json nessa ordem + a sólida (5), que o Liquid Glass usa com "Reduzir transparência".
     in property <int> desk-theme: 0;
     in property <bool> reduce-transparency: false;
-    // Opções do Liquid Glass: opacidade das superfícies (2–20%), desfoque (12–60) e controles em pílula.
+    // Opções do Liquid Glass: opacidade das superfícies (2–20%), controles em pílula e a arte como luz ambiente
+    // (desligada, a luz e o fundo do vidro usam a cor de destaque). O desfoque (12–60) fica para a etapa de camadas.
     in property <float> glass-opacity: 0.07;
-    in property <length> glass-blur: 28px;
     in property <bool> glass-pill: true;
     in property <bool> glass-ambient: true;
     out property <int> desk-variant: (desk-theme == 4 && reduce-transparency) ? 5 : desk-theme;
@@ -96,6 +96,8 @@ export global Ui {
     // Brilhos de canto da janela: a cor de destaque a 7% (cima à esquerda) e 4% (baixo à direita).
     out property <color> ambient-1: desk-accent.with-alpha(0.07);
     out property <color> ambient-2: desk-accent.with-alpha(0.04);
+    // Texto sobre o destaque: escuro (#14110f) quando ele é claro (luminância > 0,6), branco nos outros (o Tako decide).
+    in-out property <color> desk-on-accent: #ffffff;
     out property <color> desk-warning: #ffcf4d;
     out property <color> desk-error: #ff7b7b;
     out property <color> wish: #ff5d7a;
@@ -108,7 +110,7 @@ export global Ui {
     out property <color> on-primary: #111216;
 
     // Apelidos dos nomes antigos, com os valores novos.
-    out property <color> settings-bg: desk-canvas;
+    out property <color> settings-bg: [#0b0b0e, #0a0a0a, #0a0a0a, #0a0a0a, #07080c, #07080c][desk-variant];
     out property <color> settings-surface: surface;
     out property <color> settings-separator: line;
     out property <color> settings-control: tile;
@@ -123,7 +125,7 @@ export global Ui {
     // Reflexos só no Liquid Glass.
     out property <color> glass-highlight: desk-variant == 4 ? #ffffff24 : #ffffff00;
     out property <color> glass-specular: desk-variant == 4 ? #ffffff24 : #ffffff00;
-    out property <color> glass-edge: line-strong;
+    out property <color> glass-edge: desk-theme == 4 ? #ffffff21 : line-strong;
     out property <color> glass-control: [#0e0e11, #0e0e0e, #0e0e0e, #0e0e0e, #ffffff1a, #141519][desk-variant];
     out property <color> glass-hover: desk-variant == 4 ? #ffffff29 : #ffffff0d;
     out property <color> glass-selected: desk-variant == 4 ? #ffffff1f : #ffffff17;
@@ -190,9 +192,11 @@ export global Ui {
     out property <length> space-48: 48px;
     out property <length> radius-icon: 7px;
     out property <length> radius-thumb: 7px;
-    out property <length> radius-control: 9px;
+    // Liquid Glass com "Controles em pílula": controles e botões ficam totalmente redondos.
+    property <bool> pill: desk-theme == 4 && glass-pill;
+    out property <length> radius-control: pill ? 999px : 9px;
     out property <length> radius-row: 10px;
-    out property <length> radius-button: 11px;
+    out property <length> radius-button: pill ? 999px : 11px;
     out property <length> radius-card: 16px;
     out property <length> radius-hero: 18px;
     out property <length> radius-full: 999px;
@@ -218,8 +222,8 @@ export global Ui {
     out property <length> glass-light-height: 380px;
     out property <length> glass-highlight-height: 150px;
 
-    // Tempo (MovimentoBase): o hover fica com "Reduzir animações" (é só cor); o resto zera.
-    out property <duration> tempo-hover: 200ms;
+    // Tempo (MovimentoBase): com "Reduzir animações" tudo vira 0.
+    out property <duration> tempo-hover: reduce-motion ? 0ms : 200ms;
     out property <duration> tempo-foco: reduce-motion ? 0ms : 150ms;
     out property <duration> tempo-estado: reduce-motion ? 0ms : 250ms;
     out property <duration> tempo-pagina: reduce-motion ? 0ms : 450ms;

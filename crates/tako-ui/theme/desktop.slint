@@ -207,9 +207,12 @@ component Vidro inherits Rectangle {
         + DeskArt.lum-at(ax + self.width / 4, ay + self.height * 3 / 4)
         + DeskArt.lum-at(ax + self.width * 3 / 4, ay + self.height * 3 / 4)) / 5 > 0.18;
     property <bool> lens: !DeskArt.gray && !Ui.reduce-transparency;
+    // Liquid Glass sem "Arte do jogo como luz ambiente": o vidro e a luz usam a cor de destaque, não a arte.
+    property <bool> art-light: Ui.desk-theme != 4 || Ui.glass-ambient;
+    property <bool> art: DeskArt.has-art && art-light;
     // Tinta sólida até a cópia desfocada chegar (e com "Reduzir transparência"); com ela visível, o painel é transparente.
     property <brush> base-fill: DeskArt.gray ? Ui.settings-surface
-        : (lens && DeskArt.has-art && DeskArt.blur.width > 0 && DeskArt.blur-in ? transparent : Ui.glass-solid);
+        : (lens && art && DeskArt.blur.width > 0 && DeskArt.blur-in ? transparent : Ui.glass-solid);
     border-radius: radius;
     background: bare || cut-x > 0 ? transparent : base-fill;
     drop-shadow-offset-y: layer ? Ui.shadow-layer-y : Ui.shadow-float-y;
@@ -231,16 +234,18 @@ component Vidro inherits Rectangle {
         y: -parent.y;
         width: root.width;
         height: root.height;
-        if lens && !DeskArt.has-art: Rectangle {
+        if lens && !art: Rectangle {
             x: -ax;
             y: -ay;
             width: DeskArt.win-w;
             height: DeskArt.win-h;
-            background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
+            background: art-light
+                ? @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%)
+                : @linear-gradient(160deg, Ui.desk-accent.mix(Ui.desk-canvas, 0.5) 0%, Ui.desk-canvas 100%);
             animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // Troca de jogo: a cópia anterior embaixo e a nova entrando por cima junto com a arte.
-        if lens && DeskArt.has-art: Image {
+        if lens && art: Image {
             x: DeskArt.bx - ax;
             y: DeskArt.y - ay;
             width: DeskArt.bw;
@@ -248,7 +253,7 @@ component Vidro inherits Rectangle {
             source: DeskArt.blur-old;
             image-fit: fill;
         }
-        if lens && DeskArt.has-art: Image {
+        if lens && art: Image {
             x: DeskArt.bx - ax;
             y: DeskArt.y - ay;
             width: DeskArt.bw;
@@ -260,7 +265,7 @@ component Vidro inherits Rectangle {
         }
         // O vidro desfoca a arte já escurecida (o `backdrop-filter` do protótipo): o mesmo escurecimento do fundo,
         // alinhado pela janela.
-        if lens && DeskArt.has-art: ArtScrim {
+        if lens && art: ArtScrim {
             x: -ax;
             y: -ay;
             width: DeskArt.win-w;
@@ -277,7 +282,7 @@ component Vidro inherits Rectangle {
             y: -Ui.glass-light-height;
             width: Ui.glass-light-width * 2;
             height: Ui.glass-light-height * 2;
-            background: @radial-gradient(circle, DeskArt.accent.with-alpha(0.16) 0%, DeskArt.accent.with-alpha(0) 75%);
+            background: @radial-gradient(circle, (art-light ? DeskArt.accent : Ui.desk-accent).with-alpha(0.16) 0%, (art-light ? DeskArt.accent : Ui.desk-accent).with-alpha(0) 75%);
             animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // Volume da lente: brilho de cima, 150 px fixos para barra, painel e cartão parecerem o mesmo material.
@@ -3525,13 +3530,13 @@ component DeskLibrary inherits Rectangle {
     }
 }
 
-// Chave liga/desliga do desktop (50 × 30, verde ligada).
+// Chave liga/desliga do desktop (50 × 30, na cor de destaque quando ligada).
 component DeskToggle inherits Rectangle {
     in property <bool> on;
     width: 50px;
     height: 30px;
     border-radius: 15px;
-    background: on ? Ui.success : Ui.glass-pressed;
+    background: on ? Ui.desk-accent : Ui.glass-pressed;
     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
     Rectangle {
         y: 3px;
@@ -3539,7 +3544,7 @@ component DeskToggle inherits Rectangle {
         width: 24px;
         height: 24px;
         border-radius: 12px;
-        background: Ui.primary-top;
+        background: on ? Ui.desk-on-accent : Ui.primary-top;
         drop-shadow-offset-y: 1px;
         drop-shadow-blur: 3px;
         drop-shadow-color: Ui.shadow-float-color;
@@ -3920,13 +3925,13 @@ component DeskRow inherits Rectangle {
                 height: 20px;
                 border-radius: data.kind == "radio" ? self.height / 2 : 6px;
                 border-width: 2px;
-                border-color: data.on ? Ui.desk-text : Ui.desk-on-muted;
-                background: data.on ? Ui.desk-text : transparent;
+                border-color: data.on ? Ui.desk-accent : Ui.desk-on-muted;
+                background: data.on ? Ui.desk-accent : transparent;
                 if data.on: Rectangle {
                     width: 8px;
                     height: 8px;
                     border-radius: data.kind == "radio" ? 4px : 2px;
-                    background: Ui.on-primary;
+                    background: Ui.desk-on-accent;
                 }
             }
         }
@@ -3971,7 +3976,7 @@ component DeskRow inherits Rectangle {
                 line-height-factor: 1.07;
                 wrap: word-wrap;
             }
-            // Barra do download: `primary-top` sobre `glass-selected`, 4 de altura, a 8 px do texto (.dk-progress do tako-design).
+            // Barra do download: a cor de destaque sobre `glass-control`, 4 de altura, a 8 px do texto (.dk-progress do tako-design).
             // A fração vem em `value`; sem fração (loja que não informa), sem barra.
             if data.kind == "download" && data.value.is-float(): VerticalLayout {
                 padding-top: 5px;
@@ -3984,7 +3989,7 @@ component DeskRow inherits Rectangle {
                         width: parent.width * clamp(data.value.to-float(), 0, 1);
                         height: parent.height;
                         border-radius: 2px;
-                        background: Ui.primary-top;
+                        background: Ui.desk-accent;
                     }
                 }
             }

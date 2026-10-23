@@ -8,7 +8,6 @@ use tako_core::presentation::Rgb;
 pub const THEME: &str = "DesktopTheme";
 pub const ACCENT: &str = "DesktopAccent";
 pub const GLASS_AMBIENT: &str = "DesktopGlassAmbient";
-pub const GLASS_BLUR: &str = "DesktopGlassBlur";
 pub const GLASS_OPACITY: &str = "DesktopGlassOpacity";
 pub const GLASS_PILL: &str = "DesktopGlassPill";
 
@@ -63,14 +62,18 @@ pub fn slider(settings: &Settings, key: &str, default: i32) -> i32 {
         .unwrap_or(default)
 }
 
-/// Desfoque do vidro: 12–60 px.
-fn blur(position: i32) -> f64 {
-    f64::from(12 + position * 48 / 100)
-}
-
 /// Opacidade das superfícies do vidro: 2–20%.
 fn opacity(position: i32) -> f64 {
     f64::from(2 + position * 18 / 100) / 100.0
+}
+
+/// Texto sobre o destaque: escuro (#14110f) quando ele é claro (luminância > 0,6), branco nos outros.
+fn on_accent(accent: Rgb) -> Rgb {
+    if accent.luminance() > 0.6 {
+        Rgb::new(0x14, 0x11, 0x0f)
+    } else {
+        Rgb::WHITE
+    }
 }
 
 /// Entrega ao Slint o que o tema escolhe; o `Ui` calcula as cores.
@@ -82,9 +85,10 @@ pub fn apply(ui: &ComponentInstance, settings: &Settings) {
         "desk-accent",
         slint::Color::from_rgb_u8(c.r, c.g, c.b).into(),
     );
+    let o = on_accent(c);
     set(
-        "glass-blur",
-        Value::Number(blur(slider(settings, GLASS_BLUR, 34))),
+        "desk-on-accent",
+        slint::Color::from_rgb_u8(o.r, o.g, o.b).into(),
     );
     set(
         "glass-opacity",
@@ -126,11 +130,20 @@ mod tests {
 
     #[test]
     fn sliders_map_to_the_design_ranges() {
-        assert_eq!((blur(0), blur(34), blur(100)), (12.0, 28.0, 60.0));
         assert_eq!((opacity(0), opacity(100)), (0.02, 0.2));
         assert_eq!(
-            slider(&settings(&[(GLASS_BLUR, "250")]), GLASS_BLUR, 34),
-            34
+            slider(&settings(&[(GLASS_OPACITY, "250")]), GLASS_OPACITY, 28),
+            28
         );
+    }
+
+    #[test]
+    fn light_accents_get_dark_text() {
+        let dark = Rgb::new(0x14, 0x11, 0x0f);
+        assert_eq!(on_accent(STONE), Rgb::WHITE); // luminância 0,58: ainda abaixo de 0,6
+        assert_eq!(on_accent(ACCENTS[2].0), dark); // ouro
+        assert_eq!(on_accent(ACCENTS[8].0), dark); // branco
+        assert_eq!(on_accent(ACCENTS[1].0), Rgb::WHITE); // laranja
+        assert_eq!(on_accent(ACCENTS[5].0), Rgb::WHITE); // azul
     }
 }
