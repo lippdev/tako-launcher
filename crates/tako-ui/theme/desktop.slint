@@ -748,13 +748,13 @@ component TopBar inherits Vidro {
                         animate opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
                     }
                 }
-                // Palavra 68 × 14 e, 6 abaixo, a kana 46 × 8 a 85%, centrada (as duas em 2×).
+                // Palavra 68 × 14 (o PNG 2× leva a sombra 0 1px 3px a 60% e 6 de folga em volta) e, 6 abaixo, a kana 46 × 8 a 85%, centrada.
                 Rectangle {
                     width: 68px;
                     height: 28px;
                     y: (parent.height - self.height) / 2;
-                    Image { source: @image-url("brand/tako-wordmark.png"); x: 0px; y: 0px; width: 68px; height: 14px; image-fit: fill; }
-                    Image { source: @image-url("brand/tako-kana.png"); x: 11px; y: 20px; width: 46px; height: 8px; image-fit: fill; opacity: 0.85; }
+                    Image { source: @image-url("brand/tako-wordmark.png"); x: -6px; y: -6px; width: 80px; height: 26px; image-fit: fill; }
+                    Image { source: @image-url("brand/tako-kana.png"); x: 11px; y: 20px; width: 46px; height: 8px; image-fit: contain; opacity: 0.85; }
                 }
                 DeskIcon { name: "chevron-down"; size: 13px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
             }
@@ -7127,7 +7127,7 @@ export component Desktop inherits Window {
     property <length> menu-y;
 
     title: "Tako";
-    icon: @image-url("tako-mark.png");
+    icon: @image-url("brand/tako-app.png");
     // Sem a moldura do sistema: a BarraDaJanela desenha logo e botões.
     no-frame: true;
     in property <string> desk-profile-name;
