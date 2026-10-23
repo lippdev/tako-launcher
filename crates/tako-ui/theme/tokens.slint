@@ -80,6 +80,14 @@ export global Ui {
     in-out property <color> desk-canvas: [#0b0b0e, #0a0a0a, #0b0e15, #000000, #07080c, #07080c][desk-variant];
     out property <color> titlebar: [#08080b, #070707, #070707, #070707, #080a0e52, #080a0e][desk-variant];
     out property <color> titlebar-tint: #121019;
+    // BarraSuperior: no TAKO a barra é fosca (tinta violeta → canvas) e fica sempre nas cores do logo, mesmo com as
+    // cores da arte ligadas; nos outros temas, o destaque escolhido. O desktop pinta a lente por baixo.
+    out property <color> bar-accent: desk-theme == 0 ? #d8c8bc : desk-accent;
+    out property <color> bar-on-accent: desk-theme == 0 ? #14110f : desk-on-accent;
+    out property <color> bar-line: desk-theme == 0 ? #ffffff0f : line;
+    out property <brush> titlebar-wash: desk-theme == 0
+        ? @linear-gradient(90deg, titlebar-tint.with-alpha(0.75) 0%, desk-canvas.with-alpha(0.52) 45%)
+        : titlebar;
     out property <color> surface: [#0d0d10, #0c0c0c, #0c0c0c, #0c0c0c, Colors.white.with-alpha(glass-opacity), #141519][desk-variant];
     out property <color> surface-raised: [#121317, #121212, #121212, #121212, #14161c94, #18191d][desk-variant];
     out property <color> tile: [#141519, #141414, #141414, #141414, #ffffff0d, #141519][desk-variant];
@@ -200,9 +208,10 @@ export global Ui {
     out property <length> radius-card: 16px;
     out property <length> radius-hero: 18px;
     out property <length> radius-full: 999px;
-    out property <length> topbar-height: 64px;
+    out property <length> topbar-height: 52px;
     // BarraDaJanela: a barra da própria janela (sem moldura do Windows), por cima da arte.
-    out property <length> window-control-width: 46px;
+    out property <length> window-control-width: 40px;
+    out property <length> window-control-height: 36px;
     out property <color> window-close-hover: #c42b1c;
     out property <length> list-width: 344px;
     out property <length> list-width-narrow: 300px;

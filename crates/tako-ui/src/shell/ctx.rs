@@ -58,6 +58,8 @@ pub enum Effect {
     ExitToDesktop,
     /// Trocar entre o modo desktop e a tela cheia (ADR-0027).
     SwitchMode(crate::mode::UiMode),
+    /// Botão da janela acionado pelo teclado: `min`, `max` ou `close` (o mesmo `window-action` do mouse).
+    Window(&'static str),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

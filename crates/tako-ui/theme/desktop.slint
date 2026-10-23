@@ -189,6 +189,8 @@ component Vidro inherits Rectangle {
     in property <bool> dense;
     // Sem vidro próprio (BarraLateralUnida): quem está sobre o vidro em L não pinta fundo, desfoque nem brilho.
     in property <bool> bare;
+    // BarraSuperior: a cópia desfocada fica sob o `titlebar-wash` (sem a tinta do painel nem a luz ambiente).
+    in property <bool> bar;
     // Moldura em L (barra + coluna num vidro só): `cut-x` é a largura da coluna e `cut-y` a altura da barra; com
     // `cut-x` > 0 o vidro (do tamanho da janela) pinta só a barra e a coluna, na mesma camada, sem emenda.
     in property <length> cut-x;
@@ -211,7 +213,8 @@ component Vidro inherits Rectangle {
     property <bool> art-light: Ui.desk-theme != 4 || Ui.glass-ambient;
     property <bool> art: DeskArt.has-art && art-light;
     // Tinta sólida até a cópia desfocada chegar (e com "Reduzir transparência"); com ela visível, o painel é transparente.
-    property <brush> base-fill: DeskArt.gray ? Ui.settings-surface
+    property <brush> base-fill: bar ? (lens && art && DeskArt.blur.width > 0 && DeskArt.blur-in ? transparent : Ui.desk-canvas)
+        : DeskArt.gray ? Ui.settings-surface
         : (lens && art && DeskArt.blur.width > 0 && DeskArt.blur-in ? transparent : Ui.glass-solid);
     border-radius: radius;
     background: bare || cut-x > 0 ? transparent : base-fill;
@@ -234,7 +237,7 @@ component Vidro inherits Rectangle {
         y: -parent.y;
         width: root.width;
         height: root.height;
-        if lens && !art: Rectangle {
+        if lens && !art && !bar: Rectangle {
             x: -ax;
             y: -ay;
             width: DeskArt.win-w;
@@ -272,12 +275,12 @@ component Vidro inherits Rectangle {
             height: DeskArt.win-h;
             small: DeskArt.small;
         }
-        if !DeskArt.gray: Rectangle {
-            background: layer || dense || bright ? Ui.glass-panel-dense : Ui.glass-panel;
+        if !DeskArt.gray || bar: Rectangle {
+            background: bar ? Ui.titlebar-wash : layer || dense || bright ? Ui.glass-panel-dense : Ui.glass-panel;
             animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         }
         // Luz ambiente: 16% da cor do jogo a partir do canto superior esquerdo, em tamanho fixo.
-        if lens: Rectangle {
+        if lens && !bar: Rectangle {
             x: -Ui.glass-light-width;
             y: -Ui.glass-light-height;
             width: Ui.glass-light-width * 2;
@@ -506,21 +509,25 @@ component SearchBox inherits Rectangle {
     }
 }
 
-// Controles da janela integrados à barra superior, 46 × 64.
+// BarraDaJanela: Minimizar · Maximizar · Fechar, 40 × 36 com raio 8 (hit-test nativo em `window_chrome.rs`).
 component WindowButton inherits Rectangle {
     in property <string> kind;
     in property <string> label;
     in property <bool> active: true;
+    in property <bool> focused;
     in property <bool> native-hover;
     in property <bool> native-pressed;
     callback clicked();
     width: Ui.window-control-width;
-    height: Ui.topbar-height;
+    height: Ui.window-control-height;
+    border-radius: 8px;
     background: ta.pressed || native-pressed ? (kind == "close" ? Ui.window-close-hover.with-alpha(0.9) : Ui.glass-pressed)
         : (ta.has-hover || native-hover) ? (kind == "close" ? Ui.window-close-hover : Ui.glass-hover) : transparent;
     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
     accessible-role: button;
     accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    if focused: FocusRing { radius: 8px; }
     Path {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
@@ -533,10 +540,56 @@ component WindowButton inherits Rectangle {
             : kind == "restore" ? "M 2.5 0.5 H 9.5 V 7.5 M 0.5 2.5 H 7.5 V 9.5 H 0.5 Z"
             : "M 0 0 L 10 10 M 10 0 L 0 10";
         stroke: (ta.has-hover || native-hover) ? Ui.desk-text : (active ? Ui.desk-on-muted : Ui.desk-on-subtle);
-        stroke-width: 1px;
+        stroke-width: 1.2px;
         fill: transparent;
     }
     ta := TouchArea { clicked => { root.clicked(); } }
+    Tip { text: label; hovering: ta.has-hover || native-hover; }
+}
+
+// Botão da barra (tb-btn): fantasma no TAKO; com o ponteiro, o foco ou aberto, o brilho do destaque da barra
+// embaixo e o traço de 2 que cresce (`curva-entrada`). O conteúdo vai dentro (ícone, avatar…).
+component BarButton inherits Rectangle {
+    in property <string> label;
+    in property <string> tip;
+    in property <bool> focused;
+    in property <bool> on;
+    out property <bool> hovering: ta.has-hover;
+    callback clicked();
+    height: 36px;
+    min-width: 36px;
+    border-radius: Ui.radius-control;
+    // No TAKO o botão é fantasma; nos outros temas, com fundo e contorno (como nas prévias).
+    background: Ui.desk-theme == 0 ? transparent : (ta.has-hover ? Ui.glass-hover : Ui.glass-control);
+    border-width: Ui.desk-theme == 0 ? 0px : 1px;
+    border-color: Ui.line-strong;
+    property <bool> lit: ta.has-hover || on;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    if focused: FocusRing { radius: Ui.radius-control; }
+    Rectangle {
+        y: parent.height / 2;
+        height: parent.height / 2;
+        opacity: lit ? 1 : 0;
+        animate opacity { duration: Ui.tempo-hover; }
+        background: @radial-gradient(circle, Ui.bar-accent.with-alpha(0.16) 0%, Ui.bar-accent.with-alpha(0) 70%);
+    }
+    Rectangle {
+        x: parent.width * 0.3;
+        y: parent.height - 3px;
+        width: parent.width * 0.4;
+        height: 2px;
+        border-radius: 1px;
+        background: Ui.bar-accent;
+        opacity: lit ? 1 : 0;
+        transform-scale-x: lit ? 1 : 0.3;
+        animate opacity { duration: Ui.tempo-hover; }
+        animate transform-scale-x { duration: Ui.tempo-pagina; easing: Ui.curva-entrada; }
+    }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+    @children
+    Tip { text: tip; hovering: ta.has-hover; }
 }
 
 // BarraSuperior é também a barra da janela: marca, guias, perfil, Tela cheia e controles nativos.
@@ -668,6 +721,8 @@ component TopBar inherits Vidro {
     in property <bool> brand-open;
     in property <string> profile-name;
     in property <string> profile-initial;
+    // A TelaPerfil está aberta: o botão do perfil fica aceso, como a aba da página atual.
+    in property <bool> profile-active;
     in property <bool> maximized;
     in property <int> native-hover;
     in property <int> native-pressed;
@@ -695,19 +750,23 @@ component TopBar inherits Vidro {
     out property <length> drag-end: drag.absolute-position.x + drag.width;
     callback action(string);
     in property <bool> small;
-    // Foco do teclado na barra: -1 fora dela; 0 marca, 1… guias, depois perfil e Tela cheia.
+    // Foco do teclado na barra: -1 fora dela; 0 marca, 1… abas, a pílula (se houver), perfil, Tela cheia e os três
+    // botões da janela (a mesma ordem de `shell::bar`).
     in property <int> focus-index: -1;
+    // Primeiro índice depois das abas e da pílula: o do perfil.
+    property <int> first-right: 1 + items.length + (activity.on ? 1 : 0);
     callback clicked(string, int);
     // Onde abrir o menu da marca: 8 abaixo da barra, alinhado à marca.
     callback brand-menu(length, length);
     height: Ui.topbar-height;
+    bar: true;
     radius: 0px;
     edge: false;
     drop-shadow-blur: 0px;
     drop-shadow-offset-y: 0px;
     drop-shadow-color: transparent;
     // Barra lateral unida (`bare`): sem a linha de baixo, a barra e a coluna são um vidro só.
-    Rectangle { visible: !root.bare; y: parent.height - 1px; height: 1px; background: Ui.glass-edge; }
+    Rectangle { visible: !root.bare; y: parent.height - 1px; height: 1px; background: Ui.bar-line; }
     // Leitor de tela: anuncia início, conclusão e erro de qualquer atividade, nunca a porcentagem. Fica sempre na
     // árvore (vazio sem nada a dizer): muitos leitores não anunciam o texto de um elemento que já nasce preenchido.
     Rectangle {
@@ -719,19 +778,19 @@ component TopBar inherits Vidro {
     }
 
     HorizontalLayout {
-        padding-left: (small ? Ui.space-20 : Ui.space-36) - Ui.space-8;
-        padding-right: 0px;
-        spacing: small ? Ui.space-8 : Ui.space-12;
+        padding-left: Ui.space-20 - Ui.space-8;
+        padding-right: 6px;
+        spacing: 4px;
         brand := Rectangle {
             y: (parent.height - self.height) / 2;
-            height: 48px;
+            height: 40px;
             width: bl.preferred-width;
-            border-radius: self.height / 2;
+            border-radius: 8px;
             background: bta.has-hover || brand-open ? Ui.glass-hover : transparent;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: button;
             accessible-label: brand-label;
-            if focus-index == 0: FocusRing { radius: parent.height / 2; }
+            if focus-index == 0: FocusRing { radius: 8px; }
             bl := HorizontalLayout {
                 padding-left: Ui.space-8;
                 padding-right: 10px;
@@ -770,34 +829,57 @@ component TopBar inherits Vidro {
                     root.clicked("desk-brand", 0);
                 }
             }
+            Tip { text: brand-label; hovering: bta.has-hover; }
         }
-        Rectangle { width: small ? 0 : Ui.space-16; }
+        Rectangle { width: small ? 12px : 36px; }
+        // Abas em caixa alta fina (Poppins 12/400, 0,32 em). A da página atual acende com o sublinhado em tentáculo.
         HorizontalLayout {
-            spacing: small ? 18px : Ui.space-28;
+            spacing: small ? 12px : 22px;
             for it[i] in items: Rectangle {
-                width: gt.preferred-width;
+                width: gt.preferred-width + 12px + 0.32 * gt.font-size;
+                property <bool> lit: it.selected || gta.has-hover;
                 accessible-role: tab;
                 accessible-label: it.label;
-                if focus-index == 1 + i: FocusRing { radius: Ui.radius-thumb; }
-                gt := Text {
-                    text: it.label.to-uppercase();
-                    color: it.selected || gta.has-hover || focus-index == 1 + i ? Ui.desk-text : Ui.desk-on-muted;
-                    font-size: Ui.desk-label;
-                    font-weight: 700;
-                    letter-spacing: 0.04 * self.font-size;
-                    vertical-alignment: center;
-                    animate color { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                }
+                accessible-checkable: true;
+                accessible-checked: it.selected;
+                accessible-action-default => { root.clicked("desk-nav", 0); }
+                if focus-index == 1 + i: FocusRing { radius: Ui.radius-thumb; y: 8px; height: parent.height - 16px; }
+                // Luz suave atrás do texto da aba atual (o brilho do texto do protótipo).
                 if it.selected: Rectangle {
-                    y: parent.height - 12px - self.height;
-                    height: 2px;
-                    border-radius: 1px;
-                    background: Ui.desk-text;
+                    x: parent.width * 0.15;
+                    y: parent.height - 22px;
+                    width: parent.width * 0.7;
+                    height: 22px;
+                    background: @radial-gradient(circle, Ui.bar-accent.with-alpha(0.22) 0%, Ui.bar-accent.with-alpha(0) 100%);
+                }
+                gt := Text {
+                    x: 6px + 0.32 * self.font-size;
+                    text: it.label.to-uppercase();
+                    color: it.selected || focus-index == 1 + i ? #ffffff : Ui.desk-text.with-alpha(gta.has-hover ? 0.8 : 0.55);
+                    font-family: Ui.font-heading;
+                    font-size: 12px * Ui.text-scale;
+                    font-weight: it.selected ? 500 : 400;
+                    letter-spacing: 0.32 * self.font-size;
+                    vertical-alignment: center;
+                    height: parent.height;
+                    animate color { duration: Ui.tempo-hover; }
+                }
+                Rectangle {
+                    x: 4px;
+                    y: parent.height - 9px - self.height;
+                    width: parent.width - 8px;
+                    height: 3px;
+                    border-radius: 2px;
+                    // O renderizador por software só desenha até 3 pontos do degradê.
+                    background: @linear-gradient(90deg, Ui.bar-accent.with-alpha(0) 0%, Ui.bar-accent.mix(#ffffff, 0.7) 50%, Ui.bar-accent.with-alpha(0) 100%);
+                    opacity: it.selected ? 1 : (gta.has-hover ? 0.45 : 0);
+                    transform-scale-x: it.selected ? 1 : (gta.has-hover ? 0.35 : 0);
+                    animate opacity { duration: Ui.tempo-estado; }
+                    animate transform-scale-x { duration: Ui.tempo-pagina; easing: Ui.curva-entrada; }
                 }
                 gta := TouchArea {
                     mouse-cursor: pointer;
-                    // Perfil é o 3 da barra (0 Biblioteca, 1 Configurações, 2 Tela cheia).
-                    clicked => { root.clicked("desk-nav", it.id == "profile" ? 3 : 0); }
+                    clicked => { root.clicked("desk-nav", 0); }
                 }
             }
         }
@@ -819,7 +901,7 @@ component TopBar inherits Vidro {
             pill := Rectangle {
             x: 0px;
             y: (parent.height - self.height) / 2;
-            height: 40px;
+            height: 36px;
             // 11 / 12 de respiro, o texto (até 340 no total) e o "+N" depois (que já traz os 10 de espaço).
             width: min(340px, 23px + (on-b ? fb.pw : fa.pw) + more-box.width);
             border-radius: Ui.radius-control;
@@ -878,58 +960,63 @@ component TopBar inherits Vidro {
             Tip { text: activity.detail == "" ? activity.title : activity.title + " · " + activity.detail; hovering: ata.has-hover; }
             }
         }
-        profile := Rectangle {
+        // Perfil: avatar redondo de 24 com o anel do destaque e o ponto verde de "online", nome e ⌄ (menu do perfil).
+        profile := BarButton {
             y: (parent.height - self.height) / 2;
-            height: 40px;
             width: pl.preferred-width;
-            border-radius: Ui.radius-control;
-            background: pta.pressed ? Ui.glass-pressed : pta.has-hover ? Ui.glass-hover : Ui.glass-control;
-            accessible-role: button;
-            accessible-label: profile-name;
-            if focus-index == 1 + items.length + (activity.on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
+            label: profile-name;
+            tip: small ? profile-name : "";
+            focused: focus-index == first-right;
+            on: profile-active;
+            clicked => {
+                root.brand-menu(profile.absolute-position.x, root.height + Ui.space-8);
+                root.clicked("desk-profile-menu", 0);
+            }
             pl := HorizontalLayout {
-                padding-left: 6px; padding-right: 10px; spacing: 8px;
+                padding-left: 6px; padding-right: 10px; spacing: 9px;
                 Rectangle {
-                    width: 28px; height: 28px; y: (parent.height - self.height) / 2;
-                    border-radius: 14px; background: Ui.glass-hover;
-                    Text { text: profile-initial; color: Ui.desk-text; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                    width: 24px; height: 24px; y: (parent.height - self.height) / 2;
+                    Rectangle { x: -3.5px; y: -3.5px; width: 31px; height: 31px; border-radius: 15.5px; border-width: 2px; border-color: Ui.bar-accent.with-alpha(0.14); }
+                    Rectangle { x: -1.5px; y: -1.5px; width: 27px; height: 27px; border-radius: 13.5px; border-width: 1.5px; border-color: Ui.bar-accent.with-alpha(0.75); }
+                    Rectangle {
+                        border-radius: 12px;
+                        // O renderizador por software não recorta degradê no raio: cor lisa, a média do degradê do protótipo.
+                        background: #232129;
+                        Text { text: profile-initial; color: #ffffff; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle { x: 17px; y: 17px; width: 10px; height: 10px; border-radius: 5px; background: Ui.success; border-width: 2px; border-color: Ui.desk-canvas; }
                 }
-                if !small: Text { text: profile-name; max-width: 160px; overflow: elide; font-size: 14px; font-weight: 600; color: Ui.desk-text; vertical-alignment: center; }
-                DeskIcon { name: "chevron-down"; size: 12px; y: (parent.height - self.height) / 2; }
-            }
-            pta := TouchArea {
-                mouse-cursor: pointer;
-                clicked => {
-                    root.brand-menu(profile.absolute-position.x, root.height + Ui.space-8);
-                    root.clicked("desk-profile-menu", 0);
+                if !small: Text {
+                    text: profile-name;
+                    max-width: 160px;
+                    overflow: elide;
+                    font-family: Ui.font-heading;
+                    font-size: 13px * Ui.text-scale;
+                    font-weight: 500;
+                    letter-spacing: 0.04 * self.font-size;
+                    color: profile.hovering || profile-active ? #ffffff : Ui.desk-text.with-alpha(0.62);
+                    vertical-alignment: center;
                 }
+                DeskIcon { name: "chevron-down"; size: 13px; tint: Ui.desk-text-muted; y: (parent.height - self.height) / 2; }
             }
         }
-        // Tela cheia: botão de 40 com gamepad de 22, inclusive na janela grande.
-        Rectangle {
+        // Tela cheia: só o ícone do controle.
+        gamepad := BarButton {
             y: (parent.height - self.height) / 2;
-            height: 40px;
-            width: 40px;
-            border-radius: Ui.radius-control;
-            background: fta.pressed ? Ui.glass-pressed : (fta.has-hover ? Ui.glass-hover : Ui.glass-control);
-            border-width: 1px;
-            border-color: Ui.glass-edge;
-            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            accessible-role: button;
-            accessible-label: big-picture-label;
-            if focus-index == 2 + items.length + (activity.on ? 1 : 0): FocusRing { radius: Ui.radius-control; }
-            DeskIcon { name: "gamepad"; size: 22px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
-            fta := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.clicked("desk-nav", 2); }
-            }
-            Tip { text: big-picture-label + " (F11)"; hovering: fta.has-hover; }
+            width: 36px;
+            label: big-picture-label;
+            tip: big-picture-label + " (F11)";
+            focused: focus-index == first-right + 1;
+            clicked => { root.clicked("desk-nav", 2); }
+            DeskIcon { name: "gamepad"; size: 20px; tint: gamepad.hovering ? Ui.desk-text : Ui.desk-text.with-alpha(0.62); x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
         }
+        // Divisória de 1 e os botões da janela, 8 de margem.
+        Rectangle { width: 9px; Rectangle { x: 8px; y: (parent.height - 36px) / 2; width: 1px; height: 36px; background: Ui.line; } }
         HorizontalLayout {
             spacing: 0px;
-            WindowButton { native-hover: root.native-hover == 3; native-pressed: root.native-pressed == 3; kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
-            WindowButton { native-hover: root.native-hover == 1; native-pressed: root.native-pressed == 1; kind: maximized ? "restore" : "max"; active: root.active; label: maximized ? labels[2] : labels[1]; clicked => { root.action("max"); } }
-            WindowButton { native-hover: root.native-hover == 2; native-pressed: root.native-pressed == 2; kind: "close"; active: root.active; label: labels[3]; clicked => { root.action("close"); } }
+            WindowButton { y: (parent.height - self.height) / 2; focused: focus-index == first-right + 2; native-hover: root.native-hover == 3; native-pressed: root.native-pressed == 3; kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
+            WindowButton { y: (parent.height - self.height) / 2; focused: focus-index == first-right + 3; native-hover: root.native-hover == 1; native-pressed: root.native-pressed == 1; kind: maximized ? "restore" : "max"; active: root.active; label: maximized ? labels[2] : labels[1]; clicked => { root.action("max"); } }
+            WindowButton { y: (parent.height - self.height) / 2; focused: focus-index == first-right + 4; native-hover: root.native-hover == 2; native-pressed: root.native-pressed == 2; kind: "close"; active: root.active; label: labels[3]; clicked => { root.action("close"); } }
         }
     }
 }
@@ -5769,7 +5856,7 @@ component DeskOverlay inherits Rectangle {
             x: clamp(select ? menu-x - self.width : menu-x, 12px, root.width - self.width - 12px);
             y: select && menu-y + self.height > root.height - 12px
                 ? max(12px, menu-y - 6px - 36px - 6px - self.height)
-                : clamp(menu-y, bar-menu ? Ui.space-8 : 12px, root.height - self.height - 12px);
+                : clamp(menu-y, bar-menu ? 0px : 12px, root.height - self.height - 12px);
             TouchArea { }
             // Até 8 opções visíveis no select; o resto rola.
             mf := Flickable {
@@ -7158,6 +7245,7 @@ export component Desktop inherits Window {
     no-frame: true;
     in property <string> desk-profile-name;
     in property <string> desk-profile-initial;
+    in property <bool> desk-profile-active;
     out property <float> window-drag-start: bar.drag-start / 1px;
     out property <float> window-drag-end: bar.drag-end / 1px;
     in property <bool> window-maximized;
@@ -7462,9 +7550,9 @@ export component Desktop inherits Window {
         bar-menu: brand-menu || profile-menu;
         property <bool> activities: ov.kind == "activities";
         // A lista Atividades acaba onde a pílula acaba: 12 (8 na janela pequena) + 4 antes do perfil.
-        menu-x: brand-menu ? (small ? Ui.space-20 : Ui.space-36) : profile-menu ? bar.profile-x : activities ? bar.profile-x - (small ? 12px : 16px) : root.menu-x;
-        // A lista Atividades fica 8 abaixo da pílula (centrada nos 40 da barra), não 8 abaixo da barra.
-        menu-y: activities ? Ui.space-8 - (Ui.topbar-height - 40px) / 2 : brand-menu || profile-menu ? Ui.space-8 : root.menu-y - Ui.topbar-height;
+        menu-x: brand-menu ? Ui.space-20 : profile-menu ? bar.profile-x : activities ? bar.profile-x - (small ? 12px : 16px) : root.menu-x;
+        // Os menus da barra abrem 6 abaixo da marca (40 na barra de 52) e a lista Atividades 8 abaixo da pílula (36).
+        menu-y: activities || profile-menu ? Ui.space-8 - (Ui.topbar-height - 36px) / 2 : brand-menu ? 0px : root.menu-y - Ui.topbar-height;
         art: desk-game.art;
         leaving: leaving;
         clicked(z, idx) => {
@@ -7552,6 +7640,7 @@ export component Desktop inherits Window {
         bare: unified;
         profile-name: desk-profile-name;
         profile-initial: desk-profile-initial;
+        profile-active: desk-profile-active;
         maximized: window-maximized;
         native-hover: window-native-hover;
         native-pressed: window-native-pressed;

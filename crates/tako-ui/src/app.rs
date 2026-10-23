@@ -65,6 +65,8 @@ pub enum HostAction {
     Minimize,
     /// Troca entre o desktop e a tela cheia.
     SwitchMode(UiMode),
+    /// Botão da janela acionado pelo teclado (`min`, `max`, `close`).
+    Window(&'static str),
 }
 
 /// O que o app (binário) faz com os pedidos da interface que saem dela: abrir jogos, sair, atualizar.
@@ -860,6 +862,15 @@ impl App {
                 // Fora do callback que pediu: a janela antiga ainda está entregando o evento.
                 let app = self.clone();
                 slint::Timer::single_shot(Duration::ZERO, move || app.switch_mode(mode));
+            }
+            HostAction::Window(action) => {
+                let app = self.clone();
+                slint::Timer::single_shot(Duration::ZERO, move || {
+                    let _ = app
+                        .ui
+                        .borrow()
+                        .invoke("window-action", &[Value::String(action.into())]);
+                });
             }
         }
     }

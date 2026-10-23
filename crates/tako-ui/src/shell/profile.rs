@@ -59,8 +59,6 @@ pub enum Zone {
 const ACTIONS: usize = 2;
 /// Blocos da Visão geral: Tempo jogado, Mais jogado, Jogos na biblioteca.
 const TILES: usize = 3;
-/// Barra de cima: marca, Biblioteca, Perfil, menu do perfil e Tela cheia.
-const BAR_BIG_PICTURE: usize = 4;
 
 /// Segunda-feira da semana de `day`.
 fn monday(day: NaiveDate) -> NaiveDate {
@@ -335,7 +333,7 @@ impl ProfilePage {
 
     fn zone_len(&self, zone: Zone, ctx: &Ctx) -> usize {
         match zone {
-            Zone::Bar => BAR_BIG_PICTURE + 1,
+            Zone::Bar => super::bar::items(ctx).len(),
             Zone::Tabs => TABS.len(),
             Zone::Actions => ACTIONS,
             Zone::Tiles => TILES,
@@ -357,7 +355,11 @@ impl ProfilePage {
         self.index = match self.zone {
             Zone::Tabs => TABS.iter().position(|t| *t == self.tab).unwrap_or(0),
             Zone::Periods => PERIODS.iter().position(|p| *p == self.period).unwrap_or(0),
-            Zone::Bar => 2,
+            // O foco começa no botão do perfil (a página em que está).
+            Zone::Bar => super::bar::items(ctx)
+                .iter()
+                .position(|i| *i == super::bar::Item::Profile)
+                .unwrap_or(0),
             _ => 0,
         };
     }
@@ -365,14 +367,10 @@ impl ProfilePage {
     /// Enter (ou clique) no item com o foco.
     fn activate(&mut self, ctx: &mut Ctx) -> Nav {
         match self.zone {
-            Zone::Bar => match self.index {
-                0 => return Nav::Layer(Box::new(desktop::brand_menu())),
-                1 => return Nav::Back,
-                3 => return Nav::Layer(Box::new(desktop::profile_menu())),
-                BAR_BIG_PICTURE => {
-                    ctx.effect(super::Effect::SwitchMode(crate::mode::UiMode::BigPicture))
-                }
-                _ => {}
+            Zone::Bar => match super::bar::item(ctx, self.index) {
+                Some(super::bar::Item::Library) => return Nav::Back,
+                Some(item) => return super::bar::activate(item, ctx),
+                None => {}
             },
             Zone::Tabs => self.open_tab(TABS[self.index.min(TABS.len() - 1)]),
             Zone::Actions => return self.action(self.index, ctx),
@@ -509,7 +507,11 @@ impl Page for ProfilePage {
         let c = text.chars().next()?;
         // Shift+Tab chega como Tab com Shift ou como "back tab" (U+0019), conforme o sistema.
         if c == keys::TAB || c == '\u{0019}' {
-            self.step_zone(c == keys::TAB && mods != KeyModifiers::SHIFT, ctx);
+            let forward = c == keys::TAB && mods != KeyModifiers::SHIFT;
+            match super::bar::step(ctx, self.index, forward).filter(|_| self.zone == Zone::Bar) {
+                Some(i) => self.index = i,
+                None => self.step_zone(forward, ctx),
+            }
             return Some(Nav::Stay);
         }
         None
@@ -1012,12 +1014,17 @@ mod tests {
             .library
             .record_session(&id, Duration::from_secs(45 * 60))
             .unwrap();
-        // A guia Perfil da barra abre a página; a barra a marca.
-        shell.click("desk-nav", 3);
+        // "Ver perfil" do menu do avatar abre a página; o botão da barra fica aceso e não há aba do perfil.
+        shell.click("desk-profile-menu", 0);
+        shell.click("overlay-row", 0);
         assert_eq!(shell.page().kind(), KIND);
         let out = shell.render(std::time::Instant::now());
-        let nav = out.props.iter().find(|(n, _)| *n == "desk-nav").unwrap();
-        assert!(format!("{:?}", nav.1).contains("profile"));
+        let prop = |name| &out.props.iter().find(|(n, _)| *n == name).unwrap().1;
+        assert_eq!(
+            *prop("desk-profile-active"),
+            slint_interpreter::Value::Bool(true)
+        );
+        assert!(!format!("{:?}", prop("desk-nav")).contains("profile"));
         // O fundo é o jogo com a sessão do mês.
         assert_eq!(shell.focused_game(), Some(id.clone()));
         // Clicar na sessão recente leva ao jogo na biblioteca.

@@ -42,6 +42,7 @@ pub fn common(effect: &Effect, shell: &mut Shell) -> Option<HostAction> {
         }
         Effect::ApplyTheme(_) => return Some(HostAction::ReloadTheme),
         Effect::SwitchMode(mode) => return Some(HostAction::SwitchMode(*mode)),
+        Effect::Window(action) => return Some(HostAction::Window(action)),
         Effect::TestGameScreen => crate::screen_test::start(ctx),
         Effect::ImportPlaynite => crate::playnite::start(ctx),
         Effect::AddGame => crate::shell::add_game::add_game(ctx),

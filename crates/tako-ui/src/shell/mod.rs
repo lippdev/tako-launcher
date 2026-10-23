@@ -5,6 +5,7 @@ pub mod activities;
 pub mod add_game;
 pub mod art;
 pub(crate) mod art_review;
+mod bar;
 pub mod closing_game;
 pub mod control_center;
 pub mod ctx;
@@ -955,8 +956,8 @@ impl Shell {
         out
     }
 
-    /// Barra de cima do desktop: as guias das áreas (Biblioteca e Perfil; Loja quando existir), a busca e o botão
-    /// da tela cheia. Configurações fica no menu da marca.
+    /// Barra de cima do desktop: a guia da Biblioteca (a Loja entra quando existir), o perfil e o botão da tela
+    /// cheia. Configurações fica no menu da marca.
     fn render_desktop_bar(&self, out: &mut Out, now: Instant) {
         let kind = self.page().kind();
         let item = |id: &str, label: &str, icon: &str, selected: bool| crate::model::NavItem {
@@ -966,13 +967,17 @@ impl Shell {
             selected,
             ..Default::default()
         };
+        // Só a Biblioteca: a Loja não existe no app, e o Perfil vive no botão à direita.
         out.set(
             "desk-nav",
-            vec![
-                item("library", "desktop.library", "grid", kind == "desk-library"),
-                item("profile", "profile.tab", "user", kind == profile::KIND),
-            ],
+            vec![item(
+                "library",
+                "desktop.library",
+                "grid",
+                kind == "desk-library",
+            )],
         );
+        out.set("desk-profile-active", kind == profile::KIND);
         out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
         out.set(
             "desk-window-labels",
