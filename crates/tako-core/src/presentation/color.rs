@@ -18,9 +18,12 @@ impl Rgb {
         Rgb { r, g, b }
     }
 
-    /// "#RRGGBB" ou "RRGGBB"; `None` se inválida (o accent vem de metadados).
+    /// Exatamente "#RRGGBB"; `None` se inválida (o accent vem de metadados).
     pub fn parse(hex: &str) -> Option<Rgb> {
-        let v = hex.trim_start_matches('#');
+        Rgb::from_hex6(hex.strip_prefix('#')?)
+    }
+
+    fn from_hex6(v: &str) -> Option<Rgb> {
         if v.len() != 6 || !v.bytes().all(|b| b.is_ascii_hexdigit()) {
             return None;
         }
@@ -136,12 +139,12 @@ pub mod contrast_rules {
     pub fn parse_argb(hex: &str) -> Option<(Rgb, f64)> {
         let v = hex.trim_start_matches('#');
         match v.len() {
-            6 => Some((Rgb::parse(v)?, 1.0)),
+            6 => Some((Rgb::from_hex6(v)?, 1.0)),
             8 if v.is_char_boundary(2) => {
                 let alpha = u8::from_str_radix(&v[..2], 16)
                     .ok()
                     .filter(|_| v[..2].bytes().all(|b| b.is_ascii_hexdigit()))?;
-                Some((Rgb::parse(&v[2..])?, f64::from(alpha) / 255.0))
+                Some((Rgb::from_hex6(&v[2..])?, f64::from(alpha) / 255.0))
             }
             _ => None,
         }
@@ -177,7 +180,10 @@ mod tests {
     #[test]
     fn rgb_parses_hex() {
         assert_eq!(Rgb::parse("#C8102E"), Some(Rgb::new(200, 16, 46)));
-        assert_eq!(Rgb::parse("2B3A55"), Some(Rgb::new(43, 58, 85)));
+        assert_eq!(Rgb::parse("2B3A55"), None);
+        assert_eq!(Rgb::parse("ff8a3d"), None);
+        assert_eq!(Rgb::parse("##ff8a3d"), None);
+        assert_eq!(Rgb::parse("#ff8a3"), None);
         assert_eq!(Rgb::parse("+12345"), None);
         assert_eq!(Rgb::new(43, 58, 85).to_string(), "#2B3A55");
     }
