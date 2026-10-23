@@ -27,7 +27,7 @@ import "fonts/PlusJakartaSans-ExtraBold.ttf";
 import { Ui } from "tokens.slint";
 import { ControlCenter } from "main.slint";
 import { PanelRow, Icon, Toggle } from "widgets.slint";
-import { Icons } from "icons.slint";
+import { DeskGlyphs } from "desk-icons.slint";
 import { Octopus } from "polvo.slint";
 import { Overlay, Overline, OverlayView, Tile } from "overlay.slint";
 
@@ -68,24 +68,24 @@ component DeskIcon inherits Rectangle {
     if name == "store-amazon": Image { width: size; height: size; source: @image-url("stores/amazon.svg"); colorize: tint.with-alpha(1); }
     if name == "store-xbox": Image { width: size; height: size; source: @image-url("stores/xbox.svg"); colorize: tint.with-alpha(1); }
     if name == "store-manual": Image { width: size; height: size; source: @image-url("stores/manual.svg"); colorize: tint.with-alpha(1); }
-    if !store && Icons.stroke(name) != "": Path {
+    if !store && DeskGlyphs.stroke(name) != "": Path {
         width: parent.width;
         height: parent.height;
         viewbox-width: 24;
         viewbox-height: 24;
-        commands: Icons.stroke(name);
+        commands: DeskGlyphs.stroke(name);
         stroke: tint.with-alpha(1);
-        stroke-width: 1.8 * size / 24;
+        stroke-width: 1.7 * size / 24;
         stroke-line-cap: round;
         stroke-line-join: round;
         fill: transparent;
     }
-    if !store && Icons.fill(name) != "": Path {
+    if !store && DeskGlyphs.fill(name) != "": Path {
         width: parent.width;
         height: parent.height;
         viewbox-width: 24;
         viewbox-height: 24;
-        commands: Icons.fill(name);
+        commands: DeskGlyphs.fill(name);
         fill: tint.with-alpha(1);
     }
 }
@@ -730,20 +730,33 @@ component TopBar inherits Vidro {
             bl := HorizontalLayout {
                 padding-left: Ui.space-8;
                 padding-right: 10px;
-                spacing: 4px;
-                Image {
-                    // Logo horizontal em 2× (237 × 92) do design: exibida em 46px de altura (38 na janela pequena) sem serrilhado.
-                    source: @image-url("tako-logo-brand.png");
-                    height: small ? 38px : 46px;
-                    width: self.height * 237 / 92;
+                spacing: 14px;
+                // Polvo de 50 × 40. O PNG (2×) já leva o brilho lilás (drop-shadow 0 0 8px a 18%, o Slint só faz sombra
+                // de caixa) e 8 de folga em volta.
+                Rectangle {
+                    width: 50px;
+                    height: 40px;
                     y: (parent.height - self.height) / 2;
-                    image-fit: contain;
-                    // Hover: leve aumento e brilho; com "Reduzir animações" a escala fica em 1.
-                    opacity: bta.has-hover ? 1 : 0.9;
-                    transform-scale: bta.has-hover && !Ui.reduce-motion ? 1.04 : 1;
-                    animate transform-scale, opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+                    Image {
+                        x: -8px;
+                        y: -8px;
+                        width: 66px;
+                        height: 56px;
+                        source: @image-url("brand/tako-mark.png");
+                        image-fit: contain;
+                        opacity: bta.has-hover ? 1 : 0.9;
+                        animate opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+                    }
                 }
-                DeskIcon { name: "chevron-down"; size: 12px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                // Palavra 68 × 14 (o PNG 2× leva a sombra 0 1px 3px a 60% e 6 de folga em volta) e, 6 abaixo, a kana 46 × 8 a 85%, centrada.
+                Rectangle {
+                    width: 68px;
+                    height: 28px;
+                    y: (parent.height - self.height) / 2;
+                    Image { source: @image-url("brand/tako-wordmark.png"); x: -6px; y: -6px; width: 80px; height: 26px; image-fit: fill; }
+                    Image { source: @image-url("brand/tako-kana.png"); x: 11px; y: 20px; width: 46px; height: 8px; image-fit: contain; opacity: 0.85; }
+                }
+                DeskIcon { name: "chevron-down"; size: 13px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
             }
             bta := TouchArea {
                 mouse-cursor: pointer;
@@ -5446,8 +5459,8 @@ component DeskOverlay inherits Rectangle {
             x: 56px;
             y: 28px;
             height: 46px;
-            width: self.height * 495 / 192;
-            source: @image-url("tako-logo.png");
+            width: self.height * 304 / 92;
+            source: @image-url("brand/tako-logo-horizontal.png");
             image-fit: contain;
         }
         // "Pular configuração" sempre visível no topo (nunca prender a pessoa num tour).
@@ -7114,7 +7127,7 @@ export component Desktop inherits Window {
     property <length> menu-y;
 
     title: "Tako";
-    icon: @image-url("tako-mark.png");
+    icon: @image-url("brand/tako-app.png");
     // Sem a moldura do sistema: a BarraDaJanela desenha logo e botões.
     no-frame: true;
     in property <string> desk-profile-name;

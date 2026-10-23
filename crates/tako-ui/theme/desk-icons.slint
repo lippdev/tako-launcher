@@ -1,0 +1,51 @@
+// Ícones do desktop (tako-design, assets/Icones): grade de 24, traço de 1,7, pontas e junções redondas; os pontos são
+// traços de 0,01. Os nomes são os do `Icons`; o que o conjunto novo não tem (power, speaker, tv…) continua vindo de lá.
+// A tela cheia segue com o `Icons` dela.
+import { Icons } from "icons.slint";
+
+export global DeskGlyphs {
+    pure function drawn(name: string) -> string {
+        if (name == "alert" || name == "error") { return "M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z M0 0M12 8v4M12 16h.01"; }
+        else if (name == "calendar") { return "M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2Z M0 0M3 10h18M8 3v4M16 3v4"; }
+        else if (name == "camera") { return "M4 7h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z M0 0M8.5 13a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0Z"; }
+        else if (name == "check") { return "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0Z M0 0M8 12.5l3 3 5-6"; }
+        else if (name == "tick") { return "m5 12 5 5 9-10"; }
+        else if (name == "chevron") { return "m9 6 6 6-6 6"; }
+        else if (name == "chevron-down") { return "m6 9 6 6 6-6"; }
+        else if (name == "chevron-left") { return "m15 6-6 6 6 6"; }
+        else if (name == "clock") { return "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0Z M0 0M12 7v5l3 2"; }
+        else if (name == "cloud") { return "M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.4 1.5A4 4 0 0 1 17.5 18Z"; }
+        else if (name == "close") { return "M18 6 6 18M6 6l12 12"; }
+        else if (name == "download") { return "M12 4v11M7 10l5 5 5-5M4 20h16"; }
+        else if (name == "filter") { return "M4 7h10M18 7h2M4 17h4M12 17h8 M0 0M14 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0Z M0 0M8 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0Z"; }
+        else if (name == "folder") { return "M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"; }
+        else if (name == "gamepad") { return "M6 11h4M8 9v4M15 12h.01M18 10h.01 M0 0M17.3 5H6.7a4 4 0 0 0-3.98 3.59L2 15.5A2.9 2.9 0 0 0 7 17.6L9 15.5h6l2 2.1a2.9 2.9 0 0 0 5-2.1l-.72-6.91A4 4 0 0 0 17.3 5Z"; }
+        else if (name == "gear") { return "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z M0 0M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"; }
+        else if (name == "grid") { return "M5.5 4h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1 -1.5 1.5h-3.5a1.5 1.5 0 0 1 -1.5 -1.5v-3.5a1.5 1.5 0 0 1 1.5 -1.5Z M0 0M15 4h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1 -1.5 1.5h-3.5a1.5 1.5 0 0 1 -1.5 -1.5v-3.5a1.5 1.5 0 0 1 1.5 -1.5Z M0 0M5.5 13.5h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1 -1.5 1.5h-3.5a1.5 1.5 0 0 1 -1.5 -1.5v-3.5a1.5 1.5 0 0 1 1.5 -1.5Z M0 0M15 13.5h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1 -1.5 1.5h-3.5a1.5 1.5 0 0 1 -1.5 -1.5v-3.5a1.5 1.5 0 0 1 1.5 -1.5Z"; }
+        else if (name == "home") { return "M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z"; }
+        else if (name == "image") { return "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2Z M0 0M7 10a2 2 0 1 0 4 0a2 2 0 1 0 -4 0Z M0 0m4 18 5-5 4 4 3-3 4 4"; }
+        else if (name == "info") { return "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0Z M0 0M12 11v5M12 8h.01"; }
+        else if (name == "list") { return "M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"; }
+        else if (name == "monitor") { return "M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2Z M0 0M8 20h8M12 16v4"; }
+        else if (name == "palette") { return "M12 3a9 9 0 0 0 0 18c1.1 0 1.6-.9 1.2-1.8l-.4-.9c-.5-1 .2-2.3 1.4-2.3H17a4 4 0 0 0 4-4c0-5-4-9-9-9Z M0 0M6.5 11a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z M0 0M9 7a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z M0 0M14 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z"; }
+        else if (name == "pause") { return "M9 5v14M15 5v14"; }
+        else if (name == "play") { return "M7 4.5v15l13-7.5z"; }
+        else if (name == "plus") { return "M12 5v14M5 12h14"; }
+        else if (name == "refresh") { return "M20 11a8 8 0 0 0-14.6-4.5L3 9M3 4v5h5M4 13a8 8 0 0 0 14.6 4.5L21 15M21 20v-5h-5"; }
+        else if (name == "search") { return "M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0Z M0 0m20 20-3.5-3.5"; }
+        else if (name == "sort") { return "M7 4v16M3.5 7.5 7 4l3.5 3.5M17 20V4M13.5 16.5 17 20l3.5-3.5"; }
+        else if (name == "star" || name == "starfill") { return "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9Z"; }
+        else if (name == "trophy") { return "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z M0 0M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"; }
+        else if (name == "updown") { return "m8 9 4-4 4 4M8 15l4 4 4-4"; }
+        else if (name == "user") { return "M8 8a4 4 0 1 0 8 0a4 4 0 1 0 -8 0Z M0 0M4 21c0-4 3.6-7 8-7s8 3 8 7"; }
+        else if (name == "volume") { return "M4 9v6h4l5 4V5L8 9Z M0 0M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"; }
+        return "";
+    }
+    public pure function stroke(name: string) -> string {
+        return name == "play" ? "" : drawn(name) != "" ? drawn(name) : Icons.stroke(name);
+    }
+    // Só o play (sem traço, como o `.i.fill` do protótipo) e a estrela ligada preenchem; os pontos dos ícones novos já são traço, então o preenchimento antigo sai.
+    public pure function fill(name: string) -> string {
+        return name == "play" || name == "starfill" ? drawn(name) : drawn(name) != "" ? "" : Icons.fill(name);
+    }
+}
