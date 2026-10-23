@@ -6,6 +6,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 ### What's new
 - **New brand on the desktop:** the octopus, the TAKO wordmark and タコ in the top bar, the octopus as the app icon (desktop window, installer and packages, on a dark plate) and new thin-stroke icons across the desktop interface. Full screen is unchanged.
+- **Desktop themes and accent color:** in Settings › Appearance, pick TAKO (the new default), Dark, Midnight, OLED black or Liquid Glass (with the game art as ambient light, opacity and pill controls) and the accent color, including a custom one. Colors, radii and animation timings follow the new design system; full screen is unchanged.
 - **Activities in the top bar:** a pill before the profile shows what Tako is doing in the background (library refresh, update check, downloads, covers), with progress, a summary when done and "Try again" on errors; clicking it opens the "Activities" list.
 - **ScreenScraper with your developer account:** anyone with ScreenScraper developer credentials can enter them in Settings and use ScreenScraper even on builds that don't include them.
 - **Windows full screen mode:** use Tako as the home app from Settings.

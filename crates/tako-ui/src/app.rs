@@ -1779,7 +1779,14 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     };
     let custom_accent = custom_accent_for_mode(&s.ctx, mode);
     let fallback_accent = custom_accent.or_else(|| fallback_accent_for_mode(&s.ctx, mode));
-    let palette = if let Some(custom) = custom_accent {
+    let palette = if s.ctx.desktop {
+        // No desktop a cor vem só do tema do desktop (a escolhida): a do jogo e a da tela cheia não entram.
+        AccentPalette::for_accent_with_fallback(
+            None,
+            false,
+            Some(crate::desk_theme::accent(&s.ctx.settings)),
+        )
+    } else if let Some(custom) = custom_accent {
         AccentPalette::for_accent_with_fallback(None, false, Some(custom))
     } else {
         AccentPalette::for_accent_with_fallback(
@@ -1791,6 +1798,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     let color = |c: tako_core::presentation::color::Rgb| slint::Color::from_rgb_u8(c.r, c.g, c.b);
     bridge::set_global(ui, "Ui", "accent", color(palette.accent).to_value());
     bridge::set_global(ui, "Ui", "accent-deep", color(palette.deep).to_value());
+    crate::desk_theme::apply(ui, &s.ctx.settings);
     bridge::set_global(ui, "Ui", "pointer", s.ctx.pointer.to_value());
     bridge::set_global(
         ui,

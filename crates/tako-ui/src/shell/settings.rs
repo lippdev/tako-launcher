@@ -3,6 +3,8 @@
 
 #[path = "settings_controls.rs"]
 pub(crate) mod controls;
+#[path = "settings_desk_theme.rs"]
+mod desk_theme;
 #[path = "settings_emulators.rs"]
 pub(crate) mod emulators;
 #[path = "settings_integrations.rs"]
@@ -2016,6 +2018,13 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
     ]);
     items
         .into_iter()
+        // Tema, cor de destaque e Liquid Glass (só no desktop).
+        .chain(
+            ctx.desktop
+                .then(|| desk_theme::rows(ctx))
+                .into_iter()
+                .flatten(),
+        )
         // "Reduzir transparência" só existe no desktop (a tela cheia não tem vidro).
         .chain(ctx.desktop.then(|| {
             toggle(

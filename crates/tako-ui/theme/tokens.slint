@@ -64,42 +64,83 @@ export global Ui {
     // Textos que o tema mostra por conta própria (o resto vem pronto do Tako).
     in property <string> text-search: "Buscar jogos";
 
-    // ── Modo desktop (Tako Design System — Desktop). Fora da API de tema: só `desktop.slint` usa.
-    // Valores em px reais da janela (1600×900); "Reduzir transparência" troca o vidro pelo tema sólido.
+    // ── Modo desktop (Tako Design System — Desktop, rebranding out/2026). Fora da API de tema: só `desktop.slint` usa.
+    // A tela cheia mantém os nomes e os valores dela (canvas, on-accent*, warning, error): o desktop lê `desk-*`.
+    // Tema do desktop: 0 TAKO, 1 Escuro, 2 Meia-noite, 3 Preto OLED, 4 Liquid Glass. Cada cor abaixo é a lista das
+    // colunas do tokens.json nessa ordem + a sólida (5), que o Liquid Glass usa com "Reduzir transparência".
+    in property <int> desk-theme: 0;
     in property <bool> reduce-transparency: false;
+    // Opções do Liquid Glass: opacidade das superfícies (2–20%), controles em pílula e a arte como luz ambiente
+    // (desligada, a luz e o fundo do vidro usam a cor de destaque). O desfoque (12–60) fica para a etapa de camadas.
+    in property <float> glass-opacity: 0.07;
+    in property <bool> glass-pill: true;
+    in property <bool> glass-ambient: true;
+    out property <int> desk-variant: (desk-theme == 4 && reduce-transparency) ? 5 : desk-theme;
 
-    in-out property <color> desk-canvas: #0b0d12;
-    out property <color> settings-bg: #1c1c1e;
-    out property <color> settings-surface: #2c2c2e;
-    out property <color> settings-separator: #ffffff17;
-    out property <color> settings-control: #ffffff1f;
-    out property <color> settings-control-hover: #ffffff2e;
-    out property <color> art-scrim-left: #0b0d12b3;
-    out property <color> art-scrim-bottom: #0b0d12a6;
-    out property <color> art-scrim-strong: #0b0d12f0;
+    in-out property <color> desk-canvas: [#0b0b0e, #0a0a0a, #0b0e15, #000000, #07080c, #07080c][desk-variant];
+    out property <color> titlebar: [#08080b, #070707, #070707, #070707, #080a0e52, #080a0e][desk-variant];
+    out property <color> titlebar-tint: #121019;
+    out property <color> surface: [#0d0d10, #0c0c0c, #0c0c0c, #0c0c0c, Colors.white.with-alpha(glass-opacity), #141519][desk-variant];
+    out property <color> surface-raised: [#121317, #121212, #121212, #121212, #14161c94, #18191d][desk-variant];
+    out property <color> tile: [#141519, #141414, #141414, #141414, #ffffff0d, #141519][desk-variant];
+    out property <color> tile-foot: [#101014, #0f0f0f, #0f0f0f, #0f0f0f, #00000029, #101014][desk-variant];
+    out property <color> group: [#0e0c14db, #0c0c0cdb, #0c0c0cdb, #0c0c0cdb, Colors.white.with-alpha(glass-opacity), #141519][desk-variant];
+    out property <color> line: [#e1deff13, #ffffff12, #ffffff12, #ffffff12, #ffffff14, #ffffff14][desk-variant];
+    out property <color> line-strong: [#e1deff21, #ffffff1f, #ffffff1f, #ffffff1f, #ffffff26, #ffffff26][desk-variant];
+    out property <color> desk-text: [#f4f1f0, #f2f2f2, #f2f2f2, #f2f2f2, #f2f2f2, #f2f2f2][desk-variant];
+    out property <color> desk-text-muted: [#958f94, #8a8a8a, #8a8a8a, #8a8a8a, #a5a9b3, #a5a9b3][desk-variant];
+    out property <color> desk-text-dim: [#625d63, #5a5a5a, #5a5a5a, #5a5a5a, #8a8f9a, #8a8f9a][desk-variant];
+    // Cor de destaque do desktop (a escolhida, ou a da arte do jogo no TAKO). O global não anima: quem pinta com
+    // ela desliza em `tempo-cor`.
+    in-out property <color> desk-accent: #d8c8bc;
+    // Brilhos de canto da janela: a cor de destaque a 7% (cima à esquerda) e 4% (baixo à direita).
+    out property <color> ambient-1: desk-accent.with-alpha(0.07);
+    out property <color> ambient-2: desk-accent.with-alpha(0.04);
+    // Texto sobre o destaque: escuro (#14110f) quando ele é claro (luminância > 0,6), branco nos outros (o Tako decide).
+    in-out property <color> desk-on-accent: #ffffff;
+    out property <color> desk-warning: #ffcf4d;
+    out property <color> desk-error: #ff7b7b;
+    out property <color> wish: #ff5d7a;
+    out property <color> metacritic-good: #00ce7a;
+    out property <color> metacritic-mixed: #ffbd3f;
+    out property <color> metacritic-bad: #ff6874;
+    out property <color> brand-glow: #beb4ff2e;
+    out property <color> primary: #f4f4f4;
+    out property <color> primary-chip: #0d0d0d;
+    out property <color> on-primary: #111216;
+
+    // Apelidos dos nomes antigos, com os valores novos.
+    out property <color> settings-bg: [#0b0b0e, #0a0a0a, #0a0a0a, #0a0a0a, #07080c, #07080c][desk-variant];
+    out property <color> settings-surface: surface;
+    out property <color> settings-separator: line;
+    out property <color> settings-control: tile;
+    out property <color> settings-control-hover: #1c1c22;
+    out property <color> art-scrim-left: #08080899;
+    out property <color> art-scrim-bottom: #080808eb;
+    out property <color> art-scrim-strong: #0b0b0ef0;
     out property <float> custom-background-opacity: 0.55;
     out property <color> custom-background-scrim: #00000080;
-    out property <color> glass-panel: reduce-transparency ? #14161cfa : #12141a73;
-    out property <color> glass-panel-dense: reduce-transparency ? #14161cfa : #12141a9e;
-    out property <color> glass-highlight: reduce-transparency ? #ffffff00 : #ffffff14;
-    out property <color> glass-specular: reduce-transparency ? #ffffff26 : #ffffff4d;
-    out property <color> glass-edge: #ffffff1a;
-    out property <color> glass-control: reduce-transparency ? #262932 : #ffffff14;
-    out property <color> glass-hover: reduce-transparency ? #30333d : #ffffff12;
-    out property <color> glass-selected: reduce-transparency ? #3a3e49 : #ffffff1a;
-    out property <color> glass-pressed: reduce-transparency ? #444855 : #ffffff3d;
-    out property <color> glass-item-highlight: #ffffff26;
-    out property <color> glass-item-edge: #ffffff38;
-    out property <color> glass-edge-strong: #ffffff40;
-    out property <color> glass-solid: #14161cfa;
-    out property <color> primary-top: #ffffff;
-    out property <color> primary-bottom: #d9dbe1;
-    out property <color> on-primary: #11141a;
-    // Vibrância: sobre vidro o texto secundário fica mais claro que no fundo opaco da tela cheia.
-    out property <color> desk-on-muted: #ffffffcc;
-    out property <color> desk-on-subtle: #ffffffa6;
-    out property <color> keycap-bg: #ffffff14;
-    out property <color> divider: #ffffff1f;
+    out property <color> glass-panel: surface;
+    out property <color> glass-panel-dense: surface-raised;
+    // Reflexos só no Liquid Glass.
+    out property <color> glass-highlight: desk-variant == 4 ? #ffffff24 : #ffffff00;
+    out property <color> glass-specular: desk-variant == 4 ? #ffffff24 : #ffffff00;
+    out property <color> glass-edge: desk-theme == 4 ? #ffffff21 : line-strong;
+    out property <color> glass-control: [#0e0e11, #0e0e0e, #0e0e0e, #0e0e0e, #ffffff1a, #141519][desk-variant];
+    out property <color> glass-hover: desk-variant == 4 ? #ffffff29 : #ffffff0d;
+    out property <color> glass-selected: desk-variant == 4 ? #ffffff1f : #ffffff17;
+    out property <color> glass-pressed: #ffffff24;
+    out property <color> glass-item-highlight: desk-variant == 4 ? #ffffff29 : #ffffff00;
+    out property <color> glass-item-edge: #ffffff14;
+    out property <color> glass-edge-strong: #ffffff4d;
+    out property <color> glass-solid: desk-variant == 4 ? #14161cfa : #141519;
+    out property <color> primary-top: primary;
+    out property <color> primary-bottom: primary;
+    // Texto de linha e de botão contornado (#ccc–#ddd do protótipo) e o secundário.
+    out property <color> desk-on-muted: #cfcacd;
+    out property <color> desk-on-subtle: desk-text-muted;
+    out property <color> keycap-bg: #ffffff08;
+    out property <color> divider: #ffffff38;
     out property <color> brand-red: #e3161e;
     out property <color> splash-bg: #000000;
     out property <color> splash-track: #1c1112;
@@ -107,15 +148,19 @@ export global Ui {
     out property <color> medal-gold: #f0cf6a;
     out property <color> medal-silver: #c9d0da;
     out property <color> medal-bronze: #d39a6a;
-    out property <color> focus-ring: #ffffff59;
-    out property <color> focus-fill: #ffffff24;
-    out property <color> focus-glow: #ffffff1f;
-    out property <color> shadow-float-color: #00000047;
-    out property <length> shadow-float-y: 12px;
-    out property <length> shadow-float-blur: 36px;
-    out property <color> shadow-layer-color: #00000080;
-    out property <length> shadow-layer-y: 24px;
-    out property <length> shadow-layer-blur: 48px;
+    out property <color> focus-ring: #ffffff99;
+    out property <color> focus-fill: #ffffff0d;
+    out property <color> focus-glow: #ffffff14;
+    // Sombra só no que flutua: menus (float), diálogos (layer) e a janela.
+    out property <color> shadow-float-color: #00000099;
+    out property <length> shadow-float-y: 24px;
+    out property <length> shadow-float-blur: 60px;
+    out property <color> shadow-layer-color: #00000099;
+    out property <length> shadow-layer-y: 40px;
+    out property <length> shadow-layer-blur: 100px;
+    out property <color> shadow-window-color: #00000073;
+    out property <length> shadow-window-y: 30px;
+    out property <length> shadow-window-blur: 80px;
 
     in-out property <string> font-heading: "Poppins";
     in-out property <string> font-desk: "Plus Jakarta Sans";
@@ -143,11 +188,18 @@ export global Ui {
     out property <length> space-24: 24px;
     out property <length> space-28: 28px;
     out property <length> space-36: 36px;
-    out property <length> radius-icon: 6px;
-    out property <length> radius-thumb: 8px;
-    out property <length> radius-control: 14px;
-    out property <length> radius-row: 14px;
-    out property <length> radius-card: 20px;
+    out property <length> space-40: 40px;
+    out property <length> space-48: 48px;
+    out property <length> radius-icon: 7px;
+    out property <length> radius-thumb: 7px;
+    // Liquid Glass com "Controles em pílula": controles e botões ficam totalmente redondos.
+    property <bool> pill: desk-theme == 4 && glass-pill;
+    out property <length> radius-control: pill ? 999px : 9px;
+    out property <length> radius-row: 10px;
+    out property <length> radius-button: pill ? 999px : 11px;
+    out property <length> radius-card: 16px;
+    out property <length> radius-hero: 18px;
+    out property <length> radius-full: 999px;
     out property <length> topbar-height: 64px;
     // BarraDaJanela: a barra da própria janela (sem moldura do Windows), por cima da arte.
     out property <length> window-control-width: 46px;
@@ -161,7 +213,7 @@ export global Ui {
     out property <length> primary-height: 56px;
     out property <length> round-button: 52px;
     out property <length> card-height: 248px;
-    out property <length> focus-ring-width: 4px;
+    out property <length> focus-ring-width: 3px;
     out property <length> settings-row-height: 56px;
     out property <length> thumb-size: 40px;
     out property <length> list-icon-size: 28px;
@@ -170,10 +222,25 @@ export global Ui {
     out property <length> glass-light-height: 380px;
     out property <length> glass-highlight-height: 150px;
 
-    // Tempo: o hover fica com "Reduzir animações" (é só cor); o resto zera.
-    out property <duration> tempo-hover: 180ms;
+    // Tempo (MovimentoBase): com "Reduzir animações" tudo vira 0.
+    out property <duration> tempo-hover: reduce-motion ? 0ms : 200ms;
+    out property <duration> tempo-foco: reduce-motion ? 0ms : 150ms;
+    out property <duration> tempo-estado: reduce-motion ? 0ms : 250ms;
+    out property <duration> tempo-pagina: reduce-motion ? 0ms : 450ms;
+    out property <duration> tempo-saida: reduce-motion ? 0ms : 200ms;
+    out property <duration> tempo-troca: reduce-motion ? 0ms : 500ms;
+    out property <duration> tempo-escada: reduce-motion ? 0ms : 55ms;
+    out property <duration> tempo-lista: reduce-motion ? 0ms : 500ms;
+    out property <duration> tempo-arte: reduce-motion ? 0ms : 800ms;
+    out property <duration> tempo-destaque: reduce-motion ? 0ms : 900ms;
+    // Cores da arte deslizando para a paleta nova (TAKO).
+    out property <duration> tempo-cor: reduce-motion ? 0ms : 1000ms;
+    out property <duration> tempo-contador: reduce-motion ? 0ms : 1100ms;
+    out property <duration> tempo-radar: reduce-motion ? 0ms : 900ms;
     out property <duration> tempo-pulso: reduce-motion ? 0ms : 1600ms;
-    out property <duration> tempo-carrossel: reduce-motion ? 0ms : 8000ms;
+    out property <duration> tempo-carrossel: reduce-motion ? 0ms : 7000ms;
+    // Uma curva para quase tudo; os crossfades de arte e de opacidade usam `ease`.
+    out property <easing> curva-entrada: cubic-bezier(0.22, 1, 0.36, 1);
     // Troca de jogo no destaque: o texto apaga em 120 e o novo acende em 200.
     out property <duration> tempo-texto-sai: reduce-motion ? 0ms : 120ms;
     out property <duration> tempo-texto-entra: reduce-motion ? 0ms : 200ms;
@@ -235,7 +302,9 @@ export global Ui {
     // BRAND-001: no app o polvo se monta sozinho (sem barra), os sete tentáculos chegando em 1,4 s.
     out property <duration> tempo-montagem: reduce-motion ? 0ms : 1400ms;
     // Escala: com "Reduzir animações" tudo fica em 1.
-    out property <float> escala-pressionado: reduce-motion ? 1 : 0.97;
+    out property <float> escala-pressionado: reduce-motion ? 1 : 0.98;
     out property <float> escala-entrada: reduce-motion ? 1 : 0.98;
-    out property <float> escala-menu: reduce-motion ? 1 : 0.96;
+    out property <float> escala-menu: reduce-motion ? 1 : 0.98;
+    out property <float> escala-vista: reduce-motion ? 1 : 0.985;
+    out property <float> escala-capa: reduce-motion ? 1 : 1.05;
 }

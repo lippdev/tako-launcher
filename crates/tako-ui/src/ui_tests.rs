@@ -938,6 +938,20 @@ fn desktop_snapshot() {
             ctx.settings
                 .set(crate::shell::ctx::keys::SIDEBAR_WIDTH, "narrow");
         }
+        // `TAKO_SNAP_DESK_THEME=tako|dark|midnight|oled|glass`, `TAKO_SNAP_ACCENT=#rrggbb` e `TAKO_SNAP_MOTION=1`
+        // (Reduzir animações) escolhem o tema do desktop; o padrão é o TAKO.
+        for (var, key) in [
+            ("TAKO_SNAP_DESK_THEME", crate::desk_theme::THEME),
+            ("TAKO_SNAP_ACCENT", crate::desk_theme::ACCENT),
+        ] {
+            if let Ok(v) = std::env::var(var) {
+                ctx.settings.set(key, &v);
+            }
+        }
+        if std::env::var("TAKO_SNAP_MOTION").is_ok_and(|v| v == "1") {
+            ctx.settings
+                .set_bool(crate::shell::ctx::keys::REDUCED_MOTION, true);
+        }
         // `TAKO_SNAP_TEXT=125`: tamanho do texto (ListaTexto125).
         if let Ok(t) = std::env::var("TAKO_SNAP_TEXT")
             && !t.is_empty()
@@ -1533,6 +1547,13 @@ created-by-tako = true
                 }
                 crate::bridge::set(&ui, name, value);
             }
+            // O que o `App` entrega ao `Ui` fora do `render`.
+            crate::desk_theme::apply(&ui, &shell.ctx.settings);
+            let motion = shell
+                .ctx
+                .settings
+                .bool(crate::shell::ctx::keys::REDUCED_MOTION, false);
+            crate::bridge::set_global(&ui, "Ui", "reduce-motion", Value::Bool(motion));
             if switch.is_some() {
                 let id = shell.focused_game();
                 let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
