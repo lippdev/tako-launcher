@@ -5,6 +5,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 ## [Unreleased]
 
 ### What's new
+- **New brand on the desktop:** the octopus, the TAKO wordmark and タコ in the top bar, the octopus as the app icon (window, installer and packages) and new thin-stroke icons across the desktop interface. Full screen keeps its layout, with the new octopus in the icon and the sidebar.
 - **Activities in the top bar:** a pill before the profile shows what Tako is doing in the background (library refresh, update check, downloads, covers), with progress, a summary when done and "Try again" on errors; clicking it opens the "Activities" list.
 - **ScreenScraper with your developer account:** anyone with ScreenScraper developer credentials can enter them in Settings and use ScreenScraper even on builds that don't include them.
 - **Windows full screen mode:** use Tako as the home app from Settings.

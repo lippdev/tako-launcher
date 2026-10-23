@@ -5,6 +5,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 ## [Unreleased]
 
 ### Novidades
+- **Marca nova no desktop:** o polvo, a palavra TAKO e タコ na barra de cima, o polvo como ícone do app (janela, instalador e pacotes) e ícones novos de traço fino na interface do desktop. A tela cheia mantém o layout, com o polvo novo no ícone e na barra lateral.
 - **Atividades na barra de cima:** uma pílula antes do perfil mostra o que o Tako faz em segundo plano (atualizar a biblioteca, procurar atualização, downloads, capas), com o andamento, o resumo ao concluir e "Tentar de novo" no erro; clicar abre a lista "Atividades".
 - **ScreenScraper com a sua conta de desenvolvedor:** quem tem credenciais de desenvolvedor do ScreenScraper pode colocá-las nas Configurações e usar o ScreenScraper mesmo em versões que não as trazem.
 - **Modo tela cheia do Windows:** use o Tako como tela inicial nas Configurações.
