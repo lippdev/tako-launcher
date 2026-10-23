@@ -1,4 +1,4 @@
-//! Itens da barra de cima na ordem do teclado (←/→ na zona Bar). O Slint conta na mesma ordem (`focus-index`).
+//! Itens da barra de cima na ordem do teclado (←/→ e Tab na zona Bar). O Slint conta na mesma ordem (`focus-index`).
 
 use super::{Ctx, Effect, Nav, activities, desktop};
 use std::time::Instant;
@@ -15,39 +15,34 @@ pub(super) enum Item {
     Close,
 }
 
-/// Abas da barra (só a Biblioteca). O Slint soma `items.length` (as abas de `desk-nav`) ao índice do foco, então
-/// `render_desktop_bar` publica exatamente esta quantidade; o teste da barra falha se divergirem.
+/// Abas da barra (só a Biblioteca). O Slint soma `items.length` (as abas de `desk-nav`) ao índice do foco
+/// (`first-right: 2 + items.length`), então `render_desktop_bar` publica exatamente esta quantidade; o teste da
+/// barra falha se `ITEMS`, `TABS` e o Slint divergirem.
 pub(super) const TABS: usize = 1;
 
-/// Os itens agora: a pílula de atividades só entra com algo na fila.
-pub(super) fn items(ctx: &Ctx) -> Vec<Item> {
-    let mut v = vec![Item::Brand];
-    v.extend([Item::Library; TABS]);
-    if activities::visible(ctx, Instant::now()) {
-        v.push(Item::Downloads);
-    }
-    v.extend([
-        Item::Profile,
-        Item::BigPicture,
-        Item::Minimize,
-        Item::Maximize,
-        Item::Close,
-    ]);
-    v
-}
+pub(super) const ITEMS: [Item; 8] = [
+    Item::Brand,
+    Item::Library,
+    Item::Downloads,
+    Item::Profile,
+    Item::BigPicture,
+    Item::Minimize,
+    Item::Maximize,
+    Item::Close,
+];
 
-pub(super) fn item(ctx: &Ctx, index: usize) -> Option<Item> {
-    items(ctx).get(index).copied()
+pub(super) fn item(index: usize) -> Option<Item> {
+    ITEMS.get(index).copied()
 }
 
 /// Tab / Shift+Tab dentro da barra: o item vizinho; `None` no extremo (a página passa para a zona seguinte).
-pub(super) fn step(ctx: &Ctx, index: usize, forward: bool) -> Option<usize> {
+pub(super) fn step(index: usize, forward: bool) -> Option<usize> {
     let next = if forward {
         index + 1
     } else {
         index.checked_sub(1)?
     };
-    (next < items(ctx).len()).then_some(next)
+    (next < ITEMS.len()).then_some(next)
 }
 
 /// Enter no item. A Biblioteca é de cada página (a biblioteca vai para a lista, o perfil volta a ela).
@@ -69,9 +64,10 @@ pub(super) fn activate(item: Item, ctx: &mut Ctx) -> Nav {
 mod tests {
     use super::*;
     use slint::Model;
+    use std::time::Instant;
 
     #[test]
-    fn the_slint_tabs_match_the_keyboard_items() {
+    fn the_slint_tabs_and_first_right_match_the_keyboard_items() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = tempfile::tempdir().unwrap();
         let ctx = crate::app::build_ctx(
@@ -87,10 +83,10 @@ mod tests {
         else {
             panic!("desk-nav não é uma lista");
         };
-        let keyboard = items(&shell.ctx)
-            .iter()
-            .filter(|i| **i == Item::Library)
-            .count();
-        assert_eq!((tabs.row_count(), keyboard), (TABS, TABS));
+        let library = ITEMS.iter().filter(|i| **i == Item::Library).count();
+        assert_eq!((tabs.row_count(), library), (TABS, TABS));
+        // `first-right` (perfil) é 2 (marca e downloads) + as abas.
+        let profile = ITEMS.iter().position(|i| *i == Item::Profile);
+        assert_eq!(profile, Some(2 + tabs.row_count()));
     }
 }

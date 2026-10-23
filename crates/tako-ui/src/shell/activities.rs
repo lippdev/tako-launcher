@@ -1,6 +1,6 @@
-//! AtividadeNaBarra (UX-006): alimenta a fila de `tako_core::activities` com o que o Tako faz em segundo plano
-//! (biblioteca, capas, atualização), monta a pílula da barra de cima e a lista "Atividades". Os downloads e a
-//! busca de atualização alimentam a fila nos próprios módulos (`downloads.rs`, `app_updates.rs`).
+//! AtividadeNaBarra (UX-006/007): alimenta a fila de `tako_core::activities` com o que o Tako faz em segundo plano
+//! (biblioteca, capas, atualização), monta o botão Downloads da barra de cima e o popover com a lista. Os downloads
+//! e a busca de atualização alimentam a fila nos próprios módulos (`downloads.rs`, `app_updates.rs`).
 
 use super::layer::{Flow, Layer};
 use super::{Cmd, Ctx, Effect, Out};
@@ -17,16 +17,10 @@ const UPDATE_READY: &str = "update-ready";
 pub(crate) const UPDATE_CHECK: &str = "update-check";
 
 crate::theme_struct! {
-    /// A pílula da barra de cima (`desk-activity`); `announce` vale mesmo com a pílula fora.
+    /// O botão Downloads da barra de cima (`desk-activity`): o contador (0 = sem bolinha) e o nome acessível;
+    /// `announce` é a região viva (início, conclusão e erro de qualquer atividade).
     pub struct ActivityData {
-        pub on: bool,
-        pub id: String,
-        pub title: String,
-        pub detail: String,
-        pub icon: String,
-        pub progress: f32,
-        pub action: String,
-        pub more: i32,
+        pub count: i32,
         pub label: String,
         pub announce: String,
     }
@@ -72,42 +66,24 @@ fn announcement(ctx: &Ctx, a: &Activity) -> String {
     }
 }
 
-/// A pílula da barra de cima: some com a fila vazia.
+/// O botão Downloads: o contador é o que está na lista visível (andamento, erro e concluídas recentes).
 pub fn render(ctx: &Ctx, out: &mut Out, now: Instant) {
     let announce = (ctx.activity.list.last_event())
         .map(|a| announcement(ctx, a))
         .unwrap_or_default();
-    let data = match ctx.activity.list.shown(now) {
-        Some(Shown { activity: a, more }) => ActivityData {
-            on: true,
-            id: format!("{}:{:?}", a.key, a.state),
-            title: a.title.clone(),
-            detail: a.detail.clone(),
-            icon: icon(a).into(),
-            progress: f32::from(a.progress.unwrap_or(0)),
-            action: a.action.map(|x| action_label(ctx, x)).unwrap_or_default(),
-            more: more as i32,
-            label: match more {
-                0 => a.title.clone(),
-                n => format!(
-                    "{}, {}",
-                    a.title,
-                    ctx.tf("desktop.activity.more", &[("n", &n.to_string())])
-                ),
-            },
-            announce,
-        },
-        None => ActivityData {
-            announce,
-            ..Default::default()
-        },
+    let count = ctx.activity.list.shown(now).map_or(0, |s| s.more + 1);
+    let label = match count {
+        0 => ctx.t("desktop.activity.button"),
+        n => ctx.tf("desktop.activity.button_n", &[("n", &n.to_string())]),
     };
-    out.set("desk-activity", data);
-}
-
-/// Há pílula na barra agora (entra na ordem do teclado).
-pub fn visible(ctx: &Ctx, now: Instant) -> bool {
-    ctx.activity.list.shown(now).is_some()
+    out.set(
+        "desk-activity",
+        ActivityData {
+            count: count as i32,
+            label,
+            announce,
+        },
+    );
 }
 
 /// A lista "Atividades" é a camada de cima (clicar na pílula de novo a fecha).
@@ -117,28 +93,19 @@ pub fn list_is_open(layers: &[Box<dyn Layer>], ctx: &Ctx) -> bool {
         .is_some_and(|l| l.render(ctx).kind == "activities")
 }
 
-/// Clique na pílula: o destino da atividade mostrada; com várias, erro ou concluída, a lista.
-pub fn open(ctx: &mut Ctx, now: Instant) {
-    let Some(Shown { activity: a, more }) = ctx.activity.list.shown(now) else {
-        return;
-    };
-    let kind = (more == 0 && a.state == Phase::Running).then_some(a.kind);
-    open_kind(ctx, kind);
-}
-
-/// Aceitar na pílula (teclado e controle, sem o botão do mouse): num erro com ação, refaz o trabalho; no resto,
-/// o mesmo que o clique. A lista fica no botão de menu.
+/// Aceitar no botão (teclado e controle, sem o botão do mouse): num erro com ação, refaz o trabalho; no resto,
+/// abre o popover. O clique do mouse só abre; refazer é da linha do erro.
 pub fn accept(ctx: &mut Ctx, now: Instant) {
     match ctx.activity.list.shown(now) {
         Some(Shown { activity: a, .. }) if a.state == Phase::Failed && a.action.is_some() => {
             let key = a.key.clone();
             run_action(ctx, &key);
         }
-        _ => open(ctx, now),
+        _ => open_list(ctx),
     }
 }
 
-/// Abre a lista "Atividades".
+/// Abre o popover Downloads.
 pub fn open_list(ctx: &mut Ctx) {
     open_kind(ctx, None);
 }
@@ -452,6 +419,12 @@ impl Layer for ListLayer {
             } else {
                 ctx.t("desktop.activity.idle")
             },
+            // Sem nada na fila.
+            preview_text: if rows.is_empty() {
+                ctx.t("desktop.activity.none")
+            } else {
+                String::new()
+            },
             rows,
             tabs: vec![
                 ctx.t("desktop.activity.view_downloads"),
@@ -485,7 +458,7 @@ mod tests {
         (dir, shell)
     }
 
-    /// Um campo da pílula (`desk-activity`), como a janela o recebe.
+    /// Um campo do botão (`desk-activity`), como a janela o recebe.
     fn prop(shell: &mut Shell, name: &str, now: Instant) -> Value {
         let out = shell.render(now);
         let Value::Struct(pill) = out
@@ -515,12 +488,13 @@ mod tests {
     }
 
     #[test]
-    fn pill_follows_the_queue_and_shows_the_most_important_with_more() {
+    fn button_counts_what_is_in_the_queue_and_names_it_for_the_reader() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
         let now = Instant::now();
-        assert_eq!(prop(&mut shell, "on", now), Value::Bool(false));
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(0.));
+        assert_eq!(text(prop(&mut shell, "label", now)), "Downloads");
 
         let list = &mut shell.ctx.activity.list;
         list.start(
@@ -530,20 +504,13 @@ mod tests {
             "Steam · 3 de 5 lojas",
             now,
         );
-        assert_eq!(prop(&mut shell, "on", now), Value::Bool(true));
-        assert_eq!(text(prop(&mut shell, "icon", now)), "spin");
-        assert_eq!(
-            text(prop(&mut shell, "detail", now)),
-            "Steam · 3 de 5 lojas"
-        );
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
+        assert_eq!(text(prop(&mut shell, "label", now)), "Downloads, 1 ativos");
 
         let list = &mut shell.ctx.activity.list;
         list.start("download:1", Kind::Download, "Hades II", "", now);
         list.progress("download:1", Some(42), "42% · faltam 4 min");
-        assert_eq!(text(prop(&mut shell, "title", now)), "Hades II");
-        assert_eq!(text(prop(&mut shell, "icon", now)), "ring");
-        assert_eq!(prop(&mut shell, "more", now), Value::Number(1.));
-        assert!(text(prop(&mut shell, "label", now)).ends_with("e mais 1"));
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(2.));
         // O leitor de tela não ouve a porcentagem.
         assert!(!text(prop(&mut shell, "announce", now)).contains('%'));
 
@@ -554,8 +521,6 @@ mod tests {
             Some(Action::Retry),
             now,
         );
-        assert_eq!(text(prop(&mut shell, "icon", now)), "warn");
-        assert_eq!(text(prop(&mut shell, "action", now)), "Tentar de novo");
         assert_eq!(
             text(prop(&mut shell, "announce", now)),
             "Erro: Não baixou Hades II"
@@ -563,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn finished_activity_leaves_the_pill_in_four_seconds_and_tick_asks_for_the_redraw() {
+    fn finished_activity_leaves_the_count_in_four_seconds_and_tick_asks_for_the_redraw() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_dir, mut shell) = shell();
         let now = Instant::now();
@@ -576,15 +541,15 @@ mod tests {
             now,
         );
         list.finish(LIBRARY, "Biblioteca atualizada", "4 jogos novos", now);
-        assert_eq!(text(prop(&mut shell, "icon", now)), "done");
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
         tick(&mut shell.ctx, now);
         assert_eq!(shell.ctx.redraw_at, Some(now + Duration::from_secs(4)));
         let later = now + Duration::from_secs(4);
-        assert_eq!(prop(&mut shell, "on", later), Value::Bool(false));
+        assert_eq!(prop(&mut shell, "count", later), Value::Number(0.));
     }
 
     #[test]
-    fn clicking_the_pill_opens_the_target_of_each_kind() {
+    fn the_button_opens_the_popover_and_each_row_opens_its_target() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let now = Instant::now();
@@ -597,33 +562,27 @@ mod tests {
                 Phase::Failed => list.fail("k", "Erro", None, now),
                 Phase::Running => {}
             }
+            // O botão sempre abre o popover, mesmo com uma atividade só.
             shell.click("desk-activity", 0);
-            let layer = shell.layers.last().map(|l| l.render(&shell.ctx));
-            layer.map(|o| {
-                (
-                    o.kind,
-                    o.rows.first().map(|r| r.key.clone()).unwrap_or_default(),
-                )
-            })
+            assert_eq!(top(&shell).kind, "activities");
+            shell.click("overlay-row", 0);
+            shell.layers.last().map(|l| l.render(&shell.ctx))
         };
+        // Procurando atualizações → MenuDoTako; Atualização pronta → o diálogo; download → PainelDownloads;
+        // capas → a revisão; erro e concluída ficam na lista (o erro fecha, a concluída abre o destino).
         assert_eq!(
-            open(Kind::LibraryRefresh, Phase::Running).unwrap().0,
-            "activities"
-        );
-        assert_eq!(
-            open(Kind::CloudSync, Phase::Running).unwrap().0,
-            "activities"
-        );
-        assert_eq!(open(Kind::Download, Phase::Failed).unwrap().0, "activities");
-        assert_eq!(open(Kind::Covers, Phase::Done).unwrap().0, "activities");
-        // Procurando atualizações → MenuDoTako; Atualização pronta → o diálogo; download → PainelDownloads.
-        assert_eq!(
-            open(Kind::UpdateCheck, Phase::Running).unwrap().1,
+            open(Kind::UpdateCheck, Phase::Running).unwrap().rows[0].key,
             "settings"
         );
-        assert_eq!(open(Kind::UpdateReady, Phase::Running).unwrap().0, "update");
-        assert_eq!(open(Kind::Download, Phase::Running).unwrap().0, "panel");
+        assert_eq!(
+            open(Kind::UpdateReady, Phase::Running).unwrap().kind,
+            "update"
+        );
+        assert_eq!(open(Kind::Download, Phase::Running).unwrap().kind, "panel");
         assert!(open(Kind::Covers, Phase::Running).is_some());
+        // O erro sem ação fecha na linha e a lista continua aberta.
+        let closed = open(Kind::CloudSync, Phase::Failed).unwrap();
+        assert_eq!((closed.kind.as_str(), closed.rows.len()), ("activities", 0));
     }
 
     #[test]
@@ -653,9 +612,9 @@ mod tests {
         let o = top(&shell);
         assert_eq!(
             (o.kind.as_str(), o.title.as_str()),
-            ("activities", "Atividades")
+            ("activities", "Downloads")
         );
-        assert_eq!(o.overline, "2 em andamento");
+        assert_eq!(o.overline, "2 ativos");
         let titles: Vec<_> = o.rows.iter().map(|r| r.title.as_str()).collect();
         assert_eq!(
             titles,
@@ -675,7 +634,7 @@ mod tests {
     }
 
     #[test]
-    fn closing_an_error_row_removes_it_and_the_retry_runs_from_the_pill() {
+    fn closing_an_error_row_removes_it_and_the_row_retries_the_work() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_dir, mut shell) = shell();
         let now = Instant::now();
@@ -687,7 +646,8 @@ mod tests {
             Some(Action::Retry),
             now,
         );
-        shell.click("desk-activity-action", 0);
+        shell.click("desk-activity", 0);
+        shell.click("overlay-row", 0);
         assert!(shell.ctx.activity.list.all().is_empty());
         assert!(matches!(
             shell.ctx.effects.last(),
@@ -696,7 +656,6 @@ mod tests {
         let list = &mut shell.ctx.activity.list;
         list.start("cloud", Kind::CloudSync, "x", "", now);
         list.fail("cloud", "Sem rede", None, now);
-        shell.click("desk-activity", 0);
         shell.click("overlay-row", 0);
         assert!(shell.ctx.activity.list.all().is_empty(), "fechar o erro");
     }
@@ -736,20 +695,22 @@ mod tests {
     }
 
     #[test]
-    fn update_ready_shows_a_dot_until_the_update_goes_away() {
+    fn update_ready_is_counted_with_a_dot_row_until_the_update_goes_away() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_dir, mut shell) = shell();
         let now = Instant::now();
         shell.ctx.update_ready = Some("x".into());
         tick(&mut shell.ctx, now);
-        assert_eq!(text(prop(&mut shell, "icon", now)), "dot");
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
+        shell.click("desk-activity", 0);
+        assert_eq!(top(&shell).rows[0].icon, "dot");
         shell.ctx.update_ready = None;
         tick(&mut shell.ctx, now);
-        assert_eq!(prop(&mut shell, "on", now), Value::Bool(false));
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(0.));
     }
 
     #[test]
-    fn accepting_a_failed_pill_with_an_action_retries_it_and_the_list_row_too() {
+    fn accepting_a_failed_button_with_an_action_retries_it_and_the_list_row_too() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         let failed = |shell: &mut Shell| {
@@ -802,9 +763,9 @@ mod tests {
         );
         list.start("download:1", Kind::Download, "Hades II", "", now);
         list.progress("download:1", Some(10), "10%");
-        // A biblioteca termina atrás do download: a pílula mostra o download, o leitor ouve a conclusão.
+        // A biblioteca termina atrás do download: o leitor ouve a conclusão e o contador segue em 2.
         list.finish(LIBRARY, "Biblioteca atualizada", "4 jogos novos", now);
-        assert_eq!(text(prop(&mut shell, "title", now)), "Hades II");
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(2.));
         assert_eq!(
             text(prop(&mut shell, "announce", now)),
             "Biblioteca atualizada. 4 jogos novos"
@@ -812,7 +773,7 @@ mod tests {
     }
 
     #[test]
-    fn clicking_the_pill_with_the_list_open_closes_it_instead_of_stacking_another() {
+    fn clicking_the_button_with_the_popover_open_closes_it_instead_of_stacking_another() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_dir, mut shell) = shell();
         let now = Instant::now();

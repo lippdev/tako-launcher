@@ -563,7 +563,7 @@ impl Shell {
             return;
         }
         if zone == "desk-activity" && activities::list_is_open(&self.layers, &self.ctx) {
-            // A pílula abre e fecha a lista (as outras camadas ignoram o clique na barra).
+            // O botão Downloads abre e fecha o popover (as outras camadas ignoram o clique na barra).
             self.layers.pop();
             return;
         }
@@ -593,16 +593,9 @@ impl Shell {
             return;
         }
         if zone == "desk-activity" {
-            activities::open(&mut self.ctx, Instant::now());
+            activities::open_list(&mut self.ctx);
             self.after_action();
             self.ctx.dirty = true;
-            return;
-        }
-        if zone == "desk-activity-action" {
-            if let Some(a) = self.ctx.activity.list.shown(Instant::now()) {
-                let key = a.activity.key.clone();
-                activities::run_action(&mut self.ctx, &key);
-            }
             return;
         }
         if zone == "desk-brand" {

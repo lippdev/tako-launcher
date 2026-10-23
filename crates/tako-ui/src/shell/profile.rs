@@ -333,7 +333,7 @@ impl ProfilePage {
 
     fn zone_len(&self, zone: Zone, ctx: &Ctx) -> usize {
         match zone {
-            Zone::Bar => super::bar::items(ctx).len(),
+            Zone::Bar => super::bar::ITEMS.len(),
             Zone::Tabs => TABS.len(),
             Zone::Actions => ACTIONS,
             Zone::Tiles => TILES,
@@ -356,7 +356,7 @@ impl ProfilePage {
             Zone::Tabs => TABS.iter().position(|t| *t == self.tab).unwrap_or(0),
             Zone::Periods => PERIODS.iter().position(|p| *p == self.period).unwrap_or(0),
             // O foco começa no botão do perfil (a página em que está).
-            Zone::Bar => super::bar::items(ctx)
+            Zone::Bar => super::bar::ITEMS
                 .iter()
                 .position(|i| *i == super::bar::Item::Profile)
                 .unwrap_or(0),
@@ -367,7 +367,7 @@ impl ProfilePage {
     /// Enter (ou clique) no item com o foco.
     fn activate(&mut self, ctx: &mut Ctx) -> Nav {
         match self.zone {
-            Zone::Bar => match super::bar::item(ctx, self.index) {
+            Zone::Bar => match super::bar::item(self.index) {
                 Some(super::bar::Item::Library) => return Nav::Back,
                 Some(item) => return super::bar::activate(item, ctx),
                 None => {}
@@ -508,7 +508,7 @@ impl Page for ProfilePage {
         // Shift+Tab chega como Tab com Shift ou como "back tab" (U+0019), conforme o sistema.
         if c == keys::TAB || c == '\u{0019}' {
             let forward = c == keys::TAB && mods != KeyModifiers::SHIFT;
-            match super::bar::step(ctx, self.index, forward).filter(|_| self.zone == Zone::Bar) {
+            match super::bar::step(self.index, forward).filter(|_| self.zone == Zone::Bar) {
                 Some(i) => self.index = i,
                 None => self.step_zone(forward, ctx),
             }

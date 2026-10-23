@@ -665,7 +665,7 @@ impl Layer for Panel {
     }
 }
 
-/// Abrir o painel pela pílula da barra.
+/// Abrir o painel pelo botão Downloads da barra.
 pub fn open(ctx: &mut Ctx) {
     let p = panel(ctx);
     ctx.pending_layer = Some(Box::new(p));
