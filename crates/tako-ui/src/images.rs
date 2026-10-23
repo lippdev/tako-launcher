@@ -8,6 +8,7 @@ use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
+use tako_core::presentation::Rgb;
 
 /// Converte uma URI de arte (`https://`, `steam-art://`, `ssmedia://`...) num arquivo local, baixando se
 /// preciso. Roda nas threads de trabalho.
@@ -46,6 +47,8 @@ struct Lru {
     bytes: usize,
     limit: usize,
     frame: u64,
+    /// Chaves tiradas pelo teto, até o `State` apagar o que guarda delas (luminância e cor de destaque).
+    evicted: Vec<String>,
 }
 
 impl Lru {
@@ -56,6 +59,7 @@ impl Lru {
             bytes: 0,
             limit,
             frame: 0,
+            evicted: Vec::new(),
         }
     }
     fn get(&mut self, key: &str) -> Option<Image> {
@@ -96,6 +100,7 @@ impl Lru {
                 && let Some((_, b, _)) = self.map.remove(&old)
             {
                 self.bytes -= b;
+                self.evicted.push(old);
             }
         }
     }
@@ -136,6 +141,8 @@ struct State {
     lru: Lru,
     /// Grade de luminância de cada cópia de vidro (pela mesma chave do LRU); poucos bytes por arte.
     lum: HashMap<String, Vec<f32>>,
+    /// Cor de destaque tirada da arte de cada cópia de vidro (tema TAKO); `None` para arte sem cor.
+    accent: HashMap<String, Option<Rgb>>,
     /// Pedido na fila e quando foi feito.
     pending: HashMap<String, Instant>,
     /// Falhou e quando: tenta de novo depois de `RETRY` (uma falha de rede na abertura apagava as artes até reiniciar).
@@ -147,10 +154,21 @@ struct State {
     on_ready: Option<Box<dyn Fn()>>,
 }
 
+impl State {
+    /// Quem saiu do LRU leva junto a luminância e a cor de destaque: os mapas não crescem sem limite.
+    fn forget_evicted(&mut self) {
+        for key in self.lru.evicted.drain(..) {
+            self.lum.remove(&key);
+            self.accent.remove(&key);
+        }
+    }
+}
+
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State {
         lru: Lru::new(LIMIT),
         lum: HashMap::new(),
+        accent: HashMap::new(),
         pending: HashMap::new(),
         failed: HashMap::new(),
         tx: None,
@@ -193,6 +211,17 @@ pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
 /// JPG e WebP. `None` até ficar pronto (ou se a imagem não carrega): a lista desenha a inicial do nome.
 pub fn icon(uri: &str, size_px: u32) -> Option<Image> {
     request(uri, size_px, size_px, false, true)
+}
+
+/// Cor de destaque da arte (já amostrada junto da cópia de vidro); `None` sem arte pronta ou sem cor nela.
+pub fn art_accent(uri: &str) -> Option<Rgb> {
+    STATE.with(|s| {
+        s.borrow()
+            .accent
+            .get(&format!("glass|{uri}"))
+            .copied()
+            .flatten()
+    })
 }
 
 /// Cópia de vidro da arte do desktop (Liquid Glass sem desfoque em tempo real): desfocada e saturada uma vez,
@@ -288,7 +317,11 @@ pub fn is_pending(uri: &str) -> bool {
 
 /// Chamar depois de montar cada quadro (todas as `get` da tela já feitas).
 pub fn frame_done() {
-    STATE.with(|s| s.borrow_mut().lru.frame_done());
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.lru.frame_done();
+        s.forget_evicted();
+    });
 }
 
 /// Esquece falhas (ex.: depois de baixar novas artes).
@@ -303,6 +336,7 @@ pub fn clear() {
         s.lru.order.clear();
         s.lru.bytes = 0;
         s.lum.clear();
+        s.accent.clear();
     });
 }
 
@@ -316,12 +350,14 @@ fn worker(queue: Queue, resolver: Resolver) {
                 let mut s = s.borrow_mut();
                 s.pending.remove(&key);
                 match buf {
-                    Some((buf, lum)) => {
+                    Some((buf, glass)) => {
                         let bytes = (buf.width() * buf.height() * 4) as usize;
-                        if let Some(lum) = lum {
+                        if let Some((lum, accent)) = glass {
                             s.lum.insert(key.clone(), lum);
+                            s.accent.insert(key.clone(), accent);
                         }
                         s.lru.insert(key, shared(buf), bytes);
+                        s.forget_evicted();
                     }
                     None => {
                         s.failed.insert(key, Instant::now());
@@ -361,7 +397,10 @@ pub(crate) fn shared(buf: SharedPixelBuffer<Rgba8Pixel>) -> Image {
     .into()
 }
 
-type Loaded = (SharedPixelBuffer<Rgba8Pixel>, Option<Vec<f32>>);
+type Loaded = (
+    SharedPixelBuffer<Rgba8Pixel>,
+    Option<(Vec<f32>, Option<Rgb>)>,
+);
 
 /// Lê e decodifica; nada aqui pode derrubar a UI (arquivos e downloads são dados não confiáveis).
 fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
@@ -384,7 +423,7 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
     if req.glass {
         let (rgba, lum) = glass_copy(&img);
         let buf = SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height());
-        return Some((buf, Some(lum)));
+        return Some((buf, Some((lum, sample_accent(&img)))));
     }
     if req.icon {
         let rgba = round_icon(&img, req.max_w);
@@ -440,6 +479,15 @@ pub(crate) fn round_icon(img: &image::DynamicImage, size: u32) -> image::RgbaIma
         p.0[3] = (alpha * inside * 255.0).round() as u8;
     }
     out
+}
+
+/// Amostra a arte em 64 × 36 e escolhe a cor de destaque dela (`tako_core::presentation::art_accent`).
+pub(crate) fn sample_accent(img: &image::DynamicImage) -> Option<Rgb> {
+    let small = img
+        .resize_exact(64, 36, image::imageops::FilterType::Triangle)
+        .to_rgb8();
+    let pixels: Vec<Rgb> = small.pixels().map(|p| Rgb::new(p[0], p[1], p[2])).collect();
+    tako_core::presentation::art_accent(&pixels)
 }
 
 /// Reduz, satura e desfoca a arte; mede a luminância relativa (WCAG) de cada célula da grade.
@@ -586,6 +634,15 @@ mod tests {
     }
 
     #[test]
+    fn sample_accent_finds_the_art_hue_and_skips_gray_art() {
+        let blue = image::RgbaImage::from_pixel(800, 450, image::Rgba([0x51, 0x8b, 0xd6, 255]));
+        let accent = sample_accent(&image::DynamicImage::ImageRgba8(blue)).unwrap();
+        assert!(accent.b > accent.r, "{accent}");
+        let gray = image::RgbaImage::from_pixel(800, 450, image::Rgba([90, 90, 90, 255]));
+        assert_eq!(sample_accent(&image::DynamicImage::ImageRgba8(gray)), None);
+    }
+
+    #[test]
     fn glass_copy_is_small_blurred_and_measures_light_and_dark_art() {
         // Metade de cima branca, de baixo preta: a linha de cima da grade passa do limite da tinta densa (0,18).
         let art = image::RgbaImage::from_fn(800, 450, |_, y| {
@@ -719,5 +776,23 @@ mod tests {
         assert!(l.get("c").is_some());
         l.frame_done();
         assert_eq!((l.map.contains_key("b"), l.bytes), (false, 6));
+    }
+
+    #[test]
+    fn evicted_images_take_their_luminance_and_accent_with_them() {
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.lru = Lru::new(10);
+            for key in ["a", "b"] {
+                s.lum.insert(key.into(), vec![0.5]);
+                s.accent.insert(key.into(), None);
+                s.lru.insert(key.into(), Image::default(), 6);
+                s.lru.frame_done();
+            }
+            s.lru.frame_done();
+            s.forget_evicted();
+            assert_eq!(s.lum.keys().collect::<Vec<_>>(), ["b"]);
+            assert_eq!(s.accent.keys().collect::<Vec<_>>(), ["b"]);
+        });
     }
 }

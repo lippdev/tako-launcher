@@ -7,6 +7,8 @@ use tako_core::presentation::Rgb;
 
 pub const THEME: &str = "DesktopTheme";
 pub const ACCENT: &str = "DesktopAccent";
+/// "Cores da arte do jogo" (só no TAKO, ligado por padrão); a "Cor dinâmica" da tela cheia é outro ajuste.
+pub const ART_COLORS: &str = crate::shell::ctx::keys::DESKTOP_ART_COLORS;
 pub const GLASS_AMBIENT: &str = "DesktopGlassAmbient";
 pub const GLASS_OPACITY: &str = "DesktopGlassOpacity";
 pub const GLASS_PILL: &str = "DesktopGlassPill";
@@ -67,20 +69,34 @@ fn opacity(position: i32) -> f64 {
     f64::from(2 + position * 18 / 100) / 100.0
 }
 
-/// Texto sobre o destaque: escuro (#14110f) quando ele é claro (luminância > 0,6), branco nos outros.
+/// Texto sobre o destaque: escuro (#14110f) quando ele é claro (luma > 0,6), branco nos outros. Luma perceptual
+/// (0,299 R + 0,587 G + 0,114 B) como nas prévias: pela luminância WCAG a pedra daria texto branco a 1,7:1.
 fn on_accent(accent: Rgb) -> Rgb {
-    if accent.luminance() > 0.6 {
+    let luma =
+        (0.299 * f64::from(accent.r) + 0.587 * f64::from(accent.g) + 0.114 * f64::from(accent.b))
+            / 255.0;
+    if luma > 0.6 {
         Rgb::new(0x14, 0x11, 0x0f)
     } else {
         Rgb::WHITE
     }
 }
 
-/// Entrega ao Slint o que o tema escolhe; o `Ui` calcula as cores.
-pub fn apply(ui: &ComponentInstance, settings: &Settings) {
+/// O destaque que vale na tela. No TAKO é a cor da arte do jogo (com "Cores da arte do jogo" ligado e arte com cor)
+/// ou a pedra do logo; nos outros temas, a escolhida.
+pub fn effective_accent(settings: &Settings, art: Option<Rgb>) -> Rgb {
+    if theme(settings) != 0 {
+        return accent(settings);
+    }
+    art.filter(|_| settings.bool(ART_COLORS, true))
+        .unwrap_or(STONE)
+}
+
+/// Entrega ao Slint o que o tema escolhe; o `Ui` calcula as cores. `art` é a cor da arte do jogo na tela.
+pub fn apply(ui: &ComponentInstance, settings: &Settings, art: Option<Rgb>) {
     let set = |name, value| crate::bridge::set_global(ui, "Ui", name, value);
     set("desk-theme", Value::Number(theme(settings) as f64));
-    let c = accent(settings);
+    let c = effective_accent(settings, art);
     set(
         "desk-accent",
         slint::Color::from_rgb_u8(c.r, c.g, c.b).into(),
@@ -129,6 +145,42 @@ mod tests {
     }
 
     #[test]
+    fn art_colors_only_apply_to_tako_when_on_and_fall_back_to_the_chosen_accent() {
+        let blue = Rgb::new(0x51, 0x8b, 0xd6);
+        let art = Some(blue);
+        assert_eq!(effective_accent(&settings(&[]), art), blue);
+        assert_eq!(effective_accent(&settings(&[]), None), STONE);
+        assert_eq!(
+            effective_accent(&settings(&[(ART_COLORS, "false")]), art),
+            STONE
+        );
+        // No TAKO a cor escolhida não vale: é a da arte ou a pedra.
+        let orange = (ACCENT, "#ff8a3d");
+        assert_eq!(effective_accent(&settings(&[orange]), art), blue);
+        assert_eq!(effective_accent(&settings(&[orange]), None), STONE);
+        assert_eq!(
+            effective_accent(&settings(&[orange, (ART_COLORS, "false")]), art),
+            STONE
+        );
+        // A tela cheia desligar a "Cor dinâmica" não mexe nas cores da arte do desktop.
+        assert_eq!(
+            effective_accent(
+                &settings(&[(crate::shell::ctx::keys::DYNAMIC_COLOR, "false")]),
+                art
+            ),
+            blue
+        );
+        assert_eq!(
+            effective_accent(&settings(&[(THEME, "dark")]), art),
+            ACCENTS[5].0
+        );
+        assert_eq!(
+            effective_accent(&settings(&[(THEME, "glass"), orange]), art),
+            ACCENTS[1].0
+        );
+    }
+
+    #[test]
     fn sliders_map_to_the_design_ranges() {
         assert_eq!((opacity(0), opacity(100)), (0.02, 0.2));
         assert_eq!(
@@ -140,10 +192,10 @@ mod tests {
     #[test]
     fn light_accents_get_dark_text() {
         let dark = Rgb::new(0x14, 0x11, 0x0f);
-        assert_eq!(on_accent(STONE), Rgb::WHITE); // luminância 0,58: ainda abaixo de 0,6
+        assert_eq!(on_accent(STONE), dark); // luma 0,80
         assert_eq!(on_accent(ACCENTS[2].0), dark); // ouro
         assert_eq!(on_accent(ACCENTS[8].0), dark); // branco
-        assert_eq!(on_accent(ACCENTS[1].0), Rgb::WHITE); // laranja
+        assert_eq!(on_accent(ACCENTS[1].0), dark); // laranja, luma 0,64
         assert_eq!(on_accent(ACCENTS[5].0), Rgb::WHITE); // azul
     }
 }

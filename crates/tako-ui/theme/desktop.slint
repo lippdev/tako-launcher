@@ -6916,6 +6916,27 @@ component ArtLayer inherits Rectangle {
     }
     background: DeskArt.gray ? Ui.settings-bg : Ui.desk-canvas;
     animate background { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+    // Brilhos de canto do tema TAKO: a cor de destaque a 7% (alto à esquerda, 1200 × 520) e a 4% (baixo à direita,
+    // 900 × 600), apagando em 60%. O Slint só tem gradiente redondo: um quadrado achatado em y vira a elipse.
+    // A cor desliza em `tempo-cor` quando a arte do jogo muda.
+    if Ui.desk-theme == 0: Rectangle {
+        x: -1200px;
+        y: -1200px;
+        width: 2400px;
+        height: 2400px;
+        transform-scale-y: 520 / 1200;
+        background: @radial-gradient(circle 1200px, Ui.ambient-1 0%, Ui.ambient-1.with-alpha(0) 60%);
+        animate background { duration: Ui.tempo-cor; easing: ease; }
+    }
+    if Ui.desk-theme == 0: Rectangle {
+        x: parent.width - 900px;
+        y: parent.height - 900px;
+        width: 1800px;
+        height: 1800px;
+        transform-scale-y: 600 / 900;
+        background: @radial-gradient(circle 900px, Ui.ambient-2 0%, Ui.ambient-2.with-alpha(0) 60%);
+        animate background { duration: Ui.tempo-cor; easing: ease; }
+    }
     Rectangle {
         opacity: DeskArt.gray ? 0 : 1;
         animate opacity { duration: Ui.color-time; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }

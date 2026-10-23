@@ -67,6 +67,78 @@ pub fn contrast(a: Rgb, b: Rgb) -> f64 {
     la.max(lb) / la.min(lb)
 }
 
+/// Cor de destaque tirada da arte de um jogo no tema TAKO (UX-007). Agrupa os pixels em faixas de matiz de 20°,
+/// ignorando cinzas, pretos e brancos, escolhe a faixa de cor mais forte (soma das saturações) e devolve o matiz
+/// médio dela com saturação de 62–92% e luz de 50–58%. `None` se a arte quase não tem cor.
+pub fn art_accent(pixels: &[Rgb]) -> Option<Rgb> {
+    const BINS: usize = 18;
+    // Por faixa: peso (soma das saturações), e as somas de matiz, saturação e luz ponderadas por esse peso.
+    let mut bins = [[0.0f64; 4]; BINS];
+    let mut colorful = 0usize;
+    for &p in pixels {
+        let (h, s, l) = to_hsl(p);
+        if s < 0.25 || !(0.12..=0.9).contains(&l) {
+            continue;
+        }
+        colorful += 1;
+        let bin = &mut bins[((h / 20.0) as usize).min(BINS - 1)];
+        for (sum, v) in bin.iter_mut().zip([s, h * s, s * s, l * s]) {
+            *sum += v;
+        }
+    }
+    // Um punhado de pixels coloridos numa arte cinza não faz destaque.
+    if colorful * 100 < pixels.len().max(1) {
+        return None;
+    }
+    let [weight, hue, sat, light] = *bins.iter().max_by(|a, b| a[0].total_cmp(&b[0]))?;
+    (weight > 0.0).then(|| {
+        from_hsl(
+            hue / weight,
+            (sat / weight).clamp(0.62, 0.92),
+            (light / weight).clamp(0.50, 0.58),
+        )
+    })
+}
+
+/// Matiz em graus, saturação e luz (0–1) do HSL.
+fn to_hsl(c: Rgb) -> (f64, f64, f64) {
+    let [r, g, b] = [c.r, c.g, c.b].map(|v| f64::from(v) / 255.0);
+    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+    let l = (max + min) / 2.0;
+    let d = max - min;
+    if d == 0.0 {
+        return (0.0, 0.0, l);
+    }
+    let s = d / (1.0 - (2.0 * l - 1.0).abs());
+    let h = if max == r {
+        ((g - b) / d).rem_euclid(6.0)
+    } else if max == g {
+        (b - r) / d + 2.0
+    } else {
+        (r - g) / d + 4.0
+    };
+    (h * 60.0, s, l)
+}
+
+fn from_hsl(h: f64, s: f64, l: f64) -> Rgb {
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let (r, g, b) = match (h / 60.0) as u32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let m = l - c / 2.0;
+    Rgb::new(
+        round((r + m) * 255.0),
+        round((g + m) * 255.0),
+        round((b + m) * 255.0),
+    )
+}
+
 /// Accent do jogo em foco e seu tom profundo (DESIGN.md › Colors).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AccentPalette {
@@ -269,5 +341,46 @@ mod tests {
         assert_eq!(parse_argb("#FFFFFF"), Some((Rgb::WHITE, 1.0)));
         assert_eq!(parse_argb("#12"), None);
         assert_eq!(parse_argb("#ççFFFFFF"), None);
+    }
+
+    #[test]
+    fn art_accent_ignores_gray_black_and_white_art() {
+        let gray = [Rgb::new(128, 128, 128); 100];
+        assert_eq!(art_accent(&gray), None);
+        let bw: Vec<Rgb> = (0..100)
+            .map(|i| {
+                if i % 2 == 0 {
+                    Rgb::new(0, 0, 0)
+                } else {
+                    Rgb::WHITE
+                }
+            })
+            .collect();
+        assert_eq!(art_accent(&bw), None);
+        assert_eq!(art_accent(&[]), None);
+    }
+
+    #[test]
+    fn art_accent_picks_the_strongest_hue_within_the_design_ranges() {
+        // Neve azul (God of War) com um pouco de vermelho: ganha o azul, em ~214°.
+        let mut art = vec![Rgb::new(0x51, 0x8b, 0xd6); 70];
+        art.extend([Rgb::new(200, 40, 40); 10]);
+        art.extend([Rgb::new(20, 20, 20); 20]);
+        let (h, s, l) = to_hsl(art_accent(&art).unwrap());
+        assert!((200.0..220.0).contains(&h), "matiz {h}");
+        assert!(
+            // Folga de 0,01: voltar a 8 bits por canal arredonda um pouco.
+            (0.61..=0.93).contains(&s) && (0.49..=0.59).contains(&l),
+            "s {s} l {l}"
+        );
+    }
+
+    #[test]
+    fn art_accent_takes_the_hue_with_more_color_not_the_dull_majority() {
+        // Muito marrom apagado (saturação 30%) contra um pouco de verde vivo: pesa a saturação.
+        let mut art = vec![Rgb::new(130, 100, 70); 60];
+        art.extend([Rgb::new(30, 230, 90); 40]);
+        let (h, ..) = to_hsl(art_accent(&art).unwrap());
+        assert!((120.0..160.0).contains(&h), "matiz {h}");
     }
 }
