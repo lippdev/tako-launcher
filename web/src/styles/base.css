@@ -16,6 +16,69 @@
   --brand-glow-blur: 8px;
   /* "Tamanho da interface": 0,9 / 1 / 1,1 / 1,25, escrita por `applyAppearance`. */
   --ui-scale: 1;
+
+  /* GrupoDeBlocos (README: bloco com valor de 78 e faixa de rótulo de 40; protótipo: bloco fixo de 132 e barras da semana). */
+  --tile-value-height: 78px;
+  --tile-label-height: 40px;
+  --tile-fixed-width: 132px;
+  --tile-icon-size: 19px;
+  --tile-cover-width: 90px;
+  --bar-width: 10px;
+  --bar-height: 36px;
+  --bar-gap: 5px;
+  --bar-radius: 5px;
+
+  /* LinhaDeConfiguracao (README: mínimo 64, padding 12 14 12 18). `--settings-row-height` vem do tokens.css. */
+  --setting-row-padding: 12px 14px 12px 18px;
+  --setting-row-gap: 20px;
+
+  /* Chave (46×28, bolinha de 22) e ControleDeslizante (trilho 180×4, bolinha de 18, valor à direita). */
+  --switch-width: 46px;
+  --switch-height: 28px;
+  --switch-thumb: 22px;
+  --switch-inset: 3px;
+  --slider-width: 180px;
+  --slider-track-height: 4px;
+  --slider-thumb: 18px;
+  --slider-hit-height: 24px;
+  --slider-value-width: 42px;
+  /* Trilho vazio do deslizante e chave desligada: `g2a` do protótipo (sem variável no tokens.css). */
+  --control-track: #2a2a31;
+  --thumb-shadow: 0 2px 6px #00000066;
+
+  /* PainelLateral (README: 400, 480 nas configurações do jogo; véu 50% com desfoque 3). */
+  --drawer-width: 400px;
+  --drawer-width-wide: 480px;
+  --scrim: #00000080;
+  --scrim-blur: 3px;
+  --shadow-drawer: -30px 0 60px #00000066;
+  --z-scrim: 30;
+  --z-layer: 31;
+
+  /* ListaDeJogos (README: linha de 42, ícone de 28; recolhida: ícone de 46). O espaço entre linhas vem do protótipo. */
+  --list-row-height: 42px;
+  --list-row-gap: 2px;
+  --list-row-height-collapsed: 52px;
+  --list-row-gap-collapsed: 4px;
+  --list-icon-size: 28px;
+  --list-icon-size-collapsed: 46px;
+  --list-check-size: 16px;
+  --list-dot-size: 8px;
+  --list-progress-height: 3px;
+  /* Blocos de espera do EstadoCarregando: branco 6%, pulsando em 1,6 s. */
+  --skeleton: color-mix(in srgb, var(--text) 6%, transparent);
+  --tempo-pulso: 1600ms;
+}
+
+/* Trilho do deslizante e chave desligada nos outros temas: o cinza neutro do protótipo; no Liquid Glass, branco translúcido. */
+[data-theme="escuro"],
+[data-theme="meia-noite"],
+[data-theme="oled"] {
+  --control-track: #2a2a2a;
+}
+
+[data-theme="vidro"] {
+  --control-track: #ffffff24;
 }
 
 *,
@@ -77,6 +140,7 @@ textarea {
   --tempo-carrossel: 0ms;
   --tempo-contador: 0ms;
   --tempo-radar: 0ms;
+  --tempo-pulso: 0ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -95,6 +159,7 @@ textarea {
     --tempo-carrossel: 0ms;
     --tempo-contador: 0ms;
     --tempo-radar: 0ms;
+    --tempo-pulso: 0ms;
   }
 }
 

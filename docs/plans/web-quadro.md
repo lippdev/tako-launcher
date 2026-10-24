@@ -9,7 +9,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | orquestrador |
-| Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | WEB-04a, WEB-04b |
+| Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | WEB-04a |
 | Codex Lipp | `codex` | WEB-02a |
 | Codex Alyx Medical | `codex_alyx_medical` | WEB-01a (rodada 2) |
 
@@ -23,7 +23,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-03 | **Projeto `web/` e base do design system:** Vite + React + TypeScript, ESLint, build; `tokens.css`, fontes e ícones do `design/desktop/`; temas TAKO, Escuro, Meia-noite, Preto OLED e Liquid Glass por `data-theme`; hospedeiro falso (`web/src/bridge/fake.ts`) para rodar no navegador | N2 | Claude InvestSmart · Sonnet 5.5 médio | WEB-00 | `web/` (menos `web/src/bridge/`, que é do contrato) | integrada |
 | WEB-01a | **`tako-app`, primeira fatia:** boot próprio do núcleo (o que o `build_ctx` da `tako-ui` faz, sem depender dela), `library.list` (filtros, busca, ordenação, página), `game.details` e `game.play` (pedido ao hospedeiro), com os testes; a `tako-ui` não é tocada | N4 | Codex Alyx · GPT-6.1-Sol high. Revisão: Claude InvestSmart · Opus 5.5 | WEB-00 | `crates/tako-app/`, `Cargo.toml` (deps da `tako-app`) | refazer (rodada 2: ajustes da revisão) |
 | WEB-04a | **Componentes base, lote 1:** BotaoDesktop, Abas, CampoDeBusca, CampoDeSelecao + MenuDeContexto, Dialogo, Aviso | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-03 | `web/src/components/` | despachada |
-| WEB-04b | **Componentes base, lote 2:** GrupoDeBlocos, LinhaDeConfiguracao, ControleDeslizante, chave, PainelLateral, ListaDeJogos virtualizada | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-03 | `web/src/components/` | despachada |
+| WEB-04b | **Componentes base, lote 2:** GrupoDeBlocos, LinhaDeConfiguracao, ControleDeslizante, chave, PainelLateral, ListaDeJogos virtualizada | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-03 | `web/src/components/` | integrada (aguarda validação visual) |
 | WEB-06 | **Textos:** `locales/` servido à interface, troca de idioma em tempo de execução | N2 | a definir na hora | WEB-00, WEB-02a | `crates/tako-web/`, `web/src/i18n/` | fila |
 | WEB-05 | **Foco e controle:** navegação espacial, foco visível, repetição, entrada do SDL3 pela ponte | N3 | a definir na hora | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | fila |
 | WEB-01b | **`tako-app`, segunda fatia:** configurações, coleções (manuais e automáticas resolvidas pelo id no núcleo), tags e status do jogo, favoritos | N3 | a definir | WEB-01a | `crates/tako-app/` | fila |
