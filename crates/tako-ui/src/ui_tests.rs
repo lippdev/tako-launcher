@@ -7,6 +7,7 @@ use slint::{ComponentHandle, Rgb8Pixel};
 use slint_interpreter::Value;
 use std::rc::Rc;
 use std::time::Instant;
+use std::{fs, path::Path};
 use tako_core::i18n::{self, Lang};
 use tako_core::paths::DataPaths;
 
@@ -26,6 +27,94 @@ thread_local! {
     static CLOCK: std::cell::Cell<Option<std::time::Duration>> = const { std::cell::Cell::new(None) };
 }
 static START: std::sync::LazyLock<Instant> = std::sync::LazyLock::new(Instant::now);
+
+fn motion_token_reduces(name: &str, tokens: &str, depth: usize) -> bool {
+    if depth > 4 {
+        return false;
+    }
+    let property = format!("property <duration> {name}:");
+    if let Some(line) = tokens.lines().find(|line| line.contains(&property)) {
+        return line.contains("reduce-motion");
+    }
+    let function = format!("function {name}(");
+    let Some(start) = tokens.find(&function) else {
+        return false;
+    };
+    let body = &tokens[start..];
+    let Some(end) = body.find('}') else {
+        return false;
+    };
+    let body = &body[..=end];
+    body.contains("reduce-motion")
+        || tokens
+            .lines()
+            .filter_map(|line| {
+                line.split_once("property <duration> ")
+                    .map(|(_, rest)| rest)
+            })
+            .filter_map(|rest| {
+                rest.split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+                    .next()
+            })
+            .any(|token| body.contains(token) && motion_token_reduces(token, tokens, depth + 1))
+}
+
+fn check_motion_file(path: &Path, tokens: &str) {
+    let source = fs::read_to_string(path).unwrap();
+    for (index, line) in source.lines().enumerate() {
+        for key in ["duration:", "delay:"] {
+            let Some((_, value)) = line.split_once(key) else {
+                continue;
+            };
+            let value = value.split(';').next().unwrap().trim();
+            // Aceita expressões (`on ? Ui.x : 0ms`, `Ui.x * 1.3`): todo token citado zera e número solto só 0ms.
+            let names: Vec<&str> = value
+                .split("Ui.")
+                .skip(1)
+                .filter_map(|rest| {
+                    rest.split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+                        .next()
+                })
+                .collect();
+            assert!(
+                !names.is_empty(),
+                "{}:{} anima sem token Ui",
+                path.display(),
+                index + 1
+            );
+            let literal = value
+                .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '.')
+                .any(|word| word.ends_with("ms") && word != "0ms");
+            assert!(
+                !literal,
+                "{}:{} tem duração solta (só 0ms é aceito)",
+                path.display(),
+                index + 1
+            );
+            for name in names {
+                assert!(
+                    motion_token_reduces(name, tokens, 0),
+                    "{}:{} usa Ui.{name}, que não zera com reduce-motion",
+                    path.display(),
+                    index + 1
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn desktop_motion_uses_reduce_motion_tokens() {
+    let theme = Path::new(env!("CARGO_MANIFEST_DIR")).join("theme");
+    let tokens = fs::read_to_string(theme.join("tokens.slint")).unwrap();
+    for entry in fs::read_dir(&theme).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy();
+        if name == "desktop.slint" || (name.starts_with("desk-") && name.ends_with(".slint")) {
+            check_motion_file(&path, &tokens);
+        }
+    }
+}
 
 fn property<'a>(out: &'a Out, name: &str) -> &'a Value {
     &out.props
