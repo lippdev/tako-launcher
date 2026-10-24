@@ -556,6 +556,7 @@ component ActivityIcon inherits Rectangle {
 }
 
 component TopBar inherits Vidro {
+    in property <bool> onboarding;
     in property <[DeskNav]> items;
     in property <string> big-picture-label;
     in property <string> brand-label;
@@ -606,13 +607,14 @@ component TopBar inherits Vidro {
     callback brand-menu(length, length);
     height: Ui.topbar-height;
     bar: true;
+    bare: onboarding;
     radius: 0px;
     edge: false;
     drop-shadow-blur: 0px;
     drop-shadow-offset-y: 0px;
     drop-shadow-color: transparent;
     // BarraSuperior mantém a linha de baixo (branca 6%) também sobre o topo da lista fixa.
-    Rectangle { y: parent.height - 1px; height: 1px; background: Ui.bar-line; }
+    Rectangle { visible: !onboarding; y: parent.height - 1px; height: 1px; background: Ui.bar-line; }
     // Leitor de tela: anuncia início, conclusão e erro de qualquer atividade, nunca a porcentagem. Fica sempre na
     // árvore (vazio sem nada a dizer): muitos leitores não anunciam o texto de um elemento que já nasce preenchido.
     Rectangle {
@@ -628,6 +630,7 @@ component TopBar inherits Vidro {
         padding-right: 6px;
         spacing: 4px;
         brand := Rectangle {
+            visible: !onboarding;
             y: (parent.height - self.height) / 2;
             height: 40px;
             width: bl.preferred-width;
@@ -677,9 +680,10 @@ component TopBar inherits Vidro {
             }
             Tip { text: brand-label; hovering: bta.has-hover; }
         }
-        Rectangle { width: small ? 12px : 36px; }
+        Rectangle { visible: !onboarding; width: small ? 12px : 36px; }
         // Abas em caixa alta fina (Poppins 12/400, 0,32 em). A da página atual acende com o sublinhado em tentáculo.
         HorizontalLayout {
+            visible: !onboarding;
             spacing: small ? 12px : 22px;
             for it[i] in items: Rectangle {
                 width: gt.preferred-width + 12px + 0.32 * gt.font-size;
@@ -743,6 +747,7 @@ component TopBar inherits Vidro {
         }
         // Downloads: ↓ em círculo com a bolinha do contador (19, cor da barra, borda de 2); abre o popover.
         dl := BarButton {
+            visible: !onboarding;
             y: (parent.height - self.height) / 2;
             width: 36px;
             label: activity.label;
@@ -789,6 +794,7 @@ component TopBar inherits Vidro {
         }
         // Perfil: avatar redondo de 24 com o anel do destaque e o ponto verde de "online", nome e ⌄ (menu do perfil).
         profile := BarButton {
+            visible: !onboarding;
             y: (parent.height - self.height) / 2;
             width: pl.preferred-width;
             label: profile-name;
@@ -829,6 +835,7 @@ component TopBar inherits Vidro {
         }
         // Tela cheia: só o ícone do controle.
         gamepad := BarButton {
+            visible: !onboarding;
             y: (parent.height - self.height) / 2;
             width: 36px;
             label: big-picture-label;
@@ -838,7 +845,7 @@ component TopBar inherits Vidro {
             DeskIcon { name: "gamepad"; size: 20px; tint: gamepad.hovering ? Ui.desk-text : Ui.desk-text.with-alpha(0.62); x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
         }
         // Divisória de 1 e os botões da janela: 8 de cada lado (o 4 de dentro soma com o `spacing` do layout).
-        Rectangle { width: 13px; Rectangle { x: 8px; y: (parent.height - 36px) / 2; width: 1px; height: 36px; background: Ui.line; } }
+        Rectangle { visible: !onboarding; width: 13px; Rectangle { x: 8px; y: (parent.height - 36px) / 2; width: 1px; height: 36px; background: Ui.line; } }
         HorizontalLayout {
             spacing: 0px;
             WindowButton { y: (parent.height - self.height) / 2; focused: focus-index == first-right + 2; native-hover: root.native-hover == 3; native-pressed: root.native-pressed == 3; kind: "min"; active: root.active; label: labels[0]; clicked => { root.action("min"); } }
@@ -5373,12 +5380,12 @@ component ModeCard inherits Rectangle {
     in property <bool> focused;
     // Jogos da parede: as cores da lista e das capas da miniatura.
     in property <[Tile]> tiles;
-    // Janela baixa: miniatura de 54 em vez de 190, para Continuar caber na tela.
+    // Janela baixa: miniatura de 40 em vez de 190, para Continuar caber na tela.
     in property <bool> compact;
-    property <length> thumb-h: compact ? 54px : 190px;
+    property <length> thumb-h: compact ? 40px : 190px;
     callback clicked();
     width: 290px;
-    height: thumb-h + (compact ? 106px : 134px);
+    height: thumb-h + (compact ? (Ui.text-scale > 1.1 ? 112px : 96px) : 134px);
     border-radius: Ui.radius-card;
     background: data.on ? Ui.glass-selected.mix(Ui.glass-solid, 0.5) : Ui.glass-solid;
     border-width: 1px;
@@ -6059,10 +6066,10 @@ component DeskOverlay inherits Rectangle {
         // A parede some no escuro à esquerda (ob2-bg com gradiente)
         Rectangle { background: @linear-gradient(90deg, Ui.desk-canvas 0%, Ui.desk-canvas 38%, Ui.desk-canvas.with-alpha(0.65) 55%, transparent 100%); }
 
-        // Marca nova no canto superior esquerdo: polvo com brilho lilás + TAKO em caixa alta fina e kana タコ
+        // Marca do onboarding, afastada do indicador em janelas baixas.
         HorizontalLayout {
             x: 56px;
-            y: 28px;
+            y: low ? 8px : 28px;
             height: 40px;
             spacing: 12px;
             Rectangle {
@@ -6146,7 +6153,7 @@ component DeskOverlay inherits Rectangle {
             y: low ? 64px : max(120px, (parent.height - self.height) / 2);
             width: min(ov.tab == 3 ? 620px : 600px, parent.width - 160px);
             height: self.preferred-height;
-            spacing: low ? 4px : 18px;
+            spacing: low ? (Ui.text-scale > 1.1 ? 4px : 8px) : 18px;
 
             // PassosDoOnboarding: "n de 5" (13/600, números tabulares) e cinco traços de 24 × 3
             HorizontalLayout {
@@ -6191,6 +6198,7 @@ component DeskOverlay inherits Rectangle {
 
             // Título em Poppins 800 (40px)
             Text {
+                width: parent.width;
                 text: ov.title;
                 color: Ui.desk-text;
                 font-family: Ui.font-heading;
@@ -6203,11 +6211,12 @@ component DeskOverlay inherits Rectangle {
 
             // Frase/subtítulo em Plus Jakarta Sans 15px
             if ov.text != "": Text {
+                width: min(520px, parent.width);
+                height: low && Ui.text-scale > 1.1 ? 66px : self.preferred-height;
                 text: ov.text;
                 color: Ui.desk-text-muted;
                 font-size: 15px * Ui.text-scale;
                 line-height-factor: 1.55;
-                max-width: 520px;
                 wrap: word-wrap;
             }
 
@@ -8440,6 +8449,7 @@ export component Desktop inherits Window {
     bar := TopBar {
         y: 0px;
         width: root.width;
+        onboarding: overlays.length > 0 && overlays[overlays.length - 1].tabs2.length > 0;
         profile-name: desk-profile-name;
         profile-initial: desk-profile-initial;
         profile-active: desk-profile-active;
