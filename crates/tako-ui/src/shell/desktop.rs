@@ -35,8 +35,9 @@ pub const ROUTE: &str = "desk:library";
 
 /// Miniatura de capa do perfil (o quadrado do topo da capa 2:3, a 40 × 40; 2× para telas densas).
 pub(crate) const THUMB: (u32, u32) = (80, 120);
-/// Ícone da linha da lista (28 na tela, 2× para telas densas).
-const ICON: (u32, u32) = (56, 56);
+/// Ícone da linha da lista (28 na tela, 2× para telas densas) e, com a lista recolhida, o de 46 (92 px; 96 aqui).
+const ICON: u32 = 56;
+const ICON_COLLAPSED: u32 = 96;
 /// Linhas em volta da primeira visível que pedem miniatura.
 const NEAR: usize = 60;
 
@@ -61,6 +62,12 @@ pub enum View {
 
 const VIEWS: [View; 3] = [View::List, View::Grid, View::Categories];
 pub const VIEW_KEY: &str = "desktop.view";
+/// ListaDeJogos recolhida (Ctrl + B): 76 de largura, só os ícones; salvo por perfil.
+const COLLAPSED_KEY: &str = "desktop.list_collapsed";
+
+fn collapsed(ctx: &Ctx) -> bool {
+    ctx.settings.bool(COLLAPSED_KEY, false)
+}
 
 impl View {
     fn key(self) -> &'static str {
@@ -71,10 +78,16 @@ impl View {
         }
     }
     fn of(ctx: &Ctx) -> View {
-        VIEWS
+        let view = VIEWS
             .into_iter()
             .find(|v| ctx.settings.get(VIEW_KEY) == Some(v.key()))
-            .unwrap_or(View::List)
+            .unwrap_or(View::List);
+        // Recolhida, a Grade vira a lista de ícones (como no protótipo).
+        if view == View::Grid && collapsed(ctx) {
+            View::List
+        } else {
+            view
+        }
     }
 }
 
@@ -163,12 +176,13 @@ struct Run {
 
 /// Ícone da linha e, se não houver, a inicial do nome. Carrega o ícone recortado via [`crate::images::icon`].
 /// `load: false` = linha fora da área visível (não pede nada).
-fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
+fn row_icon(g: &Game, load: bool, collapsed: bool) -> (slint::Image, String) {
     let uri = g.shown_icon();
-    // 56 px já recortado e com contorno no cache: serve à tela normal e à de alta densidade.
+    // Já recortado e com contorno no cache: 56 serve à tela normal e à de alta densidade; recolhida pede 96.
+    let size = if collapsed { ICON_COLLAPSED } else { ICON };
     let icon = uri
         .filter(|_| load)
-        .and_then(|u| crate::images::icon(u, ICON.0))
+        .and_then(|u| crate::images::icon(u, size, !g.is_installed))
         .unwrap_or_default();
     // A inicial fica por baixo enquanto o ícone espera na fila (pode demorar: vem da rede); o ícone a cobre ao chegar.
     let initial = if icon.size().width > 0 {
@@ -337,6 +351,10 @@ pub enum Zone {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Control {
     Options,
+    /// Lista recolhida: a lupa no lugar do botão de opções (expande a lista e foca a busca).
+    Search,
+    /// O botão de recolher e expandir a lista (Ctrl + B).
+    Collapse,
     Overview,
 }
 
@@ -744,7 +762,13 @@ impl DesktopLibrary {
                 MenuItem::new(PanelRow::header(title.clone())),
                 MenuItem::new(PanelRow::header(ctx.t("desktop.options_sort"))),
             ];
-            for s in library_text::SORT_ORDER {
+            // Os três do protótipo e, se a escolha atual for outra (Nota, Tamanho…), ela também; o resto fica nos filtros.
+            for s in library_text::SORT_ORDER
+                .into_iter()
+                .enumerate()
+                .filter(|(i, s)| *i < 3 || *s == sort)
+                .map(|(_, s)| s)
+            {
                 let c = criteria.clone();
                 v.push(
                     MenuItem::new(mark(
@@ -1096,12 +1120,19 @@ impl DesktopLibrary {
         ]
     }
 
-    /// Nas Categorias não há linha Visão geral; só a coleção ativa tem o seletor.
+    /// As Categorias ocupam a área toda: não têm a coluna (recolher, Visão geral); só a coleção ativa tem o seletor.
     fn controls(&self, ctx: &Ctx) -> Vec<Control> {
-        let overview = View::of(ctx) == View::List || self.tab == Tab::Collections;
-        let mut v = vec![Control::Options];
-        v.extend(overview.then_some(Control::Overview));
-        v
+        if View::of(ctx) == View::Categories {
+            let mut v = vec![Control::Options];
+            v.extend((self.tab == Tab::Collections).then_some(Control::Overview));
+            return v;
+        }
+        let first = if collapsed(ctx) {
+            Control::Search
+        } else {
+            Control::Options
+        };
+        vec![first, Control::Collapse, Control::Overview]
     }
 
     /// Tab / Shift+Tab: próxima zona.
@@ -1481,10 +1512,7 @@ impl Page for DesktopLibrary {
                         }
                     }
                     _ if to_install_cur => return self.run(Action::Play, ctx),
-                    _ => {
-                        self.set_view(View::List, ctx);
-                        return Nav::Stay;
-                    }
+                    _ => {}
                 }
             }
             // Categorias: ←→ dentro da fileira, ↑↓ trocam de fileira mantendo a coluna mais próxima.
@@ -1592,6 +1620,9 @@ impl Page for DesktopLibrary {
             }
             (Zone::Controls, Cmd::Accept) => match self.controls(ctx).get(self.index) {
                 Some(Control::Options) => return Nav::Layer(Box::new(self.options(ctx))),
+                // O tema expande a lista e foca a busca (a mesma conta do Ctrl + K).
+                Some(Control::Search) => self.search_focus += 1,
+                Some(Control::Collapse) => return self.click("collapse", 0, ctx),
                 // No chip, Enter abre o seletor de coleção; na Visão geral, sai da busca e dos filtros.
                 Some(Control::Overview) if self.tab == Tab::Collections => {
                     return Nav::Layer(Box::new(self.collection_select(ctx)));
@@ -1637,6 +1668,11 @@ impl Page for DesktopLibrary {
             self.checked = self.ids(ctx).into_iter().collect();
             return Some(Nav::Stay);
         }
+        // Ctrl + B recolhe e expande a lista.
+        if mods == KeyModifiers::CTRL && c.eq_ignore_ascii_case(&'b') {
+            ctx.settings.set_bool(COLLAPSED_KEY, !collapsed(ctx));
+            return Some(Nav::Stay);
+        }
         // Shift+Tab chega como Tab com Shift ou como "back tab" (U+0019), conforme o sistema.
         if c == keys::TAB || c == '\u{0019}' {
             let forward = c == keys::TAB && mods != KeyModifiers::SHIFT;
@@ -1651,7 +1687,7 @@ impl Page for DesktopLibrary {
         if (c == PAGE_DOWN || c == PAGE_UP)
             && mods == KeyModifiers::NONE
             && matches!(self.zone, Zone::List | Zone::Actions)
-            && View::of(ctx) == View::List
+            && View::of(ctx) != View::Categories
         {
             self.more = (c == PAGE_DOWN).then(|| self.hero.clone()).flatten();
             return Some(Nav::Stay);
@@ -1699,6 +1735,7 @@ impl Page for DesktopLibrary {
                     self.set_view(*v, ctx);
                 }
             }
+            "collapse" => ctx.settings.set_bool(COLLAPSED_KEY, !collapsed(ctx)),
             "options" => return Nav::Layer(Box::new(self.options(ctx))),
             // Visão geral: ainda é a biblioteca de sempre (a tela nova é a etapa 5); sai da coleção e da busca.
             "overview" => {
@@ -1721,7 +1758,6 @@ impl Page for DesktopLibrary {
             "cover" => {
                 self.checked.clear();
                 self.select_index(ctx, index);
-                self.set_view(View::List, ctx);
             }
             "cover-play" => {
                 self.select_index(ctx, index);
@@ -1963,6 +1999,7 @@ impl Page for DesktopLibrary {
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
+        out.set("desk-collapsed", collapsed(ctx));
         // "Agrupar por **Status**": o nome do agrupamento em destaque.
         out.set("desk-group-prefix", ctx.t("desktop.group.by_prefix"));
         out.set(
@@ -2026,7 +2063,7 @@ impl Page for DesktopLibrary {
                     ctx.tf("desktop.install_game", &title),
                 )
             };
-            let (icon, initial) = row_icon(g, near && !cover);
+            let (icon, initial) = row_icon(g, near && !cover, collapsed(ctx));
             DeskGame {
                 id: g.id.clone(),
                 title: g.title.clone(),
@@ -2282,6 +2319,8 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.options"),
                 ctx.t("desktop.collection_clear"),
                 ctx.t("desktop.list_search"),
+                ctx.t("desktop.collapse"),
+                ctx.t("desktop.expand"),
             ],
         );
         out.set(
@@ -2290,7 +2329,7 @@ impl Page for DesktopLibrary {
         );
         let hero = self.hero_id(ctx, cur.map(|i| ids[i].clone()));
         // Outro jogo no destaque (ou fora da Lista): volta para a fase 1.
-        if self.more != hero || View::of(ctx) != View::List {
+        if self.more != hero || View::of(ctx) == View::Categories {
             self.more = None;
         }
         let more_on = self.more.is_some();
@@ -2530,6 +2569,8 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.empty.clear"),
                 "clear".to_owned(),
             )
+        } else if self.tab == Tab::Favorites {
+            (ctx.t("desktop.empty.favorites"), none(), none(), none())
         } else if self.tab == Tab::Collections {
             (
                 ctx.t("desktop.empty.collection"),
@@ -2881,16 +2922,16 @@ mod tests {
             title: title.into(),
             ..Default::default()
         };
-        assert_eq!(row_icon(&game("  ori"), true).1, "O");
-        assert_eq!(row_icon(&game(""), true).1, "");
+        assert_eq!(row_icon(&game("  ori"), true, false).1, "O");
+        assert_eq!(row_icon(&game(""), true, false).1, "");
         // Com ícone ainda a caminho (ou fora da área visível), a linha mostra a inicial, nunca fica vazia.
         let mut far = game("Celeste");
         far.pinned_art.insert(
             tako_core::library::ArtKind::Icon,
             "steam-art://1/icon".into(),
         );
-        assert_eq!(row_icon(&far, false).1, "C");
-        assert_eq!(row_icon(&far, true).1, "C");
+        assert_eq!(row_icon(&far, false, false).1, "C");
+        assert_eq!(row_icon(&far, true, true).1, "C");
     }
 
     fn page(shell: &Shell) -> &DesktopLibrary {
@@ -3183,13 +3224,14 @@ mod tests {
         let ids = page(&shell).ids(&shell.ctx);
         shell.click("view", 1);
         assert_eq!(View::of(&shell.ctx), View::Grid);
-        // Setas andam pelas colunas que o tema mede; Enter volta ao destaque com o jogo escolhido.
-        shell.ctx.grid_columns = 4;
+        // Setas andam pelas 3 colunas da grade.
+        shell.ctx.grid_columns = 3;
+        // A grade vive na lista: clicar numa capa escolhe o jogo e fica na grade.
         shell.click("cover", 0);
-        assert_eq!(View::of(&shell.ctx), View::List);
-        shell.click("view", 1);
+        assert_eq!(View::of(&shell.ctx), View::Grid);
+        assert_eq!(shell.focused_game().as_deref(), Some(ids[0].as_str()));
         shell.handle(Cmd::Down);
-        assert_eq!(shell.focused_game().as_deref(), Some(ids[4].as_str()));
+        assert_eq!(shell.focused_game().as_deref(), Some(ids[3].as_str()));
         // Categorias por loja: cada jogo em uma fileira; "Ver todos" abre a grade filtrada.
         shell.ctx.settings.set(GROUP_KEY, GroupBy::Store.key());
         shell.click("view", 2);
@@ -3503,9 +3545,11 @@ mod tests {
         assert!(more_on(&mut shell));
         assert_eq!(page(&shell).zone(), Zone::List);
         shell.key("\u{F72C}", KeyModifiers::NONE);
-        // Fora da Lista não há destaque nem fase 2.
+        // Na Grade o destaque continua ao lado; só as Categorias não têm destaque nem fase 2.
         shell.click("game-more", 1);
         shell.click("view", 1);
+        assert!(more_on(&mut shell));
+        shell.click("view", 2);
         assert!(!more_on(&mut shell));
         shell.key("\u{F72D}", KeyModifiers::NONE);
         assert!(!more_on(&mut shell));
@@ -3768,22 +3812,25 @@ mod tests {
         assert_eq!(page(&shell).tab(), Tab::Collections);
         assert_eq!(page(&shell).ids(&shell.ctx), vec![first]);
 
-        // No chip, Enter abre o seletor (não troca de coleção em silêncio); ← volta ao botão.
+        // No chip (depois do botão de recolher), Enter abre o seletor, sem trocar de coleção em silêncio.
         assert_eq!(page(&shell).zone(), Zone::Controls);
         shell.handle(Cmd::Right);
-        assert_eq!(page(&shell).index, 1);
+        shell.handle(Cmd::Right);
+        assert_eq!(page(&shell).index, 2);
         shell.handle(Cmd::Accept);
         assert!(shell.has_layers());
         shell.close_layers();
         assert_eq!(page(&shell).tab(), Tab::Collections);
-        // Esc em Ordenar, ver e filtrar não sai da coleção; só no chip.
+        // Esc no botão de recolher não sai da coleção; só no chip.
         shell.handle(Cmd::Left);
         shell.handle(Cmd::Back);
         assert_eq!(page(&shell).tab(), Tab::Collections);
         while page(&shell).zone() != Zone::Controls {
             shell.key("\t", KeyModifiers::NONE);
         }
-        shell.handle(Cmd::Right);
+        while page(&shell).index < 2 {
+            shell.handle(Cmd::Right);
+        }
         // Esc no chip faz o mesmo que o ×: volta para Todos.
         shell.handle(Cmd::Back);
         assert_eq!(page(&shell).tab(), Tab::All);
@@ -3810,6 +3857,70 @@ mod tests {
         let (_dir, mut shell) = shell();
         shell.click("tab", 2);
         assert_eq!(page(&shell).route_filter(), LibraryFilter::Installed);
+    }
+
+    #[test]
+    fn ctrl_b_collapses_the_list_and_the_grid_becomes_the_icon_list() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let flag = |shell: &mut Shell, name: &str| {
+            let out = shell.render(std::time::Instant::now());
+            out.props
+                .iter()
+                .find(|(n, _)| *n == name)
+                .map(|(_, v)| v.clone())
+        };
+        shell.click("view", 1);
+        assert_eq!(flag(&mut shell, "desk-collapsed"), Some(Value::Bool(false)));
+        assert_eq!(
+            flag(&mut shell, "desk-view"),
+            Some(Value::String("grid".into()))
+        );
+        // Recolhida, a Grade vira a lista de ícones (a escolha da Grade fica salva).
+        shell.key("b", KeyModifiers::CTRL);
+        assert_eq!(flag(&mut shell, "desk-collapsed"), Some(Value::Bool(true)));
+        assert_eq!(
+            flag(&mut shell, "desk-view"),
+            Some(Value::String("list".into()))
+        );
+        // O botão ao lado da busca (e a lupa) expande de novo.
+        shell.click("collapse", 0);
+        assert_eq!(flag(&mut shell, "desk-collapsed"), Some(Value::Bool(false)));
+        assert_eq!(
+            flag(&mut shell, "desk-view"),
+            Some(Value::String("grid".into()))
+        );
+    }
+
+    #[test]
+    fn keyboard_reaches_the_search_and_collapse_buttons_of_the_collapsed_list() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let prop = |shell: &mut Shell, name: &str| {
+            let out = shell.render(std::time::Instant::now());
+            out.props
+                .iter()
+                .find(|(n, _)| *n == name)
+                .map(|(_, v)| v.clone())
+        };
+        shell.key("b", KeyModifiers::CTRL);
+        assert_eq!(prop(&mut shell, "desk-collapsed"), Some(Value::Bool(true)));
+        while page(&shell).zone() != Zone::Controls {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        // A lupa pede o foco da busca (o tema expande a lista e foca); o botão ao lado expande.
+        let before = prop(&mut shell, "desk-search-focus");
+        shell.handle(Cmd::Accept);
+        assert_ne!(prop(&mut shell, "desk-search-focus"), before);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Accept);
+        assert_eq!(prop(&mut shell, "desk-collapsed"), Some(Value::Bool(false)));
+        // Expandida, o primeiro controle volta a ser o botão de opções.
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Accept);
+        assert!(shell.has_layers());
     }
 
     #[test]

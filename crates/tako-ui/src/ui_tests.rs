@@ -422,6 +422,69 @@ fn desktop_search_shortcuts_focus_the_visible_field_and_leave_returns_to_content
 }
 
 #[test]
+fn collapsed_list_expands_on_ctrl_k_only_and_not_when_returning_to_the_library() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        use slint::platform::WindowEvent;
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap()
+            .create()
+            .unwrap();
+        window.set_size(slint::PhysicalSize::new(1600, 900));
+        ui.show().unwrap();
+        let expands = Rc::new(std::cell::Cell::new(0));
+        let counted = expands.clone();
+        ui.set_callback("clicked", move |args| {
+            if matches!(&args[0], Value::String(z) if z.as_str() == "collapse") {
+                counted.set(counted.get() + 1);
+            }
+            Value::Void
+        })
+        .unwrap();
+        let ctrl_k = |text: &str| {
+            window.dispatch_event(WindowEvent::KeyPressed {
+                text: "\u{11}".into(),
+            });
+            window.dispatch_event(WindowEvent::KeyPressed { text: text.into() });
+            window.dispatch_event(WindowEvent::KeyReleased { text: text.into() });
+            window.dispatch_event(WindowEvent::KeyReleased {
+                text: "\u{11}".into(),
+            });
+            // O foco da busca passa por um timer; com a máquina carregada, 5 ms não bastavam.
+            for _ in 0..10 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                slint::platform::update_timers_and_animations();
+            }
+        };
+        let show = |page: &str| {
+            ui.set_property("page", Value::String(page.into())).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            slint::platform::update_timers_and_animations();
+        };
+        ui.set_property("desk-collapsed", Value::Bool(true))
+            .unwrap();
+        show("desk-library");
+        ctrl_k("k");
+        assert_eq!(expands.get(), 1, "Ctrl+K expande a lista recolhida");
+        // Sair e voltar à biblioteca não pede para expandir (a lista continua recolhida).
+        show("settings");
+        show("desk-library");
+        assert_eq!(expands.get(), 1, "voltar à biblioteca não expande");
+        // Ctrl+K em outra tela também não mexe na lista escondida.
+        show("settings");
+        ctrl_k("k");
+        show("desk-library");
+        assert_eq!(expands.get(), 1, "Ctrl+K nas Configurações não expande");
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
 fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question() {
     let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     std::thread::spawn(|| {
