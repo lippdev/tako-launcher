@@ -429,6 +429,11 @@ export component PaginaDoJogo inherits Rectangle {
                 background: Ui.group;
                 bx := VerticalLayout {
                     padding: Ui.space-6;
+                    HorizontalLayout {
+                        height: 44px;
+                        padding-left: 12px;
+                        Text { text: page.labels[3].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; vertical-alignment: center; }
+                    }
                     for d[i] in details: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
                 }
             }
