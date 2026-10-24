@@ -8,7 +8,13 @@ import type { Collection } from "./generated/Collection";
 import type { CollectionGames } from "./generated/CollectionGames";
 import type { GameFavoriteSet } from "./generated/GameFavoriteSet";
 import type { GameStatusSet } from "./generated/GameStatusSet";
-import type { GameTagsSet } from "./generated/GameTagsSet"; // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
+import type { GameTagsSet } from "./generated/GameTagsSet";
+import type { LibrarySourceReport } from "./generated/LibrarySourceReport";
+import type { LibrarySources } from "./generated/LibrarySources";
+import type { Setting } from "./generated/Setting";
+import type { SettingsGetRequest } from "./generated/SettingsGetRequest";
+import type { SettingsValues } from "./generated/SettingsValues";
+import type { Store } from "./generated/Store"; // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
 
@@ -232,3 +238,144 @@ Object.assign(defaults, {
     collectionMutation(p, false);
   },
 });
+
+// ---- Configurações e lojas de exemplo (WEB-13a) ----
+// Guardadas em memória e em `sessionStorage` (a aparência volta igual ao recarregar a página).
+
+/** As chaves que o núcleo aceita em `settings.set` (`crates/tako-app/src/settings.rs`). */
+const KNOWN_SETTINGS = new Set([
+  "DynamicColor",
+  "DesktopArtColors",
+  "ReducedMotion",
+  "ReducedTransparency",
+  "RestoreEnvironmentAfterGame",
+  "DeveloperOptions",
+  "AskBigPictureWithController",
+  "DisabledStores",
+  "DesktopTheme",
+  "Language",
+  "OpenIn",
+  "TextSizePercent",
+]);
+const BOOL_SETTINGS = new Set([
+  "DynamicColor",
+  "DesktopArtColors",
+  "ReducedMotion",
+  "ReducedTransparency",
+  "RestoreEnvironmentAfterGame",
+  "DeveloperOptions",
+  "AskBigPictureWithController",
+]);
+const SETTINGS_STORAGE = "tako.dev.settings";
+
+const settings = new Map<string, string>(
+  Object.entries(JSON.parse(sessionStorage.getItem(SETTINGS_STORAGE) ?? "{}") as Record<string, string>),
+);
+
+function getSettings(payload: unknown): SettingsValues {
+  const { keys } = payload as SettingsGetRequest;
+  if (keys?.some((key) => !KNOWN_SETTINGS.has(key))) throw new Error("bad_request: chaves de configuração inválidas");
+  return { values: Object.fromEntries([...settings].filter(([key]) => !keys || keys.includes(key))) };
+}
+
+function setSetting(payload: unknown) {
+  const { key, value } = payload as Setting;
+  const valid =
+    KNOWN_SETTINGS.has(key) &&
+    (!BOOL_SETTINGS.has(key) || value === "true" || value === "false") &&
+    (key !== "TextSizePercent" || ["100", "110", "125"].includes(value)) &&
+    (key !== "OpenIn" || value === "desktop" || value === "big-picture");
+  if (!valid) throw new Error("bad_request: configuração inválida");
+  settings.set(key, value);
+  sessionStorage.setItem(SETTINGS_STORAGE, JSON.stringify(Object.fromEntries(settings)));
+}
+
+/** As lojas de exemplo, com o que achariam; `notice` mostra o aviso do núcleo. */
+const SAMPLE_STORES: { store: Store; name: string; found: number; client: boolean; notice?: string }[] = [
+  { store: "steam", name: "Steam", found: 8, client: true },
+  { store: "epic", name: "Epic", found: 2, client: true },
+  { store: "gog", name: "GOG", found: 3, client: true },
+  { store: "xbox", name: "Xbox", found: 0, client: false },
+  { store: "ubisoft", name: "Ubisoft", found: 0, client: true, notice: "Não deu para ler a biblioteca da Ubisoft" },
+  { store: "ea", name: "EA", found: 0, client: false },
+  { store: "battle_net", name: "Battle.net", found: 0, client: false },
+  { store: "amazon", name: "Amazon", found: 0, client: false },
+  { store: "emulators", name: "Emuladores", found: 0, client: true },
+];
+
+let sources: LibrarySources = {
+  scanning: false,
+  completed: 0,
+  total: SAMPLE_STORES.length,
+  measuringSizes: false,
+  sources: [],
+  error: null,
+};
+
+function emitScanProgress() {
+  window.__takoDeliver?.(JSON.stringify({ v: 1, event: { name: "library.scan.progress", payload: sources } }));
+}
+
+function isStoreOff(store: Store): boolean {
+  const key = store.replace("_", "").toLowerCase();
+  return (settings.get("DisabledStores") ?? "")
+    .split(",")
+    .some((name) => name.trim().toLowerCase() === key);
+}
+
+function sampleReport(sample: (typeof SAMPLE_STORES)[number], index: number, readAt: Date): LibrarySourceReport {
+  const enabled = !isStoreOff(sample.store);
+  return {
+    store: sample.store,
+    name: sample.name,
+    enabled,
+    found: enabled ? sample.found : 0,
+    clientInstalled: enabled && sample.client,
+    error: enabled ? (sample.notice ?? null) : null,
+    lastScannedAt: enabled ? readAt.toISOString() : null,
+    elapsedMs: enabled ? 120 + index * 30 : null,
+  };
+}
+
+/** Lê as lojas devagar (400 ms cada) para a tela mostrar o andamento; respeita `DisabledStores` da hora. */
+function scanSources() {
+  if (sources.scanning) return;
+  sources = { ...sources, scanning: true, completed: 0, measuringSizes: false, error: null };
+  emitScanProgress();
+  const step = (index: number) => {
+    const sample = SAMPLE_STORES[index];
+    if (!sample) {
+      sources = { ...sources, measuringSizes: true };
+      emitScanProgress();
+      setTimeout(() => {
+        sources = { ...sources, scanning: false, measuringSizes: false };
+        emitScanProgress();
+        changed();
+      }, 600);
+      return;
+    }
+    const reports = [...sources.sources];
+    reports[index] = sampleReport(sample, index, new Date());
+    sources = { ...sources, completed: index + 1, sources: reports };
+    emitScanProgress();
+    setTimeout(() => {
+      step(index + 1);
+    }, 400);
+  };
+  setTimeout(() => {
+    step(0);
+  }, 200);
+}
+
+Object.assign(defaults, {
+  "settings.get": getSettings,
+  "settings.set": setSetting,
+  "library.sources": () => sources,
+  "library.scan": scanSources,
+});
+// A primeira leitura já aconteceu quando a interface abre (como no Tako, que lê ao iniciar).
+sources = {
+  ...sources,
+  completed: SAMPLE_STORES.length,
+  sources: SAMPLE_STORES.map((sample, index) => sampleReport(sample, index, new Date(Date.now() - 3 * 60_000))),
+};

@@ -75,6 +75,20 @@ test("todos os critérios de tela voltam iguais", () => {
     tags: ["RPG"],
     installed: false,
   };
-  const state = { view: "biblioteca", listCollapsed: true, library };
+  const state = { view: "biblioteca", listCollapsed: true, library, settingsCategory: "library" };
   assert.deepEqual(parseScreenState(serializeScreenState(state)), state);
+});
+test("a categoria aberta em Configurações volta igual; valor desconhecido cai em Geral", () => {
+  for (const settingsCategory of ["general", "appearance", "library", "about"]) {
+    const state = { ...defaultScreenState, view: "configuracoes", settingsCategory };
+    assert.deepEqual(parseScreenState(serializeScreenState(state)), state);
+  }
+  for (const settingsCategory of ["loja", 3, null, "toString", ["library"]])
+    assert.deepEqual(parseScreenState(JSON.stringify({ v: 1, settingsCategory })), defaultScreenState);
+  assert.equal(defaultScreenState.settingsCategory, "general");
+  // Estado guardado antes da categoria existir continua valendo, com a categoria padrão.
+  assert.deepEqual(parseScreenState('{"v":1,"view":"configuracoes"}'), {
+    ...defaultScreenState,
+    view: "configuracoes",
+  });
 });

@@ -42,6 +42,7 @@ fn known(key: &str) -> bool {
         || matches!(
             key,
             "Language"
+                | "DesktopTheme"
                 | "DesktopTitleLogo"
                 | "ControlCenterChord"
                 | "OpenIn"
@@ -78,6 +79,9 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
         && (key != "Language" || tako_core::i18n::Lang::from_code(&value).is_some())
         && (key != "DesktopTitleLogo" || matches!(value.as_str(), "" | "logo" | "text"))
         && (key != "OpenIn" || matches!(value.as_str(), "desktop" | "big-picture"))
+        // Tema do modo desktop (o mesmo `DesktopTheme` que o app Slint grava); `Theme` é outra coisa.
+        && (key != "DesktopTheme"
+            || matches!(value.as_str(), "tako" | "dark" | "midnight" | "oled" | "glass"))
         && (key != "ControlCenterChord" || value.parse::<u32>().is_ok())
         && (!matches!(key.as_str(), "NavigationSoundVolume" | "ThemeMusicVolume")
             || value.parse::<u32>().is_ok_and(|n| n <= 100))

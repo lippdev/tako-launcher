@@ -1,0 +1,146 @@
+// Formato das configurações que a tela mexe: as chaves do núcleo (`crates/tako-app/src/settings.rs`), os valores
+// guardados e a leitura com o padrão de cada uma. Só dados e funções puras (sem importações em execução), para o
+// teste rodar direto no Node.
+
+import type { Appearance, Theme, UiScale } from "../../appearance/appearance";
+import type { Store } from "../../bridge/generated/Store";
+
+/** Os valores devolvidos por `settings.get`: chave → texto. Chave ausente vale o padrão. */
+export type SettingsMap = Readonly<Record<string, string>>;
+
+/** As chaves públicas que a tela usa. Qualquer outra dá `bad_request` na ponte. */
+export const KEYS = {
+  language: "Language",
+  openIn: "OpenIn",
+  askBigPicture: "AskBigPictureWithController",
+  restoreEnvironment: "RestoreEnvironmentAfterGame",
+  theme: "DesktopTheme",
+  artColors: "DesktopArtColors",
+  reducedMotion: "ReducedMotion",
+  reducedTransparency: "ReducedTransparency",
+  textSize: "TextSizePercent",
+  disabledStores: "DisabledStores",
+} as const;
+
+/** As chaves que a aparência salva depende (lidas ao abrir o app). */
+export const APPEARANCE_KEYS: readonly string[] = [
+  KEYS.theme,
+  KEYS.reducedMotion,
+  KEYS.reducedTransparency,
+  KEYS.textSize,
+];
+
+/** Padrões de quando a chave ainda não foi gravada (iguais aos do núcleo antigo). */
+export const DEFAULTS = {
+  askBigPicture: true,
+  restoreEnvironment: true,
+  artColors: true,
+  reducedMotion: false,
+  reducedTransparency: false,
+} as const;
+
+export function readBool(values: SettingsMap, key: string, fallback: boolean): boolean {
+  const value = values[key];
+  return value === "true" ? true : value === "false" ? false : fallback;
+}
+
+export function boolText(value: boolean): string {
+  return value ? "true" : "false";
+}
+
+// ---- Idioma e "Abrir em" ----
+
+export const LANGUAGES = ["pt-BR", "en-US"] as const;
+export type Language = (typeof LANGUAGES)[number];
+
+/** O núcleo aceita qualquer código que comece por `pt` ou `en`; a tela mostra os dois idiomas do Tako. */
+export function readLanguage(values: SettingsMap): Language {
+  const code = (values[KEYS.language] ?? "").trim().toLowerCase().replace("_", "-");
+  return code.startsWith("en") ? "en-US" : "pt-BR";
+}
+
+export const OPEN_IN = ["desktop", "big-picture"] as const;
+export type OpenIn = (typeof OPEN_IN)[number];
+
+export function readOpenIn(values: SettingsMap): OpenIn {
+  return values[KEYS.openIn] === "big-picture" ? "big-picture" : "desktop";
+}
+
+// ---- Aparência ----
+
+/** O tema como o núcleo guarda (`Theme`) e como a interface chama. A ordem é a dos cartões do design system. */
+export const THEME_CHOICES: readonly { id: Theme; stored: string }[] = [
+  { id: "tako", stored: "tako" },
+  { id: "escuro", stored: "dark" },
+  { id: "meia-noite", stored: "midnight" },
+  { id: "oled", stored: "oled" },
+  { id: "vidro", stored: "glass" },
+];
+
+export function themeFromStored(stored: string | undefined): Theme {
+  return THEME_CHOICES.find((choice) => choice.stored === stored)?.id ?? "tako";
+}
+
+export function themeToStored(theme: Theme): string {
+  return THEME_CHOICES.find((choice) => choice.id === theme)?.stored ?? "tako";
+}
+
+/**
+ * Tamanhos que o núcleo aceita em `TextSizePercent` (100, 110 e 125). O 90% do design system não passa pela
+ * validação do núcleo (`settings.rs`), então a tela não o oferece.
+ */
+export const UI_SCALE_CHOICES: readonly UiScale[] = [100, 110, 125];
+
+export function readUiScale(values: SettingsMap): UiScale {
+  const value = Number(values[KEYS.textSize]);
+  return UI_SCALE_CHOICES.find((scale) => scale === value) ?? 100;
+}
+
+/** A aparência que as configurações guardadas descrevem. "Efeitos de vidro" é o `ReducedTransparency` invertido. */
+export function appearanceFromSettings(values: SettingsMap): Appearance {
+  return {
+    theme: themeFromStored(values[KEYS.theme]),
+    reduceMotion: readBool(values, KEYS.reducedMotion, DEFAULTS.reducedMotion),
+    glassEffects: !readBool(values, KEYS.reducedTransparency, DEFAULTS.reducedTransparency),
+    uiScale: readUiScale(values),
+  };
+}
+
+// ---- Lojas ----
+
+/** O nome da loja em `DisabledStores` (o `GameStore.ToString()` das alphas). A comparação ignora maiúsculas. */
+const STORE_KEYS: Readonly<Record<Store, string>> = {
+  steam: "Steam",
+  epic: "Epic",
+  gog: "Gog",
+  xbox: "Xbox",
+  ubisoft: "Ubisoft",
+  ea: "Ea",
+  battle_net: "BattleNet",
+  amazon: "Amazon",
+  heroic: "Heroic",
+  lutris: "Lutris",
+  bottles: "Bottles",
+  itch: "Itch",
+  emulators: "Emulators",
+  manual: "Manual",
+};
+
+function disabledList(text: string | undefined): string[] {
+  return (text ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+}
+
+export function isStoreDisabled(disabled: string | undefined, store: Store): boolean {
+  const key = STORE_KEYS[store].toLowerCase();
+  return disabledList(disabled).some((name) => name.toLowerCase() === key);
+}
+
+/** O novo `DisabledStores` com a loja ligada ou desligada; as outras lojas (e nomes que não conhecemos) ficam. */
+export function withStoreEnabled(disabled: string | undefined, store: Store, enabled: boolean): string {
+  const key = STORE_KEYS[store];
+  const rest = disabledList(disabled).filter((name) => name.toLowerCase() !== key.toLowerCase());
+  return (enabled ? rest : [...rest, key]).join(",");
+}

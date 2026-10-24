@@ -6,6 +6,23 @@
 export const VIEW_IDS = ["biblioteca", "configuracoes", "perfil", "downloads"] as const;
 export type ViewId = (typeof VIEW_IDS)[number];
 
+/** As categorias da vista Configurações, na ordem da lista (README da TelaConfiguracoes). */
+export const SETTINGS_CATEGORY_IDS = [
+  "general",
+  "theme",
+  "appearance",
+  "sound",
+  "display",
+  "controllers",
+  "library",
+  "covers",
+  "downloads",
+  "integrations",
+  "system",
+  "about",
+] as const;
+export type SettingsCategoryId = (typeof SETTINGS_CATEGORY_IDS)[number];
+
 import type { LibraryTab } from "../bridge/generated/LibraryTab";
 import type { SortOrder } from "../bridge/generated/SortOrder";
 import type { Store } from "../bridge/generated/Store";
@@ -86,6 +103,8 @@ export interface ScreenState {
   /** Lista da esquerda recolhida (76) em vez de aberta (292). */
   listCollapsed: boolean;
   library: LibraryCriteria;
+  /** A categoria aberta em Configurações. */
+  settingsCategory: SettingsCategoryId;
 }
 
 /** Versão do formato. Quem mudar o formato de um jeito que quebra a leitura sobe este número. */
@@ -95,7 +114,12 @@ export const defaultScreenState: ScreenState = {
   view: "biblioteca",
   listCollapsed: false,
   library: defaultLibraryCriteria,
+  settingsCategory: "general",
 };
+
+export function isSettingsCategoryId(value: unknown): value is SettingsCategoryId {
+  return typeof value === "string" && (SETTINGS_CATEGORY_IDS as readonly string[]).includes(value);
+}
 
 export function isViewId(value: unknown): value is ViewId {
   return typeof value === "string" && (VIEW_IDS as readonly string[]).includes(value);
@@ -121,6 +145,9 @@ export function parseScreenState(json: string | null | undefined): ScreenState {
     listCollapsed:
       typeof data["listCollapsed"] === "boolean" ? data["listCollapsed"] : defaultScreenState.listCollapsed,
     library: parseLibraryCriteria(data["library"]),
+    settingsCategory: isSettingsCategoryId(data["settingsCategory"])
+      ? data["settingsCategory"]
+      : defaultScreenState.settingsCategory,
   };
 }
 

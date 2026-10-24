@@ -150,3 +150,83 @@ export const libraryStrings = {
     size: "Tamanho",
   },
 } as const;
+
+/** Textos da tela de Configurações (WEB-13a). */
+export const settingsStrings = {
+  /** Nome da navegação e do conteúdo, para leitores de tela. */
+  nav: "Categorias das configurações",
+  count: (n: number) => `Configurações · ${String(n)} categorias`,
+  loadError: "Não foi possível ler as configurações.",
+  saveError: "Não foi possível salvar a configuração.",
+  soon: "Esta categoria chega em breve.",
+  /** Título e frase de cada categoria (a frase é a do cabeçalho). */
+  categories: {
+    general: { title: "Geral", description: "Início, idioma e comportamento durante os jogos." },
+    theme: { title: "Tema", description: "Cartões de tema e cor de destaque." },
+    appearance: { title: "Aparência", description: "Tema, tamanho da interface e efeitos." },
+    sound: { title: "Som", description: "Volume e áudio do tema." },
+    display: { title: "Tela", description: "Monitor, resolução e HDR dos jogos." },
+    controllers: { title: "Controles", description: "Controles, botões e atalhos." },
+    library: { title: "Biblioteca e lojas", description: "Lojas ligadas e a leitura da biblioteca." },
+    covers: { title: "Capas e dados", description: "Capas, fontes de dados e cache." },
+    downloads: { title: "Downloads", description: "Pastas e limites de download." },
+    integrations: { title: "Integrações", description: "Contas e serviços ligados ao TAKO." },
+    system: { title: "Sistema", description: "Desempenho, manutenção e avançado." },
+    about: { title: "Sobre", description: "Versão, licenças e créditos." },
+  },
+  general: {
+    mode: "Modo",
+    bigPicture: { title: "Ir para a tela cheia", description: "Interface para controle e TV. Atalho no desktop: F11", action: "Trocar" },
+    ask: {
+      title: "Perguntar pela tela cheia ao achar um controle",
+      description: "Quando o TAKO abre no desktop com um controle ligado",
+    },
+    openIn: { title: "Abrir em", window: "Janela", bigPicture: "Tela cheia" },
+    language: { section: "Idioma", title: "Idioma", description: "Vale para todos os textos do TAKO", pt: "Português (Brasil)", en: "English (US)" },
+    games: "Jogos",
+    restore: {
+      title: "Restaurar tela e áudio ao fim do jogo",
+      description: "Volta ao monitor, à resolução e à saída de som de antes de jogar",
+    },
+  },
+  appearance: {
+    theme: "Tema",
+    themeRow: { title: "Tema", description: "O visual de todo o TAKO" },
+    themes: { tako: "TAKO", escuro: "Escuro", "meia-noite": "Meia-noite", oled: "Preto OLED", vidro: "Liquid Glass" },
+    artColors: {
+      title: "Cores da arte do jogo",
+      description: "Brilhos e destaque pegam a cor do jogo na tela. Desligado, fica a cor pedra do logo",
+      onlyTako: "Só no tema TAKO.",
+    },
+    layout: "Layout",
+    scale: { title: "Tamanho da interface", description: "Deixa tudo maior ou menor" },
+    effects: "Efeitos",
+    motion: {
+      title: "Reduzir animações",
+      description: "Desliga transições de página, esmaecimentos e animações de passar o mouse",
+    },
+    glass: { title: "Efeitos de vidro", description: "Desfoque atrás de painéis, botões e cabeçalhos" },
+  },
+  library: {
+    stores: "Lojas",
+    reading: "Leitura",
+    scan: {
+      title: "Ler as lojas de novo",
+      description: "Procura jogos novos nas lojas ligadas. Ligar ou desligar uma loja vale na próxima leitura.",
+      action: "Ler as lojas de novo",
+    },
+    scanError: "Não foi possível ler as lojas.",
+    sourcesError: "Não foi possível consultar as lojas.",
+    empty: "As lojas ainda não foram lidas.",
+    off: "Desligada",
+    notRead: "Ainda não lida",
+    noClient: "Cliente não encontrado",
+    found: (n: number) => `${String(n)} ${n === 1 ? "jogo" : "jogos"}`,
+    readAt: (when: string) => `Lida em ${when}`,
+    progress: {
+      scanning: (done: number, total: number) => `Lendo as lojas… ${String(done)} de ${String(total)}`,
+      measuring: "Medindo o tamanho das pastas dos jogos…",
+      done: "Leitura concluída.",
+    },
+  },
+} as const;

@@ -30,6 +30,11 @@
   will-change: transform, opacity;
 }
 
+/* A vista que rola por dentro (Configurações): a altura é a da janela menos a barra de cima. */
+.bare {
+  overflow: hidden;
+}
+
 /* Margem lateral de 40, 48 acima do conteúdo (README da TelaBiblioteca). */
 .page {
   padding: var(--space-48) var(--space-40);

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { BarraSuperior } from "./BarraSuperior";
 import { BuscaGeral } from "./BuscaGeral";
 import { ColunaDaLista } from "./ColunaDaLista";
+import { TelaConfiguracoes } from "./settings/TelaConfiguracoes";
+import { useSavedAppearance } from "./settings/useSavedAppearance";
 import { strings } from "./strings";
 import { VIEW_IDS, type ViewId } from "./uiState";
 import { useScreenState } from "./useScreenState";
@@ -17,7 +19,10 @@ const PROFILE = { name: strings.topbar.profile, online: true };
  * (README do design system, "A referência: TelaBiblioteca"). As vistas são contêineres vazios por enquanto.
  */
 export function AppShell() {
-  const { state, ready, update } = useScreenState();
+  const { state, ready: screenReady, update } = useScreenState();
+  // A aparência salva (tema, animações, vidro, tamanho) é lida na abertura, antes de mostrar a janela.
+  const appearanceReady = useSavedAppearance();
+  const ready = screenReady && appearanceReady;
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocus, setSearchFocus] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
@@ -104,7 +109,16 @@ export function AppShell() {
         />
         <main ref={mainRef} className={styles["main"]}>
           {VIEW_IDS.map((id) => (
-            <Vista key={id} title={strings.views[id]} active={id === view} />
+            <Vista key={id} title={strings.views[id]} active={id === view} bare={id === "configuracoes"}>
+              {id === "configuracoes" && (
+                <TelaConfiguracoes
+                  category={state.settingsCategory}
+                  onCategoryChange={(settingsCategory) => {
+                    update({ settingsCategory });
+                  }}
+                />
+              )}
+            </Vista>
           ))}
         </main>
       </div>

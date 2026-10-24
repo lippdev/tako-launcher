@@ -626,3 +626,27 @@ fn a_storage_failure_is_reported_and_memory_changes_still_emit_an_event() {
     );
     assert_eq!(rx.try_recv().unwrap(), Event::LibraryChanged);
 }
+
+#[test]
+fn desktop_theme_is_the_slint_key_and_only_known_themes_are_accepted() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = open(&dir, false);
+    let ok = wire(
+        &mut app,
+        "settings.set",
+        Some(json!({"key":"DesktopTheme","value":"midnight"})),
+    );
+    assert_eq!(ok["ok"], true, "{ok}");
+    let bad = wire(
+        &mut app,
+        "settings.set",
+        Some(json!({"key":"DesktopTheme","value":"pink"})),
+    );
+    assert_eq!(bad["error"]["code"], "bad_request", "{bad}");
+    let got = wire(
+        &mut app,
+        "settings.get",
+        Some(json!({"keys":["DesktopTheme"]})),
+    );
+    assert_eq!(got["reply"]["data"]["values"]["DesktopTheme"], "midnight");
+}

@@ -1,4 +1,5 @@
 import { useRef, type ReactNode } from "react";
+import { cx } from "../lib/cx";
 import { usePresence } from "../lib/presence";
 import styles from "./Vista.module.css";
 
@@ -7,6 +8,11 @@ interface VistaProps {
   title: string;
   active: boolean;
   children?: ReactNode;
+  /**
+   * A vista cuida da própria rolagem e do próprio título (Configurações: lista de categorias fixa à esquerda,
+   * conteúdo que rola à direita). Sem a margem da página nem o título padrão.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -14,7 +20,7 @@ interface VistaProps {
  * que entra faz o caminho de volta, uma por cima da outra. Só `transform` e `opacity` animam. Fora do ar a vista
  * sai do DOM, depois da saída.
  */
-export function Vista({ title, active, children }: VistaProps) {
+export function Vista({ title, active, children, bare = false }: VistaProps) {
   const ref = useRef<HTMLElement>(null);
   const { mounted, visible, animating } = usePresence(active, ref);
   if (!mounted) return null;
@@ -26,13 +32,17 @@ export function Vista({ title, active, children }: VistaProps) {
       inert={!active}
       data-visible={visible}
       data-animating={animating}
-      className={styles["view"]}
+      className={cx(styles["view"], bare && styles["bare"])}
     >
-      {/* TODO: as telas de verdade entram aqui, cada uma na sua tarefa; por enquanto só o título. */}
-      <div className={styles["page"]}>
-        <h1 className="page-title">{title}</h1>
-        {children}
-      </div>
+      {bare ? (
+        children
+      ) : (
+        // TODO: as telas de verdade entram aqui, cada uma na sua tarefa; por enquanto só o título.
+        <div className={styles["page"]}>
+          <h1 className="page-title">{title}</h1>
+          {children}
+        </div>
+      )}
     </section>
   );
 }
