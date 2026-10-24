@@ -47,7 +47,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Busca geral Ctrl+K (`global_search`) | ✅ | WEB-14a |
 | Downloads (`downloads`): painel, ligar com aviso legal, fontes | 🟡 pronto; falta gerenciar fontes e abrir a pasta (núcleo) | WEB-14b · **WEB-14e** |
 | Atividades na barra (`activities`) | ✅ (downloads) | WEB-14b |
-| Perfil (`profile`) e perfis locais (`profiles`, UX-004) | 🟡 componentes prontos | **WEB-14c** |
+| Perfil (`profile`) e perfis locais (`profiles`, UX-004) | 🟡 pronto; falta reabrir com o perfil trocado e "Jogando…" | WEB-14c · **WEB-20** |
 | Diálogos do jogo e da biblioteca (`dialogs`): remover, erro do jogo, confirmar | 🟡 erro do jogo pronto | **WEB-14d** |
 | Primeira execução (`first_run`, UX-003) | ⬜ | **WEB-16** |
 
@@ -63,7 +63,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Emuladores e ROMs (`settings_emulators`) | ⬜ | **WEB-13c** |
 | Sunshine com prévia e confirmação (`settings_sunshine`) | 🟡 só a chave | **WEB-13c** |
 | Downloads (ligar, aviso legal, limite) | ✅ | WEB-14b |
-| Perfis | ⬜ | **WEB-14c** |
+| Perfis | ✅ (em Geral) | WEB-14c |
 | Backup e restauração (CLOUD-001) | ⬜ | **WEB-13c** |
 
 ## Tela cheia (Big Picture)
