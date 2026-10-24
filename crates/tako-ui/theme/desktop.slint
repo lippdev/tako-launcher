@@ -49,9 +49,7 @@ struct DeskMore { on: bool, labels: [string], description: string, details: [Des
 // retângulo da janela. Cada painel de vidro desenha o pedaço da cópia que fica atrás dele.
 // Textos do desktop que componentes fundos usam (o Tako preenche no idioma da pessoa).
 export global DeskText {
-    in-out property <string> silence: "Silenciar";
     in-out property <string> play: "Jogar";
-    in-out property <string> max: "Volume máximo";
     // Botões só de ícone da linha de download (PainelDownloads).
     in-out property <string> dl-pause: "Pausar";
     in-out property <string> dl-resume: "Continuar";
@@ -3774,51 +3772,31 @@ component DeskLibrary inherits Rectangle {
     }
 }
 
-// Chave liga/desliga do desktop (50 × 30, na cor de destaque quando ligada).
+// Chave liga/desliga do desktop (46 × 28, bolinha branca de 22; na cor de destaque quando ligada).
 component DeskToggle inherits Rectangle {
     in property <bool> on;
-    width: 50px;
-    height: 30px;
-    border-radius: 15px;
+    width: 46px;
+    height: 28px;
+    border-radius: 14px;
     background: on ? Ui.desk-accent : Ui.glass-pressed;
     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
     Rectangle {
         y: 3px;
         x: on ? parent.width - self.width - 3px : 3px;
-        width: 24px;
-        height: 24px;
-        border-radius: 12px;
-        background: on ? Ui.desk-on-accent : Ui.primary-top;
-        drop-shadow-offset-y: 1px;
-        drop-shadow-blur: 3px;
-        drop-shadow-color: Ui.shadow-float-color;
-        animate x { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        width: 22px;
+        height: 22px;
+        border-radius: 11px;
+        background: Ui.primary-top;
+        drop-shadow-offset-y: 2px;
+        drop-shadow-blur: 6px;
+        drop-shadow-color: #00000059;
+        animate x { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
     }
 }
 
-// Alto-falante do ControleDeslizante: botão de 28 com ícone de 18.
-component SliderSpeaker inherits Rectangle {
-    in property <string> icon;
-    in property <string> label;
-    callback clicked();
-    width: 28px;
-    height: 28px;
-    border-radius: 14px;
-    background: sta.has-hover ? (DeskArt.gray ? Ui.settings-control-hover : Ui.glass-hover) : transparent;
-    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-    accessible-role: button;
-    accessible-label: label;
-    accessible-action-default => { root.clicked(); }
-    DeskIcon { name: icon; size: 18px; tint: Ui.desk-on-muted; }
-    sta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-}
-
-// ControleDeslizante (valor contínuo, 0–100): alto-falante que silencia e volta · trilha de 180 com a bolinha ·
-// alto-falante que vai a 100% · valor escrito. Arrasta-se; clicar na trilha pula para o ponto e já arrasta; a roda
-// muda 5%. `value` vem do Tako ("70" ou o texto de mudo); ← → (Shift), Home/End e Page Up/Down também são dele.
+// ControleDeslizante (valor contínuo, 0–100): trilha de 180 × 4 com a parte cheia branca, bolinha de 18 e o valor
+// escrito à direita. Arrasta-se; clicar na trilha pula para o ponto e já arrasta; a roda muda 5%. `value` vem do Tako
+// ("70", ou o texto de mudo em 0); ← → (5%, Shift 10%), Home/End e Page Up/Down também são dele.
 component DeskSlider inherits Rectangle {
     in property <string> value;
     in property <string> label;
@@ -3826,46 +3804,31 @@ component DeskSlider inherits Rectangle {
     // Valor novo e se a pessoa soltou (aí o Tako toca a amostra).
     callback changed(int, bool);
     property <float> level: value.is-float() ? clamp(value.to-float(), 0, 100) : 0;
-    property <bool> muted: level <= 0;
-    // Volume de antes do mudo, para o alto-falante voltar a ele.
-    property <float> before: 70;
     property <float> drag-v;
     property <bool> dragging: tta.pressed;
     property <float> shown: dragging ? drag-v : level;
-    width: 28px + 180px + 28px + 40px + 3 * 10px;
+    width: 180px + 42px + 12px;
     height: 28px;
     HorizontalLayout {
-        spacing: 10px;
-        SliderSpeaker {
-            icon: root.muted ? "speaker-mute" : "speaker";
-            label: DeskText.silence;
-            clicked => {
-                if root.muted {
-                    root.changed(round(root.before > 0 ? root.before : 50), true);
-                } else {
-                    root.before = root.level;
-                    root.changed(0, true);
-                }
-            }
-        }
+        spacing: 12px;
         track := Rectangle {
             width: 180px;
             accessible-role: slider;
             accessible-label: root.label;
-            accessible-value: root.muted ? root.value : round(root.level) + "%";
+            accessible-value: root.level <= 0 ? root.value : round(root.level) + "%";
             accessible-value-minimum: 0;
             accessible-value-maximum: 100;
             accessible-value-step: 5;
             Rectangle {
                 y: (parent.height - self.height) / 2;
-                height: 6px;
-                border-radius: 3px;
-                background: DeskArt.gray ? Ui.settings-control : Ui.glass-pressed;
+                height: 4px;
+                border-radius: 2px;
+                background: Ui.glass-pressed;
                 Rectangle {
                     x: 0;
                     width: parent.width * root.shown / 100;
-                    border-radius: 3px;
-                    background: root.muted ? Ui.desk-on-subtle : Ui.desk-text;
+                    border-radius: 2px;
+                    background: Ui.primary;
                 }
             }
             if root.focused: Rectangle {
@@ -3886,22 +3849,10 @@ component DeskSlider inherits Rectangle {
                 y: (parent.height - self.height) / 2;
                 border-radius: self.width / 2;
                 background: Ui.primary-top;
-                drop-shadow-color: #00000059;
-                drop-shadow-offset-y: 1px;
-                drop-shadow-blur: 4px;
+                drop-shadow-color: #00000066;
+                drop-shadow-offset-y: 2px;
+                drop-shadow-blur: 6px;
                 animate width, height { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            }
-            // Arrastando: o valor numa dica acima da bolinha.
-            if root.dragging: Rectangle {
-                width: tipv.preferred-width + 16px;
-                height: 24px;
-                x: knob.x + knob.width / 2 - self.width / 2;
-                y: knob.y - self.height - 6px;
-                border-radius: 6px;
-                background: Ui.settings-surface;
-                border-width: 1px;
-                border-color: Ui.glass-edge-strong;
-                tipv := Text { text: round(root.drag-v) + "%"; color: Ui.desk-text; font-size: 12px; font-weight: 600; }
             }
             tta := TouchArea {
                 mouse-cursor: pointer;
@@ -3929,15 +3880,11 @@ component DeskSlider inherits Rectangle {
                 }
             }
         }
-        SliderSpeaker {
-            icon: "volume";
-            label: DeskText.max;
-            clicked => { root.changed(100, true); }
-        }
         Text {
-            width: 40px;
-            text: root.muted ? root.value : round(root.level) + "%";
+            width: 42px;
+            text: root.level <= 0 ? root.value : round(root.shown) + "%";
             color: Ui.desk-text;
+            font-family: Ui.font-heading;
             font-size: 13px * Ui.text-scale;
             font-weight: 600;
             horizontal-alignment: right;
@@ -4356,12 +4303,12 @@ component DeskRow inherits Rectangle {
             y: (parent.height - self.height) / 2;
             height: DeskArt.gray ? 36px : 32px;
             width: clamp(ml.preferred-width, 120px, 280px);
-            border-radius: self.height / 2;
+            border-radius: grp ? Ui.radius-control : self.height / 2;
             background: DeskArt.gray
                 ? (ta.has-hover ? Ui.settings-control-hover : Ui.settings-control)
                 : (ta.has-hover ? Ui.glass-hover : Ui.glass-control);
-            border-width: DeskArt.gray ? 0 : 1px;
-            border-color: Ui.glass-edge;
+            border-width: DeskArt.gray && !grp ? 0 : 1px;
+            border-color: grp ? Ui.line-strong : Ui.glass-edge;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             accessible-role: combobox;
             accessible-label: data.title + ": " + data.value;
@@ -4369,7 +4316,7 @@ component DeskRow inherits Rectangle {
                 padding-left: 14px;
                 padding-right: 12px;
                 spacing: 12px;
-                Text { text: data.value; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                Text { text: data.value; color: Ui.desk-text; font-size: (grp ? 13px : 14px) * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
                 Rectangle { width: 14px; DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; } }
             }
         }
@@ -6104,7 +6051,7 @@ component DeskOverlay inherits Rectangle {
             // Select (`wide`): nasce embaixo da pílula, alinhado à direita dela; vira para cima se não couber.
             property <bool> select: ov.wide;
             width: select ? clamp(max(ml.preferred-width, DeskArt.anchor-w), 200px, max(340px, DeskArt.anchor-w)) : (ov.title == "" ? 280px : 260px);
-            height: min(ml.preferred-height, select ? 8 * 38px + 12px : root.height - 40px);
+            height: min(ml.preferred-height, select ? 8 * 38px + 12px + (ov.title != "" ? 32px : 0px) : root.height - 40px);
             x: clamp(select ? menu-x - self.width : menu-x, 12px, root.width - self.width - 12px);
             y: select && menu-y + self.height > root.height - 12px
                 ? max(12px, menu-y - 6px - 36px - 6px - self.height)

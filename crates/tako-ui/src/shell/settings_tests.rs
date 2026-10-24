@@ -855,6 +855,8 @@ fn desktop_choices_are_selects_that_pick_each_option() {
                     continue;
                 }
                 let mut layer = item.select(&ctx).expect("select");
+                // A lista abre com o título da linha no alto.
+                assert_eq!(layer.render(&ctx).title, item.row.title);
                 let _ = layer.click("row", k, &mut ctx);
                 let item = find(&(cat.rows)(&ctx), &key);
                 let now = (item.options.unwrap())(&ctx).1;
