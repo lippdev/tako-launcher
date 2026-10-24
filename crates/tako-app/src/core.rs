@@ -39,6 +39,7 @@ pub struct Core {
     pub(crate) devices: crate::system::Devices,
     pub(crate) downloads: crate::downloads::DownloadsHub,
     pub(crate) game_settings: crate::game_settings::Overrides,
+    pub(crate) profiles: crate::profile::ProfileState,
 }
 
 impl Core {
@@ -198,6 +199,7 @@ impl Core {
                 .flatten(),
             downloads,
             game_settings,
+            profiles: crate::profile::ProfileState::open(&paths, simulate),
         };
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);

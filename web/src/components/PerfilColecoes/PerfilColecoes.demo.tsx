@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Aba } from "../Abas/Abas";
-import { PerfilColecoes, type ColecaoItem } from "./PerfilColecoes";
+import { PerfilColecoes, type CollectionItem } from "./PerfilColecoes";
 
 export const title = "PerfilColecoes";
 export const preview = "PerfilColecoes";
@@ -40,32 +40,32 @@ const ABAS_ORDEM: readonly Aba<"recentes" | "az" | "mais">[] = [
   { id: "mais", label: "Mais jogos" },
 ];
 
-const COLECOES_PADRAO: readonly ColecaoItem[] = [
+const COLECOES_PADRAO: readonly CollectionItem[] = [
   {
     id: "c1",
-    nome: "Roguelikes",
-    detalhe: "6 jogos · 4 instalados",
-    capas: [CAPA_A, CAPA_B, CAPA_C, CAPA_D],
+    name: "Roguelikes",
+    detail: "6 jogos · 4 instalados",
+    covers: [CAPA_A, CAPA_B, CAPA_C, CAPA_D],
   },
   {
     id: "c2",
-    nome: "Jogados este mês",
-    detalhe: "5 jogos · 5 instalados",
-    automatica: true,
-    capas: [CAPA_B, CAPA_C, CAPA_D, CAPA_A],
+    name: "Jogados este mês",
+    detail: "5 jogos · 5 instalados",
+    automatic: true,
+    covers: [CAPA_B, CAPA_C, CAPA_D, CAPA_A],
   },
   {
     id: "c3",
-    nome: "RPG & Aventura",
-    detalhe: "12 jogos · 8 instalados",
-    capas: [CAPA_C, CAPA_D, CAPA_A, CAPA_B],
+    name: "RPG & Aventura",
+    detail: "12 jogos · 8 instalados",
+    covers: [CAPA_C, CAPA_D, CAPA_A, CAPA_B],
   },
   {
     id: "c4",
-    nome: "Favoritos",
-    detalhe: "3 jogos · 3 instalados",
-    automatica: true,
-    capas: [CAPA_D, CAPA_A, CAPA_B],
+    name: "Favoritos",
+    detail: "3 jogos · 3 instalados",
+    automatic: true,
+    covers: [CAPA_D, CAPA_A, CAPA_B],
   },
 ];
 
@@ -113,29 +113,29 @@ export function Demo() {
           </div>
         )}
         <PerfilColecoes
-          resumo="4 coleções · 26 jogos"
-          seloAutomaticaLabel="Automática"
-          ordem={{
+          summary="4 coleções · 26 jogos"
+          autoBadgeLabel="Automática"
+          order={{
             label: "Ordem das coleções",
             tabs: ABAS_ORDEM,
             value: ordem,
             onChange: setOrdem,
           }}
-          colecoes={COLECOES_PADRAO}
-          novaColecao={{
+          collections={COLECOES_PADRAO}
+          newCollection={{
             label: "Nova coleção",
             onClick: () => {
               setMensagemAcao("Ação disparada: Nova coleção");
             },
           }}
-          importarColecao={{
+          importCollection={{
             label: "Importar coleção",
             onClick: () => {
               setMensagemAcao("Ação disparada: Importar coleção");
             },
           }}
-          onColecaoClick={(c) => {
-            setMensagemAcao(`Coleção aberta: ${c.nome}`);
+          onCollectionClick={(c) => {
+            setMensagemAcao(`Coleção aberta: ${c.name}`);
           }}
         />
       </section>
@@ -146,14 +146,14 @@ export function Demo() {
           ESTADO VAZIO (SEM COLEÇÕES)
         </h3>
         <PerfilColecoes
-          resumo="0 coleções · 0 jogos"
-          colecoes={[]}
-          mensagemVazio="Nenhuma coleção criada ainda. Use os botões abaixo para criar ou importar."
-          novaColecao={{
+          summary="0 coleções · 0 jogos"
+          collections={[]}
+          emptyMessage="Nenhuma coleção criada ainda. Use os botões abaixo para criar ou importar."
+          newCollection={{
             label: "Nova coleção",
             onClick: () => undefined,
           }}
-          importarColecao={{
+          importCollection={{
             label: "Importar coleção",
             onClick: () => undefined,
           }}

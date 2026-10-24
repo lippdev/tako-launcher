@@ -4,55 +4,61 @@ import { Abas, type Aba } from "../Abas/Abas";
 import { Icon } from "../Icon/Icon";
 import styles from "./PerfilColecoes.module.css";
 
-export interface ColecaoCapa {
+export interface CollectionCover {
   /** URL direta da capa do jogo. */
   src?: string;
   /** Texto alternativo para acessibilidade. */
   alt?: string;
 }
 
-export interface ColecaoItem {
+export interface CollectionItem {
   id: string;
   /** Nome da coleção, ex.: "Roguelikes" ou "Jogados este mês". */
-  nome: string;
+  name: string;
   /** Quantidade e instalados, ex.: "6 jogos · 4 instalados". */
-  detalhe?: string;
+  detail?: string;
   /** Indica se é uma coleção automática por regra (exibe o selo com ponto). */
-  automatica?: boolean;
+  automatic?: boolean;
   /** Até 4 capas para compor o mosaico 2×2. */
-  capas?: readonly (string | ColecaoCapa)[];
+  covers?: readonly (string | CollectionCover)[];
   /** Callback ao clicar neste cartão de coleção. */
   onClick?: () => void;
 }
 
-export interface PerfilColecoesProps<TOrdem extends string = string> {
+export interface PerfilColecoesProps<TOrder extends string = string> {
   /** Resumo à esquerda, ex.: "4 coleções · 26 jogos". */
-  resumo?: string;
+  summary?: string;
+  /** Nome da barra de opções para leitores de tela. */
+  toolbarLabel?: string;
   /** Seletor segmentado de ordenação à direita, ex.: Recentes · A–Z · Mais jogos. */
-  ordem?: {
-    tabs: readonly Aba<TOrdem>[];
-    value: TOrdem;
-    onChange: (value: TOrdem) => void;
+  order?: {
+    tabs: readonly Aba<TOrder>[];
+    value: TOrder;
+    onChange: (value: TOrder) => void;
     label: string;
   };
   /** Lista de coleções exibidas na grade de 4 colunas. */
-  colecoes?: readonly ColecaoItem[];
+  collections?: readonly CollectionItem[];
+  /** Nome da grade para leitores de tela; sem ele, vale o resumo. */
+  gridLabel?: string;
   /** Rótulo do selo para coleções automáticas, ex.: "Automática". */
-  seloAutomaticaLabel?: string;
+  autoBadgeLabel?: string;
+  /** Nome do grupo de ações para leitores de tela. */
+  actionsLabel?: string;
   /** Ação de "Nova coleção" no cartão tracejado. Se omitido, não renderiza. */
-  novaColecao?: {
+  newCollection?: {
     label: string;
     onClick: () => void;
   };
   /** Ação de "Importar coleção" no cartão tracejado. Se omitido, não renderiza. */
-  importarColecao?: {
+  importCollection?: {
     label: string;
     onClick: () => void;
   };
   /** Mensagem exibida caso não haja nenhuma coleção. */
-  mensagemVazio?: string;
+  emptyMessage?: string;
   /** Callback global ao clicar numa coleção. */
-  onColecaoClick?: (colecao: ColecaoItem) => void;
+  onCollectionClick?: (collection: CollectionItem) => void;
   className?: string;
 }
 
@@ -62,41 +68,50 @@ export interface PerfilColecoesProps<TOrdem extends string = string> {
  * mosaico 2×2 de capas e selo "Automática", e cartões tracejados de ação no fim.
  * Sem dado, o bloco correspondente não renderiza.
  */
-export function PerfilColecoes<TOrdem extends string = string>({
-  resumo,
-  ordem,
-  colecoes,
-  seloAutomaticaLabel,
-  novaColecao,
-  importarColecao,
-  mensagemVazio,
-  onColecaoClick,
+export function PerfilColecoes<TOrder extends string = string>({
+  summary,
+  toolbarLabel,
+  order,
+  collections,
+  gridLabel,
+  autoBadgeLabel,
+  actionsLabel,
+  newCollection,
+  importCollection,
+  emptyMessage,
+  onCollectionClick,
   className,
-}: PerfilColecoesProps<TOrdem>) {
-  const temBarraSuperior = Boolean(resumo || ordem);
-  const temColecoes = Boolean(colecoes && colecoes.length > 0);
-  const temAcoes = Boolean(novaColecao || importarColecao);
-  const temVazio = Boolean(!temColecoes && mensagemVazio);
+}: PerfilColecoesProps<TOrder>) {
+  const hasTopBar = Boolean(summary || order);
+  const hasCollections = Boolean(collections && collections.length > 0);
+  const hasActions = Boolean(newCollection || importCollection);
+  const hasEmpty = Boolean(!hasCollections && emptyMessage);
 
   // Sem dado nenhum, o bloco some
-  if (!temBarraSuperior && !temColecoes && !temAcoes && !temVazio) {
+  if (!hasTopBar && !hasCollections && !hasActions && !hasEmpty) {
     return null;
   }
+
+  const gridName = gridLabel ?? summary;
 
   return (
     <div className={cx(styles["container"], className)}>
       {/* Barra superior (resumo à esquerda e ordenação à direita) */}
-      {temBarraSuperior && (
-        <div className={styles["barraSuperior"]} role="toolbar" aria-label="Opções de coleções">
-          {resumo && <span className={styles["resumo"]}>{resumo}</span>}
-          {ordem && (
+      {hasTopBar && (
+        <div
+          className={styles["barraSuperior"]}
+          role="toolbar"
+          {...(toolbarLabel ? { "aria-label": toolbarLabel } : {})}
+        >
+          {summary && <span className={styles["resumo"]}>{summary}</span>}
+          {order && (
             <div className={styles["ordemArea"]}>
               <Abas
                 variant="segmentado"
-                label={ordem.label}
-                tabs={ordem.tabs}
-                value={ordem.value}
-                onChange={ordem.onChange}
+                label={order.label}
+                tabs={order.tabs}
+                value={order.value}
+                onChange={order.onChange}
               />
             </div>
           )}
@@ -104,12 +119,12 @@ export function PerfilColecoes<TOrdem extends string = string>({
       )}
 
       {/* Grade de coleções */}
-      {temColecoes && (
-        <div className={styles["grade"]} role="region" aria-label={resumo ?? "Coleções de jogos"}>
-          {colecoes?.map((colecao) => {
+      {hasCollections && (
+        <div className={styles["grade"]} role="region" {...(gridName ? { "aria-label": gridName } : {})}>
+          {collections?.map((collection) => {
             const handleCardClick = () => {
-              colecao.onClick?.();
-              onColecaoClick?.(colecao);
+              collection.onClick?.();
+              onCollectionClick?.(collection);
             };
 
             const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -120,33 +135,32 @@ export function PerfilColecoes<TOrdem extends string = string>({
             };
 
             // Preenche até 4 quadrantes para o mosaico 2×2
-            const quadrantes = Array.from({ length: 4 }, (_, i) => {
-              const item = colecao.capas?.[i];
+            const quadrants = Array.from({ length: 4 }, (_, i): CollectionCover | null => {
+              const item = collection.covers?.[i];
               if (!item) return null;
-              if (typeof item === "string") return { src: item, alt: `${colecao.nome} - item ${i + 1}` };
-              return item;
+              return typeof item === "string" ? { src: item } : item;
             });
 
             return (
               <div
-                key={colecao.id}
+                key={collection.id}
                 className={styles["cartao"]}
                 onClick={handleCardClick}
                 onKeyDown={handleKeyDown}
                 role="button"
                 tabIndex={0}
-                aria-label={`${colecao.nome}${colecao.detalhe ? `, ${colecao.detalhe}` : ""}${
-                  colecao.automatica && seloAutomaticaLabel ? `, ${seloAutomaticaLabel}` : ""
+                aria-label={`${collection.name}${collection.detail ? `, ${collection.detail}` : ""}${
+                  collection.automatic && autoBadgeLabel ? `, ${autoBadgeLabel}` : ""
                 }`}
               >
                 {/* Mosaico 2×2 */}
                 <div className={styles["mosaico"]} aria-hidden="true">
-                  {quadrantes.map((quadrante, idx) => (
+                  {quadrants.map((quadrant, idx) => (
                     <div key={idx} className={styles["mosaicoQuadrante"]}>
-                      {quadrante?.src ? (
+                      {quadrant?.src ? (
                         <img
-                          src={quadrante.src}
-                          alt={quadrante.alt ?? ""}
+                          src={quadrant.src}
+                          alt={quadrant.alt ?? ""}
                           className={styles["mosaicoImagem"]}
                           loading="lazy"
                         />
@@ -160,13 +174,13 @@ export function PerfilColecoes<TOrdem extends string = string>({
                 {/* Rodapé com nome, contagem e selo opcional */}
                 <div className={styles["cartaoRodape"]}>
                   <div className={styles["textos"]}>
-                    <strong className={styles["nome"]}>{colecao.nome}</strong>
-                    {colecao.detalhe && <small className={styles["detalhe"]}>{colecao.detalhe}</small>}
+                    <strong className={styles["nome"]}>{collection.name}</strong>
+                    {collection.detail && <small className={styles["detalhe"]}>{collection.detail}</small>}
                   </div>
-                  {colecao.automatica && seloAutomaticaLabel && (
+                  {collection.automatic && autoBadgeLabel && (
                     <span className={styles["seloAutomatica"]}>
                       <i className={styles["seloPonto"]} aria-hidden="true" />
-                      {seloAutomaticaLabel}
+                      {autoBadgeLabel}
                     </span>
                   )}
                 </div>
@@ -177,31 +191,31 @@ export function PerfilColecoes<TOrdem extends string = string>({
       )}
 
       {/* Cartões tracejados de ação no fim (Nova coleção e Importar coleção) */}
-      {temAcoes && (
-        <div className={styles["acoesGrade"]} role="group" aria-label="Ações de coleção">
-          {novaColecao && (
+      {hasActions && (
+        <div className={styles["acoesGrade"]} role="group" {...(actionsLabel ? { "aria-label": actionsLabel } : {})}>
+          {newCollection && (
             <button
               type="button"
               className={styles["cartaoAcao"]}
-              onClick={novaColecao.onClick}
-              aria-label={novaColecao.label}
+              onClick={newCollection.onClick}
+              aria-label={newCollection.label}
             >
               <span className={styles["acaoConteudo"]}>
                 <Icon name="plus" size="md" />
-                <span>{novaColecao.label}</span>
+                <span>{newCollection.label}</span>
               </span>
             </button>
           )}
-          {importarColecao && (
+          {importCollection && (
             <button
               type="button"
               className={styles["cartaoAcao"]}
-              onClick={importarColecao.onClick}
-              aria-label={importarColecao.label}
+              onClick={importCollection.onClick}
+              aria-label={importCollection.label}
             >
               <span className={styles["acaoConteudo"]}>
                 <Icon name="download" size="md" />
-                <span>{importarColecao.label}</span>
+                <span>{importCollection.label}</span>
               </span>
             </button>
           )}
@@ -209,7 +223,7 @@ export function PerfilColecoes<TOrdem extends string = string>({
       )}
 
       {/* Estado vazio */}
-      {temVazio && <div className={styles["vazio"]}>{mensagemVazio}</div>}
+      {hasEmpty && <div className={styles["vazio"]}>{emptyMessage}</div>}
     </div>
   );
 }

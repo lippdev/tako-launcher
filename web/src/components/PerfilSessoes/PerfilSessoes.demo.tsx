@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Aba } from "../Abas/Abas";
 import type { OpcaoDeSelecao } from "../CampoDeSelecao/CampoDeSelecao";
-import { PerfilSessoes, type GrupoDeSessoes, type SemanaSessoes, type SessaoHistorico } from "./PerfilSessoes";
+import { PerfilSessoes, type SessionGroup, type SessionsWeek, type HistorySession } from "./PerfilSessoes";
 
 export const title = "PerfilSessoes";
 export const preview = "PerfilSessoes";
@@ -77,11 +77,11 @@ const OPCOES_JOGOS: readonly OpcaoDeSelecao<string>[] = [
   { value: "cp2077", label: "Cyberpunk 2077" },
 ];
 
-const SEMANA_EXEMPLO: SemanaSessoes = {
-  rotulo: "Tempo jogado",
+const SEMANA_EXEMPLO: SessionsWeek = {
+  label: "Tempo jogado",
   total: "19 h",
   ariaLabel: "Gráfico de horas jogadas na semana: pico no domingo com 95%",
-  dias: [
+  days: [
     { label: "S", value: 0.8 },
     { label: "T", value: 0.15 },
     { label: "Q", value: 0.35 },
@@ -92,52 +92,52 @@ const SEMANA_EXEMPLO: SemanaSessoes = {
   ],
 };
 
-const GRUPOS_PADRAO: readonly GrupoDeSessoes[] = [
+const GRUPOS_PADRAO: readonly SessionGroup[] = [
   {
     id: "hoje",
-    titulo: "Hoje",
-    subtitulo: "22 out",
+    title: "Hoje",
+    subtitle: "22 out",
     total: "1 h 54 min",
-    sessoes: [
+    sessions: [
       {
         id: "s1",
-        jogo: "God of War: Ragnarök",
-        capaSrc: CAPA_GOW,
-        horario: "14:02 – agora",
-        duracao: "42 min",
-        status: { tipo: "jogando", texto: "Jogando agora" },
+        game: "God of War: Ragnarök",
+        coverSrc: CAPA_GOW,
+        time: "14:02 – agora",
+        duration: "42 min",
+        status: { kind: "playing", text: "Jogando agora" },
       },
       {
         id: "s2",
-        jogo: "Hades II",
-        capaSrc: CAPA_HADES,
-        horario: "09:10 – 10:22",
-        duracao: "1 h 12 min",
-        status: { tipo: "normal", texto: "Fechou normalmente" },
+        game: "Hades II",
+        coverSrc: CAPA_HADES,
+        time: "09:10 – 10:22",
+        duration: "1 h 12 min",
+        status: { kind: "normal", text: "Fechou normalmente" },
       },
     ],
   },
   {
     id: "ontem",
-    titulo: "Ontem",
-    subtitulo: "21 out",
+    title: "Ontem",
+    subtitle: "21 out",
     total: "2 h 31 min",
-    sessoes: [
+    sessions: [
       {
         id: "s3",
-        jogo: "Dragon's Dogma 2",
-        capaSrc: CAPA_DD2,
-        horario: "20:40 – 22:59",
-        duracao: "2 h 19 min",
-        status: { tipo: "normal", texto: "Fechou normalmente" },
+        game: "Dragon's Dogma 2",
+        coverSrc: CAPA_DD2,
+        time: "20:40 – 22:59",
+        duration: "2 h 19 min",
+        status: { kind: "normal", text: "Fechou normalmente" },
       },
       {
         id: "s4",
-        jogo: "Cyberpunk 2077",
-        capaSrc: CAPA_CP,
-        horario: "19:58 – 20:10",
-        duracao: "12 min",
-        status: { tipo: "erro", texto: "Fechou com erro", linkTexto: "Ver relatório" },
+        game: "Cyberpunk 2077",
+        coverSrc: CAPA_CP,
+        time: "19:58 – 20:10",
+        duration: "12 min",
+        status: { kind: "error", text: "Fechou com erro", linkText: "Ver relatório" },
       },
     ],
   },
@@ -148,8 +148,8 @@ export function Demo() {
   const [jogo, setJogo] = useState("todos");
   const [relatorioAberto, setRelatorioAberto] = useState<string | null>(null);
 
-  const handleVerRelatorio = (sessao: SessaoHistorico) => {
-    setRelatorioAberto(`Relatório de erro solicitado para: ${sessao.jogo} (${sessao.horario})`);
+  const handleVerRelatorio = (session: HistorySession) => {
+    setRelatorioAberto(`Relatório de erro solicitado para: ${session.game} (${session.time})`);
   };
 
   return (
@@ -192,22 +192,22 @@ export function Demo() {
           </div>
         )}
         <PerfilSessoes
-          semana={SEMANA_EXEMPLO}
-          periodo={{
+          week={SEMANA_EXEMPLO}
+          period={{
             label: "Período",
             tabs: ABAS_PERIODO,
             value: periodo,
             onChange: setPeriodo,
           }}
-          filtroJogo={{
+          gameFilter={{
             label: "Jogo",
             options: OPCOES_JOGOS,
             value: jogo,
             onChange: setJogo,
           }}
-          resumo="6 sessões · 6 h 37 min"
-          grupos={GRUPOS_PADRAO}
-          onVerRelatorio={handleVerRelatorio}
+          summary="6 sessões · 6 h 37 min"
+          groups={GRUPOS_PADRAO}
+          onOpenReport={handleVerRelatorio}
         />
       </section>
 
@@ -217,21 +217,21 @@ export function Demo() {
           APENAS LISTA DE SESSÕES (SEM O BLOCO DA SEMANA)
         </h3>
         <PerfilSessoes
-          periodo={{
+          period={{
             label: "Período",
             tabs: ABAS_PERIODO,
             value: "tudo",
             onChange: () => undefined,
           }}
-          filtroJogo={{
+          gameFilter={{
             label: "Jogo",
             options: OPCOES_JOGOS,
             value: "todos",
             onChange: () => undefined,
           }}
-          resumo="4 sessões · 4 h 25 min"
-          grupos={GRUPOS_PADRAO}
-          onVerRelatorio={handleVerRelatorio}
+          summary="4 sessões · 4 h 25 min"
+          groups={GRUPOS_PADRAO}
+          onOpenReport={handleVerRelatorio}
         />
       </section>
 
@@ -241,21 +241,21 @@ export function Demo() {
           ESTADO VAZIO (NENHUMA SESSÃO)
         </h3>
         <PerfilSessoes
-          periodo={{
+          period={{
             label: "Período",
             tabs: ABAS_PERIODO,
             value: "mes",
             onChange: () => undefined,
           }}
-          filtroJogo={{
+          gameFilter={{
             label: "Jogo",
             options: OPCOES_JOGOS,
             value: "todos",
             onChange: () => undefined,
           }}
-          resumo="0 sessões · 0 h"
-          grupos={[]}
-          mensagemVazio="Nenhuma sessão encontrada para este período ou jogo selecionado."
+          summary="0 sessões · 0 h"
+          groups={[]}
+          emptyMessage="Nenhuma sessão encontrada para este período ou jogo selecionado."
         />
       </section>
 

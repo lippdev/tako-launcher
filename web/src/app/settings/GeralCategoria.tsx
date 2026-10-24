@@ -1,5 +1,6 @@
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
+import { PerfisNasConfiguracoes } from "../perfil/PerfisNasConfiguracoes";
 import { settingsStrings } from "../strings";
 import { windowAction } from "../windowActions";
 import { LinhaChave, LinhaSelecao, type CategoryProps } from "./Linhas";
@@ -67,6 +68,7 @@ export function GeralCategoria({ values, save }: CategoryProps) {
           onChange={(value) => void save(KEYS.language, value)}
         />
       </GrupoDeConfiguracao>
+      <PerfisNasConfiguracoes />
       <GrupoDeConfiguracao title={s.games}>
         <LinhaChave
           title={s.restore.title}

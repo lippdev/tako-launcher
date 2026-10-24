@@ -6,100 +6,100 @@ import { BarrasDaSemana, Bloco, GrupoDeBlocos } from "../GrupoDeBlocos/GrupoDeBl
 import { Icon } from "../Icon/Icon";
 import styles from "./PerfilSessoes.module.css";
 
-export interface StatusSessaoJogando {
-  tipo: "jogando";
+export interface SessionStatusPlaying {
+  kind: "playing";
   /** Rótulo exibido, ex.: "Jogando agora". */
-  texto: string;
+  text: string;
 }
 
-export interface StatusSessaoNormal {
-  tipo: "normal";
-  /** Rótulo exibido, ex.: "Fechou normalmente". */
-  texto: string;
+export interface SessionStatusNormal {
+  kind: "normal";
+  /** Rótulo exibido, ex.: "Fechou normalmente" ou "Abriu e fechou". */
+  text: string;
 }
 
-export interface StatusSessaoErro {
-  tipo: "erro";
+export interface SessionStatusError {
+  kind: "error";
   /** Rótulo exibido, ex.: "Fechou com erro". */
-  texto: string;
-  /** Rótulo da ação que abre o relatório, ex.: "Ver relatório". */
-  linkTexto?: string;
+  text: string;
+  /** Rótulo da ação que abre o relatório, ex.: "Ver relatório"; sem ele não há ação. */
+  linkText?: string;
 }
 
-export type StatusSessao = StatusSessaoJogando | StatusSessaoNormal | StatusSessaoErro;
+export type SessionStatus = SessionStatusPlaying | SessionStatusNormal | SessionStatusError;
 
-export interface SessaoHistorico {
+export interface HistorySession {
   id: string;
   /** Título do jogo. */
-  jogo: string;
-  /** URL direta ou ID da capa do jogo. */
-  capaSrc?: string;
-  /** ID do protocolo tako-img (ex.: steam:570). */
-  capaId?: string;
+  game: string;
+  /** URL da capa do jogo; sem ela, as iniciais. */
+  coverSrc?: string;
   /** Texto alternativo da capa. */
-  capaAlt?: string;
+  coverAlt?: string;
   /** Horário da sessão, ex.: "14:02 – agora" ou "20:40 – 22:59". */
-  horario: string;
+  time: string;
   /** Duração formatada, ex.: "42 min" ou "2 h 19 min". */
-  duracao: string;
-  /** Estado de encerramento da sessão ou em andamento. */
-  status: StatusSessao;
+  duration: string;
+  /** Como a sessão terminou; sem dado (o núcleo não registra o fim), a linha mostra só o horário. */
+  status?: SessionStatus;
   /** Callback para abrir o relatório de erro desta sessão (ErroDoJogo). */
-  onVerRelatorio?: () => void;
+  onOpenReport?: () => void;
   /** Callback ao clicar na linha da sessão. */
   onClick?: () => void;
 }
 
-export interface GrupoDeSessoes {
+export interface SessionGroup {
   id: string;
-  /** Título do grupo, ex.: "Hoje", "Ontem", "20 out". */
-  titulo: string;
+  /** Título do grupo, ex.: "Hoje", "Ontem", "20 out". Vazio, junto com o total, é um grupo sem cabeçalho. */
+  title: string;
   /** Subtítulo ou data curta, ex.: "22 out". */
-  subtitulo?: string;
+  subtitle?: string;
   /** Duração total jogada no dia, ex.: "1 h 54 min". */
   total: string;
   /** Sessões que ocorreram neste dia. */
-  sessoes: readonly SessaoHistorico[];
+  sessions: readonly HistorySession[];
 }
 
-export interface SemanaSessoes {
+export interface SessionsWeek {
   /** Rótulo da métrica da semana, ex.: "Esta semana". */
-  rotulo: string;
+  label: string;
   /** Valor total em texto, ex.: "19 h". */
   total?: string;
   /** Nome acessível para o gráfico de barras. */
   ariaLabel: string;
   /** Altura de 0 a 1 por dia. */
-  dias: readonly { label: string; value: number }[];
+  days: readonly { label: string; value: number }[];
 }
 
-export interface PerfilSessoesProps<TPeriodo extends string = string, TJogo extends string = string> {
+export interface PerfilSessoesProps<TPeriod extends string = string, TGame extends string = string> {
   /** Bloco opcional com o tempo jogado na semana em barras. Se omitido, não renderiza. */
-  semana?: SemanaSessoes;
+  week?: SessionsWeek;
   /** Seletor de período (ex.: Esta semana, Este mês, Tudo). Se omitido, não renderiza. */
-  periodo?: {
-    tabs: readonly Aba<TPeriodo>[];
-    value: TPeriodo;
-    onChange: (value: TPeriodo) => void;
+  period?: {
+    tabs: readonly Aba<TPeriod>[];
+    value: TPeriod;
+    onChange: (value: TPeriod) => void;
     label: string;
   };
   /** Filtro de jogo (ex.: Todos os jogos). Se omitido, não renderiza. */
-  filtroJogo?: {
-    options: readonly OpcaoDeSelecao<TJogo>[];
-    value: TJogo;
-    onChange: (value: TJogo) => void;
+  gameFilter?: {
+    options: readonly OpcaoDeSelecao<TGame>[];
+    value: TGame;
+    onChange: (value: TGame) => void;
     label: string;
   };
   /** Resumo à direita da barra de filtros, ex.: "6 sessões · 6 h 37 min". */
-  resumo?: string;
+  summary?: string;
+  /** Nome da barra de filtros para leitores de tela. */
+  toolbarLabel?: string;
   /** Grupos de sessões separados por dia. */
-  grupos?: readonly GrupoDeSessoes[];
+  groups?: readonly SessionGroup[];
   /** Mensagem exibida quando não houver sessões registradas. */
-  mensagemVazio?: string;
+  emptyMessage?: string;
   /** Callback ao clicar em "Ver relatório" numa sessão com erro. */
-  onVerRelatorio?: (sessao: SessaoHistorico) => void;
+  onOpenReport?: (session: HistorySession) => void;
   /** Callback ao clicar numa sessão. */
-  onSessaoClick?: (sessao: SessaoHistorico) => void;
+  onSessionClick?: (session: HistorySession) => void;
   className?: string;
 }
 
@@ -109,148 +109,155 @@ export interface PerfilSessoesProps<TPeriodo extends string = string, TJogo exte
  * e a lista agrupada por dia. Se fornecido, exibe também as barras de tempo jogado na semana.
  * Sem dados, o bloco correspondente não é renderizado.
  */
-export function PerfilSessoes<TPeriodo extends string = string, TJogo extends string = string>({
-  semana,
-  periodo,
-  filtroJogo,
-  resumo,
-  grupos,
-  mensagemVazio,
-  onVerRelatorio,
-  onSessaoClick,
+export function PerfilSessoes<TPeriod extends string = string, TGame extends string = string>({
+  week,
+  period,
+  gameFilter,
+  summary,
+  toolbarLabel,
+  groups,
+  emptyMessage,
+  onOpenReport,
+  onSessionClick,
   className,
-}: PerfilSessoesProps<TPeriodo, TJogo>) {
-  const temSemana = Boolean(semana && semana.dias.length > 0);
-  const temFiltros = Boolean(periodo || filtroJogo || resumo);
-  const temGrupos = Boolean(grupos && grupos.length > 0);
-  const temVazio = Boolean(!temGrupos && mensagemVazio);
+}: PerfilSessoesProps<TPeriod, TGame>) {
+  const hasWeek = Boolean(week && week.days.length > 0);
+  const hasFilters = Boolean(period || gameFilter || summary);
+  const hasGroups = Boolean(groups && groups.length > 0);
+  const hasEmpty = Boolean(!hasGroups && emptyMessage);
 
   // Se nenhum dado foi fornecido, o componente não renderiza
-  if (!temSemana && !temFiltros && !temGrupos && !temVazio) {
+  if (!hasWeek && !hasFilters && !hasGroups && !hasEmpty) {
     return null;
   }
 
   return (
     <div className={cx(styles["container"], className)}>
       {/* Bloco opcional com o tempo jogado na semana em barras */}
-      {temSemana && semana && (
-        <section className={styles["semanaBloco"]} aria-label={semana.ariaLabel}>
+      {hasWeek && week && (
+        <section className={styles["semanaBloco"]} aria-label={week.ariaLabel}>
           <GrupoDeBlocos flat>
-            {semana.total && (
-              <Bloco label={semana.rotulo} icon="clock">
-                {semana.total}
+            {week.total && (
+              <Bloco label={week.label} icon="clock">
+                {week.total}
               </Bloco>
             )}
-            <Bloco label={semana.rotulo}>
-              <BarrasDaSemana days={[...semana.dias]} aria-label={semana.ariaLabel} />
+            <Bloco label={week.label}>
+              <BarrasDaSemana days={[...week.days]} aria-label={week.ariaLabel} />
             </Bloco>
           </GrupoDeBlocos>
         </section>
       )}
 
       {/* Barra de filtros (período em abas segmentadas, seletor de jogo e resumo) */}
-      {temFiltros && (
-        <div className={styles["barraFiltros"]} role="toolbar" aria-label="Filtros de sessões">
-          {periodo && (
+      {hasFilters && (
+        <div className={styles["barraFiltros"]} role="toolbar" {...(toolbarLabel ? { "aria-label": toolbarLabel } : {})}>
+          {period && (
             <Abas
               variant="segmentado"
-              label={periodo.label}
-              tabs={periodo.tabs}
-              value={periodo.value}
-              onChange={periodo.onChange}
+              label={period.label}
+              tabs={period.tabs}
+              value={period.value}
+              onChange={period.onChange}
             />
           )}
-          {filtroJogo && (
+          {gameFilter && (
             <CampoDeSelecao
-              label={filtroJogo.label}
-              options={filtroJogo.options}
-              value={filtroJogo.value}
-              onChange={filtroJogo.onChange}
+              label={gameFilter.label}
+              options={gameFilter.options}
+              value={gameFilter.value}
+              onChange={gameFilter.onChange}
             />
           )}
-          {resumo && <span className={styles["resumo"]}>{resumo}</span>}
+          {summary && <span className={styles["resumo"]}>{summary}</span>}
         </div>
       )}
 
       {/* Grupos de sessões por dia */}
-      {temGrupos &&
-        grupos?.map((grupo) => (
-          <section key={grupo.id} className={styles["grupo"]} aria-label={`${grupo.titulo} ${grupo.subtitulo ?? ""}`}>
-            <div className={styles["grupoCabecalho"]}>
-              <div className={styles["grupoTituloArea"]}>
-                <strong className={styles["grupoTitulo"]}>{grupo.titulo}</strong>
-                {grupo.subtitulo && <span className={styles["grupoSubtitulo"]}>{grupo.subtitulo}</span>}
+      {hasGroups &&
+        groups?.map((group) => (
+          <section key={group.id} className={styles["grupo"]} aria-label={`${group.title} ${group.subtitle ?? ""}`}>
+            {/* Sem título nem total (a lista da Visão geral), o grupo é só as linhas. */}
+            {(group.title || group.total) && (
+              <div className={styles["grupoCabecalho"]}>
+                <div className={styles["grupoTituloArea"]}>
+                  <strong className={styles["grupoTitulo"]}>{group.title}</strong>
+                  {group.subtitle && <span className={styles["grupoSubtitulo"]}>{group.subtitle}</span>}
+                </div>
+                <span className={styles["grupoTotal"]}>{group.total}</span>
               </div>
-              <span className={styles["grupoTotal"]}>{grupo.total}</span>
-            </div>
+            )}
 
             <div className={styles["linhasLista"]}>
-              {grupo.sessoes.map((sessao) => {
-                const handleLinhaClick = () => {
-                  sessao.onClick?.();
-                  onSessaoClick?.(sessao);
+              {group.sessions.map((session) => {
+                const handleRowClick = () => {
+                  session.onClick?.();
+                  onSessionClick?.(session);
                 };
 
                 const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-                  if (sessao.onClick || onSessaoClick) {
+                  if (session.onClick || onSessionClick) {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      handleLinhaClick();
+                      handleRowClick();
                     }
                   }
                 };
 
-                const clicavel = Boolean(sessao.onClick || onSessaoClick);
+                const clickable = Boolean(session.onClick || onSessionClick);
+                const status = session.status;
 
                 return (
                   <div
-                    key={sessao.id}
-                    className={cx(styles["linha"], clicavel && styles["linhaClicavel"])}
-                    onClick={clicavel ? handleLinhaClick : undefined}
-                    onKeyDown={clicavel ? handleKeyDown : undefined}
-                    tabIndex={clicavel ? 0 : undefined}
-                    role={clicavel ? "button" : undefined}
-                    aria-label={clicavel ? `${sessao.jogo}, ${sessao.horario}, ${sessao.duracao}` : undefined}
+                    key={session.id}
+                    className={cx(styles["linha"], clickable && styles["linhaClicavel"])}
+                    onClick={clickable ? handleRowClick : undefined}
+                    onKeyDown={clickable ? handleKeyDown : undefined}
+                    tabIndex={clickable ? 0 : undefined}
+                    role={clickable ? "button" : undefined}
+                    aria-label={clickable ? `${session.game}, ${session.time}, ${session.duration}` : undefined}
                   >
                     {/* Capa miniatura */}
                     <div className={styles["capaMiniatura"]}>
-                      {sessao.capaSrc ? (
+                      {session.coverSrc ? (
                         <img
-                          src={sessao.capaSrc}
-                          alt={sessao.capaAlt ?? sessao.jogo}
+                          src={session.coverSrc}
+                          alt={session.coverAlt ?? session.game}
                           className={styles["capaImagem"]}
                           loading="lazy"
                         />
                       ) : (
-                        <span className={styles["capaPlaceholder"]}>{sessao.jogo.slice(0, 2).toUpperCase()}</span>
+                        <span className={styles["capaPlaceholder"]}>{session.game.slice(0, 2).toUpperCase()}</span>
                       )}
                     </div>
 
                     {/* Miolo com informações do jogo e da sessão */}
                     <div className={styles["info"]}>
-                      <span className={styles["jogoTitulo"]}>{sessao.jogo}</span>
+                      <span className={styles["jogoTitulo"]}>{session.game}</span>
                       <div className={styles["detalhesLinha"]}>
-                        <span>{sessao.horario}</span>
-                        <span className={styles["separadorPonto"]} aria-hidden="true">
-                          ·
-                        </span>
-
-                        {sessao.status.tipo === "jogando" && (
-                          <span className={styles["statusTextoJogando"]}>
-                            <i className={styles["pontoJogando"]} aria-hidden="true" />
-                            {sessao.status.texto}
+                        <span>{session.time}</span>
+                        {status && (
+                          <span className={styles["separadorPonto"]} aria-hidden="true">
+                            ·
                           </span>
                         )}
 
-                        {sessao.status.tipo === "normal" && <span>{sessao.status.texto}</span>}
+                        {status?.kind === "playing" && (
+                          <span className={styles["statusTextoJogando"]}>
+                            <i className={styles["pontoJogando"]} aria-hidden="true" />
+                            {status.text}
+                          </span>
+                        )}
 
-                        {sessao.status.tipo === "erro" && (
+                        {status?.kind === "normal" && <span>{status.text}</span>}
+
+                        {status?.kind === "error" && (
                           <>
                             <span className={styles["iconeAlerta"]} aria-hidden="true">
                               <Icon name="badge-alert" size="sm" />
                             </span>
-                            <span>{sessao.status.texto}</span>
-                            {(sessao.status.linkTexto || sessao.onVerRelatorio || onVerRelatorio) && (
+                            <span>{status.text}</span>
+                            {status.linkText && (session.onOpenReport || onOpenReport) && (
                               <>
                                 <span className={styles["separadorPonto"]} aria-hidden="true">
                                   ·
@@ -260,11 +267,11 @@ export function PerfilSessoes<TPeriodo extends string = string, TJogo extends st
                                   className={styles["linkRelatorio"]}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    sessao.onVerRelatorio?.();
-                                    onVerRelatorio?.(sessao);
+                                    session.onOpenReport?.();
+                                    onOpenReport?.(session);
                                   }}
                                 >
-                                  {sessao.status.linkTexto ?? "Ver relatório"}
+                                  {status.linkText}
                                 </button>
                               </>
                             )}
@@ -274,7 +281,7 @@ export function PerfilSessoes<TPeriodo extends string = string, TJogo extends st
                     </div>
 
                     {/* Duração formatada à direita */}
-                    <span className={styles["duracao"]}>{sessao.duracao}</span>
+                    <span className={styles["duracao"]}>{session.duration}</span>
                   </div>
                 );
               })}
@@ -283,7 +290,7 @@ export function PerfilSessoes<TPeriodo extends string = string, TJogo extends st
         ))}
 
       {/* Estado vazio */}
-      {temVazio && <div className={styles["vazio"]}>{mensagemVazio}</div>}
+      {hasEmpty && <div className={styles["vazio"]}>{emptyMessage}</div>}
     </div>
   );
 }

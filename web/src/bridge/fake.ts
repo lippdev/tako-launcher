@@ -35,6 +35,17 @@ import type { DownloadsSummary } from "./generated/DownloadsSummary";
 import type { GameChoice } from "./generated/GameChoice";
 import type { GameSettingsSet } from "./generated/GameSettingsSet";
 import type { GameSettingsView } from "./generated/GameSettingsView";
+import type { ProfileCollection } from "./generated/ProfileCollection";
+import type { ProfileCollections } from "./generated/ProfileCollections";
+import type { ProfileCreate } from "./generated/ProfileCreate";
+import type { ProfileEntry } from "./generated/ProfileEntry";
+import type { ProfileRename } from "./generated/ProfileRename";
+import type { ProfileRequest } from "./generated/ProfileRequest";
+import type { ProfileSession } from "./generated/ProfileSession";
+import type { ProfileSessions } from "./generated/ProfileSessions";
+import type { ProfileSessionsRequest } from "./generated/ProfileSessionsRequest";
+import type { ProfileSummary } from "./generated/ProfileSummary";
+import type { ProfilesList } from "./generated/ProfilesList";
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
@@ -1443,4 +1454,394 @@ function setFakeGameSettings(payload: unknown): GameSettingsView {
 Object.assign(defaults, {
   "game.settings": (payload: unknown) => fakeGameSettingsView((payload as GameRequest).gameId),
   "game.settings.set": setFakeGameSettings,
+});
+
+// ---- Perfil e perfis locais (WEB-14c) ----
+// Sessões de exemplo contadas a partir de hoje (o relógio é o do navegador, para a semana e os dias fazerem sentido),
+// com os jogos e os tempos de `games`, e uma lista de perfis em memória com as mesmas regras do núcleo
+// (`tako_core::profiles`): nome de 1 a 32 caracteres e sem repetir, no máximo 8 perfis, o principal e o em uso não se
+// apagam. Trocar só grava o perfil da próxima abertura (`restartRequired`).
+
+/** [posição em `games`, dias atrás, hora, minuto, duração em segundos]: da mais recente para a mais antiga. */
+const SAMPLE_SESSIONS: [index: number, daysAgo: number, hour: number, minute: number, seconds: number][] = [
+  [0, 0, 14, 2, 42 * 60],
+  [1, 0, 9, 10, 72 * 60],
+  [3, 1, 20, 40, 139 * 60],
+  [5, 1, 19, 58, 12 * 60],
+  [5, 1, 11, 5, 20],
+  [0, 2, 21, 3, 95 * 60],
+  [4, 3, 22, 10, 55 * 60],
+  [6, 5, 15, 30, 3 * 3600 + 20 * 60],
+  [3, 8, 20, 0, 2 * 3600],
+  [7, 12, 18, 45, 46 * 60],
+  [6, 19, 21, 0, 4 * 3600],
+  [8, 33, 17, 15, 3 * 3600 + 10 * 60],
+  [2, 70, 10, 0, 12 * 3600],
+];
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const dayText = (date: Date) =>
+  `${String(date.getFullYear())}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+
+interface FakeSession {
+  gameIndex: number;
+  startedAt: Date;
+  seconds: number;
+}
+
+function fakeSessions(): FakeSession[] {
+  const now = new Date();
+  return SAMPLE_SESSIONS.map(([gameIndex, daysAgo, hour, minute, seconds]) => ({
+    gameIndex,
+    startedAt: new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, hour, minute),
+    seconds,
+  })).sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+}
+
+/** Menos de 1 minuto: "abriu e fechou", fora dos totais (como o núcleo). */
+const counts = (s: FakeSession) => (s.seconds < 60 ? 0 : s.seconds);
+
+function profileSession(s: FakeSession): ProfileSession {
+  return {
+    game: { ...games[s.gameIndex]! },
+    startedAt: s.startedAt.toISOString(),
+    durationSeconds: s.seconds,
+    quick: s.seconds < 60,
+  };
+}
+
+function monday(from: Date): Date {
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  return start;
+}
+
+let fakeProfiles: { id: string; name: string }[] = [
+  { id: "main", name: "" },
+  { id: "p3f9a1c27b40", name: "Ana" },
+];
+/** O perfil cujos dados esta "abertura" usa; o gravado para a próxima pode ser outro. */
+const OPENED_PROFILE = "main";
+let nextProfile = "main";
+let askOnStart = false;
+const MAX_PROFILES = 8;
+const MAX_PROFILE_NAME = 32;
+
+function profilesList(): ProfilesList {
+  const profiles: ProfileEntry[] = fakeProfiles.map((p) => ({
+    id: p.id,
+    name: p.name,
+    main: p.id === "main",
+    inUse: p.id === OPENED_PROFILE,
+    next: p.id === nextProfile,
+  }));
+  return {
+    profiles,
+    askOnStart,
+    maxProfiles: MAX_PROFILES,
+    maxNameChars: MAX_PROFILE_NAME,
+    restartRequired: nextProfile !== OPENED_PROFILE,
+  };
+}
+
+/** O nome como o núcleo aceita: sem espaços nas pontas, 1 a 32 caracteres, sem controle e sem repetir (sem olhar caixa). */
+function checkProfileName(name: unknown, except: string | null): string {
+  const clean = typeof name === "string" ? name.trim() : "";
+  const length = [...clean].length;
+  // eslint-disable-next-line no-control-regex
+  if (length < 1 || length > MAX_PROFILE_NAME || /[\u0000-\u001f\u007f-\u009f]/.test(clean))
+    throw new FakeError("bad_request", "nome de perfil inválido");
+  if (fakeProfiles.some((p) => p.id !== except && p.name.toLowerCase() === clean.toLowerCase()))
+    throw new FakeError("conflict", "já existe um perfil com esse nome");
+  return clean;
+}
+
+function profileById(payload: unknown): { id: string; name: string } {
+  const { profileId } = payload as ProfileRequest;
+  if (typeof profileId !== "string" || profileId.trim() === "") throw new FakeError("bad_request", "id de perfil inválido");
+  const found = fakeProfiles.find((p) => p.id === profileId);
+  if (!found) throw new FakeError("not_found", "perfil não encontrado");
+  return found;
+}
+
+function profileSummary(): ProfileSummary {
+  const sessions = fakeSessions();
+  const today = new Date();
+  const start = monday(today);
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const text = dayText(day);
+    return {
+      day: text,
+      seconds: sessions.filter((s) => dayText(s.startedAt) === text).reduce((sum, s) => sum + counts(s), 0),
+    };
+  });
+  const opened = fakeProfiles.find((p) => p.id === OPENED_PROFILE) ?? fakeProfiles[0]!;
+  const top = [...games].filter((g) => g.playTimeSeconds > 0).sort((a, b) => b.playTimeSeconds - a.playTimeSeconds);
+  return {
+    profile: { id: opened.id, name: opened.name, main: opened.id === "main", inUse: true, next: opened.id === nextProfile },
+    lastPlayedAt: sessions[0] ? sessions[0].startedAt.toISOString() : null,
+    totalPlaySeconds: games.reduce((sum, g) => sum + g.playTimeSeconds, 0),
+    gameCount: games.length,
+    today: dayText(today),
+    week,
+    topGames: top.slice(0, 3).map((g) => ({ ...g })),
+    latestGames: [...games].reverse().slice(0, 3).map((g) => ({ ...g })),
+    recentSessions: sessions.slice(0, 5).map(profileSession),
+  };
+}
+
+function profileSessions(payload: unknown): ProfileSessions {
+  const { period } = payload as ProfileSessionsRequest;
+  const now = new Date();
+  const since =
+    period === "week" ? monday(now) : period === "month" ? new Date(now.getFullYear(), now.getMonth(), 1) : null;
+  const inPeriod = fakeSessions().filter((s) => since === null || s.startedAt >= since);
+  const days: ProfileSessions["days"] = [];
+  for (const s of inPeriod.slice(0, 300)) {
+    const day = dayText(s.startedAt);
+    let group = days[days.length - 1];
+    if (group?.day !== day) {
+      group = { day, totalSeconds: 0, sessions: [] };
+      days.push(group);
+    }
+    group.totalSeconds += counts(s);
+    group.sessions.push(profileSession(s));
+  }
+  return {
+    today: dayText(now),
+    count: inPeriod.length,
+    totalSeconds: inPeriod.reduce((sum, s) => sum + counts(s), 0),
+    days,
+  };
+}
+
+function profileCollections(): ProfileCollections {
+  const manual: ProfileCollection[] = collections.map((c) => {
+    const inside = games.filter((g) => c.gameIds.includes(g.id));
+    return {
+      id: c.id,
+      name: c.name,
+      automatic: false,
+      gameCount: inside.length,
+      installedCount: inside.filter((g) => g.installed).length,
+      covers: inside.slice(0, 4).map((g) => ({ ...g })),
+    };
+  });
+  // Uma automática de exemplo, para o selo "Automática"; ela não existe em `collections.list`.
+  const installed = games.filter((g) => g.installed);
+  const automatic: ProfileCollection = {
+    id: "auto-installed",
+    name: "Instalados",
+    automatic: true,
+    gameCount: installed.length,
+    installedCount: installed.length,
+    covers: installed.slice(0, 4).map((g) => ({ ...g })),
+  };
+  const distinct = new Set(collections.flatMap((c) => c.gameIds));
+  return { collections: [...manual, automatic], gameCount: distinct.size };
+}
+
+Object.assign(defaults, {
+  "profile.summary": profileSummary,
+  "profile.sessions": profileSessions,
+  "profile.collections": profileCollections,
+  "profiles.list": profilesList,
+  "profiles.create": (payload: unknown) => {
+    const { name } = payload as ProfileCreate;
+    const clean = checkProfileName(name, null);
+    if (fakeProfiles.length >= MAX_PROFILES) throw new FakeError("conflict", "perfis demais");
+    fakeProfiles.push({ id: `p${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`, name: clean });
+    return profilesList();
+  },
+  "profiles.rename": (payload: unknown) => {
+    const profile = profileById(payload);
+    profile.name = checkProfileName((payload as ProfileRename).name, profile.id);
+    return profilesList();
+  },
+  "profiles.delete": (payload: unknown) => {
+    const profile = profileById(payload);
+    if (profile.id === "main" || profile.id === OPENED_PROFILE || profile.id === nextProfile)
+      throw new FakeError("conflict", "o perfil principal e o perfil em uso não podem ser apagados");
+    fakeProfiles = fakeProfiles.filter((p) => p.id !== profile.id);
+    return profilesList();
+  },
+  "profiles.ask.set": (payload: unknown) => {
+    const { on } = payload as { on: unknown };
+    if (typeof on !== "boolean") throw new FakeError("bad_request", "valor inválido");
+    askOnStart = on;
+    return profilesList();
+  },
+  "profiles.switch": (payload: unknown) => {
+    nextProfile = profileById(payload).id;
+    return profilesList();
+  },
+});
+
+// Os textos de `profile.toml` e `profiles.toml` e os de outras telas que o Perfil usa, nos dois idiomas.
+Object.assign(SAMPLE_CATALOGS["pt-BR"], {
+  "profile.tab": "Perfil",
+  "profile.main": "Perfil principal",
+  "profile.playing": "Jogando {game} · {time}",
+  "profile.playing_title": "Jogando {game}",
+  "profile.playing_since": "Agora · desde {time}",
+  "profile.last": "Jogou por último {when}",
+  "profile.tab_overview": "Visão geral",
+  "profile.tab_sessions": "Sessões",
+  "profile.tab_collections": "Coleções",
+  "profile.switch": "Trocar perfil",
+  "profile.edit": "Editar perfil",
+  "profile.tile_time": "Tempo jogado",
+  "profile.tile_top": "Mais jogado",
+  "profile.tile_games": "Jogos na biblioteca",
+  "profile.this_week": "Esta semana",
+  "profile.nothing": "nada",
+  "profile.recent": "Sessões recentes",
+  "profile.empty": "Nenhuma sessão ainda. Jogue pelo Tako e o tempo aparece aqui.",
+  "profile.period_week": "Esta semana",
+  "profile.period_month": "Este mês",
+  "profile.period_all": "Tudo",
+  "profile.summary.one": "{n} sessão · {time}",
+  "profile.summary.other": "{n} sessões · {time}",
+  "profile.quick": "Abriu e fechou",
+  "profile.in_game": "{time} no jogo",
+  "profile.collections.one": "{n} coleção",
+  "profile.collections.other": "{n} coleções",
+  "profile.installed.one": "{n} instalado",
+  "profile.installed.other": "{n} instalados",
+  "profile.no_games": "Nenhum jogo ainda",
+  "profile.auto": "Automática",
+  "profile.new_text": "Junte jogos do seu jeito",
+  "profile.duration.minutes": "{m} min",
+  "profile.duration.hours": "{h} h",
+  "profile.duration.hours_minutes": "{h} h {m} min",
+  "profile.weekday.today": "hoje",
+  "profile.weekday.mon": "seg",
+  "profile.weekday.tue": "ter",
+  "profile.weekday.wed": "qua",
+  "profile.weekday.thu": "qui",
+  "profile.weekday.fri": "sex",
+  "profile.weekday.sat": "sáb",
+  "profile.weekday.sun": "dom",
+  "profile.weekday_long.mon": "Segunda",
+  "profile.weekday_long.tue": "Terça",
+  "profile.weekday_long.wed": "Quarta",
+  "profile.weekday_long.thu": "Quinta",
+  "profile.weekday_long.fri": "Sexta",
+  "profile.weekday_long.sat": "Sábado",
+  "profile.weekday_long.sun": "Domingo",
+  "profiles.title": "Perfil",
+  "profiles.desc": "Cada pessoa com a própria biblioteca, favoritos, tempo de jogo e configurações",
+  "profiles.text":
+    "Cada perfil guarda a própria biblioteca, favoritos, status, tempo de jogo, coleções, imagens escolhidas, tema e configurações. Contas das lojas e chaves de API são da máquina e valem para todos.",
+  "profiles.main": "Principal",
+  "profiles.main_desc": "O perfil que já existia. Ele não pode ser apagado.",
+  "profiles.in_use": "Em uso",
+  "profiles.new": "Novo perfil",
+  "profiles.new_desc": "Começa vazio, com o assistente da primeira execução",
+  "profiles.name_hint": "Nome com até {max} caracteres",
+  "profiles.use": "Usar este perfil",
+  "profiles.rename": "Renomear",
+  "profiles.remove": "Apagar perfil",
+  "profiles.remove_title": "Apagar o perfil {name}?",
+  "profiles.remove_text":
+    "A biblioteca, os favoritos, o tempo de jogo e as configurações dele serão apagados. Os jogos instalados continuam no PC. Não dá para desfazer.",
+  "profiles.ask": "Perguntar quem está jogando ao abrir",
+  "profiles.ask_desc": "Ao abrir o Tako, escolha o perfil antes de começar",
+  "profiles.invalid_name": "Digite um nome de 1 a 32 caracteres.",
+  "profiles.duplicate_name": "Já existe um perfil com esse nome.",
+  "profiles.too_many": "O Tako aceita até 8 perfis.",
+  "profiles.save_failed": "Não foi possível gravar os perfis.",
+  "desktop.day.today": "Hoje",
+  "desktop.day.yesterday": "Ontem",
+  "desktop.sessions.see_all": "Ver todas",
+  "presentation.play_time.minutes": "{n} min",
+  "presentation.play_time.hours": "{n} h",
+  "presentation.date.short": "%d/%m",
+  "collections.new": "Nova coleção",
+  "collections.name_rule": "Até 40 caracteres, sem repetir o nome de outra coleção.",
+  "common.save": "Salvar",
+});
+Object.assign(SAMPLE_CATALOGS["en-US"], {
+  "profile.tab": "Profile",
+  "profile.main": "Main profile",
+  "profile.playing": "Playing {game} · {time}",
+  "profile.playing_title": "Playing {game}",
+  "profile.playing_since": "Now · since {time}",
+  "profile.last": "Last played {when}",
+  "profile.tab_overview": "Overview",
+  "profile.tab_sessions": "Sessions",
+  "profile.tab_collections": "Collections",
+  "profile.switch": "Switch profile",
+  "profile.edit": "Edit profile",
+  "profile.tile_time": "Time played",
+  "profile.tile_top": "Most played",
+  "profile.tile_games": "Games in library",
+  "profile.this_week": "This week",
+  "profile.nothing": "none",
+  "profile.recent": "Recent sessions",
+  "profile.empty": "No sessions yet. Play through Tako and your time shows up here.",
+  "profile.period_week": "This week",
+  "profile.period_month": "This month",
+  "profile.period_all": "All",
+  "profile.summary.one": "{n} session · {time}",
+  "profile.summary.other": "{n} sessions · {time}",
+  "profile.quick": "Opened and closed",
+  "profile.in_game": "{time} in game",
+  "profile.collections.one": "{n} collection",
+  "profile.collections.other": "{n} collections",
+  "profile.installed.one": "{n} installed",
+  "profile.installed.other": "{n} installed",
+  "profile.no_games": "No games yet",
+  "profile.auto": "Automatic",
+  "profile.new_text": "Group games your way",
+  "profile.duration.minutes": "{m} min",
+  "profile.duration.hours": "{h} h",
+  "profile.duration.hours_minutes": "{h} h {m} min",
+  "profile.weekday.today": "today",
+  "profile.weekday.mon": "Mon",
+  "profile.weekday.tue": "Tue",
+  "profile.weekday.wed": "Wed",
+  "profile.weekday.thu": "Thu",
+  "profile.weekday.fri": "Fri",
+  "profile.weekday.sat": "Sat",
+  "profile.weekday.sun": "Sun",
+  "profile.weekday_long.mon": "Monday",
+  "profile.weekday_long.tue": "Tuesday",
+  "profile.weekday_long.wed": "Wednesday",
+  "profile.weekday_long.thu": "Thursday",
+  "profile.weekday_long.fri": "Friday",
+  "profile.weekday_long.sat": "Saturday",
+  "profile.weekday_long.sun": "Sunday",
+  "profiles.title": "Profile",
+  "profiles.desc": "Each person with their own library, favorites, play time and settings",
+  "profiles.text":
+    "Each profile keeps its own library, favorites, status, play time, collections, chosen images, settings and theme. Store accounts and API keys belong to the computer and work for everyone.",
+  "profiles.main": "Main",
+  "profiles.main_desc": "The profile that already existed. It can't be deleted.",
+  "profiles.in_use": "In use",
+  "profiles.new": "New profile",
+  "profiles.new_desc": "Starts empty, with the first-run assistant",
+  "profiles.name_hint": "Name with up to {max} characters",
+  "profiles.use": "Use this profile",
+  "profiles.rename": "Rename",
+  "profiles.remove": "Delete profile",
+  "profiles.remove_title": "Delete the {name} profile?",
+  "profiles.remove_text":
+    "Its library, favorites, play time and settings will be deleted. Installed games stay on the PC. This can't be undone.",
+  "profiles.ask": "Ask who's playing when opening",
+  "profiles.ask_desc": "When Tako opens, pick the profile before starting",
+  "profiles.invalid_name": "Type a name with 1 to 32 characters.",
+  "profiles.duplicate_name": "There's already a profile with that name.",
+  "profiles.too_many": "Tako allows up to 8 profiles.",
+  "profiles.save_failed": "Couldn't save the profiles.",
+  "desktop.day.today": "Today",
+  "desktop.day.yesterday": "Yesterday",
+  "desktop.sessions.see_all": "See all",
+  "presentation.play_time.minutes": "{n} min",
+  "presentation.play_time.hours": "{n} h",
+  "presentation.date.short": "%m/%d",
+  "collections.new": "New collection",
+  "collections.name_rule": "Up to 40 characters, not the same as another collection.",
+  "common.save": "Save",
 });

@@ -78,6 +78,15 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "downloads.add"
             | "game.settings"
             | "game.settings.set"
+            | "profile.summary"
+            | "profile.sessions"
+            | "profile.collections"
+            | "profiles.list"
+            | "profiles.create"
+            | "profiles.rename"
+            | "profiles.delete"
+            | "profiles.ask.set"
+            | "profiles.switch"
     ) {
         return Err((
             header.id,
@@ -96,6 +105,9 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "i18n.catalog"
             | "downloads.list"
             | "downloads.summary"
+            | "profile.summary"
+            | "profile.collections"
+            | "profiles.list"
     ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
@@ -341,6 +353,54 @@ pub enum Call {
         #[ts(as = "GameSettingsSet")]
         GameSettingsSet,
     ),
+    /// Resumo do perfil em uso: tempo de jogo, a semana, mais jogados, últimos adicionados e sessões recentes.
+    #[serde(rename = "profile.summary")]
+    ProfileSummary,
+    /// Histórico de sessões do perfil em um período, agrupado por dia (as 300 mais recentes).
+    #[serde(rename = "profile.sessions")]
+    ProfileSessions(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ProfileSessionsRequest")]
+        ProfileSessionsRequest,
+    ),
+    /// Coleções do perfil (do usuário e automáticas) com contagens e as primeiras capas.
+    #[serde(rename = "profile.collections")]
+    ProfileCollections,
+    /// Perfis locais (UX-004) e se perguntar quem está jogando ao abrir.
+    #[serde(rename = "profiles.list")]
+    ProfilesList,
+    #[serde(rename = "profiles.create")]
+    ProfilesCreate(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ProfileCreate")]
+        ProfileCreate,
+    ),
+    #[serde(rename = "profiles.rename")]
+    ProfilesRename(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ProfileRename")]
+        ProfileRename,
+    ),
+    /// Apaga um perfil e os dados dele; o principal, o em uso e o que a próxima abertura vai usar não se apagam.
+    #[serde(rename = "profiles.delete")]
+    ProfilesDelete(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ProfileRequest")]
+        ProfileRequest,
+    ),
+    #[serde(rename = "profiles.ask.set")]
+    ProfilesAskSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ProfileAskSet")]
+        ProfileAskSet,
+    ),
+    /// Grava o perfil que o Tako usa na próxima abertura (os dados do perfil em uso só trocam ao reabrir).
+    #[serde(rename = "profiles.switch")]
+    ProfilesSwitch(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ProfileRequest")]
+        ProfileRequest,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -416,6 +476,24 @@ pub enum Reply {
     GameSettings(Box<GameSettingsView>),
     #[serde(rename = "game.settings.set")]
     GameSettingsSet(Box<GameSettingsView>),
+    #[serde(rename = "profile.summary")]
+    ProfileSummary(Box<ProfileSummary>),
+    #[serde(rename = "profile.sessions")]
+    ProfileSessions(ProfileSessions),
+    #[serde(rename = "profile.collections")]
+    ProfileCollections(ProfileCollections),
+    #[serde(rename = "profiles.list")]
+    ProfilesList(ProfilesList),
+    #[serde(rename = "profiles.create")]
+    ProfilesCreate(ProfilesList),
+    #[serde(rename = "profiles.rename")]
+    ProfilesRename(ProfilesList),
+    #[serde(rename = "profiles.delete")]
+    ProfilesDelete(ProfilesList),
+    #[serde(rename = "profiles.ask.set")]
+    ProfilesAskSet(ProfilesList),
+    #[serde(rename = "profiles.switch")]
+    ProfilesSwitch(ProfilesList),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -1318,4 +1396,188 @@ pub enum GameSettingChange {
 pub struct GameSettingsSet {
     pub game_id: String,
     pub change: GameSettingChange,
+}
+
+/// Um perfil local (UX-004). `name` vem vazio no principal enquanto ninguém lhe deu um nome: a interface mostra o
+/// texto `profiles.main`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileEntry {
+    pub id: String,
+    pub name: String,
+    /// O perfil que já existia antes dos perfis: não se apaga.
+    pub main: bool,
+    /// O perfil cujos dados esta abertura do Tako está usando.
+    pub in_use: bool,
+    /// O perfil que a próxima abertura vai usar (difere de `inUse` depois de `profiles.switch`).
+    pub next: bool,
+}
+
+/// Resposta de `profiles.list` e de todas as chamadas `profiles.*` que mudam a lista.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfilesList {
+    pub profiles: Vec<ProfileEntry>,
+    /// Perguntar "Quem está jogando?" ao abrir o Tako.
+    pub ask_on_start: bool,
+    #[ts(type = "number")]
+    pub max_profiles: usize,
+    #[ts(type = "number")]
+    pub max_name_chars: usize,
+    /// O perfil gravado para a próxima abertura não é o que está em uso: a troca só vale ao reabrir o Tako.
+    pub restart_required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ProfileCreate {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ProfileRename {
+    pub profile_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ProfileRequest {
+    pub profile_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ProfileAskSet {
+    pub on: bool,
+}
+
+/// Um dia da semana de `profile.summary`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileWeekDay {
+    /// Data local, `AAAA-MM-DD`.
+    pub day: String,
+    /// Tempo jogado no dia (sessões de menos de 1 minuto não contam).
+    #[ts(type = "number")]
+    pub seconds: u64,
+}
+
+/// Uma sessão de jogo do perfil.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileSession {
+    pub game: LibraryGame,
+    /// ISO-8601 em UTC.
+    pub started_at: String,
+    #[ts(type = "number")]
+    pub duration_seconds: u64,
+    /// Menos de 1 minuto: "abriu e fechou", fora dos totais.
+    pub quick: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileSummary {
+    /// O perfil cujos dados estão em uso.
+    pub profile: ProfileEntry,
+    /// Última sessão ou abertura de qualquer jogo; null = nada jogado ainda.
+    pub last_played_at: Option<String>,
+    /// Soma do tempo de jogo de todos os jogos.
+    #[ts(type = "number")]
+    pub total_play_seconds: u64,
+    #[ts(type = "number")]
+    pub game_count: usize,
+    /// Data local de hoje, `AAAA-MM-DD`.
+    pub today: String,
+    /// A semana atual, de segunda a domingo (sempre sete dias).
+    pub week: Vec<ProfileWeekDay>,
+    /// Até três jogos com mais tempo de jogo, o primeiro com mais.
+    pub top_games: Vec<LibraryGame>,
+    /// Até três jogos adicionados por último, o mais recente primeiro.
+    pub latest_games: Vec<LibraryGame>,
+    /// As cinco sessões mais recentes, a mais recente primeiro.
+    pub recent_sessions: Vec<ProfileSession>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum SessionPeriod {
+    /// Desde a segunda-feira desta semana.
+    Week,
+    /// Desde o dia 1 deste mês.
+    Month,
+    All,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct ProfileSessionsRequest {
+    pub period: SessionPeriod,
+}
+
+/// Sessões de um dia local, da mais recente para a mais antiga.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileDay {
+    /// Data local, `AAAA-MM-DD`.
+    pub day: String,
+    /// Tempo do dia, sem as sessões rápidas.
+    #[ts(type = "number")]
+    pub total_seconds: u64,
+    pub sessions: Vec<ProfileSession>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileSessions {
+    /// Data local de hoje, `AAAA-MM-DD`.
+    pub today: String,
+    /// Sessões do período, sem o recorte das mostradas (as rápidas contam como sessão, mas não no tempo).
+    #[ts(type = "number")]
+    pub count: usize,
+    #[ts(type = "number")]
+    pub total_seconds: u64,
+    /// Até 300 sessões, as mais recentes, em grupos por dia.
+    pub days: Vec<ProfileDay>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileCollection {
+    /// O mesmo id que `library.list` aceita em `collection`.
+    pub id: String,
+    pub name: String,
+    pub automatic: bool,
+    #[ts(type = "number")]
+    pub game_count: usize,
+    #[ts(type = "number")]
+    pub installed_count: usize,
+    /// Até quatro jogos, para o mosaico.
+    pub covers: Vec<LibraryGame>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProfileCollections {
+    pub collections: Vec<ProfileCollection>,
+    /// Jogos distintos nas coleções do usuário (as automáticas não entram na conta).
+    #[ts(type = "number")]
+    pub game_count: usize,
 }

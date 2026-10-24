@@ -545,3 +545,30 @@ export const tagEditorStrings = {
   rule: "Até 40 caracteres. Uma tag que já existe é só aplicada.", // tags.name_rule
   error: "Não foi possível atualizar as etiquetas.",
 } as const;
+
+/**
+ * Textos da tela Perfil e da gestão de perfis (WEB-14c) que não existem nos catálogos de `locales/`. Os que existem
+ * (`profile.*`, `profiles.*`, `collections.*`) vêm de `t(...)`.
+ */
+export const profileStrings = {
+  loading: "Lendo o perfil…",
+  loadError: "Não foi possível ler o perfil.",
+  retry: "Tentar novamente",
+  /** Nome do grupo de abas. */
+  tabs: "Seções do perfil",
+  /** Nome do seletor de período da guia Sessões. */
+  period: "Período",
+  /** Nomes das barras e grupos das guias, para leitores de tela. */
+  sessionsToolbar: "Filtros de sessões",
+  collectionsToolbar: "Opções de coleções",
+  collectionsGrid: "Coleções de jogos",
+  collectionActions: "Ações de coleção",
+  /** Nome da lista das últimas sessões na Visão geral. */
+  recentList: "Sessões recentes",
+  previous: "Anterior",
+  next: "Próximo",
+  /** O perfil gravado para a próxima abertura difere do que está em uso. */
+  nextOpen: "Na próxima abertura",
+  restartNotice: (name: string) => `O perfil ${name} será usado quando você reabrir o Tako.`,
+  saveError: "Não foi possível salvar. Tente de novo.",
+} as const;

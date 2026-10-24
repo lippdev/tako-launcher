@@ -10,6 +10,7 @@ mod game_settings;
 mod i18n;
 mod library;
 mod organize;
+mod profile;
 pub mod protocol;
 mod settings;
 mod sources;
@@ -195,6 +196,21 @@ impl AppService {
             | Call::DownloadsCancel(_)
             | Call::DownloadsSources(_)
             | Call::DownloadsAdd(_)) => self.handle_downloads(call),
+            call @ (Call::ProfileSummary
+            | Call::ProfileSessions(_)
+            | Call::ProfileCollections
+            | Call::ProfilesList
+            | Call::ProfilesCreate(_)
+            | Call::ProfilesRename(_)
+            | Call::ProfilesDelete(_)
+            | Call::ProfilesAskSet(_)
+            | Call::ProfilesSwitch(_)) => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                profile::handle(core, call)
+            }
             call => {
                 let core = self
                     .core

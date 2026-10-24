@@ -4,11 +4,12 @@ import { BarraSuperior } from "./BarraSuperior";
 import { BuscaGeral } from "./BuscaGeral";
 import { ColunaDaLista } from "./ColunaDaLista";
 import { PaginaDoJogo } from "./jogo/PaginaDoJogo";
+import { TelaPerfil } from "./perfil/TelaPerfil";
 import { TelaConfiguracoes } from "./settings/TelaConfiguracoes";
 import { useSavedAppearance } from "./settings/useSavedAppearance";
 import { VisaoGeral } from "./visao/VisaoGeral";
 import { strings } from "./strings";
-import { VIEW_IDS, type ViewId } from "./uiState";
+import { VIEW_IDS, defaultLibraryCriteria, type ViewId } from "./uiState";
 import { useScreenState } from "./useScreenState";
 import { Vista } from "./Vista";
 import { windowAction } from "./windowActions";
@@ -144,7 +145,7 @@ export function AppShell() {
                 key={id}
                 title={strings.views[id]}
                 active={id === view}
-                bare={id === "configuracoes" || id === "biblioteca"}
+                bare={id === "configuracoes" || id === "biblioteca" || id === "perfil"}
                 flush={id === "biblioteca"}
               >
                 {gamePage && (
@@ -156,6 +157,16 @@ export function AppShell() {
                   />
                 )}
                 {id === "biblioteca" && !gamePage && <VisaoGeral onOpenGame={openGame} />}
+                {id === "perfil" && (
+                  <TelaPerfil
+                    onOpenGame={(gameId) => {
+                      update({ view: "biblioteca", activeGame: gameId });
+                    }}
+                    onOpenCollection={(collection) => {
+                      update({ view: "biblioteca", activeGame: null, library: { ...defaultLibraryCriteria, collection } });
+                    }}
+                  />
+                )}
                 {id === "configuracoes" && (
                   <TelaConfiguracoes
                     category={state.settingsCategory}
