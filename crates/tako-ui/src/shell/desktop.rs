@@ -351,6 +351,10 @@ pub enum Zone {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Control {
     Options,
+    /// Lista recolhida: a lupa no lugar do botão de opções (expande a lista e foca a busca).
+    Search,
+    /// O botão de recolher e expandir a lista (Ctrl + B).
+    Collapse,
     Overview,
 }
 
@@ -1116,12 +1120,19 @@ impl DesktopLibrary {
         ]
     }
 
-    /// Nas Categorias não há linha Visão geral; só a coleção ativa tem o seletor.
+    /// As Categorias ocupam a área toda: não têm a coluna (recolher, Visão geral); só a coleção ativa tem o seletor.
     fn controls(&self, ctx: &Ctx) -> Vec<Control> {
-        let overview = View::of(ctx) == View::List || self.tab == Tab::Collections;
-        let mut v = vec![Control::Options];
-        v.extend(overview.then_some(Control::Overview));
-        v
+        if View::of(ctx) == View::Categories {
+            let mut v = vec![Control::Options];
+            v.extend((self.tab == Tab::Collections).then_some(Control::Overview));
+            return v;
+        }
+        let first = if collapsed(ctx) {
+            Control::Search
+        } else {
+            Control::Options
+        };
+        vec![first, Control::Collapse, Control::Overview]
     }
 
     /// Tab / Shift+Tab: próxima zona.
@@ -1609,6 +1620,9 @@ impl Page for DesktopLibrary {
             }
             (Zone::Controls, Cmd::Accept) => match self.controls(ctx).get(self.index) {
                 Some(Control::Options) => return Nav::Layer(Box::new(self.options(ctx))),
+                // O tema expande a lista e foca a busca (a mesma conta do Ctrl + K).
+                Some(Control::Search) => self.search_focus += 1,
+                Some(Control::Collapse) => return self.click("collapse", 0, ctx),
                 // No chip, Enter abre o seletor de coleção; na Visão geral, sai da busca e dos filtros.
                 Some(Control::Overview) if self.tab == Tab::Collections => {
                     return Nav::Layer(Box::new(self.collection_select(ctx)));
@@ -3798,10 +3812,11 @@ mod tests {
         assert_eq!(page(&shell).tab(), Tab::Collections);
         assert_eq!(page(&shell).ids(&shell.ctx), vec![first]);
 
-        // No chip, Enter abre o seletor (não troca de coleção em silêncio); ← volta ao botão.
+        // No chip (depois do botão de recolher), Enter abre o seletor, sem trocar de coleção em silêncio.
         assert_eq!(page(&shell).zone(), Zone::Controls);
         shell.handle(Cmd::Right);
-        assert_eq!(page(&shell).index, 1);
+        shell.handle(Cmd::Right);
+        assert_eq!(page(&shell).index, 2);
         shell.handle(Cmd::Accept);
         assert!(shell.has_layers());
         shell.close_layers();
@@ -3874,6 +3889,36 @@ mod tests {
             flag(&mut shell, "desk-view"),
             Some(Value::String("grid".into()))
         );
+    }
+
+    #[test]
+    fn keyboard_reaches_the_search_and_collapse_buttons_of_the_collapsed_list() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let prop = |shell: &mut Shell, name: &str| {
+            let out = shell.render(std::time::Instant::now());
+            out.props
+                .iter()
+                .find(|(n, _)| *n == name)
+                .map(|(_, v)| v.clone())
+        };
+        shell.key("b", KeyModifiers::CTRL);
+        assert_eq!(prop(&mut shell, "desk-collapsed"), Some(Value::Bool(true)));
+        while page(&shell).zone() != Zone::Controls {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        // A lupa pede o foco da busca (o tema expande a lista e foca); o botão ao lado expande.
+        let before = prop(&mut shell, "desk-search-focus");
+        shell.handle(Cmd::Accept);
+        assert_ne!(prop(&mut shell, "desk-search-focus"), before);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Accept);
+        assert_eq!(prop(&mut shell, "desk-collapsed"), Some(Value::Bool(false)));
+        // Expandida, o primeiro controle volta a ser o botão de opções.
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Accept);
+        assert!(shell.has_layers());
     }
 
     #[test]

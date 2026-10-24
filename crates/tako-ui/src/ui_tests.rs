@@ -462,7 +462,8 @@ fn collapsed_list_expands_on_ctrl_k_only_and_not_when_returning_to_the_library()
             std::thread::sleep(std::time::Duration::from_millis(150));
             slint::platform::update_timers_and_animations();
         };
-        ui.set_property("desk-collapsed", Value::Bool(true)).unwrap();
+        ui.set_property("desk-collapsed", Value::Bool(true))
+            .unwrap();
         show("desk-library");
         ctrl_k("k");
         assert_eq!(expands.get(), 1, "Ctrl+K expande a lista recolhida");

@@ -1210,6 +1210,7 @@ component ListBtn inherits Rectangle {
     in property <string> label;
     // A lupa da lista recolhida tem o fundo da busca (branco 3,5%).
     in property <bool> filled;
+    in property <bool> focused;
     callback clicked();
     height: 38px;
     border-radius: 10px;
@@ -1218,6 +1219,7 @@ component ListBtn inherits Rectangle {
     accessible-role: button;
     accessible-label: label;
     accessible-action-default => { root.clicked(); }
+    if focused: FocusRing { radius: 10px; }
     DeskIcon { name: icon; size: 16px; tint: ta.has-hover ? Ui.desk-text : Ui.desk-on-muted; }
     ta := TouchArea {
         mouse-cursor: pointer;
@@ -3512,20 +3514,20 @@ component DeskLibrary inherits Rectangle {
                             }
                         }
                     }
-                    ListBtn { icon: "panel"; label: view-labels[9]; clicked => { root.clicked("collapse", 0); } }
+                    ListBtn { icon: "panel"; label: view-labels[9]; focused: focus-visible && zone == "controls" && zone-index == 1; clicked => { root.clicked("collapse", 0); } }
                 }
                 // Recolhida: a busca vira a lupa (expande e foca) e o botão de expandir.
                 if collapsed: VerticalLayout {
                     spacing: Ui.space-6;
-                    ListBtn { icon: "search"; label: search-hint; filled: true; clicked => { root.expand-search(); } }
-                    ListBtn { icon: "panel"; label: view-labels[10]; clicked => { root.clicked("collapse", 0); } }
+                    ListBtn { icon: "search"; label: search-hint; filled: true; focused: focus-visible && zone == "controls" && zone-index == 0; clicked => { root.expand-search(); } }
+                    ListBtn { icon: "panel"; label: view-labels[10]; focused: focus-visible && zone == "controls" && zone-index == 1; clicked => { root.clicked("collapse", 0); } }
                 }
                 OverviewRow {
                     collapsed: collapsed;
                     chip: tab < 0;
                     label: tab < 0 ? collection.label + " · " + collection.count : view-labels[5];
                     clear-label: view-labels[7];
-                    focused: focus-visible && zone == "controls" && zone-index == 1;
+                    focused: focus-visible && zone == "controls" && zone-index == 2;
                     clicked => { root.clicked(tab < 0 ? "collection-select" : "overview", 0); }
                     clear => { root.clicked("collection-clear", 0); }
                     menu(x, y) => { root.menu(x, y); }
