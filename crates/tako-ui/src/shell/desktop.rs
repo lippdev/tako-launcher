@@ -1593,10 +1593,12 @@ impl Page for DesktopLibrary {
             (Zone::Controls, Cmd::Accept) => match self.controls(ctx).get(self.index) {
                 Some(Control::Options) => return Nav::Layer(Box::new(self.options(ctx))),
                 // No chip, Enter abre o seletor de coleção; na Visão geral, sai da busca e dos filtros.
-                Some(_) if self.tab == Tab::Collections => {
+                Some(Control::Overview) if self.tab == Tab::Collections => {
                     return Nav::Layer(Box::new(self.collection_select(ctx)));
                 }
-                _ => return self.click("overview", 0, ctx),
+                Some(Control::Overview) => return self.click("overview", 0, ctx),
+                // O índice pode ter sobrado de uma lista de controles maior (ex.: ao trocar para Categorias).
+                None => self.index = self.controls(ctx).len() - 1,
             },
             (Zone::Controls, Cmd::Down) => self.zone = Zone::List,
             (Zone::Controls, Cmd::Up) => self.cycle(false),
@@ -1608,7 +1610,10 @@ impl Page for DesktopLibrary {
                 self.anchor = None;
             }
             // No chip da coleção, Esc faz o mesmo que o ×.
-            (Zone::Controls, Cmd::Back) if self.tab == Tab::Collections => {
+            (Zone::Controls, Cmd::Back)
+                if self.tab == Tab::Collections
+                    && self.controls(ctx).get(self.index) == Some(&Control::Overview) =>
+            {
                 return self.click("collection-clear", 0, ctx);
             }
             (_, Cmd::Back) => {
@@ -3771,6 +3776,14 @@ mod tests {
         assert!(shell.has_layers());
         shell.close_layers();
         assert_eq!(page(&shell).tab(), Tab::Collections);
+        // Esc em Ordenar, ver e filtrar não sai da coleção; só no chip.
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Back);
+        assert_eq!(page(&shell).tab(), Tab::Collections);
+        while page(&shell).zone() != Zone::Controls {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        shell.handle(Cmd::Right);
         // Esc no chip faz o mesmo que o ×: volta para Todos.
         shell.handle(Cmd::Back);
         assert_eq!(page(&shell).tab(), Tab::All);
