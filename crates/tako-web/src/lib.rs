@@ -109,7 +109,7 @@ pub fn run_ui(paths: tako_core::paths::DataPaths) -> Result<(), String> {
 }
 
 /// `TAKO_WEB_RECYCLE_MS` (só debug, 100 a 300000): o núcleo fecha a interface esse tempo depois de abrir e a
-/// reabre o mesmo tempo depois, uma vez, pelo mesmo gancho que a sessão de jogo usará. Para testar e medir.
+/// reabre o mesmo tempo depois, uma vez, pelo mesmo caminho que a sessão de jogo usa. Para testar e medir.
 #[cfg(all(windows, feature = "cef"))]
 fn recycle(control: &std::sync::mpsc::Sender<core_process::Command>, delay: std::time::Duration) {
     std::thread::sleep(delay);

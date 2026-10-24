@@ -54,12 +54,12 @@ eventos são descartados de propósito (ao reabrir, a página consulta o núcleo
 - **Abrir:** o núcleo abre o filho primeiro e o `Core` depois, para a janela subir enquanto o banco carrega; os
   pedidos esperam na fila. Se o `Core` falhar, o núcleo fecha o filho e sai com o erro.
 - **Usuário fecha (X ou `window.action` `close`):** a interface manda `user_closed` e termina, e o núcleo encerra
-  o app. Saída com código 0 sem a mensagem conta igual. Ainda não há bandeja: quando houver, “fechar para a
+  o app (com um jogo aberto, não: ver [Sessão de jogo](#sessão-de-jogo-web-20)). Saída com código 0 sem a mensagem conta igual. Ainda não há bandeja: quando houver, “fechar para a
   bandeja” é o núcleo mandar `Command::Hide` em vez de encerrar.
 - **Núcleo pede (jogo, bandeja, teste):** `Command::Hide` → `close`; a interface fecha os navegadores e sai.
   Sem sair em **5 s**, o núcleo mata o processo. O núcleo segue sem interface até `Command::Show`, que abre um
-  filho novo; a página lê o `ui.state` e volta onde estava. `Command` é o gancho da sessão de jogo e da bandeja
-  (`HostRequest::Launch` ainda só registra no log).
+  filho novo; a página lê o `ui.state` e volta onde estava. A sessão de jogo usa o mesmo caminho (`hide` e
+  `show` em `core_process.rs`); `Command` continua sendo o gancho da bandeja e do teste.
 - **Queda da interface:** saída com código diferente de 0, sem pedido e sem `user_closed`. O núcleo registra e
   reabre uma vez. Outra queda até **60 s** depois dessa reabertura encerra o app com “a interface caiu de novo
   logo depois de reabrir”; depois de 60 s estável, a próxima queda reabre de novo. Sem laço infinito.
@@ -70,7 +70,67 @@ eventos são descartados de propósito (ao reabrir, a página consulta o núcleo
 
 Testes do ciclo, com um filho falso sobre `std::io::pipe`, em `core_process.rs`: fechar a pedido e reabrir com
 o `ui.state` de volta, ação de janela depois da resposta, matar quem não fecha, queda dupla, mensagens de um
-filho já substituído e falha ao abrir o núcleo. O enquadramento é testado em `ipc.rs`.
+filho já substituído, falha ao abrir o núcleo e a interface fechando e voltando durante um jogo da demonstração.
+O enquadramento é testado em `ipc.rs`.
+
+## Sessão de jogo (WEB-20)
+
+A sessão vive no **núcleo**, que sobrevive à interface como o supervisor sobrevive à interface Slint (ADR-0026). O
+processo da interface nunca abre jogo. A regra é a mesma do app Slint e saiu da `tako-ui`:
+`tako_core::session::launch` (preparar e abrir, tela e áudio do jogo, configurações efetivas por jogo, restaurar,
+recuperar depois de uma queda) e `tako_core::session::running::GameSession` (acompanhar, encerrar, como terminou).
+A `tako-ui` usa as mesmas funções; na `tako-app`, `session.rs` liga a sessão à ponte e ao núcleo.
+
+| Passo | Quem | O quê |
+|---|---|---|
+| `game.play` | `AppService` | Valida (jogo instalado, nenhum outro aberto, senão `conflict`), responde e manda `HostRequest::Launch` |
+| `HostRequest::Launch` | núcleo → `AppService::launch_game` | Grava o diário de tela e áudio, aplica a tela e a saída de áudio do jogo, esconde o cursor, abre pela loja ou pelo executável e registra a abertura. Evento `game.started` (`tracked` falso quando só dá para abrir, sem acompanhar) ou `game.ended` com `launch_failed` e o motivo |
+| acompanhar | núcleo, a cada `session_deadline` | `poll_session` nesta mesma thread, sem bloquear: 0,5 s abrindo ou fechando, 2 s jogando. O laço acorda pelo prazo, não por espera ativa |
+| janela do jogo na tela | `SessionUpdate::Shown` | O núcleo fecha a interface (`close`): **zero Chromium durante o jogo** (D-10) |
+| `game.resume` | `HostRequest::Resume` | Fecha a interface; o jogo fica na frente |
+| `game.end` (`force` opcional) | `AppService` | Pede para o jogo fechar ou o encerra à força; `game.running` passa a `closing`. `conflict` se o pedido não deu agora (a janela do jogo ainda não existe): tentar de novo ou forçar |
+| fim do jogo | `SessionUpdate::Ended` | Comando de depois, ferramentas, cursor, tela e áudio restaurados (do diário), tempo jogado registrado, `library.changed` e `game.ended`. A interface reabre onde estava (`ui.state`) |
+
+`game.running` responde `{ gameId, title, startedAt, state }` (`launching`, `playing` ou `closing`) ou `null`; é o
+`running` que a página do jogo espera. `game.ended` traz `playedSeconds`, `end` (`normal`, `quick`,
+`never_started`, `failed`, `launch_failed`), `exitCode` e `exitCodeText` (SESSION-003) e, em `launch_failed`,
+`message`. Textos já vêm no idioma do usuário.
+
+**O aviso de fim com a interface fechada.** Quase sempre o jogo termina com a interface fechada, e eventos sem
+interface se perdem (D-10). O núcleo guarda o último `game.ended` não visto e o manda **logo depois da resposta do
+próximo `game.running`**, na mesma entrega: a página que escuta `game.ended` e depois consulta `game.running` ao
+abrir recebe o "bem-vindo de volta". Se havia página aberta no fim (o jogo caiu ainda em "Abrindo…", ou a
+interface foi reaberta por cima dele), o evento vai na hora e não se repete.
+
+**Interface durante o jogo.** Com um jogo aberto, qualquer saída da interface (pedido, usuário fechando, queda) só a
+deixa fechada; o app não termina e ela não reabre sozinha até o jogo acabar, como o supervisor do Slint. Reabrir
+por cima do jogo (atalho da Central, bandeja) fica para o WEB-22 e o WEB-36; a interface reaberta já sabe do jogo
+(`game.running`) e pode voltar a ele ou encerrá-lo.
+
+**Desktop × tela cheia.** No app Slint, durante o jogo, o modo desktop minimiza a janela e a tela cheia a fecha
+(ADR-0027). Na versão web as duas fecham: a D-10 manda terminar o Chromium também minimizado, e a página web é a do
+desktop. Para o usuário do desktop a diferença é a janela sumir da barra de tarefas durante o jogo em vez de ficar
+minimizada. Como no Slint desktop, abrir um jogo sem situação (ou da lista de desejos) marca "Jogando".
+
+**Queda do núcleo no meio do jogo.** O diário (`session_environment`) é gravado antes de mudar tela e áudio. Ao
+abrir, o `Core` chama `recover_after_crash` antes de qualquer outra coisa: tela, áudio, cursor e controles
+escondidos voltam. O tempo dessa sessão se perde (como no Slint).
+
+**Demonstração (`simulate`).** A sessão usa as funções em memória do núcleo (processos, telas, áudio, cursor) e
+uma pasta temporária, sem diário: nada abre e nada muda na máquina. O jogo simulado aparece "na tela" na primeira
+leitura e fecha sozinho depois de 15 s, para o ciclo inteiro aparecer; `game.end` também funciona.
+
+**Regras do acompanhamento vistas no teste com a Steam** (as mesmas do Slint, `GameRunTracker`, sem mudança
+aqui): com o cliente da Steam fechado, o processo que abre a URI sai e a Steam leva mais que a folga de 4 s para
+abrir o jogo, então a sessão termina como `quick` e o jogo abre fora dela; e um `game.end` antes de o processo do
+jogo aparecer encerra a sessão sem nada para fechar. Com a Steam aberta, o jogo aparece em cerca de 2 s.
+
+Ainda não há no núcleo web: presença no Discord, ponteiro pelo analógico (precisa ler o controle, WEB-22), Wine e
+Proton (Linux, fora da fase Windows, D-15) e esconder o controle do jogo com a Central aberta (INPUT-005).
+
+Testes: `tako-core` (`session::launch`, `session::running`: abrir, restaurar, queda, encerrar), `tako-app`
+(`tests/session_bridge.rs`: o ciclo pela ponte, `launch_failed`, a queda do núcleo, a demonstração, o formato) e
+`tako-web` (`core_process.rs`: a interface fecha e volta com o jogo).
 
 ## Preparar e compilar
 
@@ -246,12 +306,11 @@ Sem interface, a meta da D-10 (≤ 40 MB e zero Chromium) fica com folga; o núm
 
 ## Limitações mantidas
 
-O núcleo ainda não decide sozinho quando fechar a interface: o gancho (`Command::Hide`/`Show`) existe, mas só
-o `TAKO_WEB_RECYCLE_MS` o usa. Faltam a sessão de jogo (`HostRequest::Launch` → `Hide` ao abrir o jogo e
-`Show` ao voltar, com o supervisor de sessão), a bandeja (ícone, “fechar para a bandeja” → `Hide`, clique →
-`Show`) e o descarte depois de um tempo minimizado (a interface avisa “minimizada”, o núcleo conta o tempo e
-manda `Hide`). Um segundo `tako --web` ainda não traz a janela do primeiro (a trava de instância do supervisor
-Slint não vale aqui). Sem Job Object, a queda do núcleo depende do fim da entrada padrão do filho; os
+A sessão de jogo já fecha e reabre a interface (acima). Faltam a bandeja (ícone, “fechar para a bandeja” →
+`Hide`, clique → `Show`) e o descarte depois de um tempo minimizado (a interface avisa “minimizada”, o núcleo
+conta o tempo e manda `Hide`). Um segundo `tako --web` ainda não traz a janela do primeiro (a trava de instância
+do supervisor Slint não vale aqui); aberto durante um jogo, ele acharia o diário da sessão e restauraria a tela
+por baixo do jogo, então a trava precisa chegar antes da publicação. Sem Job Object, a queda do núcleo depende do fim da entrada padrão do filho; os
 subprocessos do CEF somem com o processo principal deles, conferido acima.
 
 A resolução de arte ainda é um snapshot de abertura, não cobre arte fixada fora do cache nem descobertas

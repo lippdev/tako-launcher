@@ -5,7 +5,12 @@
 //! - o usuário fechou a última janela → o app termina;
 //! - o núcleo pediu (jogo, bandeja, `TAKO_WEB_RECYCLE_MS`) → `CoreMsg::Close`; sem sair em [`Timings::grace`],
 //!   o processo é morto; o núcleo segue sem interface até alguém pedir para reabrir;
-//! - queda → registra e reabre uma vez; outra queda até [`Timings::crash_window`] depois encerra com erro.
+//! - queda → registra e reabre uma vez; outra queda até [`Timings::crash_window`] depois encerra com erro;
+//! - com um jogo aberto, qualquer saída da interface só a deixa fechada: ela volta quando o jogo terminar.
+//!
+//! Sessão de jogo (WEB-20): `HostRequest::Launch` abre o jogo pelo `AppService`, que o acompanha nesta thread
+//! (`poll_session` no prazo de `session_deadline`, sem bloquear). A interface fecha quando a janela do jogo
+//! aparece ou com `game.resume`, e reabre onde estava quando o jogo termina.
 
 use crate::bridge;
 use crate::ipc::{self, CoreMsg, Page, UiMsg};
@@ -14,7 +19,7 @@ use std::io::{self, BufReader, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
-use tako_app::{AppService, HostRequest};
+use tako_app::{AppService, HostRequest, SessionUpdate};
 
 /// O processo da interface, visto do núcleo.
 pub trait UiProcess: Send {
@@ -200,8 +205,21 @@ impl<L: UiLauncher> Host<L> {
         Ok(())
     }
 
-    /// Confere o processo e os prazos. `Some` termina o app.
-    fn watch(&mut self, now: Instant) -> Option<Result<(), String>> {
+    /// Pede para a interface fechar, sem encerrar o app.
+    fn hide(&mut self, now: Instant) {
+        if let Some(ui) = &mut self.ui {
+            ui.request_close(now, self.timings.grace);
+        }
+    }
+
+    /// Há uma página aberta que recebe o que for entregue agora.
+    fn listening(&self) -> bool {
+        self.ui.as_ref().is_some_and(|ui| !ui.close_requested) && !self.pages.is_empty()
+    }
+
+    /// Confere o processo e os prazos. `Some` termina o app. Com `game` (um jogo aberto), a interface que sai por
+    /// qualquer motivo fica fechada até o fim do jogo, como no supervisor do Slint.
+    fn watch(&mut self, now: Instant, game: bool) -> Option<Result<(), String>> {
         let Some(ui) = &mut self.ui else {
             if std::mem::take(&mut self.show) {
                 return self.open_ui().err().map(Err);
@@ -219,6 +237,12 @@ impl<L: UiLauncher> Host<L> {
             }
             self.ui = None;
             self.pages.clear();
+            if game && exit != Exit::Requested {
+                tracing::info!(
+                    "interface fechada durante o jogo; ela volta quando o jogo terminar"
+                );
+                return None;
+            }
             return match self
                 .restarts
                 .after(exit, code, now, self.timings.crash_window)
@@ -349,7 +373,14 @@ pub fn run<L: UiLauncher>(
     control(tx);
     let result = loop {
         let now = Instant::now();
-        let command = match host.next_wake(now) {
+        let session = service
+            .session_deadline()
+            .map(|at| at.saturating_duration_since(now));
+        let wake = match (host.next_wake(now), session) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+        let command = match wake {
             Some(wait) => rx.recv_timeout(wait).ok(),
             // `host.tx` mantém o canal aberto: sem prazo, espera o próximo pedido.
             None => rx.recv().ok(),
@@ -393,22 +424,39 @@ pub fn run<L: UiLauncher>(
                 }
             }
             Some(Command::Host(HostRequest::Launch { game_id })) => {
-                // Gancho: a sessão de jogo manda `Command::Hide` ao abrir o jogo e `Command::Show` ao voltar.
-                tracing::warn!(%game_id, "sessão de jogo ainda não ligada ao hospedeiro web");
+                tracing::info!(%game_id, "abrindo o jogo");
+                service.launch_game(&game_id);
             }
-            Some(Command::Hide) => {
-                if let Some(ui) = &mut host.ui {
-                    ui.request_close(now, host.timings.grace);
-                }
+            Some(Command::Host(HostRequest::Resume)) => {
+                tracing::info!("voltar ao jogo: fechando a interface");
+                host.hide(now);
             }
+            Some(Command::Hide) => host.hide(now),
             Some(Command::Show) => host.show = true,
+            None => {}
+        }
+        // A interface fecha durante o jogo (D-10) e volta no fim, onde estava (`ui.state`).
+        match service.poll_session(Instant::now()) {
+            Some(SessionUpdate::Shown) => {
+                tracing::info!("janela do jogo na tela: fechando a interface");
+                host.hide(now);
+            }
+            Some(SessionUpdate::Ended) => {
+                if host.listening() {
+                    // O `game.ended` vai agora para a página aberta; sem ela, sai depois do próximo `game.running`.
+                    service.session_end_seen();
+                } else {
+                    tracing::info!("jogo terminou: reabrindo a interface");
+                }
+                host.show = true;
+            }
             None => {}
         }
         let (target, text) = response.unzip();
         let messages = bridge::drain_messages(text, &events);
         // Resposta e eventos causados por ela seguem juntos e nessa ordem pela mesma fila do filho.
         host.deliver_all(target.as_ref(), &messages);
-        if let Some(result) = host.watch(Instant::now()) {
+        if let Some(result) = host.watch(Instant::now(), service.game_active()) {
             break result;
         }
     };
@@ -705,6 +753,113 @@ mod tests {
         assert_eq!(reply(ui.next().unwrap())["id"], 5);
         ui.exit(3);
         assert!(core.join().unwrap().is_err());
+    }
+
+    /// Lê entregas até achar uma mensagem (resposta ou evento) que satisfaça `want`.
+    fn until(ui: &mut FakeUi, want: impl Fn(&serde_json::Value) -> bool) -> serde_json::Value {
+        loop {
+            match ui.next() {
+                Some(CoreMsg::Deliver { messages, .. }) => {
+                    if let Some(found) = messages
+                        .iter()
+                        .map(|m| serde_json::from_str::<serde_json::Value>(m).unwrap())
+                        .find(|m| want(m))
+                    {
+                        return found;
+                    }
+                }
+                Some(CoreMsg::Close) => panic!("fechou antes da mensagem esperada"),
+                None => panic!("canal fechado"),
+            }
+        }
+    }
+
+    fn event(name: &'static str) -> impl Fn(&serde_json::Value) -> bool {
+        move |m| m["event"]["name"] == name
+    }
+
+    fn answer(id: u32) -> impl Fn(&serde_json::Value) -> bool {
+        move |m| m["id"] == id
+    }
+
+    #[test]
+    fn the_ui_closes_during_the_game_and_comes_back_at_the_end_with_the_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = tako_core::paths::DataPaths::at(dir.path());
+        let (children, launched) = mpsc::channel();
+        let (control_tx, control) = mpsc::channel();
+        let core = std::thread::spawn(move || {
+            run(
+                FakeLauncher(children),
+                move || {
+                    // Demonstração: o jogo e a tela são simulados no núcleo.
+                    tako_app::Core::open(paths, tako_platform::Platform::simulated(), true)
+                        .map(|core| AppService::with_core("9.9.9", core))
+                        .map_err(|e| e.to_string())
+                },
+                fast(),
+                |tx| control_tx.send(tx).unwrap(),
+            )
+        });
+        let control: mpsc::Sender<Command> = control.recv().unwrap();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":1,"name":"game.play","payload":{"gameId":"steam:demo0"}}"#);
+        assert_eq!(until(&mut ui, answer(1))["ok"], true);
+        let started = until(&mut ui, event("game.started"));
+        assert_eq!(started["event"]["payload"]["gameId"], "steam:demo0");
+        // A janela do jogo aparece: a interface recebe o pedido de fechar e sai.
+        loop {
+            match ui.next() {
+                Some(CoreMsg::Close) => break,
+                Some(_) => {}
+                None => panic!("canal fechado"),
+            }
+        }
+        ui.exit(0);
+        // Fechada durante o jogo: nem encerra o app, nem reabre sozinha.
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(launched.try_recv().is_err());
+        assert!(!core.is_finished());
+
+        // Reaberta por cima do jogo (o gancho da Central, WEB-22): sabe do jogo e pede para encerrá-lo.
+        control.send(Command::Show).unwrap();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":2,"name":"game.running"}"#);
+        let running = until(&mut ui, answer(2));
+        assert_eq!(running["reply"]["data"]["state"], "playing");
+        ui.request(r#"{"v":1,"id":3,"name":"game.end","payload":{}}"#);
+        assert_eq!(until(&mut ui, answer(3))["ok"], true);
+        // Fecha de novo antes de o fim ser visto (a folga do pedido é de 1 s).
+        control.send(Command::Hide).unwrap();
+        loop {
+            match ui.next() {
+                Some(CoreMsg::Close) => break,
+                Some(_) => {}
+                None => panic!("canal fechado"),
+            }
+        }
+        ui.exit(0);
+
+        // O jogo termina com a interface fechada: ela reabre e o aviso sai depois do primeiro game.running.
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":4,"name":"game.running"}"#);
+        let Some(CoreMsg::Deliver { messages, .. }) = ui.next() else {
+            panic!("esperava entrega")
+        };
+        let messages: Vec<serde_json::Value> = messages
+            .iter()
+            .map(|m| serde_json::from_str(m).unwrap())
+            .collect();
+        assert_eq!(messages[0]["id"], 4);
+        assert_eq!(messages[0]["reply"]["data"], serde_json::Value::Null);
+        let ended = &messages[1]["event"];
+        assert_eq!(ended["name"], "game.ended");
+        assert_eq!(ended["payload"]["gameId"], "steam:demo0");
+        assert_eq!(ended["payload"]["end"], "normal");
+        // Sem jogo, fechar a janela encerra o app.
+        ui.send(&UiMsg::UserClosed);
+        ui.exit(0);
+        assert_eq!(core.join().unwrap(), Ok(()));
     }
 
     #[test]

@@ -87,6 +87,9 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "profiles.delete"
             | "profiles.ask.set"
             | "profiles.switch"
+            | "game.running"
+            | "game.resume"
+            | "game.end"
     ) {
         return Err((
             header.id,
@@ -108,6 +111,8 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "profile.summary"
             | "profile.collections"
             | "profiles.list"
+            | "game.running"
+            | "game.resume"
     ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
@@ -401,6 +406,20 @@ pub enum Call {
         #[ts(as = "ProfileRequest")]
         ProfileRequest,
     ),
+    /// O jogo que o Tako abriu e ainda acompanha, ou `null` (WEB-20).
+    #[serde(rename = "game.running")]
+    GameRunning,
+    /// Traz o jogo para a frente: a interface fecha e reabre quando ele terminar (D-10). `conflict` sem jogo.
+    #[serde(rename = "game.resume")]
+    GameResume,
+    /// Pede para o jogo fechar; `force` encerra os processos dele à força. `conflict` sem jogo ou quando o pedido não
+    /// deu agora (a janela do jogo ainda não existe). O fim chega por `game.ended`.
+    #[serde(rename = "game.end")]
+    GameEnd(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameEndRequest")]
+        GameEndRequest,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -494,6 +513,12 @@ pub enum Reply {
     ProfilesAskSet(ProfilesList),
     #[serde(rename = "profiles.switch")]
     ProfilesSwitch(ProfilesList),
+    #[serde(rename = "game.running")]
+    GameRunning(Option<RunningGame>),
+    #[serde(rename = "game.resume")]
+    GameResume,
+    #[serde(rename = "game.end")]
+    GameEnd,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -530,6 +555,14 @@ pub enum Event {
     /// Algo mudou nos downloads (progresso, estado, lista ou fontes lidas): a interface consulta de novo.
     #[serde(rename = "downloads.changed")]
     DownloadsChanged,
+    /// O jogo pedido por `game.play` abriu. Com `tracked`, `game.running` passa a mostrá-lo e a interface fecha
+    /// quando a janela dele aparecer.
+    #[serde(rename = "game.started")]
+    GameStarted(GameStarted),
+    /// A sessão terminou (tela, áudio e tempo jogado já tratados) ou o jogo não abriu (`launch_failed`). Se a interface
+    /// estava fechada, o aviso sai logo depois da resposta do próximo `game.running`.
+    #[serde(rename = "game.ended")]
+    GameEnded(GameEnded),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -1580,4 +1613,87 @@ pub struct ProfileCollections {
     /// Jogos distintos nas coleções do usuário (as automáticas não entram na conta).
     #[ts(type = "number")]
     pub game_count: usize,
+}
+
+/// Em que ponto está o jogo aberto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum RunningState {
+    /// Aberto, esperando a janela dele aparecer ("Abrindo…").
+    Launching,
+    Playing,
+    /// `game.end` pedido; esperando os processos sumirem ("Fechando o jogo…").
+    Closing,
+}
+
+/// Resposta de `game.running`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RunningGame {
+    pub game_id: String,
+    pub title: String,
+    /// ISO-8601 em UTC.
+    pub started_at: String,
+    pub state: RunningState,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameEndRequest {
+    #[serde(default)]
+    #[ts(as = "Option<bool>", optional)]
+    pub force: bool,
+}
+
+/// Evento `game.started`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameStarted {
+    pub game_id: String,
+    pub title: String,
+    /// ISO-8601 em UTC.
+    pub started_at: String,
+    /// Falso quando o Tako só abriu (URI sem processo nem pasta): não há como saber quando termina, nem sessão.
+    pub tracked: bool,
+    /// Avisos da abertura (ferramenta que não abriu, comando antes do jogo que falhou), já no idioma do usuário.
+    pub notices: Vec<String>,
+}
+
+/// Como a sessão terminou (SESSION-003).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum GameEndReason {
+    Normal,
+    /// Fechou sozinho em menos de 10 s: caiu ou desistiu ao abrir.
+    Quick,
+    /// O jogo não apareceu dentro do prazo.
+    NeverStarted,
+    /// Fechou sozinho com um código de erro.
+    Failed,
+    /// Não chegou a abrir; `message` diz por quê.
+    LaunchFailed,
+}
+
+/// Evento `game.ended`: para o "bem-vindo de volta" e o aviso de erro do jogo.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameEnded {
+    pub game_id: String,
+    pub title: String,
+    #[ts(type = "number")]
+    pub played_seconds: u64,
+    pub end: GameEndReason,
+    /// Código de saída, quando o Tako abriu o executável direto e o jogo terminou com erro.
+    #[ts(type = "number | null")]
+    pub exit_code: Option<u32>,
+    /// O código explicado (hexadecimal, decimal e o que significa), já no idioma do usuário.
+    pub exit_code_text: Option<String>,
+    /// Só em `launch_failed`: o motivo, já no idioma do usuário.
+    pub message: Option<String>,
 }

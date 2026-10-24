@@ -12,11 +12,13 @@ mod library;
 mod organize;
 mod profile;
 pub mod protocol;
+mod session;
 mod settings;
 mod sources;
 mod system;
 
 pub use core::{Core, CoreError};
+pub use session::SessionUpdate;
 
 use protocol::{
     AppInfo, BRIDGE_VERSION, BridgeError, Call, ErrorCode, Event, I18nLang, Reply, UiState,
@@ -38,6 +40,8 @@ pub enum HostRequest {
     /// Há resultados de trabalho em segundo plano. O hospedeiro deve chamar AppService::poll na thread do
     /// núcleo, mesmo sem interface aberta; não encaminha este aviso à janela.
     PollBackground,
+    /// `game.resume`: trazer o jogo para a frente. Na versão web a interface fecha (D-10) e reabre no fim do jogo.
+    Resume,
 }
 
 /// Atende as chamadas da interface. Uma instância por processo, na thread do núcleo.
@@ -135,18 +139,10 @@ impl AppService {
                 let game = self.find_game(&request.game_id)?;
                 Ok(Reply::GameDetails(Box::new(library::details(core, game))))
             }
-            Call::GamePlay(request) => {
-                if !self.find_game(&request.game_id)?.can_play() {
-                    return Err(BridgeError::new(
-                        ErrorCode::Conflict,
-                        "jogo não pode ser iniciado",
-                    ));
-                }
-                self.request(HostRequest::Launch {
-                    game_id: request.game_id,
-                })?;
-                Ok(Reply::GamePlay)
-            }
+            Call::GamePlay(request) => self.play(request),
+            Call::GameRunning => self.running(),
+            Call::GameResume => self.resume(),
+            Call::GameEnd(request) => self.end_game(request),
             Call::LibraryScan => {
                 let core = self
                     .core

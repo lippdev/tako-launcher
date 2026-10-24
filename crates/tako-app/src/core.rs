@@ -26,7 +26,8 @@ pub enum CoreError {
     Sources(#[from] std::io::Error),
 }
 
-/// Dados que sobrevivem à janela. A tako-app lê as lojas pela tako-sources; a sessão fica no hospedeiro.
+/// Dados que sobrevivem à janela. A tako-app lê as lojas pela tako-sources; a sessão de jogo também fica aqui,
+/// e o hospedeiro só decide a janela.
 pub struct Core {
     pub(crate) settings: HashMap<String, String>,
     pub(crate) lang: Lang,
@@ -40,6 +41,8 @@ pub struct Core {
     pub(crate) downloads: crate::downloads::DownloadsHub,
     pub(crate) game_settings: crate::game_settings::Overrides,
     pub(crate) profiles: crate::profile::ProfileState,
+    /// Sessão de jogo (WEB-20): abrir, acompanhar e restaurar, também sem interface aberta.
+    pub(crate) session: crate::session::Sessions,
 }
 
 impl Core {
@@ -158,6 +161,9 @@ impl Core {
         let settings_store = database.clone().map(db::SettingsStore::new);
         let game_settings =
             crate::game_settings::Overrides::new(database.clone().map(db::GameSettingsStore::new));
+        // Antes de tudo que mexe na máquina: restaura tela e áudio de um jogo que o núcleo não viu terminar.
+        let session =
+            crate::session::Sessions::open(&platform, &paths, database.as_ref(), simulate);
         let downloads = crate::downloads::DownloadsHub::new(
             database.clone().map(db::DownloadStore::new),
             paths.root.join("download-sources"),
@@ -200,6 +206,7 @@ impl Core {
             downloads,
             game_settings,
             profiles: crate::profile::ProfileState::open(&paths, simulate),
+            session,
         };
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);
