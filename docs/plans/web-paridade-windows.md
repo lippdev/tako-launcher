@@ -22,7 +22,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Discord Rich Presence (`discord.rs`) | ⬜ chave existe, ninguém lê | **WEB-34** |
 | API local (`local_api.rs`, EXT-002) | ⬜ | **WEB-34** |
 | Links `tako://` (`links`) | ⬜ | **WEB-34** |
-| Splash de abertura e primeira leitura (`splash.rs`) | 🟡 componente EntradaDoApp pronto; falta ligar | **WEB-35** |
+| Splash de abertura e primeira leitura (`splash.rs`) | ✅ | WEB-35 |
 | Interface descartável (núcleo e interface separados) | ✅ | WEB-02b |
 | Bandeja do sistema | ⬜ | **WEB-36** |
 | Desempenho do Tako (`performance`, PERF-001) | ⬜ | **WEB-37** |
