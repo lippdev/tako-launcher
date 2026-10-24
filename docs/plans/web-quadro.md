@@ -9,7 +9,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-02b, WEB-13b, WEB-06a, WEB-01e |
-| Antigravity | `antigravity` | WEB-04e, WEB-04g |
+| Antigravity | `antigravity` | WEB-04g |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
 | Codex Alyx Medical | `codex_alyx_medical` | sem limite; reset às ~20:52 |
@@ -37,7 +37,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-12a | **Página do jogo:** destaque (FundoDoJogo, TituloDoJogo, Destaque, AcoesDoJogo) e cartões (Sobre, Detalhes, Sessões) como componentes, página ligada ao `game.details`, Jogar, favoritar, status, troca de jogo animada, estados jogando, não instalado e sem arte | N3 | Claude Alyx · Sonnet 5.5 alto (Claude InvestSmart ainda no limite) | WEB-04c, WEB-11a | `web/src/components/`, `web/src/app/` | integrada (aguarda validação visual) |
 | WEB-10b | **Visão geral da biblioteca** (TelaBiblioteca: continuar jogando, recentes, fileiras de capas), reaproveitando o destaque do WEB-12a | N3 | Claude Alyx · Sonnet 5.5 alto (Claude InvestSmart ainda no limite) | WEB-12a | `web/src/app/` | integrada (aguarda validação visual) |
 | WEB-04d | **EntradaDoApp** (componente; ligar à abertura depois) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-03 | `web/src/components/EntradaDoApp/` | integrada (aguarda validação visual) |
-| WEB-04e | **PainelDownloads e AtividadeNaBarra** (componentes; ligar ao núcleo no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | despachada |
+| WEB-04e | **PainelDownloads e AtividadeNaBarra** (componentes; ligar ao núcleo no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | integrada (aguarda validação visual) |
 | WEB-04f | **ErroDoJogo e AtualizacaoDoApp** (componentes; ligar no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | integrada (aguarda validação visual) |
 | WEB-06a | **Idiomas, infraestrutura:** `i18n.catalog` e `i18n.changed` no núcleo, `t()`/`useT()` no React, prova num texto; a migração do `strings.ts` fica para o WEB-06b | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-01b | `crates/tako-app/src/i18n.rs`, `web/src/i18n/` | despachada |
 | WEB-06b | **Idiomas, migração:** textos do `strings.ts` e das telas para os catálogos `locales/` (chaves novas nos dois idiomas) | N2 | a definir | WEB-06a e telas estáveis | `web/src/`, `crates/tako-core/locales/` | fila |

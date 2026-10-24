@@ -185,6 +185,8 @@ textarea {
   --tempo-cover: 0ms;
   --tempo-intro-hold: 0ms;
   --tempo-intro-escada: 0ms;
+  --tempo-pop: 0ms;
+  --tempo-popover: 0ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -208,6 +210,8 @@ textarea {
     --tempo-cover: 0ms;
     --tempo-intro-hold: 0ms;
     --tempo-intro-escada: 0ms;
+    --tempo-pop: 0ms;
+    --tempo-popover: 0ms;
   }
 }
 
@@ -280,4 +284,43 @@ textarea {
   --erro-ponto-borda: 2px;
   --atualizacao-dialogo-largura: 480px;
   --atualizacao-progresso-altura: 6px;
+}
+
+/* AtividadeNaBarra e PainelDownloads (WEB-04e, README do AtividadeNaBarra e PainelDownloads) */
+:root {
+  /* AtividadeNaBarra: botão da barra de ferramentas (README do AtividadeNaBarra: 36×36, raio 9) */
+  --tb-btn-height: 36px;
+  --tb-btn-min-width: 36px;
+  --tb-btn-radius: 9px;
+  --tb-btn-padding: 0 9px;
+  --tb-btn-font-size: 13px;
+
+  /* AtividadeNaBarra: contador (README do AtividadeNaBarra: bolinha de 19 na cor de destaque, borda 2 na cor da barra, pula escala 1.35 em 400ms) */
+  --badge-size: 19px;
+  --badge-border: 2px;
+  --badge-radius: 10px;
+  --badge-text-color: #ffffff;
+  --badge-top: -5px;
+  --badge-right: -5px;
+  --tempo-pop: 400ms;
+
+  /* PainelDownloads: popover (README do PainelDownloads: largura 340, raio 14, contorno line-strong, shadow-float, entrada 300ms) */
+  --dl-panel-width: 340px;
+  --dl-panel-radius: 14px;
+  --dl-panel-padding: 8px;
+  --dl-panel-offset: -6px;
+  --tempo-popover: 300ms;
+
+  /* PainelDownloads: capa na linha de download (README do PainelDownloads: 36×46, raio de 5) */
+  --dl-cover-width: 36px;
+  --dl-cover-height: 46px;
+  --dl-cover-radius: 5px;
+
+  /* PainelDownloads: botão de ação da linha (README do PainelDownloads: 30×30, raio 8, ícone de 14) */
+  --dl-action-size: 30px;
+  --dl-action-radius: 8px;
+  --dl-action-icon-size: 14px;
+
+  /* PainelDownloads: barra de progresso (README do PainelDownloads: altura de 3 na cor de destaque) */
+  --dl-progress-height: 3px;
 }
