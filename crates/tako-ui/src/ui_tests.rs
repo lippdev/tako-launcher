@@ -356,7 +356,7 @@ fn solid_panel_text_meets_wcag_aa_contrast() {
 }
 
 #[test]
-fn desktop_search_shortcuts_focus_the_visible_field_and_leave_returns_to_content() {
+fn desktop_shortcuts_focus_native_search_and_return_to_content() {
     let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     std::thread::spawn(|| {
         use slint::platform::WindowEvent;
@@ -388,7 +388,6 @@ fn desktop_search_shortcuts_focus_the_visible_field_and_leave_returns_to_content
             ("desk-library", "grid"),
             ("desk-library", "categories"),
             ("settings", "list"),
-            ("desk-profile", "list"),
         ] {
             ui.set_property("page", Value::String(page.into())).unwrap();
             ui.set_property("desk-view", Value::String(view.into()))
@@ -1542,6 +1541,11 @@ created-by-tako = true
                 shell.ctx.pads_connected = 1;
                 shell.ask_big_picture = true;
                 crate::shell::desktop::ask_big_picture(&mut shell, std::time::Duration::ZERO);
+            }
+            Ok("search-panel") => {
+                shell.open_route(crate::shell::profile::ROUTE);
+                shell.click("global-search", 0);
+                shell.edited("overlay-search", "e");
             }
             Ok("restore-confirm") => {
                 shell.open_route("settings");

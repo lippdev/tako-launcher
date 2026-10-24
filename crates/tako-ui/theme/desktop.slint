@@ -413,6 +413,305 @@ component SearchBox inherits Rectangle {
     }
 }
 
+// Busca geral flutuante (CampoDeBusca): painel de 560 a 110 do topo sobre fundo escuro desfocado; resultados com
+// capa, nome, publicadora e situação, e a etiqueta Biblioteca; ↑↓ navegam, Enter abre o jogo e Esc fecha.
+component DeskSearchPanel inherits Rectangle {
+    in property <bool> open;
+    in property <string> text;
+    in property <string> hint;
+    in property <string> esc-label;
+    in property <int> focus-request;
+    in property <[Tile]> games;
+    in property <int> initial-selection;
+    property <int> selected-index;
+    in property <string> library-label;
+    in property <string> empty-text;
+    callback edited(string);
+    callback moved(int);
+    callback selected(int);
+    callback close();
+
+    changed open => {
+        if (open) {
+            selected-index = initial-selection;
+            ti.focus();
+        }
+    }
+    changed initial-selection => { if (open) { selected-index = initial-selection; } }
+    changed focus-request => {
+        if (open) {
+            ti.focus();
+        }
+    }
+    changed text => {
+        if (ti.text != text) {
+            ti.text = text;
+        }
+    }
+    changed selected-index => {
+        results-flick.viewport-y = selected-index * 68px;
+        if (open) { moved(selected-index); }
+    }
+
+    width: 100%;
+    height: 100%;
+    background: Ui.desk-canvas.with-alpha(Ui.reduce-transparency ? 1.0 : (open ? 0.6 : 0));
+    animate background { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+
+    TouchArea {
+        enabled: root.open;
+        clicked => { root.close(); }
+    }
+
+    panel := Vidro {
+        layer: true;
+        radius: Ui.radius-card;
+        width: min(560px, parent.width - 32px);
+        height: min(content-layout.preferred-height, parent.height - 140px);
+        x: (parent.width - self.width) / 2;
+        y: 110px + (root.open ? 0px : -10px);
+        opacity: root.open ? 1 : 0;
+        transform-scale: root.open ? 1 : 0.98;
+        animate y, transform-scale { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+        animate opacity { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+
+        TouchArea { enabled: root.open; } // Evita fechar ao clicar dentro do painel
+
+        content-layout := VerticalLayout {
+            // Cabeçalho / Input (58 px de altura)
+            VerticalLayout {
+                height: 58px;
+                alignment: center;
+                HorizontalLayout {
+                    width: 100%;
+                    padding-left: Ui.space-16;
+                    padding-right: Ui.space-16;
+                    spacing: Ui.space-12;
+                    alignment: stretch;
+                    DeskIcon {
+                        name: "search";
+                        size: 18px;
+                        tint: Ui.desk-on-subtle;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        if ti.text == "": Text {
+                            width: parent.width;
+                            text: root.hint;
+                            color: Ui.desk-on-subtle;
+                            font-size: Ui.desk-body;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        FocusScope {
+                            key-pressed(e) => {
+                                if (e.text == Key.Escape) {
+                                    if (ti.text != "") {
+                                        ti.text = "";
+                                        root.edited("");
+                                    } else {
+                                        root.close();
+                                    }
+                                    return accept;
+                                }
+                                if (e.text == Key.DownArrow) {
+                                    if (root.games.length > 0) {
+                                        root.selected-index = min(root.selected-index + 1, root.games.length - 1);
+                                    }
+                                    return accept;
+                                }
+                                if (e.text == Key.UpArrow) {
+                                    root.selected-index = max(0, root.selected-index - 1);
+                                    return accept;
+                                }
+                                if (e.text == Key.Return) {
+                                    if (root.games.length > 0 && root.selected-index < root.games.length) {
+                                        root.selected(root.selected-index);
+                                    }
+                                    return accept;
+                                }
+                                reject
+                            }
+                            ti := TextInput {
+                                accessible-role: text-input;
+                                accessible-label: root.hint;
+                                width: parent.width;
+                                height: parent.height;
+                                padding-left: Ui.space-8;
+                                text: root.text;
+                                color: Ui.desk-text;
+                                font-size: Ui.desk-body;
+                                vertical-alignment: center;
+                                single-line: true;
+                                selection-background-color: Ui.glass-pressed;
+                                selection-foreground-color: Ui.desk-text;
+                                edited => { root.edited(self.text); }
+                            }
+                        }
+                    }
+                    if root.esc-label != "": Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        height: Ui.space-24;
+                        border-radius: 6px;
+                        background: Ui.keycap-bg;
+                        border-width: 1px;
+                        border-color: Ui.glass-edge;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            Text {
+                                text: root.esc-label;
+                                color: Ui.desk-on-subtle;
+                                font-size: Ui.desk-keycap;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                height: 1px;
+                background: Ui.line;
+            }
+
+            // Lista de resultados (máximo 380 px); a seleção mantém a linha visível.
+            results-flick := Flickable {
+                width: 100%;
+                height: min(results-list.preferred-height, Ui.glass-light-height + Ui.space-48);
+                viewport-height: self.height;
+                results-list := VerticalLayout {
+                    width: 100%;
+                    padding-left: Ui.space-8;
+                    padding-right: Ui.space-8;
+                    padding-top: Ui.space-8;
+                    padding-bottom: Ui.space-16;
+                    spacing: Ui.space-4;
+                    for g[idx] in root.games: Rectangle {
+                        width: 100%;
+                        height: 64px;
+                        accessible-role: button;
+                        accessible-label: g.title + " · " + g.meta + " · " + root.library-label;
+                        border-radius: Ui.radius-row;
+                        background: (idx == root.selected-index || row-ta.has-hover) ? Ui.glass-hover : transparent;
+                        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+
+                        row-ta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.selected(idx); }
+                        }
+
+                        HorizontalLayout {
+                            width: 100%;
+                            padding: 8px;
+                            spacing: Ui.space-16;
+                            alignment: stretch;
+
+                            // Capa (40 × 54 px, raio 5)
+                            Rectangle {
+                                width: 40px;
+                                height: 54px;
+                                border-radius: 5px;
+                                clip: true;
+                                if g.cover.width > 0: Image {
+                                    width: 100%;
+                                    height: 100%;
+                                    source: g.cover;
+                                    image-fit: cover;
+                                }
+                                if g.cover.width <= 0: Rectangle {
+                                    width: 100%;
+                                    height: 100%;
+                                    background: g.accent;
+                                    Text {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        text: g.initial;
+                                        color: Ui.desk-text;
+                                        font-size: Ui.desk-label-sm;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
+                                        horizontal-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+
+                            // Título e detalhes
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                spacing: Ui.space-4;
+                                Text {
+                                    text: g.title;
+                                    font-size: Ui.desk-label;
+                                    font-weight: 600;
+                                    color: Ui.desk-text;
+                                    overflow: elide;
+                                }
+                                Text {
+                                    text: g.meta;
+                                    font-size: Ui.desk-label-sm;
+                                    color: Ui.desk-on-subtle;
+                                    overflow: elide;
+                                }
+                            }
+
+                            // Tag Biblioteca
+                            Rectangle {
+                                y: (parent.height - self.height) / 2;
+                                height: Ui.space-24;
+                                border-radius: 6px;
+                                border-width: 1px;
+                                border-color: Ui.line-strong;
+                                HorizontalLayout {
+                                    padding-left: 7px;
+                                    padding-right: 7px;
+                                    alignment: center;
+                                    Text {
+                                        text: root.library-label;
+                                        font-size: Ui.desk-label-sm;
+                                        color: Ui.desk-on-subtle;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if root.games.length == 0: Rectangle {
+                        width: 100%;
+                        height: 72px;
+                        Text {
+                            width: parent.width;
+                            horizontal-alignment: left;
+                            wrap: word-wrap;
+                            text: root.empty-text;
+                            font-size: Ui.desk-label-sm;
+                            color: Ui.desk-on-subtle;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+            if root.games.length > 0 && results-list.preferred-height > results-flick.height: Rectangle {
+                width: 100%;
+                height: Ui.space-20;
+                HorizontalLayout {
+                    alignment: center;
+                    DeskIcon {
+                        name: "chevron-down";
+                        size: Ui.space-12;
+                        tint: Ui.desk-on-subtle;
+                        opacity: results-flick.viewport-y + results-flick.height < results-list.preferred-height ? 0.7 : 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
 // BarraDaJanela: Minimizar · Maximizar · Fechar, 40 × 36 com raio 8 (hit-test nativo em `window_chrome.rs`).
 component WindowButton inherits Rectangle {
     in property <string> kind;
@@ -3399,7 +3698,7 @@ component DeskLibrary inherits Rectangle {
                 // Recolhida: a busca vira a lupa (expande e foca) e o botão de expandir.
                 if collapsed: VerticalLayout {
                     spacing: Ui.space-6;
-                    ListBtn { icon: "search"; label: search-hint; filled: true; focused: focus-visible && zone == "controls" && zone-index == 0; clicked => { root.expand-search(); } }
+                    ListBtn { icon: "search"; label: search-hint; filled: true; focused: focus-visible && zone == "controls" && zone-index == 0; clicked => { root.clicked("global-search", 0); } }
                     ListBtn { icon: "panel"; label: view-labels[10]; focused: focus-visible && zone == "controls" && zone-index == 1; clicked => { root.clicked("collapse", 0); } }
                 }
                 OverviewRow {
@@ -5547,7 +5846,7 @@ component DeskOverlay inherits Rectangle {
     callback menu(length, length);
     callback edited(string, string);
     callback hovered(string, int);
-    property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
+    property <bool> generic: ov.kind != "search" && ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
         && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress" && ov.kind != "update" && ov.kind != "activities";
     property <bool> has-buttons: ov.rows.length > 0 && ov.rows[ov.rows.length - 1].kind == "button";
     if ov.kind == "splash" || ov.kind == "launch" || ov.kind == "progress": OverlayView {
@@ -8124,7 +8423,6 @@ export component Desktop inherits Window {
     changed width => { root.sync-art(); }
     changed height => { root.sync-art(); }
     changed page => {
-        floating-search = false;
         root.sync-art();
         if (page == "desk-library") {
             lib-in = false;
@@ -8145,9 +8443,8 @@ export component Desktop inherits Window {
     changed desk-overview => { root.sync-art(); }
 
     property <int> content-search-focus;
-    property <bool> floating-search;
+    property <bool> search-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "search";
     public function focus-content-search() {
-        floating-search = page != "desk-library" && page != "settings";
         search-timer.running = true;
     }
     search-timer := Timer {
@@ -8164,8 +8461,12 @@ export component Desktop inherits Window {
     // Teclado: o Tako decide o que cada tecla faz; Ctrl+K (ou Ctrl+F) vai para a busca e Ctrl+, para as Configurações.
     fs := FocusScope {
         key-pressed(e) => {
-            if (e.modifiers.control && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && (page == "desk-library" || page == "settings" || page == "desk-profile") && overlays.length == 0) {
-                root.focus-content-search();
+            if ((e.modifiers.control || e.modifiers.meta) && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && overlays.length == 0) {
+                if (page == "desk-library" || page == "settings") {
+                    root.focus-content-search();
+                } else if (e.text == "k" || e.text == "K") {
+                    root.key(e.text, e.repeat, true, e.modifiers.shift, e.modifiers.alt);
+                }
                 return accept;
             }
             if (e.modifiers.control && !e.modifiers.alt && e.text == "," && overlays.length == 0) {
@@ -8331,18 +8632,20 @@ export component Desktop inherits Window {
         }
     }
 
-    SearchBox {
-        visible: floating-search && page == "desk-profile";
-        x: (parent.width - self.width) / 2;
-        y: Ui.topbar-height + Ui.space-20;
-        width: root.small ? 280px : 420px;
-        text: desk-search;
-        hint: desk-search-hint;
-        key-label: desk-search-key;
+    DeskSearchPanel {
+        open: search-open;
+        text: search-open ? overlays[overlays.length - 1].input : "";
+        hint: search-open ? overlays[overlays.length - 1].search-hint : desk-search-hint;
         esc-label: desk-search-esc;
         focus-request: content-search-focus;
-        edited(t) => { root.edited("search", t); }
-        leave => { floating-search = false; fs.focus(); }
+        games: search-open ? overlays[overlays.length - 1].search-results : [];
+        initial-selection: search-open ? overlays[overlays.length - 1].sel : 0;
+        library-label: search-open ? overlays[overlays.length - 1].search-library-label : "";
+        empty-text: search-open ? overlays[overlays.length - 1].search-empty-text : "";
+        edited(t) => { root.edited("overlay-search", t); }
+        moved(idx) => { root.clicked("overlay-search-move", idx); }
+        selected(idx) => { root.clicked("overlay-search-select", idx); fs.focus(); }
+        close => { root.clicked("overlay-search-close", 0); fs.focus(); }
     }
 
     if control-center: ControlCenter {

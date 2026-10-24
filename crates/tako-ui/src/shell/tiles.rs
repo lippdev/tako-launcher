@@ -48,6 +48,12 @@ pub fn tile(ctx: &Ctx, g: &Game, cover: bool) -> Tile {
     Tile {
         id: g.id.clone(),
         title: g.title.clone(),
+        initial: g
+            .title
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().collect())
+            .unwrap_or_default(),
         meta: meta(ctx, g),
         cover: image(g.shown_cover().filter(|_| cover), COVER),
         accent: parse_color(&g.accent),

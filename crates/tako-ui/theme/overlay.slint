@@ -6,6 +6,7 @@ import { PanelRow, Icon, RowView } from "widgets.slint";
 export struct Tile {
     id: string,
     title: string,
+    initial: string,
     meta: string,
     cover: image,
     accent: color,
@@ -44,6 +45,10 @@ export struct Overlay {
     thumb-cols: int,
     preview: image,
     preview-text: string,
+    search-results: [Tile],
+    search-library-label: string,
+    search-empty-text: string,
+    search-hint: string,
 }
 
 export component Overline inherits Text {
