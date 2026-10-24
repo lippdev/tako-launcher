@@ -483,10 +483,11 @@ component DeskSearchPanel inherits Rectangle {
                 height: 58px;
                 alignment: center;
                 HorizontalLayout {
-                    padding-left: 18px;
-                    padding-right: 18px;
-                    spacing: 12px;
-                    alignment: center;
+                    width: 100%;
+                    padding-left: Ui.space-16;
+                    padding-right: Ui.space-16;
+                    spacing: Ui.space-12;
+                    alignment: stretch;
                     DeskIcon {
                         name: "search";
                         size: 18px;
@@ -499,7 +500,7 @@ component DeskSearchPanel inherits Rectangle {
                             width: parent.width;
                             text: root.hint;
                             color: Ui.desk-on-subtle;
-                            font-size: 15px * Ui.text-scale;
+                            font-size: Ui.desk-body;
                             vertical-alignment: center;
                             overflow: elide;
                         }
@@ -537,9 +538,10 @@ component DeskSearchPanel inherits Rectangle {
                                 accessible-label: root.hint;
                                 width: parent.width;
                                 height: parent.height;
+                                padding-left: Ui.space-8;
                                 text: root.text;
                                 color: Ui.desk-text;
-                                font-size: 15px * Ui.text-scale;
+                                font-size: Ui.desk-body;
                                 vertical-alignment: center;
                                 single-line: true;
                                 selection-background-color: Ui.glass-pressed;
@@ -550,7 +552,7 @@ component DeskSearchPanel inherits Rectangle {
                     }
                     if root.esc-label != "": Rectangle {
                         y: (parent.height - self.height) / 2;
-                        height: 24px;
+                        height: Ui.space-24;
                         border-radius: 6px;
                         background: Ui.keycap-bg;
                         border-width: 1px;
@@ -562,7 +564,7 @@ component DeskSearchPanel inherits Rectangle {
                             Text {
                                 text: root.esc-label;
                                 color: Ui.desk-on-subtle;
-                                font-size: 12px;
+                                font-size: Ui.desk-keycap;
                                 font-weight: 600;
                                 vertical-alignment: center;
                             }
@@ -577,16 +579,22 @@ component DeskSearchPanel inherits Rectangle {
 
             // Lista de resultados (máximo 380 px); a seleção mantém a linha visível.
             results-flick := Flickable {
-                max-height: 380px;
-                viewport-height: results-list.preferred-height;
+                width: 100%;
+                height: min(results-list.preferred-height, Ui.glass-light-height + Ui.space-48);
+                viewport-height: self.height;
                 results-list := VerticalLayout {
-                    padding: 8px;
-                    spacing: 4px;
+                    width: 100%;
+                    padding-left: Ui.space-8;
+                    padding-right: Ui.space-8;
+                    padding-top: Ui.space-8;
+                    padding-bottom: Ui.space-16;
+                    spacing: Ui.space-4;
                     for g[idx] in root.games: Rectangle {
+                        width: 100%;
                         height: 64px;
                         accessible-role: button;
                         accessible-label: g.title + " · " + g.meta + " · " + root.library-label;
-                        border-radius: 10px;
+                        border-radius: Ui.radius-row;
                         background: (idx == root.selected-index || row-ta.has-hover) ? Ui.glass-hover : transparent;
                         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
 
@@ -596,9 +604,10 @@ component DeskSearchPanel inherits Rectangle {
                         }
 
                         HorizontalLayout {
+                            width: 100%;
                             padding: 8px;
-                            spacing: 14px;
-                            alignment: center;
+                            spacing: Ui.space-16;
+                            alignment: stretch;
 
                             // Capa (40 × 54 px, raio 5)
                             Rectangle {
@@ -619,9 +628,9 @@ component DeskSearchPanel inherits Rectangle {
                                     Text {
                                         width: parent.width;
                                         height: parent.height;
-                                        text: g.title;
+                                        text: g.initial;
                                         color: Ui.desk-text;
-                                        font-size: 11px * Ui.text-scale;
+                                        font-size: Ui.desk-label-sm;
                                         font-weight: 700;
                                         vertical-alignment: center;
                                         horizontal-alignment: center;
@@ -634,17 +643,17 @@ component DeskSearchPanel inherits Rectangle {
                             VerticalLayout {
                                 horizontal-stretch: 1;
                                 alignment: center;
-                                spacing: 3px;
+                                spacing: Ui.space-4;
                                 Text {
                                     text: g.title;
-                                    font-size: 14px * Ui.text-scale;
+                                    font-size: Ui.desk-label;
                                     font-weight: 600;
                                     color: Ui.desk-text;
                                     overflow: elide;
                                 }
                                 Text {
                                     text: g.meta;
-                                    font-size: 12px * Ui.text-scale;
+                                    font-size: Ui.desk-label-sm;
                                     color: Ui.desk-on-subtle;
                                     overflow: elide;
                                 }
@@ -653,7 +662,7 @@ component DeskSearchPanel inherits Rectangle {
                             // Tag Biblioteca
                             Rectangle {
                                 y: (parent.height - self.height) / 2;
-                                height: 24px;
+                                height: Ui.space-24;
                                 border-radius: 6px;
                                 border-width: 1px;
                                 border-color: Ui.line-strong;
@@ -663,7 +672,7 @@ component DeskSearchPanel inherits Rectangle {
                                     alignment: center;
                                     Text {
                                         text: root.library-label;
-                                        font-size: 12px * Ui.text-scale;
+                                        font-size: Ui.desk-label-sm;
                                         color: Ui.desk-on-subtle;
                                         vertical-alignment: center;
                                     }
@@ -672,14 +681,30 @@ component DeskSearchPanel inherits Rectangle {
                         }
                     }
                     if root.games.length == 0: Rectangle {
+                        width: 100%;
                         height: 72px;
                         Text {
+                            width: parent.width;
+                            horizontal-alignment: left;
+                            wrap: word-wrap;
                             text: root.empty-text;
-                            font-size: 13px * Ui.text-scale;
+                            font-size: Ui.desk-label-sm;
                             color: Ui.desk-on-subtle;
                             vertical-alignment: center;
-                            horizontal-alignment: center;
                         }
+                    }
+                }
+            }
+            if root.games.length > 0 && results-list.preferred-height > results-flick.height: Rectangle {
+                width: 100%;
+                height: Ui.space-20;
+                HorizontalLayout {
+                    alignment: center;
+                    DeskIcon {
+                        name: "chevron-down";
+                        size: Ui.space-12;
+                        tint: Ui.desk-on-subtle;
+                        opacity: results-flick.viewport-y + results-flick.height < results-list.preferred-height ? 0.7 : 0;
                     }
                 }
             }

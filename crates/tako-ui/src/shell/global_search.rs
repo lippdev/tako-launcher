@@ -4,7 +4,6 @@ use super::layer::{Flow, Layer};
 use super::{Cmd, Ctx};
 use crate::model::{Overlay, Tile};
 use tako_core::library::{LibraryCriteria, LibraryFilter, query};
-use tako_core::presentation::library_text;
 
 pub(super) struct GlobalSearch {
     text: String,
@@ -29,7 +28,23 @@ impl GlobalSearch {
             .map(|game| Tile {
                 id: game.id.clone(),
                 title: game.title.clone(),
-                meta: library_text::status_label(ctx.lang(), game.play_status),
+                initial: game
+                    .title
+                    .chars()
+                    .next()
+                    .map(|c| c.to_uppercase().collect())
+                    .unwrap_or_default(),
+                meta: [
+                    game.publisher
+                        .as_deref()
+                        .filter(|publisher| !publisher.trim().is_empty())
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| {
+                            tako_core::presentation::game_text::store_name(ctx.lang(), game.store())
+                        }),
+                    tako_core::presentation::game_text::status(ctx.lang(), game),
+                ]
+                .join(" · "),
                 cover: super::tiles::image(game.shown_cover(), (80, 120)),
                 accent: super::desktop::game_card_accent(ctx, &game.accent),
                 installed: game.is_installed,
@@ -130,6 +145,8 @@ mod tests {
                     id: "steam:hades".into(),
                     title: "Hades".into(),
                     store: Some(GameStore::Steam),
+                    publisher: Some("Supergiant Games".into()),
+                    is_installed: true,
                     play_status: Some(PlayStatus::Beaten),
                     ..Default::default()
                 },
@@ -155,7 +172,16 @@ mod tests {
         let rendered = search.render(&shell.ctx);
         assert_eq!(rendered.search_results.len(), 1);
         assert_eq!(rendered.search_results[0].id, "steam:hades");
-        assert!(!rendered.search_results[0].meta.is_empty());
+        assert_eq!(rendered.search_results[0].initial, "H");
+        assert_eq!(
+            rendered.search_results[0].meta,
+            "Supergiant Games · Instalado"
+        );
+        search.text.clear();
+        assert_eq!(
+            search.render(&shell.ctx).search_results[1].meta,
+            "Steam · Não instalado"
+        );
         assert_eq!(rendered.search_hint, rendered.input_hint);
         assert_eq!(
             rendered.search_library_label,

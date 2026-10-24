@@ -144,6 +144,7 @@ theme_struct! {
     pub struct Tile {
         pub id: String,
         pub title: String,
+        pub initial: String,
         pub meta: String,
         pub cover: Image,
         pub accent: Color,
