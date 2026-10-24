@@ -4985,10 +4985,13 @@ component DeskSettings inherits Rectangle {
                                 padding-left: 10px;
                                 padding-right: 10px;
                                 spacing: 12px;
-                                // Ícone sem fundo, no quadrado de 28 da coluna do ícone do jogo da lista.
+                                // O quadrado do ícone acompanha o estado selecionado da categoria.
                                 Rectangle {
                                     width: 28px;
-                                    DeskIcon { name: c.icon; size: 18px; tint: c.selected ? Ui.desk-text : Ui.desk-on-muted; }
+                                    height: 28px;
+                                    border-radius: 7px;
+                                    background: c.selected ? Ui.desk-text : transparent;
+                                    DeskIcon { name: c.icon; size: 18px; tint: c.selected ? Ui.desk-canvas : Ui.desk-on-muted; }
                                 }
                                 Text {
                                     text: c.label;
@@ -5021,6 +5024,7 @@ component DeskSettings inherits Rectangle {
         HorizontalLayout {
             horizontal-stretch: 1;
             padding-left: small ? Ui.space-24 : Ui.space-40;
+            padding-right: small ? Ui.space-24 : Ui.space-40;
             padding-top: 34px;
             VerticalLayout {
                 max-width: 820px;
