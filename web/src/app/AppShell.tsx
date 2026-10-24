@@ -5,6 +5,7 @@ import { ColunaDaLista } from "./ColunaDaLista";
 import { PaginaDoJogo } from "./jogo/PaginaDoJogo";
 import { TelaConfiguracoes } from "./settings/TelaConfiguracoes";
 import { useSavedAppearance } from "./settings/useSavedAppearance";
+import { VisaoGeral } from "./visao/VisaoGeral";
 import { strings } from "./strings";
 import { VIEW_IDS, type ViewId } from "./uiState";
 import { useScreenState } from "./useScreenState";
@@ -17,7 +18,7 @@ const PROFILE = { name: strings.topbar.profile, online: true };
 
 /**
  * O app desktop: barra de cima de borda a borda, a lista da biblioteca à esquerda e a área das vistas
- * (README do design system, "A referência: TelaBiblioteca"). As vistas são contêineres vazios por enquanto.
+ * (README do design system, "A referência: TelaBiblioteca"). Perfil e Downloads são contêineres vazios por enquanto.
  */
 export function AppShell() {
   const { state, ready: screenReady, update } = useScreenState();
@@ -125,8 +126,8 @@ export function AppShell() {
                 key={id}
                 title={strings.views[id]}
                 active={id === view}
-                bare={id === "configuracoes" || gamePage}
-                flush={gamePage}
+                bare={id === "configuracoes" || id === "biblioteca"}
+                flush={id === "biblioteca"}
               >
                 {gamePage && (
                   <PaginaDoJogo
@@ -136,6 +137,7 @@ export function AppShell() {
                     }}
                   />
                 )}
+                {id === "biblioteca" && !gamePage && <VisaoGeral onOpenGame={openGame} />}
                 {id === "configuracoes" && (
                   <TelaConfiguracoes
                     category={state.settingsCategory}

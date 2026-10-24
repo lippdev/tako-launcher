@@ -15,9 +15,10 @@
   height: clamp(560px, 86%, 700px);
 }
 
-/* Visão geral: 400 de altura, raio de 18. */
+/* Visão geral: 400 de altura, raio de 18; em janela estreita, onde a identidade e os dados se empilham, cresce o que
+   precisar (o `padding-top` do miolo guarda o lugar dos chips). */
 .visao {
-  height: var(--hero-height);
+  min-height: var(--hero-height);
   border-radius: var(--radius-hero);
 }
 
@@ -51,7 +52,7 @@
 }
 
 .visao .interno {
-  padding: 0 var(--space-24) var(--space-24);
+  padding: 56px var(--space-24) var(--space-24);
 }
 
 .esquerda {
@@ -115,7 +116,7 @@
   }
 
   .esquerda {
-    align-items: flex-start;
+    align-items: stretch;
   }
 }
 
@@ -133,4 +134,13 @@
   transform: translateY(var(--intro-rise));
   transition-duration: var(--tempo-saida);
   transition-delay: 0ms;
+}
+
+/* Visão geral: a arte dá um zoom de 1,03 ao passar o mouse, em 1,2 s (README do Destaque). Só `transform`. */
+.visao > :first-child {
+  transition: transform 1200ms var(--curva-entrada);
+}
+
+.visao:hover > :first-child {
+  transform: scale(1.03);
 }

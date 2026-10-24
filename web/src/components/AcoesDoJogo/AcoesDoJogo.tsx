@@ -32,6 +32,8 @@ export interface AcoesDoJogoProps {
   onAlternarFavorito: () => void;
   /** Escolher "Configurações do jogo" no menu Gerenciar. Sem ele a entrada fica desabilitada. */
   onConfiguracoes?: (() => void) | undefined;
+  /** Só o primário (o destaque da Visão geral): sem ★ nem Gerenciar. */
+  compacto?: boolean;
   className?: string | undefined;
 }
 
@@ -48,6 +50,7 @@ export function AcoesDoJogo({
   onEncerrar,
   onAlternarFavorito,
   onConfiguracoes,
+  compacto = false,
   className,
 }: AcoesDoJogoProps) {
   const [menuAberto, setMenuAberto] = useState(false);
@@ -75,36 +78,40 @@ export function AcoesDoJogo({
 
   return (
     <div className={cx(styles["acoes"], className)}>
-      <BotaoDesktop
-        variant="square"
-        icon="star"
-        on={favorito}
-        tone="warning"
-        aria-label={favorito ? rotulos.desfavoritar : rotulos.favoritar}
-        title={favorito ? rotulos.desfavoritar : rotulos.favoritar}
-        onClick={onAlternarFavorito}
-      />
-      <BotaoDesktop
-        ref={setAncora}
-        variant="secondary"
-        icon="gear"
-        aria-haspopup="menu"
-        aria-expanded={menuAberto}
-        onClick={() => {
-          setMenuAberto((aberto) => !aberto);
-        }}
-      >
-        {rotulos.gerenciar}
-      </BotaoDesktop>
-      <MenuDeContexto
-        open={menuAberto}
-        onClose={() => {
-          setMenuAberto(false);
-        }}
-        anchor={ancora}
-        entries={entradas}
-        label={rotulos.gerenciar}
-      />
+      {!compacto && (
+        <>
+          <BotaoDesktop
+            variant="square"
+            icon="star"
+            on={favorito}
+            tone="warning"
+            aria-label={favorito ? rotulos.desfavoritar : rotulos.favoritar}
+            title={favorito ? rotulos.desfavoritar : rotulos.favoritar}
+            onClick={onAlternarFavorito}
+          />
+          <BotaoDesktop
+            ref={setAncora}
+            variant="secondary"
+            icon="gear"
+            aria-haspopup="menu"
+            aria-expanded={menuAberto}
+            onClick={() => {
+              setMenuAberto((aberto) => !aberto);
+            }}
+          >
+            {rotulos.gerenciar}
+          </BotaoDesktop>
+          <MenuDeContexto
+            open={menuAberto}
+            onClose={() => {
+              setMenuAberto(false);
+            }}
+            anchor={ancora}
+            entries={entradas}
+            label={rotulos.gerenciar}
+          />
+        </>
+      )}
       {estado === "jogando" && onEncerrar && (
         <BotaoDesktop
           variant="square"

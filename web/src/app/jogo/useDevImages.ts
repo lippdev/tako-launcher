@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-type DevImage = (kind: "hero" | "logo", id: string, title: string) => string;
+type DevImage = (kind: "hero" | "logo" | "cover", id: string, title: string) => string;
 
 /**
  * Só no navegador com o hospedeiro falso (`npm run dev`): arte de exemplo no lugar de `tako-img://`, que só o Tako

@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-10b, WEB-02b, WEB-13b, WEB-06a |
+| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-02b, WEB-13b, WEB-06a |
 | Antigravity | `antigravity` | WEB-04e, WEB-04f |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
@@ -35,7 +35,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-13a | **Configurações:** estrutura (categorias e conteúdo), Geral, Aparência (aplicada na hora e lida na abertura) e Bibliotecas (lojas com liga/desliga e "ler de novo"); outras categorias em breve | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-10a, WEB-01b, WEB-01c | `web/src/app/settings/`, `web/src/app/`, `web/src/bridge/fake.ts` | integrada (aguarda validação visual) |
 | WEB-13b | **Configurações, demais categorias:** Tema (cartões e cor de destaque), Tela e áudio, Controles, Capas e dados, Sistema etc.; busca nas configurações | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-13a | `web/src/app/settings/` | despachada |
 | WEB-12a | **Página do jogo:** destaque (FundoDoJogo, TituloDoJogo, Destaque, AcoesDoJogo) e cartões (Sobre, Detalhes, Sessões) como componentes, página ligada ao `game.details`, Jogar, favoritar, status, troca de jogo animada, estados jogando, não instalado e sem arte | N3 | Claude Alyx · Sonnet 5.5 alto (Claude InvestSmart ainda no limite) | WEB-04c, WEB-11a | `web/src/components/`, `web/src/app/` | integrada (aguarda validação visual) |
-| WEB-10b | **Visão geral da biblioteca** (TelaBiblioteca: continuar jogando, recentes, fileiras de capas), reaproveitando o destaque do WEB-12a | N3 | Claude Alyx · Sonnet 5.5 alto (Claude InvestSmart ainda no limite) | WEB-12a | `web/src/app/` | despachada |
+| WEB-10b | **Visão geral da biblioteca** (TelaBiblioteca: continuar jogando, recentes, fileiras de capas), reaproveitando o destaque do WEB-12a | N3 | Claude Alyx · Sonnet 5.5 alto (Claude InvestSmart ainda no limite) | WEB-12a | `web/src/app/` | integrada (aguarda validação visual) |
 | WEB-04d | **EntradaDoApp** (componente; ligar à abertura depois) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-03 | `web/src/components/EntradaDoApp/` | integrada (aguarda validação visual) |
 | WEB-04e | **PainelDownloads e AtividadeNaBarra** (componentes; ligar ao núcleo no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | despachada |
 | WEB-04f | **ErroDoJogo e AtualizacaoDoApp** (componentes; ligar no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | despachada |
@@ -72,3 +72,4 @@ Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-0
 - **Tamanho da interface 90%:** o design system tem 90/100/110/125, mas o núcleo só aceita 100/110/125 em `TextSizePercent` (herdado do app atual). Decidir se o núcleo passa a aceitar 90.
 - **Página do jogo, dados que o núcleo não tem** (WEB-12a): "jogando" (a ponte não diz se o jogo está rodando; faltam também "voltar ao jogo" e "encerrar"), instalar, trailer e capturas, conquistas, parecidos, requisitos. A página já desenha o estado "jogando" quando o dado existir. Precisam de chamadas novas na `tako-app` ligadas à sessão do hospedeiro.
 - **Descrição repetida** no destaque (3 linhas) e no Sobre: o núcleo manda um texto só. Decidir se o destaque mostra um resumo próprio.
+- **Visão geral, partes da prévia fora** (WEB-10b): "Voltar a jogar" (fácil, com os dados atuais), "Sua semana" e "Precisa de atenção" (precisam de horas totais e métricas que a ponte não dá). Cabeçalho sem o nome (perfil é do WEB-14). Ao voltar da página do jogo a vista remonta e recarrega; guardar rolagem e fileiras fica para depois. A lógica de Jogar repete a da página do jogo (extrair um hook comum quando mexer em uma das duas).

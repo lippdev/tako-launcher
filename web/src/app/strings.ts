@@ -291,3 +291,20 @@ export const gameStrings = {
     updateError: "Não foi possível atualizar o jogo.",
   },
 } as const;
+
+/** Textos da Visão geral da biblioteca (WEB-10b). */
+export const overviewStrings = {
+  label: "Visão geral da biblioteca",
+  // TODO(WEB-14): "Bem-vindo de volta, <nome>" quando o perfil chegar da ponte.
+  welcome: "Bem-vindo de volta",
+  loading: "Lendo a biblioteca…",
+  loadError: "Não foi possível ler a biblioteca.",
+  retry: "Tentar novamente",
+  empty: "Sua biblioteca ainda está vazia.",
+  heroLabel: (title: string) => `Em destaque: ${title}`,
+  continuePlaying: "Continuar jogando",
+  recent: "Recentes",
+  previous: "Anterior",
+  next: "Próximo",
+  playedFor: (time: string) => `${time} jogadas`,
+} as const;

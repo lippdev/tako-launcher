@@ -21,6 +21,8 @@ export interface CapaDoJogoProps {
   largura?: number;
   /** Altura da capa em pixels CSS (se omitida, calculada pela proporção 2:3 da Steam). */
   altura?: number;
+  /** A capa ocupa a largura do contêiner (fileiras e grades); `largura` só dimensiona o pedido da imagem. */
+  ajustar?: boolean;
   /** Clique na capa do jogo. */
   onClick?: () => void;
   /** Carregamento sob demanda (`lazy`, padrão) ou prioritário (`eager`). */
@@ -53,6 +55,7 @@ export function CapaDoJogo({
   src,
   largura = 200,
   altura,
+  ajustar = false,
   onClick,
   carregamento = "lazy",
   className,
@@ -73,7 +76,7 @@ export function CapaDoJogo({
 
   const styleCustom: CSSProperties = {
     ...(corDestaque ? ({ "--capa-cor": corDestaque } as CSSProperties) : {}),
-    ...(largura ? { width: `${largura}px` } : {}),
+    ...(largura && !ajustar ? { width: `${largura}px` } : {}),
   };
 
   return (

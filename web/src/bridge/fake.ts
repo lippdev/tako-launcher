@@ -145,6 +145,19 @@ let installedFake = false;
 export function isFakeHost() {
   return installedFake;
 }
+/** Última partida e horas jogadas por posição em `FAKE_NAMES`; quem não está aqui nunca foi jogado (a Visão geral). */
+const PLAYED: Record<number, [lastPlayedAt: string, hours: number]> = {
+  0: ["2026-10-24T16:17:00Z", 7],
+  1: ["2026-10-24T04:57:00Z", 24],
+  3: ["2026-10-23T22:10:00Z", 112],
+  5: ["2026-10-22T21:03:00Z", 31],
+  4: ["2026-10-20T19:40:00Z", 58],
+  6: ["2026-10-18T14:00:00Z", 203],
+  7: ["2026-10-10T20:00:00Z", 46],
+  8: ["2026-09-30T18:30:00Z", 190],
+  2: ["2026-08-12T10:00:00Z", 12],
+  9: ["2026-07-02T15:00:00Z", 19],
+};
 const games: LibraryGame[] = fakeGames().map((row, i) => ({
   id: row.id,
   title: row.title,
@@ -152,8 +165,8 @@ const games: LibraryGame[] = fakeGames().map((row, i) => ({
   installed: row.installed,
   favorite: row.favorite,
   status: i === 0 ? "playing" : null,
-  lastPlayedAt: i < 2 ? "2026-10-24T16:17:00Z" : null,
-  playTimeSeconds: i * 3600,
+  lastPlayedAt: PLAYED[i]?.[0] ?? null,
+  playTimeSeconds: (PLAYED[i]?.[1] ?? 0) * 3600,
   accent: null,
   hasCover: false,
   hasIcon: i !== 12,
@@ -168,6 +181,12 @@ const collections: Collection[] = [
     criteria: null,
   },
   { id: "empty", name: "Próximas aventuras", gameIds: [], criteria: null },
+  {
+    id: "souls",
+    name: "Desafio e atmosfera",
+    gameIds: ["steam:1003", "steam:1007", "steam:1009", "steam:1010", "steam:1005"],
+    criteria: null,
+  },
 ];
 const gameTags = new Map<string, Set<string>>([
   ["steam:1003", new Set(["RPG"])],
@@ -468,6 +487,48 @@ const SAMPLE_GAMES: Record<string, SampleGame> = {
       sizeLabel: "68.4 GB",
     },
   },
+  // Jogados por último depois do primeiro: arte e logo, para o destaque da Visão geral trocar entre jogos completos.
+  "steam:1003": {
+    accent: "#c9a24a",
+    hero: true,
+    logo: true,
+    details: {
+      platform: "Windows",
+      description: "Um RPG de ação em um mundo aberto criado por Hidetaka Miyazaki e George R. R. Martin.",
+      developer: "FromSoftware",
+      publisher: "Bandai Namco",
+      releaseDate: "2022-02-25",
+      genres: ["RPG", "Ação"],
+      metacriticScore: 96,
+      sizeLabel: "49.8 GB",
+    },
+  },
+  "steam:1006": {
+    accent: "#8a64d6",
+    hero: true,
+    logo: false,
+    details: {
+      platform: "Windows",
+      description: "Reúna seu grupo e volte aos Reinos Esquecidos numa história de companheirismo e traição.",
+      developer: "Larian Studios",
+      releaseDate: "2023-08-03",
+      genres: ["RPG"],
+      metacriticScore: 96,
+      sizeLabel: "122 GB",
+    },
+  },
+  "steam:1008": {
+    accent: "#9a7a45",
+    hero: true,
+    logo: true,
+    details: {
+      platform: "Windows",
+      developer: "CD Projekt Red",
+      releaseDate: "2015-05-19",
+      genres: ["RPG", "Mundo aberto"],
+      metacriticScore: 93,
+    },
+  },
   // Em breve.
   "steam:1005": {
     accent: "#9b4dca",
@@ -495,15 +556,35 @@ const SAMPLE_GAMES: Record<string, SampleGame> = {
 // A arte e a cor de cada jogo de exemplo entram na lista de jogos do núcleo falso.
 for (const game of games) {
   const sample = SAMPLE_GAMES[game.id];
-  Object.assign(game, { accent: sample?.accent ?? null, hasHero: sample?.hero ?? false, hasLogo: sample?.logo ?? false });
+  Object.assign(game, {
+    accent: sample?.accent ?? null,
+    hasHero: sample?.hero ?? false,
+    hasLogo: sample?.logo ?? false,
+    // Dois jogos sem capa, para ver o EstadoSemArte nas fileiras.
+    hasCover: game.id !== "steam:1002" && game.id !== "steam:1011",
+  });
 }
 
-/** Arte de exemplo (SVG num data URI) no lugar de `tako-img://hero` e `logo`, que só o Tako serve. */
-export function fakeGameImage(kind: "hero" | "logo", id: string, title: string): string {
+/** O título em linhas de até 14 letras, em caixa alta e escapado para SVG, para a capa de exemplo. */
+function coverLines(title: string): string[] {
+  const lines: string[] = [];
+  for (const word of title.toUpperCase().split(/\s+/)) {
+    const last = lines[lines.length - 1];
+    if (last !== undefined && last.length + word.length < 14) lines[lines.length - 1] = `${last} ${word}`;
+    else lines.push(word);
+  }
+  return lines.slice(0, 4).map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
+}
+
+/** Arte de exemplo (SVG num data URI) no lugar de `tako-img://hero`, `logo` e `cover`, que só o Tako serve. */
+export function fakeGameImage(kind: "hero" | "logo" | "cover", id: string, title: string): string {
   const n = Number(id.split(":")[1]);
   const hue = HUES[n % HUES.length] ?? 210;
+  const lines = coverLines(title);
   const svg =
-    kind === "hero"
+    kind === "cover"
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${String(hue)} 55% 46%)"/><stop offset="1" stop-color="hsl(${String((hue + 60) % 360)} 55% 14%)"/></linearGradient><radialGradient id="r" cx=".7" cy=".28" r=".55"><stop offset="0" stop-color="#fff" stop-opacity=".4"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="600" height="900" fill="url(#g)"/><rect width="600" height="900" fill="url(#r)"/><path d="M0 700 L150 500 L270 620 L420 420 L600 640 V900 H0Z" fill="#000" fill-opacity=".38"/>${lines.map((line, i) => `<text x="40" y="${String(860 - (lines.length - i) * 56)}" font-family="Poppins, sans-serif" font-weight="800" font-size="44" fill="#f4f1f0">${line}</text>`).join("")}</svg>`
+      : kind === "hero"
       ? `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="620" viewBox="0 0 1920 620"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${String(hue)} 55% 52%)"/><stop offset="1" stop-color="hsl(${String((hue + 60) % 360)} 55% 16%)"/></linearGradient><radialGradient id="r" cx=".72" cy=".3" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1920" height="620" fill="url(#g)"/><rect width="1920" height="620" fill="url(#r)"/><path d="M0 520 L360 330 L620 470 L980 250 L1320 440 L1620 300 L1920 460 V620 H0Z" fill="#000" fill-opacity=".35"/></svg>`
       : `<svg xmlns="http://www.w3.org/2000/svg" width="440" height="140" viewBox="0 0 440 140"><text x="436" y="96" text-anchor="end" font-family="Poppins, sans-serif" font-weight="800" font-size="${String(Math.min(56, Math.floor(410 / (title.length * 0.72))))}" fill="#f4f1f0">${title
           .toUpperCase()
