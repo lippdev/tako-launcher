@@ -56,6 +56,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 
 - **Atualizar biblioteca:** botão novo na barra da lista do desktop relê as lojas na hora.
 ### Correções
+- **Modo tela cheia do Windows em PCs de mesa:** ao ligar o Tako como tela inicial, ele marca o aparelho como portátil (como o AnyFSE faz), sem o que o Windows não oferece o modo Xbox nem a troca do app inicial; ao desligar, o valor anterior volta.
 - **Modo tela cheia do Windows:** ligar o Tako como tela inicial volta a funcionar; antes o Windows recusava o pacote (0x80073CF6).
 - **Ícones da Steam com falha no endereço:** quando o endereço principal do ícone de um jogo da Steam não responde na CDN, o Tako busca o ícone da comunidade pela API da loja e não mantém a falha gravada para sempre.
 - **Busca de atualizações:** conexões lentas continuam enquanto recebem dados, com compressão gzip e falha clara quando a rede para.

@@ -56,6 +56,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 
 - **Refresh library:** a new button on the desktop list bar rescans the stores right away.
 ### Fixes
+- **Windows full screen mode on desktop PCs:** turning Tako on as the home app now marks the device as a handheld (as AnyFSE does), without which Windows doesn't offer Xbox mode or the home app choice; turning it off restores the previous value.
 - **Windows full screen mode:** setting Tako as the home app works again; Windows used to reject the package (0x80073CF6).
 - **Steam icon fallback:** when a Steam game's primary icon address fails on the CDN, Tako falls back to the community icon from Steam's API and avoids caching the failure indefinitely.
 - **Update checks:** slow connections keep going while receiving data, with gzip compression and a clear failure when the network stalls.
