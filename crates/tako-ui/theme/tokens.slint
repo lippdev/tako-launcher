@@ -264,14 +264,16 @@ export global Ui {
     out property <duration> tempo-hover: reduce-motion ? 0ms : 200ms;
     out property <duration> tempo-foco: reduce-motion ? 0ms : 150ms;
     out property <duration> tempo-estado: reduce-motion ? 0ms : 250ms;
-    out property <duration> tempo-dialogo: reduce-motion ? 0ms : 350ms;
+    out property <duration> tempo-dialogo: reduce-motion ? 0ms : 450ms;
     out property <duration> tempo-pagina: reduce-motion ? 0ms : 450ms;
+    out property <duration> tempo-pagina-entra: reduce-motion ? 0ms : 550ms;
     out property <duration> tempo-saida: reduce-motion ? 0ms : 200ms;
     out property <duration> tempo-menu-escala: reduce-motion ? 0ms : 200ms;
     out property <duration> tempo-troca: reduce-motion ? 0ms : 500ms;
     out property <duration> tempo-escada: reduce-motion ? 0ms : 55ms;
     out property <duration> tempo-lista: reduce-motion ? 0ms : 500ms;
     out property <duration> tempo-arte: reduce-motion ? 0ms : 800ms;
+    out property <duration> atraso-arte: reduce-motion ? 0ms : 1800ms;
     out property <duration> tempo-destaque: reduce-motion ? 0ms : 900ms;
     // Cores da arte deslizando para a paleta nova (TAKO).
     out property <duration> tempo-cor: reduce-motion ? 0ms : 1000ms;
@@ -285,6 +287,7 @@ export global Ui {
     out property <color> toast-shadow: #00000066;
     out property <color> toast-hover: #0000001a;
     out property <duration> tempo-carrossel: reduce-motion ? 0ms : 7000ms;
+    out property <duration> tempo-onboarding: reduce-motion ? 0ms : 280ms;
     // Uma curva para quase tudo; os crossfades de arte e de opacidade usam `ease`.
     out property <easing> curva-entrada: cubic-bezier(0.22, 1, 0.36, 1);
     // Troca de jogo no destaque: o texto apaga em 120 e o novo acende em 200.
@@ -297,9 +300,12 @@ export global Ui {
     public pure function enter(entering: bool) -> duration {
         return entering ? page-time : 0ms;
     }
-    // Troca de modo (TrocaDeModo): sai em 120, entra em 140.
+    public pure function page-fade(entering: bool) -> duration {
+        return reduce-motion ? 0ms : (entering ? tempo-pagina-entra : tempo-pagina);
+    }
+    // Troca de modo (TrocaDeModo): sai em 200, entra em 450.
     public pure function mode-fade(entering: bool) -> duration {
-        return entering ? page-time / 2 : tempo-texto-sai;
+        return entering ? tempo-pagina : tempo-saida;
     }
     // Troca de aba ou de categoria (TrocaDeTela › abas internas): sai em 80, entra em 120.
     public pure function list-fade(entering: bool) -> duration {
@@ -309,23 +315,22 @@ export global Ui {
     public pure function flash-fade(on: bool) -> duration {
         return on ? 0ms : tempo-pulso * 0.7;
     }
-    // Aviso: entra em 350 ms, sai em `tempo-saida` (200 ms). Com Reduzir animações, na hora.
+    // Aviso: entra em `tempo-dialogo`, sai em `tempo-saida`. Com Reduzir animações, na hora.
     public pure function toast-fade(entering: bool) -> duration {
-        return reduce-motion ? 0ms : (entering ? 350ms : tempo-saida);
+        return entering ? tempo-dialogo : tempo-saida;
     }
-    // Troca de jogo (TrocaDeJogo): a arte nova entra por cima em 700, assenta 1,04 → 1 em 900 e o desfoque sai em
-    // 500. Ao preparar a entrada (antes de começar), troca na hora.
+    // Troca de jogo: crossfade ease em 800 ms; desfoque some 1,8 s depois.
     public pure function art-fade(entering: bool) -> duration {
-        return entering && !reduce-motion ? 700ms : 0ms;
+        return entering ? tempo-arte : 0ms;
     }
     public pure function art-settle(entering: bool) -> duration {
-        return entering && !reduce-motion ? 900ms : 0ms;
+        return entering ? tempo-arte : 0ms;
     }
     public pure function art-unblur(entering: bool) -> duration {
-        return entering && !reduce-motion ? 500ms : 0ms;
+        return entering ? tempo-arte : 0ms;
     }
     public pure function art-unblur-delay(entering: bool) -> duration {
-        return entering && !reduce-motion ? 120ms : 0ms;
+        return entering ? atraso-arte : 0ms;
     }
     // Página do jogo (TelaJogo): a arte nova assenta de 1,05 a 1 em 1,8 s.
     out property <duration> tempo-assenta: reduce-motion ? 0ms : 1800ms;

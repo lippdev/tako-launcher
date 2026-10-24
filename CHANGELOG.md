@@ -5,6 +5,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 ## [Unreleased]
 
 ### Novidades
+- **Movimento do desktop (TAKO):** as animações seguem os tempos e a curva do design system; a troca entre as páginas ganha fade com escala sutil, respeita Reduzir animações e pausa a transição quando a janela está inativa.
 - **Busca geral flutuante com Ctrl+K (TAKO):** painel flutuante de busca geral de 560 a 110 do topo sobre fundo escuro desfocado, acionado por atalho de teclado ou em telas sem busca própria; lista resultados da biblioteca com capa, título, publicadora e situação com etiqueta Biblioteca; suporta navegação por setas (↑↓), Enter para abrir o jogo diretamente e Esc para limpar ou fechar a busca.
 - **Telas de camadas do desktop (TAKO):** diálogo com imagem ajustado para 540 px, Seletor de imagens para 1180 px e atualizações no Campo de texto e na Atualização do app.
 - **Camadas no padrão novo do desktop (TAKO):** menus de 220 com contorno forte e sombra elevada, abrem da âncora em 160/200 ms; avisos (toasts) no centro inferior com fundo claro, texto escuro, duração de 2,3 s e entrada subindo 20 px; dicas (tooltips) com espera de 500 ms e transição de 120 ms; painéis laterais de 400 (480 nas configurações do jogo) deslizando da direita sem escurecer a janela; e diálogos modais de 480 (compacto 440, largo 680) com raio 18 e fundo escurecido a 60%. Esc fecha a camada do topo e o foco permanece na camada ativa.
