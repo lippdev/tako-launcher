@@ -24,7 +24,8 @@ pub(crate) enum Update {
 /// Nenhum JoinHandle: fechar o núcleo não espera uma loja ou pasta lenta. Ao perder o receptor, o trabalhador
 /// abandona a leitura entre fontes e encerra. Ele nunca recebe referência ao núcleo nem ao snapshot.
 pub(crate) struct Scanner {
-    commands: Option<mpsc::Sender<()>>,
+    /// Cada pedido leva as lojas desligadas da hora (`DisabledStores`), não as da abertura.
+    commands: Option<mpsc::Sender<String>>,
     updates: mpsc::Receiver<Update>,
     wake: Wake,
     pub state: LibrarySources,
@@ -49,7 +50,7 @@ impl Scanner {
             // Nem a construção das fontes pode consultar registro, ambiente ou disco na demonstração.
             return Ok(scanner);
         }
-        let (commands, requests) = mpsc::channel();
+        let (commands, requests) = mpsc::channel::<String>();
         std::thread::Builder::new()
             .name("library-sources".into())
             .spawn(move || {
@@ -64,7 +65,7 @@ impl Scanner {
                     delivered
                 };
                 let result = catch_unwind(AssertUnwindSafe(|| {
-                    for () in requests {
+                    for disabled in requests {
                         let sources = factory();
                         if !scan(&sources, &disabled, lang, &send) {
                             break;
@@ -77,19 +78,19 @@ impl Scanner {
                 }
             })?;
         scanner.commands = Some(commands);
-        scanner.start()?;
+        scanner.start(&disabled)?;
         Ok(scanner)
     }
 
     /// Um pedido durante a leitura é ignorado, inclusive se o resultado ainda aguarda o núcleo.
-    pub fn start(&mut self) -> std::io::Result<bool> {
+    pub fn start(&mut self, disabled: &str) -> std::io::Result<bool> {
         if self.state.scanning || self.commands.is_none() {
             return Ok(false);
         }
         self.commands
             .as_ref()
             .ok_or_else(|| std::io::Error::other("leitor indisponível"))?
-            .send(())
+            .send(disabled.to_owned())
             .map_err(|_| std::io::Error::other("leitor das lojas encerrado"))?;
         self.state.scanning = true;
         self.state.completed = 0;

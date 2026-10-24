@@ -53,6 +53,19 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "game.play"
             | "library.scan"
             | "library.sources"
+            | "settings.get"
+            | "settings.set"
+            | "collections.list"
+            | "collections.create"
+            | "collections.rename"
+            | "collections.delete"
+            | "collections.add_games"
+            | "collections.remove_games"
+            | "collections.smart.set"
+            | "tags.list"
+            | "game.tags.set"
+            | "game.status.set"
+            | "game.favorite.set"
     ) {
         return Err((
             header.id,
@@ -175,6 +188,76 @@ pub enum Call {
     LibraryScan,
     #[serde(rename = "library.sources")]
     LibrarySources,
+    #[serde(rename = "settings.get")]
+    SettingsGet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "SettingsGetRequest")]
+        SettingsGetRequest,
+    ),
+    #[serde(rename = "settings.set")]
+    SettingsSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "Setting")]
+        Setting,
+    ),
+    #[serde(rename = "collections.list")]
+    CollectionsList,
+    #[serde(rename = "collections.create")]
+    CollectionsCreate(
+        #[serde(with = "object_payload")]
+        #[ts(as = "CollectionCreate")]
+        CollectionCreate,
+    ),
+    #[serde(rename = "collections.rename")]
+    CollectionsRename(
+        #[serde(with = "object_payload")]
+        #[ts(as = "CollectionRename")]
+        CollectionRename,
+    ),
+    #[serde(rename = "collections.delete")]
+    CollectionsDelete(
+        #[serde(with = "object_payload")]
+        #[ts(as = "CollectionRequest")]
+        CollectionRequest,
+    ),
+    #[serde(rename = "collections.add_games")]
+    CollectionsAddGames(
+        #[serde(with = "object_payload")]
+        #[ts(as = "CollectionGames")]
+        CollectionGames,
+    ),
+    #[serde(rename = "collections.remove_games")]
+    CollectionsRemoveGames(
+        #[serde(with = "object_payload")]
+        #[ts(as = "CollectionGames")]
+        CollectionGames,
+    ),
+    #[serde(rename = "collections.smart.set")]
+    CollectionsSmartSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "SmartCollectionSet")]
+        SmartCollectionSet,
+    ),
+    #[serde(rename = "tags.list")]
+    TagsList,
+    #[serde(rename = "game.tags.set")]
+    GameTagsSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameTagsSet")]
+        GameTagsSet,
+    ),
+    #[serde(rename = "game.status.set")]
+    GameStatusSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameStatusSet")]
+        GameStatusSet,
+    ),
+    #[serde(rename = "game.favorite.set")]
+    GameFavoriteSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameFavoriteSet")]
+        GameFavoriteSet,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -200,6 +283,32 @@ pub enum Reply {
     LibraryScan,
     #[serde(rename = "library.sources")]
     LibrarySources(LibrarySources),
+    #[serde(rename = "settings.get")]
+    SettingsGet(SettingsValues),
+    #[serde(rename = "settings.set")]
+    SettingsSet,
+    #[serde(rename = "collections.list")]
+    CollectionsList(Vec<Collection>),
+    #[serde(rename = "collections.create")]
+    CollectionsCreate(Collection),
+    #[serde(rename = "collections.rename")]
+    CollectionsRename,
+    #[serde(rename = "collections.delete")]
+    CollectionsDelete,
+    #[serde(rename = "collections.add_games")]
+    CollectionsAddGames,
+    #[serde(rename = "collections.remove_games")]
+    CollectionsRemoveGames,
+    #[serde(rename = "collections.smart.set")]
+    CollectionsSmartSet(Collection),
+    #[serde(rename = "tags.list")]
+    TagsList(Vec<Tag>),
+    #[serde(rename = "game.tags.set")]
+    GameTagsSet,
+    #[serde(rename = "game.status.set")]
+    GameStatusSet,
+    #[serde(rename = "game.favorite.set")]
+    GameFavoriteSet,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -402,7 +511,7 @@ pub struct LibraryListRequest {
     pub sort: SortOrder,
     #[ts(as = "Option<bool>", optional)]
     pub reversed: bool,
-    // Id da coleção; a resolução das coleções automáticas entra na WEB-01b.
+    // Id da coleção manual ou automática, resolvido no núcleo.
     #[ts(optional = nullable)]
     pub collection: Option<String>,
     // Dentro de cada grupo vale qualquer um; entre grupos, todos precisam valer (regra do core).
@@ -532,4 +641,158 @@ pub struct RecentSession {
     pub started_at: String,
     #[ts(type = "number")]
     pub duration_seconds: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct SettingsGetRequest {
+    #[serde(default)]
+    #[ts(optional)]
+    pub keys: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct Setting {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct SettingsValues {
+    pub values: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct CollectionRequest {
+    pub collection_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct CollectionCreate {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct CollectionRename {
+    pub collection_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct CollectionGames {
+    pub collection_id: String,
+    pub game_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+/// Aplica ou remove cada tag de todos os jogos, preservando as outras tags (LIB-002).
+pub struct GameTagsSet {
+    pub game_ids: Vec<String>,
+    pub tags: Vec<String>,
+    pub on: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameStatusSet {
+    pub game_ids: Vec<String>,
+    pub status: Option<GameStatus>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameFavoriteSet {
+    pub game_ids: Vec<String>,
+    pub favorite: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct Tag {
+    pub name: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+/// `criteria: null` identifica uma coleção manual; automáticas resolvem os jogos na consulta.
+pub struct Collection {
+    pub id: String,
+    pub name: String,
+    pub game_ids: Vec<String>,
+    pub criteria: Option<SmartCriteria>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+/// Sem id cria uma coleção; com id substitui nome e critérios da coleção automática.
+pub struct SmartCollectionSet {
+    pub collection_id: Option<String>,
+    pub name: String,
+    #[serde(with = "object_payload")]
+    #[ts(as = "SmartCriteria")]
+    pub criteria: SmartCriteria,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum PlayTime {
+    #[default]
+    Any,
+    Unplayed,
+    UnderHour,
+    OneToTenHours,
+    OverTenHours,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct SmartCriteria {
+    #[serde(default)]
+    #[serde(with = "object_payload")]
+    #[ts(as = "Option<LibraryListRequest>", optional)]
+    pub library: LibraryListRequest,
+    #[serde(default)]
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub genres: Vec<String>,
+    #[serde(default)]
+    #[ts(as = "Option<PlayTime>", optional)]
+    pub play_time: PlayTime,
+    #[serde(default)]
+    #[ts(as = "Option<bool>", optional)]
+    pub played_only: bool,
+    #[serde(default)]
+    #[ts(as = "Option<bool>", optional)]
+    pub broken_only: bool,
+    #[serde(default)]
+    #[ts(as = "Option<bool>", optional)]
+    pub favorites_only: bool,
+    #[serde(default)]
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub collections: Vec<String>,
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub filter_store: Option<Store>,
 }

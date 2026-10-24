@@ -28,10 +28,11 @@ pub enum CoreError {
 
 /// Dados que sobrevivem à janela. A tako-app lê as lojas pela tako-sources; a sessão fica no hospedeiro.
 pub struct Core {
-    settings: HashMap<String, String>,
-    lang: Lang,
-    library: GameLibrary,
-    collections: Option<CollectionLibrary>,
+    pub(crate) settings: HashMap<String, String>,
+    pub(crate) lang: Lang,
+    pub(crate) library: GameLibrary,
+    pub(crate) collections: CollectionLibrary,
+    pub(crate) settings_store: Option<db::SettingsStore>,
     found: Arc<Mutex<Arc<Vec<Game>>>>,
     snapshot: Option<SnapshotWriter>,
     pub(crate) sources: crate::sources::Scanner,
@@ -128,15 +129,20 @@ impl Core {
             system_clock(),
         );
         library.load();
-        let collections = database.map(|d| {
-            let mut collections =
-                CollectionLibrary::new(Box::new(db::CollectionStore::new(d)), system_clock());
-            if let Err(e) = collections.load() {
-                tracing::error!("coleções: {e}");
-            }
-            collections.apply_to(library.games_mut());
-            collections
-        });
+        let settings_store = database.clone().map(db::SettingsStore::new);
+        let collections = database
+            .map(|d| {
+                let mut collections =
+                    CollectionLibrary::new(Box::new(db::CollectionStore::new(d)), system_clock());
+                if let Err(e) = collections.load() {
+                    tracing::error!("coleções: {e}");
+                }
+                collections.apply_to(library.games_mut());
+                collections
+            })
+            .unwrap_or_else(|| {
+                CollectionLibrary::new(Box::new(crate::organize::MemoryCollections), system_clock())
+            });
         let sources = crate::sources::Scanner::open(
             factory.unwrap_or_else(|| crate::sources::factory(&settings)),
             settings.get("DisabledStores").cloned().unwrap_or_default(),
@@ -145,6 +151,7 @@ impl Core {
         )?;
         Ok(Self {
             settings,
+            settings_store,
             lang,
             library,
             collections,
@@ -173,9 +180,7 @@ impl Core {
         let games = Arc::new(games);
         *self.found.lock().unwrap_or_else(|e| e.into_inner()) = Arc::clone(&games);
         self.library.refresh();
-        if let Some(collections) = &self.collections {
-            collections.apply_to(self.library.games_mut());
-        }
+        self.collections.apply_to(self.library.games_mut());
         if let Some(snapshot) = &self.snapshot
             && snapshot
                 .sender

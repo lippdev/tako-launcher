@@ -44,7 +44,7 @@ fn sort(value: SortOrder) -> query::LibrarySort {
     }
 }
 
-pub(crate) fn list(core: &Core, request: LibraryListRequest) -> LibraryPage {
+pub(crate) fn criteria(request: LibraryListRequest) -> (LibraryCriteria, LibraryFilter) {
     let filter = match request.filter {
         LibraryTab::All => LibraryFilter::All,
         LibraryTab::Favorites => LibraryFilter::Favorites,
@@ -65,12 +65,49 @@ pub(crate) fn list(core: &Core, request: LibraryListRequest) -> LibraryPage {
         },
         ..Default::default()
     };
+    (criteria, filter)
+}
+
+pub(crate) fn list(core: &Core, mut request: LibraryListRequest) -> LibraryPage {
+    let smart = crate::organize::smart_collections(core)
+        .into_iter()
+        .find(|c| Some(c.id.as_str()) == request.collection.as_deref());
+    if let Some(saved) = &smart {
+        request.collection = None;
+        if request.sort == SortOrder::RecentlyPlayed && !request.reversed {
+            request.sort = wire_sort(saved.criteria.sort);
+            request.reversed = saved.criteria.reversed;
+        }
+    }
+    let (criteria, filter) = criteria(request.clone());
+    let allowed = smart.as_ref().map(|c| {
+        let criteria = c.criteria_in(core.language());
+        query::apply_by(
+            core.library()
+                .games()
+                .iter()
+                .filter(|g| c.filter.matches(g)),
+            |g| {
+                let mut facts = tako_core::library::LibraryFacts::of(g);
+                facts.source =
+                    tako_core::presentation::game_text::store_name(core.language(), g.store());
+                facts
+            },
+            &criteria,
+        )
+        .into_iter()
+        .map(|g| g.id.as_str())
+        .collect::<std::collections::HashSet<_>>()
+    });
     // A API usa identificadores de loja, sem depender do idioma global usado por LibraryFacts::source.
     let games = core.library().games();
     let stores = request.stores;
     let matches = query::apply_by(
         games.iter().filter(|g| {
             filter.matches(g)
+                && allowed
+                    .as_ref()
+                    .is_none_or(|ids| ids.contains(g.id.as_str()))
                 && (stores.is_empty() || stores.iter().any(|s| GameStore::from(*s) == g.store()))
         }),
         |g| tako_core::library::LibraryFacts::of(g),
@@ -152,5 +189,16 @@ pub(crate) fn details(core: &Core, game: &Game) -> GameDetails {
         tags: nonempty(game.tags.iter().cloned().collect()),
         size_bytes: game.size_bytes,
         size_label: optional_text(game.size_label.as_deref()),
+    }
+}
+
+pub(crate) fn wire_sort(value: query::LibrarySort) -> SortOrder {
+    match value {
+        query::LibrarySort::RecentlyPlayed => SortOrder::RecentlyPlayed,
+        query::LibrarySort::Name => SortOrder::Name,
+        query::LibrarySort::PlayTime => SortOrder::PlayTime,
+        query::LibrarySort::RecentlyAdded => SortOrder::RecentlyAdded,
+        query::LibrarySort::Rating => SortOrder::Rating,
+        query::LibrarySort::Size => SortOrder::Size,
     }
 }

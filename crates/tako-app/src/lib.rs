@@ -6,7 +6,9 @@
 mod core;
 mod demo;
 mod library;
+mod organize;
 pub mod protocol;
+mod settings;
 mod sources;
 
 pub use core::{Core, CoreError};
@@ -143,9 +145,14 @@ impl AppService {
                     .core
                     .as_mut()
                     .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                let disabled = core
+                    .settings
+                    .get("DisabledStores")
+                    .cloned()
+                    .unwrap_or_default();
                 if core
                     .sources
-                    .start()
+                    .start(&disabled)
                     .map_err(|e| BridgeError::new(ErrorCode::Internal, e.to_string()))?
                 {
                     self.emit_scan_progress();
@@ -155,6 +162,22 @@ impl AppService {
             Call::LibrarySources => Ok(Reply::LibrarySources(
                 self.require_core()?.sources.state.clone(),
             )),
+            call => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                let before = (core.library.version(), core.collections.version());
+                let result = organize::handle(core, call);
+                // O núcleo pode mudar a memória antes de uma falha de disco; a tela precisa consultar de novo.
+                core.collections.apply_to(core.library.games_mut());
+                let changed = result.as_ref().is_ok_and(|(_, changed)| *changed)
+                    || before != (core.library.version(), core.collections.version());
+                if changed {
+                    self.emit(Event::LibraryChanged);
+                }
+                result.map(|(reply, _)| reply)
+            }
         }
     }
 

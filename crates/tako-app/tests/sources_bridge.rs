@@ -451,3 +451,41 @@ fn real_machine_scan() {
     println!("Tempo total: {:.3} s", before.elapsed().as_secs_f64());
     assert!(report.error.is_none(), "{:?}", report.error);
 }
+
+#[test]
+fn a_new_scan_uses_the_stores_disabled_after_opening() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = Core::open_with_sources(
+        DataPaths::at(dir.path()),
+        Platform::simulated(),
+        false,
+        vec![Box::new(Stub(
+            GameStore::Gog,
+            LibraryScan {
+                games: vec![game("gog:1", GameStore::Gog)],
+                ..Default::default()
+            },
+        ))],
+    )
+    .unwrap();
+    let mut app = AppService::with_core("test", core);
+    assert!(finish(&mut app).sources[0].enabled);
+
+    let set = wire(
+        &mut app,
+        json!({"v":1,"id":1,"name":"settings.set","payload":{"key":"DisabledStores","value":"gog"}}),
+    );
+    assert_eq!(set["ok"], true, "{set}");
+    let scan = wire(&mut app, json!({"v":1,"id":2,"name":"library.scan"}));
+    assert_eq!(scan["ok"], true, "{scan}");
+
+    let state = finish(&mut app);
+    assert!(!state.sources[0].enabled);
+    assert_eq!(
+        wire(
+            &mut app,
+            json!({"v":1,"id":3,"name":"library.list","payload":{}})
+        )["reply"]["data"]["total"],
+        0
+    );
+}
