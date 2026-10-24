@@ -1212,6 +1212,11 @@ fn desktop_snapshot() {
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         shell.show_overview();
+        // `TAKO_SNAP_RICH=1`: sessões de demonstração, e na página do jogo trailer, captura e recursos (o resto da
+        // página só aparece com dado).
+        if std::env::var("TAKO_SNAP_RICH").is_ok() {
+            crate::demo::sessions(&mut shell.ctx);
+        }
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("sunshine-preview") => {
                 shell.open_route("settings");
@@ -1846,6 +1851,25 @@ created-by-tako = true
                     && std::env::var("TAKO_SNAP_BRIGHT").is_ok()
                 {
                     s.set_field("bright".into(), Value::Bool(true));
+                }
+                if std::env::var("TAKO_SNAP_RICH").is_ok() {
+                    match (*name, &mut value) {
+                        ("desk-game", Value::Struct(s)) => {
+                            s.set_field("trailer".into(), Value::Bool(true));
+                        }
+                        ("desk-page", Value::Struct(s)) => {
+                            if let Some((art, ..)) = art {
+                                s.set_field(
+                                    "shots".into(),
+                                    crate::values::model(vec![Value::Image(art.clone())]),
+                                );
+                            }
+                            let modes = ["Um jogador", "Cooperativo", "Online"];
+                            let features = modes.iter().map(|m| Value::String((*m).into()));
+                            s.set_field("features".into(), crate::values::model(features.collect()));
+                        }
+                        _ => {}
+                    }
                 }
                 // `TAKO_SNAP_ABOUT=<n>`: n parágrafos no Sobre da página do jogo (a rolagem e os dados fixos).
                 if let ("desk-page", Value::Struct(s)) = (*name, &mut value)

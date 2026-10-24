@@ -10,8 +10,8 @@ use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, bar, details, dialogs, keys, sidebar, smart, tiles,
 };
 use crate::model::{
-    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskOverview, DeskPage, Hint,
-    NavItem, PanelRow,
+    DeskBlock, DeskCategory, DeskEntry, DeskGame, DeskGameView, DeskInfo, DeskOverview, DeskPage,
+    Hint, NavItem, PanelRow,
 };
 use crate::values::parse_color;
 use std::cell::RefCell;
@@ -401,6 +401,8 @@ pub struct DesktopLibrary {
     page_scroll: f32,
     /// Onde o tema diz que a página está (0 topo, 1 no meio, 2 no fim): ↑ no topo sai do corpo e ↓ no fim não rola.
     page_edge: usize,
+    /// Os jogos da fileira Parecidos da página (o tema avisa o clique pelo índice).
+    similar: Vec<String>,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
     /// Visão geral (TelaBiblioteca) no lugar do destaque do jogo: o primeiro lugar da biblioteca; escolher um jogo sai
@@ -448,6 +450,7 @@ impl DesktopLibrary {
             hero_wait: None,
             page_scroll: 0.,
             page_edge: 0,
+            similar: Vec::new(),
             group_focus: None,
             overview: true,
         }
@@ -1463,6 +1466,89 @@ fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     .collect()
 }
 
+/// CartaoSessoes: as 5 últimas sessões (dia, horário e duração; a aberta leva o ponto verde) e os números delas
+/// (quantas e a média). Sem sessão registrada, nada.
+fn sessions_blocks(ctx: &Ctx, g: &Game) -> (Vec<DeskInfo>, Vec<DeskInfo>) {
+    let lang = ctx.lang();
+    let all = ctx.library.sessions(&g.id);
+    if all.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+    let total: std::time::Duration = all.iter().map(|s| s.duration).sum();
+    let numbers = vec![
+        DeskInfo {
+            icon: "clock".into(),
+            label: ctx.t("desktop.sessions.title"),
+            value: all.len().to_string(),
+            ..Default::default()
+        },
+        DeskInfo {
+            icon: "gauge".into(),
+            label: ctx.t("desktop.page.average"),
+            value: game_text::play_time(lang, total / all.len() as u32),
+            ..Default::default()
+        },
+    ];
+    let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
+    let now = running.then(|| DeskInfo {
+        label: ctx.t("desktop.day.today"),
+        detail: ctx.t("desktop.strip.playing_now"),
+        dot: true,
+        ..Default::default()
+    });
+    let rows = now
+        .into_iter()
+        .chain(all.iter().rev().map(|s| {
+            let start = s.started_at.with_timezone(&chrono::Local);
+            let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
+            DeskInfo {
+                label: day(ctx, start),
+                detail: format!("{} – {}", start.format("%H:%M"), end.format("%H:%M")),
+                value: game_text::play_time(lang, s.duration),
+                ..Default::default()
+            }
+        }))
+        .take(5)
+        .collect();
+    (rows, numbers)
+}
+
+/// Parecidos: até 8 jogos da biblioteca com gênero ou desenvolvedora em comum (a desenvolvedora pesa mais), cada um
+/// com o motivo. Só dado real: sem nenhum em comum, a fileira some.
+fn similar_games<'a>(games: &'a [Game], g: &Game) -> Vec<(&'a Game, String)> {
+    let genres: std::collections::BTreeSet<String> =
+        g.genres.iter().map(|x| x.to_lowercase()).collect();
+    let dev = g
+        .developer
+        .as_deref()
+        .map(str::to_lowercase)
+        .filter(|d| !d.is_empty());
+    let mut found: Vec<(usize, &Game, String)> = games
+        .iter()
+        .filter(|o| o.id != g.id)
+        .filter_map(|o| {
+            let shared: Vec<&String> = o
+                .genres
+                .iter()
+                .filter(|x| genres.contains(&x.to_lowercase()))
+                .collect();
+            let same_dev = dev.is_some() && o.developer.as_deref().map(str::to_lowercase) == dev;
+            let why = if same_dev {
+                o.developer.clone()?
+            } else {
+                (*shared.first()?).clone()
+            };
+            Some((shared.len() + if same_dev { 2 } else { 0 }, o, why))
+        })
+        .collect();
+    found.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.title.cmp(&b.1.title)));
+    found
+        .into_iter()
+        .take(8)
+        .map(|(_, o, why)| (o, why))
+        .collect()
+}
+
 /// CartaoSobre: os parágrafos da descrição. É dado externo: no máximo 24 parágrafos e 6000 caracteres.
 fn paragraphs(description: &str) -> Vec<String> {
     let mut left = 6000;
@@ -1912,6 +1998,12 @@ impl Page for DesktopLibrary {
                 }
             }
             "rescan" => rescan(ctx),
+            // Parecidos: um clique abre a página do jogo.
+            "similar" => {
+                if let Some(id) = self.similar.get(index).cloned() {
+                    self.open_game(&id, ctx);
+                }
+            }
             // O ← e a trilha "Biblioteca" da barra fina da página do jogo: voltam à Visão geral.
             "game-back" => {
                 if self.tab == Tab::Collections {
@@ -2521,6 +2613,9 @@ impl Page for DesktopLibrary {
                 let logo = tiles::image(g.shown_logo(), tiles::LOGO);
                 let show_logo = show_logo(ctx, g, &logo, &art_lum);
                 let title_pending = title_pending(ctx, g, &logo, &art_lum);
+                let (sessions, numbers) = sessions_blocks(ctx, g);
+                let similar = similar_games(ctx.library.games(), g);
+                self.similar = similar.iter().map(|(o, _)| o.id.clone()).collect();
                 let page = DeskPage {
                     id: g.id.clone(),
                     cover: tiles::image(g.shown_cover(), THUMB),
@@ -2530,6 +2625,12 @@ impl Page for DesktopLibrary {
                         "desktop.about",
                         "desktop.details",
                         "desktop.install.more",
+                        "desktop.page.images",
+                        "desktop.trailer",
+                        "desktop.page.features",
+                        "desktop.sessions.title",
+                        "desktop.sessions.see_all",
+                        "desktop.page.similar",
                     ]
                     .iter()
                     .map(|k| ctx.t(k))
@@ -2537,6 +2638,27 @@ impl Page for DesktopLibrary {
                     about: paragraphs(&g.description),
                     on: running || (g.is_installed && !g.is_broken),
                     bright: overview::bright(&art_lum),
+                    // A captura só decodifica na miniatura da página (276 × 156, 2× para telas densas).
+                    shots: g
+                        .media
+                        .get(tako_core::library::media::SCREENSHOT)
+                        .map(|uri| vec![tiles::image(Some(uri), (552, 312))])
+                        .unwrap_or_default(),
+                    features: g.game_modes.iter().take(8).cloned().collect(),
+                    sessions,
+                    numbers,
+                    similar: similar
+                        .iter()
+                        .map(|(o, why)| DeskEntry {
+                            id: o.id.clone(),
+                            title: o.title.clone(),
+                            detail: why.clone(),
+                            thumb: tiles::image(o.shown_cover(), tiles::COVER),
+                            accent: parse_color(&o.accent),
+                            dot: o.is_favorite,
+                            ..Default::default()
+                        })
+                        .collect(),
                 };
                 (
                     DeskGameView {
@@ -3170,6 +3292,80 @@ mod tests {
             assert!(shell.has_layers());
             shell.close_layers();
         }
+    }
+
+    #[test]
+    fn similar_games_share_a_genre_or_the_developer_and_never_the_game_itself() {
+        let game = |id: &str, genres: &[&str], dev: Option<&str>| Game {
+            id: id.into(),
+            title: id.into(),
+            genres: genres.iter().map(|g| (*g).to_owned()).collect(),
+            developer: dev.map(Into::into),
+            ..Game::default()
+        };
+        let me = game("me", &["Ação", "RPG"], Some("Estúdio X"));
+        let all = [
+            me.clone(),
+            game("a-genero", &["ação"], None),
+            game("b-dois-generos", &["RPG", "Ação"], None),
+            game("c-estudio", &["Corrida"], Some("estúdio x")),
+            game("d-nada", &["Corrida"], Some("Outro")),
+            game("e-sem-dado", &[], None),
+        ];
+        let found: Vec<(&str, &str)> = similar_games(&all, &me)
+            .into_iter()
+            .map(|(g, why)| (g.id.as_str(), why.leak() as &str))
+            .collect();
+        // A desenvolvedora pesa 2; dois gêneros também; o de um gênero vem por último; ninguém sem nada em comum.
+        assert_eq!(
+            found,
+            [
+                ("b-dois-generos", "RPG"),
+                ("c-estudio", "estúdio x"),
+                ("a-genero", "ação")
+            ]
+        );
+        assert!(similar_games(&all[4..], &me).is_empty());
+        // No máximo 8.
+        let many: Vec<Game> = (0..20)
+            .map(|i| game(&format!("g{i:02}"), &["Ação"], None))
+            .collect();
+        assert_eq!(similar_games(&many, &me).len(), 8);
+    }
+
+    #[test]
+    fn the_page_shows_sessions_numbers_and_similar_games_only_with_data() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let page = |shell: &mut Shell| {
+            let out = shell.render(std::time::Instant::now());
+            out.props.into_iter().find_map(|(n, v)| match (n, v) {
+                ("desk-page", slint_interpreter::Value::Struct(s)) => Some(s),
+                _ => None,
+            })
+        };
+        let len = |s: &slint_interpreter::Struct, field: &str| match s.get_field(field) {
+            Some(slint_interpreter::Value::Model(m)) => slint::Model::row_count(m),
+            _ => 0,
+        };
+        shell.click("game", 0);
+        let before = page(&mut shell).unwrap();
+        assert_eq!(len(&before, "sessions"), 0);
+        assert_eq!(len(&before, "numbers"), 0);
+        assert_eq!(len(&before, "shots"), 0);
+        // A fixture tem jogos do mesmo gênero: os parecidos vêm da biblioteca, e o clique abre o jogo.
+        assert!(len(&before, "similar") > 0);
+        crate::demo::sessions(&mut shell.ctx);
+        let after = page(&mut shell).unwrap();
+        assert_eq!(len(&after, "numbers"), 2);
+        assert!(len(&after, "sessions") > 0);
+        let first = shell.ctx.library.games()[0].id.clone();
+        shell.click("similar", 0);
+        assert_ne!(
+            page(&mut shell).and_then(|s| s.get_field("id").cloned()),
+            Some(slint_interpreter::Value::String(first.into()))
+        );
     }
 
     #[test]

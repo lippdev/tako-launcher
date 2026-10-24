@@ -195,6 +195,9 @@ restore = "Restaurar"
 close = "Fechar"
 
 [desktop.page]
+average = "Média por sessão"
+features = "Recursos"
+similar = "Parecidos"
 back = "Voltar"
 images = "Imagens"
 publisher = "Publicadora"

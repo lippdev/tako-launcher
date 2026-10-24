@@ -195,6 +195,9 @@ restore = "Restore"
 close = "Close"
 
 [desktop.page]
+average = "Average session"
+features = "Features"
+similar = "Similar games"
 back = "Back"
 images = "Images"
 publisher = "Publisher"

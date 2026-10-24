@@ -3,14 +3,15 @@
 // rola, com o conteúdo à esquerda e os dados à direita (fixos). Só tokens `Ui.*`; o Tako entrega o estado pronto e aqui se
 // desenha e se avisa cliques.
 import { Ui } from "tokens.slint";
-import { DeskIcon, FocusRing, Tip, DeskGameView, DeskInfo } from "desk-parts.slint";
-import { BotaoDesktop, BarraDeDados } from "desk-overview.slint";
+import { DeskIcon, FocusRing, Tip, DeskGameView, DeskInfo, DeskEntry } from "desk-parts.slint";
+import { BotaoDesktop, BarraDeDados, GrupoDeBlocos, Bloco, CapaDoJogo } from "desk-overview.slint";
 import { PanelRow } from "widgets.slint";
 
 // O que a página tem além do `DeskGameView` do destaque: o id (a página volta ao topo quando o jogo muda), a capa da
-// barra fina, os textos (Voltar, Biblioteca, Sobre, Detalhes, Escolher a loja), os parágrafos do Sobre e o ponto verde
-// da situação (instalado ou jogando) e se a arte é clara (pede mais escurecimento).
-export struct DeskPage { id: string, cover: image, labels: [string], about: [string], on: bool, bright: bool }
+// barra fina, os textos (Voltar, Biblioteca, Sobre, Detalhes, Escolher a loja, Imagens, Trailer, Recursos, Sessões, Ver
+// todas, Parecidos), os parágrafos do Sobre, o ponto verde da situação (instalado ou jogando), se a arte é clara (pede
+// mais escurecimento) e o que só aparece com dado: capturas, recursos, sessões com os números delas e os parecidos.
+export struct DeskPage { id: string, cover: image, labels: [string], about: [string], on: bool, bright: bool, shots: [image], features: [string], sessions: [DeskInfo], numbers: [DeskInfo], similar: [DeskEntry] }
 
 // A arte cobrindo o retângulo, ancorada a 20% do topo e centrada na largura (a ancoragem do FundoDoJogo).
 component ArteCobrindo inherits Rectangle {
@@ -156,6 +157,7 @@ component LinhaDeDado inherits Rectangle {
         padding-right: 12px;
         spacing: 12px;
         Text { text: info.label.to-uppercase(); color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.03 * self.font-size; vertical-alignment: center; }
+        if info.detail != "": Text { text: info.detail; color: Ui.desk-on-muted; font-size: 12.5px * Ui.text-scale; vertical-alignment: center; }
         Rectangle {
             horizontal-stretch: 1;
             HorizontalLayout {
@@ -166,6 +168,63 @@ component LinhaDeDado inherits Rectangle {
             }
             vta := TouchArea { }
             Tip { text: vt.preferred-width > vt.width ? info.value : ""; hovering: vta.has-hover; }
+        }
+    }
+}
+
+// CartaoTrailer: a miniatura parada (a arte a 60% de brilho) com o ▶ de 54, que cresce no hover; o trailer só toca ao clicar.
+component CartaoTrailer inherits Rectangle {
+    in property <image> art;
+    in property <string> label;
+    callback clicked();
+    border-radius: 12px;
+    clip: true;
+    background: Ui.tile;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    ArteCobrindo { source: art; }
+    Rectangle { background: Colors.black.with-alpha(0.4); }
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 54px;
+        height: 54px;
+        border-radius: 27px;
+        background: Colors.black.with-alpha(ta.has-hover ? 0.75 : 0.55);
+        transform-scale: ta.has-hover ? 1.12 : 1;
+        animate transform-scale, background { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
+        DeskIcon { name: "play"; size: 20px; tint: Colors.white; }
+    }
+    Rectangle { border-radius: 12px; border-width: 1px; border-color: Ui.line; }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+    Tip { text: label; hovering: ta.has-hover; }
+}
+
+// Recursos: os modos de jogo em duas colunas, com ícone.
+component Recursos inherits Rectangle {
+    in property <string> title;
+    in property <[string]> items;
+    property <length> cell-w: (root.width - 10px) / 2;
+    height: 30px + ceil(items.length / 2) * 60px - 10px;
+    Text { x: 0; y: 0; text: title.to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; }
+    for it[i] in items: Rectangle {
+        x: mod(i, 2) * (root.cell-w + 10px);
+        y: 30px + floor(i / 2) * 60px;
+        width: root.cell-w;
+        height: 50px;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Ui.line;
+        background: Ui.group;
+        accessible-role: text;
+        accessible-label: it;
+        HorizontalLayout {
+            padding-left: 14px;
+            padding-right: 14px;
+            spacing: 12px;
+            VerticalLayout { alignment: center; DeskIcon { name: "gamepad"; size: 18px; tint: Ui.desk-on-muted; } }
+            Text { text: it; color: Ui.desk-text; font-size: 13.5px * Ui.text-scale; vertical-alignment: center; overflow: elide; }
         }
     }
 }
@@ -202,11 +261,16 @@ export component PaginaDoJogo inherits Rectangle {
     property <length> right-w: two-col ? root.width - 2 * pad - gap - left-w : root.width - 2 * pad;
     property <length> body-y: hero-h + 14px;
     property <length> body-h: two-col ? max(lc.preferred-height, rc.preferred-height) : lc.preferred-height + (rc.preferred-height > 0 ? gap + rc.preferred-height : 0);
+    property <length> trailer-h: min(368px, left-w * 9 / 16);
     // Coluna da identidade (a Visão geral usa a mesma conta, 40% da largura), nunca mais estreita que a fileira de ações:
     // senão o primário sai cortado na janela pequena e com o texto a 125%. Também diz quantos itens da barra de dados cabem.
     property <length> col-w: max(clamp(240px, root.width * 0.4, 520px), ar.preferred-width);
     property <int> data-limit: max(1, min(3, floor((root.width - 2 * pad - col-w - 32px) / 190px)));
-    property <length> content-h: root.body-y + root.body-h + Ui.space-48;
+    // Parecidos: uma fileira de capas de 150 no fim, com o título; só com dado.
+    property <length> cover-w: 150px;
+    property <length> similar-h: page.similar.length > 0 ? 48px + 34px + 14px + cover-w * 1.5 + 58px : 0px;
+    property <int> similar-n: max(1, floor((root.width - 2 * pad + 16px) / (cover-w + 16px)));
+    property <length> content-h: root.body-y + root.body-h + similar-h + Ui.space-48;
     property <length> scroll-max: max(0px, content-h - root.height);
     function scroll-to(y: length) { scrolled = max(0px, min(scroll-max, y)); }
     property <float> last-page;
@@ -400,8 +464,30 @@ export component PaginaDoJogo inherits Rectangle {
             y: root.body-y;
             width: root.left-w;
             height: self.preferred-height;
-            spacing: 18px;
+            spacing: 14px;
+            if game.trailer: CartaoTrailer {
+                height: root.trailer-h;
+                art: root.art;
+                label: page.labels[6];
+                clicked => { root.clicked("trailer", 0); }
+            }
+            if page.shots.length > 0: HorizontalLayout {
+                height: 156px;
+                spacing: 14px;
+                alignment: start;
+                for shot in page.shots: Rectangle {
+                    width: 276px;
+                    border-radius: 10px;
+                    clip: true;
+                    background: Ui.tile;
+                    accessible-role: image;
+                    accessible-label: page.labels[5];
+                    Image { width: parent.width; height: parent.height; source: shot; image-fit: cover; }
+                    Rectangle { border-radius: 10px; border-width: 1px; border-color: Ui.line; }
+                }
+            }
             if page.about.length > 0: VerticalLayout {
+                padding-top: game.trailer || page.shots.length > 0 ? 34px : 0px;
                 spacing: 8px;
                 Text { text: page.labels[2].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; }
                 // O layout não mede o texto quebrado: cada parágrafo tem a altura que o texto pede na largura da coluna.
@@ -409,6 +495,10 @@ export component PaginaDoJogo inherits Rectangle {
                     height: pt.preferred-height;
                     pt := Text { width: parent.width; text: p; color: Ui.desk-on-muted; font-size: 13px * Ui.text-scale; line-height-factor: 1.65; wrap: word-wrap; }
                 }
+            }
+            if page.features.length > 0: Recursos {
+                title: page.labels[7];
+                items: page.features;
             }
         }
         rc := VerticalLayout {
@@ -436,6 +526,64 @@ export component PaginaDoJogo inherits Rectangle {
                     }
                     for d[i] in details: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
                 }
+            }
+            // Sessões: as últimas, com "Ver todas ›" para o histórico do Perfil. Só com sessões registradas.
+            if page.sessions.length > 0: Rectangle {
+                height: sx.preferred-height;
+                border-radius: Ui.radius-card;
+                border-width: 1px;
+                border-color: Ui.line-strong;
+                background: Ui.group;
+                sx := VerticalLayout {
+                    padding: Ui.space-6;
+                    HorizontalLayout {
+                        height: 44px;
+                        padding-left: 12px;
+                        Text { text: page.labels[8].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
+                        Rectangle {
+                            width: sl.preferred-width + 16px;
+                            border-radius: Ui.radius-control;
+                            background: sta.has-hover ? Ui.glass-hover : transparent;
+                            accessible-role: button;
+                            accessible-label: page.labels[9];
+                            accessible-action-default => { root.clicked("sessions", 0); }
+                            sl := HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+                                Text { text: page.labels[9]; color: Ui.desk-on-muted; font-size: 12.5px * Ui.text-scale; vertical-alignment: center; }
+                                VerticalLayout { alignment: center; DeskIcon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; } }
+                            }
+                            sta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("sessions", 0); } }
+                        }
+                    }
+                    for d[i] in page.sessions: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
+                }
+            }
+            // Números das sessões (só com sessões): quantas e a média de cada uma.
+            if page.numbers.length > 0: GrupoDeBlocos {
+                height: Ui.tile-value-height + Ui.tile-label-height + 2 * Ui.space-6 + 2px;
+                for n in page.numbers: Bloco { value: n.value; label: n.label; icon: n.icon; }
+            }
+        }
+        // Parecidos: jogos da biblioteca com gênero ou desenvolvedora em comum; um toque abre a página deles.
+        if page.similar.length > 0: Rectangle {
+            x: root.pad;
+            y: root.body-y + root.body-h + 48px;
+            width: root.width - 2 * root.pad;
+            height: root.similar-h - 48px;
+            Text { x: 0; y: 0; width: parent.width; text: page.labels[10]; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 19px * Ui.text-scale; font-weight: 700; height: 34px; vertical-alignment: top; }
+            for c[i] in page.similar: CapaDoJogo {
+                visible: i < root.similar-n;
+                x: i * (root.cover-w + 16px);
+                y: 34px + 14px;
+                width: root.cover-w;
+                art: c.thumb;
+                name: c.title;
+                label: c.detail;
+                accent: c.accent;
+                favorite: c.dot;
+                clicked => { root.clicked("similar", i); }
+                played => { root.clicked("similar", i); }
             }
         }
     }

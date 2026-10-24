@@ -334,6 +334,13 @@ theme_struct! {
         pub about: Vec<String>,
         pub on: bool,
         pub bright: bool,
+        // O que só aparece com dado: capturas, recursos (modos de jogo), as últimas sessões com os números delas e os
+        // jogos parecidos (gênero ou desenvolvedora em comum).
+        pub shots: Vec<Image>,
+        pub features: Vec<String>,
+        pub sessions: Vec<DeskInfo>,
+        pub numbers: Vec<DeskInfo>,
+        pub similar: Vec<DeskEntry>,
     }
 }
 
