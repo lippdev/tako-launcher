@@ -1,0 +1,241 @@
+/* PerfilSessoes (README do PerfilSessoes e preview.html): período em seletor segmentado,
+   jogo em seletor e total à direita; a lista agrupada por dia com linhas no padrão
+   de Precisa de atenção: capa 40×52 raio 7, jogo, início – fim, como terminou e duração.
+   Sem dado, o bloco some. Animações apenas em transform e opacity. */
+
+.container {
+  /* Medidas de PerfilSessoes (README do PerfilSessoes e preview.html) */
+  --sessoes-capa-largura: 40px;
+  --sessoes-capa-altura: 52px;
+  --sessoes-capa-raio: 7px;
+  --sessoes-linha-padding: 10px 10px 10px 12px;
+  --sessoes-linha-raio: 14px;
+  --sessoes-linha-gap: 14px;
+  --sessoes-ponto-tamanho: 8px;
+  --sessoes-barra-gap: 10px;
+  --sessoes-grupo-espaco: 20px;
+  --sessoes-cabecalho-margem: 22px 4px 10px;
+  --sessoes-icone-alerta: 14px;
+  --sessoes-duracao-largura: 84px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  width: 100%;
+}
+
+/* Bloco opcional de estatísticas da semana em barras */
+.semanaBloco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* Barra superior com seletor de período, seletor de jogo e resumo à direita */
+.barraFiltros {
+  display: flex;
+  align-items: center;
+  gap: var(--sessoes-barra-gap);
+  flex-wrap: wrap;
+}
+
+.resumo {
+  margin-left: auto;
+  font-family: var(--font-text);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Grupos de sessões */
+.grupo {
+  display: flex;
+  flex-direction: column;
+}
+
+.grupoCabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: var(--sessoes-cabecalho-margem);
+}
+
+.grupoTituloArea {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+}
+
+.grupoTitulo {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.grupoSubtitulo {
+  font-family: var(--font-text);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.grupoTotal {
+  font-family: var(--font-text);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* Lista de linhas do grupo (padrão att-row) */
+.linhasLista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: var(--sessoes-linha-gap);
+  padding: var(--sessoes-linha-padding);
+  border: 1px solid var(--line);
+  border-radius: var(--sessoes-linha-raio);
+  background: var(--surface);
+  transition:
+    background var(--tempo-hover) var(--curva-entrada),
+    border-color var(--tempo-hover) var(--curva-entrada);
+}
+
+.linhaClicavel {
+  cursor: pointer;
+}
+
+.linhaClicavel:hover {
+  background: var(--surface-raised);
+  border-color: var(--line-strong);
+}
+
+/* Capa miniatura 40×52 com raio 7 */
+.capaMiniatura {
+  flex-shrink: 0;
+  width: var(--sessoes-capa-largura);
+  height: var(--sessoes-capa-altura);
+  border-radius: var(--sessoes-capa-raio);
+  overflow: hidden;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+}
+
+.capaImagem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.capaPlaceholder {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2px;
+  word-break: break-word;
+}
+
+/* Informações da sessão (miolo) */
+.info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jogoTitulo {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detalhesLinha {
+  font-family: var(--font-text);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.separadorPonto {
+  color: var(--line-strong);
+}
+
+/* Indicadores de status */
+.pontoJogando {
+  width: var(--sessoes-ponto-tamanho);
+  height: var(--sessoes-ponto-tamanho);
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.statusTextoJogando {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  color: var(--text);
+}
+
+.iconeAlerta {
+  display: inline-flex;
+  align-items: center;
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.linkRelatorio {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: var(--font-text);
+  font-size: 12.5px;
+  color: var(--text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linkRelatorio:hover {
+  color: var(--accent);
+}
+
+/* Duração à direita */
+.duracao {
+  flex-shrink: 0;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: right;
+  min-width: var(--sessoes-duracao-largura);
+}
+
+/* Mensagem de vazio */
+.vazio {
+  padding: var(--space-24);
+  text-align: center;
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--sessoes-linha-raio);
+}

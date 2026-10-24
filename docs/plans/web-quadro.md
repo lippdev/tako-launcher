@@ -9,7 +9,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-02b, WEB-05a |
-| Antigravity | `antigravity` | WEB-04h, WEB-04i (conferir tudo que ele entrega) |
+| Antigravity | `antigravity` | livre (conferir tudo que ele entrega) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
 | Codex Alyx Medical | `codex_alyx_medical` | sem limite; reset às ~20:52 |
@@ -43,8 +43,8 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-06b | **Idiomas, migração:** textos do `strings.ts` e das telas para os catálogos `locales/` (chaves novas nos dois idiomas) | N2 | a definir | WEB-06a e telas estáveis | `web/src/`, `crates/tako-core/locales/` | fila |
 | WEB-01e | **Downloads pela ponte:** `downloads.list/summary/pause/resume/cancel/sources/add` e `downloads.changed`, ligando o gerenciador que já existe no `tako-core`; desligado por padrão (ADR-0028) | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-01a | `crates/tako-app/` | integrada |
 | WEB-04g | **CampoDeTexto e SeletorDeImagens** (componentes; ligar no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | integrada (aguarda validação visual) |
-| WEB-04h | **ConfiguracoesDoJogo** (componente; ligar no WEB-12b) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/ConfiguracoesDoJogo/` | despachada |
-| WEB-04i | **PerfilSessoes, PerfilColecoes, PerfilFamilia** (componentes; tela do perfil no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/Perfil*/` | despachada |
+| WEB-04h | **ConfiguracoesDoJogo** (componente; ligar no WEB-12b) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/ConfiguracoesDoJogo/` | integrada (aguarda validação visual) |
+| WEB-04i | **PerfilSessoes, PerfilColecoes, PerfilFamilia** (componentes; tela do perfil no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/Perfil*/` | integrada (aguarda validação visual) |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | despachada |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
