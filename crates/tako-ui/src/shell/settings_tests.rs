@@ -908,21 +908,25 @@ fn liquid_glass_slider_uses_five_point_arrows_and_ten_with_shift() {
     let (_d, mut ctx) = ctx();
     ctx.desktop = true;
     ctx.settings.set("DesktopTheme", "glass");
-    let adjust = find(&rows_of(&ctx, "theme"), "glass-opacity")
+    let adjust = find(&super::desk_theme::rows(&ctx), "glass-opacity")
         .adjust
         .unwrap();
     let _ = adjust(&mut ctx, 1);
     assert_eq!(
-        find(&rows_of(&ctx, "theme"), "glass-opacity").row.value,
+        find(&super::desk_theme::rows(&ctx), "glass-opacity")
+            .row
+            .value,
         "33"
     );
-    let _ = find(&rows_of(&ctx, "theme"), "glass-opacity").slide_key(
+    let _ = find(&super::desk_theme::rows(&ctx), "glass-opacity").slide_key(
         &RIGHT.to_string(),
         true,
         &mut ctx,
     );
     assert_eq!(
-        find(&rows_of(&ctx, "theme"), "glass-opacity").row.value,
+        find(&super::desk_theme::rows(&ctx), "glass-opacity")
+            .row
+            .value,
         "43"
     );
 }
