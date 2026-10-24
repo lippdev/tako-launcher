@@ -667,7 +667,8 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
 }
 
 /// Captura da janela desktop para conferir com as prévias do design: `TAKO_SNAP_OUT=<pasta>` (obrigatório),
-/// `TAKO_SNAP_ART=<imagem>` (arte do jogo em foco), `TAKO_SNAP_PAGE=settings` e `TAKO_SNAP_CLICK` (opcionais).
+/// `TAKO_SNAP_ART=<imagem>` (arte do jogo em foco, e do destaque da Visão geral, com `TAKO_SNAP_LOGO`, `TAKO_SNAP_COVER`,
+/// `TAKO_SNAP_BRIGHT` e `TAKO_SNAP_LOADING`), `TAKO_SNAP_PAGE=settings` e `TAKO_SNAP_CLICK` (opcionais).
 /// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
 /// TelaCarregamento: `TAKO_SNAP_OUT=<pasta>` grava `splash-<progresso>.png` (440 × 600) para cada valor de
 /// `TAKO_SNAP_PROGRESS` (padrão `-1,0.42,1`; negativo = barra indeterminada), depois dos tentáculos assentarem.
@@ -1026,6 +1027,7 @@ fn desktop_snapshot() {
         }
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
+        shell.show_overview();
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("sunshine-preview") => {
                 shell.open_route("settings");
@@ -1587,6 +1589,49 @@ created-by-tako = true
                     s.set_field("art".into(), Value::Image(art.clone()));
                     s.set_field("art-blur".into(), Value::Image(blur.clone()));
                     s.set_field("art-lum".into(), lum.clone());
+                }
+                // Visão geral: `TAKO_SNAP_ART` e `TAKO_SNAP_LOGO` vão para o destaque dela; `TAKO_SNAP_COVER=<imagem>` vira a
+                // capa de todas as linhas.
+                if let ("desk-overview", Value::Struct(s)) = (*name, &mut value) {
+                    // `TAKO_SNAP_BRIGHT=1`: arte clara no destaque (EstadoArteClara).
+                    if std::env::var("TAKO_SNAP_BRIGHT").is_ok() {
+                        s.set_field("hero-bright".into(), Value::Bool(true));
+                    }
+                    if std::env::var("TAKO_SNAP_LOADING").is_ok() {
+                        s.set_field("loading".into(), Value::Bool(true));
+                        s.set_field("back".into(), crate::values::model(Vec::new()));
+                    }
+                    if let Some(Value::Struct(mut hero)) = s.get_field("hero").cloned() {
+                        if let Some((art, _, _)) = art {
+                            hero.set_field("art".into(), Value::Image(art.clone()));
+                        }
+                        if let Some(p) = std::env::var("TAKO_SNAP_LOGO").ok().filter(|p| !p.is_empty()) {
+                            let logo = to_image(&image::open(p).unwrap().to_rgba8());
+                            hero.set_field("logo".into(), Value::Image(logo));
+                            hero.set_field("show-logo".into(), Value::Bool(true));
+                        }
+                        s.set_field("hero".into(), Value::Struct(hero));
+                    }
+                    if let Some(p) = std::env::var("TAKO_SNAP_COVER").ok().filter(|p| !p.is_empty()) {
+                        let cover = to_image(&image::open(p).unwrap().to_rgba8());
+                        let with_cover = |v: &Value| match v {
+                            Value::Struct(item) => {
+                                let mut item = item.clone();
+                                item.set_field("thumb".into(), Value::Image(cover.clone()));
+                                Value::Struct(item)
+                            }
+                            other => other.clone(),
+                        };
+                        for key in ["back", "attention", "installed"] {
+                            if let Some(Value::Model(m)) = s.get_field(key) {
+                                let items: Vec<Value> = slint::Model::iter(m).map(|v| with_cover(&v)).collect();
+                                s.set_field(key.into(), crate::values::model(items));
+                            }
+                        }
+                        if let Some(best) = s.get_field("best").cloned() {
+                            s.set_field("best".into(), with_cover(&best));
+                        }
+                    }
                 }
                 // `TAKO_SNAP_TITLE` / `TAKO_SNAP_DESC`: textos longos no destaque.
                 if let ("desk-game", Value::Struct(s)) = (*name, &mut value) {

@@ -1,0 +1,648 @@
+// TelaBiblioteca (a Visão geral da biblioteca do desktop) e as peças que as próximas telas reaproveitam: BotaoDesktop,
+// GrupoDeBlocos, barra de dados (CartaoSessoes) e CapaDoJogo. Só tokens `Ui.*`; o Tako entrega o estado pronto
+// (`DeskOverview`) e aqui se desenha e se avisa cliques.
+import { Ui } from "tokens.slint";
+import { DeskIcon, FocusRing, Tip, Skeleton, Ring, DeskGameView, DeskInfo, DeskBar } from "desk-parts.slint";
+
+// Uma linha da Visão geral: jogo de Voltar a jogar, do Jogo da semana, da fileira Instalados ou item de Precisa de
+// atenção. `state`: "" · "busy" (andamento em `progress`) · "error" · "art" · "broken".
+export struct OvItem { id: string, title: string, detail: string, action: string, thumb: image, accent: color, progress: float, state: string, playable: bool }
+
+export struct DeskOverview {
+    on: bool,
+    loading: bool,
+    // Biblioteca sem nenhum jogo (a ListaVazia fica por conta de quem hospeda).
+    empty: bool,
+    title: string,
+    count: string,
+    // Destaque: o último jogo jogado, a barra de dados, o botão primário e se a arte clara pede mais escurecimento.
+    hero: DeskGameView,
+    // Ponto verde da situação (instalado, jogando).
+    hero-on: bool,
+    hero-bright: bool,
+    strip: [DeskInfo],
+    action: string,
+    action-icon: string,
+    action-enabled: bool,
+    back-title: string,
+    back: [OvItem],
+    week-title: string,
+    week-groups: [[DeskInfo]],
+    bars: [DeskBar],
+    bars-text: string,
+    best: OvItem,
+    attention-title: string,
+    attention-count: string,
+    attention: [OvItem],
+    installed-title: string,
+    installed-count: string,
+    installed: [OvItem],
+    prev-label: string,
+    next-label: string,
+    // Onde está o foco do teclado: "hero", "back", "best", "attention" ou "cover" e o índice dentro dele.
+    focus-kind: string,
+    focus-index: int,
+}
+
+// BotaoDesktop: `primary` (branco com o chip escuro do ícone, um por região), `state` (o primário na cor de estado),
+// `ghost` (secundário: fundo escuro e chip contornado) e `square` (terciário, só o ícone: precisa de `tip`, que vira
+// o nome acessível e a dica). `progress` de 0 a 1 põe a barra de andamento no pé.
+export component BotaoDesktop inherits Rectangle {
+    in property <string> kind: "primary";
+    in property <string> label;
+    in property <string> icon;
+    in property <string> tip;
+    in property <bool> small;
+    in property <bool> focused;
+    in property <bool> enabled: true;
+    in property <bool> on;
+    in property <color> on-tint: Ui.desk-warning;
+    in property <float> progress: -1;
+    callback clicked();
+    property <bool> square: kind == "square";
+    property <bool> solid: kind == "primary" || kind == "state";
+    property <length> chip: small ? Ui.button-chip-sm : Ui.button-chip;
+    property <bool> lit: ta.has-hover && enabled;
+    height: small && !square ? Ui.button-height-sm : Ui.button-height;
+    width: square ? Ui.button-height : row.preferred-width;
+    border-radius: small && !square ? Ui.radius-control : Ui.radius-button;
+    background: kind == "primary" ? (lit ? Colors.white : Ui.primary)
+        : kind == "state" ? (lit ? Ui.desk-accent.mix(Colors.white, 0.88) : Ui.desk-accent)
+        : (lit ? Ui.glass-selected : Ui.group);
+    border-width: 1px;
+    border-color: kind == "primary" ? Colors.white : kind == "state" ? Ui.desk-accent.mix(Colors.white, 0.7) : Ui.line-strong;
+    opacity: enabled ? 1 : 0.6;
+    animate background { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
+    transform-scale: ta.pressed && enabled ? Ui.escala-pressionado : 1;
+    accessible-role: button;
+    accessible-label: label != "" ? label : tip;
+    accessible-enabled: enabled;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
+    // O anel do primário: 3 de branco a 8%, 4 a 14% no hover.
+    if kind == "primary": Rectangle {
+        x: -(lit ? 4px : 3px);
+        y: -(lit ? 4px : 3px);
+        width: root.width + 2 * (lit ? 4px : 3px);
+        height: root.height + 2 * (lit ? 4px : 3px);
+        border-radius: root.border-radius + (lit ? 4px : 3px);
+        border-width: lit ? 4px : 3px;
+        border-color: Ui.primary.with-alpha(lit ? 0.14 : 0.08);
+    }
+    if focused: FocusRing { radius: root.border-radius; background: transparent; }
+    row := HorizontalLayout {
+        visible: !square;
+        padding-left: small ? 14px : 18px;
+        padding-right: 5px;
+        spacing: small ? 14px : 20px;
+        HorizontalLayout {
+            min-width: solid && !small ? 112px : 0px;
+            Text {
+                text: label;
+                color: kind == "primary" ? Ui.on-primary : kind == "state" ? Ui.desk-on-accent : Ui.desk-text;
+                font-family: Ui.font-heading;
+                font-size: (small ? 13px : 14px) * Ui.text-scale;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: chip;
+                height: chip;
+                border-radius: small ? 7px : 8px;
+                background: kind == "primary" ? Ui.primary-chip : kind == "state" ? Colors.black.with-alpha(0.25) : transparent;
+                border-width: kind == "ghost" ? 1px : 0px;
+                border-color: Ui.line-strong;
+                if icon == "ring": Ring { size: 17px; tint: Ui.desk-text; }
+                if icon != "ring": DeskIcon { name: icon; size: 17px; tint: solid ? Ui.desk-text : Ui.desk-on-muted; }
+            }
+        }
+    }
+    if square: DeskIcon {
+        name: icon;
+        size: 19px;
+        tint: on ? on-tint : (lit ? Ui.desk-text : Ui.desk-on-muted);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    if progress >= 0: Rectangle {
+        x: 0;
+        y: parent.height - 3px;
+        width: parent.width * min(1, progress);
+        height: 3px;
+        background: Ui.desk-accent;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Tip { text: square ? tip : ""; hovering: ta.has-hover; }
+}
+
+// GrupoDeBlocos: contorno, calha de 6 e os blocos dentro (a superfície principal do TAKO).
+export component GrupoDeBlocos inherits Rectangle {
+    background: Ui.group;
+    border-radius: Ui.radius-card;
+    border-width: 1px;
+    border-color: Ui.line-strong;
+    HorizontalLayout {
+        padding: Ui.space-6;
+        spacing: Ui.space-6;
+        @children
+    }
+}
+
+// Um bloco do grupo: o valor (Poppins 22/700, com ícone) em cima e o rótulo em caixa alta na faixa de baixo. Com
+// filhos (o gráfico da semana) eles ocupam o lugar do valor.
+export component Bloco inherits Rectangle {
+    in property <string> value;
+    in property <string> icon;
+    in property <string> label;
+    // Leitura do que o filho desenha, para o leitor de tela.
+    in property <string> reading: value;
+    horizontal-stretch: 1;
+    border-radius: Ui.radius-block;
+    background: Ui.tile;
+    border-width: 1px;
+    border-color: Ui.line;
+    clip: true;
+    accessible-role: text;
+    accessible-label: label + ": " + reading;
+    VerticalLayout {
+        Rectangle {
+            height: Ui.tile-value-height;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 7px;
+                if value != "": Text {
+                    text: value;
+                    color: Ui.desk-text;
+                    font-family: Ui.font-heading;
+                    font-size: 22px * Ui.text-scale;
+                    font-weight: 700;
+                    letter-spacing: -0.02 * self.font-size;
+                    vertical-alignment: center;
+                }
+                if value != "" && icon != "": VerticalLayout { alignment: center; DeskIcon { name: icon; size: 19px; tint: Ui.desk-on-muted; } }
+            }
+            @children
+        }
+        Rectangle {
+            height: Ui.tile-label-height;
+            background: Ui.tile-foot;
+            Rectangle { height: 1px; background: Ui.line; }
+            Text {
+                x: 8px;
+                width: parent.width - 16px;
+                text: label.to-uppercase();
+                color: Ui.desk-text-muted;
+                font-size: 12px * Ui.text-scale;
+                font-weight: 700;
+                letter-spacing: 0.03 * self.font-size;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+// Barra de dados do destaque (CartaoSessoes): ícone, rótulo em caixa alta e valor, separados por linhas de 1. A nota do
+// Metacritic leva a etiqueta colorida e o veredito por extenso (a cor nunca sozinha).
+export component BarraDeDados inherits Rectangle {
+    in property <[DeskInfo]> items;
+    // Quantos itens cabem (a janela pequena tira os últimos).
+    in property <int> limit: 3;
+    width: row.preferred-width;
+    height: 44px;
+    row := HorizontalLayout {
+        for it[i] in items: HorizontalLayout {
+            visible: i < limit;
+            spacing: 12px;
+            if i > 0 && i < limit: VerticalLayout { alignment: center; Rectangle { width: 1px; height: 30px; background: Colors.white.with-alpha(0.22); } }
+            if i < limit: HorizontalLayout {
+                padding-left: i > 0 ? 10px : 0px;
+                padding-right: 10px;
+                spacing: 12px;
+                VerticalLayout { alignment: center; DeskIcon { name: it.icon == "metacritic" ? "info" : it.icon; size: 20px; tint: Ui.desk-on-muted; } }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 3px;
+                    Text {
+                        text: it.label.to-uppercase();
+                        color: Ui.desk-on-muted;
+                        font-size: 12px * Ui.text-scale;
+                        font-weight: 700;
+                        letter-spacing: 0.07 * self.font-size;
+                    }
+                    HorizontalLayout {
+                        spacing: 7px;
+                        if it.dot: VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Ui.success; } }
+                        if it.icon == "metacritic": VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 24px;
+                                height: 18px;
+                                border-radius: 4px;
+                                background: it.score >= 75 ? Ui.metacritic-good : (it.score >= 50 ? Ui.metacritic-mixed : Ui.metacritic-bad);
+                                Text {
+                                    text: it.score;
+                                    color: Ui.on-primary;
+                                    font-size: 12px * Ui.text-scale;
+                                    font-weight: 800;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        Text { text: it.value; color: Ui.desk-text; font-size: 15px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// CapaDoJogo: capa 2:3 com zoom de 1,05 no hover (700 ms), brilho de 8% e contorno interno de 6%; embaixo o rótulo pequeno
+// (horas jogadas) e o nome. ★ no canto de quem é favorito. Sem a capa, o nome sobre a cor do jogo.
+export component CapaDoJogo inherits Rectangle {
+    in property <image> art;
+    in property <string> name;
+    in property <string> label;
+    in property <color> accent;
+    in property <bool> favorite;
+    in property <bool> focused;
+    callback clicked();
+    callback played();
+    property <length> cover-h: self.width * 1.5;
+    height: cover-h + 58px;
+    accessible-role: button;
+    accessible-label: label != "" ? name + ", " + label : name;
+    accessible-action-default => { root.clicked(); }
+    Rectangle {
+        width: parent.width;
+        height: root.cover-h;
+        border-radius: Ui.radius-block;
+        clip: true;
+        background: @linear-gradient(160deg, accent.mix(Ui.desk-canvas, 0.6) 0%, accent.mix(Ui.desk-canvas, 0.25) 100%);
+        if art.width == 0: Text {
+            x: 14px;
+            width: parent.width - 28px;
+            text: name;
+            color: Ui.desk-text;
+            font-family: Ui.font-heading;
+            font-size: 18px * Ui.text-scale;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            wrap: word-wrap;
+        }
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: art;
+            image-fit: cover;
+            transform-scale: ta.has-hover ? Ui.escala-capa : 1;
+            animate transform-scale { duration: Ui.tempo-arte - 100ms; easing: Ui.curva-entrada; }
+        }
+        Rectangle { background: ta.has-hover ? Colors.white.with-alpha(0.08) : transparent; animate background { duration: Ui.tempo-hover; } }
+        Rectangle { border-radius: Ui.radius-block; border-width: 1px; border-color: Colors.white.with-alpha(0.06); }
+        if favorite: Rectangle {
+            x: 8px;
+            y: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            background: Ui.desk-canvas.with-alpha(0.6);
+            DeskIcon { name: "starfill"; size: 16px; tint: Ui.desk-warning; }
+        }
+    }
+    if focused: FocusRing { y: 0; height: root.cover-h; radius: Ui.radius-block; background: transparent; }
+    VerticalLayout {
+        y: root.cover-h + 10px;
+        height: 48px;
+        spacing: 3px;
+        Text { text: label.to-uppercase(); color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: 600; letter-spacing: 0.03 * self.font-size; overflow: elide; }
+        Text { text: name; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; overflow: elide; }
+    }
+    ta := TouchArea {
+        height: root.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+        double-clicked => { root.played(); }
+    }
+}
+
+// Destaque da Visão geral (400, raio 18): a arte com zoom de 1,03 no hover (1,2 s), degradês de baixo e da esquerda e,
+// embaixo, os dados à esquerda e a identidade (situação, logo ou nome, descrição) com a ação à direita. Sem arte
+// (EstadoSemArte) vira o degradê da cor do jogo com o nome em texto; arte clara (EstadoArteClara) ganha mais
+// escurecimento, também na direita.
+component Destaque inherits Rectangle {
+    in property <DeskGameView> game;
+    in property <bool> bright;
+    in property <bool> dot;
+    in property <[DeskInfo]> strip;
+    in property <string> action;
+    in property <string> action-icon;
+    in property <bool> action-enabled: true;
+    in property <bool> focused;
+    in property <bool> small;
+    callback open();
+    callback play();
+    height: Ui.hero-height;
+    border-radius: Ui.radius-hero;
+    clip: true;
+    background: Ui.tile;
+    property <bool> has-art: game.art.width > 0;
+    property <bool> text-title: !game.show-logo && !game.title-pending;
+    // A coluna da identidade encolhe com a largura (que vem de fora: a Visão geral a fixa).
+    property <length> col-w: clamp(210px, self.width * 0.38, 340px);
+    // Sem arte: a cor do jogo a 30% sobre o canvas, com o brilho no alto à direita.
+    if !has-art: Rectangle {
+        background: game.accent.mix(Ui.desk-canvas, 0.3);
+        Rectangle {
+            x: parent.width * 0.4;
+            y: -parent.height * 0.6;
+            width: parent.width * 1.2;
+            height: parent.height * 1.6;
+            background: @radial-gradient(circle, game.accent.with-alpha(0.35) 0%, game.accent.with-alpha(0) 65%);
+        }
+    }
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: game.art;
+        image-fit: cover;
+        opacity: has-art ? 1 : 0;
+        animate opacity { duration: Ui.tempo-arte; easing: Ui.curva-entrada; }
+        transform-scale: hero-ta.has-hover ? Ui.escala-destaque : 1;
+        animate transform-scale { duration: Ui.tempo-zoom; easing: Ui.curva-entrada; }
+    }
+    // De baixo: 92% → 30% em 50% → 0 em 75% é quase uma reta; dois pontos evitam a linha que o renderizador de software
+    // desenha no ponto do meio.
+    Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom 0%, Ui.art-scrim-bottom.with-alpha(0) 75%); }
+    Rectangle { background: @linear-gradient(90deg, Ui.art-scrim-left 0%, Ui.art-scrim-left.with-alpha(0) 55%); }
+    if bright: Rectangle { background: @linear-gradient(270deg, Ui.art-scrim-left 0%, Ui.art-scrim-left.with-alpha(0) 55%); }
+    if bright: Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom.with-alpha(0.5) 0%, Ui.art-scrim-bottom.with-alpha(0) 60%); }
+    hero-ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.open(); }
+        accessible-role: button;
+        accessible-label: game.title;
+    }
+    HorizontalLayout {
+        padding-left: 26px;
+        padding-right: 26px;
+        padding-bottom: 24px;
+        padding-top: 24px;
+        spacing: 20px;
+        VerticalLayout {
+            alignment: end;
+            BarraDeDados { items: strip; limit: root.width < 760px ? 1 : (small ? 2 : 3); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        VerticalLayout {
+            width: col-w;
+            alignment: end;
+            spacing: 12px;
+            if game.overline != "": HorizontalLayout {
+                alignment: end;
+                Rectangle {
+                    height: 26px;
+                    width: badge.preferred-width;
+                    border-radius: 7px;
+                    background: Colors.black.with-alpha(0.6);
+                    border-width: 1px;
+                    border-color: Ui.line-strong;
+                    badge := HorizontalLayout {
+                        padding-left: 11px;
+                        padding-right: 11px;
+                        spacing: 7px;
+                        VerticalLayout { alignment: center; Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: dot ? Ui.success : Ui.desk-text-muted; } }
+                        Text { text: game.overline; color: Ui.desk-on-muted; font-size: 12px * Ui.text-scale; font-weight: 800; letter-spacing: 0.08 * self.font-size; vertical-alignment: center; }
+                    }
+                }
+            }
+            if game.show-logo: HorizontalLayout {
+                alignment: end;
+                property <length> src-w: max(1px, game.logo.width * 1px);
+                property <length> src-h: max(1px, game.logo.height * 1px);
+                property <float> fit: min(1, min(col-w / src-w, 100px / src-h));
+                Image {
+                    source: game.logo;
+                    width: parent.src-w * parent.fit;
+                    height: parent.src-h * parent.fit;
+                    image-fit: contain;
+                    accessible-role: image;
+                    accessible-label: game.title;
+                }
+            }
+            if text-title: Text {
+                text: game.title;
+                color: Ui.desk-text;
+                font-family: Ui.font-heading;
+                font-size: 54px * Ui.text-scale;
+                font-weight: 800;
+                letter-spacing: -0.02 * self.font-size;
+                horizontal-alignment: right;
+                wrap: word-wrap;
+                overflow: elide;
+                max-height: 120px;
+            }
+            if game.description != "" && root.width >= 760px: Text {
+                text: game.description;
+                color: Ui.desk-on-muted;
+                font-size: 13.5px * Ui.text-scale;
+                horizontal-alignment: right;
+                wrap: word-wrap;
+                overflow: elide;
+                max-height: 56px;
+            }
+            HorizontalLayout {
+                alignment: end;
+                BotaoDesktop {
+                    label: action;
+                    icon: action-icon;
+                    enabled: action-enabled;
+                    focused: root.focused;
+                    clicked => { root.play(); }
+                }
+            }
+        }
+    }
+}
+
+// Voltar a jogar (300): os jogos seguintes ao do destaque, com capa 46 × 60, quando jogou e quanto, e o ▶ redondo
+// branco nos que estão instalados.
+component VoltarAJogar inherits Rectangle {
+    in property <string> title;
+    in property <[OvItem]> items;
+    in property <string> focus-kind;
+    in property <int> focus-index;
+    in property <bool> focus-visible;
+    in property <string> play-label;
+    // EstadoCarregando: quatro linhas de espera no lugar dos jogos.
+    in property <bool> loading;
+    callback open(int);
+    callback play(int);
+    width: Ui.hero-side-width;
+    border-radius: Ui.radius-hero;
+    background: Ui.surface;
+    border-width: 1px;
+    border-color: Ui.line-strong;
+    VerticalLayout {
+        padding: Ui.space-8;
+        Text {
+            text: title.to-uppercase();
+            color: Ui.desk-text-muted;
+            font-size: 12px * Ui.text-scale;
+            font-weight: 700;
+            letter-spacing: 0.05 * self.font-size;
+            height: 36px;
+            padding-left: 10px;
+            vertical-alignment: center;
+        }
+        if loading: VerticalLayout {
+            for i in 4: HorizontalLayout {
+                height: (Ui.hero-height - 2 * Ui.space-8 - 36px) / 4;
+                padding: Ui.space-8;
+                spacing: 12px;
+                VerticalLayout { alignment: center; Skeleton { width: 46px; height: 60px; radius: 8px; } }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    Skeleton { width: 140px; height: 12px; radius: 6px; }
+                    Skeleton { width: 90px; height: 10px; radius: 5px; }
+                }
+            }
+        }
+        for it[i] in items: Rectangle {
+            // Quatro vagas fixas do tamanho do que cabe (400 menos a margem de 8 e o título de 36).
+            height: (Ui.hero-height - 2 * Ui.space-8 - 36px) / 4;
+            border-radius: 12px;
+            background: row-ta.has-hover ? Ui.glass-hover : transparent;
+            animate background { duration: Ui.tempo-hover; }
+            accessible-role: button;
+            accessible-label: it.title + ", " + it.detail;
+            accessible-action-default => { root.open(i); }
+            if focus-visible && focus-kind == "back" && focus-index == i: FocusRing { radius: 12px; }
+            row-ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.open(i); }
+            }
+            HorizontalLayout {
+                padding: Ui.space-8;
+                spacing: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 46px;
+                        height: 60px;
+                        border-radius: 8px;
+                        clip: true;
+                        background: it.accent.mix(Ui.desk-canvas, 0.4);
+                        Image { width: parent.width; height: parent.height; source: it.thumb; image-fit: cover; }
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 2px;
+                    Text { text: it.title; color: Ui.desk-text; font-size: 13.5px * Ui.text-scale; font-weight: 600; overflow: elide; }
+                    Text { text: it.detail; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; overflow: elide; }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    // Vaga fixa: o ▶ só aparece nos instalados, mas o texto não muda de largura.
+                    if it.playable: Rectangle {
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 15px;
+                        background: Ui.primary;
+                        accessible-role: button;
+                        accessible-label: it.action;
+                        accessible-action-default => { root.play(i); }
+                        DeskIcon { name: "play"; size: 13px; tint: Ui.on-primary; }
+                        Tip { text: it.action; }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.play(i); }
+                        }
+                    }
+                    if !it.playable: Rectangle {
+                        width: 30px;
+                        height: 30px;
+                        opacity: 0;
+                        border-radius: 15px;
+                        accessible-role: none;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A Visão geral: título com a contagem, o Destaque com Voltar a jogar ao lado e, abaixo, as seções, com 40 de margem, 48
+// entre elas e 16 entre colunas. Rola na vertical; `zone` "overview" mostra o foco do teclado.
+export component VisaoGeral inherits Rectangle {
+    in property <DeskOverview> o;
+    in property <bool> focus-visible;
+    in property <bool> small;
+    callback clicked(string, int);
+    property <bool> side: self.width >= 760px && (o.back.length > 0 || o.loading);
+    property <length> hero-w: self.width - (side ? Ui.hero-side-width + Ui.space-16 : 0px);
+    property <bool> focus-on: focus-visible;
+    fl := Flickable {
+        width: parent.width;
+        height: parent.height;
+        viewport-width: parent.width;
+        viewport-height: col.preferred-height;
+        animate viewport-y { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
+        col := VerticalLayout {
+            width: fl.viewport-width;
+            padding-top: 6px;
+            padding-bottom: Ui.space-28;
+            if o.loading || o.hero.has-game: VerticalLayout {
+                spacing: 18px;
+                HorizontalLayout {
+                    height: 30px * Ui.text-scale;
+                    spacing: Ui.space-8;
+                    alignment: start;
+                    Text { text: o.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 26px * Ui.text-scale; font-weight: 800; letter-spacing: -0.4px; vertical-alignment: bottom; }
+                    // A linha de base do título, 4 acima do fundo da caixa do texto menor.
+                    VerticalLayout { alignment: end; padding-bottom: 5px; Text { text: o.count; color: Ui.desk-text-muted; font-size: 13px * Ui.text-scale; } }
+                }
+                HorizontalLayout {
+                    spacing: Ui.space-16;
+                    if o.loading: Skeleton { width: hero-w; radius: Ui.radius-hero; }
+                    if !o.loading: Destaque {
+                        width: hero-w;
+                        game: o.hero;
+                        bright: o.hero-bright;
+                        dot: o.hero-on;
+                        strip: o.strip;
+                        action: o.action;
+                        action-icon: o.action-icon;
+                        action-enabled: o.action-enabled;
+                        focused: focus-visible && o.focus-kind == "hero";
+                        small: root.small;
+                        open => { root.clicked("ov-open-hero", 0); }
+                        play => { root.clicked("ov-play-hero", 0); }
+                    }
+                    if side: VoltarAJogar {
+                        title: o.back-title;
+                        loading: o.loading;
+                        items: o.back;
+                        focus-kind: o.focus-kind;
+                        focus-index: o.focus-index;
+                        focus-visible: root.focus-visible;
+                        open(i) => { root.clicked("ov-back", i); }
+                        play(i) => { root.clicked("ov-back-play", i); }
+                    }
+                }
+            }
+        }
+    }
+}

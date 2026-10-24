@@ -430,6 +430,59 @@ theme_struct! {
 }
 
 theme_struct! {
+    /// TelaBiblioteca: uma linha (Voltar a jogar, Jogo da semana, fileira Instalados ou Precisa de atenção).
+    /// `state`: "", "busy" (andamento em `progress`), "error", "art" ou "broken".
+    pub struct OvItem {
+        pub id: String,
+        pub title: String,
+        pub detail: String,
+        // Rótulo da ação da linha (▶ de Voltar a jogar, botão de Precisa de atenção); vazio = sem ação.
+        pub action: String,
+        pub thumb: Image,
+        pub accent: Color,
+        pub progress: f32,
+        pub state: String,
+        pub playable: bool,
+    }
+}
+
+theme_struct! {
+    /// TelaBiblioteca inteira (a Visão geral da biblioteca do desktop).
+    pub struct DeskOverview {
+        pub on: bool,
+        pub loading: bool,
+        pub empty: bool,
+        pub title: String,
+        pub count: String,
+        pub hero: DeskGameView,
+        pub hero_on: bool,
+        pub hero_bright: bool,
+        pub strip: Vec<DeskInfo>,
+        pub action: String,
+        pub action_icon: String,
+        pub action_enabled: bool,
+        pub back_title: String,
+        pub back: Vec<OvItem>,
+        pub week_title: String,
+        pub week_groups: Vec<Vec<DeskInfo>>,
+        pub bars: Vec<DeskBar>,
+        pub bars_text: String,
+        pub best: OvItem,
+        pub attention_title: String,
+        pub attention_count: String,
+        pub attention: Vec<OvItem>,
+        pub installed_title: String,
+        pub installed_count: String,
+        pub installed: Vec<OvItem>,
+        pub prev_label: String,
+        pub next_label: String,
+        // Foco do teclado: "hero", "back", "best", "attention" ou "cover" e o índice dentro dele.
+        pub focus_kind: String,
+        pub focus_index: i32,
+    }
+}
+
+theme_struct! {
     /// PerfilColecoes: um cartão de coleção (do usuário ou automática).
     pub struct DeskCard {
         pub title: String,

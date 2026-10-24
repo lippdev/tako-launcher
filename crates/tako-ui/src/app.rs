@@ -164,6 +164,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
     }
     let art = crate::art::cache(&paths);
     let profiles = Profiles::load(|k| settings.get(k).map(str::to_owned));
+    let active_profile = tako_core::profiles::Profiles::load(&paths.machine).active();
     let mut ctx = Ctx {
         paths,
         library,
@@ -183,6 +184,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         pad_guid: String::new(),
         pads: Vec::new(),
         profiles,
+        active_profile,
         pads_connected: 0,
         pad_lost: false,
         art_review: Default::default(),
@@ -203,6 +205,7 @@ pub fn build_ctx(paths: DataPaths, platform: Platform, simulate: bool) -> Ctx {
         restoring: false,
         pending_link: None,
         grid_columns: 7,
+        overview_show_back: true,
         pointer: false,
         pending_layer: None,
         open_details: None,
@@ -742,6 +745,7 @@ impl App {
         let mut shell = Shell::new(ctx);
         if mode == UiMode::Desktop {
             shell.enter_desktop();
+            shell.show_overview();
         }
         shell.ctx.pending_link = opts.link.clone();
         if let Some((id, title)) = &opts.running {
@@ -1420,6 +1424,20 @@ impl App {
                     {
                         s.ctx.dirty = true;
                     }
+                    let ui = app.ui.borrow();
+                    let width = ui.window().size().width as f32 / ui.window().scale_factor();
+                    let small = width < 1280.0;
+                    let collapsed = s.ctx.settings.bool("desktop.list_collapsed", false);
+                    let main_width = width
+                        - if small { 40.0 } else { 72.0 }
+                        - if collapsed { 76.0 } else { 292.0 }
+                        - if small { 20.0 } else { 28.0 }
+                        - 4.0;
+                    let show_back = main_width >= 760.0;
+                    if show_back != s.ctx.overview_show_back {
+                        s.ctx.overview_show_back = show_back;
+                        s.ctx.dirty = true;
+                    }
                 }
                 let expired = app.shell.borrow().ctx.toast_expired(Instant::now());
                 if expired {
@@ -1769,6 +1787,15 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     let size = ui.window().size();
     if size.width > 0 && size.height > 0 {
         s.ctx.art_height = crate::shell::tiles::art_height(size.width, size.height);
+        let width = size.width as f32 / ui.window().scale_factor();
+        let small = width < 1280.0;
+        let collapsed = s.ctx.settings.bool("desktop.list_collapsed", false);
+        let main_width = width
+            - if small { 40.0 } else { 72.0 }
+            - if collapsed { 76.0 } else { 292.0 }
+            - if small { 20.0 } else { 28.0 }
+            - 4.0;
+        s.ctx.overview_show_back = main_width >= 760.0;
     }
     if let Ok(Value::Number(n)) = ui.get_property("library-columns") {
         s.ctx.grid_columns = (n as usize).max(1);

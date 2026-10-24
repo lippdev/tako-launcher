@@ -23,6 +23,7 @@ pub mod launch_splash;
 pub mod layer;
 pub mod library;
 mod links;
+mod overview;
 pub mod performance;
 pub mod profile;
 pub mod profiles;
@@ -168,6 +169,15 @@ impl Shell {
         }
         self.pages = vec![Box::new(page)];
         self.ctx.dirty = true;
+    }
+
+    /// A Visão geral da biblioteca desktop, com o foco no destaque: é onde o app abre (a troca vinda da tela cheia
+    /// fica no jogo que estava em foco).
+    pub fn show_overview(&mut self) {
+        if let Some(lib) = self.pages.first_mut().and_then(|p| p.desktop_mut()) {
+            lib.show_overview();
+            self.ctx.dirty = true;
+        }
     }
 
     /// Passa a apresentar na tela cheia: a Início, com o jogo selecionado no desktop em foco.

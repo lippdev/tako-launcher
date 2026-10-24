@@ -261,6 +261,8 @@ pub struct Ctx {
     pub pads: Vec<(String, String)>,
     /// Perfis de botões (INPUT-001), lidos das configurações; mudam só por [`Ctx::save_profiles`].
     pub profiles: Profiles,
+    /// Perfil local ativo; mantém o nome da Visão geral fora do caminho de renderização no disco.
+    pub active_profile: tako_core::profiles::Profile,
     pub pads_connected: usize,
     /// O controle em uso caiu e nenhum outro ficou: o aviso "Controle desconectado" fica na tela.
     pub pad_lost: bool,
@@ -295,6 +297,8 @@ pub struct Ctx {
     pub pending_link: Option<tako_core::links::Link>,
     /// Colunas da grade da biblioteca (o tema calcula pela largura da janela).
     pub grid_columns: usize,
+    /// A coluna lateral da Visão geral só existe quando a janela tem ao menos 760 px lógicos.
+    pub overview_show_back: bool,
     /// Camada que uma página pediu para abrir junto com ela.
     pub pending_layer: Option<Box<dyn super::Layer>>,
     /// Abrir os detalhes deste jogo (pedido de um diálogo).

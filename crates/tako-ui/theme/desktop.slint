@@ -27,9 +27,10 @@ import "fonts/PlusJakartaSans-ExtraBold.ttf";
 import { Ui } from "tokens.slint";
 import { ControlCenter } from "main.slint";
 import { PanelRow, Icon, Toggle } from "widgets.slint";
-import { DeskGlyphs } from "desk-icons.slint";
+import { DeskIcon, FocusRing, Tip, Skeleton, Ring, DeskGameView, DeskInfo, DeskBar, DeskEntry } from "desk-parts.slint";
 import { Octopus } from "polvo.slint";
 import { Overlay, Overline, OverlayView, Tile } from "overlay.slint";
+import { VisaoGeral, DeskOverview } from "desk-overview.slint";
 
 export { Ui }
 
@@ -37,58 +38,12 @@ struct DeskNav { id: string, label: string, icon: string, count: string, section
 struct DeskGame { id: string, title: string, icon: image, initial: string, cover: image, accent: color, favorite: bool, running: bool, installed: bool, store-icon: string, store-name: string, checked: bool, index: int, label: string, kind: string, count: string, open: bool, installing: bool, progress: float, percent: string, install-label: string }
 struct DeskBlock { kind: string, title: string, count: string, label: string, icon: string, open: bool, games: [DeskGame], first: int, index: int, rows-before: int, sections-before: int, groups-before: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
-struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, install-note: string, install-warn: bool, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string, play-status: string, play-status-label: string }
 struct CoverRow { current: image, has-current: bool, proposed: image, has-proposed: bool, current-label: string, level: int, confidence: string, reason: string, accept: string, other: string }
 struct DeskStat { label: string, value: string }
-struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string], score: int }
-struct DeskBar { label: string, value: string, fraction: float, today: bool, future: bool }
-struct DeskEntry { id: string, title: string, detail: string, note: string, value: string, thumb: image, accent: color, fraction: float, dot: bool, header: bool, row: int }
 struct DeskCard { title: string, count: string, auto: bool, covers: [DeskEntry] }
 struct DeskProfile { name: string, initial: string, line: [DeskInfo], playing: bool, tabs: [string], tab: int, actions: [DeskInfo], tiles: [DeskInfo], week-label: string, week-total: string, week: [DeskBar], week-text: string, top: [DeskEntry], fan: [DeskEntry], recent-title: string, see-all: string, recent: [DeskEntry], empty: string, periods: [string], period: int, summary: string, sessions: [DeskEntry], cards-summary: string, cards: [DeskCard], auto-label: string, new-label: string, new-text: string, zone: string, index: int }
 struct DeskMore { on: bool, labels: [string], description: string, details: [DeskInfo], sessions-summary: string, sessions: [DeskInfo], shots: [image] }
 
-// Ícone do desktop: cor opaca com a transparência no elemento inteiro (com a cor translúcida no traço, o femtovg
-// somava a transparência onde os traços se cruzam e o ícone parecia ter contorno) e pontas e cantos redondos,
-// como os SVG das prévias. A tela cheia continua com o `Icon` dela.
-component DeskIcon inherits Rectangle {
-    in property <string> name;
-    in property <color> tint: Ui.desk-text;
-    in property <length> size: 20px;
-    width: size;
-    height: size;
-    opacity: tint.to-hsv().alpha;
-    // Logos de loja vêm do SVG com colorize: o Path com furos do femtovg deixa um contorno nas bordas.
-    property <bool> store: !(name != "store-steam" && name != "store-epic" && name != "store-gog" && name != "store-ubisoft" && name != "store-ea" && name != "store-battlenet" && name != "store-amazon" && name != "store-xbox" && name != "store-manual");
-    if name == "store-steam": Image { width: size; height: size; source: @image-url("stores/steam.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-epic": Image { width: size; height: size; source: @image-url("stores/epic.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-gog": Image { width: size; height: size; source: @image-url("stores/gog.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-ubisoft": Image { width: size; height: size; source: @image-url("stores/ubisoft.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-ea": Image { width: size; height: size; source: @image-url("stores/ea.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-battlenet": Image { width: size; height: size; source: @image-url("stores/battlenet.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-amazon": Image { width: size; height: size; source: @image-url("stores/amazon.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-xbox": Image { width: size; height: size; source: @image-url("stores/xbox.svg"); colorize: tint.with-alpha(1); }
-    if name == "store-manual": Image { width: size; height: size; source: @image-url("stores/manual.svg"); colorize: tint.with-alpha(1); }
-    if !store && DeskGlyphs.stroke(name) != "": Path {
-        width: parent.width;
-        height: parent.height;
-        viewbox-width: 24;
-        viewbox-height: 24;
-        commands: DeskGlyphs.stroke(name);
-        stroke: tint.with-alpha(1);
-        stroke-width: 1.7 * size / 24;
-        stroke-line-cap: round;
-        stroke-line-join: round;
-        fill: transparent;
-    }
-    if !store && DeskGlyphs.fill(name) != "": Path {
-        width: parent.width;
-        height: parent.height;
-        viewbox-width: 24;
-        viewbox-height: 24;
-        commands: DeskGlyphs.fill(name);
-        fill: tint.with-alpha(1);
-    }
-}
 
 // O que fica atrás do vidro: a arte do jogo em foco e a cópia desfocada dela (feita uma vez pelo Tako), no mesmo
 // retângulo da janela. Cada painel de vidro desenha o pedaço da cópia que fica atrás dele.
@@ -145,6 +100,8 @@ global DeskArt {
     out property <length> bw: w;
     // Configurações: sem jogo em foco, as mesmas formas em superfícies opacas sobre o cinza.
     in-out property <bool> gray;
+    // Visão geral: o fundo é o canvas (com os brilhos de canto), sem o degradê do jogo sem arte.
+    in-out property <bool> plain;
 
     // Luminância da cópia num ponto da janela (fora da arte: o fundo escuro).
     public pure function lum-at(px: length, py: length) -> float {
@@ -312,71 +269,7 @@ component Vidro inherits Rectangle {
     @children
 }
 
-// Foco do teclado ou do controle, como na Apple TV: o item clareia (`focus-fill`), ganha um contorno fino
-// (`focus-ring`) e um brilho em volta (`focus-glow`). Nunca muda a geometria; o mouse não mostra.
-component FocusRing inherits Rectangle {
-    in property <length> radius: Ui.radius-row;
-    border-radius: radius;
-    background: Ui.focus-fill;
-    border-width: 1px;
-    border-color: Ui.focus-ring;
-    Rectangle {
-        x: -Ui.focus-ring-width;
-        y: -Ui.focus-ring-width;
-        width: parent.width + 2 * Ui.focus-ring-width;
-        height: parent.height + 2 * Ui.focus-ring-width;
-        border-radius: root.radius + Ui.focus-ring-width;
-        border-width: Ui.focus-ring-width;
-        border-color: Ui.focus-glow;
-    }
-}
 
-// Dica do mouse (MenusEDicas): aparece 500 ms depois de parar em cima e entra em 120 ms; some ao sair. Botões só
-// de ícone e nomes cortados mostram o texto inteiro aqui.
-component Tip inherits Rectangle {
-    in property <string> text;
-    in property <bool> hovering;
-    property <bool> show;
-    changed hovering => {
-        show = false;
-        tip-timer.running = hovering && text != "";
-    }
-    tip-timer := Timer {
-        interval: 500ms;
-        running: false;
-        triggered => {
-            self.running = false;
-            show = root.hovering;
-        }
-    }
-    // Abaixo do dono, centralizada; não captura o mouse.
-    if show: Rectangle {
-        property <bool> lit;
-        // Entrada: ligar no `init` não anima (o Slint aplica antes do primeiro quadro); o Timer liga logo depois.
-        Timer {
-            interval: 1ms;
-            running: true;
-            triggered => {
-                self.running = false;
-                lit = true;
-            }
-        }
-        opacity: lit ? 1 : 0;
-        animate opacity { duration: Ui.tempo-texto-sai; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-        x: (root.width - self.width) / 2;
-        y: root.height + 6px;
-        width: tl.preferred-width + 20px;
-        height: 28px;
-        border-radius: Ui.radius-thumb;
-        background: Ui.glass-solid;
-        border-width: 1px;
-        border-color: Ui.glass-edge-strong;
-        drop-shadow-offset-y: Ui.shadow-float-y;
-        drop-shadow-blur: Ui.shadow-float-blur;
-        drop-shadow-color: Ui.shadow-float-color;
-        tl := Text { text: root.text; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 500; }
-    }
-}
 
 // Botão do desktop: primário (sólido), perigo (texto vermelho) ou comum (translúcido). Só ícone quando sem rótulo.
 component DeskButton inherits Rectangle {
@@ -633,29 +526,6 @@ component ProgressRing inherits Rectangle {
     }
 }
 
-// Anel de progresso (JogarEAbrir): trilha fraca e um arco girando; com "reduzir animações" fica parado.
-component Ring inherits Rectangle {
-    in property <length> size: 22px;
-    in property <color> tint: Ui.on-primary;
-    width: size;
-    height: size;
-    Rectangle {
-        border-radius: parent.width / 2;
-        border-width: 2px;
-        border-color: tint.with-alpha(0.25);
-    }
-    Path {
-        width: parent.width;
-        height: parent.height;
-        viewbox-width: 24;
-        viewbox-height: 24;
-        commands: "M 12 2 A 10 10 0 0 1 22 12";
-        stroke: tint;
-        stroke-width: 2px;
-        fill: transparent;
-        transform-rotation: Ui.reduce-motion ? 0deg : animation-tick() / 900ms * 360deg;
-    }
-}
 
 // O botão Downloads da barra de cima (`desk-activity`): contador do que está em andamento (0 = sem bolinha), nome
 // acessível, `state` (`error` = selo "!" de erro, `ready` = ponto de atualização pronta, vazio = nada) e a região
@@ -1234,6 +1104,8 @@ component OverviewRow inherits Rectangle {
     in property <string> label;
     in property <string> clear-label;
     in property <bool> chip;
+    // Visão geral aberta: a linha fica na segunda camada de vidro, como o jogo escolhido.
+    in property <bool> active;
     in property <bool> focused;
     // Lista recolhida: só o ícone, de 46, com a dica.
     in property <bool> collapsed;
@@ -1254,6 +1126,7 @@ component OverviewRow inherits Rectangle {
             root.menu(self.absolute-position.x + self.width, self.absolute-position.y + self.height + 6px);
         }
     }
+    if active && !chip: Selected { }
     if focused: FocusRing { }
     ta := TouchArea {
         mouse-cursor: pointer;
@@ -1674,6 +1547,8 @@ component EmptyList inherits VerticalLayout {
     // Na lista de 292 (ListaVazia): o polvo de 44 a 75% e uma frase; recolhida, só o polvo.
     in property <bool> compact;
     in property <bool> collapsed;
+    // Nas áreas grandes (Visão geral): o polvo da marca com esta altura (64), em vez do animado.
+    in property <length> mark: 0px;
     callback clicked();
     alignment: center;
     spacing: 10px;
@@ -1684,7 +1559,8 @@ component EmptyList inherits VerticalLayout {
         alignment: center;
         // O polvo do design system (44 a 75%, com a folga do brilho do PNG); fora da lista, o polvo animado.
         if compact: Image { width: 58px; height: 49px; source: @image-url("brand/tako-mark.png"); image-fit: contain; opacity: 0.75; accessible-role: none; }
-        if !compact: Octopus { width: 94px; with-name: false; self-assemble: true; accessible-role: none; }
+        if !compact && mark > 0px: Image { width: mark * 132 / 112; height: mark; source: @image-url("brand/tako-mark.png"); image-fit: contain; opacity: 0.75; accessible-role: none; }
+        if !compact && mark == 0px: Octopus { width: 94px; with-name: false; self-assemble: true; accessible-role: none; }
     }
     if !collapsed: Text {
         text: title;
@@ -1721,13 +1597,6 @@ component EmptyList inherits VerticalLayout {
     }
 }
 
-// Blocos de espera (EstadoCarregando) no tamanho do que vai chegar; pulsam devagar, parados com "Reduzir animações".
-component Skeleton inherits Rectangle {
-    in property <length> radius: Ui.radius-thumb;
-    border-radius: radius;
-    background: Ui.glass-control;
-    opacity: Ui.reduce-motion ? 0.8 : 0.55 + 0.45 * abs(sin(animation-tick() / Ui.tempo-pulso * 180deg));
-}
 
 // Barra de ações da seleção múltipla: pílula de vidro de camada no pé do painel da lista.
 component BulkBar inherits Vidro {
@@ -3339,6 +3208,8 @@ component DeskLibrary inherits Rectangle {
     in property <string> focus-id;
     in property <int> focus-group: -1;
     in property <DeskGameView> game;
+    // Visão geral (TelaBiblioteca): no lugar do destaque do jogo enquanto `overview.on`.
+    in property <DeskOverview> overview;
     // DestaqueFases: a fase 2 do destaque (e se ela está aberta).
     in property <DeskMore> more;
     in property <[PanelRow]> actions;
@@ -3525,6 +3396,7 @@ component DeskLibrary inherits Rectangle {
                 OverviewRow {
                     collapsed: collapsed;
                     chip: tab < 0;
+                    active: overview.on;
                     label: tab < 0 ? collection.label + " · " + collection.count : view-labels[5];
                     clear-label: view-labels[7];
                     focused: focus-visible && zone == "controls" && zone-index == 2;
@@ -3690,14 +3562,44 @@ component DeskLibrary inherits Rectangle {
             }
           }
         }
-        if !game.has-game && !loading: Rectangle { horizontal-stretch: 1; }
+        // Visão geral: 4 a menos na direita, para a margem ser de 40 (a da janela é de 36).
+        if overview.on && !overview.empty: Rectangle {
+            horizontal-stretch: 1;
+            VisaoGeral {
+                x: 0;
+                y: 0;
+                width: parent.width - Ui.space-4;
+                height: parent.height;
+                o: overview;
+                focus-visible: focus-visible && zone == "overview";
+                small: small;
+                clicked(z, i) => {
+                    root.focus-main();
+                    root.clicked(z, i);
+                }
+            }
+        }
+        if overview.on && overview.empty: Rectangle {
+            horizontal-stretch: 1;
+            border-width: 1px;
+            border-color: Ui.line-strong;
+            border-radius: Ui.radius-hero;
+            EmptyList {
+                mark: 64px;
+                title: empty-title;
+                text: empty-text;
+                action: empty-action;
+                clicked => { root.clicked(empty-zone, 0); }
+            }
+        }
+        if !overview.on && !game.has-game && !loading: Rectangle { horizontal-stretch: 1; }
         // Espera (BRAND-001): o polvo no alto da área livre do destaque, fora do layout, sem tirar largura do texto.
-        if !game.has-game && loading: Rectangle {
+        if !overview.on && !game.has-game && loading: Rectangle {
             horizontal-stretch: 1;
             LoadingStage { x: 0; y: 0; width: parent.width; height: parent.height; small: small; }
             Octopus { x: 0; y: 0; width: 90px; height: 69px; with-name: false; self-assemble: true; accessible-role: none; }
         }
-        if game.has-game: phases := GamePhases {
+        if !overview.on && game.has-game: phases := GamePhases {
             horizontal-stretch: 1;
             more: more;
             trailer: game.trailer;
@@ -7317,7 +7219,7 @@ component ArtLayer inherits Rectangle {
         if Ui.has-custom-background && Ui.custom-background.width > 0: Rectangle {
             background: Ui.custom-background-scrim;
         }
-        if !Ui.has-custom-background && !DeskArt.has-art: Rectangle {
+        if !Ui.has-custom-background && !DeskArt.has-art && !DeskArt.plain: Rectangle {
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
             animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             // Brilho suave no alto à direita (EstadoSemArte).
@@ -7451,6 +7353,7 @@ export component Desktop inherits Window {
     in property <string> desk-focus-id;
     in property <int> desk-focus-group: -1;
     in property <DeskGameView> desk-game;
+    in property <DeskOverview> desk-overview;
     in property <DeskMore> desk-more;
     in property <[PanelRow]> desk-actions;
     in property <[DeskInfo]> desk-stats;
@@ -7553,6 +7456,7 @@ export component Desktop inherits Window {
         DeskArt.win-w = root.width;
         DeskArt.win-h = root.height;
         DeskArt.gray = page != "desk-library" && page != "desk-profile";
+        DeskArt.plain = page == "desk-library" && desk-overview.on;
         // Troca de jogo: enquanto a arte nova carrega, fica a anterior (senão o fundo pisca sem arte e o vidro
         // fica sólido); quando chega, a arte faz um crossfade só.
         if (!desk-game.art-loading) {
@@ -7592,6 +7496,7 @@ export component Desktop inherits Window {
         }
     }
     changed desk-game => { root.sync-art(); }
+    changed desk-overview => { root.sync-art(); }
 
     property <int> content-search-focus;
     property <bool> floating-search;
@@ -7688,6 +7593,7 @@ export component Desktop inherits Window {
                 focus-id: desk-focus-id;
                 focus-group: desk-focus-group;
                 game: desk-game;
+                overview: desk-overview;
                 more: desk-more;
                 actions: desk-actions;
                 stats: desk-stats;

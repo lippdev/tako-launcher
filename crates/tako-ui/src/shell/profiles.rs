@@ -27,7 +27,10 @@ pub fn active_name(ctx: &Ctx) -> String {
 
 fn save(ctx: &mut Ctx, p: &Profiles) -> bool {
     match p.save(&ctx.paths.machine) {
-        Ok(()) => true,
+        Ok(()) => {
+            ctx.active_profile = p.active();
+            true
+        }
         Err(e) => {
             tracing::warn!("perfis não gravados: {e}");
             ctx.toast(ctx.t("profiles.save_failed"));
