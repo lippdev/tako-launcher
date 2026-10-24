@@ -165,6 +165,21 @@ export const libraryStrings = {
 } as const;
 
 /**
+ * Textos dos modos da lista (WEB-11c) que não existem nos catálogos de `locales/`. Os nomes dos modos e dos
+ * agrupamentos (`desktop.view.*`, `desktop.group.*`) vêm de `t()`.
+ */
+export const listViewStrings = {
+  categoriesRegion: "Biblioteca por categorias",
+  loadingGroups: "Lendo as categorias…",
+  /** Nome do ▶ do cartão da grade. */
+  play: "Jogar",
+  playError: "Não foi possível abrir o jogo.",
+  cannotPlay: "Este jogo não pode ser aberto agora.",
+  previous: "Anterior",
+  next: "Próximo",
+} as const;
+
+/**
  * Textos das coleções na lista (WEB-11b) que não existem nos catálogos de `locales/`. Os que existem
  * (`smart.*`, `library.collection.*`, `collections.*`) vêm de `t()`.
  */

@@ -14,6 +14,7 @@ import type { CollectionRename } from "./generated/CollectionRename";
 import type { CollectionRequest } from "./generated/CollectionRequest";
 import type { SmartCollectionSet } from "./generated/SmartCollectionSet";
 import type { GameFavoriteSet } from "./generated/GameFavoriteSet";
+import type { GameStatus } from "./generated/GameStatus";
 import type { GameStatusSet } from "./generated/GameStatusSet";
 import type { GameTagsSet } from "./generated/GameTagsSet";
 import type { LibrarySourceReport } from "./generated/LibrarySourceReport";
@@ -202,6 +203,34 @@ const games: LibraryGame[] = fakeGames().map((row, i) => ({
   hasHero: false,
   hasLogo: false,
 }));
+// Situações de exemplo para as Categorias terem mais de uma fileira (o primeiro já joga).
+for (const [i, status] of ([[1, "paused"], [3, "beaten"], [5, "wishlist"], [7, "abandoned"], [8, "beaten"]] as const)) {
+  const sample = games[i];
+  if (sample) sample.status = status;
+}
+// ?jogos=600 acrescenta jogos de exemplo (lojas, situações e instalação variadas) para ver a rolagem paginada.
+const extraGames = Number(new URLSearchParams(typeof location === "undefined" ? "" : location.search).get("jogos")) || 0;
+{
+  const stores: Store[] = ["steam", "epic", "gog", "xbox", "ubisoft"];
+  const statuses: (GameStatus | null)[] = [null, null, "playing", "beaten", "wishlist", "paused", "abandoned"];
+  for (let i = 0; i < Math.min(5000, extraGames); i++) {
+    games.push({
+      id: `steam:${String(2000 + i)}`,
+      title: `Jogo de exemplo ${String(i + 1)}`,
+      store: stores[i % stores.length] ?? "steam",
+      installed: i % 3 !== 0,
+      favorite: i % 17 === 0,
+      status: statuses[i % statuses.length] ?? null,
+      lastPlayedAt: null,
+      playTimeSeconds: 0,
+      accent: null,
+      hasCover: false,
+      hasIcon: true,
+      hasHero: false,
+      hasLogo: false,
+    });
+  }
+}
 const collections: Collection[] = [
   {
     id: "favorites-night",
@@ -392,6 +421,8 @@ const KNOWN_SETTINGS = new Set([
   "Language",
   "OpenIn",
   "TextSizePercent",
+  "desktop.view",
+  "desktop.group_by",
 ]);
 const BOOL_SETTINGS = new Set([
   "DynamicColor",
@@ -420,7 +451,9 @@ function setSetting(payload: unknown) {
     KNOWN_SETTINGS.has(key) &&
     (!BOOL_SETTINGS.has(key) || value === "true" || value === "false") &&
     (key !== "TextSizePercent" || ["100", "110", "125"].includes(value)) &&
-    (key !== "OpenIn" || value === "desktop" || value === "big-picture");
+    (key !== "OpenIn" || value === "desktop" || value === "big-picture") &&
+    (key !== "desktop.view" || ["list", "grid", "categories"].includes(value)) &&
+    (key !== "desktop.group_by" || ["status", "collection", "tag", "genre", "store", "install"].includes(value));
   if (!valid) throw new Error("bad_request: configuração inválida");
   settings.set(key, value);
   sessionStorage.setItem(SETTINGS_STORAGE, JSON.stringify(Object.fromEntries(settings)));
@@ -874,6 +907,19 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
     "desktop.collections_manage": "Organizar coleções",
     "desktop.collection_auto": "Auto",
     "desktop.no_collections": "Nenhuma coleção ainda",
+    // Modos da lista (WEB-11c): textos de `desktop.toml`.
+    "desktop.view.list": "Lista",
+    "desktop.view.grid": "Grade",
+    "desktop.view.categories": "Categorias",
+    "desktop.view.menu": "Modo de exibição",
+    "desktop.group.by_prefix": "Agrupar por",
+    "desktop.group.status": "Status",
+    "desktop.group.collection": "Coleção",
+    "desktop.group.tag": "Etiqueta",
+    "desktop.group.store": "Loja",
+    "desktop.group.install": "Instalação",
+    "desktop.group.installed": "Instalados",
+    "desktop.group.not_installed": "Não instalados",
     "settings.library.collections_create": "Criar",
     "settings.library.rename": "Renomear",
     "settings.library.delete": "Excluir",
@@ -943,6 +989,19 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
     "desktop.collections_manage": "Manage collections",
     "desktop.collection_auto": "Auto",
     "desktop.no_collections": "No collections yet",
+    // Library view modes (WEB-11c): texts from `desktop.toml`.
+    "desktop.view.list": "List",
+    "desktop.view.grid": "Grid",
+    "desktop.view.categories": "Categories",
+    "desktop.view.menu": "View mode",
+    "desktop.group.by_prefix": "Group by",
+    "desktop.group.status": "Status",
+    "desktop.group.collection": "Collection",
+    "desktop.group.tag": "Tag",
+    "desktop.group.store": "Store",
+    "desktop.group.install": "Install state",
+    "desktop.group.installed": "Installed",
+    "desktop.group.not_installed": "Not installed",
     "settings.library.collections_create": "Create",
     "settings.library.rename": "Rename",
     "settings.library.delete": "Delete",

@@ -61,6 +61,13 @@
   background: var(--tile);
   color: var(--text);
 }
+.countLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
 .count {
   color: var(--text-muted);
   font-size: var(--space-12);

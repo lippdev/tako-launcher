@@ -34,8 +34,10 @@ export interface BibliotecaGradeProps {
   loading?: boolean;
   activeId: string | null;
   selection: ReadonlySet<string>;
+  /** Clique, Enter ou duplo clique: abre a página do jogo. */
   onActivate: (id: string) => void;
   onSelectionChange: (ids: Set<string>) => void;
+  /** O botão ▶ do cartão. */
   onPlay?: (id: string) => void;
   resolveCover?: (id: string, width: number, height: number) => string | null;
   resolveIcon?: (id: string, px: number) => string | null;
@@ -250,7 +252,7 @@ export function BibliotecaGrade({
               title={`${row.title}${row.hint ? ` · ${row.hint}` : ""}`}
               onClick={(e) => onCardClick(e, index, row)}
               onDoubleClick={() => {
-                if (row.installed) onPlay?.(row.id);
+                onActivate(row.id);
               }}
             >
               {/* Capa do jogo ou fallback com letra inicial */}

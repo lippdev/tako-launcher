@@ -652,6 +652,44 @@ fn desktop_theme_is_the_slint_key_and_only_known_themes_are_accepted() {
 }
 
 #[test]
+fn library_view_and_grouping_use_the_slint_keys_and_values() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = open(&dir, false);
+    for (key, value) in [
+        ("desktop.view", "list"),
+        ("desktop.view", "grid"),
+        ("desktop.view", "categories"),
+        ("desktop.group_by", "status"),
+        ("desktop.group_by", "install"),
+    ] {
+        let ok = wire(
+            &mut app,
+            "settings.set",
+            Some(json!({"key":key,"value":value})),
+        );
+        assert_eq!(ok["ok"], true, "{key}={value}: {ok}");
+    }
+    for (key, value) in [("desktop.view", "cards"), ("desktop.group_by", "year")] {
+        let bad = wire(
+            &mut app,
+            "settings.set",
+            Some(json!({"key":key,"value":value})),
+        );
+        assert_eq!(bad["error"]["code"], "bad_request", "{key}={value}: {bad}");
+    }
+    let got = wire(
+        &mut app,
+        "settings.get",
+        Some(json!({"keys":["desktop.view","desktop.group_by"]})),
+    );
+    assert_eq!(got["reply"]["data"]["values"]["desktop.view"], "categories");
+    assert_eq!(
+        got["reply"]["data"]["values"]["desktop.group_by"],
+        "install"
+    );
+}
+
+#[test]
 fn hide_other_screens_uses_the_slint_values() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = open(&dir, false);

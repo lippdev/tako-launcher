@@ -1,17 +1,24 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { CallError, call } from "../bridge";
 import { Abas, type Aba } from "../components/Abas/Abas";
 import { Aviso } from "../components/Aviso/Aviso";
 import { CampoDeBusca } from "../components/CampoDeBusca/CampoDeBusca";
 import { Icon } from "../components/Icon/Icon";
+import { BibliotecaGrade } from "../components/BibliotecaGrade/BibliotecaGrade";
 import { ListaDeJogos } from "../components/ListaDeJogos/ListaDeJogos";
 import { cx } from "../lib/cx";
-import { listLabels, strings, libraryStrings as s } from "./strings";
+import { listLabels, listViewStrings, strings, libraryStrings as s } from "./strings";
 import { hasSavableCriteria, smartRuleFromCriteria } from "./colecoes/colecoesModel";
 import { OrganizarColecoes } from "./colecoes/OrganizarColecoes";
 import { SalvarColecao } from "./colecoes/SalvarColecao";
 import { LibraryFilters, filterCount } from "./LibraryFilters";
 import { LibraryBulkActions } from "./LibraryBulkActions";
-import type { LibraryCriteria } from "./uiState";
+import { AgruparPor, SeletorDeModo } from "./lista/ModoDaLista";
+import { CategoriasDaLista } from "./lista/CategoriasDaLista";
+import { GROUP_KEY, VIEW_KEY, parseGroupBy, parseListView, planGroups, type GroupBy, type ListView } from "./lista/listaModel";
+import { useLibraryGroups } from "./lista/useLibraryGroups";
+import { useSettings } from "./settings/useSettings";
+import { STORE_IDS, type LibraryCriteria } from "./uiState";
 import { useLibrary } from "./useLibrary";
 import styles from "./ColunaDaLista.module.css";
 import controls from "./LibraryControls.module.css";
@@ -21,6 +28,9 @@ const TABS: readonly Aba<LibraryCriteria["filter"]>[] = [
   { id: "favorites", label: strings.list.tabs.favorites },
   { id: "installed", label: strings.list.tabs.installed },
 ];
+/** O modo de exibição e o agrupamento das Categorias: as chaves do núcleo que o Slint também usa. */
+const MODE_KEYS = [VIEW_KEY, GROUP_KEY];
+
 interface ColunaDaListaProps {
   shown: boolean;
   collapsed: boolean;
@@ -43,6 +53,21 @@ export function ColunaDaLista({
   onActiveChange,
 }: ColunaDaListaProps) {
   const library = useLibrary(criteria);
+  const prefs = useSettings(MODE_KEYS);
+  // Recolhida a coluna só tem os ícones: a grade e as categorias esperam ela abrir (como o Slint).
+  const view: ListView = collapsed ? "list" : parseListView(prefs.values[VIEW_KEY]);
+  const groupBy = parseGroupBy(prefs.values[GROUP_KEY]);
+  const specs = useMemo(
+    () => planGroups(groupBy, library.request, { collections: library.collections, tags: library.tags, stores: STORE_IDS }),
+    [groupBy, library.request, library.collections, library.tags],
+  );
+  const groups = useLibraryGroups(view === "categories", library.request, specs);
+  const chooseView = (next: ListView) => {
+    void prefs.save(VIEW_KEY, next);
+  };
+  const chooseGroup = (next: GroupBy) => {
+    void prefs.save(GROUP_KEY, next);
+  };
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [notice, setNotice] = useState<{
@@ -63,6 +88,19 @@ export function ColunaDaLista({
   const count = filterCount(criteria);
   const collection = library.collections.find((c) => c.id === criteria.collection);
   const rule = smartRuleFromCriteria(criteria, collection?.criteria ? collection : null);
+  const play = async (id: string) => {
+    try {
+      await call("game.play", { gameId: id });
+    } catch (failure) {
+      const conflict = failure instanceof CallError && failure.error.code === "conflict";
+      if (!conflict) console.error("game.play", failure);
+      setNotice({ error: true, key: Date.now(), message: conflict ? listViewStrings.cannotPlay : listViewStrings.playError });
+    }
+  };
+  // Os jogos que a tela conhece: a página da lista e as capas das fileiras (a seleção pode vir de qualquer uma).
+  const knownGame = (id: string) =>
+    library.games.find((g) => g.id === id) ??
+    [...groups.groups.values()].flatMap((g) => g.games).find((g) => g.id === id);
   const collectionDone = (error: boolean, message: string) => {
     setNotice({ error, key: Date.now(), message });
   };
@@ -167,11 +205,15 @@ export function ColunaDaLista({
             )}
           </div>
           {!collapsed && (
-            <div className={controls["count"]} role="status">
-              {selection.size ? s.selected(selection.size, library.total) : s.count(library.total)}
-              {library.pending && !library.loading ? ` · ${s.busy}` : ""}
+            <div className={controls["countLine"]}>
+              <div className={controls["count"]} role="status">
+                {selection.size ? s.selected(selection.size, library.total) : s.count(library.total)}
+                {library.pending && !library.loading ? ` · ${s.busy}` : ""}
+              </div>
+              <SeletorDeModo view={view} onViewChange={chooseView} />
             </div>
           )}
+          {view === "categories" && <AgruparPor value={groupBy} onChange={chooseGroup} />}
           {library.error && (
             <div className={controls["count"]} role="alert">
               {s.loadError}
@@ -180,25 +222,61 @@ export function ColunaDaLista({
               </button>
             </div>
           )}
-          <ListaDeJogos
-            key={library.queryKey}
-            className={cx(styles["games"])}
-            aria-label={strings.list.label}
-            collapsed={collapsed}
-            rows={library.rows}
-            labels={{ ...listLabels, empty }}
-            loading={library.loading}
-            activeId={activeId}
-            selection={selection}
-            onActivate={onActiveChange}
-            onSelectionChange={setSelection}
-            resolveIcon={library.resolveIcon}
-            onNearEnd={library.loadMore}
-          />
+          {!prefs.ready ? (
+            <div className={cx(styles["games"])} />
+          ) : view === "grid" ? (
+            <BibliotecaGrade
+              key={library.queryKey}
+              className={cx(styles["games"])}
+              aria-label={strings.list.label}
+              rows={library.rows}
+              labels={{ ...listLabels, empty, play: listViewStrings.play }}
+              loading={library.loading}
+              activeId={activeId}
+              selection={selection}
+              onActivate={onActiveChange}
+              onSelectionChange={setSelection}
+              onPlay={(id) => void play(id)}
+              resolveCover={library.resolveCover}
+              resolveIcon={library.resolveIcon}
+              onNearEnd={library.loadMore}
+            />
+          ) : view === "categories" ? (
+            <CategoriasDaLista
+              className={cx(styles["games"])}
+              specs={specs}
+              groups={groups.groups}
+              loading={groups.loading}
+              downloading={library.downloading}
+              devCover={library.devCover}
+              activeId={activeId}
+              selection={selection}
+              onSelectionChange={setSelection}
+              onActivate={onActiveChange}
+              onNearEnd={groups.loadMore}
+              empty={empty}
+            />
+          ) : (
+            <ListaDeJogos
+              key={library.queryKey}
+              className={cx(styles["games"])}
+              aria-label={strings.list.label}
+              collapsed={collapsed}
+              rows={library.rows}
+              labels={{ ...listLabels, empty }}
+              loading={library.loading}
+              activeId={activeId}
+              selection={selection}
+              onActivate={onActiveChange}
+              onSelectionChange={setSelection}
+              resolveIcon={library.resolveIcon}
+              onNearEnd={library.loadMore}
+            />
+          )}
           {selection.size > 0 && !collapsed && (
             <LibraryBulkActions
               selection={selection}
-              allFavorite={[...selection].every((id) => library.games.find((g) => g.id === id)?.favorite)}
+              allFavorite={[...selection].every((id) => knownGame(id)?.favorite)}
               collections={library.collections}
               tags={library.tags}
               clear={() => {

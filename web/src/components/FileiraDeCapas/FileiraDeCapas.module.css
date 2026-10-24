@@ -97,6 +97,16 @@
   scroll-snap-align: start;
 }
 
+/* O jogo aberto e os marcados na seleção: anel por dentro da capa (o trilho rola e cortaria um anel de fora),
+   com as cores da BibliotecaGrade. */
+.cartao[data-ativa] > :first-child::after {
+  box-shadow: inset 0 0 0 3px var(--primary);
+}
+
+.cartao[data-selecionada]:not([data-ativa]) > :first-child::after {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
 .meta {
   padding-top: 10px;
 }

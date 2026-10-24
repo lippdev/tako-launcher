@@ -15,6 +15,10 @@ export interface CapaDaFileira {
   temArte: boolean;
   /** URL da capa quando não vem do núcleo (galeria e hospedeiro falso). */
   src?: string | undefined;
+  /** O jogo aberto na página dele (anel). */
+  ativa?: boolean;
+  /** Marcado na seleção múltipla (anel de destaque). */
+  selecionada?: boolean;
 }
 
 export interface FileiraDeCapasProps {
@@ -122,6 +126,9 @@ export function FileiraDeCapas({
           <li
             key={capa.id}
             className={styles["cartao"]}
+            data-id={capa.id}
+            data-ativa={capa.ativa ? "" : undefined}
+            data-selecionada={capa.selecionada ? "" : undefined}
             onPointerEnter={() => onDestacar?.(capa.id)}
             onFocus={() => onDestacar?.(capa.id)}
           >

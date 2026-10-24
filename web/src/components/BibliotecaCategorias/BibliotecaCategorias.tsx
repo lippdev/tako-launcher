@@ -15,6 +15,10 @@ export interface CategoryGame {
   hasArt?: boolean | undefined;
   /** URL da capa quando não vem do núcleo (galeria e hospedeiro falso); sem ela, usa `resolveCover`. */
   coverUrl?: string | null | undefined;
+  /** O jogo aberto na página dele. */
+  active?: boolean | undefined;
+  /** Marcado na seleção múltipla. */
+  selected?: boolean | undefined;
 }
 
 export interface GameCategoryGroup {
@@ -39,6 +43,8 @@ export interface BibliotecaCategoriasProps {
   loading?: boolean | undefined;
   onOpen: (id: string) => void;
   onHighlight?: ((id: string) => void) | undefined;
+  /** A rolagem de uma fileira chegou perto do fim: hora de pedir mais capas dela (recebe o id do grupo). */
+  onNearEnd?: ((groupId: string) => void) | undefined;
   resolveCover?: ((id: string, width: number, height: number) => string | null) | undefined;
   className?: string | undefined;
 }
@@ -58,6 +64,7 @@ export function BibliotecaCategorias({
   loading = false,
   onOpen,
   onHighlight,
+  onNearEnd,
   resolveCover = defaultResolveCover,
   className,
 }: BibliotecaCategoriasProps) {
@@ -73,6 +80,8 @@ export function BibliotecaCategorias({
         corDestaque: game.accentColor ?? null,
         temArte: game.hasArt !== false,
         src: game.coverUrl ?? resolveCover(game.id, 233, 311) ?? undefined,
+        ativa: game.active === true,
+        selecionada: game.selected === true,
       }));
 
       const contagem = group.countLabel ?? countFormatter(group.games.length);
@@ -113,6 +122,7 @@ export function BibliotecaCategorias({
           rotuloProximo={nextLabel}
           onAbrir={onOpen}
           onDestacar={onHighlight}
+          onPertoDoFim={onNearEnd ? () => { onNearEnd(group.id); } : undefined}
           className={cx(styles["fileiraCategorias"], group.className)}
         />
       ))}

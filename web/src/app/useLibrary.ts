@@ -137,10 +137,13 @@ export function useLibrary(criteria: LibraryCriteria) {
   }, [data, request]);
 
   const [devIcon, setDevIcon] = useState<((id: string, px: number) => string) | null>(null);
+  const [devCover, setDevCover] = useState<((id: string, title: string) => string) | null>(null);
   useEffect(() => {
     if (import.meta.env.DEV && !window.location.protocol.startsWith("tako")) {
-      void import("../bridge/fake").then(({ fakeGameIcon, isFakeHost }) => {
-        if (isFakeHost()) setDevIcon(() => fakeGameIcon);
+      void import("../bridge/fake").then(({ fakeGameIcon, fakeGameImage, isFakeHost }) => {
+        if (!isFakeHost()) return;
+        setDevIcon(() => fakeGameIcon);
+        setDevCover(() => (id: string, title: string) => fakeGameImage("cover", id, title));
       });
     }
   }, []);
@@ -154,12 +157,24 @@ export function useLibrary(criteria: LibraryCriteria) {
       ),
     [data.games, downloading],
   );
+  const byId = useMemo(() => new Map(data.games.map((game) => [game.id, game])), [data.games]);
   const resolveIcon = useCallback(
     (id: string, px: number) => {
-      const game = data.games.find((g) => g.id === id);
+      const game = byId.get(id);
       return game?.hasIcon ? (devIcon?.(id, px) ?? libraryGameIcon(game, px)) : null;
     },
-    [data.games, devIcon],
+    [byId, devIcon],
+  );
+  // A capa da grade: só a que o núcleo tem (sem ela a grade cai no ícone). O hospedeiro falso usa a capa de exemplo.
+  const resolveCover = useCallback(
+    (id: string, width: number, height: number) => {
+      const game = byId.get(id);
+      if (devCover) return game ? devCover(id, game.title) : null;
+      return game?.hasCover
+        ? `tako-img://cover?id=${encodeURIComponent(id)}&w=${String(width)}&h=${String(height)}`
+        : null;
+    },
+    [byId, devCover],
   );
   return {
     ...data,
@@ -169,6 +184,10 @@ export function useLibrary(criteria: LibraryCriteria) {
     loadMore,
     refresh,
     resolveIcon,
+    resolveCover,
+    devCover,
+    downloading,
+    request,
     pending,
     queryKey: JSON.stringify(request),
   };

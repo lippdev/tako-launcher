@@ -52,6 +52,8 @@ fn known(key: &str) -> bool {
                 | "TextSizePercent"
                 | "NavigationSoundVolume"
                 | "ThemeMusicVolume"
+                | "desktop.view"
+                | "desktop.group_by"
         )
 }
 
@@ -89,6 +91,13 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
         && (key != "DownloadsUploadLimitKiB" || matches!(value.as_str(), "0" | "64" | "256" | "1024"))
         && (key != "DesktopTheme"
             || matches!(value.as_str(), "tako" | "dark" | "midnight" | "oled" | "glass"))
+        // Modo de exibição da lista e agrupamento das Categorias: as chaves e valores que o app Slint grava.
+        && (key != "desktop.view" || matches!(value.as_str(), "list" | "grid" | "categories"))
+        && (key != "desktop.group_by"
+            || matches!(
+                value.as_str(),
+                "status" | "collection" | "tag" | "genre" | "store" | "install"
+            ))
         && (key != "ControlCenterChord" || value.parse::<u32>().is_ok())
         && (!matches!(key.as_str(), "NavigationSoundVolume" | "ThemeMusicVolume")
             || value.parse::<u32>().is_ok_and(|n| n <= 100))
