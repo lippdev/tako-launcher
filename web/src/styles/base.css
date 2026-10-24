@@ -1,0 +1,121 @@
+/* Base da interface: reinício mínimo, medidas que o `tokens.css` não traz e as opções de acessibilidade.
+   Tudo o mais vem das variáveis do `tokens.css`. */
+
+:root {
+  /* Medidas do README do design system ("Ícones" e "Marca") sem variável no `tokens.css`. */
+  --icon-size: 18px;
+  --icon-size-sm: 15px;
+  --icon-stroke: 1.7;
+  --brand-mark-width: 50px;
+  --brand-mark-height: 40px;
+  --brand-word-width: 68px;
+  --brand-word-height: 14px;
+  --brand-kana-width: 46px;
+  --brand-kana-height: 8px;
+  --brand-kana-opacity: 0.85;
+  --brand-glow-blur: 8px;
+  /* "Tamanho da interface": 0,9 / 1 / 1,1 / 1,25, escrita por `applyAppearance`. */
+  --ui-scale: 1;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Todas as medidas são px; `zoom` escala a interface inteira de uma vez (Chromium). Quem precisar
+     da altura da janela usa `100%`, não `100vh`: o `vh` não acompanha o zoom. */
+  zoom: var(--ui-scale);
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--canvas);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Efeitos de vidro desligados: nenhum `backdrop-filter` em lugar nenhum. */
+[data-glass="off"],
+[data-glass="off"] * {
+  backdrop-filter: none !important;
+}
+
+/* Reduzir animações: zera durações e atrasos (as variáveis e, por garantia, tudo o que as ignora).
+   Vale para a opção do Tako e para o pedido do sistema. */
+:root[data-reduce-motion="true"] {
+  --tempo-hover: 0ms;
+  --tempo-foco: 0ms;
+  --tempo-estado: 0ms;
+  --tempo-pagina: 0ms;
+  --tempo-saida: 0ms;
+  --tempo-troca: 0ms;
+  --tempo-escada: 0ms;
+  --tempo-lista: 0ms;
+  --tempo-arte: 0ms;
+  --tempo-destaque: 0ms;
+  --tempo-cor: 0ms;
+  --tempo-carrossel: 0ms;
+  --tempo-contador: 0ms;
+  --tempo-radar: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --tempo-hover: 0ms;
+    --tempo-foco: 0ms;
+    --tempo-estado: 0ms;
+    --tempo-pagina: 0ms;
+    --tempo-saida: 0ms;
+    --tempo-troca: 0ms;
+    --tempo-escada: 0ms;
+    --tempo-lista: 0ms;
+    --tempo-arte: 0ms;
+    --tempo-destaque: 0ms;
+    --tempo-cor: 0ms;
+    --tempo-carrossel: 0ms;
+    --tempo-contador: 0ms;
+    --tempo-radar: 0ms;
+  }
+}
+
+:root[data-reduce-motion="true"] *,
+:root[data-reduce-motion="true"] *::before,
+:root[data-reduce-motion="true"] *::after {
+  animation-duration: 0ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

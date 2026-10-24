@@ -9,7 +9,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | orquestrador |
-| Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | WEB-03 |
+| Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | livre |
 | Codex Lipp | `codex` | WEB-02a |
 | Codex Alyx Medical | `codex_alyx_medical` | WEB-01a |
 
@@ -20,7 +20,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | ORQ-00 | Processo, branch de integração, design system em `design/desktop/`, CI só manual | — | Orquestrador | — | `docs/`, `design/`, `.github/`, `AGENTS.md` | integrada |
 | WEB-00 | **Contrato da ponte:** consultas, comandos e eventos (formato, erros, versão), esquemas `tako-app://` e `tako-img://`, geração dos tipos TS a partir do Rust; esqueleto dos crates `tako-app` e `tako-web` e da pasta `web/` | N4 | Orquestrador | ORQ-00 | `docs/web/ponte.md`, `crates/tako-app/`, `crates/tako-web/`, `web/src/bridge/`, `Cargo.toml`, `.cargo/config.toml` | integrada |
 | WEB-02a | **Hospedeiro CEF no Windows:** janela com a barra própria, runtime do CEF num cache compartilhado de desenvolvimento, `tako-app://` (build do `web/` ou servidor do Vite em dev), `tako-img://` do cache de imagens, transporte da ponte, abrir com `tako --web`, fechar e reabrir o Chromium (D-10) | N4 | Codex Lipp · GPT-6.1-Sol xhigh. Revisão: Claude InvestSmart · Opus 5.5 | WEB-00 | `crates/tako-web/`, `crates/tako/src/main.rs` (só a opção `--web`), `Cargo.toml` (deps do CEF) | despachada |
-| WEB-03 | **Projeto `web/` e base do design system:** Vite + React + TypeScript, ESLint, build; `tokens.css`, fontes e ícones do `design/desktop/`; temas TAKO, Escuro, Meia-noite, Preto OLED e Liquid Glass por `data-theme`; hospedeiro falso (`web/src/bridge/fake.ts`) para rodar no navegador | N2 | Claude InvestSmart · Sonnet 5.5 médio | WEB-00 | `web/` (menos `web/src/bridge/`, que é do contrato) | despachada |
+| WEB-03 | **Projeto `web/` e base do design system:** Vite + React + TypeScript, ESLint, build; `tokens.css`, fontes e ícones do `design/desktop/`; temas TAKO, Escuro, Meia-noite, Preto OLED e Liquid Glass por `data-theme`; hospedeiro falso (`web/src/bridge/fake.ts`) para rodar no navegador | N2 | Claude InvestSmart · Sonnet 5.5 médio | WEB-00 | `web/` (menos `web/src/bridge/`, que é do contrato) | integrada |
 | WEB-01a | **`tako-app`, primeira fatia:** boot próprio do núcleo (o que o `build_ctx` da `tako-ui` faz, sem depender dela), `library.list` (filtros, busca, ordenação, página), `game.details` e `game.play` (pedido ao hospedeiro), com os testes; a `tako-ui` não é tocada | N4 | Codex Alyx · GPT-6.1-Sol high. Revisão: Claude InvestSmart · Opus 5.5 | WEB-00 | `crates/tako-app/`, `Cargo.toml` (deps da `tako-app`) | despachada |
 | WEB-04a | **Componentes base, lote 1:** BotaoDesktop, Abas, CampoDeBusca, CampoDeSelecao + MenuDeContexto, Dialogo, Aviso | N3 | a definir na hora (conta livre) | WEB-03 | `web/src/components/` | fila |
 | WEB-04b | **Componentes base, lote 2:** GrupoDeBlocos, LinhaDeConfiguracao, ControleDeslizante, chave, PainelLateral, ListaDeJogos virtualizada | N3 | a definir na hora (conta livre) | WEB-03 | `web/src/components/` | fila |

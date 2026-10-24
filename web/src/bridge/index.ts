@@ -93,7 +93,7 @@ export function call<N extends CallName>(
       host().post(JSON.stringify(message));
     } catch (e) {
       pending.delete(id);
-      reject(e);
+      reject(e instanceof Error ? e : new Error(String(e)));
     }
   });
 }

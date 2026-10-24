@@ -1,0 +1,34 @@
+.bar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.mark {
+  width: var(--brand-mark-width);
+  height: var(--brand-mark-height);
+  filter: drop-shadow(0 0 var(--brand-glow-blur) var(--brand-glow));
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.word {
+  width: var(--brand-word-width);
+  height: var(--brand-word-height);
+}
+
+.kana {
+  width: var(--brand-kana-width);
+  height: var(--brand-kana-height);
+  opacity: var(--brand-kana-opacity);
+}
+
+.horizontal {
+  display: block;
+  max-width: 100%;
+}

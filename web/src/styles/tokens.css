@@ -1,0 +1,258 @@
+/* Cópia de design/desktop/tokens.css (scripts/sync-design.mjs). Não edite à mão. */
+/* Tako Design System — Desktop — gerado de tokens.json (tema principal: TAKO) */
+:root, [data-theme="tako"] {
+  --canvas: #0b0b0e;
+  --titlebar: #08080b;
+  --titlebar-tint: #121019;
+  --surface: #0d0d10;
+  --surface-raised: #121317;
+  --tile: #141519;
+  --tile-foot: #101014;
+  --group: #0e0c14db;
+  --line: #e1deff13;
+  --line-strong: #e1deff21;
+  --text: #f4f1f0;
+  --text-muted: #958f94;
+  --text-dim: #625d63;
+  --accent: #d8c8bc;
+  --ambient-1: #518bd612;
+  --ambient-2: #518bd60a;
+  --success: #3ddc84;
+  --warning: #ffcf4d;
+  --error: #ff7b7b;
+  --wish: #ff5d7a;
+  --metacritic-good: #00ce7a;
+  --metacritic-mixed: #ffbd3f;
+  --metacritic-bad: #ff6874;
+  --window-close-hover: #c42b1c;
+  --brand-glow: #beb4ff2e;
+  --primary: #f4f4f4;
+  --primary-chip: #0d0d0d;
+  --on-primary: #111216;
+  --glass-panel: #0d0d10;
+  --glass-panel-dense: #121317;
+  --glass-highlight: #ffffff00;
+  --glass-specular: #ffffff00;
+  --glass-edge: #e1deff21;
+  --glass-control: #0e0e11;
+  --glass-hover: #ffffff0d;
+  --glass-selected: #ffffff17;
+  --glass-pressed: #ffffff24;
+  --glass-item-highlight: #ffffff00;
+  --glass-item-edge: #ffffff14;
+  --glass-edge-strong: #ffffff4d;
+  --glass-solid: #141519;
+  --primary-top: #f4f4f4;
+  --primary-bottom: #f4f4f4;
+  --on-accent: #f4f1f0;
+  --on-accent-muted: #cfcacd;
+  --on-accent-subtle: #958f94;
+  --accent-deep: #141519;
+  --accent-exemplo: #518bd6;
+  --settings-bg: #0b0b0e;
+  --settings-surface: #0d0d10;
+  --settings-separator: #e1deff13;
+  --settings-control: #141519;
+  --settings-control-hover: #1c1c22;
+  --keycap-bg: #ffffff08;
+  --divider: #ffffff38;
+  --art-scrim-left: #08080899;
+  --art-scrim-bottom: #080808eb;
+  --art-scrim-strong: #0b0b0ef0;
+  --brand-red: #d8c8bc;
+  --splash-bg: #0b0b0e;
+  --splash-track: #1a1a20;
+  --splash-muted: #958f94;
+  --medal-gold: #f0cf6a;
+  --medal-silver: #c9d0da;
+  --medal-bronze: #d39a6a;
+  --focus-ring: #ffffff99;
+  --focus-fill: #ffffff0d;
+  --focus-glow: #ffffff14;
+  --shadow-float: 0 24px 60px #00000099;
+  --shadow-layer: 0 40px 100px #00000099;
+  --shadow-window: 0 30px 80px #00000073;
+}
+[data-theme="escuro"] {
+  --canvas: #0a0a0a;
+  --titlebar: #070707;
+  --surface: #0c0c0c;
+  --surface-raised: #121212;
+  --tile: #141414;
+  --tile-foot: #0f0f0f;
+  --group: #0c0c0cdb;
+  --line: #ffffff12;
+  --line-strong: #ffffff1f;
+  --text: #f2f2f2;
+  --text-muted: #8a8a8a;
+  --text-dim: #5a5a5a;
+  --accent: #4d9bff;
+  --glass-panel: #0c0c0c;
+  --glass-panel-dense: #121212;
+  --glass-edge: #ffffff1f;
+  --glass-control: #0e0e0e;
+  --on-accent: #f2f2f2;
+  --on-accent-subtle: #8a8a8a;
+  --settings-bg: #0a0a0a;
+  --settings-surface: #0c0c0c;
+  --settings-separator: #ffffff12;
+  --settings-control: #141414;
+}
+[data-theme="meia-noite"] {
+  --canvas: #0b0e15;
+  --titlebar: #070707;
+  --surface: #0c0c0c;
+  --surface-raised: #121212;
+  --tile: #141414;
+  --tile-foot: #0f0f0f;
+  --group: #0c0c0cdb;
+  --line: #ffffff12;
+  --line-strong: #ffffff1f;
+  --text: #f2f2f2;
+  --text-muted: #8a8a8a;
+  --text-dim: #5a5a5a;
+  --accent: #4d9bff;
+  --glass-panel: #0c0c0c;
+  --glass-panel-dense: #121212;
+  --glass-edge: #ffffff1f;
+  --glass-control: #0e0e0e;
+  --on-accent: #f2f2f2;
+  --on-accent-subtle: #8a8a8a;
+  --settings-bg: #0a0a0a;
+  --settings-surface: #0c0c0c;
+  --settings-separator: #ffffff12;
+  --settings-control: #141414;
+}
+[data-theme="oled"] {
+  --canvas: #000000;
+  --titlebar: #070707;
+  --surface: #0c0c0c;
+  --surface-raised: #121212;
+  --tile: #141414;
+  --tile-foot: #0f0f0f;
+  --group: #0c0c0cdb;
+  --line: #ffffff12;
+  --line-strong: #ffffff1f;
+  --text: #f2f2f2;
+  --text-muted: #8a8a8a;
+  --text-dim: #5a5a5a;
+  --accent: #4d9bff;
+  --glass-panel: #0c0c0c;
+  --glass-panel-dense: #121212;
+  --glass-edge: #ffffff1f;
+  --glass-control: #0e0e0e;
+  --on-accent: #f2f2f2;
+  --on-accent-subtle: #8a8a8a;
+  --settings-bg: #0a0a0a;
+  --settings-surface: #0c0c0c;
+  --settings-separator: #ffffff12;
+  --settings-control: #141414;
+}
+[data-theme="vidro"] {
+  --canvas: #07080c;
+  --titlebar: #080a0e52;
+  --surface: #ffffff12;
+  --surface-raised: #14161c94;
+  --tile: #ffffff0d;
+  --tile-foot: #00000029;
+  --group: #ffffff12;
+  --line: #ffffff14;
+  --line-strong: #ffffff26;
+  --text-muted: #a5a9b3;
+  --text-dim: #8a8f9a;
+  --accent: #4d9bff;
+  --glass-panel: #ffffff12;
+  --glass-panel-dense: #14161c94;
+  --glass-highlight: #ffffff24;
+  --glass-specular: #ffffff24;
+  --glass-edge: #ffffff21;
+  --glass-control: #ffffff1a;
+  --glass-hover: #ffffff29;
+  --glass-selected: #ffffff1f;
+  --glass-item-highlight: #ffffff29;
+  --glass-solid: #14161cfa;
+}
+[data-theme="solido"] {
+  --glass-panel: #141519;
+  --glass-panel-dense: #141519;
+  --glass-highlight: #ffffff00;
+  --glass-specular: #ffffff00;
+  --surface: #141519;
+  --surface-raised: #18191d;
+  --group: #141519;
+}
+:root {
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --radius-thumb: 7px;
+  --radius-control: 9px;
+  --radius-row: 10px;
+  --radius-button: 11px;
+  --radius-card: 16px;
+  --radius-hero: 18px;
+  --radius-full: 999px;
+  --window-width: 1480px;
+  --topbar-height: 52px;
+  --list-width: 292px;
+  --list-collapsed-width: 76px;
+  --game-row-height: 42px;
+  --window-control-width: 40px;
+  --control-height: 36px;
+  --primary-height: 46px;
+  --hero-height: 400px;
+  --glass-blur: 28px;
+  --glass-item-blur: 12px;
+  --glass-saturate: 160%;
+  --intro-rise: 14px;
+  --card-height: 380px;
+  --settings-row-height: 64px;
+  --focus-ring-width: 3px;
+  --tempo-hover: 200ms;
+  --tempo-foco: 150ms;
+  --tempo-estado: 250ms;
+  --tempo-pagina: 450ms;
+  --tempo-saida: 200ms;
+  --tempo-troca: 500ms;
+  --tempo-escada: 55ms;
+  --tempo-lista: 500ms;
+  --tempo-arte: 800ms;
+  --tempo-destaque: 900ms;
+  --tempo-cor: 1000ms;
+  --tempo-carrossel: 7000ms;
+  --tempo-contador: 1100ms;
+  --tempo-radar: 900ms;
+  --curva-entrada: cubic-bezier(0.22, 1, 0.36, 1);
+  --curva-saida: cubic-bezier(0.22, 1, 0.36, 1);
+  --curva-estado: ease;
+  --escala-pressionado: 0.98;
+  --escala-entrada: 0.98;
+  --escala-menu: 0.98;
+  --escala-vista: 0.985;
+  --escala-capa: 1.05;
+  --font-text: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-heading: Poppins, "Plus Jakarta Sans", sans-serif;
+  --font-title: Poppins, "Plus Jakarta Sans", sans-serif;
+}
+.headline { font-family: var(--font-heading); font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; }
+.page-title { font-family: var(--font-heading); font-size: 26px; line-height: 1.15; font-weight: 800; letter-spacing: -0.015em; }
+.title { font-family: var(--font-heading); font-size: 19px; line-height: 1.25; font-weight: 700; letter-spacing: -0.01em; }
+.value { font-family: var(--font-heading); font-size: 22px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; }
+.tab { font-family: var(--font-heading); font-size: 12px; line-height: 1; font-weight: 400; letter-spacing: 0.32em; }
+.label-lg { font-family: var(--font-heading); font-size: 14px; line-height: 1.2; font-weight: 600; }
+.body { font-family: var(--font-text); font-size: 13.5px; line-height: 1.55; font-weight: 400; }
+.label { font-family: var(--font-text); font-size: 14px; line-height: 1.25; font-weight: 400; }
+.label-sm { font-family: var(--font-text); font-size: 12.5px; line-height: 1.3; font-weight: 500; }
+.overline { font-family: var(--font-text); font-size: 11px; line-height: 1.2; font-weight: 700; letter-spacing: 0.05em; }
+.keycap { font-family: var(--font-text); font-size: 10.5px; line-height: 1; font-weight: 500; }
+@font-face { font-family: "Poppins"; src: url("fonts/Poppins-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Poppins"; src: url("fonts/Poppins-Medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Poppins"; src: url("fonts/Poppins-SemiBold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Poppins"; src: url("fonts/Poppins-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Poppins"; src: url("fonts/Poppins-ExtraBold.ttf") format("truetype"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/PlusJakartaSans-Variable.ttf") format("truetype"); font-weight: 200 800; font-style: normal; font-display: swap; }

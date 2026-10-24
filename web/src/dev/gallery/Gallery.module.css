@@ -1,0 +1,32 @@
+/* Layout mínimo da página de desenvolvimento (não é tela do app): medidas soltas permitidas aqui. */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px;
+  color: var(--text);
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+.index a {
+  color: var(--text-muted);
+}
+.section {
+  margin-bottom: 48px;
+}
+.stage {
+  margin-top: 16px;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--canvas);
+}
