@@ -1,14 +1,23 @@
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 // Só para desenvolvimento; o build de produção não instala isto.
 
-import type { Call, Event, Reply } from "./index";
+import type { Call, Event } from "./index";
 import type { BridgeError } from "./generated/BridgeError";
+import type { UiState } from "./generated/UiState";
 
-type Handler = (payload: unknown) => Reply["data"] | Promise<Reply["data"]>;
+/** Devolve o `data` da resposta (ou nada, para chamadas sem retorno). */
+type Handler = (payload: unknown) => unknown;
 export type FakeHandlers = Partial<Record<Call["name"], Handler>>;
+
+let uiState: UiState = { json: null };
 
 const defaults: FakeHandlers = {
   "app.info": () => ({ version: "dev", bridgeVersion: 1 }),
+  "window.action": (action) => console.info("[hospedeiro falso] janela:", action),
+  "ui.state": () => uiState,
+  "ui.state.set": (state) => {
+    uiState = state as UiState;
+  },
 };
 
 /** Instala o hospedeiro falso se não houver um de verdade. Devolve uma função para emitir eventos. */

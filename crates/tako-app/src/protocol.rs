@@ -79,6 +79,15 @@ pub enum Call {
     /// Versão do app e do contrato; a interface confere a versão ao abrir.
     #[serde(rename = "app.info")]
     AppInfo,
+    /// Botões da barra da janela (BarraDaJanela) e tela cheia; quem executa é o hospedeiro.
+    #[serde(rename = "window.action")]
+    WindowAction(WindowAction),
+    /// Onde a interface estava antes de fechar (D-10); `json: null` na primeira abertura.
+    #[serde(rename = "ui.state")]
+    UiState,
+    /// Guarda onde a interface está (tela, jogo, filtros, rolagem), em JSON da própria interface, até 64 KiB.
+    #[serde(rename = "ui.state.set")]
+    UiStateSet(UiState),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -88,6 +97,32 @@ pub enum Call {
 pub enum Reply {
     #[serde(rename = "app.info")]
     AppInfo(AppInfo),
+    #[serde(rename = "window.action")]
+    WindowAction,
+    #[serde(rename = "ui.state")]
+    UiState(UiState),
+    #[serde(rename = "ui.state.set")]
+    UiStateSet,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum WindowAction {
+    Minimize,
+    /// Maximiza ou restaura, conforme o estado atual.
+    ToggleMaximize,
+    Close,
+    /// Começa a arrastar a janela (barra própria sem moldura do sistema).
+    StartDrag,
+    /// Troca para a tela cheia (Big Picture).
+    BigPicture,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[ts(export)]
+pub struct UiState {
+    pub json: Option<String>,
 }
 
 /// Eventos do núcleo para a interface.

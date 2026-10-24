@@ -72,6 +72,11 @@ e entrega cada resposta e evento chamando `window.__takoDeliver(message)`, que o
 O `AppService` roda na thread do núcleo. Chamada demorada (ler uma loja, baixar arte) responde logo com o
 estado atual e avisa o resto por evento; o hospedeiro nunca trava a janela esperando o núcleo.
 
+**Pedidos ao hospedeiro.** O que só o hospedeiro sabe fazer (mexer na janela, abrir um jogo pela sessão) passa
+por `HostRequest`: a chamada (`window.action`, `game.play`…) manda o pedido pelo canal de `set_host_sink` e
+responde assim que ele foi aceito; o resultado chega depois por evento. Assim o `AppService` não conhece janela
+nem supervisor.
+
 ## 4. Esquemas próprios
 
 Nenhuma porta de rede. Tudo que a página carrega vem de dois esquemas, registrados como seguros e com CSP:
@@ -101,8 +106,8 @@ script-src tako-app:; connect-src 'none'`. Em desenvolvimento, o servidor do Vit
 ## 6. Interface descartável (D-10)
 
 A interface pode ser fechada e reaberta a qualquer momento (jogo aberto, minimizado, bandeja). Por isso:
-- Estado que precisa sobreviver (tela atual, jogo selecionado, filtros, rolagem) é guardado no núcleo por uma
-  chamada (`ui.state.set`, a criar no WEB-02a) e lido ao abrir (`ui.state`).
+- Estado que precisa sobreviver (tela atual, jogo selecionado, filtros, rolagem) é guardado no núcleo com
+  `ui.state.set` (JSON da própria interface, até 64 KiB) e lido ao abrir com `ui.state`.
 - Evento emitido com a interface fechada se perde de propósito; ao abrir, a interface consulta tudo de novo.
 
 ## 7. Acrescentar uma chamada ou evento

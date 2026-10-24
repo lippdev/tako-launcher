@@ -5,13 +5,27 @@
 
 pub mod protocol;
 
-use protocol::{AppInfo, BRIDGE_VERSION, BridgeError, Call, Event, Reply};
+use protocol::{
+    AppInfo, BRIDGE_VERSION, BridgeError, Call, ErrorCode, Event, Reply, UiState, WindowAction,
+};
 use std::sync::mpsc::Sender;
+
+/// Maior estado de tela guardado (`ui.state.set`); é só onde a interface estava, não dados.
+const MAX_UI_STATE_BYTES: usize = 64 * 1024;
+
+/// O que só o hospedeiro sabe fazer (janela, sessão de jogo). A chamada responde na hora que o pedido foi aceito;
+/// o resultado chega depois por evento.
+#[derive(Debug, Clone, PartialEq)]
+pub enum HostRequest {
+    Window(WindowAction),
+}
 
 /// Atende as chamadas da interface. Uma instância por processo, na thread do núcleo.
 pub struct AppService {
     version: String,
     events: Option<Sender<Event>>,
+    host: Option<Sender<HostRequest>>,
+    ui_state: Option<String>,
 }
 
 impl AppService {
@@ -19,6 +33,8 @@ impl AppService {
         Self {
             version: version.into(),
             events: None,
+            host: None,
+            ui_state: None,
         }
     }
 
@@ -27,12 +43,47 @@ impl AppService {
         self.events = Some(sink);
     }
 
+    /// Para onde vão os pedidos ao hospedeiro (`HostRequest`).
+    pub fn set_host_sink(&mut self, sink: Sender<HostRequest>) {
+        self.host = Some(sink);
+    }
+
     pub fn handle(&mut self, call: Call) -> Result<Reply, BridgeError> {
         match call {
             Call::AppInfo => Ok(Reply::AppInfo(AppInfo {
                 version: self.version.clone(),
                 bridge_version: BRIDGE_VERSION,
             })),
+            Call::WindowAction(action) => {
+                self.request(HostRequest::Window(action))?;
+                Ok(Reply::WindowAction)
+            }
+            Call::UiState => Ok(Reply::UiState(UiState {
+                json: self.ui_state.clone(),
+            })),
+            Call::UiStateSet(state) => {
+                if state
+                    .json
+                    .as_ref()
+                    .is_some_and(|s| s.len() > MAX_UI_STATE_BYTES)
+                {
+                    return Err(BridgeError::new(
+                        ErrorCode::BadRequest,
+                        "estado de tela grande demais",
+                    ));
+                }
+                self.ui_state = state.json;
+                Ok(Reply::UiStateSet)
+            }
+        }
+    }
+
+    fn request(&self, req: HostRequest) -> Result<(), BridgeError> {
+        let sent = self.host.as_ref().is_some_and(|h| h.send(req).is_ok());
+        if sent {
+            Ok(())
+        } else {
+            Err(BridgeError::new(ErrorCode::Internal, "sem hospedeiro"))
         }
     }
 
@@ -94,6 +145,46 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&err).unwrap(),
             r#"{"v":1,"id":8,"ok":false,"error":{"code":"not_found","message":"jogo x"}}"#
+        );
+    }
+
+    #[test]
+    fn window_actions_go_to_the_host() {
+        let mut app = AppService::new("1");
+        let no_host = app.handle(Call::WindowAction(WindowAction::Close));
+        assert_eq!(no_host.unwrap_err().code, ErrorCode::Internal);
+        let (tx, rx) = std::sync::mpsc::channel();
+        app.set_host_sink(tx);
+        let req: Request = serde_json::from_str(
+            r#"{"v":1,"id":1,"name":"window.action","payload":"toggle_maximize"}"#,
+        )
+        .unwrap();
+        assert_eq!(app.handle(req.call).unwrap(), Reply::WindowAction);
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            HostRequest::Window(WindowAction::ToggleMaximize)
+        );
+    }
+
+    #[test]
+    fn ui_state_survives_until_replaced_and_has_a_limit() {
+        let mut app = AppService::new("1");
+        let empty = Reply::UiState(UiState { json: None });
+        assert_eq!(app.handle(Call::UiState).unwrap(), empty);
+        let state = UiState {
+            json: Some(r#"{"screen":"library"}"#.into()),
+        };
+        assert_eq!(
+            app.handle(Call::UiStateSet(state.clone())).unwrap(),
+            Reply::UiStateSet
+        );
+        assert_eq!(app.handle(Call::UiState).unwrap(), Reply::UiState(state));
+        let big = UiState {
+            json: Some("x".repeat(MAX_UI_STATE_BYTES + 1)),
+        };
+        assert_eq!(
+            app.handle(Call::UiStateSet(big)).unwrap_err().code,
+            ErrorCode::BadRequest
         );
     }
 
