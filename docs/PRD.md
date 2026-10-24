@@ -75,6 +75,7 @@ Um launcher de jogos para a TV e o controle, **igual no Windows, no Linux e no m
 | D-12 | O **Slint fica congelado** até a paridade da interface web: só correções críticas, sem polimento nem funções novas de interface. Funções novas entram no núcleo Rust e ganham tela já na versão web. | Decidido |
 | D-13 | **Testes locais durante a migração:** fmt, clippy, testes e build rodam na máquina do desenvolvimento (agentes e orquestrador) antes de cada entrada na integração. O GitHub guarda o código, mas os workflows de teste (`CI`, `Rust`, `Packaging`, `PR title`) ficam desligados e só rodam se alguém pedir. O `Release` continua para publicar versões. | Decidido (24/10/2026). Religar com `gh workflow enable` e os gatilhos antigos quando a migração acabar. |
 | D-14 | **Implementar primeiro, otimizar depois:** a interface web é construída direto na fundação definitiva, sem protótipo descartável nem linha de base do Slint antes. As medições da §8.5 e a comparação CEF × WebView2 no Windows acontecem sobre o app web (WEB-60), e o que não bater a meta vira tarefa de otimização. | Decidido (24/10/2026). Substitui o gate antes do porte (MIG-W00 e MIG-W01). |
+| D-15 | **Fase Windows primeiro:** a migração para a interface web mira só o Windows até a paridade com a interface Slint no Windows. Linux e macOS (hospedeiro CEF, empacotamento, testes) ficam para depois. Matriz de paridade em [`docs/plans/web-paridade-windows.md`](plans/web-paridade-windows.md). | Decidido (24/10/2026) |
 
 ### 2.1 Por que a interface vai para a web (D-09)
 
