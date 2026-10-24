@@ -3,6 +3,7 @@ import {
   useId,
   useLayoutEffect,
   useRef,
+  useState,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -233,6 +234,8 @@ export function PainelDownloads(props: PainelDownloadsProps) {
 
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Capa que não carregou (o jogo ainda não tem arte no cache): fica o quadrado do estado, sem imagem quebrada.
+  const [brokenCovers, setBrokenCovers] = useState<ReadonlySet<string>>(new Set());
 
   // Camada: presença para animação suave de saída (200ms)
   const { mounted, visible, animating } = usePresence(estaAberto, panelRef);
@@ -421,8 +424,15 @@ export function PainelDownloads(props: PainelDownloadsProps) {
 
                 return (
                   <div key={item.id} className={styles["item"]} role="listitem">
-                    {item.capa ? (
-                      <img src={item.capa} alt="" className={styles["cover"]} />
+                    {item.capa && !brokenCovers.has(item.capa) ? (
+                      <img
+                        src={item.capa}
+                        alt=""
+                        className={styles["cover"]}
+                        onError={() => {
+                          setBrokenCovers((previous) => new Set(previous).add(item.capa ?? ""));
+                        }}
+                      />
                     ) : (
                       <div
                         className={cx(

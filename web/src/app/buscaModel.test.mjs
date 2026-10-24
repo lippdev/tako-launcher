@@ -33,14 +33,14 @@ const resultLabels = { stores: { steam: "Steam", gog: "GOG" }, installed: "Insta
 const shortcuts = buildShortcuts(labels);
 const game = (id, title, store, installed) => ({ id, title, store, installed });
 
-test("o catálogo tem as quatro vistas e as doze categorias, nessa ordem", () => {
-  assert.equal(shortcuts.length, 16);
+test("o catálogo tem as três vistas e as doze categorias, nessa ordem", () => {
+  assert.equal(shortcuts.length, 15);
   assert.deepEqual(
-    shortcuts.slice(0, 4).map((s) => s.target),
-    [{ view: "biblioteca" }, { view: "configuracoes" }, { view: "perfil" }, { view: "downloads" }],
+    shortcuts.slice(0, 3).map((s) => s.target),
+    [{ view: "biblioteca" }, { view: "configuracoes" }, { view: "perfil" }],
   );
-  assert.deepEqual(shortcuts[4]?.target, { view: "configuracoes", settingsCategory: "general" });
-  assert.deepEqual(shortcuts[15]?.target, { view: "configuracoes", settingsCategory: "about" });
+  assert.deepEqual(shortcuts[3]?.target, { view: "configuracoes", settingsCategory: "general" });
+  assert.deepEqual(shortcuts[14]?.target, { view: "configuracoes", settingsCategory: "about" });
 });
 
 test("normaliza acento e caixa", () => {

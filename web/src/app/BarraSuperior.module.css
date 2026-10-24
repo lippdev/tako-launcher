@@ -7,7 +7,6 @@
   --nav-gap: 40px;
   --chevron-size: 13px;
   --avatar-size: 24px;
-  --badge-size: 19px;
 
   position: absolute;
   inset: 0 0 auto;
@@ -181,34 +180,4 @@
   border: 2px solid var(--titlebar);
   border-radius: 50%;
   background: var(--success);
-}
-
-/* ---- Contador do Downloads (AtividadeNaBarra) ---- */
-
-.badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  display: grid;
-  place-items: center;
-  min-width: var(--badge-size);
-  height: var(--badge-size);
-  padding: 0 var(--space-4);
-  border: 2px solid var(--titlebar);
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--accent-deep);
-  font-family: var(--font-heading);
-  font-size: 11px;
-  font-weight: 700;
-  animation: badge-pop 400ms var(--curva-entrada);
-}
-
-@keyframes badge-pop {
-  0% {
-    transform: scale(1.35);
-  }
-  100% {
-    transform: scale(1);
-  }
 }

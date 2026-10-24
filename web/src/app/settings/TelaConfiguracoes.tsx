@@ -7,6 +7,7 @@ import { SETTINGS_CATEGORY_IDS, type SettingsCategoryId } from "../uiState";
 import { AparenciaCategoria } from "./AparenciaCategoria";
 import { BibliotecaCategoria } from "./BibliotecaCategoria";
 import { CategoriaDeConfiguracao } from "./CategoriaDeConfiguracao";
+import { DownloadsCategoria } from "./DownloadsCategoria";
 import { GeralCategoria } from "./GeralCategoria";
 import { IntegracoesCategoria } from "./IntegracoesCategoria";
 import type { CategoryProps } from "./Linhas";
@@ -46,6 +47,9 @@ const SETTINGS_KEYS: readonly string[] = [
   KEYS.discord,
   KEYS.sunshineSync,
   KEYS.developer,
+  KEYS.downloadsEnabled,
+  KEYS.downloadsAccepted,
+  KEYS.downloadsUpload,
 ];
 
 const PANEL_ID = "configuracoes-painel";
@@ -89,8 +93,7 @@ function Conteudo({ category, ...props }: CategoryProps & { category: SettingsCa
       // passam pela ponte, e o cache de capas.
       return <Soon />;
     case "downloads":
-      // TODO(WEB-13b): Downloads espera o núcleo de downloads (pastas, limites e fila).
-      return <Soon />;
+      return <DownloadsCategoria {...props} />;
   }
 }
 

@@ -37,6 +37,9 @@ export const KEYS = {
   discord: "DiscordRichPresence",
   sunshineSync: "SunshineSyncOnRescan",
   developer: "DeveloperOptions",
+  downloadsEnabled: "DownloadsEnabled",
+  downloadsAccepted: "DownloadsLegalAccepted",
+  downloadsUpload: "DownloadsUploadLimitKiB",
 } as const;
 
 /** As chaves que a aparência salva depende (lidas ao abrir o app). */
@@ -63,6 +66,9 @@ export const DEFAULTS = {
   discord: false,
   sunshineSync: false,
   developer: false,
+  /** Os downloads vêm desligados até o usuário aceitar o aviso legal. */
+  downloadsEnabled: false,
+  downloadsAccepted: false,
   /** Os sons de navegação vêm desligados; a música do tema, a 70%. */
   navigationVolume: 0,
   themeMusicVolume: 70,

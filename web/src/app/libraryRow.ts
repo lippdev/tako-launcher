@@ -10,7 +10,11 @@ const statuses = {
 } as const;
 
 /** Só campos conhecidos: situação pessoal não significa processo em execução. */
-export function libraryGameToRow(game: LibraryGame, storeName: string = game.store): GameRow {
+export function libraryGameToRow(
+  game: LibraryGame,
+  storeName: string = game.store,
+  downloadPercent: number | null = null,
+): GameRow {
   return {
     id: game.id,
     title: game.title,
@@ -19,7 +23,7 @@ export function libraryGameToRow(game: LibraryGame, storeName: string = game.sto
     favorite: game.favorite,
     status: game.status ? statuses[game.status] : "none",
     running: false,
-    downloadPercent: null,
+    downloadPercent,
     updateAvailable: false,
   };
 }

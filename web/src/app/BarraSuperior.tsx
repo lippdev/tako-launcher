@@ -4,6 +4,7 @@ import { Icon } from "../components/Icon/Icon";
 import { Marca } from "../components/Marca/Marca";
 import { cx } from "../lib/cx";
 import { BarraDaJanela } from "./BarraDaJanela";
+import { DownloadsNaBarra } from "./DownloadsNaBarra";
 import { MenuDoTako } from "./MenuDoTako";
 import { strings } from "./strings";
 import type { ViewId } from "./uiState";
@@ -17,14 +18,16 @@ interface BarraSuperiorProps {
   view: ViewId;
   onNavigate: (view: ViewId) => void;
   onSearch: () => void;
-  /** Atividades em segundo plano (AtividadeNaBarra): a bolinha do Downloads; 0 some. */
-  activityCount?: number;
+  /** Abre a página de um jogo na biblioteca (o painel de downloads concluídos). */
+  onOpenGame: (gameId: string) => void;
+  /** Abre Configurações › Downloads. */
+  onOpenDownloadSettings: () => void;
   /** Nome e situação do perfil. */
   profile: { name: string; online: boolean };
 }
 
 /** A barra de cima de borda a borda (README da BarraSuperior), que também é a barra da janela (arrasta e duplo clique maximiza). */
-export function BarraSuperior({ view, onNavigate, activityCount = 0, profile, onSearch }: BarraSuperiorProps) {
+export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSettings, profile, onSearch }: BarraSuperiorProps) {
   const [brand, setBrand] = useState<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -84,25 +87,7 @@ export function BarraSuperior({ view, onNavigate, activityCount = 0, profile, on
         >
           <Icon name="search" />
         </button>
-        <button
-          type="button"
-          className={cx(styles["action"], view === "downloads" && styles["on"])}
-          aria-label={strings.topbar.downloads}
-          title={strings.topbar.downloads}
-          {...(view === "downloads" ? { "aria-current": "page" as const } : {})}
-          onClick={() => {
-            // TODO(WEB-14): o Downloads vira o PainelDownloads; por enquanto abre a vista vazia.
-            onNavigate("downloads");
-          }}
-        >
-          <Icon name="download-circle" />
-          {activityCount > 0 && (
-            // `key` refaz o elemento a cada mudança: a bolinha pula de novo (escala 1,35 em 400 ms).
-            <span key={activityCount} className={styles["badge"]}>
-              {activityCount}
-            </span>
-          )}
-        </button>
+        <DownloadsNaBarra onOpenGame={onOpenGame} onOpenSettings={onOpenDownloadSettings} />
 
         <button
           type="button"

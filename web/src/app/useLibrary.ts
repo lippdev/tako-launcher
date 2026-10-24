@@ -3,6 +3,8 @@ import { call, on } from "../bridge";
 import type { Collection } from "../bridge/generated/Collection";
 import type { Tag } from "../bridge/generated/Tag";
 import type { LibraryGame } from "../bridge/generated/LibraryGame";
+import { percentByGame } from "./downloadsModel";
+import { useDownloads } from "./downloadsStore";
 import { libraryGameIcon, libraryGameToRow } from "./libraryRow";
 import type { LibraryCriteria } from "./uiState";
 import { libraryStrings } from "./strings";
@@ -142,9 +144,15 @@ export function useLibrary(criteria: LibraryCriteria) {
       });
     }
   }, []);
+  // "Baixando · n%" na linha do jogo que tem um download em aberto (só existe com os downloads ligados).
+  const { entries } = useDownloads();
+  const downloading = useMemo(() => percentByGame(entries), [entries]);
   const rows = useMemo(
-    () => data.games.map((game) => libraryGameToRow(game, libraryStrings.stores[game.store])),
-    [data.games],
+    () =>
+      data.games.map((game) =>
+        libraryGameToRow(game, libraryStrings.stores[game.store], downloading.get(game.id) ?? null),
+      ),
+    [data.games, downloading],
   );
   const resolveIcon = useCallback(
     (id: string, px: number) => {

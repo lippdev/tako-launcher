@@ -65,7 +65,8 @@ export interface ShortcutLabels {
   viewsGroup: string;
 }
 
-const VIEW_ORDER: readonly ViewId[] = ["biblioteca", "configuracoes", "perfil", "downloads"];
+// A vista "downloads" ficou sem tela (os downloads vivem no painel da barra e em Configurações › Downloads).
+const VIEW_ORDER: readonly ViewId[] = ["biblioteca", "configuracoes", "perfil"];
 const CATEGORY_ORDER: readonly SettingsCategoryId[] = [
   "general",
   "theme",

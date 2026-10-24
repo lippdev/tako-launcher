@@ -126,3 +126,13 @@
 .sections > :nth-child(n + 4) {
   animation-delay: calc(var(--tempo-escada) * 4);
 }
+
+/* O texto do aviso legal dos downloads: os parágrafos vêm separados por linha em branco. */
+.legal {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-line;
+}

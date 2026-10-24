@@ -115,6 +115,12 @@ export function AppShell() {
         view={view}
         onNavigate={navigate}
         profile={PROFILE}
+        onOpenGame={(id) => {
+          update({ view: "biblioteca", activeGame: id });
+        }}
+        onOpenDownloadSettings={() => {
+          update({ view: "configuracoes", settingsCategory: "downloads" });
+        }}
         onSearch={() => {
           setSearchOpen(true);
           setSearchFocus((n) => n + 1);

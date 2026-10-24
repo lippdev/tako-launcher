@@ -20,6 +20,13 @@ import type { SettingsValues } from "./generated/SettingsValues";
 import type { Store } from "./generated/Store";
 import type { AudioOutputList } from "./generated/AudioOutputList";
 import type { DisplayList } from "./generated/DisplayList";
+import type { DownloadAdd } from "./generated/DownloadAdd";
+import type { DownloadCancel } from "./generated/DownloadCancel";
+import type { DownloadEntry } from "./generated/DownloadEntry";
+import type { DownloadRequest } from "./generated/DownloadRequest";
+import type { DownloadSource } from "./generated/DownloadSource";
+import type { DownloadSources } from "./generated/DownloadSources";
+import type { DownloadsSummary } from "./generated/DownloadsSummary";
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
@@ -714,11 +721,91 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
     "settings.general.title": "Geral",
     "common.games.one": "{n} jogo",
     "common.games.other": "{n} jogos",
+    // Downloads (WEB-14b): os textos de `downloads.toml` e dois de `common.toml`.
+    "downloads.title": "Downloads",
+    "downloads.enable": "Downloads por torrent",
+    "downloads.enable_desc": "Baixar jogos de fontes .json que você mesmo adiciona. Desligado até você ligar.",
+    "downloads.privacy": "Privacidade",
+    "downloads.privacy_desc": "Num torrent, o seu endereço IP fica visível para os outros participantes e para quem monitora a rede. O Tako não abre portas no roteador (sem UPnP) e para de enviar quando o download termina. O histórico fica no banco local até você remover os itens da lista; isso não apaga os arquivos.",
+    "downloads.upload": "Limite de envio",
+    "downloads.upload_desc": "Quanto o Tako envia para outros participantes enquanto baixa. Ao terminar, o envio para.",
+    "downloads.upload_none": "Sem limite",
+    "downloads.sources": "Fontes de download",
+    "downloads.sources_desc": "{count} fontes adicionadas por você · a procedência aparece em cada item",
+    "downloads.source_desc": "{count} itens · atualizada em {date}",
+    "downloads.source_loading": "Lendo a fonte…",
+    "downloads.tool": "O Tako é só a ferramenta",
+    "downloads.tool_desc": "O Tako não hospeda, não indexa, não recomenda e não fiscaliza fontes nem conteúdo. Você escolhe as fontes e responde pelo que baixa.",
+    "downloads.legal_title": "Antes de ligar os downloads",
+    "downloads.legal_text": "O Tako fornece só a ferramenta: não traz, não sugere e não lista fontes, nem verifica o conteúdo delas. Baixar material protegido por direitos autorais sem autorização pode ser ilegal onde você mora, e a responsabilidade é sua.\n\nNum torrent, o seu endereço IP fica visível para os outros participantes e para quem monitora a rede. O Tako nunca abre nem executa o que for baixado: ao terminar, mostra só a pasta.",
+    "downloads.legal_accept": "Entendi e aceito",
+    "downloads.group_active": "Baixando",
+    "downloads.group_queued": "Na fila",
+    "downloads.group_done": "Concluídos",
+    "downloads.empty": "Nenhum download",
+    "downloads.n_active": "{n} baixando",
+    "downloads.paused": "Pausado",
+    "downloads.waiting": "espera",
+    "downloads.metadata": "Buscando os dados do torrent…",
+    "downloads.of": "{done} de {total}",
+    "downloads.left": "faltam {time}",
+    "downloads.failed": "Erro: {error}",
+    "downloads.cancel_title": "Cancelar o download?",
+    "downloads.cancel_title_game": "Cancelar o download de {title}?",
+    "downloads.cancel_text": "O jogo deixa de mostrar o download. Os arquivos parciais podem ficar na pasta ou ser apagados.",
+    "downloads.cancel_keep": "Continuar baixando",
+    "downloads.cancel_keep_files": "Cancelar e manter os arquivos",
+    "downloads.cancel_delete": "Cancelar e apagar",
+    "downloads.pause": "Pausar",
+    "downloads.resume": "Continuar",
+    "downloads.cancel": "Cancelar",
+    "common.cancel": "Cancelar",
+    "common.close": "Fechar",
   },
   "en-US": {
     "settings.general.title": "General",
     "common.games.one": "{n} game",
     "common.games.other": "{n} games",
+    // Downloads (WEB-14b): os textos de `downloads.toml` e dois de `common.toml`.
+    "downloads.title": "Downloads",
+    "downloads.enable": "Torrent downloads",
+    "downloads.enable_desc": "Download games from .json sources you add yourself. Off until you turn it on.",
+    "downloads.privacy": "Privacy",
+    "downloads.privacy_desc": "In a torrent, your IP address is visible to other participants and to anyone watching the network. Tako opens no router ports (no UPnP) and stops uploading when a download finishes. Download history stays in the local database until you remove items from the list; this does not delete the files.",
+    "downloads.upload": "Upload limit",
+    "downloads.upload_desc": "How much Tako uploads to other participants while downloading. Uploading stops when it finishes.",
+    "downloads.upload_none": "No limit",
+    "downloads.sources": "Download sources",
+    "downloads.sources_desc": "{count} sources added by you · each item shows where it came from",
+    "downloads.source_desc": "{count} items · updated {date}",
+    "downloads.source_loading": "Reading the source…",
+    "downloads.tool": "Tako is only the tool",
+    "downloads.tool_desc": "Tako doesn't host, index, recommend or check sources or content. You choose the sources and are responsible for what you download.",
+    "downloads.legal_title": "Before turning on downloads",
+    "downloads.legal_text": "Tako only provides the tool: it doesn't ship, suggest or list sources, nor check what they contain. Downloading copyrighted material without permission may be illegal where you live, and you are responsible for it.\n\nIn a torrent, your IP address is visible to other participants and to anyone watching the network. Tako never opens or runs what you download: when it finishes, it only shows the folder.",
+    "downloads.legal_accept": "I understand and accept",
+    "downloads.group_active": "Downloading",
+    "downloads.group_queued": "Queued",
+    "downloads.group_done": "Completed",
+    "downloads.empty": "No downloads",
+    "downloads.n_active": "{n} downloading",
+    "downloads.paused": "Paused",
+    "downloads.waiting": "waiting",
+    "downloads.metadata": "Getting the torrent's data…",
+    "downloads.of": "{done} of {total}",
+    "downloads.left": "{time} left",
+    "downloads.failed": "Error: {error}",
+    "downloads.cancel_title": "Cancel the download?",
+    "downloads.cancel_title_game": "Cancel the download of {title}?",
+    "downloads.cancel_text": "The game stops showing the download. Partial files can stay in the folder or be deleted.",
+    "downloads.cancel_keep": "Keep downloading",
+    "downloads.cancel_keep_files": "Cancel and keep files",
+    "downloads.cancel_delete": "Cancel and delete",
+    "downloads.pause": "Pause",
+    "downloads.resume": "Resume",
+    "downloads.cancel": "Cancel",
+    "common.cancel": "Cancel",
+    "common.close": "Close",
   },
 };
 
@@ -749,3 +836,206 @@ function setSettingAndAnnounceLanguage(payload: unknown) {
 }
 
 Object.assign(defaults, { "i18n.catalog": i18nCatalog, "settings.set": setSettingAndAnnounceLanguage });
+
+// ---- Downloads (WEB-14b) ----
+// Um motor de exemplo em memória: o progresso avança sozinho (a velocidade é a mostrada), `downloads.changed` avisa a
+// cada passo e toda chamada dá `conflict` enquanto os downloads estão desligados, como o núcleo.
+
+for (const key of ["DownloadsEnabled", "DownloadsLegalAccepted", "DownloadsUploadLimitKiB"]) KNOWN_SETTINGS.add(key);
+BOOL_SETTINGS.add("DownloadsEnabled");
+BOOL_SETTINGS.add("DownloadsLegalAccepted");
+
+const GB = 1024 ** 3;
+const MB = 1024 ** 2;
+/** Quantos downloads o motor de exemplo baixa ao mesmo tempo; os outros esperam na fila. */
+const MAX_PARALLEL = 2;
+
+let nextDownloadId = 1;
+let downloads: DownloadEntry[] = [];
+let downloadTimer: ReturnType<typeof setInterval> | undefined;
+/** O ritmo de cada download de exemplo enquanto baixa (bytes por segundo). */
+const FAKE_SPEED = new Map<number, number>();
+
+/** Como o núcleo: ligados só com a chave e o aviso legal aceito. */
+function downloadsOn(): boolean {
+  return settings.get("DownloadsEnabled") === "true" && settings.get("DownloadsLegalAccepted") === "true";
+}
+
+function requireDownloads() {
+  if (!downloadsOn()) throw new FakeError("conflict", "os downloads estão desligados");
+  // Recarregar a página com tudo ligado (a configuração fica na sessão) também começa com os de exemplo.
+  seedDownloads();
+  ensureDownloadTimer();
+}
+
+function announceDownloads() {
+  window.__takoDeliver?.(JSON.stringify({ v: 1, event: { name: "downloads.changed" } }));
+}
+
+function newDownload(title: string, gameId: string | null, total: number, done: number): DownloadEntry {
+  return {
+    id: nextDownloadId++,
+    title,
+    gameId,
+    source: "Minha fonte",
+    state: "queued",
+    error: null,
+    done,
+    total,
+    progress: done / total,
+    speed: 0,
+    etaSeconds: null,
+  };
+}
+
+/** Sobe os da fila até o limite de paralelos e recalcula velocidade, tempo restante e progresso. */
+function schedule() {
+  let running = downloads.filter((d) => d.state === "downloading").length;
+  for (const d of downloads) {
+    if (d.state === "queued" && running < MAX_PARALLEL) {
+      d.state = "downloading";
+      running += 1;
+    }
+  }
+  for (const d of downloads) {
+    d.speed = d.state === "downloading" ? (FAKE_SPEED.get(d.id) ?? 40 * MB) : 0;
+    d.etaSeconds = d.speed > 0 && d.total !== null ? Math.ceil((d.total - d.done) / d.speed) : null;
+    d.progress = d.total === null ? null : d.done / d.total;
+  }
+}
+
+function tickDownloads() {
+  for (const d of downloads) {
+    if (d.state !== "downloading" || d.total === null) continue;
+    d.done = Math.min(d.total, d.done + d.speed);
+    if (d.done >= d.total) d.state = "completed";
+  }
+  schedule();
+  if (!downloads.some((d) => d.state === "downloading")) stopDownloadTimer();
+  announceDownloads();
+}
+
+function stopDownloadTimer() {
+  if (downloadTimer === undefined) return;
+  clearInterval(downloadTimer);
+  downloadTimer = undefined;
+}
+
+function ensureDownloadTimer() {
+  if (downloadTimer === undefined && downloads.some((d) => d.state === "downloading")) {
+    downloadTimer = setInterval(tickDownloads, 1000);
+  }
+}
+
+/** Os da primeira vez que se liga: ligados a jogos da lista que não estão instalados. */
+let seeded = false;
+function seedDownloads() {
+  if (seeded) return;
+  seeded = true;
+  const samples: [title: string, gameId: string, total: number, done: number, speed: number, paused?: boolean][] = [
+    ["Watch Dogs 2", "steam:1002", 6.2 * GB, 3.5 * GB, 48 * MB],
+    ["Black Myth: Wukong", "steam:1010", 9.4 * GB, 1.1 * GB, 32 * MB],
+    ["Death Stranding", "steam:1011", 4.8 * GB, 0, 24 * MB],
+    ["Ghost of Tsushima Director's Cut", "steam:1012", 7.5 * GB, 2.3 * GB, 40 * MB, true],
+  ];
+  downloads = samples.map(([title, gameId, total, done, speed, paused]) => {
+    const entry = newDownload(title, gameId, Math.round(total), Math.round(done));
+    FAKE_SPEED.set(entry.id, speed);
+    if (paused) entry.state = "paused";
+    return entry;
+  });
+  schedule();
+}
+
+function downloadById(payload: unknown): DownloadEntry {
+  const { downloadId } = payload as DownloadRequest;
+  const entry = downloads.find((d) => d.id === downloadId);
+  if (!entry) throw new FakeError("not_found", `download ${String(downloadId)}`);
+  return entry;
+}
+
+function changeDownload(payload: unknown, from: DownloadEntry["state"][], to: DownloadEntry["state"]) {
+  requireDownloads();
+  const entry = downloadById(payload);
+  if (!from.includes(entry.state)) throw new FakeError("conflict", `download ${String(entry.id)} está ${entry.state}`);
+  entry.state = to;
+  schedule();
+  ensureDownloadTimer();
+  announceDownloads();
+}
+
+const SAMPLE_DOWNLOAD_SOURCES: DownloadSource[] = [
+  { id: "fonte-1", name: "Minha fonte", host: "exemplo.com.br", itemCount: 128, dropped: 2, updatedAt: "2026-10-20T12:00:00Z" },
+];
+
+Object.assign(defaults, {
+  "downloads.list": () => {
+    requireDownloads();
+    return downloads.map((d) => ({ ...d }));
+  },
+  "downloads.summary": (): DownloadsSummary => {
+    requireDownloads();
+    const open = downloads.filter((d) => d.state === "downloading" || d.state === "queued");
+    return {
+      downloading: downloads.filter((d) => d.state === "downloading").length,
+      queued: downloads.filter((d) => d.state === "queued").length,
+      speed: downloads.reduce((sum, d) => sum + d.speed, 0),
+      done: open.reduce((sum, d) => sum + d.done, 0),
+      total: open.reduce((sum, d) => sum + (d.total ?? 0), 0),
+    };
+  },
+  "downloads.pause": (payload: unknown) => {
+    changeDownload(payload, ["downloading", "queued"], "paused");
+  },
+  "downloads.resume": (payload: unknown) => {
+    changeDownload(payload, ["paused", "failed"], "queued");
+  },
+  "downloads.cancel": (payload: unknown) => {
+    requireDownloads();
+    const { deleteFiles } = payload as DownloadCancel;
+    const entry = downloadById(payload);
+    console.info("[hospedeiro falso] cancelar download:", entry.title, deleteFiles ? "(apagando os arquivos)" : "(mantendo os arquivos)");
+    downloads = downloads.filter((d) => d.id !== entry.id);
+    schedule();
+    announceDownloads();
+  },
+  "downloads.sources": (): DownloadSources => {
+    requireDownloads();
+    return { loading: false, sources: SAMPLE_DOWNLOAD_SOURCES, items: [], total: 0 };
+  },
+  "downloads.add": (payload: unknown): DownloadEntry => {
+    requireDownloads();
+    const { title, gameId } = payload as DownloadAdd;
+    const open = ["downloading", "queued", "paused"];
+    if (gameId && downloads.some((d) => d.gameId === gameId && open.includes(d.state)))
+      throw new FakeError("conflict", "este jogo já tem um download");
+    const entry = newDownload(title, gameId ?? null, 5 * GB, 0);
+    FAKE_SPEED.set(entry.id, 36 * MB);
+    downloads.push(entry);
+    schedule();
+    ensureDownloadTimer();
+    announceDownloads();
+    return { ...entry };
+  },
+});
+
+/** Por cima do que já valida: o limite só aceita as quatro escolhas do núcleo, e ligar põe o motor para andar. */
+const setSettingBeforeDownloads = defaults["settings.set"];
+Object.assign(defaults, {
+  "settings.set": (payload: unknown) => {
+    const { key, value } = payload as Setting;
+    if (key === "DownloadsUploadLimitKiB" && !["0", "64", "256", "1024"].includes(value))
+      throw new Error("bad_request: configuração inválida");
+    setSettingBeforeDownloads?.(payload);
+    if (key !== "DownloadsEnabled" && key !== "DownloadsLegalAccepted") return;
+    if (downloadsOn()) {
+      seedDownloads();
+      ensureDownloadTimer();
+    } else {
+      // Desligar solta o motor: os downloads param e voltam pausados quando a função for ligada de novo.
+      stopDownloadTimer();
+      for (const d of downloads) if (d.state === "downloading" || d.state === "queued") d.state = "paused";
+      schedule();
+    }
+  },
+});
