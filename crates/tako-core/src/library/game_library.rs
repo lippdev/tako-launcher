@@ -297,7 +297,9 @@ impl GameLibrary {
                 }
                 // A Steam já soma o próprio tempo; o registrado pelo launcher vale para os demais.
                 if game.store() != GameStore::Steam {
-                    game.play_time += Duration::from_secs_f64(state.play_minutes.max(0.0) * 60.0);
+                    let recorded =
+                        Duration::try_from_secs_f64(state.play_minutes * 60.0).unwrap_or_default();
+                    game.play_time = game.play_time.saturating_add(recorded);
                 }
             }
             games.push(game);
@@ -322,6 +324,51 @@ mod tests {
     fn clock(now: &Arc<Mutex<DateTime<Utc>>>) -> Clock {
         let now = Arc::clone(now);
         Box::new(move || *now.lock().unwrap())
+    }
+
+    #[test]
+    fn rebuild_tolerates_invalid_minutes_and_saturates_duration_sums() {
+        for (minutes, initial, expected) in [
+            (-1.0, Duration::from_secs(5), Duration::from_secs(5)),
+            (f64::NAN, Duration::from_secs(5), Duration::from_secs(5)),
+            (
+                f64::INFINITY,
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+            ),
+            (
+                f64::NEG_INFINITY,
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+            ),
+            (f64::MAX, Duration::from_secs(5), Duration::from_secs(5)),
+            (1.0, Duration::from_secs(5), Duration::from_secs(65)),
+            (1.0, Duration::MAX, Duration::MAX),
+        ] {
+            let game = Game {
+                id: "manual:duration".into(),
+                play_time: initial,
+                ..Default::default()
+            };
+            let store = MemoryLibraryStore(LibraryData {
+                state: [(
+                    game.id.clone(),
+                    GameStateRecord {
+                        play_minutes: minutes,
+                        ..Default::default()
+                    },
+                )]
+                .into(),
+                ..Default::default()
+            });
+            let mut library = GameLibrary::new(
+                Box::new(move || vec![game.clone()]),
+                Box::new(store),
+                super::super::system_clock(),
+            );
+            library.load();
+            assert_eq!(library.games()[0].play_time, expected);
+        }
     }
 
     #[test]

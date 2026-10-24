@@ -10,6 +10,64 @@ use ts_rs::TS;
 /// Versão do contrato. Sobe quando uma mudança quebra a interface já publicada (campo removido ou renomeado).
 pub const BRIDGE_VERSION: u32 = 1;
 
+/// Maior mensagem aceita da interface; confere antes de alocar o JSON.
+pub const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
+
+/// Valida o envelope antes do payload, para distinguir chamada desconhecida de enum inválido.
+pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
+    let bad_request = |message| BridgeError::new(ErrorCode::BadRequest, message);
+    if text.len() > MAX_MESSAGE_BYTES {
+        return Err((0, bad_request("mensagem grande demais".into())));
+    }
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| (0, bad_request(e.to_string())))?;
+    let id = value
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|id| u32::try_from(id).ok())
+        .unwrap_or(0);
+    #[derive(Deserialize)]
+    struct Header {
+        v: u32,
+        id: u32,
+        name: String,
+    }
+    let header = Header::deserialize(&value).map_err(|e| (id, bad_request(e.to_string())))?;
+    if header.v != BRIDGE_VERSION {
+        return Err((
+            header.id,
+            BridgeError::new(
+                ErrorCode::VersionMismatch,
+                format!("interface v{}, núcleo v{BRIDGE_VERSION}", header.v),
+            ),
+        ));
+    }
+    if !matches!(
+        header.name.as_str(),
+        "app.info"
+            | "window.action"
+            | "ui.state"
+            | "ui.state.set"
+            | "library.list"
+            | "game.details"
+            | "game.play"
+    ) {
+        return Err((
+            header.id,
+            BridgeError::new(
+                ErrorCode::UnknownCall,
+                format!("chamada desconhecida: {}", header.name),
+            ),
+        ));
+    }
+    let request: Request =
+        serde_json::from_value(value).map_err(|e| (id, bad_request(e.to_string())))?;
+    if let Call::LibraryList(criteria) = &request.call {
+        criteria.validate().map_err(|error| (id, error))?;
+    }
+    Ok(request)
+}
+
 /// Pedido da interface: `{ "v": 1, "id": 7, "name": "app.info", "payload": {…} }`.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Request {
@@ -88,6 +146,24 @@ pub enum Call {
     /// Guarda onde a interface está (tela, jogo, filtros, rolagem), em JSON da própria interface, até 64 KiB.
     #[serde(rename = "ui.state.set")]
     UiStateSet(UiState),
+    #[serde(rename = "library.list")]
+    LibraryList(
+        #[serde(with = "object_payload")]
+        #[ts(as = "LibraryListRequest")]
+        LibraryListRequest,
+    ),
+    #[serde(rename = "game.details")]
+    GameDetails(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
+    #[serde(rename = "game.play")]
+    GamePlay(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -103,6 +179,12 @@ pub enum Reply {
     UiState(UiState),
     #[serde(rename = "ui.state.set")]
     UiStateSet,
+    #[serde(rename = "library.list")]
+    LibraryList(LibraryPage),
+    #[serde(rename = "game.details")]
+    GameDetails(Box<GameDetails>),
+    #[serde(rename = "game.play")]
+    GamePlay,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -177,4 +259,229 @@ pub enum ErrorCode {
     Conflict,
     /// Falha do núcleo; detalhes no log.
     Internal,
+}
+
+/// Tamanho padrão e teto de uma página; o total nunca depende deste recorte.
+pub const DEFAULT_PAGE_LIMIT: u32 = 50;
+pub const MAX_PAGE_LIMIT: u32 = 200;
+
+// Serde também aceita structs como sequências. Na ponte o contrato exige objetos, inclusive para
+// consultas cujos campos têm padrão (caso contrário [] seria uma consulta válida).
+mod object_payload {
+    use serde::{Deserialize, Serialize};
+
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+        T: serde::de::DeserializeOwned,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if !value.is_object() {
+            return Err(serde::de::Error::custom("payload deve ser um objeto"));
+        }
+        serde_json::from_value(value).map_err(serde::de::Error::custom)
+    }
+
+    pub fn serialize<S: serde::Serializer, T: Serialize>(
+        value: &T,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        value.serialize(serializer)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum Store {
+    Steam,
+    Epic,
+    Gog,
+    Xbox,
+    Ubisoft,
+    Ea,
+    BattleNet,
+    Amazon,
+    Heroic,
+    Lutris,
+    Bottles,
+    Itch,
+    Emulators,
+    Manual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum GameStatus {
+    Playing,
+    Beaten,
+    Paused,
+    Abandoned,
+    Wishlist,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum SortOrder {
+    RecentlyPlayed,
+    Name,
+    PlayTime,
+    RecentlyAdded,
+    Rating,
+    Size,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum LibraryTab {
+    All,
+    Favorites,
+    Installed,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+#[ts(export)]
+pub struct LibraryListRequest {
+    #[ts(as = "Option<LibraryTab>", optional)]
+    pub filter: LibraryTab,
+    #[ts(as = "Option<String>", optional)]
+    pub search: String,
+    #[ts(as = "Option<SortOrder>", optional)]
+    pub sort: SortOrder,
+    #[ts(as = "Option<bool>", optional)]
+    pub reversed: bool,
+    // Id da coleção; a resolução das coleções automáticas entra na WEB-01b.
+    #[ts(optional = nullable)]
+    pub collection: Option<String>,
+    // Dentro de cada grupo vale qualquer um; entre grupos, todos precisam valer (regra do core).
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub tags: Vec<String>,
+    #[ts(as = "Option<Vec<GameStatus>>", optional)]
+    pub statuses: Vec<GameStatus>,
+    #[ts(as = "Option<bool>", optional)]
+    pub no_status: bool,
+    #[ts(as = "Option<Vec<Store>>", optional)]
+    pub stores: Vec<Store>,
+    // null = todos, true = instalados, false = não instalados.
+    #[ts(optional = nullable)]
+    pub installed: Option<bool>,
+    #[ts(as = "Option<u32>", optional)]
+    pub offset: u32,
+    // Valores acima de MAX_PAGE_LIMIT são reduzidos ao teto; zero retorna só o total.
+    #[ts(as = "Option<u32>", optional)]
+    pub limit: u32,
+}
+
+impl Default for LibraryListRequest {
+    fn default() -> Self {
+        Self {
+            filter: LibraryTab::All,
+            search: String::new(),
+            sort: SortOrder::RecentlyPlayed,
+            reversed: false,
+            collection: None,
+            tags: Vec::new(),
+            statuses: Vec::new(),
+            no_status: false,
+            stores: Vec::new(),
+            installed: None,
+            offset: 0,
+            limit: DEFAULT_PAGE_LIMIT,
+        }
+    }
+}
+
+impl LibraryListRequest {
+    pub fn validate(&self) -> Result<(), BridgeError> {
+        if self.search.chars().count() > 256
+            || self.tags.len() > 64
+            || self.statuses.len() > 64
+            || self.stores.len() > 64
+            || self.tags.iter().any(|tag| tag.chars().count() > 128)
+            || self
+                .collection
+                .as_ref()
+                .is_some_and(|id| id.chars().count() > 128)
+        {
+            return Err(BridgeError::new(
+                ErrorCode::BadRequest,
+                "critérios da biblioteca excedem os limites",
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameRequest {
+    pub game_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LibraryPage {
+    pub rows: Vec<LibraryGame>,
+    pub total: usize,
+}
+
+/// Só dados para desenhar; imagens são pedidas por id em tako-img://, nunca por URI da fonte.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LibraryGame {
+    pub id: String,
+    pub title: String,
+    pub store: Store,
+    pub installed: bool,
+    pub favorite: bool,
+    pub status: Option<GameStatus>,
+    // ISO-8601 em UTC; null = nunca jogado.
+    pub last_played_at: Option<String>,
+    #[ts(type = "number")]
+    pub play_time_seconds: u64,
+    pub accent: Option<String>,
+    pub has_cover: bool,
+    pub has_icon: bool,
+    pub has_hero: bool,
+    pub has_logo: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameDetails {
+    pub game: LibraryGame,
+    pub can_play: bool,
+    pub upcoming: bool,
+    pub platform: Option<String>,
+    pub description: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    // Data ISO-8601 (sem horário).
+    pub release_date: Option<String>,
+    pub genres: Option<Vec<String>>,
+    pub metacritic_score: Option<i32>,
+    pub critic_score: Option<i32>,
+    // Mais recentes primeiro, até dez; null = sem histórico.
+    pub recent_sessions: Option<Vec<RecentSession>>,
+    pub tags: Option<Vec<String>>,
+    #[ts(type = "number | null")]
+    pub size_bytes: Option<u64>,
+    pub size_label: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RecentSession {
+    pub started_at: String,
+    #[ts(type = "number")]
+    pub duration_seconds: u64,
 }

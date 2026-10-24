@@ -6440,9 +6440,12 @@ dependencies = [
 name = "tako-app"
 version = "0.2.0-alpha.1"
 dependencies = [
+ "chrono",
  "serde",
  "serde_json",
  "tako-core",
+ "tako-platform",
+ "tempfile",
  "thiserror 2.0.21",
  "tracing",
  "ts-rs",

@@ -2,9 +2,7 @@
 //! (CEF ou WebView2): cada transporte só entrega e devolve strings.
 
 use tako_app::AppService;
-use tako_app::protocol::{
-    BRIDGE_VERSION, BridgeError, ErrorCode, Event, EventEnvelope, Request, Response,
-};
+use tako_app::protocol::{BRIDGE_VERSION, Event, EventEnvelope, Response};
 
 /// Maior mensagem aceita da interface. Pedidos são pequenos; acima disso é erro de quem mandou.
 pub const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
@@ -15,25 +13,10 @@ pub fn handle_message(app: &mut AppService, text: &str) -> String {
 }
 
 fn respond(app: &mut AppService, text: &str) -> Response {
-    if text.len() > MAX_MESSAGE_BYTES {
-        return Response::err(
-            0,
-            BridgeError::new(ErrorCode::BadRequest, "mensagem grande demais"),
-        );
-    }
-    let req: Request = match serde_json::from_str(text) {
-        Ok(r) => r,
-        Err(e) => return Response::err(request_id(text), classify(&e)),
+    let req = match tako_app::protocol::parse_request(text) {
+        Ok(request) => request,
+        Err((id, error)) => return Response::err(id, error),
     };
-    if req.v != BRIDGE_VERSION {
-        return Response::err(
-            req.id,
-            BridgeError::new(
-                ErrorCode::VersionMismatch,
-                format!("interface v{}, núcleo v{BRIDGE_VERSION}", req.v),
-            ),
-        );
-    }
     match app.handle(req.call) {
         Ok(reply) => Response::ok(req.id, reply),
         Err(error) => {
@@ -46,26 +29,6 @@ fn respond(app: &mut AppService, text: &str) -> Response {
 /// Evento pronto para mandar à interface.
 pub fn event_message(event: Event) -> String {
     serde_json::to_string(&EventEnvelope::from(event)).unwrap_or_default()
-}
-
-/// Nome desconhecido vira `UnknownCall` (interface mais nova que o núcleo); o resto, `BadRequest`.
-fn classify(e: &serde_json::Error) -> BridgeError {
-    let message = e.to_string();
-    let code = if message.contains("unknown variant") {
-        ErrorCode::UnknownCall
-    } else {
-        ErrorCode::BadRequest
-    };
-    BridgeError::new(code, message)
-}
-
-/// O `id` de um pedido que não desserializou inteiro, para a interface saber qual promessa rejeitar.
-fn request_id(text: &str) -> u32 {
-    serde_json::from_str::<serde_json::Value>(text)
-        .ok()
-        .and_then(|v| v.get("id")?.as_u64())
-        .and_then(|id| u32::try_from(id).ok())
-        .unwrap_or(0)
 }
 
 fn serialize(response: &Response) -> String {

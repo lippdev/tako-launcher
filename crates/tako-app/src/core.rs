@@ -1,0 +1,250 @@
+//! Boot sem interface. Por enquanto duplica a montagem de build_ctx do Slint; não depende da tako-ui.
+
+use std::collections::HashMap;
+use std::io::Read;
+use std::path::Path;
+use std::sync::{Arc, Mutex, mpsc};
+use std::thread::JoinHandle;
+use tako_core::i18n::{self, Lang};
+use tako_core::library::{
+    CollectionLibrary, Game, GameLibrary, LibraryStore, MemoryLibraryStore, system_clock,
+};
+use tako_core::metadata::SecretStore;
+use tako_core::paths::DataPaths;
+use tako_core::persistence::{self as db, TakoDatabase};
+use tako_platform::Platform;
+use tako_platform::secrets::Secrets;
+
+/// O snapshot pode ter milhares de jogos, mas nunca cresce sem limite.
+const MAX_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;
+
+#[derive(Debug, thiserror::Error)]
+pub enum CoreError {
+    #[error(transparent)]
+    Persistence(#[from] db::PersistenceError),
+}
+
+/// Dados que sobrevivem à janela. A tako-app lê as lojas pela tako-sources; a sessão fica no hospedeiro.
+pub struct Core {
+    settings: HashMap<String, String>,
+    lang: Lang,
+    library: GameLibrary,
+    collections: Option<CollectionLibrary>,
+    found: Arc<Mutex<Arc<Vec<Game>>>>,
+    snapshot: Option<SnapshotWriter>,
+}
+
+impl Core {
+    /// Abre o banco e os dados locais; a primeira consulta usa o snapshot da última leitura das lojas.
+    /// Em demonstração nada é lido ou gravado no banco, no snapshot ou no cofre.
+    pub fn open(paths: DataPaths, platform: Platform, simulate: bool) -> Result<Self, CoreError> {
+        let database = if simulate {
+            None
+        } else {
+            let database = TakoDatabase::new(paths.database());
+            database.open()?;
+            #[cfg(windows)]
+            let decrypt = tako_platform::windows::dpapi::unprotect;
+            #[cfg(not(windows))]
+            let decrypt = |_: &[u8]| None;
+            if let Err(e) = db::alpha_migration::migrate_secrets(
+                &paths.machine,
+                decrypt,
+                &Vault(platform.secrets.as_ref()),
+            ) {
+                tracing::warn!("segredos das alphas: {e}");
+            }
+            Some(database)
+        };
+        let settings = database
+            .as_ref()
+            .map(|d| {
+                db::SettingsStore::new(d.clone())
+                    .load_all()
+                    .unwrap_or_else(|e| {
+                        tracing::error!("configurações: {e}");
+                        HashMap::new()
+                    })
+            })
+            .unwrap_or_default();
+        let lang = settings
+            .get("Language")
+            .and_then(|s| Lang::from_code(s))
+            .unwrap_or_else(Lang::from_env);
+        if !cfg!(test) {
+            i18n::set_lang(lang);
+        }
+        let store: Box<dyn LibraryStore + Send> = match &database {
+            Some(d) => Box::new(db::LibraryStore::new(
+                d.clone(),
+                Some(paths.root.join("library.json")),
+            )),
+            None => Box::new(MemoryLibraryStore::default()),
+        };
+        // TODO(WEB-01c): leitura das lojas
+        let found = Arc::new(Mutex::new(Arc::new(if simulate {
+            crate::demo::games()
+        } else {
+            load_found(&paths.cache().join("found-games.json"))
+        })));
+        let discover_from = Arc::clone(&found);
+        let mut library = GameLibrary::new(
+            Box::new(move || {
+                discover_from
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .as_ref()
+                    .clone()
+            }),
+            store,
+            system_clock(),
+        );
+        library.load();
+        let collections = database.map(|d| {
+            let mut collections =
+                CollectionLibrary::new(Box::new(db::CollectionStore::new(d)), system_clock());
+            if let Err(e) = collections.load() {
+                tracing::error!("coleções: {e}");
+            }
+            collections.apply_to(library.games_mut());
+            collections
+        });
+        Ok(Self {
+            settings,
+            lang,
+            library,
+            collections,
+            found,
+            snapshot: (!simulate)
+                .then(|| SnapshotWriter::open(paths.cache().join("found-games.json")))
+                .flatten(),
+        })
+    }
+
+    pub fn language(&self) -> Lang {
+        self.lang
+    }
+
+    pub fn setting(&self, key: &str) -> Option<&str> {
+        self.settings.get(key).map(String::as_str)
+    }
+
+    pub fn library(&self) -> &GameLibrary {
+        &self.library
+    }
+
+    /// O AppService emite library.changed depois desta troca. Não expõe mutação silenciosa à interface.
+    pub(crate) fn reload_library(&mut self, games: Vec<Game>) {
+        let games = Arc::new(games);
+        *self.found.lock().unwrap_or_else(|e| e.into_inner()) = Arc::clone(&games);
+        self.library.refresh();
+        if let Some(collections) = &self.collections {
+            collections.apply_to(self.library.games_mut());
+        }
+        if let Some(snapshot) = &self.snapshot
+            && snapshot
+                .sender
+                .as_ref()
+                .is_some_and(|sender| sender.send(games).is_err())
+        {
+            tracing::warn!("gravador do snapshot encerrado");
+        }
+    }
+}
+
+/// Um único gravador preserva a ordem das recargas sem serializar na thread do núcleo.
+struct SnapshotWriter {
+    sender: Option<mpsc::Sender<Arc<Vec<Game>>>>,
+    worker: Option<JoinHandle<()>>,
+}
+
+impl SnapshotWriter {
+    fn open(path: std::path::PathBuf) -> Option<Self> {
+        let (sender, receiver) = mpsc::channel::<Arc<Vec<Game>>>();
+        match std::thread::Builder::new()
+            .name("library-snapshot".into())
+            .spawn(move || {
+                for games in receiver {
+                    let result = serde_json::to_vec(games.as_ref())
+                        .map_err(std::io::Error::other)
+                        .and_then(|bytes| {
+                            tako_core::metadata::cache::write_cache_file(&path, &bytes)
+                        });
+                    if let Err(e) = result {
+                        tracing::warn!("não foi possível guardar a última leitura das lojas: {e}");
+                    }
+                }
+            }) {
+            Ok(worker) => Some(Self {
+                sender: Some(sender),
+                worker: Some(worker),
+            }),
+            Err(e) => {
+                tracing::warn!("não foi possível iniciar o gravador do snapshot: {e}");
+                None
+            }
+        }
+    }
+}
+
+impl Drop for SnapshotWriter {
+    fn drop(&mut self) {
+        self.sender.take();
+        // Só o encerramento aguarda o cache; a recarga e seu evento não esperam pelo disco.
+        if let Some(worker) = self.worker.take()
+            && worker.join().is_err()
+        {
+            tracing::error!("gravador do snapshot terminou com pânico");
+        }
+    }
+}
+
+struct Vault<'a>(&'a dyn Secrets);
+
+impl SecretStore for Vault<'_> {
+    fn get(&self, key: &str) -> Option<String> {
+        self.0.get(key)
+    }
+
+    fn set(&self, key: &str, value: &str) -> Result<(), String> {
+        self.0.set(key, value)
+    }
+}
+
+fn load_found(path: &Path) -> Vec<Game> {
+    match read_found(path) {
+        Ok(games) => games,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => {
+            tracing::warn!("snapshot da biblioteca ignorado: {e}");
+            Vec::new()
+        }
+    }
+}
+
+fn read_found(path: &Path) -> std::io::Result<Vec<Game>> {
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)?
+        .take(MAX_SNAPSHOT_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    let invalid = || std::io::Error::new(std::io::ErrorKind::InvalidData, "snapshot inválido");
+    if bytes.len() as u64 > MAX_SNAPSHOT_BYTES {
+        return Err(invalid());
+    }
+    serde_json::from_slice(&bytes).map_err(|_| invalid())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reload_increments_the_library_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut core = Core::open(DataPaths::at(dir.path()), Platform::simulated(), true).unwrap();
+        let before = core.library().version();
+        core.reload_library(Vec::new());
+        assert_eq!(core.library().version(), before + 1);
+        assert!(core.library().games().is_empty());
+    }
+}

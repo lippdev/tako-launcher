@@ -3,7 +3,12 @@
 //! A interface só desenha; dados e regras ficam aqui e nos crates do núcleo. Nada neste crate conhece CEF,
 //! janela ou React: o hospedeiro (`tako-web`) recebe o JSON, chama `AppService::handle` e devolve a resposta.
 
+mod core;
+mod demo;
+mod library;
 pub mod protocol;
+
+pub use core::{Core, CoreError};
 
 use protocol::{
     AppInfo, BRIDGE_VERSION, BridgeError, Call, ErrorCode, Event, Reply, UiState, WindowAction,
@@ -18,6 +23,7 @@ const MAX_UI_STATE_BYTES: usize = 64 * 1024;
 #[derive(Debug, Clone, PartialEq)]
 pub enum HostRequest {
     Window(WindowAction),
+    Launch { game_id: String },
 }
 
 /// Atende as chamadas da interface. Uma instância por processo, na thread do núcleo.
@@ -26,6 +32,7 @@ pub struct AppService {
     events: Option<Sender<Event>>,
     host: Option<Sender<HostRequest>>,
     ui_state: Option<String>,
+    core: Option<Core>,
 }
 
 impl AppService {
@@ -35,7 +42,29 @@ impl AppService {
             events: None,
             host: None,
             ui_state: None,
+            core: None,
         }
+    }
+
+    /// Serviço com o núcleo já aberto, independente da vida da janela.
+    pub fn with_core(version: impl Into<String>, core: Core) -> Self {
+        Self {
+            core: Some(core),
+            ..Self::new(version)
+        }
+    }
+
+    /// Recebe uma leitura concluída das fontes e avisa a interface para consultar de novo.
+    pub fn reload_library(
+        &mut self,
+        games: Vec<tako_core::library::Game>,
+    ) -> Result<(), BridgeError> {
+        self.core
+            .as_mut()
+            .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?
+            .reload_library(games);
+        self.emit(Event::LibraryChanged);
+        Ok(())
     }
 
     /// Para onde vão os eventos do núcleo; o hospedeiro repassa à interface aberta (ou descarta, com ela fechada).
@@ -75,7 +104,47 @@ impl AppService {
                 self.ui_state = state.json;
                 Ok(Reply::UiStateSet)
             }
+            Call::LibraryList(request) => {
+                request.validate()?;
+                Ok(Reply::LibraryList(library::list(
+                    self.require_core()?,
+                    request,
+                )))
+            }
+            Call::GameDetails(request) => {
+                let core = self.require_core()?;
+                let game = self.find_game(&request.game_id)?;
+                Ok(Reply::GameDetails(Box::new(library::details(core, game))))
+            }
+            Call::GamePlay(request) => {
+                if !self.find_game(&request.game_id)?.can_play() {
+                    return Err(BridgeError::new(
+                        ErrorCode::Conflict,
+                        "jogo não pode ser iniciado",
+                    ));
+                }
+                self.request(HostRequest::Launch {
+                    game_id: request.game_id,
+                })?;
+                Ok(Reply::GamePlay)
+            }
         }
+    }
+
+    fn require_core(&self) -> Result<&Core, BridgeError> {
+        self.core
+            .as_ref()
+            .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))
+    }
+
+    fn find_game(&self, id: &str) -> Result<&tako_core::library::Game, BridgeError> {
+        if id.trim().is_empty() {
+            return Err(BridgeError::new(ErrorCode::BadRequest, "id de jogo vazio"));
+        }
+        self.require_core()?
+            .library()
+            .find(id)
+            .ok_or_else(|| BridgeError::new(ErrorCode::NotFound, format!("jogo {id}")))
     }
 
     fn request(&self, req: HostRequest) -> Result<(), BridgeError> {

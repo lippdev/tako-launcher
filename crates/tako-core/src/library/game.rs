@@ -382,13 +382,27 @@ mod duration_secs {
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
         let secs = f64::deserialize(d)?;
-        Ok(Duration::from_secs_f64(secs.max(0.0)))
+        Ok(Duration::try_from_secs_f64(secs).unwrap_or_default())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalid_durations_become_zero_without_panicking() {
+        for secs in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e300] {
+            let input = serde::de::value::F64Deserializer::<serde::de::value::Error>::new(secs);
+            assert_eq!(duration_secs::deserialize(input).unwrap(), Duration::ZERO);
+        }
+        let mut value = serde_json::to_value(Game::default()).unwrap();
+        value["play_time"] = serde_json::json!(1e300);
+        assert_eq!(
+            serde_json::from_value::<Game>(value).unwrap().play_time,
+            Duration::ZERO
+        );
+    }
 
     #[test]
     fn pinned_art_wins_over_automatic() {
