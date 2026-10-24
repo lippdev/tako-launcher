@@ -347,6 +347,8 @@ pub enum Zone {
     Controls,
     List,
     Actions,
+    /// O corpo da página do jogo (abaixo do destaque): ↓ a partir das ações entra e rola, ↑ rola de volta e, no topo, volta.
+    Body,
 }
 
 /// Os controles da zona `Controls`, na ordem da tela (o índice da zona).
@@ -394,8 +396,11 @@ pub struct DesktopLibrary {
     /// TrocaDeJogo: o jogo no destaque e a seleção do teclado esperando parar (id, desde quando).
     hero: Option<String>,
     hero_wait: Option<(String, std::time::Instant)>,
-    /// Page Down soma 1 e Page Up tira 1: o tema rola a página do jogo uma tela por passo.
-    page_scroll: i32,
+    /// Page Down soma 1 e Page Up tira 1 (uma tela por passo); ↓ e ↑ no corpo somam e tiram `BODY_STEP`. O tema rola a
+    /// página do jogo pela diferença.
+    page_scroll: f32,
+    /// Onde o tema diz que a página está (0 topo, 1 no meio, 2 no fim): ↑ no topo sai do corpo e ↓ no fim não rola.
+    page_edge: usize,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
     /// Visão geral (TelaBiblioteca) no lugar do destaque do jogo: o primeiro lugar da biblioteca; escolher um jogo sai
@@ -406,6 +411,9 @@ pub struct DesktopLibrary {
 /// Page Up e Page Down como o Slint manda.
 const PAGE_UP: char = '\u{F72C}';
 const PAGE_DOWN: char = '\u{F72D}';
+
+/// Quanto ↓ e ↑ rolam o corpo da página do jogo, em telas.
+const BODY_STEP: f32 = 0.3;
 
 /// Teclado rápido: só a seleção anda; arte e texto trocam quando ela para por este tempo.
 const HERO_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
@@ -438,7 +446,8 @@ impl DesktopLibrary {
             cat_focus: (0, 0),
             hero: None,
             hero_wait: None,
-            page_scroll: 0,
+            page_scroll: 0.,
+            page_edge: 0,
             group_focus: None,
             overview: true,
         }
@@ -491,6 +500,11 @@ impl DesktopLibrary {
 
     pub fn zone(&self) -> Zone {
         self.zone
+    }
+
+    /// O tema avisa onde a página do jogo está (`Shell::click` com "page-edge").
+    pub fn set_page_edge(&mut self, edge: usize) {
+        self.page_edge = edge;
     }
 
     /// Coleções da aba: as do usuário e as automáticas.
@@ -1165,7 +1179,12 @@ impl DesktopLibrary {
     /// Tab / Shift+Tab: próxima zona.
     fn cycle(&mut self, forward: bool) {
         let zones = self.zones();
-        let i = zones.iter().position(|z| *z == self.zone).unwrap_or(0) as i32;
+        let from = if self.zone == Zone::Body {
+            Zone::Actions
+        } else {
+            self.zone
+        };
+        let i = zones.iter().position(|z| *z == from).unwrap_or(0) as i32;
         let n = zones.len() as i32;
         self.zone = zones[((i + if forward { 1 } else { -1 }).rem_euclid(n)) as usize];
         self.index = match self.zone {
@@ -1411,24 +1430,25 @@ fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let tags: Vec<&str> = g.tags.iter().map(String::as_str).collect();
     let release = g.release_date.map(|d| game_text::date(lang, d));
     let score = g.metacritic_score.or(g.critic_score).map(|s| s.to_string());
+    // A ordem do CartaoDetalhes: Desenvolvedor, Publicadora, Lançamento, o resto e, por último, Tamanho e Situação.
     [
-        ("check", "details.status", game_text::status(lang, g)),
+        ("user", "details.developer", text(&g.developer)),
+        ("user", "desktop.page.publisher", text(&g.publisher)),
+        ("calendar", "details.release", text(&release)),
+        ("tag", "details.genres", g.genres.join(" - ")),
         (
             store_icon(g.store()),
             "desktop.store",
             game_text::store_name(lang, g.store()),
         ),
-        ("tag", "details.genres", g.genres.join(" - ")),
-        ("user", "details.developer", text(&g.developer)),
-        ("user", "desktop.page.publisher", text(&g.publisher)),
-        ("calendar", "details.release", text(&release)),
         ("layers", "details.series", text(&g.franchise)),
         ("star", "desktop.info.critic", text(&score)),
         ("tag", "desktop.info.tags", tags.join(", ")),
         ("monitor", "details.system", text(&g.platform)),
         ("user", "details.players", text(&g.players)),
-        ("gauge", "desktop.size", text(&g.size_label)),
         ("folder", "desktop.page.folder", text(&g.install_path)),
+        ("gauge", "desktop.size", text(&g.size_label)),
+        ("check", "details.status", game_text::status(lang, g)),
     ]
     .into_iter()
     .filter(|(.., value)| !value.trim().is_empty())
@@ -1621,7 +1641,19 @@ impl Page for DesktopLibrary {
                     .unwrap_or(1);
                 self.index = (self.index + 1).min(n - 1);
             }
-            (Zone::Actions, Cmd::Up) | (Zone::Actions, Cmd::Down) => self.zone = Zone::List,
+            (Zone::Actions, Cmd::Up) => self.zone = Zone::List,
+            // Desce para o corpo da página (Sobre, Detalhes…) e já rola o primeiro passo.
+            (Zone::Actions, Cmd::Down) => {
+                self.zone = Zone::Body;
+                self.page_scroll += BODY_STEP;
+            }
+            (Zone::Body, Cmd::Down) if self.page_edge < 2 => self.page_scroll += BODY_STEP,
+            (Zone::Body, Cmd::Up) if self.page_edge > 0 => self.page_scroll -= BODY_STEP,
+            (Zone::Body, Cmd::Up) => {
+                self.zone = Zone::Actions;
+                self.index = 0;
+            }
+            (Zone::Body, Cmd::Left) => self.zone = Zone::List,
             (Zone::Actions, Cmd::Accept) => {
                 let action = cur
                     .and_then(|i| ctx.library.find(&ids[i]))
@@ -1721,14 +1753,18 @@ impl Page for DesktopLibrary {
             }
             return Some(Nav::Stay);
         }
-        // Page Down e Page Up rolam a página do jogo (com o foco na lista ou nas ações).
+        // Page Down e Page Up rolam a página do jogo (com o foco na lista, nas ações ou no corpo).
         if (c == PAGE_DOWN || c == PAGE_UP)
             && mods == KeyModifiers::NONE
-            && matches!(self.zone, Zone::List | Zone::Actions)
+            && matches!(self.zone, Zone::List | Zone::Actions | Zone::Body)
             && View::of(ctx) != View::Categories
             && !self.overview_on(ctx)
         {
-            self.page_scroll += if c == PAGE_DOWN { 1 } else { -1 };
+            self.page_scroll += if c == PAGE_DOWN { 1. } else { -1. };
+            // Com a página rolada, o foco das ações ficaria fora da tela: ele passa para o corpo.
+            if self.zone == Zone::Actions {
+                self.zone = Zone::Body;
+            }
             return Some(Nav::Stay);
         }
         None
@@ -2549,7 +2585,7 @@ impl Page for DesktopLibrary {
         };
         out.set("desk-game", view);
         out.set("desk-page", page);
-        out.set("desk-scroll-page", self.page_scroll as f32);
+        out.set("desk-scroll-page", self.page_scroll);
         out.set("desk-actions", actions);
         out.set("desk-stats", stats);
         out.set("desk-details", details);
@@ -2562,6 +2598,7 @@ impl Page for DesktopLibrary {
                 Zone::List => "list",
                 Zone::Actions if overview => "overview",
                 Zone::Actions => "actions",
+                Zone::Body => "body",
             },
         );
         out.set("desk-zone-index", self.index as i32);
@@ -3145,7 +3182,7 @@ mod tests {
         let (text, more) = about(&long);
         assert!(more && text.ends_with('…') && text.chars().count() <= 241);
         assert_eq!(about("curta"), ("curta".to_owned(), false));
-        // Detalhes: uma linha por dado que o jogo tem, o Status primeiro e com o ponto verde se instalado.
+        // Detalhes: uma linha por dado que o jogo tem, o Status por último e com o ponto verde se instalado.
         let mut g = shell.ctx.library.games()[0].clone();
         g.release_date = chrono::NaiveDate::from_ymd_opt(2025, 9, 25);
         g.metacritic_score = Some(93);
@@ -3156,8 +3193,9 @@ mod tests {
         g.is_installed = true;
         g.publisher = Some("Supergiant".into());
         let rows = more_details(&shell.ctx, &g);
-        assert_eq!(rows[0].label, shell.ctx.t("details.status"));
-        assert!(rows[0].dot);
+        let last = rows.last().unwrap();
+        assert_eq!(last.label, shell.ctx.t("details.status"));
+        assert!(last.dot);
         assert!(rows.iter().any(|r| r.value == "Hades"));
         assert!(rows.iter().any(|r| r.value == "Roguelike - Ação - Indie"));
         assert!(rows.iter().any(|r| r.value == "Supergiant Games, Outro"));
@@ -3587,13 +3625,91 @@ mod tests {
         assert_eq!(page(&shell).zone(), Zone::Actions);
         shell.key("\u{F72D}", KeyModifiers::NONE);
         assert_eq!(page_scroll(&mut shell), 2.);
-        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // A página rolou: o foco das ações sairia da tela, então ele passa para o corpo.
+        assert_eq!(page(&shell).zone(), Zone::Body);
         // Com Ctrl, não: o atalho é de outra coisa. As Categorias não têm a página.
         shell.key("\u{F72D}", KeyModifiers::CTRL);
         assert_eq!(page_scroll(&mut shell), 2.);
         shell.click("view", 2);
         shell.key("\u{F72D}", KeyModifiers::NONE);
         assert_eq!(page_scroll(&mut shell), 2.);
+    }
+
+    /// O foco do teclado e do controle da página do jogo: ↓ das ações entra no corpo e rola, ↑ rola de volta e, no topo,
+    /// devolve às ações. O tema avisa onde a página está (`page-edge`).
+    #[test]
+    fn arrows_and_dpad_scroll_the_game_page_body() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("game", 0);
+        shell.key("\u{0009}", KeyModifiers::NONE);
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // ↓ entra no corpo e já rola um passo; os seguintes rolam mais.
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).zone(), Zone::Body);
+        assert_eq!(page_scroll(&mut shell), BODY_STEP as f64);
+        shell.click("page-edge", 1);
+        shell.handle(Cmd::Down);
+        assert_eq!(page_scroll(&mut shell), 2. * BODY_STEP as f64);
+        // No fim da página ↓ não rola mais.
+        shell.click("page-edge", 2);
+        shell.handle(Cmd::Down);
+        assert_eq!(page_scroll(&mut shell), 2. * BODY_STEP as f64);
+        // ↑ rola de volta enquanto a página não chegou ao topo…
+        shell.handle(Cmd::Up);
+        shell.click("page-edge", 1);
+        shell.handle(Cmd::Up);
+        assert_eq!(page_scroll(&mut shell), 0.);
+        assert_eq!(page(&shell).zone(), Zone::Body);
+        // …e no topo devolve o foco às ações.
+        shell.click("page-edge", 0);
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // O aviso da página não é gesto do usuário: o anel de foco continua.
+        shell.key("\u{0009}", KeyModifiers::SHIFT);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Down);
+        assert!(shell.ctx.focus_visible);
+        shell.click("page-edge", 1);
+        assert!(shell.ctx.focus_visible);
+        // ← sai do corpo para a lista; Tab sai dele para a zona seguinte às ações.
+        shell.handle(Cmd::Left);
+        assert_eq!(page(&shell).zone(), Zone::List);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).zone(), Zone::Body);
+        shell.key("\u{0009}", KeyModifiers::NONE);
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+    }
+
+    #[test]
+    fn game_details_follow_the_card_order_with_status_last() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, shell) = shell();
+        let g = shell
+            .ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.developer.is_some() && g.publisher.is_some())
+            .cloned()
+            .or_else(|| shell.ctx.library.games().first().cloned())
+            .unwrap();
+        let mut g = g;
+        g.developer = Some("Dev".into());
+        g.publisher = Some("Pub".into());
+        g.size_label = Some("23 GB".into());
+        let labels: Vec<String> = more_details(&shell.ctx, &g)
+            .into_iter()
+            .map(|d| d.label.to_string())
+            .collect();
+        let at = |key: &str| labels.iter().position(|l| *l == shell.ctx.t(key)).unwrap();
+        assert!(at("details.developer") < at("desktop.page.publisher"));
+        assert!(at("desktop.page.publisher") < at("desktop.size"));
+        assert_eq!(at("details.status"), labels.len() - 1);
+        assert_eq!(at("desktop.size"), labels.len() - 2);
     }
 
     #[test]

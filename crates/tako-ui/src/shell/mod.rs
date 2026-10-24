@@ -570,6 +570,13 @@ impl Shell {
     }
 
     pub fn click(&mut self, zone: &str, index: usize) {
+        // A página do jogo só avisa onde rolou: não é gesto do usuário, então não tira o anel de foco nem a intro.
+        if zone == "page-edge" {
+            if let Some(d) = self.pages.last_mut().and_then(|p| p.desktop_mut()) {
+                d.set_page_edge(index);
+            }
+            return;
+        }
         if self.end_intro() {
             return;
         }

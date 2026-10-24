@@ -202,8 +202,9 @@ export component PaginaDoJogo inherits Rectangle {
     property <length> right-w: two-col ? root.width - 2 * pad - gap - left-w : root.width - 2 * pad;
     property <length> body-y: hero-h + 14px;
     property <length> body-h: two-col ? max(lc.preferred-height, rc.preferred-height) : lc.preferred-height + (rc.preferred-height > 0 ? gap + rc.preferred-height : 0);
-    // Coluna da identidade (a Visão geral usa a mesma conta) e quantos itens da barra de dados cabem ao lado dela.
-    property <length> col-w: clamp(240px, root.width * 0.4, 520px);
+    // Coluna da identidade (a Visão geral usa a mesma conta, 40% da largura), nunca mais estreita que a fileira de ações:
+    // senão o primário sai cortado na janela pequena e com o texto a 125%. Também diz quantos itens da barra de dados cabem.
+    property <length> col-w: max(clamp(240px, root.width * 0.4, 520px), ar.preferred-width);
     property <int> data-limit: max(1, min(3, floor((root.width - 2 * pad - col-w - 32px) / 190px)));
     property <length> content-h: root.body-y + root.body-h + Ui.space-48;
     property <length> scroll-max: max(0px, content-h - root.height);
@@ -214,6 +215,18 @@ export component PaginaDoJogo inherits Rectangle {
         root.scroll-to(scrolled + (scroll-page - last-page) * root.height * 0.85);
         last-page = scroll-page;
     }
+    // O anel das ações está no destaque: com a página rolada ele ficaria fora da tela, então focar uma ação volta ao topo.
+    property <int> actions-key: zone == "actions" ? zone-index + 1 : 0;
+    changed actions-key => {
+        if (actions-key > 0) {
+            scrolled = 0px;
+        }
+    }
+    // Onde a página está (0 topo, 1 no meio, 2 no fim): o teclado e o controle rolam passo a passo e precisam saber se ↑ ainda
+    // rola ou volta para as ações.
+    callback edge(int);
+    property <int> at-edge: scrolled <= 1px ? 0 : (scrolled >= scroll-max - 1px ? 2 : 1);
+    changed at-edge => { root.edge(at-edge); }
     // Outro jogo: a página volta ao topo (`changed` só dispara quando o texto muda, não quando o `page` é reenviado).
     property <string> game-id: page.id;
     changed game-id => { scrolled = 0px; }
@@ -258,7 +271,7 @@ export component PaginaDoJogo inherits Rectangle {
                             height: 26px;
                             width: badge.preferred-width;
                             border-radius: 7px;
-                            background: Colors.black.with-alpha(0.6);
+                            background: Ui.chip-scrim;
                             border-width: 1px;
                             border-color: Ui.line-strong;
                             badge := HorizontalLayout {
@@ -321,7 +334,7 @@ export component PaginaDoJogo inherits Rectangle {
                     }
                     if game.hint != "": Text { text: game.hint; color: Ui.desk-warning; font-size: 13px * Ui.text-scale; horizontal-alignment: right; wrap: word-wrap; }
                     // AcoesDoJogo: os quadrados (★, ⋯, ⚙, ✕) e, por último e à direita, o primário.
-                    HorizontalLayout {
+                    ar := HorizontalLayout {
                         alignment: end;
                         padding-top: 6px;
                         // O vão de 10 vai em cada item que existe, não entre os vazios dos dois laços.
@@ -394,7 +407,7 @@ export component PaginaDoJogo inherits Rectangle {
                 // O layout não mede o texto quebrado: cada parágrafo tem a altura que o texto pede na largura da coluna.
                 for p in page.about: Rectangle {
                     height: pt.preferred-height;
-                    pt := Text { width: parent.width; text: p; color: Ui.desk-on-muted; font-size: 13px * Ui.text-scale; line-height-factor: 1.3; wrap: word-wrap; }
+                    pt := Text { width: parent.width; text: p; color: Ui.desk-on-muted; font-size: 13px * Ui.text-scale; line-height-factor: 1.65; wrap: word-wrap; }
                 }
             }
         }
@@ -408,6 +421,8 @@ export component PaginaDoJogo inherits Rectangle {
             spacing: 16px;
             if details.length > 0: Rectangle {
                 height: bx.preferred-height;
+                accessible-role: groupbox;
+                accessible-label: page.labels[3];
                 border-radius: Ui.radius-card;
                 border-width: 1px;
                 border-color: Ui.line-strong;
@@ -476,6 +491,7 @@ export component PaginaDoJogo inherits Rectangle {
                             label: a.title;
                             icon: a.icon;
                             enabled: a.enabled && root.stuck;
+                            focused: focus-visible && zone == "actions" && zone-index == i && root.stuck;
                             clicked => { root.clicked("action", i); }
                         }
                     }

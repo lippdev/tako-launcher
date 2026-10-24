@@ -763,6 +763,80 @@ fn game_page_scrolls_with_page_down_and_the_thin_bar_gets_the_play_button() {
     .unwrap();
 }
 
+/// Janela pequena: a coluna da identidade nunca fica mais estreita que a fileira de ações, então o botão primário tem
+/// a mesma largura a 960 e a 1600 (antes saía cortado a 960). Pelos pixels: a corrida clara mais longa de uma linha é o
+/// fundo do primário.
+#[test]
+fn game_page_primary_action_is_not_clipped_in_a_small_window() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let mut longest_light_run = |w: usize, h: usize, scale: f64| {
+            window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+            ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+                .unwrap();
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            for _ in 0..2 {
+                ui.window().request_redraw();
+                window.draw_if_needed(|r| {
+                    r.render(&mut pixels, w);
+                });
+            }
+            (0..h)
+                .map(|y| {
+                    let (mut best, mut run) = (0, 0);
+                    for x in w / 2..w {
+                        let p = pixels[y * w + x];
+                        run = if p.r > 235 && p.g > 235 && p.b > 235 {
+                            run + 1
+                        } else {
+                            0
+                        };
+                        best = best.max(run);
+                    }
+                    best
+                })
+                .max()
+                .unwrap_or(0)
+        };
+        let wide = longest_light_run(1600, 900, 1.);
+        let small = longest_light_run(960, 600, 1.);
+        let large_text = longest_light_run(960, 600, 1.25);
+        assert!(wide > 100, "o primário aparece a 1600: {wide}");
+        assert!(
+            small + 2 >= wide,
+            "primário cortado a 960: {small} < {wide}"
+        );
+        assert!(
+            large_text + 2 >= wide,
+            "primário cortado a 960 com texto a 125%: {large_text} < {wide}"
+        );
+    })
+    .join()
+    .unwrap();
+}
+
 /// O escurecimento da arte (UI-GLASS-001) não pode ter aresta dura: sobre fundo branco, a luminância muda de um pixel
 /// para o outro só pelo degradê, inclusive no topo e na direita da elipse atrás do texto.
 #[test]

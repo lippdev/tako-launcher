@@ -2920,6 +2920,8 @@ component DeskLibrary inherits Rectangle {
         focus-visible: focus-visible;
         small: small;
         scroll-page: scroll-page;
+        // Só avisa onde a página está: sem `focus-main`, que tiraria o foco do campo de busca ao rolar com a roda.
+        edge(e) => { root.clicked("page-edge", e); }
         clicked(z, i) => {
             root.focus-main();
             root.clicked(z, i);
