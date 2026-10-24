@@ -145,15 +145,15 @@ struct Week {
 
 fn week(ctx: &Ctx) -> Option<Week> {
     let sessions = profile::all_sessions(ctx);
-    if sessions.is_empty() {
-        return None;
-    }
     let today = Local::now().date_naive();
     let start = profile::monday(today);
     let this: Vec<&(&Game, &PlaySession)> = sessions
         .iter()
         .filter(|(_, s)| profile::local_day(s) >= start && !profile::counted(s).is_zero())
         .collect();
+    if this.is_empty() {
+        return None;
+    }
     let days = profile::week(sessions.iter().map(|(_, s)| *s), today);
     let today_i = today.weekday().num_days_from_monday() as usize;
     let max = days.iter().max().copied().unwrap_or_default();
@@ -231,12 +231,9 @@ fn week(ctx: &Ctx) -> Option<Week> {
             String::new(),
         )]);
     }
-    // A última sessão (de sempre) e a maior da semana.
+    // A duração da última sessão e a maior sessão desta semana.
     let mut last = Vec::new();
-    if let Some((_, s)) = sessions
-        .first()
-        .filter(|(_, s)| !profile::counted(s).is_zero())
-    {
+    if let Some((_, s)) = this.first() {
         last.push(tile(
             "clock",
             "desktop.home.week_last",
@@ -316,19 +313,18 @@ fn attention(ctx: &Ctx) -> Vec<OvItem> {
             ..row(g, "busy", detail, String::new())
         }
     }));
-    v.extend(
-        games
-            .iter()
-            .filter(|g| g.is_installed && !g.is_broken && g.shown_cover().is_none())
-            .map(|g| {
-                row(
-                    g,
-                    "art",
-                    ctx.t("desktop.home.no_art"),
-                    ctx.t("desktop.home.no_art_action"),
-                )
-            }),
-    );
+    let no_art: Vec<&Game> = games
+        .iter()
+        .filter(|g| g.is_installed && !g.is_broken && g.shown_cover().is_none())
+        .collect();
+    if let Some(g) = no_art.first() {
+        v.push(row(
+            g,
+            "art",
+            ctx.tn("desktop.home.no_art_count", no_art.len() as i64, &[]),
+            ctx.t("desktop.home.no_art_action"),
+        ));
+    }
     v
 }
 
@@ -623,6 +619,37 @@ mod tests {
         let o = build(&shell.ctx, None);
         assert_eq!(o.week_groups.len(), w.groups.len());
         assert!(!o.bars_text.is_empty());
+        let old_states = shell
+            .ctx
+            .library
+            .games()
+            .iter()
+            .map(|g| {
+                let sessions = shell
+                    .ctx
+                    .library
+                    .sessions(&g.id)
+                    .iter()
+                    .cloned()
+                    .map(|mut s| {
+                        s.started_at -= chrono::Duration::days(14);
+                        s
+                    })
+                    .collect();
+                (
+                    g.id.clone(),
+                    tako_core::library::GameStateRecord {
+                        sessions,
+                        ..Default::default()
+                    },
+                )
+            })
+            .collect();
+        shell.ctx.library.import(Vec::new(), old_states).unwrap();
+        assert!(
+            week(&shell.ctx).is_none(),
+            "sessões antigas não mantêm Sua semana"
+        );
     }
 
     #[test]
@@ -640,6 +667,7 @@ mod tests {
             });
             found[1].is_installed = false;
             found[2].cover_uri = None;
+            found[4].cover_uri = None;
         }
         shell.ctx.library.refresh();
         let broken = shell.ctx.library.games()[3].id.clone();
@@ -663,6 +691,10 @@ mod tests {
         let states: Vec<&str> = items.iter().map(|i| i.state.as_str()).collect();
         assert_eq!(states, ["error", "broken", "busy", "art"]);
         assert_eq!(items[0].id, "download:1");
+        assert_eq!(
+            items[3].detail,
+            shell.ctx.tn("desktop.home.no_art_count", 2, &[])
+        );
         assert!((items[2].progress - 0.42).abs() < 1e-6);
         assert!(items[2].detail.contains("42%"));
         let o = build(&shell.ctx, None);

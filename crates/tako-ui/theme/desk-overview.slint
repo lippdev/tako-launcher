@@ -624,6 +624,10 @@ component BlocoDoJogo inherits Rectangle {
     in property <OvItem> game;
     in property <bool> focused;
     callback clicked();
+    callback reveal(length, length);
+    changed focused => {
+        if focused: root.reveal(self.absolute-position.y, self.height);
+    }
     horizontal-stretch: 1;
     height: 120px;
     border-radius: Ui.radius-block;
@@ -685,6 +689,10 @@ component LinhaDeAtencao inherits Rectangle {
     in property <bool> focused;
     callback open();
     callback act();
+    callback reveal(length, length);
+    changed focused => {
+        if focused: root.reveal(self.absolute-position.y, self.height);
+    }
     height: 74px;
     border-radius: 14px;
     background: Ui.surface;
@@ -808,27 +816,22 @@ export component VisaoGeral inherits Rectangle {
     property <length> hero-w: self.width - (side ? Ui.hero-side-width + Ui.space-16 : 0px);
     property <bool> show-week: o.week-groups.length > 0 || o.loading;
     property <bool> show-att: o.attention.length > 0;
-    // Onde cada seção começa (os blocos têm altura conhecida): o foco do teclado rola até lá.
     property <length> title-h: 30px * Ui.text-scale;
-    property <length> week-y: 6px + title-h + 18px + Ui.hero-height + Ui.space-48;
-    property <length> att-y: week-y + (show-week ? 22px * Ui.text-scale + Ui.space-16 + 134px + Ui.space-48 : 0px);
-    property <length> shelf-y: att-y + (show-att ? 22px * Ui.text-scale + Ui.space-16 + o.attention.length * 82px - 8px + Ui.space-48 : 0px);
     property <int> shelf-cols: max(3, floor((self.width + 16px) / 216px));
     property <length> shelf-h: (self.width - (shelf-cols - 1) * Ui.space-16) / shelf-cols * 1.5 + 62px;
     property <string> focus-key: o.focus-kind + ":" + o.focus-index;
     function reveal(y: length, h: length) {
-        if (y < -fl.viewport-y) {
-            fl.viewport-y = -y;
-        } else if (y + h > -fl.viewport-y + fl.height) {
-            fl.viewport-y = fl.height - y - h;
+        let top = y - fl.absolute-position.y;
+        if (top < 0px) {
+            fl.viewport-y -= top;
+        } else if (top + h > fl.height) {
+            fl.viewport-y -= top + h - fl.height;
         }
     }
     changed focus-key => {
         if (focus-visible) {
-            if (o.focus-kind == "best") { reveal(week-y, 22px + 16px + 134px); }
-            if (o.focus-kind == "attention") { reveal(att-y + 38px + o.focus-index * 82px, 74px); }
-            if (o.focus-kind == "cover") { reveal(shelf-y, 38px + shelf-h); }
             if (o.focus-kind == "hero" || o.focus-kind == "back") { fl.viewport-y = 0px; }
+            if (o.focus-kind == "cover") { reveal(shelf.absolute-position.y, shelf.height); }
         }
     }
     fl := Flickable {
@@ -905,6 +908,7 @@ export component VisaoGeral inherits Rectangle {
                             if t.icon == "game": BlocoDoJogo {
                                 game: o.best;
                                 focused: focus-visible && o.focus-kind == "best";
+                                reveal(y, h) => { root.reveal(y, h); }
                                 clicked => { root.clicked("ov-best", 0); }
                             }
                             if t.icon != "bars" && t.icon != "game": Bloco { value: t.value; icon: t.icon; label: t.label; }
@@ -921,6 +925,7 @@ export component VisaoGeral inherits Rectangle {
                     for it[i] in o.attention: LinhaDeAtencao {
                         it: it;
                         focused: focus-visible && o.focus-kind == "attention" && o.focus-index == i;
+                        reveal(y, h) => { root.reveal(y, h); }
                         open => { root.clicked("ov-att", i); }
                         act => { root.clicked("ov-att-action", i); }
                     }

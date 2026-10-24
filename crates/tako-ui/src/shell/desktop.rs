@@ -2530,6 +2530,11 @@ impl Page for DesktopLibrary {
         );
         // Na Visão geral nenhum jogo está escolhido; só a lista com o foco do teclado mostra onde ele está.
         let overview = self.overview_on(ctx);
+        let targets = if overview {
+            overview::targets(ctx)
+        } else {
+            Vec::new()
+        };
         out.set(
             "desk-selected",
             self.focus_pos(&list, cur)
