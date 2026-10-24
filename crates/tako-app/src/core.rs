@@ -36,6 +36,7 @@ pub struct Core {
     found: Arc<Mutex<Arc<Vec<Game>>>>,
     snapshot: Option<SnapshotWriter>,
     pub(crate) sources: crate::sources::Scanner,
+    pub(crate) devices: crate::system::Devices,
 }
 
 impl Core {
@@ -149,6 +150,7 @@ impl Core {
             lang,
             simulate,
         )?;
+        let devices = crate::system::Devices::new(&platform, simulate);
         Ok(Self {
             settings,
             settings_store,
@@ -157,6 +159,7 @@ impl Core {
             collections,
             found,
             sources,
+            devices,
             snapshot: (!simulate)
                 .then(|| SnapshotWriter::open(paths.cache().join("found-games.json")))
                 .flatten(),

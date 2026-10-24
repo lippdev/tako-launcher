@@ -10,7 +10,6 @@ const BOOL_KEYS: &[&str] = &[
     "RestoreEnvironmentAfterGame",
     "DeveloperOptions",
     "GameScreenEnabled",
-    "GameScreenHideOthers",
     "GameScreenHdr",
     "GameScreenVrr",
     "HideCursorDuringGame",
@@ -43,6 +42,7 @@ fn known(key: &str) -> bool {
             key,
             "Language"
                 | "DesktopTheme"
+                | "GameScreenHideOthers"
                 | "DesktopTitleLogo"
                 | "ControlCenterChord"
                 | "OpenIn"
@@ -80,6 +80,8 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
         && (key != "DesktopTitleLogo" || matches!(value.as_str(), "" | "logo" | "text"))
         && (key != "OpenIn" || matches!(value.as_str(), "desktop" | "big-picture"))
         // Tema do modo desktop (o mesmo `DesktopTheme` que o app Slint grava); `Theme` é outra coisa.
+        // O app Slint guarda `Disconnect` (desliga as outras telas, o padrão) ou `None`; não é chave de liga/desliga.
+        && (key != "GameScreenHideOthers" || matches!(value.as_str(), "Disconnect" | "None"))
         && (key != "DesktopTheme"
             || matches!(value.as_str(), "tako" | "dark" | "midnight" | "oled" | "glass"))
         && (key != "ControlCenterChord" || value.parse::<u32>().is_ok())

@@ -7,7 +7,13 @@ import { AparenciaCategoria } from "./AparenciaCategoria";
 import { BibliotecaCategoria } from "./BibliotecaCategoria";
 import { CategoriaDeConfiguracao } from "./CategoriaDeConfiguracao";
 import { GeralCategoria } from "./GeralCategoria";
+import { IntegracoesCategoria } from "./IntegracoesCategoria";
 import type { CategoryProps } from "./Linhas";
+import { SistemaCategoria } from "./SistemaCategoria";
+import { SobreCategoria } from "./SobreCategoria";
+import { SomCategoria } from "./SomCategoria";
+import { TelaCategoria } from "./TelaCategoria";
+import { TemaCategoria } from "./TemaCategoria";
 import { CATEGORY_ICONS } from "./categories";
 import { APPEARANCE_KEYS, KEYS } from "./model";
 import { useSettings } from "./useSettings";
@@ -22,6 +28,23 @@ const SETTINGS_KEYS: readonly string[] = [
   KEYS.restoreEnvironment,
   KEYS.artColors,
   KEYS.disabledStores,
+  KEYS.navigationVolume,
+  KEYS.themeMusic,
+  KEYS.themeMusicVolume,
+  KEYS.screenEnabled,
+  KEYS.screenHideOthers,
+  KEYS.screenId,
+  KEYS.screenName,
+  KEYS.screenMode,
+  KEYS.screenHdr,
+  KEYS.screenVrr,
+  KEYS.audioId,
+  KEYS.audioName,
+  KEYS.hideCursor,
+  KEYS.controllerMouse,
+  KEYS.discord,
+  KEYS.sunshineSync,
+  KEYS.developer,
 ];
 
 const PANEL_ID = "configuracoes-painel";
@@ -29,6 +52,10 @@ const PANEL_ID = "configuracoes-painel";
 interface TelaConfiguracoesProps {
   category: SettingsCategoryId;
   onCategoryChange: (category: SettingsCategoryId) => void;
+}
+
+function Soon() {
+  return <p className={styles["soon"]}>{settingsStrings.soon}</p>;
 }
 
 /** O conteúdo de uma categoria. As que ainda não têm tela mostram o "em breve". */
@@ -40,9 +67,29 @@ function Conteudo({ category, ...props }: CategoryProps & { category: SettingsCa
       return <AparenciaCategoria {...props} />;
     case "library":
       return <BibliotecaCategoria {...props} />;
-    default:
-      // TODO(WEB-13b): Tema, Som, Tela, Controles, Capas e dados, Downloads, Integrações, Sistema e Sobre.
-      return <p className={styles["soon"]}>{settingsStrings.soon}</p>;
+    case "theme":
+      return <TemaCategoria {...props} />;
+    case "sound":
+      return <SomCategoria {...props} />;
+    case "display":
+      return <TelaCategoria {...props} />;
+    case "integrations":
+      return <IntegracoesCategoria {...props} />;
+    case "system":
+      return <SistemaCategoria {...props} />;
+    case "about":
+      return <SobreCategoria />;
+    case "controllers":
+      // TODO(WEB-13b): Controles espera o foco e o controle (FOCO/INPUT): lista de controles, botões e atalhos da
+      // Central de Controle.
+      return <Soon />;
+    case "covers":
+      // TODO(WEB-13b): Capas e dados espera os segredos dos provedores (IGDB, ScreenScraper, SteamGridDB), que não
+      // passam pela ponte, e o cache de capas.
+      return <Soon />;
+    case "downloads":
+      // TODO(WEB-13b): Downloads espera o núcleo de downloads (pastas, limites e fila).
+      return <Soon />;
   }
 }
 

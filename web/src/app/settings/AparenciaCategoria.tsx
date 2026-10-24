@@ -1,6 +1,7 @@
-import { setAppearance, type Appearance } from "../../appearance/appearance";
+import type { Appearance } from "../../appearance/appearance";
 import { GrupoDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
 import { settingsStrings } from "../strings";
+import { changeAppearance } from "./changeAppearance";
 import { LinhaChave, LinhaSelecao, type CategoryProps } from "./Linhas";
 import {
   DEFAULTS,
@@ -27,10 +28,7 @@ export function AparenciaCategoria({ values, save, read }: CategoryProps) {
   const artColors = readBool(values, KEYS.artColors, DEFAULTS.artColors);
 
   function change(patch: Partial<Appearance>, key: string, value: string) {
-    setAppearance(patch);
-    void save(key, value).then((ok) => {
-      if (!ok) setAppearance(appearanceFromSettings(read()));
-    });
+    changeAppearance({ save, read }, patch, key, value);
   }
 
   return (

@@ -17,7 +17,10 @@ import type { LibrarySources } from "./generated/LibrarySources";
 import type { Setting } from "./generated/Setting";
 import type { SettingsGetRequest } from "./generated/SettingsGetRequest";
 import type { SettingsValues } from "./generated/SettingsValues";
-import type { Store } from "./generated/Store"; // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
+import type { Store } from "./generated/Store";
+import type { AudioOutputList } from "./generated/AudioOutputList";
+import type { DisplayList } from "./generated/DisplayList";
+// Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
 
@@ -631,3 +634,74 @@ function playGame(payload: unknown) {
 }
 
 Object.assign(defaults, { "game.details": gameDetails, "game.play": playGame });
+
+// ---- Configurações: Tema a Sobre (WEB-13b) ----
+// As chaves novas, com a mesma validação do núcleo, e as telas e saídas de áudio de exemplo.
+
+const MORE_BOOL_SETTINGS = [
+  "ThemeMusicEnabled",
+  "GameScreenEnabled",
+  "GameScreenHdr",
+  "GameScreenVrr",
+  "HideCursorDuringGame",
+  "ControllerMouseDuringGame",
+  "SafeMode",
+  "DiscordRichPresence",
+  "SunshineSyncOnRescan",
+];
+const MORE_TEXT_SETTINGS = ["GameScreenHideOthers", "GameScreenId", "GameScreenName", "GameScreenMode", "GameAudioDeviceId", "GameAudioDeviceName"];
+const PERCENT_SETTINGS = ["NavigationSoundVolume", "ThemeMusicVolume"];
+for (const key of [...MORE_BOOL_SETTINGS, ...MORE_TEXT_SETTINGS, ...PERCENT_SETTINGS]) KNOWN_SETTINGS.add(key);
+for (const key of MORE_BOOL_SETTINGS) BOOL_SETTINGS.add(key);
+
+/** A saída "com defeito" mostra o aviso de gravação que falhou e a volta ao valor de antes. */
+const BROKEN_AUDIO_ID = "broken";
+
+const setBaseSetting = setSetting;
+function setMoreSettings(payload: unknown) {
+  const { key, value } = payload as Setting;
+  if (PERCENT_SETTINGS.includes(key) && !(/^\d{1,3}$/.test(value) && Number(value) <= 100))
+    throw new Error("bad_request: configuração inválida");
+  if (key === "GameAudioDeviceId" && value === BROKEN_AUDIO_ID) throw new Error("internal: não foi possível gravar");
+  setBaseSetting(payload);
+}
+
+const SAMPLE_DISPLAYS: DisplayList = {
+  managedBySession: false,
+  vrrLimitation: "O Windows não tem API pública para ligar o VRR. Use o painel do driver de vídeo (AMD, NVIDIA ou Intel).",
+  displays: [
+    {
+      id: "DISPLAY1",
+      name: "Monitor",
+      primary: true,
+      active: true,
+      hdr: "unsupported",
+      vrr: "unsupported",
+      modes: ["1920x1080@144", "1920x1080@60", "1280x720@60"],
+    },
+    {
+      id: "DISPLAY2",
+      name: "TV",
+      primary: false,
+      active: false,
+      hdr: "off",
+      vrr: "off",
+      modes: ["3840x2160@120", "3840x2160@60", "1920x1080@120"],
+    },
+  ],
+};
+
+const SAMPLE_AUDIO: AudioOutputList = {
+  canSwitch: true,
+  outputs: [
+    { id: "speakers", name: "Alto-falantes", default: true },
+    { id: "tv", name: "TV (HDMI)", default: false },
+    { id: BROKEN_AUDIO_ID, name: "Saída com defeito (a gravação falha)", default: false },
+  ],
+};
+
+Object.assign(defaults, {
+  "settings.set": setMoreSettings,
+  "system.displays": () => SAMPLE_DISPLAYS,
+  "system.audio_outputs": () => SAMPLE_AUDIO,
+});

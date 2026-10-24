@@ -162,10 +162,10 @@ export const settingsStrings = {
   /** Título e frase de cada categoria (a frase é a do cabeçalho). */
   categories: {
     general: { title: "Geral", description: "Início, idioma e comportamento durante os jogos." },
-    theme: { title: "Tema", description: "Cartões de tema e cor de destaque." },
+    theme: { title: "Tema", description: "Escolha o visual do TAKO." },
     appearance: { title: "Aparência", description: "Tema, tamanho da interface e efeitos." },
     sound: { title: "Som", description: "Volume e áudio do tema." },
-    display: { title: "Tela", description: "Monitor, resolução e HDR dos jogos." },
+    display: { title: "Tela", description: "Onde o jogo aparece e toca, e o que muda durante a partida." },
     controllers: { title: "Controles", description: "Controles, botões e atalhos." },
     library: { title: "Biblioteca e lojas", description: "Lojas ligadas e a leitura da biblioteca." },
     covers: { title: "Capas e dados", description: "Capas, fontes de dados e cache." },
@@ -227,6 +227,129 @@ export const settingsStrings = {
       scanning: (done: number, total: number) => `Lendo as lojas… ${String(done)} de ${String(total)}`,
       measuring: "Medindo o tamanho das pastas dos jogos…",
       done: "Leitura concluída.",
+    },
+  },
+  // Os textos de Tema a Sobre (WEB-13b) são os dos catálogos do app atual (`crates/tako-core/locales/pt-BR`); a
+  // chave de cada bloco vem no comentário, para o WEB-06 achar. Texto sem chave lá é novo desta tela.
+  theme: {
+    // settings.appearance.themes_header, desc_tako … desc_glass
+    section: "Tema",
+    cards: "Escolha do tema",
+    descriptions: {
+      tako: "Preto tinta e o polvo",
+      escuro: "Monocromático, como desenhado",
+      "meia-noite": "Preto azulado",
+      oled: "Preto puro para OLED",
+      vidro: "Translúcido, iluminado pelos seus jogos",
+    },
+    // O nome da seção das opções do tema escolhido (README do Temas).
+    takoOptions: "TAKO",
+  },
+  sound: {
+    // settings.sound.*
+    music: "Música",
+    musicEnabled: { title: "Música de fundo do tema", description: "Toca a música definida pelo tema na tela cheia." },
+    musicVolume: {
+      title: "Volume da música do tema",
+      description: "0% silencia a música do tema. A música nunca toca durante os jogos.",
+    },
+    navigation: "Navegação",
+    navigationVolume: {
+      title: "Volume dos sons de navegação",
+      description: "0% desliga. Tons locais curtos para navegar; nunca tocam durante um jogo.",
+    },
+    // accessibility.sound_muted
+    muted: "Mudo",
+  },
+  screen: {
+    // settings.screen.*
+    screen: "Tela",
+    managed: {
+      title: "Tela da sessão",
+      value: "Gamescope",
+      description: "Esta sessão (gamescope) cuida das telas; o Tako não muda tela, resolução nem HDR",
+    },
+    enabled: {
+      title: "Usar a tela de jogo",
+      description: "Ao abrir um jogo, usa só a tela escolhida (ex.: a TV); tudo volta ao sair do jogo",
+    },
+    display: {
+      title: "Tela onde você joga",
+      description: "Na primeira vez com uma tela nova, o Tako pergunta se você está vendo a imagem",
+      choose: "Escolher",
+      none: "Nenhuma tela encontrada",
+      // Sem chave no catálogo.
+      error: "Não foi possível ler as telas.",
+    },
+    hide: { title: "Desligar as outras telas durante o jogo", description: "Saem da área de trabalho e voltam ao fim do jogo" },
+    mode: { title: "Resolução e taxa", description: "Valem na tela de jogo só durante o jogo", keep: "Manter a atual" },
+    hdr: { title: "Ligar o HDR", description: "Liga o HDR na tela de jogo e desliga ao sair" },
+    // vrr.toggle, vrr.toggle_desc, vrr.unsupported
+    vrr: {
+      title: "Ligar o VRR",
+      description: "Liga a taxa variável (FreeSync, G-Sync) na tela de jogo e desliga ao sair",
+      unsupported: "Esta tela não informa VRR",
+    },
+    audio: "Áudio",
+    audioOutput: {
+      title: "Saída de áudio do jogo",
+      description: "Ao abrir um jogo, o som passa a sair por aqui; ao fechar, volta para a saída de antes",
+      keep: "Não alterar",
+      locked: "Este sistema não deixa o Tako trocar a saída de áudio",
+      // Sem chave no catálogo.
+      error: "Não foi possível ler as saídas de áudio.",
+    },
+    during: "Durante o jogo",
+    restore: {
+      title: "Restaurar tela e som ao sair do jogo",
+      description:
+        "Volta resolução, taxa, tela principal, VRR, saída de áudio e volume como estavam antes do jogo. Desligada, o VRR ligado para o jogo continua ligado",
+    },
+    cursor: { title: "Esconder o ponteiro", description: "O ponteiro do mouse some enquanto o jogo está aberto" },
+    mouse: {
+      title: "Mover o ponteiro com o analógico",
+      description: "Durante o jogo, o analógico move o ponteiro e os gatilhos clicam (launchers e menus sem controle)",
+    },
+  },
+  integrations: {
+    // settings.system.sunshine*, discord*
+    sunshine: "Sunshine / Apollo",
+    sunshineSync: {
+      title: "Manter sincronizado ao reescanear",
+      description: "Atualiza os apps do Sunshine quando a biblioteca for reexaminada. O Tako não envia dados pela rede.",
+    },
+    discord: "Discord",
+    discordPresence: {
+      title: "Mostrar o jogo no Discord",
+      description: "Seus amigos veem no Discord o que você está jogando pelo Tako",
+    },
+  },
+  system: {
+    // settings.system.advanced_header, developer, developer_desc
+    advanced: "Avançado",
+    developer: {
+      title: "Opções de desenvolvedor",
+      description: "Ferramentas para quem cria temas ou testa o Tako; deixe desligado no dia a dia",
+    },
+  },
+  about: {
+    // settings.about.*
+    app: "TAKO",
+    version: "Versão",
+    license: {
+      title: "Licença",
+      description: "Software livre: você pode usar, estudar, mudar e compartilhar o Tako",
+      value: "AGPL-3.0",
+      action: "Ver o texto",
+      // O texto completo da AGPL-3.0; abre no navegador do sistema.
+      url: "https://www.gnu.org/licenses/agpl-3.0.html",
+    },
+    // Sem chave no catálogo.
+    source: {
+      title: "Código-fonte",
+      description: "github.com/lippdev/tako-launcher",
+      action: "Abrir no navegador",
+      url: "https://github.com/lippdev/tako-launcher",
     },
   },
 } as const;

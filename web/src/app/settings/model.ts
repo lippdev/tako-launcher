@@ -20,6 +20,23 @@ export const KEYS = {
   reducedTransparency: "ReducedTransparency",
   textSize: "TextSizePercent",
   disabledStores: "DisabledStores",
+  navigationVolume: "NavigationSoundVolume",
+  themeMusic: "ThemeMusicEnabled",
+  themeMusicVolume: "ThemeMusicVolume",
+  screenEnabled: "GameScreenEnabled",
+  screenHideOthers: "GameScreenHideOthers",
+  screenId: "GameScreenId",
+  screenName: "GameScreenName",
+  screenMode: "GameScreenMode",
+  screenHdr: "GameScreenHdr",
+  screenVrr: "GameScreenVrr",
+  audioId: "GameAudioDeviceId",
+  audioName: "GameAudioDeviceName",
+  hideCursor: "HideCursorDuringGame",
+  controllerMouse: "ControllerMouseDuringGame",
+  discord: "DiscordRichPresence",
+  sunshineSync: "SunshineSyncOnRescan",
+  developer: "DeveloperOptions",
 } as const;
 
 /** As chaves que a aparência salva depende (lidas ao abrir o app). */
@@ -37,6 +54,18 @@ export const DEFAULTS = {
   artColors: true,
   reducedMotion: false,
   reducedTransparency: false,
+  themeMusic: true,
+  screenEnabled: false,
+  screenHdr: false,
+  screenVrr: false,
+  hideCursor: false,
+  controllerMouse: false,
+  discord: false,
+  sunshineSync: false,
+  developer: false,
+  /** Os sons de navegação vêm desligados; a música do tema, a 70%. */
+  navigationVolume: 0,
+  themeMusicVolume: 70,
 } as const;
 
 export function readBool(values: SettingsMap, key: string, fallback: boolean): boolean {
@@ -46,6 +75,14 @@ export function readBool(values: SettingsMap, key: string, fallback: boolean): b
 
 export function boolText(value: boolean): string {
   return value ? "true" : "false";
+}
+
+/** Um número de 0 a 100 guardado como texto; ausente ou fora da faixa vale o padrão. */
+export function readPercent(values: SettingsMap, key: string, fallback: number): number {
+  const text = values[key];
+  if (text === undefined || !/^\d{1,3}$/.test(text)) return fallback;
+  const value = Number(text);
+  return value <= 100 ? value : fallback;
 }
 
 // ---- Idioma e "Abrir em" ----
@@ -143,4 +180,26 @@ export function withStoreEnabled(disabled: string | undefined, store: Store, ena
   const key = STORE_KEYS[store];
   const rest = disabledList(disabled).filter((name) => name.toLowerCase() !== key.toLowerCase());
   return (enabled ? rest : [...rest, key]).join(",");
+}
+
+// ---- Tela e áudio do jogo ----
+
+/**
+ * "Desligar as outras telas durante o jogo". O núcleo e o app Slint guardam `Disconnect` / `None` (padrão: ligado);
+ * só `None` vale como desligado.
+ */
+export function readHideOthers(values: SettingsMap): boolean {
+  const value = values[KEYS.screenHideOthers];
+  return value !== "None";
+}
+
+/** O valor que o núcleo aceita para a chave acima. */
+export function hideOthersText(on: boolean): "Disconnect" | "None" {
+  return on ? "Disconnect" : "None";
+}
+
+/** "1920 × 1080 · 144 Hz" para a chave `1920x1080@144` do núcleo; chave que não é desse formato aparece como veio. */
+export function modeLabel(key: string): string {
+  const match = /^(\d+)x(\d+)@(\d+)$/.exec(key);
+  return match ? `${match[1] ?? ""} × ${match[2] ?? ""} · ${match[3] ?? ""} Hz` : key;
 }

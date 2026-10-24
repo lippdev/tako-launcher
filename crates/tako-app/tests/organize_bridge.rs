@@ -650,3 +650,23 @@ fn desktop_theme_is_the_slint_key_and_only_known_themes_are_accepted() {
     );
     assert_eq!(got["reply"]["data"]["values"]["DesktopTheme"], "midnight");
 }
+
+#[test]
+fn hide_other_screens_uses_the_slint_values() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = open(&dir, false);
+    for value in ["Disconnect", "None"] {
+        let ok = wire(
+            &mut app,
+            "settings.set",
+            Some(json!({"key":"GameScreenHideOthers","value":value})),
+        );
+        assert_eq!(ok["ok"], true, "{ok}");
+    }
+    let bad = wire(
+        &mut app,
+        "settings.set",
+        Some(json!({"key":"GameScreenHideOthers","value":"false"})),
+    );
+    assert_eq!(bad["error"]["code"], "bad_request", "{bad}");
+}

@@ -10,6 +10,7 @@ mod organize;
 pub mod protocol;
 mod settings;
 mod sources;
+mod system;
 
 pub use core::{Core, CoreError};
 
@@ -162,6 +163,12 @@ impl AppService {
             Call::LibrarySources => Ok(Reply::LibrarySources(
                 self.require_core()?.sources.state.clone(),
             )),
+            Call::SystemDisplays => Ok(Reply::SystemDisplays(system::displays(
+                &self.require_core()?.devices,
+            )?)),
+            Call::SystemAudioOutputs => Ok(Reply::SystemAudioOutputs(system::audio_outputs(
+                &self.require_core()?.devices,
+            )?)),
             call => {
                 let core = self
                     .core

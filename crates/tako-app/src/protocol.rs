@@ -66,6 +66,8 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "game.tags.set"
             | "game.status.set"
             | "game.favorite.set"
+            | "system.displays"
+            | "system.audio_outputs"
     ) {
         return Err((
             header.id,
@@ -75,8 +77,10 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             ),
         ));
     }
-    if matches!(header.name.as_str(), "library.scan" | "library.sources")
-        && value.get("payload").is_some()
+    if matches!(
+        header.name.as_str(),
+        "library.scan" | "library.sources" | "system.displays" | "system.audio_outputs"
+    ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
     }
@@ -258,6 +262,12 @@ pub enum Call {
         #[ts(as = "GameFavoriteSet")]
         GameFavoriteSet,
     ),
+    /// As telas ligadas ao computador (Configurações › Tela).
+    #[serde(rename = "system.displays")]
+    SystemDisplays,
+    /// As saídas de áudio do computador (Configurações › Tela e áudio do jogo).
+    #[serde(rename = "system.audio_outputs")]
+    SystemAudioOutputs,
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -309,6 +319,10 @@ pub enum Reply {
     GameStatusSet,
     #[serde(rename = "game.favorite.set")]
     GameFavoriteSet,
+    #[serde(rename = "system.displays")]
+    SystemDisplays(DisplayList),
+    #[serde(rename = "system.audio_outputs")]
+    SystemAudioOutputs(AudioOutputList),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -793,4 +807,66 @@ pub struct SmartCriteria {
     #[serde(default)]
     #[ts(optional = nullable)]
     pub filter_store: Option<Store>,
+}
+
+/// Estado de HDR ou VRR de uma tela, como o sistema informa.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum DisplayFeature {
+    /// O sistema não diz se a tela tem o recurso.
+    Unknown,
+    Unsupported,
+    Off,
+    On,
+}
+
+/// Uma tela ligada ao computador.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DisplayInfo {
+    /// Id estável entre execuções; é o que as configurações guardam em `GameScreenId`.
+    pub id: String,
+    pub name: String,
+    pub primary: bool,
+    pub active: bool,
+    pub hdr: DisplayFeature,
+    pub vrr: DisplayFeature,
+    /// Resoluções e taxas da tela, do maior para o menor, no formato guardado em `GameScreenMode` (`3840x2160@120`).
+    pub modes: Vec<String>,
+}
+
+/// Resposta de `system.displays`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DisplayList {
+    pub displays: Vec<DisplayInfo>,
+    /// Sessão que cuida das telas sozinha (gamescope): o Tako só informa.
+    pub managed_by_session: bool,
+    /// Por que o Tako não consegue ligar o VRR neste sistema; `null` quando consegue.
+    pub vrr_limitation: Option<String>,
+}
+
+/// Uma saída de áudio do computador.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AudioOutput {
+    /// Id estável; é o que as configurações guardam em `GameAudioDeviceId`.
+    pub id: String,
+    pub name: String,
+    /// A saída padrão do sistema agora.
+    pub default: bool,
+}
+
+/// Resposta de `system.audio_outputs`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AudioOutputList {
+    pub outputs: Vec<AudioOutput>,
+    /// Falso quando o sistema não deixa o Tako trocar a saída de áudio.
+    pub can_switch: bool,
 }
