@@ -20,7 +20,7 @@ Regras para quem implementa: [`AGENTS.md`](../../AGENTS.md).
 
 | Conta no T3 | Provider | Uso |
 |---|---|---|
-| Alyx Medical (Claude) | `claudeAgent` | Orquestrador. Só tarefas N1 curtas além disso |
+| Alyx Medical (Claude) | `claudeAgent` | Orquestrador (esta thread) e, desde 24/10, implementador por subagentes (autorizado pelo mantenedor), em threads separadas para não gastar o contexto de quem orquestra |
 | Lipp InvestSmart (Claude) | `claudeAgent_lipp_investsmart` | Implementador e revisor Claude |
 | Lipp (Codex) | `codex` | Implementador e revisor Codex |
 | Alyx Medical (Codex) | `codex_alyx_medical` | Implementador e revisor Codex |
@@ -30,7 +30,7 @@ Regras de distribuição:
   worktree compila o seu `target/`). Tarefas só de front (`npm`) são leves.
 - Espalhar as tarefas paralelas entre as três contas de implementação; não acumular duas tarefas N4 na mesma conta.
 - Revisão cruzada: código de Codex é revisado por Claude e vice-versa.
-- O Antigravity (Gemini) também está disponível no T3; fica fora da rotação até o mantenedor pedir.
+- **Antigravity (`antigravity`, Gemini 3.8 Flash high/medium/low):** na rotação desde 24/10 (autorizado pelo mantenedor), só para tarefas N1 e N2 e como revisor cruzado de código Claude quando as contas Codex estão fora. Nunca em tarefas N4 (hospedeiro, segurança, ciclo de vida).
 
 ### 2.1 Conta sem limite
 
