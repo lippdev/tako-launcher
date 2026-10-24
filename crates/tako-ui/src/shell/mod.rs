@@ -193,7 +193,7 @@ impl Shell {
         self.pages.first()?.desktop()
     }
 
-    /// Barra superior do desktop: Biblioteca, Configurações, Tela cheia e Perfil (3).
+    /// Barra superior do desktop: Biblioteca (0), Configurações (1), Tela cheia (2) e Perfil (3, "Ver perfil" do avatar).
     fn desktop_nav(&mut self, index: usize) {
         self.ctx.discard_theme_draft();
         self.layers.clear();
@@ -968,15 +968,14 @@ impl Shell {
             ..Default::default()
         };
         // Só a Biblioteca: a Loja não existe no app, e o Perfil vive no botão à direita.
-        out.set(
-            "desk-nav",
-            vec![item(
-                "library",
-                "desktop.library",
-                "grid",
-                kind == "desk-library",
-            )],
-        );
+        let tabs = vec![item(
+            "library",
+            "desktop.library",
+            "grid",
+            kind == "desk-library",
+        )];
+        debug_assert_eq!(tabs.len(), bar::TABS);
+        out.set("desk-nav", tabs);
         out.set("desk-profile-active", kind == profile::KIND);
         out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
         out.set(
