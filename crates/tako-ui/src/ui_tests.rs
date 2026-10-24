@@ -996,6 +996,25 @@ fn desktop_snapshot() {
                 .extend(crate::demo::not_installed());
         }
         ctx.library.refresh();
+        // Visão geral: `TAKO_SNAP_SESSIONS=1` põe as sessões de demonstração (Sua semana) e `TAKO_SNAP_ATTENTION=1` um
+        // download com erro e um jogo sem os arquivos (Precisa de atenção).
+        if std::env::var("TAKO_SNAP_SESSIONS").is_ok_and(|v| v == "1") {
+            crate::demo::sessions(&mut ctx);
+        }
+        if std::env::var("TAKO_SNAP_ATTENTION").is_ok_and(|v| v == "1") {
+            let now = Instant::now();
+            let list = &mut ctx.activity.list;
+            list.start("download:1", tako_core::activities::Kind::Download, "x", "", now);
+            list.fail(
+                "download:1",
+                "Não baixou Hades II",
+                Some(tako_core::activities::Action::Retry),
+                now,
+            );
+            if let Some(g) = ctx.library.games_mut().get_mut(3) {
+                g.is_broken = true;
+            }
+        }
         // `TAKO_SNAP_DESK_THEME=tako|dark|midnight|oled|glass`, `TAKO_SNAP_ACCENT=#rrggbb` e `TAKO_SNAP_MOTION=1`
         // (Reduzir animações) escolhem o tema do desktop; o padrão é o TAKO. `TAKO_SNAP_TRANSPARENCY=1` liga Reduzir
         // transparência.
@@ -1599,7 +1618,9 @@ created-by-tako = true
                     }
                     if std::env::var("TAKO_SNAP_LOADING").is_ok() {
                         s.set_field("loading".into(), Value::Bool(true));
-                        s.set_field("back".into(), crate::values::model(Vec::new()));
+                        for key in ["back", "attention", "installed", "week-groups"] {
+                            s.set_field(key.into(), crate::values::model(Vec::new()));
+                        }
                     }
                     if let Some(Value::Struct(mut hero)) = s.get_field("hero").cloned() {
                         if let Some((art, _, _)) = art {

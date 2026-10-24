@@ -584,8 +584,221 @@ component VoltarAJogar inherits Rectangle {
     }
 }
 
+// Título de seção (19/700, com a contagem pequena ao lado); os filhos ficam na ponta direita (as setas da fileira).
+component SecaoTitulo inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> count;
+    height: 22px * Ui.text-scale;
+    spacing: 10px;
+    Text { text: title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 19px * Ui.text-scale; font-weight: 700; letter-spacing: -0.2px; vertical-alignment: center; }
+    Text { text: count; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; vertical-alignment: center; }
+    Rectangle { horizontal-stretch: 1; }
+    @children
+}
+
+// Seta ‹ › da fileira: só rola a fileira, nunca troca um valor.
+component SetaDaFileira inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    callback clicked();
+    width: 34px;
+    height: 34px;
+    border-radius: 17px;
+    background: ta.has-hover ? Ui.glass-selected : Ui.surface-raised;
+    border-width: 1px;
+    border-color: Ui.line-strong;
+    animate background { duration: Ui.tempo-hover; }
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    DeskIcon { name: icon; size: 15px; tint: ta.has-hover ? Ui.desk-text : Ui.desk-on-muted; }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Tip { text: label; hovering: ta.has-hover; }
+}
+
+// Jogo da semana: o bloco com a capa inteira e o texto, dentro de um grupo (clicável).
+component BlocoDoJogo inherits Rectangle {
+    in property <OvItem> game;
+    in property <bool> focused;
+    callback clicked();
+    horizontal-stretch: 1;
+    height: 120px;
+    border-radius: Ui.radius-block;
+    background: Ui.tile;
+    border-width: 1px;
+    border-color: Ui.line;
+    clip: true;
+    accessible-role: button;
+    accessible-label: game.title + ", " + game.detail;
+    accessible-action-default => { root.clicked(); }
+    HorizontalLayout {
+        Rectangle {
+            width: 90px;
+            background: game.accent.mix(Ui.desk-canvas, 0.4);
+            Image { width: parent.width; height: parent.height; source: game.thumb; image-fit: cover; }
+        }
+        VerticalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            alignment: center;
+            spacing: 4px;
+            Text { text: game.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 13px * Ui.text-scale; font-weight: 700; wrap: word-wrap; overflow: elide; max-height: 40px; }
+            Text { text: game.detail; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; wrap: word-wrap; }
+        }
+    }
+    if focused: FocusRing { radius: Ui.radius-block; background: transparent; }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Gráfico da semana dentro de um bloco: sete barras de 10 (segunda a domingo), o dia de hoje com a letra em destaque.
+component BarrasDaSemana inherits HorizontalLayout {
+    in property <[DeskBar]> bars;
+    alignment: center;
+    spacing: 5px;
+    for b in bars: VerticalLayout {
+        width: 10px;
+        alignment: center;
+        spacing: 4px;
+        Rectangle {
+            width: 10px;
+            height: 36px;
+            border-radius: 2px;
+            background: Ui.line-strong;
+            opacity: b.future ? 0.5 : 1;
+            clip: true;
+            Rectangle { y: parent.height * (1 - b.fraction); height: parent.height * b.fraction; background: Ui.desk-text; }
+        }
+        Text { text: b.label; color: b.today ? Ui.desk-text : Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: b.today ? 800 : 500; horizontal-alignment: center; }
+    }
+}
+
+// Precisa de atenção: uma linha com a capa de 40 × 52, o nome, a situação em texto (com o ponto) e a ação (o primário na cor
+// de estado quando é um erro a refazer). `busy` mostra o andamento no lugar da ação.
+component LinhaDeAtencao inherits Rectangle {
+    in property <OvItem> it;
+    in property <bool> focused;
+    callback open();
+    callback act();
+    height: 74px;
+    border-radius: 14px;
+    background: Ui.surface;
+    border-width: 1px;
+    border-color: Ui.line;
+    accessible-role: button;
+    accessible-label: it.title + ", " + it.detail;
+    accessible-action-default => { root.open(); }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.open(); }
+    }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 10px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 14px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 40px;
+                height: 52px;
+                border-radius: 7px;
+                clip: true;
+                background: it.accent.mix(Ui.desk-canvas, 0.4);
+                Image { width: parent.width; height: parent.height; source: it.thumb; image-fit: cover; }
+                if it.thumb.width == 0: DeskIcon { name: "alert"; size: 20px; tint: Ui.desk-error; }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 3px;
+            Text { text: it.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14px * Ui.text-scale; font-weight: 600; overflow: elide; }
+            HorizontalLayout {
+                spacing: 6px;
+                VerticalLayout { alignment: center; Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: it.state == "error" ? Ui.desk-error : Ui.desk-accent; } }
+                Text { text: it.detail; color: Ui.desk-text-muted; font-size: 12.5px * Ui.text-scale; overflow: elide; }
+            }
+            if it.state == "busy" && it.progress >= 0: HorizontalLayout {
+                alignment: start;
+                Rectangle {
+                    width: 260px;
+                    height: 3px;
+                    border-radius: 1.5px;
+                    background: Ui.line-strong;
+                    Rectangle { x: 0; width: parent.width * min(1, it.progress); border-radius: 1.5px; background: Ui.desk-accent; }
+                }
+            }
+        }
+        if it.action != "": VerticalLayout {
+            alignment: center;
+            BotaoDesktop {
+                small: true;
+                kind: it.state == "error" ? "state" : "ghost";
+                label: it.action;
+                icon: it.state == "error" ? "refresh" : (it.state == "art" ? "image" : "chevron");
+                clicked => { root.act(); }
+            }
+        }
+    }
+    if focused: FocusRing { radius: 14px; background: transparent; }
+}
+
+// Instalados: a fileira de capas (CapaDoJogo, 2:3) que rola na horizontal, de 3 a 6 colunas conforme a largura; `page` leva
+// o mesmo que as setas ‹ ›. Vagas fixas: as capas são posições de uma linha só, sem criar nem apagar nada ao rolar.
+component Prateleira inherits Rectangle {
+    in property <[OvItem]> items;
+    in property <int> focus-index: -1;
+    callback open(int);
+    callback play(int);
+    property <int> cols: max(3, floor((self.width + 16px) / 216px));
+    property <length> cover-w: (self.width - (cols - 1) * Ui.space-16) / cols;
+    property <length> step: cover-w + Ui.space-16;
+    property <length> min-x: min(0px, self.width - (items.length * step - Ui.space-16));
+    height: cover-w * 1.5 + 62px;
+    public function page(dir: int) {
+        fl.viewport-x = clamp(fl.viewport-x - dir * step * cols, min-x, 0px);
+    }
+    // O foco do teclado traz a capa para a vista.
+    changed focus-index => {
+        if (focus-index >= 0) {
+            if (focus-index * step < -fl.viewport-x) {
+                fl.viewport-x = clamp(-focus-index * step, min-x, 0px);
+            } else if (focus-index * step + cover-w > -fl.viewport-x + root.width) {
+                fl.viewport-x = clamp(root.width - focus-index * step - cover-w, min-x, 0px);
+            }
+        }
+    }
+    fl := Flickable {
+        width: parent.width;
+        height: parent.height;
+        viewport-width: max(parent.width, items.length * step - Ui.space-16);
+        viewport-height: parent.height;
+        interactive: false;
+        animate viewport-x { duration: Ui.tempo-lista; easing: Ui.curva-entrada; }
+        for it[i] in items: CapaDoJogo {
+            x: i * step;
+            width: cover-w;
+            art: it.thumb;
+            name: it.title;
+            label: it.detail;
+            accent: it.accent;
+            favorite: it.state == "favorite";
+            focused: focus-index == i;
+            clicked => { root.open(i); }
+            played => { root.play(i); }
+        }
+    }
+}
+
 // A Visão geral: título com a contagem, o Destaque com Voltar a jogar ao lado e, abaixo, as seções, com 40 de margem, 48
-// entre elas e 16 entre colunas. Rola na vertical; `zone` "overview" mostra o foco do teclado.
+// entre elas e 16 entre colunas. Rola na vertical; `focus-visible` mostra o foco do teclado.
 export component VisaoGeral inherits Rectangle {
     in property <DeskOverview> o;
     in property <bool> focus-visible;
@@ -593,7 +806,31 @@ export component VisaoGeral inherits Rectangle {
     callback clicked(string, int);
     property <bool> side: self.width >= 760px && (o.back.length > 0 || o.loading);
     property <length> hero-w: self.width - (side ? Ui.hero-side-width + Ui.space-16 : 0px);
-    property <bool> focus-on: focus-visible;
+    property <bool> show-week: o.week-groups.length > 0 || o.loading;
+    property <bool> show-att: o.attention.length > 0;
+    // Onde cada seção começa (os blocos têm altura conhecida): o foco do teclado rola até lá.
+    property <length> title-h: 30px * Ui.text-scale;
+    property <length> week-y: 6px + title-h + 18px + Ui.hero-height + Ui.space-48;
+    property <length> att-y: week-y + (show-week ? 22px * Ui.text-scale + Ui.space-16 + 134px + Ui.space-48 : 0px);
+    property <length> shelf-y: att-y + (show-att ? 22px * Ui.text-scale + Ui.space-16 + o.attention.length * 82px - 8px + Ui.space-48 : 0px);
+    property <int> shelf-cols: max(3, floor((self.width + 16px) / 216px));
+    property <length> shelf-h: (self.width - (shelf-cols - 1) * Ui.space-16) / shelf-cols * 1.5 + 62px;
+    property <string> focus-key: o.focus-kind + ":" + o.focus-index;
+    function reveal(y: length, h: length) {
+        if (y < -fl.viewport-y) {
+            fl.viewport-y = -y;
+        } else if (y + h > -fl.viewport-y + fl.height) {
+            fl.viewport-y = fl.height - y - h;
+        }
+    }
+    changed focus-key => {
+        if (focus-visible) {
+            if (o.focus-kind == "best") { reveal(week-y, 22px + 16px + 134px); }
+            if (o.focus-kind == "attention") { reveal(att-y + 38px + o.focus-index * 82px, 74px); }
+            if (o.focus-kind == "cover") { reveal(shelf-y, 38px + shelf-h); }
+            if (o.focus-kind == "hero" || o.focus-kind == "back") { fl.viewport-y = 0px; }
+        }
+    }
     fl := Flickable {
         width: parent.width;
         height: parent.height;
@@ -607,7 +844,7 @@ export component VisaoGeral inherits Rectangle {
             if o.loading || o.hero.has-game: VerticalLayout {
                 spacing: 18px;
                 HorizontalLayout {
-                    height: 30px * Ui.text-scale;
+                    height: title-h;
                     spacing: Ui.space-8;
                     alignment: start;
                     Text { text: o.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 26px * Ui.text-scale; font-weight: 800; letter-spacing: -0.4px; vertical-alignment: bottom; }
@@ -641,6 +878,69 @@ export component VisaoGeral inherits Rectangle {
                         open(i) => { root.clicked("ov-back", i); }
                         play(i) => { root.clicked("ov-back-play", i); }
                     }
+                }
+            }
+            // Sua semana: só com dados das sessões; sem eles a seção some (nenhuma métrica é inventada).
+            if show-week: VerticalLayout {
+                padding-top: Ui.space-48;
+                spacing: Ui.space-16;
+                SecaoTitulo { title: o.week-title; }
+                if o.loading: HorizontalLayout {
+                    height: 134px;
+                    spacing: Ui.space-16;
+                    for i in 4: Skeleton { radius: Ui.radius-card; horizontal-stretch: 1; }
+                }
+                if !o.loading: HorizontalLayout {
+                    spacing: Ui.space-16;
+                    // Grupos de largura igual (3 ou 4), com 16 entre eles.
+                    for g in o.week-groups: GrupoDeBlocos {
+                        width: (root.width - (o.week-groups.length - 1) * Ui.space-16) / o.week-groups.length;
+                        for t in g: HorizontalLayout {
+                            horizontal-stretch: 1;
+                            if t.icon == "bars": Bloco {
+                                label: t.label;
+                                reading: o.bars-text;
+                                BarrasDaSemana { bars: o.bars; }
+                            }
+                            if t.icon == "game": BlocoDoJogo {
+                                game: o.best;
+                                focused: focus-visible && o.focus-kind == "best";
+                                clicked => { root.clicked("ov-best", 0); }
+                            }
+                            if t.icon != "bars" && t.icon != "game": Bloco { value: t.value; icon: t.icon; label: t.label; }
+                        }
+                    }
+                }
+            }
+            if show-att: VerticalLayout {
+                padding-top: Ui.space-48;
+                spacing: Ui.space-16;
+                SecaoTitulo { title: o.attention-title; count: o.attention-count; }
+                VerticalLayout {
+                    spacing: 8px;
+                    for it[i] in o.attention: LinhaDeAtencao {
+                        it: it;
+                        focused: focus-visible && o.focus-kind == "attention" && o.focus-index == i;
+                        open => { root.clicked("ov-att", i); }
+                        act => { root.clicked("ov-att-action", i); }
+                    }
+                }
+            }
+            if o.installed.length > 0: VerticalLayout {
+                padding-top: Ui.space-48;
+                spacing: Ui.space-16;
+                SecaoTitulo {
+                    title: o.installed-title;
+                    count: o.installed-count;
+                    SetaDaFileira { icon: "chevron-left"; label: o.prev-label; clicked => { shelf.page(-1); } }
+                    Rectangle { width: Ui.space-8; }
+                    SetaDaFileira { icon: "chevron"; label: o.next-label; clicked => { shelf.page(1); } }
+                }
+                shelf := Prateleira {
+                    items: o.installed;
+                    focus-index: focus-visible && o.focus-kind == "cover" ? o.focus-index : -1;
+                    open(i) => { root.clicked("ov-cover", i); }
+                    play(i) => { root.clicked("ov-cover-play", i); }
                 }
             }
         }
