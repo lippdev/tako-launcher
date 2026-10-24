@@ -37,11 +37,11 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Lista da biblioteca: abas, busca, filtros, ordenação, coleções, seleção múltipla (`desktop`, `library`) | ✅ | WEB-11a |
 | Visão geral (`overview`, `home`) | ✅ (falta "Voltar a jogar") | WEB-10b |
 | Página do jogo (`details`) | ✅ (falta "jogando", depende do WEB-20) | WEB-12a |
-| Configurações do jogo (`game_settings`) | 🟡 componente pronto | **WEB-12b** |
+| Configurações do jogo (`game_settings`) | 🟡 pronto; comandos antes e depois só leitura até a aprovação | WEB-12b · **WEB-20** |
 | Editar jogo (`edit_game`) e Fontes e IDs (`source_ids`) | ⬜ | **WEB-12c** |
 | Adicionar jogo (`add_game`) | ⬜ | **WEB-12c** |
 | Seletor de imagens (`art`) e Revisar capas (`art_review`) | 🟡 componente do seletor pronto | **WEB-12d** |
-| Editor de etiquetas (`tags_editor`) | 🟡 etiquetas em lote na seleção | **WEB-12b** |
+| Editor de etiquetas (`tags_editor`) | ✅ | WEB-12b |
 | Coleções automáticas (`smart`): salvar filtros | 🟡 núcleo pronto | **WEB-11b** |
 | Busca geral Ctrl+K (`global_search`) | ✅ | WEB-14a |
 | Downloads (`downloads`): painel, ligar com aviso legal, fontes | 🟡 pronto; falta gerenciar fontes e abrir a pasta (núcleo) | WEB-14b · **WEB-14e** |
