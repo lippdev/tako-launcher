@@ -2233,6 +2233,14 @@ fn the_theme_category_is_desktop_only_and_its_cards_pick_theme_and_accent() {
         "TAKO é o padrão"
     );
     assert!(rows.iter().any(|i| i.row.key == "desk-preview"));
+    assert!(!find(&rows, "desk-preview").row.is_focusable());
+
+    // A prévia fica visível na categoria, mas não aparece como resultado de busca.
+    let preview = find(&rows, "desk-preview");
+    let mut page = SettingsPage::at("theme");
+    page.query = preview.row.value.clone();
+    assert!(page.items(&ctx).iter().all(|i| i.row.kind != "preview"));
+    assert_eq!(page.matches_in(&ctx, page.cat), 0);
 
     // Escolher o Liquid Glass troca o tema, mostra as cores e as opções dele; fora da faixa, nada muda.
     let _ = themes.pick_zone("row-pick:4", &mut ctx);
@@ -2256,4 +2264,36 @@ fn the_theme_category_is_desktop_only_and_its_cards_pick_theme_and_accent() {
     assert_eq!(dt::theme(&ctx.settings), dt::GLASS);
     adjust(&mut ctx, &themes, -1);
     assert_eq!(dt::theme(&ctx.settings), 3);
+
+    // Ao sair de uma cor própria, a seta parte para a primeira ou a última opção, conforme a direção.
+    ctx.settings.set(dt::ACCENT, "#123456");
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    adjust(&mut ctx, &accents, 1);
+    assert_eq!(dt::accent(&ctx.settings), dt::ACCENTS[0].0);
+    ctx.settings.set(dt::ACCENT, "#123456");
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    adjust(&mut ctx, &accents, -1);
+    assert_eq!(
+        dt::accent(&ctx.settings),
+        dt::ACCENTS[dt::ACCENTS.len() - 1].0
+    );
+}
+
+#[test]
+fn desktop_appearance_names_the_fullscreen_theme_clearly() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    ctx.desktop = true;
+    let row = find(&rows_of(&ctx, "appearance"), "theme");
+    assert_eq!(row.row.title, ctx.t("settings.appearance.fullscreen_theme"));
+    assert_eq!(
+        row.row.description,
+        ctx.t("settings.appearance.fullscreen_theme_desc")
+    );
+
+    ctx.desktop = false;
+    let row = find(&rows_of(&ctx, "appearance"), "theme");
+    assert_eq!(row.row.title, ctx.t("settings.appearance.theme"));
+    assert_eq!(row.row.description, ctx.t("settings.appearance.theme_desc"));
 }

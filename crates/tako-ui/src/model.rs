@@ -132,7 +132,7 @@ impl PanelRow {
         self
     }
     pub fn is_focusable(&self) -> bool {
-        self.kind != "header" && self.kind != "separator"
+        self.kind != "header" && self.kind != "separator" && self.kind != "preview"
     }
     /// Divisória entre grupos de um menu.
     pub fn separator() -> Self {

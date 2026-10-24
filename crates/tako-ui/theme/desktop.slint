@@ -4006,7 +4006,7 @@ component DeskRow inherits Rectangle {
     property <bool> emu: data.icon == "emu-retroarch" || data.icon == "emu-dolphin" || data.icon == "emu-pcsx2" || data.icon == "emu-duckstation" || data.icon == "emu-ppsspp" || data.icon == "emu-ryujinx" || data.icon == "emu-cemu" || data.icon == "emu-rpcs3";
     // A linha da fila cresce com o motivo (texto essencial: quebra em vez de cortar). Onboarding (`bare`): linhas de
     // 12 em cima e embaixo, sem a altura mínima das Configurações.
-    out property <length> row-h: is-header ? (grp ? 52px : 40px) : (data.kind == "themes" ? 244px : data.kind == "accents" ? 74px : data.kind == "preview" ? 80px : (data.kind == "note" ? notel.preferred-height : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : (grp ? Ui.settings-row-height : 56px), lay.preferred-height) + card-gap)));
+    out property <length> row-h: is-header ? (grp ? 52px : 40px) : (data.kind == "themes" ? max(244px, theme-cards.preferred-height + 28px) : data.kind == "accents" ? 74px : data.kind == "preview" ? 80px : (data.kind == "note" ? notel.preferred-height : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : (grp ? Ui.settings-row-height : 56px), lay.preferred-height) + card-gap)));
     callback clicked();
     // Ação dentro da linha: 0 = Aceitar, 1 = Escolher outra.
     callback act(int);
@@ -4408,11 +4408,13 @@ component DeskRow inherits Rectangle {
         if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && data.action == "": Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
     // TelaTema, Tema: os cinco cartões (prévia de 118, nome com ✓ no escolhido e a frase).
-    if data.kind == "themes": HorizontalLayout {
+    theme-cards := HorizontalLayout {
+        visible: data.kind == "themes";
         padding: 14px;
         spacing: 12px;
         for card[k] in cards: Rectangle {
             horizontal-stretch: 1;
+            height: max(210px, theme-text.preferred-height + 150px);
             border-radius: 14px;
             background: cta.has-hover ? #ffffff08 : #ffffff05;
             border-width: 1px;
@@ -4426,15 +4428,14 @@ component DeskRow inherits Rectangle {
             accessible-checked: card.on;
             accessible-action-default => { root.pick(k); }
             ThemePreview { x: 8px; y: 8px; width: parent.width - 16px; height: 118px; variant: k; }
-            VerticalLayout {
+            theme-text := VerticalLayout {
                 x: 12px;
                 y: 136px;
                 width: parent.width - 24px;
-                height: parent.height - 136px - 8px;
                 alignment: start;
                 spacing: 2px;
                 HorizontalLayout {
-                    Text { text: card.title; color: Ui.desk-text; font-size: 13.5px * Ui.text-scale; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                    Text { text: card.title; color: Ui.desk-text; font-size: 13.5px * Ui.text-scale; font-weight: 600; wrap: word-wrap; overflow: elide; horizontal-stretch: 1; }
                     if card.on: DeskIcon { name: "tick"; size: 15px; tint: Ui.desk-accent; }
                 }
                 Text { text: card.detail; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; wrap: word-wrap; }
@@ -4457,7 +4458,8 @@ component DeskRow inherits Rectangle {
                 if c.on: Rectangle { y: (parent.height - self.height) / 2; width: 42px; height: 42px; border-radius: 21px; background: Ui.desk-text; }
                 if c.on: Rectangle { y: (parent.height - self.height) / 2; x: 2px; width: 38px; height: 38px; border-radius: 19px; background: Ui.settings-surface; }
                 Rectangle { x: 4px; y: (parent.height - self.height) / 2; width: 34px; height: 34px; border-radius: 17px; background: c.color; }
-                TouchArea { mouse-cursor: pointer; clicked => { root.pick(k); } }
+                accent-touch := TouchArea { mouse-cursor: pointer; clicked => { root.pick(k); } }
+                Tip { text: c.title; hovering: accent-touch.has-hover; }
             }
         }
         Rectangle { width: 1px; height: 28px; y: (parent.height - self.height) / 2; background: Ui.line-strong; }
@@ -4477,7 +4479,8 @@ component DeskRow inherits Rectangle {
                 background: @conic-gradient(#ff4d5e 0deg, #ffcf4d 60deg, #3ddc84 120deg, #3dd6e0 180deg, #4d9bff 240deg, #9b7bff 300deg, #ff4d5e 360deg);
                 DeskIcon { name: "plus"; size: 15px; tint: #ffffff; }
             }
-            TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+            custom-touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+            Tip { text: DeskText.custom-color; hovering: custom-touch.has-hover; }
         }
         Rectangle {
             width: code.preferred-width + 22px;

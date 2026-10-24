@@ -113,9 +113,10 @@ fn accents_row(ctx: &Ctx) -> MenuItem {
         let at = ACCENTS
             .iter()
             .position(|(c, _)| *c == dt::accent(&ctx.settings));
-        let next = at.map_or(0, |i| {
-            (i as i32 + direction.signum()).clamp(0, ACCENTS.len() as i32 - 1) as usize
-        });
+        let next = at.map_or_else(
+            || if direction < 0 { ACCENTS.len() - 1 } else { 0 },
+            |i| (i as i32 + direction.signum()).clamp(0, ACCENTS.len() as i32 - 1) as usize,
+        );
         set(ctx, next)
     })
 }

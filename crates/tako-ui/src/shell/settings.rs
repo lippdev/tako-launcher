@@ -1978,9 +1978,20 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             (picks, cur)
         }),
         MenuItem::new(
-            PanelRow::action("theme", ctx.t("settings.appearance.theme"))
-                .desc(ctx.t("settings.appearance.theme_desc"))
-                .value(theme_name(ctx)),
+            PanelRow::action(
+                "theme",
+                ctx.t(if ctx.desktop {
+                    "settings.appearance.fullscreen_theme"
+                } else {
+                    "settings.appearance.theme"
+                }),
+            )
+            .desc(ctx.t(if ctx.desktop {
+                "settings.appearance.fullscreen_theme_desc"
+            } else {
+                "settings.appearance.theme_desc"
+            }))
+            .value(theme_name(ctx)),
         )
         .on(|ctx| Flow::Push(Box::new(themes_panel(ctx)))),
     ];
@@ -2746,6 +2757,7 @@ impl SettingsPage {
                 .into_iter()
                 .filter(|i| {
                     i.row.kind != "header"
+                        && i.row.kind != "preview"
                         && tako_core::library::search_text::matches(
                             &format!("{} {} {}", i.row.title, i.row.description, i.row.value),
                             &self.query,
@@ -2768,6 +2780,7 @@ impl SettingsPage {
             .iter()
             .filter(|i| {
                 i.row.kind != "header"
+                    && i.row.kind != "preview"
                     && tako_core::library::search_text::matches(
                         &format!("{} {} {}", i.row.title, i.row.description, i.row.value),
                         &self.query,
