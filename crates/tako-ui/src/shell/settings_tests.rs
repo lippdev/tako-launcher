@@ -569,10 +569,12 @@ fn desktop_lists_every_connected_controller_and_a_test_group() {
     assert_eq!(pads.len(), 2);
     assert_eq!(pads[0].row.value, "");
     let in_use = &pads[1].row;
+    // Bateria: só o número (a barrinha liga com `on`), em `warning` abaixo de 20%.
     assert_eq!(
-        (in_use.value.as_str(), in_use.style.as_str()),
-        ("15%", "warning")
+        (in_use.value.as_str(), in_use.style.as_str(), in_use.on),
+        ("15", "warning", true)
     );
+    assert!(!pads[0].row.on);
     let pos = |k: &str| rows.iter().position(|r| r.row.key == k).unwrap();
     assert_eq!(rows[pos("settings.controls.test") - 1].row.kind, "header");
     assert!(pos("settings.controls.test") < pos("reset"));
