@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | resetou; rodando WEB-12b, WEB-20 e WEB-35 (pedido do mantenedor de acelerar: acima do limite de 4 agentes, com só 2 builds Rust pesados) |
+| Claude Alyx Medical | `claudeAgent` | resetou; rodando WEB-12b, WEB-20, WEB-35 e WEB-11b (pedido do mantenedor de acelerar: acima do limite de 4 agentes, com só 2 builds Rust pesados) |
 | Antigravity | `antigravity` | rodando WEB-04j (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
@@ -51,6 +51,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-14a | **Busca geral (Ctrl+K)** com jogos e atalhos de tela | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-10a | `web/src/app/BuscaGeral.tsx`, `web/src/app/busca/` | integrada (aguarda validação visual; atalhos de tela são novos, o Slint só buscava jogos) |
 | WEB-04j | **BibliotecaGrade e BibliotecaCategorias** (componentes dos modos Grade e Categorias da lista; ligar ao app depois) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04c | `web/src/components/BibliotecaGrade/`, `web/src/components/BibliotecaCategorias/` | despachada |
 | WEB-35 | **Abertura do app:** EntradaDoApp ligada à abertura, progresso da primeira leitura, sem repetir ao reabrir depois do jogo | N2 | Claude Alyx · Sonnet 5.5 médio | WEB-04d | `web/src/App.tsx`, `web/src/app/abertura/` | despachada |
+| WEB-11b | **Coleções automáticas pela lista:** salvar filtros e busca como coleção, renomear, trocar os filtros, apagar; coleção manual se a ponte permitir | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-11a, WEB-01b | `web/src/app/ColunaDaLista.tsx`, `web/src/app/colecoes/` | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | integrada (falta ligar à sessão de jogo e à bandeja) |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
