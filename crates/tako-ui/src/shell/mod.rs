@@ -570,10 +570,10 @@ impl Shell {
     }
 
     pub fn click(&mut self, zone: &str, index: usize) {
-        // A página do jogo só avisa onde rolou: não é gesto do usuário, então não tira o anel de foco nem a intro.
-        if zone == "page-edge" {
+        // A página do jogo só avisa onde rolou e quantas capas cabem: não é gesto do usuário, então não tira o anel de foco nem a intro.
+        if let Some(kind) = zone.strip_prefix("page-") {
             if let Some(d) = self.pages.last_mut().and_then(|p| p.desktop_mut()) {
-                d.set_page_edge(index);
+                d.report_page(kind, index);
             }
             return;
         }

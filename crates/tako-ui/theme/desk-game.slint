@@ -176,6 +176,7 @@ component LinhaDeDado inherits Rectangle {
 component CartaoTrailer inherits Rectangle {
     in property <image> art;
     in property <string> label;
+    in property <bool> focused;
     callback clicked();
     border-radius: 12px;
     clip: true;
@@ -184,19 +185,20 @@ component CartaoTrailer inherits Rectangle {
     accessible-label: label;
     accessible-action-default => { root.clicked(); }
     ArteCobrindo { source: art; }
-    Rectangle { background: Colors.black.with-alpha(0.4); }
+    Rectangle { background: Ui.media-veil; }
     Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         width: 54px;
         height: 54px;
         border-radius: 27px;
-        background: Colors.black.with-alpha(ta.has-hover ? 0.75 : 0.55);
+        background: ta.has-hover ? Ui.media-play-hover : Ui.media-play;
         transform-scale: ta.has-hover ? 1.12 : 1;
         animate transform-scale, background { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
-        DeskIcon { name: "play"; size: 20px; tint: Colors.white; }
+        DeskIcon { name: "play"; size: 20px; tint: Ui.media-on; }
     }
     Rectangle { border-radius: 12px; border-width: 1px; border-color: Ui.line; }
+    if focused: FocusRing { radius: 12px; background: transparent; }
     ta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
     Tip { text: label; hovering: ta.has-hover; }
 }
@@ -262,6 +264,9 @@ export component PaginaDoJogo inherits Rectangle {
     property <length> body-y: hero-h + 14px;
     property <length> body-h: two-col ? max(lc.preferred-height, rc.preferred-height) : lc.preferred-height + (rc.preferred-height > 0 ? gap + rc.preferred-height : 0);
     property <length> trailer-h: min(368px, left-w * 9 / 16);
+    // O cabeçalho das sessões com a coluna da direita solta (a coluna acompanha a rolagem, então só importa até colar).
+    property <length> sessions-y: body-y + (details.length > 0 ? 44px + details.length * 39px + 2 * Ui.space-6 + 16px : 0px) + (two-col ? 0px : lc.preferred-height + gap);
+    property <length> similar-y: body-y + body-h + 48px + 34px + 14px;
     // Coluna da identidade (a Visão geral usa a mesma conta, 40% da largura), nunca mais estreita que a fileira de ações:
     // senão o primário sai cortado na janela pequena e com o texto a 125%. Também diz quantos itens da barra de dados cabem.
     property <length> col-w: max(clamp(240px, root.width * 0.4, 520px), ar.preferred-width);
@@ -288,9 +293,29 @@ export component PaginaDoJogo inherits Rectangle {
     }
     // Onde a página está (0 topo, 1 no meio, 2 no fim): o teclado e o controle rolam passo a passo e precisam saber se ↑ ainda
     // rola ou volta para as ações.
-    callback edge(int);
+    callback report(string, int);
     property <int> at-edge: scrolled <= 1px ? 0 : (scrolled >= scroll-max - 1px ? 2 : 1);
-    changed at-edge => { root.edge(at-edge); }
+    changed at-edge => { root.report("edge", at-edge); }
+    // Quantas capas de Parecidos cabem na largura: o foco do teclado só passa pelas que aparecem.
+    changed similar-n => { root.report("similar-n", similar-n); }
+    // O corpo tem foco (trailer, Ver todas, capas de Parecidos): rola só o bastante para o item aparecer inteiro.
+    property <string> body-key: zone + zone-index;
+    function reveal(top: length, bottom: length) {
+        if (bottom + 24px > scrolled + root.height) {
+            root.scroll-to(bottom + 24px - root.height);
+        } else if (top < scrolled + Ui.topbar-height + bar-h + 16px) {
+            root.scroll-to(top - Ui.topbar-height - bar-h - 16px);
+        }
+    }
+    changed body-key => {
+        if (zone == "body-trailer") {
+            reveal(body-y, body-y + trailer-h);
+        } else if (zone == "body-sessions") {
+            reveal(sessions-y, sessions-y + 44px);
+        } else if (zone == "body-similar") {
+            reveal(similar-y, similar-y + cover-w * 1.5 + 58px);
+        }
+    }
     // Outro jogo: a página volta ao topo (`changed` só dispara quando o texto muda, não quando o `page` é reenviado).
     property <string> game-id: page.id;
     changed game-id => { scrolled = 0px; }
@@ -469,6 +494,7 @@ export component PaginaDoJogo inherits Rectangle {
                 height: root.trailer-h;
                 art: root.art;
                 label: page.labels[6];
+                focused: focus-visible && zone == "body-trailer";
                 clicked => { root.clicked("trailer", 0); }
             }
             if page.shots.length > 0: HorizontalLayout {
@@ -547,6 +573,7 @@ export component PaginaDoJogo inherits Rectangle {
                             accessible-role: button;
                             accessible-label: page.labels[9];
                             accessible-action-default => { root.clicked("sessions", 0); }
+                            if focus-visible && zone == "body-sessions": FocusRing { radius: Ui.radius-control; background: transparent; }
                             sl := HorizontalLayout {
                                 alignment: center;
                                 spacing: 4px;
@@ -582,6 +609,7 @@ export component PaginaDoJogo inherits Rectangle {
                 label: c.detail;
                 accent: c.accent;
                 favorite: c.dot;
+                focused: focus-visible && zone == "body-similar" && zone-index == i;
                 clicked => { root.clicked("similar", i); }
                 played => { root.clicked("similar", i); }
             }

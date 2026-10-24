@@ -351,6 +351,17 @@ pub enum Zone {
     Body,
 }
 
+/// Parecidos de um jogo: o id, a versão da biblioteca em que foram calculados e (id, motivo) de cada um.
+type SimilarCache = (String, u64, Vec<(String, String)>);
+
+/// Os pontos de foco do corpo da página do jogo: o trailer, o Ver todas das sessões e as capas de Parecidos.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyItem {
+    Trailer,
+    Sessions,
+    Similar(usize),
+}
+
 /// Os controles da zona `Controls`, na ordem da tela (o índice da zona).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Control {
@@ -401,8 +412,11 @@ pub struct DesktopLibrary {
     page_scroll: f32,
     /// Onde o tema diz que a página está (0 topo, 1 no meio, 2 no fim): ↑ no topo sai do corpo e ↓ no fim não rola.
     page_edge: usize,
-    /// Os jogos da fileira Parecidos da página (o tema avisa o clique pelo índice).
-    similar: Vec<String>,
+    /// Parecidos do jogo da página (id e motivo), guardados por jogo e versão da biblioteca: o `render` roda a cada
+    /// quadro e a busca varre a biblioteca inteira. O tema avisa o clique pelo índice.
+    similar: Option<SimilarCache>,
+    /// Quantas capas de Parecidos cabem na janela (o tema avisa); o foco só passa pelas que aparecem.
+    similar_shown: usize,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
     /// Visão geral (TelaBiblioteca) no lugar do destaque do jogo: o primeiro lugar da biblioteca; escolher um jogo sai
@@ -450,7 +464,8 @@ impl DesktopLibrary {
             hero_wait: None,
             page_scroll: 0.,
             page_edge: 0,
-            similar: Vec::new(),
+            similar: None,
+            similar_shown: usize::MAX,
             group_focus: None,
             overview: true,
         }
@@ -505,9 +520,108 @@ impl DesktopLibrary {
         self.zone
     }
 
-    /// O tema avisa onde a página do jogo está (`Shell::click` com "page-edge").
-    pub fn set_page_edge(&mut self, edge: usize) {
-        self.page_edge = edge;
+    /// O tema avisa o estado da página do jogo (`Shell::click` com "page-edge" ou "page-similar-n").
+    pub fn report_page(&mut self, kind: &str, value: usize) {
+        match kind {
+            "edge" => self.page_edge = value,
+            "similar-n" => self.similar_shown = value,
+            _ => {}
+        }
+    }
+
+    /// Parecidos de `g`: recalcula só quando o jogo ou a biblioteca mudam.
+    fn similar_of(&mut self, ctx: &Ctx, g: &Game) -> &[(String, String)] {
+        let version = ctx.library.version();
+        let fresh = matches!(&self.similar, Some((id, v, _)) if *id == g.id && *v == version);
+        if !fresh {
+            let found = similar_games(ctx.library.games(), g)
+                .into_iter()
+                .map(|(o, why)| (o.id.clone(), why))
+                .collect();
+            self.similar = Some((g.id.clone(), version, found));
+        }
+        self.similar.as_ref().map_or(&[], |(.., found)| found)
+    }
+
+    /// Onde o foco do corpo da página do jogo pode parar, na ordem da tela: trailer, Ver todas e as capas de Parecidos.
+    fn body_items(&mut self, ctx: &Ctx) -> Vec<BodyItem> {
+        let Some(g) = self.selected(ctx).and_then(|id| ctx.library.find(&id)) else {
+            return Vec::new();
+        };
+        let mut items = Vec::new();
+        if g.media.contains_key(tako_core::library::media::VIDEO) {
+            items.push(BodyItem::Trailer);
+        }
+        if !ctx.library.sessions(&g.id).is_empty() {
+            items.push(BodyItem::Sessions);
+        }
+        let shown = self.similar_shown;
+        let n = self.similar_of(ctx, g).len().min(shown);
+        items.extend((0..n).map(BodyItem::Similar));
+        items
+    }
+
+    /// Teclado e controle no corpo da página do jogo. Com itens: ←→ andam na fileira (trailer e Ver todas, ou as capas),
+    /// ↓ passa para as capas, ↑ volta para o trailer e depois para as ações, Enter age. Sem itens, ↓ e ↑ rolam a página.
+    fn body_cmd(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
+        let items = self.body_items(ctx);
+        let rolls = |edge: usize, cmd| match cmd {
+            Cmd::Down => edge < 2,
+            _ => edge > 0,
+        };
+        let covers = items.iter().position(|i| matches!(i, BodyItem::Similar(_)));
+        let Some(item) = items
+            .get(self.index.min(items.len().saturating_sub(1)))
+            .copied()
+        else {
+            match cmd {
+                Cmd::Down | Cmd::Up if rolls(self.page_edge, cmd) => {
+                    self.page_scroll += if cmd == Cmd::Down {
+                        BODY_STEP
+                    } else {
+                        -BODY_STEP
+                    };
+                }
+                Cmd::Up => self.focus_actions(),
+                Cmd::Left => self.zone = Zone::List,
+                _ => {}
+            }
+            return Nav::Stay;
+        };
+        let at = self.index.min(items.len() - 1);
+        let in_covers = matches!(item, BodyItem::Similar(_));
+        let (first, last) = match (in_covers, covers) {
+            (true, Some(c)) => (c, items.len() - 1),
+            (_, c) => (0, c.unwrap_or(items.len()) - 1),
+        };
+        match cmd {
+            Cmd::Left if at == first => self.zone = Zone::List,
+            Cmd::Left => self.index = at - 1,
+            Cmd::Right => self.index = (at + 1).min(last),
+            Cmd::Down if !in_covers && covers.is_some() => self.index = covers.unwrap_or(at),
+            // Última fileira: ↓ continua rolando para o que está abaixo.
+            Cmd::Down if rolls(self.page_edge, cmd) => self.page_scroll += BODY_STEP,
+            Cmd::Up if in_covers && first > 0 => self.index = 0,
+            Cmd::Up if !in_covers && covers.is_none() && rolls(self.page_edge, cmd) => {
+                self.page_scroll -= BODY_STEP;
+            }
+            Cmd::Up => self.focus_actions(),
+            Cmd::Accept => {
+                return match item {
+                    BodyItem::Trailer => self.click("trailer", 0, ctx),
+                    BodyItem::Sessions => self.click("sessions", 0, ctx),
+                    BodyItem::Similar(i) => self.click("similar", i, ctx),
+                };
+            }
+            _ => {}
+        }
+        Nav::Stay
+    }
+
+    /// Volta o foco para as ações do destaque (o tema rola a página de volta ao topo).
+    fn focus_actions(&mut self) {
+        self.zone = Zone::Actions;
+        self.index = 0;
     }
 
     /// Coleções da aba: as do usuário e as automáticas.
@@ -1728,18 +1842,17 @@ impl Page for DesktopLibrary {
                 self.index = (self.index + 1).min(n - 1);
             }
             (Zone::Actions, Cmd::Up) => self.zone = Zone::List,
-            // Desce para o corpo da página (Sobre, Detalhes…) e já rola o primeiro passo.
+            // Desce para o corpo da página: no primeiro item (o tema rola até ele) ou, sem itens, rolando o primeiro passo.
             (Zone::Actions, Cmd::Down) => {
                 self.zone = Zone::Body;
-                self.page_scroll += BODY_STEP;
-            }
-            (Zone::Body, Cmd::Down) if self.page_edge < 2 => self.page_scroll += BODY_STEP,
-            (Zone::Body, Cmd::Up) if self.page_edge > 0 => self.page_scroll -= BODY_STEP,
-            (Zone::Body, Cmd::Up) => {
-                self.zone = Zone::Actions;
                 self.index = 0;
+                if self.body_items(ctx).is_empty() {
+                    self.page_scroll += BODY_STEP;
+                }
             }
-            (Zone::Body, Cmd::Left) => self.zone = Zone::List,
+            (Zone::Body, Cmd::Up | Cmd::Down | Cmd::Left | Cmd::Right | Cmd::Accept) => {
+                return self.body_cmd(cmd, ctx);
+            }
             (Zone::Actions, Cmd::Accept) => {
                 let action = cur
                     .and_then(|i| ctx.library.find(&ids[i]))
@@ -1847,8 +1960,9 @@ impl Page for DesktopLibrary {
             && !self.overview_on(ctx)
         {
             self.page_scroll += if c == PAGE_DOWN { 1. } else { -1. };
-            // Com a página rolada, o foco das ações ficaria fora da tela: ele passa para o corpo.
-            if self.zone == Zone::Actions {
+            // Com a página rolada, o foco das ações ficaria fora da tela: ele passa para o corpo (sem itens, que o tema
+            // rolaria de volta até o primeiro).
+            if self.zone == Zone::Actions && self.body_items(ctx).is_empty() {
                 self.zone = Zone::Body;
             }
             return Some(Nav::Stay);
@@ -2000,8 +2114,15 @@ impl Page for DesktopLibrary {
             "rescan" => rescan(ctx),
             // Parecidos: um clique abre a página do jogo.
             "similar" => {
-                if let Some(id) = self.similar.get(index).cloned() {
+                let selected = self.selected(ctx);
+                let game = selected.as_deref().and_then(|id| ctx.library.find(id));
+                let id = game
+                    .and_then(|g| self.similar_of(ctx, g).get(index))
+                    .map(|(id, _)| id.clone());
+                if let Some(id) = id {
                     self.open_game(&id, ctx);
+                    // O foco vai para as ações do jogo novo (a página dele abre no topo).
+                    self.focus_actions();
                 }
             }
             // O ← e a trilha "Biblioteca" da barra fina da página do jogo: voltam à Visão geral.
@@ -2614,8 +2735,11 @@ impl Page for DesktopLibrary {
                 let show_logo = show_logo(ctx, g, &logo, &art_lum);
                 let title_pending = title_pending(ctx, g, &logo, &art_lum);
                 let (sessions, numbers) = sessions_blocks(ctx, g);
-                let similar = similar_games(ctx.library.games(), g);
-                self.similar = similar.iter().map(|(o, _)| o.id.clone()).collect();
+                let similar: Vec<(&Game, String)> = self
+                    .similar_of(ctx, g)
+                    .iter()
+                    .filter_map(|(id, why)| Some((ctx.library.find(id)?, why.clone())))
+                    .collect();
                 let page = DeskPage {
                     id: g.id.clone(),
                     cover: tiles::image(g.shown_cover(), THUMB),
@@ -2711,6 +2835,19 @@ impl Page for DesktopLibrary {
         out.set("desk-actions", actions);
         out.set("desk-stats", stats);
         out.set("desk-details", details);
+        // No corpo da página, a zona diz qual item tem o foco (o tema o mostra e rola até ele) e o índice é o da capa.
+        let (body, body_index) = match self.zone {
+            Zone::Body if !overview => {
+                let items = self.body_items(ctx);
+                match items.get(self.index.min(items.len().saturating_sub(1))) {
+                    Some(BodyItem::Trailer) => ("body-trailer", 0),
+                    Some(BodyItem::Sessions) => ("body-sessions", 0),
+                    Some(BodyItem::Similar(i)) => ("body-similar", *i),
+                    None => ("body", 0),
+                }
+            }
+            _ => ("", 0),
+        };
         out.set(
             "desk-zone",
             match self.zone {
@@ -2720,10 +2857,17 @@ impl Page for DesktopLibrary {
                 Zone::List => "list",
                 Zone::Actions if overview => "overview",
                 Zone::Actions => "actions",
-                Zone::Body => "body",
+                Zone::Body => body,
             },
         );
-        out.set("desk-zone-index", self.index as i32);
+        out.set(
+            "desk-zone-index",
+            if body.is_empty() {
+                self.index
+            } else {
+                body_index
+            } as i32,
+        );
         out.set("desk-search-focus", self.search_focus);
         // ListaVazia: diz por quê e oferece a saída (zona do clique e o rótulo do botão).
         let none = String::new;
@@ -3360,11 +3504,17 @@ mod tests {
         let after = page(&mut shell).unwrap();
         assert_eq!(len(&after, "numbers"), 2);
         assert!(len(&after, "sessions") > 0);
-        let first = shell.ctx.library.games()[0].id.clone();
+        // O clique abre exatamente o primeiro parecido (o de mais gêneros em comum), não só "outro jogo".
+        let game = shell.ctx.library.games()[0].clone();
+        let expected = similar_games(shell.ctx.library.games(), &game)[0]
+            .0
+            .id
+            .clone();
+        assert_ne!(expected, game.id);
         shell.click("similar", 0);
-        assert_ne!(
+        assert_eq!(
             page(&mut shell).and_then(|s| s.get_field("id").cloned()),
-            Some(slint_interpreter::Value::String(first.into()))
+            Some(slint_interpreter::Value::String(expected.into()))
         );
     }
 
@@ -3821,8 +3971,15 @@ mod tests {
         assert_eq!(page(&shell).zone(), Zone::Actions);
         shell.key("\u{F72D}", KeyModifiers::NONE);
         assert_eq!(page_scroll(&mut shell), 2.);
-        // A página rolou: o foco das ações sairia da tela, então ele passa para o corpo.
+        // O corpo tem itens (as capas de Parecidos): o foco fica nas ações, que o tema não rolaria de volta ao topo.
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // Sem nenhum item no corpo, a página rolada leva o foco das ações para ele.
+        shell.click("page-similar-n", 0);
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert_eq!(page_scroll(&mut shell), 3.);
         assert_eq!(page(&shell).zone(), Zone::Body);
+        shell.key("\u{F72C}", KeyModifiers::NONE);
+        assert_eq!(page_scroll(&mut shell), 2.);
         // Com Ctrl, não: o atalho é de outra coisa. As Categorias não têm a página.
         shell.key("\u{F72D}", KeyModifiers::CTRL);
         assert_eq!(page_scroll(&mut shell), 2.);
@@ -3839,6 +3996,8 @@ mod tests {
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
         shell.click("game", 0);
+        // Nenhuma capa de Parecidos cabe (o tema avisa): sem trailer, sessões nem capas, o corpo só rola.
+        shell.click("page-similar-n", 0);
         shell.key("\u{0009}", KeyModifiers::NONE);
         assert_eq!(page(&shell).zone(), Zone::Actions);
         // ↓ entra no corpo e já rola um passo; os seguintes rolam mais.
@@ -3877,6 +4036,142 @@ mod tests {
         assert_eq!(page(&shell).zone(), Zone::Body);
         shell.key("\u{0009}", KeyModifiers::NONE);
         assert_eq!(page(&shell).zone(), Zone::Bar);
+    }
+
+    /// Trailer, Ver todas e as capas de Parecidos entram na ordem da tela: ↓ das ações vai ao primeiro, ←→ andam na
+    /// fileira, ↓ passa às capas, ↑ volta e Enter age.
+    #[test]
+    fn the_keyboard_and_controller_reach_trailer_sessions_and_similar_games() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("game", 0);
+        let game = shell.ctx.library.games()[0].clone();
+        let similar: Vec<String> = similar_games(shell.ctx.library.games(), &game)
+            .into_iter()
+            .map(|(o, _)| o.id.clone())
+            .collect();
+        assert!(similar.len() >= 2);
+        let zone = |shell: &mut Shell| {
+            let out = shell.render(std::time::Instant::now());
+            let text = |name: &str| {
+                out.props.iter().find_map(|(n, v)| match (*n, v) {
+                    (n, slint_interpreter::Value::String(s)) if n == name => Some(s.to_string()),
+                    _ => None,
+                })
+            };
+            let index = out.props.iter().find_map(|(n, v)| match (*n, v) {
+                ("desk-zone-index", slint_interpreter::Value::Number(i)) => Some(*i as i32),
+                _ => None,
+            });
+            (text("desk-zone").unwrap_or_default(), index.unwrap_or(-1))
+        };
+        // Só capas: ↓ das ações cai na primeira, sem rolar o corpo à mão (o tema rola até ela).
+        shell.key("\u{0009}", KeyModifiers::NONE);
+        shell.handle(Cmd::Down);
+        assert_eq!(zone(&mut shell), ("body-similar".to_owned(), 0));
+        assert_eq!(page_scroll(&mut shell), 0.);
+        shell.handle(Cmd::Right);
+        assert_eq!(zone(&mut shell), ("body-similar".to_owned(), 1));
+        // Só cabem duas capas: → para na última que aparece.
+        shell.click("page-similar-n", 2);
+        shell.handle(Cmd::Right);
+        assert_eq!(zone(&mut shell), ("body-similar".to_owned(), 1));
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Left);
+        assert_eq!(page(&shell).zone(), Zone::List);
+        // Enter na capa abre o parecido e leva o foco às ações dele.
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Down);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Accept);
+        assert_eq!(shell.focused_game(), Some(similar[1].clone()));
+        assert_eq!(zone(&mut shell).0, "actions");
+        // Com sessões e trailer: trailer → Ver todas → capas.
+        let id = shell.focused_game().unwrap();
+        shell
+            .ctx
+            .library
+            .record_session(&id, std::time::Duration::from_secs(600))
+            .unwrap();
+        if let Some(g) = shell
+            .ctx
+            .library
+            .games_mut()
+            .iter_mut()
+            .find(|g| g.id == id)
+        {
+            g.media.insert(
+                tako_core::library::media::VIDEO.to_owned(),
+                "https://example.com/trailer".to_owned(),
+            );
+        }
+        shell.click("page-similar-n", 8);
+        shell.handle(Cmd::Down);
+        assert_eq!(zone(&mut shell).0, "body-trailer");
+        shell.handle(Cmd::Accept);
+        assert!(
+            shell
+                .ctx
+                .effects
+                .contains(&Effect::OpenUrl("https://example.com/trailer".to_owned()))
+        );
+        shell.handle(Cmd::Right);
+        assert_eq!(zone(&mut shell).0, "body-sessions");
+        shell.handle(Cmd::Down);
+        assert_eq!(zone(&mut shell).0, "body-similar");
+        shell.handle(Cmd::Up);
+        assert_eq!(zone(&mut shell).0, "body-trailer");
+        // Enter em Ver todas abre o histórico de sessões no Perfil.
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Accept);
+        assert_eq!(shell.page().kind(), "desk-profile");
+    }
+
+    /// Parecidos são guardados por jogo e versão da biblioteca: o `render` roda a cada quadro e não varre tudo de novo.
+    #[test]
+    fn similar_games_are_cached_per_game_until_the_library_changes() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("game", 0);
+        let game = shell.ctx.library.games()[0].clone();
+        let first: Vec<String> = {
+            let Shell { pages, ctx, .. } = &mut shell;
+            let d = pages.last_mut().and_then(|p| p.desktop_mut()).unwrap();
+            d.similar_of(ctx, &game)
+                .iter()
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        assert!(!first.is_empty());
+        // Tira o gênero do primeiro parecido sem a biblioteca avisar: o cache segue valendo…
+        let other = first[0].clone();
+        let strip_genres = |shell: &mut Shell| {
+            if let Some(o) = shell
+                .ctx
+                .library
+                .games_mut()
+                .iter_mut()
+                .find(|g| g.id == other)
+            {
+                o.genres.clear();
+                o.developer = None;
+            }
+        };
+        strip_genres(&mut shell);
+        let again = |shell: &mut Shell| -> Vec<String> {
+            let Shell { pages, ctx, .. } = shell;
+            let d = pages.last_mut().and_then(|p| p.desktop_mut()).unwrap();
+            d.similar_of(ctx, &game)
+                .iter()
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        assert_eq!(again(&mut shell), first);
+        // …até a biblioteca mudar (a versão sobe): aí recalcula e o jogo sai.
+        shell.ctx.library.toggle_favorite(&game.id).unwrap();
+        assert!(!again(&mut shell).contains(&other));
     }
 
     #[test]

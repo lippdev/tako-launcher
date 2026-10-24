@@ -837,6 +837,79 @@ fn game_page_primary_action_is_not_clipped_in_a_small_window() {
     .unwrap();
 }
 
+/// Focar uma capa de Parecidos pelo teclado rola a página até ela: a fileira fica abaixo da dobra num 960 × 600 e
+/// passa a aparecer inteira (o quadro muda muito); ↑ volta ao topo, onde estavam as ações.
+#[test]
+fn focusing_similar_games_with_the_keyboard_scrolls_the_page_to_them() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (960usize, 600usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        let settle = |shell: &mut Shell, ms: u64| {
+            let t = START.elapsed() + std::time::Duration::from_millis(ms);
+            CLOCK.with(|c| c.set(Some(t)));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        let differ =
+            |a: &[Rgb8Pixel], b: &[Rgb8Pixel]| a.iter().zip(b).filter(|(x, y)| x != y).count();
+        shell.key("\u{0009}", tako_core::input::shortcut::KeyModifiers::NONE);
+        draw(&mut shell);
+        let top = settle(&mut shell, 100);
+        shell.handle(Cmd::Down);
+        draw(&mut shell);
+        settle(&mut shell, 1000);
+        let rolled = settle(&mut shell, 1600);
+        assert!(
+            differ(&top, &rolled) > 20_000,
+            "a página rolou até as capas: {}",
+            differ(&top, &rolled)
+        );
+        shell.handle(Cmd::Up);
+        draw(&mut shell);
+        settle(&mut shell, 2200);
+        let back = settle(&mut shell, 3000);
+        assert!(
+            differ(&top, &back) < differ(&top, &rolled) / 4,
+            "↑ voltou ao topo: {}",
+            differ(&top, &back)
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
 /// O escurecimento da arte (UI-GLASS-001) não pode ter aresta dura: sobre fundo branco, a luminância muda de um pixel
 /// para o outro só pelo degradê, inclusive no topo e na direita da elipse atrás do texto.
 #[test]
