@@ -1,0 +1,507 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Logos": {
+      "files": {
+        "tako-logo-horizontal.png": {
+          "blob": "ce063d09278dcab44f2e7c78665ac350",
+          "name": "tako-logo-horizontal.png",
+          "size": 71280,
+          "type": "image/png"
+        },
+        "tako-mark.png": {
+          "blob": "904cd0c32e5dba91677337a1cb94d7c4",
+          "name": "tako-mark.png",
+          "size": 93574,
+          "type": "image/png"
+        },
+        "tako-wordmark.png": {
+          "blob": "55dd844e617842f9c67d01ecd48bc555",
+          "name": "tako-wordmark.png",
+          "size": 13581,
+          "type": "image/png"
+        },
+        "tako-kana.png": {
+          "blob": "8929d7ca7f3371b2275e7ed7e9d6e576",
+          "name": "tako-kana.png",
+          "size": 2020,
+          "type": "image/png"
+        }
+      },
+      "name": "Logos",
+      "order": [
+        "tako-logo-horizontal.png",
+        "tako-mark.png",
+        "tako-wordmark.png",
+        "tako-kana.png"
+      ],
+      "tile": "l"
+    },
+    "Icones": {
+      "files": {
+        "tako.svg": {
+          "blob": "7f59005258e425fca5e3e2fe4a5df578",
+          "name": "tako.svg",
+          "size": 421,
+          "type": "image/svg+xml"
+        },
+        "home.svg": {
+          "blob": "d8082099df241714ef7ac93aa27dfd21",
+          "name": "home.svg",
+          "size": 254,
+          "type": "image/svg+xml"
+        },
+        "store.svg": {
+          "blob": "40088d82392350b0f670e6b3b2d662c4",
+          "name": "store.svg",
+          "size": 294,
+          "type": "image/svg+xml"
+        },
+        "search.svg": {
+          "blob": "d55084238c56b1405f8fc4348769b0e6",
+          "name": "search.svg",
+          "size": 242,
+          "type": "image/svg+xml"
+        },
+        "sliders.svg": {
+          "blob": "b06930698d6a92111b876d0587b77c6c",
+          "name": "sliders.svg",
+          "size": 287,
+          "type": "image/svg+xml"
+        },
+        "play.svg": {
+          "blob": "6fc3e92c038b539e3ef0d1b7ae9076ad",
+          "name": "play.svg",
+          "size": 214,
+          "type": "image/svg+xml"
+        },
+        "download.svg": {
+          "blob": "5b6f29be9f508496b1a7d9f23499f197",
+          "name": "download.svg",
+          "size": 226,
+          "type": "image/svg+xml"
+        },
+        "download-circle.svg": {
+          "blob": "52b986b5cbf547efe7a7462439ecb63c",
+          "name": "download-circle.svg",
+          "size": 260,
+          "type": "image/svg+xml"
+        },
+        "refresh.svg": {
+          "blob": "d9d80d7e2c9ecc4f1a70d64ebf23c23d",
+          "name": "refresh.svg",
+          "size": 276,
+          "type": "image/svg+xml"
+        },
+        "gamepad.svg": {
+          "blob": "99f2f4d45f248f34db9edb7c76a068bf",
+          "name": "gamepad.svg",
+          "size": 364,
+          "type": "image/svg+xml"
+        },
+        "user.svg": {
+          "blob": "f33e39f8dcaa6cfeb030763ab4f76968",
+          "name": "user.svg",
+          "size": 254,
+          "type": "image/svg+xml"
+        },
+        "gear.svg": {
+          "blob": "db0b4fa541e3e6ed32ae1f7e2da8dd23",
+          "name": "gear.svg",
+          "size": 771,
+          "type": "image/svg+xml"
+        },
+        "star.svg": {
+          "blob": "356a917d87a92b22cfe1cc51b0d9826d",
+          "name": "star.svg",
+          "size": 271,
+          "type": "image/svg+xml"
+        },
+        "heart.svg": {
+          "blob": "893305c019ddf8624611131609b25b6a",
+          "name": "heart.svg",
+          "size": 266,
+          "type": "image/svg+xml"
+        },
+        "cart.svg": {
+          "blob": "d5902298e9a001df10d9bbc05c8aba6c",
+          "name": "cart.svg",
+          "size": 290,
+          "type": "image/svg+xml"
+        },
+        "amphora.svg": {
+          "blob": "14d9b9213b0da44e4a21008b85ac9b5c",
+          "name": "amphora.svg",
+          "size": 296,
+          "type": "image/svg+xml"
+        },
+        "arrow-left.svg": {
+          "blob": "6d469a9ea35f3601f552762d5d69f7da",
+          "name": "arrow-left.svg",
+          "size": 219,
+          "type": "image/svg+xml"
+        },
+        "badge-alert.svg": {
+          "blob": "4127c47056ff80e8002de676fd9f33be",
+          "name": "badge-alert.svg",
+          "size": 385,
+          "type": "image/svg+xml"
+        },
+        "badge.svg": {
+          "blob": "44d60c6f6bf2329fdfdeb937a73221f8",
+          "name": "badge.svg",
+          "size": 395,
+          "type": "image/svg+xml"
+        },
+        "books.svg": {
+          "blob": "db2bc88530450bdb44891caec09cee73",
+          "name": "books.svg",
+          "size": 251,
+          "type": "image/svg+xml"
+        },
+        "brush.svg": {
+          "blob": "e74959ed8e8fd98f999d2f57270e8620",
+          "name": "brush.svg",
+          "size": 319,
+          "type": "image/svg+xml"
+        },
+        "calendar.svg": {
+          "blob": "001b5e7ad2f3a62a10e3d2e693be92d2",
+          "name": "calendar.svg",
+          "size": 267,
+          "type": "image/svg+xml"
+        },
+        "camera.svg": {
+          "blob": "acc1c6b1d456a79b91bd6ef03dcc44e8",
+          "name": "camera.svg",
+          "size": 312,
+          "type": "image/svg+xml"
+        },
+        "card.svg": {
+          "blob": "832e753b8bb23d82e6f300001f6aaccb",
+          "name": "card.svg",
+          "size": 261,
+          "type": "image/svg+xml"
+        },
+        "check.svg": {
+          "blob": "f5428c316e5904c8066beeaed1307c40",
+          "name": "check.svg",
+          "size": 211,
+          "type": "image/svg+xml"
+        },
+        "chevron-down.svg": {
+          "blob": "cb6d3138e7db07b3ef717b8d8ddbd721",
+          "name": "chevron-down.svg",
+          "size": 209,
+          "type": "image/svg+xml"
+        },
+        "chevron-left.svg": {
+          "blob": "daa35273b888f7993c7f38cf8f6806b0",
+          "name": "chevron-left.svg",
+          "size": 210,
+          "type": "image/svg+xml"
+        },
+        "chevron-right.svg": {
+          "blob": "3ee2937c39c09879c02a548379d2e56c",
+          "name": "chevron-right.svg",
+          "size": 209,
+          "type": "image/svg+xml"
+        },
+        "clock.svg": {
+          "blob": "f890e370c8158581fb2ce957ea0a5ee3",
+          "name": "clock.svg",
+          "size": 239,
+          "type": "image/svg+xml"
+        },
+        "cloud.svg": {
+          "blob": "3478c498fd5a8e06b6d9b8bf24cf7c12",
+          "name": "cloud.svg",
+          "size": 259,
+          "type": "image/svg+xml"
+        },
+        "compass.svg": {
+          "blob": "bc70c1e5bbf00e80baa57b8fb2a183f1",
+          "name": "compass.svg",
+          "size": 250,
+          "type": "image/svg+xml"
+        },
+        "cpu.svg": {
+          "blob": "94fc3d69dee873ad251d1e180d1c4313",
+          "name": "cpu.svg",
+          "size": 353,
+          "type": "image/svg+xml"
+        },
+        "eye.svg": {
+          "blob": "6123480e62062c71167e796e276d0457",
+          "name": "eye.svg",
+          "size": 276,
+          "type": "image/svg+xml"
+        },
+        "flag.svg": {
+          "blob": "4254783be004f6b43648568eaf932f82",
+          "name": "flag.svg",
+          "size": 222,
+          "type": "image/svg+xml"
+        },
+        "flower.svg": {
+          "blob": "cc2ec0cde73b6b82001b47076569ba09",
+          "name": "flower.svg",
+          "size": 386,
+          "type": "image/svg+xml"
+        },
+        "folder.svg": {
+          "blob": "8c0520bac4552e5af4e98ceb8dc5d932",
+          "name": "folder.svg",
+          "size": 271,
+          "type": "image/svg+xml"
+        },
+        "gem.svg": {
+          "blob": "910be50285f401c459eb43894f3b9ab4",
+          "name": "gem.svg",
+          "size": 261,
+          "type": "image/svg+xml"
+        },
+        "globe.svg": {
+          "blob": "c57b785617102f83d910cf180e9c887c",
+          "name": "globe.svg",
+          "size": 280,
+          "type": "image/svg+xml"
+        },
+        "grid.svg": {
+          "blob": "358cfe8e275143e07280e7ce199aeb07",
+          "name": "grid.svg",
+          "size": 409,
+          "type": "image/svg+xml"
+        },
+        "image.svg": {
+          "blob": "5c712c23d2d20be17efae6315c1d5eb0",
+          "name": "image.svg",
+          "size": 297,
+          "type": "image/svg+xml"
+        },
+        "info.svg": {
+          "blob": "1cd8e8a042496db4a728baa9a1f51e9b",
+          "name": "info.svg",
+          "size": 245,
+          "type": "image/svg+xml"
+        },
+        "list.svg": {
+          "blob": "c82cc32a5e33797e6b1a0002faf7e521",
+          "name": "list.svg",
+          "size": 246,
+          "type": "image/svg+xml"
+        },
+        "lock.svg": {
+          "blob": "874a5971cbc9f9a6b8db352759cabb5c",
+          "name": "lock.svg",
+          "size": 270,
+          "type": "image/svg+xml"
+        },
+        "minus.svg": {
+          "blob": "daedb1fe835a4f4f3920dc12b66cdeef",
+          "name": "minus.svg",
+          "size": 205,
+          "type": "image/svg+xml"
+        },
+        "monitor.svg": {
+          "blob": "96e36b675b6957116ec8d3ac2129d852",
+          "name": "monitor.svg",
+          "size": 261,
+          "type": "image/svg+xml"
+        },
+        "palette.svg": {
+          "blob": "c2d40fd5234f9fc501c6ab004a1a899d",
+          "name": "palette.svg",
+          "size": 390,
+          "type": "image/svg+xml"
+        },
+        "panel.svg": {
+          "blob": "54844ad08e8cf90ee049116d7bbc3e27",
+          "name": "panel.svg",
+          "size": 270,
+          "type": "image/svg+xml"
+        },
+        "pause.svg": {
+          "blob": "b246984e9fd23d9bdc57cb8083b0f735",
+          "name": "pause.svg",
+          "size": 212,
+          "type": "image/svg+xml"
+        },
+        "plug.svg": {
+          "blob": "370491f9ca6f4696a68a72bdf29da626",
+          "name": "plug.svg",
+          "size": 255,
+          "type": "image/svg+xml"
+        },
+        "plus.svg": {
+          "blob": "173906aab2e1d030d8c4f692720f5038",
+          "name": "plus.svg",
+          "size": 213,
+          "type": "image/svg+xml"
+        },
+        "share.svg": {
+          "blob": "6f4743608c6eef104d2b57f5accae5f0",
+          "name": "share.svg",
+          "size": 328,
+          "type": "image/svg+xml"
+        },
+        "shield.svg": {
+          "blob": "9607f2ff50c1e0cd81dd860451b9484c",
+          "name": "shield.svg",
+          "size": 271,
+          "type": "image/svg+xml"
+        },
+        "sort.svg": {
+          "blob": "b738705561ab04133327b7b76f76680d",
+          "name": "sort.svg",
+          "size": 256,
+          "type": "image/svg+xml"
+        },
+        "square.svg": {
+          "blob": "9592d886359b91f095bc26a805535062",
+          "name": "square.svg",
+          "size": 234,
+          "type": "image/svg+xml"
+        },
+        "sword.svg": {
+          "blob": "b6b8331606e3c1a52781a6ee3c6181a4",
+          "name": "sword.svg",
+          "size": 255,
+          "type": "image/svg+xml"
+        },
+        "trash.svg": {
+          "blob": "62d1bc947e1abdbf3d883df0e66877f2",
+          "name": "trash.svg",
+          "size": 231,
+          "type": "image/svg+xml"
+        },
+        "trophy.svg": {
+          "blob": "8d02e524fc5f3d599190a7b846a18e4f",
+          "name": "trophy.svg",
+          "size": 296,
+          "type": "image/svg+xml"
+        },
+        "updown.svg": {
+          "blob": "bf0e703d6c07d2f497feba7dd2a0bb51",
+          "name": "updown.svg",
+          "size": 222,
+          "type": "image/svg+xml"
+        },
+        "users.svg": {
+          "blob": "0fd3f884f47da3d110fc242fe1242d2f",
+          "name": "users.svg",
+          "size": 258,
+          "type": "image/svg+xml"
+        },
+        "volume.svg": {
+          "blob": "3363be5fb5b0a45d22d5ef2544e2af5f",
+          "name": "volume.svg",
+          "size": 275,
+          "type": "image/svg+xml"
+        },
+        "wallet.svg": {
+          "blob": "0635468af964c5a29ced5898dc6d83c8",
+          "name": "wallet.svg",
+          "size": 294,
+          "type": "image/svg+xml"
+        },
+        "x.svg": {
+          "blob": "d534de766d4cdebcfdb672c10eb2013d",
+          "name": "x.svg",
+          "size": 217,
+          "type": "image/svg+xml"
+        }
+      },
+      "name": "Icones",
+      "order": [
+        "tako.svg",
+        "home.svg",
+        "store.svg",
+        "search.svg",
+        "sliders.svg",
+        "play.svg",
+        "download.svg",
+        "download-circle.svg",
+        "refresh.svg",
+        "gamepad.svg",
+        "user.svg",
+        "gear.svg",
+        "star.svg",
+        "heart.svg",
+        "cart.svg",
+        "amphora.svg",
+        "arrow-left.svg",
+        "badge-alert.svg",
+        "badge.svg",
+        "books.svg",
+        "brush.svg",
+        "calendar.svg",
+        "camera.svg",
+        "card.svg",
+        "check.svg",
+        "chevron-down.svg",
+        "chevron-left.svg",
+        "chevron-right.svg",
+        "clock.svg",
+        "cloud.svg",
+        "compass.svg",
+        "cpu.svg",
+        "eye.svg",
+        "flag.svg",
+        "flower.svg",
+        "folder.svg",
+        "gem.svg",
+        "globe.svg",
+        "grid.svg",
+        "image.svg",
+        "info.svg",
+        "list.svg",
+        "lock.svg",
+        "minus.svg",
+        "monitor.svg",
+        "palette.svg",
+        "panel.svg",
+        "pause.svg",
+        "plug.svg",
+        "plus.svg",
+        "share.svg",
+        "shield.svg",
+        "sort.svg",
+        "square.svg",
+        "sword.svg",
+        "trash.svg",
+        "trophy.svg",
+        "updown.svg",
+        "users.svg",
+        "volume.svg",
+        "wallet.svg",
+        "x.svg"
+      ],
+      "tile": "xs"
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-10-17T16:15:22Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "groups": [
+    "Logos",
+    "Icones"
+  ],
+  "lastChange": {
+    "by": "Alyx",
+    "at": "2026-10-22T18:30:00Z",
+    "via": "cowork",
+    "note": "Rebranding total pelo protótipo do mantenedor: logo novo (polvo + TAKO + タコ), tema TAKO principal com as cores da arte do jogo, temas Escuro/Meia-noite/OLED/Liquid Glass, tokens, ícones, todas as prévias refeitas e movimento do protótipo. Saem DestaqueFases e BarraLateralUnida."
+  },
+  "layout": "files",
+  "libraries": [],
+  "namespace": "TakoDesktop",
+  "sections": {},
+  "title": "Tako Design System — Desktop"
+}
