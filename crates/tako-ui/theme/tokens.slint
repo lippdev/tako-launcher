@@ -117,6 +117,10 @@ export global Ui {
     out property <color> primary-chip: #0d0d0d;
     out property <color> on-primary: #111216;
 
+    // Aviso (toast, PainelEAviso): fundo claro (#f6efed no tema TAKO, #f4f4f4 nos outros), texto escuro.
+    out property <color> toast-bg: desk-theme == 0 ? #f6efed : #f4f4f4;
+    out property <color> toast-text: #111111;
+
     // Apelidos dos nomes antigos, com os valores novos.
     out property <color> settings-bg: [#0b0b0e, #0a0a0a, #0a0a0a, #0a0a0a, #07080c, #07080c][desk-variant];
     out property <color> settings-surface: surface;
@@ -255,6 +259,8 @@ export global Ui {
     out property <duration> tempo-estado: reduce-motion ? 0ms : 250ms;
     out property <duration> tempo-pagina: reduce-motion ? 0ms : 450ms;
     out property <duration> tempo-saida: reduce-motion ? 0ms : 200ms;
+    out property <duration> tempo-menu-opacidade: reduce-motion ? 0ms : 160ms;
+    out property <duration> tempo-menu-escala: reduce-motion ? 0ms : 200ms;
     out property <duration> tempo-troca: reduce-motion ? 0ms : 500ms;
     out property <duration> tempo-escada: reduce-motion ? 0ms : 55ms;
     out property <duration> tempo-lista: reduce-motion ? 0ms : 500ms;
@@ -291,9 +297,9 @@ export global Ui {
     public pure function flash-fade(on: bool) -> duration {
         return on ? 0ms : tempo-pulso * 0.7;
     }
-    // Aviso: entra em `tempo-pagina`, sai em `tempo-saida`.
+    // Aviso: entra em 350 ms, sai em `tempo-saida` (200 ms). Com Reduzir animações, na hora.
     public pure function toast-fade(entering: bool) -> duration {
-        return entering ? page-time : leave-time;
+        return reduce-motion ? 0ms : (entering ? 350ms : tempo-saida);
     }
     // Troca de jogo (TrocaDeJogo): a arte nova entra por cima em 700, assenta 1,04 → 1 em 900 e o desfoque sai em
     // 500. Ao preparar a entrada (antes de começar), troca na hora.
