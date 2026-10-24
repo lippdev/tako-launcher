@@ -35,8 +35,9 @@ pub const ROUTE: &str = "desk:library";
 
 /// Miniatura de capa do perfil (o quadrado do topo da capa 2:3, a 40 × 40; 2× para telas densas).
 pub(crate) const THUMB: (u32, u32) = (80, 120);
-/// Ícone da linha da lista (28 na tela, 2× para telas densas).
-const ICON: (u32, u32) = (56, 56);
+/// Ícone da linha da lista (28 na tela, 2× para telas densas) e, com a lista recolhida, o de 46 (92 px; 96 aqui).
+const ICON: u32 = 56;
+const ICON_COLLAPSED: u32 = 96;
 /// Linhas em volta da primeira visível que pedem miniatura.
 const NEAR: usize = 60;
 
@@ -175,12 +176,13 @@ struct Run {
 
 /// Ícone da linha e, se não houver, a inicial do nome. Carrega o ícone recortado via [`crate::images::icon`].
 /// `load: false` = linha fora da área visível (não pede nada).
-fn row_icon(g: &Game, load: bool) -> (slint::Image, String) {
+fn row_icon(g: &Game, load: bool, collapsed: bool) -> (slint::Image, String) {
     let uri = g.shown_icon();
-    // 56 px já recortado e com contorno no cache: serve à tela normal e à de alta densidade.
+    // Já recortado e com contorno no cache: 56 serve à tela normal e à de alta densidade; recolhida pede 96.
+    let size = if collapsed { ICON_COLLAPSED } else { ICON };
     let icon = uri
         .filter(|_| load)
-        .and_then(|u| crate::images::icon(u, ICON.0, !g.is_installed))
+        .and_then(|u| crate::images::icon(u, size, !g.is_installed))
         .unwrap_or_default();
     // A inicial fica por baixo enquanto o ícone espera na fila (pode demorar: vem da rede); o ícone a cobre ao chegar.
     let initial = if icon.size().width > 0 {
@@ -2047,7 +2049,7 @@ impl Page for DesktopLibrary {
                     ctx.tf("desktop.install_game", &title),
                 )
             };
-            let (icon, initial) = row_icon(g, near && !cover);
+            let (icon, initial) = row_icon(g, near && !cover, collapsed(ctx));
             DeskGame {
                 id: g.id.clone(),
                 title: g.title.clone(),
@@ -2906,16 +2908,16 @@ mod tests {
             title: title.into(),
             ..Default::default()
         };
-        assert_eq!(row_icon(&game("  ori"), true).1, "O");
-        assert_eq!(row_icon(&game(""), true).1, "");
+        assert_eq!(row_icon(&game("  ori"), true, false).1, "O");
+        assert_eq!(row_icon(&game(""), true, false).1, "");
         // Com ícone ainda a caminho (ou fora da área visível), a linha mostra a inicial, nunca fica vazia.
         let mut far = game("Celeste");
         far.pinned_art.insert(
             tako_core::library::ArtKind::Icon,
             "steam-art://1/icon".into(),
         );
-        assert_eq!(row_icon(&far, false).1, "C");
-        assert_eq!(row_icon(&far, true).1, "C");
+        assert_eq!(row_icon(&far, false, false).1, "C");
+        assert_eq!(row_icon(&far, true, true).1, "C");
     }
 
     fn page(shell: &Shell) -> &DesktopLibrary {

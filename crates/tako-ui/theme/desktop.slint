@@ -3404,13 +3404,16 @@ component DeskLibrary inherits Rectangle {
     property <bool> mode-in: true;
     property <bool> list-in: true;
     init => { view = view-in; }
-    // Lista recolhida: a lupa e Ctrl + K expandem a lista e só então focam a busca (ela não existe recolhida).
+    // Lista recolhida: a lupa e Ctrl + K expandem a lista e só então focam a busca (ela não existe recolhida). Quem
+    // chama Ctrl + K é o Desktop (só com a biblioteca na tela): reagir à mudança de `search-focus` aqui expandia a lista
+    // sozinha ao voltar de outra tela.
     property <int> search-bump;
     public function expand-search() {
-        root.clicked("collapse", 0);
-        bump-timer.running = true;
+        if (collapsed) {
+            root.clicked("collapse", 0);
+            bump-timer.running = true;
+        }
     }
-    changed search-focus => { if (collapsed) { root.expand-search(); } }
     bump-timer := Timer {
         interval: 1ms;
         running: false;
@@ -7597,7 +7600,11 @@ export component Desktop inherits Window {
     search-timer := Timer {
         interval: 1ms;
         running: false;
-        triggered => { self.running = false; content-search-focus += 1; }
+        triggered => {
+            self.running = false;
+            content-search-focus += 1;
+            if (page == "desk-library") { lib.expand-search(); }
+        }
     }
     changed desk-search-focus => { root.focus-content-search(); }
 

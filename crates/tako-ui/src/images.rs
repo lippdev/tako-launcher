@@ -454,9 +454,6 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
     ))
 }
 
-/// Ícone quadrado de `size` px (recorte central do meio da imagem), com os cantos redondos (raio 7/28 do lado,
-/// anti-serrilhado) e o contorno de 1 px a cada 28 de `#ffffff1a` por cima da borda. Fora do arredondado o pixel
-/// fica transparente.
 /// Cinza 80% e brilho 70% (NaoInstalados): o ícone de um jogo que ainda não está no PC.
 fn dim_icon(img: &mut image::RgbaImage) {
     for p in img.pixels_mut() {
@@ -468,6 +465,9 @@ fn dim_icon(img: &mut image::RgbaImage) {
     }
 }
 
+/// Ícone quadrado de `size` px (recorte central do meio da imagem), com os cantos redondos (raio 7/28 do lado,
+/// anti-serrilhado) e o contorno de 1 px a cada 28 de `#ffffff1a` por cima da borda. Fora do arredondado o pixel
+/// fica transparente.
 pub(crate) fn round_icon(img: &image::DynamicImage, size: u32) -> image::RgbaImage {
     let size = size.clamp(8, 256);
     let mut out = img
