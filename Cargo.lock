@@ -6674,6 +6674,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tako-core",
+ "tako-downloads",
  "tako-platform",
  "tako-sources",
  "tempfile",

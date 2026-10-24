@@ -69,6 +69,13 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "system.displays"
             | "system.audio_outputs"
             | "i18n.catalog"
+            | "downloads.list"
+            | "downloads.summary"
+            | "downloads.pause"
+            | "downloads.resume"
+            | "downloads.cancel"
+            | "downloads.sources"
+            | "downloads.add"
     ) {
         return Err((
             header.id,
@@ -85,6 +92,8 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "system.displays"
             | "system.audio_outputs"
             | "i18n.catalog"
+            | "downloads.list"
+            | "downloads.summary"
     ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
@@ -276,6 +285,46 @@ pub enum Call {
     /// Idioma atual e o catálogo inteiro dele; a interface só escreve texto que vem daqui (`t()`).
     #[serde(rename = "i18n.catalog")]
     I18nCatalog,
+    /// Downloads com estado, progresso e jogo vinculado (DL-001). Desligados por padrão: `conflict` até o usuário
+    /// ligar e aceitar o aviso legal (configurações `DownloadsEnabled` e `DownloadsLegalAccepted`).
+    #[serde(rename = "downloads.list")]
+    DownloadsList,
+    #[serde(rename = "downloads.summary")]
+    DownloadsSummary,
+    #[serde(rename = "downloads.pause")]
+    DownloadsPause(
+        #[serde(with = "object_payload")]
+        #[ts(as = "DownloadRequest")]
+        DownloadRequest,
+    ),
+    /// Retoma um pausado ou com erro, ou "baixar agora" um item da fila.
+    #[serde(rename = "downloads.resume")]
+    DownloadsResume(
+        #[serde(with = "object_payload")]
+        #[ts(as = "DownloadRequest")]
+        DownloadRequest,
+    ),
+    /// Cancela (ou tira da lista um concluído); `deleteFiles` apaga também o que já foi baixado.
+    #[serde(rename = "downloads.cancel")]
+    DownloadsCancel(
+        #[serde(with = "object_payload")]
+        #[ts(as = "DownloadCancel")]
+        DownloadCancel,
+    ),
+    /// Fontes que o usuário adicionou e os itens delas (paginados, por busca ou sugeridos para um jogo).
+    #[serde(rename = "downloads.sources")]
+    DownloadsSources(
+        #[serde(with = "object_payload")]
+        #[ts(as = "DownloadSourcesRequest")]
+        DownloadSourcesRequest,
+    ),
+    /// Começa um item de uma fonte do usuário, opcionalmente vinculado a um jogo da biblioteca.
+    #[serde(rename = "downloads.add")]
+    DownloadsAdd(
+        #[serde(with = "object_payload")]
+        #[ts(as = "DownloadAdd")]
+        DownloadAdd,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -333,6 +382,20 @@ pub enum Reply {
     SystemAudioOutputs(AudioOutputList),
     #[serde(rename = "i18n.catalog")]
     I18nCatalog(I18nCatalog),
+    #[serde(rename = "downloads.list")]
+    DownloadsList(Vec<DownloadEntry>),
+    #[serde(rename = "downloads.summary")]
+    DownloadsSummary(DownloadsSummary),
+    #[serde(rename = "downloads.pause")]
+    DownloadsPause,
+    #[serde(rename = "downloads.resume")]
+    DownloadsResume,
+    #[serde(rename = "downloads.cancel")]
+    DownloadsCancel,
+    #[serde(rename = "downloads.sources")]
+    DownloadsSources(DownloadSources),
+    #[serde(rename = "downloads.add")]
+    DownloadsAdd(DownloadEntry),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -366,6 +429,9 @@ pub enum Event {
     /// O idioma mudou (`settings.set` com `Language`): a interface pede `i18n.catalog` de novo.
     #[serde(rename = "i18n.changed")]
     I18nChanged(I18nLang),
+    /// Algo mudou nos downloads (progresso, estado, lista ou fontes lidas): a interface consulta de novo.
+    #[serde(rename = "downloads.changed")]
+    DownloadsChanged,
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -900,4 +966,169 @@ pub struct I18nLang {
 pub struct I18nCatalog {
     pub lang: String,
     pub messages: std::collections::BTreeMap<String, String>,
+}
+
+/// Estado de um download. O motor só mostra "baixando" depois de aceitar o item; `queued` espera a vez.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum DownloadStatus {
+    Queued,
+    Downloading,
+    Paused,
+    Completed,
+    Failed,
+}
+
+/// Um download do usuário. Só dados para desenhar: a pasta, o endereço do item e o que veio da fonte ficam no núcleo.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DownloadEntry {
+    #[ts(type = "number")]
+    pub id: u64,
+    /// Título do item na fonte, texto simples.
+    pub title: String,
+    /// Jogo da biblioteca vinculado pelo usuário; null = sem vínculo.
+    pub game_id: Option<String>,
+    /// Nome da fonte de onde veio (procedência).
+    pub source: String,
+    pub state: DownloadStatus,
+    /// Só em `failed`: o motivo, já no idioma do usuário (texto do núcleo, não é um código).
+    pub error: Option<String>,
+    #[ts(type = "number")]
+    pub done: u64,
+    /// null até os metadados do torrent chegarem.
+    #[ts(type = "number | null")]
+    pub total: Option<u64>,
+    /// 0 a 1; null enquanto o tamanho é desconhecido.
+    pub progress: Option<f32>,
+    /// Bytes por segundo; 0 fora de `downloading`.
+    #[ts(type = "number")]
+    pub speed: u64,
+    /// null quando não há velocidade ou tamanho para estimar.
+    #[ts(type = "number | null")]
+    pub eta_seconds: Option<u64>,
+}
+
+/// Resumo para a pílula da barra e o topo do painel; só conta os downloads em aberto (não concluídos nem com erro).
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DownloadsSummary {
+    pub downloading: usize,
+    pub queued: usize,
+    #[ts(type = "number")]
+    pub speed: u64,
+    #[ts(type = "number")]
+    pub done: u64,
+    #[ts(type = "number")]
+    pub total: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct DownloadRequest {
+    #[ts(type = "number")]
+    pub download_id: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct DownloadCancel {
+    #[ts(type = "number")]
+    pub download_id: u64,
+    #[serde(default)]
+    #[ts(as = "Option<bool>", optional)]
+    pub delete_files: bool,
+}
+
+/// Itens das fontes do usuário. `gameId` pede as sugestões para o título do jogo (mais parecidos primeiro) e não
+/// combina com `search`; sem nenhum dos dois, lista tudo na ordem das fontes.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+#[ts(export)]
+pub struct DownloadSourcesRequest {
+    /// Restringe os itens a uma fonte (`DownloadSource.id`).
+    #[ts(optional = nullable)]
+    pub source_id: Option<String>,
+    #[ts(as = "Option<String>", optional)]
+    pub search: String,
+    #[ts(optional = nullable)]
+    pub game_id: Option<String>,
+    #[ts(as = "Option<u32>", optional)]
+    pub offset: u32,
+    /// Acima de MAX_PAGE_LIMIT é reduzido ao teto; zero devolve só as fontes e o total.
+    #[ts(as = "Option<u32>", optional)]
+    pub limit: u32,
+}
+
+impl Default for DownloadSourcesRequest {
+    fn default() -> Self {
+        Self {
+            source_id: None,
+            search: String::new(),
+            game_id: None,
+            offset: 0,
+            limit: DEFAULT_PAGE_LIMIT,
+        }
+    }
+}
+
+/// Fontes lidas do disco em segundo plano: com `loading` verdadeiro a lista ainda está incompleta e o evento
+/// `downloads.changed` avisa quando termina.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DownloadSources {
+    pub loading: bool,
+    pub sources: Vec<DownloadSource>,
+    pub items: Vec<DownloadSourceItem>,
+    /// Itens que combinam com o pedido, antes de `offset` e `limit`.
+    pub total: usize,
+}
+
+/// Uma fonte `.json` que o próprio usuário adicionou. O endereço não sai do núcleo: só o domínio, para o usuário
+/// reconhecer a fonte.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DownloadSource {
+    pub id: String,
+    pub name: String,
+    pub host: String,
+    pub item_count: usize,
+    /// Itens da fonte descartados por estarem quebrados ou além do limite.
+    pub dropped: usize,
+    /// ISO-8601 em UTC.
+    pub updated_at: String,
+}
+
+/// Texto da fonte, mostrado só como texto simples.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DownloadSourceItem {
+    pub source_id: String,
+    /// Posição na fonte; vale junto com `title` em `downloads.add`.
+    pub index: usize,
+    pub title: String,
+    pub file_size: String,
+    pub upload_date: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct DownloadAdd {
+    pub source_id: String,
+    pub index: usize,
+    /// Título do item como a interface o mostrou; se a fonte mudou desde então, a chamada dá `conflict`.
+    pub title: String,
+    /// Jogo da biblioteca a vincular; um jogo tem no máximo um download em aberto.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub game_id: Option<String>,
 }

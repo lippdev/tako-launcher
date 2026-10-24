@@ -21,6 +21,8 @@ const BOOL_KEYS: &[&str] = &[
     "AskBigPictureWithController",
     "ThemeMusicEnabled",
     "HideControllerFromGame",
+    "DownloadsEnabled",
+    "DownloadsLegalAccepted",
 ];
 const TEXT_KEYS: &[&str] = &[
     "GameScreenId",
@@ -43,6 +45,7 @@ fn known(key: &str) -> bool {
             "Language"
                 | "DesktopTheme"
                 | "GameScreenHideOthers"
+                | "DownloadsUploadLimitKiB"
                 | "DesktopTitleLogo"
                 | "ControlCenterChord"
                 | "OpenIn"
@@ -82,6 +85,8 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
         // Tema do modo desktop (o mesmo `DesktopTheme` que o app Slint grava); `Theme` é outra coisa.
         // O app Slint guarda `Disconnect` (desliga as outras telas, o padrão) ou `None`; não é chave de liga/desliga.
         && (key != "GameScreenHideOthers" || matches!(value.as_str(), "Disconnect" | "None"))
+        // Limite de envio dos downloads: as escolhas do app atual (KiB/s), 0 = sem limite.
+        && (key != "DownloadsUploadLimitKiB" || matches!(value.as_str(), "0" | "64" | "256" | "1024"))
         && (key != "DesktopTheme"
             || matches!(value.as_str(), "tako" | "dark" | "midnight" | "oled" | "glass"))
         && (key != "ControlCenterChord" || value.parse::<u32>().is_ok())

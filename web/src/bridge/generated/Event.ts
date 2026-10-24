@@ -5,4 +5,4 @@ import type { LibrarySources } from "./LibrarySources";
 /**
  * Eventos do núcleo para a interface.
  */
-export type Event = { "name": "library.changed" } | { "name": "library.scan.progress", "payload": LibrarySources } | { "name": "i18n.changed", "payload": I18nLang };
+export type Event = { "name": "library.changed" } | { "name": "library.scan.progress", "payload": LibrarySources } | { "name": "i18n.changed", "payload": I18nLang } | { "name": "downloads.changed" };

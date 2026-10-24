@@ -5,6 +5,7 @@
 
 mod core;
 mod demo;
+mod downloads;
 mod i18n;
 mod library;
 mod organize;
@@ -87,6 +88,7 @@ impl AppService {
     pub fn set_host_sink(&mut self, sink: Sender<HostRequest>) {
         if let Some(core) = &mut self.core {
             core.sources.set_host_sink(sink.clone());
+            core.downloads.set_host_sink(sink.clone());
         }
         self.host = Some(sink);
     }
@@ -172,6 +174,13 @@ impl AppService {
                 &self.require_core()?.devices,
             )?)),
             Call::I18nCatalog => Ok(Reply::I18nCatalog(i18n::catalog(self.require_core()?))),
+            call @ (Call::DownloadsList
+            | Call::DownloadsSummary
+            | Call::DownloadsPause(_)
+            | Call::DownloadsResume(_)
+            | Call::DownloadsCancel(_)
+            | Call::DownloadsSources(_)
+            | Call::DownloadsAdd(_)) => self.handle_downloads(call),
             call => {
                 let core = self
                     .core

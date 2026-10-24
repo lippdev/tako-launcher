@@ -670,3 +670,28 @@ fn hide_other_screens_uses_the_slint_values() {
     );
     assert_eq!(bad["error"]["code"], "bad_request", "{bad}");
 }
+
+#[test]
+fn downloads_settings_can_be_turned_on_through_the_bridge() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = open(&dir, false);
+    for (key, value) in [
+        ("DownloadsEnabled", "true"),
+        ("DownloadsLegalAccepted", "true"),
+        ("DownloadsUploadLimitKiB", "0"),
+        ("DownloadsUploadLimitKiB", "1024"),
+    ] {
+        let ok = wire(
+            &mut app,
+            "settings.set",
+            Some(json!({"key":key,"value":value})),
+        );
+        assert_eq!(ok["ok"], true, "{key}={value}: {ok}");
+    }
+    let bad = wire(
+        &mut app,
+        "settings.set",
+        Some(json!({"key":"DownloadsUploadLimitKiB","value":"99999"})),
+    );
+    assert_eq!(bad["error"]["code"], "bad_request", "{bad}");
+}

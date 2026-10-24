@@ -37,13 +37,14 @@ pub struct Core {
     snapshot: Option<SnapshotWriter>,
     pub(crate) sources: crate::sources::Scanner,
     pub(crate) devices: crate::system::Devices,
+    pub(crate) downloads: crate::downloads::DownloadsHub,
 }
 
 impl Core {
     /// Abre o banco e os dados locais; a primeira consulta usa o snapshot da última leitura das lojas.
     /// Em demonstração nada é lido ou gravado no banco, no snapshot ou no cofre.
     pub fn open(paths: DataPaths, platform: Platform, simulate: bool) -> Result<Self, CoreError> {
-        Self::open_using(paths, platform, simulate, None)
+        Self::open_using(paths, platform, simulate, None, None)
     }
 
     /// Abre com fontes fornecidas pelo hospedeiro, sem descobrir lojas da máquina. Permite testes isolados
@@ -60,6 +61,27 @@ impl Core {
             platform,
             simulate,
             Some(Box::new(move || Arc::clone(&sources))),
+            None,
+        )
+    }
+
+    /// Como [`Core::open_with_sources`], com o motor de downloads fornecido pelo hospedeiro (o falso, nos testes) e a
+    /// pasta onde cada download ganha a sua subpasta. Sem isto o motor é o real, ou o falso na demonstração.
+    pub fn open_with_downloads(
+        paths: DataPaths,
+        platform: Platform,
+        simulate: bool,
+        sources: Vec<Box<dyn tako_sources::LibrarySource>>,
+        engine: impl Fn() -> Box<dyn tako_core::downloads::Downloader> + Send + 'static,
+        root: std::path::PathBuf,
+    ) -> Result<Self, CoreError> {
+        let sources = Arc::new(sources);
+        Self::open_using(
+            paths,
+            platform,
+            simulate,
+            Some(Box::new(move || Arc::clone(&sources))),
+            Some((Box::new(engine), root)),
         )
     }
 
@@ -68,6 +90,7 @@ impl Core {
         platform: Platform,
         simulate: bool,
         factory: Option<crate::sources::Factory>,
+        engine: Option<(crate::downloads::EngineFactory, std::path::PathBuf)>,
     ) -> Result<Self, CoreError> {
         let database = if simulate {
             None
@@ -131,6 +154,12 @@ impl Core {
         );
         library.load();
         let settings_store = database.clone().map(db::SettingsStore::new);
+        let downloads = crate::downloads::DownloadsHub::new(
+            database.clone().map(db::DownloadStore::new),
+            paths.root.join("download-sources"),
+            simulate,
+            engine,
+        );
         let collections = database
             .map(|d| {
                 let mut collections =
@@ -151,7 +180,8 @@ impl Core {
             simulate,
         )?;
         let devices = crate::system::Devices::new(&platform, simulate);
-        Ok(Self {
+
+        let mut core = Self {
             settings,
             settings_store,
             lang,
@@ -163,7 +193,11 @@ impl Core {
             snapshot: (!simulate)
                 .then(|| SnapshotWriter::open(paths.cache().join("found-games.json")))
                 .flatten(),
-        })
+            downloads,
+        };
+        // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
+        core.downloads.ensure(&core.settings);
+        Ok(core)
     }
 
     pub fn language(&self) -> Lang {
