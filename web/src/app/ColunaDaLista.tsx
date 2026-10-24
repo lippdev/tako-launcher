@@ -24,12 +24,22 @@ interface ColunaDaListaProps {
   onToggleCollapsed: () => void;
   criteria: LibraryCriteria;
   onCriteriaChange: (criteria: LibraryCriteria) => void;
+  /** O jogo aberto (a página dele); `null` = a Visão geral. Vive no estado de tela, não aqui. */
+  activeId: string | null;
+  onActiveChange: (id: string | null) => void;
 }
 
 /** A coluna consulta a ponte; só critérios, seleção e páginas alcançadas vivem nesta tela. */
-export function ColunaDaLista({ shown, collapsed, onToggleCollapsed, criteria, onCriteriaChange }: ColunaDaListaProps) {
+export function ColunaDaLista({
+  shown,
+  collapsed,
+  onToggleCollapsed,
+  criteria,
+  onCriteriaChange,
+  activeId,
+  onActiveChange,
+}: ColunaDaListaProps) {
   const library = useLibrary(criteria);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [notice, setNotice] = useState<{
@@ -114,7 +124,7 @@ export function ColunaDaLista({ shown, collapsed, onToggleCollapsed, criteria, o
               aria-label={collection?.name ?? strings.list.overview}
               aria-current={activeId === null ? "true" : undefined}
               onClick={() => {
-                setActiveId(null);
+                onActiveChange(null);
                 setSelection(new Set());
               }}
             >
@@ -166,7 +176,7 @@ export function ColunaDaLista({ shown, collapsed, onToggleCollapsed, criteria, o
             loading={library.loading}
             activeId={activeId}
             selection={selection}
-            onActivate={setActiveId}
+            onActivate={onActiveChange}
             onSelectionChange={setSelection}
             resolveIcon={library.resolveIcon}
             onNearEnd={library.loadMore}

@@ -98,11 +98,18 @@ export function parseLibraryCriteria(raw: unknown): LibraryCriteria {
   };
 }
 
+/** O ID do jogo aberto: texto não vazio e de tamanho razoável; qualquer outra coisa é a Visão geral. */
+export function parseActiveGame(raw: unknown): string | null {
+  return typeof raw === "string" && raw.length > 0 && raw.length <= 512 ? raw : null;
+}
+
 export interface ScreenState {
   view: ViewId;
   /** Lista da esquerda recolhida (76) em vez de aberta (292). */
   listCollapsed: boolean;
   library: LibraryCriteria;
+  /** O jogo aberto na biblioteca (a página dele); `null` = a Visão geral. */
+  activeGame: string | null;
   /** A categoria aberta em Configurações. */
   settingsCategory: SettingsCategoryId;
 }
@@ -114,6 +121,7 @@ export const defaultScreenState: ScreenState = {
   view: "biblioteca",
   listCollapsed: false,
   library: defaultLibraryCriteria,
+  activeGame: null,
   settingsCategory: "general",
 };
 
@@ -145,6 +153,7 @@ export function parseScreenState(json: string | null | undefined): ScreenState {
     listCollapsed:
       typeof data["listCollapsed"] === "boolean" ? data["listCollapsed"] : defaultScreenState.listCollapsed,
     library: parseLibraryCriteria(data["library"]),
+    activeGame: parseActiveGame(data["activeGame"]),
     settingsCategory: isSettingsCategoryId(data["settingsCategory"])
       ? data["settingsCategory"]
       : defaultScreenState.settingsCategory,

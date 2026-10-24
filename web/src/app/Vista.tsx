@@ -13,6 +13,8 @@ interface VistaProps {
    * conteúdo que rola à direita). Sem a margem da página nem o título padrão.
    */
   bare?: boolean;
+  /** O conteúdo começa sob a barra de cima (a página do jogo põe a arte por baixo dela). */
+  flush?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface VistaProps {
  * que entra faz o caminho de volta, uma por cima da outra. Só `transform` e `opacity` animam. Fora do ar a vista
  * sai do DOM, depois da saída.
  */
-export function Vista({ title, active, children, bare = false }: VistaProps) {
+export function Vista({ title, active, children, bare = false, flush = false }: VistaProps) {
   const ref = useRef<HTMLElement>(null);
   const { mounted, visible, animating } = usePresence(active, ref);
   if (!mounted) return null;
@@ -32,7 +34,7 @@ export function Vista({ title, active, children, bare = false }: VistaProps) {
       inert={!active}
       data-visible={visible}
       data-animating={animating}
-      className={cx(styles["view"], bare && styles["bare"])}
+      className={cx(styles["view"], bare && styles["bare"], flush && styles["flush"])}
     >
       {bare ? (
         children

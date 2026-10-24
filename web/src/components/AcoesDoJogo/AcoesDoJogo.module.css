@@ -1,0 +1,12 @@
+/* AcoesDoJogo (README): ★ · Gerenciar ⚙ · primário, em fileira de 10 de espaço, embaixo à direita do destaque. */
+
+.acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Encerrar jogo: o quadrado ✕ em vermelho (README do EstadoJogando). */
+.encerrar {
+  color: var(--error);
+}

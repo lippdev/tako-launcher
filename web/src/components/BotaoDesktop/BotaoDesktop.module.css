@@ -205,6 +205,8 @@
 .square {
   display: grid;
   place-items: center;
+  /* O `.btn` usa `space-between`: numa grade de uma coluna isso empurrava o ícone para a esquerda. */
+  justify-content: center;
   width: var(--primary-height);
   height: var(--primary-height);
   padding: 0;

@@ -35,6 +35,11 @@
   overflow: hidden;
 }
 
+/* A arte do destaque passa por baixo da barra de cima (a barra é translúcida). */
+.flush {
+  padding-top: 0;
+}
+
 /* Margem lateral de 40, 48 acima do conteúdo (README da TelaBiblioteca). */
 .page {
   padding: var(--space-48) var(--space-40);

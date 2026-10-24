@@ -13,7 +13,7 @@ interface Presence {
 }
 
 /** Espera as transições CSS em andamento dentro de `el` (nenhuma com "Reduzir animações"). */
-function settled(el: HTMLElement | null): Promise<unknown> {
+export function settled(el: HTMLElement | null): Promise<unknown> {
   if (!el) return Promise.resolve();
   return Promise.allSettled(el.getAnimations({ subtree: true }).map((a) => a.finished));
 }

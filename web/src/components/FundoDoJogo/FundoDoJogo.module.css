@@ -1,0 +1,62 @@
+/* FundoDoJogo (README): a arte larga atrás do destaque. Tema TAKO: some na esquerda (máscara de 220) e embaixo no
+   canvas (degradê do Destaque). Só `transform` e `opacity` animam; "Reduzir animações" zera as duas (base.css). */
+
+.fundo {
+  --fundo-esquerda: 220px;
+  /* A arte assenta de 1,05 para 1 em 1,8 s (README); o `tokens.css` só traz os 800 ms da opacidade. */
+  --fundo-assenta: 1800ms;
+
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent 0, var(--canvas) var(--fundo-esquerda));
+}
+
+.camada {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(var(--escala-capa));
+  transition:
+    opacity var(--tempo-arte) var(--curva-estado),
+    transform var(--fundo-assenta) var(--curva-entrada);
+}
+
+.camada.on {
+  opacity: 1;
+  transform: none;
+}
+
+/* A que está saindo fica por baixo, quieta, até a nova cobrir. */
+.antiga {
+  z-index: 0;
+}
+
+.camada:not(.antiga) {
+  z-index: 1;
+}
+
+.camada.on:not(.antiga) {
+  will-change: transform, opacity;
+}
+
+.arte {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+}
+
+/* EstadoSemArte: brilho no alto à direita e a cor do jogo a 30% sobre o canvas. */
+.semArte {
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(
+      ellipse 70% 80% at 85% 0%,
+      color-mix(in srgb, var(--cor-do-jogo, var(--accent)) 55%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--cor-do-jogo, var(--accent)) 30%, var(--canvas)), var(--canvas));
+}

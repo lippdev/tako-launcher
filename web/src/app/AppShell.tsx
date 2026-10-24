@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { BarraSuperior } from "./BarraSuperior";
 import { BuscaGeral } from "./BuscaGeral";
 import { ColunaDaLista } from "./ColunaDaLista";
+import { PaginaDoJogo } from "./jogo/PaginaDoJogo";
 import { TelaConfiguracoes } from "./settings/TelaConfiguracoes";
 import { useSavedAppearance } from "./settings/useSavedAppearance";
 import { strings } from "./strings";
@@ -27,12 +28,19 @@ export function AppShell() {
   const [searchFocus, setSearchFocus] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
 
-  const { view, listCollapsed } = state;
+  const { view, listCollapsed, activeGame } = state;
   const listShown = view === "biblioteca";
 
   const navigate = useCallback(
     (next: ViewId) => {
       update({ view: next });
+    },
+    [update],
+  );
+  // Escolher um jogo na lista abre a página dele; a Visão geral (ou um jogo que saiu da biblioteca) volta ao conteúdo da vista.
+  const openGame = useCallback(
+    (id: string | null) => {
+      update({ activeGame: id });
     },
     [update],
   );
@@ -106,20 +114,39 @@ export function AppShell() {
           onToggleCollapsed={toggleList}
           criteria={state.library}
           onCriteriaChange={(library) => { update({ library }); }}
+          activeId={activeGame}
+          onActiveChange={openGame}
         />
         <main ref={mainRef} className={styles["main"]}>
-          {VIEW_IDS.map((id) => (
-            <Vista key={id} title={strings.views[id]} active={id === view} bare={id === "configuracoes"}>
-              {id === "configuracoes" && (
-                <TelaConfiguracoes
-                  category={state.settingsCategory}
-                  onCategoryChange={(settingsCategory) => {
-                    update({ settingsCategory });
-                  }}
-                />
-              )}
-            </Vista>
-          ))}
+          {VIEW_IDS.map((id) => {
+            const gamePage = id === "biblioteca" && activeGame !== null;
+            return (
+              <Vista
+                key={id}
+                title={strings.views[id]}
+                active={id === view}
+                bare={id === "configuracoes" || gamePage}
+                flush={gamePage}
+              >
+                {gamePage && (
+                  <PaginaDoJogo
+                    gameId={activeGame}
+                    onMissing={() => {
+                      openGame(null);
+                    }}
+                  />
+                )}
+                {id === "configuracoes" && (
+                  <TelaConfiguracoes
+                    category={state.settingsCategory}
+                    onCategoryChange={(settingsCategory) => {
+                      update({ settingsCategory });
+                    }}
+                  />
+                )}
+              </Vista>
+            );
+          })}
         </main>
       </div>
       <BuscaGeral

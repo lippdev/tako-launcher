@@ -1,0 +1,80 @@
+/* A página do jogo (README da TelaJogo e da TelaJogoRolada): o destaque de borda a borda e, rolando, o corpo com o
+   texto à esquerda (1,16 fr) e os dados à direita (1 fr). Só `opacity` anima no corpo. */
+
+.pagina {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: calc(var(--topbar-height) + var(--space-48)) var(--space-40);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.retry {
+  padding: var(--space-4) var(--space-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--tile);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--glass-hover);
+}
+
+/* O corpo faz só opacidade na troca de jogo: 150 ms para sair e 400 ms para voltar (TrocaDeJogo). */
+.corpo {
+  padding: 0 var(--space-40);
+  container-type: inline-size;
+  transition: opacity 400ms var(--curva-entrada);
+}
+
+.corpo[data-trocando="true"] {
+  opacity: 0;
+  transition-duration: 150ms;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1.16fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  padding: 14px 0 var(--space-48);
+}
+
+.sobre {
+  margin-top: var(--space-24);
+}
+
+.lateral {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  min-width: 0;
+}
+
+/* Janela estreita: uma coluna só, os dados primeiro. */
+@container (max-width: 760px) {
+  .grade {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lateral {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .sobre {
+    margin-top: 0;
+  }
+}

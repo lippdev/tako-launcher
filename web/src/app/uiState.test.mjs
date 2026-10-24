@@ -75,7 +75,13 @@ test("todos os critérios de tela voltam iguais", () => {
     tags: ["RPG"],
     installed: false,
   };
-  const state = { view: "biblioteca", listCollapsed: true, library, settingsCategory: "library" };
+  const state = {
+    view: "biblioteca",
+    listCollapsed: true,
+    library,
+    activeGame: "heroic:legendary:Fortnite",
+    settingsCategory: "library",
+  };
   assert.deepEqual(parseScreenState(serializeScreenState(state)), state);
 });
 test("a categoria aberta em Configurações volta igual; valor desconhecido cai em Geral", () => {
@@ -90,5 +96,19 @@ test("a categoria aberta em Configurações volta igual; valor desconhecido cai 
   assert.deepEqual(parseScreenState('{"v":1,"view":"configuracoes"}'), {
     ...defaultScreenState,
     view: "configuracoes",
+  });
+});
+test("o jogo aberto volta igual; valor ruim ou ausente é a Visão geral", () => {
+  assert.equal(defaultScreenState.activeGame, null);
+  for (const activeGame of ["steam:1000", "heroic:legendary:Fortnite", "gog:1207658924"]) {
+    const state = { ...defaultScreenState, activeGame };
+    assert.deepEqual(parseScreenState(serializeScreenState(state)), state);
+  }
+  for (const activeGame of ["", 7, null, true, ["steam:1"], {}, "x".repeat(513)])
+    assert.deepEqual(parseScreenState(JSON.stringify({ v: 1, activeGame })), defaultScreenState);
+  // Estado guardado antes do jogo aberto existir continua valendo: abre na Visão geral.
+  assert.deepEqual(parseScreenState('{"v":1,"view":"biblioteca","listCollapsed":true}'), {
+    ...defaultScreenState,
+    listCollapsed: true,
   });
 });

@@ -1,5 +1,8 @@
 import type { Call, Event } from "./index";
 import type { BridgeError } from "./generated/BridgeError";
+import type { ErrorCode } from "./generated/ErrorCode";
+import type { GameDetails } from "./generated/GameDetails";
+import type { GameRequest } from "./generated/GameRequest";
 import type { UiState } from "./generated/UiState";
 import type { GameRow } from "../components/ListaDeJogos/ListaDeJogos";
 import type { LibraryGame } from "./generated/LibraryGame";
@@ -21,6 +24,15 @@ import type { Store } from "./generated/Store"; // Hospedeiro falso para rodar a
 /** Devolve o `data` da resposta (ou nada, para chamadas sem retorno). */
 type Handler = (payload: unknown) => unknown;
 export type FakeHandlers = Partial<Record<Call["name"], Handler>>;
+
+/** Erro com o código do núcleo (`conflict`, `not_found`…): o falso responde com ele em vez de `internal`. */
+export class FakeError extends Error {
+  readonly code: ErrorCode;
+  constructor(code: ErrorCode, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
 
 let uiState: UiState = { json: sessionStorage.getItem("tako.dev.ui.state") };
 
@@ -73,7 +85,7 @@ export function installFakeHost(handlers: FakeHandlers = {}, latencyMs = 30) {
                 v: 1,
                 id: req.id,
                 ok: false,
-                error: { code: "internal", message: String(e) },
+                error: { code: e instanceof FakeError ? e.code : "internal", message: String(e) },
               }),
           );
       },
@@ -379,3 +391,162 @@ sources = {
   completed: SAMPLE_STORES.length,
   sources: SAMPLE_STORES.map((sample, index) => sampleReport(sample, index, new Date(Date.now() - 3 * 60_000))),
 };
+
+// ---- Página do jogo (WEB-12a) ----
+// Detalhes de exemplo: uns jogos completos, outros com campos `null` (o bloco some), um sem arte, um sem logo,
+// um que sai em breve e um que dá `conflict` ao jogar.
+
+interface SampleGame {
+  /** `accent` do jogo (a cor do EstadoSemArte); sem ele vale a do tema. */
+  accent: string | null;
+  hero: boolean;
+  logo: boolean;
+  details: Partial<Omit<GameDetails, "game">>;
+}
+
+const LONG_TEXT =
+  "Da Santa Monica Studio, trazido ao PC com a Jetpack Interactive, é uma jornada épica e emocionante de Kratos e Atreus entre segurar e deixar ir.\n\n" +
+  "Continuação do aclamado capítulo anterior, a história começa com o Fimbulwinter já avançado. Kratos e Atreus percorrem os Nove Reinos atrás de respostas enquanto as forças de Odin se preparam para a batalha profetizada.\n\n" +
+  "No caminho, exploram paisagens míticas e enfrentam deuses e monstros nórdicos.";
+
+const SAMPLE_GAMES: Record<string, SampleGame> = {
+  // Completo: arte, logo, todos os dados.
+  "steam:1000": {
+    accent: "#6b8cae",
+    hero: true,
+    logo: true,
+    details: {
+      platform: "Windows",
+      description: LONG_TEXT,
+      developer: "Santa Monica Studios",
+      publisher: "PlayStation Publishing LLC",
+      releaseDate: "2024-09-19",
+      genres: ["Ação", "Aventura"],
+      metacriticScore: 94,
+      criticScore: 94,
+      recentSessions: [
+        { startedAt: "2026-10-24T16:17:00Z", durationSeconds: 2520 },
+        { startedAt: "2026-10-22T21:03:00Z", durationSeconds: 7 * 3600 + 1200 },
+        { startedAt: "2026-10-20T19:40:00Z", durationSeconds: 5400 },
+      ],
+      sizeBytes: 25_231_000_000,
+      sizeLabel: "23.5 GB",
+    },
+  },
+  // Sem logo (título em texto), poucos dados.
+  "steam:1001": {
+    accent: "#c27a3d",
+    hero: true,
+    logo: false,
+    details: {
+      platform: "Windows",
+      description: "Um RPG de ação de mundo aberto em que você escolhe a vocação, recruta peões e caça monstros.",
+      developer: "Capcom",
+      genres: ["RPG"],
+      sizeLabel: "71.2 GB",
+    },
+  },
+  // Não instalado, sem arte, com a cor do jogo.
+  "steam:1002": {
+    accent: "#2f8f83",
+    hero: false,
+    logo: false,
+    details: { platform: null, developer: "Ubisoft Montreal", releaseDate: "2016-11-15", genres: ["Ação", "Mundo aberto"] },
+  },
+  // Arte e logo, nota mista, sem sessões.
+  "steam:1004": {
+    accent: "#d7c33a",
+    hero: true,
+    logo: true,
+    details: {
+      platform: "Windows",
+      description: "Uma aventura de ação e RPG de mundo aberto em Night City.",
+      developer: "CD Projekt Red",
+      publisher: "CD Projekt",
+      releaseDate: "2020-12-10",
+      metacriticScore: 62,
+      sizeLabel: "68.4 GB",
+    },
+  },
+  // Em breve.
+  "steam:1005": {
+    accent: "#9b4dca",
+    hero: true,
+    logo: false,
+    details: {
+      upcoming: true,
+      description: "A continuação do roguelike de ação sobre a princesa das sombras.",
+      developer: "Supergiant Games",
+      releaseDate: "2026-12-01",
+      genres: ["Roguelike"],
+    },
+  },
+  // Joga e dá `conflict`: o jogo saiu do disco depois da última leitura.
+  "steam:1009": {
+    accent: "#c24a4a",
+    hero: true,
+    logo: true,
+    details: { platform: "Windows", developer: "Shift Up", metacriticScore: 81, sizeLabel: "52.0 GB" },
+  },
+  // O mínimo: o núcleo só sabe o título.
+  "steam:1007": { accent: null, hero: false, logo: false, details: {} },
+};
+
+// A arte e a cor de cada jogo de exemplo entram na lista de jogos do núcleo falso.
+for (const game of games) {
+  const sample = SAMPLE_GAMES[game.id];
+  Object.assign(game, { accent: sample?.accent ?? null, hasHero: sample?.hero ?? false, hasLogo: sample?.logo ?? false });
+}
+
+/** Arte de exemplo (SVG num data URI) no lugar de `tako-img://hero` e `logo`, que só o Tako serve. */
+export function fakeGameImage(kind: "hero" | "logo", id: string, title: string): string {
+  const n = Number(id.split(":")[1]);
+  const hue = HUES[n % HUES.length] ?? 210;
+  const svg =
+    kind === "hero"
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="620" viewBox="0 0 1920 620"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${String(hue)} 55% 52%)"/><stop offset="1" stop-color="hsl(${String((hue + 60) % 360)} 55% 16%)"/></linearGradient><radialGradient id="r" cx=".72" cy=".3" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1920" height="620" fill="url(#g)"/><rect width="1920" height="620" fill="url(#r)"/><path d="M0 520 L360 330 L620 470 L980 250 L1320 440 L1620 300 L1920 460 V620 H0Z" fill="#000" fill-opacity=".35"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" width="440" height="140" viewBox="0 0 440 140"><text x="436" y="96" text-anchor="end" font-family="Poppins, sans-serif" font-weight="800" font-size="${String(Math.min(56, Math.floor(410 / (title.length * 0.72))))}" fill="#f4f1f0">${title
+          .toUpperCase()
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function gameDetails(payload: unknown): GameDetails {
+  const { gameId } = payload as GameRequest;
+  const game = games.find((g) => g.id === gameId);
+  if (!game) throw new FakeError("not_found", gameId);
+  const sample = SAMPLE_GAMES[game.id]?.details ?? {};
+  const tags = [...(gameTags.get(game.id) ?? [])];
+  const upcoming = sample.upcoming ?? false;
+  return {
+    game: { ...game },
+    canPlay: game.installed && !upcoming,
+    upcoming,
+    platform: null,
+    description: null,
+    developer: null,
+    publisher: null,
+    releaseDate: null,
+    genres: null,
+    metacriticScore: null,
+    criticScore: null,
+    recentSessions: null,
+    sizeBytes: null,
+    sizeLabel: null,
+    ...sample,
+    tags: tags.length > 0 ? tags : null,
+  };
+}
+
+function playGame(payload: unknown) {
+  const { gameId } = payload as GameRequest;
+  const game = games.find((g) => g.id === gameId);
+  if (!game) throw new FakeError("not_found", gameId);
+  // Sem dado de execução na ponte: o falso só avisa que abriria.
+  if (!game.installed || SAMPLE_GAMES[gameId]?.details.upcoming || gameId === "steam:1009")
+    throw new FakeError("conflict", `${gameId} não pode ser jogado agora`);
+  console.info("[hospedeiro falso] jogar:", game.title);
+}
+
+Object.assign(defaults, { "game.details": gameDetails, "game.play": playGame });
