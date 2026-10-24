@@ -32,6 +32,24 @@ Regras de distribuição:
 - Revisão cruzada: código de Codex é revisado por Claude e vice-versa.
 - O Antigravity (Gemini) também está disponível no T3; fica fora da rotação até o mantenedor pedir.
 
+### 2.1 Conta sem limite
+
+Uma conta pode esgotar o limite de uso no meio de uma tarefa. O orquestrador trata isso sozinho, sem esperar o
+mantenedor:
+
+1. **Detectar:** a tarefa termina com erro do provider (limite de uso, cota, `429`, "rate limit", "usage limit",
+   "try again at…") no `summary` do `task_status`, ou para logo no começo sem relatório.
+2. **Salvar o que já foi feito:** se a worktree tem commits, eles entram como base da nova rodada (o orquestrador
+   junta a branch parcial na integração ou passa o hash no brief novo). Nada é refeito do zero se não precisar.
+3. **Trocar de conta:** a mesma tarefa vai para outra conta **no mesmo nível**, pelo modelo equivalente da tabela
+   do §3 (Claude ↔ Codex, ou a outra conta Codex), com o brief original e uma nota do ponto em que parou.
+4. **Marcar no quadro:** a conta fica `sem limite até <hora>` (a hora que o erro informar, ou +5 h se não
+   informar) e sai da rotação até lá.
+5. Se as três contas de implementação esgotarem, o orquestrador avisa o mantenedor e só segue com tarefas N1 na
+   própria conta.
+
+A revisão cruzada continua valendo: se a troca deixar implementador e revisor no mesmo provider, o revisor muda.
+
 ## 3. Níveis de tarefa e modelo
 
 O orquestrador classifica cada tarefa antes de despachar. Na dúvida, sobe um nível.
@@ -83,8 +101,8 @@ develop ──► feature/WEB-interface-web (integração da migração)
 5. **Validar com o mantenedor** quando a tarefa tem visual: o orquestrador abre a worktree (servidor do Vite ou o
    Tako com `--web`), o mantenedor vê ao vivo e aprova ou pede ajuste. Ajuste pequeno o orquestrador faz na hora;
    ajuste grande vira nova rodada.
-6. **Juntar:** squash na integração, quadro atualizado, worktree removida, item do PRD marcado quando a história
-   inteira fecha.
+6. **Juntar:** squash na integração, verificação local de novo, `git push` da integração para o GitHub, quadro
+   atualizado, worktree removida, item do PRD marcado quando a história inteira fecha.
 
 ## 6. Modelo de brief
 
@@ -123,8 +141,14 @@ divergiu do brief e o que ficou aberto. O orquestrador não aceita "pronto" sem 
 
 ## 8. Validação ao vivo e testes
 
+**Tudo é testado localmente (PRD D-13).** O GitHub guarda o código (a integração é publicada a cada tarefa
+juntada), mas os workflows de teste estão desligados. Quem garante que nada quebrou é a verificação local: o
+agente roda na worktree e mostra a saída; o orquestrador roda de novo na integração depois do squash, antes do
+push.
+
 - Telas são aprovadas pelo mantenedor, ao vivo, contra a prévia do `design/desktop/` a 1600×900.
 - Código Rust segue o `CONTRIBUTING.md` §5 e §7 (fmt, clippy, testes) dentro do que a tarefa toca.
 - O front tem lint e build passando; teste de componente onde houver regra (foco, navegação, formatação), não
   para pixel.
-- Gates (MIG-W00, MIG-W01, WEB-60) seguem a §8.5 do PRD e passam pelo mantenedor.
+- Medições (WEB-60, e MIG-W00 e MIG-W01 se feitas) seguem a §8.5 do PRD e passam pelo mantenedor; pela D-14 elas
+  vêm depois da implementação.

@@ -4,30 +4,34 @@ Mantido pelo orquestrador ([processo](../processo/multiagente.md)). Integração
 
 Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor) → `integrada` | `refazer` | `bloqueada`.
 
-## Onda 1 — Medir e provar (MIG-W00, MIG-W01)
+## Contas
 
-Objetivo: chegar ao gate com números do Slint e do protótipo web lado a lado. Nada daqui vai para o app; o código
-do spike mora em `crates/spike-web/` e `web-spike/` e é descartável.
+| Conta | Provider | Situação |
+|---|---|---|
+| Claude Alyx Medical | `claudeAgent` | orquestrador |
+| Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | livre |
+| Codex Lipp | `codex` | livre |
+| Codex Alyx Medical | `codex_alyx_medical` | livre |
+
+## Onda 1 — Fundação (D-14: direto no código definitivo)
 
 | ID | Tarefa | Nível | Conta e modelo | Depende de | Pode tocar | Estado |
 |---|---|---|---|---|---|---|
-| ORQ-00 | Processo, branch de integração, design system em `design/desktop/` | — | Orquestrador | — | `docs/`, `design/`, `AGENTS.md` | integrada |
-| W01-A | **Contrato da ponte do spike:** mensagens (consulta, comando, evento), formato JSON, esquemas `tako-app://` e `tako-img://`, tipos Rust e TS do spike | N4 | Orquestrador | ORQ-00 | `docs/spikes/MIG-W01-ponte.md`, `crates/spike-web/src/bridge.rs`, `web-spike/src/bridge/` | fila |
-| W01-B | **Hospedeiro CEF mínimo (Windows):** janela, CEF baixado para cache compartilhado, `tako-app://` servindo o build, `tako-img://` servindo capas do cache, ponte do W01-A, fechar e reabrir o Chromium (D-10) com tempo medido | N4 | Codex Lipp · GPT-6.1-Sol xhigh. Revisão: Claude InvestSmart · Opus 5.5 | W01-A | `crates/spike-web/`, `Cargo.toml` (membro e deps do spike) | fila |
-| W01-C | **Telas do spike em React** a partir do `design/desktop/`: TelaBiblioteca, BibliotecaGrade com 1.000 capas virtualizada, CampoDeSelecao abrindo o MenuDeContexto, Dialogo com vidro; foco por teclado e eventos de controle simulados; ponte falsa para rodar no navegador | N3 | Claude InvestSmart · Sonnet 5.5 alto | W01-A | `web-spike/` | fila |
-| W01-D | **Variante WebView2** do hospedeiro, mesmo React e mesma ponte, para comparar no gate | N3 | Codex Alyx · GPT-6.1-Sol medium | W01-A, W01-B (estrutura) | `crates/spike-web/` (módulo `webview2`) | fila |
-| W00-A | **Ferramenta de medição:** memória somada da árvore de processos (Private Working Set), quadros por tela, abertura a frio e volta do jogo; serve para o Slint (`tako --bench`) e para o spike | N3 | Codex Alyx · GPT-6.1-Sol medium | ORQ-00 | `crates/tako/src/bench.rs`, `crates/spike-web/src/measure.rs`, `docs/marco-web/` | fila |
-| W00-B | **Linha de base do Slint** nas telas listadas pelo mantenedor, com a W00-A | N2 | Orquestrador + mantenedor | W00-A, lista de telas | `docs/marco-web/medicoes.md` | bloqueada (lista de telas) |
-| W01-E | **Medição do spike** (CEF e WebView2) e registro no ADR-0035 com a recomendação do motor do Windows | N3 | Orquestrador | W01-B, W01-C, W01-D, W00-A | `docs/marco-web/`, `docs/adr/0035-*` | fila |
-| W01-F | **Gate** com o mantenedor | — | Mantenedor | W00-B, W01-E | — | fila |
+| ORQ-00 | Processo, branch de integração, design system em `design/desktop/`, CI só manual | — | Orquestrador | — | `docs/`, `design/`, `.github/`, `AGENTS.md` | integrada |
+| WEB-00 | **Contrato da ponte:** consultas, comandos e eventos (formato, erros, versão), esquemas `tako-app://` e `tako-img://`, geração dos tipos TS a partir do Rust; esqueleto dos crates `tako-app` e `tako-web` e da pasta `web/` | N4 | Orquestrador | ORQ-00 | `docs/web/ponte.md`, `crates/tako-app/`, `crates/tako-web/` (esqueleto), `web/` (esqueleto), `Cargo.toml` | fila |
+| WEB-02a | **Hospedeiro CEF no Windows:** janela com a barra própria, runtime do CEF num cache compartilhado de desenvolvimento, `tako-app://` (build do `web/` ou servidor do Vite em dev), `tako-img://` do cache de imagens, transporte da ponte, abrir com `tako --web`, fechar e reabrir o Chromium (D-10) | N4 | Codex Lipp · GPT-6.1-Sol xhigh. Revisão: Claude InvestSmart · Opus 5.5 | WEB-00 | `crates/tako-web/`, `crates/tako/src/main.rs` (só a opção `--web`), `Cargo.toml` (deps do CEF) | fila |
+| WEB-03 | **Projeto `web/` e base do design system:** Vite + React + TypeScript, ESLint, build; `tokens.css`, fontes e ícones do `design/desktop/`; temas TAKO, Escuro, Meia-noite, Preto OLED e Liquid Glass por `data-theme`; ponte falsa para rodar no navegador | N2 | Claude InvestSmart · Sonnet 5.5 médio | WEB-00 | `web/` | fila |
+| WEB-01a | **`tako-app`, primeira fatia:** biblioteca (lista, filtros, busca, ordenação), detalhes do jogo e Jogar, extraídos da `Shell` com os testes; a `tako-ui` passa a chamar a `tako-app` nesses pontos | N4 | Codex Alyx · GPT-6.1-Sol high. Revisão: Claude InvestSmart · Opus 5.5 | WEB-00 | `crates/tako-app/`, `crates/tako-ui/src/shell/` (só os pontos extraídos) | fila |
+| WEB-04a | **Componentes base, lote 1:** BotaoDesktop, Abas, CampoDeBusca, CampoDeSelecao + MenuDeContexto, Dialogo, Aviso | N3 | a definir na hora (conta livre) | WEB-03 | `web/src/components/` | fila |
+| WEB-04b | **Componentes base, lote 2:** GrupoDeBlocos, LinhaDeConfiguracao, ControleDeslizante, chave, PainelLateral, ListaDeJogos virtualizada | N3 | a definir na hora (conta livre) | WEB-03 | `web/src/components/` | fila |
+| WEB-06 | **Textos:** `locales/` servido à interface, troca de idioma em tempo de execução | N2 | a definir na hora | WEB-00, WEB-02a | `crates/tako-web/`, `web/src/i18n/` | fila |
+| WEB-05 | **Foco e controle:** navegação espacial, foco visível, repetição, entrada do SDL3 pela ponte | N3 | a definir na hora | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | fila |
 
-Paralelismo da onda: W01-A primeiro (curta, do orquestrador); depois W01-B, W01-C e W00-A juntas (três contas,
-duas com Rust); W01-D entra quando a estrutura do W01-B existir.
+Paralelismo: WEB-00 primeiro (orquestrador). Depois WEB-02a, WEB-03 e WEB-01a juntas, uma por conta (duas com
+Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-05 quando o hospedeiro existir.
 
-## Próximas ondas (depois do gate)
+## Próximas ondas
 
-- **Onda 2 — Fundação:** WEB-01 (`tako-app`), WEB-02 (`tako-web`), WEB-03 (`web/`), WEB-04 (design system),
-  WEB-05 (foco), WEB-06 (textos).
-- **Onda 3 — Telas:** WEB-10 a WEB-16, uma tela por tarefa, com validação ao vivo.
-- **Em paralelo à 3 — Instalador:** INST-01 a INST-04.
-- **Onda 4 — Temas, Chromium, corte, medição final:** WEB-40, WEB-41, WEB-50, WEB-60.
+- **Onda 2 — Telas:** WEB-10 a WEB-16, uma tela por tarefa, com validação ao vivo; hospedeiro no Linux e no macOS.
+- **Em paralelo — Instalador:** INST-01 a INST-04.
+- **Onda 3 — Temas, Chromium, medição e otimização, corte:** WEB-40, WEB-41, WEB-60 (com MIG-W00 e MIG-W01), WEB-50.

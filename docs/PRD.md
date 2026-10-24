@@ -73,6 +73,8 @@ Um launcher de jogos para a TV e o controle, **igual no Windows, no Linux e no m
 | D-10 | **Interface descartável:** durante o jogo, minimizado e na bandeja, os processos do Chromium terminam e fica só o núcleo Rust. Ao voltar, a interface reabre na tela onde estava. | Decidido |
 | D-11 | **Instalador no modelo do Steam:** um instalador pequeno baixa e confere os componentes (núcleo, runtime do Chromium, pacote da interface), emenda no onboarding e depois atualiza cada componente separado. Continua existindo um pacote completo offline e o portable. | Decidido; o desenho do instalador e do onboarding vem depois (épico INST). |
 | D-12 | O **Slint fica congelado** até a paridade da interface web: só correções críticas, sem polimento nem funções novas de interface. Funções novas entram no núcleo Rust e ganham tela já na versão web. | Decidido |
+| D-13 | **Testes locais durante a migração:** fmt, clippy, testes e build rodam na máquina do desenvolvimento (agentes e orquestrador) antes de cada entrada na integração. O GitHub guarda o código, mas os workflows de teste (`CI`, `Rust`, `Packaging`, `PR title`) ficam desligados e só rodam se alguém pedir. O `Release` continua para publicar versões. | Decidido (24/10/2026). Religar com `gh workflow enable` e os gatilhos antigos quando a migração acabar. |
+| D-14 | **Implementar primeiro, otimizar depois:** a interface web é construída direto na fundação definitiva, sem protótipo descartável nem linha de base do Slint antes. As medições da §8.5 e a comparação CEF × WebView2 no Windows acontecem sobre o app web (WEB-60), e o que não bater a meta vira tarefa de otimização. | Decidido (24/10/2026). Substitui o gate antes do porte (MIG-W00 e MIG-W01). |
 
 ### 2.1 Por que a interface vai para a web (D-09)
 
@@ -322,9 +324,10 @@ cache, 1080p.
 | **Tamanho** | Instalador pequeno (bootstrapper) | ≤ 10 MB |
 | | Instalação completa | Registrada a cada release; sem meta rígida, porque o Chromium domina |
 
-**Regra do gate:** se o protótipo (MIG-W01) não cumprir as metas de desempenho e de memória durante o jogo, ou
-ficar pior que a linha de base em quadros, a migração para e os números voltam ao mantenedor antes de qualquer
-porte de tela (mesma regra do §0, item 4).
+**Quando medir (D-14):** depois que o app web estiver de pé, não antes. A linha de base do Slint é opcional: se
+ainda houver um build Slint à mão, mede-se com o mesmo método para ter o "antes e depois". Meta não cumprida vira
+tarefa de otimização; se alguma for impossível de cumprir com o Chromium, os números voltam ao mantenedor (§0,
+item 4).
 
 ---
 
@@ -388,12 +391,12 @@ nova entregam a parte do núcleo agora e ganham tela já na versão web (D-12). 
 
 ### Fase 4 — Interface web (P0, D-09 a D-12)
 
-Plano detalhado em [`docs/plans/2026-10-24-interface-web.md`](plans/2026-10-24-interface-web.md). Ordem: medir,
-provar, fundar, portar, cortar. Nenhuma tela é portada antes do gate (MIG-W01).
+Plano detalhado em [`docs/plans/2026-10-24-interface-web.md`](plans/2026-10-24-interface-web.md). Ordem (D-14):
+fundar, portar, medir e otimizar, cortar. Processo de trabalho: [`docs/processo/multiagente.md`](processo/multiagente.md).
 
-**Gate**
-- [ ] **MIG-W00 — Linha de base do Slint.** Medir as métricas da §8.5 no Tako atual (Slint), nas máquinas de referência e com o método da §8.5, incluindo as telas que hoje caem de quadros (listadas pelo mantenedor). Resultado em `docs/marco-web/medicoes.md`.
-- [ ] **MIG-W01 — Spike da interface web.** Hospedeiro CEF em Rust (Windows e Linux; macOS se der) com a visão geral, um dropdown, um diálogo e a grade de 1.000 capas servidas pelo `tako-img://`, navegação por controle e interface descartável (fechar e reabrir o Chromium). O mesmo React também sobre WebView2 no Windows. **Gate:** metas de desempenho e de memória da §8.5 e nenhuma tela pior que a linha de base. Resultado no ADR-0035 com os números, incluindo o motor do Windows.
+**Medição (adiada pela D-14; entra no WEB-60)**
+- [ ] **MIG-W00 — Linha de base do Slint (opcional).** Medir as métricas da §8.5 no Tako atual (Slint), nas máquinas de referência e com o método da §8.5, incluindo as telas que hoje caem de quadros (listadas pelo mantenedor). Resultado em `docs/marco-web/medicoes.md`.
+- [ ] **MIG-W01 — Comparação de motores no Windows.** O mesmo React sobre CEF e sobre WebView2, medido pela §8.5 já com o app web de pé; resultado no ADR-0035 com a decisão do motor do Windows. _Antes era o spike e gate antes do porte; a D-14 trocou por construir direto na fundação._
 
 **Fundação**
 - [ ] **WEB-01 — `tako-app`.** Extrair da `Shell` da `tako-ui` os comandos, consultas e eventos que são regra do app (biblioteca, jogo, sessão, configurações, downloads, temas, perfis, backup), com os testes. A `tako-ui` passa a usá-la também, para as duas interfaces conviverem até o corte.
@@ -618,7 +621,7 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 ## 12. Definition of Done
 
 - Implementado, revisado e com testes automatizados onde aplicável (inclusive os portados do C#).
-- CI verde nos três SOs.
+- CI verde nos três SOs. Durante a migração (D-13): fmt, clippy, testes e build verdes **localmente**, com a saída no relatório da tarefa.
 - Funções de hardware com checklist por SO executado ou marcado como pendente na PR.
 - Erros com tratamento e caminho de recuperação; nenhum `unwrap` em caminho de dado externo.
 - Textos visíveis em português do Brasil e inglês.

@@ -1,26 +1,10 @@
 name: Packaging
 
 # PLAT-002: valida os pacotes do AUR e o Flatpak do Linux. Nada é publicado (AUR e Flathub exigem a conta do
-# mantenedor; roteiro em docs/packaging-linux.md).
+# mantenedor; roteiro em docs/packaging-linux.md). Testes são locais durante a migração (PRD D-13): só roda quando
+# alguém pede.
 on:
-  pull_request:
-    branches: [develop, main]
-    paths:
-      - "packaging/aur/**"
-      - "packaging/flatpak/**"
-      - "packaging/tako-mark.png"
-      - "Cargo.lock"
-      - "crates/**"
-      - ".github/workflows/packaging.yml"
-  push:
-    branches: [develop, main]
-    paths:
-      - "packaging/aur/**"
-      - "packaging/flatpak/**"
-      - "packaging/tako-mark.png"
-      - "Cargo.lock"
-      - "crates/**"
-      - ".github/workflows/packaging.yml"
+  workflow_dispatch:
 
 concurrency:
   group: packaging-${{ github.ref }}

@@ -53,29 +53,15 @@ SDL3 no núcleo.
 
 ---
 
-## Etapa 0 — Linha de base do Slint (MIG-W00)
+## Ordem (D-14: implementar primeiro, otimizar depois)
 
-- [ ] Mantenedor lista as telas onde vê texto granulado e quadros baixos.
-- [ ] Definir as máquinas de referência (um iGPU tipo Steam Deck e um PC Windows) e o método de memória da §8.5.
-- [ ] Estender `tako --bench` para medir quadros por tela, memória somada dos processos e volta do jogo.
-- [ ] Rodar no Slint atual (release) e publicar em `docs/marco-web/medicoes.md`.
+Sem protótipo descartável e sem linha de base antes: a primeira onda já é a fundação definitiva (Etapa 2). As
+medições, a linha de base opcional do Slint (MIG-W00) e a comparação CEF × WebView2 (MIG-W01) ficam para a
+Etapa 5, sobre o app web de pé (WEB-60). O que não bater a §8.5 vira tarefa de otimização.
 
-## Etapa 1 — Spike e gate (MIG-W01)
-
-Código descartável em `crates/spike-web` e `web-spike/`; não entra no app.
-
-- [ ] Hospedeiro CEF mínimo em Rust: janela, `tako-app://` servindo o build do Vite, `tako-img://` servindo capas
-  do cache atual.
-- [ ] Ponte mínima: uma consulta (biblioteca), um comando (abrir jogo simulado), um evento (progresso).
-- [ ] Telas montadas com o CSS do `tako-design-desktop`: TelaBiblioteca (visão geral), grade virtualizada de
-  1.000 capas (BibliotecaGrade), CampoDeSelecao abrindo o MenuDeContexto e um Dialogo com vidro e desfoque. Assim o
-  gate compara o mesmo visual que hoje fica granulado no Slint.
-- [ ] Controle: SDL3 no Rust → eventos → foco no React.
-- [ ] Interface descartável: fechar todos os processos do Chromium e reabrir na mesma tela; medir o tempo.
-- [ ] Mesmo React sobre WebView2 no Windows.
-- [ ] Rodar em Windows e Linux (X11, Wayland KDE, gamescope); macOS se o empacotamento permitir.
-- [ ] Medir pela §8.5, comparar com a Etapa 0 e registrar no ADR-0035, com a recomendação do motor do Windows.
-- [ ] **Gate:** mantenedor aprova os números. Se reprovar, parar aqui.
+Riscos que o spike provaria e agora aparecem na fundação, cedo: bindings Rust do CEF, CEF no Wayland e no
+gamescope, Linux arm64 e o empacotamento do macOS. A primeira tarefa do hospedeiro (Windows) lista o que achar;
+Linux e macOS entram como tarefas próprias logo depois.
 
 ## Etapa 2 — Fundação (WEB-01 a WEB-06)
 
@@ -132,7 +118,9 @@ Em paralelo à Etapa 3, a partir do WEB-02:
 - [ ] **WEB-41:** job do CI que avisa nova estável do CEF; procedimento para publicar o runtime em poucos dias.
 - [ ] **WEB-50:** beta web nos três SOs; remover `tako-ui`, `.slint`, dependências do Slint e o modo dev de hot
   reload do Slint; changelog sobre temas `.slint`.
-- [ ] **WEB-60:** medir a §8.5 no app completo contra a linha de base e publicar antes da estável.
+- [ ] **WEB-60:** ferramenta de medição (memória somada da árvore de processos, quadros por tela, abertura e
+  volta do jogo); medir a §8.5 no app web; linha de base do Slint se ainda houver build (MIG-W00); mesmo React
+  sobre WebView2 no Windows para decidir o motor (MIG-W01); metas não cumpridas viram tarefas de otimização.
 
 ## Fora deste plano
 

@@ -1,9 +1,7 @@
 name: CI
+# Testes são locais durante a migração para a interface web (PRD D-13): só roda quando alguém pede.
 on:
-  pull_request:
-    branches: [develop, main]
-  push:
-    branches: [develop, main]
+  workflow_dispatch:
 jobs:
   build-test:
     runs-on: windows-latest

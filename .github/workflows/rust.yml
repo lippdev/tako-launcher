@@ -1,11 +1,9 @@
 name: Rust
 
-# Tako em Rust (PRD §4 e §8.4): fmt, clippy e testes nos três SOs a cada push e PR.
+# Tako em Rust (PRD §4 e §8.4): fmt, clippy e testes nos três SOs. Durante a migração para a interface web os
+# testes são locais (PRD D-13): só roda quando alguém pede.
 on:
-  pull_request:
-    branches: [develop, main]
-  push:
-    branches: [develop, main]
+  workflow_dispatch:
 
 concurrency:
   group: rust-${{ github.ref }}
