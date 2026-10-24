@@ -223,3 +223,11 @@ covers_step = "{done} of {total} games"
 covers_done = "Covers updated"
 download_failed = "Couldn't download {title}"
 install_done = "{title} installed"
+
+# TelaBiblioteca (UX-007): the library Overview.
+[desktop.home]
+welcome = "Welcome back, {name}"
+summary = "{games} · {time} played"
+continue = "Continue playing"
+back_title = "Jump back in"
+play_game = "Play {title}"

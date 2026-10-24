@@ -618,6 +618,7 @@ mod tests {
             "overlays",
             "desk-games",
             "desk-game",
+            "desk-overview",
             "desk-actions",
             "settings-rows",
             "desk-profile-name",

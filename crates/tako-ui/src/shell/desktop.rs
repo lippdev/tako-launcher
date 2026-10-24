@@ -5,11 +5,13 @@
 
 use super::ctx::keys::TITLE_LOGO;
 use super::library::Criteria;
+use super::overview::{self, Target};
 use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, bar, details, dialogs, keys, sidebar, smart, tiles,
 };
 use crate::model::{
-    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, Hint, NavItem, PanelRow,
+    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, DeskOverview, Hint,
+    NavItem, PanelRow,
 };
 use crate::values::parse_color;
 use std::cell::RefCell;
@@ -396,6 +398,9 @@ pub struct DesktopLibrary {
     more: Option<String>,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
+    /// Visão geral (TelaBiblioteca) no lugar do destaque do jogo: o primeiro lugar da biblioteca; escolher um jogo sai
+    /// dela. Com ela aberta, a zona `Actions` é o conteúdo da Visão geral e `index` anda pelos alvos dela.
+    overview: bool,
 }
 
 /// Page Up e Page Down como o Slint manda.
@@ -424,7 +429,7 @@ impl DesktopLibrary {
             criteria: Rc::new(RefCell::new(LibraryCriteria::default())),
             selected: None,
             selection_index: 0,
-            zone: Zone::List,
+            zone: Zone::Actions,
             index: 0,
             search_focus: 0,
             checked: Default::default(),
@@ -435,6 +440,7 @@ impl DesktopLibrary {
             hero_wait: None,
             more: None,
             group_focus: None,
+            overview: true,
         }
     }
 
@@ -468,6 +474,19 @@ impl DesktopLibrary {
 
     pub fn tab(&self) -> Tab {
         self.tab
+    }
+
+    /// Volta à Visão geral, com o foco do teclado no destaque.
+    pub fn show_overview(&mut self) {
+        self.overview = true;
+        self.zone = Zone::Actions;
+        self.index = 0;
+    }
+
+    /// A Visão geral está na tela: na Lista e na Grade (as Categorias tomam a janela toda) e fora das coleções (o chip
+    /// da coleção toma o lugar da linha).
+    fn overview_on(&self, ctx: &Ctx) -> bool {
+        self.overview && View::of(ctx) != View::Categories && self.tab != Tab::Collections
     }
 
     pub fn zone(&self) -> Zone {
@@ -670,6 +689,7 @@ impl DesktopLibrary {
         }
         self.group_focus = None;
         self.zone = Zone::List;
+        self.overview = false;
     }
 
     /// Onde está o foco na lista: o cabeçalho de loja ou o jogo escolhido.
@@ -688,6 +708,7 @@ impl DesktopLibrary {
                     self.selected = Some(id.clone());
                 }
                 self.group_focus = None;
+                self.overview = false;
             }
             Entry::Group(store) => self.group_focus = Some(store),
             Entry::Section => {}
@@ -1052,6 +1073,7 @@ impl DesktopLibrary {
         } else {
             self.tab = Tab::All;
         }
+        self.overview = false;
         self.set_view(View::Grid, ctx);
     }
 
@@ -1085,6 +1107,11 @@ impl DesktopLibrary {
             return Nav::Stay;
         };
         self.selected = Some(id.clone());
+        self.run_on(&id, action, ctx)
+    }
+
+    /// A ação num jogo qualquer (a Visão geral age em jogos que podem estar fora da aba atual).
+    fn run_on(&mut self, id: &str, action: Action, ctx: &mut Ctx) -> Nav {
         match action {
             Action::Play => {
                 if ctx.restoring {
@@ -1095,14 +1122,14 @@ impl DesktopLibrary {
                 if ctx.launching {
                     return Nav::Stay;
                 }
-                details::primary_action(ctx, &id)
+                details::primary_action(ctx, id)
             }
             Action::Favorite => {
-                dialogs::toggle_favorite(ctx, &id);
+                dialogs::toggle_favorite(ctx, id);
                 Nav::Stay
             }
-            Action::More => Nav::Layer(Box::new(dialogs::more_actions(ctx, &id))),
-            Action::Settings => Nav::Layer(dialogs::game_settings(ctx, &id)),
+            Action::More => Nav::Layer(Box::new(dialogs::more_actions(ctx, id))),
+            Action::Settings => Nav::Layer(dialogs::game_settings(ctx, id)),
             Action::End => {
                 ctx.effect(Effect::EndGame);
                 Nav::Stay
@@ -1160,6 +1187,47 @@ impl DesktopLibrary {
         let c = self.criteria.borrow();
         c.has_search() || c.has_filters()
     }
+
+    /// Abre a página do jogo na lista, onde quer que ele esteja (volta para Todos sem a busca se a aba o esconde).
+    fn open_game(&mut self, id: &str, ctx: &Ctx) {
+        self.hero = None;
+        self.focus_game(id, ctx);
+    }
+
+    /// Teclado e controle na Visão geral: os alvos vêm de `overview::targets`, na ordem da tela.
+    fn overview_cmd(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
+        let targets = overview::targets(ctx);
+        let last = targets.len().saturating_sub(1);
+        let at = self.index.min(last);
+        let Some(target) = targets.get(at).copied() else {
+            self.zone = Zone::List;
+            return Nav::Stay;
+        };
+        let Some(id) = overview::game_of(ctx, target).map(|g| g.id.clone()) else {
+            return Nav::Stay;
+        };
+        match cmd {
+            Cmd::Down | Cmd::Right => self.index = (at + 1).min(last),
+            Cmd::Up | Cmd::Left if at > 0 => self.index = at - 1,
+            // No primeiro alvo: ← vai para a lista; ↑ para a linha Visão geral, no topo dela.
+            Cmd::Left => self.zone = Zone::List,
+            Cmd::Up => {
+                self.zone = Zone::Controls;
+                self.index = self
+                    .controls(ctx)
+                    .iter()
+                    .position(|c| *c == Control::Overview)
+                    .unwrap_or(0);
+            }
+            // Enter: o destaque joga; os outros abrem a página do jogo (como na grade).
+            Cmd::Accept if target == Target::Hero => return self.run_on(&id, Action::Play, ctx),
+            Cmd::Accept => self.open_game(&id, ctx),
+            Cmd::Favorite => return self.run_on(&id, Action::Favorite, ctx),
+            Cmd::Menu => return self.run_on(&id, Action::More, ctx),
+            _ => {}
+        }
+        Nav::Stay
+    }
 }
 
 /// "Hoje", "Ontem" ou o dia e o mês, para a última sessão e o cartão de Sessões.
@@ -1175,9 +1243,50 @@ pub(crate) fn day(ctx: &Ctx, at: chrono::DateTime<chrono::Local>) -> String {
     }
 }
 
+/// O botão principal do jogo (Jogar, Voltar ao jogo, Instalar…, ou o anel enquanto abre): o do destaque e o da
+/// Visão geral.
+pub(super) fn play_row(
+    ctx: &Ctx,
+    g: &Game,
+    running: bool,
+    install: &Option<details::InstallStage>,
+) -> PanelRow {
+    let mut row = if running && ctx.launching {
+        // Botão travado com o anel girando (JogarEAbrir).
+        let slow = ctx.launch_slow(std::time::Instant::now());
+        PanelRow::button(
+            "play",
+            ctx.t(if slow {
+                "desktop.opening_slow"
+            } else {
+                "desktop.opening"
+            }),
+        )
+        .icon("ring")
+        .enabled(false)
+    } else {
+        match (running, install) {
+            (false, Some(i)) => {
+                // Instalar: loja e tamanho na linha de baixo da pílula, ⌄ se houver mais de uma loja.
+                let icon = if i.installing { "ring" } else { "download" };
+                let mut row = PanelRow::button("play", i.label.clone())
+                    .icon(icon)
+                    .enabled(!i.installing)
+                    .desc(i.sub.clone());
+                row.on = i.split;
+                row
+            }
+            (true, _) => PanelRow::button("play", ctx.t("game.resume")).icon("gamepad"),
+            _ => PanelRow::button("play", tiles::play_label(ctx, g)).icon("play"),
+        }
+    };
+    row.style = "primary".into();
+    row
+}
+
 /// Faixa de estado do destaque: Última sessão e Tempo de jogo. Nuvem e Conquistas só entram quando o Tako tiver esses
 /// dados (sem métricas inventadas).
-fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
+pub(super) fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let lang = ctx.lang();
     let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
     let last = ctx.library.sessions(&g.id).last().map(|s| s.started_at);
@@ -1317,7 +1426,7 @@ fn details_rows(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
 }
 
 /// Descrição do CartaoSobre: até uns 240 caracteres, cortada na última palavra com "…". `true` quando cortou.
-fn about(description: &str) -> (String, bool) {
+pub(super) fn about(description: &str) -> (String, bool) {
     const LIMIT: usize = 240;
     let clean = description.split_whitespace().collect::<Vec<_>>().join(" ");
     if clean.chars().count() <= LIMIT {
@@ -1457,6 +1566,17 @@ impl Page for DesktopLibrary {
                 };
                 self.open_tab(TABS[to], ctx);
             }
+            // Visão geral: ←→↑↓ andam pelos alvos (destaque → Voltar a jogar → …) e Enter age no alvo.
+            (
+                Zone::Actions,
+                Cmd::Left
+                | Cmd::Right
+                | Cmd::Up
+                | Cmd::Down
+                | Cmd::Accept
+                | Cmd::Favorite
+                | Cmd::Menu,
+            ) if self.overview_on(ctx) => return self.overview_cmd(cmd, ctx),
             // Cabeçalho de loja (NaoInstalados): Enter alterna, → abre e ← fecha.
             (Zone::List, Cmd::Accept | Cmd::Left | Cmd::Right)
                 if self.group_focus.is_some() && View::of(ctx) != View::Categories =>
@@ -1532,6 +1652,7 @@ impl Page for DesktopLibrary {
                     Cmd::Up => (r - 1, c.min(len(r - 1).saturating_sub(1))),
                     Cmd::Down if r + 1 < rows.len() => (r + 1, c.min(len(r + 1).saturating_sub(1))),
                     Cmd::Accept => {
+                        self.overview = false;
                         self.set_view(View::List, ctx);
                         return Nav::Stay;
                     }
@@ -1737,12 +1858,33 @@ impl Page for DesktopLibrary {
             }
             "collapse" => ctx.settings.set_bool(COLLAPSED_KEY, !collapsed(ctx)),
             "options" => return Nav::Layer(Box::new(self.options(ctx))),
-            // Visão geral: ainda é a biblioteca de sempre (a tela nova é a etapa 5); sai da coleção e da busca.
+            // Visão geral: sai da coleção e da busca e mostra a TelaBiblioteca.
             "overview" => {
                 self.clear();
                 self.open_tab(Tab::All, ctx);
                 self.selected = None;
-                self.zone = Zone::List;
+                self.overview = true;
+                self.zone = Zone::Actions;
+                self.index = 0;
+            }
+            // O destaque e Voltar a jogar: o clique abre a página do jogo, o ▶ joga.
+            "ov-open-hero" | "ov-play-hero" | "ov-back" | "ov-back-play" => {
+                let target = match zone {
+                    "ov-back" | "ov-back-play" => Target::Back(index),
+                    _ => Target::Hero,
+                };
+                let Some(id) = overview::game_of(ctx, target).map(|g| g.id.clone()) else {
+                    return Nav::Stay;
+                };
+                if matches!(zone, "ov-play-hero" | "ov-back-play") {
+                    self.zone = Zone::Actions;
+                    self.index = overview::targets(ctx)
+                        .iter()
+                        .position(|t| *t == target)
+                        .unwrap_or(0);
+                    return self.run_on(&id, Action::Play, ctx);
+                }
+                self.open_game(&id, ctx);
             }
             "collection-clear" => {
                 self.open_tab(Tab::All, ctx);
@@ -1773,6 +1915,7 @@ impl Page for DesktopLibrary {
                     return Nav::Stay;
                 };
                 self.selected = Some(id);
+                self.overview = false;
                 match zone {
                     "cat-cover-play" => return self.run(Action::Play, ctx),
                     "cat-cover-menu" => return self.run(Action::More, ctx),
@@ -2323,21 +2466,45 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.expand"),
             ],
         );
+        // Na Visão geral nenhum jogo está escolhido; só a lista com o foco do teclado mostra onde ele está.
+        let overview = self.overview_on(ctx);
         out.set(
             "desk-selected",
-            self.focus_pos(&list, cur).map_or(-1, |p| p as i32),
+            self.focus_pos(&list, cur)
+                .filter(|_| !overview || self.zone == Zone::List)
+                .map_or(-1, |p| p as i32),
         );
         let hero = self.hero_id(ctx, cur.map(|i| ids[i].clone()));
         // Outro jogo no destaque (ou fora da Lista): volta para a fase 1.
-        if self.more != hero || View::of(ctx) == View::Categories {
+        if self.more != hero || View::of(ctx) == View::Categories || overview {
             self.more = None;
         }
+        if overview && self.zone == Zone::Actions && overview::targets(ctx).is_empty() {
+            self.zone = Zone::List;
+        }
+        let focus = if overview && self.zone == Zone::Actions {
+            let targets = overview::targets(ctx);
+            self.index = self.index.min(targets.len().saturating_sub(1));
+            targets.get(self.index).copied()
+        } else {
+            None
+        };
+        out.set(
+            "desk-overview",
+            if overview {
+                overview::build(ctx, focus)
+            } else {
+                DeskOverview::default()
+            },
+        );
         let more_on = self.more.is_some();
         // Na fase 2 os botões de ação ficam escondidos: o foco do teclado não pode ficar neles (Enter jogaria).
         if more_on && self.zone == Zone::Actions {
             self.zone = Zone::List;
         }
-        let game = hero.and_then(|id| ctx.library.find(&id));
+        let game = hero
+            .and_then(|id| ctx.library.find(&id))
+            .filter(|_| !overview);
         out.set(
             "desk-more",
             DeskMore {
@@ -2385,42 +2552,7 @@ impl Page for DesktopLibrary {
                     self.actions(ctx, g)
                         .into_iter()
                         .map(|a| match a {
-                            Action::Play if running && ctx.launching => {
-                                // Botão travado com o anel girando (JogarEAbrir).
-                                let slow = ctx.launch_slow(std::time::Instant::now());
-                                let mut row = PanelRow::button(
-                                    "play",
-                                    ctx.t(if slow {
-                                        "desktop.opening_slow"
-                                    } else {
-                                        "desktop.opening"
-                                    }),
-                                )
-                                .icon("ring")
-                                .enabled(false);
-                                row.style = "primary".into();
-                                row
-                            }
-                            Action::Play => {
-                                let mut row = match (running, &install) {
-                                    (false, Some(i)) => {
-                                        // Instalar: loja e tamanho na linha de baixo da pílula, ⌄ se houver mais de uma loja.
-                                        let icon = if i.installing { "ring" } else { "download" };
-                                        let mut row = PanelRow::button("play", i.label.clone())
-                                            .icon(icon)
-                                            .enabled(!i.installing)
-                                            .desc(i.sub.clone());
-                                        row.on = i.split;
-                                        row
-                                    }
-                                    (true, _) => PanelRow::button("play", ctx.t("game.resume"))
-                                        .icon("gamepad"),
-                                    _ => PanelRow::button("play", tiles::play_label(ctx, g))
-                                        .icon("play"),
-                                };
-                                row.style = "primary".into();
-                                row
-                            }
+                            Action::Play => play_row(ctx, g, running, &install),
                             Action::Favorite => {
                                 let mut row = PanelRow::button(
                                     "favorite",
@@ -2536,6 +2668,7 @@ impl Page for DesktopLibrary {
                 Zone::Tabs => "tabs",
                 Zone::Controls => "controls",
                 Zone::List => "list",
+                Zone::Actions if overview => "overview",
                 Zone::Actions => "actions",
             },
         );
@@ -2599,6 +2732,10 @@ impl Page for DesktopLibrary {
     }
 
     fn focused_game(&self, ctx: &Ctx) -> Option<String> {
+        if self.overview_on(ctx) {
+            // A cor da tela vem do jogo do destaque.
+            return overview::hero(ctx).map(|g| g.id.clone());
+        }
         self.selected(ctx)
     }
 
@@ -2618,6 +2755,7 @@ impl Page for DesktopLibrary {
         }
         self.selected = Some(id.to_owned());
         self.zone = Zone::List;
+        self.overview = false;
     }
 }
 
@@ -2857,7 +2995,7 @@ pub(crate) fn title_mode(ctx: &Ctx, id: &str) -> String {
 
 /// O título vira o logo quando há logo, a pessoa não pediu texto e o contraste médio dele com a arte embaixo é de
 /// pelo menos 3:1. "Logo" escolhido no jogo vale mesmo com pouco contraste (a aba Logo avisa).
-fn show_logo(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool {
+pub(super) fn show_logo(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool {
     let wanted = match title_mode(ctx, &g.id).as_str() {
         "logo" => return logo.size().width > 0,
         "text" => false,
@@ -2868,7 +3006,7 @@ fn show_logo(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool 
 
 /// O logo (ou a cópia desfocada da arte, que mede o contraste dele) ainda carrega: o título espera em vez de mostrar
 /// o nome em texto e trocar para o logo um instante depois.
-fn title_pending(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool {
+pub(super) fn title_pending(ctx: &Ctx, g: &Game, logo: &slint::Image, art_lum: &[f32]) -> bool {
     let mode = title_mode(ctx, &g.id);
     let wanted = mode == "logo" || (mode != "text" && ctx.settings.string(TITLE_LOGO) != "text");
     let Some(uri) = g.shown_logo().filter(|_| wanted) else {
@@ -3516,6 +3654,11 @@ mod tests {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
+        // A Visão geral não tem fase 2: o jogo escolhido a abre.
+        shell.show_overview();
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert!(!more_on(&mut shell));
+        shell.click("game", 0);
         assert!(!more_on(&mut shell));
         // Page Down abre, Page Up volta; Esc também volta.
         shell.key("\u{F72D}", KeyModifiers::NONE);
@@ -3615,6 +3758,143 @@ mod tests {
                 .contains(&Effect::Launch(ids[installed].clone()))
                 || shell.has_layers()
         );
+    }
+
+    fn overview_prop(shell: &mut Shell, field: &str) -> Option<slint_interpreter::Value> {
+        let out = shell.render(std::time::Instant::now());
+        out.props.iter().find_map(|(n, v)| match (*n, v) {
+            ("desk-overview", slint_interpreter::Value::Struct(s)) => s.get_field(field).cloned(),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn the_app_opens_on_the_overview_and_choosing_a_game_leaves_it() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.show_overview();
+        assert_eq!(
+            overview_prop(&mut shell, "on"),
+            Some(slint_interpreter::Value::Bool(true))
+        );
+        let hero = overview::hero(&shell.ctx).map(|g| g.id.clone()).unwrap();
+        // A cor da tela vem do jogo do destaque; a lista não marca nenhum jogo e o destaque comum fica de fora.
+        assert_eq!(shell.focused_game(), Some(hero.clone()));
+        let out = shell.render(std::time::Instant::now());
+        let number = |name: &str| match out.props.iter().find(|(n, _)| *n == name) {
+            Some((_, slint_interpreter::Value::Number(n))) => *n as i32,
+            _ => panic!("sem {name}"),
+        };
+        assert_eq!(number("desk-selected"), -1);
+        let has_game = out.props.iter().any(|(n, v)| match (*n, v) {
+            ("desk-game", slint_interpreter::Value::Struct(s)) => {
+                s.get_field("has-game") == Some(&slint_interpreter::Value::Bool(true))
+            }
+            _ => false,
+        });
+        assert!(!has_game);
+        // Trocar de aba e buscar não saem dela; escolher um jogo sai.
+        shell.click("tab", 1);
+        shell.edited("search", "a");
+        assert!(page(&shell).overview_on(&shell.ctx));
+        shell.edited("search", "");
+        shell.click("tab", 0);
+        shell.click("game", 1);
+        assert!(!page(&shell).overview_on(&shell.ctx));
+        assert_eq!(
+            overview_prop(&mut shell, "on"),
+            Some(slint_interpreter::Value::Bool(false))
+        );
+        // A linha Visão geral volta, e Esc na coleção também não a deixa para trás.
+        shell.click("overview", 0);
+        assert!(page(&shell).overview_on(&shell.ctx));
+        // A Grade da lista mantém a Visão geral; as Categorias, que tomam a janela toda, não.
+        shell.click("view", 1);
+        assert!(page(&shell).overview_on(&shell.ctx));
+        shell.click("view", 2);
+        assert!(!page(&shell).overview_on(&shell.ctx));
+    }
+
+    #[test]
+    fn the_overview_opens_and_plays_games_outside_the_current_tab() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.show_overview();
+        let hero = overview::hero(&shell.ctx).map(|g| g.id.clone()).unwrap();
+        let back = overview::game_of(&shell.ctx, Target::Back(0))
+            .map(|g| g.id.clone())
+            .unwrap();
+        // Favoritos não tem o destaque: jogar nele joga o jogo certo, não o primeiro da aba.
+        shell.click("tab", 1);
+        assert!(!page(&shell).ids(&shell.ctx).contains(&hero));
+        shell.click("ov-play-hero", 0);
+        assert!(shell.ctx.effects.contains(&Effect::Launch(hero.clone())) || shell.has_layers());
+        shell.close_layers();
+        shell.ctx.effects.clear();
+        // Abrir um de Voltar a jogar volta para Todos (sem a busca) e deixa o jogo escolhido.
+        shell.click("ov-back", 0);
+        assert!(!page(&shell).overview_on(&shell.ctx));
+        assert_eq!(page(&shell).tab(), Tab::All);
+        assert_eq!(shell.focused_game(), Some(back.clone()));
+        // O ▶ de Voltar a jogar joga o jogo da linha.
+        shell.click("overview", 0);
+        let other = overview::game_of(&shell.ctx, Target::Back(1))
+            .map(|g| g.id.clone())
+            .unwrap();
+        shell.click("ov-back-play", 1);
+        assert!(shell.ctx.effects.contains(&Effect::Launch(other)) || shell.has_layers());
+    }
+
+    #[test]
+    fn the_keyboard_walks_hero_then_back_to_play_and_leaves_through_the_list_and_the_top() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.show_overview();
+        let n = overview::targets(&shell.ctx).len();
+        assert!(n >= 3);
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // ↓ anda pelo destaque e por Voltar a jogar; no último fica.
+        for _ in 0..n + 2 {
+            shell.handle(Cmd::Down);
+        }
+        assert_eq!(page(&shell).index, n - 1);
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).index, n - 2);
+        // Enter num jogo de Voltar a jogar abre a página dele.
+        let id = overview::game_of(&shell.ctx, Target::Back(n - 3))
+            .map(|g| g.id.clone())
+            .unwrap();
+        shell.handle(Cmd::Accept);
+        assert!(!page(&shell).overview_on(&shell.ctx));
+        assert_eq!(shell.focused_game(), Some(id));
+        // No destaque, Enter joga o jogo do destaque; ← vai para a lista e ↑ para a linha Visão geral.
+        shell.click("overview", 0);
+        let hero = overview::hero(&shell.ctx).map(|g| g.id.clone()).unwrap();
+        shell.handle(Cmd::Accept);
+        assert!(shell.ctx.effects.contains(&Effect::Launch(hero)) || shell.has_layers());
+        shell.close_layers();
+        shell.handle(Cmd::Left);
+        assert_eq!(page(&shell).zone(), Zone::List);
+        shell.handle(Cmd::Right);
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).zone(), Zone::Controls);
+        assert_eq!(
+            page(&shell).controls(&shell.ctx).get(page(&shell).index),
+            Some(&Control::Overview)
+        );
+        // F (favoritar) age no alvo com o foco, não no primeiro jogo da lista escondido.
+        shell.click("overview", 0);
+        shell.handle(Cmd::Down);
+        let target = overview::game_of(&shell.ctx, Target::Back(0))
+            .map(|g| g.id.clone())
+            .unwrap();
+        let before = shell.ctx.library.find(&target).unwrap().is_favorite;
+        shell.handle(Cmd::Favorite);
+        assert_ne!(shell.ctx.library.find(&target).unwrap().is_favorite, before);
     }
 
     #[test]

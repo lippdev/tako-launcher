@@ -742,6 +742,7 @@ impl App {
         let mut shell = Shell::new(ctx);
         if mode == UiMode::Desktop {
             shell.enter_desktop();
+            shell.show_overview();
         }
         shell.ctx.pending_link = opts.link.clone();
         if let Some((id, title)) = &opts.running {

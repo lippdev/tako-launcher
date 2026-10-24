@@ -207,6 +207,8 @@ export global Ui {
     out property <length> radius-button: pill ? 999px : 11px;
     out property <length> radius-card: 16px;
     out property <length> radius-hero: 18px;
+    // Blocos do GrupoDeBlocos, capas e botão pequeno do tema TAKO.
+    out property <length> radius-block: 11px;
     out property <length> radius-full: 999px;
     out property <length> topbar-height: 52px;
     // BarraDaJanela: a barra da própria janela (sem moldura do Windows), por cima da arte.
@@ -222,6 +224,16 @@ export global Ui {
     out property <length> game-row-height: 42px;
     out property <length> control-height: 44px;
     out property <length> primary-height: 56px;
+    // BotaoDesktop: altura e chip do ícone (grande e pequeno).
+    out property <length> button-height: 46px;
+    out property <length> button-height-sm: 38px;
+    out property <length> button-chip: 36px;
+    out property <length> button-chip-sm: 30px;
+    // TelaBiblioteca: Destaque, Voltar a jogar ao lado e os blocos (valor e rótulo).
+    out property <length> hero-height: 400px;
+    out property <length> hero-side-width: 300px;
+    out property <length> tile-value-height: 78px;
+    out property <length> tile-label-height: 40px;
     out property <length> round-button: 52px;
     out property <length> card-height: 248px;
     out property <length> focus-ring-width: 3px;
@@ -249,6 +261,7 @@ export global Ui {
     out property <duration> tempo-destaque: reduce-motion ? 0ms : 900ms;
     // Cores da arte deslizando para a paleta nova (TAKO).
     out property <duration> tempo-cor: reduce-motion ? 0ms : 1000ms;
+    out property <duration> tempo-zoom: reduce-motion ? 0ms : 1200ms;
     out property <duration> tempo-contador: reduce-motion ? 0ms : 1100ms;
     out property <duration> tempo-radar: reduce-motion ? 0ms : 900ms;
     out property <duration> tempo-pulso: reduce-motion ? 0ms : 1600ms;
@@ -321,4 +334,5 @@ export global Ui {
     out property <float> escala-menu: reduce-motion ? 1 : 0.98;
     out property <float> escala-vista: reduce-motion ? 1 : 0.985;
     out property <float> escala-capa: reduce-motion ? 1 : 1.05;
+    out property <float> escala-destaque: reduce-motion ? 1 : 1.03;
 }
