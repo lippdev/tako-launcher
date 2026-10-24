@@ -5,6 +5,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 ## [Unreleased]
 
 ### What's new
+- **Desktop motion (TAKO):** animations follow the design system timings and easing curve; page changes fade with a subtle scale, respect Reduce motion, and skip transitions while the window is inactive.
 - **Floating global search with Ctrl+K (TAKO):** 560-wide floating search panel positioned 110 px from the top over a dimmed backdrop, reachable via keyboard shortcut or on pages without an embedded search; shows library results with cover, title, publisher, and status with a Library badge; supports arrow key navigation (↑↓), Enter to open the selected game directly, and Esc to clear or dismiss.
 - **Desktop layer screens (TAKO):** image dialogs adjusted to 540px, the Image picker to 1180px, and updates to Text field and App update dialogs.
 - **Layers in the new desktop style (TAKO):** 220px menus with high-contrast borders and elevated shadows opening from the anchor in 160/200 ms; bottom-centered notification toasts with light background, dark text, 2.3s duration, and a 20px rise entrance; tooltips with a 500ms delay and 120ms fade; 400px side panels (480px in game settings) sliding from the right without dimming the background; and 480px modal dialogs (compact 440px, wide 680px) with 18px radius and a 60% dimming backdrop. Esc closes the topmost layer and focus stays locked to the active layer.

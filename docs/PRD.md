@@ -336,18 +336,18 @@ Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias
 - [ ] **UX-004:** perfis locais (vários usuários na mesma máquina).
 - [x] **UX-005:** ícone do jogo na lista, como na Steam; a capa fica só na Grade. O ícone vem da própria loja (Steam, Epic, GOG, Xbox) ou do executável no Windows, com a inicial do título quando não houver.
 - [x] **UX-006:** atividades em segundo plano na barra de cima (AtividadeNaBarra).
-- [ ] **UX-007:** rebranding do desktop pelo novo design system (tako-design 188a48a).
-  - [ ] Tokens e temas
-  - [ ] Marca
-  - [ ] Barra de cima e janela
-  - [ ] Lista da biblioteca
-  - [ ] Visão geral
-  - [ ] Página do jogo (sai a DestaqueFases)
-  - [ ] Configurações
-  - [ ] Camadas
-  - [ ] Loja (só o que já existe)
-  - [ ] Perfil e onboarding (se existirem)
-  - [ ] Movimento (sai a BarraLateralUnida e o vidro flutuante)
+- [x] **UX-007:** rebranding do desktop pelo novo design system (tako-design 188a48a).
+  - [x] Tokens e temas
+  - [x] Marca
+  - [x] Barra de cima e janela
+  - [x] Lista da biblioteca
+  - [x] Visão geral
+  - [x] Página do jogo (sai a DestaqueFases)
+  - [x] Configurações
+  - [x] Camadas
+  - [x] Loja (fora: sem área de loja no app)
+  - [x] Perfil e onboarding (se existirem)
+  - [x] Movimento (sai a BarraLateralUnida e o vidro flutuante)
 
 ### Épico THEME (P2)
 
