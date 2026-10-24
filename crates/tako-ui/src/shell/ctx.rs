@@ -208,10 +208,6 @@ pub mod keys {
     /// TituloDoJogo (desktop): "text" = sempre o nome em texto; qualquer outro valor = logo quando houver. Por jogo,
     /// `TITLE_LOGO` + ":" + id guarda "logo", "text" ou nada (usar o padrão).
     pub const TITLE_LOGO: &str = "DesktopTitleLogo";
-    /// BarraLateralUnida (desktop, por perfil): a lista encosta na barra de cima e na borda esquerda. Padrão: desligada.
-    pub const SIDEBAR_UNIFIED: &str = "layout.sidebar_unida";
-    /// "Largura da barra lateral" (desktop, por perfil): "narrow" = Estreita; qualquer outro valor = Normal.
-    pub const SIDEBAR_WIDTH: &str = "layout.sidebar_largura";
     pub const RESTORE_ENVIRONMENT: &str = "RestoreEnvironmentAfterGame";
     pub const DEVELOPER: &str = "DeveloperOptions";
     pub const GAME_SCREEN_ENABLED: &str = "GameScreenEnabled";

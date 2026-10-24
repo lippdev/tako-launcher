@@ -44,10 +44,12 @@ const NEAR: usize = 60;
 pub enum Tab {
     All,
     Favorites,
+    Installed,
+    /// Sem aba própria: entra pelo menu Ordenar, ver e filtrar (seção Coleção) e pelo Perfil.
     Collections,
 }
 
-const TABS: [Tab; 3] = [Tab::All, Tab::Favorites, Tab::Collections];
+const TABS: [Tab; 3] = [Tab::All, Tab::Favorites, Tab::Installed];
 
 /// Modo de exibição da biblioteca (Lista · Grade · Categorias), salvo por perfil.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -325,9 +327,17 @@ pub enum Zone {
     /// Barra superior: marca (menu do Tako), guia Biblioteca, busca e Tela cheia.
     Bar,
     Tabs,
-    Collections,
+    /// O topo da lista: Ordenar, ver e filtrar e a linha Visão geral (ou o chip da coleção).
+    Controls,
     List,
     Actions,
+}
+
+/// Os controles da zona `Controls`, na ordem da tela (o índice da zona).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Control {
+    Options,
+    Overview,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -477,6 +487,7 @@ impl DesktopLibrary {
     fn route_filter(&self) -> LibraryFilter {
         match self.tab {
             Tab::Favorites => LibraryFilter::Favorites,
+            Tab::Installed => LibraryFilter::Installed,
             _ => LibraryFilter::All,
         }
     }
@@ -488,6 +499,14 @@ impl DesktopLibrary {
         arrange(match (&self.tab, &self.pick) {
             (Tab::All, _) => query::apply(games, LibraryFilter::All, &user),
             (Tab::Favorites, _) => query::apply(games, LibraryFilter::Favorites, &user),
+            (Tab::Installed, _) => {
+                let base = LibraryCriteria {
+                    install: InstallFilter::Installed,
+                    ..Default::default()
+                };
+                let base = query::apply(games, LibraryFilter::All, &base);
+                query::apply_by(base, |g| LibraryFacts::of(g), &user)
+            }
             (Tab::Collections, None) => Vec::new(),
             (Tab::Collections, Some(Pick::Manual(id))) => {
                 let base = LibraryCriteria::default().toggle_collection(id);
@@ -682,61 +701,144 @@ impl DesktopLibrary {
     /// SeletorDeColecao: as coleções com a quantidade (e "Auto" nas automáticas) e ✓ na atual; depois "Nova
     /// coleção…" e "Organizar coleções".
     fn collection_select(&self, ctx: &Ctx) -> super::layer::MenuLayer {
-        use super::layer::{Flow, MenuItem, MenuLayer};
         let request = self.pick_request.clone();
         let current = self.pick.clone();
         let focus = Self::picks(ctx)
             .iter()
             .position(|(p, ..)| Some(p) == current.as_ref())
             .unwrap_or(0);
+        super::layer::MenuLayer::menu(String::new(), move |ctx| {
+            collection_items(ctx, &request, current.as_ref())
+        })
+        .wide()
+        .focus_at(focus)
+    }
+
+    /// Ordenar, ver e filtrar: o botão da busca reúne ordem, modo de exibição, filtros, coleções e as ações da
+    /// biblioteca num menu só, com a contagem no cabeçalho.
+    fn options(&self, ctx: &Ctx) -> super::layer::MenuLayer {
+        use super::layer::{Flow, MenuItem, MenuLayer};
+        let (request, current, criteria) = (
+            self.pick_request.clone(),
+            self.pick.clone(),
+            self.criteria.clone(),
+        );
+        let route = self.route_filter();
+        let title = format!(
+            "{} · {}",
+            ctx.t("desktop.library"),
+            library_text::game_count(ctx.lang(), self.games(ctx).len())
+        );
         MenuLayer::menu(String::new(), move |ctx| {
-            let mut v: Vec<MenuItem> = Self::picks(ctx)
-                .into_iter()
-                .enumerate()
-                .map(|(i, (p, name, n))| {
-                    let note = if matches!(p, Pick::Smart(_)) {
-                        format!("{n} · {}", ctx.t("desktop.collection_auto"))
-                    } else {
-                        n.to_string()
-                    };
-                    let on = current.as_ref() == Some(&p);
-                    let request = request.clone();
-                    MenuItem::new(
-                        PanelRow::button(format!("pick-{i}"), name)
-                            .icon(if on { "tick" } else { "" })
-                            .value(note)
-                            .emphasized(on),
-                    )
+            let (sort, reversed, installed) = {
+                let c = criteria.borrow();
+                (c.sort, c.reversed, c.install == InstallFilter::Installed)
+            };
+            let mark = |on: bool, mut row: PanelRow| {
+                if on {
+                    row.value = "✓".into();
+                }
+                row
+            };
+            let mut v = vec![
+                MenuItem::new(PanelRow::header(title.clone())),
+                MenuItem::new(PanelRow::header(ctx.t("desktop.options_sort"))),
+            ];
+            for s in library_text::SORT_ORDER {
+                let c = criteria.clone();
+                v.push(
+                    MenuItem::new(mark(
+                        s == sort,
+                        PanelRow::button(
+                            format!("sort-{}", s as u8),
+                            library_text::sort_label(ctx.lang(), s),
+                        ),
+                    ))
                     .on(move |ctx| {
-                        ctx.settings.set(COLLECTION_KEY, &p.key());
-                        *request.borrow_mut() = Some(p.clone());
-                        Flow::Close
-                    })
-                })
-                .collect();
-            if !v.is_empty() {
-                v.push(MenuItem::new(PanelRow::separator()));
+                        c.borrow_mut().sort = s;
+                        ctx.dirty = true;
+                        Flow::Stay
+                    }),
+                );
             }
+            let c = criteria.clone();
             v.push(
-                MenuItem::new(PanelRow::button(
-                    "new",
-                    format!("{}…", ctx.t("collections.new")),
+                MenuItem::new(mark(
+                    reversed,
+                    PanelRow::button("reverse", ctx.t("desktop.view.reverse")).icon("sort"),
                 ))
-                .on(|ctx| Flow::Replace(Box::new(super::dialogs::new_collection(ctx, None)))),
+                .on(move |ctx| {
+                    let mut c = c.borrow_mut();
+                    c.reversed = !c.reversed;
+                    ctx.dirty = true;
+                    Flow::Stay
+                }),
+            );
+            v.push(MenuItem::new(PanelRow::separator()));
+            v.push(MenuItem::new(PanelRow::header(ctx.t("desktop.view.menu"))));
+            v.extend(view_items(ctx));
+            v.push(MenuItem::new(PanelRow::separator()));
+            v.push(MenuItem::new(PanelRow::header(
+                ctx.t("desktop.options_show"),
+            )));
+            let (c, c2) = (criteria.clone(), criteria.clone());
+            v.push(
+                MenuItem::new(mark(
+                    installed,
+                    PanelRow::button(
+                        "installed",
+                        library_text::install_label(ctx.lang(), InstallFilter::Installed),
+                    ),
+                ))
+                .on(move |ctx| {
+                    let mut c = c.borrow_mut();
+                    c.install = if c.install == InstallFilter::Installed {
+                        InstallFilter::Any
+                    } else {
+                        InstallFilter::Installed
+                    };
+                    ctx.dirty = true;
+                    Flow::Stay
+                }),
             );
             v.push(
-                MenuItem::new(PanelRow::button(
-                    "manage",
-                    ctx.t("desktop.collections_manage"),
-                ))
+                MenuItem::new(
+                    PanelRow::button("filter", format!("{}…", ctx.t("desktop.filter_sort")))
+                        .icon("filter"),
+                )
+                .on(move |ctx| {
+                    Flow::Replace(Box::new(dialogs::library_filters(ctx, c2.clone(), route)))
+                }),
+            );
+            v.push(MenuItem::new(PanelRow::separator()));
+            v.push(MenuItem::new(PanelRow::header(
+                ctx.t("desktop.tab_collections"),
+            )));
+            v.extend(collection_items(ctx, &request, current.as_ref()));
+            v.push(MenuItem::new(PanelRow::separator()));
+            v.push(
+                MenuItem::new(
+                    PanelRow::button("add-game", ctx.t("desktop.menu.add_game")).icon("plus"),
+                )
                 .on(|ctx| {
-                    Flow::Replace(Box::new(super::settings::library::collections_panel(ctx)))
+                    ctx.effect(Effect::AddGame);
+                    Flow::CloseAll
+                }),
+            );
+            let label = if ctx.scanning {
+                ctx.t("desktop.refresh_busy")
+            } else {
+                ctx.t("desktop.refresh_library")
+            };
+            v.push(
+                MenuItem::new(PanelRow::button("rescan", label).icon("refresh")).on(|ctx| {
+                    rescan(ctx);
+                    Flow::CloseAll
                 }),
             );
             v
         })
         .wide()
-        .focus_at(focus)
     }
 
     // ── Seleção múltipla (SelecaoMultipla) ──
@@ -985,11 +1087,20 @@ impl DesktopLibrary {
     }
 
     fn zones(&self) -> Vec<Zone> {
-        let mut v = vec![Zone::Bar, Zone::Tabs];
-        if self.tab == Tab::Collections {
-            v.push(Zone::Collections);
-        }
-        v.extend([Zone::List, Zone::Actions]);
+        vec![
+            Zone::Bar,
+            Zone::Tabs,
+            Zone::Controls,
+            Zone::List,
+            Zone::Actions,
+        ]
+    }
+
+    /// Nas Categorias não há linha Visão geral; só a coleção ativa tem o seletor.
+    fn controls(&self, ctx: &Ctx) -> Vec<Control> {
+        let overview = View::of(ctx) == View::List || self.tab == Tab::Collections;
+        let mut v = vec![Control::Options];
+        v.extend(overview.then_some(Control::Overview));
         v
     }
 
@@ -1304,12 +1415,16 @@ impl Page for DesktopLibrary {
         let list = entries(ctx, &games);
         let cur = self.current(&ids);
         let to_install_cur = cur.is_some_and(|i| to_install(games[i]));
-        let picks = Self::picks(ctx);
         match (self.zone, cmd) {
             (_, Cmd::PrevSection) | (_, Cmd::NextSection) => {
-                let i = TABS.iter().position(|t| *t == self.tab).unwrap_or(0) as i32;
-                let d = if cmd == Cmd::NextSection { 1 } else { -1 };
-                self.open_tab(TABS[(i + d).rem_euclid(TABS.len() as i32) as usize], ctx);
+                let next = cmd == Cmd::NextSection;
+                // Numa coleção (sem aba) o ponto de partida é antes da primeira aba.
+                let to = match TABS.iter().position(|t| *t == self.tab) {
+                    Some(i) => (i + if next { 1 } else { TABS.len() - 1 }) % TABS.len(),
+                    None if next => 0,
+                    None => TABS.len() - 1,
+                };
+                self.open_tab(TABS[to], ctx);
             }
             // Cabeçalho de loja (NaoInstalados): Enter alterna, → abre e ← fecha.
             (Zone::List, Cmd::Accept | Cmd::Left | Cmd::Right)
@@ -1469,26 +1584,37 @@ impl Page for DesktopLibrary {
             (Zone::Tabs, Cmd::Right) => self.index = (self.index + 1).min(TABS.len() - 1),
             (Zone::Tabs, Cmd::Accept) | (Zone::Tabs, Cmd::Down) => {
                 self.open_tab(TABS[self.index.min(TABS.len() - 1)], ctx);
-                self.cycle(true);
+                self.zone = Zone::List;
             }
-            (Zone::Collections, Cmd::Left) => self.index = self.index.saturating_sub(1),
-            (Zone::Collections, Cmd::Right) => {
-                self.index = (self.index + 1).min(picks.len().saturating_sub(1))
+            (Zone::Controls, Cmd::Left) => self.index = self.index.saturating_sub(1),
+            (Zone::Controls, Cmd::Right) => {
+                self.index = (self.index + 1).min(self.controls(ctx).len() - 1)
             }
-            (Zone::Collections, Cmd::Accept) => {
-                if let Some((p, ..)) = picks.get(self.index) {
-                    self.pick = Some(p.clone());
-                    self.selected = None;
+            (Zone::Controls, Cmd::Accept) => match self.controls(ctx).get(self.index) {
+                Some(Control::Options) => return Nav::Layer(Box::new(self.options(ctx))),
+                // No chip, Enter abre o seletor de coleção; na Visão geral, sai da busca e dos filtros.
+                Some(Control::Overview) if self.tab == Tab::Collections => {
+                    return Nav::Layer(Box::new(self.collection_select(ctx)));
                 }
-            }
-            (Zone::Collections, Cmd::Down) => self.zone = Zone::List,
-            (Zone::Collections, Cmd::Up) => self.cycle(false),
+                Some(Control::Overview) => return self.click("overview", 0, ctx),
+                // O índice pode ter sobrado de uma lista de controles maior (ex.: ao trocar para Categorias).
+                None => self.index = self.controls(ctx).len() - 1,
+            },
+            (Zone::Controls, Cmd::Down) => self.zone = Zone::List,
+            (Zone::Controls, Cmd::Up) => self.cycle(false),
             // Esc: fecha a fase 2 do destaque, sai da seleção múltipla, depois limpa a busca e os filtros, depois
             // volta para a lista.
             (_, Cmd::Back) if self.more.is_some() => self.more = None,
             (_, Cmd::Back) if !self.checked.is_empty() => {
                 self.checked.clear();
                 self.anchor = None;
+            }
+            // No chip da coleção, Esc faz o mesmo que o ×.
+            (Zone::Controls, Cmd::Back)
+                if self.tab == Tab::Collections
+                    && self.controls(ctx).get(self.index) == Some(&Control::Overview) =>
+            {
+                return self.click("collection-clear", 0, ctx);
             }
             (_, Cmd::Back) => {
                 if self.zone == Zone::List && self.filtered() {
@@ -1545,6 +1671,7 @@ impl Page for DesktopLibrary {
                 if let Some((p, ..)) = Self::picks(ctx).into_iter().nth(index) {
                     ctx.settings.set(COLLECTION_KEY, &p.key());
                     self.pick = Some(p);
+                    self.tab = Tab::Collections;
                     self.selected = None;
                 }
                 self.zone = Zone::List;
@@ -1572,7 +1699,19 @@ impl Page for DesktopLibrary {
                     self.set_view(*v, ctx);
                 }
             }
-            "view-menu" => return Nav::Layer(Box::new(view_menu())),
+            "options" => return Nav::Layer(Box::new(self.options(ctx))),
+            // Visão geral: ainda é a biblioteca de sempre (a tela nova é a etapa 5); sai da coleção e da busca.
+            "overview" => {
+                self.clear();
+                self.open_tab(Tab::All, ctx);
+                self.selected = None;
+                self.zone = Zone::List;
+            }
+            "collection-clear" => {
+                self.open_tab(Tab::All, ctx);
+                self.selected = None;
+                self.zone = Zone::List;
+            }
             "group-by" => return Nav::Layer(Box::new(group_menu())),
             "reverse" => {
                 let mut c = self.criteria.borrow_mut();
@@ -1614,15 +1753,7 @@ impl Page for DesktopLibrary {
                     self.see_all(see, ctx);
                 }
             }
-            "rescan" => {
-                if ctx.restoring {
-                    ctx.toast(ctx.t("settings.system.restore_busy"));
-                } else if ctx.scanning {
-                    ctx.toast(ctx.t("library.rescan.already_running"));
-                } else {
-                    ctx.effect(Effect::UserRescan);
-                }
-            }
+            "rescan" => rescan(ctx),
             // DestaqueFases: 1 abre a fase 2 (roda para baixo, "Mais sobre o jogo"), 0 volta para a fase 1.
             "game-more" => {
                 self.more = (index == 1)
@@ -1732,6 +1863,7 @@ impl Page for DesktopLibrary {
     fn render(&mut self, ctx: &Ctx, out: &mut Out) {
         if let Some(p) = self.pick_request.borrow_mut().take() {
             self.pick = Some(p);
+            self.tab = Tab::Collections;
             self.selected = None;
         }
         let lang = ctx.lang();
@@ -1752,12 +1884,15 @@ impl Page for DesktopLibrary {
             vec![
                 ctx.t("desktop.tab_all"),
                 ctx.t("desktop.tab_favorites"),
-                ctx.t("desktop.tab_collections"),
+                ctx.t("desktop.tab_installed"),
             ],
         );
+        // Coleção ativa: nenhuma aba escolhida (-1) e o chip no lugar da Visão geral.
         out.set(
             "desk-tab",
-            TABS.iter().position(|t| *t == self.tab).unwrap_or(0) as i32,
+            TABS.iter()
+                .position(|t| *t == self.tab)
+                .map_or(-1, |i| i as i32),
         );
         let picks = Self::picks(ctx);
         let chips: Vec<NavItem> = picks
@@ -1828,14 +1963,6 @@ impl Page for DesktopLibrary {
         out.set("desk-selecting", checked > 0);
         out.set("desk-reversed", c.reversed);
         out.set("desk-view", view.key());
-        out.set(
-            "desk-sidebar-unified",
-            ctx.settings.bool(super::ctx::keys::SIDEBAR_UNIFIED, false),
-        );
-        out.set(
-            "desk-sidebar-narrow",
-            ctx.settings.string(super::ctx::keys::SIDEBAR_WIDTH) == "narrow",
-        );
         // "Agrupar por **Status**": o nome do agrupamento em destaque.
         out.set("desk-group-prefix", ctx.t("desktop.group.by_prefix"));
         out.set(
@@ -2143,11 +2270,6 @@ impl Page for DesktopLibrary {
             ),
         );
         out.set("desk-loading-label", ctx.t("desktop.empty.loading"));
-        let refresh_label = if ctx.scanning {
-            ctx.t("desktop.refresh_busy")
-        } else {
-            ctx.t("desktop.refresh_library")
-        };
         out.set(
             "desk-view-labels",
             vec![
@@ -2156,9 +2278,10 @@ impl Page for DesktopLibrary {
                 ctx.t("desktop.view.categories"),
                 ctx.t("desktop.view.reverse"),
                 ctx.t("desktop.filter_sort"),
-                ctx.t("desktop.view.menu"),
-                ctx.t("desktop.add_game"),
-                refresh_label,
+                ctx.t("desktop.overview"),
+                ctx.t("desktop.options"),
+                ctx.t("desktop.collection_clear"),
+                ctx.t("desktop.list_search"),
             ],
         );
         out.set(
@@ -2372,7 +2495,7 @@ impl Page for DesktopLibrary {
             match self.zone {
                 Zone::Bar => "bar",
                 Zone::Tabs => "tabs",
-                Zone::Collections => "collections",
+                Zone::Controls => "controls",
                 Zone::List => "list",
                 Zone::Actions => "actions",
             },
@@ -2459,30 +2582,90 @@ impl Page for DesktopLibrary {
 
 /// Aberto no desktop com um controle conectado: pergunta uma vez se quer a tela cheia (ADR-0027). O SDL avisa
 /// os controles já ligados nos primeiros quadros; depois de `ASK_WINDOW`, um controle novo não pergunta.
-/// Modo de exibição (Lista · Grade · Categorias), pelo ícone da linha de contagem.
-fn view_menu() -> super::layer::MenuLayer {
-    use super::layer::{Flow, MenuItem, MenuLayer};
-    MenuLayer::menu(String::new(), |ctx| {
-        let current = View::of(ctx);
-        [
-            (View::List, "list"),
-            (View::Grid, "grid"),
-            (View::Categories, "layers"),
-        ]
+/// Lista · Grade · Categorias, com ✓ no modo atual.
+fn view_items(ctx: &Ctx) -> Vec<super::layer::MenuItem> {
+    use super::layer::{Flow, MenuItem};
+    let current = View::of(ctx);
+    [
+        (View::List, "list"),
+        (View::Grid, "grid"),
+        (View::Categories, "layers"),
+    ]
+    .into_iter()
+    .map(|(v, icon)| {
+        let mut row =
+            PanelRow::button(v.key(), ctx.t(&format!("desktop.view.{}", v.key()))).icon(icon);
+        if v == current {
+            row.value = "✓".into();
+        }
+        MenuItem::new(row).on(move |ctx| {
+            ctx.settings.set(VIEW_KEY, v.key());
+            Flow::Close
+        })
+    })
+    .collect()
+}
+
+/// As coleções com a quantidade e ✓ na atual, depois "Nova coleção…" e "Organizar coleções".
+fn collection_items(
+    ctx: &Ctx,
+    request: &Rc<RefCell<Option<Pick>>>,
+    current: Option<&Pick>,
+) -> Vec<super::layer::MenuItem> {
+    use super::layer::{Flow, MenuItem};
+    let mut v: Vec<MenuItem> = DesktopLibrary::picks(ctx)
         .into_iter()
-        .map(|(v, icon)| {
-            let mut row =
-                PanelRow::button(v.key(), ctx.t(&format!("desktop.view.{}", v.key()))).icon(icon);
-            if v == current {
-                row.value = "✓".into();
-            }
-            MenuItem::new(row).on(move |ctx| {
-                ctx.settings.set(VIEW_KEY, v.key());
+        .enumerate()
+        .map(|(i, (p, name, n))| {
+            let note = if matches!(p, Pick::Smart(_)) {
+                format!("{n} · {}", ctx.t("desktop.collection_auto"))
+            } else {
+                n.to_string()
+            };
+            let on = current == Some(&p);
+            let request = request.clone();
+            MenuItem::new(
+                PanelRow::button(format!("pick-{i}"), name)
+                    .icon(if on { "tick" } else { "" })
+                    .value(note)
+                    .emphasized(on),
+            )
+            .on(move |ctx| {
+                ctx.settings.set(COLLECTION_KEY, &p.key());
+                *request.borrow_mut() = Some(p.clone());
                 Flow::Close
             })
         })
-        .collect()
-    })
+        .collect();
+    if !v.is_empty() {
+        v.push(MenuItem::new(PanelRow::separator()));
+    }
+    v.push(
+        MenuItem::new(PanelRow::button(
+            "new",
+            format!("{}…", ctx.t("collections.new")),
+        ))
+        .on(|ctx| Flow::Replace(Box::new(super::dialogs::new_collection(ctx, None)))),
+    );
+    v.push(
+        MenuItem::new(PanelRow::button(
+            "manage",
+            ctx.t("desktop.collections_manage"),
+        ))
+        .on(|ctx| Flow::Replace(Box::new(super::settings::library::collections_panel(ctx)))),
+    );
+    v
+}
+
+/// Atualizar biblioteca: um de cada vez e nunca durante uma restauração.
+fn rescan(ctx: &mut Ctx) {
+    if ctx.restoring {
+        ctx.toast(ctx.t("settings.system.restore_busy"));
+    } else if ctx.scanning {
+        ctx.toast(ctx.t("library.rescan.already_running"));
+    } else {
+        ctx.effect(Effect::UserRescan);
+    }
 }
 
 /// "Agrupar por" das Categorias.
@@ -2712,6 +2895,14 @@ mod tests {
 
     fn page(shell: &Shell) -> &DesktopLibrary {
         shell.desktop_library().unwrap()
+    }
+
+    fn open_collections_tab(shell: &mut Shell) {
+        let Shell { pages, ctx, .. } = shell;
+        pages[0]
+            .desktop_mut()
+            .unwrap()
+            .open_tab(Tab::Collections, ctx);
     }
 
     #[test]
@@ -3483,9 +3674,33 @@ mod tests {
         shell.click("filter", 0);
         assert!(shell.has_layers());
         shell.close_layers();
+        // Ordenar, ver e filtrar: um menu só; Visão geral sai da busca e volta para Todos.
+        shell.click("options", 0);
+        assert!(shell.has_layers());
+        shell.close_layers();
+        shell.edited("search", &title);
+        shell.click("overview", 0);
+        assert_eq!(page(&shell).ids(&shell.ctx).len(), all);
 
-        // Coleções: vazia mostra o aviso; com uma do usuário e uma automática, as duas viram escolhas.
+        // Instalados: só o que está no PC.
+        let installed = shell
+            .ctx
+            .library
+            .games()
+            .iter()
+            .filter(|g| g.is_installed)
+            .count();
         shell.click("tab", 2);
+        assert_eq!(page(&shell).tab(), Tab::Installed);
+        assert_eq!(page(&shell).ids(&shell.ctx).len(), installed);
+        assert!(installed < all);
+        shell.click("tab", 0);
+
+        // Coleções (sem aba, pelo menu): vazia mostra o aviso; com uma do usuário e uma automática, as duas viram
+        // escolhas.
+        shell.click("collection-select", 0);
+        shell.close_layers();
+        open_collections_tab(&mut shell);
         assert!(page(&shell).ids(&shell.ctx).is_empty());
         let first = shell.ctx.library.games()[0].id.clone();
         shell
@@ -3513,6 +3728,88 @@ mod tests {
         assert_eq!(page(&shell).ids(&shell.ctx), vec![first.clone()]);
         shell.click("collection", 1);
         assert_eq!(page(&shell).ids(&shell.ctx).len(), favorites);
+        // O × do chip volta para Todos.
+        shell.click("collection-clear", 0);
+        assert_eq!(page(&shell).tab(), Tab::All);
+        assert_eq!(page(&shell).ids(&shell.ctx).len(), all);
+    }
+
+    #[test]
+    fn keyboard_enters_a_collection_through_the_options_menu_and_leaves_with_esc() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let first = shell.ctx.library.games()[0].id.clone();
+        shell
+            .ctx
+            .collections
+            .create("Sofá", Some(first.as_str()))
+            .unwrap();
+        shell.ctx.sync_collections();
+        let all = page(&shell).ids(&shell.ctx).len();
+
+        // Tab chega ao topo da lista; o primeiro controle é Ordenar, ver e filtrar.
+        while page(&shell).zone() != Zone::Controls {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        assert_eq!(page(&shell).index, 0);
+        shell.handle(Cmd::Accept);
+        assert!(shell.has_layers());
+        for _ in 0..40 {
+            let o = shell.layers.last().unwrap().render(&shell.ctx);
+            if o.rows[o.sel as usize].key == "pick-0" {
+                break;
+            }
+            shell.handle(Cmd::Down);
+        }
+        shell.handle(Cmd::Accept);
+        shell.render(std::time::Instant::now());
+        assert!(!shell.has_layers());
+        assert_eq!(page(&shell).tab(), Tab::Collections);
+        assert_eq!(page(&shell).ids(&shell.ctx), vec![first]);
+
+        // No chip, Enter abre o seletor (não troca de coleção em silêncio); ← volta ao botão.
+        assert_eq!(page(&shell).zone(), Zone::Controls);
+        shell.handle(Cmd::Right);
+        assert_eq!(page(&shell).index, 1);
+        shell.handle(Cmd::Accept);
+        assert!(shell.has_layers());
+        shell.close_layers();
+        assert_eq!(page(&shell).tab(), Tab::Collections);
+        // Esc em Ordenar, ver e filtrar não sai da coleção; só no chip.
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Back);
+        assert_eq!(page(&shell).tab(), Tab::Collections);
+        while page(&shell).zone() != Zone::Controls {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        shell.handle(Cmd::Right);
+        // Esc no chip faz o mesmo que o ×: volta para Todos.
+        shell.handle(Cmd::Back);
+        assert_eq!(page(&shell).tab(), Tab::All);
+        assert_eq!(page(&shell).ids(&shell.ctx).len(), all);
+    }
+
+    #[test]
+    fn section_buttons_from_a_collection_start_before_the_first_tab() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        open_collections_tab(&mut shell);
+        shell.handle(Cmd::NextSection);
+        assert_eq!(page(&shell).tab(), Tab::All);
+        open_collections_tab(&mut shell);
+        shell.handle(Cmd::PrevSection);
+        assert_eq!(page(&shell).tab(), Tab::Installed);
+    }
+
+    #[test]
+    fn installed_tab_counts_and_saves_only_installed_games() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("tab", 2);
+        assert_eq!(page(&shell).route_filter(), LibraryFilter::Installed);
     }
 
     #[test]
@@ -3526,17 +3823,6 @@ mod tests {
         let out = shell.render(std::time::Instant::now());
         let busy = out.props.iter().find(|(n, _)| *n == "desk-rescan-busy");
         assert_eq!(busy.map(|(_, v)| v), Some(&Value::Bool(false)));
-        let labels = out.props.iter().find(|(n, _)| *n == "desk-view-labels");
-        let Some((_, Value::Model(m))) = labels else {
-            panic!("desk-view-labels não encontrado ou não é Model");
-        };
-        assert_eq!(
-            m.row_data(7).and_then(|v| match v {
-                Value::String(s) => Some(s.to_string()),
-                _ => None,
-            }),
-            Some("Atualizar biblioteca".to_string())
-        );
 
         // Enquanto atualiza com a biblioteca preenchida:
         shell.ctx.scanning = true;
@@ -3552,17 +3838,6 @@ mod tests {
         assert_eq!(
             count_short.map(|(_, v)| v),
             Some(&Value::String("Atualizando…".into()))
-        );
-        let labels = out.props.iter().find(|(n, _)| *n == "desk-view-labels");
-        let Some((_, Value::Model(m))) = labels else {
-            panic!("desk-view-labels não encontrado ou não é Model");
-        };
-        assert_eq!(
-            m.row_data(7).and_then(|v| match v {
-                Value::String(s) => Some(s.to_string()),
-                _ => None,
-            }),
-            Some("Atualizando biblioteca…".to_string())
         );
 
         // Clicar novamente durante atualização exibe toast e não duplica efeito
