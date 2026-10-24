@@ -5,6 +5,7 @@ pub mod activities;
 pub mod add_game;
 pub mod art;
 pub(crate) mod art_review;
+mod bar;
 pub mod closing_game;
 pub mod control_center;
 pub mod ctx;
@@ -192,7 +193,7 @@ impl Shell {
         self.pages.first()?.desktop()
     }
 
-    /// Barra superior do desktop: Biblioteca, Configurações, Tela cheia e Perfil (3).
+    /// Barra superior do desktop: Biblioteca (0), Configurações (1), Tela cheia (2) e Perfil (3, "Ver perfil" do avatar).
     fn desktop_nav(&mut self, index: usize) {
         self.ctx.discard_theme_draft();
         self.layers.clear();
@@ -955,8 +956,8 @@ impl Shell {
         out
     }
 
-    /// Barra de cima do desktop: as guias das áreas (Biblioteca e Perfil; Loja quando existir), a busca e o botão
-    /// da tela cheia. Configurações fica no menu da marca.
+    /// Barra de cima do desktop: a guia da Biblioteca (a Loja entra quando existir), o perfil e o botão da tela
+    /// cheia. Configurações fica no menu da marca.
     fn render_desktop_bar(&self, out: &mut Out, now: Instant) {
         let kind = self.page().kind();
         let item = |id: &str, label: &str, icon: &str, selected: bool| crate::model::NavItem {
@@ -966,13 +967,16 @@ impl Shell {
             selected,
             ..Default::default()
         };
-        out.set(
-            "desk-nav",
-            vec![
-                item("library", "desktop.library", "grid", kind == "desk-library"),
-                item("profile", "profile.tab", "user", kind == profile::KIND),
-            ],
-        );
+        // Só a Biblioteca: a Loja não existe no app, e o Perfil vive no botão à direita.
+        let tabs = vec![item(
+            "library",
+            "desktop.library",
+            "grid",
+            kind == "desk-library",
+        )];
+        debug_assert_eq!(tabs.len(), bar::TABS);
+        out.set("desk-nav", tabs);
+        out.set("desk-profile-active", kind == profile::KIND);
         out.set("desk-big-picture-label", self.ctx.t("desktop.big_picture"));
         out.set(
             "desk-window-labels",

@@ -6,7 +6,7 @@
 use super::ctx::keys::TITLE_LOGO;
 use super::library::Criteria;
 use super::{
-    Cmd, Ctx, Effect, InputKind, Nav, Out, Page, details, dialogs, keys, sidebar, smart, tiles,
+    Cmd, Ctx, Effect, InputKind, Nav, Out, Page, bar, details, dialogs, keys, sidebar, smart, tiles,
 };
 use crate::model::{
     DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, Hint, NavItem, PanelRow,
@@ -296,12 +296,6 @@ fn neighbor(entries: &[Entry], from: Option<usize>, forward: bool) -> Option<usi
         (0..from.unwrap_or(0)).rev().find(focusable)
     }
 }
-
-/// Itens da barra superior na ordem do Tab: marca, guias Biblioteca e Perfil, menu do perfil, Tela cheia.
-const BAR_ITEMS: usize = 5;
-const BAR_PROFILE: usize = 2;
-const BAR_ACCOUNT: usize = 3;
-const BAR_DOWNLOADS: usize = 3;
 
 /// Rota que abre a biblioteca numa coleção (`desk:collection:m:<id>` ou `s:<id>`, a chave do SeletorDeColecao).
 pub const COLLECTION_ROUTE: &str = "desk:collection:";
@@ -1455,42 +1449,18 @@ impl Page for DesktopLibrary {
             }
             (Zone::Bar, Cmd::Left) => self.index = self.index.saturating_sub(1),
             (Zone::Bar, Cmd::Right) => {
-                let count = BAR_ITEMS
-                    + usize::from(super::activities::visible(ctx, std::time::Instant::now()));
-                self.index = (self.index + 1).min(count - 1);
+                self.index = (self.index + 1).min(bar::items(ctx).len() - 1);
             }
             // Menu na pílula: a lista de atividades (Aceitar num erro refaz o trabalho).
-            (Zone::Bar, Cmd::Menu)
-                if self.index == BAR_DOWNLOADS
-                    && super::activities::visible(ctx, std::time::Instant::now()) =>
-            {
+            (Zone::Bar, Cmd::Menu) if bar::item(ctx, self.index) == Some(bar::Item::Downloads) => {
                 super::activities::open_list(ctx);
                 return Nav::Stay;
             }
             (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
-            (Zone::Bar, Cmd::Accept) => {
-                let now = std::time::Instant::now();
-                let downloads_on = super::activities::visible(ctx, now);
-                if downloads_on && self.index == BAR_DOWNLOADS {
-                    super::activities::accept(ctx, now);
-                    return Nav::Stay;
-                }
-                match self.index {
-                    0 => return Nav::Layer(Box::new(brand_menu())),
-                    BAR_PROFILE => return Nav::Push(Box::new(super::profile::ProfilePage::new())),
-                    BAR_ACCOUNT if !downloads_on => return Nav::Layer(Box::new(profile_menu())),
-                    index if downloads_on && index == BAR_ACCOUNT + 1 => {
-                        return Nav::Layer(Box::new(profile_menu()));
-                    }
-                    4 if !downloads_on => {
-                        ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture))
-                    }
-                    5 if downloads_on => {
-                        ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture))
-                    }
-                    _ => self.zone = Zone::List,
-                }
-            }
+            (Zone::Bar, Cmd::Accept) => match bar::item(ctx, self.index) {
+                Some(bar::Item::Library) | None => self.zone = Zone::List,
+                Some(item) => return bar::activate(item, ctx),
+            },
             (Zone::Tabs, Cmd::Up) => {
                 self.zone = Zone::Bar;
                 self.index = 0;
@@ -1543,7 +1513,12 @@ impl Page for DesktopLibrary {
         }
         // Shift+Tab chega como Tab com Shift ou como "back tab" (U+0019), conforme o sistema.
         if c == keys::TAB || c == '\u{0019}' {
-            self.cycle(c == keys::TAB && mods != KeyModifiers::SHIFT);
+            let forward = c == keys::TAB && mods != KeyModifiers::SHIFT;
+            // Na barra, Tab anda item a item (marca → abas → … → janela) antes de ir para a zona seguinte.
+            match bar::step(ctx, self.index, forward).filter(|_| self.zone == Zone::Bar) {
+                Some(i) => self.index = i,
+                None => self.cycle(forward),
+            }
             return Some(Nav::Stay);
         }
         // DestaqueFases: Page Down abre a fase 2 do destaque, Page Up volta (com o foco na lista ou nas ações).
@@ -2776,10 +2751,59 @@ mod tests {
         assert_eq!(page(&shell).zone(), Zone::Bar);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
-        shell.handle(Cmd::Right);
         shell.handle(Cmd::Accept);
         assert!(shell.has_layers());
         assert_eq!(page(&shell).zone(), Zone::Bar);
+    }
+
+    #[test]
+    fn bar_keyboard_order_ends_in_the_window_buttons() {
+        use bar::Item::*;
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        assert_eq!(
+            bar::items(&shell.ctx),
+            [
+                Brand, Library, Profile, BigPicture, Minimize, Maximize, Close
+            ]
+        );
+        while page(&shell).zone() != Zone::Tabs {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        shell.handle(Cmd::Up);
+        // ← → andam pela barra até o fim, sem passar dele; Enter nos botões da janela pede a ação.
+        for _ in 0..10 {
+            shell.handle(Cmd::Right);
+        }
+        assert_eq!(page(&shell).index, 6);
+        shell.handle(Cmd::Accept);
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Accept);
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Accept);
+        assert_eq!(
+            shell.ctx.effects,
+            [
+                Effect::Window("close"),
+                Effect::Window("max"),
+                Effect::Window("min")
+            ]
+        );
+        // Tab percorre a barra do começo ao fim e só então sai dela.
+        for _ in 0..4 {
+            shell.handle(Cmd::Left);
+        }
+        assert_eq!(page(&shell).index, 0);
+        for index in 1..=6 {
+            shell.key("\t", KeyModifiers::NONE);
+            assert_eq!(
+                (page(&shell).zone(), page(&shell).index),
+                (Zone::Bar, index)
+            );
+        }
+        shell.key("\t", KeyModifiers::NONE);
+        assert_eq!(page(&shell).zone(), Zone::Tabs);
     }
 
     #[test]
@@ -2793,7 +2817,8 @@ mod tests {
             shell.key("\t", KeyModifiers::NONE);
         }
         shell.handle(Cmd::Up);
-        for _ in 0..BAR_DOWNLOADS {
+        // Marca, Biblioteca e então a pílula.
+        for _ in 0..2 {
             shell.handle(Cmd::Right);
         }
         assert_eq!(page(&shell).zone(), Zone::Bar);
@@ -2805,7 +2830,7 @@ mod tests {
         shell.handle(Cmd::Back);
         assert!(!shell.has_layers());
         assert_eq!(page(&shell).zone(), Zone::Bar);
-        assert_eq!(page(&shell).index, BAR_DOWNLOADS);
+        assert_eq!(page(&shell).index, 2);
     }
 
     #[test]
