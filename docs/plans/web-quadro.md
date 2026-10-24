@@ -9,7 +9,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | resetou; rodando WEB-20, WEB-11b, WEB-14c e WEB-12c (pedido do mantenedor de acelerar: acima do limite de 4 agentes, com só 2 builds Rust pesados) |
-| Antigravity | `antigravity` | livre (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
+| Antigravity | `antigravity` | rodando WEB-04k (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
 | Codex Alyx Medical | `codex_alyx_medical` | sem limite; reset às ~20:52 |
@@ -54,6 +54,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-11b | **Coleções automáticas pela lista:** salvar filtros e busca como coleção, renomear, trocar os filtros, apagar; coleção manual se a ponte permitir | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-11a, WEB-01b | `web/src/app/ColunaDaLista.tsx`, `web/src/app/colecoes/` | despachada |
 | WEB-14c | **Tela do Perfil:** resumo, tempo de jogo, sessões, coleções; perfis locais se a UX-004 existir no núcleo; `profile.*` na ponte se faltar dado | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-04i | `web/src/app/perfil/`, `crates/tako-app/src/profile.rs` | despachada |
 | WEB-12c | **Editar e adicionar jogo, Fontes e IDs:** diálogos ligados ao núcleo (`game.edit`, IDs de fonte, jogo manual, remover), seletor de arquivo pelo hospedeiro se couber | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-12a | `crates/tako-app/src/edit.rs`, `web/src/app/editar/`, `web/src/app/jogo/` | despachada |
+| WEB-04k | **Componentes do onboarding:** PassosDoOnboarding (com a escada de entrada), EscolhaDoOnboarding (cartão e linha, sem pagamento), LojaEncontrada, TelaOnboarding (moldura); os passos ficam para o WEB-16 | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (quatro pastas) | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | integrada (falta ligar à sessão de jogo e à bandeja) |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
