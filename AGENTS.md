@@ -29,6 +29,9 @@ Se o brief contradiz o PRD ou o ADR, **pare e diga no relatório**; não escolha
   componente; "Reduzir animações" zera durações.
 - Tema não executa código: CSS, tokens e arquivos; sem JavaScript de tema.
 - Comentários e documentação em português; nomes de código em inglês.
+- **Nunca encerre processos que você não iniciou** (`Stop-Process -Name node`, `taskkill /IM node.exe`, `pkill`
+  e afins). Outros agentes rodam builds, testes e servidores em paralelo na mesma máquina. Encerre só pelo PID do
+  que você abriu, e use portas próprias (a 5173 é do orquestrador).
 
 ## 3. Ambiente (Windows)
 

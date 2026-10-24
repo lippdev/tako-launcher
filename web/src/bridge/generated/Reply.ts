@@ -4,6 +4,7 @@ import type { AudioOutputList } from "./AudioOutputList";
 import type { Collection } from "./Collection";
 import type { DisplayList } from "./DisplayList";
 import type { GameDetails } from "./GameDetails";
+import type { I18nCatalog } from "./I18nCatalog";
 import type { LibraryPage } from "./LibraryPage";
 import type { LibrarySources } from "./LibrarySources";
 import type { SettingsValues } from "./SettingsValues";
@@ -13,4 +14,4 @@ import type { UiState } from "./UiState";
 /**
  * Respostas, uma por chamada e com o mesmo nome.
  */
-export type Reply = { "name": "app.info", "data": AppInfo } | { "name": "window.action" } | { "name": "ui.state", "data": UiState } | { "name": "ui.state.set" } | { "name": "library.list", "data": LibraryPage } | { "name": "game.details", "data": GameDetails } | { "name": "game.play" } | { "name": "library.scan" } | { "name": "library.sources", "data": LibrarySources } | { "name": "settings.get", "data": SettingsValues } | { "name": "settings.set" } | { "name": "collections.list", "data": Array<Collection> } | { "name": "collections.create", "data": Collection } | { "name": "collections.rename" } | { "name": "collections.delete" } | { "name": "collections.add_games" } | { "name": "collections.remove_games" } | { "name": "collections.smart.set", "data": Collection } | { "name": "tags.list", "data": Array<Tag> } | { "name": "game.tags.set" } | { "name": "game.status.set" } | { "name": "game.favorite.set" } | { "name": "system.displays", "data": DisplayList } | { "name": "system.audio_outputs", "data": AudioOutputList };
+export type Reply = { "name": "app.info", "data": AppInfo } | { "name": "window.action" } | { "name": "ui.state", "data": UiState } | { "name": "ui.state.set" } | { "name": "library.list", "data": LibraryPage } | { "name": "game.details", "data": GameDetails } | { "name": "game.play" } | { "name": "library.scan" } | { "name": "library.sources", "data": LibrarySources } | { "name": "settings.get", "data": SettingsValues } | { "name": "settings.set" } | { "name": "collections.list", "data": Array<Collection> } | { "name": "collections.create", "data": Collection } | { "name": "collections.rename" } | { "name": "collections.delete" } | { "name": "collections.add_games" } | { "name": "collections.remove_games" } | { "name": "collections.smart.set", "data": Collection } | { "name": "tags.list", "data": Array<Tag> } | { "name": "game.tags.set" } | { "name": "game.status.set" } | { "name": "game.favorite.set" } | { "name": "system.displays", "data": DisplayList } | { "name": "system.audio_outputs", "data": AudioOutputList } | { "name": "i18n.catalog", "data": I18nCatalog };

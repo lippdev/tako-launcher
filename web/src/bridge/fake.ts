@@ -705,3 +705,47 @@ Object.assign(defaults, {
   "system.displays": () => SAMPLE_DISPLAYS,
   "system.audio_outputs": () => SAMPLE_AUDIO,
 });
+// ---- Textos e idiomas (WEB-06a) ----
+// Um catálogo pequeno de exemplo, no formato do núcleo (`tako_core::i18n::messages`): só o que as telas já migradas
+// usam. O de verdade tem todas as chaves de `crates/tako-core/locales`.
+
+const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
+  "pt-BR": {
+    "settings.general.title": "Geral",
+    "common.games.one": "{n} jogo",
+    "common.games.other": "{n} jogos",
+  },
+  "en-US": {
+    "settings.general.title": "General",
+    "common.games.one": "{n} game",
+    "common.games.other": "{n} games",
+  },
+};
+
+/** O idioma que o núcleo usaria para este valor de `Language` (`pt…` e `en…`; qualquer outro é recusado). */
+function fakeLang(value: string | undefined): "pt-BR" | "en-US" | null {
+  const code = (value ?? "pt-BR").trim().toLowerCase().replace("_", "-");
+  return code.startsWith("pt") ? "pt-BR" : code.startsWith("en") ? "en-US" : null;
+}
+
+function i18nCatalog() {
+  const lang = fakeLang(settings.get("Language")) ?? "pt-BR";
+  return { lang, messages: SAMPLE_CATALOGS[lang] };
+}
+
+/** Como o núcleo: gravar um `Language` diferente avisa a interface com `i18n.changed`. */
+const setSettingBase = defaults["settings.set"];
+function setSettingAndAnnounceLanguage(payload: unknown) {
+  const { key, value } = payload as Setting;
+  if (key !== "Language") return setSettingBase?.(payload);
+  if (!fakeLang(value)) throw new Error("bad_request: configuração inválida");
+  const before = fakeLang(settings.get("Language"));
+  setSettingBase?.(payload);
+  const lang = fakeLang(value);
+  if (lang !== before)
+    setTimeout(() => {
+      window.__takoDeliver?.(JSON.stringify({ v: 1, event: { name: "i18n.changed", payload: { lang } } }));
+    }, 0);
+}
+
+Object.assign(defaults, { "i18n.catalog": i18nCatalog, "settings.set": setSettingAndAnnounceLanguage });

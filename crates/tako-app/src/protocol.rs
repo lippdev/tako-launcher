@@ -68,6 +68,7 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "game.favorite.set"
             | "system.displays"
             | "system.audio_outputs"
+            | "i18n.catalog"
     ) {
         return Err((
             header.id,
@@ -79,7 +80,11 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
     }
     if matches!(
         header.name.as_str(),
-        "library.scan" | "library.sources" | "system.displays" | "system.audio_outputs"
+        "library.scan"
+            | "library.sources"
+            | "system.displays"
+            | "system.audio_outputs"
+            | "i18n.catalog"
     ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
@@ -268,6 +273,9 @@ pub enum Call {
     /// As saídas de áudio do computador (Configurações › Tela e áudio do jogo).
     #[serde(rename = "system.audio_outputs")]
     SystemAudioOutputs,
+    /// Idioma atual e o catálogo inteiro dele; a interface só escreve texto que vem daqui (`t()`).
+    #[serde(rename = "i18n.catalog")]
+    I18nCatalog,
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -323,6 +331,8 @@ pub enum Reply {
     SystemDisplays(DisplayList),
     #[serde(rename = "system.audio_outputs")]
     SystemAudioOutputs(AudioOutputList),
+    #[serde(rename = "i18n.catalog")]
+    I18nCatalog(I18nCatalog),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -353,6 +363,9 @@ pub enum Event {
     LibraryChanged,
     #[serde(rename = "library.scan.progress")]
     LibraryScanProgress(LibrarySources),
+    /// O idioma mudou (`settings.set` com `Language`): a interface pede `i18n.catalog` de novo.
+    #[serde(rename = "i18n.changed")]
+    I18nChanged(I18nLang),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -869,4 +882,22 @@ pub struct AudioOutputList {
     pub outputs: Vec<AudioOutput>,
     /// Falso quando o sistema não deixa o Tako trocar a saída de áudio.
     pub can_switch: bool,
+}
+
+/// Código do idioma (`pt-BR`, `en-US`), como o núcleo usa em `Language`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct I18nLang {
+    pub lang: String,
+}
+
+/// Catálogo do idioma atual: `chave completa → texto`. Os parâmetros são `{nome}` e o plural vem em duas chaves,
+/// `chave.one` e `chave.other`, escolhidas pelo `n` (`n == 1` é `one`), o mesmo formato de `tako_core::i18n`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct I18nCatalog {
+    pub lang: String,
+    pub messages: std::collections::BTreeMap<String, String>,
 }

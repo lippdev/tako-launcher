@@ -5,6 +5,7 @@
 
 mod core;
 mod demo;
+mod i18n;
 mod library;
 mod organize;
 pub mod protocol;
@@ -15,7 +16,8 @@ mod system;
 pub use core::{Core, CoreError};
 
 use protocol::{
-    AppInfo, BRIDGE_VERSION, BridgeError, Call, ErrorCode, Event, Reply, UiState, WindowAction,
+    AppInfo, BRIDGE_VERSION, BridgeError, Call, ErrorCode, Event, I18nLang, Reply, UiState,
+    WindowAction,
 };
 use std::sync::mpsc::Sender;
 
@@ -169,19 +171,27 @@ impl AppService {
             Call::SystemAudioOutputs => Ok(Reply::SystemAudioOutputs(system::audio_outputs(
                 &self.require_core()?.devices,
             )?)),
+            Call::I18nCatalog => Ok(Reply::I18nCatalog(i18n::catalog(self.require_core()?))),
             call => {
                 let core = self
                     .core
                     .as_mut()
                     .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
                 let before = (core.library.version(), core.collections.version());
+                let lang_before = core.lang;
                 let result = organize::handle(core, call);
                 // O núcleo pode mudar a memória antes de uma falha de disco; a tela precisa consultar de novo.
                 core.collections.apply_to(core.library.games_mut());
                 let changed = result.as_ref().is_ok_and(|(_, changed)| *changed)
                     || before != (core.library.version(), core.collections.version());
+                let lang = core.lang;
                 if changed {
                     self.emit(Event::LibraryChanged);
+                }
+                if lang != lang_before {
+                    self.emit(Event::I18nChanged(I18nLang {
+                        lang: lang.code().to_owned(),
+                    }));
                 }
                 result.map(|(reply, _)| reply)
             }

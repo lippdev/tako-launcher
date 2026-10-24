@@ -119,3 +119,37 @@ A interface pode ser fechada e reaberta a qualquer momento (jogo aberto, minimiz
 4. Usar com `call("dominio.acao", payload)` na interface; o TypeScript confere payload e resposta.
 
 Mudança que quebra uma tela já publicada (remover ou renomear campo) sobe o `BRIDGE_VERSION`.
+
+## 8. Textos e idiomas
+
+Todo texto visível vem dos catálogos `crates/tako-core/locales/<idioma>/*.toml` (pt-BR e en-US), os mesmos do app
+atual. **Componente não escreve texto**: ele chama `t("chave")`. Chave nova entra nos dois `.toml` (o teste
+`catalogs_match` reprova se faltar num deles); não existe catálogo no `web/`.
+
+- **De onde vem.** `i18n.catalog` (sem argumentos) responde `{ lang, messages }`: o código do idioma atual
+  (`pt-BR`) e o catálogo inteiro dele como mapa plano `chave completa → texto` (`settings.general.title`). Hoje são
+  cerca de 120 KB, 12% do limite de 1 MiB; se um dia apertar, a chamada passa a receber uma lista de módulos.
+- **Quando muda.** `settings.set` com `Language` diferente do atual emite `i18n.changed` (`{ lang }`); a interface
+  pede o catálogo de novo e os componentes redesenham sozinhos. Igual ao anterior, inválido ou outra chave: sem evento.
+- **Formato** (o de `tako_core::i18n`): parâmetro é `{nome}`; plural são duas chaves, `chave.one` e `chave.other`,
+  e `one` vale só quando `n == 1`.
+
+```tsx
+import { useT } from "../i18n"; // em componentes: redesenha quando o idioma muda
+// import { t } from "../i18n"; // fora deles (handler, aviso): lê o idioma da hora, sem redesenhar
+
+const t = useT();
+t("settings.general.title");                       // "Geral" / "General"
+t("art.summary", { count: 3, total: 10 });         // "3 de 10 jogos para conferir"
+t("common.games", { n: 1 });                       // chave sem texto próprio + n numérico → "1 jogo"
+t("common.games", { n: 3 });                       // → "3 jogos" (o {n} também é preenchido)
+```
+
+- Chave sem texto aparece como a própria chave e, em desenvolvimento, avisa uma vez no console; nunca quebra a
+  tela. Enquanto o primeiro catálogo não chega, `t` devolve a chave sem avisar.
+- Valor de `{nome}` ausente em `vars` fica como está no texto. Nada de HTML: o texto vai como texto.
+- O código está em `web/src/i18n/` (`core.ts` é puro e tem teste; `index.ts` liga a ponte e o React). O hospedeiro
+  falso responde `i18n.catalog` com poucas chaves de exemplo: ao usar uma chave nova no navegador, acrescente-a em
+  `SAMPLE_CATALOGS` de `fake.ts`.
+- Os textos que ainda estão em `web/src/app/strings.ts` migram para o catálogo por tarefa própria; até lá os dois
+  convivem.

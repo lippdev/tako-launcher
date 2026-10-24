@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from "react";
 import { Aviso } from "../../components/Aviso/Aviso";
 import { Icon } from "../../components/Icon/Icon";
+import { useT } from "../../i18n";
 import { settingsStrings } from "../strings";
 import { SETTINGS_CATEGORY_IDS, type SettingsCategoryId } from "../uiState";
 import { AparenciaCategoria } from "./AparenciaCategoria";
@@ -101,6 +102,10 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
   const { values, ready, loadFailed, failures, save, read } = useSettings(SETTINGS_KEYS);
   const [loadNoticeClosed, setLoadNoticeClosed] = useState(false);
   const [saveNoticeClosedAt, setSaveNoticeClosedAt] = useState(0);
+  const t = useT();
+  // Prova do WEB-06a: o título de Geral já vem do catálogo do núcleo (as outras categorias migram na WEB-06b).
+  const titleOf = (id: SettingsCategoryId) =>
+    id === "general" ? t("settings.general.title") : settingsStrings.categories[id].title;
   const text = settingsStrings.categories[category];
 
   // ↑ ↓ Home End movem o foco pela lista; Enter e Espaço abrem (são botões). Tab percorre todos.
@@ -130,7 +135,7 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
           <CategoriaDeConfiguracao
             key={id}
             icon={CATEGORY_ICONS[id]}
-            title={settingsStrings.categories[id].title}
+            title={titleOf(id)}
             current={id === category}
             controls={PANEL_ID}
             onSelect={() => {
@@ -148,7 +153,7 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
             </span>
             <div>
               <h1 id={`${PANEL_ID}-titulo`} className={styles["title"]}>
-                {text.title}
+                {titleOf(category)}
               </h1>
               <p className={styles["description"]}>{text.description}</p>
             </div>
