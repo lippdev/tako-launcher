@@ -2058,7 +2058,7 @@ component CategoryRows inherits Rectangle {
                 y: 40px + cell-w * 0.75 - 18px;
                 width: 36px;
                 height: 36px;
-                border-radius: 18px;
+                border-radius: Ui.radius-hero;
                 visible: hf.viewport-x < 0;
                 background: Ui.glass-panel-dense;
                 border-width: 1px;
@@ -2074,7 +2074,7 @@ component CategoryRows inherits Rectangle {
                 y: 40px + cell-w * 0.75 - 18px;
                 width: 36px;
                 height: 36px;
-                border-radius: 18px;
+                border-radius: Ui.radius-hero;
                 visible: hf.viewport-x > hf.width - hf.viewport-width;
                 background: Ui.glass-panel-dense;
                 border-width: 1px;
@@ -5561,22 +5561,27 @@ component DeskOverlay inherits Rectangle {
     // AtualizacaoDoApp: Baixando (`ov.tab2 == 1`, barra em `ov.tab`/1000) e Pronta. `ov.overline` = versão nova (600),
     // `tabs2` = [resto da linha de versão, ajuda do rodapé, tempo restante]; `ov.tabs` = novidades; `ov.input` = jogo aberto.
     if ov.kind == "update": Rectangle {
-        background: ov.secret ? transparent : #00000030;
+        background: ov.secret ? transparent : Ui.desk-canvas.with-alpha(shown ? 0.6 : 0);
+        animate background { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
             layer: true;
             dense: true;
-            width: min(500px, root.width - 32px);
+            width: min(540px, root.width - 32px);
             height: min(update-layout.preferred-height, root.height - 32px);
             x: (root.width - self.width) / 2;
-            y: (root.height - self.height) / 2;
-            radius: Ui.radius-card;
+            y: (root.height - self.height) / 2 + (shown ? 0 : 12px);
+            opacity: shown ? 1 : 0;
+            transform-scale: shown && top-most ? 1 : Ui.escala-entrada;
+            animate y, transform-scale { duration: Ui.tempo-dialogo; easing: Ui.curva-entrada; }
+            animate opacity { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+            radius: Ui.radius-hero;
             TouchArea { }
             update-scroll := Flickable {
                 viewport-height: update-layout.preferred-height;
                 update-layout := VerticalLayout {
                     width: update-scroll.width;
-                    padding: 24px;
+                    padding: 22px;
                     spacing: 18px;
                     HorizontalLayout {
                         spacing: 14px;
@@ -5665,20 +5670,21 @@ component DeskOverlay inherits Rectangle {
     // Fonte em select, Estilo e "Escolher do computador…"; a grade na largura toda e a prévia fixa de 380. Clicar
     // escolhe; "Usar" aplica. `ov.rows`: fonte, estilo, do computador, usar, voltar à original, cancelar, atual, prévia.
     if ov.kind == "art" && ov.rows.length >= 8: Rectangle {
-        background: Ui.desk-canvas.with-alpha(shown ? 0.7 : 0);
-        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        background: Ui.desk-canvas.with-alpha(shown ? 0.6 : 0);
+        animate background { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
         TouchArea { }
         // Proporção da imagem por tipo: capa 2:3, fundo 31:10, logo 2:1 contido, ícone 1:1.
         property <float> ratio: ov.tab == 0 ? 1.5 : (ov.tab == 1 ? 1240 / 3840 : (ov.tab == 2 ? 0.5 : 1));
         Vidro {
             layer: true;
+            radius: Ui.radius-hero;
             opacity: shown ? 1 : 0;
             transform-scale: shown && top-most ? 1 : Ui.escala-entrada;
-            animate opacity, transform-scale { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            width: min(parent.width - 80px, 1440px);
+            animate opacity, transform-scale, y { duration: Ui.tempo-dialogo; easing: Ui.curva-entrada; }
+            width: min(parent.width - 80px, 1180px);
             height: parent.height - 96px;
             x: (parent.width - self.width) / 2;
-            y: 48px;
+            y: 48px + (shown ? 0 : 12px);
             VerticalLayout {
                 padding: Ui.space-24;
                 spacing: Ui.space-16;
@@ -5951,9 +5957,9 @@ component DeskOverlay inherits Rectangle {
             y: (parent.height - self.height) / 2 + (shown ? 0 : 12px);
             // Empilhar (TrocaDePopup): a camada de baixo recua para 0,98; a de cima a escurece com o scrim dela.
             transform-scale: shown && top-most ? 1 : Ui.escala-entrada;
-            animate y, transform-scale { duration: Ui.tempo-dialogo; easing: Ui.curva-entrada; }
+animate y, transform-scale { duration: Ui.tempo-dialogo; easing: Ui.curva-entrada; }
             animate opacity { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
-            width: min(parent.width - 80px, ov.wide ? 680px : (ov.compact ? 440px : 480px));
+            width: min(parent.width - 80px, ov.wide ? 680px : (ov.compact ? 440px : (ov.image.width > 0 ? 540px : 480px)));
             height: min(dlg.preferred-height, parent.height - 80px);
             dlg := VerticalLayout {
                 padding: 22px;
@@ -6800,21 +6806,23 @@ component DeskOverlay inherits Rectangle {
             }
         }
     }
-    // Campo de texto (CampoDeTexto): diálogo de 480 com o teclado do computador, colar e seleção; Enter confirma, Esc
-    // cancela.
+    // Campo de texto (CampoDeTexto): diálogo S (440) com o campo de 44, ajuda embaixo, Cancelar e primário.
     if ov.kind == "keyboard": Rectangle {
         background: Ui.desk-canvas.with-alpha(shown ? 0.6 : 0);
-        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        animate background { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
         TouchArea { }
         Vidro {
             layer: true;
+            radius: Ui.radius-hero;
             opacity: shown ? 1 : 0;
-            transform-scale: shown ? 1 : Ui.escala-entrada;
-            animate opacity, transform-scale { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            width: min(parent.width - 80px, 480px);
+            y: (parent.height - self.height) / 2 + (shown ? 0 : 12px);
+            transform-scale: shown && top-most ? 1 : Ui.escala-entrada;
+            animate y, transform-scale { duration: Ui.tempo-dialogo; easing: Ui.curva-entrada; }
+            animate opacity { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+            width: min(parent.width - 80px, 440px);
             height: kl.preferred-height;
             kl := VerticalLayout {
-                padding: Ui.space-24;
+                padding: 22px;
                 spacing: 14px;
                 HorizontalLayout {
                     Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-title; font-weight: 700; wrap: word-wrap; horizontal-stretch: 1; }
