@@ -99,8 +99,9 @@ script-src tako-app:; connect-src 'none'`. Em desenvolvimento, o servidor do Vit
 
 ## 5. Desenvolvimento
 
-- `TAKO_WEB_DEV_URL=http://localhost:5173 tako --web` faz o hospedeiro carregar o servidor do Vite (hot reload)
-  em vez de `tako-app://`, com o DevTools liberado. Só em build de debug.
+- `TAKO_WEB_DEV_URL=http://localhost:5173 tako --web` (binário de `cargo build -p tako --features web`) faz o
+  hospedeiro carregar o servidor do Vite (hot reload) em vez de `tako-app://`, com o
+  DevTools liberado. Só em build de debug.
 - `npm run dev` em `web/` sem o Tako usa o hospedeiro falso.
 
 ## 6. Interface descartável (D-10)

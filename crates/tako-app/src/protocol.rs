@@ -319,8 +319,6 @@ pub enum WindowAction {
     /// Maximiza ou restaura, conforme o estado atual.
     ToggleMaximize,
     Close,
-    /// Começa a arrastar a janela (barra própria sem moldura do sistema).
-    StartDrag,
     /// Troca para a tela cheia (Big Picture).
     BigPicture,
 }

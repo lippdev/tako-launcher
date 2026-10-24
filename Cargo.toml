@@ -18,6 +18,8 @@ tako-ui = { path = "crates/tako-ui" }
 tako-downloads = { path = "crates/tako-downloads" }
 tako-app = { path = "crates/tako-app" }
 tako-web = { path = "crates/tako-web" }
+# Mesmo binário nos subprocessos: o sandbox da crate exige outro bootstrap no Windows.
+cef = { version = "=156.1.0", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ts-rs = { version = "12", features = ["serde-json-impl"] }

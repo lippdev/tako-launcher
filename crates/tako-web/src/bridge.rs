@@ -5,7 +5,19 @@ use tako_app::AppService;
 use tako_app::protocol::{BRIDGE_VERSION, Event, EventEnvelope, Response};
 
 /// Maior mensagem aceita da interface. Pedidos são pequenos; acima disso é erro de quem mandou.
-pub const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
+pub use tako_app::protocol::MAX_MESSAGE_BYTES;
+
+/// Uma única thread drena os eventos depois de handle/poll; a resposta sempre precede seus eventos.
+#[cfg(any(all(windows, feature = "cef"), test))]
+pub(crate) fn drain_messages(
+    response: Option<String>,
+    events: &std::sync::mpsc::Receiver<Event>,
+) -> Vec<String> {
+    response
+        .into_iter()
+        .chain(events.try_iter().map(event_message))
+        .collect()
+}
 
 /// Atende uma mensagem da interface e devolve a resposta serializada. Nunca entra em pânico com entrada ruim.
 pub fn handle_message(app: &mut AppService, text: &str) -> String {
@@ -44,6 +56,69 @@ fn serialize(response: &Response) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn response_precedes_caused_events_and_poll_preserves_event_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = tako_app::Core::open_with_sources(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            false,
+            Vec::new(),
+        )
+        .unwrap();
+        let mut app = AppService::with_core("1", core);
+        let (tx, events) = std::sync::mpsc::channel();
+        app.set_event_sink(tx);
+        // Esperar a leitura inicial vazia antes de provocar outra por library.scan.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let response = handle_message(&mut app, r#"{"v":1,"id":1,"name":"library.sources"}"#);
+            let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+            if response["reply"]["data"]["scanning"] == false {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        drain_messages(None, &events);
+        let response = handle_message(&mut app, r#"{"v":1,"id":7,"name":"library.scan"}"#);
+        let messages = drain_messages(Some(response), &events);
+        let response: serde_json::Value = serde_json::from_str(&messages[0]).unwrap();
+        assert_eq!(response["id"], 7);
+        assert_eq!(response["ok"], true);
+        let event: serde_json::Value = serde_json::from_str(&messages[1]).unwrap();
+        assert_eq!(event["event"]["name"], "library.scan.progress");
+        // Ao terminar, poll emite library.changed antes do progresso final.
+        let mut polled = Vec::new();
+        loop {
+            app.poll();
+            polled.extend(drain_messages(None, &events));
+            if polled.len() == 4 {
+                let names = polled
+                    .iter()
+                    .map(|text| {
+                        serde_json::from_str::<serde_json::Value>(text).unwrap()["event"]["name"]
+                            .as_str()
+                            .unwrap()
+                            .to_owned()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    names,
+                    [
+                        "library.scan.progress",
+                        "library.scan.progress",
+                        "library.changed",
+                        "library.scan.progress"
+                    ]
+                );
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
 
     fn call(text: &str) -> serde_json::Value {
         let mut app = AppService::new("9.9.9");

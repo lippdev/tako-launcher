@@ -35,6 +35,28 @@ pub fn resolve_app_path(root: &Path, url_path: &str) -> Option<PathBuf> {
     (file.starts_with(&root) && file.is_file()).then_some(file)
 }
 
+/// Além de arquivos existentes, aceita rotas do React sem extensão, inclusive IDs codificados nas rotas.
+/// A validação antecede o fallback porque `None` em resolve_app_path também significa entrada ruim.
+pub fn resolve_app_route(root: &Path, url_path: &str) -> Option<PathBuf> {
+    if let Some(file) = resolve_app_path(root, url_path) {
+        return Some(file);
+    }
+    let path = url_path.split(['?', '#']).next()?;
+    let decoded = percent_decode(path.trim_start_matches('/'))?;
+    let rel = Path::new(&decoded);
+    if decoded.contains('\\')
+        || decoded.chars().any(char::is_control)
+        || rel.extension().is_some()
+        || rel
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+        || root.join(rel).exists()
+    {
+        return None;
+    }
+    resolve_app_path(root, "")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageKind {
     /// Capa 2:3 (600×900 da Steam).

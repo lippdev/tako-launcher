@@ -89,9 +89,29 @@ fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
 }
 
 fn main() {
+    #[cfg(feature = "web")]
+    if let Some(code) = tako_web::execute_subprocess() {
+        std::process::exit(code);
+    }
     let started = std::time::Instant::now();
     tako_platform::tune_allocator();
     let all: Vec<String> = std::env::args().collect();
+    if all.iter().any(|arg| arg == "--web") {
+        let paths = value(&all, "--data-dir").map_or_else(DataPaths::detect, DataPaths::at);
+        init_logs(&paths, "web");
+        #[cfg(feature = "web")]
+        let result = tako_web::run(paths);
+        #[cfg(not(feature = "web"))]
+        let result: Result<(), String> =
+            Err("compilado sem a interface web; use cargo build -p tako --features web".into());
+        if let Err(error) = result {
+            tracing::error!(%error, "hospedeiro web");
+            tako_platform::attach_parent_console();
+            eprintln!("Tako: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if all.len() == 3 && all[1] == "--fse-setup" && all[2] == "disable" {
         let paths = DataPaths::detect();
         init_logs(&paths, "fse-setup");
