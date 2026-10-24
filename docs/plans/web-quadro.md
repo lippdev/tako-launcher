@@ -11,7 +11,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Claude Alyx Medical | `claudeAgent` | orquestrador |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **sem limite até ~21:37** (rate limit; fora da rotação) |
 | Codex Lipp | `codex` | **sem créditos** desde 24/10 (precisa recarregar; fora da rotação) |
-| Codex Alyx Medical | `codex_alyx_medical` | WEB-01c, WEB-01b, WEB-10a (continuação) |
+| Codex Alyx Medical | `codex_alyx_medical` | WEB-01b, WEB-10a (continuação) |
 
 ## Onda 1 — Fundação (D-14: direto no código definitivo)
 
@@ -28,7 +28,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-05 | **Foco e controle:** navegação espacial, foco visível, repetição, entrada do SDL3 pela ponte | N3 | a definir na hora | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | fila |
 | WEB-01b | **`tako-app`, segunda fatia:** configurações, coleções (manuais e automáticas resolvidas pelo id no núcleo), tags e status do jogo, favoritos | N3 | Codex Alyx · GPT-6.1-Sol medium (trocou de conta) | WEB-01a | `crates/tako-app/` | despachada |
 | WEB-10a | **Estrutura do app, barra de cima e janela:** BarraSuperior com BarraDaJanela (só BIBLIOTECA, sem loja), MenuDoTako, vistas com TrocaDeTela, lista recolhível, `ui.state`, atalhos, janela pequena | N3 | Claude InvestSmart · Sonnet 5.5 alto → continuação no Codex Alyx (limite de uso) | WEB-04a, WEB-04b | `web/src/app/`, `web/src/App.tsx` | despachada |
-| WEB-01c | **Leitura das lojas na `tako-app`:** descoberta pela `tako-sources` numa thread própria, snapshot, `library.changed` ao terminar; hoje a versão web só vê o snapshot deixado pelo Slint | N4 | Codex Alyx · GPT-6.1-Sol high | WEB-01a | `crates/tako-app/` | despachada |
+| WEB-01c | **Leitura das lojas na `tako-app`:** descoberta pela `tako-sources` numa thread própria, snapshot, `library.changed` ao terminar; hoje a versão web só vê o snapshot deixado pelo Slint | N4 | Codex Alyx · GPT-6.1-Sol high | WEB-01a | `crates/tako-app/` | integrada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
@@ -52,3 +52,6 @@ Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-0
 
 - **Código de SO na `tako-app`** (revisão do WEB-01a, item 12): o boot copiou do `build_ctx` um `#[cfg(windows)]` (DPAPI das alphas) e o adaptador `Vault`. Pelo PRD §5, código de SO mora na `tako-platform`. Mover quando a `tako-ui` sair (WEB-50), ou antes se outra tarefa mexer ali.
 - **`GameDetails` incompleto para a TelaJogo:** mídia (trailer, capturas) e conquistas ainda não existem no núcleo.
+- **Leitura das lojas usa a configuração da abertura** (revisão do WEB-01c): `DisabledStores` e pastas de ROM são lidas no `Core::open`; mudança feita por `settings.set` só vale na próxima abertura. Corrigir junto da integração do WEB-01b (a leitura pega a configuração atual a cada `library.scan`).
+- **Loop do hospedeiro precisa atender `HostRequest::PollBackground`** chamando `AppService::poll()`, inclusive sem janela (WEB-02b).
+- **Textos de erro em português dentro do núcleo** (`sources.rs`: "Falha ao ler a fonte"): trocar por código e catálogo no WEB-06.

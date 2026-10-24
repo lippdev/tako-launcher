@@ -17,14 +17,66 @@ use tako_core::paths::DataPaths;
 use tako_core::persistence::{self as db, TakoDatabase};
 use tako_platform::Platform;
 
+struct SnapshotSource(Vec<Game>);
+
+impl tako_sources::LibrarySource for SnapshotSource {
+    fn store(&self) -> GameStore {
+        GameStore::Steam
+    }
+
+    fn scan(&self) -> tako_sources::LibraryScan {
+        tako_sources::LibraryScan {
+            games: self.0.clone(),
+            ..Default::default()
+        }
+    }
+}
+
+// Os testes de persistência continuam lendo só a pasta temporária, sem descobrir lojas desta máquina.
+fn open_core(
+    paths: DataPaths,
+    platform: Platform,
+    simulate: bool,
+) -> Result<Core, tako_app::CoreError> {
+    let games = if simulate {
+        Vec::new()
+    } else {
+        std::fs::read(paths.cache().join("found-games.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default()
+    };
+    Core::open_with_sources(
+        paths,
+        platform,
+        simulate,
+        vec![Box::new(SnapshotSource(games))],
+    )
+}
+
+fn settled_app(version: &str, core: Core) -> AppService {
+    let mut app = AppService::with_core(version, core);
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let Reply::LibrarySources(state) = app.handle(Call::LibrarySources).unwrap() else {
+            panic!("relatório esperado");
+        };
+        if !state.scanning {
+            return app;
+        }
+        assert!(std::time::Instant::now() < deadline, "leitura não terminou");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
 fn game_request(id: &str) -> GameRequest {
     GameRequest { game_id: id.into() }
 }
 
 fn demo() -> (tempfile::TempDir, AppService) {
     let dir = tempfile::tempdir().unwrap();
-    let core = Core::open(DataPaths::at(dir.path()), Platform::simulated(), true).unwrap();
-    (dir, AppService::with_core("test", core))
+    let core = open_core(DataPaths::at(dir.path()), Platform::simulated(), true).unwrap();
+    (dir, settled_app("test", core))
 }
 
 fn list(app: &mut AppService, request: LibraryListRequest) -> LibraryPage {
@@ -124,12 +176,12 @@ fn opens_real_paths_with_snapshot_settings_manual_games_state_and_collections() 
     let collections = db::CollectionStore::new(database);
     collections.insert("sofa", "Sofá", now).unwrap();
     collections.add_game("sofa", "steam:570", now).unwrap();
-    let core = Core::open(paths.clone(), Platform::simulated(), false).unwrap();
+    let core = open_core(paths.clone(), Platform::simulated(), false).unwrap();
     assert!(paths.database().is_file());
     assert_eq!(core.language(), Lang::EnUs);
     assert_eq!(core.setting("Language"), Some("en-US"));
     assert!(core.library().find("manual:test").is_some());
-    let mut app = AppService::with_core("1", core);
+    let mut app = settled_app("1", core);
     let page = list(
         &mut app,
         LibraryListRequest {
@@ -184,10 +236,10 @@ fn simulate_does_not_touch_existing_database_snapshot_or_alpha_secrets() {
         "snapshot preservado",
     )
     .unwrap();
-    let core = Core::open(paths.clone(), Platform::simulated(), true).unwrap();
+    let core = open_core(paths.clone(), Platform::simulated(), true).unwrap();
     assert_eq!(core.library().games().len(), 12);
     assert!(core.setting("Language").is_none());
-    let mut app = AppService::with_core("1", core);
+    let mut app = settled_app("1", core);
     app.reload_library(fixture_games()).unwrap();
     assert_eq!(
         std::fs::read_to_string(paths.database()).unwrap(),
@@ -222,7 +274,7 @@ fn real_boot_migrates_alpha_secrets_into_the_supplied_vault() {
     .unwrap();
     let platform = Platform::simulated();
     let secrets = platform.secrets.clone();
-    Core::open(paths.clone(), platform, false).unwrap();
+    open_core(paths.clone(), platform, false).unwrap();
     let migrated = IgdbSettings::load(&Vault(secrets.as_ref()));
     assert_eq!(migrated.client_id, "ficticio");
     assert!(migrated.enabled);
@@ -579,8 +631,8 @@ fn missing_games_are_not_found_and_invalid_payloads_are_bad_request_through_the_
 fn reload_notifies_after_new_data_is_visible_and_persists_the_snapshot() {
     let dir = tempfile::tempdir().unwrap();
     let paths = DataPaths::at(dir.path());
-    let core = Core::open(paths.clone(), Platform::simulated(), false).unwrap();
-    let mut app = AppService::with_core("1", core);
+    let core = open_core(paths.clone(), Platform::simulated(), false).unwrap();
+    let mut app = settled_app("1", core);
     let (tx, rx) = mpsc::channel();
     app.set_event_sink(tx);
     app.reload_library(fixture_games()).unwrap();
@@ -590,13 +642,13 @@ fn reload_notifies_after_new_data_is_visible_and_persists_the_snapshot() {
     app.reload_library(fixture_games()[..1].to_vec()).unwrap();
     assert_eq!(rx.try_recv().unwrap(), Event::LibraryChanged);
     drop(app);
-    let reopened = Core::open(paths.clone(), Platform::simulated(), false).unwrap();
+    let reopened = open_core(paths.clone(), Platform::simulated(), false).unwrap();
     assert_eq!(reopened.library().games().len(), 1);
     drop(reopened);
     std::fs::remove_file(paths.cache().join("found-games.json")).unwrap();
     std::fs::create_dir(paths.cache().join("found-games.json")).unwrap();
-    let core = Core::open(paths, Platform::simulated(), false).unwrap();
-    let mut app = AppService::with_core("1", core);
+    let core = open_core(paths, Platform::simulated(), false).unwrap();
+    let mut app = settled_app("1", core);
     let (tx, rx) = mpsc::channel();
     app.set_event_sink(tx);
     app.reload_library(fixture_games()).unwrap();
@@ -622,14 +674,14 @@ fn broken_and_oversized_snapshots_do_not_panic_or_prevent_boot() {
         r#"[{"play_time":-1}]"#,
     ] {
         std::fs::write(&snapshot, content).unwrap();
-        let core = Core::open(paths.clone(), Platform::simulated(), false).unwrap();
+        let core = open_core(paths.clone(), Platform::simulated(), false).unwrap();
         assert!(core.library().games().is_empty());
     }
     let file = std::fs::File::create(snapshot).unwrap();
     file.set_len(64 * 1024 * 1024 + 1).unwrap();
     drop(file);
     assert!(
-        Core::open(paths, Platform::simulated(), false)
+        open_core(paths, Platform::simulated(), false)
             .unwrap()
             .library()
             .games()
@@ -642,7 +694,7 @@ fn boot_propagates_filesystem_failures_and_queries_require_a_core() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("file");
     std::fs::write(&file, "arquivo").unwrap();
-    assert!(Core::open(DataPaths::at(file), Platform::simulated(), false).is_err());
+    assert!(open_core(DataPaths::at(file), Platform::simulated(), false).is_err());
     let mut app = AppService::new("1");
     assert_eq!(
         app.handle(Call::LibraryList(Default::default()))
@@ -666,12 +718,12 @@ fn unreadable_settings_and_collections_fall_back_without_preventing_boot() {
         )
         .unwrap();
     drop(connection);
-    let core = Core::open(paths, Platform::simulated(), false).unwrap();
+    let core = open_core(paths, Platform::simulated(), false).unwrap();
     assert!(core.setting("Language").is_none());
     assert_eq!(core.language(), Lang::from_env());
     assert!(core.library().games().is_empty());
     // A falha das coleções também não bloqueia a recarga.
-    let mut app = AppService::with_core("1", core);
+    let mut app = settled_app("1", core);
     app.reload_library(fixture_games()).unwrap();
     assert_eq!(list(&mut app, Default::default()).total, 3);
 }
@@ -696,13 +748,13 @@ fn reload_uses_loaded_state_and_collections_without_reading_the_database() {
     collections
         .add_game("sofa", "steam:570", Utc::now())
         .unwrap();
-    let core = Core::open(paths, Platform::simulated(), false).unwrap();
+    let core = open_core(paths, Platform::simulated(), false).unwrap();
     database
         .open()
         .unwrap()
         .execute_batch("DROP TABLE collections; DROP TABLE game_state;")
         .unwrap();
-    let mut app = AppService::with_core("1", core);
+    let mut app = settled_app("1", core);
     app.reload_library(fixture_games()).unwrap();
     let page = list(
         &mut app,
@@ -868,7 +920,7 @@ fn snapshot_durations_are_read_once_and_invalid_values_become_zero() {
         let mut games = serde_json::to_value(fixture_games()).unwrap();
         games[0]["play_time"] = secs;
         std::fs::write(paths.cache().join("found-games.json"), games.to_string()).unwrap();
-        let core = Core::open(paths.clone(), Platform::simulated(), false).unwrap();
+        let core = open_core(paths.clone(), Platform::simulated(), false).unwrap();
         assert_eq!(core.library().games().len(), 3);
         assert_eq!(
             core.library().find("steam:570").unwrap().play_time,

@@ -51,6 +51,8 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "library.list"
             | "game.details"
             | "game.play"
+            | "library.scan"
+            | "library.sources"
     ) {
         return Err((
             header.id,
@@ -59,6 +61,11 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
                 format!("chamada desconhecida: {}", header.name),
             ),
         ));
+    }
+    if matches!(header.name.as_str(), "library.scan" | "library.sources")
+        && value.get("payload").is_some()
+    {
+        return Err((id, bad_request("chamada não aceita argumentos".into())));
     }
     let request: Request =
         serde_json::from_value(value).map_err(|e| (id, bad_request(e.to_string())))?;
@@ -164,6 +171,10 @@ pub enum Call {
         #[ts(as = "GameRequest")]
         GameRequest,
     ),
+    #[serde(rename = "library.scan")]
+    LibraryScan,
+    #[serde(rename = "library.sources")]
+    LibrarySources,
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -185,6 +196,10 @@ pub enum Reply {
     GameDetails(Box<GameDetails>),
     #[serde(rename = "game.play")]
     GamePlay,
+    #[serde(rename = "library.scan")]
+    LibraryScan,
+    #[serde(rename = "library.sources")]
+    LibrarySources(LibrarySources),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -215,6 +230,39 @@ pub enum Event {
     /// A biblioteca mudou (fonte lida, jogo editado, metadados chegaram): a interface consulta de novo o que mostra.
     #[serde(rename = "library.changed")]
     LibraryChanged,
+    #[serde(rename = "library.scan.progress")]
+    LibraryScanProgress(LibrarySources),
+}
+
+/// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LibrarySources {
+    pub scanning: bool,
+    pub completed: usize,
+    pub total: usize,
+    pub measuring_sizes: bool,
+    pub sources: Vec<LibrarySourceReport>,
+    // Falha do trabalhador; os avisos de cada loja ficam no relatório dela.
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LibrarySourceReport {
+    pub store: Store,
+    pub name: String,
+    pub enabled: bool,
+    pub found: usize,
+    pub client_installed: bool,
+    // A tako-sources entrega erros e avisos (inclusive cliente ausente) pelo mesmo campo notice.
+    pub error: Option<String>,
+    // ISO-8601 em UTC; null para fonte desligada, que não foi lida.
+    pub last_scanned_at: Option<String>,
+    #[ts(type = "number | null")]
+    pub elapsed_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]

@@ -7,6 +7,7 @@ mod core;
 mod demo;
 mod library;
 pub mod protocol;
+mod sources;
 
 pub use core::{Core, CoreError};
 
@@ -23,7 +24,12 @@ const MAX_UI_STATE_BYTES: usize = 64 * 1024;
 #[derive(Debug, Clone, PartialEq)]
 pub enum HostRequest {
     Window(WindowAction),
-    Launch { game_id: String },
+    Launch {
+        game_id: String,
+    },
+    /// Há resultados de trabalho em segundo plano. O hospedeiro deve chamar AppService::poll na thread do
+    /// núcleo, mesmo sem interface aberta; não encaminha este aviso à janela.
+    PollBackground,
 }
 
 /// Atende as chamadas da interface. Uma instância por processo, na thread do núcleo.
@@ -74,10 +80,14 @@ impl AppService {
 
     /// Para onde vão os pedidos ao hospedeiro (`HostRequest`).
     pub fn set_host_sink(&mut self, sink: Sender<HostRequest>) {
+        if let Some(core) = &mut self.core {
+            core.sources.set_host_sink(sink.clone());
+        }
         self.host = Some(sink);
     }
 
     pub fn handle(&mut self, call: Call) -> Result<Reply, BridgeError> {
+        self.poll();
         match call {
             Call::AppInfo => Ok(Reply::AppInfo(AppInfo {
                 version: self.version.clone(),
@@ -128,6 +138,23 @@ impl AppService {
                 })?;
                 Ok(Reply::GamePlay)
             }
+            Call::LibraryScan => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                if core
+                    .sources
+                    .start()
+                    .map_err(|e| BridgeError::new(ErrorCode::Internal, e.to_string()))?
+                {
+                    self.emit_scan_progress();
+                }
+                Ok(Reply::LibraryScan)
+            }
+            Call::LibrarySources => Ok(Reply::LibrarySources(
+                self.require_core()?.sources.state.clone(),
+            )),
         }
     }
 

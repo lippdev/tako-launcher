@@ -8,4 +8,4 @@ import type { WindowAction } from "./WindowAction";
  * Chamadas. Nomes em `dominio.acao`; consultas com substantivo (`library.list`), comandos com verbo
  * (`game.play`).
  */
-export type Call = { "name": "app.info" } | { "name": "window.action", "payload": WindowAction } | { "name": "ui.state" } | { "name": "ui.state.set", "payload": UiState } | { "name": "library.list", "payload": LibraryListRequest } | { "name": "game.details", "payload": GameRequest } | { "name": "game.play", "payload": GameRequest };
+export type Call = { "name": "app.info" } | { "name": "window.action", "payload": WindowAction } | { "name": "ui.state" } | { "name": "ui.state.set", "payload": UiState } | { "name": "library.list", "payload": LibraryListRequest } | { "name": "game.details", "payload": GameRequest } | { "name": "game.play", "payload": GameRequest } | { "name": "library.scan" } | { "name": "library.sources" };

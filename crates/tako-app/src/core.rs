@@ -22,6 +22,8 @@ const MAX_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;
 pub enum CoreError {
     #[error(transparent)]
     Persistence(#[from] db::PersistenceError),
+    #[error("não foi possível iniciar a leitura das lojas: {0}")]
+    Sources(#[from] std::io::Error),
 }
 
 /// Dados que sobrevivem à janela. A tako-app lê as lojas pela tako-sources; a sessão fica no hospedeiro.
@@ -32,12 +34,39 @@ pub struct Core {
     collections: Option<CollectionLibrary>,
     found: Arc<Mutex<Arc<Vec<Game>>>>,
     snapshot: Option<SnapshotWriter>,
+    pub(crate) sources: crate::sources::Scanner,
 }
 
 impl Core {
     /// Abre o banco e os dados locais; a primeira consulta usa o snapshot da última leitura das lojas.
     /// Em demonstração nada é lido ou gravado no banco, no snapshot ou no cofre.
     pub fn open(paths: DataPaths, platform: Platform, simulate: bool) -> Result<Self, CoreError> {
+        Self::open_using(paths, platform, simulate, None)
+    }
+
+    /// Abre com fontes fornecidas pelo hospedeiro, sem descobrir lojas da máquina. Permite testes isolados
+    /// do boot real (banco e snapshot); em demonstração nem estas fontes são executadas.
+    pub fn open_with_sources(
+        paths: DataPaths,
+        platform: Platform,
+        simulate: bool,
+        sources: Vec<Box<dyn tako_sources::LibrarySource>>,
+    ) -> Result<Self, CoreError> {
+        let sources = Arc::new(sources);
+        Self::open_using(
+            paths,
+            platform,
+            simulate,
+            Some(Box::new(move || Arc::clone(&sources))),
+        )
+    }
+
+    fn open_using(
+        paths: DataPaths,
+        platform: Platform,
+        simulate: bool,
+        factory: Option<crate::sources::Factory>,
+    ) -> Result<Self, CoreError> {
         let database = if simulate {
             None
         } else {
@@ -81,7 +110,6 @@ impl Core {
             )),
             None => Box::new(MemoryLibraryStore::default()),
         };
-        // TODO(WEB-01c): leitura das lojas
         let found = Arc::new(Mutex::new(Arc::new(if simulate {
             crate::demo::games()
         } else {
@@ -109,12 +137,19 @@ impl Core {
             collections.apply_to(library.games_mut());
             collections
         });
+        let sources = crate::sources::Scanner::open(
+            factory.unwrap_or_else(|| crate::sources::factory(&settings)),
+            settings.get("DisabledStores").cloned().unwrap_or_default(),
+            lang,
+            simulate,
+        )?;
         Ok(Self {
             settings,
             lang,
             library,
             collections,
             found,
+            sources,
             snapshot: (!simulate)
                 .then(|| SnapshotWriter::open(paths.cache().join("found-games.json")))
                 .flatten(),

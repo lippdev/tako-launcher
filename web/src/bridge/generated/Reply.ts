@@ -2,9 +2,10 @@
 import type { AppInfo } from "./AppInfo";
 import type { GameDetails } from "./GameDetails";
 import type { LibraryPage } from "./LibraryPage";
+import type { LibrarySources } from "./LibrarySources";
 import type { UiState } from "./UiState";
 
 /**
  * Respostas, uma por chamada e com o mesmo nome.
  */
-export type Reply = { "name": "app.info", "data": AppInfo } | { "name": "window.action" } | { "name": "ui.state", "data": UiState } | { "name": "ui.state.set" } | { "name": "library.list", "data": LibraryPage } | { "name": "game.details", "data": GameDetails } | { "name": "game.play" };
+export type Reply = { "name": "app.info", "data": AppInfo } | { "name": "window.action" } | { "name": "ui.state", "data": UiState } | { "name": "ui.state.set" } | { "name": "library.list", "data": LibraryPage } | { "name": "game.details", "data": GameDetails } | { "name": "game.play" } | { "name": "library.scan" } | { "name": "library.sources", "data": LibrarySources };
