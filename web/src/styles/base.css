@@ -68,6 +68,24 @@
   /* Blocos de espera do EstadoCarregando: branco 6%, pulsando em 1,6 s. */
   --skeleton: color-mix(in srgb, var(--text) 6%, transparent);
   --tempo-pulso: 1600ms;
+
+  /* EntradaDoApp (BRAND-002, README do EntradaDoApp / MovimentoBase) */
+  --intro-mark-width: 80px;
+  --intro-mark-height: 64px;
+  --intro-word-width: 108px;
+  --intro-word-height: 22px;
+  --intro-kana-width: 72px;
+  --intro-kana-height: 12px;
+  --intro-glow-blur: 16px;
+  --intro-gap: 16px;
+  --tempo-intro-hold: 350ms;
+  --tempo-intro-escada: 70ms;
+  --intro-preview-width: 1600px;
+  --intro-preview-height: 900px;
+  --intro-z: 100;
+  --intro-card-width: 180px;
+  --intro-card-height: 240px;
+  --intro-title-size: 32px;
 }
 
 /* Trilho do deslizante e chave desligada nos outros temas: o cinza neutro do protótipo; no Liquid Glass, branco translúcido. */
@@ -165,6 +183,8 @@ textarea {
   --tempo-radar: 0ms;
   --tempo-pulso: 0ms;
   --tempo-cover: 0ms;
+  --tempo-intro-hold: 0ms;
+  --tempo-intro-escada: 0ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -186,6 +206,8 @@ textarea {
     --tempo-radar: 0ms;
     --tempo-pulso: 0ms;
     --tempo-cover: 0ms;
+    --tempo-intro-hold: 0ms;
+    --tempo-intro-escada: 0ms;
   }
 }
 
