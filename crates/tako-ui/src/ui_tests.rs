@@ -845,6 +845,116 @@ fn game_page_swaps_parts_in_a_staircase_and_instantly_with_reduced_motion() {
     .unwrap();
 }
 
+/// Trocar de jogo duas vezes dentro da saída de 200 ms (A→B→A e A→B→C): no fim fica na tela o último jogo escolhido,
+/// igual ao quadro de quem só o escolheu, e a página não fica presa fora do ar nem no jogo do meio.
+#[test]
+fn game_page_double_switch_inside_the_exit_ends_on_the_last_game() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (1600usize, 900usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        // O relógio manual anda `ms` a cada chamada.
+        let base = START.elapsed();
+        let now = std::cell::Cell::new(500u64);
+        let wait = |shell: &mut Shell, ms: u64| {
+            now.set(now.get() + ms);
+            CLOCK.with(|c| c.set(Some(base + std::time::Duration::from_millis(now.get()))));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        let pick = |shell: &mut Shell, game: usize| {
+            shell.click("game", game);
+            draw(shell);
+            wait(shell, 10);
+        };
+        // Espera a saída acabar (a cópia troca e as animações recomeçam no passo seguinte) e tudo assentar.
+        let assent = |shell: &mut Shell| {
+            wait(shell, 300);
+            wait(shell, 2500)
+        };
+        // Quem só escolhe o jogo e espera tudo assentar: o quadro de referência de cada um.
+        let settled = |shell: &mut Shell, game: usize| {
+            pick(shell, game);
+            assent(shell)
+        };
+        let reference: Vec<_> = (0..3).map(|g| settled(&mut shell, g)).collect();
+        let differ =
+            |a: &[Rgb8Pixel], b: &[Rgb8Pixel]| a.iter().zip(b).filter(|(x, y)| x != y).count();
+        assert!(
+            differ(&reference[0], &reference[1]) > 2000,
+            "são jogos diferentes"
+        );
+        assert!(
+            differ(&reference[1], &reference[2]) > 2000,
+            "são jogos diferentes"
+        );
+        let tolerance = w * h / 200;
+        // A→B→A: a segunda troca chega aos 110 ms da primeira, com a saída ainda correndo.
+        settled(&mut shell, 0);
+        pick(&mut shell, 1);
+        wait(&mut shell, 100);
+        pick(&mut shell, 0);
+        let back = assent(&mut shell);
+        assert!(
+            differ(&back, &reference[0]) < tolerance,
+            "A→B→A volta ao jogo A inteiro"
+        );
+        assert!(
+            differ(&back, &reference[1]) > 2000,
+            "e não fica no jogo do meio"
+        );
+        // A→B→C: o jogo do meio nunca chega à tela.
+        pick(&mut shell, 1);
+        wait(&mut shell, 100);
+        pick(&mut shell, 2);
+        let last = assent(&mut shell);
+        assert!(
+            differ(&last, &reference[2]) < tolerance,
+            "A→B→C termina em C"
+        );
+        assert!(differ(&last, &reference[1]) > 2000, "e não no jogo do meio");
+        // Nada ficou preso: uma troca comum depois disso funciona como sempre.
+        let after = settled(&mut shell, 1);
+        assert!(
+            differ(&after, &reference[1]) < tolerance,
+            "a página segue trocando"
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
 /// Janela pequena: a coluna da identidade nunca fica mais estreita que a fileira de ações, então o botão primário tem
 /// a mesma largura a 960 e a 1600 (antes saía cortado a 960). Pelos pixels: a corrida clara mais longa de uma linha é o
 /// fundo do primário.
