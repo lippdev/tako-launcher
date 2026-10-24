@@ -35,6 +35,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 |---|---|---|
 | Janela, barra de cima, menu do Tako (`bar`, `desktop`) | ✅ | WEB-10a |
 | Lista da biblioteca: abas, busca, filtros, ordenação, coleções, seleção múltipla (`desktop`, `library`) | ✅ | WEB-11a |
+| Modos Grade e Categorias da lista | 🟡 componentes prontos; falta ligar | WEB-04j · **WEB-11c** |
 | Visão geral (`overview`, `home`) | ✅ (falta "Voltar a jogar") | WEB-10b |
 | Página do jogo (`details`) | ✅ (falta "jogando", depende do WEB-20) | WEB-12a |
 | Configurações do jogo (`game_settings`) | 🟡 pronto; comandos antes e depois só leitura até a aprovação | WEB-12b · **WEB-20** |
