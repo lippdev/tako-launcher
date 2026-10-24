@@ -1,0 +1,38 @@
+/* BarraDaJanela (README): Minimizar · Maximizar · Fechar, 40×36, raio 8, ícones de 15, depois de uma linha
+   vertical de 1 com 8 de margem. */
+
+.controls {
+  --window-button-radius: 8px;
+
+  display: flex;
+  margin-left: var(--space-8);
+  padding-left: var(--space-8);
+  border-left: 1px solid var(--line);
+}
+
+.button {
+  composes: ring from "../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  width: var(--window-control-width);
+  height: var(--control-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--window-button-radius);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* O resto da barra arrasta a janela; os controles não. */
+  -webkit-app-region: no-drag;
+}
+
+.button:hover {
+  background-color: var(--settings-control-hover);
+  color: var(--text);
+}
+
+.close:hover {
+  background-color: var(--window-close-hover);
+  color: var(--text);
+}

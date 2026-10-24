@@ -1,0 +1,54 @@
+/* Marcador da busca geral: painel sob a barra, na linha do Dialogo (véu, entrada subindo com escala 0,98). */
+
+.veil {
+  --busca-top: 96px;
+  --busca-width: 640px;
+  --busca-rise: 12px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: var(--busca-top);
+  background: var(--scrim);
+  backdrop-filter: blur(var(--scrim-blur));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--tempo-estado) var(--curva-estado);
+}
+
+.veil[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.panel {
+  width: min(var(--busca-width), calc(100% - 2 * var(--space-24)));
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-hero);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-layer);
+  outline: none;
+  transform: translateY(var(--busca-rise)) scale(var(--escala-entrada));
+  transition: transform var(--tempo-entrada) var(--curva-entrada);
+}
+
+.veil[data-visible="true"] .panel {
+  transform: none;
+}
+
+.veil[data-animating="true"] .panel {
+  will-change: transform;
+}
+
+.soon {
+  margin: 0;
+  padding: var(--space-24) 18px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}

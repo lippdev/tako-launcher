@@ -19,7 +19,8 @@ interface AbasProps<T extends string> {
    */
   variant: "topo" | "lista" | "loja" | "segmentado";
   tabs: readonly Aba<T>[];
-  value: T;
+  /** A aba atual; fora de `tabs` (ex.: `""`) nenhuma fica marcada (a barra de cima nas Configurações). */
+  value: T | "";
   onChange: (id: T) => void;
   /** Nome do grupo de abas para leitores de tela. */
   label: string;
@@ -66,6 +67,9 @@ export function Abas<T extends string>({ variant, tabs, value, onChange, label, 
     };
   }, []);
 
+  // Nenhuma marcada: a primeira aba segue sendo a entrada do Tab (tabulação por `tablist`: só uma aba tabulável).
+  const hasSelection = tabs.some((tab) => tab.id === value);
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const index = tabs.findIndex((tab) => tab.id === value);
     let next = -1;
@@ -90,7 +94,7 @@ export function Abas<T extends string>({ variant, tabs, value, onChange, label, 
       onKeyDown={onKeyDown}
     >
       {variant === "segmentado" && <span ref={pillRef} className={styles["pill"]} aria-hidden="true" />}
-      {tabs.map((tab) => {
+      {tabs.map((tab, index) => {
         const selected = tab.id === value;
         return (
           <button
@@ -99,7 +103,7 @@ export function Abas<T extends string>({ variant, tabs, value, onChange, label, 
             role="tab"
             data-tab={tab.id}
             aria-selected={selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={selected || (!hasSelection && index === 0) ? 0 : -1}
             data-force={tab.force}
             {...(idPrefix ? { id: `${idPrefix}-tab-${tab.id}`, "aria-controls": `${idPrefix}-panel-${tab.id}` } : {})}
             className={cx(styles["tab"], selected && styles["selected"])}

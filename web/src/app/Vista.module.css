@@ -1,0 +1,36 @@
+/* Vista: as vistas ficam empilhadas na área do conteúdo; a barra de cima fica por cima e o conteúdo rola por baixo. */
+
+.view {
+  --view-scale-time: 550ms;
+
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-top: var(--topbar-height);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  opacity: 0;
+  transform: scale(var(--escala-vista));
+  pointer-events: none;
+  /* 450 de opacidade e 550 de escala, na curva do protótipo. "Reduzir animações" zera as duas (base.css). */
+  transition:
+    opacity var(--tempo-pagina) var(--curva-entrada),
+    transform var(--view-scale-time) var(--curva-entrada);
+}
+
+.view[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* `will-change` só enquanto anima. */
+.view[data-animating="true"] {
+  will-change: transform, opacity;
+}
+
+/* Margem lateral de 40, 48 acima do conteúdo (README da TelaBiblioteca). */
+.page {
+  padding: var(--space-48) var(--space-40);
+}
