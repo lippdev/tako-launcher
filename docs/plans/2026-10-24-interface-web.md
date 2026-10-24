@@ -104,8 +104,8 @@ Código descartável em `crates/spike-web` e `web-spike/`; não entra no app.
 
 Fluxo por tela, com o mantenedor validando ao vivo (hot reload do Vite):
 
-1. Abrir a prévia da tela no `tako-design-desktop` (o visual) e ler a tela no Slint e na `Shell` (estados, ações
-   e textos).
+1. Visual: a prévia da tela em `design/desktop/` (nada vem dos `.slint`). Comportamento: a `Shell` em Rust
+   (`crates/tako-ui/src/shell/`), que diz o que a tela faz (estados, ações, textos).
 2. Garantir comandos, consultas e eventos na `tako-app`.
 3. Montar a tela no React com os componentes base.
 4. Mantenedor aprova o visual; checar quadros no DevTools.
