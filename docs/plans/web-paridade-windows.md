@@ -43,7 +43,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Seletor de imagens (`art`) e Revisar capas (`art_review`) | 🟡 componente do seletor pronto | **WEB-12d** |
 | Editor de etiquetas (`tags_editor`) | 🟡 etiquetas em lote na seleção | **WEB-12b** |
 | Coleções automáticas (`smart`): salvar filtros | 🟡 núcleo pronto | **WEB-11b** |
-| Busca geral Ctrl+K (`global_search`) | ⬜ só o campo | **WEB-14a** |
+| Busca geral Ctrl+K (`global_search`) | ✅ | WEB-14a |
 | Downloads (`downloads`): painel, ligar com aviso legal, fontes | 🟡 núcleo e componentes prontos | **WEB-14b** |
 | Atividades na barra (`activities`) | 🟡 botão pronto | **WEB-14b** |
 | Perfil (`profile`) e perfis locais (`profiles`, UX-004) | 🟡 componentes prontos | **WEB-14c** |
