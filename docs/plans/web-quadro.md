@@ -9,7 +9,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | orquestrador |
-| Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | revisão do WEB-02a |
+| Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | WEB-10a, revisão do WEB-02a |
 | Codex Lipp | `codex` | livre |
 | Codex Alyx Medical | `codex_alyx_medical` | WEB-01a (rodada 2) |
 
@@ -27,6 +27,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-06 | **Textos:** `locales/` servido à interface, troca de idioma em tempo de execução | N2 | a definir na hora | WEB-00, WEB-02a | `crates/tako-web/`, `web/src/i18n/` | fila |
 | WEB-05 | **Foco e controle:** navegação espacial, foco visível, repetição, entrada do SDL3 pela ponte | N3 | a definir na hora | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | fila |
 | WEB-01b | **`tako-app`, segunda fatia:** configurações, coleções (manuais e automáticas resolvidas pelo id no núcleo), tags e status do jogo, favoritos | N3 | a definir | WEB-01a | `crates/tako-app/` | fila |
+| WEB-10a | **Estrutura do app, barra de cima e janela:** BarraSuperior com BarraDaJanela (só BIBLIOTECA, sem loja), MenuDoTako, vistas com TrocaDeTela, lista recolhível, `ui.state`, atalhos, janela pequena | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-04a, WEB-04b | `web/src/app/`, `web/src/App.tsx` | despachada |
 | WEB-01c | **Leitura das lojas na `tako-app`:** descoberta pela `tako-sources` numa thread própria, snapshot, `library.changed` ao terminar; hoje a versão web só vê o snapshot deixado pelo Slint | N4 | a definir | WEB-01a | `crates/tako-app/` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
