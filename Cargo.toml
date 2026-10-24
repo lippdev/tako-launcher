@@ -16,8 +16,11 @@ tako-platform = { path = "crates/tako-platform" }
 tako-themes = { path = "crates/tako-themes" }
 tako-ui = { path = "crates/tako-ui" }
 tako-downloads = { path = "crates/tako-downloads" }
+tako-app = { path = "crates/tako-app" }
+tako-web = { path = "crates/tako-web" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+ts-rs = { version = "12", features = ["serde-json-impl"] }
 toml = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 thiserror = "2"
