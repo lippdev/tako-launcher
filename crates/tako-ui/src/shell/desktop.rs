@@ -3821,14 +3821,16 @@ mod tests {
         assert!(shell.has_layers());
         shell.close_layers();
         assert_eq!(page(&shell).tab(), Tab::Collections);
-        // Esc em Ordenar, ver e filtrar não sai da coleção; só no chip.
+        // Esc no botão de recolher não sai da coleção; só no chip.
         shell.handle(Cmd::Left);
         shell.handle(Cmd::Back);
         assert_eq!(page(&shell).tab(), Tab::Collections);
         while page(&shell).zone() != Zone::Controls {
             shell.key("\t", KeyModifiers::NONE);
         }
-        shell.handle(Cmd::Right);
+        while page(&shell).index < 2 {
+            shell.handle(Cmd::Right);
+        }
         // Esc no chip faz o mesmo que o ×: volta para Todos.
         shell.handle(Cmd::Back);
         assert_eq!(page(&shell).tab(), Tab::All);

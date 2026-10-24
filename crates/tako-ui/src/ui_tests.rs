@@ -454,8 +454,11 @@ fn collapsed_list_expands_on_ctrl_k_only_and_not_when_returning_to_the_library()
             window.dispatch_event(WindowEvent::KeyReleased {
                 text: "\u{11}".into(),
             });
-            std::thread::sleep(std::time::Duration::from_millis(5));
-            slint::platform::update_timers_and_animations();
+            // O foco da busca passa por um timer; com a máquina carregada, 5 ms não bastavam.
+            for _ in 0..10 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                slint::platform::update_timers_and_animations();
+            }
         };
         let show = |page: &str| {
             ui.set_property("page", Value::String(page.into())).unwrap();
