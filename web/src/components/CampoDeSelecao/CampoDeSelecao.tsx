@@ -1,4 +1,4 @@
-import { useState, type ComponentPropsWithRef, type KeyboardEvent } from "react";
+import { useState, type ComponentPropsWithRef } from "react";
 import { cx } from "../../lib/cx";
 import { Icon } from "../Icon/Icon";
 import { MenuDeContexto } from "../MenuDeContexto/MenuDeContexto";
@@ -20,7 +20,7 @@ interface CampoDeSelecaoProps<T extends string>
 
 /**
  * Seletor (README do CampoDeSelecao): uma opção entre várias. O botão mostra a atual e abre um MenuDeContexto
- * com o título da linha e ✓ na atual. ↓ ↑ também abrem o menu.
+ * com o título da linha e ✓ na atual. Enter e Espaço abrem; ↑ ↓ ficam para a navegação entre as linhas.
  */
 export function CampoDeSelecao<T extends string>({
   options,
@@ -34,13 +34,6 @@ export function CampoDeSelecao<T extends string>({
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const current = options.find((option) => option.value === value);
-
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      setOpen(true);
-    }
-  };
 
   return (
     <>
@@ -58,7 +51,6 @@ export function CampoDeSelecao<T extends string>({
         onClick={() => {
           setOpen((v) => !v);
         }}
-        onKeyDown={onKeyDown}
       >
         <span className={styles["value"]}>{current?.label}</span>
         <Icon name="updown" size="sm" />

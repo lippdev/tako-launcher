@@ -101,7 +101,7 @@ develop ──► feature/WEB-interface-web (integração da migração)
 5. **Validar com o mantenedor** quando a tarefa tem visual: o orquestrador abre a worktree (servidor do Vite ou o
    Tako com `--web`), o mantenedor vê ao vivo e aprova ou pede ajuste. Ajuste pequeno o orquestrador faz na hora;
    ajuste grande vira nova rodada.
-6. **Juntar:** squash na integração, verificação local de novo, `git push` da integração para o GitHub, quadro
+6. **Juntar:** squash na integração, verificação local de novo, **`cargo test -p tako-app` para regenerar os tipos da ponte e `git diff --exit-code web/src/bridge/generated` (um squash de branch antiga pode trazer `.ts` velhos)**, `git push` da integração para o GitHub, quadro
    atualizado, worktree removida, item do PRD marcado quando a história inteira fecha.
 
 ## 6. Modelo de brief

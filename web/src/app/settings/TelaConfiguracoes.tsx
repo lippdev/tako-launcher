@@ -108,7 +108,8 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
     id === "general" ? t("settings.general.title") : settingsStrings.categories[id].title;
   const text = settingsStrings.categories[category];
 
-  // ↑ ↓ Home End movem o foco pela lista; Enter e Espaço abrem (são botões). Tab percorre todos.
+  // ↑ ↓ Home End movem o foco pela lista; Enter e Espaço abrem (são botões). Tab percorre todos. Nas pontas a seta
+  // não é tratada aqui: segue para o navegador de foco (↑ sobe para a barra, ↓ não tem para onde).
   function onNavKeyDown(event: KeyboardEvent<HTMLElement>) {
     const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
     const index = items.findIndex((item) => item === document.activeElement);
@@ -122,14 +123,20 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
             : event.key === "End"
               ? items[items.length - 1]
               : undefined;
-    if (!target) return;
+    if (!target || target === document.activeElement) return;
     event.preventDefault();
     target.focus();
   }
 
   return (
     <div className={styles["screen"]}>
-      <nav className={styles["nav"]} aria-label={settingsStrings.nav} onKeyDown={onNavKeyDown}>
+      <nav
+        className={styles["nav"]}
+        aria-label={settingsStrings.nav}
+        data-focus-region="categories"
+        data-focus-sections="content"
+        onKeyDown={onNavKeyDown}
+      >
         <p className={styles["meta"]}>{settingsStrings.count(SETTINGS_CATEGORY_IDS.length)}</p>
         {SETTINGS_CATEGORY_IDS.map((id) => (
           <CategoriaDeConfiguracao

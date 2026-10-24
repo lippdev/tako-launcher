@@ -69,6 +69,7 @@ export function ColunaDaLista({
         inert={!shown}
         className={cx(styles["side"], collapsed && styles["collapsed"], !shown && styles["hidden"])}
         aria-label={strings.list.label}
+        data-focus-region="list"
       >
         <div className={styles["inner"]}>
           {!collapsed && (

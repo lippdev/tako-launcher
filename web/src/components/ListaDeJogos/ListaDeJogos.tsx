@@ -218,6 +218,10 @@ export function ListaDeJogos({
     const current = focusIndex ?? Math.max(0, indexOf(activeId));
     const page = Math.max(1, Math.floor((viewportRef.current?.clientHeight ?? 0) / pitch) - 1);
     const key = event.key;
+    // Na primeira e na última linha a seta não é da lista: segue para o navegador de foco (sobe para a busca).
+    // Segurar a seta até a ponta não pula para fora: só um aperto novo passa.
+    if (!event.shiftKey && !event.repeat && ((key === "ArrowUp" && current <= 0) || (key === "ArrowDown" && current >= rows.length - 1)))
+      return;
     if (key === "ArrowDown") moveFocus(current + 1, event);
     else if (key === "ArrowUp") moveFocus(current - 1, event);
     else if (key === "PageDown") moveFocus(current + page, event);

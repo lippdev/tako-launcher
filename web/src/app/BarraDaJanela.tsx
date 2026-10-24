@@ -7,7 +7,7 @@ import styles from "./BarraDaJanela.module.css";
 /** Os botões da janela sem moldura, na ponta da BarraSuperior (README da BarraDaJanela). */
 export function BarraDaJanela() {
   return (
-    <div className={styles["controls"]} role="group" aria-label={strings.window.group}>
+    <div className={styles["controls"]} data-focus-skip="" role="group" aria-label={strings.window.group}>
       <button
         type="button"
         className={styles["button"]}

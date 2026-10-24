@@ -17,6 +17,19 @@ function onKeyDown(event: KeyboardEvent): void {
   handlers.get(top)?.();
 }
 
+/** Há alguma camada aberta (diálogo, menu, painel)? A navegação por direção fica presa nela. */
+export function hasOpenLayer(): boolean {
+  return order.length > 0;
+}
+
+/** Fecha a camada de cima, como o Esc faria; `false` se não há nenhuma. É o "voltar" do controle. */
+export function closeTopLayer(): boolean {
+  const top = order[order.length - 1];
+  if (top === undefined) return false;
+  handlers.get(top)?.();
+  return true;
+}
+
 function register(id: symbol, handler: () => void): () => void {
   if (order.length === 0) document.addEventListener("keydown", onKeyDown, true);
   order.push(id);

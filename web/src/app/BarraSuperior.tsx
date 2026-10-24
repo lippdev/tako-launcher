@@ -35,7 +35,7 @@ export function BarraSuperior({ view, onNavigate, activityCount = 0, profile, on
   };
 
   return (
-    <header className={styles["bar"]} onDoubleClick={onDoubleClick}>
+    <header className={styles["bar"]} data-focus-region="top" onDoubleClick={onDoubleClick}>
       <button
         ref={setBrand}
         type="button"

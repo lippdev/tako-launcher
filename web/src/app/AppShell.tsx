@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSpatialNavigation } from "../focus";
 import { BarraSuperior } from "./BarraSuperior";
 import { BuscaGeral } from "./BuscaGeral";
 import { ColunaDaLista } from "./ColunaDaLista";
@@ -48,6 +49,17 @@ export function AppShell() {
   const toggleList = useCallback(() => {
     update({ listCollapsed: !listCollapsed });
   }, [update, listCollapsed]);
+
+  // Navegação por direção (teclado hoje, controle depois). "Voltar" sem camada nem campo: da página do jogo
+  // para a Visão geral; das outras vistas para a biblioteca; na Visão geral não há para onde.
+  useSpatialNavigation(
+    useCallback(() => {
+      if (view !== "biblioteca") navigate("biblioteca");
+      else if (activeGame !== null) openGame(null);
+      else return false;
+      return true;
+    }, [view, activeGame, navigate, openGame]),
+  );
 
   // A largura da lista muda de uma vez; o conteúdo parte da posição antiga e desliza até a nova por `transform`
   // (FLIP): a largura nunca é animada. A transição dura `--tempo-lista` (500 ms); "Reduzir animações" zera.
@@ -118,7 +130,7 @@ export function AppShell() {
           activeId={activeGame}
           onActiveChange={openGame}
         />
-        <main ref={mainRef} className={styles["main"]}>
+        <main ref={mainRef} className={styles["main"]} data-focus-region="content" data-focus-initial="">
           {VIEW_IDS.map((id) => {
             const gamePage = id === "biblioteca" && activeGame !== null;
             return (

@@ -32,7 +32,10 @@ interface AbasProps<T extends string> {
   className?: string;
 }
 
-/** Abas (README do Abas), com teclado de `tablist`: ← → entre as abas (ativa ao focar), Home e End. */
+/**
+ * Abas (README do Abas), com teclado de `tablist`: ← → entre as abas (ativa ao focar), Home e End. Na primeira e na
+ * última aba a seta não é das abas (não dá a volta): segue para o navegador de foco.
+ */
 export function Abas<T extends string>({ variant, tabs, value, onChange, label, idPrefix, className }: AbasProps<T>) {
   const listRef = useRef<HTMLDivElement>(null);
   const pillRef = useRef<HTMLSpanElement>(null);
@@ -73,8 +76,8 @@ export function Abas<T extends string>({ variant, tabs, value, onChange, label, 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const index = tabs.findIndex((tab) => tab.id === value);
     let next = -1;
-    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
-    else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === "ArrowRight") next = index + 1 < tabs.length ? index + 1 : -1;
+    else if (event.key === "ArrowLeft") next = index - 1;
     else if (event.key === "Home") next = 0;
     else if (event.key === "End") next = tabs.length - 1;
     const target = tabs[next];

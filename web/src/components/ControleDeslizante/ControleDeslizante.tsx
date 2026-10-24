@@ -23,7 +23,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Valor contínuo (trilho 180×4, bolinha de 18, valor à direita). Teclado: setas, Page Up/Down, Home e End. */
+/**
+ * Valor contínuo (trilho 180×4, bolinha de 18, valor à direita). Teclado: ← → (e Page Up/Down, Home e End) mexem no
+ * valor; ↑ ↓ ficam para a navegação entre as linhas. No mínimo e no máximo a seta não é do deslizante: um aperto novo
+ * segue para o navegador de foco (← vai às categorias); segurar a tecla até a ponta não pula para fora.
+ */
 export function ControleDeslizante({
   value,
   onChange,
@@ -78,11 +82,10 @@ export function ControleDeslizante({
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (disabled) return;
     const page = step * 10;
+    if (!event.repeat && ((event.key === "ArrowLeft" && value <= min) || (event.key === "ArrowRight" && value >= max))) return;
     const targets: Record<string, number> = {
       ArrowRight: value + step,
-      ArrowUp: value + step,
       ArrowLeft: value - step,
-      ArrowDown: value - step,
       PageUp: value + page,
       PageDown: value - page,
       Home: min,

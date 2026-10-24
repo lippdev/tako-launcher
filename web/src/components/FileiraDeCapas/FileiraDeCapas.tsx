@@ -89,7 +89,8 @@ export function FileiraDeCapas({
           {titulo}
           {contagem && <small className={styles["contagem"]}>{contagem}</small>}
         </h2>
-        <div className={styles["setas"]}>
+        {/* As setas só rolam; pelo teclado e pelo controle a fileira rola sozinha com o foco (`data-focus-skip`). */}
+        <div className={styles["setas"]} data-focus-skip="">
           <button
             type="button"
             className={styles["seta"]}
@@ -116,7 +117,7 @@ export function FileiraDeCapas({
           </button>
         </div>
       </div>
-      <ul ref={trilho} className={styles["trilho"]}>
+      <ul ref={trilho} className={styles["trilho"]} data-focus-group="">
         {capas.map((capa) => (
           <li
             key={capa.id}

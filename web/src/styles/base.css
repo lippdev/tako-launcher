@@ -350,3 +350,9 @@ textarea {
   --seletor-badge-fundo: color-mix(in srgb, var(--accent) 25%, var(--surface-raised));
   --seletor-badge-cor: var(--accent);
 }
+
+/* Navegação por direção (WEB-05a): o elemento que recebe o foco entra na tela com folga, para o anel e o brilho
+   (`focus-ring-width`) não ficarem cortados na borda de quem rola. */
+:where(a[href], button, input, select, textarea, [tabindex]) {
+  scroll-margin: var(--space-20);
+}

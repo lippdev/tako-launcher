@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-05a, WEB-20 |
+| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-20 |
 | Antigravity | `antigravity` | livre (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
@@ -26,7 +26,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-04a | **Componentes base, lote 1:** BotaoDesktop, Abas, CampoDeBusca, CampoDeSelecao + MenuDeContexto, Dialogo, Aviso | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-03 | `web/src/components/` | integrada (aguarda validação visual) |
 | WEB-04b | **Componentes base, lote 2:** GrupoDeBlocos, LinhaDeConfiguracao, ControleDeslizante, chave, PainelLateral, ListaDeJogos virtualizada | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-03 | `web/src/components/` | integrada (aguarda validação visual) |
 | WEB-06 | **Textos:** `locales/` servido à interface, troca de idioma em tempo de execução | N2 | a definir na hora | WEB-00, WEB-02a | `crates/tako-web/`, `web/src/i18n/` | fila |
-| WEB-05 | **Foco e controle:** WEB-05a (navegação espacial no React, foco visível, regiões; Claude Alyx · Sonnet 5.5) e WEB-05b (entrada do SDL3 pela ponte, depois do processo separado) | N3 | Claude Alyx · Sonnet 5.5 alto (05a) | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | 05a despachada; 05b na fila |
+| WEB-05 | **Foco e controle:** WEB-05a (navegação espacial no React, foco visível, regiões; Claude Alyx · Sonnet 5.5) e WEB-05b (entrada do SDL3 pela ponte, depois do processo separado) | N3 | Claude Alyx · Sonnet 5.5 alto (05a) | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | 05a integrada; 05b na fila (entrada do controle pelo núcleo) |
 | WEB-01b | **`tako-app`, segunda fatia:** configurações, coleções (manuais e automáticas resolvidas pelo id no núcleo), tags e status do jogo, favoritos | N3 | Codex Alyx · GPT-6.1-Sol medium (trocou de conta) | WEB-01a | `crates/tako-app/` | integrada |
 | WEB-10a | **Estrutura do app, barra de cima e janela:** BarraSuperior com BarraDaJanela (só BIBLIOTECA, sem loja), MenuDoTako, vistas com TrocaDeTela, lista recolhível, `ui.state`, atalhos, janela pequena | N3 | Claude InvestSmart · Sonnet 5.5 alto → continuação no Codex Alyx (limite de uso) | WEB-04a, WEB-04b | `web/src/app/`, `web/src/App.tsx` | integrada (aguarda validação visual) |
 | WEB-01c | **Leitura das lojas na `tako-app`:** descoberta pela `tako-sources` numa thread própria, snapshot, `library.changed` ao terminar; hoje a versão web só vê o snapshot deixado pelo Slint | N4 | Codex Alyx · GPT-6.1-Sol high | WEB-01a | `crates/tako-app/` | integrada |
@@ -84,3 +84,4 @@ Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-0
 - **Downloads, o que a tela ainda vai precisar** (WEB-01e): adicionar, atualizar e remover fontes (`downloads.source.*` com `fetch_https`, cache, limite de 20); "abrir pasta" (`HostRequest` novo, pasta resolvida no núcleo); motivo do `conflict` distinguível (desligado, jogo ocupado, duplicado, sem espaço) e código no erro de download em vez de texto pronto; reler tudo ao reabrir a interface.
 - **Fila núcleo → interface sem limite** (WEB-02b, de propósito: o núcleo nunca espera a interface). Se a interface travar sem cair, os eventos acumulam na memória; pôr um teto ou descartar eventos velhos quando houver motivo.
 - **Segunda instância de `tako --web`** ainda não traz a janela da primeira para a frente; sem Job Object, a limpeza na queda do núcleo depende do fim do stdin do filho (funcionou nos testes).
+- **Foco, detalhes** (WEB-05a): vindo da lista, o foco entra na página do jogo pelo botão mais próximo (Favoritar), não em Jogar (um `data-focus-primary` no `AcoesDoJogo` resolve); atalhos F, / e M do app atual ainda sem tela; PageUp/PageDown seguem para lista e deslizante (seções só por Q/E).
