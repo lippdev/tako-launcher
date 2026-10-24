@@ -3,6 +3,9 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $gaming = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GamingConfiguration'
 $dev = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+# Como o AnyFSE: o Windows só oferece o app inicial do modo Xbox a aparelhos marcados como portáteis (46).
+$oem = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OEM'
+$handheld = 46
 $backup = Join-Path $Layout 'previous.clixml'
 $name = 'Tako.GamingHome'
 function Read-PackageCertificate($path) {
@@ -42,7 +45,7 @@ function Set-DescriptorFiles($Descriptors, [string]$Content, [switch]$Remove) {
         }
     }
 }
-function Set-MachineState($value, [string]$ImportCertificate = '', [string[]]$RemoveThumbprints = @(), [object[]]$Descriptors = @(), [string]$DescriptorContent = '', [switch]$RemoveDescriptors) {
+function Set-MachineState($value, [string]$ImportCertificate = '', [string[]]$RemoveThumbprints = @(), [object[]]$Descriptors = @(), [string]$DescriptorContent = '', [switch]$RemoveDescriptors, [switch]$SetHandheld, [switch]$RestoreForm, $FormValue = $null) {
     # Uma elevação reúne confiança e Dev Mode; HKCU e AppX ficam no usuário original.
     foreach ($thumbprint in $RemoveThumbprints) {
         if ($thumbprint -notmatch '^[A-Fa-f0-9]{40}$') { throw 'Invalid saved certificate thumbprint.' }
@@ -51,6 +54,13 @@ function Set-MachineState($value, [string]$ImportCertificate = '', [string[]]$Re
         "if ((Get-ItemProperty -LiteralPath '$dev' -ErrorAction SilentlyContinue).PSObject.Properties.Name -contains 'AllowDevelopmentWithoutDevLicense') { Remove-ItemProperty -LiteralPath '$dev' -Name AllowDevelopmentWithoutDevLicense }"
     } else {
         "if (-not (Test-Path -LiteralPath '$dev')) { New-Item -Path '$dev' | Out-Null }; New-ItemProperty -LiteralPath '$dev' -Name AllowDevelopmentWithoutDevLicense -PropertyType DWord -Value $([int]$value) -Force | Out-Null"
+    }
+    if ($SetHandheld) {
+        $operation += "; if (-not (Test-Path -LiteralPath '$oem')) { New-Item -Path '$oem' | Out-Null }; New-ItemProperty -LiteralPath '$oem' -Name DeviceForm -PropertyType DWord -Value $handheld -Force | Out-Null"
+    } elseif ($RestoreForm) {
+        if ($null -eq $FormValue) {
+            $operation += "; if ((Get-ItemProperty -LiteralPath '$oem' -ErrorAction SilentlyContinue).PSObject.Properties.Name -contains 'DeviceForm') { Remove-ItemProperty -LiteralPath '$oem' -Name DeviceForm }"
+        } else { $operation += "; New-ItemProperty -LiteralPath '$oem' -Name DeviceForm -PropertyType DWord -Value $([int]$FormValue) -Force | Out-Null" }
     }
     if ($ImportCertificate) {
         $expected = (Read-PackageCertificate $ImportCertificate).Thumbprint
@@ -94,8 +104,10 @@ function Restore-Previous($state) {
     $current = (Get-ItemProperty -LiteralPath $dev -ErrorAction SilentlyContinue).AllowDevelopmentWithoutDevLicense
     $remove = @(Owned-Certificates $state | Where-Object { Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$_" })
     $descriptors = @($state.Descriptors | Where-Object { $_ -and (Test-Path -LiteralPath $_.Path) })
-    if ($current -ne $state.Dev -or $remove.Count -gt 0 -or $descriptors.Count -gt 0) {
-        Set-MachineState $state.Dev -RemoveThumbprints $remove -Descriptors $descriptors -RemoveDescriptors
+    # Só devolve o tipo de aparelho se ainda for o portátil que o Tako marcou.
+    $restoreForm = $state.DeviceFormSet -and (Get-ItemProperty -LiteralPath $oem -ErrorAction SilentlyContinue).DeviceForm -eq $handheld
+    if ($current -ne $state.Dev -or $remove.Count -gt 0 -or $descriptors.Count -gt 0 -or $restoreForm) {
+        Set-MachineState $state.Dev -RemoveThumbprints $remove -Descriptors $descriptors -RemoveDescriptors -RestoreForm:$restoreForm -FormValue $state.DeviceForm
     }
     Remove-Item -LiteralPath $backup
 }
@@ -105,8 +117,8 @@ try {
     $package = Get-AppxPackage -Name $name
     $gamingKey = Get-Item -LiteralPath $gaming -ErrorAction SilentlyContinue
     $gamingHome = if ($null -ne $gamingKey) { $gamingKey.GetValue('GamingHomeApp', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } else { $null }
-    # Presence of GamingConfiguration is conservative: build alone cannot establish rollout availability.
-    $supported = [Environment]::OSVersion.Version.Build -ge 26100 -and (Test-Path -LiteralPath $gaming)
+    # Como o AnyFSE: a partir do 24H2 o Tako marca o aparelho como portátil e cria GamingConfiguration se faltar.
+    $supported = [Environment]::OSVersion.Version.Build -ge 26100
     if ($Action -eq 'status') {
         if ($package -and $gamingHome -eq "$($package.PackageFamilyName)!App") { 'enabled' }
         elseif (Test-Path -LiteralPath $backup) { 'recovery' }
@@ -138,6 +150,9 @@ try {
         $kind = if ($null -ne $gamingHome) { $gamingKey.GetValueKind('GamingHomeApp').ToString() } else { 'String' }
         $state = [pscustomobject]@{ Home = $gamingHome; HomeKind = $kind; Dev = $oldDev }
     }
+    $oldForm = (Get-ItemProperty -LiteralPath $oem -ErrorAction SilentlyContinue).DeviceForm
+    $setForm = $oldForm -ne $handheld
+    if ($setForm -and -not $state.DeviceFormSet) { $state | Add-Member -NotePropertyMembers @{ DeviceForm = $oldForm; DeviceFormSet = $true } -Force }
     $msix = Join-Path $Layout 'Tako-GamingHome.msix'
     $descriptorBytes = Read-PackageDescriptor $msix
     $descriptorContent = [Convert]::ToBase64String($descriptorBytes)
@@ -161,7 +176,7 @@ try {
     Save-Previous $state
     try {
         if ($package) { $package | Remove-AppxPackage }
-        if ($oldDev -ne 1 -or $import -or $retired.Count -gt 0 -or $newDescriptors.Count -gt 0) { Set-MachineState 1 -ImportCertificate $(if ($import) { $certificatePath } else { '' }) -RemoveThumbprints $retired -Descriptors $newDescriptors -DescriptorContent $descriptorContent }
+        if ($oldDev -ne 1 -or $import -or $retired.Count -gt 0 -or $newDescriptors.Count -gt 0 -or $setForm) { Set-MachineState 1 -ImportCertificate $(if ($import) { $certificatePath } else { '' }) -RemoveThumbprints $retired -Descriptors $newDescriptors -DescriptorContent $descriptorContent -SetHandheld:$setForm }
         Write-Host "FSE pre-install: exe=$(Test-Path -LiteralPath $Executable); DevMode=$((Get-ItemProperty -LiteralPath $dev).AllowDevelopmentWithoutDevLicense); AllowAllTrustedApps=$((Get-ItemProperty -LiteralPath $dev).AllowAllTrustedApps); TrustedPeople=$(Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"); Root=$(Test-Path -LiteralPath "Cert:\LocalMachine\Root\$($certificate.Thumbprint)")"
         # O cmdlet rejeita ambas as flags: ForceApplicationShutdown ja inclui o pacote e dependencias.
         Add-AppxPackage -Path $msix -ExternalLocation (Split-Path -Parent $Executable) -ForceUpdateFromAnyVersion -ForceApplicationShutdown
@@ -169,6 +184,7 @@ try {
         if (-not $package) { throw 'Package registration did not produce an identity.' }
         $state.AssignedHome = "$($package.PackageFamilyName)!App"
         Save-Previous $state
+        if (-not (Test-Path -LiteralPath $gaming)) { New-Item -Path $gaming | Out-Null }
         New-ItemProperty -LiteralPath $gaming -Name GamingHomeApp -Value "$($package.PackageFamilyName)!App" -PropertyType String -Force | Out-Null
     } catch {
         $failure = $_

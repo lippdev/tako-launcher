@@ -31,6 +31,7 @@ function Test-Path { param($LiteralPath) if ($LiteralPath -like 'Cert:*') { retu
 function Get-ItemProperty {
     param($LiteralPath,$ErrorAction)
     if ($LiteralPath -like 'HKCU:*') { [pscustomobject]@{GamingHomeApp=$script:GamingHome} }
+    elseif ($LiteralPath -like '*\OEM') { [pscustomobject]@{DeviceForm=$script:Form} }
     else { [pscustomobject]@{AllowDevelopmentWithoutDevLicense=$script:Dev} }
 }
 function Get-Item {
@@ -62,7 +63,9 @@ function Start-Process {
         & ([scriptblock]::Create($code.Substring($descriptorStart + 2, $code.LastIndexOf('; return') - $descriptorStart - 2)))
     }
     $script:Elevations++
-    if ($code -match '-Value (\d+)') { $script:Dev = [int]$Matches[1] } else { $script:Dev = $null }
+    if ($code -match 'AllowDevelopmentWithoutDevLicense -PropertyType DWord -Value (\d+)') { $script:Dev = [int]$Matches[1] } else { $script:Dev = $null }
+    if ($code -match 'Name DeviceForm -PropertyType DWord -Value (\d+)') { $script:Form = [int]$Matches[1] }
+    elseif ($code -match 'Remove-ItemProperty -LiteralPath ''[^'']*OEM'' -Name DeviceForm') { $script:Form = $null }
     [pscustomobject]@{ExitCode=0}
 }
 function Run($action) { & ([scriptblock]::Create($source)) -Action $action -Layout $script:Layout -Executable (Join-Path $script:AppRoot 'Tako.exe') }
@@ -70,7 +73,7 @@ function Reset($gamingHome,$dev) {
     Microsoft.PowerShell.Management\Remove-Item "$script:AppRoot/*" -Force -ErrorAction SilentlyContinue
     Microsoft.PowerShell.Management\Remove-Item "$script:Layout/*" -Force -ErrorAction SilentlyContinue
     [IO.File]::WriteAllBytes((Join-Path $script:Layout 'Tako-GamingHome.msix'), $fixtureBytes)
-    $script:Thumbprint='A'*40; $script:Trusted=[Collections.Generic.HashSet[string]]::new(); $script:OtherValue='preserved'; $script:GamingHome=$gamingHome; $script:Dev=$dev; $script:Package=$false; $script:Build=26100
+    $script:Thumbprint='A'*40; $script:Trusted=[Collections.Generic.HashSet[string]]::new(); $script:OtherValue='preserved'; $script:GamingHome=$gamingHome; $script:Dev=$dev; $script:Package=$false; $script:Build=26100; $script:Form=$null
     $script:Supported=$true; $script:FailRegister=$false; $script:FailRemove=$false; $script:Cancel=$false; $script:Elevations=0
 }
 try {
@@ -90,10 +93,12 @@ try {
             Run enable
             Assert ((Get-Content "$script:Layout/previous.clixml" -Raw) -eq $before) 'backup overwritten'
             Assert ($script:Dev -eq 1) 'developer mode enabled'
+            Assert ($script:Form -eq 46) 'device marked as handheld'
             Run disable
             Assert ($script:GamingHome -eq $oldHome) 'home restored'
             Assert ($script:OtherValue -eq 'preserved') 'other registry values survive'
             Assert ($script:Dev -eq $oldDev) 'developer mode restored'
+            Assert ($null -eq $script:Form) 'device form restored'
             Assert (-not $script:Package) 'package removed'
             Assert (-not (Test-Path -LiteralPath (Join-Path $script:AppRoot 'CustomCapability.SCCD'))) 'owned external SCCD removed'
             Assert (-not (Test-Path "$script:Layout/previous.clixml")) 'backup cleaned'
@@ -106,9 +111,11 @@ try {
     $descriptorSource = Join-Path $PSScriptRoot '../../../packaging/fse/CustomCapability.SCCD'
     Copy-Item -LiteralPath $descriptorSource -Destination $descriptorPath
     $script:Trusted.Add($script:Thumbprint) | Out-Null
+    $script:Form=46
     Run enable
     Run disable
     Assert (Test-Path -LiteralPath $descriptorPath) 'preexisting external SCCD retained'
+    Assert ($script:Form -eq 46) 'preexisting handheld form retained'
     Assert ($script:Elevations -eq 0) 'preexisting trust, descriptor and Dev Mode need no elevation'
     Reset 'Original!App' 0
     [IO.File]::WriteAllText($descriptorPath, 'another app')
@@ -154,8 +161,15 @@ try {
         Assert (-not (Test-Path "$script:Layout/previous.clixml")) 'later choice backup cleaned'
     }
     Reset 'Original!App' 0
+    $script:Form=1
+    Run enable
+    Assert ($script:Form -eq 46) 'desktop marked as handheld'
+    Run disable
+    Assert ($script:Form -eq 1) 'desktop form restored'
+    Reset 'Original!App' 0
     $script:FailRegister=$true
     try { Run enable; throw 'expected failure' } catch { Assert ($_.ToString() -ne 'expected failure') 'registration should fail' }
+    Assert ($null -eq $script:Form) 'registration failure restores device form'
     Assert ($script:GamingHome -eq 'Original!App' -and $script:Dev -eq 0) 'registration rollback'
     Reset 'Original!App' 0
     $script:Cancel=$true
@@ -168,7 +182,7 @@ try {
     Assert (Test-Path "$script:Layout/previous.clixml") 'failed recovery retains backup'
     Assert ((Run status) -eq 'recovery') 'failed recovery offers restoration'
     $script:FailRemove=$false
-    $script:Supported=$false
+    $script:Build=22631
     Run disable
     Assert ($script:GamingHome -eq 'Original!App' -and $script:Dev -eq 0) 'retry recovery'
     Assert ((Run status) -eq 'unavailable') 'unsupported status'
