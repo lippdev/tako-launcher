@@ -319,7 +319,7 @@ impl ProfilePage {
     }
 
     fn zones(&self, ctx: &Ctx) -> Vec<Zone> {
-        let mut v = vec![Zone::Bar, Zone::Tabs, Zone::Actions];
+        let mut v = vec![Zone::Bar, Zone::Actions, Zone::Tabs];
         match self.tab {
             Tab::Overview => v.push(Zone::Tiles),
             Tab::Sessions => v.push(Zone::Periods),
@@ -832,7 +832,7 @@ impl Page for ProfilePage {
                     ..Default::default()
                 },
                 DeskInfo {
-                    icon: "user".into(),
+                    icon: "pencil".into(),
                     label: ctx.t("profile.edit"),
                     ..Default::default()
                 },
@@ -914,6 +914,21 @@ mod tests {
             started_at: start.with_timezone(&chrono::Utc),
             duration: Duration::from_secs(minutes * 60),
         }
+    }
+
+    #[test]
+    fn profile_actions_precede_tabs_in_keyboard_navigation() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = crate::app::build_ctx(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        let page = ProfilePage::default();
+        assert_eq!(
+            &page.zones(&ctx)[..3],
+            &[Zone::Bar, Zone::Actions, Zone::Tabs]
+        );
     }
 
     #[test]

@@ -6775,7 +6775,7 @@ component ProfileSessionRow inherits Rectangle {
             text: data.value;
             color: Ui.desk-text;
             font-family: Ui.font-heading;
-            font-size: 14px;
+            font-size: 14px * Ui.text-scale;
             font-weight: 600;
             horizontal-alignment: right;
             vertical-alignment: center;
@@ -6805,7 +6805,7 @@ component ProfileTile inherits Rectangle {
         clicked => { root.clicked(); }
     }
     VerticalLayout {
-        Rectangle {
+        VerticalLayout {
             vertical-stretch: 1;
             padding-top: small ? 14px : 18px;
             padding-left: small ? 16px : 20px;
@@ -6819,7 +6819,7 @@ component ProfileTile inherits Rectangle {
             background: Ui.tile-foot;
             Rectangle { y: 0; width: parent.width; height: 1px; background: Ui.line; }
             Text {
-                text: info.label;
+                text: info.label.to-uppercase();
                 color: Ui.desk-text-dim;
                 font-family: Ui.font-heading;
                 font-size: Ui.desk-overline;
@@ -6887,8 +6887,8 @@ component ProfileCard inherits Rectangle {
             VerticalLayout {
                 spacing: 4px;
                 horizontal-stretch: 1;
-                Text { text: card.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 16px; font-weight: 700; overflow: elide; }
-                Text { text: card.count; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: 12.5px; font-weight: 500; overflow: elide; }
+                Text { text: card.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 16px * Ui.text-scale; font-weight: 700; overflow: elide; }
+                Text { text: card.count; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: 12.5px * Ui.text-scale; font-weight: 500; overflow: elide; }
             }
             if card.auto: Rectangle {
                 y: parent.height - self.height;
@@ -6908,7 +6908,7 @@ component ProfileCard inherits Rectangle {
                         border-radius: 3px;
                         background: Ui.desk-accent;
                     }
-                    Text { text: auto-label; color: Ui.desk-text; font-family: Ui.font-desk; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                    Text { text: auto-label; color: Ui.desk-text; font-family: Ui.font-desk; font-size: 12px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
                 }
             }
         }
@@ -6953,9 +6953,9 @@ component DeskProfileScreen inherits Rectangle {
     }
     property <bool> kb: focus-visible;
     property <length> gap: small ? 16px : 24px;
+    property <length> tile-w: (fl.width - 2 * gap - 26px) / 3;
     property <length> avatar: small ? 72px : 88px;
     // Três blocos iguais (o texto de cada um não muda a largura).
-    property <length> tile-w: (fl.width - 2 * gap) / 3;
     // Foco do teclado na barra, nas guias ou nas ações: a página volta ao topo.
     changed zone => {
         if (zone == "bar" || zone == "tabs" || zone == "actions") {
@@ -6989,7 +6989,7 @@ component DeskProfileScreen inherits Rectangle {
                     width: avatar;
                     height: avatar;
                     border-radius: avatar / 2;
-                    background: @radial-gradient(circle, #35333f 0%, #131219 100%);
+                    background: Ui.surface-raised;
                     border-width: 2px;
                     border-color: Ui.desk-accent.with-alpha(0.75);
                     drop-shadow-blur: 16px;
@@ -7024,7 +7024,7 @@ component DeskProfileScreen inherits Rectangle {
                         accessible-label: p.name;
                         color: Ui.desk-text;
                         font-family: Ui.font-heading;
-                        font-size: small ? 24px : 30px;
+                        font-size: (small ? 24px : 30px) * Ui.text-scale;
                         font-weight: 800;
                         letter-spacing: -0.02 * self.font-size;
                         overflow: elide;
@@ -7038,7 +7038,7 @@ component DeskProfileScreen inherits Rectangle {
                                 text: "|";
                                 color: Ui.line-strong;
                                 font-family: Ui.font-desk;
-                                font-size: 13.5px;
+                                font-size: 13.5px * Ui.text-scale;
                                 vertical-alignment: center;
                             }
                             if it.dot: Rectangle {
@@ -7052,7 +7052,7 @@ component DeskProfileScreen inherits Rectangle {
                                 text: it.label;
                                 color: it.dot ? Ui.desk-text : Ui.desk-text-muted;
                                 font-family: Ui.font-desk;
-                                font-size: 13.5px;
+                                font-size: 13.5px * Ui.text-scale;
                                 font-weight: 500;
                                 vertical-alignment: center;
                             }
@@ -7085,7 +7085,7 @@ component DeskProfileScreen inherits Rectangle {
                                 text: a.label;
                                 color: Ui.desk-text;
                                 font-family: Ui.font-desk;
-                                font-size: 13.5px;
+                                font-size: 13.5px * Ui.text-scale;
                                 font-weight: 600;
                                 vertical-alignment: center;
                             }
@@ -7117,7 +7117,7 @@ component DeskProfileScreen inherits Rectangle {
                         text: t;
                         color: i == p.tab || tta.has-hover || focused ? Ui.desk-text : Ui.desk-text-muted;
                         font-family: Ui.font-heading;
-                        font-size: 13.5px;
+                        font-size: 13.5px * Ui.text-scale;
                         font-weight: 600;
                         horizontal-alignment: center;
                         vertical-alignment: center;
@@ -7142,12 +7142,14 @@ component DeskProfileScreen inherits Rectangle {
                     background: Ui.group;
                     border-width: 1px;
                     border-color: Ui.line-strong;
-                    padding: 6px;
-                    HorizontalLayout {
+                    VerticalLayout {
+                        padding: 6px;
+                        HorizontalLayout {
                         spacing: 6px;
                         height: (small ? 236px : 310px) + max(0, Ui.text-scale - 1) * 160px;
                         // Tempo jogado: total e a semana em barras.
                         ProfileTile {
+                            width: tile-w;
                             info: p.tiles[0];
                             small: root.small;
                             focused: kb && p.zone == "tiles" && p.index == 0;
@@ -7168,7 +7170,7 @@ component DeskProfileScreen inherits Rectangle {
                                     DeskIcon {
                                         name: "clock";
                                         size: 19px;
-                                        tint: #cfcfcf;
+                                        tint: Ui.desk-text;
                                         y: (parent.height - self.height) / 2;
                                     }
                                 }
@@ -7203,7 +7205,7 @@ component DeskProfileScreen inherits Rectangle {
                                             height: b.future ? parent.room : parent.room * b.fraction;
                                             y: parent.height - parent.label-h - 7px - self.height;
                                             border-radius: 4px;
-                                            background: b.future ? transparent : (b.today ? #eeeeee : Ui.surface-raised);
+                                            background: b.future ? transparent : (b.today ? Ui.desk-text : Ui.surface-raised);
                                             border-width: b.future ? 1px : 0;
                                             border-color: Ui.line;
                                             drop-shadow-blur: b.today ? 16px : 0;
@@ -7226,6 +7228,7 @@ component DeskProfileScreen inherits Rectangle {
                         }
                         // Mais jogado: três jogos com capa, horas e trilho proporcional.
                         ProfileTile {
+                            width: tile-w;
                             info: p.tiles[1];
                             small: root.small;
                             focused: kb && p.zone == "tiles" && p.index == 1;
@@ -7248,7 +7251,7 @@ component DeskProfileScreen inherits Rectangle {
                                     DeskIcon {
                                         name: "star";
                                         size: 19px;
-                                        tint: #cfcfcf;
+                                        tint: Ui.desk-text;
                                         y: (parent.height - self.height) / 2;
                                     }
                                 }
@@ -7280,6 +7283,7 @@ component DeskProfileScreen inherits Rectangle {
                         }
                         // Jogos na biblioteca: leque com as três últimas capas.
                         ProfileTile {
+                            width: tile-w;
                             info: p.tiles[2];
                             small: root.small;
                             focused: kb && p.zone == "tiles" && p.index == 2;
@@ -7301,7 +7305,7 @@ component DeskProfileScreen inherits Rectangle {
                                     DeskIcon {
                                         name: "gamepad";
                                         size: 19px;
-                                        tint: #cfcfcf;
+                                        tint: Ui.desk-text;
                                         y: (parent.height - self.height) / 2;
                                     }
                                 }
@@ -7325,32 +7329,26 @@ component DeskProfileScreen inherits Rectangle {
                                 }
                             }
                         }
+                        }
                     }
                 }
                 // Sessões recentes (com "Ver todas"), na rolagem.
-                HorizontalLayout {
-                    padding-top: small ? 20px : 32px;
-                    padding-bottom: 14px;
-                    spacing: 10px;
-                    alignment: center;
+                Rectangle {
+                    width: fl.width;
+                    height: small ? 52px : 64px;
                     Text {
+                        x: 0;
+                        horizontal-alignment: left;
                         text: p.recent-title;
                         color: Ui.desk-text;
                         font-family: Ui.font-heading;
-                        font-size: 19px;
+                        font-size: 19px * Ui.text-scale;
                         font-weight: 700;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: p.recent.length + " " + (p.recent.length == 1 ? "jogo" : "jogos");
-                        color: Ui.desk-text-muted;
-                        font-family: Ui.font-desk;
-                        font-size: Ui.desk-label-sm;
-                        font-weight: 500;
-                        horizontal-stretch: 1;
-                        vertical-alignment: center;
+                        y: (parent.height - self.height) / 2;
                     }
                     if p.recent.length > 0: Rectangle {
+                        x: parent.width - self.width;
+                        y: (parent.height - self.height) / 2;
                         width: sl.preferred-width + 16px;
                         height: 32px;
                         border-radius: Ui.radius-control;
@@ -7413,9 +7411,9 @@ component DeskProfileScreen inherits Rectangle {
                 opacity: tab-in ? 1 : 0;
                 animate opacity { duration: Ui.list-fade(tab-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                 spacing: 18px;
-                HorizontalLayout {
-                    spacing: 14px;
-                    alignment: center;
+                Rectangle {
+                    width: fl.width;
+                    height: 36px;
                     Rectangle {
                         width: small ? 280px : 330px;
                         height: 36px;
@@ -7431,7 +7429,7 @@ component DeskProfileScreen inherits Rectangle {
                                 background: i == p.period ? Ui.surface-raised : (pta.has-hover ? Ui.glass-hover : transparent);
                                 border-width: i == p.period ? 1px : 0px;
                                 border-color: Ui.line-strong;
-                                accessible-role: button;
+                                accessible-role: tab;
                                 accessible-label: per;
                                 property <bool> focused: kb && p.zone == "periods" && p.index == i;
                                 if focused: FocusRing { radius: Ui.radius-control - 2px; }
@@ -7451,8 +7449,16 @@ component DeskProfileScreen inherits Rectangle {
                             }
                         }
                     }
-                    Rectangle { horizontal-stretch: 1; }
-                    Text { text: p.summary; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
+                    Text {
+                        x: parent.width - self.width;
+                        height: parent.height;
+                        text: p.summary;
+                        color: Ui.desk-text-muted;
+                        font-family: Ui.font-desk;
+                        font-size: Ui.desk-label-sm;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                    }
                 }
                 Rectangle {
                     border-radius: Ui.radius-card;
@@ -7483,9 +7489,9 @@ component DeskProfileScreen inherits Rectangle {
                                 padding-top: 18px;
                                 padding-bottom: 8px;
                                 spacing: 10px;
-                                Text { text: e.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px; font-weight: 700; }
+                                Text { text: e.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px * Ui.text-scale; font-weight: 700; }
                                 Text { text: e.detail; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-stretch: 1; }
-                                Text { text: e.value; color: Ui.desk-text-muted; font-family: Ui.font-heading; font-size: 14px; font-weight: 600; }
+                                Text { text: e.value; color: Ui.desk-text-muted; font-family: Ui.font-heading; font-size: 14px * Ui.text-scale; font-weight: 600; }
                             }
                             if !e.header: Rectangle { height: 1px; background: Ui.line; }
                             if !e.header: ProfileSessionRow {
@@ -7507,7 +7513,7 @@ component DeskProfileScreen inherits Rectangle {
                 opacity: tab-in ? 1 : 0;
                 animate opacity { duration: Ui.list-fade(tab-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                 spacing: 18px;
-                Text { text: p.cards-summary; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: 13.5px; font-weight: 500; height: 30px; vertical-alignment: center; }
+                Text { text: p.cards-summary; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: 13.5px * Ui.text-scale; font-weight: 500; height: 30px; vertical-alignment: center; }
                 grid := Rectangle {
                     property <int> cols: 4;
                     property <length> card-w: (self.width - (cols - 1) * gap) / cols;
@@ -7558,7 +7564,7 @@ component DeskProfileScreen inherits Rectangle {
                                 alignment: center;
                                 DeskIcon { name: "plus"; size: 26px; tint: Ui.desk-text-muted; }
                             }
-                            Text { text: p.new-label; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px; font-weight: 650; horizontal-alignment: center; overflow: elide; }
+                            Text { text: p.new-label; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px * Ui.text-scale; font-weight: 650; horizontal-alignment: center; overflow: elide; }
                             Text { text: p.new-text; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-alignment: center; wrap: word-wrap; }
                         }
                         nta := TouchArea {
