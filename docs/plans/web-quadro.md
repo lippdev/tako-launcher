@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | resetou; rodando WEB-20, WEB-12c e WEB-11c (pedido do mantenedor de acelerar: acima do limite de 4 agentes, com só 2 builds Rust pesados) |
+| Claude Alyx Medical | `claudeAgent` | resetou; rodando WEB-20, WEB-12c, WEB-11c e WEB-13c1 (pedido do mantenedor de acelerar: acima do limite de 4 agentes, com só 2 builds Rust pesados) |
 | Antigravity | `antigravity` | rodando WEB-04l (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
@@ -57,6 +57,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-04k | **Componentes do onboarding:** PassosDoOnboarding (com a escada de entrada), EscolhaDoOnboarding (cartão e linha, sem pagamento), LojaEncontrada, TelaOnboarding (moldura); os passos ficam para o WEB-16 | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (quatro pastas) | integrada (aguarda validação visual; o orquestrador trocou a duração fixa da escada pelos tokens de tempo) |
 | WEB-11c | **Modos Grade e Categorias na lista:** seletor de modo como no Slint, BibliotecaGrade e BibliotecaCategorias ligadas à paginação, filtros, coleção e seleção | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-04j, WEB-11b | `web/src/app/ColunaDaLista.tsx`, `web/src/app/lista/` | despachada |
 | WEB-04l | **Passos do onboarding:** OnboardingEmuladores, OnboardingCapas, OnboardingModo, OnboardingPronto (visuais, montados com as peças do WEB-04k); ligar no WEB-16 | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04k | `web/src/components/Onboarding*/` | despachada |
+| WEB-13c1 | **Configurações que faltam (1):** aparência do desktop (cor de destaque, Liquid Glass), coleções automáticas em Biblioteca, Emuladores e ROMs | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-13b, WEB-11b | `web/src/app/settings/`, `crates/tako-app/src/{settings,emulators}.rs` | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | integrada (falta ligar à sessão de jogo e à bandeja) |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
