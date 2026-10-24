@@ -1,8 +1,10 @@
-﻿import { Chave } from "../components/Chave/Chave";
+﻿import { BotaoDesktop } from "../components/BotaoDesktop/BotaoDesktop";
+import { Chave } from "../components/Chave/Chave";
 import { CampoDeSelecao } from "../components/CampoDeSelecao/CampoDeSelecao";
 import { PainelLateral } from "../components/PainelLateral/PainelLateral";
 import type { Collection } from "../bridge/generated/Collection";
 import type { Tag } from "../bridge/generated/Tag";
+import { useT } from "../i18n";
 import { defaultLibraryCriteria, SORT_IDS, STATUS_IDS, STORE_IDS, type LibraryCriteria } from "./uiState";
 import { libraryStrings as s } from "./strings";
 import styles from "./LibraryControls.module.css";
@@ -33,6 +35,9 @@ export function LibraryFilters({
   update,
   collections,
   tags,
+  canSaveCollection,
+  onSaveCollection,
+  onManageCollections,
 }: {
   open: boolean;
   onClose: () => void;
@@ -40,7 +45,12 @@ export function LibraryFilters({
   update: (patch: Partial<LibraryCriteria>) => void;
   collections: Collection[];
   tags: Tag[];
+  /** Há busca, filtro ou ordenação a guardar como coleção automática. */
+  canSaveCollection: boolean;
+  onSaveCollection: () => void;
+  onManageCollections: () => void;
 }) {
+  const t = useT();
   const count = filterCount(c);
   return (
     <PainelLateral
@@ -169,6 +179,19 @@ export function LibraryFilters({
             />
           </div>
         )}
+        <div className={styles["field"]}>
+          <span>{t("collections.title")}</span>
+          <div className={styles["collectionActions"]}>
+            {canSaveCollection && (
+              <BotaoDesktop variant="outlined" title={t("smart.save_desc")} onClick={onSaveCollection}>
+                {t("smart.save")}
+              </BotaoDesktop>
+            )}
+            <BotaoDesktop variant="outlined" onClick={onManageCollections}>
+              {t("desktop.collections_manage")}
+            </BotaoDesktop>
+          </div>
+        </div>
       </div>
     </PainelLateral>
   );

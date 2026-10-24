@@ -8,7 +8,11 @@ import type { GameRow } from "../components/ListaDeJogos/ListaDeJogos";
 import type { LibraryGame } from "./generated/LibraryGame";
 import type { LibraryListRequest } from "./generated/LibraryListRequest";
 import type { Collection } from "./generated/Collection";
+import type { CollectionCreate } from "./generated/CollectionCreate";
 import type { CollectionGames } from "./generated/CollectionGames";
+import type { CollectionRename } from "./generated/CollectionRename";
+import type { CollectionRequest } from "./generated/CollectionRequest";
+import type { SmartCollectionSet } from "./generated/SmartCollectionSet";
 import type { GameFavoriteSet } from "./generated/GameFavoriteSet";
 import type { GameStatusSet } from "./generated/GameStatusSet";
 import type { GameTagsSet } from "./generated/GameTagsSet";
@@ -220,21 +224,41 @@ function collectionMutation(payload: unknown, add: boolean) {
     c.gameIds = add ? [...new Set([...c.gameIds, ...p.gameIds])] : c.gameIds.filter((id) => !p.gameIds.includes(id));
   });
 }
-function listLibrary(payload: unknown) {
-  const p = payload as LibraryListRequest;
-  const collection = p.collection ? collections.find((c) => c.id === p.collection) : null;
+/** Critérios do pedido, menos a coleção (que o núcleo resolve à parte). */
+function matchesRequest(g: LibraryGame, p: LibraryListRequest): boolean {
   const needle = p.search?.trim().toLocaleLowerCase("pt-BR") ?? "";
-  const rows = games.filter(
-    (g) =>
-      (p.filter !== "favorites" || g.favorite) &&
-      (p.filter !== "installed" || g.installed) &&
-      g.title.toLocaleLowerCase("pt-BR").includes(needle) &&
-      (!p.collection || !!collection?.gameIds.includes(g.id)) &&
-      (!p.stores?.length || p.stores.includes(g.store)) &&
-      (p.installed == null || p.installed === g.installed) &&
-      ((!p.statuses?.length && !p.noStatus) || (g.status === null ? p.noStatus : p.statuses?.includes(g.status))) &&
-      (!p.tags?.length || p.tags.every((tag) => gameTags.get(g.id)?.has(tag))),
+  return Boolean(
+    (p.filter !== "favorites" || g.favorite) &&
+    (p.filter !== "installed" || g.installed) &&
+    g.title.toLocaleLowerCase("pt-BR").includes(needle) &&
+    (!p.stores?.length || p.stores.includes(g.store)) &&
+    (p.installed == null || p.installed === g.installed) &&
+    ((!p.statuses?.length && !p.noStatus) || (g.status === null ? p.noStatus : p.statuses?.includes(g.status))) &&
+    (!p.tags?.length || p.tags.every((tag) => gameTags.get(g.id)?.has(tag))),
   );
+}
+/** O jogo está na coleção: manual = os ids dela; automática = a regra salva, resolvida na hora (como o núcleo). */
+function inCollection(g: LibraryGame, collectionId: string): boolean {
+  const c = collections.find((c) => c.id === collectionId);
+  if (!c) return false;
+  if (!c.criteria) return c.gameIds.includes(g.id);
+  const { library: rule = {}, favoritesOnly, filterStore } = c.criteria;
+  return (
+    matchesRequest(g, rule) &&
+    (!favoritesOnly || g.favorite) &&
+    (!filterStore || g.store === filterStore) &&
+    (!rule.collection || inCollection(g, rule.collection))
+  );
+}
+function listLibrary(payload: unknown) {
+  const requested = payload as LibraryListRequest;
+  // Coleção automática aberta com a ordenação padrão: vale a ordenação salva nela.
+  const rule = collections.find((c) => c.id === requested.collection)?.criteria?.library;
+  const p: LibraryListRequest =
+    rule && (requested.sort ?? "recently_played") === "recently_played" && !requested.reversed
+      ? { ...requested, sort: rule.sort ?? "recently_played", reversed: rule.reversed ?? false }
+      : requested;
+  const rows = games.filter((g) => matchesRequest(g, p) && (!p.collection || inCollection(g, p.collection)));
   rows.sort((a, b) => {
     if (p.sort === "name") return a.title.localeCompare(b.title, "pt-BR");
     if (p.sort === "play_time") return b.playTimeSeconds - a.playTimeSeconds;
@@ -249,9 +273,65 @@ function listLibrary(payload: unknown) {
     rows: rows.slice(offset, offset + Math.min(200, Math.max(1, p.limit ?? 40))),
   };
 }
+let nextCollection = 1;
+const cleanName = (name: string) => name.split(" ").map((w) => w.trim()).filter(Boolean).join(" ");
+const nameKey = (name: string) => name.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
+const ofKind = (list: Collection[], auto: boolean) => list.filter((c) => (c.criteria !== null) === auto);
+/** Como o núcleo: o nome vale só entre as coleções do mesmo tipo (sem caixa nem acento) e o erro é `bad_request`. */
+function checkCollectionName(name: string, auto: boolean, exceptId: string | null = null) {
+  const clean = cleanName(name);
+  const taken = ofKind(collections, auto).some((c) => c.id !== exceptId && nameKey(c.name) === nameKey(clean));
+  if (!clean || [...clean].length > 40 || taken) throw new FakeError("bad_request", "nome inválido");
+}
+function findCollection(id: string) {
+  const c = collections.find((c) => c.id === id);
+  if (!c) throw new FakeError("not_found", `coleção ${id}`);
+  return c;
+}
+function setSmartCollection(payload: unknown) {
+  const p = payload as SmartCollectionSet;
+  if (p.criteria.library?.offset) throw new FakeError("bad_request", "critérios inválidos");
+  if (p.criteria.filterStore && (p.criteria.library?.filter ?? "all") !== "all")
+    throw new FakeError("bad_request", "filtro de loja exige a aba todos");
+  const criteria = JSON.parse(JSON.stringify(p.criteria)) as SmartCollectionSet["criteria"];
+  let saved: Collection;
+  if (p.collectionId) {
+    saved = findCollection(p.collectionId);
+    if (!saved.criteria) throw new FakeError("not_found", `coleção automática ${p.collectionId}`);
+    checkCollectionName(p.name, true, saved.id);
+    saved.name = cleanName(p.name);
+    saved.criteria = criteria;
+  } else {
+    checkCollectionName(p.name, true);
+    saved = { id: `smart-${String(nextCollection++)}`, name: cleanName(p.name), gameIds: [], criteria };
+    collections.push(saved);
+  }
+  changed();
+  return saved;
+}
 Object.assign(defaults, {
   "library.list": listLibrary,
-  "collections.list": () => collections,
+  // Manuais primeiro, automáticas depois, como a lista do núcleo.
+  "collections.list": () => [...ofKind(collections, false), ...ofKind(collections, true)],
+  "collections.create": (p: unknown) => {
+    const { name } = p as CollectionCreate;
+    checkCollectionName(name, false);
+    const created: Collection = { id: `manual-${String(nextCollection++)}`, name: cleanName(name), gameIds: [], criteria: null };
+    collections.push(created);
+    changed();
+    return created;
+  },
+  "collections.rename": (p: unknown) =>
+    mutate<CollectionRename>(p, (p) => {
+      const c = findCollection(p.collectionId);
+      checkCollectionName(p.name, c.criteria !== null, c.id);
+      c.name = cleanName(p.name);
+    }),
+  "collections.delete": (p: unknown) =>
+    mutate<CollectionRequest>(p, (p) => {
+      collections.splice(collections.indexOf(findCollection(p.collectionId)), 1);
+    }),
+  "collections.smart.set": setSmartCollection,
   "tags.list": () =>
     [...new Set([...gameTags.values()].flatMap((tags) => [...tags]))].map((name) => ({
       name,
@@ -767,6 +847,28 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
     "downloads.cancel": "Cancelar",
     "common.cancel": "Cancelar",
     "common.close": "Fechar",
+    // Coleções (WEB-11b): textos de `smart.toml`, `library.toml`, `ui.toml`, `desktop.toml` e `settings.toml`.
+    "smart.save": "Salvar como coleção automática",
+    "smart.save_desc": "Guarda esta busca, filtros e ordenação; os jogos se atualizam sozinhos.",
+    "smart.saved": "Coleção automática salva",
+    "smart.name_rule": "Use um nome único de até 40 letras.",
+    "smart.delete_title": "Excluir {name}?",
+    "smart.delete_text": "Só a coleção será excluída. Os jogos continuam na biblioteca.",
+    "library.collection.name_empty": "Dê um nome à coleção.",
+    "library.collection.name_too_long": "Use até {n} letras.",
+    "library.collection.name_taken": "Já existe uma coleção com esse nome.",
+    "collections.title": "Coleções",
+    "collections.new": "Nova coleção",
+    "collections.name_rule": "Até 40 caracteres, sem repetir o nome de outra coleção.",
+    "desktop.collections_manage": "Organizar coleções",
+    "desktop.collection_auto": "Auto",
+    "desktop.no_collections": "Nenhuma coleção ainda",
+    "settings.library.collections_create": "Criar",
+    "settings.library.rename": "Renomear",
+    "settings.library.delete": "Excluir",
+    "settings.library.delete_title": "Excluir \"{name}\"?",
+    "settings.library.delete_text": "Os jogos continuam na biblioteca; só a coleção some.",
+    "common.save": "Salvar",
   },
   "en-US": {
     "settings.general.title": "General",
@@ -814,6 +916,28 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
     "downloads.cancel": "Cancel",
     "common.cancel": "Cancel",
     "common.close": "Close",
+    // Coleções (WEB-11b): textos de `smart.toml`, `library.toml`, `ui.toml`, `desktop.toml` e `settings.toml`.
+    "smart.save": "Save as smart collection",
+    "smart.save_desc": "Saves this search, filters and sort order; games update automatically.",
+    "smart.saved": "Smart collection saved",
+    "smart.name_rule": "Use a unique name of up to 40 characters.",
+    "smart.delete_title": "Delete {name}?",
+    "smart.delete_text": "Only the collection will be deleted. Games stay in your library.",
+    "library.collection.name_empty": "Give the collection a name.",
+    "library.collection.name_too_long": "Use up to {n} characters.",
+    "library.collection.name_taken": "A collection with this name already exists.",
+    "collections.title": "Collections",
+    "collections.new": "New collection",
+    "collections.name_rule": "Up to 40 characters, not the same as another collection.",
+    "desktop.collections_manage": "Manage collections",
+    "desktop.collection_auto": "Auto",
+    "desktop.no_collections": "No collections yet",
+    "settings.library.collections_create": "Create",
+    "settings.library.rename": "Rename",
+    "settings.library.delete": "Delete",
+    "settings.library.delete_title": "Delete \"{name}\"?",
+    "settings.library.delete_text": "The games stay in the library; only the collection goes away.",
+    "common.save": "Save",
   },
 };
 

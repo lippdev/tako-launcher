@@ -102,3 +102,58 @@ test("ui.state.set grava o estado no armazenamento da sessão de desenvolvimento
   await call("ui.state.set", { json: '{"v":1}' });
   assert.equal(storage.get("tako.dev.ui.state"), '{"v":1}');
 });
+test("coleções automáticas: salvar, abrir, trocar os filtros, renomear e apagar", async () => {
+  const rule = (library) => ({ library, genres: [], playTime: "any", collections: [] });
+  const ok = (name, data) => request(name, data).then((r) => r.ok);
+  const before = (await call("collections.list")).length;
+  const saved = await call("collections.smart.set", {
+    collectionId: null,
+    name: "  Instalados   da Steam ",
+    criteria: rule({ filter: "installed", stores: ["steam"], sort: "name" }),
+  });
+  assert.equal(saved.name, "Instalados da Steam");
+  assert.ok(saved.criteria);
+  assert.equal((await call("collections.list")).length, before + 1);
+
+  // A coleção mostra o que a regra acha na hora e a ordenação salva vale com a ordenação padrão.
+  const open = await call("library.list", { collection: saved.id, limit: 50 });
+  const direct = await call("library.list", { filter: "installed", stores: ["steam"], sort: "name", limit: 50 });
+  assert.deepEqual(
+    open.rows.map((g) => g.id),
+    direct.rows.map((g) => g.id),
+  );
+  assert.ok(open.total > 0);
+  // Filtros do pedido valem por cima da regra.
+  const narrowed = await call("library.list", { collection: saved.id, search: "zzzz" });
+  assert.equal(narrowed.total, 0);
+
+  // Nome vazio ou repetido (sem caixa nem acento) é recusado; renomear mantém o próprio nome.
+  for (const name of ["   ", "instalados da STEAM", "x".repeat(41)]) {
+    assert.equal(await ok("collections.smart.set", { collectionId: null, name, criteria: rule({}) }), false, name);
+  }
+  assert.equal(await ok("collections.rename", { collectionId: saved.id, name: "INSTALADOS da steam" }), true);
+
+  // Trocar os filtros: a mesma coleção passa a mostrar outros jogos.
+  const updated = await call("collections.smart.set", {
+    collectionId: saved.id,
+    name: "Instalados da Steam",
+    criteria: rule({ filter: "favorites" }),
+  });
+  assert.equal(updated.id, saved.id);
+  const favorites = await call("library.list", { collection: saved.id, limit: 50 });
+  assert.ok(favorites.rows.every((g) => g.favorite));
+
+  assert.equal(await ok("collections.smart.set", { collectionId: "missing", name: "Outra", criteria: rule({}) }), false);
+  await call("collections.delete", { collectionId: saved.id });
+  assert.equal((await call("collections.list")).length, before);
+  assert.equal(await ok("collections.delete", { collectionId: saved.id }), false);
+
+  // Manuais: criar, nome repetido, renomear e apagar.
+  const manual = await call("collections.create", { name: "Para o fim de semana" });
+  assert.equal(manual.criteria, null);
+  assert.equal(await ok("collections.create", { name: "para o fim de semana" }), false);
+  await call("collections.rename", { collectionId: manual.id, name: "Fim de semana" });
+  assert.ok((await call("collections.list")).some((c) => c.name === "Fim de semana"));
+  await call("collections.delete", { collectionId: manual.id });
+  assert.equal((await call("collections.list")).length, before);
+});

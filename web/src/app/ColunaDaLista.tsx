@@ -6,6 +6,9 @@ import { Icon } from "../components/Icon/Icon";
 import { ListaDeJogos } from "../components/ListaDeJogos/ListaDeJogos";
 import { cx } from "../lib/cx";
 import { listLabels, strings, libraryStrings as s } from "./strings";
+import { hasSavableCriteria, smartRuleFromCriteria } from "./colecoes/colecoesModel";
+import { OrganizarColecoes } from "./colecoes/OrganizarColecoes";
+import { SalvarColecao } from "./colecoes/SalvarColecao";
 import { LibraryFilters, filterCount } from "./LibraryFilters";
 import { LibraryBulkActions } from "./LibraryBulkActions";
 import type { LibraryCriteria } from "./uiState";
@@ -45,7 +48,13 @@ export function ColunaDaLista({
   const [notice, setNotice] = useState<{
     error: boolean;
     key: number;
+    /** Texto próprio do aviso; sem ele valem os da biblioteca. */
+    message?: string;
   } | null>(null);
+  // O formulário de "salvar como coleção" recomeça vazio a cada abertura (a chave troca).
+  const [saveOpen, setSaveOpen] = useState<number | null>(null);
+  const [lastSaveKey, setLastSaveKey] = useState(0);
+  const [manageOpen, setManageOpen] = useState(false);
   const update = (patch: Partial<LibraryCriteria>) => {
     setSelection(new Set());
     onCriteriaChange({ ...criteria, ...patch });
@@ -53,6 +62,10 @@ export function ColunaDaLista({
   const toggleLabel = collapsed ? strings.list.expand : strings.list.collapse;
   const count = filterCount(criteria);
   const collection = library.collections.find((c) => c.id === criteria.collection);
+  const rule = smartRuleFromCriteria(criteria, collection?.criteria ? collection : null);
+  const collectionDone = (error: boolean, message: string) => {
+    setNotice({ error, key: Date.now(), message });
+  };
   const empty =
     criteria.search.trim() || count > Number(criteria.collection !== null)
       ? listLabels.empty
@@ -207,6 +220,38 @@ export function ColunaDaLista({
         update={update}
         collections={library.collections}
         tags={library.tags}
+        canSaveCollection={hasSavableCriteria(criteria)}
+        onSaveCollection={() => {
+          setFiltersOpen(false);
+          setLastSaveKey((n) => n + 1);
+          setSaveOpen(lastSaveKey + 1);
+        }}
+        onManageCollections={() => {
+          setFiltersOpen(false);
+          setManageOpen(true);
+        }}
+      />
+      <SalvarColecao
+        key={saveOpen ?? lastSaveKey}
+        open={saveOpen !== null}
+        onClose={() => {
+          setSaveOpen(null);
+        }}
+        collections={library.collections}
+        rule={rule}
+        onDone={collectionDone}
+      />
+      <OrganizarColecoes
+        open={manageOpen}
+        onClose={() => {
+          setManageOpen(false);
+        }}
+        collections={library.collections}
+        rule={rule}
+        onDeleted={(id) => {
+          if (criteria.collection === id) update({ collection: null });
+        }}
+        onDone={collectionDone}
       />
       <Aviso open={library.error} onClose={() => {}} duration={null} tone="error">
         {s.loadError}
@@ -219,7 +264,7 @@ export function ColunaDaLista({
         noticeKey={notice?.key ?? 0}
         tone={notice?.error ? "error" : "success"}
       >
-        {notice?.error ? s.actionError : s.actionSuccess}
+        {notice?.message ?? (notice?.error ? s.actionError : s.actionSuccess)}
       </Aviso>
     </>
   );

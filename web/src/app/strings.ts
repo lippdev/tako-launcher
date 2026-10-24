@@ -164,6 +164,23 @@ export const libraryStrings = {
   },
 } as const;
 
+/**
+ * Textos das coleções na lista (WEB-11b) que não existem nos catálogos de `locales/`. Os que existem
+ * (`smart.*`, `library.collection.*`, `collections.*`) vêm de `t()`.
+ */
+export const collectionStrings = {
+  nameLabel: "Nome da coleção",
+  useCurrent: "Usar os filtros atuais",
+  useCurrentFor: (name: string) => `Usar os filtros atuais em ${name}`,
+  renameFor: (name: string) => `Renomear ${name}`,
+  deleteFor: (name: string) => `Excluir ${name}`,
+  savedRule: "Filtros da coleção atualizados.",
+  created: "Coleção criada.",
+  renamed: "Coleção renomeada.",
+  deleted: "Coleção excluída.",
+  saveError: "Não foi possível salvar a coleção.",
+} as const;
+
 /** Textos da tela de Configurações (WEB-13a). */
 export const settingsStrings = {
   /** Nome da navegação e do conteúdo, para leitores de tela. */
