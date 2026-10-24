@@ -43,7 +43,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Adicionar jogo (`add_game`) | ⬜ | **WEB-12c** |
 | Seletor de imagens (`art`) e Revisar capas (`art_review`) | 🟡 componente do seletor pronto | **WEB-12d** |
 | Editor de etiquetas (`tags_editor`) | ✅ | WEB-12b |
-| Coleções automáticas (`smart`): salvar filtros | 🟡 núcleo pronto | **WEB-11b** |
+| Coleções automáticas (`smart`): salvar filtros | ✅ (falta a lista em Configurações › Biblioteca, WEB-13c) | WEB-11b |
 | Busca geral Ctrl+K (`global_search`) | ✅ | WEB-14a |
 | Downloads (`downloads`): painel, ligar com aviso legal, fontes | 🟡 pronto; falta gerenciar fontes e abrir a pasta (núcleo) | WEB-14b · **WEB-14e** |
 | Atividades na barra (`activities`) | ✅ (downloads) | WEB-14b |
