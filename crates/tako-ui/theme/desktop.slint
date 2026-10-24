@@ -648,22 +648,17 @@ component Ring inherits Rectangle {
     }
 }
 
-// A pílula da barra de cima (`desk-activity`); `icon`: spin | ring | done | warn | dot. `announce` vale mesmo com a
-// pílula fora (o leitor de tela ouve a conclusão de qualquer atividade).
+// O botão Downloads da barra de cima (`desk-activity`): contador do que está em andamento (0 = sem bolinha), nome
+// acessível, `state` (`error` = selo "!" de erro, `ready` = ponto de atualização pronta, vazio = nada) e a região
+// viva (`announce` vale mesmo sem nada na tela: o leitor de tela ouve a conclusão de qualquer atividade).
 struct ActivityData {
-    on: bool,
-    id: string,
-    title: string,
-    detail: string,
-    icon: string,
-    progress: float,
-    action: string,
-    more: int,
+    count: int,
     label: string,
+    state: string,
     announce: string,
 }
 
-// AtividadeNaBarra (UX-006): ícone da pílula e das linhas da lista. Giro de 16 (tarefa sem %), anel de 18 (com %),
+// AtividadeNaBarra (UX-006): ícone das linhas do popover. Giro de 16 (tarefa sem %), anel de 18 (com %),
 // ✓ em success (concluída), ⚠ em warning (erro) e ponto success de 8 (atualização pronta). O giro e o anel
 // seguem "Reduzir animações" (Ring e ProgressRing já param).
 component ActivityIcon inherits Rectangle {
@@ -677,41 +672,6 @@ component ActivityIcon inherits Rectangle {
     if icon == "done": DeskIcon { name: "check"; size: 18px; tint: Ui.success; }
     if icon == "warn": DeskIcon { name: "alert"; size: 18px; tint: Ui.desk-warning; }
     if icon == "dot": Rectangle { x: 5px; y: 5px; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-}
-
-// Um lado do crossfade da pílula: ícone, as duas linhas e a ação do erro. Janela pequena: só o ícone.
-component ActivityFace inherits Rectangle {
-    in property <ActivityData> data;
-    in property <bool> small;
-    in property <bool> active;
-    callback act();
-    // 8 de folga: o texto cortado (…) por diferença de medida da fonte fica pior que um respiro a mais.
-    out property <length> pw: row.preferred-width + (small ? 0px : 8px);
-    opacity: active ? 1 : 0;
-    animate opacity { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    row := HorizontalLayout {
-        spacing: 10px;
-        // O lado que acabou de sair deixa de desenhar (e de girar) quando termina de sumir.
-        if active || root.opacity > 0: ActivityIcon { icon: data.icon; progress: data.progress; y: (parent.height - self.height) / 2; }
-        if !small: VerticalLayout {
-            alignment: center;
-            spacing: 3px;
-            Text { text: data.title; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; overflow: elide; }
-            if data.detail != "": Text { text: data.detail; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
-        }
-        if !small && active && data.action != "": Rectangle {
-            y: (parent.height - self.height) / 2;
-            width: at.preferred-width + 16px;
-            height: 24px;
-            border-radius: 8px;
-            background: aa.has-hover ? Ui.glass-hover : #ffffff14;
-            accessible-role: button;
-            accessible-label: data.action;
-            accessible-action-default => { root.act(); }
-            at := Text { text: data.action; color: Ui.desk-text; font-size: 12.5px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
-            aa := TouchArea { mouse-cursor: pointer; clicked => { root.act(); } }
-        }
-    }
 }
 
 component TopBar inherits Vidro {
@@ -728,33 +688,38 @@ component TopBar inherits Vidro {
     in property <int> native-pressed;
     in property <bool> active: true;
     in property <[string]> labels;
-    // AtividadeNaBarra: a atividade em segundo plano mais importante, antes do perfil (some com a fila vazia).
+    // AtividadeNaBarra: o botão Downloads antes do perfil, com o contador do que roda em segundo plano.
     in property <ActivityData> activity;
-    // A lista Atividades está aberta (o pill fica no destaque do hover).
+    // O popover Downloads está aberto (o botão fica aceso).
     in property <bool> activity-open;
-    // Crossfade da AtividadeNaBarra: dois lados; a atividade nova vai para o lado escondido e os lados trocam.
-    property <ActivityData> slot-a;
-    property <ActivityData> slot-b;
-    property <bool> on-b;
-    changed activity => {
-        // Mesma atividade (só a % ou o detalhe mudou): atualiza no lado visível, sem troca.
-        if (activity.id == (on-b ? slot-b : slot-a).id) {
-            if (on-b) { slot-b = activity; } else { slot-a = activity; }
-        } else {
-            if (on-b) { slot-a = activity; } else { slot-b = activity; }
-            on-b = !on-b;
+    // O número pula (1,35 em 400, `curva-entrada`) quando o contador muda; com Reduzir animações, não.
+    property <bool> pop;
+    property <int> count: activity.count;
+    changed count => {
+        if (!Ui.reduce-motion && count > 0) {
+            pop = true;
+            pop-timer.running = true;
         }
     }
+    pop-timer := Timer {
+        interval: Ui.tempo-hover;
+        running: false;
+        triggered => {
+            self.running = false;
+            pop = false;
+        }
+    }
+    out property <length> downloads-right: dl.absolute-position.x + dl.width;
     out property <length> profile-x: profile.absolute-position.x;
     out property <length> drag-start: drag.absolute-position.x;
     out property <length> drag-end: drag.absolute-position.x + drag.width;
     callback action(string);
     in property <bool> small;
-    // Foco do teclado na barra: -1 fora dela; 0 marca, 1… abas, a pílula (se houver), perfil, Tela cheia e os três
-    // botões da janela (a mesma ordem de `shell::bar`).
+    // Foco do teclado na barra: -1 fora dela; 0 marca, 1… abas, Downloads, perfil, Tela cheia e os três botões da
+    // janela (a mesma ordem de `shell::bar`).
     in property <int> focus-index: -1;
-    // Primeiro índice depois das abas e da pílula: o do perfil.
-    property <int> first-right: 1 + items.length + (activity.on ? 1 : 0);
+    // Primeiro índice depois das abas e do Downloads: o do perfil.
+    property <int> first-right: 2 + items.length;
     callback clicked(string, int);
     // Onde abrir o menu da marca: 8 abaixo da barra, alinhado à marca.
     callback brand-menu(length, length);
@@ -895,69 +860,50 @@ component TopBar inherits Vidro {
                 double-clicked => { root.action("max"); }
             }
         }
-        if activity.on: Rectangle {
-            // 4 de espaço antes do perfil.
-            width: pill.width + 4px;
-            pill := Rectangle {
-            x: 0px;
+        // Downloads: ↓ em círculo com a bolinha do contador (19, cor da barra, borda de 2); abre o popover.
+        dl := BarButton {
             y: (parent.height - self.height) / 2;
-            height: 36px;
-            // 11 / 12 de respiro, o texto (até 340 no total) e o "+N" depois (que já traz os 10 de espaço).
-            width: min(340px, 23px + (on-b ? fb.pw : fa.pw) + more-box.width);
-            border-radius: Ui.radius-control;
-            transform-scale: ata.pressed ? Ui.escala-pressionado : 1;
-            animate transform-scale { duration: Ui.focus-time; }
-            background: ata.pressed ? Ui.glass-pressed : (ata.has-hover || activity-open ? Ui.glass-hover : Ui.glass-control);
-            border-width: 1px;
-            border-color: Ui.glass-edge;
-            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            accessible-role: button;
-            accessible-label: activity.label;
-            accessible-action-default => { root.clicked("desk-activity", 0); }
-            if focus-index == 1 + items.length: FocusRing { radius: Ui.radius-control; }
-            ata := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.clicked("desk-activity", 0); }
+            width: 36px;
+            label: activity.label;
+            tip: activity.label;
+            focused: focus-index == 1 + items.length;
+            on: activity-open;
+            clicked => { root.clicked("desk-activity", 0); }
+            DeskIcon { name: "download-circle"; size: 20px; tint: dl.hovering || activity-open ? Ui.desk-text : Ui.desk-text.with-alpha(0.62); x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+            if activity.count > 0: Rectangle {
+                x: parent.width - 14px;
+                y: -5px;
+                width: max(19px, bt.preferred-width + 11px);
+                height: 19px;
+                border-radius: 9.5px;
+                background: Ui.bar-accent;
+                border-width: 2px;
+                border-color: Ui.desk-canvas;
+                transform-scale: pop ? 1.35 : 1;
+                animate transform-scale { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
+                bt := Text { text: activity.count; color: Ui.bar-on-accent; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
             }
-            HorizontalLayout {
-                padding-left: 11px;
-                padding-right: 12px;
-                spacing: 0px;
-                // Crossfade: a atividade nova entra num lado enquanto a anterior sai pelo outro.
-                Rectangle {
-                    horizontal-stretch: 1;
-                    fa := ActivityFace {
-                        width: parent.width;
-                        height: parent.height;
-                        data: slot-a;
-                        small: root.small;
-                        active: !on-b;
-                        act => { root.clicked("desk-activity-action", 0); }
-                    }
-                    fb := ActivityFace {
-                        width: parent.width;
-                        height: parent.height;
-                        data: slot-b;
-                        small: root.small;
-                        active: on-b;
-                        act => { root.clicked("desk-activity-action", 0); }
-                    }
-                }
-                more-box := Rectangle {
-                    visible: activity.more > 0;
-                    width: activity.more > 0 ? more-text.preferred-width + 12px + 10px : 0px;
-                    Rectangle {
-                        x: 10px;
-                        y: (parent.height - self.height) / 2;
-                        width: parent.width - 10px;
-                        height: 20px;
-                        border-radius: 10px;
-                        background: #ffffff1f;
-                        more-text := Text { text: "+" + activity.more; color: Ui.desk-text; font-size: 12px * Ui.text-scale; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                }
+            // Erro: selo com "!" embaixo à direita (forma e cor; o nome acessível diz "N erro"). Atualização pronta: ponto.
+            if activity.state == "error": Rectangle {
+                x: parent.width - 13px;
+                y: parent.height - 13px;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                background: Ui.desk-error;
+                border-width: 2px;
+                border-color: Ui.desk-canvas;
+                Text { text: "!"; color: Ui.desk-canvas; font-size: 11px; font-weight: 800; horizontal-alignment: center; vertical-alignment: center; }
             }
-            Tip { text: activity.detail == "" ? activity.title : activity.title + " · " + activity.detail; hovering: ata.has-hover; }
+            if activity.state == "ready": Rectangle {
+                x: parent.width - 11px;
+                y: parent.height - 11px;
+                width: 12px;
+                height: 12px;
+                border-radius: 6px;
+                background: Ui.success;
+                border-width: 2px;
+                border-color: Ui.desk-canvas;
             }
         }
         // Perfil: avatar redondo de 24 com o anel do destaque e o ponto verde de "online", nome e ⌄ (menu do perfil).
@@ -5921,8 +5867,10 @@ component DeskOverlay inherits Rectangle {
             }
         }
     }
-    // Atividades (AtividadeNaBarra): a lista do que roda em segundo plano, camada de 400 ancorada 8 abaixo da pílula.
-    // `ov.rows`: ícone (`icon`), nome, detalhe e % (`value`, com a fração em `action`); `ov.tabs` = rodapé.
+    // Downloads (AtividadeNaBarra, PainelDownloads): o popover de 340 sob o botão da barra, alinhado à direita; abre
+    // 6 abaixo, entra em `page-time` descendo 6 e crescendo de 0,98 a partir do canto de cima à direita. `ov.rows`:
+    // ícone (`icon`), nome, detalhe e % (`action`, com o texto em `value`); `ov.tabs` = rodapé; `ov.preview-text` =
+    // texto de lista vazia.
     if ov.kind == "activities": Rectangle {
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
@@ -5930,12 +5878,13 @@ component DeskOverlay inherits Rectangle {
             opacity: shown ? 1 : 0;
             transform-scale: shown ? 1 : Ui.escala-menu;
             transform-origin: { x: self.width, y: 0 };
-            animate opacity, transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            radius: Ui.radius-card;
-            width: 400px;
+            animate opacity { duration: Ui.tempo-hover; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+            animate transform-scale, y { duration: Ui.page-time; easing: Ui.curva-entrada; }
+            radius: 14px;
+            width: 340px;
             height: min(al.preferred-height, root.height - 40px);
             x: clamp(menu-x - self.width, 12px, root.width - self.width - 12px);
-            y: menu-y;
+            y: menu-y + (shown ? 0px : -6px);
             TouchArea { }
             af := Flickable {
                 viewport-height: al.preferred-height;
@@ -5944,37 +5893,59 @@ component DeskOverlay inherits Rectangle {
                     padding: 8px;
                     spacing: 2px;
                     HorizontalLayout {
-                        padding: 10px;
+                        padding: 8px;
                         padding-top: 8px;
-                        Text { text: ov.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
+                        padding-bottom: 10px;
+                        Text { text: ov.title.to-uppercase(); color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.4px; vertical-alignment: center; }
                         Rectangle { horizontal-stretch: 1; }
-                        Text { text: ov.overline; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; vertical-alignment: center; }
+                        Text { text: ov.overline; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.4px; vertical-alignment: center; }
+                    }
+                    if ov.rows.length == 0: Text {
+                        text: ov.preview-text;
+                        color: Ui.desk-text-muted;
+                        font-size: 12.5px * Ui.text-scale;
+                        horizontal-alignment: center;
+                        height: 56px;
+                        vertical-alignment: center;
                     }
                     for r[i] in ov.rows: Rectangle {
-                        height: r.description != "" ? 54px : 40px;
+                        height: 62px;
                         border-radius: 10px;
                         background: arow.has-hover ? Ui.glass-hover : transparent;
                         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                         if focus-visible && i == ov.sel && top-most && !r.on: FocusRing { radius: 10px; }
                         arow := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("row", i); } }
                         HorizontalLayout {
-                            padding-left: 10px;
-                            padding-right: r.style == "warning" ? 6px : 10px;
+                            padding: 8px;
+                            padding-right: r.style == "warning" ? 4px : 8px;
                             spacing: 12px;
-                            ActivityIcon { icon: r.icon; progress: r.action.to-float(); y: (parent.height - self.height) / 2; }
+                            // O "capa" de 36 × 46 (as atividades não têm capa: giro, anel, ✓ ou ⚠ no lugar).
+                            Rectangle {
+                                width: 36px;
+                                border-radius: 5px;
+                                background: Ui.tile;
+                                ActivityIcon { icon: r.icon; progress: r.action.to-float(); x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                            }
                             VerticalLayout {
                                 horizontal-stretch: 1;
                                 alignment: center;
-                                spacing: 4px;
-                                Text { text: r.title; color: r.style == "done" ? Ui.desk-on-muted : Ui.desk-text; font-size: 13.5px * Ui.text-scale; font-weight: 600; overflow: elide; }
-                                if r.description != "": Text { text: r.description; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; font-weight: 500; overflow: elide; }
+                                spacing: 3px;
+                                Text { text: r.title; color: r.style == "done" ? Ui.desk-on-muted : Ui.desk-text; font-size: 13px * Ui.text-scale; font-weight: 600; overflow: elide; }
+                                if r.description != "": Text { text: r.description; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; overflow: elide; }
+                                // Barra de 3 na cor de destaque (só com porcentagem).
+                                if r.icon == "ring": Rectangle {
+                                    height: 3px;
+                                    border-radius: 2px;
+                                    background: Ui.tile-foot;
+                                    Rectangle { x: 0px; width: parent.width * clamp(r.action.to-float() / 100, 0, 1); border-radius: 2px; background: Ui.desk-accent; }
+                                }
                             }
                             if r.value != "": Text { text: r.value; color: Ui.desk-text; font-size: 12.5px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
                             // O erro fica até resolver ou fechar: o "fechar" é um gesto à parte (→ no teclado).
                             if r.style == "warning": Rectangle {
                                 y: (parent.height - self.height) / 2;
-                                width: 28px;
-                                height: 28px;
+                                width: 30px;
+                                height: 30px;
                                 border-radius: 8px;
                                 background: cta.has-hover ? Ui.glass-hover : transparent;
                                 accessible-role: button;
@@ -5983,6 +5954,7 @@ component DeskOverlay inherits Rectangle {
                                 if focus-visible && i == ov.sel && top-most && r.on: FocusRing { radius: 8px; }
                                 DeskIcon { name: "close"; size: 14px; tint: Ui.desk-on-muted; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
                                 cta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("close", i); } }
+                                Tip { text: ov.text; hovering: cta.has-hover; }
                             }
                         }
                     }
@@ -7550,9 +7522,10 @@ export component Desktop inherits Window {
         bar-menu: brand-menu || profile-menu;
         property <bool> activities: ov.kind == "activities";
         // A lista Atividades acaba onde a pílula acaba: 12 (8 na janela pequena) + 4 antes do perfil.
-        menu-x: brand-menu ? Ui.space-20 : profile-menu ? bar.profile-x : activities ? bar.profile-x - (small ? 12px : 16px) : root.menu-x;
-        // Os menus da barra abrem 6 abaixo da marca (40 na barra de 52) e a lista Atividades 8 abaixo da pílula (36).
-        menu-y: activities || profile-menu ? Ui.space-8 - (Ui.topbar-height - 36px) / 2 : brand-menu ? 0px : root.menu-y - Ui.topbar-height;
+        menu-x: brand-menu ? Ui.space-20 : profile-menu ? bar.profile-x : activities ? bar.downloads-right : root.menu-x;
+        // O menu da marca abre 6 abaixo dela (40 na barra de 52), o do perfil 8 abaixo do botão (36) e o popover
+        // Downloads 6 abaixo do dele.
+        menu-y: profile-menu ? Ui.space-8 - (Ui.topbar-height - 36px) / 2 : activities ? Ui.space-6 - (Ui.topbar-height - 36px) / 2 : brand-menu ? 0px : root.menu-y - Ui.topbar-height;
         art: desk-game.art;
         leaving: leaving;
         clicked(z, idx) => {

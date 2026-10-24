@@ -1449,15 +1449,15 @@ impl Page for DesktopLibrary {
             }
             (Zone::Bar, Cmd::Left) => self.index = self.index.saturating_sub(1),
             (Zone::Bar, Cmd::Right) => {
-                self.index = (self.index + 1).min(bar::items(ctx).len() - 1);
+                self.index = (self.index + 1).min(bar::ITEMS.len() - 1);
             }
-            // Menu na pílula: a lista de atividades (Aceitar num erro refaz o trabalho).
-            (Zone::Bar, Cmd::Menu) if bar::item(ctx, self.index) == Some(bar::Item::Downloads) => {
+            // Menu no botão Downloads: o popover (o mesmo que Aceitar).
+            (Zone::Bar, Cmd::Menu) if bar::item(self.index) == Some(bar::Item::Downloads) => {
                 super::activities::open_list(ctx);
                 return Nav::Stay;
             }
             (Zone::Bar, Cmd::Down) => self.zone = Zone::List,
-            (Zone::Bar, Cmd::Accept) => match bar::item(ctx, self.index) {
+            (Zone::Bar, Cmd::Accept) => match bar::item(self.index) {
                 Some(bar::Item::Library) | None => self.zone = Zone::List,
                 Some(item) => return bar::activate(item, ctx),
             },
@@ -1515,7 +1515,7 @@ impl Page for DesktopLibrary {
         if c == keys::TAB || c == '\u{0019}' {
             let forward = c == keys::TAB && mods != KeyModifiers::SHIFT;
             // Na barra, Tab anda item a item (marca → abas → … → janela) antes de ir para a zona seguinte.
-            match bar::step(ctx, self.index, forward).filter(|_| self.zone == Zone::Bar) {
+            match bar::step(self.index, forward).filter(|_| self.zone == Zone::Bar) {
                 Some(i) => self.index = i,
                 None => self.cycle(forward),
             }
@@ -2751,6 +2751,7 @@ mod tests {
         assert_eq!(page(&shell).zone(), Zone::Bar);
         shell.handle(Cmd::Right);
         shell.handle(Cmd::Right);
+        shell.handle(Cmd::Right);
         shell.handle(Cmd::Accept);
         assert!(shell.has_layers());
         assert_eq!(page(&shell).zone(), Zone::Bar);
@@ -2763,9 +2764,9 @@ mod tests {
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
         assert_eq!(
-            bar::items(&shell.ctx),
+            bar::ITEMS,
             [
-                Brand, Library, Profile, BigPicture, Minimize, Maximize, Close
+                Brand, Library, Downloads, Profile, BigPicture, Minimize, Maximize, Close
             ]
         );
         while page(&shell).zone() != Zone::Tabs {
@@ -2776,7 +2777,7 @@ mod tests {
         for _ in 0..10 {
             shell.handle(Cmd::Right);
         }
-        assert_eq!(page(&shell).index, 6);
+        assert_eq!(page(&shell).index, 7);
         shell.handle(Cmd::Accept);
         shell.handle(Cmd::Left);
         shell.handle(Cmd::Accept);
@@ -2791,11 +2792,11 @@ mod tests {
             ]
         );
         // Tab percorre a barra do começo ao fim e só então sai dela.
-        for _ in 0..4 {
+        for _ in 0..5 {
             shell.handle(Cmd::Left);
         }
         assert_eq!(page(&shell).index, 0);
-        for index in 1..=6 {
+        for index in 1..=7 {
             shell.key("\t", KeyModifiers::NONE);
             assert_eq!(
                 (page(&shell).zone(), page(&shell).index),
@@ -2807,7 +2808,7 @@ mod tests {
     }
 
     #[test]
-    fn activity_pill_is_in_the_keyboard_bar_order() {
+    fn downloads_button_is_in_the_keyboard_bar_order() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
@@ -2817,7 +2818,7 @@ mod tests {
             shell.key("\t", KeyModifiers::NONE);
         }
         shell.handle(Cmd::Up);
-        // Marca, Biblioteca e então a pílula.
+        // Marca, Biblioteca e então o botão Downloads.
         for _ in 0..2 {
             shell.handle(Cmd::Right);
         }
@@ -2826,7 +2827,7 @@ mod tests {
 
         assert!(shell.has_layers());
         assert_eq!(page(&shell).zone(), Zone::Bar);
-        // Esc fecha e o foco continua na pílula.
+        // Esc fecha e o foco continua no botão.
         shell.handle(Cmd::Back);
         assert!(!shell.has_layers());
         assert_eq!(page(&shell).zone(), Zone::Bar);

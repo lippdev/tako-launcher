@@ -428,7 +428,7 @@ pub(crate) fn notify_rescan_finished(
         ctx.tn("common.games", current_games.len() as i64, &[])
     };
     if warnings.is_empty() {
-        // No desktop o ✓ da pílula já traz o resultado; o aviso fica para a tela cheia.
+        // No desktop quem avisa o resultado é a fila de atividades (`activities::tick`); aqui fica a tela cheia.
         if !ctx.desktop {
             ctx.toast_success(format!("{updated} · {detail}"));
         }
@@ -2189,7 +2189,7 @@ mod tests {
     }
 
     #[test]
-    fn desktop_rescan_result_goes_to_the_pill_not_a_toast() {
+    fn desktop_rescan_result_is_announced_by_the_queue_not_here() {
         let dir = tempfile::tempdir().unwrap();
         let mut ctx = build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
         ctx.desktop = true;

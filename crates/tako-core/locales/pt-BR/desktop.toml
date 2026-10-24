@@ -188,14 +188,18 @@ images = "Imagens"
 publisher = "Publicadora"
 folder = "Pasta"
 
-# AtividadeNaBarra (UX-006): a pílula da barra de cima e a lista "Atividades".
+# AtividadeNaBarra (UX-006/007): o botão Downloads da barra de cima e o popover com a lista.
 [desktop.activity]
-title = "Atividades"
-running = "{n} em andamento"
+title = "Downloads"
+running.one = "{n} ativo"
+running.other = "{n} ativos"
 idle = "Nada em andamento"
-more = "e mais {n}"
 view_downloads = "Ver downloads"
 clear_done = "Limpar concluídas"
+button = "Downloads"
+errors.one = "{n} erro"
+errors.other = "{n} erros"
+none = "Nenhum download ativo"
 close = "Fechar"
 error = "Erro: {reason}"
 library = "Atualizando biblioteca"
