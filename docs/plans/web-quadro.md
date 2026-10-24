@@ -9,7 +9,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-02b, WEB-01e, WEB-05a |
-| Antigravity | `antigravity` | WEB-04g, WEB-04h, WEB-04i (resetou; conferir tudo que ele entrega) |
+| Antigravity | `antigravity` | WEB-04h, WEB-04i (conferir tudo que ele entrega) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
 | Codex Alyx Medical | `codex_alyx_medical` | sem limite; reset às ~20:52 |
@@ -42,7 +42,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-06a | **Idiomas, infraestrutura:** `i18n.catalog` e `i18n.changed` no núcleo, `t()`/`useT()` no React, prova num texto; a migração do `strings.ts` fica para o WEB-06b | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-01b | `crates/tako-app/src/i18n.rs`, `web/src/i18n/` | integrada |
 | WEB-06b | **Idiomas, migração:** textos do `strings.ts` e das telas para os catálogos `locales/` (chaves novas nos dois idiomas) | N2 | a definir | WEB-06a e telas estáveis | `web/src/`, `crates/tako-core/locales/` | fila |
 | WEB-01e | **Downloads pela ponte:** `downloads.list/summary/pause/resume/cancel/sources/add` e `downloads.changed`, ligando o gerenciador que já existe no `tako-core`; desligado por padrão (ADR-0028) | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-01a | `crates/tako-app/` | despachada |
-| WEB-04g | **CampoDeTexto e SeletorDeImagens** (componentes; ligar no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | despachada |
+| WEB-04g | **CampoDeTexto e SeletorDeImagens** (componentes; ligar no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (duas pastas) | integrada (aguarda validação visual) |
 | WEB-04h | **ConfiguracoesDoJogo** (componente; ligar no WEB-12b) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/ConfiguracoesDoJogo/` | despachada |
 | WEB-04i | **PerfilSessoes, PerfilColecoes, PerfilFamilia** (componentes; tela do perfil no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/Perfil*/` | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
@@ -79,3 +79,4 @@ Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-0
 - **Visão geral, partes da prévia fora** (WEB-10b): "Voltar a jogar" (fácil, com os dados atuais), "Sua semana" e "Precisa de atenção" (precisam de horas totais e métricas que a ponte não dá). Cabeçalho sem o nome (perfil é do WEB-14). Ao voltar da página do jogo a vista remonta e recarrega; guardar rolagem e fileiras fica para depois. A lógica de Jogar repete a da página do jogo (extrair um hook comum quando mexer em uma das duas).
 - **Configurações, o que ainda não tem quem leia ou não tem chamada** (WEB-13b): o Sunshine sem a prévia de confirmação do app atual; Discord e Sunshine sem ninguém lendo as chaves no caminho web; cor de destaque e opções do Liquid Glass sem chave; troca de monitor sem restaurar os presets da tela (`GameScreenPresets`); testar a imagem na tela de jogo, exportar para o Sunshine, relatório, logs, backup e desempenho sem chamadas na ponte. "Sair do modo seguro" é ação do hospedeiro (`--safe-mode`), não chave.
 - **Idioma global do núcleo** (WEB-06a): `settings.set` com `Language` troca `core.lang`, mas não o `tako_core::i18n::set_lang` global. Ligar quando o hospedeiro usar textos do núcleo (bandeja, avisos do sistema).
+- **Props em português** em componentes feitos pelo Gemini (`CapaDoJogo`, `PilulaDaLoja`, `StatusDoJogo`, `EtiquetasDoJogo`, `ErroDoJogo`, `AtualizacaoDoApp`, `SeletorDeImagens`): contradiz "nomes de código em inglês". Padronizar numa tarefa N1 quando as telas que os usam estabilizarem (renomear props e chamadas juntos).

@@ -324,3 +324,29 @@ textarea {
   /* PainelDownloads: barra de progresso (README do PainelDownloads: altura de 3 na cor de destaque) */
   --dl-progress-height: 3px;
 }
+
+/* Componentes CampoDeTexto e SeletorDeImagens (WEB-04g): medidas e superfícies dos componentes */
+:root {
+  /* CampoDeTexto: altura 44 (README do CampoDeTexto e protótipo) */
+  --campo-texto-altura: 44px;
+  --campo-texto-radius: var(--radius-control);
+  --campo-texto-fundo: color-mix(in srgb, var(--text) 3.5%, transparent);
+  --campo-texto-fundo-hover: color-mix(in srgb, var(--text) 5.5%, transparent);
+  --campo-texto-fundo-foco: color-mix(in srgb, var(--text) 5%, transparent);
+  --campo-texto-borda: var(--line);
+  --campo-texto-borda-hover: var(--line-strong);
+  --campo-texto-borda-foco: color-mix(in srgb, var(--text) 30%, transparent);
+
+  /* SeletorDeImagens (README do SeletorDeImagens e protótipo): diálogo largo de 1180, prévia de 300 */
+  --seletor-dialogo-largura: 1180px;
+  --seletor-previa-largura: 300px;
+  --seletor-grade-colunas: 6;
+  --seletor-grade-gap: 12px;
+  --seletor-capa-tamanho: 44px;
+  --seletor-capa-radius: 8px;
+  --seletor-opcao-radius: 10px;
+  --seletor-opcao-borda: color-mix(in srgb, var(--text) 7%, transparent);
+  --seletor-opcao-borda-foco: var(--text);
+  --seletor-badge-fundo: color-mix(in srgb, var(--accent) 25%, var(--surface-raised));
+  --seletor-badge-cor: var(--accent);
+}

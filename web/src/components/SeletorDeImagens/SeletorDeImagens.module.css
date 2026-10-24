@@ -1,0 +1,378 @@
+/* SeletorDeImagens (WEB-04g): diálogo largo de 1180px para troca de imagens do jogo */
+
+.dialogo {
+  --dialogo-largura: var(--seletor-dialogo-largura);
+  max-height: 90vh;
+  padding: var(--space-20);
+}
+
+/* Oculta visualmente o cabeçalho padrão do Dialogo para renderizar o cabeçalho personalizado */
+.dialogo > header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-14);
+  margin-bottom: var(--space-14);
+}
+
+.miniatura {
+  flex: none;
+  width: var(--seletor-capa-tamanho);
+  height: var(--seletor-capa-tamanho);
+  border-radius: var(--seletor-capa-radius);
+  object-fit: cover;
+  background: var(--tile);
+  display: block;
+}
+
+.miniaturaVazia {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--seletor-capa-tamanho);
+  height: var(--seletor-capa-tamanho);
+  border-radius: var(--seletor-capa-radius);
+  background: var(--tile);
+  color: var(--text-muted);
+}
+
+.titulos {
+  flex: 1;
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.subtitulo {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.botaoFechar {
+  composes: ring from "../../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.botaoFechar:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+/* Barra de controles: abas segmentadas, seletores e botão de arquivo */
+.barraControles {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  margin-bottom: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.filtrosWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.seletorFiltro {
+  composes: ring from "../../lib/focus.module.css";
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  height: 32px;
+  padding: 0 var(--space-10);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.seletorFiltro:hover {
+  background: var(--tile);
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.acoesBarra {
+  margin-left: auto;
+}
+
+/* Estrutura principal em duas colunas */
+.areaPrincipal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--seletor-previa-largura);
+  gap: var(--space-20);
+  align-items: start;
+}
+
+.colunaEsquerda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.resumoInfo {
+  margin-bottom: var(--space-10);
+  font-family: var(--font-text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Grade de imagens com rolagem */
+.gradeOpcoes {
+  display: grid;
+  gap: var(--seletor-grade-gap);
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 2px;
+  padding-right: var(--space-4);
+}
+
+.gradeCapa {
+  grid-template-columns: repeat(var(--seletor-grade-colunas), 1fr);
+}
+
+.gradeFundo {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.gradeLogo {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.gradeIcone {
+  grid-template-columns: repeat(var(--seletor-grade-colunas), 1fr);
+}
+
+/* Botão de opção na grade */
+.opcaoItem {
+  composes: ring from "../../lib/focus.module.css";
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--seletor-opcao-radius);
+  overflow: hidden;
+  background: var(--tile);
+  box-shadow: inset 0 0 0 1px var(--seletor-opcao-borda);
+  cursor: pointer;
+  transition:
+    transform var(--tempo-hover) var(--curva-estado),
+    box-shadow var(--tempo-hover) var(--curva-estado);
+}
+
+.aspectCapa {
+  aspect-ratio: 3 / 4;
+}
+
+.aspectFundo {
+  aspect-ratio: 16 / 9;
+}
+
+.aspectLogo {
+  aspect-ratio: 16 / 9;
+  background: var(--surface-raised);
+}
+
+.aspectIcone {
+  aspect-ratio: 1 / 1;
+}
+
+.opcaoItem:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.opcaoSelecionada {
+  box-shadow: 0 0 0 2px var(--seletor-opcao-borda-foco) !important;
+}
+
+.opcaoImagem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.opcaoImagemLogo {
+  object-fit: contain;
+  padding: var(--space-10);
+}
+
+.etiquetaAtual {
+  position: absolute;
+  top: var(--space-6);
+  right: var(--space-6);
+  padding: 2px var(--space-6);
+  border-radius: var(--radius-full);
+  background: var(--seletor-badge-fundo);
+  color: var(--seletor-badge-cor);
+  font-family: var(--font-text);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--titlebar) 60%, transparent);
+}
+
+/* Estado sem arte / erro na imagem */
+.semArte {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-8);
+  background: var(--tile);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.semArteTexto {
+  line-height: 1.2;
+}
+
+/* Skeletons de carregamento */
+.skeletonCard {
+  width: 100%;
+  border-radius: var(--seletor-opcao-radius);
+  background: var(--skeleton);
+  animation: pulsar var(--tempo-pulso) ease-in-out infinite;
+}
+
+@keyframes pulsar {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Estado vazio */
+.estadoVazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-10);
+  min-height: 240px;
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--line-strong);
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  text-align: center;
+}
+
+/* Coluna lateral de prévia */
+.colunaPrevia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding: var(--space-12);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+}
+
+.previaImagemWrap {
+  position: relative;
+  width: 100%;
+  border-radius: var(--seletor-opcao-radius);
+  overflow: hidden;
+  background: var(--tile);
+}
+
+.imagemPrevia {
+  width: 100%;
+  height: auto;
+  border-radius: var(--seletor-opcao-radius);
+  object-fit: cover;
+  display: block;
+}
+
+.imagemPreviaLogo {
+  object-fit: contain;
+  padding: var(--space-14);
+}
+
+.linhaMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-text);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.linhaMetaValor {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.acoesPrevia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-top: var(--space-4);
+}
+
+.acoesSecundarias {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+}
