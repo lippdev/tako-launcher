@@ -3121,6 +3121,23 @@ mod tests {
     }
 
     #[test]
+    fn desktop_toast_time_keeps_action_time_and_short_confirmation() {
+        let (_dir, mut shell) = shell();
+        shell.ctx.toast("Salvo");
+        assert_eq!(
+            shell.ctx.toast_time(),
+            std::time::Duration::from_millis(2300)
+        );
+        shell.ctx.toast_with_undo("Desfeito", |_| {});
+        assert_eq!(shell.ctx.toast_time(), std::time::Duration::from_secs(8));
+        shell.ctx.toast("Atualização falhou");
+        shell.ctx.app_update.toast_label = "Tentar de novo".into();
+        assert_eq!(shell.ctx.toast_time(), std::time::Duration::from_secs(8));
+        shell.ctx.desktop = false;
+        assert_eq!(shell.ctx.toast_time(), super::super::TOAST_TIME);
+    }
+
+    #[test]
     fn a_row_without_icon_shows_the_title_initial() {
         let game = |title: &str| Game {
             title: title.into(),

@@ -5939,21 +5939,24 @@ component DeskOverlay inherits Rectangle {
             }
         }
     }
-    // Diálogo (e qualquer camada sem desenho próprio): cabeçalho com o X, o corpo em grupos e as ações no rodapé.
+    // Diálogo padrão (PadraoPopup): 480 (S 440 / M 540 / L 680), escurece o fundo (60%), raio 18, shadow-layer.
     if generic && ov.tab2 != 1: Rectangle {
-        background: Ui.desk-canvas.with-alpha(shown ? 0.55 : 0);
-        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        background: Ui.desk-canvas.with-alpha(shown ? 0.6 : 0);
+        animate background { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
         TouchArea { }
         Vidro {
             layer: true;
+            radius: Ui.radius-hero;
             opacity: shown ? 1 : 0;
+            y: (parent.height - self.height) / 2 + (shown ? 0 : 12px);
             // Empilhar (TrocaDePopup): a camada de baixo recua para 0,98; a de cima a escurece com o scrim dela.
             transform-scale: shown && top-most ? 1 : Ui.escala-entrada;
-            animate opacity, transform-scale { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            width: min(parent.width - 80px, ov.wide ? 680px : (ov.compact ? 440px : 540px));
+            animate y, transform-scale { duration: Ui.tempo-dialogo; easing: Ui.curva-entrada; }
+            animate opacity { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+            width: min(parent.width - 80px, ov.wide ? 680px : (ov.compact ? 440px : 480px));
             height: min(dlg.preferred-height, parent.height - 80px);
             dlg := VerticalLayout {
-                padding: Ui.space-24;
+                padding: 22px;
                 spacing: 14px;
                 if ov.kind == "dialog" && ov.tabs.length > 0: Stepper { steps: ov.tabs; current: ov.tab; }
                 HorizontalLayout {
@@ -6356,21 +6359,19 @@ component DeskOverlay inherits Rectangle {
         }
     }
 
-    // Painel lateral: flutua à direita a 36 das bordas, sem escurecer a janela; clique fora ou Esc fecha.
+    // Painel lateral: 400 (480 nas configurações do jogo), pela direita, sem escurecer o fundo.
     if ov.kind == "panel": Rectangle {
-        // Scrim de 0 a 25% junto com a entrada do painel (PainelEAviso).
-        background: Ui.desk-canvas.with-alpha(shown ? 0.25 : 0);
-        animate background { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        background: Ui.desk-canvas.with-alpha(ov.image.width > 0 ? 0.25 : 0.5);
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
             layer: true;
             // Mesma margem direita do conteúdo (20 na janela pequena).
-            x: parent.width - self.width - (parent.width < 1280px ? Ui.space-20 : Ui.space-36) + (shown ? 0 : 48px);
+            x: parent.width - self.width - (parent.width < 1280px ? Ui.space-20 : Ui.space-36) + (shown ? 0 : self.width * 1.02);
             opacity: shown ? 1 : 0;
-            animate x, opacity { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+            animate x, opacity { duration: Ui.tempo-pagina; easing: Ui.curva-entrada; }
             // Abaixo da barra superior, alinhado com o conteúdo: 84 do topo e 28 de baixo (480 de largura no largo).
             y: 84px;
-            width: min(parent.width - 120px, ov.wide ? 480px : 440px);
+            width: min(parent.width - 120px, ov.wide ? 480px : 400px);
             height: min(parent.height - 84px - Ui.space-28, pl.preferred-height);
             TouchArea { }
             pl := VerticalLayout {
@@ -6427,21 +6428,23 @@ component DeskOverlay inherits Rectangle {
             }
         }
     }
-    // Menu (MenuDeContexto, MenuDoTako): vidro de camada junto do ponteiro, do botão ⋯ ou da marca; clique fora
-    // fecha. Item de 36 com ícone de 18, atalho à direita e divisórias entre grupos.
+    // Menu (MenuDeContexto, MenuDoTako): 220 de largura, raio 12, surface-raised, contorno line-strong, shadow-float,
+    // itens de 34 com ícone de 15, abrem do ponto/âncora (160/200 ms na curva cubic-bezier(0.22,1,0.36,1)).
     if ov.kind == "menu": Rectangle {
         TouchArea { clicked => { root.clicked("outside", 0); } }
         Vidro {
-            layer: true;
+            layer: false;
+            dense: true;
             opacity: shown ? 1 : 0;
             transform-scale: shown ? 1 : Ui.escala-menu;
             // Nasce do ponto que abriu: do canto do ponteiro/botão, ou do canto direito da pílula no select.
             transform-origin: { x: select ? self.width : clamp(menu-x - self.x, 0, self.width), y: menu-y > self.y ? self.height : 0 };
-            animate opacity, transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-            radius: Ui.radius-control;
+            animate opacity { duration: Ui.tempo-foco; easing: Ui.curva-entrada; }
+            animate transform-scale { duration: Ui.tempo-menu-escala; easing: Ui.curva-entrada; }
+            radius: 12px;
             // Select (`wide`): nasce embaixo da pílula, alinhado à direita dela; vira para cima se não couber.
             property <bool> select: ov.wide;
-            width: select ? clamp(max(ml.preferred-width, DeskArt.anchor-w), 200px, max(340px, DeskArt.anchor-w)) : (ov.title == "" ? 280px : 260px);
+            width: select ? clamp(max(ml.preferred-width, DeskArt.anchor-w), 200px, max(340px, DeskArt.anchor-w)) : min(max(220px, ml.preferred-width), root.width - 24px);
             height: min(ml.preferred-height, select ? 8 * 38px + 12px + (ov.title != "" ? 32px : 0px) : root.height - 40px);
             x: clamp(select ? menu-x - self.width : menu-x, 12px, root.width - self.width - 12px);
             y: select && menu-y + self.height > root.height - 12px
@@ -6456,39 +6459,40 @@ component DeskOverlay inherits Rectangle {
                     padding: 6px;
                     spacing: 2px;
                     if ov.title != "": Text {
-                        text: ov.title;
-                        color: Ui.desk-on-subtle;
-                        font-size: Ui.desk-label-sm;
-                        font-weight: 600;
-                        height: 30px;
+                        text: ov.title.to-uppercase();
+                        color: Ui.desk-text-dim;
+                        font-size: Ui.desk-overline;
+                        font-weight: 700;
+                        letter-spacing: 0.05 * self.font-size;
+                        height: 28px;
                         vertical-alignment: center;
                         overflow: elide;
-                        x: 10px;
+                        x: 8px;
                     }
                     for r[i] in ov.rows: Rectangle {
-                        height: r.kind == "separator" ? 9px : (r.description != "" ? 54px : 36px);
-                        border-radius: 10px;
+                        height: r.kind == "separator" ? 9px : (r.description != "" ? 52px : 34px);
+                        border-radius: 8px;
                         background: r.kind != "separator" && mta.has-hover && r.enabled ? Ui.glass-hover : transparent;
                         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                         opacity: r.enabled ? 1 : 0.5;
                         if r.kind == "separator": Rectangle { x: 8px; width: parent.width - 16px; height: 1px; background: Ui.divider; }
-                        if focus-visible && i == ov.sel && top-most: FocusRing { radius: 10px; }
+                        if focus-visible && i == ov.sel && top-most: FocusRing { radius: 8px; }
                         if r.kind != "separator": HorizontalLayout {
                             padding-left: 10px;
                             padding-right: 10px;
                             spacing: 10px;
                             // "Instalar pela": a coluna do ✓ (16) vem antes do ícone da loja.
-                            if r.style == "offer": Rectangle { width: 16px; if r.on: DeskIcon { name: "tick"; size: 16px; tint: Ui.desk-text; } }
+                            if r.style == "offer": Rectangle { width: 16px; if r.on: DeskIcon { name: "tick"; size: 15px; tint: Ui.desk-accent; } }
                             // No select, a coluna do ✓ (16) marca a atual, em peso 600.
-                            if r.key == "updates" && !r.enabled: Ring { size: 18px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
-                            if !ov.wide && (r.key != "updates" || r.enabled): DeskIcon { name: r.icon; size: 18px; tint: r.style == "success" ? Ui.success : (r.style == "warning" ? Ui.desk-warning : (r.style == "danger" ? Ui.desk-error : Ui.desk-on-muted)); y: (parent.height - self.height) / 2; }
-                            if ov.wide: Rectangle { width: 18px; DeskIcon { name: r.icon; size: 16px; tint: Ui.desk-text; } }
+                            if r.key == "updates" && !r.enabled: Ring { size: 15px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
+                            if !ov.wide && (r.key != "updates" || r.enabled): DeskIcon { name: r.icon; size: 15px; tint: r.style == "danger" ? Ui.desk-error : (r.style == "success" ? Ui.success : (r.style == "warning" ? Ui.desk-warning : Ui.desk-on-muted)); y: (parent.height - self.height) / 2; }
+                            if ov.wide: Rectangle { width: 16px; DeskIcon { name: r.icon; size: 15px; tint: Ui.desk-text; } }
                             if r.style == "play-status": PlayStatusDot { status: r.value; y: (parent.height - self.height) / 2; }
                             VerticalLayout {
                                 horizontal-stretch: 1; spacing: 2px; alignment: center;
                                 Text {
                                     text: r.title; color: r.style == "danger" ? Ui.desk-error : Ui.desk-text;
-                                    font-size: ov.wide ? 14px * Ui.text-scale : Ui.desk-label;
+                                    font-size: ov.wide ? 14px * Ui.text-scale : Ui.desk-label-sm;
                                     font-weight: r.emphasized ? 600 : 500; overflow: elide;
                                 }
                                 if r.description != "": Text { text: r.description; color: Ui.desk-on-subtle; font-size: 12px * Ui.text-scale; overflow: elide; }
@@ -8381,8 +8385,7 @@ export component Desktop inherits Window {
         }
     }
 
-    // Aviso (toast, PainelEAviso): entra subindo 12 em `tempo-pagina`; sai só por opacidade em `tempo-saida` (o texto
-    // fica até sumir). Não rouba o foco.
+    // Aviso (toast, PainelEAviso): embaixo no centro, 26 acima da borda, entra subindo 20 em 350 ms; some em 2,3 s.
     property <string> toast-shown;
     property <bool> toast-on: toast != "";
     changed toast => {
@@ -8390,9 +8393,8 @@ export component Desktop inherits Window {
             toast-shown = toast;
         }
     }
-    // Aviso: vidro de camada denso (legível sobre qualquer arte).
-    if toast-shown != "": Vidro {
-        dense: true;
+    // Aviso: fundo claro (#f6efed tema TAKO, #f4f4f4 outros), texto escuro #111111, raio 10.
+    if toast-shown != "": Rectangle {
         property <bool> shown;
         Timer {
             interval: 1ms;
@@ -8402,41 +8404,45 @@ export component Desktop inherits Window {
                 shown = true;
             }
         }
-        layer: true;
-        radius: self.height / 2;
+        border-radius: 10px;
+        background: Ui.toast-bg;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-blur: 40px;
+        drop-shadow-color: Ui.toast-shadow;
         x: (root.width - self.width) / 2;
+        // 26 px acima da borda de baixo; entra subindo 20 px
+        y: root.height - self.height - 26px + (shown ? 0 : 20px);
+        opacity: shown && toast-on ? 1 : 0;
         // Depois de sumir, não recebe cliques (o "Desfazer" escondido não pode ser clicado).
         visible: self.opacity > 0;
-        y: root.height - self.height - Ui.space-28 + (shown ? 0 : 12px);
-        opacity: shown && toast-on ? 1 : 0;
-        animate y { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-        animate opacity { duration: Ui.toast-fade(toast-on); easing: toast-on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
+        animate y { duration: Ui.tempo-dialogo; easing: Ui.curva-entrada; }
+        animate opacity { duration: Ui.toast-fade(toast-on); easing: Ui.curva-entrada; }
         height: Ui.control-height;
         width: min(tl.preferred-width, root.width - 72px);
         // Ponteiro por cima pausa o tempo do aviso (PainelEAviso); o "Desfazer" tem a própria zona.
         toast-hover := TouchArea { changed has-hover => { root.hovered("toast", self.has-hover ? 1 : 0); } }
         tl := HorizontalLayout {
-            padding-left: Ui.space-20;
-            padding-right: Ui.space-20;
+            padding-left: 16px;
+            padding-right: 16px;
             spacing: 10px;
             if !desk-toast-mascot: DeskIcon {
                 name: desk-toast-kind == "success" ? "check" : (desk-toast-kind == "warning" ? "alert" : (desk-toast-kind == "error" ? "error" : "info"));
                 size: 18px;
-                tint: desk-toast-kind == "success" ? Ui.success : (desk-toast-kind == "warning" ? Ui.desk-warning : (desk-toast-kind == "error" ? Ui.desk-error : Ui.desk-text));
+                tint: desk-toast-kind == "success" ? Ui.toast-success : (desk-toast-kind == "warning" ? Ui.toast-warning : (desk-toast-kind == "error" ? Ui.toast-error : Ui.toast-text));
                 y: (parent.height - self.height) / 2;
             }
-            if desk-toast-mascot: Octopus { y: (parent.height - self.height) / 2; width: 34px; with-name: false; self-assemble: true; accessible-role: none; }
-            Text { text: toast-shown; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+            if desk-toast-mascot: Octopus { y: (parent.height - self.height) / 2; width: 22px; with-name: false; self-assemble: true; accessible-role: none; }
+            Text { text: toast-shown; color: Ui.toast-text; font-size: 13px * Ui.text-scale; font-weight: 500; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
             // "Desfazer" das ações em lote: texto clicável à direita, sem roubar o foco.
             if desk-toast-undo != "": Rectangle {
                 width: ut.preferred-width + 16px;
                 y: 6px;
                 height: parent.height - 12px;
                 border-radius: Ui.radius-thumb;
-                background: uta.has-hover ? Ui.glass-hover : transparent;
+                background: uta.has-hover ? Ui.toast-hover : transparent;
                 accessible-role: button;
                 accessible-label: desk-toast-undo;
-                ut := Text { text: desk-toast-undo; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 700; }
+                ut := Text { text: desk-toast-undo; color: Ui.toast-text; font-size: 13px * Ui.text-scale; font-weight: 700; }
                 uta := TouchArea {
                     mouse-cursor: pointer;
                     changed has-hover => { root.hovered("toast", self.has-hover ? 3 : 2); }

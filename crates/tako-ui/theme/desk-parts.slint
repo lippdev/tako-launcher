@@ -101,15 +101,15 @@ export component Tip inherits Rectangle {
             }
         }
         opacity: lit ? 1 : 0;
-        animate opacity { duration: Ui.tempo-texto-sai; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        animate opacity { duration: Ui.tempo-foco; easing: Ui.curva-entrada; }
         x: (root.width - self.width) / 2;
         y: root.height + 6px;
         width: tl.preferred-width + 20px;
         height: 28px;
         border-radius: Ui.radius-thumb;
-        background: Ui.glass-solid;
+        background: Ui.surface-raised;
         border-width: 1px;
-        border-color: Ui.glass-edge-strong;
+        border-color: Ui.line-strong;
         drop-shadow-offset-y: Ui.shadow-float-y;
         drop-shadow-blur: Ui.shadow-float-blur;
         drop-shadow-color: Ui.shadow-float-color;

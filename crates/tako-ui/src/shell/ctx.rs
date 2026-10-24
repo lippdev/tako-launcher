@@ -491,15 +491,15 @@ impl Ctx {
         }
     }
 
-    /// Quanto o aviso fica. Desktop: 4 s, e 8 s com "Desfazer" (dá tempo de clicar); tela cheia: `TOAST_TIME`.
+    /// Quanto o aviso fica. Ações e atualização duram 8 s; confirmações curtas no desktop, 2,3 s.
     pub fn toast_time(&self) -> std::time::Duration {
-        if self.desktop && !self.app_update.toast_label.is_empty() {
-            return std::time::Duration::from_secs(4);
+        if !self.desktop {
+            return super::TOAST_TIME;
         }
-        match (self.desktop, self.toast_undo.is_some()) {
-            (true, true) => std::time::Duration::from_secs(8),
-            (true, false) => std::time::Duration::from_secs(4),
-            _ => super::TOAST_TIME,
+        if self.toast_undo.is_some() || !self.app_update.toast_label.is_empty() {
+            std::time::Duration::from_secs(8)
+        } else {
+            std::time::Duration::from_millis(2300)
         }
     }
 
