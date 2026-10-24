@@ -55,10 +55,23 @@ export const strings = {
   search: {
     title: "Busca geral",
     escape: "Esc",
-    placeholder: "Buscar jogos, configurações e ações",
+    // Atalho do campo (aria-keyshortcuts) e o nome da lista de resultados, para leitores de tela.
+    keyShortcuts: "Control+K",
+    results: "Resultados da busca",
+    placeholder: "Buscar jogos, telas e configurações",
     label: "Busca geral",
-    // TODO: a busca geral é de outra tarefa; por enquanto só o marcador.
-    soon: "A busca geral chega em breve.",
+    // desktop.global_search_empty
+    empty: "Nenhum resultado encontrado",
+    error: "Não foi possível buscar agora.",
+    loading: "Buscando…",
+    // desktop.global_search_library: a etiqueta de um jogo; a de um atalho de tela é nova.
+    tagGame: "Biblioteca",
+    tagShortcut: "Atalho",
+    viewsGroup: "Ir para",
+    settingsGroup: "Configurações",
+    installed: "Instalado",
+    notInstalled: "Não instalado",
+    count: (n: number) => `${String(n)} ${n === 1 ? "resultado" : "resultados"}`,
   },
 } as const;
 

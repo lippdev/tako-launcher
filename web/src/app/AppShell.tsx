@@ -169,6 +169,12 @@ export function AppShell() {
         onClose={() => {
           setSearchOpen(false);
         }}
+        onOpenGame={(id) => {
+          update({ view: "biblioteca", activeGame: id });
+        }}
+        onOpenShortcut={({ view: next, settingsCategory }) => {
+          update(settingsCategory ? { view: next, settingsCategory } : { view: next });
+        }}
       />
     </div>
   );

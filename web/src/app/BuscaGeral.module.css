@@ -1,9 +1,15 @@
-/* Marcador da busca geral: painel sob a barra, na linha do Dialogo (véu, entrada subindo com escala 0,98). */
+/* Busca geral (Ctrl K): painel de 560 a 110 do topo sobre o véu desfocado (README do CampoDeBusca, "Busca geral").
+   Entrada como a do Dialogo: sobe com escala 0,98 (só `transform` e `opacity`). */
 
 .veil {
-  --busca-top: 96px;
-  --busca-width: 640px;
-  --busca-rise: 12px;
+  --busca-top: 110px;
+  --busca-width: 560px;
+  --busca-rise: 10px;
+  --busca-results-max: 380px;
+  --busca-art-w: 40px;
+  --busca-art-h: 54px;
+  --busca-art-radius: 5px;
+  --busca-row-gap: 14px;
 
   position: fixed;
   inset: 0;
@@ -28,12 +34,12 @@
   width: min(var(--busca-width), calc(100% - 2 * var(--space-24)));
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-hero);
+  border-radius: var(--radius-card);
   background: var(--surface-raised);
   color: var(--text);
   box-shadow: var(--shadow-layer);
   outline: none;
-  transform: translateY(var(--busca-rise)) scale(var(--escala-entrada));
+  transform: translateY(calc(-1 * var(--busca-rise))) scale(var(--escala-entrada));
   transition: transform var(--tempo-entrada) var(--curva-entrada);
 }
 
@@ -45,10 +51,107 @@
   will-change: transform;
 }
 
-.soon {
-  margin: 0;
-  padding: var(--space-24) 18px;
+.results {
+  max-height: var(--busca-results-max);
+  padding: var(--space-8);
+  overflow-y: auto;
+}
+
+.results[hidden] {
+  display: none;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--busca-row-gap);
+  padding: var(--space-8);
+  border-radius: var(--radius-row);
+  cursor: pointer;
+  transition: background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.result[data-selected="true"] {
+  background: var(--settings-control-hover);
+}
+
+.art {
+  flex: none;
+  width: var(--busca-art-w);
+  height: var(--busca-art-h);
+  border-radius: var(--busca-art-radius);
+  object-fit: cover;
+  background: var(--settings-control-hover);
+}
+
+/* Sem imagem: a inicial no quadrado. */
+.art[data-fallback] {
+  display: grid;
+  place-items: center;
   color: var(--text-muted);
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A etiqueta da direita (Biblioteca / Atalho). */
+.tag {
+  flex: none;
+  margin-left: auto;
+  padding: 3px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-style: normal;
+}
+
+/* Sem resultado: o polvo e uma frase, como a lista vazia. */
+.empty {
+  margin: 0;
+  padding: 30px var(--space-8);
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+}
+
+.emptyMark {
+  display: block;
+  width: 44px;
+  height: auto;
+  margin: 0 auto var(--space-12);
+  opacity: 0.75;
+}
+
+/* Região ao vivo: o leitor de tela anuncia quantos resultados há; fora da vista. */
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
