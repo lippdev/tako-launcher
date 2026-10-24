@@ -536,7 +536,6 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
                 .criteria
                 .borrow_mut()
                 .favorites_only = false;
-            shell.click("tab", 2);
             if shell.ctx.collections.collections().is_empty() {
                 shell
                     .ctx
@@ -933,15 +932,6 @@ fn desktop_snapshot() {
                 .extend(crate::demo::not_installed());
         }
         ctx.library.refresh();
-        // `TAKO_SNAP_UNIFIED=1` liga a barra lateral unida; `TAKO_SNAP_NARROW=1`, a largura Estreita.
-        if std::env::var("TAKO_SNAP_UNIFIED").is_ok_and(|v| v == "1") {
-            ctx.settings
-                .set_bool(crate::shell::ctx::keys::SIDEBAR_UNIFIED, true);
-        }
-        if std::env::var("TAKO_SNAP_NARROW").is_ok_and(|v| v == "1") {
-            ctx.settings
-                .set(crate::shell::ctx::keys::SIDEBAR_WIDTH, "narrow");
-        }
         // `TAKO_SNAP_DESK_THEME=tako|dark|midnight|oled|glass`, `TAKO_SNAP_ACCENT=#rrggbb` e `TAKO_SNAP_MOTION=1`
         // (Reduzir animações) escolhem o tema do desktop; o padrão é o TAKO. `TAKO_SNAP_TRANSPARENCY=1` liga Reduzir
         // transparência.

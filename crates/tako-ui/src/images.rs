@@ -448,7 +448,7 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
     ))
 }
 
-/// Ícone quadrado de `size` px (recorte central do meio da imagem), com os cantos redondos (raio 6/28 do lado,
+/// Ícone quadrado de `size` px (recorte central do meio da imagem), com os cantos redondos (raio 7/28 do lado,
 /// anti-serrilhado) e o contorno de 1 px a cada 28 de `#ffffff1a` por cima da borda. Fora do arredondado o pixel
 /// fica transparente.
 pub(crate) fn round_icon(img: &image::DynamicImage, size: u32) -> image::RgbaImage {
@@ -457,7 +457,7 @@ pub(crate) fn round_icon(img: &image::DynamicImage, size: u32) -> image::RgbaIma
         .resize_to_fill(size, size, image::imageops::FilterType::Lanczos3)
         .to_rgba8();
     let half = size as f32 / 2.0;
-    let radius = size as f32 * 6.0 / 28.0;
+    let radius = size as f32 * 7.0 / 28.0;
     let border = (size / 28).max(1) as f32;
     for (x, y, p) in out.enumerate_pixels_mut() {
         // Distância (negativa por dentro) até a borda do retângulo arredondado.

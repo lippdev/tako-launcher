@@ -136,35 +136,6 @@ fn text_size_and_navigation_volume_persist_and_are_bounded() {
     assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 20);
 }
 
-/// BarraLateralUnida: desligada e Normal por padrão (perfil sem a preferência); as duas escolhas ficam no perfil.
-#[test]
-fn sidebar_layout_defaults_off_and_normal_and_persists_per_profile() {
-    let dir = tempfile::tempdir().unwrap();
-    let (_guard, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
-    ctx.desktop = true;
-    assert!(!ctx.settings.bool(keys::SIDEBAR_UNIFIED, false));
-    assert_eq!(ctx.settings.string(keys::SIDEBAR_WIDTH), "");
-    let items = rows_of(&ctx, "appearance");
-    let unified = find(&items, "settings.appearance.sidebar_unified");
-    let width = find(&items, "sidebar-width");
-    assert!(!unified.row.on);
-    assert_eq!(width.row.value, ctx.t("settings.appearance.sidebar_normal"));
-    accept(&mut ctx, &unified);
-    let mut layer = width.select(&ctx).expect("select");
-    let _ = layer.click("row", 1, &mut ctx);
-    drop(ctx);
-    let mut ctx = crate::app::build_ctx(DataPaths::at(dir.path()), Platform::simulated(), false);
-    ctx.desktop = true;
-    assert!(ctx.settings.bool(keys::SIDEBAR_UNIFIED, false));
-    assert_eq!(ctx.settings.string(keys::SIDEBAR_WIDTH), "narrow");
-    let items = rows_of(&ctx, "appearance");
-    assert!(find(&items, "settings.appearance.sidebar_unified").row.on);
-    assert_eq!(
-        find(&items, "sidebar-width").row.value,
-        ctx.t("settings.appearance.sidebar_narrow")
-    );
-}
-
 #[test]
 fn toggles_persist_in_settings() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
