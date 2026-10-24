@@ -31,7 +31,7 @@ import { DeskIcon, FocusRing, Tip, Skeleton, Ring, DeskGameView, DeskInfo, DeskB
 import { Octopus } from "polvo.slint";
 import { Overlay, Overline, OverlayView, Tile } from "overlay.slint";
 import { VisaoGeral, DeskOverview } from "desk-overview.slint";
-import { PaginaDoJogo, DeskPage } from "desk-game.slint";
+import { PaginaDoJogo, PaginaCarregando, DeskPage } from "desk-game.slint";
 
 export { Ui }
 
@@ -2434,35 +2434,6 @@ component PlayStatusDot inherits Rectangle {
     background: hollow ? transparent : tint;
 }
 
-// EstadoCarregando: o destaque e os cartões já com a forma final (etiqueta, título, faixa, botões e três cartões), em
-// blocos de espera que crescem com o tamanho do texto, para o layout não pular quando os dados chegam.
-component LoadingStage inherits VerticalLayout {
-    in property <bool> small;
-    alignment: end;
-    spacing: small ? Ui.space-16 : Ui.space-28;
-    VerticalLayout {
-        spacing: small ? 10px : 14px;
-        alignment: end;
-        HorizontalLayout { alignment: start; Skeleton { width: 120px * Ui.text-scale; height: 26px; radius: 13px; } }
-        HorizontalLayout { alignment: start; Skeleton { width: (small ? 360px : 480px) * Ui.text-scale; height: (small ? 40px * Ui.text-scale : Ui.desk-display) * 1.1; radius: 10px; } }
-        HorizontalLayout { alignment: start; Skeleton { width: 420px * Ui.text-scale; height: 62px; radius: 31px; } }
-        HorizontalLayout {
-            alignment: start;
-            spacing: Ui.space-12;
-            padding-top: 6px;
-            Skeleton { width: max(small ? 180px : 232px, 140px * Ui.text-scale); height: small ? 50px : Ui.primary-height; radius: self.height / 2; }
-            for i in 3: Skeleton { width: small ? 46px : Ui.round-button; height: small ? 46px : Ui.round-button; radius: self.height / 2; }
-        }
-    }
-    HorizontalLayout {
-        height: small ? 190px : Ui.card-height;
-        spacing: Ui.space-20;
-        Skeleton { horizontal-stretch: 1.25; radius: Ui.radius-card; }
-        Skeleton { horizontal-stretch: 1.1; radius: Ui.radius-card; }
-        if !small: Skeleton { horizontal-stretch: 1.1; radius: Ui.radius-card; }
-    }
-}
-
 // Ícones da linha de contagem: inverter a ordem e filtrar; filtros ativos só acendem o ícone.
 component SortFilter inherits HorizontalLayout {
     in property <bool> reversed;
@@ -2895,11 +2866,16 @@ component DeskLibrary inherits Rectangle {
         }
         if !overview.on && !game.has-game && !loading: Rectangle { horizontal-stretch: 1; }
         // Espera (BRAND-001): o polvo no alto da área livre do destaque, fora do layout, sem tirar largura do texto.
-        if !overview.on && !game.has-game && loading: Rectangle {
-            horizontal-stretch: 1;
-            LoadingStage { x: 0; y: 0; width: parent.width; height: parent.height; small: small; }
-            Octopus { x: 0; y: 0; width: 90px; height: 69px; with-name: false; self-assemble: true; accessible-role: none; }
-        }
+    }
+
+    // EstadoCarregando da página do jogo: a mesma colocação, com blocos de espera e o polvo no alto da área livre.
+    if !wide && !overview.on && !game.has-game && loading: PaginaCarregando {
+        x: col-w - pad-x - root.x;
+        y: -Ui.topbar-height - Ui.space-20;
+        width: DeskArt.win-w - col-w;
+        height: DeskArt.win-h;
+        small: small;
+        Octopus { x: Ui.space-40; y: Ui.topbar-height + Ui.space-20; width: 90px; height: 69px; with-name: false; self-assemble: true; accessible-role: none; }
     }
 
     // TelaJogo: a página do jogo, colada à lista (sem as margens da janela), do topo ao pé da janela por baixo da barra

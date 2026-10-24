@@ -406,6 +406,8 @@ theme_struct! {
         pub show_logo: bool,
         // O logo ainda carrega: o título fica vazio (nem o nome em texto) até ele chegar.
         pub title_pending: bool,
+        // Instalando: o andamento de 0 a 1 (a barra no pé do botão); negativo = sem número.
+        pub progress: f32,
     }
 }
 

@@ -3,7 +3,7 @@
 // rola, com o conteúdo à esquerda e os dados à direita (fixos). Só tokens `Ui.*`; o Tako entrega o estado pronto e aqui se
 // desenha e se avisa cliques.
 import { Ui } from "tokens.slint";
-import { DeskIcon, FocusRing, Tip, DeskGameView, DeskInfo, DeskEntry } from "desk-parts.slint";
+import { DeskIcon, FocusRing, Tip, Skeleton, DeskGameView, DeskInfo, DeskEntry } from "desk-parts.slint";
 import { BotaoDesktop, BarraDeDados, GrupoDeBlocos, Bloco, CapaDoJogo } from "desk-overview.slint";
 import { PanelRow } from "widgets.slint";
 
@@ -231,6 +231,33 @@ component Recursos inherits Rectangle {
     }
 }
 
+// Uma parte do destaque na troca de jogo (TrocaDeJogo): sai em 200 (opacidade, 14 para baixo) e volta em escada de 55 ms
+// por `step`, em 500 de opacidade e 650 de subida (`slow`: o logo e as ações, 650 de ponta a ponta). Com Reduzir animações,
+// tudo isso é 0.
+component Escada inherits Rectangle {
+    in property <int> step;
+    in property <bool> on;
+    in property <bool> slow;
+    height: c.preferred-height;
+    c := VerticalLayout {
+        y: root.on ? 0px : 14px;
+        opacity: root.on ? 1 : 0;
+        animate y { duration: root.on ? Ui.tempo-troca * 1.3 : Ui.tempo-saida; delay: root.on ? root.step * Ui.tempo-escada : 0ms; easing: Ui.curva-entrada; }
+        animate opacity { duration: root.on ? (root.slow ? Ui.tempo-troca * 1.3 : Ui.tempo-troca) : Ui.tempo-saida; delay: root.on ? root.step * Ui.tempo-escada : 0ms; easing: Ui.curva-entrada; }
+        @children
+    }
+}
+
+// Texto à direita que o layout não sabe medir quebrado: a altura é a do texto na largura da coluna (até `max-h`).
+component Parrafo inherits Rectangle {
+    in property <string> text;
+    in property <color> tint: Ui.desk-on-muted;
+    in property <length> size;
+    in property <length> max-h: 1000px;
+    height: min(max-h, t.preferred-height);
+    t := Text { width: parent.width; text: root.text; color: root.tint; font-size: root.size; horizontal-alignment: right; wrap: word-wrap; overflow: elide; }
+}
+
 export component PaginaDoJogo inherits Rectangle {
     in property <DeskGameView> game;
     in property <DeskPage> page;
@@ -248,6 +275,45 @@ export component PaginaDoJogo inherits Rectangle {
     callback clicked(string, int);
     callback menu(length, length);
     callback status-menu(length, length, length);
+    // TrocaDeJogo: o que está na tela (`g`, `pg`, `acts`, `sts`, `dts`) é uma cópia. Ao chegar outro jogo as partes saem
+    // em 200 (sobem 14 ao contrário: descem), a cópia troca, a página volta ao topo e as partes voltam em escada de 55.
+    // Mudança no mesmo jogo (jogar, favoritar, andamento) vale na hora.
+    property <DeskGameView> g;
+    property <DeskPage> pg;
+    property <[PanelRow]> acts;
+    property <[DeskInfo]> sts;
+    property <[DeskInfo]> dts;
+    property <bool> live: true;
+    function show-now() {
+        g = game;
+        pg = page;
+        acts = actions;
+        sts = stats;
+        dts = details;
+    }
+    function sync() {
+        if (page.id == pg.id || pg.id == "") {
+            show-now();
+        } else {
+            live = false;
+            swap.running = true;
+        }
+    }
+    changed game => { sync(); }
+    changed page => { sync(); }
+    changed actions => { sync(); }
+    changed stats => { sync(); }
+    changed details => { sync(); }
+    swap := Timer {
+        interval: max(1ms, Ui.tempo-saida);
+        running: false;
+        triggered => {
+            self.running = false;
+            show-now();
+            scrolled = 0px;
+            live = true;
+        }
+    }
     property <length> pad: small ? Ui.space-24 : Ui.space-40;
     property <length> hero-h: Ui.game-hero-h(root.height);
     // A barra fina de 62 fica sob a barra de cima; com o corpo por baixo ela ganha fundo, a capa e o primário.
@@ -265,7 +331,7 @@ export component PaginaDoJogo inherits Rectangle {
     property <length> body-h: two-col ? max(lc.preferred-height, rc.preferred-height) : lc.preferred-height + (rc.preferred-height > 0 ? gap + rc.preferred-height : 0);
     property <length> trailer-h: min(368px, left-w * 9 / 16);
     // O cabeçalho das sessões com a coluna da direita solta (a coluna acompanha a rolagem, então só importa até colar).
-    property <length> sessions-y: body-y + (details.length > 0 ? 44px + details.length * 39px + 2 * Ui.space-6 + 16px : 0px) + (two-col ? 0px : lc.preferred-height + gap);
+    property <length> sessions-y: body-y + (dts.length > 0 ? 44px + dts.length * 39px + 2 * Ui.space-6 + 16px : 0px) + (two-col ? 0px : lc.preferred-height + gap);
     property <length> similar-y: body-y + body-h + 48px + 34px + 14px;
     // Coluna da identidade (a Visão geral usa a mesma conta, 40% da largura), nunca mais estreita que a fileira de ações:
     // senão o primário sai cortado na janela pequena e com o texto a 125%. Também diz quantos itens da barra de dados cabem.
@@ -273,13 +339,16 @@ export component PaginaDoJogo inherits Rectangle {
     property <int> data-limit: max(1, min(3, floor((root.width - 2 * pad - col-w - 32px) / 190px)));
     // Parecidos: uma fileira de capas de 150 no fim, com o título; só com dado.
     property <length> cover-w: 150px;
-    property <length> similar-h: page.similar.length > 0 ? 48px + 34px + 14px + cover-w * 1.5 + 58px : 0px;
+    property <length> similar-h: pg.similar.length > 0 ? 48px + 34px + 14px + cover-w * 1.5 + 58px : 0px;
     property <int> similar-n: max(1, floor((root.width - 2 * pad + 16px) / (cover-w + 16px)));
     property <length> content-h: root.body-y + root.body-h + similar-h + Ui.space-48;
     property <length> scroll-max: max(0px, content-h - root.height);
     function scroll-to(y: length) { scrolled = max(0px, min(scroll-max, y)); }
     property <float> last-page;
-    init => { last-page = scroll-page; }
+    init => {
+        show-now();
+        last-page = scroll-page;
+    }
     changed scroll-page => {
         root.scroll-to(scrolled + (scroll-page - last-page) * root.height * 0.85);
         last-page = scroll-page;
@@ -316,9 +385,6 @@ export component PaginaDoJogo inherits Rectangle {
             reveal(similar-y, similar-y + cover-w * 1.5 + 58px);
         }
     }
-    // Outro jogo: a página volta ao topo (`changed` só dispara quando o texto muda, não quando o `page` é reenviado).
-    property <string> game-id: page.id;
-    changed game-id => { scrolled = 0px; }
     clip: true;
     // Embaixo de tudo: os botões não tratam a roda e ela chega aqui.
     TouchArea {
@@ -342,19 +408,20 @@ export component PaginaDoJogo inherits Rectangle {
             width: parent.width;
             height: root.hero-h;
             FundoDoJogo { art: root.art; accent: game.accent; bright: page.bright; }
+            title-measure := Text { x: 0; y: 0; visible: false; width: 0; text: g.title; font-family: Ui.font-heading; font-size: 54px * Ui.text-scale; font-weight: 800; }
             HorizontalLayout {
                 padding-left: root.pad;
                 padding-right: root.pad;
                 padding-bottom: 46px;
                 spacing: 32px;
-                VerticalLayout { alignment: end; BarraDeDados { items: stats; limit: root.data-limit; } }
+                VerticalLayout { alignment: end; Escada { step: 4; on: root.live; BarraDeDados { items: sts; limit: root.data-limit; } } }
                 Rectangle { horizontal-stretch: 1; }
                 VerticalLayout {
                     width: root.col-w;
                     alignment: end;
                     spacing: 12px;
                     // Etiqueta de situação (INSTALADO, JOGANDO…), com o ponto verde de quem está no ar.
-                    if game.overline != "": HorizontalLayout {
+                    if g.overline != "": Escada { step: 0; on: root.live; HorizontalLayout {
                         alignment: end;
                         Rectangle {
                             height: 26px;
@@ -367,67 +434,74 @@ export component PaginaDoJogo inherits Rectangle {
                                 padding-left: 11px;
                                 padding-right: 11px;
                                 spacing: 7px;
-                                if page.on: VerticalLayout { alignment: center; Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: Ui.success; } }
-                                Text { text: game.overline; color: Ui.desk-on-muted; font-size: 12px * Ui.text-scale; font-weight: 800; letter-spacing: 0.08 * self.font-size; vertical-alignment: center; }
+                                if pg.on: VerticalLayout { alignment: center; Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: Ui.success; } }
+                                Text { text: g.overline; color: Ui.desk-on-muted; font-size: 12px * Ui.text-scale; font-weight: 800; letter-spacing: 0.08 * self.font-size; vertical-alignment: center; }
                             }
                         }
-                    }
+                    } }
                     // TituloDoJogo: o logo (até 440 × 140, nunca ampliado) ou o nome em texto (Poppins 54/800).
-                    if game.show-logo || game.title-pending: HorizontalLayout {
+                    if g.show-logo || g.title-pending: Escada { step: 1; on: root.live; slow: true; HorizontalLayout {
                         alignment: end;
-                        property <length> src-w: max(1px, game.logo.width * 1px);
-                        property <length> src-h: max(1px, game.logo.height * 1px);
+                        property <length> src-w: max(1px, g.logo.width * 1px);
+                        property <length> src-h: max(1px, g.logo.height * 1px);
                         property <float> fit: min(1, min(min(440px, root.col-w) / src-w, 140px / src-h));
-                        min-height: game.title-pending ? 140px : 0px;
+                        min-height: g.title-pending ? 140px : 0px;
                         Image {
-                            source: game.logo;
+                            source: g.logo;
                             width: parent.src-w * parent.fit;
                             height: parent.src-h * parent.fit;
                             image-fit: contain;
                             accessible-role: image;
-                            accessible-label: game.title;
+                            accessible-label: g.title;
+                        }
+                    } }
+                    if !g.show-logo && !g.title-pending: Escada {
+                        step: 1;
+                        on: root.live;
+                        slow: true;
+                        // O título encolhe (até 30) para caber em duas linhas; a altura é a do texto quebrado.
+                        Rectangle {
+                            height: tt.preferred-height;
+                            tt := Text {
+                                property <length> base: title-measure.font-size;
+                                width: parent.width;
+                                text: g.title;
+                                color: Ui.desk-text;
+                                font-family: Ui.font-heading;
+                                font-size: max(min(base, base * 1.8 * root.col-w / max(1px, title-measure.preferred-width)), 30px * Ui.text-scale);
+                                font-weight: 800;
+                                letter-spacing: -0.02 * self.font-size;
+                                horizontal-alignment: right;
+                                wrap: word-wrap;
+                            }
                         }
                     }
-                    if !game.show-logo && !game.title-pending: HorizontalLayout {
-                        // O título encolhe (até 30) para caber em duas linhas.
-                        title-measure := Text { visible: false; width: 0; text: game.title; font-family: Ui.font-heading; font-size: 54px * Ui.text-scale; font-weight: 800; }
-                        Text {
-                            property <length> base: title-measure.font-size;
-                            text: game.title;
-                            color: Ui.desk-text;
-                            font-family: Ui.font-heading;
-                            font-size: max(min(base, base * 1.8 * root.col-w / max(1px, title-measure.preferred-width)), 30px * Ui.text-scale);
-                            font-weight: 800;
-                            letter-spacing: -0.02 * self.font-size;
-                            horizontal-alignment: right;
-                            wrap: word-wrap;
-                            horizontal-stretch: 1;
-                        }
-                    }
-                    if game.description != "" && root.width >= 720px: Text {
-                        text: game.description;
-                        color: Ui.desk-on-muted;
-                        font-size: 13.5px * Ui.text-scale;
-                        horizontal-alignment: right;
-                        wrap: word-wrap;
-                        overflow: elide;
-                        max-height: 64px;
+                    if g.description != "" && root.width >= 720px: Escada {
+                        step: 2;
+                        on: root.live;
+                        Parrafo { text: g.description; size: 13.5px * Ui.text-scale; max-h: 64px; }
                     }
                     // Instalar: loja e tamanho, espaço livre e por onde abre; sem espaço, o aviso em `warning`.
-                    if game.install-note != "": Text {
-                        text: actions[0].description != "" ? actions[0].description + " · " + game.install-note : game.install-note;
-                        color: game.install-warn ? Ui.desk-warning : Ui.desk-on-muted;
-                        font-size: 12px * Ui.text-scale;
-                        horizontal-alignment: right;
-                        wrap: word-wrap;
+                    if g.install-note != "": Escada {
+                        step: 2;
+                        on: root.live;
+                        Parrafo {
+                            text: acts[0].description != "" ? acts[0].description + " · " + g.install-note : g.install-note;
+                            tint: g.install-warn ? Ui.desk-warning : Ui.desk-on-muted;
+                            size: 12px * Ui.text-scale;
+                        }
                     }
-                    if game.hint != "": Text { text: game.hint; color: Ui.desk-warning; font-size: 13px * Ui.text-scale; horizontal-alignment: right; wrap: word-wrap; }
+                    if g.hint != "": Escada { step: 2; on: root.live; Parrafo { text: g.hint; tint: Ui.desk-warning; size: 13px * Ui.text-scale; } }
                     // AcoesDoJogo: os quadrados (★, ⋯, ⚙, ✕) e, por último e à direita, o primário.
+                    Escada {
+                        step: 3;
+                        on: root.live;
+                        slow: true;
                     ar := HorizontalLayout {
                         alignment: end;
                         padding-top: 6px;
                         // O vão de 10 vai em cada item que existe, não entre os vazios dos dois laços.
-                        for a[i] in actions: HorizontalLayout {
+                        for a[i] in acts: HorizontalLayout {
                             padding-left: a.style != "primary" ? 10px : 0px;
                             if a.style != "primary": BotaoDesktop {
                                 kind: "square";
@@ -442,14 +516,14 @@ export component PaginaDoJogo inherits Rectangle {
                                 }
                             }
                         }
-                        for a[i] in actions: HorizontalLayout {
+                        for a[i] in acts: HorizontalLayout {
                             padding-left: a.style == "primary" ? 10px : 0px;
                             spacing: 10px;
                             // Instalar por mais de uma loja: o ⌄ ao lado escolhe a loja.
                             if a.style == "primary" && a.on: BotaoDesktop {
                                 kind: "square";
                                 icon: "chevron-down";
-                                tip: page.labels[4];
+                                tip: pg.labels[4];
                                 clicked => {
                                     root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
                                     root.clicked("install-more", i);
@@ -459,75 +533,86 @@ export component PaginaDoJogo inherits Rectangle {
                                 label: a.title;
                                 icon: a.icon;
                                 enabled: a.enabled;
+                                progress: g.progress;
                                 focused: focus-visible && zone == "actions" && zone-index == i;
                                 clicked => { root.clicked("action", i); }
                             }
                         }
                     }
+                    }
                 }
             }
             // PilulaDaLoja: a situação do jogo e a loja de origem, a 76 do topo.
-            HorizontalLayout {
+            Escada {
+                x: 0;
                 y: 76px;
                 width: parent.width;
+                step: 5;
+                on: root.live;
+            HorizontalLayout {
                 height: 32px;
                 padding-right: root.pad;
                 alignment: end;
                 spacing: 8px;
                 Chip {
                     menu: true;
-                    status: game.play-status;
-                    text: game.play-status-label;
+                    status: g.play-status;
+                    text: g.play-status-label;
                     clicked(x, y, w) => { root.status-menu(x, y, w); }
                 }
-                if game.store-name != "": Chip { icon: game.store-icon; text: game.store-name; }
+                if g.store-name != "": Chip { icon: g.store-icon; text: g.store-name; }
             }
         }
+            }
         // O corpo: o conteúdo à esquerda e os dados à direita, que ficam a 78 abaixo da barra ao rolar.
         lc := VerticalLayout {
+            opacity: root.live ? 1 : 0;
+            animate opacity { duration: root.live ? Ui.tempo-troca * 0.8 : Ui.tempo-saida * 0.75; easing: ease; }
             x: root.pad;
             y: root.body-y;
             width: root.left-w;
             height: self.preferred-height;
             spacing: 14px;
-            if game.trailer: CartaoTrailer {
+            if g.trailer: CartaoTrailer {
                 height: root.trailer-h;
                 art: root.art;
-                label: page.labels[6];
+                label: pg.labels[6];
                 focused: focus-visible && zone == "body-trailer";
                 clicked => { root.clicked("trailer", 0); }
             }
-            if page.shots.length > 0: HorizontalLayout {
+            if pg.shots.length > 0: HorizontalLayout {
                 height: 156px;
                 spacing: 14px;
                 alignment: start;
-                for shot in page.shots: Rectangle {
+                for shot in pg.shots: Rectangle {
                     width: 276px;
                     border-radius: 10px;
                     clip: true;
                     background: Ui.tile;
                     accessible-role: image;
-                    accessible-label: page.labels[5];
+                    accessible-label: pg.labels[5];
                     Image { width: parent.width; height: parent.height; source: shot; image-fit: cover; }
                     Rectangle { border-radius: 10px; border-width: 1px; border-color: Ui.line; }
                 }
             }
-            if page.about.length > 0: VerticalLayout {
-                padding-top: game.trailer || page.shots.length > 0 ? 34px : 0px;
+            if pg.about.length > 0: VerticalLayout {
+                padding-top: g.trailer || pg.shots.length > 0 ? 34px : 0px;
                 spacing: 8px;
-                Text { text: page.labels[2].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; }
+                Text { text: pg.labels[2].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; }
                 // O layout não mede o texto quebrado: cada parágrafo tem a altura que o texto pede na largura da coluna.
-                for p in page.about: Rectangle {
+                for p in pg.about: Rectangle {
                     height: pt.preferred-height;
                     pt := Text { width: parent.width; text: p; color: Ui.desk-on-muted; font-size: 13px * Ui.text-scale; line-height-factor: 1.65; wrap: word-wrap; }
                 }
             }
-            if page.features.length > 0: Recursos {
-                title: page.labels[7];
-                items: page.features;
+            if pg.features.length > 0: Recursos {
+                title: pg.labels[7];
+                items: pg.features;
             }
         }
         rc := VerticalLayout {
+            opacity: root.live ? 1 : 0;
+            animate opacity { duration: root.live ? Ui.tempo-troca * 0.8 : Ui.tempo-saida * 0.75; easing: ease; }
             x: root.two-col ? root.pad + root.left-w + root.gap : root.pad;
             y: root.two-col
                 ? root.body-y + max(0px, min(root.body-h - self.preferred-height, root.scrolled + Ui.topbar-height + root.bar-h + 1px - root.body-y))
@@ -535,10 +620,10 @@ export component PaginaDoJogo inherits Rectangle {
             width: root.right-w;
             height: self.preferred-height;
             spacing: 16px;
-            if details.length > 0: Rectangle {
+            if dts.length > 0: Rectangle {
                 height: bx.preferred-height;
                 accessible-role: groupbox;
-                accessible-label: page.labels[3];
+                accessible-label: pg.labels[3];
                 border-radius: Ui.radius-card;
                 border-width: 1px;
                 border-color: Ui.line-strong;
@@ -548,13 +633,13 @@ export component PaginaDoJogo inherits Rectangle {
                     HorizontalLayout {
                         height: 44px;
                         padding-left: 12px;
-                        Text { text: page.labels[3].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; vertical-alignment: center; }
+                        Text { text: pg.labels[3].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; vertical-alignment: center; }
                     }
-                    for d[i] in details: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
+                    for d[i] in dts: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
                 }
             }
             // Sessões: as últimas, com "Ver todas ›" para o histórico do Perfil. Só com sessões registradas.
-            if page.sessions.length > 0: Rectangle {
+            if pg.sessions.length > 0: Rectangle {
                 height: sx.preferred-height;
                 border-radius: Ui.radius-card;
                 border-width: 1px;
@@ -565,41 +650,43 @@ export component PaginaDoJogo inherits Rectangle {
                     HorizontalLayout {
                         height: 44px;
                         padding-left: 12px;
-                        Text { text: page.labels[8].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
+                        Text { text: pg.labels[8].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
                         Rectangle {
                             width: sl.preferred-width + 16px;
                             border-radius: Ui.radius-control;
                             background: sta.has-hover ? Ui.glass-hover : transparent;
                             accessible-role: button;
-                            accessible-label: page.labels[9];
+                            accessible-label: pg.labels[9];
                             accessible-action-default => { root.clicked("sessions", 0); }
                             if focus-visible && zone == "body-sessions": FocusRing { radius: Ui.radius-control; background: transparent; }
                             sl := HorizontalLayout {
                                 alignment: center;
                                 spacing: 4px;
-                                Text { text: page.labels[9]; color: Ui.desk-on-muted; font-size: 12.5px * Ui.text-scale; vertical-alignment: center; }
+                                Text { text: pg.labels[9]; color: Ui.desk-on-muted; font-size: 12.5px * Ui.text-scale; vertical-alignment: center; }
                                 VerticalLayout { alignment: center; DeskIcon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; } }
                             }
                             sta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("sessions", 0); } }
                         }
                     }
-                    for d[i] in page.sessions: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
+                    for d[i] in pg.sessions: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
                 }
             }
             // Números das sessões (só com sessões): quantas e a média de cada uma.
-            if page.numbers.length > 0: GrupoDeBlocos {
+            if pg.numbers.length > 0: GrupoDeBlocos {
                 height: Ui.tile-value-height + Ui.tile-label-height + 2 * Ui.space-6 + 2px;
-                for n in page.numbers: Bloco { value: n.value; label: n.label; icon: n.icon; }
+                for n in pg.numbers: Bloco { value: n.value; label: n.label; icon: n.icon; }
             }
         }
         // Parecidos: jogos da biblioteca com gênero ou desenvolvedora em comum; um toque abre a página deles.
-        if page.similar.length > 0: Rectangle {
+        if pg.similar.length > 0: Rectangle {
+            opacity: root.live ? 1 : 0;
+            animate opacity { duration: root.live ? Ui.tempo-troca * 0.8 : Ui.tempo-saida * 0.75; easing: ease; }
             x: root.pad;
             y: root.body-y + root.body-h + 48px;
             width: root.width - 2 * root.pad;
             height: root.similar-h - 48px;
-            Text { x: 0; y: 0; width: parent.width; text: page.labels[10]; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 19px * Ui.text-scale; font-weight: 700; height: 34px; vertical-alignment: top; }
-            for c[i] in page.similar: CapaDoJogo {
+            Text { x: 0; y: 0; width: parent.width; text: pg.labels[10]; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 19px * Ui.text-scale; font-weight: 700; height: 34px; vertical-alignment: top; }
+            for c[i] in pg.similar: CapaDoJogo {
                 visible: i < root.similar-n;
                 x: i * (root.cover-w + 16px);
                 y: 34px + 14px;
@@ -633,18 +720,18 @@ export component PaginaDoJogo inherits Rectangle {
                 background: bta.has-hover ? Ui.glass-selected : transparent;
                 animate background { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
                 accessible-role: button;
-                accessible-label: page.labels[0];
+                accessible-label: pg.labels[0];
                 accessible-action-default => { root.clicked("game-back", 0); }
                 DeskIcon { name: "arrow-left"; size: 17px; tint: Ui.desk-text; }
                 bta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("game-back", 0); } }
-                Tip { text: page.labels[0]; hovering: bta.has-hover; }
+                Tip { text: pg.labels[0]; hovering: bta.has-hover; }
             }
             HorizontalLayout {
                 horizontal-stretch: 0;
                 spacing: 8px;
-                Text { text: page.labels[1]; color: Ui.desk-on-muted; font-size: 13.5px * Ui.text-scale; vertical-alignment: center; }
+                Text { text: pg.labels[1]; color: Ui.desk-on-muted; font-size: 13.5px * Ui.text-scale; vertical-alignment: center; }
                 VerticalLayout { alignment: center; DeskIcon { name: "chevron"; size: 13px; tint: Ui.desk-text-dim; } }
-                Text { text: game.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 13.5px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; }
+                Text { text: g.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 13.5px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; }
             }
             Rectangle { horizontal-stretch: 1; }
             HorizontalLayout {
@@ -660,11 +747,11 @@ export component PaginaDoJogo inherits Rectangle {
                         height: 34px;
                         border-radius: 5px;
                         clip: true;
-                        background: game.accent.mix(Ui.desk-canvas, 0.4);
-                        Image { width: parent.width; height: parent.height; source: page.cover; image-fit: cover; }
+                        background: g.accent.mix(Ui.desk-canvas, 0.4);
+                        Image { width: parent.width; height: parent.height; source: pg.cover; image-fit: cover; }
                     }
                 }
-                for a[i] in actions: HorizontalLayout {
+                for a[i] in acts: HorizontalLayout {
                     if a.style == "primary": VerticalLayout {
                         alignment: center;
                         BotaoDesktop {
@@ -680,4 +767,46 @@ export component PaginaDoJogo inherits Rectangle {
             }
         }
     }
+}
+
+// EstadoCarregando da página do jogo: a estrutura inteira com blocos de espera nos tamanhos do que vai chegar (o destaque
+// com a barra de dados, a identidade e os botões, e o corpo em duas colunas), para nada pular quando os dados chegam.
+export component PaginaCarregando inherits Rectangle {
+    in property <bool> small;
+    property <length> pad: small ? Ui.space-24 : Ui.space-40;
+    property <length> hero-h: Ui.game-hero-h(root.height);
+    property <length> col-w: clamp(240px, root.width * 0.4, 520px);
+    property <bool> two-col: root.width - 2 * pad >= 640px;
+    property <length> left-w: two-col ? (root.width - 2 * pad - 28px) * 1.16 / 2.16 : root.width - 2 * pad;
+    clip: true;
+    Skeleton { x: 0; y: 0; width: parent.width; height: root.hero-h; radius: 0px; opacity: 0.35; }
+    HorizontalLayout {
+        y: 0;
+        height: root.hero-h;
+        padding-left: root.pad;
+        padding-right: root.pad;
+        padding-bottom: 46px;
+        spacing: 32px;
+        VerticalLayout { alignment: end; Skeleton { width: 360px * Ui.text-scale; height: 44px; radius: 8px; } }
+        Rectangle { horizontal-stretch: 1; }
+        VerticalLayout {
+            width: root.col-w;
+            alignment: end;
+            spacing: 12px;
+            HorizontalLayout { alignment: end; Skeleton { width: 110px * Ui.text-scale; height: 26px; radius: 7px; } }
+            HorizontalLayout { alignment: end; Skeleton { width: min(root.col-w, 420px * Ui.text-scale); height: 70px; radius: 10px; } }
+            HorizontalLayout { alignment: end; Skeleton { width: root.col-w * 0.9; height: 40px; radius: 8px; } }
+            HorizontalLayout {
+                alignment: end;
+                spacing: 10px;
+                padding-top: 6px;
+                for i in 3: Skeleton { width: Ui.button-height; height: Ui.button-height; radius: Ui.radius-button; }
+                Skeleton { width: 160px * Ui.text-scale; height: Ui.button-height; radius: Ui.radius-button; }
+            }
+        }
+    }
+    Skeleton { x: root.pad; y: root.hero-h + 14px; width: root.left-w; height: min(368px, root.left-w * 9 / 16); radius: 12px; }
+    Skeleton { x: root.pad; y: root.hero-h + 14px + min(368px, root.left-w * 9 / 16) + 34px; width: root.left-w * 0.7; height: 14px; radius: 7px; }
+    Skeleton { x: root.pad; y: root.hero-h + 14px + min(368px, root.left-w * 9 / 16) + 62px; width: root.left-w; height: 13px; radius: 6px; }
+    if root.two-col: Skeleton { x: root.width - root.pad - (root.width - 2 * root.pad - 28px) / 2.16; y: root.hero-h + 14px; width: (root.width - 2 * root.pad - 28px) / 2.16; height: 230px; radius: Ui.radius-card; }
 }

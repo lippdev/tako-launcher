@@ -2678,7 +2678,19 @@ impl Page for DesktopLibrary {
                 let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
                 // Etiqueta de estado: JOGANDO, QUEBRADO, INSTALADO ou NÃO INSTALADO (e os casos de ROM e lançamento).
                 let badge = if running {
-                    ctx.t("desktop.badge.playing")
+                    // "JOGANDO · 42 MIN": a sessão atual, quando o Tako sabe quando abriu o jogo.
+                    let started = ctx.running.as_ref().and_then(|r| r.started);
+                    started.map_or_else(
+                        || ctx.t("desktop.badge.playing"),
+                        |t| {
+                            let time = std::time::Duration::from_secs(60).max(t.elapsed());
+                            format!(
+                                "{} · {}",
+                                ctx.t("desktop.badge.playing"),
+                                game_text::play_time(lang, time)
+                            )
+                        },
+                    )
                 } else if g.is_broken {
                     ctx.t("desktop.badge.broken")
                 } else {
@@ -2717,7 +2729,7 @@ impl Page for DesktopLibrary {
                                     .danger()
                             }
                             Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
-                                .icon("power")
+                                .icon("close")
                                 .danger(),
                         })
                         .collect();
@@ -2796,6 +2808,7 @@ impl Page for DesktopLibrary {
                         logo,
                         show_logo,
                         title_pending,
+                        progress: install.as_ref().and_then(|i| i.progress).unwrap_or(-1.0),
                         accent: game_card_accent(ctx, &g.accent),
                         hint,
                         install_note: install

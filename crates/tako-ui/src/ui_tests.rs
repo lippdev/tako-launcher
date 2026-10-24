@@ -763,6 +763,88 @@ fn game_page_scrolls_with_page_down_and_the_thin_bar_gets_the_play_button() {
     .unwrap();
 }
 
+/// Trocar de jogo não recarrega a página: as partes do destaque saem, o outro jogo entra e elas voltam em escada. Com
+/// Reduzir animações tudo troca na hora. Pelos pixels do nome do jogo (texto claro), no relógio manual das animações.
+#[test]
+fn game_page_swaps_parts_in_a_staircase_and_instantly_with_reduced_motion() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (1600usize, 900usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        let base = START.elapsed();
+        let at = |shell: &mut Shell, ms: u64| {
+            CLOCK.with(|c| c.set(Some(base + std::time::Duration::from_millis(ms))));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        // O nome do jogo (texto claro) na coluna da identidade, embaixo à direita do destaque.
+        let title = |px: &[Rgb8Pixel]| {
+            (400..700)
+                .flat_map(|y| (900..1560).map(move |x| (x, y)))
+                .filter(|(x, y)| px[y * w + x].g > 215)
+                .count()
+        };
+        draw(&mut shell);
+        let before = at(&mut shell, 500);
+        assert!(title(&before) > 500, "o nome do primeiro jogo aparece");
+        shell.click("game", 1);
+        draw(&mut shell);
+        at(&mut shell, 510);
+        // No fim da saída (200 ms) a cópia troca e as partes recomeçam de zero: quase nada à vista.
+        let gap = at(&mut shell, 715);
+        assert!(
+            title(&gap) * 5 < title(&before),
+            "as partes saem antes do outro jogo entrar"
+        );
+        let end = at(&mut shell, 2500);
+        assert!(title(&end) > 500, "o outro jogo entrou");
+        assert!(end != before, "é outro jogo");
+        // Reduzir animações: troca na hora.
+        crate::bridge::set_global(&ui, "Ui", "reduce-motion", Value::Bool(true));
+        shell.click("game", 2);
+        draw(&mut shell);
+        at(&mut shell, 2600);
+        let instant = at(&mut shell, 2650);
+        assert!(
+            title(&instant) > 500,
+            "sem animação o jogo novo já está na tela"
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
 /// Janela pequena: a coluna da identidade nunca fica mais estreita que a fileira de ações, então o botão primário tem
 /// a mesma largura a 960 e a 1600 (antes saía cortado a 960). Pelos pixels: a corrida clara mais longa de uma linha é o
 /// fundo do primário.

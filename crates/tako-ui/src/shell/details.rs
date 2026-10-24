@@ -183,6 +183,8 @@ pub(crate) struct InstallStage {
     pub sub: String,
     pub split: bool,
     pub installing: bool,
+    /// Andamento de 0 a 1 quando a loja informa (a barra no pé do botão).
+    pub progress: Option<f32>,
     pub note: String,
     pub warn: bool,
 }
@@ -202,6 +204,10 @@ pub(crate) fn install_stage(ctx: &Ctx, g: &Game) -> Option<InstallStage> {
             sub: String::new(),
             split: false,
             installing: true,
+            progress: p
+                .fraction
+                .filter(|f| f.is_finite())
+                .map(|f| f.clamp(0.0, 1.0)),
             note: String::new(),
             warn: false,
         });
@@ -239,6 +245,7 @@ pub(crate) fn install_stage(ctx: &Ctx, g: &Game) -> Option<InstallStage> {
         sub,
         split: offers.len() > 1,
         installing: false,
+        progress: None,
         note,
         warn,
     })
