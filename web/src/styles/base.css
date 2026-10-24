@@ -265,3 +265,19 @@ textarea {
   --status-dropped: #ff6b6b;
   --status-none: #888888;
 }
+
+/* Componentes ErroDoJogo e AtualizacaoDoApp (WEB-04f): medidas e espaçamentos dos diálogos da prévia */
+:root {
+  --space-10: 10px;
+  --space-14: 14px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --erro-dialogo-largura: 540px;
+  --erro-capa-tamanho: 44px;
+  --erro-capa-radius: 8px;
+  --erro-ponto-tamanho: 12px;
+  --erro-ponto-offset: -3px;
+  --erro-ponto-borda: 2px;
+  --atualizacao-dialogo-largura: 480px;
+  --atualizacao-progresso-altura: 6px;
+}
