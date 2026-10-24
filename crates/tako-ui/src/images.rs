@@ -23,6 +23,8 @@ struct Request {
     glass: bool,
     /// Ícone do jogo (`icon`): quadrado de `max_w` px, já com os cantos redondos e o contorno.
     icon: bool,
+    /// Ícone apagado (jogo não instalado): quase cinza e mais escuro.
+    dim: bool,
 }
 
 /// Grade de luminância da cópia de vidro (colunas × linhas sobre a arte inteira).
@@ -202,15 +204,15 @@ pub fn init(resolver: Resolver, workers: usize, on_ready: impl Fn() + 'static) {
 
 /// Imagem pronta, ou `None` (e o pedido entra na fila). `max_w`/`max_h` em pixels físicos.
 pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
-    request(uri, max_w, max_h, false, false)
+    request(uri, max_w, max_h, false, false, false)
 }
 
 /// Ícone do jogo (UX-005, `Game::shown_icon`): quadrado de `size_px` pixels físicos (28 na tela normal, 56 em
 /// alta densidade), decodificado nesse tamanho e guardado já com os cantos redondos (raio 7/28 do lado) e o
 /// contorno de `#ffffff1a`, para a lista só desenhar a imagem, sem recorte em tempo real. Aceita `.ico`, PNG,
 /// JPG e WebP. `None` até ficar pronto (ou se a imagem não carrega): a lista desenha a inicial do nome.
-pub fn icon(uri: &str, size_px: u32) -> Option<Image> {
-    request(uri, size_px, size_px, false, true)
+pub fn icon(uri: &str, size_px: u32, dim: bool) -> Option<Image> {
+    request(uri, size_px, size_px, false, true, dim)
 }
 
 /// Cor de destaque da arte (já amostrada junto da cópia de vidro); `None` sem arte pronta ou sem cor nela.
@@ -227,20 +229,20 @@ pub fn art_accent(uri: &str) -> Option<Rgb> {
 /// Cópia de vidro da arte do desktop (Liquid Glass sem desfoque em tempo real): desfocada e saturada uma vez,
 /// em thread de fundo, com a luminância média em `GLASS_GRID` (linhas de cima para baixo). `None` até ficar pronta.
 pub fn glass(uri: &str) -> Option<(Image, Vec<f32>)> {
-    let img = request(uri, 0, GLASS_HEIGHT, true, false)?;
+    let img = request(uri, 0, GLASS_HEIGHT, true, false, false)?;
     let key = format!("glass|{uri}");
     let lum = STATE.with(|s| s.borrow().lum.get(&key).cloned())?;
     Some((img, lum))
 }
 
-fn request(uri: &str, max_w: u32, max_h: u32, glass: bool, icon: bool) -> Option<Image> {
+fn request(uri: &str, max_w: u32, max_h: u32, glass: bool, icon: bool, dim: bool) -> Option<Image> {
     if uri.is_empty() {
         return None;
     }
     let key = if glass {
         format!("glass|{uri}")
     } else if icon {
-        format!("icon{max_w}|{uri}")
+        format!("icon{max_w}{}|{uri}", if dim { "d" } else { "" })
     } else {
         format!("{max_w}x{max_h}|{uri}")
     };
@@ -259,6 +261,7 @@ fn request(uri: &str, max_w: u32, max_h: u32, glass: bool, icon: bool) -> Option
             max_h,
             glass,
             icon,
+            dim,
         };
         let tx = if icon { &s.icon_tx } else { &s.tx };
         if let Some(tx) = tx.clone() {
@@ -426,7 +429,10 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
         return Some((buf, Some((lum, sample_accent(&img)))));
     }
     if req.icon {
-        let rgba = round_icon(&img, req.max_w);
+        let mut rgba = round_icon(&img, req.max_w);
+        if req.dim {
+            dim_icon(&mut rgba);
+        }
         return Some((
             SharedPixelBuffer::clone_from_slice(rgba.as_raw(), rgba.width(), rgba.height()),
             None,
@@ -451,6 +457,17 @@ fn load(req: &Request, resolver: &Resolver) -> Option<Loaded> {
 /// Ícone quadrado de `size` px (recorte central do meio da imagem), com os cantos redondos (raio 7/28 do lado,
 /// anti-serrilhado) e o contorno de 1 px a cada 28 de `#ffffff1a` por cima da borda. Fora do arredondado o pixel
 /// fica transparente.
+/// Cinza 80% e brilho 70% (NaoInstalados): o ícone de um jogo que ainda não está no PC.
+fn dim_icon(img: &mut image::RgbaImage) {
+    for p in img.pixels_mut() {
+        let luma =
+            0.299 * f32::from(p.0[0]) + 0.587 * f32::from(p.0[1]) + 0.114 * f32::from(p.0[2]);
+        for c in &mut p.0[..3] {
+            *c = ((f32::from(*c) * 0.2 + luma * 0.8) * 0.7).round() as u8;
+        }
+    }
+}
+
 pub(crate) fn round_icon(img: &image::DynamicImage, size: u32) -> image::RgbaImage {
     let size = size.clamp(8, 256);
     let mut out = img
@@ -587,6 +604,7 @@ mod tests {
                 max_h: 1,
                 glass: false,
                 icon: false,
+                dim: false,
             });
         }
         assert_eq!(q.pop().key, "c");
@@ -610,7 +628,7 @@ mod tests {
         });
         init(resolver, 2, || {});
         for i in 0..300 {
-            assert!(icon(&format!("icon://{i}"), 56).is_none());
+            assert!(icon(&format!("icon://{i}"), 56, false).is_none());
         }
         let asked = std::time::Instant::now();
         assert!(get("hero://destaque", 1600, 900).is_none());
@@ -669,6 +687,7 @@ mod tests {
             max_h: size,
             glass: false,
             icon: true,
+            dim: false,
         };
         let (buf, _) = load(&req, &(Arc::new(|_: &str| None) as Resolver)).unwrap();
         image::RgbaImage::from_raw(buf.width(), buf.height(), buf.as_bytes().to_vec()).unwrap()
@@ -702,6 +721,16 @@ mod tests {
     }
 
     #[test]
+    fn dim_icon_is_nearly_gray_and_darker_and_keeps_alpha() {
+        let mut img = image::RgbaImage::from_pixel(1, 1, image::Rgba([200, 40, 40, 128]));
+        dim_icon(&mut img);
+        let [r, g, b, a] = img.get_pixel(0, 0).0;
+        assert_eq!(a, 128);
+        assert!(r > g && r < 200 && (i32::from(r) - i32::from(g)) < 100);
+        assert!(g.abs_diff(b) <= 1);
+    }
+
+    #[test]
     fn icon_decodes_ico_and_survives_broken_files() {
         use image::ImageEncoder;
         let dir = tempfile::tempdir().unwrap();
@@ -725,6 +754,7 @@ mod tests {
             max_h: 28,
             glass: false,
             icon: true,
+            dim: false,
         };
         let none: Resolver = Arc::new(|_: &str| None);
         for (name, content) in [
