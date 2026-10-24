@@ -827,12 +827,12 @@ impl Page for ProfilePage {
             tab: TABS.iter().position(|t| *t == self.tab).unwrap_or(0) as i32,
             actions: vec![
                 DeskInfo {
-                    icon: "user".into(),
+                    icon: "users".into(),
                     label: ctx.t("profile.switch"),
                     ..Default::default()
                 },
                 DeskInfo {
-                    icon: "pencil".into(),
+                    icon: "user".into(),
                     label: ctx.t("profile.edit"),
                     ..Default::default()
                 },

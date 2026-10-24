@@ -3762,7 +3762,7 @@ component DeskLibrary inherits Rectangle {
     }
     SearchBox {
         visible: wide;
-        x: (parent.width - self.width) / 2;
+        x: (root.width - self.width) / 2;
         y: 1px;
         width: small ? 280px : 420px;
         text: search;
@@ -6678,7 +6678,7 @@ component DeskOverlay inherits Rectangle {
 // Fundo da janela. Na biblioteca, a arte do jogo em foco, nítida, na altura da janela; nas bordas (atrás da lista e à
 // direita) ela se funde com a cópia desfocada misturada a 45% do accent, como uma luz da cor do jogo; escurecida só
 // atrás do título e embaixo dos cartões. Sem arte, um degradê do accent. Nas Configurações, o cinza `settings-bg`.
-// Capa pequena da TelaPerfil: o quadrado do topo da capa; sem capa, o degradê da cor do jogo.
+// Capa pequena da TelaPerfil: o topo da capa com proporção ou recorte; sem capa, o degradê da cor do jogo.
 component ProfileThumb inherits Rectangle {
     in property <DeskEntry> data;
     in property <length> radius: Ui.radius-thumb;
@@ -6686,7 +6686,7 @@ component ProfileThumb inherits Rectangle {
     clip: true;
     background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.55) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
     Image { width: parent.width; height: parent.height; source: data.thumb; image-fit: cover; vertical-alignment: top; }
-    Rectangle { border-radius: root.radius; border-width: 1px; border-color: Ui.glass-edge; }
+    Rectangle { border-radius: root.radius; border-width: 1px; border-color: Ui.line; }
 }
 
 // Linha de sessão (TelaPerfil › Sessões recentes e PerfilSessoes): capa, jogo, quando, o total do jogo e a duração.
@@ -6694,7 +6694,7 @@ component ProfileSessionRow inherits Rectangle {
     in property <DeskEntry> data;
     in property <bool> focused;
     in property <bool> small;
-    in property <length> thumb: 48px;
+    in property <length> thumb: 44px;
     callback clicked();
     // Ao ganhar o foco do teclado, a rolagem traz a linha para a tela.
     callback reveal(length, length);
@@ -6708,7 +6708,7 @@ component ProfileSessionRow inherits Rectangle {
     animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
     accessible-role: list-item;
     accessible-label: data.title + " · " + data.detail + " · " + data.value;
-    if focused: FocusRing { }
+    if focused: FocusRing { radius: Ui.radius-row; }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
@@ -6716,13 +6716,30 @@ component ProfileSessionRow inherits Rectangle {
     HorizontalLayout {
         padding-left: 10px;
         padding-right: 10px;
-        spacing: small ? 12px : 18px;
-        ProfileThumb { data: data; width: root.thumb; height: root.thumb; y: (parent.height - self.height) / 2; }
+        spacing: small ? 12px : 16px;
+        // Capa proporção 40×52 com raio 7px.
+        Rectangle {
+            width: root.thumb;
+            height: root.thumb * 1.3;
+            y: (parent.height - self.height) / 2;
+            border-radius: Ui.radius-thumb;
+            clip: true;
+            background: @linear-gradient(160deg, data.accent.mix(Ui.desk-canvas, 0.55) 0%, data.accent.mix(Ui.desk-canvas, 0.25) 100%);
+            Image { width: parent.width; height: parent.height; source: data.thumb; image-fit: cover; }
+            Rectangle { border-radius: Ui.radius-thumb; border-width: 1px; border-color: Ui.line; }
+        }
         VerticalLayout {
             alignment: center;
-            spacing: 6px;
+            spacing: 4px;
             horizontal-stretch: 1;
-            Text { text: data.title; color: Ui.desk-text; font-size: Ui.desk-label-lg; font-weight: 600; overflow: elide; }
+            Text {
+                text: data.title;
+                color: Ui.desk-text;
+                font-family: Ui.font-desk;
+                font-size: Ui.desk-body;
+                font-weight: 600;
+                overflow: elide;
+            }
             HorizontalLayout {
                 spacing: 8px;
                 if data.dot: Rectangle {
@@ -6732,13 +6749,21 @@ component ProfileSessionRow inherits Rectangle {
                     border-radius: 4px;
                     background: Ui.success;
                 }
-                Text { text: data.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; overflow: elide; horizontal-stretch: 1; }
+                Text {
+                    text: data.detail;
+                    color: Ui.desk-text-muted;
+                    font-family: Ui.font-desk;
+                    font-size: Ui.desk-label-sm;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
             }
         }
         if data.note != "" && !small: Text {
             width: 220px;
             text: data.note;
-            color: Ui.desk-on-muted;
+            color: Ui.desk-text-muted;
+            font-family: Ui.font-desk;
             font-size: Ui.desk-label-sm;
             font-weight: 500;
             horizontal-alignment: right;
@@ -6749,7 +6774,8 @@ component ProfileSessionRow inherits Rectangle {
             width: small ? 96px : 120px;
             text: data.value;
             color: Ui.desk-text;
-            font-size: Ui.desk-label;
+            font-family: Ui.font-heading;
+            font-size: 14px;
             font-weight: 600;
             horizontal-alignment: right;
             vertical-alignment: center;
@@ -6758,52 +6784,68 @@ component ProfileSessionRow inherits Rectangle {
     }
 }
 
-// Bloco da Visão geral (vidro denso, 310 de altura): o visual em cima e, abaixo da divisória, rótulo e valor grande.
-// No foco (mouse, teclado ou controle) cresce 2,5% com o foco suave; com Reduzir animações, fica do tamanho.
-component ProfileTile inherits Vidro {
+// Bloco da Visão geral (GrupoDeBlocos): raio 11, contorno line, fundo tile e rodapé em tile-foot com rótulo em caixa alta.
+component ProfileTile inherits Rectangle {
     in property <DeskInfo> info;
     in property <bool> focused;
     in property <bool> small;
     callback clicked();
-    dense: true;
+    border-radius: Ui.radius-button;
+    background: Ui.tile;
+    border-width: 1px;
+    border-color: Ui.line;
+    clip: true;
     accessible-role: button;
     accessible-label: info.label + ": " + info.value;
-    transform-scale: (focused || ta.has-hover) && !Ui.reduce-motion ? 1.025 : 1;
+    transform-scale: (focused || ta.has-hover) && !Ui.reduce-motion ? 1.02 : 1;
     animate transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    if focused: FocusRing { radius: Ui.radius-card; }
+    if focused: FocusRing { radius: Ui.radius-button; }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
     VerticalLayout {
-        padding-top: small ? 16px : 22px;
-        padding-left: small ? 16px : 24px;
-        padding-right: small ? 16px : 24px;
-        padding-bottom: small ? 16px : 24px;
-        spacing: small ? 12px : 16px;
         Rectangle {
             vertical-stretch: 1;
+            padding-top: small ? 14px : 18px;
+            padding-left: small ? 16px : 20px;
+            padding-right: small ? 16px : 20px;
+            padding-bottom: small ? 12px : 16px;
             @children
         }
-        Rectangle { height: 1px; background: Ui.divider; }
-        VerticalLayout {
-            spacing: 6px;
-            Text { text: info.label; color: Ui.desk-on-muted; font-size: Ui.desk-label; font-weight: 500; overflow: elide; }
-            Text { text: info.value; color: Ui.desk-text; font-size: small ? Ui.desk-title : Ui.desk-headline; font-weight: 700; overflow: elide; }
+        // Faixa de rodapé (40px, tile-foot, rótulo em caixa alta Poppins 12/700, text-dim).
+        Rectangle {
+            height: 40px;
+            background: Ui.tile-foot;
+            Rectangle { y: 0; width: parent.width; height: 1px; background: Ui.line; }
+            Text {
+                text: info.label;
+                color: Ui.desk-text-dim;
+                font-family: Ui.font-heading;
+                font-size: Ui.desk-overline;
+                font-weight: 700;
+                letter-spacing: 0.4px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
     }
 }
 
 // Cartão de coleção (PerfilColecoes): mosaico com até 4 capas, nome, quantidade e o selo Automática.
-component ProfileCard inherits Vidro {
+component ProfileCard inherits Rectangle {
     in property <DeskCard> card;
     in property <bool> focused;
     in property <string> auto-label;
     callback clicked();
-    dense: true;
+    border-radius: Ui.radius-card;
+    background: Ui.surface;
+    border-width: 1px;
+    border-color: Ui.line-strong;
+    clip: true;
     accessible-role: button;
     accessible-label: card.title + " · " + card.count + (card.auto ? " · " + auto-label : "");
-    transform-scale: (focused || ta.has-hover) && !Ui.reduce-motion ? 1.025 : 1;
+    transform-scale: (focused || ta.has-hover) && !Ui.reduce-motion ? 1.02 : 1;
     animate transform-scale { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     if focused: FocusRing { radius: Ui.radius-card; }
     ta := TouchArea {
@@ -6811,55 +6853,62 @@ component ProfileCard inherits Vidro {
         clicked => { root.clicked(); }
     }
     VerticalLayout {
-        padding: 14px;
-        spacing: 12px;
+        padding: 8px;
+        spacing: 10px;
         mosaic := Rectangle {
             vertical-stretch: 1;
-            border-radius: 12px;
+            border-radius: 11px;
             clip: true;
             property <int> n: card.covers.length;
             property <length> half-w: (self.width - 4px) / 2;
             property <length> half-h: (self.height - 4px) / 2;
             // Coleção vazia: o mosaico só com o contorno.
             if n == 0: Rectangle {
-                border-radius: 12px;
+                border-radius: 11px;
                 border-width: 1px;
-                border-color: Ui.glass-item-edge;
+                border-color: Ui.line;
             }
             // 1 capa ocupa tudo; 2 lado a lado; 3: duas em cima e a terceira na metade de baixo; 4: 2 × 2.
-            for c[i] in card.covers: ProfileThumb {
-                data: c;
-                radius: 0;
+            for c[i] in card.covers: Rectangle {
                 x: n == 1 || (n == 3 && i == 2) ? 0 : mod(i, 2) * (mosaic.half-w + 4px);
                 y: n <= 2 ? 0 : floor(i / 2) * (mosaic.half-h + 4px);
                 width: n == 1 || (n == 3 && i == 2) ? mosaic.width : mosaic.half-w;
                 height: n <= 2 ? mosaic.height : mosaic.half-h;
+                clip: true;
+                background: @linear-gradient(160deg, c.accent.mix(Ui.desk-canvas, 0.55) 0%, c.accent.mix(Ui.desk-canvas, 0.25) 100%);
+                Image { width: parent.width; height: parent.height; source: c.thumb; image-fit: cover; }
             }
         }
         HorizontalLayout {
             spacing: 10px;
             padding-left: 4px;
             padding-right: 4px;
+            padding-bottom: 4px;
             VerticalLayout {
-                spacing: 5px;
+                spacing: 4px;
                 horizontal-stretch: 1;
-                Text { text: card.title; color: Ui.desk-text; font-size: Ui.desk-label-lg; font-weight: 650; overflow: elide; }
-                Text { text: card.count; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; overflow: elide; }
+                Text { text: card.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 16px; font-weight: 700; overflow: elide; }
+                Text { text: card.count; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: 12.5px; font-weight: 500; overflow: elide; }
             }
             if card.auto: Rectangle {
                 y: parent.height - self.height;
                 height: 24px;
-                width: al.preferred-width;
+                width: al.preferred-width + 16px;
                 border-radius: 12px;
-                background: Ui.glass-control;
+                background: Ui.tile;
                 border-width: 1px;
-                border-color: Ui.glass-edge-strong;
+                border-color: Ui.line-strong;
                 al := HorizontalLayout {
-                    padding-left: 9px;
-                    padding-right: 9px;
-                    spacing: 5px;
-                    DeskIcon { name: "layers"; size: 13px; y: (parent.height - self.height) / 2; }
-                    Text { text: auto-label; color: Ui.desk-text; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
+                    alignment: center;
+                    spacing: 6px;
+                    Rectangle {
+                        width: 6px;
+                        height: 6px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 3px;
+                        background: Ui.desk-accent;
+                    }
+                    Text { text: auto-label; color: Ui.desk-text; font-family: Ui.font-desk; font-size: 12px; font-weight: 600; vertical-alignment: center; }
                 }
             }
         }
@@ -6885,7 +6934,7 @@ component DeskProfileScreen inherits Rectangle {
     }
     opacity: shown ? 1 : 0;
     x: shown ? 0 : 16px;
-    animate opacity, x { duration: Ui.page-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
+    animate opacity, x { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
     // Troca de guia (abas internas): o conteúdo sai em 80 e o novo entra em 120, só opacidade.
     property <bool> tab-in: true;
     changed cur-tab => {
@@ -6904,7 +6953,7 @@ component DeskProfileScreen inherits Rectangle {
     }
     property <bool> kb: focus-visible;
     property <length> gap: small ? 16px : 24px;
-    property <length> avatar: small ? 72px : 120px;
+    property <length> avatar: small ? 72px : 88px;
     // Três blocos iguais (o texto de cada um não muda a largura).
     property <length> tile-w: (fl.width - 2 * gap) / 3;
     // Foco do teclado na barra, nas guias ou nas ações: a página volta ao topo.
@@ -6932,56 +6981,66 @@ component DeskProfileScreen inherits Rectangle {
             padding-top: small ? 8px : 30px;
             padding-bottom: Ui.space-16;
             spacing: 0;
-            // Identidade: avatar com a inicial (ponto verde com um jogo aberto), nome e a linha de estado.
+            // Identidade: avatar com anel da cor de destaque, nome e a linha de estado.
             HorizontalLayout {
-                spacing: small ? 20px : 30px;
+                spacing: small ? 16px : 22px;
+                alignment: center;
                 Rectangle {
-                    width: avatar + 8px;
-                    height: self.width;
-                    border-radius: self.width / 2;
-                    // Cores sólidas: o renderizador de software não arredonda degradês.
-                    background: #ffffff26;
-                    Rectangle {
-                        width: avatar;
-                        height: avatar;
-                        border-radius: avatar / 2;
-                        background: Ui.accent.mix(Ui.accent-deep, 0.5);
-                        animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                        border-width: 1px;
-                        border-color: #ffffff2e;
-                        Text { text: p.initial; color: Ui.desk-text; font-size: avatar * 0.42; font-weight: 700; }
+                    width: avatar;
+                    height: avatar;
+                    border-radius: avatar / 2;
+                    background: @radial-gradient(circle, #35333f 0%, #131219 100%);
+                    border-width: 2px;
+                    border-color: Ui.desk-accent.with-alpha(0.75);
+                    drop-shadow-blur: 16px;
+                    drop-shadow-color: Ui.desk-accent.with-alpha(0.14);
+                    Text {
+                        text: p.initial;
+                        color: #ffffff;
+                        font-family: Ui.font-heading;
+                        font-size: small ? 28px : 34px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                     if p.playing: Rectangle {
-                        x: parent.width - self.width - 6px;
-                        y: parent.height - self.height - 6px;
-                        width: small ? 16px : 22px;
+                        x: parent.width - self.width - 2px;
+                        y: parent.height - self.height - 4px;
+                        width: small ? 14px : 16px;
                         height: self.width;
                         border-radius: self.width / 2;
                         background: Ui.success;
-                        border-width: 4px;
-                        border-color: #10131a;
+                        border-width: 3px;
+                        border-color: Ui.desk-canvas;
                     }
                 }
                 VerticalLayout {
                     alignment: center;
-                    spacing: small ? 8px : 12px;
+                    spacing: 6px;
                     horizontal-stretch: 1;
                     Text {
                         text: p.name;
                         accessible-role: text;
                         accessible-label: p.name;
                         color: Ui.desk-text;
-                        font-size: small ? Ui.desk-headline * 1.3 : Ui.desk-display;
+                        font-family: Ui.font-heading;
+                        font-size: small ? 24px : 30px;
                         font-weight: 800;
-                        letter-spacing: -0.025 * self.font-size;
+                        letter-spacing: -0.02 * self.font-size;
                         overflow: elide;
                     }
                     HorizontalLayout {
                         alignment: start;
-                        spacing: 14px;
+                        spacing: 10px;
                         for it[i] in p.line: HorizontalLayout {
-                            spacing: 14px;
-                            if i > 0: Rectangle { width: 1px; height: 16px; y: (parent.height - self.height) / 2; background: Ui.glass-item-edge; }
+                            spacing: 10px;
+                            if i > 0: Text {
+                                text: "|";
+                                color: Ui.line-strong;
+                                font-family: Ui.font-desk;
+                                font-size: 13.5px;
+                                vertical-alignment: center;
+                            }
                             if it.dot: Rectangle {
                                 width: 8px;
                                 height: 8px;
@@ -6991,39 +7050,78 @@ component DeskProfileScreen inherits Rectangle {
                             }
                             Text {
                                 text: it.label;
-                                color: it.dot ? Ui.desk-text : Ui.desk-on-muted;
-                                font-size: small ? Ui.desk-label : Ui.desk-label-lg;
+                                color: it.dot ? Ui.desk-text : Ui.desk-text-muted;
+                                font-family: Ui.font-desk;
+                                font-size: 13.5px;
                                 font-weight: 500;
                                 vertical-alignment: center;
                             }
                         }
                     }
                 }
+                // Botões de ação no cabeçalho à direita (Trocar perfil · Editar perfil): botões contornados (btn-out).
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: center;
+                    for a[i] in p.actions: Rectangle {
+                        property <bool> focused: kb && p.zone == "actions" && p.index == i;
+                        height: 36px;
+                        width: abtn.preferred-width + 28px;
+                        border-radius: Ui.radius-control;
+                        background: ata.has-hover ? Ui.glass-hover : Ui.tile;
+                        border-width: 1px;
+                        border-color: Ui.line-strong;
+                        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                        accessible-role: button;
+                        accessible-label: a.label;
+                        if focused: FocusRing { radius: Ui.radius-control; }
+                        abtn := HorizontalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            DeskIcon { name: a.icon; size: 16px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
+                            Text {
+                                text: a.label;
+                                color: Ui.desk-text;
+                                font-family: Ui.font-desk;
+                                font-size: 13.5px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                        ata := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.clicked("profile-action", i); }
+                        }
+                    }
+                }
             }
-            Rectangle { height: small ? 16px : 34px; }
-            // Guias de texto (a atual com o traço de 3 embaixo) e, à direita, as ações em ícone redondo.
+            Rectangle { height: small ? 16px : 26px; }
+            // Guias de navegação (st-tabs): Visão geral · Sessões · Coleções.
             HorizontalLayout {
-                spacing: small ? 24px : 36px;
+                spacing: 4px;
+                padding-bottom: small ? 14px : 22px;
                 for t[i] in p.tabs: Rectangle {
-                    width: tt.preferred-width;
-                    height: tt.preferred-height + 24px;
+                    height: 36px;
+                    width: tt.preferred-width + 28px;
+                    border-radius: Ui.radius-control;
+                    background: i == p.tab ? Ui.surface-raised : (tta.has-hover ? Ui.glass-hover : transparent);
+                    border-width: i == p.tab && Ui.desk-theme == 4 ? 1px : 0px;
+                    border-color: Ui.line-strong;
                     accessible-role: tab;
                     accessible-label: t;
                     property <bool> focused: kb && p.zone == "tabs" && p.index == i;
-                    if focused: FocusRing { radius: Ui.radius-thumb; }
+                    if focused: FocusRing { radius: Ui.radius-control; }
                     tt := Text {
-                        y: 10px;
                         text: t;
-                        color: i == p.tab || tta.has-hover || focused ? Ui.desk-text : Ui.desk-on-muted;
-                        font-size: small ? Ui.desk-label-lg : Ui.desk-title;
-                        font-weight: i == p.tab ? 650 : 500;
+                        color: i == p.tab || tta.has-hover || focused ? Ui.desk-text : Ui.desk-text-muted;
+                        font-family: Ui.font-heading;
+                        font-size: 13.5px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                         animate color { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                    }
-                    if i == p.tab: Rectangle {
-                        y: parent.height - self.height;
-                        height: 3px;
-                        border-radius: 2px;
-                        background: Ui.desk-text;
                     }
                     tta := TouchArea {
                         mouse-cursor: pointer;
@@ -7031,187 +7129,241 @@ component DeskProfileScreen inherits Rectangle {
                     }
                 }
                 Rectangle { horizontal-stretch: 1; }
-                for a[i] in p.actions: Rectangle {
-                    property <bool> focused: kb && p.zone == "actions" && p.index == i;
-                    y: (parent.height - self.height) / 2;
-                    width: 48px;
-                    height: 48px;
-                    border-radius: 24px;
-                    background: focused ? Ui.focus-fill : (ata.has-hover ? Ui.glass-hover : Ui.glass-control);
-                    border-width: 1px;
-                    border-color: focused ? Ui.focus-ring : Ui.glass-edge;
-                    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                    accessible-role: button;
-                    accessible-label: a.label;
-                    DeskIcon { name: a.icon; size: 21px; }
-                    ata := TouchArea {
-                        mouse-cursor: pointer;
-                        clicked => { root.clicked("profile-action", i); }
-                    }
-                    // O nome aparece acima do ícone no hover e no foco do teclado.
-                    if ata.has-hover || focused: Rectangle {
-                        y: -self.height - 10px;
-                        x: (parent.width - self.width) / 2;
-                        width: an.preferred-width + 20px;
-                        height: 28px;
-                        border-radius: Ui.radius-thumb;
-                        background: Ui.glass-panel-dense;
-                        border-width: 1px;
-                        border-color: Ui.glass-edge-strong;
-                        an := Text { text: a.label; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; }
-                    }
-                }
             }
-            Rectangle { height: small ? 14px : 22px; }
 
             // ── Visão geral: Tempo jogado · Mais jogado · Jogos na biblioteca, e as sessões recentes.
             if p.tab == 0: VerticalLayout {
                 opacity: tab-in ? 1 : 0;
                 animate opacity { duration: Ui.list-fade(tab-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                 spacing: 0;
-                HorizontalLayout {
-                    spacing: gap;
-                    // Texto maior (125%): o bloco cresce junto para o valor não encostar na borda.
-                    height: (small ? 236px : 310px) + max(0, Ui.text-scale - 1) * 160px;
-                    // Tempo jogado: a semana em barras, só hoje com o valor e em branco; dia que não chegou, contornado.
-                    ProfileTile {
-                        width: tile-w;
-                        info: p.tiles[0];
-                        small: root.small;
-                        focused: kb && p.zone == "tiles" && p.index == 0;
-                        clicked => { root.clicked("profile-tile", 0); }
-                        VerticalLayout {
-                            spacing: 14px;
-                            HorizontalLayout {
-                                Text { text: p.week-label; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-stretch: 1; }
-                                Text { text: p.week-total; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 650; }
-                            }
-                            Rectangle {
-                                vertical-stretch: 1;
-                                accessible-role: image;
-                                accessible-label: p.week-text;
-                                property <length> bar-gap: small ? 5px : 8px;
-                                property <length> slot: (self.width - 6 * bar-gap) / 7;
-                                for b[i] in p.week: Rectangle {
-                                    x: i * (parent.slot + parent.bar-gap);
-                                    width: parent.slot;
-                                    property <length> label-h: 12px * Ui.text-scale;
-                                    // Até onde o valor de hoje pode ir sem sair do gráfico.
-                                    property <length> right-room: parent.width - self.x;
-                                    property <length> room: self.height - 2 * self.label-h - 14px;
-                                    property <length> bar-w: min(30px, self.width);
-                                    Text {
-                                        y: parent.height - self.height;
-                                        text: b.label;
-                                        color: b.today ? Ui.desk-text : Ui.desk-on-muted;
-                                        font-size: Ui.desk-overline * 0.92;
-                                        font-weight: 600;
-                                    }
-                                    Rectangle {
-                                        x: (parent.width - self.width) / 2;
-                                        width: parent.bar-w;
-                                        height: b.future ? parent.room : parent.room * b.fraction;
-                                        y: parent.height - parent.label-h - 7px - self.height;
-                                        border-radius: 4px;
-                                        background: b.future ? transparent : (b.today ? Ui.primary-top : Ui.glass-item-highlight);
-                                        border-width: b.future ? 1px : 0;
-                                        border-color: Ui.glass-item-edge;
-                                        drop-shadow-blur: b.today ? 16px : 0;
-                                        drop-shadow-color: b.today ? #ffffff40 : transparent;
-                                    }
-                                    if b.value != "": Text {
-                                        width: self.preferred-width;
-                                        x: max(-parent.x, min((parent.width - self.width) / 2, parent.right-room - self.width));
-                                        y: parent.height - parent.label-h - 14px - parent.room * b.fraction - self.height;
-                                        text: b.value;
-                                        color: Ui.desk-text;
-                                        font-size: Ui.desk-overline;
-                                        font-weight: 700;
-                                        wrap: no-wrap;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    // Mais jogado: três jogos com capa, horas e trilho proporcional (o primeiro em branco).
-                    ProfileTile {
-                        width: tile-w;
-                        info: p.tiles[1];
-                        small: root.small;
-                        focused: kb && p.zone == "tiles" && p.index == 1;
-                        clicked => { root.clicked("profile-tile", 1); }
-                        VerticalLayout {
-                            alignment: start;
-                            spacing: small ? 10px : 14px;
-                            for e[i] in p.top: HorizontalLayout {
+                // GrupoDeBlocos (calha de 6, raio 16, line-strong, fundo group).
+                Rectangle {
+                    border-radius: Ui.radius-card;
+                    background: Ui.group;
+                    border-width: 1px;
+                    border-color: Ui.line-strong;
+                    padding: 6px;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        height: (small ? 236px : 310px) + max(0, Ui.text-scale - 1) * 160px;
+                        // Tempo jogado: total e a semana em barras.
+                        ProfileTile {
+                            info: p.tiles[0];
+                            small: root.small;
+                            focused: kb && p.zone == "tiles" && p.index == 0;
+                            clicked => { root.clicked("profile-tile", 0); }
+                            VerticalLayout {
                                 spacing: 14px;
-                                ProfileThumb { data: e; width: small ? 36px : 52px; height: self.width; }
-                                VerticalLayout {
+                                HorizontalLayout {
                                     alignment: center;
                                     spacing: 8px;
-                                    HorizontalLayout {
-                                        spacing: 8px;
-                                        Text { text: e.title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
-                                        Text { text: e.value; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; }
+                                    Text {
+                                        text: p.tiles[0].value;
+                                        color: Ui.desk-text;
+                                        font-family: Ui.font-heading;
+                                        font-size: small ? 18px : 22px;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
                                     }
-                                    Rectangle {
-                                        height: 4px;
-                                        border-radius: 2px;
-                                        background: Ui.glass-control;
+                                    DeskIcon {
+                                        name: "clock";
+                                        size: 19px;
+                                        tint: #cfcfcf;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                                HorizontalLayout {
+                                    Text { text: p.week-label; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-stretch: 1; }
+                                    Text { text: p.week-total; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-label-sm; font-weight: 650; }
+                                }
+                                Rectangle {
+                                    vertical-stretch: 1;
+                                    accessible-role: image;
+                                    accessible-label: p.week-text;
+                                    property <length> bar-gap: small ? 5px : 8px;
+                                    property <length> slot: (self.width - 6 * bar-gap) / 7;
+                                    for b[i] in p.week: Rectangle {
+                                        x: i * (parent.slot + parent.bar-gap);
+                                        width: parent.slot;
+                                        property <length> label-h: 12px * Ui.text-scale;
+                                        property <length> right-room: parent.width - self.x;
+                                        property <length> room: self.height - 2 * self.label-h - 14px;
+                                        property <length> bar-w: min(30px, self.width);
+                                        Text {
+                                            y: parent.height - self.height;
+                                            text: b.label;
+                                            color: b.today ? Ui.desk-text : Ui.desk-text-muted;
+                                            font-family: Ui.font-desk;
+                                            font-size: Ui.desk-overline * 0.92;
+                                            font-weight: 600;
+                                        }
                                         Rectangle {
-                                            x: 0;
-                                            width: parent.width * e.fraction;
-                                            border-radius: 2px;
-                                            background: i == 0 ? Ui.primary-top : Ui.glass-item-highlight;
+                                            x: (parent.width - self.width) / 2;
+                                            width: parent.bar-w;
+                                            height: b.future ? parent.room : parent.room * b.fraction;
+                                            y: parent.height - parent.label-h - 7px - self.height;
+                                            border-radius: 4px;
+                                            background: b.future ? transparent : (b.today ? #eeeeee : Ui.surface-raised);
+                                            border-width: b.future ? 1px : 0;
+                                            border-color: Ui.line;
+                                            drop-shadow-blur: b.today ? 16px : 0;
+                                            drop-shadow-color: b.today ? #ffffff40 : transparent;
+                                        }
+                                        if b.value != "": Text {
+                                            width: self.preferred-width;
+                                            x: max(-parent.x, min((parent.width - self.width) / 2, parent.right-room - self.width));
+                                            y: parent.height - parent.label-h - 14px - parent.room * b.fraction - self.height;
+                                            text: b.value;
+                                            color: Ui.desk-text;
+                                            font-family: Ui.font-heading;
+                                            font-size: Ui.desk-overline;
+                                            font-weight: 700;
+                                            wrap: no-wrap;
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    // Jogos na biblioteca: leque com as três últimas capas, a mais recente na frente.
-                    ProfileTile {
-                        width: tile-w;
-                        info: p.tiles[2];
-                        small: root.small;
-                        focused: kb && p.zone == "tiles" && p.index == 2;
-                        clicked => { root.clicked("profile-tile", 2); }
-                        Rectangle {
-                            property <float> k: small ? 0.7 : 1;
-                            width: 236px * k;
-                            height: 140px * k;
-                            for e[i] in p.fan: ProfileThumb {
-                                property <bool> front: i == p.fan.length - 1;
-                                data: e;
-                                radius: 14px;
-                                width: (front ? 116px : 92px) * parent.k;
-                                height: self.width;
-                                x: front ? 60px * parent.k : (i == 0 ? 0 : parent.width - self.width);
-                                y: (front ? 8px : 26px) * parent.k;
-                                transform-rotation: front ? 0deg : (i == 0 ? -7deg : 7deg);
-                                drop-shadow-offset-y: 10px;
-                                drop-shadow-blur: 26px;
-                                drop-shadow-color: #00000073;
+                        // Mais jogado: três jogos com capa, horas e trilho proporcional.
+                        ProfileTile {
+                            info: p.tiles[1];
+                            small: root.small;
+                            focused: kb && p.zone == "tiles" && p.index == 1;
+                            clicked => { root.clicked("profile-tile", 1); }
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: small ? 10px : 14px;
+                                HorizontalLayout {
+                                    alignment: center;
+                                    spacing: 8px;
+                                    Text {
+                                        text: p.tiles[1].value;
+                                        color: Ui.desk-text;
+                                        font-family: Ui.font-heading;
+                                        font-size: small ? 16px : 20px;
+                                        font-weight: 700;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+                                    DeskIcon {
+                                        name: "star";
+                                        size: 19px;
+                                        tint: #cfcfcf;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                                for e[i] in p.top: HorizontalLayout {
+                                    spacing: 14px;
+                                    ProfileThumb { data: e; width: small ? 36px : 48px; height: self.width; }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 6px;
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            Text { text: e.title; color: Ui.desk-text; font-family: Ui.font-desk; font-size: Ui.desk-label; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                                            Text { text: e.value; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; }
+                                        }
+                                        Rectangle {
+                                            height: 4px;
+                                            border-radius: 2px;
+                                            background: Ui.line-strong;
+                                            Rectangle {
+                                                x: 0;
+                                                width: parent.width * e.fraction;
+                                                border-radius: 2px;
+                                                background: i == 0 ? Ui.desk-accent : Ui.surface-raised;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Jogos na biblioteca: leque com as três últimas capas.
+                        ProfileTile {
+                            info: p.tiles[2];
+                            small: root.small;
+                            focused: kb && p.zone == "tiles" && p.index == 2;
+                            clicked => { root.clicked("profile-tile", 2); }
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 14px;
+                                HorizontalLayout {
+                                    alignment: center;
+                                    spacing: 8px;
+                                    Text {
+                                        text: p.tiles[2].value;
+                                        color: Ui.desk-text;
+                                        font-family: Ui.font-heading;
+                                        font-size: small ? 18px : 22px;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
+                                    }
+                                    DeskIcon {
+                                        name: "gamepad";
+                                        size: 19px;
+                                        tint: #cfcfcf;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                                Rectangle {
+                                    property <float> k: small ? 0.7 : 1;
+                                    width: 236px * k;
+                                    height: 140px * k;
+                                    for e[i] in p.fan: ProfileThumb {
+                                        property <bool> front: i == p.fan.length - 1;
+                                        data: e;
+                                        radius: 12px;
+                                        width: (front ? 116px : 92px) * parent.k;
+                                        height: self.width;
+                                        x: front ? 60px * parent.k : (i == 0 ? 0 : parent.width - self.width);
+                                        y: (front ? 8px : 26px) * parent.k;
+                                        transform-rotation: front ? 0deg : (i == 0 ? -7deg : 7deg);
+                                        drop-shadow-offset-y: 10px;
+                                        drop-shadow-blur: 26px;
+                                        drop-shadow-color: #00000073;
+                                    }
+                                }
                             }
                         }
                     }
                 }
                 // Sessões recentes (com "Ver todas"), na rolagem.
                 HorizontalLayout {
-                    padding-top: small ? 20px : 34px;
-                    padding-bottom: 12px;
-                    Text { text: p.recent-title; color: Ui.desk-text; font-size: Ui.desk-title; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; accessible-role: text; }
+                    padding-top: small ? 20px : 32px;
+                    padding-bottom: 14px;
+                    spacing: 10px;
+                    alignment: center;
+                    Text {
+                        text: p.recent-title;
+                        color: Ui.desk-text;
+                        font-family: Ui.font-heading;
+                        font-size: 19px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: p.recent.length + " " + (p.recent.length == 1 ? "jogo" : "jogos");
+                        color: Ui.desk-text-muted;
+                        font-family: Ui.font-desk;
+                        font-size: Ui.desk-label-sm;
+                        font-weight: 500;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                    }
                     if p.recent.length > 0: Rectangle {
-                        width: sl.preferred-width + 12px;
-                        border-radius: Ui.radius-thumb;
+                        width: sl.preferred-width + 16px;
+                        height: 32px;
+                        border-radius: Ui.radius-control;
                         background: sla.has-hover ? Ui.glass-hover : transparent;
+                        border-width: 1px;
+                        border-color: sla.has-hover ? Ui.line-strong : transparent;
                         accessible-role: button;
                         accessible-label: p.see-all;
                         sl := HorizontalLayout {
                             alignment: center;
-                            spacing: 2px;
-                            Text { text: p.see-all; color: sla.has-hover ? Ui.desk-text : Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
-                            DeskIcon { name: "chevron"; size: 15px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
+                            spacing: 4px;
+                            Text { text: p.see-all; color: sla.has-hover ? Ui.desk-text : Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
+                            DeskIcon { name: "chevron"; size: 14px; tint: Ui.desk-text-muted; y: (parent.height - self.height) / 2; }
                         }
                         sla := TouchArea {
                             mouse-cursor: pointer;
@@ -7219,8 +7371,12 @@ component DeskProfileScreen inherits Rectangle {
                         }
                     }
                 }
-                Vidro {
-                    dense: true;
+                Rectangle {
+                    border-radius: Ui.radius-card;
+                    background: Ui.surface-raised;
+                    border-width: 1px;
+                    border-color: Ui.line-strong;
+                    clip: true;
                     VerticalLayout {
                         padding-left: small ? 8px : 14px;
                         padding-right: small ? 8px : 14px;
@@ -7229,19 +7385,20 @@ component DeskProfileScreen inherits Rectangle {
                         if p.recent.length == 0: Text {
                             height: 72px;
                             text: p.empty;
-                            color: Ui.desk-on-muted;
+                            color: Ui.desk-text-muted;
+                            font-family: Ui.font-desk;
                             font-size: Ui.desk-label;
                             vertical-alignment: center;
                             horizontal-alignment: center;
                             wrap: word-wrap;
                         }
                         for e[i] in p.recent: VerticalLayout {
-                            if i > 0: Rectangle { height: 1px; background: Ui.divider; }
+                            if i > 0: Rectangle { height: 1px; background: Ui.line; }
                             ProfileSessionRow {
-                                height: small ? 60px : 72px;
+                                height: small ? 56px : 68px;
                                 data: e;
                                 small: root.small;
-                                thumb: small ? 40px : 48px;
+                                thumb: small ? 38px : 44px;
                                 focused: kb && p.zone == "list" && p.index == i;
                                 clicked => { root.clicked("profile-row", i); }
                                 reveal(t, h) => { root.reveal(t, h); }
@@ -7258,23 +7415,51 @@ component DeskProfileScreen inherits Rectangle {
                 spacing: 18px;
                 HorizontalLayout {
                     spacing: 14px;
-                    Vidro {
-                        width: small ? 300px : 360px;
-                        height: 46px;
-                        radius: Ui.radius-control;
-                        Tabs {
-                            y: 3px;
-                            tabs: p.periods;
-                            current: p.period;
-                            focus-index: kb && p.zone == "periods" ? p.index : -1;
-                            clicked(i) => { root.clicked("profile-period", i); }
+                    alignment: center;
+                    Rectangle {
+                        width: small ? 280px : 330px;
+                        height: 36px;
+                        border-radius: Ui.radius-control;
+                        background: Ui.surface;
+                        border-width: 1px;
+                        border-color: Ui.line-strong;
+                        HorizontalLayout {
+                            padding: 2px;
+                            spacing: 2px;
+                            for per[i] in p.periods: Rectangle {
+                                border-radius: Ui.radius-control - 2px;
+                                background: i == p.period ? Ui.surface-raised : (pta.has-hover ? Ui.glass-hover : transparent);
+                                border-width: i == p.period ? 1px : 0px;
+                                border-color: Ui.line-strong;
+                                accessible-role: button;
+                                accessible-label: per;
+                                property <bool> focused: kb && p.zone == "periods" && p.index == i;
+                                if focused: FocusRing { radius: Ui.radius-control - 2px; }
+                                Text {
+                                    text: per;
+                                    color: i == p.period || pta.has-hover ? Ui.desk-text : Ui.desk-text-muted;
+                                    font-family: Ui.font-desk;
+                                    font-size: Ui.desk-label-sm;
+                                    font-weight: i == p.period ? 650 : 500;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                                pta := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.clicked("profile-period", i); }
+                                }
+                            }
                         }
                     }
                     Rectangle { horizontal-stretch: 1; }
-                    Text { text: p.summary; color: Ui.desk-on-muted; font-size: Ui.desk-label; font-weight: 500; vertical-alignment: center; }
+                    Text { text: p.summary; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
                 }
-                Vidro {
-                    dense: true;
+                Rectangle {
+                    border-radius: Ui.radius-card;
+                    background: Ui.surface;
+                    border-width: 1px;
+                    border-color: Ui.line-strong;
+                    clip: true;
                     VerticalLayout {
                         padding-left: small ? 8px : 14px;
                         padding-right: small ? 8px : 14px;
@@ -7283,7 +7468,8 @@ component DeskProfileScreen inherits Rectangle {
                         if p.sessions.length == 0: Text {
                             height: 72px;
                             text: p.empty;
-                            color: Ui.desk-on-muted;
+                            color: Ui.desk-text-muted;
+                            font-family: Ui.font-desk;
                             font-size: Ui.desk-label;
                             vertical-alignment: center;
                             horizontal-alignment: center;
@@ -7297,16 +7483,16 @@ component DeskProfileScreen inherits Rectangle {
                                 padding-top: 18px;
                                 padding-bottom: 8px;
                                 spacing: 10px;
-                                Text { text: e.title; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 700; }
-                                Text { text: e.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-stretch: 1; }
-                                Text { text: e.value; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 600; }
+                                Text { text: e.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px; font-weight: 700; }
+                                Text { text: e.detail; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-stretch: 1; }
+                                Text { text: e.value; color: Ui.desk-text-muted; font-family: Ui.font-heading; font-size: 14px; font-weight: 600; }
                             }
-                            if !e.header: Rectangle { height: 1px; background: Ui.divider; }
+                            if !e.header: Rectangle { height: 1px; background: Ui.line; }
                             if !e.header: ProfileSessionRow {
                                 height: small ? 56px : 64px;
                                 data: e;
                                 small: root.small;
-                                thumb: small ? 36px : 44px;
+                                thumb: small ? 36px : 40px;
                                 focused: kb && p.zone == "list" && p.index == e.row;
                                 clicked => { root.clicked("profile-row", e.row); }
                                 reveal(t, h) => { root.reveal(t, h); }
@@ -7321,7 +7507,7 @@ component DeskProfileScreen inherits Rectangle {
                 opacity: tab-in ? 1 : 0;
                 animate opacity { duration: Ui.list-fade(tab-in); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                 spacing: 18px;
-                Text { text: p.cards-summary; color: Ui.desk-on-muted; font-size: Ui.desk-label; font-weight: 500; height: 30px; vertical-alignment: center; }
+                Text { text: p.cards-summary; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: 13.5px; font-weight: 500; height: 30px; vertical-alignment: center; }
                 grid := Rectangle {
                     property <int> cols: 4;
                     property <length> card-w: (self.width - (cols - 1) * gap) / cols;
@@ -7358,7 +7544,7 @@ component DeskProfileScreen inherits Rectangle {
                         height: grid.card-h;
                         border-radius: Ui.radius-card;
                         border-width: 1.5px;
-                        border-color: Ui.glass-item-edge;
+                        border-color: Ui.line-strong;
                         background: nta.has-hover ? Ui.glass-hover : transparent;
                         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                         accessible-role: button;
@@ -7366,14 +7552,14 @@ component DeskProfileScreen inherits Rectangle {
                         if focused: FocusRing { radius: Ui.radius-card; }
                         VerticalLayout {
                             alignment: center;
-                            spacing: 8px;
+                            spacing: 10px;
                             padding: 14px;
                             HorizontalLayout {
                                 alignment: center;
-                                DeskIcon { name: "plus"; size: 24px; }
+                                DeskIcon { name: "plus"; size: 26px; tint: Ui.desk-text-muted; }
                             }
-                            Text { text: p.new-label; color: Ui.desk-text; font-size: Ui.desk-label-lg; font-weight: 650; horizontal-alignment: center; overflow: elide; }
-                            Text { text: p.new-text; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-alignment: center; wrap: word-wrap; }
+                            Text { text: p.new-label; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 15px; font-weight: 650; horizontal-alignment: center; overflow: elide; }
+                            Text { text: p.new-text; color: Ui.desk-text-muted; font-family: Ui.font-desk; font-size: Ui.desk-label-sm; font-weight: 500; horizontal-alignment: center; wrap: word-wrap; }
                         }
                         nta := TouchArea {
                             mouse-cursor: pointer;
