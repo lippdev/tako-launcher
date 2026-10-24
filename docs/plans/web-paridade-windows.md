@@ -44,8 +44,8 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Editor de etiquetas (`tags_editor`) | 🟡 etiquetas em lote na seleção | **WEB-12b** |
 | Coleções automáticas (`smart`): salvar filtros | 🟡 núcleo pronto | **WEB-11b** |
 | Busca geral Ctrl+K (`global_search`) | ✅ | WEB-14a |
-| Downloads (`downloads`): painel, ligar com aviso legal, fontes | 🟡 núcleo e componentes prontos | **WEB-14b** |
-| Atividades na barra (`activities`) | 🟡 botão pronto | **WEB-14b** |
+| Downloads (`downloads`): painel, ligar com aviso legal, fontes | 🟡 pronto; falta gerenciar fontes e abrir a pasta (núcleo) | WEB-14b · **WEB-14e** |
+| Atividades na barra (`activities`) | ✅ (downloads) | WEB-14b |
 | Perfil (`profile`) e perfis locais (`profiles`, UX-004) | 🟡 componentes prontos | **WEB-14c** |
 | Diálogos do jogo e da biblioteca (`dialogs`): remover, erro do jogo, confirmar | 🟡 erro do jogo pronto | **WEB-14d** |
 | Primeira execução (`first_run`, UX-003) | ⬜ | **WEB-16** |
@@ -61,7 +61,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Controles: atalhos, mapeamento, HidHide (`settings_controls`) | ⬜ | **WEB-13c** (depois do WEB-05b) |
 | Emuladores e ROMs (`settings_emulators`) | ⬜ | **WEB-13c** |
 | Sunshine com prévia e confirmação (`settings_sunshine`) | 🟡 só a chave | **WEB-13c** |
-| Downloads (ligar, aviso legal, limite) | ⬜ | **WEB-14b** |
+| Downloads (ligar, aviso legal, limite) | ✅ | WEB-14b |
 | Perfis | ⬜ | **WEB-14c** |
 | Backup e restauração (CLOUD-001) | ⬜ | **WEB-13c** |
 

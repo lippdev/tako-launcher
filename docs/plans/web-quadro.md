@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | resetou; rodando WEB-12b, WEB-20, WEB-14b e WEB-35 (pedido do mantenedor de acelerar: acima do limite de 4 agentes, com só 2 builds Rust pesados) |
+| Claude Alyx Medical | `claudeAgent` | resetou; rodando WEB-12b, WEB-20 e WEB-35 (pedido do mantenedor de acelerar: acima do limite de 4 agentes, com só 2 builds Rust pesados) |
 | Antigravity | `antigravity` | rodando WEB-04j (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
@@ -47,7 +47,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-04i | **PerfilSessoes, PerfilColecoes, PerfilFamilia** (componentes; tela do perfil no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/Perfil*/` | integrada (aguarda validação visual) |
 | WEB-20 | **Jogar de verdade:** sessão de jogo no processo do núcleo web (abrir, tela e áudio, acompanhar, restaurar, registrar tempo, recuperação após queda), interface fecha no jogo e reabre ao terminar, `game.running/resume/end` e eventos `game.started/ended`; regra de sessão sai da `tako-ui` para o núcleo | N4 | Claude Alyx · Opus 5.5 alto; revisão: Codex (quando voltar) + orquestrador | WEB-02b | `crates/tako-core/src/session/`, `crates/tako-app/`, `crates/tako-web/src/core_process.rs` | despachada de novo (`web-20-r2`; a 1ª caiu pelo limite sem escrever) |
 | WEB-12b | **Configurações do jogo e editor de etiquetas:** `game.settings`/`game.settings.set` no núcleo, painel ligado, editor de etiquetas | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-12a, WEB-04h | `crates/tako-app/src/game_settings.rs`, `web/src/app/jogo/` | despachada |
-| WEB-14b | **Downloads na interface:** botão da barra, painel, "Baixando · n%" na lista, Configurações › Downloads com aviso legal e limite | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-01e, WEB-04e | `web/src/app/` | despachada de novo (2ª rodada; a 1ª caiu pelo limite sem escrever) |
+| WEB-14b | **Downloads na interface:** botão da barra, painel, "Baixando · n%" na lista, Configurações › Downloads com aviso legal e limite | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-01e, WEB-04e | `web/src/app/` | integrada (aguarda validação visual; faltam no núcleo: gerenciar fontes e abrir a pasta) |
 | WEB-14a | **Busca geral (Ctrl+K)** com jogos e atalhos de tela | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-10a | `web/src/app/BuscaGeral.tsx`, `web/src/app/busca/` | integrada (aguarda validação visual; atalhos de tela são novos, o Slint só buscava jogos) |
 | WEB-04j | **BibliotecaGrade e BibliotecaCategorias** (componentes dos modos Grade e Categorias da lista; ligar ao app depois) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04c | `web/src/components/BibliotecaGrade/`, `web/src/components/BibliotecaCategorias/` | despachada |
 | WEB-35 | **Abertura do app:** EntradaDoApp ligada à abertura, progresso da primeira leitura, sem repetir ao reabrir depois do jogo | N2 | Claude Alyx · Sonnet 5.5 médio | WEB-04d | `web/src/App.tsx`, `web/src/app/abertura/` | despachada |
