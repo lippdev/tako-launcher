@@ -164,6 +164,7 @@ textarea {
   --tempo-contador: 0ms;
   --tempo-radar: 0ms;
   --tempo-pulso: 0ms;
+  --tempo-cover: 0ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -184,6 +185,7 @@ textarea {
     --tempo-contador: 0ms;
     --tempo-radar: 0ms;
     --tempo-pulso: 0ms;
+    --tempo-cover: 0ms;
   }
 }
 
@@ -207,4 +209,37 @@ textarea {
     transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Componentes do jogo (WEB-04c): CapaDoJogo, PilulaDaLoja, StatusDoJogo e EtiquetasDoJogo */
+:root {
+  /* CapaDoJogo: proporção 2:3 da Steam, zoom de 1.05 e 700 ms suave (README do CapaDoJogo) */
+  --cover-aspect-ratio: 2 / 3;
+  --cover-zoom: 1.05;
+  --cover-brightness: 1.08;
+  --tempo-cover: 700ms;
+  /* Contorno interno da CapaDoJogo (README do CapaDoJogo: 1px branco a 6%) */
+  --cover-border: rgba(255, 255, 255, 0.06);
+  /* Sombra de texto sobre a arte da CapaDoJogo (README do CapaDoJogo / protótipo) */
+  --cover-text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+
+  /* PilulaDaLoja e chips (README da PilulaDaLoja e EtiquetasDoJogo): altura de 32, raio de 9 e versão compacta de 26 */
+  --chip-height: 32px;
+  --chip-height-sm: 26px;
+  --chip-padding: 0 12px;
+  --chip-padding-sm: 0 8px;
+  --chip-font-size: 12.5px;
+  --chip-font-size-sm: 11.5px;
+  --chip-gap: 8px;
+  --chip-bg: rgba(10, 10, 10, 0.65);
+  --chip-bg-hover: rgba(30, 30, 30, 0.8);
+  --chip-dot-size: 8px;
+
+  /* Cores de situação do jogo (StatusDoJogo, README do design system) */
+  --status-playing: #3ddc84;
+  --status-completed: #4d9bff;
+  --status-queued: #b388ff;
+  --status-paused: #ffcf4d;
+  --status-dropped: #ff6b6b;
+  --status-none: #888888;
 }

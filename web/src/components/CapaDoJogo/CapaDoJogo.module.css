@@ -1,0 +1,85 @@
+/* CapaDoJogo: proporção 2:3 da Steam (600×900), raio 11, borda interna de 1px branca 6%.
+   Hover com zoom de 1.05 e brilho de 1.08 em 700ms suave.
+   EstadoSemArte: degradê com a cor de destaque do jogo e título. */
+
+.container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--cover-aspect-ratio);
+  border-radius: var(--radius-button);
+  overflow: hidden;
+  background: var(--surface-raised);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  isolation: isolate;
+}
+
+/* Borda interna fina (README do CapaDoJogo: box-shadow inset de 1px branco a 6%) */
+.container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--cover-border);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition:
+    transform var(--tempo-cover) var(--curva-entrada),
+    filter var(--tempo-cover) var(--curva-entrada);
+  will-change: transform, filter;
+}
+
+/* Efeito ao passar o mouse */
+.container:hover .img,
+.container[data-force="hover"] .img {
+  transform: scale(var(--cover-zoom));
+  filter: brightness(var(--cover-brightness));
+}
+
+/* EstadoSemArte: degradê da cor de destaque do jogo com o título em texto */
+.semArte {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--space-16);
+  background:
+    radial-gradient(70% 90% at 80% 10%, color-mix(in srgb, var(--capa-cor, var(--accent)) 45%, transparent), transparent 70%),
+    linear-gradient(160deg, color-mix(in srgb, var(--capa-cor, var(--accent)) 30%, var(--canvas)), var(--canvas) 70%);
+  transition:
+    transform var(--tempo-cover) var(--curva-entrada),
+    filter var(--tempo-cover) var(--curva-entrada);
+}
+
+.container:hover .semArte,
+.container[data-force="hover"] .semArte {
+  transform: scale(var(--cover-zoom));
+  filter: brightness(var(--cover-brightness));
+}
+
+.semArteTitulo {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  text-shadow: var(--cover-text-shadow);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.clicavel {
+  cursor: pointer;
+}

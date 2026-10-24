@@ -1,0 +1,60 @@
+/* EtiquetasDoJogo: chips das tags do usuário, só exibição, com '+N' quando passar do espaço ou limite. */
+
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.chip {
+  composes: ring from "../../lib/focus.module.css";
+  height: var(--chip-height);
+  padding: var(--chip-padding);
+  border-radius: var(--radius-control);
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-text);
+  font-size: var(--chip-font-size);
+  font-weight: 500;
+  line-height: 1;
+  background: var(--chip-bg);
+  border: 1px solid var(--line-strong);
+  backdrop-filter: blur(10px);
+  color: color-mix(in srgb, var(--text) 85%, transparent);
+  box-sizing: border-box;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado);
+}
+
+/* Versão compacta para a seção Detalhes (README: chip de 26) */
+.sm {
+  height: var(--chip-height-sm);
+  padding: var(--chip-padding-sm);
+  border-radius: var(--radius-thumb);
+  font-size: var(--chip-font-size-sm);
+}
+
+/* Chip "+N" das etiquetas restantes */
+.mais {
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* Quando uma etiqueta é clicável para filtrar */
+button.chip {
+  cursor: pointer;
+  margin: 0;
+}
+
+button.chip:hover,
+button.chip[data-force="hover"] {
+  background: var(--chip-bg-hover);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 25%, transparent);
+}
