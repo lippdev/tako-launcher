@@ -56,7 +56,7 @@ fn navigates_between_categories_and_rows() {
     let (_d, mut ctx) = ctx();
     let mut page = SettingsPage::new();
     let n = page.cats.len();
-    assert_eq!(n, 11);
+    assert_eq!(n, 12);
     page.handle(Cmd::NextSection, &mut ctx);
     assert_eq!(page.cats[page.cat].id, "appearance");
     page.handle(Cmd::PrevSection, &mut ctx);
@@ -90,6 +90,7 @@ fn categories_follow_the_review_order_and_audio_is_under_sound() {
         ids,
         [
             "general",
+            "theme",
             "appearance",
             "sound",
             "screen",
@@ -2205,4 +2206,94 @@ fn the_settings_route_accepts_a_row_after_the_category() {
     shell.enter_desktop();
     shell.open_route("settings:appearance/settings.appearance.transparency");
     assert_eq!(shell.page().kind(), "settings");
+}
+
+/// Configurações › Tema (TelaTema): só no desktop, com os cinco temas e as nove cores em cartões que se escolhem.
+#[test]
+fn the_theme_category_is_desktop_only_and_its_cards_pick_theme_and_accent() {
+    use crate::desk_theme as dt;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let mut page = SettingsPage::new();
+    ctx.desktop = false;
+    page.render(&ctx, &mut Out::default());
+    assert!(!page.cats.iter().any(|c| c.id == "theme"));
+    ctx.desktop = true;
+    page.render(&ctx, &mut Out::default());
+    assert_eq!(page.cats[1].id, "theme");
+
+    // TAKO: sem a cor de destaque (vem da arte); cinco cartões com o tema atual marcado.
+    let rows = rows_of(&ctx, "theme");
+    assert!(rows.iter().all(|i| i.row.key != "desk-accent"));
+    let themes = find(&rows, "desk-theme");
+    assert_eq!(themes.cards.len(), dt::THEMES.len());
+    assert_eq!(
+        themes.cards.iter().position(|c| c.on),
+        Some(0),
+        "TAKO é o padrão"
+    );
+    assert!(rows.iter().any(|i| i.row.key == "desk-preview"));
+    assert!(!find(&rows, "desk-preview").row.is_focusable());
+
+    // A prévia fica visível na categoria, mas não aparece como resultado de busca.
+    let preview = find(&rows, "desk-preview");
+    let mut page = SettingsPage::at("theme");
+    page.query = preview.row.value.clone();
+    assert!(page.items(&ctx).iter().all(|i| i.row.kind != "preview"));
+    assert_eq!(page.matches_in(&ctx, page.cat), 0);
+
+    // Escolher o Liquid Glass troca o tema, mostra as cores e as opções dele; fora da faixa, nada muda.
+    let _ = themes.pick_zone("row-pick:4", &mut ctx);
+    assert!(themes.pick_zone("row-pick:9", &mut ctx).is_none());
+    assert_eq!(dt::theme(&ctx.settings), dt::GLASS);
+    let rows = rows_of(&ctx, "theme");
+    assert!(rows.iter().any(|i| i.row.key == "glass-opacity"));
+    let accents = find(&rows, "desk-accent");
+    assert_eq!(accents.cards.len(), dt::ACCENTS.len());
+    assert!(!accents.row.on, "a cor padrão é uma das nove");
+    let _ = accents.pick_zone("row-pick:3", &mut ctx);
+    assert_eq!(dt::accent(&ctx.settings), dt::ACCENTS[3].0);
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    assert_eq!(accents.cards.iter().position(|c| c.on), Some(3));
+
+    // ← → andam entre os temas e as cores, sem dar a volta.
+    adjust(&mut ctx, &accents, 1);
+    assert_eq!(dt::accent(&ctx.settings), dt::ACCENTS[4].0);
+    let themes = find(&rows_of(&ctx, "theme"), "desk-theme");
+    adjust(&mut ctx, &themes, 1);
+    assert_eq!(dt::theme(&ctx.settings), dt::GLASS);
+    adjust(&mut ctx, &themes, -1);
+    assert_eq!(dt::theme(&ctx.settings), 3);
+
+    // Ao sair de uma cor própria, a seta parte para a primeira ou a última opção, conforme a direção.
+    ctx.settings.set(dt::ACCENT, "#123456");
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    adjust(&mut ctx, &accents, 1);
+    assert_eq!(dt::accent(&ctx.settings), dt::ACCENTS[0].0);
+    ctx.settings.set(dt::ACCENT, "#123456");
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    adjust(&mut ctx, &accents, -1);
+    assert_eq!(
+        dt::accent(&ctx.settings),
+        dt::ACCENTS[dt::ACCENTS.len() - 1].0
+    );
+}
+
+#[test]
+fn desktop_appearance_names_the_fullscreen_theme_clearly() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    ctx.desktop = true;
+    let row = find(&rows_of(&ctx, "appearance"), "theme");
+    assert_eq!(row.row.title, ctx.t("settings.appearance.fullscreen_theme"));
+    assert_eq!(
+        row.row.description,
+        ctx.t("settings.appearance.fullscreen_theme_desc")
+    );
+
+    ctx.desktop = false;
+    let row = find(&rows_of(&ctx, "appearance"), "theme");
+    assert_eq!(row.row.title, ctx.t("settings.appearance.theme"));
+    assert_eq!(row.row.description, ctx.t("settings.appearance.theme_desc"));
 }

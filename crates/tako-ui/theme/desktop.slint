@@ -39,6 +39,8 @@ struct DeskGame { id: string, title: string, icon: image, initial: string, cover
 struct DeskBlock { kind: string, title: string, count: string, label: string, icon: string, open: bool, games: [DeskGame], first: int, index: int, rows-before: int, sections-before: int, groups-before: int }
 struct DeskCategory { title: string, count: string, icon: string, games: [DeskGame] }
 struct CoverRow { current: image, has-current: bool, proposed: image, has-proposed: bool, current-label: string, level: int, confidence: string, reason: string, accept: string, other: string }
+// Cartão de uma linha de escolha visual da TelaTema: um tema (nome, frase) ou uma cor de destaque (nome, cor).
+struct ChoiceCard { title: string, detail: string, color: color, on: bool }
 struct DeskStat { label: string, value: string }
 struct DeskCard { title: string, count: string, auto: bool, covers: [DeskEntry] }
 struct DeskProfile { name: string, initial: string, line: [DeskInfo], playing: bool, tabs: [string], tab: int, actions: [DeskInfo], tiles: [DeskInfo], week-label: string, week-total: string, week: [DeskBar], week-text: string, top: [DeskEntry], fan: [DeskEntry], recent-title: string, see-all: string, recent: [DeskEntry], empty: string, periods: [string], period: int, summary: string, sessions: [DeskEntry], cards-summary: string, cards: [DeskCard], auto-label: string, new-label: string, new-text: string, zone: string, index: int }
@@ -50,6 +52,7 @@ struct DeskMore { on: bool, labels: [string], description: string, details: [Des
 // Textos do desktop que componentes fundos usam (o Tako preenche no idioma da pessoa).
 export global DeskText {
     in-out property <string> play: "Jogar";
+    in-out property <string> custom-color: "Cor própria";
     // Botões só de ícone da linha de download (PainelDownloads).
     in-out property <string> dl-pause: "Pausar";
     in-out property <string> dl-resume: "Continuar";
@@ -3923,6 +3926,52 @@ component EmuLogo inherits Rectangle {
     }
 }
 
+// Prévia de 118 de um tema no cartão da TelaTema (.tprev): lista, destaque e botões nas cores dele. As cores dos
+// cinco são as do tokens.json; o botão da direita leva a cor de destaque (a pedra no TAKO).
+component ThemePreview inherits Rectangle {
+    in property <int> variant;
+    property <bool> glass: variant == 4;
+    property <length> x0: self.width * 0.24 + 12px;
+    // Os dois botões encolhem junto com o cartão (34 até onde cabe).
+    property <length> bw: min(34px, (self.width - x0 - 44px) / 2);
+    border-radius: 10px;
+    clip: true;
+    background: [#0b0b0e, #0a0a0a, #0b0e15, #000000, #1c2540][variant];
+    border-width: 1px;
+    border-color: #ffffff0f;
+    if variant == 0: Rectangle {
+        x: -root.width * 0.2;
+        y: -root.height * 0.4;
+        width: root.width * 1.2;
+        height: root.height * 1.4;
+        background: @radial-gradient(circle, #6061be57 0%, #6061be00 70%);
+    }
+    if glass: Rectangle { background: @linear-gradient(135deg, #5b82b8 0%, #243252 100%); }
+    Rectangle {
+        x: 6px;
+        y: 6px;
+        width: root.width * 0.24;
+        height: root.height - 12px;
+        border-radius: 6px;
+        background: glass ? #ffffff29 : #ffffff0f;
+        border-width: glass ? 1px : 0px;
+        border-color: #ffffff38;
+    }
+    Rectangle {
+        x: root.x0;
+        y: 6px;
+        width: root.width - root.x0 - 6px;
+        height: root.height * 0.54;
+        border-radius: 6px;
+        background: glass ? @linear-gradient(180deg, #ffffff29 0%, #ffffff29 100%) : @linear-gradient(135deg, #ffffff24 0%, #ffffff0a 100%);
+        border-width: glass ? 1px : 0px;
+        border-color: #ffffff38;
+    }
+    Rectangle { x: root.x0; y: root.height - 24px; width: root.bw; height: 14px; border-radius: glass ? 7px : 4px; background: #f4f4f4; }
+    Rectangle { x: root.x0 + root.bw + 6px; y: root.height - 24px; width: root.bw; height: 14px; border-radius: glass ? 7px : 4px; background: glass ? #ffffff29 : #ffffff1a; }
+    Rectangle { x: root.width - 32px; y: root.height - 21px; width: 26px; height: 8px; border-radius: 4px; background: variant == 0 ? #d8c8bc : Ui.desk-accent; }
+}
+
 // Linha de configuração, painel ou diálogo (dk-row): linhas seguidas formam UM grupo com divisórias, nunca caixas
 // soltas. `first`/`last` arredondam as pontas do grupo; cabeçalhos de grupo em `overline`.
 component DeskRow inherits Rectangle {
@@ -3946,6 +3995,10 @@ component DeskRow inherits Rectangle {
     property <length> desc-size: grp ? 12.5px * Ui.text-scale : Ui.desk-label-sm;
     // FilaDeCapas: a linha da fila (capa atual, proposta, confiança e as ações dentro dela).
     in property <CoverRow> cv;
+    // TelaTema: os cartões das linhas "themes" (cinco temas) e "accents" (nove cores), e a escolha de um deles.
+    in property <[ChoiceCard]> cards;
+    callback pick(int);
+    property <bool> is-block: data.kind == "themes" || data.kind == "accents" || data.kind == "preview";
     property <bool> is-cover: data.kind == "cover";
     // Pasta de ROMs do onboarding: caixa própria, 18 abaixo da lista.
     property <bool> card: bare && data.style == "card";
@@ -3953,7 +4006,7 @@ component DeskRow inherits Rectangle {
     property <bool> emu: data.icon == "emu-retroarch" || data.icon == "emu-dolphin" || data.icon == "emu-pcsx2" || data.icon == "emu-duckstation" || data.icon == "emu-ppsspp" || data.icon == "emu-ryujinx" || data.icon == "emu-cemu" || data.icon == "emu-rpcs3";
     // A linha da fila cresce com o motivo (texto essencial: quebra em vez de cortar). Onboarding (`bare`): linhas de
     // 12 em cima e embaixo, sem a altura mínima das Configurações.
-    out property <length> row-h: is-header ? (grp ? 52px : 40px) : (data.kind == "note" ? notel.preferred-height : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : (grp ? Ui.settings-row-height : 56px), lay.preferred-height) + card-gap));
+    out property <length> row-h: is-header ? (grp ? 52px : 40px) : (data.kind == "themes" ? max(244px, theme-cards.preferred-height + 28px) : data.kind == "accents" ? 74px : data.kind == "preview" ? 80px : (data.kind == "note" ? notel.preferred-height : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : (grp ? Ui.settings-row-height : 56px), lay.preferred-height) + card-gap)));
     callback clicked();
     // Ação dentro da linha: 0 = Aceitar, 1 = Escolher outra.
     callback act(int);
@@ -4042,7 +4095,7 @@ component DeskRow inherits Rectangle {
     }
     ta := TouchArea {
         // A linha de download só reage aos botões dela (um clique solto não pausa nada).
-        enabled: !is-header && !is-cover && data.kind != "download" && data.kind != "note";
+        enabled: !is-header && !is-cover && !is-block && data.kind != "download" && data.kind != "note";
         mouse-cursor: data.enabled ? pointer : default;
         clicked => {
             if (data.kind == "choice") {
@@ -4146,7 +4199,7 @@ component DeskRow inherits Rectangle {
         }
     }
     lay := HorizontalLayout {
-        visible: !is-header && !is-cover && data.kind != "note";
+        visible: !is-header && !is-cover && !is-block && data.kind != "note";
         y: root.card-gap;
         height: parent.height - root.card-gap;
         padding-left: card ? 16px : loose || bare ? 4px : 18px;
@@ -4354,6 +4407,144 @@ component DeskRow inherits Rectangle {
         }
         if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && data.action == "": Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
+    // TelaTema, Tema: os cinco cartões (prévia de 118, nome com ✓ no escolhido e a frase).
+    theme-cards := HorizontalLayout {
+        visible: data.kind == "themes";
+        padding: 14px;
+        spacing: 12px;
+        for card[k] in cards: Rectangle {
+            horizontal-stretch: 1;
+            height: max(210px, theme-text.preferred-height + 150px);
+            border-radius: 14px;
+            background: cta.has-hover ? #ffffff08 : #ffffff05;
+            border-width: 1px;
+            border-color: card.on ? Ui.desk-accent : (cta.has-hover ? Ui.line-strong : Ui.line);
+            drop-shadow-color: card.on ? Ui.desk-accent.with-alpha(0.18) : transparent;
+            drop-shadow-blur: 30px;
+            drop-shadow-offset-y: 10px;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: radio-button;
+            accessible-label: card.title + ". " + card.detail;
+            accessible-checked: card.on;
+            accessible-action-default => { root.pick(k); }
+            ThemePreview { x: 8px; y: 8px; width: parent.width - 16px; height: 118px; variant: k; }
+            theme-text := VerticalLayout {
+                x: 12px;
+                y: 136px;
+                width: parent.width - 24px;
+                alignment: start;
+                spacing: 2px;
+                HorizontalLayout {
+                    Text { text: card.title; color: Ui.desk-text; font-size: 13.5px * Ui.text-scale; font-weight: 600; wrap: word-wrap; overflow: elide; horizontal-stretch: 1; }
+                    if card.on: DeskIcon { name: "tick"; size: 15px; tint: Ui.desk-accent; }
+                }
+                Text { text: card.detail; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; wrap: word-wrap; }
+            }
+            cta := TouchArea { mouse-cursor: pointer; clicked => { root.pick(k); } }
+        }
+    }
+    // TelaTema, Cor de destaque: bolinhas de 34 (a escolhida com anel branco), a cor própria, o código e o nome da atual.
+    if data.kind == "accents": HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 18px;
+        spacing: 16px;
+        HorizontalLayout {
+            for c[k] in cards: Rectangle {
+                width: 42px;
+                accessible-role: radio-button;
+                accessible-label: c.title;
+                accessible-checked: c.on;
+                accessible-action-default => { root.pick(k); }
+                if c.on: Rectangle { y: (parent.height - self.height) / 2; width: 42px; height: 42px; border-radius: 21px; background: Ui.desk-text; }
+                if c.on: Rectangle { y: (parent.height - self.height) / 2; x: 2px; width: 38px; height: 38px; border-radius: 19px; background: Ui.settings-surface; }
+                Rectangle { x: 4px; y: (parent.height - self.height) / 2; width: 34px; height: 34px; border-radius: 17px; background: c.color; }
+                accent-touch := TouchArea { mouse-cursor: pointer; clicked => { root.pick(k); } }
+                Tip { text: c.title; hovering: accent-touch.has-hover; }
+            }
+        }
+        Rectangle { width: 1px; height: 28px; y: (parent.height - self.height) / 2; background: Ui.line-strong; }
+        Rectangle {
+            width: 42px;
+            accessible-role: button;
+            accessible-label: data.title + ": " + DeskText.custom-color;
+            accessible-action-default => { root.clicked(); }
+            if data.on: Rectangle { y: (parent.height - self.height) / 2; width: 42px; height: 42px; border-radius: 21px; background: Ui.desk-text; }
+            if data.on: Rectangle { y: (parent.height - self.height) / 2; x: 2px; width: 38px; height: 38px; border-radius: 19px; background: Ui.settings-surface; }
+            Rectangle {
+                x: 4px;
+                y: (parent.height - self.height) / 2;
+                width: 34px;
+                height: 34px;
+                border-radius: 17px;
+                background: @conic-gradient(#ff4d5e 0deg, #ffcf4d 60deg, #3ddc84 120deg, #3dd6e0 180deg, #4d9bff 240deg, #9b7bff 300deg, #ff4d5e 360deg);
+                DeskIcon { name: "plus"; size: 15px; tint: #ffffff; }
+            }
+            custom-touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+            Tip { text: DeskText.custom-color; hovering: custom-touch.has-hover; }
+        }
+        Rectangle {
+            width: code.preferred-width + 22px;
+            height: 32px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 8px;
+            background: Ui.tile;
+            border-width: 1px;
+            border-color: Ui.line-strong;
+            code := Text { x: 11px; text: data.value.to-uppercase(); color: Ui.desk-on-muted; font-family: Ui.font-heading; font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; height: parent.height; }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        HorizontalLayout {
+            horizontal-stretch: 0;
+            spacing: 8px;
+            Rectangle { y: (parent.height - self.height) / 2; width: 12px; height: 12px; border-radius: 6px; background: Ui.desk-accent; }
+            Text { text: data.description; color: Ui.desk-text-muted; font-size: 12.5px * Ui.text-scale; vertical-alignment: center; overflow: elide; }
+        }
+    }
+    // TelaTema, Prévia: situação, progresso, chave, ponto e Jogar nas cores do tema escolhido.
+    if data.kind == "preview": HorizontalLayout {
+        padding-left: 18px;
+        padding-right: 18px;
+        spacing: 16px;
+        Rectangle {
+            width: stat.preferred-width + 40px;
+            height: 26px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 7px;
+            background: #0a0a0a99;
+            border-width: 1px;
+            border-color: Ui.line-strong;
+            Rectangle { x: 11px; y: (parent.height - self.height) / 2; width: 7px; height: 7px; border-radius: 3.5px; background: Ui.desk-accent; }
+            stat := Text { x: 25px; text: data.title.to-uppercase(); color: Ui.desk-on-muted; font-family: Ui.font-heading; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 1px; vertical-alignment: center; height: parent.height; }
+        }
+        Rectangle {
+            width: 150px;
+            height: 4px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 2px;
+            background: #ffffff1a;
+            Rectangle { x: 0; width: parent.width * 0.62; border-radius: 2px; background: Ui.desk-accent; }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        DeskToggle { on: true; y: (parent.height - self.height) / 2; }
+        Rectangle { width: 7px; height: 7px; y: (parent.height - self.height) / 2; border-radius: 3.5px; background: Ui.desk-accent; }
+        Rectangle {
+            width: play.preferred-width + 68px;
+            height: 40px;
+            y: (parent.height - self.height) / 2;
+            border-radius: Ui.radius-button;
+            background: Ui.primary;
+            play := Text { x: 16px; text: data.value; color: Ui.on-primary; font-family: Ui.font-heading; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; height: parent.height; }
+            Rectangle {
+                x: parent.width - self.width - 6px;
+                y: (parent.height - self.height) / 2;
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                background: Ui.primary-chip;
+                DeskIcon { name: "play"; size: 14px; tint: #ffffff; }
+            }
+        }
+    }
     notel := VerticalLayout {
         visible: data.kind == "note";
         x: 4px;
@@ -4428,6 +4619,7 @@ component RowScroll inherits Rectangle {
     in property <length> gap: Ui.space-8;
     // FilaDeCapas: dados extras das linhas "cover", na mesma ordem das linhas.
     in property <[CoverRow]> covers;
+    in property <[[ChoiceCard]]> cards;
     // Outra camada no mesmo lugar (outro título): volta ao topo.
     in property <string> content-key;
     out property <length> content-h: rl.preferred-height;
@@ -4479,6 +4671,8 @@ component RowScroll inherits Rectangle {
                     flash: flash-lit && i == flash-row;
                     data: r;
                     cv: covers[i];
+                    cards: cards[i];
+                    pick(k) => { root.clicked("row-pick:" + k, i); }
                     act(k) => { root.clicked("row-act:" + k, i); }
                     loose: inline-buttons && !root.body(i - 1) && !root.body(i + 1);
                     first: !root.body(i - 1);
@@ -4774,6 +4968,7 @@ component DeskSettings inherits Rectangle {
     in property <string> subtitle;
     in property <[PanelRow]> rows;
     in property <[CoverRow]> covers;
+    in property <[[ChoiceCard]]> cards;
     in property <int> row-focus;
     in property <bool> focus-visible;
     in property <bool> small;
@@ -4911,6 +5106,7 @@ component DeskSettings inherits Rectangle {
                     flash-lit: root.flash-lit;
                     rows: rows;
                     covers: covers;
+                    cards: cards;
                     sel: row-focus;
                     key-focus: focus-visible;
                     clicked(z, i) => { root.clicked(z, i); }
@@ -7448,6 +7644,7 @@ export component Desktop inherits Window {
     in property <string> settings-subtitle;
     in property <[PanelRow]> settings-rows;
     in property <[CoverRow]> settings-covers;
+    in property <[[ChoiceCard]]> settings-cards;
     in property <int> settings-row-focus: -1;
     in property <int> settings-flash: -1;
     in property <int> settings-flash-nonce;
@@ -7714,6 +7911,7 @@ export component Desktop inherits Window {
         subtitle: settings-subtitle;
         rows: settings-rows;
         covers: settings-covers;
+        cards: settings-cards;
         row-focus: settings-row-focus;
         flash-row: settings-flash;
         flash-nonce: settings-flash-nonce;

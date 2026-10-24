@@ -2,42 +2,32 @@
 
 use super::{Ctx, toggle};
 use crate::desk_theme::{self as dt, ACCENTS, GLASS, THEMES};
-use crate::model::PanelRow;
+use crate::model::{ChoiceCard, PanelRow};
 use crate::shell::keyboard::KeyboardLayer;
-use crate::shell::layer::{Flow, MenuItem, Pick};
+use crate::shell::layer::{Flow, MenuItem};
 use tako_core::presentation::Rgb;
 
 const T: &str = "settings.appearance.";
+const TT: &str = "settings.theme.";
 
+/// Configurações › Tema (TelaTema): os cinco temas em cartões, a cor de destaque (fora do TAKO), as opções do tema
+/// escolhido e a prévia.
 pub(super) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
     let theme = dt::theme(&ctx.settings);
-    let mut rows = vec![
-        MenuItem::new(PanelRow::header(ctx.t(&format!("{T}desk_header")))),
-        theme_row(ctx, theme),
-    ];
+    let header = |key: &str| MenuItem::new(PanelRow::header(ctx.t(&format!("{TT}{key}"))));
+    let mut rows = vec![header("themes_header"), themes_row(ctx, theme)];
     // No TAKO o destaque vem da arte (ou é a pedra); a cor escolhida só vale nos outros temas.
     if theme != 0 {
-        rows.push(accent_row(ctx));
-        rows.push(
-            MenuItem::new(
-                PanelRow::action(
-                    "desk-accent-custom",
-                    ctx.t(&format!("{T}desk_accent_custom")),
-                )
-                .value(dt::accent(&ctx.settings).to_string()),
-            )
-            .on(custom_accent),
-        );
-    } else {
-        rows.push(toggle(
-            ctx,
-            "settings.appearance.art_colors",
-            dt::ART_COLORS,
-            true,
-        ));
+        rows.extend([header("accent_header"), accents_row(ctx)]);
     }
-    if theme == GLASS {
+    if theme == 0 {
         rows.extend([
+            MenuItem::new(PanelRow::header(ctx.t(&format!("{T}desk_theme_tako")))),
+            toggle(ctx, "settings.appearance.art_colors", dt::ART_COLORS, true),
+        ]);
+    } else if theme == GLASS {
+        rows.extend([
+            MenuItem::new(PanelRow::header(ctx.t(&format!("{T}desk_theme_glass")))),
             toggle(
                 ctx,
                 "settings.appearance.glass_ambient",
@@ -48,57 +38,86 @@ pub(super) fn rows(ctx: &Ctx) -> Vec<MenuItem> {
             toggle(ctx, "settings.appearance.glass_pill", dt::GLASS_PILL, true),
         ]);
     }
+    rows.extend([
+        header("preview_header"),
+        MenuItem::new(
+            PanelRow::new(
+                "desk-preview",
+                "preview",
+                ctx.t(&format!("{TT}preview_status")),
+            )
+            .value(ctx.t("game.play")),
+        ),
+    ]);
     rows
 }
 
-fn theme_row(ctx: &Ctx, current: usize) -> MenuItem {
-    let name = |ctx: &Ctx, i: usize| ctx.t(&format!("{T}desk_theme_{}", THEMES[i].1));
-    MenuItem::new(
-        PanelRow::choice(
-            "desk-theme",
-            ctx.t(&format!("{T}desk_theme")),
-            name(ctx, current),
-        )
-        .desc(ctx.t(&format!("{T}desk_theme_desc"))),
-    )
-    .options(move |ctx| {
-        let picks = (0..THEMES.len())
-            .map(|i| {
-                Pick::new(name(ctx, i)).set(move |ctx| {
-                    ctx.settings.set(dt::THEME, THEMES[i].0);
-                    Flow::Stay
-                })
-            })
-            .collect();
-        (picks, dt::theme(&ctx.settings))
+/// Os cinco cartões; ←/→ andam entre eles sem dar a volta.
+fn themes_row(ctx: &Ctx, current: usize) -> MenuItem {
+    let cards = THEMES
+        .iter()
+        .enumerate()
+        .map(|(i, (_, id))| ChoiceCard {
+            title: ctx.t(&format!("{T}desk_theme_{id}")),
+            detail: ctx.t(&format!("{TT}desc_{id}")),
+            on: i == current,
+            ..Default::default()
+        })
+        .collect();
+    let set = |ctx: &mut Ctx, i: usize| {
+        ctx.settings.set(dt::THEME, THEMES[i].0);
+        Flow::Stay
+    };
+    MenuItem::new(PanelRow::new(
+        "desk-theme",
+        "themes",
+        ctx.t(&format!("{T}desk_theme")),
+    ))
+    .cards(cards, set)
+    .on_adjust(move |ctx, direction| {
+        let next = (dt::theme(&ctx.settings) as i32 + direction.signum())
+            .clamp(0, THEMES.len() as i32 - 1);
+        set(ctx, next as usize)
     })
 }
 
-fn accent_row(ctx: &Ctx) -> MenuItem {
+/// As nove cores, a cor própria (o código num campo) e o código da atual; ←/→ andam pelas nove.
+fn accents_row(ctx: &Ctx) -> MenuItem {
     let now = dt::accent(&ctx.settings);
     let preset = ACCENTS.iter().position(|(c, _)| *c == now);
-    let label = preset.map_or_else(|| now.to_string(), |i| accent_name(ctx, i));
-    MenuItem::new(
-        PanelRow::choice("desk-accent", ctx.t(&format!("{T}desk_accent")), label)
-            .desc(ctx.t(&format!("{T}desk_accent_desc"))),
-    )
-    .options(move |ctx| {
-        let mut picks: Vec<Pick> = ACCENTS
+    let cards = ACCENTS
+        .iter()
+        .enumerate()
+        .map(|(i, (c, _))| ChoiceCard {
+            title: accent_name(ctx, i),
+            color: slint::Color::from_rgb_u8(c.r, c.g, c.b),
+            on: preset == Some(i),
+            ..Default::default()
+        })
+        .collect();
+    let set = |ctx: &mut Ctx, i: usize| {
+        ctx.settings.set(dt::ACCENT, &ACCENTS[i].0.to_string());
+        Flow::Stay
+    };
+    let label = preset.map_or_else(|| ctx.t(&format!("{TT}custom")), |i| accent_name(ctx, i));
+    MenuItem::new(PanelRow {
+        // Cor própria em uso: o anel vai para a bolinha dela.
+        on: preset.is_none(),
+        ..PanelRow::new("desk-accent", "accents", ctx.t(&format!("{T}desk_accent")))
+            .value(now.to_string())
+            .desc(label)
+    })
+    .on(custom_accent)
+    .cards(cards, set)
+    .on_adjust(move |ctx, direction| {
+        let at = ACCENTS
             .iter()
-            .enumerate()
-            .map(|(i, (color, _))| {
-                let hex = color.to_string();
-                Pick::new(accent_name(ctx, i)).set(move |ctx| {
-                    ctx.settings.set(dt::ACCENT, &hex);
-                    Flow::Stay
-                })
-            })
-            .collect();
-        // Uma cor própria já escolhida aparece como a última opção, marcada.
-        if preset.is_none() {
-            picks.push(Pick::new(now.to_string()));
-        }
-        (picks, preset.unwrap_or(ACCENTS.len()))
+            .position(|(c, _)| *c == dt::accent(&ctx.settings));
+        let next = at.map_or_else(
+            || if direction < 0 { ACCENTS.len() - 1 } else { 0 },
+            |i| (i as i32 + direction.signum()).clamp(0, ACCENTS.len() as i32 - 1) as usize,
+        );
+        set(ctx, next)
     })
 }
 

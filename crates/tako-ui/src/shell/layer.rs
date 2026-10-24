@@ -66,6 +66,8 @@ pub type Action = Rc<dyn Fn(&mut Ctx) -> Flow>;
 pub type Adjust = Rc<dyn Fn(&mut Ctx, i32) -> Flow>;
 /// Controle deslizante do desktop: o valor novo (0–100) e se a pessoa soltou.
 pub type Slide = Rc<dyn Fn(&mut Ctx, i32, bool) -> Flow>;
+/// Escolha de um cartão da linha (TelaTema): a posição dele.
+pub type PickCard = Rc<dyn Fn(&mut Ctx, usize) -> Flow>;
 /// As opções de uma escolha e a atual.
 pub type Options = Rc<dyn Fn(&Ctx) -> (Vec<Pick>, usize)>;
 
@@ -116,6 +118,9 @@ pub struct MenuItem {
     /// Desktop: linha da fila de capas (duas ações dentro da linha: `accept` e `alt`).
     pub cover: Option<crate::model::CoverRow>,
     pub alt: Option<Action>,
+    /// Desktop (TelaTema): os cartões da linha (temas ou cores) e o que escolher um deles faz.
+    pub cards: Vec<crate::model::ChoiceCard>,
+    pub pick: Option<PickCard>,
 }
 
 /// Rodapé do popup (PadraoPopup): de 1 a 3 ações, todas no fim da lista; mais que isso segue empilhado.
@@ -160,7 +165,25 @@ impl MenuItem {
             slide: None,
             cover: None,
             alt: None,
+            cards: Vec::new(),
+            pick: None,
         }
+    }
+    pub fn cards(
+        mut self,
+        cards: Vec<crate::model::ChoiceCard>,
+        pick: impl Fn(&mut Ctx, usize) -> Flow + 'static,
+    ) -> Self {
+        self.cards = cards;
+        self.pick = Some(Rc::new(pick));
+        self
+    }
+
+    /// Zona de um cartão: "row-pick:<posição>".
+    pub fn pick_zone(&self, zone: &str, ctx: &mut Ctx) -> Option<Flow> {
+        let pick = self.pick.clone().filter(|_| self.row.enabled)?;
+        let k = zone.strip_prefix("row-pick:")?.parse().ok()?;
+        (k < self.cards.len()).then(|| pick(ctx, k))
     }
     pub fn cover(
         mut self,

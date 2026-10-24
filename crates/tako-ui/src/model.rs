@@ -132,7 +132,7 @@ impl PanelRow {
         self
     }
     pub fn is_focusable(&self) -> bool {
-        self.kind != "header" && self.kind != "separator"
+        self.kind != "header" && self.kind != "separator" && self.kind != "preview"
     }
     /// Divisória entre grupos de um menu.
     pub fn separator() -> Self {
@@ -285,6 +285,16 @@ theme_struct! {
         pub chips: Vec<String>,
         // Nota (Metacritic) na faixa de estado.
         pub score: i32,
+    }
+}
+
+theme_struct! {
+    /// Cartão de uma linha de escolha visual (TelaTema): um tema ou uma cor de destaque; `color` só nas cores.
+    pub struct ChoiceCard {
+        pub title: String,
+        pub detail: String,
+        pub color: Color,
+        pub on: bool,
     }
 }
 

@@ -48,6 +48,11 @@ pub fn categories() -> Vec<Category> {
             rows: general,
         },
         Category {
+            id: "theme",
+            icon: "pencil",
+            rows: desk_theme::rows,
+        },
+        Category {
             id: "appearance",
             icon: "palette",
             rows: appearance,
@@ -1973,9 +1978,20 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
             (picks, cur)
         }),
         MenuItem::new(
-            PanelRow::action("theme", ctx.t("settings.appearance.theme"))
-                .desc(ctx.t("settings.appearance.theme_desc"))
-                .value(theme_name(ctx)),
+            PanelRow::action(
+                "theme",
+                ctx.t(if ctx.desktop {
+                    "settings.appearance.fullscreen_theme"
+                } else {
+                    "settings.appearance.theme"
+                }),
+            )
+            .desc(ctx.t(if ctx.desktop {
+                "settings.appearance.fullscreen_theme_desc"
+            } else {
+                "settings.appearance.theme_desc"
+            }))
+            .value(theme_name(ctx)),
         )
         .on(|ctx| Flow::Push(Box::new(themes_panel(ctx)))),
     ];
@@ -2019,13 +2035,6 @@ fn appearance(ctx: &Ctx) -> Vec<MenuItem> {
     ));
     items
         .into_iter()
-        // Tema, cor de destaque e Liquid Glass (só no desktop).
-        .chain(
-            ctx.desktop
-                .then(|| desk_theme::rows(ctx))
-                .into_iter()
-                .flatten(),
-        )
         // "Reduzir transparência" só existe no desktop (a tela cheia não tem vidro).
         .chain(ctx.desktop.then(|| {
             toggle(
@@ -2691,15 +2700,20 @@ impl Default for SettingsPage {
     }
 }
 
+/// Categorias que só o desktop tem (a tela cheia não as mostra).
+fn desktop_only(id: &str) -> bool {
+    matches!(id, "theme" | "downloads")
+}
+
 impl SettingsPage {
     fn sync_categories(&mut self, ctx: &Ctx) {
-        if self.cats.iter().any(|c| c.id == "downloads") == ctx.desktop {
+        if self.cats.iter().any(|c| desktop_only(c.id)) == ctx.desktop {
             return;
         }
         let selected = self.cats[self.cat].id;
         self.cats = categories()
             .into_iter()
-            .filter(|c| ctx.desktop || c.id != "downloads")
+            .filter(|c| ctx.desktop || !desktop_only(c.id))
             .collect();
         self.cat = self.cats.iter().position(|c| c.id == selected).unwrap_or(0);
         self.row = None;
@@ -2743,6 +2757,7 @@ impl SettingsPage {
                 .into_iter()
                 .filter(|i| {
                     i.row.kind != "header"
+                        && i.row.kind != "preview"
                         && tako_core::library::search_text::matches(
                             &format!("{} {} {}", i.row.title, i.row.description, i.row.value),
                             &self.query,
@@ -2765,6 +2780,7 @@ impl SettingsPage {
             .iter()
             .filter(|i| {
                 i.row.kind != "header"
+                    && i.row.kind != "preview"
                     && tako_core::library::search_text::matches(
                         &format!("{} {} {}", i.row.title, i.row.description, i.row.value),
                         &self.query,
@@ -2967,6 +2983,9 @@ impl Page for SettingsPage {
                 .map(|i| i.cover.clone().unwrap_or_default())
                 .collect();
             out.set("settings-covers", covers);
+            let cards: Vec<Vec<crate::model::ChoiceCard>> =
+                items.iter().map(|i| i.cards.clone()).collect();
+            out.set("settings-cards", cards);
             out.set("settings-flash", flash.map_or(-1, |i| i as i32));
             out.set(
                 "settings-flash-nonce",
@@ -3005,6 +3024,12 @@ impl Page for SettingsPage {
                     .items(ctx)
                     .get(index)
                     .and_then(|i| i.slide_zone(z, ctx));
+                flow.map_or(Nav::Stay, |f| Self::run(f, ctx))
+            }
+            // TelaTema: um cartão da linha (tema ou cor de destaque).
+            z if z.starts_with("row-pick:") => {
+                self.row = Some(index);
+                let flow = self.items(ctx).get(index).and_then(|i| i.pick_zone(z, ctx));
                 flow.map_or(Nav::Stay, |f| Self::run(f, ctx))
             }
             // FilaDeCapas: as ações dentro da linha (0 = Aceitar, 1 = Escolher outra).
