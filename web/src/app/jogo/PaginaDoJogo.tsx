@@ -14,7 +14,17 @@ import { TituloDoJogo } from "../../components/TituloDoJogo/TituloDoJogo";
 import { useLatest } from "../../lib/useLatest";
 import { gameStrings as s, libraryStrings } from "../strings";
 import { EtiquetaDeSituacao } from "./EtiquetaDeSituacao";
-import { chipToStatus, gameBlocks, metacriticTone, metacriticVerdict, primaryState, statusToChip } from "./jogoModel";
+import { EditorDasEtiquetas } from "./EditorDasEtiquetas";
+import { PainelConfiguracoesDoJogo } from "./PainelConfiguracoesDoJogo";
+import {
+  chipToStatus,
+  gameBlocks,
+  imageUrl,
+  metacriticTone,
+  metacriticVerdict,
+  primaryState,
+  statusToChip,
+} from "./jogoModel";
 import { useDevImages } from "./useDevImages";
 import { useGameDetails } from "./useGameDetails";
 import styles from "./PaginaDoJogo.module.css";
@@ -56,6 +66,7 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
   const [shown, setShown] = useState<GameDetails | null>(null);
   const [entered, setEntered] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [notice, setNotice] = useState<Notice>({ open: false, tone: "info", text: "", key: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const latestOnMissing = useLatest(onMissing);
@@ -267,7 +278,9 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
             onAlternarFavorito={() =>
               void change(() => call("game.favorite.set", { gameIds: [game.id], favorite: !game.favorite }))
             }
-            // TODO(WEB-12b): onConfiguracoes abre o painel de configurações do jogo.
+            onConfiguracoes={() => {
+              setSettingsOpen(true);
+            }}
           />
         }
       />
@@ -282,6 +295,16 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
                   linhas={detailRows}
                   etiquetas={blocks.tags}
                   rotuloEtiquetas={s.tags}
+                  editorDeEtiquetas={
+                    <EditorDasEtiquetas
+                      gameId={game.id}
+                      tags={blocks.tags}
+                      onChanged={refresh}
+                      onError={(text) => {
+                        showNotice("error", text);
+                      }}
+                    />
+                  }
                 />
                 <ListaDeSessoes titulo={s.recentSessions} sessoes={blocks.sessions.map((x) => ({ inicio: x.startedAt, duracao: x.duration }))} />
               </div>
@@ -289,6 +312,24 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
           </div>
         </div>
       )}
+      <PainelConfiguracoesDoJogo
+        key={game.id}
+        gameId={game.id}
+        title={game.title}
+        coverUrl={
+          game.hasCover
+            ? (devImage?.("cover", game.id, game.title) ??
+              imageUrl("cover", game.id, 36 * window.devicePixelRatio, 46 * window.devicePixelRatio))
+            : undefined
+        }
+        open={settingsOpen}
+        onClose={() => {
+          setSettingsOpen(false);
+        }}
+        onError={(text) => {
+          showNotice("error", text);
+        }}
+      />
       <Aviso
         open={notice.open}
         tone={notice.tone}

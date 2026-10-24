@@ -444,3 +444,87 @@ export const overviewStrings = {
   next: "Próximo",
   playedFor: (time: string) => `${time} jogadas`,
 } as const;
+
+/**
+ * Textos do painel "Configurações deste jogo" (WEB-12b). São os do catálogo do app atual
+ * (`crates/tako-core/locales/pt-BR/game.toml`, tabela `game_settings`; `vrr.toml`); a chave de cada um vem no comentário.
+ */
+export const gameSettingsStrings = {
+  // ui.toml: details.game_settings
+  title: "Configurações deste jogo",
+  close: "Fechar (Esc)",
+  groups: {
+    // game_settings.screen, sound, launch
+    screen: "Tela",
+    sound: "Som",
+    launch: "Abrir o jogo",
+  },
+  rows: {
+    useScreen: "Usar a tela de jogo", // game_settings.use_screen
+    screen: "Tela deste jogo", // game_settings.which_screen
+    mode: "Resolução e taxa", // game_settings.mode
+    hdr: "HDR", // game_settings.hdr
+    vrr: "VRR", // vrr.game
+    audio: "Saída de áudio", // game_settings.audio
+    arguments: "Argumentos extras", // game_settings.arguments
+    folder: "Pasta de trabalho", // game_settings.folder
+    environment: "Variáveis de ambiente", // game_settings.environment
+    commands: "Comandos antes e depois", // game_settings.before_command / after_command
+  },
+  notes: {
+    useScreen: "A tela é a escolhida em Configurações › Tela de jogo, ou a deste jogo logo abaixo.", // screen_note
+    screen:
+      "Outra tela só para este jogo (por exemplo, o monitor da mesa em vez da TV). A resolução e o HDR abaixo valem para ela.", // which_screen_desc
+    launch: "Valem quando o Tako abre o executável. Jogos da Steam usam as opções de inicialização da Steam.", // launch_note
+    environment: "NOME=valor, separadas por ponto e vírgula. Valem quando o Tako abre o executável.", // environment_hint
+    // Sem chave no catálogo: a gravação de comandos espera a permissão ao abrir o jogo.
+    commands: "Ainda não dá para editar os comandos por aqui.",
+    vrrUnsupported: "Esta tela não informa VRR", // vrr.unsupported
+    audioLocked: "Este sistema não deixa o Tako trocar a saída de áudio", // settings.screen
+  },
+  commandsBefore: "Antes",
+  commandsAfter: "Depois",
+  values: {
+    default: "Padrão: ", // game_settings.default
+    on: "Ligado", // game_settings.on
+    off: "Desligado", // game_settings.off
+    none: "Nenhum", // game_settings.none
+    noneFeminine: "Nenhuma", // game_settings.environment
+    noScreen: "Nenhuma", // game_settings.no_screen
+    keepCurrent: "Manter a atual", // game_settings.keep_current
+    keepAudio: "Não alterar", // game_settings.keep_audio
+    executableFolder: "Pasta do executável", // game_settings.exe_folder
+    disconnected: (name: string) => `${name} (desconectada)`, // game_settings.disconnected
+  },
+  changes: {
+    one: "mudança", // game_settings.changes
+    other: "mudanças",
+    none: "nenhuma mudança",
+  },
+  reset: {
+    action: "Usar tudo do Tako", // game_settings.reset
+    description: (changes: number) =>
+      changes === 0 ? "Nenhuma mudança neste jogo" : `Volta as ${String(changes)} ${changes === 1 ? "mudança" : "mudanças"} ao padrão`,
+    title: "Usar tudo do Tako neste jogo?", // game_settings.reset_title
+    text: "As mudanças deste jogo (tela, som e como ele abre) somem e ele volta a seguir as Configurações do Tako.", // reset_text
+    cancel: "Cancelar", // common.cancel
+  },
+  loadError: "Não foi possível ler as configurações deste jogo.",
+  saveError: "Não foi possível salvar agora; veja os registros", // game_settings.save_failed
+  folderMissing: (folder: string) => `Pasta de trabalho não encontrada: ${folder}`, // game_settings.folder_missing
+  invalid: "Valor inválido: confira o tamanho e o formato.",
+  invalidEnvironment: "Variáveis de ambiente inválidas: use NOME=valor, até 32.",
+} as const;
+
+/** Textos do editor de etiquetas da página do jogo (WEB-12b); do catálogo `tags` e `desktop.info.tags`. */
+export const tagEditorStrings = {
+  list: "Etiquetas do jogo",
+  add: "Etiqueta", // tags.placeholder ("+ Etiqueta")
+  field: "Nova etiqueta",
+  menuTitle: "Etiquetas", // desktop.info.tags
+  remove: (name: string) => `Tirar ${name}`, // tags.remove
+  create: (name: string) => `Criar "${name}"`, // tags.create
+  games: (n: number) => `${String(n)} ${n === 1 ? "jogo" : "jogos"}`, // common.games
+  rule: "Até 40 caracteres. Uma tag que já existe é só aplicada.", // tags.name_rule
+  error: "Não foi possível atualizar as etiquetas.",
+} as const;

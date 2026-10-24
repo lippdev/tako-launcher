@@ -27,6 +27,10 @@ import type { DownloadRequest } from "./generated/DownloadRequest";
 import type { DownloadSource } from "./generated/DownloadSource";
 import type { DownloadSources } from "./generated/DownloadSources";
 import type { DownloadsSummary } from "./generated/DownloadsSummary";
+
+import type { GameChoice } from "./generated/GameChoice";
+import type { GameSettingsSet } from "./generated/GameSettingsSet";
+import type { GameSettingsView } from "./generated/GameSettingsView";
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
@@ -1073,3 +1077,246 @@ if (firstRead) {
   sources = { ...sources, completed: 0, sources: [] };
   scanSources();
 }
+
+// ---- Configurações do jogo (WEB-12b) ----
+// As escolhas de cada jogo ficam em memória; o padrão vem das configurações do Tako (`settings`), as telas e as saídas
+// de áudio são as de exemplo acima. Mesma conta do núcleo (`crates/tako-app/src/game_settings.rs`) em menor escala.
+
+interface FakeGameSettings {
+  useScreen: boolean | null;
+  screen: string | null;
+  mode: GameChoice;
+  hdr: boolean | null;
+  vrr: boolean | null;
+  audio: GameChoice;
+  arguments: string | null;
+  workingDirectory: string | null;
+  environment: string | null;
+  beforeCommand: string | null;
+  afterCommand: string | null;
+}
+
+const emptyGameSettings = (): FakeGameSettings => ({
+  useScreen: null,
+  screen: null,
+  mode: { kind: "default" },
+  hdr: null,
+  vrr: null,
+  audio: { kind: "default" },
+  arguments: null,
+  workingDirectory: null,
+  environment: null,
+  beforeCommand: null,
+  afterCommand: null,
+});
+
+/** Dois jogos já com escolhas: o primeiro na TV (o painel abre mostrando "Padrão: …"), o outro com comandos só de leitura. */
+const gameSettingsStore = new Map<string, FakeGameSettings>([
+  [
+    "steam:1000",
+    {
+      ...emptyGameSettings(),
+      screen: "DISPLAY2",
+      mode: { kind: "pick", id: "3840x2160@60" },
+      hdr: true,
+      audio: { kind: "pick", id: "tv" },
+      arguments: "-windowed",
+    },
+  ],
+  ["steam:1003", { ...emptyGameSettings(), beforeCommand: "mount.bat", afterCommand: "umount.bat" }],
+]);
+
+const sameFakeId = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const fakeFlag = (key: string) => settings.get(key)?.trim().toLowerCase() === "true";
+const textOrNull = (value: string | null | undefined) => (value?.trim() ? value.trim() : null);
+const fakeMode = (saved: GameChoice) => (saved.kind === "keep" ? "" : saved.kind === "pick" ? saved.id : null);
+
+function fakeGameSettingsView(gameId: string): GameSettingsView {
+  if (!games.some((g) => g.id === gameId)) throw new FakeError("not_found", gameId);
+  const saved = gameSettingsStore.get(gameId) ?? emptyGameSettings();
+  const takoScreen = (settings.get("GameScreenId") ?? "").trim();
+  const screens = SAMPLE_DISPLAYS.displays;
+  const own = saved.screen ? (screens.find((d) => sameFakeId(d.id, saved.screen ?? ""))?.id ?? saved.screen) : null;
+  const screenId = own ?? takoScreen;
+  const shown = screens.find((d) => sameFakeId(d.id, screenId));
+  const takoMode = textOrNull(settings.get("GameScreenMode"));
+  const defaultMode = sameFakeId(screenId, takoScreen) ? takoMode : null;
+  const useDefault = own !== null || fakeFlag("GameScreenEnabled");
+  const hdrDefault = fakeFlag("GameScreenHdr");
+  const vrrDefault = fakeFlag("GameScreenVrr");
+
+  const modeSaved = fakeMode(saved.mode);
+  const modeOptions = [...(shown?.modes ?? [])];
+  if (saved.mode.kind === "pick" && !modeOptions.includes(saved.mode.id)) modeOptions.push(saved.mode.id);
+
+  const outputs = SAMPLE_AUDIO.outputs.map((o) => ({ id: o.id, name: o.name, connected: true }));
+  const takoAudioId = (settings.get("GameAudioDeviceId") ?? "").trim();
+  const takoAudio = takoAudioId
+    ? { id: takoAudioId, name: settings.get("GameAudioDeviceName") || takoAudioId }
+    : null;
+  const savedAudio = saved.audio;
+  const audioEffective =
+    savedAudio.kind === "pick"
+      ? { id: savedAudio.id, name: outputs.find((o) => o.id === savedAudio.id)?.name ?? savedAudio.id }
+      : savedAudio.kind === "keep"
+        ? null
+        : takoAudio;
+  const environment = textOrNull(saved.environment);
+  const changes = [
+    saved.useScreen !== null,
+    own !== null,
+    saved.mode.kind !== "default",
+    saved.hdr !== null,
+    saved.vrr !== null,
+    saved.audio.kind !== "default",
+    textOrNull(saved.arguments) !== null,
+    textOrNull(saved.workingDirectory) !== null,
+    environment !== null,
+    textOrNull(saved.beforeCommand) !== null,
+    textOrNull(saved.afterCommand) !== null,
+  ].filter(Boolean).length;
+  const text = (value: string | null) => {
+    const clean = textOrNull(value);
+    return { saved: clean, effective: clean };
+  };
+
+  return {
+    gameId,
+    changes,
+    useScreen: { saved: saved.useScreen, default: useDefault, effective: saved.useScreen ?? useDefault },
+    screen: {
+      saved: own,
+      default: takoScreen
+        ? {
+            id: takoScreen,
+            name: settings.get("GameScreenName") || (screens.find((d) => sameFakeId(d.id, takoScreen))?.name ?? takoScreen),
+          }
+        : null,
+      effective: (saved.useScreen ?? useDefault) && screenId ? screenId : null,
+      options: screens.map((d) => ({ id: d.id, name: d.name, connected: true })),
+      noScreenChosen: saved.useScreen === true && !screenId,
+    },
+    mode: {
+      saved: saved.mode,
+      default: defaultMode,
+      effective: modeSaved === null ? defaultMode : modeSaved === "" ? null : modeSaved,
+      options: modeOptions,
+    },
+    hdr: { saved: saved.hdr, default: hdrDefault, effective: saved.hdr ?? hdrDefault },
+    vrr: {
+      saved: saved.vrr,
+      default: vrrDefault,
+      effective: saved.vrr ?? vrrDefault,
+      unsupported: shown?.vrr === "unsupported",
+      limitation: SAMPLE_DISPLAYS.vrrLimitation,
+    },
+    audio: {
+      saved: saved.audio,
+      default: takoAudio,
+      effective: audioEffective,
+      options: outputs,
+      canSwitch: SAMPLE_AUDIO.canSwitch,
+    },
+    arguments: text(saved.arguments),
+    workingDirectory: text(saved.workingDirectory),
+    environment: { saved: environment, effective: environment },
+    beforeCommand: text(saved.beforeCommand),
+    afterCommand: text(saved.afterCommand),
+    commandsApproved:
+      !textOrNull(saved.beforeCommand) && !textOrNull(saved.afterCommand) && !textOrNull(saved.arguments) && !environment,
+  };
+}
+
+function badFake(message: string): never {
+  throw new FakeError("bad_request", message);
+}
+
+function setFakeGameSettings(payload: unknown): GameSettingsView {
+  const { gameId, change } = payload as GameSettingsSet;
+  fakeGameSettingsView(gameId); // o jogo precisa existir
+  const value: FakeGameSettings = { ...(gameSettingsStore.get(gameId) ?? emptyGameSettings()) };
+  const screens = SAMPLE_DISPLAYS.displays;
+  const screenIdOf = () => value.screen ?? (settings.get("GameScreenId") ?? "").trim();
+  switch (change.field) {
+    case "use_screen":
+      value.useScreen = change.value;
+      break;
+    case "hdr":
+      value.hdr = change.value;
+      break;
+    case "vrr": {
+      const shown = screens.find((d) => sameFakeId(d.id, screenIdOf()));
+      if (change.value !== null && shown?.vrr === "unsupported") throw new FakeError("conflict", "a tela não informa VRR");
+      value.vrr = change.value;
+      break;
+    }
+    case "screen": {
+      if (change.value === null) {
+        value.screen = null;
+        value.mode = { kind: "default" };
+        break;
+      }
+      const screen = screens.find((d) => sameFakeId(d.id, change.value ?? ""));
+      if (!screen) throw new FakeError("not_found", "tela não encontrada");
+      if (value.screen !== screen.id) value.mode = { kind: "default" };
+      value.screen = screen.id;
+      break;
+    }
+    case "mode": {
+      if (change.value.kind === "pick") {
+        const id = change.value.id;
+        const shown = screens.find((d) => sameFakeId(d.id, screenIdOf()));
+        if (!/^\d+x\d+@\d+$/.test(id)) badFake("resolução inválida");
+        if (value.mode.kind !== "pick" || value.mode.id !== id) {
+          if (!screenIdOf()) throw new FakeError("conflict", "nenhuma tela de jogo escolhida");
+          if (!shown?.modes.includes(id)) throw new FakeError("not_found", "resolução não encontrada");
+        }
+      }
+      value.mode = change.value;
+      break;
+    }
+    case "audio": {
+      if (change.value.kind === "pick") {
+        const id = change.value.id;
+        if (!SAMPLE_AUDIO.outputs.some((o) => o.id === id)) throw new FakeError("not_found", "saída não encontrada");
+        // A saída "com defeito" mostra o aviso de gravação que falhou e a volta ao valor de antes.
+        if (id === BROKEN_AUDIO_ID) throw new Error("internal: não foi possível gravar");
+      }
+      value.audio = change.value;
+      break;
+    }
+    case "arguments": {
+      const text = change.value;
+      if (text !== null && (text.length > 2048 || /\p{Cc}/u.test(text))) badFake("argumentos inválidos");
+      value.arguments = textOrNull(text);
+      break;
+    }
+    case "working_directory": {
+      const text = textOrNull(change.value);
+      if (text !== null && (text.length > 1024 || /\p{Cc}/u.test(text))) badFake("pasta de trabalho inválida");
+      // Não há disco aqui: um caminho com "inexistente" faz de conta que a pasta não existe.
+      if (text?.toLowerCase().includes("inexistente")) throw new FakeError("not_found", "pasta de trabalho não encontrada");
+      value.workingDirectory = text;
+      break;
+    }
+    case "environment": {
+      const items = (change.value ?? "")
+        .split(/[\n;]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (items.length > 32 || items.some((item) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(item))) badFake("variáveis inválidas");
+      value.environment = items.length > 0 ? items.join(";") : null;
+      break;
+    }
+    case "reset_all":
+      gameSettingsStore.delete(gameId);
+      return fakeGameSettingsView(gameId);
+  }
+  gameSettingsStore.set(gameId, value);
+  return fakeGameSettingsView(gameId);
+}
+
+Object.assign(defaults, {
+  "game.settings": (payload: unknown) => fakeGameSettingsView((payload as GameRequest).gameId),
+  "game.settings.set": setFakeGameSettings,
+});

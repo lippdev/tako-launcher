@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cx } from "../../lib/cx";
 import { EtiquetasDoJogo } from "../EtiquetasDoJogo/EtiquetasDoJogo";
 import styles from "./CartaoDetalhes.module.css";
@@ -16,6 +17,11 @@ export interface CartaoDetalhesProps {
   /** Etiquetas da pessoa para o jogo: até 3 chips e "+N". */
   etiquetas?: readonly string[];
   rotuloEtiquetas: string;
+  /**
+   * Quem edita as etiquetas (EditorDeEtiquetas) no lugar dos chips de leitura. Com ele a linha existe mesmo sem
+   * etiquetas: é por ela que a primeira entra.
+   */
+  editorDeEtiquetas?: ReactNode;
   /** Nome do cartão para leitores de tela. */
   "aria-label": string;
   className?: string | undefined;
@@ -25,8 +31,15 @@ export interface CartaoDetalhesProps {
  * Detalhes em chave/valor (README do CartaoDetalhes): linhas de 39, alternadas no `tile`, numa caixa de raio 16 com
  * contorno. O radar de gênero do protótipo fica de fora: o núcleo não tem os eixos, e métrica não se inventa.
  */
-export function CartaoDetalhes({ linhas, etiquetas = [], rotuloEtiquetas, "aria-label": label, className }: CartaoDetalhesProps) {
-  const temEtiquetas = etiquetas.length > 0;
+export function CartaoDetalhes({
+  linhas,
+  etiquetas = [],
+  rotuloEtiquetas,
+  editorDeEtiquetas,
+  "aria-label": label,
+  className,
+}: CartaoDetalhesProps) {
+  const temEtiquetas = etiquetas.length > 0 || editorDeEtiquetas !== undefined;
   if (linhas.length === 0 && !temEtiquetas) return null;
   return (
     <section className={cx(styles["caixa"], className)} aria-label={label}>
@@ -42,7 +55,7 @@ export function CartaoDetalhes({ linhas, etiquetas = [], rotuloEtiquetas, "aria-
       {temEtiquetas && (
         <div className={styles["linha"]}>
           <span className={styles["rotulo"]}>{rotuloEtiquetas}</span>
-          <EtiquetasDoJogo etiquetas={etiquetas} limite={3} tamanho="sm" aria-label={rotuloEtiquetas} />
+          {editorDeEtiquetas ?? <EtiquetasDoJogo etiquetas={etiquetas} limite={3} tamanho="sm" aria-label={rotuloEtiquetas} />}
         </div>
       )}
     </section>

@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { cx } from "../../lib/cx";
 import { PainelLateral } from "../PainelLateral/PainelLateral";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao, type LinhaIds } from "../LinhaDeConfiguracao/LinhaDeConfiguracao";
@@ -10,6 +10,7 @@ import styles from "./ConfiguracoesDoJogo.module.css";
 export type { OpcaoDeSelecao };
 
 export type ChaveConfiguracaoJogo =
+  | "usarTela"
   | "monitor"
   | "resolucaoETaxa"
   | "hdr"
@@ -23,6 +24,7 @@ export type ChaveConfiguracaoJogo =
 export type ValorConfiguracaoJogo = boolean | string;
 
 export interface ValoresConfiguracoesDoJogo {
+  usarTela?: boolean;
   monitor?: boolean | string;
   resolucaoETaxa?: string;
   hdr?: string;
@@ -43,6 +45,7 @@ export interface OpcoesConfiguracoesDoJogo {
 }
 
 export interface DescricoesConfiguracoesDoJogo {
+  usarTela?: string;
   monitor?: string;
   resolucaoETaxa?: string;
   hdr?: string;
@@ -60,6 +63,8 @@ export interface ConfiguracoesDoJogoRotulos {
   grupoTela: string;
   grupoSom: string;
   grupoAbrirOJogo: string;
+  /** "Usar a tela de jogo" (liga e desliga); sem ele a linha `usarTela` não aparece. */
+  usarTela?: string;
   monitor: string;
   resolucaoETaxa: string;
   hdr: string;
@@ -92,6 +97,13 @@ export interface ConfiguracoesDoJogoProps {
   descricoes?: DescricoesConfiguracoesDoJogo;
   rotulos: ConfiguracoesDoJogoRotulos;
   mudancasCount?: number;
+  /**
+   * Linhas que só mostram o valor, sem controle: o que o jogo guarda mas esta tela ainda não grava (comandos) ou o que
+   * o sistema não deixa mudar (VRR sem suporte). O motivo vai na descrição da linha.
+   */
+  somenteLeitura?: readonly ChaveConfiguracaoJogo[];
+  /** O que dizer de uma linha de texto vazia ("Nenhum", "Pasta do executável"), no campo e em "Padrão: …". */
+  textoDoVazio?: Partial<Record<ChaveConfiguracaoJogo, string>>;
   inline?: boolean;
   onChange?: (chave: ChaveConfiguracaoJogo, valor: ValorConfiguracaoJogo) => void;
   onResetarAoPadrao?: () => void;
@@ -99,7 +111,7 @@ export interface ConfiguracoesDoJogoProps {
   className?: string;
 }
 
-const CHAVES_TELA: readonly ChaveConfiguracaoJogo[] = ["monitor", "resolucaoETaxa", "hdr", "vrr"];
+const CHAVES_TELA: readonly ChaveConfiguracaoJogo[] = ["usarTela", "monitor", "resolucaoETaxa", "hdr", "vrr"];
 const CHAVES_SOM: readonly ChaveConfiguracaoJogo[] = ["saidaDeAudio"];
 const CHAVES_ABRIR: readonly ChaveConfiguracaoJogo[] = [
   "argumentos",
@@ -129,6 +141,8 @@ export function ConfiguracoesDoJogo({
   descricoes,
   rotulos,
   mudancasCount: mudancasCountProp,
+  somenteLeitura = [],
+  textoDoVazio,
   inline = false,
   onChange,
   onResetarAoPadrao,
@@ -150,6 +164,9 @@ export function ConfiguracoesDoJogo({
     }
     if (typeof valorPadrao === "string" && valorPadrao.length > 0) {
       return valorPadrao;
+    }
+    if (textoDoVazio?.[chave]) {
+      return textoDoVazio[chave];
     }
     if (chave === "variaveisDeAmbiente") {
       return rotulos.nenhuma ?? "nenhuma";
@@ -186,14 +203,24 @@ export function ConfiguracoesDoJogo({
 
   const subtituloPainel = `${tituloDoJogo} \u00b7 ${textoMudancas}`;
 
+  /** O valor de uma linha só de leitura, em texto: o rótulo da opção, ligado/desligado ou o texto do vazio. */
+  const textoDeLeitura = (chave: ChaveConfiguracaoJogo, valor: ValorConfiguracaoJogo): string => {
+    if (typeof valor === "boolean") {
+      return valor ? (rotulos.ligado ?? "ligado") : (rotulos.desligado ?? "desligado");
+    }
+    const opcao = opcoes?.[chave as keyof OpcoesConfiguracoesDoJogo]?.find((o) => o.value === valor);
+    return opcao?.label ?? (valor.trim() || formatarRotuloValorPadrao(chave, ""));
+  };
+
   const renderLinha = (chave: ChaveConfiguracaoJogo): ReactNode => {
     const valor = valores[chave];
     if (valor === undefined || valor === null) {
       return null;
     }
 
+    const soLeitura = somenteLeitura.includes(chave);
     const valorPadrao = padroes?.[chave];
-    const mudou = valorPadrao !== undefined && valor !== valorPadrao;
+    const mudou = !soLeitura && valorPadrao !== undefined && valor !== valorPadrao;
 
     let descricaoFinal: string | undefined = descricoes?.[chave];
     if (mudou && valorPadrao !== undefined) {
@@ -210,6 +237,24 @@ export function ConfiguracoesDoJogo({
     const linhaProps: LinhaPropsBase = { title: tituloLinha };
     if (descricaoFinal) {
       linhaProps.description = descricaoFinal;
+    }
+
+    if (soLeitura) {
+      linhaProps.control = <span className={styles["valorLeitura"]}>{textoDeLeitura(chave, valor)}</span>;
+      return <LinhaDeConfiguracao key={chave} {...linhaProps} />;
+    }
+
+    if (chave === "usarTela") {
+      if (!rotulos.usarTela) return null;
+      linhaProps.control = ({ labelId, descriptionId }: LinhaIds) => (
+        <Chave
+          checked={Boolean(valor)}
+          onChange={(novo) => onChange?.("usarTela", novo)}
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+        />
+      );
+      return <LinhaDeConfiguracao key={chave} {...linhaProps} />;
     }
 
     if (chave === "monitor") {
@@ -288,12 +333,10 @@ export function ConfiguracoesDoJogo({
     }
 
     linhaProps.control = ({ labelId, descriptionId }: LinhaIds) => (
-      <input
-        type="text"
-        className={styles["campoTexto"]}
+      <CampoDaLinha
         value={typeof valor === "string" ? valor : ""}
-        placeholder={chave === "variaveisDeAmbiente" ? rotulos.nenhuma : rotulos.nenhum}
-        onChange={(e) => onChange?.(chave, e.target.value)}
+        placeholder={textoDoVazio?.[chave] ?? (chave === "variaveisDeAmbiente" ? rotulos.nenhuma : rotulos.nenhum)}
+        onCommit={(novo) => onChange?.(chave, novo)}
         aria-labelledby={labelId}
         aria-describedby={descriptionId}
       />
@@ -387,5 +430,45 @@ export function ConfiguracoesDoJogo({
     >
       {conteudo}
     </PainelLateral>
+  );
+}
+
+interface CampoDaLinhaProps {
+  value: string;
+  placeholder: string | undefined;
+  onCommit: (valor: string) => void;
+  "aria-labelledby": string;
+  "aria-describedby": string;
+}
+
+/**
+ * Campo de texto de uma linha. Escreve num rascunho e só entrega o valor ao sair do campo ou com Enter: gravar a cada
+ * tecla mandaria à ponte textos pela metade (`NOME` sem o `=valor`). Se o valor de fora mudar (a gravação falhou e
+ * voltou o de antes), o rascunho o acompanha.
+ */
+function CampoDaLinha({ value, placeholder, onCommit, ...aria }: CampoDaLinhaProps) {
+  const [rascunho, setRascunho] = useState(value);
+  const [visto, setVisto] = useState(value);
+  if (value !== visto) {
+    setVisto(value);
+    setRascunho(value);
+  }
+  return (
+    <input
+      type="text"
+      className={styles["campoTexto"]}
+      value={rascunho}
+      placeholder={placeholder}
+      onChange={(e) => {
+        setRascunho(e.target.value);
+      }}
+      onBlur={() => {
+        if (rascunho !== value) onCommit(rascunho);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+      {...aria}
+    />
   );
 }

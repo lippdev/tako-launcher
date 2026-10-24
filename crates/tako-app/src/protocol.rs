@@ -76,6 +76,8 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "downloads.cancel"
             | "downloads.sources"
             | "downloads.add"
+            | "game.settings"
+            | "game.settings.set"
     ) {
         return Err((
             header.id,
@@ -325,6 +327,20 @@ pub enum Call {
         #[ts(as = "DownloadAdd")]
         DownloadAdd,
     ),
+    /// Configurações deste jogo (UX-007): o que o jogo mudou, o que vale de fato e o padrão de cada linha.
+    #[serde(rename = "game.settings")]
+    GameSettings(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
+    /// Grava uma configuração do jogo (ou volta ao padrão) e devolve as configurações já atualizadas.
+    #[serde(rename = "game.settings.set")]
+    GameSettingsSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameSettingsSet")]
+        GameSettingsSet,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -396,6 +412,10 @@ pub enum Reply {
     DownloadsSources(DownloadSources),
     #[serde(rename = "downloads.add")]
     DownloadsAdd(DownloadEntry),
+    #[serde(rename = "game.settings")]
+    GameSettings(Box<GameSettingsView>),
+    #[serde(rename = "game.settings.set")]
+    GameSettingsSet(Box<GameSettingsView>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -1131,4 +1151,171 @@ pub struct DownloadAdd {
     #[serde(default)]
     #[ts(optional = nullable)]
     pub game_id: Option<String>,
+}
+
+/// Um campo do jogo que tem "padrão do Tako", "manter como está" e um valor próprio (resolução, saída de áudio).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export)]
+pub enum GameChoice {
+    /// O jogo não escolhe: vale o padrão do Tako.
+    Default,
+    /// O jogo pede para não mexer (manter a resolução atual, não trocar a saída de áudio).
+    Keep,
+    /// O jogo escolhe: a chave da resolução (`1920x1080@60`) ou o id da saída de áudio.
+    Pick { id: String },
+}
+
+/// Uma configuração de liga/desliga: o que o jogo guardou (`null` = segue o padrão), o padrão e o que vale.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameFlagSetting {
+    pub saved: Option<bool>,
+    pub default: bool,
+    pub effective: bool,
+}
+
+/// VRR: como [`GameFlagSetting`], mais o aviso de que a tela não deixa ligar.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameVrrSetting {
+    pub saved: Option<bool>,
+    pub default: bool,
+    pub effective: bool,
+    /// A tela do jogo informa que não tem VRR; a linha fica à vista, mas não grava.
+    pub unsupported: bool,
+    /// Por que o Tako não consegue ligar o VRR neste sistema (o mesmo de `system.displays`).
+    pub limitation: Option<String>,
+}
+
+/// Um texto livre do jogo (argumentos, pasta, variáveis, comandos). Não existe padrão do Tako: o padrão é "nenhum".
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameTextSetting {
+    /// Como o jogo guardou, sem espaços nas pontas; `null` = vazio.
+    pub saved: Option<String>,
+    /// O que a sessão usa (variáveis já lidas e sem as inválidas); `null` = nada.
+    pub effective: Option<String>,
+}
+
+/// Uma tela ou saída de áudio pelo id estável e o nome para mostrar.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameDevice {
+    pub id: String,
+    pub name: String,
+}
+
+/// Uma tela ou saída que o jogo pode escolher; a escolhida e desconectada agora continua na lista.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameDeviceOption {
+    pub id: String,
+    pub name: String,
+    pub connected: bool,
+}
+
+/// "Tela deste jogo" (PERF-002): outra tela só para o jogo, no lugar da tela de jogo do Tako.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameScreenSetting {
+    /// Id da tela do jogo; `null` = usa a tela de jogo do Tako.
+    pub saved: Option<String>,
+    /// A tela de jogo do Tako (Configurações › Tela); `null` = nenhuma escolhida.
+    pub default: Option<GameDevice>,
+    /// Id da tela que o jogo vai usar; `null` = o jogo não usa tela própria.
+    pub effective: Option<String>,
+    pub options: Vec<GameDeviceOption>,
+    /// O jogo pediu a tela de jogo e não há nenhuma escolhida.
+    pub no_screen_chosen: bool,
+}
+
+/// Resolução e taxa na tela do jogo.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameModeSetting {
+    pub saved: GameChoice,
+    /// A resolução padrão nesta tela (a do Tako, ou o preset do monitor); `null` = manter a atual.
+    pub default: Option<String>,
+    /// O que vale: `null` = manter a atual.
+    pub effective: Option<String>,
+    /// As resoluções da tela do jogo, no formato `1920x1080@60`, e a guardada que a tela não tem mais.
+    pub options: Vec<String>,
+}
+
+/// Saída de áudio do jogo.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameAudioSetting {
+    pub saved: GameChoice,
+    /// A saída do Tako (Configurações › Tela e áudio do jogo); `null` = não alterar.
+    pub default: Option<GameDevice>,
+    /// A saída que vale; `null` = não alterar.
+    pub effective: Option<GameDevice>,
+    pub options: Vec<GameDeviceOption>,
+    /// Falso quando o sistema não deixa o Tako trocar a saída de áudio.
+    pub can_switch: bool,
+}
+
+/// Resposta de `game.settings` e `game.settings.set`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameSettingsView {
+    pub game_id: String,
+    /// Quantas coisas o jogo muda em relação ao Tako.
+    pub changes: usize,
+    pub use_screen: GameFlagSetting,
+    pub screen: GameScreenSetting,
+    pub mode: GameModeSetting,
+    pub hdr: GameFlagSetting,
+    pub vrr: GameVrrSetting,
+    pub audio: GameAudioSetting,
+    pub arguments: GameTextSetting,
+    pub working_directory: GameTextSetting,
+    pub environment: GameTextSetting,
+    /// Só leitura na interface: gravar comandos depende de o Tako pedir a permissão ao abrir o jogo (SESSION-004).
+    pub before_command: GameTextSetting,
+    pub after_command: GameTextSetting,
+    /// Os comandos, os argumentos e as variáveis do jogo já foram permitidos como estão (ou não há o que permitir).
+    pub commands_approved: bool,
+}
+
+/// Uma configuração do jogo; `null` (ou `{ kind: "default" }`) volta ao padrão do Tako.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(tag = "field", content = "value", rename_all = "snake_case")]
+#[ts(export)]
+pub enum GameSettingChange {
+    /// Usar a tela de jogo do Tako neste jogo.
+    UseScreen(Option<bool>),
+    /// Id da tela só deste jogo. Trocar de tela esquece a resolução escolhida para a anterior.
+    Screen(Option<String>),
+    Mode(GameChoice),
+    Hdr(Option<bool>),
+    Vrr(Option<bool>),
+    Audio(GameChoice),
+    /// Argumentos extras, em uma linha (até 2048 caracteres).
+    Arguments(Option<String>),
+    /// Pasta de trabalho; precisa existir (até 1024 caracteres).
+    WorkingDirectory(Option<String>),
+    /// `NOME=valor` separados por `;` ou por linha (até 32 variáveis, 4096 caracteres).
+    Environment(Option<String>),
+    /// "Usar tudo do Tako": apaga todas as escolhas do jogo.
+    ResetAll,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameSettingsSet {
+    pub game_id: String,
+    pub change: GameSettingChange,
 }

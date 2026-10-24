@@ -6,6 +6,7 @@
 mod core;
 mod demo;
 mod downloads;
+mod game_settings;
 mod i18n;
 mod library;
 mod organize;
@@ -174,6 +175,19 @@ impl AppService {
                 &self.require_core()?.devices,
             )?)),
             Call::I18nCatalog => Ok(Reply::I18nCatalog(i18n::catalog(self.require_core()?))),
+            Call::GameSettings(request) => Ok(Reply::GameSettings(Box::new(game_settings::view(
+                self.require_core()?,
+                &request.game_id,
+            )?))),
+            Call::GameSettingsSet(request) => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                Ok(Reply::GameSettingsSet(Box::new(game_settings::set(
+                    core, request,
+                )?)))
+            }
             call @ (Call::DownloadsList
             | Call::DownloadsSummary
             | Call::DownloadsPause(_)

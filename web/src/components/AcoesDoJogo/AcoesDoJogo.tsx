@@ -64,7 +64,7 @@ export function AcoesDoJogo({
       onSelect: onAlternarFavorito,
     },
     { type: "separator" },
-    // TODO(WEB-12b): abre o painel de configurações do jogo; até lá a entrada fica à vista e desligada.
+    // Sem o ouvinte (a galeria de componentes) a entrada fica à vista e desligada.
     {
       id: "configuracoes",
       label: rotulos.configuracoes,
