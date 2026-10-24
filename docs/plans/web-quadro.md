@@ -11,7 +11,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Claude Alyx Medical | `claudeAgent` | orquestrador |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **sem limite até ~21:37** (rate limit; fora da rotação) |
 | Codex Lipp | `codex` | **sem créditos** desde 24/10 (precisa recarregar; fora da rotação) |
-| Codex Alyx Medical | `codex_alyx_medical` | WEB-01b, WEB-10a (continuação), WEB-02a (rodada 2) |
+| Codex Alyx Medical | `codex_alyx_medical` | WEB-02a (rodada 2), WEB-11a |
 
 ## Onda 1 — Fundação (D-14: direto no código definitivo)
 
@@ -29,6 +29,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-01b | **`tako-app`, segunda fatia:** configurações, coleções (manuais e automáticas resolvidas pelo id no núcleo), tags e status do jogo, favoritos | N3 | Codex Alyx · GPT-6.1-Sol medium (trocou de conta) | WEB-01a | `crates/tako-app/` | integrada |
 | WEB-10a | **Estrutura do app, barra de cima e janela:** BarraSuperior com BarraDaJanela (só BIBLIOTECA, sem loja), MenuDoTako, vistas com TrocaDeTela, lista recolhível, `ui.state`, atalhos, janela pequena | N3 | Claude InvestSmart · Sonnet 5.5 alto → continuação no Codex Alyx (limite de uso) | WEB-04a, WEB-04b | `web/src/app/`, `web/src/App.tsx` | integrada (aguarda validação visual) |
 | WEB-01c | **Leitura das lojas na `tako-app`:** descoberta pela `tako-sources` numa thread própria, snapshot, `library.changed` ao terminar; hoje a versão web só vê o snapshot deixado pelo Slint | N4 | Codex Alyx · GPT-6.1-Sol high | WEB-01a | `crates/tako-app/` | integrada |
+| WEB-11a | **Lista da biblioteca ligada à ponte:** `library.list` paginado, abas, busca, filtros e ordenação no PainelLateral, seletor de coleção, seleção múltipla com ações (favorito, status, tags, coleção), `library.changed`, estados vazios e carregando, hospedeiro falso respondendo as mesmas chamadas | N3 | Codex Alyx · GPT-6.1-Sol medium | WEB-10a, WEB-01b | `web/src/app/`, `web/src/bridge/fake.ts` | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
