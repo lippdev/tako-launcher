@@ -348,7 +348,8 @@ component SearchBox inherits Rectangle {
     sta := TouchArea { mouse-cursor: MouseCursor.text; clicked => { ti.focus(); } }
     HorizontalLayout {
         padding-left: flat ? 13px : Ui.space-16;
-        padding-right: flat ? 38px : Ui.space-8;
+        // A vaga do botão da direita (38) só existe sem o keycap, que ocupa o lugar dele nas Configurações.
+        padding-right: flat && key-label == "" ? 38px : Ui.space-8;
         spacing: flat ? 10px : Ui.space-12;
         DeskIcon { name: "search"; size: flat ? 16px : 20px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
         Rectangle {
@@ -3990,6 +3991,12 @@ component DeskRow inherits Rectangle {
     in property <bool> loose;
     // Lista do onboarding (LojaEncontrada): linhas sem caixa, separadas por divisórias.
     in property <bool> bare;
+    // Configurações (LinhaDeConfiguracao): grupo com contorno, linhas de 64, título 14 e descrição 12,5.
+    in property <bool> grp;
+    // A linha que veio de um link: pisca na cor de destaque (só com `flash-lit`, que não liga com Reduzir animações).
+    in property <bool> flash;
+    property <length> title-size: grp ? 14px * Ui.text-scale : Ui.desk-label;
+    property <length> desc-size: grp ? 12.5px * Ui.text-scale : Ui.desk-label-sm;
     // FilaDeCapas: a linha da fila (capa atual, proposta, confiança e as ações dentro dela).
     in property <CoverRow> cv;
     property <bool> is-cover: data.kind == "cover";
@@ -3999,7 +4006,7 @@ component DeskRow inherits Rectangle {
     property <bool> emu: data.icon == "emu-retroarch" || data.icon == "emu-dolphin" || data.icon == "emu-pcsx2" || data.icon == "emu-duckstation" || data.icon == "emu-ppsspp" || data.icon == "emu-ryujinx" || data.icon == "emu-cemu" || data.icon == "emu-rpcs3";
     // A linha da fila cresce com o motivo (texto essencial: quebra em vez de cortar). Onboarding (`bare`): linhas de
     // 12 em cima e embaixo, sem a altura mínima das Configurações.
-    out property <length> row-h: is-header ? 40px : (data.kind == "note" ? notel.preferred-height : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : Ui.settings-row-height, lay.preferred-height) + card-gap));
+    out property <length> row-h: is-header ? (grp ? 52px : 40px) : (data.kind == "note" ? notel.preferred-height : (is-cover ? max(120px, covl.preferred-height) : max(loose ? Ui.control-height : bare ? 46px : (grp ? Ui.settings-row-height : 56px), lay.preferred-height) + card-gap));
     callback clicked();
     // Ação dentro da linha: 0 = Aceitar, 1 = Escolher outra.
     callback act(int);
@@ -4008,7 +4015,7 @@ component DeskRow inherits Rectangle {
     // Canto inferior direito da pílula do select, para a lista nascer embaixo dela, alinhada à direita.
     callback anchor(length, length);
     property <bool> is-header: data.kind == "header";
-    property <color> group-bg: DeskArt.gray ? Ui.settings-control : Ui.glass-control;
+    property <color> group-bg: grp ? Ui.settings-surface : (DeskArt.gray ? Ui.settings-control : Ui.glass-control);
     // Grupos das Configurações usam o raio dos cartões; nos painéis de vidro, o dos controles.
     property <length> group-r: DeskArt.gray ? Ui.radius-card : Ui.radius-control;
     property <color> fg: data.style == "danger" ? Ui.desk-error : Ui.desk-text;
@@ -4032,20 +4039,59 @@ component DeskRow inherits Rectangle {
         border-top-right-radius: first ? group-r : 0;
         border-bottom-left-radius: last ? group-r : 0;
         border-bottom-right-radius: last ? group-r : 0;
-        background: ta.has-hover && data.enabled ? (DeskArt.gray ? Ui.settings-control-hover.mix(Ui.settings-surface, 0.5) : Ui.glass-hover.mix(Ui.glass-control, 0.5)) : group-bg;
+        // Configurações: o contorno (line-strong) é a própria camada de baixo; a de cima fica 1 recuada nas bordas.
+        background: grp ? Ui.line-strong : (ta.has-hover && data.enabled ? (DeskArt.gray ? Ui.settings-control-hover.mix(Ui.settings-surface, 0.5) : Ui.glass-hover.mix(Ui.glass-control, 0.5)) : group-bg);
         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
         // Divisória entre linhas do mesmo grupo, recuada 18 da esquerda.
-        if !first: Rectangle { x: 18px; y: 0; width: parent.width - 18px; height: 1px; background: DeskArt.gray ? Ui.settings-separator : Ui.divider; }
+        if !first && !grp: Rectangle { x: 18px; y: 0; width: parent.width - 18px; height: 1px; background: DeskArt.gray ? Ui.settings-separator : Ui.divider; }
+        if grp: Rectangle {
+            x: 1px;
+            y: first ? 1px : 0;
+            width: parent.width - 2px;
+            height: parent.height - (first ? 1px : 0px) - (last ? 1px : 0px);
+            border-top-left-radius: first ? group-r - 1px : 0;
+            border-top-right-radius: first ? group-r - 1px : 0;
+            border-bottom-left-radius: last ? group-r - 1px : 0;
+            border-bottom-right-radius: last ? group-r - 1px : 0;
+            background: ta.has-hover && data.enabled ? group-bg.mix(Colors.white, 0.96) : group-bg;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            if !first: Rectangle { y: 0; height: 1px; background: Ui.line; }
+            // Pisca da cor de destaque a 14% (tk-rowHl).
+            Rectangle {
+                border-top-left-radius: parent.border-top-left-radius;
+                border-top-right-radius: parent.border-top-right-radius;
+                border-bottom-left-radius: parent.border-bottom-left-radius;
+                border-bottom-right-radius: parent.border-bottom-right-radius;
+                background: flash ? Ui.desk-accent.with-alpha(0.14) : transparent;
+                animate background { duration: Ui.flash-fade(flash); easing: cubic-bezier(0.22, 1, 0.36, 1); }
+            }
+        }
     }
     if focused && !is-header && data.kind != "note": FocusRing { radius: Ui.radius-control; }
     if is-header: Text {
         x: 4px;
-        y: parent.height - self.height - 8px;
+        y: parent.height - self.height - (grp ? 10px : 8px);
         text: data.title.to-uppercase();
         color: Ui.desk-on-subtle;
         font-size: Ui.desk-overline;
         font-weight: 700;
         letter-spacing: 0.1 * self.font-size;
+    }
+    // Leitor de tela (Configurações): a linha da chave é uma caixa de marcar e a da ação, um botão.
+    if grp && data.kind == "toggle": Rectangle {
+        accessible-role: checkbox;
+        accessible-label: data.title;
+        accessible-description: data.description;
+        accessible-checked: data.on;
+        accessible-enabled: data.enabled;
+        accessible-action-default => { root.clicked(); }
+    }
+    if grp && (data.kind == "action" || data.kind == "button"): Rectangle {
+        accessible-role: button;
+        accessible-label: data.title;
+        accessible-description: data.description;
+        accessible-enabled: data.enabled;
+        accessible-action-default => { root.clicked(); }
     }
     ta := TouchArea {
         // A linha de download só reage aos botões dela (um clique solto não pausa nada).
@@ -4207,14 +4253,14 @@ component DeskRow inherits Rectangle {
             Text {
                 text: data.title;
                 color: fg;
-                font-size: Ui.desk-label;
-                font-weight: data.emphasized ? 600 : 500;
+                font-size: title-size;
+                font-weight: grp || data.emphasized ? 600 : 500;
                 wrap: word-wrap;
             }
             if data.description != "": Text {
                 text: data.description;
-                color: Ui.desk-on-muted;
-                font-size: Ui.desk-label-sm;
+                color: grp ? Ui.desk-text-muted : Ui.desk-on-muted;
+                font-size: desc-size;
                 // 13/1,35 das linhas (Plus Jakarta tem 1,26 de natural).
                 line-height-factor: 1.07;
                 wrap: word-wrap;
@@ -4348,14 +4394,16 @@ component DeskRow inherits Rectangle {
         if data.action != "" && DeskArt.gray: Rectangle {
             y: (parent.height - self.height) / 2;
             height: 36px;
-            width: al.preferred-width + 32px;
-            border-radius: self.height / 2;
+            width: al.preferred-width + (grp ? 28px : 32px);
+            border-radius: grp ? Ui.radius-control : self.height / 2;
             background: !data.enabled ? Ui.settings-control : (ta.has-hover ? Ui.settings-control-hover : Ui.settings-control);
+            border-width: grp ? 1px : 0px;
+            border-color: Ui.line-strong;
             opacity: data.enabled ? 1 : 0.5;
             accessible-role: button;
             accessible-label: data.title + (data.value != "" ? (": " + data.value + ". ") : ": ") + data.action;
             animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-            al := Text { text: data.action; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; }
+            al := Text { text: data.action; color: Ui.desk-text; font-size: grp ? 13px * Ui.text-scale : Ui.desk-label; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
         }
         if (data.kind == "action" || data.kind == "button") && data.style != "link" && !as-check && !card && data.action == "": Text { text: "›"; color: Ui.desk-on-subtle; font-size: 18px; vertical-alignment: center; }
     }
@@ -4425,6 +4473,11 @@ component RowScroll inherits Rectangle {
     in property <bool> inline-buttons;
     in property <bool> bare;
     in property <bool> side-panel;
+    // Configurações: os grupos de linhas no padrão da LinhaDeConfiguracao.
+    in property <bool> grp;
+    // Linha que pisca ao abrir por um link (índice; -1 = nenhuma) e se o pisca está aceso agora.
+    in property <int> flash-row: -1;
+    in property <bool> flash-lit;
     in property <length> gap: Ui.space-8;
     // FilaDeCapas: dados extras das linhas "cover", na mesma ordem das linhas.
     in property <[CoverRow]> covers;
@@ -4440,18 +4493,23 @@ component RowScroll inherits Rectangle {
     clip: true;
     changed content-key => { fl.viewport-y = 0; }
     // Só o teclado puxa a lista até a linha focada; o mouse rola pela roda.
-    changed sel => {
-        if (key-focus && sel >= 0 && sel < rows.length) {
-            if (rl.y-of(sel) + fl.viewport-y < 0) {
-                fl.viewport-y = -rl.y-of(sel);
-            } else if (rl.y-of(sel) + 72px + fl.viewport-y > fl.height) {
-                fl.viewport-y = -(rl.y-of(sel) + 72px - fl.height);
+    changed sel => { root.reveal(key-focus ? sel : -1); }
+    // A linha de um link também aparece na tela, qualquer que seja o foco.
+    changed flash-row => { root.reveal(flash-row); }
+    function reveal(i: int) {
+        if (i >= 0 && i < rows.length) {
+            if (rl.y-of(i) + fl.viewport-y < 0) {
+                fl.viewport-y = -rl.y-of(i);
+            } else if (rl.y-of(i) + 72px + fl.viewport-y > fl.height) {
+                fl.viewport-y = -(rl.y-of(i) + 72px - fl.height);
             }
         }
     }
     fl := Flickable {
-        viewport-height: rl.preferred-height;
+        viewport-height: rl.preferred-height + (grp ? Ui.space-48 : 0px);
         rl := VerticalLayout {
+            // Configurações: o primeiro grupo sem título de seção também fica a 30 do cabeçalho da categoria.
+            padding-top: grp && rows.length > 0 && rows[0].kind != "header" ? Ui.space-24 : 0px;
             // Posição aproximada de uma linha (altura média), para seguir o foco sem medir cada uma.
             pure function y-of(i: int) -> length { return i * (self.preferred-height / max(1, rows.length)); }
             width: fl.width - 6px;
@@ -4470,6 +4528,8 @@ component RowScroll inherits Rectangle {
                     visible: !(button && (footer || inline-buttons));
                     bare: root.bare;
                     side-panel: root.side-panel;
+                    grp: root.grp;
+                    flash: flash-lit && i == flash-row;
                     data: r;
                     cv: covers[i];
                     act(k) => { root.clicked("row-act:" + k, i); }
@@ -4686,9 +4746,8 @@ component DialogFooter inherits Rectangle {
     }
 }
 
-// Configurações (TelaConfiguracoes): a mesma estrutura da biblioteca sobre o cinza. À esquerda, o painel de categorias
-// no lugar da lista (CategoriaDeConfiguracao); à direita, ancorado no topo, o cabeçalho da categoria e os grupos de
-// linhas, até 860 de largura.
+// Configurações (TelaConfiguracoes): as categorias numa coluna fixa de 292 colada à borda esquerda (como a lista da
+// biblioteca) e, ao lado, o conteúdo de até 900 (40 de margem): cabeçalho da categoria e grupos de linhas.
 component DeskSettings inherits Rectangle {
     in property <string> search;
     in property <string> search-hint;
@@ -4742,6 +4801,25 @@ component DeskSettings inherits Rectangle {
             rows-in = true;
         }
     }
+    // Abrir uma configuração por um link: a linha pisca da cor de destaque (acende e apaga em 30% de `tempo-pulso`).
+    // O número muda a cada pedido, para pedir a mesma linha duas vezes piscar duas vezes; Reduzir animações não pisca.
+    in property <int> flash-row: -1;
+    in property <int> flash-nonce;
+    property <bool> flash-lit;
+    changed flash-nonce => {
+        if (flash-row >= 0 && !Ui.reduce-motion) {
+            flash-lit = true;
+            flash-timer.running = true;
+        }
+    }
+    flash-timer := Timer {
+        interval: Ui.tempo-pulso * 0.3;
+        running: false;
+        triggered => {
+            self.running = false;
+            flash-lit = false;
+        }
+    }
     in property <string> count;
     in property <[DeskNav]> categories;
     in property <int> category-focus;
@@ -4754,20 +4832,23 @@ component DeskSettings inherits Rectangle {
     in property <bool> small;
     callback clicked(string, int);
     callback menu(length, length);
-    property <length> list-w: root.width < 1100px - 2 * Ui.space-36 ? Ui.list-width-narrow : Ui.list-width;
-    property <length> category-row-h: (small ? Ui.control-height : Ui.list-row-height) + (Ui.text-scale - 1) * 32px;
+    property <length> category-row-h: 44px + (Ui.text-scale - 1) * 32px;
     HorizontalLayout {
-        spacing: small ? Ui.space-20 : Ui.space-28;
-        Vidro {
-            width: list-w;
-            height: min(parent.height, cl.preferred-height);
-            cl := VerticalLayout {
-                padding-top: Ui.space-16;
+        // CategoriaDeConfiguracao: a coluna fixa. Fundo por tema, como a lista da biblioteca: o TAKO sem fundo e sem
+        // divisória; o Liquid Glass é vidro; os outros, a superfície e a linha.
+        Rectangle {
+            width: Ui.list-column;
+            if Ui.desk-variant == 4: Vidro { radius: 0px; edge: false; }
+            if Ui.desk-theme != 0 && Ui.desk-variant != 4: Rectangle { background: Ui.surface; }
+            if Ui.desk-theme != 0: Rectangle { x: parent.width - 1px; width: 1px; background: Ui.line; }
+            VerticalLayout {
+                padding-top: 14px;
                 padding-left: Ui.space-12;
                 padding-right: Ui.space-12;
                 padding-bottom: Ui.space-12;
-                spacing: small ? 4px : 6px;
+                spacing: Ui.space-6;
                 SearchBox {
+                    flat: true;
                     text: search;
                     hint: search-hint;
                     key-label: search-key;
@@ -4776,96 +4857,111 @@ component DeskSettings inherits Rectangle {
                     edited(t) => { root.edited(t); }
                     leave => { root.focus-main(); }
                 }
-                if !small: HorizontalLayout {
-                    padding-left: Ui.space-12;
-                    Text {
+                if !small: Text {
                     height: 36px;
                     text: count;
                     color: Ui.desk-on-subtle;
-                    font-size: Ui.desk-label-sm;
-                    font-weight: 500;
+                    font-size: Ui.desk-overline;
                     vertical-alignment: center;
-                    }
+                    overflow: elide;
                 }
                 cf := Flickable {
                     vertical-stretch: 1;
                     viewport-height: cats.preferred-height;
                     cats := VerticalLayout {
                         width: cf.width;
-                for c[i] in categories: Rectangle {
-                    // Na busca, a categoria sem nada que combine fica apagada.
-                    opacity: c.count == "0" ? 0.4 : 1;
-                    height: category-row-h;
-                    border-radius: Ui.radius-row;
-                    background: !c.selected && cta.has-hover ? Ui.glass-hover : transparent;
-                    animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-                    accessible-role: tab;
-                    accessible-label: c.label;
-                    if c.selected: Selected { lifted: true; }
-                    if focus-visible && row-focus < 0 && i == category-focus: FocusRing { }
-                    HorizontalLayout {
-                        padding-left: Ui.space-8;
-                        spacing: 14px;
-                        // Ícone sem fundo no lugar da miniatura do jogo, para os nomes alinharem como na lista.
-                        Rectangle {
-                            width: Ui.thumb-size;
-                            DeskIcon { name: c.icon; size: 22px; tint: c.selected ? Ui.desk-text : Ui.desk-on-muted; }
+                        spacing: 2px;
+                        for c[i] in categories: Rectangle {
+                            // Na busca, a categoria sem nada que combine fica apagada.
+                            opacity: c.count == "0" ? 0.35 : 1;
+                            height: category-row-h;
+                            border-radius: Ui.radius-row;
+                            background: !c.selected && cta.has-hover ? Ui.glass-hover : transparent;
+                            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+                            accessible-role: tab;
+                            accessible-label: c.label;
+                            accessible-action-default => { root.clicked("category", i); }
+                            if c.selected: Selected { }
+                            if focus-visible && row-focus < 0 && i == category-focus: FocusRing { }
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                spacing: 12px;
+                                // O quadrado do ícone acompanha o estado selecionado da categoria.
+                                Rectangle {
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: 7px;
+                                    background: c.selected ? Ui.desk-text : transparent;
+                                    DeskIcon { name: c.icon; size: 18px; tint: c.selected ? Ui.desk-canvas : Ui.desk-on-muted; }
+                                }
+                                Text {
+                                    text: c.label;
+                                    color: c.selected ? Ui.desk-text : Ui.desk-on-muted;
+                                    font-size: 14px * Ui.text-scale;
+                                    font-weight: c.selected ? 600 : 500;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                                // Contagem na cor de destaque (capas a revisar; na busca, linhas que combinam), sempre com o número.
+                                if c.count != "" && c.count != "0": Rectangle {
+                                    y: (parent.height - self.height) / 2;
+                                    width: max(20px, cnt.preferred-width + 12px);
+                                    height: 20px;
+                                    border-radius: 6px;
+                                    background: Ui.desk-accent;
+                                    cnt := Text { text: c.count; color: Ui.desk-on-accent; font-size: Ui.desk-overline; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                            }
+                            cta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.clicked("category", i); }
+                            }
                         }
-                        Text {
-                            text: c.label;
-                            color: Ui.desk-text;
-                            font-size: Ui.desk-label;
-                            font-weight: c.selected ? 600 : 500;
-                            vertical-alignment: center;
-                            overflow: elide;
-                            horizontal-stretch: 1;
-                        }
-                        // Contagem do item (FilaDeCapas: capas a revisar; na busca, linhas que combinam).
-                        if c.count != "" && c.count != "0": Rectangle {
-                            width: cnt.preferred-width + Ui.space-12;
-                            cnt := Text { x: 0; text: c.count; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; height: parent.height; }
-                        }
-                    }
-                    cta := TouchArea {
-                        mouse-cursor: pointer;
-                        clicked => { root.clicked("category", i); }
-                    }
-                }
                     }
                 }
             }
         }
         HorizontalLayout {
             horizontal-stretch: 1;
+            padding-left: small ? Ui.space-24 : Ui.space-40;
+            padding-right: small ? Ui.space-24 : Ui.space-40;
+            padding-top: 34px;
             VerticalLayout {
-                max-width: 860px;
+                max-width: 820px;
                 horizontal-stretch: 1;
                 opacity: rows-in ? 1 : 0;
                 animate opacity { duration: Ui.list-fade(rows-in); easing: rows-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
                 // Ancorado no topo: numa janela alta a sobra fica embaixo das linhas.
                 alignment: start;
-                spacing: Ui.space-12;
-                // Cabeçalho na altura do conteúdo: numa janela alta a sobra fica nas linhas, não aqui.
+                // Cabeçalho da categoria: ícone de 52 num quadrado, título 28/700 e uma frase; 30 até a primeira seção.
                 HorizontalLayout {
                     vertical-stretch: 0;
-                    padding-top: 4px;
-                    padding-bottom: 10px;
-                    padding-left: 8px;
-                    spacing: 18px;
+                    padding-bottom: Ui.space-8;
+                    spacing: Ui.space-16;
                     Rectangle {
-                        width: 34px;
-                        DeskIcon { name: categories[category-focus].icon; size: 34px; tint: Ui.desk-text; }
+                        width: 52px;
+                        height: 52px;
+                        border-radius: 14px;
+                        background: Ui.tile;
+                        border-width: 1px;
+                        border-color: Ui.line-strong;
+                        DeskIcon { name: search != "" ? "search" : categories[category-focus].icon; size: 24px; tint: Ui.desk-text; }
                     }
                     VerticalLayout {
                         alignment: center;
-                        spacing: 6px;
-                        Text { text: heading; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-headline; font-weight: 700; letter-spacing: -0.01 * self.font-size; }
-                        Text { text: subtitle; color: Ui.desk-on-muted; font-size: Ui.desk-label; wrap: word-wrap; }
+                        spacing: 2px;
+                        Text { text: heading; color: Ui.desk-text; font-family: Ui.font-heading; font-size: Ui.desk-headline; font-weight: 700; letter-spacing: -0.02 * self.font-size; overflow: elide; }
+                        Text { text: subtitle; color: Ui.desk-text-muted; font-size: 13.5px * Ui.text-scale; wrap: word-wrap; }
                     }
                 }
                 RowScroll {
                     vertical-stretch: 1;
                     content-key: heading;
+                    grp: true;
+                    flash-row: root.flash-row;
+                    flash-lit: root.flash-lit;
                     rows: rows;
                     covers: covers;
                     sel: row-focus;
@@ -7406,6 +7502,8 @@ export component Desktop inherits Window {
     in property <[PanelRow]> settings-rows;
     in property <[CoverRow]> settings-covers;
     in property <int> settings-row-focus: -1;
+    in property <int> settings-flash: -1;
+    in property <int> settings-flash-nonce;
 
     // Entrada: zona e índice (como na tela cheia), textos editados e a primeira linha visível da lista.
     callback clicked(string, int);
@@ -7646,34 +7744,41 @@ export component Desktop inherits Window {
                     root.clicked(z, i);
                 }
             }
-            settings := DeskSettings {
-                visible: page == "settings";
-                search: settings-search;
-                search-hint: desk-settings-search-hint;
-                search-key: desk-search-key;
-                search-esc: desk-search-esc;
-                search-focus: page == "settings" ? content-search-focus : 0;
-                edited(t) => { root.edited("search", t); }
-                focus-main => { fs.focus(); }
-                count: settings-count;
-                categories: settings-categories;
-                category-focus: settings-category-focus;
-                heading: settings-heading;
-                subtitle: settings-subtitle;
-                rows: settings-rows;
-                covers: settings-covers;
-                row-focus: settings-row-focus;
-                focus-visible: desk-focus-visible;
-                small: root.small;
-                clicked(z, i) => {
-                    fs.focus();
-                    root.clicked(z, i);
-                }
-                menu(x, y) => {
-                    root.menu-x = x;
-                    root.menu-y = y;
-                }
-            }
+        }
+    }
+
+    // Configurações ocupa o que sobra abaixo da barra, de borda a borda (a coluna de categorias é colada na esquerda).
+    settings := DeskSettings {
+        visible: page == "settings";
+        y: Ui.topbar-height;
+        width: root.width;
+        height: root.height - Ui.topbar-height;
+        search: settings-search;
+        search-hint: desk-settings-search-hint;
+        search-key: desk-search-key;
+        search-esc: desk-search-esc;
+        search-focus: page == "settings" ? content-search-focus : 0;
+        edited(t) => { root.edited("search", t); }
+        focus-main => { fs.focus(); }
+        count: settings-count;
+        categories: settings-categories;
+        category-focus: settings-category-focus;
+        heading: settings-heading;
+        subtitle: settings-subtitle;
+        rows: settings-rows;
+        covers: settings-covers;
+        row-focus: settings-row-focus;
+        flash-row: settings-flash;
+        flash-nonce: settings-flash-nonce;
+        focus-visible: desk-focus-visible;
+        small: root.small;
+        clicked(z, i) => {
+            fs.focus();
+            root.clicked(z, i);
+        }
+        menu(x, y) => {
+            root.menu-x = x;
+            root.menu-y = y;
         }
     }
 

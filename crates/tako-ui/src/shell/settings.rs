@@ -2677,6 +2677,12 @@ pub struct SettingsPage {
     row: Option<usize>,
     /// Busca de configurações do desktop: as linhas de todas as categorias que combinam com o texto.
     query: String,
+    /// Linha que pisca ao abrir por um link: a chave dela e o número do pedido (muda a cada link).
+    flash: Option<(String, i32)>,
+}
+
+thread_local! {
+    static FLASH_NONCE: std::cell::Cell<i32> = const { std::cell::Cell::new(0) };
 }
 
 impl Default for SettingsPage {
@@ -2705,12 +2711,24 @@ impl SettingsPage {
             cat: 0,
             row: None,
             query: String::new(),
+            flash: None,
         }
     }
 
     pub fn at(category: &str) -> SettingsPage {
         let mut p = Self::new();
         p.cat = p.cats.iter().position(|c| c.id == category).unwrap_or(0);
+        p
+    }
+
+    /// Abre a categoria e faz a linha de chave `key` piscar (link vindo de outro lugar).
+    pub fn at_row(category: &str, key: &str) -> SettingsPage {
+        let mut p = Self::at(category);
+        let nonce = FLASH_NONCE.with(|n| {
+            n.set(n.get() + 1);
+            n.get()
+        });
+        p.flash = Some((key.to_owned(), nonce));
         p
     }
 
@@ -2809,6 +2827,7 @@ impl Page for SettingsPage {
 
     fn handle(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
         self.sync_categories(ctx);
+        self.flash = None;
         let items = self.items(ctx);
         let n = self.cats.len();
         match (self.row, cmd) {
@@ -2871,6 +2890,7 @@ impl Page for SettingsPage {
         if zone == "search" {
             self.query = text.to_owned();
             self.row = None;
+            self.flash = None;
         }
     }
 
@@ -2933,15 +2953,25 @@ impl Page for SettingsPage {
                 .count();
             out.set(
                 "settings-subtitle",
-                ctx.tf("desktop.settings_found", &[("n", &n.to_string())]),
+                ctx.tn("desktop.settings_found", n as i64, &[]),
             );
         }
+        let flash = self.flash.as_ref().and_then(|(key, _)| {
+            items
+                .iter()
+                .position(|i| !key.is_empty() && i.row.key == *key)
+        });
         if ctx.desktop {
             let covers: Vec<crate::model::CoverRow> = items
                 .iter()
                 .map(|i| i.cover.clone().unwrap_or_default())
                 .collect();
             out.set("settings-covers", covers);
+            out.set("settings-flash", flash.map_or(-1, |i| i as i32));
+            out.set(
+                "settings-flash-nonce",
+                self.flash.as_ref().map_or(0, |f| f.1),
+            );
         }
         let rows: Vec<PanelRow> = items.into_iter().map(|i| i.shown(ctx)).collect();
         out.set("settings-rows", rows);
@@ -2967,6 +2997,7 @@ impl Page for SettingsPage {
     }
 
     fn click(&mut self, zone: &str, index: usize, ctx: &mut Ctx) -> Nav {
+        self.flash = None;
         match zone {
             z if z.starts_with("row-slide:") || z.starts_with("row-drop:") => {
                 self.row = Some(index);

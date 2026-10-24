@@ -1114,6 +1114,10 @@ fn desktop_snapshot() {
                 {
                     shell.click("category", index);
                 }
+                // `TAKO_SNAP_QUERY=<texto>`: digita na busca das configurações.
+                if let Ok(query) = std::env::var("TAKO_SNAP_QUERY") {
+                    shell.edited("search", &query);
+                }
             }
             Ok("appearance") => {
                 shell.open_route("settings");
@@ -1757,6 +1761,11 @@ created-by-tako = true
             if switch.as_deref() == Some("intro") {
                 ui.set_property("desk-intro", Value::Bool(false)).unwrap();
                 capture("i", &mut pixels);
+            } else if let Some(route) = switch.as_deref().and_then(|s| s.strip_prefix("route=")) {
+                // `TAKO_SNAP_SWITCH=route=settings:<categoria>/<linha>`: abre por um link (a linha pisca nos quadros).
+                shell.open_route(route);
+                apply(&mut shell, art.as_ref());
+                capture("s", &mut pixels);
             } else if let Some((zone, i)) = switch.as_deref().and_then(|s| s.split_once(':')) {
                 shell.click(zone, i.parse().unwrap_or(0));
                 apply(&mut shell, art2.as_ref().or(art.as_ref()));

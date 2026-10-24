@@ -237,7 +237,7 @@ export global Ui {
     out property <length> round-button: 52px;
     out property <length> card-height: 248px;
     out property <length> focus-ring-width: 3px;
-    out property <length> settings-row-height: 56px;
+    out property <length> settings-row-height: 64px;
     out property <length> thumb-size: 40px;
     out property <length> list-icon-size: 28px;
     out property <length> list-icon-compact: 24px;
@@ -285,6 +285,10 @@ export global Ui {
     // Troca de aba ou de categoria (TrocaDeTela › abas internas): sai em 80, entra em 120.
     public pure function list-fade(entering: bool) -> duration {
         return entering ? focus-time * 0.75 : focus-time / 2;
+    }
+    // Pisca da linha aberta por um link: acende de uma vez e apaga em 70% de `tempo-pulso`.
+    public pure function flash-fade(on: bool) -> duration {
+        return on ? 0ms : tempo-pulso * 0.7;
     }
     // Aviso: entra em `tempo-pagina`, sai em `tempo-saida`.
     public pure function toast-fade(entering: bool) -> duration {

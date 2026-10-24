@@ -610,7 +610,7 @@ fn panel_rows(ctx: &Ctx) -> Vec<MenuItem> {
                 .value(ctx.t("downloads.manage")),
         )
         .on(|ctx| {
-            ctx.open_route = Some("settings:downloads".into());
+            ctx.open_route = Some("settings:downloads/add-source".into());
             Flow::CloseAll
         }),
     );

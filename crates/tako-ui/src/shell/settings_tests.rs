@@ -2124,3 +2124,53 @@ fn fse_panel_keeps_status_and_ignores_clicks_while_applying() {
         *state.borrow_mut() = FseState::default();
     });
 }
+
+/// Linha e número do pedido que o desenho manda para o pisca (`settings-flash`, `settings-flash-nonce`).
+fn flash_of(page: &mut SettingsPage, ctx: &Ctx) -> (i32, i32) {
+    let mut out = Out::default();
+    page.render(ctx, &mut out);
+    let get = |name: &str| match out.props.iter().find(|(n, _)| *n == name) {
+        Some((_, slint_interpreter::Value::Number(n))) => *n as i32,
+        _ => panic!("sem {name}"),
+    };
+    (get("settings-flash"), get("settings-flash-nonce"))
+}
+
+#[test]
+fn a_link_to_a_row_flashes_it_until_the_next_input() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    let key = "settings.appearance.transparency";
+    let want = rows_of(&ctx, "appearance")
+        .iter()
+        .position(|i| i.row.key == key)
+        .unwrap() as i32;
+    let mut page = SettingsPage::at_row("appearance", key);
+    let (row, nonce) = flash_of(&mut page, &ctx);
+    assert_eq!(row, want);
+    assert!(nonce > 0);
+    // O mesmo link de novo pisca de novo (o número do pedido muda); uma linha que não existe não pisca.
+    assert_ne!(
+        flash_of(&mut SettingsPage::at_row("appearance", key), &ctx).1,
+        nonce
+    );
+    assert_eq!(
+        flash_of(&mut SettingsPage::at_row("appearance", "nada"), &ctx).0,
+        -1
+    );
+    // Qualquer entrada apaga o pisca; sem link, nada pisca.
+    page.handle(Cmd::Down, &mut ctx);
+    assert_eq!(flash_of(&mut page, &ctx), (-1, 0));
+    assert_eq!(flash_of(&mut SettingsPage::at("appearance"), &ctx), (-1, 0));
+}
+
+#[test]
+fn the_settings_route_accepts_a_row_after_the_category() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let mut shell = Shell::new(ctx);
+    shell.enter_desktop();
+    shell.open_route("settings:appearance/settings.appearance.transparency");
+    assert_eq!(shell.page().kind(), "settings");
+}
