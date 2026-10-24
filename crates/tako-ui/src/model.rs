@@ -324,19 +324,16 @@ theme_struct! {
 }
 
 theme_struct! {
-    /// DestaqueFases: a fase 2 do destaque (o que o Tako sabe do jogo além da primeira tela).
-    pub struct DeskMore {
-        // A fase 2 está aberta.
-        pub on: bool,
-        // Mais sobre o jogo, Voltar, Sobre, Detalhes, Sessões, Imagens, Trailer.
+    /// A página do jogo (TelaJogo) além do destaque: o id (a página volta ao topo quando o jogo muda), a capa da barra
+    /// fina, os textos (Voltar, Biblioteca, Sobre, Detalhes, Escolher a loja), os parágrafos do Sobre, o ponto verde
+    /// da situação e se a arte é clara.
+    pub struct DeskPage {
+        pub id: String,
+        pub cover: Image,
         pub labels: Vec<String>,
-        // A descrição inteira, sem corte.
-        pub description: String,
-        pub details: Vec<DeskInfo>,
-        pub sessions_summary: String,
-        pub sessions: Vec<DeskInfo>,
-        // Capturas de tela da fonte de metadados (só com a fase aberta).
-        pub shots: Vec<Image>,
+        pub about: Vec<String>,
+        pub on: bool,
+        pub bright: bool,
     }
 }
 
@@ -390,11 +387,6 @@ theme_struct! {
         pub install_warn: bool,
         // Jogando agora: a etiqueta ganha o ponto verde.
         pub running: bool,
-        // A descrição foi cortada: o cartão mostra "Mais".
-        pub about_more: bool,
-        // Até 4 gêneros (texto, não chips) e o "+N" do resto.
-        pub genres: Vec<String>,
-        pub genres_more: String,
         // Tem trailer (a mídia `video` do jogo).
         pub trailer: bool,
         // A arte (ou a cópia de vidro) ainda carrega: a janela segura a do jogo anterior para não piscar.

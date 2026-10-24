@@ -1,0 +1,486 @@
+// TelaJogo e TelaJogoRolada: a página do jogo da biblioteca. O destaque (560 a 700) leva a arte de borda a borda, que some
+// na lista e no canvas; embaixo à esquerda ficam os dados e embaixo à direita a identidade e as ações. Abaixo dele o corpo
+// rola, com o conteúdo à esquerda e os dados à direita (fixos). Só tokens `Ui.*`; o Tako entrega o estado pronto e aqui se
+// desenha e se avisa cliques.
+import { Ui } from "tokens.slint";
+import { DeskIcon, FocusRing, Tip, DeskGameView, DeskInfo } from "desk-parts.slint";
+import { BotaoDesktop, BarraDeDados } from "desk-overview.slint";
+import { PanelRow } from "widgets.slint";
+
+// O que a página tem além do `DeskGameView` do destaque: o id (a página volta ao topo quando o jogo muda), a capa da
+// barra fina, os textos (Voltar, Biblioteca, Sobre, Detalhes, Escolher a loja), os parágrafos do Sobre e o ponto verde
+// da situação (instalado ou jogando) e se a arte é clara (pede mais escurecimento).
+export struct DeskPage { id: string, cover: image, labels: [string], about: [string], on: bool, bright: bool }
+
+// A arte cobrindo o retângulo, ancorada a 20% do topo e centrada na largura (a ancoragem do FundoDoJogo).
+component ArteCobrindo inherits Rectangle {
+    in property <image> source;
+    // Assenta de 1,05 a 1 depois que a arte entra.
+    in property <float> grow: 1;
+    property <length> src-w: max(1px, source.width * 1px);
+    property <length> src-h: max(1px, source.height * 1px);
+    property <float> k: max(root.width / src-w, root.height / src-h);
+    clip: true;
+    Image {
+        source: root.source;
+        width: root.src-w * root.k;
+        height: root.src-h * root.k;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) * 0.2;
+        image-fit: fill;
+        transform-scale: root.grow;
+    }
+}
+
+// FundoDoJogo: a arte (a nova entra por cima da antiga em 800 de opacidade e assenta em 1,8 s), o degradê da cor do
+// jogo quando não há arte (EstadoSemArte) e os escurecimentos que seguram o texto. A arte some à esquerda no tema TAKO
+// (a lista fica sem fundo) e embaixo no canvas; arte clara (EstadoArteClara) ganha também a direita e mais embaixo.
+export component FundoDoJogo inherits Rectangle {
+    in property <image> art;
+    in property <color> accent;
+    in property <bool> bright;
+    clip: true;
+    // Sem ligação (`top-src: art`): senão, ao trocar, a "antiga" já seria a nova.
+    property <image> top-src;
+    property <image> bottom-src;
+    property <bool> top-in: true;
+    property <float> top-alpha: top-in ? 1 : 0;
+    animate top-alpha { duration: top-in ? Ui.tempo-arte : 0ms; easing: ease; }
+    property <float> grow: top-in ? 1 : 1.05;
+    animate grow { duration: top-in ? Ui.tempo-assenta : 0ms; easing: Ui.curva-entrada; }
+    // Jogo sem arte: a antiga some (revelando o degradê) em vez de ficar embaixo da nova.
+    property <float> bottom-alpha: top-src.width == 0 && top-in ? 0 : 1;
+    animate bottom-alpha { duration: Ui.tempo-arte; easing: ease; }
+    init => { top-src = art; }
+    changed art => {
+        // Troca interrompida: fica embaixo a que mais aparece no quadro.
+        if (top-alpha >= 0.5) {
+            bottom-src = top-src;
+        }
+        top-src = art;
+        top-in = false;
+        swap.running = true;
+    }
+    swap := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            top-in = true;
+        }
+    }
+    // Sem arte: a cor do jogo a 30% sobre o canvas, com o brilho no alto à direita.
+    Rectangle {
+        opacity: top-src.width == 0 ? 1 : 0;
+        animate opacity { duration: Ui.tempo-arte; easing: ease; }
+        background: accent.mix(Ui.desk-canvas, 0.3);
+        Rectangle {
+            x: parent.width * 0.4;
+            y: -parent.height * 0.6;
+            width: parent.width * 1.2;
+            height: parent.height * 1.6;
+            background: @radial-gradient(circle, accent.with-alpha(0.35) 0%, accent.with-alpha(0) 65%);
+        }
+    }
+    ArteCobrindo { source: bottom-src; opacity: bottom-alpha; }
+    ArteCobrindo { source: top-src; opacity: top-alpha; grow: root.grow; }
+    // Da direita a 60% e de baixo (100% → 30% em 52% → 0 em 75%, quase uma reta: com três pontos o renderizador de
+    // software desenha uma linha no do meio).
+    Rectangle { background: @linear-gradient(270deg, Ui.desk-canvas.with-alpha(0.6) 0%, Ui.desk-canvas.with-alpha(0) 55%); }
+    Rectangle { background: @linear-gradient(0deg, Ui.desk-canvas 0%, Ui.desk-canvas.with-alpha(0) 75%); }
+    if bright: Rectangle { background: @linear-gradient(270deg, Ui.art-scrim-left 0%, Ui.art-scrim-left.with-alpha(0) 55%); }
+    if bright: Rectangle { background: @linear-gradient(0deg, Ui.art-scrim-bottom.with-alpha(0.5) 0%, Ui.art-scrim-bottom.with-alpha(0) 60%); }
+    // Máscara de 220 na esquerda (só o TAKO: nos outros temas a lista tem superfície e a arte começa na borda dela).
+    if Ui.desk-theme == 0: Rectangle { background: @linear-gradient(90deg, Ui.desk-canvas 0%, Ui.desk-canvas.with-alpha(0) 220px / root.width); }
+}
+
+// PilulaDaLoja: chip de 32 e raio 9 sobre a arte, com ícone de 14. `menu` mostra o ⌄ e vira botão (a situação do jogo).
+component Chip inherits Rectangle {
+    in property <string> icon;
+    in property <string> text;
+    // A situação (StatusDoJogo): o ponto leva a cor e o nome vai sempre junto.
+    in property <string> status;
+    in property <bool> menu;
+    callback clicked(length, length, length);
+    height: 32px;
+    width: cl.preferred-width;
+    border-radius: Ui.radius-control;
+    background: ta.has-hover ? Ui.glass-selected : Ui.desk-canvas.with-alpha(0.55);
+    border-width: 1px;
+    border-color: Ui.line-strong;
+    animate background { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
+    cl := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: menu ? 8px : 12px;
+        spacing: 8px;
+        if icon != "": VerticalLayout { alignment: center; DeskIcon { name: icon; size: 14px; tint: Ui.desk-on-muted; } }
+        if icon == "" && menu: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                property <bool> hollow: status == "" || status == "none" || status == "wishlist";
+                property <color> tint: status == "playing" ? Ui.success : (status == "paused" ? Ui.desk-warning : (status == "beaten" ? Ui.desk-text : Ui.desk-text-muted));
+                background: hollow ? transparent : tint;
+                border-width: hollow ? 1.5px : 0;
+                border-color: tint;
+            }
+        }
+        Text { text: root.text; color: Ui.desk-text; font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
+        if menu: VerticalLayout { alignment: center; DeskIcon { name: "chevron-down"; size: 14px; tint: Ui.desk-on-muted; } }
+    }
+    // Só a situação abre um menu: o leitor de tela a ouve como botão e a loja como texto.
+    if menu: Rectangle {
+        accessible-role: button;
+        accessible-label: text;
+        accessible-action-default => { root.clicked(root.absolute-position.x + root.width, root.absolute-position.y + root.height + 6px, root.width); }
+    }
+    ta := TouchArea {
+        enabled: root.menu;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(root.absolute-position.x + root.width, root.absolute-position.y + root.height + 6px, root.width); }
+    }
+}
+
+// Uma linha chave e valor do CartaoDetalhes (39, as ímpares em `tile`): rótulo em caixa alta à esquerda e o valor à
+// direita, cortado com "…" (o inteiro aparece na dica); o ponto verde marca "instalado".
+component LinhaDeDado inherits Rectangle {
+    in property <DeskInfo> info;
+    in property <bool> odd;
+    height: 39px;
+    border-radius: 7px;
+    background: odd ? Ui.tile : transparent;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        Text { text: info.label.to-uppercase(); color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.03 * self.font-size; vertical-alignment: center; }
+        Rectangle {
+            horizontal-stretch: 1;
+            HorizontalLayout {
+                alignment: end;
+                spacing: 7px;
+                if info.dot: VerticalLayout { alignment: center; Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: Ui.success; } }
+                vt := Text { text: info.value; color: Ui.desk-text; font-size: 12.5px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; horizontal-alignment: right; }
+            }
+            vta := TouchArea { }
+            Tip { text: vt.preferred-width > vt.width ? info.value : ""; hovering: vta.has-hover; }
+        }
+    }
+}
+
+export component PaginaDoJogo inherits Rectangle {
+    in property <DeskGameView> game;
+    in property <DeskPage> page;
+    // A arte que está na tela (a anterior fica até a nova carregar).
+    in property <image> art;
+    in property <[PanelRow]> actions;
+    in property <[DeskInfo]> stats;
+    in property <[DeskInfo]> details;
+    in property <string> zone;
+    in property <int> zone-index;
+    in property <bool> focus-visible;
+    in property <bool> small;
+    // Page Down soma 1 e Page Up tira 1: a página rola uma tela por passo.
+    in property <float> scroll-page;
+    callback clicked(string, int);
+    callback menu(length, length);
+    callback status-menu(length, length, length);
+    property <length> pad: small ? Ui.space-24 : Ui.space-40;
+    property <length> hero-h: Ui.game-hero-h(root.height);
+    // A barra fina de 62 fica sob a barra de cima; com o corpo por baixo ela ganha fundo, a capa e o primário.
+    property <length> bar-h: 62px;
+    // A rolagem é daqui, não de um Flickable: a roda, Page Up e Page Down e a troca de jogo movem o mesmo `scrolled`.
+    in-out property <length> scrolled;
+    animate scrolled { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
+    property <bool> solid: scrolled > 40px;
+    property <bool> stuck: scrolled > hero-h - Ui.topbar-height - bar-h - 80px;
+    property <bool> two-col: root.width - 2 * pad >= 640px;
+    property <length> gap: 28px;
+    property <length> left-w: two-col ? (root.width - 2 * pad - gap) * 1.16 / 2.16 : root.width - 2 * pad;
+    property <length> right-w: two-col ? root.width - 2 * pad - gap - left-w : root.width - 2 * pad;
+    property <length> body-y: hero-h + 14px;
+    property <length> body-h: two-col ? max(lc.preferred-height, rc.preferred-height) : lc.preferred-height + (rc.preferred-height > 0 ? gap + rc.preferred-height : 0);
+    // Coluna da identidade (a Visão geral usa a mesma conta) e quantos itens da barra de dados cabem ao lado dela.
+    property <length> col-w: clamp(240px, root.width * 0.4, 520px);
+    property <int> data-limit: max(1, min(3, floor((root.width - 2 * pad - col-w - 32px) / 190px)));
+    property <length> content-h: root.body-y + root.body-h + Ui.space-48;
+    property <length> scroll-max: max(0px, content-h - root.height);
+    function scroll-to(y: length) { scrolled = max(0px, min(scroll-max, y)); }
+    property <float> last-page;
+    init => { last-page = scroll-page; }
+    changed scroll-page => {
+        root.scroll-to(scrolled + (scroll-page - last-page) * root.height * 0.85);
+        last-page = scroll-page;
+    }
+    // Outro jogo: a página volta ao topo (`changed` só dispara quando o texto muda, não quando o `page` é reenviado).
+    property <string> game-id: page.id;
+    changed game-id => { scrolled = 0px; }
+    clip: true;
+    // Embaixo de tudo: os botões não tratam a roda e ela chega aqui.
+    TouchArea {
+        scroll-event(e) => {
+            if (abs(e.delta-y) <= abs(e.delta-x)) {
+                return reject;
+            }
+            root.scroll-to(root.scrolled - e.delta-y);
+            accept
+        }
+    }
+    fl := Rectangle {
+        x: 0;
+        y: -min(root.scrolled, root.scroll-max);
+        width: parent.width;
+        height: root.content-h;
+        // O destaque.
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: root.hero-h;
+            FundoDoJogo { art: root.art; accent: game.accent; bright: page.bright; }
+            HorizontalLayout {
+                padding-left: root.pad;
+                padding-right: root.pad;
+                padding-bottom: 46px;
+                spacing: 32px;
+                VerticalLayout { alignment: end; BarraDeDados { items: stats; limit: root.data-limit; } }
+                Rectangle { horizontal-stretch: 1; }
+                VerticalLayout {
+                    width: root.col-w;
+                    alignment: end;
+                    spacing: 12px;
+                    // Etiqueta de situação (INSTALADO, JOGANDO…), com o ponto verde de quem está no ar.
+                    if game.overline != "": HorizontalLayout {
+                        alignment: end;
+                        Rectangle {
+                            height: 26px;
+                            width: badge.preferred-width;
+                            border-radius: 7px;
+                            background: Colors.black.with-alpha(0.6);
+                            border-width: 1px;
+                            border-color: Ui.line-strong;
+                            badge := HorizontalLayout {
+                                padding-left: 11px;
+                                padding-right: 11px;
+                                spacing: 7px;
+                                if page.on: VerticalLayout { alignment: center; Rectangle { width: 7px; height: 7px; border-radius: 3.5px; background: Ui.success; } }
+                                Text { text: game.overline; color: Ui.desk-on-muted; font-size: 12px * Ui.text-scale; font-weight: 800; letter-spacing: 0.08 * self.font-size; vertical-alignment: center; }
+                            }
+                        }
+                    }
+                    // TituloDoJogo: o logo (até 440 × 140, nunca ampliado) ou o nome em texto (Poppins 54/800).
+                    if game.show-logo || game.title-pending: HorizontalLayout {
+                        alignment: end;
+                        property <length> src-w: max(1px, game.logo.width * 1px);
+                        property <length> src-h: max(1px, game.logo.height * 1px);
+                        property <float> fit: min(1, min(min(440px, root.col-w) / src-w, 140px / src-h));
+                        min-height: game.title-pending ? 140px : 0px;
+                        Image {
+                            source: game.logo;
+                            width: parent.src-w * parent.fit;
+                            height: parent.src-h * parent.fit;
+                            image-fit: contain;
+                            accessible-role: image;
+                            accessible-label: game.title;
+                        }
+                    }
+                    if !game.show-logo && !game.title-pending: HorizontalLayout {
+                        // O título encolhe (até 30) para caber em duas linhas.
+                        title-measure := Text { visible: false; width: 0; text: game.title; font-family: Ui.font-heading; font-size: 54px * Ui.text-scale; font-weight: 800; }
+                        Text {
+                            property <length> base: title-measure.font-size;
+                            text: game.title;
+                            color: Ui.desk-text;
+                            font-family: Ui.font-heading;
+                            font-size: max(min(base, base * 1.8 * root.col-w / max(1px, title-measure.preferred-width)), 30px * Ui.text-scale);
+                            font-weight: 800;
+                            letter-spacing: -0.02 * self.font-size;
+                            horizontal-alignment: right;
+                            wrap: word-wrap;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                    if game.description != "" && root.width >= 720px: Text {
+                        text: game.description;
+                        color: Ui.desk-on-muted;
+                        font-size: 13.5px * Ui.text-scale;
+                        horizontal-alignment: right;
+                        wrap: word-wrap;
+                        overflow: elide;
+                        max-height: 64px;
+                    }
+                    // Instalar: loja e tamanho, espaço livre e por onde abre; sem espaço, o aviso em `warning`.
+                    if game.install-note != "": Text {
+                        text: actions[0].description != "" ? actions[0].description + " · " + game.install-note : game.install-note;
+                        color: game.install-warn ? Ui.desk-warning : Ui.desk-on-muted;
+                        font-size: 12px * Ui.text-scale;
+                        horizontal-alignment: right;
+                        wrap: word-wrap;
+                    }
+                    if game.hint != "": Text { text: game.hint; color: Ui.desk-warning; font-size: 13px * Ui.text-scale; horizontal-alignment: right; wrap: word-wrap; }
+                    // AcoesDoJogo: os quadrados (★, ⋯, ⚙, ✕) e, por último e à direita, o primário.
+                    HorizontalLayout {
+                        alignment: end;
+                        padding-top: 6px;
+                        // O vão de 10 vai em cada item que existe, não entre os vazios dos dois laços.
+                        for a[i] in actions: HorizontalLayout {
+                            padding-left: a.style != "primary" ? 10px : 0px;
+                            if a.style != "primary": BotaoDesktop {
+                                kind: "square";
+                                icon: a.icon;
+                                tip: a.title;
+                                on: a.on || a.style == "danger";
+                                on-tint: a.style == "danger" ? Ui.desk-error : Ui.desk-warning;
+                                focused: focus-visible && zone == "actions" && zone-index == i;
+                                clicked => {
+                                    root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
+                                    root.clicked("action", i);
+                                }
+                            }
+                        }
+                        for a[i] in actions: HorizontalLayout {
+                            padding-left: a.style == "primary" ? 10px : 0px;
+                            spacing: 10px;
+                            // Instalar por mais de uma loja: o ⌄ ao lado escolhe a loja.
+                            if a.style == "primary" && a.on: BotaoDesktop {
+                                kind: "square";
+                                icon: "chevron-down";
+                                tip: page.labels[4];
+                                clicked => {
+                                    root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
+                                    root.clicked("install-more", i);
+                                }
+                            }
+                            if a.style == "primary": BotaoDesktop {
+                                label: a.title;
+                                icon: a.icon;
+                                enabled: a.enabled;
+                                focused: focus-visible && zone == "actions" && zone-index == i;
+                                clicked => { root.clicked("action", i); }
+                            }
+                        }
+                    }
+                }
+            }
+            // PilulaDaLoja: a situação do jogo e a loja de origem, a 76 do topo.
+            HorizontalLayout {
+                y: 76px;
+                width: parent.width;
+                height: 32px;
+                padding-right: root.pad;
+                alignment: end;
+                spacing: 8px;
+                Chip {
+                    menu: true;
+                    status: game.play-status;
+                    text: game.play-status-label;
+                    clicked(x, y, w) => { root.status-menu(x, y, w); }
+                }
+                if game.store-name != "": Chip { icon: game.store-icon; text: game.store-name; }
+            }
+        }
+        // O corpo: o conteúdo à esquerda e os dados à direita, que ficam a 78 abaixo da barra ao rolar.
+        lc := VerticalLayout {
+            x: root.pad;
+            y: root.body-y;
+            width: root.left-w;
+            height: self.preferred-height;
+            spacing: 18px;
+            if page.about.length > 0: VerticalLayout {
+                spacing: 8px;
+                Text { text: page.labels[2].to-uppercase(); color: Ui.desk-text; font-family: Ui.font-heading; font-size: 14.5px * Ui.text-scale; font-weight: 800; }
+                // O layout não mede o texto quebrado: cada parágrafo tem a altura que o texto pede na largura da coluna.
+                for p in page.about: Rectangle {
+                    height: pt.preferred-height;
+                    pt := Text { width: parent.width; text: p; color: Ui.desk-on-muted; font-size: 13px * Ui.text-scale; line-height-factor: 1.3; wrap: word-wrap; }
+                }
+            }
+        }
+        rc := VerticalLayout {
+            x: root.two-col ? root.pad + root.left-w + root.gap : root.pad;
+            y: root.two-col
+                ? root.body-y + max(0px, min(root.body-h - self.preferred-height, root.scrolled + Ui.topbar-height + root.bar-h + 1px - root.body-y))
+                : root.body-y + lc.preferred-height + (lc.preferred-height > 0 ? root.gap : 0px);
+            width: root.right-w;
+            height: self.preferred-height;
+            spacing: 16px;
+            if details.length > 0: Rectangle {
+                height: bx.preferred-height;
+                border-radius: Ui.radius-card;
+                border-width: 1px;
+                border-color: Ui.line-strong;
+                background: Ui.group;
+                bx := VerticalLayout {
+                    padding: Ui.space-6;
+                    for d[i] in details: LinhaDeDado { info: d; odd: mod(i, 2) == 0; }
+                }
+            }
+        }
+    }
+    // TelaJogoRolada: a barra fina com o voltar e a trilha; ao rolar ganha fundo, a capa pequena e o primário.
+    Rectangle {
+        y: Ui.topbar-height;
+        height: root.bar-h;
+        background: root.solid ? Ui.desk-canvas.with-alpha(0.97) : transparent;
+        animate background { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+        HorizontalLayout {
+            padding-left: root.pad - 8px;
+            padding-right: root.pad;
+            spacing: 14px;
+            Rectangle {
+                width: 34px;
+                height: 34px;
+                y: (parent.height - self.height) / 2;
+                border-radius: Ui.radius-control;
+                background: bta.has-hover ? Ui.glass-selected : transparent;
+                animate background { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
+                accessible-role: button;
+                accessible-label: page.labels[0];
+                accessible-action-default => { root.clicked("game-back", 0); }
+                DeskIcon { name: "arrow-left"; size: 17px; tint: Ui.desk-text; }
+                bta := TouchArea { mouse-cursor: pointer; clicked => { root.clicked("game-back", 0); } }
+                Tip { text: page.labels[0]; hovering: bta.has-hover; }
+            }
+            HorizontalLayout {
+                horizontal-stretch: 0;
+                spacing: 8px;
+                Text { text: page.labels[1]; color: Ui.desk-on-muted; font-size: 13.5px * Ui.text-scale; vertical-alignment: center; }
+                VerticalLayout { alignment: center; DeskIcon { name: "chevron"; size: 13px; tint: Ui.desk-text-dim; } }
+                Text { text: game.title; color: Ui.desk-text; font-family: Ui.font-heading; font-size: 13.5px * Ui.text-scale; font-weight: 600; vertical-alignment: center; overflow: elide; }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            HorizontalLayout {
+                horizontal-stretch: 0;
+                spacing: 12px;
+                opacity: root.stuck ? 1 : 0;
+                animate opacity { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+                visible: self.opacity > 0.01;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 26px;
+                        height: 34px;
+                        border-radius: 5px;
+                        clip: true;
+                        background: game.accent.mix(Ui.desk-canvas, 0.4);
+                        Image { width: parent.width; height: parent.height; source: page.cover; image-fit: cover; }
+                    }
+                }
+                for a[i] in actions: HorizontalLayout {
+                    if a.style == "primary": VerticalLayout {
+                        alignment: center;
+                        BotaoDesktop {
+                            small: true;
+                            label: a.title;
+                            icon: a.icon;
+                            enabled: a.enabled && root.stuck;
+                            clicked => { root.clicked("action", i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

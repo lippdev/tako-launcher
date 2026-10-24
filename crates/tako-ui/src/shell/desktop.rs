@@ -10,7 +10,7 @@ use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, bar, details, dialogs, keys, sidebar, smart, tiles,
 };
 use crate::model::{
-    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, DeskOverview, Hint,
+    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskOverview, DeskPage, Hint,
     NavItem, PanelRow,
 };
 use crate::values::parse_color;
@@ -394,8 +394,8 @@ pub struct DesktopLibrary {
     /// TrocaDeJogo: o jogo no destaque e a seleção do teclado esperando parar (id, desde quando).
     hero: Option<String>,
     hero_wait: Option<(String, std::time::Instant)>,
-    /// DestaqueFases: o jogo com a fase 2 aberta; trocar de jogo (ou sair da Lista) volta para a fase 1.
-    more: Option<String>,
+    /// Page Down soma 1 e Page Up tira 1: o tema rola a página do jogo uma tela por passo.
+    page_scroll: i32,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
     /// Visão geral (TelaBiblioteca) no lugar do destaque do jogo: o primeiro lugar da biblioteca; escolher um jogo sai
@@ -438,7 +438,7 @@ impl DesktopLibrary {
             cat_focus: (0, 0),
             hero: None,
             hero_wait: None,
-            more: None,
+            page_scroll: 0,
             group_focus: None,
             overview: true,
         }
@@ -1389,79 +1389,6 @@ pub(super) fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     items
 }
 
-/// CartaoDetalhes: uma linha com ícone por informação que o jogo tem, até 6, as de menor prioridade saem primeiro.
-/// O tempo de jogo e a última vez ficam só na faixa do destaque.
-fn details_rows(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
-    let lang = ctx.lang();
-    // (prioridade, linha): 0 é a mais importante.
-    let mut rows: Vec<(u8, DeskInfo)> = Vec::new();
-    let mut add = |prio: u8, icon: &str, key: &str, value: String| {
-        if !value.trim().is_empty() {
-            rows.push((
-                prio,
-                DeskInfo {
-                    icon: icon.into(),
-                    label: ctx.t(key),
-                    value,
-                    ..Default::default()
-                },
-            ));
-        }
-    };
-    if let Some(d) = g.release_date {
-        add(1, "calendar", "details.release", game_text::date(lang, d));
-    }
-    if let Some(score) = g.metacritic_score.or(g.critic_score) {
-        add(5, "star", "desktop.info.critic", score.to_string());
-    }
-    let genres: Vec<&str> = g.genres.iter().take(2).map(String::as_str).collect();
-    add(2, "tag", "details.genres", genres.join(" - "));
-    if let Some(dev) = &g.developer {
-        let first = dev.split([',', ';']).next().unwrap_or(dev).trim();
-        add(3, "user", "details.developer", first.to_owned());
-    }
-    if let Some(f) = &g.franchise {
-        add(6, "layers", "details.series", f.clone());
-    }
-    if !g.tags.is_empty() {
-        rows.push((
-            4,
-            DeskInfo {
-                icon: "tag".into(),
-                label: ctx.t("desktop.info.tags"),
-                chips: g.tags.iter().take(3).cloned().collect(),
-                value: if g.tags.len() > 3 {
-                    format!("+{}", g.tags.len() - 3)
-                } else {
-                    String::new()
-                },
-                ..Default::default()
-            },
-        ));
-    }
-    rows.push((
-        0,
-        DeskInfo {
-            icon: "check".into(),
-            label: ctx.t("details.status"),
-            value: game_text::status(lang, g),
-            dot: g.is_installed,
-            ..Default::default()
-        },
-    ));
-    while rows.len() > 6 {
-        if let Some(worst) = rows
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, (p, _))| *p)
-            .map(|(i, _)| i)
-        {
-            rows.remove(worst);
-        }
-    }
-    rows.into_iter().map(|(_, r)| r).collect()
-}
-
 /// Descrição do CartaoSobre: até uns 240 caracteres, cortada na última palavra com "…". `true` quando cortou.
 pub(super) fn about(description: &str) -> (String, bool) {
     const LIMIT: usize = 240;
@@ -1477,45 +1404,7 @@ pub(super) fn about(description: &str) -> (String, bool) {
     )
 }
 
-/// CartaoSessoes: as 4 últimas sessões (dia, horário, duração) e o resumo; a sessão aberta tem o ponto verde.
-fn sessions_rows(ctx: &Ctx, g: &Game) -> (String, Vec<DeskInfo>) {
-    let lang = ctx.lang();
-    let all = ctx.library.sessions(&g.id);
-    if all.is_empty() {
-        return (String::new(), Vec::new());
-    }
-    let total: std::time::Duration = all.iter().map(|s| s.duration).sum();
-    let avg = total / all.len() as u32;
-    let summary = ctx.tf(
-        "desktop.sessions.summary",
-        &[
-            ("n", &all.len().to_string()),
-            ("avg", &game_text::play_time(lang, avg)),
-        ],
-    );
-    let mut rows: Vec<DeskInfo> = Vec::new();
-    if ctx.running.as_ref().is_some_and(|r| r.id == g.id) {
-        rows.push(DeskInfo {
-            label: ctx.t("desktop.day.today"),
-            detail: ctx.t("desktop.strip.playing_now"),
-            dot: true,
-            ..Default::default()
-        });
-    }
-    for s in all.iter().rev().take(3 - rows.len()) {
-        let start = s.started_at.with_timezone(&chrono::Local);
-        let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
-        rows.push(DeskInfo {
-            label: day(ctx, start),
-            detail: format!("{} – {}", start.format("%H:%M"), end.format("%H:%M")),
-            value: game_text::play_time(lang, s.duration),
-            ..Default::default()
-        });
-    }
-    (summary, rows)
-}
-
-/// DestaqueFases › fase 2, Detalhes: todas as informações que o jogo tem, sem o limite de 6 da fase 1.
+/// CartaoDetalhes: todas as informações que o jogo tem, uma linha por dado.
 fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let lang = ctx.lang();
     let text = |v: &Option<String>| v.clone().unwrap_or_default();
@@ -1531,7 +1420,7 @@ fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         ),
         ("tag", "details.genres", g.genres.join(" - ")),
         ("user", "details.developer", text(&g.developer)),
-        ("user", "desktop.phase.publisher", text(&g.publisher)),
+        ("user", "desktop.page.publisher", text(&g.publisher)),
         ("calendar", "details.release", text(&release)),
         ("layers", "details.series", text(&g.franchise)),
         ("star", "desktop.info.critic", text(&score)),
@@ -1539,7 +1428,7 @@ fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         ("monitor", "details.system", text(&g.platform)),
         ("user", "details.players", text(&g.players)),
         ("gauge", "desktop.size", text(&g.size_label)),
-        ("folder", "desktop.phase.folder", text(&g.install_path)),
+        ("folder", "desktop.page.folder", text(&g.install_path)),
     ]
     .into_iter()
     .filter(|(.., value)| !value.trim().is_empty())
@@ -1547,33 +1436,26 @@ fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         icon: icon.into(),
         label: ctx.t(key),
         value,
+        // A situação ganha o ponto verde quando o jogo está instalado.
+        dot: key == "details.status" && g.is_installed,
         ..Default::default()
     })
     .collect()
 }
 
-/// DestaqueFases › fase 2, Sessões: o histórico, da mais recente para a mais antiga.
-fn more_sessions(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
-    // shortcut: só as 100 últimas (o painel de sessões tem todas), subir se alguém sentir falta.
-    let lang = ctx.lang();
-    let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
-    let now = running.then(|| DeskInfo {
-        label: ctx.t("desktop.day.today"),
-        detail: ctx.t("desktop.strip.playing_now"),
-        dot: true,
-        ..Default::default()
-    });
-    now.into_iter()
-        .chain(ctx.library.sessions(&g.id).iter().rev().take(100).map(|s| {
-            let start = s.started_at.with_timezone(&chrono::Local);
-            let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
-            DeskInfo {
-                label: day(ctx, start),
-                detail: format!("{} – {}", start.format("%H:%M"), end.format("%H:%M")),
-                value: game_text::play_time(lang, s.duration),
-                ..Default::default()
-            }
-        }))
+/// CartaoSobre: os parágrafos da descrição. É dado externo: no máximo 24 parágrafos e 6000 caracteres.
+fn paragraphs(description: &str) -> Vec<String> {
+    let mut left = 6000;
+    description
+        .split('\n')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .take(24)
+        .map_while(|p| {
+            let cut: String = p.chars().take(left).collect();
+            left -= cut.chars().count();
+            (!cut.is_empty()).then_some(cut)
+        })
         .collect()
 }
 
@@ -1791,9 +1673,7 @@ impl Page for DesktopLibrary {
             },
             (Zone::Controls, Cmd::Down) => self.zone = Zone::List,
             (Zone::Controls, Cmd::Up) => self.cycle(false),
-            // Esc: fecha a fase 2 do destaque, sai da seleção múltipla, depois limpa a busca e os filtros, depois
-            // volta para a lista.
-            (_, Cmd::Back) if self.more.is_some() => self.more = None,
+            // Esc: sai da seleção múltipla, depois limpa a busca e os filtros, depois volta para a lista.
             (_, Cmd::Back) if !self.checked.is_empty() => {
                 self.checked.clear();
                 self.anchor = None;
@@ -1841,13 +1721,14 @@ impl Page for DesktopLibrary {
             }
             return Some(Nav::Stay);
         }
-        // DestaqueFases: Page Down abre a fase 2 do destaque, Page Up volta (com o foco na lista ou nas ações).
+        // Page Down e Page Up rolam a página do jogo (com o foco na lista ou nas ações).
         if (c == PAGE_DOWN || c == PAGE_UP)
             && mods == KeyModifiers::NONE
             && matches!(self.zone, Zone::List | Zone::Actions)
             && View::of(ctx) != View::Categories
+            && !self.overview_on(ctx)
         {
-            self.more = (c == PAGE_DOWN).then(|| self.hero.clone()).flatten();
+            self.page_scroll += if c == PAGE_DOWN { 1 } else { -1 };
             return Some(Nav::Stay);
         }
         None
@@ -1995,47 +1876,28 @@ impl Page for DesktopLibrary {
                 }
             }
             "rescan" => rescan(ctx),
-            // DestaqueFases: 1 abre a fase 2 (roda para baixo, "Mais sobre o jogo"), 0 volta para a fase 1.
-            "game-more" => {
-                self.more = (index == 1)
-                    .then(|| self.hero.clone().or_else(|| self.selected(ctx)))
-                    .flatten();
+            // O ← e a trilha "Biblioteca" da barra fina da página do jogo: voltam à Visão geral.
+            "game-back" => {
+                if self.tab == Tab::Collections {
+                    self.open_tab(Tab::All, ctx);
+                }
+                self.show_overview();
             }
-            // Cartões do destaque: o texto inteiro do Sobre, o trailer e o histórico de sessões.
-            "about-more" | "trailer" | "sessions" => {
+            // Os dados do destaque: o trailer e o histórico de sessões.
+            "trailer" | "sessions" => {
                 let Some(g) = self
                     .selected(ctx)
                     .and_then(|id| ctx.library.find(&id).cloned())
                 else {
                     return Nav::Stay;
                 };
-                match zone {
-                    "about-more" => {
-                        let text = g.description.clone();
-                        let layer =
-                            super::layer::MenuLayer::dialog(ctx.t("desktop.about"), |ctx| {
-                                vec![
-                                    super::layer::MenuItem::new(PanelRow::button(
-                                        "close",
-                                        ctx.t("common.close"),
-                                    ))
-                                    .on(|_| super::layer::Flow::Close),
-                                ]
-                            })
-                            .text(text)
-                            .overline(g.title.to_uppercase())
-                            .wide();
-                        return Nav::Layer(Box::new(layer));
+                if zone == "trailer" {
+                    if let Some(url) = g.media.get(tako_core::library::media::VIDEO) {
+                        ctx.effect(Effect::OpenUrl(url.clone()));
                     }
-                    "trailer" => {
-                        if let Some(url) = g.media.get(tako_core::library::media::VIDEO) {
-                            ctx.effect(Effect::OpenUrl(url.clone()));
-                        }
-                    }
-                    _ => {
-                        ctx.open_route = Some("desk:profile:sessions".into());
-                        return Nav::Stay;
-                    }
+                } else {
+                    ctx.open_route = Some("desk:profile:sessions".into());
+                    return Nav::Stay;
                 }
             }
             "game-play" => {
@@ -2542,10 +2404,6 @@ impl Page for DesktopLibrary {
                 .map_or(-1, |p| p as i32),
         );
         let hero = self.hero_id(ctx, cur.map(|i| ids[i].clone()));
-        // Outro jogo no destaque (ou fora da Lista): volta para a fase 1.
-        if self.more != hero || View::of(ctx) == View::Categories || overview {
-            self.more = None;
-        }
         if overview && self.zone == Zone::Actions && targets.is_empty() {
             self.zone = Zone::List;
         }
@@ -2563,46 +2421,10 @@ impl Page for DesktopLibrary {
                 DeskOverview::default()
             },
         );
-        let more_on = self.more.is_some();
-        // Na fase 2 os botões de ação ficam escondidos: o foco do teclado não pode ficar neles (Enter jogaria).
-        if more_on && self.zone == Zone::Actions {
-            self.zone = Zone::List;
-        }
         let game = hero
             .and_then(|id| ctx.library.find(&id))
             .filter(|_| !overview);
-        out.set(
-            "desk-more",
-            DeskMore {
-                on: more_on,
-                labels: [
-                    "desktop.phase.more",
-                    "desktop.phase.back",
-                    "desktop.about",
-                    "desktop.details",
-                    "desktop.sessions.title",
-                    "desktop.phase.images",
-                    "desktop.trailer",
-                ]
-                .iter()
-                .map(|k| ctx.t(k))
-                .collect(),
-                description: game
-                    .map(|g| g.description.trim().to_owned())
-                    .unwrap_or_default(),
-                details: game.map(|g| more_details(ctx, g)).unwrap_or_default(),
-                sessions_summary: game.map(|g| sessions_rows(ctx, g).0).unwrap_or_default(),
-                sessions: game.map(|g| more_sessions(ctx, g)).unwrap_or_default(),
-                // A captura só decodifica com a fase aberta, no tamanho da miniatura (256 × 144, 2× para HiDPI).
-                shots: game
-                    .filter(|_| more_on)
-                    .and_then(|g| g.media.get(tako_core::library::media::SCREENSHOT))
-                    .map(|uri| vec![tiles::image(Some(uri), (512, 288))])
-                    .unwrap_or_default(),
-            },
-        );
-        let mut sessions = (String::new(), Vec::new());
-        let (view, actions, stats, details) = match game {
+        let (view, page, actions, stats, details) = match game {
             Some(g) => {
                 let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
                 // Etiqueta de estado: JOGANDO, QUEBRADO, INSTALADO ou NÃO INSTALADO (e os casos de ROM e lançamento).
@@ -2659,11 +2481,27 @@ impl Page for DesktopLibrary {
                     .shown_hero()
                     .and_then(crate::images::glass)
                     .unwrap_or_default();
-                let (description, about_more) = about(&g.description);
+                let description = about(&g.description).0;
                 let logo = tiles::image(g.shown_logo(), tiles::LOGO);
                 let show_logo = show_logo(ctx, g, &logo, &art_lum);
                 let title_pending = title_pending(ctx, g, &logo, &art_lum);
-                sessions = sessions_rows(ctx, g);
+                let page = DeskPage {
+                    id: g.id.clone(),
+                    cover: tiles::image(g.shown_cover(), THUMB),
+                    labels: [
+                        "desktop.page.back",
+                        "desktop.library",
+                        "desktop.about",
+                        "desktop.details",
+                        "desktop.install.more",
+                    ]
+                    .iter()
+                    .map(|k| ctx.t(k))
+                    .collect(),
+                    about: paragraphs(&g.description),
+                    on: running || (g.is_installed && !g.is_broken),
+                    bright: overview::bright(&art_lum),
+                };
                 (
                     DeskGameView {
                         has_game: true,
@@ -2685,13 +2523,6 @@ impl Page for DesktopLibrary {
                             .unwrap_or_default(),
                         install_warn: install.as_ref().is_some_and(|i| i.warn),
                         running,
-                        about_more,
-                        genres: g.genres.iter().take(4).cloned().collect(),
-                        genres_more: if g.genres.len() > 4 {
-                            format!("+{}", g.genres.len() - 4)
-                        } else {
-                            String::new()
-                        },
                         trailer: g.media.contains_key(tako_core::library::media::VIDEO),
                         art_loading: g.shown_hero().is_some_and(crate::images::is_pending),
                         store_icon: store_icon(g.store()).into(),
@@ -2702,31 +2533,26 @@ impl Page for DesktopLibrary {
                             |s| library_text::status_label(lang, Some(s)),
                         ),
                     },
+                    page,
                     actions,
                     strip(ctx, g),
-                    details_rows(ctx, g),
+                    more_details(ctx, g),
                 )
             }
-            None => (DeskGameView::default(), Vec::new(), Vec::new(), Vec::new()),
+            None => (
+                DeskGameView::default(),
+                DeskPage::default(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
         };
         out.set("desk-game", view);
+        out.set("desk-page", page);
+        out.set("desk-scroll-page", self.page_scroll as f32);
         out.set("desk-actions", actions);
         out.set("desk-stats", stats);
         out.set("desk-details", details);
-        out.set("desk-sessions-summary", sessions.0);
-        out.set("desk-sessions", sessions.1);
-        out.set(
-            "desk-card-labels",
-            vec![
-                ctx.t("desktop.sessions.title"),
-                ctx.t("desktop.sessions.see_all"),
-                ctx.t("desktop.about_more"),
-                ctx.t("desktop.trailer"),
-            ],
-        );
-        out.set("desk-about-label", ctx.t("desktop.about"));
-        out.set("desk-install-more-label", ctx.t("desktop.install.more"));
-        out.set("desk-details-label", ctx.t("desktop.details"));
         out.set(
             "desk-zone",
             match self.zone {
@@ -3310,7 +3136,7 @@ mod tests {
     }
 
     #[test]
-    fn hero_cards_cut_long_text_and_keep_at_most_six_detail_rows() {
+    fn the_hero_cuts_long_text_and_the_page_lists_every_detail() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, shell) = shell();
@@ -3319,7 +3145,7 @@ mod tests {
         let (text, more) = about(&long);
         assert!(more && text.ends_with('…') && text.chars().count() <= 241);
         assert_eq!(about("curta"), ("curta".to_owned(), false));
-        // Detalhes: com tudo preenchido, sai a de menor prioridade (Série) e o Status fica.
+        // Detalhes: uma linha por dado que o jogo tem, o Status primeiro e com o ponto verde se instalado.
         let mut g = shell.ctx.library.games()[0].clone();
         g.release_date = chrono::NaiveDate::from_ymd_opt(2025, 9, 25);
         g.metacritic_score = Some(93);
@@ -3327,15 +3153,18 @@ mod tests {
         g.developer = Some("Supergiant Games, Outro".into());
         g.franchise = Some("Hades".into());
         g.tags = ["Co-op".to_owned()].into();
-        let rows = details_rows(&shell.ctx, &g);
-        assert_eq!(rows.len(), 6);
-        assert!(
-            rows.iter()
-                .any(|r| r.dot || r.label == shell.ctx.t("details.status"))
-        );
-        assert!(!rows.iter().any(|r| r.value == "Hades"));
-        assert!(rows.iter().any(|r| r.value == "Roguelike - Ação"));
-        assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
+        g.is_installed = true;
+        g.publisher = Some("Supergiant".into());
+        let rows = more_details(&shell.ctx, &g);
+        assert_eq!(rows[0].label, shell.ctx.t("details.status"));
+        assert!(rows[0].dot);
+        assert!(rows.iter().any(|r| r.value == "Hades"));
+        assert!(rows.iter().any(|r| r.value == "Roguelike - Ação - Indie"));
+        assert!(rows.iter().any(|r| r.value == "Supergiant Games, Outro"));
+        // Os parágrafos do Sobre vêm da descrição, sem linhas vazias e com limite.
+        assert_eq!(paragraphs("um\n\n  dois \n"), ["um", "dois"]);
+        assert_eq!(paragraphs(&"a\n".repeat(100)).len(), 24);
+        assert_eq!(paragraphs(&"x".repeat(9000))[0].len(), 6000);
         // A faixa não inventa Nuvem nem Conquistas; o Metacritic entra por último quando o jogo tem nota.
         let items = strip(&shell.ctx, &g);
         assert_eq!(items.len(), 2 + usize::from(g.metacritic_score.is_some()));
@@ -3720,46 +3549,35 @@ mod tests {
         assert!(!closed[2].flag("open"));
     }
 
-    /// A fase 2 do destaque está aberta no último desenho.
-    fn more_on(shell: &mut Shell) -> bool {
+    /// O contador de Page Up e Page Down que o tema lê para rolar a página do jogo.
+    fn page_scroll(shell: &mut Shell) -> f64 {
         let out = shell.render(std::time::Instant::now());
         out.props
             .iter()
             .find_map(|(n, v)| match (*n, v) {
-                ("desk-more", slint_interpreter::Value::Struct(s)) => s.get_field("on").cloned(),
+                ("desk-scroll-page", slint_interpreter::Value::Number(n)) => Some(*n),
                 _ => None,
             })
-            .is_some_and(|v| v == slint_interpreter::Value::Bool(true))
+            .unwrap_or_default()
     }
 
     #[test]
-    fn the_hero_pages_to_phase_two_and_back_and_a_new_game_starts_on_phase_one() {
+    fn page_keys_scroll_the_game_page_and_only_there() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
-        // A Visão geral não tem fase 2: o jogo escolhido a abre.
+        // A Visão geral não tem a página: as teclas não contam.
         shell.show_overview();
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(!more_on(&mut shell));
+        assert_eq!(page_scroll(&mut shell), 0.);
+        // Escolhido um jogo, Page Down rola uma tela para baixo e Page Up uma para cima.
         shell.click("game", 0);
-        assert!(!more_on(&mut shell));
-        // Page Down abre, Page Up volta; Esc também volta.
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(more_on(&mut shell));
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert_eq!(page_scroll(&mut shell), 2.);
         shell.key("\u{F72C}", KeyModifiers::NONE);
-        assert!(!more_on(&mut shell));
-        shell.key("\u{F72D}", KeyModifiers::NONE);
-        shell.handle(Cmd::Back);
-        assert!(!more_on(&mut shell));
-        // A roda (ou "Mais sobre o jogo") abre; outro jogo no destaque volta para a fase 1.
-        shell.click("game-more", 1);
-        assert!(more_on(&mut shell));
-        shell.click("game", 2);
-        assert!(!more_on(&mut shell));
-        shell.click("game-more", 1);
-        shell.click("game-more", 0);
-        assert!(!more_on(&mut shell));
-        // Com o foco nos botões de ação (escondidos na fase 2), abrir a fase 2 leva o foco para a lista.
+        assert_eq!(page_scroll(&mut shell), 1.);
+        // Também com o foco nos botões de ação.
         for _ in 0..8 {
             if page(&shell).zone() == Zone::Actions {
                 break;
@@ -3768,17 +3586,28 @@ mod tests {
         }
         assert_eq!(page(&shell).zone(), Zone::Actions);
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(more_on(&mut shell));
-        assert_eq!(page(&shell).zone(), Zone::List);
-        shell.key("\u{F72C}", KeyModifiers::NONE);
-        // Na Grade o destaque continua ao lado; só as Categorias não têm destaque nem fase 2.
-        shell.click("game-more", 1);
-        shell.click("view", 1);
-        assert!(more_on(&mut shell));
+        assert_eq!(page_scroll(&mut shell), 2.);
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // Com Ctrl, não: o atalho é de outra coisa. As Categorias não têm a página.
+        shell.key("\u{F72D}", KeyModifiers::CTRL);
+        assert_eq!(page_scroll(&mut shell), 2.);
         shell.click("view", 2);
-        assert!(!more_on(&mut shell));
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(!more_on(&mut shell));
+        assert_eq!(page_scroll(&mut shell), 2.);
+    }
+
+    #[test]
+    fn the_back_button_of_the_game_page_returns_to_the_overview() {
+        let (_dir, mut shell) = shell();
+        shell.click("game", 1);
+        assert!(page(&shell).selected(&shell.ctx).is_some());
+        shell.click("game-back", 0);
+        let out = shell.render(std::time::Instant::now());
+        let on = out.props.iter().find_map(|(n, v)| match (*n, v) {
+            ("desk-overview", slint_interpreter::Value::Struct(s)) => s.get_field("on").cloned(),
+            _ => None,
+        });
+        assert_eq!(on, Some(slint_interpreter::Value::Bool(true)));
     }
 
     #[test]

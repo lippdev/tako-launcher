@@ -31,6 +31,7 @@ import { DeskIcon, FocusRing, Tip, Skeleton, Ring, DeskGameView, DeskInfo, DeskB
 import { Octopus } from "polvo.slint";
 import { Overlay, Overline, OverlayView, Tile } from "overlay.slint";
 import { VisaoGeral, DeskOverview } from "desk-overview.slint";
+import { PaginaDoJogo, DeskPage } from "desk-game.slint";
 
 export { Ui }
 
@@ -44,7 +45,6 @@ struct ChoiceCard { title: string, detail: string, color: color, on: bool }
 struct DeskStat { label: string, value: string }
 struct DeskCard { title: string, count: string, auto: bool, covers: [DeskEntry] }
 struct DeskProfile { name: string, initial: string, line: [DeskInfo], playing: bool, tabs: [string], tab: int, actions: [DeskInfo], tiles: [DeskInfo], week-label: string, week-total: string, week: [DeskBar], week-text: string, top: [DeskEntry], fan: [DeskEntry], recent-title: string, see-all: string, recent: [DeskEntry], empty: string, periods: [string], period: int, summary: string, sessions: [DeskEntry], cards-summary: string, cards: [DeskCard], auto-label: string, new-label: string, new-text: string, zone: string, index: int }
-struct DeskMore { on: bool, labels: [string], description: string, details: [DeskInfo], sessions-summary: string, sessions: [DeskInfo], shots: [image] }
 
 
 // O que fica atrás do vidro: a arte do jogo em foco e a cópia desfocada dela (feita uma vez pelo Tako), no mesmo
@@ -90,12 +90,19 @@ global DeskArt {
     in-out property <color> accent-deep: Ui.accent-deep;
     // Retângulo da arte na janela (FundoDoJogo, padrão 3840 × 1240): cobre a altura com o centro da arte a 62% da
     // largura, sem sobra nas bordas; numa janela mais larga que a arte, cobre a largura e ancora a 30% do topo.
+    // Na página do jogo (`paged`) a arte é o destaque, à direita da lista (`box-x`) e com `box-h` de altura: cobre
+    // a caixa, centrada, a 20% do topo. A cópia desfocada da barra de cima segue o mesmo retângulo.
+    in-out property <bool> paged;
+    in-out property <length> box-x;
+    in-out property <length> box-h;
     out property <bool> small: win-w < 1280px;
-    property <bool> fit-w: win-h > 0 && win-w / win-h > aspect;
-    out property <length> w: fit-w ? win-w : win-h * aspect;
-    out property <length> h: fit-w ? win-w / aspect : win-h;
-    out property <length> x: fit-w ? 0 : clamp(0.62 * win-w - 0.5 * w, win-w - w, 0);
-    out property <length> y: fit-w ? -(h - win-h) * 0.3 : 0;
+    property <length> area-w: paged ? win-w - box-x : win-w;
+    property <length> area-h: paged ? box-h : win-h;
+    property <bool> fit-w: area-h > 0 && area-w / area-h > aspect;
+    out property <length> w: fit-w ? area-w : area-h * aspect;
+    out property <length> h: fit-w ? area-w / aspect : area-h;
+    out property <length> x: paged ? box-x + (area-w - w) / 2 : (fit-w ? 0 : clamp(0.62 * win-w - 0.5 * w, win-w - w, 0));
+    out property <length> y: paged ? -(h - area-h) * 0.2 : (fit-w ? -(h - win-h) * 0.3 : 0);
     // A cópia desfocada ocupa o mesmo retângulo.
     out property <length> bx: x;
     out property <length> bw: w;
@@ -2427,507 +2434,6 @@ component PlayStatusDot inherits Rectangle {
     background: hollow ? transparent : tint;
 }
 
-component PlayStatusSelect inherits Rectangle {
-    in property <string> status;
-    in property <string> label;
-    callback clicked(length, length);
-    height: 28px;
-    width: sl.preferred-width;
-    border-radius: 14px;
-    background: sta.has-hover ? Ui.glass-hover : Ui.glass-control;
-    border-width: 1px;
-    border-color: Ui.glass-edge-strong;
-    accessible-role: button;
-    accessible-label: label;
-    accessible-action-default => { root.clicked(self.absolute-position.x + self.width, self.absolute-position.y + self.height + 6px); }
-    sl := HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 8px;
-        spacing: 6px;
-        PlayStatusDot { status: root.status; y: (parent.height - self.height) / 2; }
-        Text {
-            text: label;
-            color: status == "" ? Ui.desk-on-muted : Ui.desk-text;
-            font-size: 13px * Ui.text-scale;
-            font-weight: 600;
-            vertical-alignment: center;
-        }
-        DeskIcon { name: "updown"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
-    }
-    sta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => {
-            DeskArt.anchor-w = root.width;
-            root.clicked(root.absolute-position.x + root.width, root.absolute-position.y + root.height + 6px);
-        }
-    }
-}
-
-// Loja de origem do jogo escolhido: cápsula de vidro com o logo e o nome.
-component StorePill inherits Rectangle {
-    in property <string> icon;
-    in property <string> text;
-    height: 28px;
-    width: sl.preferred-width;
-    border-radius: self.height / 2;
-    background: Ui.glass-control;
-    border-width: 1px;
-    border-color: Ui.glass-edge-strong;
-    accessible-role: image;
-    accessible-label: text;
-    sl := HorizontalLayout {
-        padding-left: Ui.space-12;
-        padding-right: Ui.space-12;
-        spacing: 6px;
-        DeskIcon { name: icon; size: 16px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
-    }
-}
-
-// Faixa de estado do jogo: cápsula de vidro com itens separados por divisórias (ícone de 26, rótulo em caixa alta e
-// valor). Só os itens que o Tako tem; na janela pequena, os três primeiros.
-component StatusStrip inherits Vidro {
-    in property <[DeskInfo]> items;
-    in property <bool> small;
-    height: 62px;
-    width: sl.preferred-width;
-    sl := HorizontalLayout {
-        padding-left: Ui.space-16;
-        padding-right: 22px;
-        for it[i] in items: HorizontalLayout {
-            // Metacritic é o último da faixa e o primeiro a sair quando falta largura.
-            visible: it.icon == "metacritic" ? !small : (!small || i < 3);
-            spacing: 11px;
-            // Divisória no meio do espaço entre os itens.
-            if i > 0: HorizontalLayout {
-                padding-left: small ? 11px : 14px;
-                padding-right: small ? 0 : 3px;
-                Rectangle { width: 1px; height: 30px; y: 16px; background: Ui.divider; }
-            }
-            if it.icon != "metacritic": DeskIcon { name: it.icon; size: 26px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
-            if it.icon == "metacritic": Rectangle {
-                width: 22px;
-                height: 22px;
-                border-radius: 6px;
-                y: (parent.height - self.height) / 2;
-                background: it.score >= 75 ? Ui.success : (it.score >= 50 ? Ui.desk-warning : Ui.desk-error);
-                Text {
-                    text: it.score;
-                    font-family: Ui.font-text;
-                    font-size: 11px * Ui.text-scale;
-                    font-weight: 800;
-                    color: it.score < 50 ? #ffffff : #0b0d10;
-                    vertical-alignment: center;
-                    horizontal-alignment: center;
-                }
-            }
-            VerticalLayout {
-                alignment: center;
-                spacing: 5px;
-                Text {
-                    text: it.label.to-uppercase();
-                    color: Ui.desk-on-muted;
-                    font-size: 11px * Ui.text-scale;
-                    font-weight: 700;
-                    letter-spacing: 0.08 * self.font-size;
-                }
-                HorizontalLayout {
-                    spacing: 7px;
-                    if it.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-                    Text { text: it.value; color: Ui.desk-text; font-size: Ui.desk-label; font-weight: 500; }
-                }
-            }
-        }
-    }
-}
-
-// Pílula principal (Jogar, Voltar ao jogo, Instalar): branca, a única por tela. Responde no pressionar (0,97).
-component PlayButton inherits Rectangle {
-    in property <string> label;
-    in property <string> icon;
-    // Texto menor ao lado do rótulo ("Steam · 9,1 GB" no Instalar).
-    in property <string> sub;
-    // Botão dividido (jogo em mais de uma loja): o ⌄ de 48 ao lado, 2 de vão.
-    in property <bool> split;
-    in property <string> more-label;
-    in property <bool> enabled: true;
-    in property <bool> focused;
-    in property <bool> small;
-    callback clicked();
-    callback more-clicked(length, length);
-    height: small ? 50px : Ui.primary-height;
-    property <length> main-w: split ? pl.preferred-width : max(small ? 180px : 232px, pl.preferred-width);
-    width: split ? main-w + 2px + 48px : main-w;
-    accessible-role: button;
-    accessible-label: sub != "" ? label + ", " + sub : label;
-    property <float> press: pta.pressed && enabled ? Ui.escala-pressionado : 1;
-    // Na ponta de dentro do botão dividido o canto é de 6.
-    property <length> inner-r: split ? 6px : root.height / 2;
-    Rectangle {
-        x: (root.main-w - self.width) / 2;
-        y: (root.height - self.height) / 2;
-        width: root.main-w * press;
-        height: root.height * press;
-        border-radius: self.height / 2;
-        background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%);
-        drop-shadow-offset-y: Ui.shadow-float-y;
-        drop-shadow-blur: Ui.shadow-float-blur;
-        drop-shadow-color: Ui.shadow-float-color;
-        opacity: enabled ? 1 : 0.7;
-        // Botão dividido: a ponta de dentro é de 6, não redonda; o degradê vertical esconde a emenda.
-        if split: Rectangle { x: parent.width - parent.height / 2; width: parent.height / 2; border-radius: 6px; background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%); }
-        // Brilho de 1px no topo.
-        Rectangle { x: parent.height / 2; y: 1px; width: parent.width - parent.height / 2 - root.inner-r; height: 1px; background: Ui.primary-top; }
-        if pta.pressed: Rectangle { border-radius: parent.border-radius; background: Ui.on-primary.with-alpha(0.06); }
-    }
-    if split: Rectangle {
-        x: root.main-w + 2px;
-        y: (root.height - self.height) / 2;
-        width: 48px * more-press;
-        height: root.height * more-press;
-        border-radius: self.height / 2;
-        background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%);
-        drop-shadow-offset-y: Ui.shadow-float-y;
-        drop-shadow-blur: Ui.shadow-float-blur;
-        drop-shadow-color: Ui.shadow-float-color;
-        opacity: enabled ? 1 : 0.7;
-        // A ponta de dentro (esquerda) também é de 6.
-        Rectangle { width: parent.height / 2; border-radius: 6px; background: @linear-gradient(180deg, Ui.primary-top 0%, Ui.primary-bottom 100%); }
-        property <float> more-press: mta.pressed && enabled ? Ui.escala-pressionado : 1;
-        DeskIcon { name: "chevron-down"; size: 20px; tint: Ui.on-primary; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
-        mta := TouchArea {
-            enabled: root.enabled;
-            mouse-cursor: pointer;
-            accessible-role: button;
-            accessible-label: more-label;
-            clicked => { root.more-clicked(self.absolute-position.x, self.absolute-position.y + self.height + 8px); }
-        }
-    }
-    if focused: FocusRing { radius: root.height / 2; background: transparent; }
-    pl := HorizontalLayout {
-        x: 0;
-        width: root.main-w;
-        padding-left: split ? 22px : 32px;
-        padding-right: split ? 24px : 32px;
-        spacing: split ? 10px : Ui.space-12;
-        alignment: center;
-        if icon == "ring": Ring { size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
-        if icon != "ring": DeskIcon { name: icon; size: 22px; tint: Ui.on-primary; y: (parent.height - self.height) / 2; }
-        Text { text: label; color: Ui.on-primary; font-size: 19px * Ui.text-scale; font-weight: 700; vertical-alignment: center; }
-        if sub != "": Text { text: sub; color: Ui.on-primary.with-alpha(0.65); font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; }
-    }
-    pta := TouchArea {
-        width: root.main-w;
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-}
-
-// Botão redondo de vidro só com ícone (favoritar, ⋯, engrenagem) ou pílula de vidro com rótulo (Encerrar jogo).
-// Sobre a arte é uma lente; perigo usa a tinta densa para o vermelho manter contraste.
-component GlassButton inherits Vidro {
-    in property <string> icon;
-    in property <string> label;
-    in property <bool> show-label;
-    in property <bool> on;
-    in property <bool> danger;
-    in property <bool> focused;
-    in property <bool> small;
-    callback clicked();
-    dense: danger;
-    radius: self.height / 2;
-    // Pressionar responde na hora (pointer-down), sem animação.
-    transform-scale: gta.pressed ? Ui.escala-pressionado : 1;
-    height: show-label ? Ui.control-height + 8px : (small ? 46px : Ui.round-button);
-    width: show-label ? gl.preferred-width : self.height;
-    accessible-role: button;
-    accessible-label: label;
-    Rectangle {
-        border-radius: root.height / 2;
-        background: gta.pressed ? Ui.glass-pressed : (gta.has-hover ? Ui.glass-hover : transparent);
-        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-    }
-    if focused: FocusRing { radius: root.height / 2; background: transparent; }
-    gl := HorizontalLayout {
-        padding-left: show-label ? 18px : 0;
-        padding-right: show-label ? 20px : 0;
-        spacing: 10px;
-        alignment: center;
-        DeskIcon {
-            name: icon;
-            size: 22px;
-            tint: danger ? Ui.desk-error : (on ? Ui.desk-warning : Ui.desk-text);
-            y: (parent.height - self.height) / 2;
-        }
-        if show-label: Text { text: label; color: danger ? Ui.desk-error : Ui.desk-text; font-size: Ui.desk-label; font-weight: 600; vertical-alignment: center; }
-    }
-    gta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-    Tip { text: show-label ? "" : label; hovering: gta.has-hover; }
-}
-
-// Título de cartão (Poppins, `title`).
-component CardTitle inherits Text {
-    color: Ui.desk-text;
-    font-family: Ui.font-heading;
-    font-size: Ui.desk-title;
-    font-weight: 700;
-    overflow: elide;
-}
-
-// CartaoSobre: descrição (cortada com "Mais", que abre o texto inteiro) e os gêneros como texto no rodapé.
-component AboutCard inherits Vidro {
-    in property <string> title;
-    in property <string> text;
-    in property <bool> more;
-    in property <string> more-label;
-    in property <[string]> genres;
-    in property <string> genres-more;
-    in property <bool> small;
-    callback more-clicked();
-    VerticalLayout {
-        padding-left: small ? Ui.space-16 : Ui.space-24;
-        padding-right: small ? Ui.space-16 : Ui.space-24;
-        padding-top: small ? Ui.space-16 : Ui.space-24;
-        padding-bottom: small ? Ui.space-16 : Ui.space-20;
-        spacing: small ? 10px : Ui.space-16;
-        CardTitle { text: title; }
-        // A descrição ocupa a sobra e corta com "…": não pede altura para a fileira crescer.
-        Text { text: root.text; color: Ui.desk-on-muted; font-size: Ui.desk-body; line-height-factor: 1.23; wrap: word-wrap; overflow: elide; vertical-stretch: 1; min-height: 0; preferred-height: 0; }
-        if genres.length > 0 || more: VerticalLayout {
-            spacing: Ui.space-12;
-            Rectangle { height: 1px; background: Ui.glass-edge; }
-            HorizontalLayout {
-                height: 24px;
-                spacing: Ui.space-8;
-                for g[i] in genres: HorizontalLayout {
-                    visible: !small || i < 2;
-                    spacing: Ui.space-8;
-                    if i > 0: Text { text: "-"; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
-                    Text { text: g; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; max-width: 150px; overflow: elide; }
-                }
-                if genres-more != "" && !small: Text { text: genres-more; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; }
-                Rectangle { horizontal-stretch: 1; }
-                if more: Rectangle {
-                    width: ml.preferred-width + 16px;
-                    border-radius: Ui.radius-thumb;
-                    background: mta.has-hover ? Ui.glass-hover : transparent;
-                    accessible-role: button;
-                    accessible-label: more-label;
-                    ml := Text { text: more-label; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; }
-                    mta := TouchArea {
-                        mouse-cursor: pointer;
-                        clicked => { root.more-clicked(); }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// CartaoTrailer: miniatura parada (a arte), escurecida embaixo, com o botão de vidro "Trailer"; só toca ao clicar.
-component TrailerCard inherits Rectangle {
-    in property <image> art;
-    in property <string> label;
-    callback clicked();
-    border-radius: Ui.radius-card;
-    clip: true;
-    background: Ui.glass-solid;
-    drop-shadow-offset-y: Ui.shadow-float-y;
-    drop-shadow-blur: Ui.shadow-float-blur;
-    drop-shadow-color: Ui.shadow-float-color;
-    Image { width: parent.width; height: parent.height; source: art; image-fit: cover; }
-    Rectangle { background: @linear-gradient(0deg, Ui.desk-canvas.with-alpha(0.8) 0%, Ui.desk-canvas.with-alpha(0) 55%); }
-    Rectangle { border-radius: Ui.radius-card; border-width: 1px; border-color: Ui.glass-edge; }
-    GlassButton {
-        x: Ui.space-16;
-        y: parent.height - self.height - Ui.space-16;
-        height: 40px;
-        show-label: true;
-        icon: "play";
-        label: root.label;
-        clicked => { root.clicked(); }
-    }
-}
-
-// CartaoDetalhes: linhas em grade (ícone · rótulo · valor) que dividem a altura, com divisórias; Status com o ponto.
-component DetailsCard inherits Vidro {
-    in property <string> title;
-    in property <[DeskInfo]> rows;
-    in property <bool> small;
-    // Coluna dos rótulos pelo mais longo, nunca menos que 104 (corrige o "Desenvolv…").
-    property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
-    VerticalLayout {
-        padding-left: small ? Ui.space-16 : Ui.space-24;
-        padding-right: small ? Ui.space-16 : Ui.space-24;
-        padding-top: small ? Ui.space-16 : Ui.space-24;
-        padding-bottom: small ? Ui.space-16 : Ui.space-20;
-        // Título → linhas 8; as linhas dividem a altura sem espaço entre elas (mín. 28, máx. 40).
-        spacing: 0;
-        CardTitle { text: title; }
-        Rectangle { height: small ? 4px : 8px; }
-        for r[i] in rows: Rectangle {
-            vertical-stretch: 1;
-            min-height: small ? 22px : 28px;
-            max-height: 40px;
-            if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
-            HorizontalLayout {
-                spacing: Ui.space-12;
-                DeskIcon { name: r.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
-                Text { text: r.label; width: root.label-w; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; vertical-alignment: center; overflow: elide; }
-                if r.chips.length == 0: HorizontalLayout {
-                    horizontal-stretch: 1;
-                    spacing: Ui.space-8;
-                    if r.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-                    // Valor cortado com "…": o inteiro aparece na dica ao passar o mouse.
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        vt := Text { width: parent.width; height: parent.height; text: r.value; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; overflow: elide; }
-                        vta := TouchArea { }
-                        Tip { text: vt.preferred-width > vt.width ? r.value : ""; hovering: vta.has-hover; }
-                    }
-                }
-                if r.chips.length > 0: HorizontalLayout {
-                    horizontal-stretch: 1;
-                    spacing: 6px;
-                    for c in r.chips: Rectangle {
-                        y: (parent.height - self.height) / 2;
-                        height: 22px;
-                        width: min(cl.preferred-width + 16px, 96px);
-                        border-radius: 11px;
-                        background: Ui.glass-control;
-                        border-width: 1px;
-                        border-color: Ui.glass-edge;
-                        cl := Text { width: parent.width - 16px; text: c; color: Ui.desk-text; font-size: Ui.desk-overline; font-weight: 600; overflow: elide; horizontal-alignment: center; }
-                    }
-                    if r.value != "": Text { text: r.value; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; vertical-alignment: center; }
-                    Rectangle { horizontal-stretch: 1; }
-                }
-            }
-        }
-        if rows.length < 6: Rectangle { vertical-stretch: 6 - rows.length; }
-    }
-}
-
-// CartaoSessoes: o histórico (SESSION-002): título com "Ver todas ›", o resumo e as últimas sessões.
-component SessionsCard inherits Vidro {
-    in property <[string]> labels;
-    in property <string> summary;
-    in property <[DeskInfo]> rows;
-    callback see-all();
-    dense: true;
-    VerticalLayout {
-        padding: Ui.space-24;
-        padding-bottom: Ui.space-20;
-        spacing: 6px;
-        HorizontalLayout {
-            CardTitle { text: labels[0]; horizontal-stretch: 1; }
-            Rectangle {
-                width: sl.preferred-width + 8px;
-                border-radius: Ui.radius-thumb;
-                background: sta.has-hover ? Ui.glass-hover : transparent;
-                accessible-role: button;
-                accessible-label: labels[1];
-                sl := HorizontalLayout {
-                    spacing: 4px;
-                    alignment: center;
-                    Text { text: labels[1]; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
-                    DeskIcon { name: "chevron"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
-                }
-                sta := TouchArea {
-                    mouse-cursor: pointer;
-                    clicked => { root.see-all(); }
-                }
-            }
-        }
-        Text { text: summary; color: Ui.desk-on-subtle; font-size: Ui.desk-label-sm; font-weight: 500; }
-        for r[i] in rows: Rectangle {
-            vertical-stretch: 1;
-            max-height: 40px;
-            if i > 0: Rectangle { y: 0; height: 1px; background: Ui.divider; }
-            HorizontalLayout {
-                spacing: Ui.space-8;
-                if r.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-                Text { text: r.label; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 700; vertical-alignment: center; }
-                Text { text: r.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
-                Text { text: r.value; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
-            }
-        }
-    }
-}
-
-// Fileira de cartões do destaque: Sobre, Detalhes e Sessões, 20 entre eles (larguras 1,25 · 1,1 · 1,1).
-component CardRow inherits Rectangle {
-    in property <DeskGameView> game;
-    in property <[DeskInfo]> details;
-    in property <string> sessions-summary;
-    in property <[DeskInfo]> sessions;
-    in property <[string]> card-labels;
-    in property <string> about-label;
-    in property <string> details-label;
-    in property <bool> small;
-    in property <bool> show-about;
-    in property <bool> show-sessions;
-    callback clicked(string, int);
-    // Larguras 1,25 · 1,1 · 1,1, 20 entre eles (ou 1,25 · 1,1 sem sessões); o trailer mora na fase 2.
-    property <float> s-about: 1.25;
-    property <float> s-details: 1.1;
-    property <float> s-sessions: 1.1;
-    property <float> total: (show-about ? s-about : 0) + s-details + (show-sessions ? s-sessions : 0);
-    property <int> cards: (show-about ? 1 : 0) + 1 + (show-sessions ? 1 : 0);
-    property <length> unit: (root.width - (cards - 1) * Ui.space-20) / total;
-    property <length> about-w: show-about ? unit * s-about + Ui.space-20 : 0;
-    property <length> details-w: unit * s-details;
-    // Altura que o conteúdo pede (Detalhes com seis linhas), para a fileira crescer em vez de cortar.
-    out property <length> content-h: dc.min-height;
-    // Entrada do app: os cartões acendem um a um depois das ações, subindo `intro-rise`.
-    property <float> intro-about: DeskIntro.on ? 1 : 0;
-    animate intro-about { duration: Ui.page-time; delay: Ui.intro-delay(5); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    property <float> intro-details: DeskIntro.on ? 1 : 0;
-    animate intro-details { duration: Ui.page-time; delay: Ui.intro-delay(6); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    property <float> intro-sessions: DeskIntro.on ? 1 : 0;
-    animate intro-sessions { duration: Ui.page-time; delay: Ui.intro-delay(7); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    if show-about: AboutCard {
-        x: 0;
-        y: (1 - intro-about) * Ui.intro-rise;
-        opacity: intro-about;
-        height: root.height;
-        width: unit * s-about;
-        title: about-label;
-        text: game.description;
-        more: game.about-more;
-        more-label: card-labels[2];
-        genres: game.genres;
-        genres-more: game.genres-more;
-        small: small;
-        more-clicked => { root.clicked("about-more", 0); }
-    }
-    dc := DetailsCard {
-        x: about-w;
-        y: (1 - intro-details) * Ui.intro-rise;
-        opacity: intro-details;
-        height: root.height;
-        width: details-w;
-        title: details-label;
-        rows: details;
-        small: small;
-    }
-    if show-sessions: SessionsCard {
-        x: about-w + details-w + Ui.space-20;
-        y: (1 - intro-sessions) * Ui.intro-rise;
-        opacity: intro-sessions;
-        height: root.height;
-        width: unit * s-sessions;
-        labels: card-labels;
-        summary: sessions-summary;
-        rows: sessions;
-        see-all => { root.clicked("sessions", 0); }
-    }
-}
-
 // EstadoCarregando: o destaque e os cartões já com a forma final (etiqueta, título, faixa, botões e três cartões), em
 // blocos de espera que crescem com o tamanho do texto, para o layout não pular quando os dados chegam.
 component LoadingStage inherits VerticalLayout {
@@ -2954,515 +2460,6 @@ component LoadingStage inherits VerticalLayout {
         Skeleton { horizontal-stretch: 1.25; radius: Ui.radius-card; }
         Skeleton { horizontal-stretch: 1.1; radius: Ui.radius-card; }
         if !small: Skeleton { horizontal-stretch: 1.1; radius: Ui.radius-card; }
-    }
-}
-
-// Destaque do jogo selecionado e a fileira de cartões, ancorados embaixo sobre a arte (Destaque, AcoesDoJogo,
-// CartaoSobre, CartaoTrailer, CartaoDetalhes, CartaoSessoes). Com quatro cartões, a fileira rola na horizontal.
-component GameStage inherits VerticalLayout {
-    // O jogo que chega; `game` é o que está na tela (o anterior fica até o texto apagar).
-    in property <DeskGameView> game-in;
-    property <DeskGameView> game;
-    in property <[PanelRow]> actions;
-    in property <[DeskInfo]> stats;
-    in property <[DeskInfo]> details;
-    in property <string> sessions-summary;
-    in property <[DeskInfo]> sessions;
-    in property <[string]> card-labels;
-    in property <string> about-label;
-    in property <string> details-label;
-    in property <string> more-install-label;
-    in property <string> zone;
-    in property <int> zone-index;
-    in property <bool> focus-visible;
-    in property <bool> small;
-    callback clicked(string, int);
-    callback menu(length, length);
-    property <bool> show-about: game.description != "";
-    // Entrada do app: etiqueta e título, depois faixa e ações, subindo `intro-rise` (o logo só acende: o layout dele
-    // já usa o `y`).
-    property <float> intro-title: DeskIntro.on ? 1 : 0;
-    animate intro-title { duration: Ui.page-time; delay: Ui.intro-delay(3); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    property <float> intro-actions: DeskIntro.on ? 1 : 0;
-    animate intro-actions { duration: Ui.page-time; delay: Ui.intro-delay(4); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-    // Troca de jogo (TrocaDeJogo): título, faixa e cartões do jogo anterior apagam em 120 (`curva-saida`), o novo
-    // entra em 200 (`curva-entrada`); a arte faz o crossfade dela. Mudança no mesmo jogo troca na hora.
-    property <bool> text-in: true;
-    init => { game = game-in; }
-    changed game-in => {
-        if (game-in.title == game.title) {
-            game = game-in;
-        } else {
-            text-in = false;
-            text-timer.running = true;
-        }
-    }
-    text-timer := Timer {
-        interval: max(1ms, Ui.tempo-texto-sai);
-        running: false;
-        triggered => {
-            self.running = false;
-            game = game-in;
-            text-rise = false;
-            text-in = true;
-            rise-timer.running = true;
-        }
-    }
-    // O texto novo entra subindo 8: começa 8 abaixo (sem animar) e sobe em 200.
-    property <bool> text-rise: true;
-    rise-timer := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            self.running = false;
-            text-rise = true;
-        }
-    }
-    // Abaixo de 1280 de largura ou na janela pequena, Sessões sai da fileira da fase 1.
-    property <bool> show-sessions: sessions.length > 0 && !small && DeskArt.win-w >= 1280px;
-    alignment: end;
-    // Os 8 da subida do texto saem do espaço até os cartões.
-    spacing: (small ? Ui.space-16 : Ui.space-28) - 8px;
-    VerticalLayout {
-        spacing: small ? 10px : 14px;
-        alignment: end;
-        padding-bottom: text-rise ? 8px : 0px;
-        animate padding-bottom { duration: Ui.text-fade(text-rise) * (text-rise ? 1 : 0); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-        opacity: text-in ? 1 : 0;
-        animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
-        if game.overline != "": HorizontalLayout {
-            alignment: start;
-            Badge {
-                text: game.overline;
-                live: game.running;
-                y: (1 - intro-title) * Ui.intro-rise;
-                opacity: intro-title;
-            }
-        }
-        // TituloDoJogo: o logo do jogo numa caixa de 520 × 180 (380 × 130 na janela pequena), ancorado embaixo à
-        // esquerda, nunca ampliado acima do tamanho dele; a etiqueta fica 20 acima.
-        // Logo ainda carregando: a caixa fica vazia na altura dele (nunca o nome em texto antes do logo).
-        if game.show-logo || game.title-pending: HorizontalLayout {
-            alignment: start;
-            padding-top: 20px - (small ? 10px : 14px);
-            min-height: game.title-pending ? self.box-h + self.padding-top : 0;
-            property <length> box-w: small ? 380px : 520px;
-            property <length> box-h: small ? 130px : 180px;
-            property <length> src-w: max(1px, game.logo.width * 1px);
-            property <length> src-h: max(1px, game.logo.height * 1px);
-            property <float> fit: min(1, min(box-w / src-w, box-h / src-h));
-            Image {
-                source: game.logo;
-                // O logo acende quando chega, em vez de aparecer de uma vez.
-                opacity: game.logo.width > 0 ? intro-title : 0;
-                animate opacity { duration: Ui.text-fade(true); easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-                width: parent.src-w * parent.fit;
-                height: parent.src-h * parent.fit;
-                image-fit: contain;
-                accessible-role: image;
-                accessible-label: game.title;
-            }
-        }
-        // Título em até duas linhas, até 620 de largura (520 na janela pequena), crescendo para cima: um título longo
-        // encolhe (até 36) para caber em duas.
-        if !game.show-logo && !game.title-pending: HorizontalLayout {
-            title-measure := Text {
-                visible: false;
-                width: 0;
-                text: game.title;
-                font-family: Ui.font-heading;
-                font-size: small ? 40px * Ui.text-scale : Ui.desk-display;
-                font-weight: 700;
-                letter-spacing: -0.02 * self.font-size;
-            }
-            Text {
-                property <length> base: title-measure.font-size;
-                property <length> fit: base * 1.7 * (small ? 520px : 620px) / max(1px, title-measure.preferred-width);
-                text: game.title;
-                y: (1 - intro-title) * Ui.intro-rise;
-                opacity: intro-title;
-                color: Ui.desk-text;
-                font-family: Ui.font-heading;
-                font-size: max(min(base, fit), 36px * Ui.text-scale);
-                // Entrelinha 1,04 do `display` (Poppins tem 1,5 de natural).
-                line-height-factor: 0.69;
-                font-weight: 700;
-                letter-spacing: -0.02 * self.font-size;
-                // Sem `max-height`: com ele o Slint cortava na primeira linha; o tamanho acima já limita a duas.
-                wrap: word-wrap;
-                max-width: small ? 520px : 620px;
-                // Sem esticar, o Text ficava com a largura da palavra mais longa e cortava.
-                horizontal-stretch: 1;
-            }
-            Rectangle { horizontal-stretch: 0.0001; }
-        }
-        if stats.length > 0: HorizontalLayout {
-            alignment: start;
-            StatusStrip {
-                items: stats;
-                small: small;
-                y: (1 - intro-actions) * Ui.intro-rise;
-                opacity: intro-actions;
-            }
-        }
-        HorizontalLayout {
-            spacing: Ui.space-12;
-            alignment: start;
-            padding-top: 6px;
-            for a[i] in actions: HorizontalLayout {
-                if a.style == "primary": PlayButton {
-                    y: (1 - intro-actions) * Ui.intro-rise;
-                    opacity: intro-actions;
-                    label: a.title;
-                    icon: a.icon;
-                    sub: a.description;
-                    split: a.on;
-                    more-label: more-install-label;
-                    enabled: a.enabled;
-                    small: small;
-                    focused: focus-visible && zone == "actions" && zone-index == i;
-                    clicked => { root.clicked("action", i); }
-                    more-clicked(x, y) => {
-                        root.menu(x, y);
-                        root.clicked("install-more", i);
-                    }
-                }
-                if a.style != "primary": GlassButton {
-                    y: (parent.height - self.height) / 2 + (1 - intro-actions) * Ui.intro-rise;
-                    opacity: intro-actions;
-                    icon: a.icon;
-                    label: a.title;
-                    show-label: a.style == "danger";
-                    on: a.on;
-                    danger: a.style == "danger";
-                    small: small;
-                    focused: focus-visible && zone == "actions" && zone-index == i;
-                    clicked => {
-                        root.menu(self.absolute-position.x, self.absolute-position.y + self.height + 6px);
-                        root.clicked("action", i);
-                    }
-                }
-            }
-        }
-        // Jogo não instalado: espaço livre e por onde a instalação abre; sem espaço, o aviso em `warning`.
-        if game.install-note != "": Text {
-            text: game.install-note;
-            opacity: intro-actions;
-            color: game.install-warn ? Ui.desk-warning : Ui.desk-on-muted;
-            font-size: Ui.desk-label-sm;
-            font-weight: 500;
-            wrap: word-wrap;
-        }
-        if game.hint != "": Text { text: game.hint; opacity: intro-actions; color: Ui.desk-warning; font-size: Ui.desk-label; wrap: word-wrap; }
-    }
-    // Fileira Sobre · Detalhes · Sessões da fase 1 (o trailer fica na fase 2).
-    // 248 (190 na janela pequena), crescendo se o conteúdo pedir mais: nada passa da borda do cartão.
-    CardRow {
-        opacity: text-in ? 1 : 0;
-        animate opacity { duration: Ui.text-fade(text-in); easing: text-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
-        height: max(small ? 190px : Ui.card-height, self.content-h);
-        game: game;
-        details: details;
-        sessions-summary: sessions-summary;
-        sessions: sessions;
-        card-labels: card-labels;
-        about-label: about-label;
-        details-label: details-label;
-        small: small;
-        show-about: show-about;
-        show-sessions: show-sessions;
-        clicked(z, i) => { root.clicked(z, i); }
-    }
-}
-
-// Linha de rótulo e valor da fase 2 (como no CartaoDetalhes), 36 de altura mínima; o valor quebra em linhas.
-component MoreRow inherits Rectangle {
-    in property <DeskInfo> info;
-    in property <bool> first;
-    in property <length> label-w;
-    min-height: 36px;
-    if !first: Rectangle { y: 0; height: 1px; background: Ui.divider; }
-    HorizontalLayout {
-        padding-top: Ui.space-8;
-        padding-bottom: Ui.space-8;
-        spacing: Ui.space-12;
-        if info.icon != "": DeskIcon { name: info.icon; size: 16px; tint: Ui.desk-on-subtle; y: (parent.height - self.height) / 2; }
-        if info.dot: Rectangle { y: (parent.height - self.height) / 2; width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
-        Text { text: info.label; width: root.label-w; color: info.icon != "" ? Ui.desk-on-subtle : Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: info.icon != "" ? 500 : 700; vertical-alignment: center; overflow: elide; }
-        if info.detail != "": Text { text: info.detail; color: Ui.desk-on-muted; font-size: Ui.desk-label-sm; vertical-alignment: center; }
-        Text { text: info.value; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; horizontal-alignment: info.icon != "" ? left : right; }
-    }
-}
-
-// Cartão de vidro denso fixo da fase 2: título `title` e o conteúdo embaixo, 24 por dentro (16 na janela pequena).
-// Rolagem sem lag: vidro denso fixo (glass-panel-dense + contorno glass-edge), sem desfoque ao vivo e sem sombra.
-component MoreCard inherits Rectangle {
-    in property <string> title;
-    in property <bool> small;
-    border-radius: Ui.radius-card;
-    background: Ui.glass-panel-dense;
-    border-width: 1px;
-    border-color: Ui.glass-edge;
-    VerticalLayout {
-        padding: small ? Ui.space-16 : Ui.space-24;
-        padding-bottom: small ? Ui.space-16 : Ui.space-20;
-        spacing: Ui.space-12;
-        if title != "": CardTitle { text: title; }
-        @children
-    }
-}
-
-// DestaqueFases › fase 2: o que o Tako sabe do jogo além da primeira tela.
-// Duas colunas (58% e 42%, 20 entre elas; uma coluna abaixo de 820 ou na janela pequena).
-// Sem repetir a fase 1: Sobre e Sessões saem da fase 2. O Trailer fica no topo da coluna larga.
-// Rolagem sem lag: cartões em vidro denso fixo sem desfoque ao vivo e sem sombra; 40 px de esmaecido embaixo.
-component GameMore inherits Rectangle {
-    in property <DeskMore> more;
-    in property <bool> trailer;
-    in property <image> art;
-    in property <bool> small;
-    in property <length> offset;
-    out property <length> scroll-max: max(0px, content-h - view.height);
-    callback clicked(string, int);
-    property <bool> one-col: small || root.width < 820px;
-    property <length> gap: small ? Ui.space-16 : Ui.space-20;
-    property <length> left-w: one-col ? root.width : (root.width - gap) * 0.58;
-    property <length> right-w: one-col ? root.width : root.width - left-w - gap;
-    property <length> content-h: one-col
-        ? (lc.preferred-height > 0 && rc.preferred-height > 0 ? lc.preferred-height + gap + rc.preferred-height : lc.preferred-height + rc.preferred-height)
-        : max(lc.preferred-height, rc.preferred-height);
-    property <length> label-w: max(104px, 13 * 7.4px * Ui.text-scale);
-    // "⌃ Voltar": volta para a fase 1 (como a roda para cima no topo, Page Up e Esc).
-    back := Vidro {
-        x: (root.width - self.width) / 2;
-        y: 0;
-        height: 32px;
-        width: bl.preferred-width;
-        radius: 16px;
-        accessible-role: button;
-        accessible-label: more.labels[1];
-        if bta.has-hover: Rectangle { border-radius: 16px; background: Ui.glass-hover; }
-        bl := HorizontalLayout {
-            padding-left: Ui.space-12;
-            padding-right: Ui.space-16;
-            spacing: 6px;
-            DeskIcon { name: "chevron-up"; size: 16px; tint: Ui.desk-text; y: (parent.height - self.height) / 2; }
-            Text { text: more.labels[1]; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 600; vertical-alignment: center; }
-        }
-        bta := TouchArea {
-            mouse-cursor: pointer;
-            clicked => { root.clicked("game-more", 0); }
-        }
-    }
-    view := Rectangle {
-        y: back.height + Ui.space-12;
-        height: root.height - self.y;
-        clip: true;
-        Rectangle {
-            y: -root.offset;
-            height: root.content-h;
-            // Coluna larga (58%): Trailer (16:9, raio 12, botão "Assistir trailer") e Requisitos (se houvesse fonte).
-            lc := VerticalLayout {
-                x: 0;
-                y: 0;
-                width: root.left-w;
-                height: self.preferred-height;
-                spacing: root.gap;
-                if trailer: MoreCard {
-                    title: more.labels[6];
-                    small: small;
-                    Rectangle {
-                        height: (root.left-w - (small ? Ui.space-16 : Ui.space-24) * 2) * 9 / 16;
-                        border-radius: 12px;
-                        clip: true;
-                        background: Ui.glass-control;
-                        Image { width: parent.width; height: parent.height; source: root.art; image-fit: cover; }
-                        Rectangle { background: @linear-gradient(0deg, Ui.desk-canvas.with-alpha(0.85) 0%, Ui.desk-canvas.with-alpha(0) 55%); }
-                        Rectangle { border-radius: 12px; border-width: 1px; border-color: Ui.glass-edge; }
-                        GlassButton {
-                            x: 14px;
-                            y: parent.height - self.height - 14px;
-                            height: 40px;
-                            show-label: true;
-                            icon: "play";
-                            label: more.labels[6];
-                            clicked => { root.clicked("trailer", 0); }
-                        }
-                        TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => { root.clicked("trailer", 0); }
-                        }
-                    }
-                }
-            }
-            // Coluna estreita (42%): Detalhes completos e Imagens (miniaturas de 256 × 144, 192 × 108, raio 8).
-            rc := VerticalLayout {
-                x: root.one-col ? 0 : root.left-w + root.gap;
-                y: root.one-col ? (lc.preferred-height > 0 ? lc.preferred-height + root.gap : 0) : 0;
-                width: root.right-w;
-                height: self.preferred-height;
-                spacing: root.gap;
-                if more.details.length > 0: MoreCard {
-                    title: more.labels[3];
-                    small: small;
-                    VerticalLayout {
-                        spacing: 0;
-                        for r[i] in more.details: MoreRow { info: r; first: i == 0; label-w: root.label-w; }
-                    }
-                }
-                if more.shots.length > 0: MoreCard {
-                    title: more.labels[5];
-                    small: small;
-                    HorizontalLayout {
-                        spacing: Ui.space-12;
-                        alignment: start;
-                        for shot in more.shots: Rectangle {
-                            width: small ? 192px : 256px;
-                            height: self.width * 9 / 16;
-                            border-radius: 8px;
-                            clip: true;
-                            background: Ui.glass-control;
-                            Image { width: parent.width; height: parent.height; source: shot; image-fit: cover; }
-                            Rectangle { border-radius: 8px; border-width: 1px; border-color: Ui.glass-edge; }
-                        }
-                    }
-                }
-            }
-        }
-        // 40 px de esmaecido embaixo mostram que a rolagem continua.
-        if root.scroll-max > 0 && root.offset < root.scroll-max - 4px: Rectangle {
-            y: parent.height - 40px;
-            height: 40px;
-            width: parent.width;
-            background: @linear-gradient(180deg, transparent 0%, Ui.desk-canvas.with-alpha(0.85) 100%);
-        }
-    }
-}
-
-// DestaqueFases: o destaque em duas fases. Um gesto da roda (ou do trackpad) para baixo troca para a fase 2 inteira;
-// para cima no topo dela, volta. Uma troca por gesto: a roda fica travada até o gesto parar (300 sem eventos, 500 no
-// mínimo). A fase nova entra 24 de baixo/cima em `tempo-fase` (`curva-entrada`); a atual apaga em `tempo-fase-sai`.
-// Quem decide a fase é o Tako (`more.on`): Page Down/Up, Esc e a troca de jogo também passam por ele.
-component GamePhases inherits Rectangle {
-    in property <DeskMore> more;
-    in property <bool> trailer;
-    in property <image> art;
-    in property <bool> small;
-    callback clicked(string, int);
-    property <bool> on: more.on;
-    // A fase 2 guarda o último conteúdo enquanto apaga (o Tako para de mandar a captura ao voltar).
-    property <DeskMore> shown;
-    init => {
-        if (more.on) {
-            shown = more;
-        }
-    }
-    changed more => {
-        if (more.on) {
-            shown = more;
-        }
-    }
-    // Trava da roda: `busy` depois de trocar de fase; `scrolled` depois de rolar a fase 2 (não troca no mesmo gesto).
-    property <bool> busy;
-    property <bool> scrolled;
-    property <int> ticks;
-    property <int> quiet;
-    property <length> offset;
-    changed on => {
-        offset = 0;
-        busy = true;
-        ticks = 0;
-        quiet = 0;
-    }
-    Timer {
-        interval: 100ms;
-        running: root.busy || root.scrolled;
-        triggered => {
-            root.ticks += 1;
-            root.quiet += 1;
-            if (root.quiet >= 3 && (!root.busy || root.ticks >= 5)) {
-                root.busy = false;
-                root.scrolled = false;
-            }
-        }
-    }
-    // Embaixo de tudo: os botões não tratam a roda e ela chega aqui; a lista de jogos fica fora deste retângulo.
-    TouchArea {
-        scroll-event(e) => {
-            if (abs(e.delta-y) <= abs(e.delta-x) || abs(e.delta-y) < 2px) {
-                return reject;
-            }
-            root.quiet = 0;
-            if (root.busy) {
-                return accept;
-            }
-            if (!root.on) {
-                if (e.delta-y < 0) {
-                    root.busy = true;
-                    root.ticks = 0;
-                    root.clicked("game-more", 1);
-                }
-                return accept;
-            }
-            if ((e.delta-y < 0 && root.offset < more2.scroll-max) || (e.delta-y > 0 && root.offset > 0)) {
-                if (!root.scrolled) {
-                    root.ticks = 0;
-                }
-                root.scrolled = true;
-                root.offset = max(0px, min(more2.scroll-max, root.offset - e.delta-y));
-                return accept;
-            }
-            if (e.delta-y > 0 && !root.scrolled) {
-                root.busy = true;
-                root.ticks = 0;
-                root.clicked("game-more", 0);
-            }
-            accept
-        }
-    }
-    Rectangle {
-        y: on ? -24px : 0;
-        animate y { duration: Ui.tempo-fase; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-        opacity: on ? 0 : 1;
-        animate opacity { duration: Ui.phase-fade(!on); easing: !on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
-        visible: self.opacity > 0.01;
-        @children
-        // "Mais sobre o jogo ⌄": no respiro embaixo do destaque, no centro; abre a fase 2. Na janela pequena o
-        // respiro não cabe a dica: lá a fase 2 abre pela roda e pelo Page Down.
-        if !small: Rectangle {
-            x: (parent.width - self.width) / 2;
-            y: parent.height + 2px;
-            height: 24px;
-            width: hl.preferred-width;
-            border-radius: self.height / 2;
-            background: hta.has-hover ? Ui.glass-hover : transparent;
-            accessible-role: button;
-            accessible-label: more.labels[0];
-            hl := HorizontalLayout {
-                padding-left: Ui.space-12;
-                padding-right: Ui.space-8;
-                spacing: 4px;
-                Text { text: more.labels[0]; color: Ui.desk-on-muted; font-size: Ui.desk-overline; font-weight: 600; vertical-alignment: center; }
-                DeskIcon { name: "chevron-down"; size: 14px; tint: Ui.desk-on-muted; y: (parent.height - self.height) / 2; }
-            }
-            hta := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.clicked("game-more", 1); }
-            }
-        }
-    }
-    more2 := GameMore {
-        y: on ? 0 : 24px;
-        animate y { duration: Ui.tempo-fase; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
-        opacity: on ? 1 : 0;
-        animate opacity { duration: Ui.phase-fade(on); easing: on ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
-        visible: self.opacity > 0.01;
-        more: shown;
-        trailer: trailer;
-        art: root.art;
-        small: small;
-        offset: root.offset;
-        clicked(z, i) => { root.clicked(z, i); }
     }
 }
 
@@ -3518,17 +2515,13 @@ component DeskLibrary inherits Rectangle {
     in property <DeskGameView> game;
     // Visão geral (TelaBiblioteca): no lugar do destaque do jogo enquanto `overview.on`.
     in property <DeskOverview> overview;
-    // DestaqueFases: a fase 2 do destaque (e se ela está aberta).
-    in property <DeskMore> more;
+    // A página do jogo (TelaJogo): o que ela tem além do destaque, a arte que está na tela e a rolagem de Page Up/Down.
+    in property <DeskPage> page;
+    in property <image> art;
+    in property <float> scroll-page;
     in property <[PanelRow]> actions;
     in property <[DeskInfo]> stats;
     in property <[DeskInfo]> details;
-    in property <string> sessions-summary;
-    in property <[DeskInfo]> sessions;
-    in property <[string]> card-labels;
-    in property <string> about-label;
-    in property <string> details-label;
-    in property <string> more-install-label;
     in property <string> zone;
     in property <int> zone-index;
     in property <bool> focus-visible;
@@ -3907,52 +2900,36 @@ component DeskLibrary inherits Rectangle {
             LoadingStage { x: 0; y: 0; width: parent.width; height: parent.height; small: small; }
             Octopus { x: 0; y: 0; width: 90px; height: 69px; with-name: false; self-assemble: true; accessible-role: none; }
         }
-        if !overview.on && game.has-game: phases := GamePhases {
-            horizontal-stretch: 1;
-            more: more;
-            trailer: game.trailer;
-            art: game.art;
-            small: small;
-            clicked(z, i) => { root.clicked(z, i); }
-          GameStage {
-            width: phases.width;
-            height: phases.height;
-            game-in: game;
-            actions: actions;
-            stats: stats;
-            details: details;
-            sessions-summary: sessions-summary;
-            sessions: sessions;
-            card-labels: card-labels;
-            about-label: about-label;
-            details-label: details-label;
-            more-install-label: more-install-label;
-            zone: zone;
-            zone-index: zone-index;
-            focus-visible: focus-visible;
-            small: small;
-            clicked(z, i) => { root.clicked(z, i); }
-            menu(x, y) => { root.menu(x, y); }
-          }
-        }
     }
 
-    // Loja do jogo escolhido, no canto superior direito do destaque.
-    if !wide && !small && !more.on && game.has-game: HorizontalLayout {
-        x: 0;
-        y: 0;
-        width: parent.width;
-        height: 28px;
-        alignment: end;
-        opacity: mode-in ? 1 : 0;
-        animate opacity { duration: Ui.mode-fade(mode-in); easing: mode-in ? cubic-bezier(0.2, 0.8, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1); }
-        spacing: 8px;
-        PlayStatusSelect {
-            status: game.play-status;
-            label: game.play-status-label;
-            clicked(x, y) => { root.menu(x, y); root.clicked("status", 0); }
+    // TelaJogo: a página do jogo, colada à lista (sem as margens da janela), do topo ao pé da janela por baixo da barra
+    // de cima; o destaque leva a arte até as bordas.
+    if !wide && !overview.on && game.has-game: PaginaDoJogo {
+        x: col-w - pad-x - root.x;
+        y: -Ui.topbar-height - Ui.space-20;
+        width: DeskArt.win-w - col-w;
+        height: DeskArt.win-h;
+        game: game;
+        page: page;
+        art: art;
+        actions: actions;
+        stats: stats;
+        details: details;
+        zone: zone;
+        zone-index: zone-index;
+        focus-visible: focus-visible;
+        small: small;
+        scroll-page: scroll-page;
+        clicked(z, i) => {
+            root.focus-main();
+            root.clicked(z, i);
         }
-        if game.store-name != "": StorePill { icon: game.store-icon; text: game.store-name; }
+        menu(x, y) => { root.menu(x, y); }
+        status-menu(x, y, w) => {
+            DeskArt.anchor-w = w;
+            root.menu(x, y);
+            root.clicked("status", 0);
+        }
     }
 
     if wide: VerticalLayout {
@@ -8161,7 +7138,7 @@ component ArtLayer inherits Rectangle {
         if Ui.has-custom-background && Ui.custom-background.width > 0: Rectangle {
             background: Ui.custom-background-scrim;
         }
-        if !Ui.has-custom-background && !DeskArt.has-art && !DeskArt.plain: Rectangle {
+        if !Ui.has-custom-background && !DeskArt.has-art && !DeskArt.plain && !DeskArt.paged: Rectangle {
             background: @linear-gradient(160deg, DeskArt.accent 0%, DeskArt.accent-deep 100%);
             animate background { duration: Ui.art-fade(true); easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
             // Brilho suave no alto à direita (EstadoSemArte).
@@ -8173,7 +7150,7 @@ component ArtLayer inherits Rectangle {
                 background: @radial-gradient(circle, Ui.desk-text.with-alpha(0.08) 0%, Ui.desk-text.with-alpha(0) 70%);
             }
         }
-        if !Ui.has-custom-background && DeskArt.has-art: Rectangle {
+        if !Ui.has-custom-background && DeskArt.has-art && !DeskArt.paged: Rectangle {
             Image {
                 x: DeskArt.x;
                 y: DeskArt.y;
@@ -8238,7 +7215,7 @@ component ArtLayer inherits Rectangle {
                 }
             }
         }
-        ArtScrim { width: parent.width; height: parent.height; small: DeskArt.small; }
+        if !DeskArt.paged: ArtScrim { width: parent.width; height: parent.height; small: DeskArt.small; }
     }
 }
 
@@ -8296,16 +7273,11 @@ export component Desktop inherits Window {
     in property <int> desk-focus-group: -1;
     in property <DeskGameView> desk-game;
     in property <DeskOverview> desk-overview;
-    in property <DeskMore> desk-more;
+    in property <DeskPage> desk-page;
+    in property <float> desk-scroll-page;
     in property <[PanelRow]> desk-actions;
     in property <[DeskInfo]> desk-stats;
     in property <[DeskInfo]> desk-details;
-    in property <string> desk-sessions-summary;
-    in property <[DeskInfo]> desk-sessions;
-    in property <[string]> desk-card-labels;
-    in property <string> desk-about-label;
-    in property <string> desk-details-label;
-    in property <string> desk-install-more-label;
     in property <string> desk-zone: "list";
     in property <int> desk-zone-index;
     in property <string> desk-empty-title;
@@ -8402,6 +7374,9 @@ export component Desktop inherits Window {
         DeskArt.win-h = root.height;
         DeskArt.gray = page != "desk-library" && page != "desk-profile";
         DeskArt.plain = page == "desk-library" && desk-overview.on;
+        DeskArt.paged = page == "desk-library" && !desk-overview.on && desk-game.has-game && desk-view != "categories";
+        DeskArt.box-x = desk-collapsed ? Ui.list-column-collapsed : Ui.list-column;
+        DeskArt.box-h = Ui.game-hero-h(root.height);
         // Troca de jogo: enquanto a arte nova carrega, fica a anterior (senão o fundo pisca sem arte e o vidro
         // fica sólido); quando chega, a arte faz um crossfade só.
         if (!desk-game.art-loading) {
@@ -8441,6 +7416,8 @@ export component Desktop inherits Window {
     }
     changed desk-game => { root.sync-art(); }
     changed desk-overview => { root.sync-art(); }
+    changed desk-view => { root.sync-art(); }
+    changed desk-collapsed => { root.sync-art(); }
 
     property <int> content-search-focus;
     property <bool> search-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "search";
@@ -8541,16 +7518,12 @@ export component Desktop inherits Window {
                 focus-group: desk-focus-group;
                 game: desk-game;
                 overview: desk-overview;
-                more: desk-more;
+                page: desk-page;
+                art: art-shown;
+                scroll-page: desk-scroll-page;
                 actions: desk-actions;
                 stats: desk-stats;
                 details: desk-details;
-                sessions-summary: desk-sessions-summary;
-                sessions: desk-sessions;
-                card-labels: desk-card-labels;
-                about-label: desk-about-label;
-                details-label: desk-details-label;
-                more-install-label: desk-install-more-label;
                 zone: desk-zone;
                 zone-index: desk-zone-index;
                 focus-visible: desk-focus-visible;

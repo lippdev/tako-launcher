@@ -320,11 +320,11 @@ export global Ui {
     public pure function art-unblur-delay(entering: bool) -> duration {
         return entering && !reduce-motion ? 120ms : 0ms;
     }
-    // Fases do destaque (DestaqueFases): a fase nova anda e acende em 460, a atual apaga em 200.
-    out property <duration> tempo-fase: reduce-motion ? 0ms : 460ms;
-    out property <duration> tempo-fase-sai: reduce-motion ? 0ms : 200ms;
-    public pure function phase-fade(entering: bool) -> duration {
-        return entering ? tempo-fase : tempo-fase-sai;
+    // Página do jogo (TelaJogo): a arte nova assenta de 1,05 a 1 em 1,8 s.
+    out property <duration> tempo-assenta: reduce-motion ? 0ms : 1800ms;
+    // Altura do destaque da página do jogo (560 a 700, 86% da janela).
+    public pure function game-hero-h(win: length) -> length {
+        return max(560px, min(700px, win * 0.86));
     }
     // Entrada do app (só na abertura): arte, barra, lista, título, faixa e ações e cartões acendem um a um, 70 depois
     // da parte anterior, cada um em `tempo-pagina` subindo `intro-rise`. Com "Reduzir animações", tudo de uma vez.

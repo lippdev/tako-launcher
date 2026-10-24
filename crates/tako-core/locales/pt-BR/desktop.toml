@@ -51,7 +51,6 @@ installing_game_unknown = "Instalando {title}"
 game_label_missing = "{title} · {store}, não instalado"
 game_label_installing = "{title} · {store}, não instalado, baixando {percent}"
 group_label = "{store}, {count}"
-about_more = "Mais"
 undo = "Desfazer"
 trailer = "Trailer"
 search_esc = "Esc"
@@ -195,8 +194,7 @@ maximize = "Maximizar"
 restore = "Restaurar"
 close = "Fechar"
 
-[desktop.phase]
-more = "Mais sobre o jogo"
+[desktop.page]
 back = "Voltar"
 images = "Imagens"
 publisher = "Publicadora"

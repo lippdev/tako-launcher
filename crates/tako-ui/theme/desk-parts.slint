@@ -3,7 +3,7 @@
 import { Ui } from "tokens.slint";
 import { DeskGlyphs } from "desk-icons.slint";
 
-export struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, install-note: string, install-warn: bool, running: bool, about-more: bool, genres: [string], genres-more: string, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string, play-status: string, play-status-label: string }
+export struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, install-note: string, install-warn: bool, running: bool, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, store-icon: string, store-name: string, play-status: string, play-status-label: string }
 export struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string], score: int }
 export struct DeskBar { label: string, value: string, fraction: float, today: bool, future: bool }
 export struct DeskEntry { id: string, title: string, detail: string, note: string, value: string, thumb: image, accent: color, fraction: float, dot: bool, header: bool, row: int }

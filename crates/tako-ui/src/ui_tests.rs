@@ -671,6 +671,98 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
 /// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
 /// TelaCarregamento: `TAKO_SNAP_OUT=<pasta>` grava `splash-<progresso>.png` (440 × 600) para cada valor de
 /// `TAKO_SNAP_PROGRESS` (padrão `-1,0.42,1`; negativo = barra indeterminada), depois dos tentáculos assentarem.
+/// A página do jogo rola pelo tema: Page Down move o corpo e, passado o primário do destaque, a barra fina ganha o
+/// botão Jogar (TelaJogoRolada). Pelos pixels, porque a rolagem mora no tema e não no Tako.
+#[test]
+fn game_page_scrolls_with_page_down_and_the_thin_bar_gets_the_play_button() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (1280usize, 800usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                let mut value = value;
+                // Muitos parágrafos no Sobre: a página tem por onde rolar.
+                if let ("desk-page", Value::Struct(s)) = (name, &mut value) {
+                    let about = (0..30).map(|_| Value::String("Um parágrafo do Sobre.".into()));
+                    s.set_field("about".into(), crate::values::model(about.collect()));
+                }
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        // Passa o tempo no relógio das animações (a rolagem anima em 200 ms).
+        let settle = |shell: &mut Shell, ms: u64| {
+            let t = START.elapsed() + std::time::Duration::from_millis(ms);
+            CLOCK.with(|c| c.set(Some(t)));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        draw(&mut shell);
+        let top = settle(&mut shell, 100);
+        // Page Down rolou 85% da janela: o corpo muda e a barra fina da direita deixa de ser só fundo.
+        shell.key("\u{F72D}", tako_core::input::shortcut::KeyModifiers::NONE);
+        draw(&mut shell);
+        // A rolagem nasce no primeiro passo (o `changed` dispara) e anda no segundo.
+        settle(&mut shell, 1000);
+        let rolled = settle(&mut shell, 1600);
+        // O primário branco da barra fina: pixels claros na faixa de 52 a 114, à direita (as pílulas do topo têm só o
+        // texto claro).
+        let light = |px: &[Rgb8Pixel]| {
+            (60..110)
+                .flat_map(|y| (900..1270).map(move |x| (x, y)))
+                .filter(|(x, y)| px[y * w + x].g > 235)
+                .count()
+        };
+        assert!(
+            light(&top) < 300,
+            "sem rolar, a barra fina não tem o primário"
+        );
+        assert!(
+            light(&rolled) > 2000,
+            "rolada, a barra fina mostra o primário: {}",
+            light(&rolled)
+        );
+        assert!(top != rolled, "o corpo da página se moveu");
+        // Page Up volta ao topo.
+        shell.key("\u{F72C}", tako_core::input::shortcut::KeyModifiers::NONE);
+        draw(&mut shell);
+        settle(&mut shell, 2200);
+        let back = settle(&mut shell, 3000);
+        assert!(
+            light(&back) < 300,
+            "de volta ao topo, o primário sai da barra"
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
 /// O escurecimento da arte (UI-GLASS-001) não pode ter aresta dura: sobre fundo branco, a luminância muda de um pixel
 /// para o outro só pelo degradê, inclusive no topo e na direita da elipse atrás do texto.
 #[test]
@@ -1405,15 +1497,17 @@ created-by-tako = true
             Ok("welcome-back") => shell
                 .ctx
                 .toast_welcome_back("Bem-vindo de volta · Hades · 1 h 20 min"),
-            Ok("opening") | Ok("opening-slow") => {
+            // `playing`: o primeiro jogo aberto há 42 minutos (EstadoJogando); `opening`, ainda abrindo.
+            Ok("opening") | Ok("opening-slow") | Ok("playing") => {
                 let g = shell.ctx.library.games()[0].clone();
+                let playing = std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("playing");
                 shell.ctx.running = Some(crate::shell::ctx::RunningGame {
                     id: g.id,
                     title: g.title,
                     pid: None,
-                    started: None,
+                    started: playing.then(|| Instant::now() - std::time::Duration::from_secs(42 * 60)),
                 });
-                shell.ctx.launching = true;
+                shell.ctx.launching = !playing;
                 if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("opening-slow") {
                     shell.ctx.launch_since =
                         Some(Instant::now() - std::time::Duration::from_secs(30));
@@ -1673,6 +1767,22 @@ created-by-tako = true
                         }
                     }
                 }
+                // `TAKO_SNAP_BRIGHT=1`: arte clara também na página do jogo.
+                if let ("desk-page", Value::Struct(s)) = (*name, &mut value)
+                    && std::env::var("TAKO_SNAP_BRIGHT").is_ok()
+                {
+                    s.set_field("bright".into(), Value::Bool(true));
+                }
+                // `TAKO_SNAP_ABOUT=<n>`: n parágrafos no Sobre da página do jogo (a rolagem e os dados fixos).
+                if let ("desk-page", Value::Struct(s)) = (*name, &mut value)
+                    && let Some(n) = std::env::var("TAKO_SNAP_ABOUT")
+                        .ok()
+                        .and_then(|n| n.parse::<usize>().ok())
+                {
+                    let text = "Kratos e Atreus partem numa jornada mítica atrás de respostas antes do Ragnarök, enfrentando deuses e monstros dos Nove Reinos enquanto as forças de Odin se preparam para a batalha profetizada que vai acabar com o mundo.";
+                    let about = (0..n).map(|_| Value::String(text.into())).collect();
+                    s.set_field("about".into(), crate::values::model(about));
+                }
                 // `TAKO_SNAP_TITLE` / `TAKO_SNAP_DESC`: textos longos no destaque.
                 if let ("desk-game", Value::Struct(s)) = (*name, &mut value) {
                     for (var, field) in [
@@ -1735,6 +1845,26 @@ created-by-tako = true
                     r.render(&mut scratch, w as usize);
                 });
                 std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            // `TAKO_SNAP_PAGES=2`: com a página já na tela, Page Down duas vezes antes da captura (a página do jogo
+            // rolada; negativo = Page Up).
+            if let Some(n) = std::env::var("TAKO_SNAP_PAGES")
+                .ok()
+                .and_then(|n| n.parse::<i32>().ok())
+            {
+                let key = if n > 0 { "\u{F72D}" } else { "\u{F72C}" };
+                for _ in 0..n.abs() {
+                    shell.key(key, tako_core::input::shortcut::KeyModifiers::NONE);
+                }
+                apply(&mut shell, art.as_ref());
+                for _ in 0..wait / 50 {
+                    slint::platform::update_timers_and_animations();
+                    ui.window().request_redraw();
+                    window.draw_if_needed(|r| {
+                        r.render(&mut scratch, w as usize);
+                    });
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
             }
             slint::platform::update_timers_and_animations();
             let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
