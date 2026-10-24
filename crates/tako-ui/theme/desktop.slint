@@ -739,8 +739,8 @@ component TopBar inherits Vidro {
     drop-shadow-blur: 0px;
     drop-shadow-offset-y: 0px;
     drop-shadow-color: transparent;
-    // Barra lateral unida (`bare`): sem a linha de baixo, a barra e a coluna são um vidro só.
-    Rectangle { visible: !root.bare; y: parent.height - 1px; height: 1px; background: Ui.bar-line; }
+    // BarraSuperior mantém a linha de baixo (branca 6%) também sobre o topo da lista fixa.
+    Rectangle { y: parent.height - 1px; height: 1px; background: Ui.bar-line; }
     // Leitor de tela: anuncia início, conclusão e erro de qualquer atividade, nunca a porcentagem. Fica sempre na
     // árvore (vazio sem nada a dizer): muitos leitores não anunciam o texto de um elemento que já nasce preenchido.
     Rectangle {
