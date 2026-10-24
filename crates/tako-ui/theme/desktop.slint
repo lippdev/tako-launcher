@@ -419,22 +419,25 @@ component DeskSearchPanel inherits Rectangle {
     in property <bool> open;
     in property <string> text;
     in property <string> hint;
-    in property <string> key-label;
     in property <string> esc-label;
     in property <int> focus-request;
-    in property <[DeskGame]> games;
+    in property <[Tile]> games;
+    in property <int> initial-selection;
+    property <int> selected-index;
+    in property <string> library-label;
+    in property <string> empty-text;
     callback edited(string);
+    callback moved(int);
     callback selected(int);
     callback close();
 
-    property <int> selected-index: 0;
-
     changed open => {
         if (open) {
-            selected-index = 0;
+            selected-index = initial-selection;
             ti.focus();
         }
     }
+    changed initial-selection => { if (open) { selected-index = initial-selection; } }
     changed focus-request => {
         if (open) {
             ti.focus();
@@ -445,29 +448,34 @@ component DeskSearchPanel inherits Rectangle {
             ti.text = text;
         }
     }
+    changed selected-index => {
+        results-flick.viewport-y = selected-index * 68px;
+        if (open) { moved(selected-index); }
+    }
 
     width: 100%;
     height: 100%;
     background: Ui.desk-canvas.with-alpha(Ui.reduce-transparency ? 1.0 : (open ? 0.6 : 0));
-    animate background { duration: Ui.reduce-motion ? 0ms : 250ms; easing: Ui.curva-entrada; }
+    animate background { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
 
     TouchArea {
+        enabled: root.open;
         clicked => { root.close(); }
     }
 
     panel := Vidro {
         layer: true;
-        radius: 16px;
+        radius: Ui.radius-card;
         width: min(560px, parent.width - 32px);
         height: min(content-layout.preferred-height, parent.height - 140px);
         x: (parent.width - self.width) / 2;
         y: 110px + (root.open ? 0px : -10px);
         opacity: root.open ? 1 : 0;
         transform-scale: root.open ? 1 : 0.98;
-        animate y, transform-scale { duration: Ui.reduce-motion ? 0ms : 300ms; easing: Ui.curva-entrada; }
-        animate opacity { duration: Ui.reduce-motion ? 0ms : 250ms; easing: Ui.curva-entrada; }
+        animate y, transform-scale { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
+        animate opacity { duration: Ui.tempo-estado; easing: Ui.curva-entrada; }
 
-        TouchArea { } // Evita fechar ao clicar dentro do painel
+        TouchArea { enabled: root.open; } // Evita fechar ao clicar dentro do painel
 
         content-layout := VerticalLayout {
             // Cabeçalho / Input (58 px de altura)
@@ -491,7 +499,7 @@ component DeskSearchPanel inherits Rectangle {
                             width: parent.width;
                             text: root.hint;
                             color: Ui.desk-on-subtle;
-                            font-size: 15px;
+                            font-size: 15px * Ui.text-scale;
                             vertical-alignment: center;
                             overflow: elide;
                         }
@@ -518,28 +526,25 @@ component DeskSearchPanel inherits Rectangle {
                                 }
                                 if (e.text == Key.Return) {
                                     if (root.games.length > 0 && root.selected-index < root.games.length) {
-                                        root.selected(root.games[root.selected-index].index);
+                                        root.selected(root.selected-index);
                                     }
-                                    root.close();
                                     return accept;
                                 }
                                 reject
                             }
                             ti := TextInput {
+                                accessible-role: text-input;
+                                accessible-label: root.hint;
                                 width: parent.width;
                                 height: parent.height;
                                 text: root.text;
                                 color: Ui.desk-text;
-                                font-size: 15px;
+                                font-size: 15px * Ui.text-scale;
                                 vertical-alignment: center;
                                 single-line: true;
                                 selection-background-color: Ui.glass-pressed;
                                 selection-foreground-color: Ui.desk-text;
-                                edited => {
-                                    root.selected-index = 0;
-                                    root.edited(self.text);
-                                }
-                                accepted => { root.close(); }
+                                edited => { root.edited(self.text); }
                             }
                         }
                     }
@@ -570,7 +575,7 @@ component DeskSearchPanel inherits Rectangle {
                 background: Ui.line;
             }
 
-            // Lista de resultados (máximo 380 px)
+            // Lista de resultados (máximo 380 px); a seleção mantém a linha visível.
             results-flick := Flickable {
                 max-height: 380px;
                 viewport-height: results-list.preferred-height;
@@ -579,16 +584,15 @@ component DeskSearchPanel inherits Rectangle {
                     spacing: 4px;
                     for g[idx] in root.games: Rectangle {
                         height: 64px;
+                        accessible-role: button;
+                        accessible-label: g.title + " · " + g.meta + " · " + root.library-label;
                         border-radius: 10px;
                         background: (idx == root.selected-index || row-ta.has-hover) ? Ui.glass-hover : transparent;
                         animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
 
                         row-ta := TouchArea {
                             mouse-cursor: pointer;
-                            clicked => {
-                                root.selected(g.index);
-                                root.close();
-                            }
+                            clicked => { root.selected(idx); }
                         }
 
                         HorizontalLayout {
@@ -613,12 +617,15 @@ component DeskSearchPanel inherits Rectangle {
                                     height: 100%;
                                     background: g.accent;
                                     Text {
-                                        text: g.initial;
-                                        color: #ffffff;
-                                        font-size: 16px;
+                                        width: parent.width;
+                                        height: parent.height;
+                                        text: g.title;
+                                        color: Ui.desk-text;
+                                        font-size: 11px * Ui.text-scale;
                                         font-weight: 700;
                                         vertical-alignment: center;
                                         horizontal-alignment: center;
+                                        overflow: elide;
                                     }
                                 }
                             }
@@ -630,14 +637,14 @@ component DeskSearchPanel inherits Rectangle {
                                 spacing: 3px;
                                 Text {
                                     text: g.title;
-                                    font-size: 14px;
+                                    font-size: 14px * Ui.text-scale;
                                     font-weight: 600;
                                     color: Ui.desk-text;
                                     overflow: elide;
                                 }
                                 Text {
-                                    text: g.store-name != "" ? g.store-name + (g.label != "" ? " · " + g.label : "") : g.label;
-                                    font-size: 12px;
+                                    text: g.meta;
+                                    font-size: 12px * Ui.text-scale;
                                     color: Ui.desk-on-subtle;
                                     overflow: elide;
                                 }
@@ -655,8 +662,8 @@ component DeskSearchPanel inherits Rectangle {
                                     padding-right: 7px;
                                     alignment: center;
                                     Text {
-                                        text: "Biblioteca";
-                                        font-size: 12px;
+                                        text: root.library-label;
+                                        font-size: 12px * Ui.text-scale;
                                         color: Ui.desk-on-subtle;
                                         vertical-alignment: center;
                                     }
@@ -667,8 +674,8 @@ component DeskSearchPanel inherits Rectangle {
                     if root.games.length == 0: Rectangle {
                         height: 72px;
                         Text {
-                            text: "Nenhum resultado encontrado";
-                            font-size: 13px;
+                            text: root.empty-text;
+                            font-size: 13px * Ui.text-scale;
                             color: Ui.desk-on-subtle;
                             vertical-alignment: center;
                             horizontal-alignment: center;
@@ -3666,7 +3673,7 @@ component DeskLibrary inherits Rectangle {
                 // Recolhida: a busca vira a lupa (expande e foca) e o botão de expandir.
                 if collapsed: VerticalLayout {
                     spacing: Ui.space-6;
-                    ListBtn { icon: "search"; label: search-hint; filled: true; focused: focus-visible && zone == "controls" && zone-index == 0; clicked => { root.expand-search(); } }
+                    ListBtn { icon: "search"; label: search-hint; filled: true; focused: focus-visible && zone == "controls" && zone-index == 0; clicked => { root.clicked("global-search", 0); } }
                     ListBtn { icon: "panel"; label: view-labels[10]; focused: focus-visible && zone == "controls" && zone-index == 1; clicked => { root.clicked("collapse", 0); } }
                 }
                 OverviewRow {
@@ -5814,7 +5821,7 @@ component DeskOverlay inherits Rectangle {
     callback menu(length, length);
     callback edited(string, string);
     callback hovered(string, int);
-    property <bool> generic: ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
+    property <bool> generic: ov.kind != "search" && ov.kind != "panel" && ov.kind != "menu" && ov.kind != "keyboard" && ov.kind != "tags" && ov.kind != "art"
         && ov.kind != "splash" && ov.kind != "launch" && ov.kind != "progress" && ov.kind != "update" && ov.kind != "activities";
     property <bool> has-buttons: ov.rows.length > 0 && ov.rows[ov.rows.length - 1].kind == "button";
     if ov.kind == "splash" || ov.kind == "launch" || ov.kind == "progress": OverlayView {
@@ -8391,7 +8398,6 @@ export component Desktop inherits Window {
     changed width => { root.sync-art(); }
     changed height => { root.sync-art(); }
     changed page => {
-        floating-search = false;
         root.sync-art();
         if (page == "desk-library") {
             lib-in = false;
@@ -8412,9 +8418,8 @@ export component Desktop inherits Window {
     changed desk-overview => { root.sync-art(); }
 
     property <int> content-search-focus;
-    property <bool> floating-search;
+    property <bool> search-open: overlays.length > 0 && overlays[overlays.length - 1].kind == "search";
     public function focus-content-search() {
-        floating-search = page != "desk-library" && page != "settings";
         search-timer.running = true;
     }
     search-timer := Timer {
@@ -8431,8 +8436,12 @@ export component Desktop inherits Window {
     // Teclado: o Tako decide o que cada tecla faz; Ctrl+K (ou Ctrl+F) vai para a busca e Ctrl+, para as Configurações.
     fs := FocusScope {
         key-pressed(e) => {
-            if (e.modifiers.control && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && (page == "desk-library" || page == "settings" || page == "desk-profile") && overlays.length == 0) {
-                root.focus-content-search();
+            if ((e.modifiers.control || e.modifiers.meta) && !e.modifiers.alt && (e.text == "k" || e.text == "K" || e.text == "f" || e.text == "F") && overlays.length == 0) {
+                if (page == "desk-library" || page == "settings") {
+                    root.focus-content-search();
+                } else if (e.text == "k" || e.text == "K") {
+                    root.key(e.text, e.repeat, true, e.modifiers.shift, e.modifiers.alt);
+                }
                 return accept;
             }
             if (e.modifiers.control && !e.modifiers.alt && e.text == "," && overlays.length == 0) {
@@ -8598,24 +8607,20 @@ export component Desktop inherits Window {
         }
     }
 
-    if floating-search: DeskSearchPanel {
-        open: floating-search;
-        text: desk-search;
-        hint: desk-search-hint;
-        key-label: desk-search-key;
+    DeskSearchPanel {
+        open: search-open;
+        text: search-open ? overlays[overlays.length - 1].input : "";
+        hint: search-open ? overlays[overlays.length - 1].search-hint : desk-search-hint;
         esc-label: desk-search-esc;
         focus-request: content-search-focus;
-        games: desk-games;
-        edited(t) => { root.edited("search", t); }
-        selected(idx) => {
-            root.clicked("game", idx);
-            floating-search = false;
-            fs.focus();
-        }
-        close => {
-            floating-search = false;
-            fs.focus();
-        }
+        games: search-open ? overlays[overlays.length - 1].search-results : [];
+        initial-selection: search-open ? overlays[overlays.length - 1].sel : 0;
+        library-label: search-open ? overlays[overlays.length - 1].search-library-label : "";
+        empty-text: search-open ? overlays[overlays.length - 1].search-empty-text : "";
+        edited(t) => { root.edited("overlay-search", t); }
+        moved(idx) => { root.clicked("overlay-search-move", idx); }
+        selected(idx) => { root.clicked("overlay-search-select", idx); fs.focus(); }
+        close => { root.clicked("overlay-search-close", 0); fs.focus(); }
     }
 
     if control-center: ControlCenter {

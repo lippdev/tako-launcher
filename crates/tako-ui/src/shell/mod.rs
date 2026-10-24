@@ -16,6 +16,7 @@ pub mod downloads;
 pub mod edit_game;
 pub mod first_run;
 pub mod game_settings;
+mod global_search;
 pub mod home;
 pub mod keyboard;
 pub mod keys;
@@ -514,6 +515,19 @@ impl Shell {
                 .effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture));
             return true;
         }
+        if self.ctx.desktop
+            && self.layers.is_empty()
+            && mods.contains(tako_core::input::shortcut::KeyModifiers::CTRL)
+            && !mods.contains(tako_core::input::shortcut::KeyModifiers::ALT)
+            && matches!(text, "k" | "K")
+            && self.page().kind() != "desk-library"
+            && self.page().kind() != "settings"
+        {
+            self.layers
+                .push(Box::new(global_search::GlobalSearch::new()));
+            self.ctx.dirty = true;
+            return true;
+        }
         let Some(mut top) = self.layers.pop() else {
             if !self.ctx.desktop {
                 return false;
@@ -562,6 +576,11 @@ impl Shell {
         self.ctx.dirty = true;
         self.ctx.pointer = false;
         self.ctx.focus_visible = false;
+        if self.ctx.desktop && zone == "global-search" {
+            self.layers
+                .push(Box::new(global_search::GlobalSearch::new()));
+            return;
+        }
         if let Some(cc) = self.cc.as_mut() {
             if let Some(z) = zone.strip_prefix("cc-")
                 && cc.click(z, index, &mut self.ctx)

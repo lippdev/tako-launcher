@@ -356,7 +356,7 @@ fn solid_panel_text_meets_wcag_aa_contrast() {
 }
 
 #[test]
-fn desktop_search_shortcuts_focus_the_visible_field_and_leave_returns_to_content() {
+fn desktop_shortcuts_focus_native_search_and_return_to_content() {
     let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     std::thread::spawn(|| {
         use slint::platform::WindowEvent;
@@ -388,7 +388,6 @@ fn desktop_search_shortcuts_focus_the_visible_field_and_leave_returns_to_content
             ("desk-library", "grid"),
             ("desk-library", "categories"),
             ("settings", "list"),
-            ("desk-profile", "list"),
         ] {
             ui.set_property("page", Value::String(page.into())).unwrap();
             ui.set_property("desk-view", Value::String(view.into()))
@@ -1545,7 +1544,8 @@ created-by-tako = true
             }
             Ok("search-panel") => {
                 shell.open_route(crate::shell::profile::ROUTE);
-                shell.edited("search", "Hades");
+                shell.click("global-search", 0);
+                shell.edited("overlay-search", "e");
             }
             Ok("restore-confirm") => {
                 shell.open_route("settings");
@@ -1704,9 +1704,6 @@ created-by-tako = true
             crate::bridge::set_global(&ui, "Ui", "reduce-motion", Value::Bool(motion));
             let flat = (shell.ctx.settings).bool(crate::shell::ctx::keys::REDUCED_TRANSPARENCY, false);
             crate::bridge::set_global(&ui, "Ui", "reduce-transparency", Value::Bool(flat));
-            if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("search-panel") {
-                let _ = ui.set_property("floating-search", Value::Bool(true));
-            }
             if switch.is_some() {
                 let id = shell.focused_game();
                 let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));

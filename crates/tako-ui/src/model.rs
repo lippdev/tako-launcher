@@ -231,6 +231,11 @@ theme_struct! {
         pub thumb_cols: i32,
         pub preview: Image,
         pub preview_text: String,
+        // Busca geral do desktop; a lista contém apenas jogos da biblioteca.
+        pub search_results: Vec<Tile>,
+        pub search_library_label: String,
+        pub search_empty_text: String,
+        pub search_hint: String,
     }
 }
 
