@@ -1,0 +1,78 @@
+/* Medidas do PassosDoOnboarding (design/desktop/components/PassosDoOnboarding/README.md) */
+.root {
+  --onboarding-step-gap: 12px;
+  --onboarding-step-font-size: 13px;
+  --onboarding-step-bar-width: 24px;
+  --onboarding-step-bar-height: 3px;
+  --onboarding-step-bar-radius: 3px;
+  --onboarding-step-bar-gap: 6px;
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--onboarding-step-gap);
+}
+
+.counter {
+  font-family: inherit;
+  font-size: var(--onboarding-step-font-size);
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.bars {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--onboarding-step-bar-gap);
+}
+
+.bar {
+  display: block;
+  width: var(--onboarding-step-bar-width);
+  height: var(--onboarding-step-bar-height);
+  border-radius: var(--onboarding-step-bar-radius);
+  transition: background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.barActive {
+  background: var(--text);
+}
+
+.barInactive {
+  background: color-mix(in srgb, var(--text) 15%, transparent);
+}
+
+/* Escada de entrada ao trocar de passo (PassosDoOnboardingMovimento)
+   Sem desfoque/blur, apenas opacidade e translateY conforme a regra da tarefa. */
+.staggerContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.staggerItem {
+  animation: staggerIn var(--tempo-estado) var(--curva-entrada) both;
+  animation-delay: calc(var(--stagger-index, 0) * var(--tempo-escada));
+}
+
+@keyframes staggerIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
+  .staggerItem {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

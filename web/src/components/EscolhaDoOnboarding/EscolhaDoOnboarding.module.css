@@ -1,0 +1,182 @@
+/* Medidas do EscolhaDoOnboarding (design/desktop/components/EscolhaDoOnboarding/README.md) */
+.group {
+  --onboarding-choice-gap: 14px;
+  --onboarding-choice-row-gap: 8px;
+  --onboarding-choice-card-width: 290px;
+  --onboarding-choice-card-radius: 14px;
+  --onboarding-choice-card-padding: 8px 8px 12px;
+  --onboarding-choice-thumbnail-height: 150px;
+  --onboarding-choice-thumbnail-radius: 10px;
+  --onboarding-choice-row-radius: 12px;
+  --onboarding-choice-row-padding: 14px;
+  --onboarding-choice-radio-size: 16px;
+
+  display: flex;
+}
+
+.variantCard {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--onboarding-choice-gap);
+}
+
+.variantRow {
+  flex-direction: column;
+  gap: var(--onboarding-choice-row-gap);
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Variante Cartão */
+.cardItem {
+  display: flex;
+  flex-direction: column;
+  width: var(--onboarding-choice-card-width);
+  padding: var(--onboarding-choice-card-padding);
+  border-radius: var(--onboarding-choice-card-radius);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color var(--tempo-hover) var(--curva-estado),
+              background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.cardItem:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+.cardItem:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.cardItemSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 10px 30px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.thumbnailContainer {
+  height: var(--onboarding-choice-thumbnail-height);
+  border-radius: var(--onboarding-choice-thumbnail-radius);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--text) 6%, transparent);
+  background: var(--canvas);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 4px 2px;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cardCheck {
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+}
+
+.cardDescription {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0 4px;
+}
+
+.cardHint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 6px 4px 0;
+}
+
+/* Variante Linha */
+.rowItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 50px;
+  padding: var(--onboarding-choice-row-padding);
+  border-radius: var(--onboarding-choice-row-radius);
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color var(--tempo-hover) var(--curva-estado),
+              background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.rowItem:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+.rowItem:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rowItemSelected {
+  border-color: var(--text);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+.radioIndicator {
+  width: var(--onboarding-choice-radio-size);
+  height: var(--onboarding-choice-radio-size);
+  border-radius: 50%;
+  border: 2px solid var(--text-dim);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition: border-color var(--tempo-hover) var(--curva-estado),
+              border-width var(--tempo-hover) var(--curva-estado);
+}
+
+.radioIndicatorSelected {
+  border-color: var(--text);
+  border-width: 5px;
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rowTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rowDescription {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardItem,
+  .rowItem,
+  .radioIndicator {
+    transition: none;
+  }
+}
