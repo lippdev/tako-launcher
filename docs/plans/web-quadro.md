@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-02b, WEB-06a, WEB-01e |
+| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-02b, WEB-06a, WEB-01e, WEB-05a |
 | Antigravity | `antigravity` | WEB-04g, WEB-04h, WEB-04i (resetou; conferir tudo que ele entrega) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
@@ -26,7 +26,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-04a | **Componentes base, lote 1:** BotaoDesktop, Abas, CampoDeBusca, CampoDeSelecao + MenuDeContexto, Dialogo, Aviso | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-03 | `web/src/components/` | integrada (aguarda validação visual) |
 | WEB-04b | **Componentes base, lote 2:** GrupoDeBlocos, LinhaDeConfiguracao, ControleDeslizante, chave, PainelLateral, ListaDeJogos virtualizada | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-03 | `web/src/components/` | integrada (aguarda validação visual) |
 | WEB-06 | **Textos:** `locales/` servido à interface, troca de idioma em tempo de execução | N2 | a definir na hora | WEB-00, WEB-02a | `crates/tako-web/`, `web/src/i18n/` | fila |
-| WEB-05 | **Foco e controle:** navegação espacial, foco visível, repetição, entrada do SDL3 pela ponte | N3 | a definir na hora | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | fila |
+| WEB-05 | **Foco e controle:** WEB-05a (navegação espacial no React, foco visível, regiões; Claude Alyx · Sonnet 5.5) e WEB-05b (entrada do SDL3 pela ponte, depois do processo separado) | N3 | Claude Alyx · Sonnet 5.5 alto (05a) | WEB-02a, WEB-04a | `web/src/focus/`, `crates/tako-web/` (eventos de entrada) | 05a despachada; 05b na fila |
 | WEB-01b | **`tako-app`, segunda fatia:** configurações, coleções (manuais e automáticas resolvidas pelo id no núcleo), tags e status do jogo, favoritos | N3 | Codex Alyx · GPT-6.1-Sol medium (trocou de conta) | WEB-01a | `crates/tako-app/` | integrada |
 | WEB-10a | **Estrutura do app, barra de cima e janela:** BarraSuperior com BarraDaJanela (só BIBLIOTECA, sem loja), MenuDoTako, vistas com TrocaDeTela, lista recolhível, `ui.state`, atalhos, janela pequena | N3 | Claude InvestSmart · Sonnet 5.5 alto → continuação no Codex Alyx (limite de uso) | WEB-04a, WEB-04b | `web/src/app/`, `web/src/App.tsx` | integrada (aguarda validação visual) |
 | WEB-01c | **Leitura das lojas na `tako-app`:** descoberta pela `tako-sources` numa thread própria, snapshot, `library.changed` ao terminar; hoje a versão web só vê o snapshot deixado pelo Slint | N4 | Codex Alyx · GPT-6.1-Sol high | WEB-01a | `crates/tako-app/` | integrada |
