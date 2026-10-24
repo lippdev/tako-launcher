@@ -626,7 +626,7 @@ component BlocoDoJogo inherits Rectangle {
     callback clicked();
     callback reveal(length, length);
     changed focused => {
-        if focused: root.reveal(self.absolute-position.y, self.height);
+        if (focused) { root.reveal(self.absolute-position.y, self.height); }
     }
     horizontal-stretch: 1;
     height: 120px;
@@ -691,7 +691,7 @@ component LinhaDeAtencao inherits Rectangle {
     callback act();
     callback reveal(length, length);
     changed focused => {
-        if focused: root.reveal(self.absolute-position.y, self.height);
+        if (focused) { root.reveal(self.absolute-position.y, self.height); }
     }
     height: 74px;
     border-radius: 14px;
@@ -765,6 +765,7 @@ component Prateleira inherits Rectangle {
     in property <int> focus-index: -1;
     callback open(int);
     callback play(int);
+    callback reveal(length, length);
     property <int> cols: max(3, floor((self.width + 16px) / 216px));
     property <length> cover-w: (self.width - (cols - 1) * Ui.space-16) / cols;
     property <length> step: cover-w + Ui.space-16;
@@ -776,6 +777,7 @@ component Prateleira inherits Rectangle {
     // O foco do teclado traz a capa para a vista.
     changed focus-index => {
         if (focus-index >= 0) {
+            root.reveal(self.absolute-position.y, self.height);
             if (focus-index * step < -fl.viewport-x) {
                 fl.viewport-x = clamp(-focus-index * step, min-x, 0px);
             } else if (focus-index * step + cover-w > -fl.viewport-x + root.width) {
@@ -831,7 +833,6 @@ export component VisaoGeral inherits Rectangle {
     changed focus-key => {
         if (focus-visible) {
             if (o.focus-kind == "hero" || o.focus-kind == "back") { fl.viewport-y = 0px; }
-            if (o.focus-kind == "cover") { reveal(shelf.absolute-position.y, shelf.height); }
         }
     }
     fl := Flickable {
@@ -944,6 +945,7 @@ export component VisaoGeral inherits Rectangle {
                 shelf := Prateleira {
                     items: o.installed;
                     focus-index: focus-visible && o.focus-kind == "cover" ? o.focus-index : -1;
+                    reveal(y, h) => { root.reveal(y, h); }
                     open(i) => { root.clicked("ov-cover", i); }
                     play(i) => { root.clicked("ov-cover-play", i); }
                 }

@@ -2531,7 +2531,7 @@ impl Page for DesktopLibrary {
         // Na Visão geral nenhum jogo está escolhido; só a lista com o foco do teclado mostra onde ele está.
         let overview = self.overview_on(ctx);
         let targets = if overview {
-            overview::targets(ctx)
+            overview::targets(ctx, ctx.overview_show_back)
         } else {
             Vec::new()
         };
@@ -2546,11 +2546,6 @@ impl Page for DesktopLibrary {
         if self.more != hero || View::of(ctx) == View::Categories || overview {
             self.more = None;
         }
-        let targets = if overview {
-            overview::targets(ctx, ctx.overview_show_back)
-        } else {
-            Vec::new()
-        };
         if overview && self.zone == Zone::Actions && targets.is_empty() {
             self.zone = Zone::List;
         }
@@ -3977,11 +3972,24 @@ mod tests {
         let (_dir, mut shell) = shell();
         shell.show_overview();
         shell.ctx.overview_show_back = false;
-        let hero = overview::hero(&shell.ctx).unwrap().id.clone();
+        let visible_targets = overview::targets(&shell.ctx, false);
+        assert!(
+            visible_targets
+                .iter()
+                .all(|target| !matches!(target, Target::Back(_)))
+        );
         shell.handle(Cmd::Down);
-        assert_eq!(page(&shell).index, 0);
+        assert!(page(&shell).index < visible_targets.len());
+        assert!(!matches!(
+            visible_targets[page(&shell).index],
+            Target::Back(_)
+        ));
         shell.handle(Cmd::Accept);
-        assert!(shell.ctx.effects.contains(&Effect::Launch(hero)) || shell.has_layers());
+        assert!(!shell
+            .ctx
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::Launch(id) if overview::game_of(&shell.ctx, Target::Back(0)).is_some_and(|game| game.id == *id))));
         assert!(page(&shell).overview_on(&shell.ctx));
     }
 

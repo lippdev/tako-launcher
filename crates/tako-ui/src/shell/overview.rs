@@ -619,6 +619,11 @@ mod tests {
         let o = build(&shell.ctx, None);
         assert_eq!(o.week_groups.len(), w.groups.len());
         assert!(!o.bars_text.is_empty());
+        type StateChange = Box<
+            dyn FnOnce(
+                Option<tako_core::library::GameStateRecord>,
+            ) -> tako_core::library::GameStateRecord,
+        >;
         let old_states = shell
             .ctx
             .library
@@ -636,13 +641,11 @@ mod tests {
                         s
                     })
                     .collect();
-                (
-                    g.id.clone(),
-                    tako_core::library::GameStateRecord {
-                        sessions,
-                        ..Default::default()
-                    },
-                )
+                let change: StateChange = Box::new(move |_| tako_core::library::GameStateRecord {
+                    sessions,
+                    ..Default::default()
+                });
+                (g.id.clone(), change)
             })
             .collect();
         shell.ctx.library.import(Vec::new(), old_states).unwrap();
@@ -726,7 +729,7 @@ mod tests {
         let o = build(&shell.ctx, None);
         assert_eq!(o.installed.len(), row.len());
         assert!(o.installed_count.contains(&row.len().to_string()));
-        let t = targets(&shell.ctx);
+        let t = targets(&shell.ctx, shell.ctx.overview_show_back);
         assert_eq!(t.last(), Some(&Target::Cover(row.len() - 1)));
     }
 }
