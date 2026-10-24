@@ -719,6 +719,8 @@ Object.assign(defaults, {
 const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
   "pt-BR": {
     "settings.general.title": "Geral",
+    "first_run.splash.scanning": "Procurando seus jogos…",
+    "first_run.splash.starting": "Iniciando o Tako…",
     "common.games.one": "{n} jogo",
     "common.games.other": "{n} jogos",
     // Downloads (WEB-14b): os textos de `downloads.toml` e dois de `common.toml`.
@@ -764,6 +766,8 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
   },
   "en-US": {
     "settings.general.title": "General",
+    "first_run.splash.scanning": "Looking for your games…",
+    "first_run.splash.starting": "Starting Tako…",
     "common.games.one": "{n} game",
     "common.games.other": "{n} games",
     // Downloads (WEB-14b): os textos de `downloads.toml` e dois de `common.toml`.
@@ -1039,3 +1043,33 @@ Object.assign(defaults, {
     }
   },
 });
+
+// ---- Abertura do app (WEB-35) ----
+// Parâmetros da página para ver a abertura no navegador:
+//   ?demora=2000  a `library.list` só responde depois desse tanto desde a abertura (a entrada espera a biblioteca chegar);
+//   ?primeira     biblioteca vazia e leitura das lojas em andamento (a tela de primeira leitura);
+//   ?limpar       esquece o `ui.state` guardado (sem ele a página abre como a primeira abertura).
+// Sem `ui.state` guardado vale a abertura normal; com ele (como ao voltar de um jogo) o app aparece direto.
+const openParams = typeof location === "undefined" ? new URLSearchParams() : new URLSearchParams(location.search);
+if (openParams.has("limpar")) {
+  sessionStorage.removeItem("tako.dev.ui.state");
+  uiState = { json: null };
+}
+const openDelayMs = Number(openParams.get("demora")) || 0;
+const firstRead = openParams.has("primeira");
+if (openDelayMs > 0 || firstRead) {
+  const listBase = defaults["library.list"];
+  const readyAt = performance.now() + openDelayMs;
+  Object.assign(defaults, {
+    "library.list": async (payload: unknown) => {
+      const wait = readyAt - performance.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      const page = listBase?.(payload) as { rows: unknown[]; total: number };
+      return firstRead && sources.scanning ? { rows: [], total: 0 } : page;
+    },
+  });
+}
+if (firstRead) {
+  sources = { ...sources, completed: 0, sources: [] };
+  scanSources();
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "./app/AppShell";
+import { Abertura } from "./app/abertura/Abertura";
 import { DevPage } from "./dev/DevPage";
 import { Gallery } from "./dev/gallery/Gallery";
 
@@ -22,5 +23,9 @@ export function App() {
   const route = useRoute();
   if (route === "/dev") return <DevPage />;
   if (route === "/componentes") return <Gallery />;
-  return <AppShell />;
+  return (
+    <Abertura>
+      <AppShell />
+    </Abertura>
+  );
 }
