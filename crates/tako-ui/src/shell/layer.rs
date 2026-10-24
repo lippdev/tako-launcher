@@ -255,8 +255,11 @@ impl MenuItem {
                 })
                 .collect()
         };
+        // O título da linha no alto da lista (MenuDeContexto do CampoDeSelecao).
         Some(Box::new(
-            MenuLayer::menu("", build).wide().focus_at(current),
+            MenuLayer::menu(self.row.title.clone(), build)
+                .wide()
+                .focus_at(current),
         ))
     }
     pub fn on(mut self, f: impl Fn(&mut Ctx) -> Flow + 'static) -> Self {

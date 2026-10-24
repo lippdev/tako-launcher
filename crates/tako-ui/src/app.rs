@@ -1862,8 +1862,6 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     );
     for (name, key) in [
         ("play", "game.play"),
-        ("silence", "accessibility.sound_silence"),
-        ("max", "accessibility.sound_max"),
         ("dl-pause", "downloads.pause"),
         ("dl-resume", "downloads.resume"),
         ("dl-cancel", "downloads.cancel"),

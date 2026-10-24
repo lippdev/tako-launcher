@@ -855,6 +855,8 @@ fn desktop_choices_are_selects_that_pick_each_option() {
                     continue;
                 }
                 let mut layer = item.select(&ctx).expect("select");
+                // A lista abre com o título da linha no alto.
+                assert_eq!(layer.render(&ctx).title, item.row.title);
                 let _ = layer.click("row", k, &mut ctx);
                 let item = find(&(cat.rows)(&ctx), &key);
                 let now = (item.options.unwrap())(&ctx).1;
@@ -897,6 +899,36 @@ fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
     );
     let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
     assert_eq!(volume(&ctx.settings), 65);
+}
+
+#[test]
+fn liquid_glass_slider_uses_five_point_arrows_and_ten_with_shift() {
+    use crate::shell::keys::RIGHT;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    ctx.settings.set("DesktopTheme", "glass");
+    let adjust = find(&super::desk_theme::rows(&ctx), "glass-opacity")
+        .adjust
+        .unwrap();
+    let _ = adjust(&mut ctx, 1);
+    assert_eq!(
+        find(&super::desk_theme::rows(&ctx), "glass-opacity")
+            .row
+            .value,
+        "33"
+    );
+    let _ = find(&super::desk_theme::rows(&ctx), "glass-opacity").slide_key(
+        &RIGHT.to_string(),
+        true,
+        &mut ctx,
+    );
+    assert_eq!(
+        find(&super::desk_theme::rows(&ctx), "glass-opacity")
+            .row
+            .value,
+        "43"
+    );
 }
 
 #[test]

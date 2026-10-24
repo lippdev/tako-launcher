@@ -145,10 +145,9 @@ fn slider_row(ctx: &Ctx, id: &str, text: &str, key: &'static str, default: i32) 
         ctx.dirty = true;
         Flow::Stay
     })
-    // ← → andam 10.
+    // ← → andam 5; Shift ← → continuam andando 10 pelo fluxo comum.
     .on_adjust(move |ctx, direction| {
-        let next =
-            (dt::slider(&ctx.settings, key, default) + direction.signum() * 10).clamp(0, 100);
+        let next = (dt::slider(&ctx.settings, key, default) + direction.signum() * 5).clamp(0, 100);
         ctx.settings.set(key, &next.to_string());
         ctx.dirty = true;
         Flow::Stay
