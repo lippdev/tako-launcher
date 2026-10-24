@@ -326,10 +326,15 @@ impl Shell {
                 }
                 return;
             }
-            if let Some(cat) = route.strip_prefix("settings:") {
+            if let Some(target) = route.strip_prefix("settings:") {
+                // `settings:<categoria>` ou `settings:<categoria>/<linha>` (a linha pisca ao abrir).
+                let page = match target.split_once('/') {
+                    Some((cat, row)) => settings::SettingsPage::at_row(cat, row),
+                    None => settings::SettingsPage::at(target),
+                };
                 self.layers.clear();
                 self.pages.truncate(1);
-                self.pages.push(Box::new(settings::SettingsPage::at(cat)));
+                self.pages.push(Box::new(page));
                 self.ctx.dirty = true;
                 return;
             }

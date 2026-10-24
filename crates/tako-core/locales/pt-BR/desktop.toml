@@ -53,8 +53,9 @@ undo = "Desfazer"
 trailer = "Trailer"
 search_esc = "Esc"
 settings_count = "Configurações · {n} categorias"
-settings_search = "Buscar configuração"
-settings_found = "{n} configurações encontradas"
+settings_search = "Buscar nas configurações"
+settings_found.one = "{n} configuração encontrada"
+settings_found.other = "{n} configurações encontradas"
 theme_big_picture = "O tema vale para a tela cheia. O modo desktop usa o visual do Tako."
 
 [desktop.menu]
