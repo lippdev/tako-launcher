@@ -1,0 +1,10 @@
+/* Foco do design system (README, "Acessibilidade" e `Implementacao.md`): clareia (`focus-fill`), contorno fino
+   (`focus-ring`) e brilho suave (`focus-glow`), sem mudar a geometria. Use com `composes: ring from` este arquivo. */
+.ring:focus-visible,
+.ring[data-force="focus"] {
+  outline: none;
+  background-image: linear-gradient(var(--focus-fill), var(--focus-fill));
+  box-shadow:
+    inset 0 0 0 1px var(--focus-ring),
+    0 0 0 var(--focus-ring-width) var(--focus-glow);
+}

@@ -1,0 +1,96 @@
+/* Aviso: medidas do README (design/desktop/components/Aviso) e do protótipo. */
+
+/* As regiões ao vivo ficam sempre no DOM; não ocupam lugar nem pegam o mouse. */
+.wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 26px;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.region {
+  display: flex;
+  justify-content: center;
+  max-width: calc(100% - 2 * var(--space-24));
+}
+
+/* Sobe 20 em 350 ms e some pelo mesmo caminho. */
+.slot {
+  --aviso-subida: 20px;
+  opacity: 0;
+  transform: translateY(var(--aviso-subida));
+  transition:
+    opacity var(--tempo-entrada) var(--curva-entrada),
+    transform var(--tempo-entrada) var(--curva-entrada);
+}
+
+.slot[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.slot[data-animating="true"] {
+  will-change: transform, opacity;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px var(--space-16);
+  border-radius: 10px;
+  background: var(--toast-bg);
+  color: var(--on-primary);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  box-shadow: var(--shadow-float);
+}
+
+.toast svg {
+  flex: none;
+}
+
+/* Notícia do TAKO: o polvo no lugar do ícone. */
+.mark {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.message {
+  min-width: 0;
+}
+
+.action {
+  flex: none;
+  margin: -4px -8px -4px 4px;
+  padding: var(--space-4) 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--on-primary);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.action:hover {
+  background: color-mix(in srgb, var(--on-primary) 10%, transparent);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--on-primary);
+  outline-offset: 0;
+}

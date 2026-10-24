@@ -81,6 +81,28 @@
   --control-track: #ffffff24;
 }
 
+/* Camadas, avisos e controles (WEB-04a): valores do README/protótipo que o `tokens.css` não tem. */
+:root {
+  /* Entrada de diálogo e aviso (350 ms, TrocaDePopup e Aviso), pílula das Abas e busca da loja. */
+  --tempo-entrada: 350ms;
+  /* Véu do diálogo: preto a 60% com desfoque de 8 (README do Dialogo). */
+  --veil: #00000099;
+  --veil-blur: 8px;
+  /* Primário no hover: "branco puro" (README do BotaoDesktop). */
+  --primary-hover: #ffffff;
+  /* Fundo do Aviso: claro. `#f6efed` no tema TAKO, o primário nos outros (README do Aviso). */
+  --toast-bg: #f6efed;
+  /* Controle desabilitado. */
+  --disabled-opacity: 0.45;
+}
+[data-theme="escuro"],
+[data-theme="meia-noite"],
+[data-theme="oled"],
+[data-theme="vidro"],
+[data-theme="solido"] {
+  --toast-bg: var(--primary);
+}
+
 *,
 *::before,
 *::after {
@@ -129,6 +151,7 @@ textarea {
   --tempo-hover: 0ms;
   --tempo-foco: 0ms;
   --tempo-estado: 0ms;
+  --tempo-entrada: 0ms;
   --tempo-pagina: 0ms;
   --tempo-saida: 0ms;
   --tempo-troca: 0ms;
@@ -148,6 +171,7 @@ textarea {
     --tempo-hover: 0ms;
     --tempo-foco: 0ms;
     --tempo-estado: 0ms;
+    --tempo-entrada: 0ms;
     --tempo-pagina: 0ms;
     --tempo-saida: 0ms;
     --tempo-troca: 0ms;
