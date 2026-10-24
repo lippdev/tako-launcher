@@ -227,7 +227,7 @@ install_done = "{title} installed"
 # TelaBiblioteca (UX-007): the library Overview.
 [desktop.home]
 welcome = "Welcome back, {name}"
-summary = "{games} · {time} played"
+summary = "{games} · {time} of play"
 continue = "Continue playing"
 back_title = "Jump back in"
 play_game = "Play {title}"

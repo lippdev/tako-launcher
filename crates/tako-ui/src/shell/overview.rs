@@ -12,7 +12,7 @@ use tako_core::presentation::{game_text, library_text};
 /// Arte do destaque (912 × 400 na janela de 1600): uma textura só, no tamanho em que aparece (2× para telas densas).
 const HERO_ART: (u32, u32) = (1920, 840);
 /// Capa de Voltar a jogar (46 × 60, 2× para telas densas).
-const BACK_COVER: (u32, u32) = (92, 120);
+const BACK_COVER: (u32, u32) = (400, 600);
 /// Quantos jogos Voltar a jogar mostra.
 const BACK: usize = 4;
 
@@ -71,11 +71,13 @@ fn back(ctx: &Ctx) -> Vec<&Game> {
 }
 
 /// O que se pode focar, na ordem da tela.
-pub(super) fn targets(ctx: &Ctx) -> Vec<Target> {
+pub(super) fn targets(ctx: &Ctx, show_back: bool) -> Vec<Target> {
     let mut v = Vec::new();
     if hero(ctx).is_some() {
         v.push(Target::Hero);
-        v.extend((0..back(ctx).len()).map(Target::Back));
+        if show_back {
+            v.extend((0..back(ctx).len()).map(Target::Back));
+        }
     }
     v
 }
@@ -169,10 +171,7 @@ fn bright(lum: &[f32]) -> bool {
 
 /// O estado da Visão geral. `focus` é o alvo com o foco do teclado (se a zona estiver aqui).
 pub(super) fn build(ctx: &Ctx, focus: Option<Target>) -> DeskOverview {
-    let name = super::profiles::name(
-        ctx,
-        &tako_core::profiles::Profiles::load(&ctx.paths.machine).active(),
-    );
+    let name = super::profiles::name(ctx, &ctx.active_profile);
     let loading = ctx.scanning && ctx.library.games().is_empty();
     let mut o = DeskOverview {
         on: true,
@@ -266,7 +265,8 @@ mod tests {
         assert_eq!(hero(ctx).map(|g| g.id.as_str()), Some(ids[0].as_str()));
         let back_ids: Vec<&str> = back(ctx).iter().map(|g| g.id.as_str()).collect();
         assert_eq!(back_ids, [&ids[1], &ids[2], &ids[3], &ids[4]]);
-        assert_eq!(targets(ctx).len(), 1 + BACK);
+        assert_eq!(targets(ctx, true).len(), 1 + BACK);
+        assert_eq!(targets(ctx, false), [Target::Hero]);
         let second = game_of(ctx, Target::Back(1)).map(|g| g.id.as_str());
         assert_eq!(second, Some(ids[2].as_str()));
         let o = build(ctx, Some(Target::Back(2)));
@@ -291,7 +291,7 @@ mod tests {
         );
         shell.ctx.found.lock().unwrap().clear();
         shell.ctx.library.refresh();
-        assert!(targets(&shell.ctx).is_empty());
+        assert!(targets(&shell.ctx, true).is_empty());
         let o = build(&shell.ctx, None);
         assert!(o.empty && !o.hero.has_game);
     }

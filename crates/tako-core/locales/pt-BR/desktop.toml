@@ -227,7 +227,7 @@ install_done = "{title} instalado"
 # TelaBiblioteca (UX-007): a Visão geral da biblioteca.
 [desktop.home]
 welcome = "Bem-vindo de volta, {name}"
-summary = "{games} · {time} jogadas"
+summary = "{games} · {time} de jogo"
 continue = "Continuar jogando"
 back_title = "Voltar a jogar"
 play_game = "Jogar {title}"

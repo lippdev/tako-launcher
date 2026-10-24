@@ -3581,6 +3581,9 @@ component DeskLibrary inherits Rectangle {
         }
         if overview.on && overview.empty: Rectangle {
             horizontal-stretch: 1;
+            border-width: 1px;
+            border-color: Ui.line-strong;
+            border-radius: Ui.radius-hero;
             EmptyList {
                 mark: 64px;
                 title: empty-title;

@@ -1196,7 +1196,7 @@ impl DesktopLibrary {
 
     /// Teclado e controle na Visão geral: os alvos vêm de `overview::targets`, na ordem da tela.
     fn overview_cmd(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
-        let targets = overview::targets(ctx);
+        let targets = overview::targets(ctx, ctx.overview_show_back);
         let last = targets.len().saturating_sub(1);
         let at = self.index.min(last);
         let Some(target) = targets.get(at).copied() else {
@@ -1878,7 +1878,7 @@ impl Page for DesktopLibrary {
                 };
                 if matches!(zone, "ov-play-hero" | "ov-back-play") {
                     self.zone = Zone::Actions;
-                    self.index = overview::targets(ctx)
+                    self.index = overview::targets(ctx, ctx.overview_show_back)
                         .iter()
                         .position(|t| *t == target)
                         .unwrap_or(0);
@@ -2479,11 +2479,15 @@ impl Page for DesktopLibrary {
         if self.more != hero || View::of(ctx) == View::Categories || overview {
             self.more = None;
         }
-        if overview && self.zone == Zone::Actions && overview::targets(ctx).is_empty() {
+        let targets = if overview {
+            overview::targets(ctx, ctx.overview_show_back)
+        } else {
+            Vec::new()
+        };
+        if overview && self.zone == Zone::Actions && targets.is_empty() {
             self.zone = Zone::List;
         }
         let focus = if overview && self.zone == Zone::Actions {
-            let targets = overview::targets(ctx);
             self.index = self.index.min(targets.len().saturating_sub(1));
             targets.get(self.index).copied()
         } else {
@@ -3853,7 +3857,7 @@ mod tests {
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
         shell.show_overview();
-        let n = overview::targets(&shell.ctx).len();
+        let n = overview::targets(&shell.ctx, shell.ctx.overview_show_back).len();
         assert!(n >= 3);
         assert_eq!(page(&shell).zone(), Zone::Actions);
         // ↓ anda pelo destaque e por Voltar a jogar; no último fica.
@@ -3895,6 +3899,19 @@ mod tests {
         let before = shell.ctx.library.find(&target).unwrap().is_favorite;
         shell.handle(Cmd::Favorite);
         assert_ne!(shell.ctx.library.find(&target).unwrap().is_favorite, before);
+    }
+
+    #[test]
+    fn hidden_back_column_is_skipped_by_keyboard_focus() {
+        let (_dir, mut shell) = shell();
+        shell.show_overview();
+        shell.ctx.overview_show_back = false;
+        let hero = overview::hero(&shell.ctx).unwrap().id.clone();
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).index, 0);
+        shell.handle(Cmd::Accept);
+        assert!(shell.ctx.effects.contains(&Effect::Launch(hero)) || shell.has_layers());
+        assert!(page(&shell).overview_on(&shell.ctx));
     }
 
     #[test]

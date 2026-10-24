@@ -249,7 +249,7 @@ export component BarraDeDados inherits Rectangle {
                                 background: it.score >= 75 ? Ui.metacritic-good : (it.score >= 50 ? Ui.metacritic-mixed : Ui.metacritic-bad);
                                 Text {
                                     text: it.score;
-                                    color: #000000;
+                                    color: Ui.on-primary;
                                     font-size: 12px * Ui.text-scale;
                                     font-weight: 800;
                                     horizontal-alignment: center;
@@ -443,7 +443,7 @@ component Destaque inherits Rectangle {
                 text: game.title;
                 color: Ui.desk-text;
                 font-family: Ui.font-heading;
-                font-size: 34px * Ui.text-scale;
+                font-size: 54px * Ui.text-scale;
                 font-weight: 800;
                 letter-spacing: -0.02 * self.font-size;
                 horizontal-alignment: right;
@@ -556,20 +556,27 @@ component VoltarAJogar inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     // Vaga fixa: o ▶ só aparece nos instalados, mas o texto não muda de largura.
-                    Rectangle {
+                    if it.playable: Rectangle {
                         width: 30px;
                         height: 30px;
-                        opacity: it.playable ? 1 : 0;
                         border-radius: 15px;
                         background: Ui.primary;
                         accessible-role: button;
-                        accessible-label: it.playable ? it.action : "";
+                        accessible-label: it.action;
                         accessible-action-default => { root.play(i); }
                         DeskIcon { name: "play"; size: 13px; tint: Ui.on-primary; }
-                        if it.playable: TouchArea {
+                        Tip { text: it.action; }
+                        TouchArea {
                             mouse-cursor: pointer;
                             clicked => { root.play(i); }
                         }
+                    }
+                    if !it.playable: Rectangle {
+                        width: 30px;
+                        height: 30px;
+                        opacity: 0;
+                        border-radius: 15px;
+                        accessible-role: none;
                     }
                 }
             }
