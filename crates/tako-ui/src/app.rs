@@ -1862,6 +1862,7 @@ pub fn render(shell: &Rc<RefCell<Shell>>, ui: &ComponentInstance) {
     );
     for (name, key) in [
         ("play", "game.play"),
+        ("custom-color", "settings.theme.custom"),
         ("dl-pause", "downloads.pause"),
         ("dl-resume", "downloads.resume"),
         ("dl-cancel", "downloads.cancel"),

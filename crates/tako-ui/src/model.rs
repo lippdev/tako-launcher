@@ -289,6 +289,16 @@ theme_struct! {
 }
 
 theme_struct! {
+    /// Cartão de uma linha de escolha visual (TelaTema): um tema ou uma cor de destaque; `color` só nas cores.
+    pub struct ChoiceCard {
+        pub title: String,
+        pub detail: String,
+        pub color: Color,
+        pub on: bool,
+    }
+}
+
+theme_struct! {
     /// Linha da fila de capas (FilaDeCapas), em paralelo às linhas das Configurações (só o desktop).
     pub struct CoverRow {
         pub current: Image,
