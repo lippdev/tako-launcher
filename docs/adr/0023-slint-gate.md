@@ -1,6 +1,7 @@
 # ADR-0023: Slint na interface e resultado do gate do MIG-001
 
-- Status: Aceita, com números de referência pendentes (ver Consequências)
+- Status: Interface substituída pelo [ADR-0035](0035-interface-web-rust-e-chromium.md) (2026-10-24). O item 2
+  da decisão (o processo da interface termina durante o jogo) continua valendo.
 - Data: 2026-10-16
 
 ## Contexto

@@ -1,8 +1,8 @@
 # Tako — PRD e backlog
 
-**Versão:** 0.2 (replanejamento multiplataforma)  
-**Data:** 16/10/2026  
-**Status:** em vigor. Substitui a versão 0.1 inteira (WPF, Windows-only, runtime absorvido do Console Mode).  
+**Versão:** 0.3 (interface web sobre o núcleo Rust)  
+**Data:** 24/10/2026 (v0.2 de 16/10/2026)  
+**Status:** em vigor. Substitui a versão 0.1 inteira (WPF, Windows-only, runtime absorvido do Console Mode). A v0.3 troca o Slint por uma interface web (React sobre Chromium embutido) e acrescenta o instalador com onboarding (§2.1, épicos WEB e INST).  
 **Plataformas:** Windows, Linux e macOS, com a mesma experiência  
 **Licença:** AGPL-3.0-only ([ADR-0014](adr/0014-licenca-agpl.md))
 
@@ -62,13 +62,48 @@ Um launcher de jogos para a TV e o controle, **igual no Windows, no Linux e no m
 | # | Decisão | Situação |
 |---|---|---|
 | D-01 | **Rust** é a linguagem do Tako inteiro (app, plataforma, ferramentas). | Decidido |
-| D-02 | **Slint** é o toolkit da interface: renderização na GPU, `.slint` declarativo e intérprete para carregar temas em tempo de execução. | Decidido, **sujeito ao gate do spike MIG-001**. Se falhar no gate, a alternativa é Avalonia/.NET, e a decisão volta aos mantenedores com os números. |
+| D-02 | ~~**Slint** é o toolkit da interface.~~ | **Substituída pela D-09** (24/10/2026). O Slint segue publicado até a paridade da interface web (D-12). |
 | D-03 | O Tako mantém **somente quatro** funções vindas do Console Mode: troca de resolução, troca de saída de áudio, esconder o cursor e cursor pelo controle. O resto sai do Tako (§3). | Decidido |
 | D-04 | A integração com o Console Mode exige uma API que **ainda não existe** no Console Mode. Fica no backlog (épico CMI); o Tako não depende dela para funcionar. | Decidido |
 | D-05 | **Fim do WPF e da compatibilidade com temas do Playnite 10** (`.pthm`, XAML restrito, `PlayniteCompat.P10`). Temas passam a ter formato próprio. Um conversor de temas do Playnite fica como estudo no backlog (THEME-010), sem compromisso. | Decidido |
 | D-06 | **Dados dos usuários das alphas são migrados**: biblioteca, coleções, configurações, escolhas de arte e credenciais (MIG-030). Ninguém perde a biblioteca na troca. | Decidido |
 | D-07 | **Releases:** `main` publica estável; `develop` publica alpha e beta quando um dev pede. Saídas: Windows (instalador e portable), Linux (deb, AppImage, tar.gz; x64 e arm64) e macOS (dmg e zip; Apple Silicon e Intel). | Decidido. O fluxo existe na branch `ci/release-pipeline` (PR pendente) e precisa ser adaptado para `cargo` (MIG-040). |
 | D-08 | A UI C#/WPF continua sendo a versão publicada **até a paridade** (Fase 3). Durante a migração, ela só recebe correções críticas, sem funções novas. | Decidido |
+| D-09 | **Interface web: React + TypeScript desenhados por um Chromium embutido (CEF)**, no modelo do Steam. O núcleo continua em Rust e é a fonte da verdade; o React guarda só o estado de tela. Ponte tipada pelas mensagens do CEF, sem porta de rede. Motivos na §2.1; detalhes no [ADR-0035](adr/0035-interface-web-rust-e-chromium.md). | Decidido. O motor no Windows (CEF ou WebView2) sai do gate do MIG-W01, pelos números. |
+| D-10 | **Interface descartável:** durante o jogo, minimizado e na bandeja, os processos do Chromium terminam e fica só o núcleo Rust. Ao voltar, a interface reabre na tela onde estava. | Decidido |
+| D-11 | **Instalador no modelo do Steam:** um instalador pequeno baixa e confere os componentes (núcleo, runtime do Chromium, pacote da interface), emenda no onboarding e depois atualiza cada componente separado. Continua existindo um pacote completo offline e o portable. | Decidido; o desenho do instalador e do onboarding vem depois (épico INST). |
+| D-12 | O **Slint fica congelado** até a paridade da interface web: só correções críticas, sem polimento nem funções novas de interface. Funções novas entram no núcleo Rust e ganham tela já na versão web. | Decidido |
+
+### 2.1 Por que a interface vai para a web (D-09)
+
+A interface em Slint chegou à paridade (MIG-029) e absorveu o design system (UX-007). No uso diário, o mantenedor
+viu que ela não entrega o acabamento que o Tako quer, e que esses problemas não aparecem em teste automático:
+
+1. **Texto granulado nas animações.** Menus, dropdowns, diálogos e cards abrem com escala animada; o Slint
+   redesenha o texto em tamanhos fracionários a cada quadro e os glifos "fervem". Um navegador compõe a camada
+   pronta na GPU e não mexe no texto durante a animação.
+2. **Qualidade do texto parado.** O renderizador do Slint em uso (FemtoVG) desenha texto visivelmente pior que o
+   Chromium.
+3. **Telas abaixo de 60 fps.** Seções com vidro, desfoque e várias camadas perdem quadros, e o Slint dá pouca
+   ferramenta para achar a causa. O Chromium tem um compositor otimizado há mais de quinze anos e o DevTools para
+   medir tela por tela.
+4. **Custo de cada detalhe.** O mantenedor trabalha com React, CSS e WebView2 e já tem um app Rust + WebView2 com
+   esse nível de animação. No Slint há menos componentes prontos, menos exemplos e menos gente para perguntar.
+5. **É o caminho da referência.** O Steam Big Picture é React num Chromium embutido desde 2022 (é a interface do
+   Steam Deck), e o cliente desktop do Steam inteiro desde 2023. Battle.net, EA app e Epic usam o mesmo motor
+   (CEF).
+6. **O Tako já está pronto para a troca.** O núcleo (biblioteca, lojas, metadados, sessão, plataforma, downloads)
+   está em Rust, separado da interface, e a interface já termina durante o jogo (ADR-0023). Muda a camada de
+   apresentação; o núcleo fica.
+
+Por que não as alternativas: refinar no Slint resolve só parte do problema e o teto continua incerto; GPUI ainda é
+instável e sem temas em tempo de execução; o WebView do sistema é o WebKitGTK no Linux, bem pior em animação, e
+quebraria o "igual em todo lugar"; Electron carrega o Node.js inteiro e é o que dá a fama de app pesado.
+
+O que se aceita em troca: o Chromium soma de 150 a 250 MB à instalação; o Tako passa a responder pelas
+atualizações de segurança do Chromium; com a interface aberta, a memória base é maior que a de um toolkit nativo,
+o que a interface descartável (D-10) compensa; e os temas `.slint` deixam de funcionar (§7). As metas que provam
+que a troca valeu estão na §8.5.
 
 ---
 
@@ -98,7 +133,8 @@ Notas:
 | Responsabilidade | Tecnologia | Observação |
 |---|---|---|
 | Linguagem | Rust (edição 2024, toolchain estável fixada em `rust-toolchain.toml`) | Workspace Cargo |
-| Interface | Slint | Backend com renderização na GPU (Skia ou FemtoVG, a definir no spike). Temas `.slint` carregados pelo `slint-interpreter`. |
+| Interface | React + TypeScript (Vite), desenhados por Chromium embutido (CEF, crate `cef`) | D-09. No Windows, WebView2 se empatar no gate do MIG-W01. Tipos da ponte gerados dos tipos Rust. Até a paridade da web, a versão publicada segue em Slint (D-12). |
+| Instalador | Bootstrapper próprio em Rust (`tako-installer`) | D-11: baixa e confere os componentes com SHA-256; pacote offline e portable continuam |
 | Controle | SDL3 (gamecontroller) | Banco de mapeamentos da comunidade, DualSense/Edge, Switch Pro, Xbox, 8BitDo; hotplug |
 | Persistência | SQLite (`rusqlite`, SQLite embutido) | Esquema atual migrado (D-06), migrações versionadas |
 | HTTP | `reqwest` (rustls) | Metadados, arte e atualizações |
@@ -123,11 +159,16 @@ Notas:
 | `tako-sources` | Fontes de biblioteca (uma por loja ou launcher), cada uma atrás do trait `LibrarySource`, com `cfg` por SO |
 | `tako-platform` | Traits `Displays`, `AudioOutputs`, `Cursor`, `PointerInjector`, `Secrets`, `Paths`, `ProcessLauncher` e uma implementação por SO (`windows`, `linux`, `macos`) |
 | `tako-themes` | Formato de tema, validação, instalação e carregamento seguro (§7) |
-| `tako-ui` | Telas Slint, foco, animações e ligação com o core |
+| `tako-ui` | Telas Slint, foco, animações e ligação com o core. **Sai no corte da interface web (WEB-50)**; até lá, só correções críticas (D-12). |
+| `tako-app` (novo) | Camada de serviços sem interface: comandos, consultas e eventos do app (abrir jogo, editar, configurações, downloads, temas…), extraídos da `Shell` da `tako-ui`. Usada pela ponte web e testável sem tela. |
+| `tako-web` (novo) | Hospedeiro do Chromium: janelas, ciclo de vida da interface descartável (D-10), ponte tipada React ↔ `tako-app`, esquemas próprios (`tako-app://` para o pacote da interface, `tako-img://` para imagens do cache) |
+| `web/` (novo, fora do workspace Cargo) | Interface em React + TypeScript (Vite): design system, telas do desktop e do Big Picture, foco e navegação por controle |
+| `tako-installer` (novo) | Instalador por componentes e onboarding de instalação (D-11) |
 | `tako` (binário) | Inicialização, supervisor, ciclo de vida da sessão, single-instance, atualização |
 
 Regras:
-- As dependências apontam para dentro: `tako` → `tako-ui` → `tako-core`; `tako-sources` e `tako-platform` dependem de `tako-core`, nunca o contrário.
+- As dependências apontam para dentro: `tako` → `tako-web` → `tako-app` → `tako-core` (e `tako-ui` → `tako-core` até o corte); `tako-sources` e `tako-platform` dependem de `tako-core`, nunca o contrário.
+- O React não guarda dado de domínio: tudo que precisa sobreviver a fechar a interface vive no Rust (D-10).
 - Código específico de SO fica **só** em `tako-platform` e `tako-sources`, atrás de `cfg(target_os)`.
 - Sem `unsafe` fora de `tako-platform`. Cada bloco `unsafe` tem comentário `// SAFETY:`.
 
@@ -135,6 +176,7 @@ Regras:
 
 - Um único executável, `tako`. O modo supervisor (mesmo binário) garante que tela e áudio sejam restaurados mesmo se a interface cair. A comunicação entre os dois é um socket local restrito ao usuário (named pipe no Windows, socket Unix nos demais).
 - **Durante o jogo**, a interface esconde a janela, para o loop de renderização e libera texturas e caches de imagem. Ao voltar, recarrega o que estiver visível.
+- **Com a interface web (D-10):** o núcleo Rust é o processo que fica. Os processos do Chromium (principal, GPU, renderização) só existem com a janela aberta; terminam durante o jogo, ao minimizar por mais de um tempo configurável e na bandeja, e reabrem na tela onde o usuário estava.
 - Estados da sessão: `Browsing → Launching → Playing → Returning → Restoring → Browsing`, com `Error → Recovery → Desktop`. Transições idempotentes: restaurar duas vezes não pode desfazer nada a mais nem deixar estado pela metade. Um diário em disco (como o `SessionJournal` atual) permite restaurar depois de uma queda do processo.
 
 ### 5.3 Funções de plataforma por SO
@@ -198,6 +240,12 @@ O app Rust só substitui o WPF quando tiver, **funcionando nas três plataformas
 - Se o tema falhar ao carregar ou durante o uso, o Tako volta ao tema padrão e não entra em loop de falha (mesma ideia do `FaultBudget` atual).
 - A API de temas é documentada para autores (THEME-001) e tem uma ferramenta de checagem por linha de comando (`tako theme check`).
 
+**Com a interface web (D-09, WEB-40):** o formato acima vale até o corte. Depois dele:
+- As paletas (`tokens.toml`, THEME-003 e THEME-006) continuam valendo e viram variáveis CSS; quem só trocou cores não perde nada.
+- Um tema passa a ser `theme.toml` + CSS + imagens, fontes e sons. **Sem JavaScript**: o pacote do tema roda sob uma CSP que bloqueia scripts e rede, e o CSS é validado antes de carregar.
+- Layouts alternativos (como o Fita) viram **layouts oficiais** em React, que o tema escolhe e estiliza.
+- Temas `.slint` de terceiros deixam de funcionar; o changelog da release do corte avisa.
+
 ---
 
 ## 8. Requisitos não funcionais
@@ -243,6 +291,41 @@ O benchmark (MIG-041) roda no CI, onde os números só servem de tendência, e e
 - `cargo fmt --check`, `cargo clippy -- -D warnings` e testes nos três SOs a cada PR.
 - Versionamento do banco e das configurações; migração testada a partir de um banco real das alphas.
 
+### 8.5 Metas da migração para a interface web (D-09)
+
+A troca só vale se provar ganho, e não só no visual. Toda meta é medida **duas vezes, com o mesmo método e nas
+mesmas máquinas de referência**: primeiro a linha de base do Slint (MIG-W00), depois a interface web (gate no
+MIG-W01 com o protótipo, confirmação no WEB-60 com o app completo). Os resultados ficam em
+`docs/marco-web/medicoes.md`.
+
+Memória = soma de **todos** os processos do Tako (núcleo, supervisor e os do Chromium), em memória privada
+(Private Working Set no Windows, PSS no Linux, footprint no macOS). Cenário: biblioteca de 1.000 jogos, capas em
+cache, 1080p.
+
+| Dimensão | Métrica | Meta |
+|---|---|---|
+| **Design** | Texto durante animações (abrir menu, dropdown, diálogo, hover de card, troca de página) | Sem tremor nem mudança de nitidez, na avaliação do mantenedor em 1080p e 4K |
+| | Fidelidade ao design system (`DESIGN.md`, tokens) | Checklist visual por tela aprovado pelo mantenedor |
+| **Desempenho** | Quadros em **todas** as telas, inclusive as que hoje caem (vidro, desfoque, camadas) | p95 ≥ 58 fps num iGPU de referência (Steam Deck ou equivalente); nenhuma tela abaixo da linha de base |
+| | Resposta ao controle e ao teclado | ≤ 50 ms no p95 (igual à §8.1) |
+| | Abertura a frio até a tela interativa | ≤ 1,5 s no p95 (SSD), com o splash cobrindo a carga do Chromium |
+| | Volta do jogo até a biblioteca (interface reabrindo, D-10) | ≤ 1 s no p95, no jogo e na posição de onde o usuário saiu |
+| **Memória** | Interface aberta, em repouso | ≤ 250 MB. Relatar também a diferença para a linha de base do Slint; se a web passar dela, a diferença precisa caber nesta meta |
+| | Minimizado ou na bandeja, depois do tempo de descarte | ≤ 40 MB (só o núcleo, sem processos do Chromium) |
+| | Durante o jogo | ≤ 40 MB e **zero** processos do Chromium (igual à §8.1) |
+| **CPU e GPU** | Interface aberta, parada, sem animação na tela | CPU ~0% (sem trabalho contínuo) e nenhum quadro desenhado |
+| | Durante o jogo | Igual à §8.1: zero quadros, sem polling |
+| **Funcionalidade** | Escopo da §6 | 100% da paridade nas três plataformas antes do corte (WEB-50) |
+| | Ganhos que a web habilita | Trailers e arte animada (UX-002) e leitor de tela nas telas principais, entregues ou com caminho provado |
+| **Conforto** | Tarefas principais pelo controle (achar um jogo, jogar, voltar, mudar uma configuração, trocar tema) | Mesmo número de passos ou menos que no Slint e sem nenhuma tarefa mais lenta, medido num roteiro em `docs/testing/` |
+| | Instalação até o primeiro jogo aberto (D-11) | Instalador + onboarding sem nenhuma pergunta técnica; tempo registrado no roteiro de teste |
+| **Tamanho** | Instalador pequeno (bootstrapper) | ≤ 10 MB |
+| | Instalação completa | Registrada a cada release; sem meta rígida, porque o Chromium domina |
+
+**Regra do gate:** se o protótipo (MIG-W01) não cumprir as metas de desempenho e de memória durante o jogo, ou
+ficar pior que a linha de base em quadros, a migração para e os números voltam ao mantenedor antes de qualquer
+porte de tela (mesma regra do §0, item 4).
+
 ---
 
 ## 9. Backlog
@@ -259,6 +342,9 @@ Ordem do que falta nesta rodada (decisão do mantenedor de usar MoSCoW). Fora da
 | **Should** | THEME-007, THEME-008 (Fita), STREAM-001, CMI-002, THEME-006 | valor visível com pouco risco; CMI-002 é só detecção sobre a API local; THEME-006 reaproveita o THEME-003 |
 | **Could** | CLOUD-002, DL-002, EXT-003, STREAM-002, THEME-005, UX-002, SOURCE-001, CMI-003, CMI-004, INPUT-002, SESSION-001, ART-002 | maiores ou dependentes de outro item, de ADR aceita (PR #135) ou do Console Mode |
 | **Won't (agora)** | DATA-001, DEALS-001, ART-003, VOICE-001, THEME-011 | precisam de serviço externo, fonte de preços, servidor ou decisão ainda não tomada; os outros temas oficiais ficaram para depois do Fita |
+
+A partir de 24/10, a Fase 4 (interface web) e o épico INST passam à frente. Os itens acima que ainda pedem tela
+nova entregam a parte do núcleo agora e ganham tela já na versão web (D-12). THEME-011 depende do WEB-40.
 
 ### Fase 0 — Decisão técnica (P0)
 
@@ -299,6 +385,47 @@ Ordem do que falta nesta rodada (decisão do mantenedor de usar MoSCoW). Fora da
 - [ ] **MIG-041 — Benchmark.** Medir as métricas da §8.1 no CI e nas máquinas de referência; publicar em `docs/`. _Estado: `tako --bench` e job `bench` no CI; faltam as máquinas de referência (`docs/marco-2/paridade.md`)._
 - [x] **MIG-042 — Checklists de hardware** por SO, em `docs/testing/`.
 - [ ] **MIG-043 — Corte.** Remover a solução C#/WPF do repositório e do CI. Changelog da primeira release Rust com o que saiu (§3) e o que mudou (temas do Playnite). Aceite: MIG-010 a MIG-042 concluídos e uma beta Rust testada nos três SOs. _Estado: aguarda a beta Rust testada nos três SOs._
+
+### Fase 4 — Interface web (P0, D-09 a D-12)
+
+Plano detalhado em [`docs/plans/2026-10-24-interface-web.md`](plans/2026-10-24-interface-web.md). Ordem: medir,
+provar, fundar, portar, cortar. Nenhuma tela é portada antes do gate (MIG-W01).
+
+**Gate**
+- [ ] **MIG-W00 — Linha de base do Slint.** Medir as métricas da §8.5 no Tako atual (Slint), nas máquinas de referência e com o método da §8.5, incluindo as telas que hoje caem de quadros (listadas pelo mantenedor). Resultado em `docs/marco-web/medicoes.md`.
+- [ ] **MIG-W01 — Spike da interface web.** Hospedeiro CEF em Rust (Windows e Linux; macOS se der) com a visão geral, um dropdown, um diálogo e a grade de 1.000 capas servidas pelo `tako-img://`, navegação por controle e interface descartável (fechar e reabrir o Chromium). O mesmo React também sobre WebView2 no Windows. **Gate:** metas de desempenho e de memória da §8.5 e nenhuma tela pior que a linha de base. Resultado no ADR-0035 com os números, incluindo o motor do Windows.
+
+**Fundação**
+- [ ] **WEB-01 — `tako-app`.** Extrair da `Shell` da `tako-ui` os comandos, consultas e eventos que são regra do app (biblioteca, jogo, sessão, configurações, downloads, temas, perfis, backup), com os testes. A `tako-ui` passa a usá-la também, para as duas interfaces conviverem até o corte.
+- [ ] **WEB-02 — `tako-web`.** Hospedeiro do Chromium nos três SOs: janela (com a barra própria do desktop), esquemas `tako-app://` e `tako-img://`, ponte tipada com tipos TypeScript gerados, interface descartável (D-10) e restauração da tela ao reabrir.
+- [ ] **WEB-03 — Projeto `web/`.** React + TypeScript + Vite, lint e testes de componentes no CI, build embutido no pacote. Desenvolvimento com hot reload do Vite dentro do Tako e DevTools.
+- [ ] **WEB-04 — Design system na web.** Fonte: o **Tako Design System — Desktop** (`tako-design-desktop`: `tokens.json`/`tokens.css`, 93 componentes com README e prévia HTML, fontes e ícones), que já é o HTML e CSS do protótipo do mantenedor. `tokens.css` entra direto como variáveis CSS; o CSS do protótipo (`bundle.css`, escopo `.tk`) é quebrado por componente React; cada `preview.html` é o critério de aceite visual (bate com a prévia a 1600×900, nos cinco temas, com Reduzir animações e com Efeitos de vidro desligado). Animações só de `transform` e `opacity`. A tela cheia usa o design system dela (WEB-15).
+- [ ] **WEB-05 — Foco e controle.** Navegação espacial (regras do `tako-core`), foco visível, repetição ao segurar e entrada vinda do SDL3 do núcleo pela ponte.
+- [ ] **WEB-06 — Textos.** Os mesmos arquivos de `locales/` (pt-BR e en-US) servidos à interface; nenhum texto duplicado.
+
+**Porte das telas** (cada item com paridade de função e aprovação visual do mantenedor)
+- [ ] **WEB-10 — Desktop: barra, janela e visão geral.**
+- [ ] **WEB-11 — Desktop: biblioteca** (lista e grade, busca, filtros, ordenação, tags, coleções).
+- [ ] **WEB-12 — Desktop: página do jogo** (Jogar, edição, arte, configurações por jogo, sessões).
+- [ ] **WEB-13 — Desktop: configurações** (todas as categorias).
+- [ ] **WEB-14 — Desktop: camadas** (diálogos, menus, toasts, central rápida, atividades, downloads, perfil, busca global).
+- [ ] **WEB-15 — Big Picture** (tela cheia pelo controle, Central por cima do jogo, splash e animação de entrada).
+- [ ] **WEB-16 — Primeira execução** dentro do onboarding novo (INST-03).
+
+**Temas, medição e corte**
+- [ ] **WEB-40 — Temas na web.** Formato da §7 para a web: paletas `tokens.toml` mantidas, CSS validado sem JavaScript (CSP), layouts oficiais; o Fita como layout oficial; prévia, edição e criação de tema (THEME-002/003/006) na web.
+- [ ] **WEB-41 — Atualização do Chromium.** Processo para acompanhar as versões estáveis do CEF com correção de segurança e publicar o runtime do Tako em poucos dias (CI que avisa versão nova).
+- [ ] **WEB-50 — Corte do Slint.** Remover `tako-ui`, `.slint` e as dependências do Slint. Aceite: WEB-01 a WEB-41 concluídos, paridade da §6 nos três SOs e uma beta web testada. Changelog avisa sobre os temas `.slint`.
+- [ ] **WEB-60 — Medição final.** As métricas da §8.5 no app completo, comparadas com a linha de base (MIG-W00), publicadas em `docs/marco-web/medicoes.md` antes da primeira estável web.
+
+### Épico INST — Instalador e onboarding (P0 junto com a Fase 4, D-11)
+
+Desenho de telas e fluxo fica para depois; aqui ficam os requisitos.
+
+- [ ] **INST-01 — Instalador por componentes.** Instalador pequeno (≤ 10 MB) que baixa o núcleo, o runtime do Chromium e o pacote da interface do GitHub Releases, confere o SHA-256 de cada um, instala e abre o onboarding. Retoma downloads interrompidos e explica o erro sem termo técnico.
+- [ ] **INST-02 — Atualização por componentes.** O atualizador (MIG-032) passa a atualizar cada componente separado: a interface (pequena e frequente) sem baixar o Chromium de novo. Mesmas regras de hoje: canal estável e de teste, SHA-256 conferido, nunca rebaixa.
+- [ ] **INST-03 — Onboarding.** Fluxo contínuo do instalador à primeira tela: idioma, lojas detectadas, provedores de metadados, controle e preferências de abertura (o que hoje é o UX-003), com desenho a definir.
+- [ ] **INST-04 — Pacotes completos.** Continua existindo o instalador offline completo e o portable no Windows. No Linux e no macOS, os pacotes (deb, AppImage, Flatpak, AUR, dmg) levam tudo e o gerenciador de pacotes faz o papel do instalador; Flatpak não se autoatualiza.
 
 Ideias ainda não priorizadas ficam em [`docs/backlog/ideias.md`](backlog/ideias.md); entram aqui quando forem para o plano.
 
@@ -479,6 +606,12 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 | Remoção de funções que estavam nas alphas (TV, FPS) frustrar usuários | Médio | Changelog claro e épico CMI para recuperá-las via Console Mode |
 | Fim da compatibilidade com temas do Playnite | Médio | Tema padrão forte, tema alternativo, API documentada e estudo do conversor (THEME-010) |
 | Mudanças nos formatos das lojas | Médio | Parsers isolados por fonte, testes com fixtures, falha de uma fonte não derruba as outras |
+| Interface web não cumprir as metas de memória ou quadros | Alto | Linha de base (MIG-W00) e gate do protótipo (MIG-W01) antes de portar telas; interface descartável (D-10) |
+| Chromium embutido desatualizado (falha de segurança) | Alto | WEB-41: runtime atualizado em poucos dias a cada estável do CEF; atualização por componentes (INST-02) |
+| Tamanho da instalação crescer com o Chromium | Médio | Instalador por componentes (D-11); WebView2 no Windows se empatar no gate |
+| Bindings Rust do CEF imaturos ou CEF instável no Wayland, gamescope, Linux arm64 ou macOS | Alto | Testados no MIG-W01; o spike lista o que não funcionar antes da decisão de portar |
+| Duas interfaces ao mesmo tempo deixarem o produto parado | Alto | Slint congelado (D-12); `tako-app` compartilhada (WEB-01); porte tela a tela com aprovação |
+| Temas `.slint` de terceiros pararem de funcionar | Baixo | Paletas mantidas, Fita como layout oficial, aviso no changelog (§7) |
 
 ---
 
@@ -497,7 +630,9 @@ Decisão do mantenedor (2026-10-16): o Tako fornece só a ferramenta. As fontes 
 ## 13. Referências
 
 - Console Mode: https://github.com/lippdev/consolemode
-- Slint: https://slint.dev e https://docs.slint.dev
+- Slint: https://slint.dev e https://docs.slint.dev (até o corte da interface web)
+- Chromium Embedded Framework: https://bitbucket.org/chromiumembedded/cef e bindings Rust: https://github.com/tauri-apps/cef-rs
+- WebView2: https://learn.microsoft.com/microsoft-edge/webview2/
 - SDL3: https://wiki.libsdl.org/SDL3
 - gamescope: https://github.com/ValveSoftware/gamescope
 - Heroic Games Launcher: https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher
