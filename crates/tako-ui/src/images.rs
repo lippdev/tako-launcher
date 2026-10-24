@@ -206,7 +206,7 @@ pub fn get(uri: &str, max_w: u32, max_h: u32) -> Option<Image> {
 }
 
 /// Ícone do jogo (UX-005, `Game::shown_icon`): quadrado de `size_px` pixels físicos (28 na tela normal, 56 em
-/// alta densidade), decodificado nesse tamanho e guardado já com os cantos redondos (raio 6/28 do lado) e o
+/// alta densidade), decodificado nesse tamanho e guardado já com os cantos redondos (raio 7/28 do lado) e o
 /// contorno de `#ffffff1a`, para a lista só desenhar a imagem, sem recorte em tempo real. Aceita `.ico`, PNG,
 /// JPG e WebP. `None` até ficar pronto (ou se a imagem não carrega): a lista desenha a inicial do nome.
 pub fn icon(uri: &str, size_px: u32) -> Option<Image> {

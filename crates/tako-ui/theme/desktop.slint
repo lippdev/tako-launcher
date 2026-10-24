@@ -1029,55 +1029,69 @@ component Tabs inherits Rectangle {
     callback clicked(int);
     height: underline ? 36px : 40px;
     property <length> pad: underline ? 0px : 3px;
-    // A pílula (ou o sublinhado) desliza para a nova aba em `tempo-foco` (TrocaDeTela › abas internas).
-    property <length> tab-w: (root.width - 2 * pad - 2px * (tabs.length - 1)) / max(1, tabs.length);
+    // Onde está a aba escolhida (as abas mandam): a pílula (ou o sublinhado) desliza até lá em `tempo-lista`
+    // (TrocaDeTela › abas internas). Sem largura ainda (primeiro quadro), ela aparece no lugar, sem deslizar.
+    property <length> cur-x;
+    property <length> cur-w;
+    animate cur-x { duration: Ui.tempo-lista * (cur-w > 0 ? 1 : 0); easing: Ui.curva-entrada; }
     if underline: Rectangle {
         y: parent.height - 1px;
         height: 1px;
         background: Ui.line;
     }
     if current >= 0 && current < tabs.length && !underline: Selected {
-        x: pad + current * (tab-w + 2px);
+        x: cur-x;
         y: pad;
-        width: tab-w;
+        width: cur-w;
         height: root.height - 2 * pad;
         radius: 11px;
-        animate x { duration: Ui.focus-time; easing: cubic-bezier(0.2, 0.8, 0.2, 1); }
     }
     if current >= 0 && current < tabs.length && underline: Rectangle {
-        x: current * (tab-w + 2px) + tab-w * 0.18;
+        x: cur-x + cur-w * 0.18;
         y: parent.height - 2px;
-        width: tab-w * 0.64;
+        width: cur-w * 0.64;
         height: 2px;
         border-radius: 1px;
         // Cinza claro, sem cor da paleta (Abas).
         background: @linear-gradient(90deg, #d9d9d900 0%, #d9d9d9 25%, #d9d9d9 75%, #d9d9d900 100%);
-        animate x { duration: Ui.tempo-lista; easing: Ui.curva-entrada; }
     }
-    // Abas de largura igual, na mesma conta da pílula (num layout, o texto mais longo ganhava mais largura).
-    for t[i] in tabs: Rectangle {
-        x: pad + i * (tab-w + 2px);
-        y: pad;
-        width: tab-w;
-        height: root.height - 2 * pad;
-        border-radius: underline ? 0px : 11px;
-        background: !underline && i != current && tta.has-hover ? Ui.glass-hover : transparent;
-        animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
-        accessible-role: tab;
-        accessible-label: t;
-        if i == focus-index: FocusRing { radius: underline ? Ui.radius-row : 11px; }
-        Text {
-            text: t;
-            color: i == current ? Ui.desk-text : (underline ? Ui.desk-text.with-alpha(tta.has-hover ? 0.85 : 0.62) : Ui.desk-on-muted);
-            font-family: underline ? Ui.font-heading : Ui.font-desk;
-            font-size: (underline ? 12.5px : 14px) * Ui.text-scale;
-            letter-spacing: underline ? 0.05 * self.font-size : 0px;
-            font-weight: i == current ? (underline ? 500 : 600) : (underline ? 400 : 500);
-            overflow: elide;
-        }
-        tta := TouchArea {
-            mouse-cursor: pointer;
-            clicked => { root.clicked(i); }
+    // Cada aba pede o tamanho do texto mais 8 de cada lado e o que sobra se divide por igual: a 125% o texto
+    // não cabia na parte igual e Favoritos encostava em Instalados.
+    HorizontalLayout {
+        padding: pad;
+        spacing: 2px;
+        for t[i] in tabs: Rectangle {
+            property <bool> on: i == current;
+            preferred-width: tx.preferred-width + 2 * Ui.space-8;
+            min-width: 24px;
+            horizontal-stretch: 1;
+            border-radius: underline ? 0px : 11px;
+            background: !underline && i != current && tta.has-hover ? Ui.glass-hover : transparent;
+            animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
+            accessible-role: tab;
+            accessible-label: t;
+            init => { if (on) { cur-w = self.width; cur-x = self.x; } }
+            changed on => { if (on) { cur-w = self.width; cur-x = self.x; } }
+            changed x => { if (on) { cur-x = self.x; } }
+            changed width => { if (on) { cur-w = self.width; } }
+            if i == focus-index: FocusRing { radius: underline ? Ui.radius-row : 11px; }
+            tx := Text {
+                width: parent.width;
+                height: parent.height;
+                text: t;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                color: i == current ? Ui.desk-text : (underline ? Ui.desk-text.with-alpha(tta.has-hover ? 0.85 : 0.62) : Ui.desk-on-muted);
+                font-family: underline ? Ui.font-heading : Ui.font-desk;
+                font-size: (underline ? 12.5px : 14px) * Ui.text-scale;
+                letter-spacing: underline ? 0.05 * self.font-size : 0px;
+                font-weight: i == current ? (underline ? 500 : 600) : (underline ? 400 : 500);
+                overflow: elide;
+            }
+            tta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.clicked(i); }
+            }
         }
     }
 }
@@ -1207,6 +1221,13 @@ component OverviewRow inherits Rectangle {
     accessible-role: button;
     accessible-label: label;
     accessible-action-default => { root.clicked(); }
+    // Pelo teclado o seletor abre onde o clique o abriria.
+    changed focused => {
+        if (self.focused && self.chip) {
+            DeskArt.anchor-w = self.width;
+            root.menu(self.absolute-position.x + self.width, self.absolute-position.y + self.height + 6px);
+        }
+    }
     if focused: FocusRing { }
     ta := TouchArea {
         mouse-cursor: pointer;
@@ -3113,13 +3134,18 @@ component SortFilter inherits HorizontalLayout {
     in property <bool> reversed;
     in property <int> filter-count;
     in property <[string]> labels;
+    // O foco do teclado está em Ordenar, ver e filtrar (o menu abre embaixo do botão).
+    in property <bool> focused;
     callback clicked(string);
+    callback menu(length, length);
     spacing: 2px;
     IconBtn { icon: "sort"; label: labels[3]; on: reversed; clicked => { root.clicked("reverse"); } }
     IconBtn {
         icon: "filter";
         label: labels[4];
         on: filter-count > 0;
+        focused: root.focused;
+        changed focused => { if (self.focused) { root.menu(self.absolute-position.x + self.width, self.absolute-position.y + self.height + 6px); } }
         clicked => { root.clicked("filter"); }
     }
 }
@@ -3293,6 +3319,8 @@ component DeskLibrary inherits Rectangle {
                         icon: "filter";
                         label: view-labels[6];
                         dot: filter-count > 0;
+                        focused: focus-visible && zone == "controls" && zone-index == 0;
+                        changed focused => { if (self.focused) { root.menu(parent.absolute-position.x, parent.absolute-position.y + parent.height + 6px); } }
                         clicked => {
                             root.menu(parent.absolute-position.x, parent.absolute-position.y + parent.height + 6px);
                             root.clicked("options", 0);
@@ -3303,7 +3331,7 @@ component DeskLibrary inherits Rectangle {
                     chip: tab < 0;
                     label: tab < 0 ? collection.label + " · " + collection.count : view-labels[5];
                     clear-label: view-labels[7];
-                    focused: focus-visible && zone == "collections";
+                    focused: focus-visible && zone == "controls" && zone-index == 1;
                     clicked => { root.clicked(tab < 0 ? "collection-select" : "overview", 0); }
                     clear => { root.clicked("collection-clear", 0); }
                     menu(x, y) => { root.menu(x, y); }
@@ -3556,6 +3584,8 @@ component DeskLibrary inherits Rectangle {
                     reversed: reversed;
                     filter-count: filter-count;
                     labels: view-labels;
+                    focused: focus-visible && zone == "controls" && zone-index == 0;
+                    menu(x, y) => { root.menu(x, y); }
                     clicked(z) => { root.clicked(z, 0); }
                 }
             }
@@ -3585,7 +3615,7 @@ component DeskLibrary inherits Rectangle {
             width: 280px;
             height: 40px;
             current: collection;
-            focused: focus-visible && zone == "collections";
+            focused: focus-visible && zone == "controls" && zone-index == 1;
             clicked => { root.clicked("collection-select", 0); }
             menu(x, y) => { root.menu(x, y); }
         }

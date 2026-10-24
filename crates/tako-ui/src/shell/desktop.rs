@@ -327,9 +327,17 @@ pub enum Zone {
     /// Barra superior: marca (menu do Tako), guia Biblioteca, busca e Tela cheia.
     Bar,
     Tabs,
-    Collections,
+    /// O topo da lista: Ordenar, ver e filtrar e a linha Visão geral (ou o chip da coleção).
+    Controls,
     List,
     Actions,
+}
+
+/// Os controles da zona `Controls`, na ordem da tela (o índice da zona).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Control {
+    Options,
+    Overview,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -479,6 +487,7 @@ impl DesktopLibrary {
     fn route_filter(&self) -> LibraryFilter {
         match self.tab {
             Tab::Favorites => LibraryFilter::Favorites,
+            Tab::Installed => LibraryFilter::Installed,
             _ => LibraryFilter::All,
         }
     }
@@ -1078,11 +1087,20 @@ impl DesktopLibrary {
     }
 
     fn zones(&self) -> Vec<Zone> {
-        let mut v = vec![Zone::Bar, Zone::Tabs];
-        if self.tab == Tab::Collections {
-            v.push(Zone::Collections);
-        }
-        v.extend([Zone::List, Zone::Actions]);
+        vec![
+            Zone::Bar,
+            Zone::Tabs,
+            Zone::Controls,
+            Zone::List,
+            Zone::Actions,
+        ]
+    }
+
+    /// Nas Categorias não há linha Visão geral; só a coleção ativa tem o seletor.
+    fn controls(&self, ctx: &Ctx) -> Vec<Control> {
+        let overview = View::of(ctx) == View::List || self.tab == Tab::Collections;
+        let mut v = vec![Control::Options];
+        v.extend(overview.then_some(Control::Overview));
         v
     }
 
@@ -1397,12 +1415,16 @@ impl Page for DesktopLibrary {
         let list = entries(ctx, &games);
         let cur = self.current(&ids);
         let to_install_cur = cur.is_some_and(|i| to_install(games[i]));
-        let picks = Self::picks(ctx);
         match (self.zone, cmd) {
             (_, Cmd::PrevSection) | (_, Cmd::NextSection) => {
-                let i = TABS.iter().position(|t| *t == self.tab).unwrap_or(0) as i32;
-                let d = if cmd == Cmd::NextSection { 1 } else { -1 };
-                self.open_tab(TABS[(i + d).rem_euclid(TABS.len() as i32) as usize], ctx);
+                let next = cmd == Cmd::NextSection;
+                // Numa coleção (sem aba) o ponto de partida é antes da primeira aba.
+                let to = match TABS.iter().position(|t| *t == self.tab) {
+                    Some(i) => (i + if next { 1 } else { TABS.len() - 1 }) % TABS.len(),
+                    None if next => 0,
+                    None => TABS.len() - 1,
+                };
+                self.open_tab(TABS[to], ctx);
             }
             // Cabeçalho de loja (NaoInstalados): Enter alterna, → abre e ← fecha.
             (Zone::List, Cmd::Accept | Cmd::Left | Cmd::Right)
@@ -1562,26 +1584,32 @@ impl Page for DesktopLibrary {
             (Zone::Tabs, Cmd::Right) => self.index = (self.index + 1).min(TABS.len() - 1),
             (Zone::Tabs, Cmd::Accept) | (Zone::Tabs, Cmd::Down) => {
                 self.open_tab(TABS[self.index.min(TABS.len() - 1)], ctx);
-                self.cycle(true);
+                self.zone = Zone::List;
             }
-            (Zone::Collections, Cmd::Left) => self.index = self.index.saturating_sub(1),
-            (Zone::Collections, Cmd::Right) => {
-                self.index = (self.index + 1).min(picks.len().saturating_sub(1))
+            (Zone::Controls, Cmd::Left) => self.index = self.index.saturating_sub(1),
+            (Zone::Controls, Cmd::Right) => {
+                self.index = (self.index + 1).min(self.controls(ctx).len() - 1)
             }
-            (Zone::Collections, Cmd::Accept) => {
-                if let Some((p, ..)) = picks.get(self.index) {
-                    self.pick = Some(p.clone());
-                    self.selected = None;
+            (Zone::Controls, Cmd::Accept) => match self.controls(ctx).get(self.index) {
+                Some(Control::Options) => return Nav::Layer(Box::new(self.options(ctx))),
+                // No chip, Enter abre o seletor de coleção; na Visão geral, sai da busca e dos filtros.
+                Some(_) if self.tab == Tab::Collections => {
+                    return Nav::Layer(Box::new(self.collection_select(ctx)));
                 }
-            }
-            (Zone::Collections, Cmd::Down) => self.zone = Zone::List,
-            (Zone::Collections, Cmd::Up) => self.cycle(false),
+                _ => return self.click("overview", 0, ctx),
+            },
+            (Zone::Controls, Cmd::Down) => self.zone = Zone::List,
+            (Zone::Controls, Cmd::Up) => self.cycle(false),
             // Esc: fecha a fase 2 do destaque, sai da seleção múltipla, depois limpa a busca e os filtros, depois
             // volta para a lista.
             (_, Cmd::Back) if self.more.is_some() => self.more = None,
             (_, Cmd::Back) if !self.checked.is_empty() => {
                 self.checked.clear();
                 self.anchor = None;
+            }
+            // No chip da coleção, Esc faz o mesmo que o ×.
+            (Zone::Controls, Cmd::Back) if self.tab == Tab::Collections => {
+                return self.click("collection-clear", 0, ctx);
             }
             (_, Cmd::Back) => {
                 if self.zone == Zone::List && self.filtered() {
@@ -2462,7 +2490,7 @@ impl Page for DesktopLibrary {
             match self.zone {
                 Zone::Bar => "bar",
                 Zone::Tabs => "tabs",
-                Zone::Collections => "collections",
+                Zone::Controls => "controls",
                 Zone::List => "list",
                 Zone::Actions => "actions",
             },
@@ -3699,6 +3727,76 @@ mod tests {
         shell.click("collection-clear", 0);
         assert_eq!(page(&shell).tab(), Tab::All);
         assert_eq!(page(&shell).ids(&shell.ctx).len(), all);
+    }
+
+    #[test]
+    fn keyboard_enters_a_collection_through_the_options_menu_and_leaves_with_esc() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let first = shell.ctx.library.games()[0].id.clone();
+        shell
+            .ctx
+            .collections
+            .create("Sofá", Some(first.as_str()))
+            .unwrap();
+        shell.ctx.sync_collections();
+        let all = page(&shell).ids(&shell.ctx).len();
+
+        // Tab chega ao topo da lista; o primeiro controle é Ordenar, ver e filtrar.
+        while page(&shell).zone() != Zone::Controls {
+            shell.key("\t", KeyModifiers::NONE);
+        }
+        assert_eq!(page(&shell).index, 0);
+        shell.handle(Cmd::Accept);
+        assert!(shell.has_layers());
+        for _ in 0..40 {
+            let o = shell.layers.last().unwrap().render(&shell.ctx);
+            if o.rows[o.sel as usize].key == "pick-0" {
+                break;
+            }
+            shell.handle(Cmd::Down);
+        }
+        shell.handle(Cmd::Accept);
+        shell.render(std::time::Instant::now());
+        assert!(!shell.has_layers());
+        assert_eq!(page(&shell).tab(), Tab::Collections);
+        assert_eq!(page(&shell).ids(&shell.ctx), vec![first]);
+
+        // No chip, Enter abre o seletor (não troca de coleção em silêncio); ← volta ao botão.
+        assert_eq!(page(&shell).zone(), Zone::Controls);
+        shell.handle(Cmd::Right);
+        assert_eq!(page(&shell).index, 1);
+        shell.handle(Cmd::Accept);
+        assert!(shell.has_layers());
+        shell.close_layers();
+        assert_eq!(page(&shell).tab(), Tab::Collections);
+        // Esc no chip faz o mesmo que o ×: volta para Todos.
+        shell.handle(Cmd::Back);
+        assert_eq!(page(&shell).tab(), Tab::All);
+        assert_eq!(page(&shell).ids(&shell.ctx).len(), all);
+    }
+
+    #[test]
+    fn section_buttons_from_a_collection_start_before_the_first_tab() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        open_collections_tab(&mut shell);
+        shell.handle(Cmd::NextSection);
+        assert_eq!(page(&shell).tab(), Tab::All);
+        open_collections_tab(&mut shell);
+        shell.handle(Cmd::PrevSection);
+        assert_eq!(page(&shell).tab(), Tab::Installed);
+    }
+
+    #[test]
+    fn installed_tab_counts_and_saves_only_installed_games() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("tab", 2);
+        assert_eq!(page(&shell).route_filter(), LibraryFilter::Installed);
     }
 
     #[test]
