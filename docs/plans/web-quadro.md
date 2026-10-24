@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes |
+| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes: WEB-10b, WEB-02b |
 | Antigravity | `antigravity` | livre |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit** (ainda ativo às 17:04; sem horário informado) |
 | Codex Lipp | `codex` | **sem créditos** desde 24/10 (precisa recarregar; fora da rotação) |
@@ -35,10 +35,10 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-13a | **Configurações:** estrutura (categorias e conteúdo), Geral, Aparência (aplicada na hora e lida na abertura) e Bibliotecas (lojas com liga/desliga e "ler de novo"); outras categorias em breve | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-10a, WEB-01b, WEB-01c | `web/src/app/settings/`, `web/src/app/`, `web/src/bridge/fake.ts` | integrada (aguarda validação visual) |
 | WEB-13b | **Configurações, demais categorias:** Tema (cartões e cor de destaque), Tela e áudio, Controles, Capas e dados, Sistema etc.; busca nas configurações | N3 | a definir | WEB-13a | `web/src/app/settings/` | fila |
 | WEB-12a | **Página do jogo:** destaque (FundoDoJogo, TituloDoJogo, Destaque, AcoesDoJogo) e cartões (Sobre, Detalhes, Sessões) como componentes, página ligada ao `game.details`, Jogar, favoritar, status, troca de jogo animada, estados jogando, não instalado e sem arte | N3 | Claude Alyx · Sonnet 5.5 alto (Claude InvestSmart ainda no limite) | WEB-04c, WEB-11a | `web/src/components/`, `web/src/app/` | integrada (aguarda validação visual) |
-| WEB-10b | **Visão geral da biblioteca** (TelaBiblioteca: continuar jogando, recentes, fileiras de capas), reaproveitando o destaque do WEB-12a | N3 | a definir | WEB-12a | `web/src/app/` | fila |
+| WEB-10b | **Visão geral da biblioteca** (TelaBiblioteca: continuar jogando, recentes, fileiras de capas), reaproveitando o destaque do WEB-12a | N3 | Claude Alyx · Sonnet 5.5 alto (Claude InvestSmart ainda no limite) | WEB-12a | `web/src/app/` | despachada |
 | WEB-04d | **EntradaDoApp** (componente; ligar à abertura depois) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-03 | `web/src/components/EntradaDoApp/` | integrada (aguarda validação visual) |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
-| WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
+| WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | despachada |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
 
 Paralelismo: WEB-00 primeiro (orquestrador). Depois WEB-02a, WEB-03 e WEB-01a juntas, uma por conta (duas com
