@@ -902,6 +902,21 @@ fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
 }
 
 #[test]
+fn liquid_glass_slider_uses_five_point_arrows_and_ten_with_shift() {
+    use crate::shell::keys::RIGHT;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    ctx.settings.set("DesktopTheme", "4");
+    let row = || find(&rows_of(&ctx, "appearance"), "glass-opacity");
+
+    let _ = (row().adjust.unwrap())(&mut ctx, 1);
+    assert_eq!(row().row.value, "33");
+    let _ = row().slide_key(&RIGHT.to_string(), true, &mut ctx);
+    assert_eq!(row().row.value, "43");
+}
+
+#[test]
 fn system_category_includes_backup_and_restore_options() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, ctx) = ctx();
