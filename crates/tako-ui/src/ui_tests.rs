@@ -1543,6 +1543,10 @@ created-by-tako = true
                 shell.ask_big_picture = true;
                 crate::shell::desktop::ask_big_picture(&mut shell, std::time::Duration::ZERO);
             }
+            Ok("search-panel") => {
+                shell.open_route(crate::shell::profile::ROUTE);
+                shell.edited("search", "Hades");
+            }
             Ok("restore-confirm") => {
                 shell.open_route("settings");
                 if let Some(index) = crate::shell::settings::categories()
@@ -1700,6 +1704,9 @@ created-by-tako = true
             crate::bridge::set_global(&ui, "Ui", "reduce-motion", Value::Bool(motion));
             let flat = (shell.ctx.settings).bool(crate::shell::ctx::keys::REDUCED_TRANSPARENCY, false);
             crate::bridge::set_global(&ui, "Ui", "reduce-transparency", Value::Bool(flat));
+            if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("search-panel") {
+                let _ = ui.set_property("floating-search", Value::Bool(true));
+            }
             if switch.is_some() {
                 let id = shell.focused_game();
                 let g = id.as_deref().and_then(|id| shell.ctx.library.find(id));
