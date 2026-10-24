@@ -2037,6 +2037,32 @@ created-by-tako = true
                     std::thread::sleep(std::time::Duration::from_millis(50));
                 }
             }
+            // `TAKO_SNAP_CMDS=tab,down,right`: teclas antes da captura (foco do corpo da página do jogo). Use um tamanho por
+            // execução: o estado do teclado se acumula de um tamanho para o outro.
+            if let Ok(cmds) = std::env::var("TAKO_SNAP_CMDS") {
+                for name in cmds.split(',') {
+                    match name {
+                        "tab" => {
+                            shell.key("\u{0009}", tako_core::input::shortcut::KeyModifiers::NONE);
+                        }
+                        "up" => shell.handle(Cmd::Up),
+                        "down" => shell.handle(Cmd::Down),
+                        "left" => shell.handle(Cmd::Left),
+                        "right" => shell.handle(Cmd::Right),
+                        "accept" => shell.handle(Cmd::Accept),
+                        _ => {}
+                    }
+                }
+                apply(&mut shell, art.as_ref());
+                for _ in 0..wait / 50 {
+                    slint::platform::update_timers_and_animations();
+                    ui.window().request_redraw();
+                    window.draw_if_needed(|r| {
+                        r.render(&mut scratch, w as usize);
+                    });
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            }
             slint::platform::update_timers_and_animations();
             let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];
             ui.window().request_redraw();
