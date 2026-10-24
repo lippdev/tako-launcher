@@ -907,7 +907,7 @@ fn liquid_glass_slider_uses_five_point_arrows_and_ten_with_shift() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (_d, mut ctx) = ctx();
     ctx.desktop = true;
-    ctx.settings.set("DesktopTheme", "4");
+    ctx.settings.set("DesktopTheme", "glass");
     let adjust = find(&rows_of(&ctx, "theme"), "glass-opacity")
         .adjust
         .unwrap();
