@@ -2,11 +2,12 @@
 //! (biblioteca, capas, atualização), monta o botão Downloads da barra de cima e o popover com a lista. Os downloads
 //! e a busca de atualização alimentam a fila nos próprios módulos (`downloads.rs`, `app_updates.rs`).
 
+use super::ctx::ToastKind;
 use super::layer::{Flow, Layer};
 use super::{Cmd, Ctx, Effect, Out};
 use crate::model::{Hint, Overlay, PanelRow};
 use std::time::Instant;
-use tako_core::activities::{Action, Activity, Kind, Shown, State as Phase};
+use tako_core::activities::{Action, Activity, Kind, State as Phase};
 use tako_core::library::GameStore;
 use tako_core::presentation::game_text;
 
@@ -17,11 +18,13 @@ const UPDATE_READY: &str = "update-ready";
 pub(crate) const UPDATE_CHECK: &str = "update-check";
 
 crate::theme_struct! {
-    /// O botão Downloads da barra de cima (`desk-activity`): o contador (0 = sem bolinha) e o nome acessível;
+    /// O botão Downloads da barra de cima (`desk-activity`): o contador do que está em andamento (0 = sem bolinha),
+    /// o nome acessível e o `state` (`error` com algum erro na lista, `ready` com atualização pronta, senão vazio);
     /// `announce` é a região viva (início, conclusão e erro de qualquer atividade).
     pub struct ActivityData {
         pub count: i32,
         pub label: String,
+        pub state: String,
         pub announce: String,
     }
 }
@@ -33,6 +36,8 @@ pub struct State {
     library_games: usize,
     /// O último passo (feitos, total) de cada [`Job`], para só montar o texto quando ele muda.
     steps: [(usize, usize); 2],
+    /// O último resultado que foi para o Aviso: cada conclusão ou erro avisa uma vez.
+    announced: Option<Activity>,
 }
 
 /// Ícone da pílula e das linhas: `spin` sem %, `ring` com %, `done`, `warn` e `dot` (atualização pronta).
@@ -66,21 +71,42 @@ fn announcement(ctx: &Ctx, a: &Activity) -> String {
     }
 }
 
-/// O botão Downloads: o contador é o que está na lista visível (andamento, erro e concluídas recentes).
-pub fn render(ctx: &Ctx, out: &mut Out, now: Instant) {
-    let announce = (ctx.activity.list.last_event())
+/// O botão Downloads: o contador é o mesmo "N ativos" do popover (só o que está em andamento). Erro e atualização
+/// pronta aparecem no `state` (um selo no botão) e no nome acessível, nunca só pela cor.
+pub fn render(ctx: &Ctx, out: &mut Out) {
+    let list = &ctx.activity.list;
+    let announce = list
+        .last_event()
         .map(|a| announcement(ctx, a))
         .unwrap_or_default();
-    let count = ctx.activity.list.shown(now).map_or(0, |s| s.more + 1);
-    let label = match count {
-        0 => ctx.t("desktop.activity.button"),
-        n => ctx.tf("desktop.activity.button_n", &[("n", &n.to_string())]),
+    let running = list.running_count();
+    let failed = list
+        .all()
+        .iter()
+        .filter(|a| a.state == Phase::Failed)
+        .count();
+    let ready = list.get(UPDATE_READY).is_some();
+    let label = [
+        Some(ctx.t("desktop.activity.button")),
+        (running > 0).then(|| ctx.tn("desktop.activity.running", running as i64, &[])),
+        (failed > 0).then(|| ctx.tn("desktop.activity.errors", failed as i64, &[])),
+        ready.then(|| ctx.t("desktop.window.update_ready")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(", ");
+    let state = match (failed > 0, ready) {
+        (true, _) => "error",
+        (_, true) => "ready",
+        _ => "",
     };
     out.set(
         "desk-activity",
         ActivityData {
-            count: count as i32,
+            count: running as i32,
             label,
+            state: state.into(),
             announce,
         },
     );
@@ -93,19 +119,8 @@ pub fn list_is_open(layers: &[Box<dyn Layer>], ctx: &Ctx) -> bool {
         .is_some_and(|l| l.render(ctx).kind == "activities")
 }
 
-/// Aceitar no botão (teclado e controle, sem o botão do mouse): num erro com ação, refaz o trabalho; no resto,
-/// abre o popover. O clique do mouse só abre; refazer é da linha do erro.
-pub fn accept(ctx: &mut Ctx, now: Instant) {
-    match ctx.activity.list.shown(now) {
-        Some(Shown { activity: a, .. }) if a.state == Phase::Failed && a.action.is_some() => {
-            let key = a.key.clone();
-            run_action(ctx, &key);
-        }
-        _ => open_list(ctx),
-    }
-}
-
-/// Abre o popover Downloads.
+/// Abre o popover Downloads. É o que o botão faz com o mouse, o teclado e o controle: refazer um erro é da linha
+/// dele no popover, onde o usuário vê o que vai ser refeito.
 pub fn open_list(ctx: &mut Ctx) {
     open_kind(ctx, None);
 }
@@ -170,10 +185,29 @@ pub fn tick(ctx: &mut Ctx, now: Instant) {
         }
         ctx.dirty = true;
     }
-    // A conclusão sai da pílula sozinha: redesenha no instante.
-    if let Some(t) = ctx.activity.list.next_expiry(now) {
-        ctx.redraw_at = Some(ctx.redraw_at.map_or(t, |r| r.min(t)));
+    announce_result(ctx);
+}
+
+/// O botão só mostra o número: a conclusão e o erro vão para o Aviso (a tela cheia já avisa pelos módulos, e o
+/// fim do download pela fila, em `downloads.rs`). Uma vez por evento; um sucesso não cobre um aviso de atenção
+/// ainda na tela (ex.: a loja que falhou na leitura da biblioteca).
+fn announce_result(ctx: &mut Ctx) {
+    let Some(event) = ctx.activity.list.last_event() else {
+        return;
+    };
+    if event.state == Phase::Running || ctx.activity.announced.as_ref() == Some(event) {
+        return;
     }
+    let event = event.clone();
+    let text = announcement(ctx, &event);
+    let attention =
+        ctx.toast.is_some() && matches!(ctx.toast_kind, ToastKind::Warning | ToastKind::Error);
+    match event.state {
+        Phase::Failed => ctx.toast_error(text),
+        _ if !attention => ctx.toast_success(text),
+        _ => {}
+    }
+    ctx.activity.announced = Some(event);
 }
 
 fn is_running(ctx: &Ctx, key: &str) -> bool {
@@ -415,7 +449,7 @@ impl Layer for ListLayer {
             kind: "activities".into(),
             title: ctx.t("desktop.activity.title"),
             overline: if running > 0 {
-                ctx.tf("desktop.activity.running", &[("n", &running.to_string())])
+                ctx.tn("desktop.activity.running", running as i64, &[])
             } else {
                 ctx.t("desktop.activity.idle")
             },
@@ -441,9 +475,8 @@ impl Layer for ListLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shell::Shell;
+    use crate::shell::{Shell, bar};
     use slint_interpreter::Value;
-    use std::time::Duration;
 
     fn shell() -> (tempfile::TempDir, Shell) {
         let dir = tempfile::tempdir().unwrap();
@@ -488,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn button_counts_what_is_in_the_queue_and_names_it_for_the_reader() {
+    fn button_counts_what_is_running_and_names_it_with_the_errors_for_the_reader() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
@@ -505,15 +538,18 @@ mod tests {
             now,
         );
         assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
-        assert_eq!(text(prop(&mut shell, "label", now)), "Downloads, 1 ativos");
+        // Singular com um, plural com mais.
+        assert_eq!(text(prop(&mut shell, "label", now)), "Downloads, 1 ativo");
 
         let list = &mut shell.ctx.activity.list;
         list.start("download:1", Kind::Download, "Hades II", "", now);
         list.progress("download:1", Some(42), "42% · faltam 4 min");
         assert_eq!(prop(&mut shell, "count", now), Value::Number(2.));
+        assert_eq!(text(prop(&mut shell, "label", now)), "Downloads, 2 ativos");
         // O leitor de tela não ouve a porcentagem.
         assert!(!text(prop(&mut shell, "announce", now)).contains('%'));
 
+        // O erro não conta como ativo: aparece no selo (`state`) e no nome acessível.
         let list = &mut shell.ctx.activity.list;
         list.fail(
             "download:1",
@@ -521,14 +557,23 @@ mod tests {
             Some(Action::Retry),
             now,
         );
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
+        assert_eq!(
+            text(prop(&mut shell, "label", now)),
+            "Downloads, 1 ativo, 1 erro"
+        );
+        assert_eq!(text(prop(&mut shell, "state", now)), "error");
         assert_eq!(
             text(prop(&mut shell, "announce", now)),
             "Erro: Não baixou Hades II"
         );
+        // O contador do botão é o mesmo do título do popover.
+        shell.click("desk-activity", 0);
+        assert_eq!(top(&shell).overline, "1 ativo");
     }
 
     #[test]
-    fn finished_activity_leaves_the_count_in_four_seconds_and_tick_asks_for_the_redraw() {
+    fn finished_activity_is_not_counted_as_running() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_dir, mut shell) = shell();
         let now = Instant::now();
@@ -541,11 +586,82 @@ mod tests {
             now,
         );
         list.finish(LIBRARY, "Biblioteca atualizada", "4 jogos novos", now);
-        assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
-        tick(&mut shell.ctx, now);
-        assert_eq!(shell.ctx.redraw_at, Some(now + Duration::from_secs(4)));
-        let later = now + Duration::from_secs(4);
-        assert_eq!(prop(&mut shell, "count", later), Value::Number(0.));
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(0.));
+        assert_eq!(text(prop(&mut shell, "state", now)), "");
+    }
+
+    #[test]
+    fn a_finished_activity_on_the_desktop_toasts_once_per_event() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let ctx = &mut shell.ctx;
+        let now = Instant::now();
+        // A leitura de biblioteca da própria fixture termina no primeiro quadro: descarta esse aviso.
+        tick(ctx, now);
+        ctx.toast = None;
+        let finish = |ctx: &mut Ctx, now: Instant| {
+            let list = &mut ctx.activity.list;
+            list.start("cloud", Kind::CloudSync, "Sincronizando a nuvem", "", now);
+            list.finish("cloud", "Nuvem sincronizada", "Hades II", now);
+        };
+        // Em andamento não avisa.
+        ctx.activity
+            .list
+            .start("cloud", Kind::CloudSync, "Sincronizando a nuvem", "", now);
+        tick(ctx, now);
+        assert!(ctx.toast.is_none(), "{:?}", ctx.toast);
+        finish(ctx, now);
+        tick(ctx, now);
+        let toast = |ctx: &Ctx| ctx.toast.as_ref().map(|(t, _)| t.clone());
+        assert_eq!(toast(ctx).as_deref(), Some("Nuvem sincronizada. Hades II"));
+        assert_eq!(ctx.toast_kind, ToastKind::Success);
+        // O mesmo evento não avisa de novo (o quadro seguinte, o aviso já saiu).
+        ctx.toast = None;
+        tick(ctx, now);
+        assert!(ctx.toast.is_none());
+        // Outro evento, mesmo da mesma chave, avisa.
+        let later = now + std::time::Duration::from_secs(1);
+        finish(ctx, later);
+        tick(ctx, later);
+        assert!(ctx.toast.is_some());
+        // Tela cheia: os módulos já avisam, a fila não repete.
+        ctx.toast = None;
+        ctx.desktop = false;
+        finish(ctx, later + std::time::Duration::from_secs(1));
+        tick(ctx, later);
+        assert!(ctx.toast.is_none());
+    }
+
+    #[test]
+    fn an_error_on_the_desktop_toasts_as_an_error_and_a_success_never_covers_it() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let ctx = &mut shell.ctx;
+        let now = Instant::now();
+        // A leitura de biblioteca da própria fixture termina no primeiro quadro: descarta esse aviso.
+        tick(ctx, now);
+        ctx.toast = None;
+        let list = &mut ctx.activity.list;
+        list.start("download:1", Kind::Download, "Hades II", "", now);
+        list.fail(
+            "download:1",
+            "Não baixou Hades II",
+            Some(Action::Retry),
+            now,
+        );
+        tick(ctx, now);
+        let text = |ctx: &Ctx| ctx.toast.as_ref().map(|(t, _)| t.clone());
+        assert_eq!(text(ctx).as_deref(), Some("Erro: Não baixou Hades II"));
+        assert_eq!(ctx.toast_kind, ToastKind::Error);
+        // A nuvem conclui com o erro ainda na tela: o aviso de atenção fica.
+        let list = &mut ctx.activity.list;
+        list.start("cloud", Kind::CloudSync, "Sincronizando a nuvem", "", now);
+        list.finish("cloud", "Nuvem sincronizada", "", now);
+        tick(ctx, now);
+        assert_eq!(text(ctx).as_deref(), Some("Erro: Não baixou Hades II"));
+        assert_eq!(ctx.toast_kind, ToastKind::Error);
     }
 
     #[test]
@@ -695,22 +811,29 @@ mod tests {
     }
 
     #[test]
-    fn update_ready_is_counted_with_a_dot_row_until_the_update_goes_away() {
+    fn update_ready_shows_a_dot_row_and_a_ready_state_until_the_update_goes_away() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let (_dir, mut shell) = shell();
         let now = Instant::now();
         shell.ctx.update_ready = Some("x".into());
         tick(&mut shell.ctx, now);
-        assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
+        // Esperar o usuário não é "ativo": o botão não conta e mostra o ponto de pronto, também no nome acessível.
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(0.));
+        assert_eq!(text(prop(&mut shell, "state", now)), "ready");
+        let ready = shell.ctx.t("desktop.window.update_ready");
+        assert_eq!(
+            text(prop(&mut shell, "label", now)),
+            format!("Downloads, {ready}")
+        );
         shell.click("desk-activity", 0);
         assert_eq!(top(&shell).rows[0].icon, "dot");
         shell.ctx.update_ready = None;
         tick(&mut shell.ctx, now);
-        assert_eq!(prop(&mut shell, "count", now), Value::Number(0.));
+        assert_eq!(text(prop(&mut shell, "state", now)), "");
     }
 
     #[test]
-    fn accepting_a_failed_button_with_an_action_retries_it_and_the_list_row_too() {
+    fn accepting_the_button_always_opens_the_popover_and_the_row_retries() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         let failed = |shell: &mut Shell| {
@@ -718,30 +841,38 @@ mod tests {
             list.start(UPDATE_CHECK, Kind::UpdateCheck, "x", "", now);
             list.fail(UPDATE_CHECK, "Sem rede", Some(Action::Retry), now);
         };
-        // Teclado/controle (sem o botão do mouse): Aceitar na pílula refaz o trabalho.
+        // Teclado/controle: Aceitar no botão com erro no topo abre a lista e não refaz nada às cegas.
         let (_dir, mut shell) = shell();
         failed(&mut shell);
-        accept(&mut shell.ctx, now);
+        bar::activate(bar::Item::Downloads, &mut shell.ctx);
+        shell.after_action();
+        assert_eq!(top(&shell).kind, "activities");
+        assert_eq!(
+            shell.ctx.activity.list.all().len(),
+            1,
+            "o erro continua na lista"
+        );
+        assert!(!matches!(
+            shell.ctx.effects.last(),
+            Some(Effect::CheckUpdates)
+        ));
+        // A linha do erro refaz com Aceitar.
+        shell.handle(Cmd::Accept);
         assert!(shell.ctx.activity.list.all().is_empty());
         assert!(matches!(
             shell.ctx.effects.last(),
             Some(Effect::CheckUpdates)
         ));
-        // Erro sem ação: Aceitar abre a lista, onde o "fechar" alcança o erro pelo teclado.
+        // Erro sem ação: a lista abre e o "fechar" alcança o erro pelo teclado.
+        shell.close_layers();
         let list = &mut shell.ctx.activity.list;
         list.start("cloud", Kind::CloudSync, "x", "", now);
         list.fail("cloud", "Sem rede", None, now);
-        accept(&mut shell.ctx, now);
+        bar::activate(bar::Item::Downloads, &mut shell.ctx);
         shell.after_action();
         assert_eq!(top(&shell).kind, "activities");
         shell.handle(Cmd::Right);
         assert!(top(&shell).rows[0].on, "o foco foi para o fechar");
-        shell.handle(Cmd::Accept);
-        assert!(shell.ctx.activity.list.all().is_empty());
-        // Na lista, Aceitar na linha com ação refaz o trabalho.
-        failed(&mut shell);
-        open_list(&mut shell.ctx);
-        shell.after_action();
         shell.handle(Cmd::Accept);
         assert!(shell.ctx.activity.list.all().is_empty());
     }
@@ -763,9 +894,9 @@ mod tests {
         );
         list.start("download:1", Kind::Download, "Hades II", "", now);
         list.progress("download:1", Some(10), "10%");
-        // A biblioteca termina atrás do download: o leitor ouve a conclusão e o contador segue em 2.
+        // A biblioteca termina atrás do download: o leitor ouve a conclusão e o contador fica só com o download.
         list.finish(LIBRARY, "Biblioteca atualizada", "4 jogos novos", now);
-        assert_eq!(prop(&mut shell, "count", now), Value::Number(2.));
+        assert_eq!(prop(&mut shell, "count", now), Value::Number(1.));
         assert_eq!(
             text(prop(&mut shell, "announce", now)),
             "Biblioteca atualizada. 4 jogos novos"

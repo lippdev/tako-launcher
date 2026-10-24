@@ -1194,12 +1194,13 @@ created-by-tako = true
                 );
                 shell.after_action();
             }
-            // AtividadeNaBarra (UX-006): `atividade-<estado>` = giro, download, concluida, erro, varias, pronta, lista.
-            Ok(p) if p.starts_with("atividade-") => {
+            // AtividadeNaBarra (UX-006): `atividade-<estado>` = giro, download, concluida, erro, varias, pronta, lista; `aviso-concluida`
+            // e `aviso-erro` deixam o Aviso do resultado na tela; `erro-lista` abre o popover com o erro.
+            Ok(p) if p.starts_with("atividade-") || p.starts_with("aviso-") || p == "erro-lista" => {
                 use tako_core::activities::Kind;
                 let now = Instant::now();
                 let list = &mut shell.ctx.activity.list;
-                let page = &p["atividade-".len()..];
+                let page = p.strip_prefix("atividade-").unwrap_or(p);
                 let spin = |l: &mut tako_core::activities::Activities| {
                     l.start("library", Kind::LibraryRefresh, "Atualizando biblioteca", "Steam · 3 de 5 lojas", now)
                 };
@@ -1210,11 +1211,11 @@ created-by-tako = true
                 match page {
                     "giro" => spin(list),
                     "download" => download(list),
-                    "concluida" => {
+                    "concluida" | "aviso-concluida" => {
                         spin(list);
                         list.finish("library", "Biblioteca atualizada", "4 jogos novos", now);
                     }
-                    "erro" => {
+                    "erro" | "aviso-erro" | "erro-lista" => {
                         // O caminho de produção: a busca explícita que falha, com o menu fechado.
                         shell.ctx.app_update.menu_open = false;
                         crate::app_updates::finish_check(
@@ -1234,10 +1235,10 @@ created-by-tako = true
                         list.finish("cloud", "Nuvem sincronizada", "Hades II", now);
                     }
                 }
-                if page == "pronta" {
+                if page == "pronta" || page.starts_with("aviso-") {
                     crate::shell::activities::tick(&mut shell.ctx, now);
                 }
-                if matches!(page, "varias" | "lista") {
+                if matches!(page, "varias" | "lista" | "erro-lista") {
                     shell.click("desk-activity", 0);
                     if page == "varias" {
                         shell.close_layers();

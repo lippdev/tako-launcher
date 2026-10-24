@@ -944,14 +944,14 @@ impl Shell {
         );
         out.set("see-all-label", self.ctx.t("home.see_all"));
         if self.ctx.desktop {
-            self.render_desktop_bar(&mut out, now);
+            self.render_desktop_bar(&mut out);
         }
         out
     }
 
     /// Barra de cima do desktop: a guia da Biblioteca (a Loja entra quando existir), o perfil e o botão da tela
     /// cheia. Configurações fica no menu da marca.
-    fn render_desktop_bar(&self, out: &mut Out, now: Instant) {
+    fn render_desktop_bar(&self, out: &mut Out) {
         let kind = self.page().kind();
         let item = |id: &str, label: &str, icon: &str, selected: bool| crate::model::NavItem {
             id: id.into(),
@@ -977,8 +977,8 @@ impl Shell {
                 .map(|k| self.ctx.t(&format!("desktop.window.{k}")))
                 .to_vec(),
         );
-        // AtividadeNaBarra: downloads, biblioteca, capas e atualização numa pílula só, antes do perfil.
-        activities::render(&self.ctx, out, now);
+        // AtividadeNaBarra: o botão Downloads, antes do perfil.
+        activities::render(&self.ctx, out);
         let name = profiles::active_name(&self.ctx);
         let initial = name
             .chars()

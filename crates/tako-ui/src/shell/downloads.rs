@@ -1241,7 +1241,14 @@ mod tests {
         engine.set(2, 9_800_000_000, Some(9_800_000_000), true);
         assert!(poll(&mut ctx));
         assert_eq!(progress(&ctx), None);
-        // O fim do download vira o ✓ da pílula (e não mais um aviso).
+        // O fim do download entra na fila e quem avisa, uma vez, é a fila (`activities::tick`): `poll` não repete.
+        assert!(ctx.toast.is_none());
+        crate::shell::activities::tick(&mut ctx, Instant::now());
+        let (toast, _) = ctx.toast.clone().expect("aviso de download pronto");
+        assert!(
+            toast.contains("terminou de baixar") || toast.contains("finished"),
+            "{toast}"
+        );
         let done = ctx.activity.list.get("download:2").unwrap();
         assert_eq!(done.state, tako_core::activities::State::Done);
         assert!(done.title.contains("terminou de baixar") || done.title.contains("finished"));

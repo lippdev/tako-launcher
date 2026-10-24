@@ -1451,7 +1451,7 @@ impl Page for DesktopLibrary {
             (Zone::Bar, Cmd::Right) => {
                 self.index = (self.index + 1).min(bar::ITEMS.len() - 1);
             }
-            // Menu no botão Downloads: o popover (Aceitar num erro refaz o trabalho).
+            // Menu no botão Downloads: o popover (o mesmo que Aceitar).
             (Zone::Bar, Cmd::Menu) if bar::item(self.index) == Some(bar::Item::Downloads) => {
                 super::activities::open_list(ctx);
                 return Nav::Stay;

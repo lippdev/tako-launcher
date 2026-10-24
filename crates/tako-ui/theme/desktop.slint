@@ -648,11 +648,13 @@ component Ring inherits Rectangle {
     }
 }
 
-// O botão Downloads da barra de cima (`desk-activity`): contador (0 = sem bolinha), nome acessível e a região viva
-// (`announce` vale mesmo sem nada na tela: o leitor de tela ouve a conclusão de qualquer atividade).
+// O botão Downloads da barra de cima (`desk-activity`): contador do que está em andamento (0 = sem bolinha), nome
+// acessível, `state` (`error` = selo "!" de erro, `ready` = ponto de atualização pronta, vazio = nada) e a região
+// viva (`announce` vale mesmo sem nada na tela: o leitor de tela ouve a conclusão de qualquer atividade).
 struct ActivityData {
     count: int,
     label: string,
+    state: string,
     announce: string,
 }
 
@@ -880,6 +882,28 @@ component TopBar inherits Vidro {
                 transform-scale: pop ? 1.35 : 1;
                 animate transform-scale { duration: Ui.tempo-hover; easing: Ui.curva-entrada; }
                 bt := Text { text: activity.count; color: Ui.bar-on-accent; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            }
+            // Erro: selo com "!" embaixo à direita (forma e cor; o nome acessível diz "N erro"). Atualização pronta: ponto.
+            if activity.state == "error": Rectangle {
+                x: parent.width - 13px;
+                y: parent.height - 13px;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                background: Ui.desk-error;
+                border-width: 2px;
+                border-color: Ui.desk-canvas;
+                Text { text: "!"; color: Ui.desk-canvas; font-size: 11px; font-weight: 800; horizontal-alignment: center; vertical-alignment: center; }
+            }
+            if activity.state == "ready": Rectangle {
+                x: parent.width - 11px;
+                y: parent.height - 11px;
+                width: 12px;
+                height: 12px;
+                border-radius: 6px;
+                background: Ui.success;
+                border-width: 2px;
+                border-color: Ui.desk-canvas;
             }
         }
         // Perfil: avatar redondo de 24 com o anel do destaque e o ponto verde de "online", nome e ⌄ (menu do perfil).
@@ -5872,13 +5896,13 @@ component DeskOverlay inherits Rectangle {
                         padding: 8px;
                         padding-top: 8px;
                         padding-bottom: 10px;
-                        Text { text: ov.title.to-uppercase(); color: Ui.desk-text-dim; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.4px; vertical-alignment: center; }
+                        Text { text: ov.title.to-uppercase(); color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.4px; vertical-alignment: center; }
                         Rectangle { horizontal-stretch: 1; }
-                        Text { text: ov.overline; color: Ui.desk-text-dim; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.4px; vertical-alignment: center; }
+                        Text { text: ov.overline; color: Ui.desk-text-muted; font-size: 12px * Ui.text-scale; font-weight: 700; letter-spacing: 0.4px; vertical-alignment: center; }
                     }
                     if ov.rows.length == 0: Text {
                         text: ov.preview-text;
-                        color: Ui.desk-text-dim;
+                        color: Ui.desk-text-muted;
                         font-size: 12.5px * Ui.text-scale;
                         horizontal-alignment: center;
                         height: 56px;

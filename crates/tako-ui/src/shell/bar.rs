@@ -1,7 +1,6 @@
 //! Itens da barra de cima na ordem do teclado (←/→ e Tab na zona Bar). O Slint conta na mesma ordem (`focus-index`).
 
 use super::{Ctx, Effect, Nav, activities, desktop};
-use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Item {
@@ -50,7 +49,7 @@ pub(super) fn activate(item: Item, ctx: &mut Ctx) -> Nav {
     match item {
         Item::Brand => return Nav::Layer(Box::new(desktop::brand_menu())),
         Item::Profile => return Nav::Layer(Box::new(desktop::profile_menu())),
-        Item::Downloads => activities::accept(ctx, Instant::now()),
+        Item::Downloads => activities::open_list(ctx),
         Item::BigPicture => ctx.effect(Effect::SwitchMode(crate::mode::UiMode::BigPicture)),
         Item::Minimize => ctx.effect(Effect::Window("min")),
         Item::Maximize => ctx.effect(Effect::Window("max")),
