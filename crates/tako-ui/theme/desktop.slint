@@ -6953,7 +6953,7 @@ component DeskProfileScreen inherits Rectangle {
     }
     property <bool> kb: focus-visible;
     property <length> gap: small ? 16px : 24px;
-    property <length> tile-w: (fl.width - 2 * gap - 26px) / 3;
+    property <length> tile-w: (fl.width - 14px - 12px) / 3;
     property <length> avatar: small ? 72px : 88px;
     // Três blocos iguais (o texto de cada um não muda a largura).
     // Foco do teclado na barra, nas guias ou nas ações: a página volta ao topo.
@@ -6983,9 +6983,13 @@ component DeskProfileScreen inherits Rectangle {
             spacing: 0;
             // Identidade: avatar com anel da cor de destaque, nome e a linha de estado.
             HorizontalLayout {
-                spacing: small ? 16px : 22px;
-                alignment: center;
-                Rectangle {
+                width: fl.width;
+                alignment: space-between;
+                padding-right: 144px * max(0, Ui.text-scale - 1);
+                HorizontalLayout {
+                    spacing: small ? 16px : 22px;
+                    alignment: start;
+                    Rectangle {
                     width: avatar;
                     height: avatar;
                     border-radius: avatar / 2;
@@ -7014,7 +7018,7 @@ component DeskProfileScreen inherits Rectangle {
                         border-color: Ui.desk-canvas;
                     }
                 }
-                VerticalLayout {
+                    VerticalLayout {
                     alignment: center;
                     spacing: 6px;
                     horizontal-stretch: 1;
@@ -7058,11 +7062,12 @@ component DeskProfileScreen inherits Rectangle {
                             }
                         }
                     }
+                    }
                 }
                 // Botões de ação no cabeçalho à direita (Trocar perfil · Editar perfil): botões contornados (btn-out).
                 HorizontalLayout {
                     spacing: 10px;
-                    alignment: center;
+                    alignment: end;
                     for a[i] in p.actions: Rectangle {
                         property <bool> focused: kb && p.zone == "actions" && p.index == i;
                         height: 36px;
@@ -7157,7 +7162,7 @@ component DeskProfileScreen inherits Rectangle {
                             VerticalLayout {
                                 spacing: 14px;
                                 HorizontalLayout {
-                                    alignment: center;
+                                    alignment: start;
                                     spacing: 8px;
                                     Text {
                                         text: p.tiles[0].value;
@@ -7237,7 +7242,7 @@ component DeskProfileScreen inherits Rectangle {
                                 alignment: start;
                                 spacing: small ? 10px : 14px;
                                 HorizontalLayout {
-                                    alignment: center;
+                                    alignment: start;
                                     spacing: 8px;
                                     Text {
                                         text: p.tiles[1].value;
@@ -7292,7 +7297,7 @@ component DeskProfileScreen inherits Rectangle {
                                 alignment: center;
                                 spacing: 14px;
                                 HorizontalLayout {
-                                    alignment: center;
+                                    alignment: start;
                                     spacing: 8px;
                                     Text {
                                         text: p.tiles[2].value;
