@@ -85,13 +85,17 @@ pub fn rows(ctx: &Ctx) -> Vec<MenuItem> {
                     _ if in_use => ctx.t("settings.controls.controller"),
                     _ => String::new(),
                 };
-                let row = PanelRow::info(
-                    "controller",
-                    name.clone(),
-                    level.map(|p| format!("{p}%")).unwrap_or_default(),
-                )
-                .desc(desc)
-                .icon("gamepad");
+                // `on` liga a barrinha da bateria; o valor é só o número (o % vem do desenho).
+                let row = PanelRow {
+                    on: level.is_some(),
+                    ..PanelRow::info(
+                        "controller",
+                        name.clone(),
+                        level.map(|p| p.to_string()).unwrap_or_default(),
+                    )
+                    .desc(desc)
+                    .icon("gamepad")
+                };
                 // Bateria fraca: a porcentagem em `warning`.
                 MenuItem::new(if level.is_some_and(|p| p < 20) {
                     PanelRow {

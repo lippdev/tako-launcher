@@ -184,7 +184,7 @@ pub fn queue_rows(ctx: &Ctx) -> Vec<MenuItem> {
             MenuItem::new(
                 PanelRow::action("accept-all", ctx.tf("art_review.high_title", &[("n", &n)]))
                     .desc(ctx.t("art_review.high_desc"))
-                    .value(ctx.tf("art_review.accept_all", &[("n", &n)])),
+                    .action_btn(ctx.tf("art_review.accept_all", &[("n", &n)])),
             )
             .on(move |ctx| {
                 accept_with_undo(ctx, high.clone());

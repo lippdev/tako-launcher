@@ -1114,6 +1114,18 @@ fn desktop_snapshot() {
                 {
                     shell.click("category", index);
                 }
+                // `TAKO_SNAP_BATTERY=<%>`: dois controles conectados, o em uso com essa bateria (TelaControles).
+                if let Some(level) = std::env::var("TAKO_SNAP_BATTERY")
+                    .ok()
+                    .and_then(|b| b.parse().ok())
+                {
+                    shell.ctx.pads = vec![
+                        ("a".into(), "Controle sem fio Xbox".into()),
+                        ("b".into(), "DualSense".into()),
+                    ];
+                    (shell.ctx.pad_guid, shell.ctx.pad_name) = ("b".into(), "DualSense".into());
+                    shell.ctx.pad_battery = Some(level);
+                }
                 // `TAKO_SNAP_QUERY=<texto>`: digita na busca das configurações.
                 if let Ok(query) = std::env::var("TAKO_SNAP_QUERY") {
                     shell.edited("search", &query);
@@ -1437,8 +1449,7 @@ created-by-tako = true
                         .write(&g.id, &cached)
                         .unwrap();
                 }
-                shell.open_route("settings");
-                shell.click("category", 2);
+                shell.open_route("settings:metadata");
                 // A fila é conferida numa thread: espera ela terminar.
                 for _ in 0..40 {
                     std::thread::sleep(std::time::Duration::from_millis(50));

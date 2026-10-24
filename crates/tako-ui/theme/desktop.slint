@@ -4184,16 +4184,22 @@ component DeskRow inherits Rectangle {
             alignment: center;
             spacing: 8px;
             horizontal-stretch: 0;
+            // Botões contornados da FilaDeCapas; "Aceitar" leva o ✓.
             for label[k] in [cv.accept, cv.other]: Rectangle {
+                property <length> icon-w: k == 0 ? 23px : 0px;
                 visible: label != "";
-                width: label == "" ? 0 : pl.preferred-width + 28px;
+                width: label == "" ? 0 : pl.preferred-width + 28px + icon-w;
                 height: label == "" ? 0 : 36px;
-                border-radius: self.height / 2;
+                border-radius: Ui.radius-control;
                 background: pta.has-hover ? Ui.settings-control-hover : Ui.settings-control;
+                border-width: 1px;
+                border-color: Ui.line-strong;
                 animate background { duration: Ui.tempo-hover; easing: cubic-bezier(0.25, 0.1, 0.25, 1); }
                 accessible-role: button;
                 accessible-label: label + ": " + data.title;
-                pl := Text { x: 14px; text: label; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 600; vertical-alignment: center; height: parent.height; }
+                accessible-action-default => { root.act(k); }
+                if k == 0: DeskIcon { x: 14px; y: (parent.height - self.height) / 2; name: "tick"; size: 15px; tint: Ui.desk-text; }
+                pl := Text { x: 14px + icon-w; text: label; color: Ui.desk-text; font-size: 13px * Ui.text-scale; font-weight: 600; vertical-alignment: center; height: parent.height; }
                 pta := TouchArea { mouse-cursor: pointer; clicked => { root.act(k); } }
             }
         }
@@ -4315,7 +4321,7 @@ component DeskRow inherits Rectangle {
         }
         if data.kind == "toggle" && !as-check: DeskToggle { on: data.on; y: (parent.height - self.height) / 2; }
         // Loja encontrada (onboarding): ponto `success` quando a pasta existe.
-        if data.kind == "info" && data.on: Rectangle {
+        if data.kind == "info" && data.on && data.key != "controller": Rectangle {
             y: (parent.height - self.height) / 2;
             width: 14px;
             height: 14px;
@@ -4325,7 +4331,7 @@ component DeskRow inherits Rectangle {
             Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Ui.success; }
         }
         // Bateria do controle (28 × 12), sempre com o número; abaixo de 20% em `warning`.
-        if data.key == "controller" && data.value != "": battery := Rectangle {
+        if data.key == "controller" && data.on: battery := Rectangle {
             width: 32px;
             property <float> level: clamp(data.value.to-float() / 100, 0, 1);
             Rectangle {
@@ -4379,8 +4385,9 @@ component DeskRow inherits Rectangle {
             cl := Text { text: data.value; color: Ui.desk-text; font-size: 14px * Ui.text-scale; font-weight: 500; }
             Rectangle { y: (parent.height + cl.preferred-height) / 2; height: 1px; background: Ui.desk-text; }
         }
-        if !card && data.value != "" && data.value != data.action && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download": Text {
-            text: data.value;
+        if !card && data.value != "" && data.value != data.action && data.kind != "toggle" && data.kind != "slider" && data.kind != "choice" && data.kind != "download" && !is-block: Text {
+            // A bateria do controle vem só com o número (a barrinha lê dele); o % é daqui.
+            text: data.key == "controller" && data.on ? data.value + "%" : data.value;
             color: data.style == "warning" ? Ui.desk-warning : (data.style == "error" ? Ui.desk-error : (data.emphasized ? Ui.desk-text : Ui.desk-on-muted));
             // Resumo do onboarding: a quantidade em 15/600.
             font-size: bare ? Ui.desk-label : Ui.desk-label-sm;
