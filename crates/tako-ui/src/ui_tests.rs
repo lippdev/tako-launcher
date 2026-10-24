@@ -67,19 +67,38 @@ fn check_motion_file(path: &Path, tokens: &str) {
                 continue;
             };
             let value = value.split(';').next().unwrap().trim();
-            let name = value
-                .strip_prefix("Ui.")
-                .expect("animações do desktop devem usar tokens Ui");
-            let name = name
-                .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
-                .next()
-                .unwrap();
+            // Aceita expressões (`on ? Ui.x : 0ms`, `Ui.x * 1.3`): todo token citado zera e número solto só 0ms.
+            let names: Vec<&str> = value
+                .split("Ui.")
+                .skip(1)
+                .filter_map(|rest| {
+                    rest.split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+                        .next()
+                })
+                .collect();
             assert!(
-                motion_token_reduces(name, tokens, 0),
-                "{}:{} usa Ui.{name}, que não zera com reduce-motion",
+                !names.is_empty(),
+                "{}:{} anima sem token Ui",
                 path.display(),
                 index + 1
             );
+            let literal = value
+                .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '.')
+                .any(|word| word.ends_with("ms") && word != "0ms");
+            assert!(
+                !literal,
+                "{}:{} tem duração solta (só 0ms é aceito)",
+                path.display(),
+                index + 1
+            );
+            for name in names {
+                assert!(
+                    motion_token_reduces(name, tokens, 0),
+                    "{}:{} usa Ui.{name}, que não zera com reduce-motion",
+                    path.display(),
+                    index + 1
+                );
+            }
         }
     }
 }

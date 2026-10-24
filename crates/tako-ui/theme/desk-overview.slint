@@ -307,7 +307,7 @@ export component CapaDoJogo inherits Rectangle {
             source: art;
             image-fit: cover;
             transform-scale: ta.has-hover ? Ui.escala-capa : 1;
-            animate transform-scale { duration: Ui.tempo-arte - 100ms; easing: Ui.curva-entrada; }
+            animate transform-scale { duration: Ui.tempo-arte * 0.875; easing: Ui.curva-entrada; }
         }
         Rectangle { background: ta.has-hover ? Colors.white.with-alpha(0.08) : transparent; animate background { duration: Ui.tempo-hover; } }
         Rectangle { border-radius: Ui.radius-block; border-width: 1px; border-color: Colors.white.with-alpha(0.06); }
