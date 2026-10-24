@@ -2,6 +2,7 @@
 //!
 //! `tako` (versão publicada) = supervisor, que abre `tako --ui`; `tako --no-supervisor` = só a interface.
 //! `--simulate` usa a biblioteca de demonstração e funções de plataforma em memória.
+//! Com a feature `web`: `tako --web` = núcleo sem CEF, que abre `tako --web-ui` (interface descartável, WEB-02b).
 
 // Sem janela de terminal no Windows (supervisor e interface rodam em segundo plano). Builds de desenvolvimento
 // mantêm o console para os logs.
@@ -96,14 +97,31 @@ fn main() {
     let started = std::time::Instant::now();
     tako_platform::tune_allocator();
     let all: Vec<String> = std::env::args().collect();
-    if all.iter().any(|arg| arg == "--web") {
+    // Processo da interface web (WEB-02b): só o `tako --web` abre; aceito em qualquer posição.
+    #[cfg(feature = "web")]
+    if all.iter().any(|arg| arg == tako_web::UI_ARG) {
         let paths = value(&all, "--data-dir").map_or_else(DataPaths::detect, DataPaths::at);
+        init_logs(&paths, "web-ui");
+        if let Err(error) = tako_web::run_ui(paths) {
+            tracing::error!(%error, "interface web");
+            eprintln!("Tako: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    if all.iter().any(|arg| arg == "--web") {
+        let data_dir = value(&all, "--data-dir");
+        let paths = data_dir
+            .clone()
+            .map_or_else(DataPaths::detect, DataPaths::at);
         init_logs(&paths, "web");
         #[cfg(feature = "web")]
-        let result = tako_web::run(paths);
+        let result = tako_web::run(paths, data_dir);
         #[cfg(not(feature = "web"))]
-        let result: Result<(), String> =
-            Err("compilado sem a interface web; use cargo build -p tako --features web".into());
+        let result: Result<(), String> = {
+            let _ = data_dir;
+            Err("compilado sem a interface web; use cargo build -p tako --features web".into())
+        };
         if let Err(error) = result {
             tracing::error!(%error, "hospedeiro web");
             tako_platform::attach_parent_console();

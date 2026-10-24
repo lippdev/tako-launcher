@@ -1,19 +1,31 @@
-//! CEF Views no Windows. Objetos CEF de janela ficam exclusivamente na thread UI.
+//! Processo da interface (`tako --web-ui`, WEB-02b): CEF Views no Windows. Objetos CEF de janela ficam
+//! exclusivamente na thread UI. Não há `AppService` aqui: a ponte vai e volta pelo transporte de `ipc` até o
+//! processo do núcleo, que abriu este.
 
 use crate::bridge;
+use crate::ipc::{self, CoreMsg, Page, UiMsg};
 use crate::resources::{CSP, Resource, Resources};
+use crate::target::{APP_URL, dev_origin};
 use cef::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
-use tako_app::{AppService, Core, HostRequest, protocol::WindowAction};
+use std::time::Duration;
+use tako_app::protocol::WindowAction;
 use tako_core::paths::DataPaths;
 
 const POST: &str = "tako.post";
 const CONTEXT: &str = "tako.context";
-const APP_URL: &str = "tako-app://app/";
+
+/// Depois do fim do transporte, quanto esperar a janela fechar antes de sair à força (sem órfão).
+const ORPHAN_GRACE: Duration = Duration::from_secs(5);
+
+/// O núcleo pediu para fechar (ou terminou): o fechamento da última janela não é do usuário.
+static CLOSING: AtomicBool = AtomicBool::new(false);
+/// A janela não pôde ser criada: o processo sai com erro, e o núcleo trata como queda.
+static FAILED: AtomicBool = AtomicBool::new(false);
 
 fn cef_text(value: CefStringUserfree) -> String {
     CefString::from(&value).to_string()
@@ -29,62 +41,14 @@ struct BrowserEntry {
     page: Option<Page>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Page {
-    browser: i32,
-    frame: String,
-    generation: String,
-}
-
 #[derive(Clone)]
 struct Config {
     url: String,
     origin: String,
     resources: Arc<Resources>,
-    requests: mpsc::SyncSender<CoreCommand>,
+    /// Para o núcleo, pela saída padrão. Limite de 64 mensagens na fila da página.
+    requests: mpsc::SyncSender<UiMsg>,
     processes: Arc<dyn tako_core::devices::ProcessLauncher>,
-    reopen_ms: Arc<Mutex<Option<i64>>>,
-}
-
-struct CoreRequest {
-    page: Page,
-    text: String,
-}
-
-enum CoreCommand {
-    Request(CoreRequest),
-    Page(Page),
-    Closed(i32),
-    Host(HostRequest),
-    Stop,
-}
-
-/// Uma origem exata, incluindo porta. Só localhost é aceito para desenvolvimento.
-fn dev_origin(url: &str) -> Option<String> {
-    let normalized = url.to_ascii_lowercase();
-    let rest = normalized.strip_prefix("http://")?;
-    let authority = rest.split(['/', '?', '#']).next()?;
-    let (host, port) = if let Some(rest) = authority.strip_prefix("[::1]") {
-        (
-            "[::1]",
-            if rest.is_empty() {
-                "80"
-            } else {
-                rest.strip_prefix(':')?
-            },
-        )
-    } else {
-        authority.rsplit_once(':').unwrap_or((authority, "80"))
-    };
-    let port = port.parse::<u16>().ok()?;
-    if !matches!(host, "localhost" | "127.0.0.1" | "[::1]") || port == 0 {
-        return None;
-    }
-    Some(if port == 80 {
-        format!("http://{host}")
-    } else {
-        format!("http://{host}:{port}")
-    })
 }
 
 fn trusted(url: &str, origin: &str) -> bool {
@@ -101,7 +65,7 @@ fn renderer_origin() -> String {
     {
         return origin;
     }
-    "tako-app://app".into()
+    crate::target::APP_ORIGIN.into()
 }
 
 pub fn execute_subprocess() -> i32 {
@@ -116,61 +80,32 @@ pub fn execute_subprocess() -> i32 {
 
 pub fn run(paths: DataPaths) -> Result<(), String> {
     crate::check_runtime(&std::env::current_exe().map_err(|e| e.to_string())?)?;
-    let root = if cfg!(debug_assertions) {
-        std::env::var_os("TAKO_WEB_TEST_ROOT").map(PathBuf::from)
-    } else {
-        None
-    }
-    .unwrap_or_else(|| {
-        if cfg!(debug_assertions) {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/dist")
-        } else {
-            std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|p| p.join("web/dist")))
-                .unwrap_or_default()
-        }
-    });
-    let mut url = APP_URL.to_owned();
-    let mut origin = "tako-app://app".to_owned();
-    if cfg!(debug_assertions)
-        && let Ok(dev_url) = std::env::var("TAKO_WEB_DEV_URL")
-    {
-        origin = dev_origin(&dev_url)
-            .ok_or("TAKO_WEB_DEV_URL deve usar http://localhost:<porta>/ ou loopback")?;
-        url = dev_url;
-    } else if !root.join("index.html").is_file() {
-        return Err(format!(
-            "pacote web ausente: {}; gere web/dist ou defina TAKO_WEB_TEST_ROOT no debug",
-            root.display()
-        ));
-    }
-    let resources = Arc::new(Resources::new(root, &paths));
+    let target = crate::target::resolve()?;
+    let resources = Arc::new(Resources::new(target.root, &paths));
     if cfg!(debug_assertions)
         && let Some(art) = std::env::var_os("TAKO_WEB_TEST_ART")
     {
         resources.install_test_art(&PathBuf::from(art))?;
     }
-    let (tx, rx) = mpsc::sync_channel::<CoreCommand>(64);
-    let stop = tx.clone();
+    let (requests, outgoing) = mpsc::sync_channel::<UiMsg>(64);
+    // Um só escritor na saída padrão: as mensagens chegam ao núcleo na ordem em que a página mandou.
+    std::thread::spawn(move || {
+        let mut out = std::io::stdout().lock();
+        for message in outgoing {
+            if ipc::write_message(&mut out, &message).is_err() {
+                break;
+            }
+        }
+    });
     let platform = tako_platform::Platform::native(&paths.machine);
     let config = Config {
         processes: platform.processes.clone(),
-        url,
-        origin,
+        url: target.url,
+        origin: target.origin,
         resources,
-        requests: tx,
-        reopen_ms: Arc::new(Mutex::new(if cfg!(debug_assertions) {
-            std::env::var("TAKO_WEB_REOPEN_MS")
-                .ok()
-                .and_then(|v| v.parse::<i64>().ok())
-                .filter(|v| (100..=300_000).contains(v))
-        } else {
-            None
-        })),
+        requests,
     };
     let _ = api_hash(sys::CEF_API_VERSION_LAST, 0);
-    let reopen_ms = config.reopen_ms.clone();
     let mut app = TakoCefApp::new(Some(config), Arc::new(AtomicU64::new(0)));
     let cache = paths.cache().join("cef");
     std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
@@ -191,105 +126,51 @@ pub fn run(paths: DataPaths) -> Result<(), String> {
     {
         return Err("CEF não inicializou; confira runtime e logs/cef.log".into());
     }
-    let worker_tx = stop.clone();
-    let worker = std::thread::spawn(move || core_loop(paths, platform, rx, worker_tx, reopen_ms));
-    tracing::info!(pid = std::process::id(), "CEF inicializado uma vez");
+    tracing::info!(
+        pid = std::process::id(),
+        "CEF inicializado no processo da interface"
+    );
+    std::thread::spawn(read_core);
     run_message_loop();
-    // O próprio CEF ainda retém o App até shutdown; o comando evita depender da queda dos remetentes.
-    let _ = stop.send(CoreCommand::Stop);
     drop(app);
-    let result = worker
-        .join()
-        .map_err(|_| "thread AppService encerrou com pânico".to_owned())
-        .and_then(|result| result);
     shutdown();
     tracing::info!("CEF finalizado");
-    result
+    if FAILED.load(Ordering::Relaxed) {
+        return Err("a janela da interface não abriu; veja logs/cef.log".into());
+    }
+    Ok(())
 }
 
-fn core_loop(
-    paths: DataPaths,
-    platform: tako_platform::Platform,
-    rx: mpsc::Receiver<CoreCommand>,
-    tx: mpsc::SyncSender<CoreCommand>,
-    reopen_ms: Arc<Mutex<Option<i64>>>,
-) -> Result<(), String> {
-    let core = Core::open(paths, platform, false).map_err(|e| e.to_string());
-    let core = match core {
-        Ok(core) => core,
-        Err(error) => {
-            tracing::error!(%error, "não foi possível abrir o núcleo");
-            let mut task = Quit::new(reopen_ms);
-            post_task(ThreadId::UI, Some(&mut task));
-            return Err(error);
-        }
-    };
-    let mut service = AppService::with_core(env!("CARGO_PKG_VERSION"), core);
-    let (host_tx, host_rx) = mpsc::channel();
-    let (event_tx, event_rx) = mpsc::channel();
-    let host_wake = host_tx.clone();
-    service.set_host_sink(host_tx);
-    service.set_event_sink(event_tx);
-    // Um só receptor acorda por pedidos da página e por resultados das lojas, inclusive sem janela.
-    let relay_stop = Arc::new(AtomicBool::new(false));
-    let stopped = relay_stop.clone();
-    let relay = std::thread::spawn(move || {
-        for request in host_rx {
-            if stopped.load(Ordering::Relaxed) || tx.send(CoreCommand::Host(request)).is_err() {
-                break;
+/// Entrada padrão ← núcleo. O fim dela é o núcleo que terminou: fecha a janela e, se não fechar, sai.
+fn read_core() {
+    let result =
+        ipc::read_messages::<CoreMsg>(std::io::stdin().lock(), ipc::MAX_CORE_LINE, |message| {
+            match message {
+                CoreMsg::Deliver {
+                    page,
+                    messages,
+                    actions,
+                } => post_delivery(page, messages, actions),
+                CoreMsg::Close => post_close(),
             }
-        }
-    });
-    let mut pages = HashMap::new();
-    for command in &rx {
-        let mut response = None;
-        match command {
-            CoreCommand::Request(request) => {
-                pages.insert(request.page.browser, request.page.clone());
-                response = Some((
-                    request.page,
-                    bridge::handle_message(&mut service, &request.text),
-                ));
-            }
-            CoreCommand::Page(page) => {
-                pages.insert(page.browser, page);
-            }
-            CoreCommand::Closed(browser) => {
-                pages.remove(&browser);
-            }
-            CoreCommand::Host(HostRequest::PollBackground) => service.poll(),
-            CoreCommand::Host(HostRequest::Window(action)) => {
-                for page in pages.values() {
-                    post_delivery(page.clone(), Vec::new(), vec![action]);
-                }
-            }
-            CoreCommand::Host(HostRequest::Launch { game_id }) => {
-                tracing::warn!(%game_id, "sessão de jogo ainda não ligada ao hospedeiro web");
-            }
-            CoreCommand::Stop => break,
-        };
-        let (target, text) = response.unzip();
-        let messages = bridge::drain_messages(text, &event_rx);
-        // Resposta e eventos causados por ela entram juntos na fila UI, sempre nessa ordem.
-        for page in pages.values() {
-            let batch = if target.as_ref() == Some(page) || target.is_none() {
-                messages.clone()
-            } else {
-                messages.iter().skip(1).cloned().collect()
-            };
-            if !batch.is_empty() {
-                post_delivery(page.clone(), batch, Vec::new());
-            }
-        }
+            true
+        });
+    if let Err(error) = result {
+        tracing::warn!(%error, "entrada do núcleo");
     }
-    drop(service);
-    relay_stop.store(true, Ordering::Relaxed);
-    let _ = host_wake.send(HostRequest::PollBackground);
-    // Liberar o receptor antes do join evita reter um relay bloqueado na fila limitada.
-    drop(rx);
-    relay
-        .join()
-        .map_err(|_| "thread de avisos encerrou com pânico".to_owned())
+    tracing::info!("transporte do núcleo fechado; fechando a interface");
+    post_close();
+    std::thread::sleep(ORPHAN_GRACE);
+    tracing::warn!("a interface não fechou depois do fim do núcleo; saindo");
+    std::process::exit(2);
+}
+
+fn post_close() {
+    CLOSING.store(true, Ordering::Relaxed);
+    let mut task = CloseAll::new();
+    if post_task(ThreadId::UI, Some(&mut task)) == 0 {
+        tracing::warn!("fila UI encerrada");
+    }
 }
 
 /// Em release, `command_line_args_disabled` faz o próprio CEF descartar toda opção externa do Chromium antes de
@@ -358,25 +239,17 @@ fn browser_closed(config: &Config, browser: Option<&mut Browser>) {
         return;
     };
     WINDOWS.with(|windows| windows.borrow_mut().remove(&browser.identifier()));
-    let _ = config
-        .requests
-        .try_send(CoreCommand::Closed(browser.identifier()));
-    tracing::info!(
-        browser = browser.identifier(),
-        "navegador CEF fechado; AppService continua vivo"
-    );
+    let _ = config.requests.try_send(UiMsg::Closed {
+        browser: browser.identifier(),
+    });
+    tracing::info!(browser = browser.identifier(), "navegador CEF fechado");
     if WINDOWS.with(|windows| windows.borrow().is_empty()) {
-        let delay = config
-            .reopen_ms
-            .lock()
-            .ok()
-            .and_then(|mut value| value.take());
-        if let Some(delay) = delay {
-            let mut task = Reopen::new(config.clone());
-            post_delayed_task(ThreadId::UI, Some(&mut task), delay);
-        } else {
-            quit_message_loop();
+        // Sem pedido do núcleo, quem fechou foi o usuário: o núcleo encerra o app. A fila espera vaga (o
+        // escritor drena sempre) e falha na hora se o núcleo já terminou.
+        if !CLOSING.load(Ordering::Relaxed) {
+            let _ = config.requests.send(UiMsg::UserClosed);
         }
+        quit_message_loop();
     }
 }
 
@@ -425,9 +298,9 @@ fn accept_post(
         }
     });
     let command = if name == CONTEXT {
-        CoreCommand::Page(page)
+        UiMsg::Page { page }
     } else {
-        CoreCommand::Request(CoreRequest { page, text })
+        UiMsg::Request { page, text }
     };
     if let Err(error) = config.requests.try_send(command) {
         tracing::warn!("fila da ponte indisponível");
@@ -436,8 +309,8 @@ fn accept_post(
                 command
             }
         };
-        if let CoreCommand::Request(request) = command {
-            let id = tako_app::protocol::parse_request(&request.text)
+        if let UiMsg::Request { page, text } = command {
+            let id = tako_app::protocol::parse_request(&text)
                 .map(|request| request.id)
                 .unwrap_or_else(|(id, _)| id);
             let response = tako_app::protocol::Response::err(
@@ -448,7 +321,7 @@ fn accept_post(
                 ),
             );
             if let Ok(text) = serde_json::to_string(&response) {
-                deliver(&request.page, &[text], &[]);
+                deliver(&page, &[text], &[]);
             }
         }
     }
@@ -673,10 +546,8 @@ fn post_delivery(page: Page, messages: Vec<String>, actions: Vec<WindowAction>) 
     }
 }
 
-fn close_after_core_error(reopen_ms: &Mutex<Option<i64>>) {
-    if let Ok(mut delay) = reopen_ms.lock() {
-        delay.take();
-    }
+/// Pedido do núcleo (ou fim do transporte): fecha todos os navegadores; o último fecha o laço de mensagens.
+fn close_all() {
     let browsers = WINDOWS.with(|windows| {
         windows
             .borrow()
@@ -695,8 +566,8 @@ fn close_after_core_error(reopen_ms: &Mutex<Option<i64>>) {
 }
 
 wrap_task! {
-    struct Quit { reopen_ms: Arc<Mutex<Option<i64>>> }
-    impl Task { fn execute(&self) { close_after_core_error(&self.reopen_ms); } }
+    struct CloseAll;
+    impl Task { fn execute(&self) { close_all(); } }
 }
 
 wrap_app! {
@@ -731,7 +602,12 @@ wrap_browser_process_handler! {
                 let mut factory = ResourceFactory::new(self.config.resources.clone());
                 register_scheme_handler_factory(Some(&CefString::from(scheme)), None, Some(&mut factory));
             }
-            open_window(&self.config);
+            // Fechamento pedido antes de o CEF ficar pronto: não abre a janela.
+            if CLOSING.load(Ordering::Relaxed) {
+                quit_message_loop();
+            } else {
+                open_window(&self.config);
+            }
         }
     }
 }
@@ -748,12 +624,14 @@ fn open_window(config: &Config) {
         Some(&mut view_delegate),
     ) else {
         tracing::error!("CEF não criou BrowserView");
+        FAILED.store(true, Ordering::Relaxed);
         quit_message_loop();
         return;
     };
     let mut delegate = HostWindow::new(RefCell::new(Some(view)));
     if window_create_top_level(Some(&mut delegate)).is_none() {
         tracing::error!("CEF não criou a janela");
+        FAILED.store(true, Ordering::Relaxed);
         quit_message_loop();
     }
 }
@@ -824,11 +702,6 @@ wrap_life_span_handler! {
             1
         }
     }
-}
-
-wrap_task! {
-    struct Reopen { config: Config }
-    impl Task { fn execute(&self) { open_window(&self.config); } }
 }
 
 wrap_request_handler! {
@@ -1171,7 +1044,7 @@ mod tests {
         }
     }
     #[test]
-    fn origin_is_exact_and_development_is_loopback_only() {
+    fn origin_is_exact() {
         assert!(trusted("tako-app://app/library", "tako-app://app"));
         for url in [
             "tako-app://app.evil/",
@@ -1181,28 +1054,6 @@ mod tests {
         ] {
             assert!(!trusted(url, "tako-app://app"));
         }
-        assert_eq!(
-            dev_origin("http://localhost:5173/"),
-            Some("http://localhost:5173".into())
-        );
-        assert_eq!(
-            dev_origin("http://127.0.0.1:80/"),
-            Some("http://127.0.0.1".into())
-        );
-        assert!(dev_origin("http://localhost:5173@evil/").is_none());
-        assert!(dev_origin("https://example.org/").is_none());
-        assert_eq!(
-            dev_origin("HTTP://LOCALHOST:05173/path"),
-            Some("http://localhost:5173".into())
-        );
-        assert_eq!(
-            dev_origin("http://[::1]:5173/"),
-            Some("http://[::1]:5173".into())
-        );
-        assert_eq!(dev_origin("http://[::1]/"), Some("http://[::1]".into()));
-        assert!(dev_origin("http://[::1]:0/").is_none());
-        assert!(dev_origin("http://[::1]evil:5173/").is_none());
-        assert!(dev_origin("http://localhost:65536/").is_none());
         assert!(trusted(
             "HTTP://LOCALHOST:5173/path",
             "http://localhost:5173"

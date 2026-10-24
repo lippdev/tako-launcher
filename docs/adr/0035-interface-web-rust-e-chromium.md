@@ -49,6 +49,20 @@ foi para a mesma base. Battle.net, EA app e Epic também usam CEF, e o Heroic us
 4. **Interface descartável.** Durante o jogo, minimizado e na bandeja, os processos do Chromium terminam e fica só
    o núcleo Rust (continua o item 2 do ADR-0023). Ao voltar, a interface reabre e o React restaura a tela a
    partir do estado do Rust.
+   **Como ficou (WEB-02b):** o CEF não reinicia no mesmo processo, então são dois processos:
+   - `tako --web`: o núcleo (`AppService`, `ui.state`), que nunca carrega a `libcef.dll`;
+   - `tako --web-ui`: o filho descartável com o CEF e a janela.
+
+   Eles conversam pelos pipes de stdin e stdout do filho, uma linha JSON por mensagem, como o supervisor do
+   ADR-0026: sem porta, sem nome que outro processo abra, e com limite de tamanho por linha.
+
+   Regras de queda:
+   - fechar a pedido do núcleo mata o filho se ele não sair em 5 s;
+   - se o filho cair, o núcleo reabre uma vez; uma segunda queda em até 60 s encerra o app com erro;
+   - se o núcleo cair, o filho fecha.
+
+   Medido em debug, biblioteca real: interface aberta 115 MiB; **sem interface 6,6 MiB e zero processos do
+   Chromium** (eram 74,7 MiB com 4 processos com o CEF no mesmo processo).
 5. **Motor no Windows decidido por números.** O padrão é o CEF nos três SOs. No gate do MIG-W01 o mesmo React
    também roda sobre o WebView2 (que já é Chromium, vem no Windows e a Microsoft atualiza); se ele empatar em
    qualidade e desempenho, o Windows usa o WebView2 e economiza o tamanho e as atualizações do Chromium. A

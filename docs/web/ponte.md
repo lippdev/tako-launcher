@@ -65,7 +65,7 @@ e entrega cada resposta e evento chamando `window.__takoDeliver(message)`, que o
 
 | Motor | `post` | Entrega |
 |---|---|---|
-| CEF (WEB-02a) | função V8 registrada no processo de renderização → mensagem de processo para o principal → `bridge::handle_message` | `ExecuteJavaScript("window.__takoDeliver(…)")` ou mensagem de processo de volta, com o texto como string JS escapada |
+| CEF (WEB-02a, WEB-02b) | função V8 registrada no processo de renderização → mensagem de processo para o principal do filho `--web-ui` → linha JSON no stdout do filho → núcleo (`tako --web`) → `bridge::handle_message` | resposta e eventos em ordem, em linhas JSON no stdin do filho → `ExecuteJavaScript("window.__takoDeliver(…)")` com o texto como string JS escapada. Detalhes em `docs/web/hospedeiro.md` |
 | WebView2 (MIG-W01) | `chrome.webview.postMessage` (o script injetado adapta) | `PostWebMessageAsString` + `chrome.webview.addEventListener("message")` → `__takoDeliver` |
 | Falso (navegador) | `installFakeHost()` em `fake.ts` | `setTimeout` com dados de exemplo |
 

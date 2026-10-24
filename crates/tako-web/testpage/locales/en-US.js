@@ -4,7 +4,7 @@ window.testTexts = {
   state: "UI state:",
   save: "Save state", read: "Read state",
   windowTest: "Test maximize / restore",
-  instructions: "Drag the title bar (CEF CSS region). F12 opens DevTools in debug builds. TAKO_WEB_REOPEN_MS makes the first Close reopen once after the interval.",
+  instructions: "Drag the title bar (CEF CSS region). F12 opens DevTools in debug builds. With TAKO_WEB_RECYCLE_MS, the core closes this window after the interval and reopens it once; visits goes up.",
   scan: "Scan stores", external: "Open external link", dialogs: "Test alert and close",
   image: "Core artwork cache fixture",
 };

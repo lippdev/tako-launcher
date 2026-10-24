@@ -8,8 +8,8 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-02b, WEB-05a |
-| Antigravity | `antigravity` | livre (conferir tudo que ele entrega) |
+| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes (plano 5x): WEB-05a |
+| Antigravity | `antigravity` | livre (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit**; reset às ~20:52 (aviso agendado para 20:55) |
 | Codex Lipp | `codex` | sem limite; reset às ~20:52 |
 | Codex Alyx Medical | `codex_alyx_medical` | sem limite; reset às ~20:52 |
@@ -46,7 +46,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-04h | **ConfiguracoesDoJogo** (componente; ligar no WEB-12b) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/ConfiguracoesDoJogo/` | integrada (aguarda validação visual) |
 | WEB-04i | **PerfilSessoes, PerfilColecoes, PerfilFamilia** (componentes; tela do perfil no WEB-14) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04b | `web/src/components/Perfil*/` | integrada (aguarda validação visual) |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
-| WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | despachada |
+| WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | integrada (falta ligar à sessão de jogo e à bandeja) |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
 
 Paralelismo: WEB-00 primeiro (orquestrador). Depois WEB-02a, WEB-03 e WEB-01a juntas, uma por conta (duas com
@@ -81,3 +81,5 @@ Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-0
 - **Idioma global do núcleo** (WEB-06a): `settings.set` com `Language` troca `core.lang`, mas não o `tako_core::i18n::set_lang` global. Ligar quando o hospedeiro usar textos do núcleo (bandeja, avisos do sistema).
 - **Props em português** em componentes feitos pelo Gemini (`CapaDoJogo`, `PilulaDaLoja`, `StatusDoJogo`, `EtiquetasDoJogo`, `ErroDoJogo`, `AtualizacaoDoApp`, `SeletorDeImagens`): contradiz "nomes de código em inglês". Padronizar numa tarefa N1 quando as telas que os usam estabilizarem (renomear props e chamadas juntos).
 - **Downloads, o que a tela ainda vai precisar** (WEB-01e): adicionar, atualizar e remover fontes (`downloads.source.*` com `fetch_https`, cache, limite de 20); "abrir pasta" (`HostRequest` novo, pasta resolvida no núcleo); motivo do `conflict` distinguível (desligado, jogo ocupado, duplicado, sem espaço) e código no erro de download em vez de texto pronto; reler tudo ao reabrir a interface.
+- **Fila núcleo → interface sem limite** (WEB-02b, de propósito: o núcleo nunca espera a interface). Se a interface travar sem cair, os eventos acumulam na memória; pôr um teto ou descartar eventos velhos quando houver motivo.
+- **Segunda instância de `tako --web`** ainda não traz a janela da primeira para a frente; sem Job Object, a limpeza na queda do núcleo depende do fim do stdin do filho (funcionou nos testes).
