@@ -61,16 +61,16 @@ const ACTIONS: usize = 2;
 const TILES: usize = 3;
 
 /// Segunda-feira da semana de `day`.
-fn monday(day: NaiveDate) -> NaiveDate {
+pub(super) fn monday(day: NaiveDate) -> NaiveDate {
     day - chrono::Days::new(u64::from(day.weekday().num_days_from_monday()))
 }
 
-fn local_day(s: &PlaySession) -> NaiveDate {
+pub(super) fn local_day(s: &PlaySession) -> NaiveDate {
     s.started_at.with_timezone(&Local).date_naive()
 }
 
 /// O tempo que conta nos totais (sessão de menos de 1 minuto não soma).
-fn counted(s: &PlaySession) -> Duration {
+pub(super) fn counted(s: &PlaySession) -> Duration {
     if s.duration < MIN_SESSION {
         Duration::ZERO
     } else {
@@ -119,7 +119,7 @@ pub fn top_since<'a>(
 }
 
 /// "42 min", "2 h", "6 h 37 min".
-fn hm(d: Duration) -> String {
+pub(super) fn hm(d: Duration) -> String {
     let m = d.as_secs() / 60;
     match (m / 60, m % 60) {
         (0, m) => i18n::tf("profile.duration.minutes", &[("m", &m.to_string())]),
@@ -131,10 +131,10 @@ fn hm(d: Duration) -> String {
     }
 }
 
-const WEEKDAYS: [&str; 7] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+pub(super) const WEEKDAYS: [&str; 7] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
 /// Todas as sessões do perfil (o histórico é por jogo), da mais recente para a mais antiga.
-fn all_sessions(ctx: &Ctx) -> Vec<(&Game, &PlaySession)> {
+pub(super) fn all_sessions(ctx: &Ctx) -> Vec<(&Game, &PlaySession)> {
     let mut v: Vec<(&Game, &PlaySession)> = ctx
         .library
         .games()
@@ -440,6 +440,24 @@ fn most_played(ctx: &Ctx) -> Vec<&Game> {
     v
 }
 
+/// Leitura da semana para o leitor de tela ("Segunda 40 min, Terça nada, …"), até hoje.
+pub(super) fn week_text(ctx: &Ctx, days: &[Duration; 7], today_i: usize) -> String {
+    days.iter()
+        .enumerate()
+        .take(today_i + 1)
+        .map(|(i, d)| {
+            let day = ctx.t(&format!("profile.weekday_long.{}", WEEKDAYS[i]));
+            let v = if d.is_zero() {
+                ctx.t("profile.nothing")
+            } else {
+                hm(*d)
+            };
+            format!("{day} {v}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// O fundo: o mais jogado do mês; sem sessões no mês, o último jogo jogado.
 fn backdrop_game(ctx: &Ctx) -> Option<&Game> {
     let today = Local::now().date_naive();
@@ -618,21 +636,7 @@ impl Page for ProfilePage {
                 future: i > today_i,
             })
             .collect();
-        let week_text = days
-            .iter()
-            .enumerate()
-            .take(today_i + 1)
-            .map(|(i, d)| {
-                let day = ctx.t(&format!("profile.weekday_long.{}", WEEKDAYS[i]));
-                let v = if d.is_zero() {
-                    ctx.t("profile.nothing")
-                } else {
-                    hm(*d)
-                };
-                format!("{day} {v}")
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
+        let week_text = week_text(ctx, &days, today_i);
         let week_total: Duration = days.iter().sum();
         let total: Duration = ctx.library.games().iter().map(|g| g.play_time).sum();
 

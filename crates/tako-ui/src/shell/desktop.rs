@@ -1194,7 +1194,8 @@ impl DesktopLibrary {
         self.focus_game(id, ctx);
     }
 
-    /// Teclado e controle na Visão geral: os alvos vêm de `overview::targets`, na ordem da tela.
+    /// Teclado e controle na Visão geral: os alvos vêm de `overview::targets`, na ordem da tela. A fileira Instalados
+    /// anda com ←→ (↑ sai dela para a seção de cima); no resto, ↓→ vão para o próximo e ↑← para o anterior.
     fn overview_cmd(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
         let targets = overview::targets(ctx, ctx.overview_show_back);
         let last = targets.len().saturating_sub(1);
@@ -1203,11 +1204,17 @@ impl DesktopLibrary {
             self.zone = Zone::List;
             return Nav::Stay;
         };
-        let Some(id) = overview::game_of(ctx, target).map(|g| g.id.clone()) else {
-            return Nav::Stay;
-        };
+        let first_cover = targets
+            .iter()
+            .position(|t| matches!(t, Target::Cover(_)))
+            .unwrap_or(0);
+        let in_row = matches!(target, Target::Cover(_));
+        let id = overview::game_of(ctx, target).map(|g| g.id.clone());
         match cmd {
-            Cmd::Down | Cmd::Right => self.index = (at + 1).min(last),
+            Cmd::Right => self.index = (at + 1).min(last),
+            Cmd::Down if !in_row => self.index = (at + 1).min(last),
+            Cmd::Left if in_row => self.index = at.saturating_sub(1).max(first_cover),
+            Cmd::Up if in_row => self.index = first_cover.saturating_sub(1),
             Cmd::Up | Cmd::Left if at > 0 => self.index = at - 1,
             // No primeiro alvo: ← vai para a lista; ↑ para a linha Visão geral, no topo dela.
             Cmd::Left => self.zone = Zone::List,
@@ -1219,14 +1226,44 @@ impl DesktopLibrary {
                     .position(|c| *c == Control::Overview)
                     .unwrap_or(0);
             }
-            // Enter: o destaque joga; os outros abrem a página do jogo (como na grade).
-            Cmd::Accept if target == Target::Hero => return self.run_on(&id, Action::Play, ctx),
-            Cmd::Accept => self.open_game(&id, ctx),
-            Cmd::Favorite => return self.run_on(&id, Action::Favorite, ctx),
-            Cmd::Menu => return self.run_on(&id, Action::More, ctx),
+            // Enter: o destaque joga, Precisa de atenção faz a ação da linha e os outros abrem a página do jogo.
+            Cmd::Accept => match (target, id) {
+                (Target::Hero, Some(id)) => return self.run_on(&id, Action::Play, ctx),
+                (Target::Attention(i), _) => return self.attention_act(i, ctx),
+                (_, Some(id)) => self.open_game(&id, ctx),
+                _ => {}
+            },
+            Cmd::Favorite => {
+                if let Some(id) = id {
+                    return self.run_on(&id, Action::Favorite, ctx);
+                }
+            }
+            Cmd::Menu => {
+                if let Some(id) = id {
+                    return self.run_on(&id, Action::More, ctx);
+                }
+            }
             _ => {}
         }
         Nav::Stay
+    }
+
+    /// A ação de uma linha de Precisa de atenção: refazer o que falhou, escolher a arte ou abrir o jogo.
+    fn attention_act(&mut self, index: usize, ctx: &mut Ctx) -> Nav {
+        let Some(item) = overview::attention_of(ctx, index) else {
+            return Nav::Stay;
+        };
+        match item.state.as_str() {
+            "error" => {
+                super::activities::run_action(ctx, &item.id);
+                Nav::Stay
+            }
+            "art" => Nav::Layer(super::art::picker(ctx, &item.id)),
+            _ => {
+                self.open_game(&item.id, ctx);
+                Nav::Stay
+            }
+        }
     }
 }
 
@@ -1886,6 +1923,31 @@ impl Page for DesktopLibrary {
                 }
                 self.open_game(&id, ctx);
             }
+            // Sua semana, Precisa de atenção e a fileira Instalados.
+            "ov-best" | "ov-att" | "ov-att-action" | "ov-cover" | "ov-cover-play" => {
+                let target = match zone {
+                    "ov-best" => Target::Best,
+                    "ov-att" | "ov-att-action" => Target::Attention(index),
+                    _ => Target::Cover(index),
+                };
+                if let Some(at) = overview::targets(ctx, ctx.overview_show_back)
+                    .iter()
+                    .position(|t| *t == target)
+                {
+                    self.zone = Zone::Actions;
+                    self.index = at;
+                }
+                if zone == "ov-att-action" {
+                    return self.attention_act(index, ctx);
+                }
+                let Some(id) = overview::game_of(ctx, target).map(|g| g.id.clone()) else {
+                    return Nav::Stay;
+                };
+                if zone == "ov-cover-play" {
+                    return self.run_on(&id, Action::Play, ctx);
+                }
+                self.open_game(&id, ctx);
+            }
             "collection-clear" => {
                 self.open_tab(Tab::All, ctx);
                 self.selected = None;
@@ -2468,6 +2530,11 @@ impl Page for DesktopLibrary {
         );
         // Na Visão geral nenhum jogo está escolhido; só a lista com o foco do teclado mostra onde ele está.
         let overview = self.overview_on(ctx);
+        let targets = if overview {
+            overview::targets(ctx, ctx.overview_show_back)
+        } else {
+            Vec::new()
+        };
         out.set(
             "desk-selected",
             self.focus_pos(&list, cur)
@@ -2479,11 +2546,6 @@ impl Page for DesktopLibrary {
         if self.more != hero || View::of(ctx) == View::Categories || overview {
             self.more = None;
         }
-        let targets = if overview {
-            overview::targets(ctx, ctx.overview_show_back)
-        } else {
-            Vec::new()
-        };
         if overview && self.zone == Zone::Actions && targets.is_empty() {
             self.zone = Zone::List;
         }
@@ -3857,11 +3919,15 @@ mod tests {
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
         shell.show_overview();
-        let n = overview::targets(&shell.ctx, shell.ctx.overview_show_back).len();
+        // Só o destaque e Voltar a jogar: as seções vêm depois (outro teste).
+        let n = overview::targets(&shell.ctx, shell.ctx.overview_show_back)
+            .iter()
+            .take_while(|t| matches!(t, Target::Hero | Target::Back(_)))
+            .count();
         assert!(n >= 3);
         assert_eq!(page(&shell).zone(), Zone::Actions);
-        // ↓ anda pelo destaque e por Voltar a jogar; no último fica.
-        for _ in 0..n + 2 {
+        // ↓ anda pelo destaque e por Voltar a jogar.
+        for _ in 0..n - 1 {
             shell.handle(Cmd::Down);
         }
         assert_eq!(page(&shell).index, n - 1);
@@ -3906,12 +3972,149 @@ mod tests {
         let (_dir, mut shell) = shell();
         shell.show_overview();
         shell.ctx.overview_show_back = false;
-        let hero = overview::hero(&shell.ctx).unwrap().id.clone();
+        let visible_targets = overview::targets(&shell.ctx, false);
+        assert!(
+            visible_targets
+                .iter()
+                .all(|target| !matches!(target, Target::Back(_)))
+        );
         shell.handle(Cmd::Down);
-        assert_eq!(page(&shell).index, 0);
+        assert!(page(&shell).index < visible_targets.len());
+        assert!(!matches!(
+            visible_targets[page(&shell).index],
+            Target::Back(_)
+        ));
         shell.handle(Cmd::Accept);
-        assert!(shell.ctx.effects.contains(&Effect::Launch(hero)) || shell.has_layers());
+        assert!(!shell
+            .ctx
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::Launch(id) if overview::game_of(&shell.ctx, Target::Back(0)).is_some_and(|game| game.id == *id))));
         assert!(page(&shell).overview_on(&shell.ctx));
+    }
+
+    #[test]
+    fn the_overview_sections_take_focus_in_order_and_the_cover_row_walks_sideways() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        crate::demo::sessions(&mut shell.ctx);
+        shell.show_overview();
+        let targets = overview::targets(&shell.ctx, shell.ctx.overview_show_back);
+        let first_cover = targets
+            .iter()
+            .position(|t| matches!(t, Target::Cover(_)))
+            .unwrap();
+        assert!(
+            first_cover > 4,
+            "destaque, Voltar a jogar e as seções vêm antes das capas"
+        );
+        // A ordem da tela: destaque, Voltar a jogar, Jogo da semana, atenção, capas.
+        let order: Vec<u8> = targets
+            .iter()
+            .map(|t| match t {
+                Target::Hero => 0,
+                Target::Back(_) => 1,
+                Target::Best => 2,
+                Target::Attention(_) => 3,
+                Target::Cover(_) => 4,
+            })
+            .collect();
+        assert!(order.windows(2).all(|w| w[0] <= w[1]));
+        for _ in 0..first_cover {
+            shell.handle(Cmd::Down);
+        }
+        assert_eq!(page(&shell).index, first_cover);
+        // ← → andam só dentro da fileira: ← na primeira capa fica; ↓ no fim fica.
+        shell.handle(Cmd::Left);
+        assert_eq!(page(&shell).index, first_cover);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Right);
+        assert_eq!(page(&shell).index, first_cover + 2);
+        let out = shell.render(std::time::Instant::now());
+        let focus = out.props.iter().find_map(|(n, v)| match (*n, v) {
+            ("desk-overview", slint_interpreter::Value::Struct(s)) => Some((
+                s.get_field("focus-kind").cloned(),
+                s.get_field("focus-index").cloned(),
+            )),
+            _ => None,
+        });
+        assert_eq!(
+            focus,
+            Some((
+                Some(slint_interpreter::Value::String("cover".into())),
+                Some(slint_interpreter::Value::Number(2.))
+            ))
+        );
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).index, first_cover + 2);
+        // ↑ sai da fileira para a seção de cima, não para a capa de cima.
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).index, first_cover - 1);
+        // Enter numa capa abre a página do jogo; duplo clique (▶) joga.
+        shell.handle(Cmd::Down);
+        let id = overview::game_of(&shell.ctx, Target::Cover(0))
+            .map(|g| g.id.clone())
+            .unwrap();
+        shell.handle(Cmd::Accept);
+        assert!(!page(&shell).overview_on(&shell.ctx));
+        assert_eq!(shell.focused_game(), Some(id));
+        shell.click("overview", 0);
+        let other = overview::game_of(&shell.ctx, Target::Cover(1))
+            .map(|g| g.id.clone())
+            .unwrap();
+        shell.click("ov-cover-play", 1);
+        assert!(shell.ctx.effects.contains(&Effect::Launch(other)) || shell.has_layers());
+        shell.close_layers();
+        // O Jogo da semana abre a página dele.
+        shell.click("overview", 0);
+        let best = overview::game_of(&shell.ctx, Target::Best)
+            .map(|g| g.id.clone())
+            .unwrap();
+        shell.click("ov-best", 0);
+        assert_eq!(shell.focused_game(), Some(best));
+    }
+
+    #[test]
+    fn attention_rows_redo_the_failed_work_choose_art_or_open_the_game() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let now = std::time::Instant::now();
+        let list = &mut shell.ctx.activity.list;
+        list.start(
+            "download:7",
+            tako_core::activities::Kind::Download,
+            "x",
+            "",
+            now,
+        );
+        list.fail(
+            "download:7",
+            "Não baixou X",
+            Some(tako_core::activities::Action::Retry),
+            now,
+        );
+        shell.show_overview();
+        let first = overview::attention_of(&shell.ctx, 0).unwrap();
+        assert_eq!(first.state, "error");
+        // O botão da linha tira o erro da fila (quem alimenta a fila começa outro trabalho).
+        shell.click("ov-att-action", 0);
+        assert!(shell.ctx.activity.list.get("download:7").is_none());
+        // Sem a capa, a ação abre o seletor de imagens; o clique na linha abre a página do jogo.
+        shell.ctx.found.lock().unwrap()[0].cover_uri = None;
+        shell.ctx.library.refresh();
+        let art = (0..)
+            .map_while(|i| overview::attention_of(&shell.ctx, i))
+            .position(|a| a.state == "art")
+            .unwrap();
+        shell.click("ov-att-action", art);
+        assert!(shell.has_layers());
+        shell.close_layers();
+        let id = overview::attention_of(&shell.ctx, art).unwrap().id;
+        shell.click("ov-att", art);
+        assert!(!page(&shell).overview_on(&shell.ctx));
+        assert_eq!(shell.focused_game(), Some(id));
     }
 
     #[test]
