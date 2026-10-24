@@ -4,7 +4,6 @@ import { BuscaGeral } from "./BuscaGeral";
 import { ColunaDaLista } from "./ColunaDaLista";
 import { strings } from "./strings";
 import { VIEW_IDS, type ViewId } from "./uiState";
-import { useLibrary } from "./useLibrary";
 import { useScreenState } from "./useScreenState";
 import { Vista } from "./Vista";
 import { windowAction } from "./windowActions";
@@ -19,7 +18,6 @@ const PROFILE = { name: strings.topbar.profile, online: true };
  */
 export function AppShell() {
   const { state, ready, update } = useScreenState();
-  const library = useLibrary();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocus, setSearchFocus] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
@@ -101,8 +99,8 @@ export function AppShell() {
           shown={listShown}
           collapsed={listCollapsed}
           onToggleCollapsed={toggleList}
-          rows={library.rows}
-          {...(library.resolveIcon ? { resolveIcon: library.resolveIcon } : {})}
+          criteria={state.library}
+          onCriteriaChange={(library) => { update({ library }); }}
         />
         <main ref={mainRef} className={styles["main"]}>
           {VIEW_IDS.map((id) => (

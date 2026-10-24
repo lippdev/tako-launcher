@@ -118,6 +118,7 @@
 }
 
 .action {
+  position: relative;
   display: grid;
   place-items: center;
   flex: none;
@@ -220,4 +221,21 @@
 
 .geral .input {
   font-size: 15px;
+}
+/* Quantidade de filtros: emblema no canto do botão, no lugar do ponto. */
+.count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+  color: var(--on-primary);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
 }

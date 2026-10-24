@@ -13,6 +13,8 @@ interface AcaoDaBusca {
   active?: boolean;
   /** O menu que o botão abre está aberto. */
   expanded?: boolean;
+  count?: number;
+  popup?: "menu" | "dialog";
 }
 
 interface CampoDeBuscaProps
@@ -81,12 +83,12 @@ export function CampoDeBusca({
           type="button"
           className={cx(styles["action"], action.active && styles["active"])}
           aria-label={action.label}
-          aria-haspopup="menu"
+          aria-haspopup={action.popup ?? "menu"}
           {...(action.expanded === undefined ? {} : { "aria-expanded": action.expanded })}
           onClick={action.onClick}
         >
           <Icon name={action.icon ?? "sliders"} size="sm" />
-          <span className={styles["indicator"]} aria-hidden="true" />
+          {action.count ? <span className={styles["count"]}>{action.count}</span> : <span className={styles["indicator"]} aria-hidden="true" />}
         </button>
       )}
     </label>

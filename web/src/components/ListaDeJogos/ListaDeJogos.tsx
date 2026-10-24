@@ -67,6 +67,8 @@ interface ListaDeJogosProps {
    */
   resolveIcon?: (id: string, px: number) => string | null;
   className?: string;
+  /** Avisa quando a janela virtual alcança as últimas linhas da página carregada. */
+  onNearEnd?: () => void;
 }
 
 /** Ícones que o núcleo respondeu 404: lembrados para a rolagem não pedir de novo a cada linha que reaparece. */
@@ -134,6 +136,7 @@ export function ListaDeJogos({
   onPlay,
   resolveIcon = coreIcon,
   className,
+  onNearEnd,
   "aria-label": ariaLabel,
 }: ListaDeJogosProps) {
   const listId = useId();
@@ -160,6 +163,9 @@ export function ListaDeJogos({
   }, [collapsed, uiScale]);
 
   const { start, end, totalSize, scrollToIndex } = useVirtualRange({ count: rows.length, itemSize: pitch, viewportRef });
+  useEffect(() => {
+    if (!loading && rows.length > 0 && end >= rows.length - 4) onNearEnd?.();
+  }, [end, rows.length, loading, onNearEnd]);
   const selecting = selection.size > 0;
   const px = iconPixels(uiScale);
 

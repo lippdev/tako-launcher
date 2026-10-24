@@ -86,7 +86,11 @@
 }
 
 .toggle:hover {
-  background-image: radial-gradient(70% 90% at 50% 100%, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
+  background-image: radial-gradient(
+    70% 90% at 50% 100%,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    transparent
+  );
   color: var(--text);
 }
 
@@ -169,4 +173,38 @@
     0 0 0 2px var(--canvas),
     0 0 0 3px color-mix(in srgb, var(--text) 60%, transparent);
   background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.homeLine {
+  display: flex;
+  align-items: center;
+}
+.homeLine .home {
+  flex: 1;
+  min-width: 0;
+}
+
+.collectionLine {
+  align-self: flex-start;
+  max-width: calc(var(--list-width) - var(--space-24));
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+}
+.collectionLine .home {
+  height: calc(var(--space-24) + var(--space-4));
+  margin: 0;
+  gap: var(--space-8);
+  font-size: var(--space-12);
+  background: transparent;
+}
+.collectionLine .home .homeIcon {
+  width: var(--space-16);
+  height: var(--space-16);
+  box-shadow: none;
+  background: transparent;
+}
+.collectionLine .toggle {
+  width: var(--space-24);
+  height: var(--space-24);
 }

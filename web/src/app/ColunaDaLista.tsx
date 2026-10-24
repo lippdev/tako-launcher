@@ -1,114 +1,215 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Abas, type Aba } from "../components/Abas/Abas";
+import { Aviso } from "../components/Aviso/Aviso";
 import { CampoDeBusca } from "../components/CampoDeBusca/CampoDeBusca";
 import { Icon } from "../components/Icon/Icon";
-import { ListaDeJogos, type GameRow } from "../components/ListaDeJogos/ListaDeJogos";
+import { ListaDeJogos } from "../components/ListaDeJogos/ListaDeJogos";
 import { cx } from "../lib/cx";
-import { listLabels, strings } from "./strings";
+import { listLabels, strings, libraryStrings as s } from "./strings";
+import { LibraryFilters, filterCount } from "./LibraryFilters";
+import { LibraryBulkActions } from "./LibraryBulkActions";
+import type { LibraryCriteria } from "./uiState";
+import { useLibrary } from "./useLibrary";
 import styles from "./ColunaDaLista.module.css";
+import controls from "./LibraryControls.module.css";
 
-type Filter = "all" | "favorites" | "installed";
-
-const TABS: readonly Aba<Filter>[] = [
+const TABS: readonly Aba<LibraryCriteria["filter"]>[] = [
   { id: "all", label: strings.list.tabs.all },
   { id: "favorites", label: strings.list.tabs.favorites },
   { id: "installed", label: strings.list.tabs.installed },
 ];
-
 interface ColunaDaListaProps {
-  /** Só a biblioteca mostra a lista; nas outras vistas a coluna some (largura 0). */
   shown: boolean;
-  /** Recolhida (76, só ícones) em vez de aberta (292). */
   collapsed: boolean;
   onToggleCollapsed: () => void;
-  rows: readonly GameRow[];
-  resolveIcon?: (id: string, px: number) => string | null;
+  criteria: LibraryCriteria;
+  onCriteriaChange: (criteria: LibraryCriteria) => void;
 }
 
-/**
- * A coluna da esquerda da biblioteca (README da TelaBiblioteca): abas, busca com o botão de recolher, "Visão
- * geral" e a ListaDeJogos. Por enquanto o estado é só dela: abrir um jogo, jogar e ligar à biblioteca de verdade
- * são de outras tarefas.
- */
-export function ColunaDaLista({ shown, collapsed, onToggleCollapsed, rows, resolveIcon }: ColunaDaListaProps) {
-  const [filter, setFilter] = useState<Filter>("all");
-  const [query, setQuery] = useState("");
+/** A coluna consulta a ponte; só critérios, seleção e páginas alcançadas vivem nesta tela. */
+export function ColunaDaLista({ shown, collapsed, onToggleCollapsed, criteria, onCriteriaChange }: ColunaDaListaProps) {
+  const library = useLibrary(criteria);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
-
-  const visibleRows = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("pt-BR");
-    return rows.filter(
-      (row) =>
-        (filter === "all" || (filter === "favorites" ? row.favorite : row.installed)) &&
-        row.title.toLocaleLowerCase("pt-BR").includes(needle),
-    );
-  }, [rows, filter, query]);
-
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [notice, setNotice] = useState<{
+    error: boolean;
+    key: number;
+  } | null>(null);
+  const update = (patch: Partial<LibraryCriteria>) => {
+    setSelection(new Set());
+    onCriteriaChange({ ...criteria, ...patch });
+  };
   const toggleLabel = collapsed ? strings.list.expand : strings.list.collapse;
-
+  const count = filterCount(criteria);
+  const collection = library.collections.find((c) => c.id === criteria.collection);
+  const empty =
+    criteria.search.trim() || count > Number(criteria.collection !== null)
+      ? listLabels.empty
+      : criteria.collection
+        ? s.emptyCollection
+        : criteria.filter === "favorites"
+          ? s.emptyFavorites
+          : criteria.filter === "installed"
+            ? s.emptyInstalled
+            : s.emptyLibrary;
   return (
-    <aside
-      // Escondida, a coluna sai da ordem do Tab, do clique e do leitor de tela, mas fica no DOM até o fade acabar.
-      inert={!shown}
-      className={cx(styles["side"], collapsed && styles["collapsed"], !shown && styles["hidden"])}
-      aria-label={strings.list.label}
-    >
-      <div className={styles["inner"]}>
-        {!collapsed && (
-          <Abas variant="lista" label={strings.list.tabsLabel} tabs={TABS} value={filter} onChange={setFilter} />
-        )}
-        <div className={styles["top"]}>
+    <>
+      <aside
+        inert={!shown}
+        className={cx(styles["side"], collapsed && styles["collapsed"], !shown && styles["hidden"])}
+        aria-label={strings.list.label}
+      >
+        <div className={styles["inner"]}>
           {!collapsed && (
-            <CampoDeBusca
+            <Abas
               variant="lista"
-              className={cx(styles["search"])}
-              value={query}
-              onChange={setQuery}
-              placeholder={strings.list.searchPlaceholder}
-              label={strings.list.searchLabel}
+              label={strings.list.tabsLabel}
+              tabs={TABS}
+              value={criteria.filter}
+              onChange={(filter) => {
+                update({ filter });
+              }}
             />
           )}
-          <button
-            type="button"
-            className={styles["toggle"]}
-            aria-label={toggleLabel}
-            aria-keyshortcuts="Control+B"
-            title={`${toggleLabel} · ${strings.list.shortcut}`}
-            onClick={onToggleCollapsed}
-          >
-            <Icon name="panel" size="sm" />
-          </button>
+          <div className={styles["top"]}>
+            {!collapsed && (
+              <CampoDeBusca
+                variant="lista"
+                className={cx(styles["search"])}
+                value={criteria.search}
+                onChange={(search) => {
+                  update({ search });
+                }}
+                placeholder={strings.list.searchPlaceholder}
+                label={strings.list.searchLabel}
+                action={{
+                  label: s.filterCount(count),
+                  count,
+                  active: count > 0,
+                  expanded: filtersOpen,
+                  popup: "dialog",
+                  onClick: () => {
+                    setFiltersOpen(true);
+                  },
+                }}
+              />
+            )}
+            <button
+              type="button"
+              className={styles["toggle"]}
+              aria-label={toggleLabel}
+              aria-keyshortcuts="Control+B"
+              title={`${toggleLabel} · ${strings.list.shortcut}`}
+              onClick={onToggleCollapsed}
+            >
+              <Icon name="panel" size="sm" />
+            </button>
+          </div>
+          <div className={cx(styles["homeLine"], criteria.collection !== null && !collapsed && styles["collectionLine"])}>
+            <button
+              type="button"
+              className={cx(styles["home"], activeId === null && styles["active"])}
+              title={collection?.name ?? strings.list.overview}
+              aria-label={collection?.name ?? strings.list.overview}
+              aria-current={activeId === null ? "true" : undefined}
+              onClick={() => {
+                setActiveId(null);
+                setSelection(new Set());
+              }}
+            >
+              <span className={styles["homeIcon"]}>
+                <Icon name={criteria.collection ? "folder" : "home"} size="sm" />
+              </span>
+              {!collapsed && (
+                <span className={styles["homeLabel"]}>
+                  {collection
+                    ? s.collectionLabel(collection.name, collection.criteria ? null : collection.gameIds.length)
+                    : strings.list.overview}
+                </span>
+              )}
+            </button>
+            {!collapsed && criteria.collection && (
+              <button
+                className={styles["toggle"]}
+                aria-label={s.allCollections}
+                title={s.allCollections}
+                onClick={() => {
+                  update({ collection: null });
+                }}
+              >
+                <Icon name="x" size="sm" />
+              </button>
+            )}
+          </div>
+          {!collapsed && (
+            <div className={controls["count"]} role="status">
+              {selection.size ? s.selected(selection.size, library.total) : s.count(library.total)}
+              {library.pending && !library.loading ? ` · ${s.busy}` : ""}
+            </div>
+          )}
+          {library.error && (
+            <div className={controls["count"]} role="alert">
+              {s.loadError}
+              <button className={controls["retry"]} onClick={library.refresh}>
+                {s.retry}
+              </button>
+            </div>
+          )}
+          <ListaDeJogos
+            key={library.queryKey}
+            className={cx(styles["games"])}
+            aria-label={strings.list.label}
+            collapsed={collapsed}
+            rows={library.rows}
+            labels={{ ...listLabels, empty }}
+            loading={library.loading}
+            activeId={activeId}
+            selection={selection}
+            onActivate={setActiveId}
+            onSelectionChange={setSelection}
+            resolveIcon={library.resolveIcon}
+            onNearEnd={library.loadMore}
+          />
+          {selection.size > 0 && !collapsed && (
+            <LibraryBulkActions
+              selection={selection}
+              allFavorite={[...selection].every((id) => library.games.find((g) => g.id === id)?.favorite)}
+              collections={library.collections}
+              tags={library.tags}
+              clear={() => {
+                setSelection(new Set());
+              }}
+              notify={(error) => {
+                setNotice({ error, key: Date.now() });
+              }}
+            />
+          )}
         </div>
-        <button
-          type="button"
-          className={cx(styles["home"], activeId === null && styles["active"])}
-          title={strings.list.overview}
-          aria-label={strings.list.overview}
-          aria-current={activeId === null ? "true" : undefined}
-          onClick={() => {
-            setActiveId(null);
-            setSelection(new Set());
-          }}
-        >
-          <span className={styles["homeIcon"]}>
-            <Icon name="home" size="sm" />
-          </span>
-          {!collapsed && <span className={styles["homeLabel"]}>{strings.list.overview}</span>}
-        </button>
-        <ListaDeJogos
-          className={cx(styles["games"])}
-          aria-label={strings.list.label}
-          collapsed={collapsed}
-          rows={visibleRows}
-          labels={listLabels}
-          activeId={activeId}
-          selection={selection}
-          onActivate={setActiveId}
-          onSelectionChange={setSelection}
-          {...(resolveIcon ? { resolveIcon } : {})}
-        />
-      </div>
-    </aside>
+      </aside>
+      <LibraryFilters
+        open={filtersOpen}
+        onClose={() => {
+          setFiltersOpen(false);
+        }}
+        criteria={criteria}
+        update={update}
+        collections={library.collections}
+        tags={library.tags}
+      />
+      <Aviso open={library.error} onClose={() => {}} duration={null} tone="error">
+        {s.loadError}
+      </Aviso>
+      <Aviso
+        open={notice !== null}
+        onClose={() => {
+          setNotice(null);
+        }}
+        noticeKey={notice?.key ?? 0}
+        tone={notice?.error ? "error" : "success"}
+      >
+        {notice?.error ? s.actionError : s.actionSuccess}
+      </Aviso>
+    </>
   );
 }

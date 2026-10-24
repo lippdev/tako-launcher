@@ -8,7 +8,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes: WEB-02a (rodada 2, continuação), WEB-11a (continuação) |
+| Claude Alyx Medical | `claudeAgent` | orquestrador + subagentes: WEB-02a (rodada 2, continuação) |
 | Antigravity | `antigravity` | WEB-04c |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | **rate limit** (ainda ativo às 17:04; sem horário informado) |
 | Codex Lipp | `codex` | **sem créditos** desde 24/10 (precisa recarregar; fora da rotação) |
@@ -30,7 +30,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-01b | **`tako-app`, segunda fatia:** configurações, coleções (manuais e automáticas resolvidas pelo id no núcleo), tags e status do jogo, favoritos | N3 | Codex Alyx · GPT-6.1-Sol medium (trocou de conta) | WEB-01a | `crates/tako-app/` | integrada |
 | WEB-10a | **Estrutura do app, barra de cima e janela:** BarraSuperior com BarraDaJanela (só BIBLIOTECA, sem loja), MenuDoTako, vistas com TrocaDeTela, lista recolhível, `ui.state`, atalhos, janela pequena | N3 | Claude InvestSmart · Sonnet 5.5 alto → continuação no Codex Alyx (limite de uso) | WEB-04a, WEB-04b | `web/src/app/`, `web/src/App.tsx` | integrada (aguarda validação visual) |
 | WEB-01c | **Leitura das lojas na `tako-app`:** descoberta pela `tako-sources` numa thread própria, snapshot, `library.changed` ao terminar; hoje a versão web só vê o snapshot deixado pelo Slint | N4 | Codex Alyx · GPT-6.1-Sol high | WEB-01a | `crates/tako-app/` | integrada |
-| WEB-11a | **Lista da biblioteca ligada à ponte:** `library.list` paginado, abas, busca, filtros e ordenação no PainelLateral, seletor de coleção, seleção múltipla com ações (favorito, status, tags, coleção), `library.changed`, estados vazios e carregando, hospedeiro falso respondendo as mesmas chamadas | N3 | Codex Alyx · GPT-6.1-Sol medium | WEB-10a, WEB-01b | `web/src/app/`, `web/src/bridge/fake.ts` | despachada (continuação no Claude Alyx · Sonnet 5.5) |
+| WEB-11a | **Lista da biblioteca ligada à ponte:** `library.list` paginado, abas, busca, filtros e ordenação no PainelLateral, seletor de coleção, seleção múltipla com ações (favorito, status, tags, coleção), `library.changed`, estados vazios e carregando, hospedeiro falso respondendo as mesmas chamadas | N3 | Codex Alyx · GPT-6.1-Sol medium | WEB-10a, WEB-01b | `web/src/app/`, `web/src/bridge/fake.ts` | integrada (aguarda validação visual) |
 | WEB-04c | **Componentes do jogo:** CapaDoJogo (com estado sem arte), PilulaDaLoja, StatusDoJogo, EtiquetasDoJogo | N2 | Antigravity · Gemini 3.8 Flash high | WEB-03 | `web/src/components/` (só as quatro pastas) | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | a definir | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | fila |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
@@ -57,3 +57,6 @@ Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-0
 - **`GameDetails` incompleto para a TelaJogo:** mídia (trailer, capturas) e conquistas ainda não existem no núcleo.
 - **Loop do hospedeiro precisa atender `HostRequest::PollBackground`** chamando `AppService::poll()`, inclusive sem janela (WEB-02b).
 - **Textos de erro em português dentro do núcleo** (`sources.rs`: "Falha ao ler a fonte"): trocar por código e catálogo no WEB-06.
+- **Filtros da biblioteca, uma escolha por campo** (WEB-11a): por "escolhas são select", o painel aceita uma loja, um status e uma etiqueta por vez; várias ao mesmo tempo pedem um componente de seleção múltipla que o design system não tem. Decisão do mantenedor.
+- **Etiqueta na barra de seleção** é campo com sugestões; o design pede chip "+ Etiqueta" com MenuDeContexto. Ajustar junto da tela de tags.
+- **Paginação da lista** testada só com o hospedeiro falso (13 jogos); conferir rolando uma biblioteca grande no Tako de verdade.
