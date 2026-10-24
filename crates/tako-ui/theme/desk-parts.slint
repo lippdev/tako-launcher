@@ -81,7 +81,7 @@ export component Tip inherits Rectangle {
         tip-timer.running = hovering && text != "";
     }
     tip-timer := Timer {
-        interval: Ui.reduce-motion ? 0ms : 500ms;
+        interval: 500ms;
         running: false;
         triggered => {
             self.running = false;
@@ -101,12 +101,12 @@ export component Tip inherits Rectangle {
             }
         }
         opacity: lit ? 1 : 0;
-        animate opacity { duration: Ui.reduce-motion ? 0ms : 120ms; easing: Ui.curva-entrada; }
+        animate opacity { duration: Ui.tempo-foco; easing: Ui.curva-entrada; }
         x: (root.width - self.width) / 2;
         y: root.height + 6px;
         width: tl.preferred-width + 20px;
         height: 28px;
-        border-radius: 8px;
+        border-radius: Ui.radius-thumb;
         background: Ui.surface-raised;
         border-width: 1px;
         border-color: Ui.line-strong;
