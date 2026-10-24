@@ -10,8 +10,8 @@ use super::{
     Cmd, Ctx, Effect, InputKind, Nav, Out, Page, bar, details, dialogs, keys, sidebar, smart, tiles,
 };
 use crate::model::{
-    DeskBlock, DeskCategory, DeskGame, DeskGameView, DeskInfo, DeskMore, DeskOverview, Hint,
-    NavItem, PanelRow,
+    DeskBlock, DeskCategory, DeskEntry, DeskGame, DeskGameView, DeskInfo, DeskOverview, DeskPage,
+    Hint, NavItem, PanelRow,
 };
 use crate::values::parse_color;
 use std::cell::RefCell;
@@ -347,6 +347,19 @@ pub enum Zone {
     Controls,
     List,
     Actions,
+    /// O corpo da página do jogo (abaixo do destaque): ↓ a partir das ações entra e rola, ↑ rola de volta e, no topo, volta.
+    Body,
+}
+
+/// Parecidos de um jogo: o id, a versão da biblioteca em que foram calculados e (id, motivo) de cada um.
+type SimilarCache = (String, u64, Vec<(String, String)>);
+
+/// Os pontos de foco do corpo da página do jogo: o trailer, o Ver todas das sessões e as capas de Parecidos.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyItem {
+    Trailer,
+    Sessions,
+    Similar(usize),
 }
 
 /// Os controles da zona `Controls`, na ordem da tela (o índice da zona).
@@ -394,8 +407,16 @@ pub struct DesktopLibrary {
     /// TrocaDeJogo: o jogo no destaque e a seleção do teclado esperando parar (id, desde quando).
     hero: Option<String>,
     hero_wait: Option<(String, std::time::Instant)>,
-    /// DestaqueFases: o jogo com a fase 2 aberta; trocar de jogo (ou sair da Lista) volta para a fase 1.
-    more: Option<String>,
+    /// Page Down soma 1 e Page Up tira 1 (uma tela por passo); ↓ e ↑ no corpo somam e tiram `BODY_STEP`. O tema rola a
+    /// página do jogo pela diferença.
+    page_scroll: f32,
+    /// Onde o tema diz que a página está (0 topo, 1 no meio, 2 no fim): ↑ no topo sai do corpo e ↓ no fim não rola.
+    page_edge: usize,
+    /// Parecidos do jogo da página (id e motivo), guardados por jogo e versão da biblioteca: o `render` roda a cada
+    /// quadro e a busca varre a biblioteca inteira. O tema avisa o clique pelo índice.
+    similar: Option<SimilarCache>,
+    /// Quantas capas de Parecidos cabem na janela (o tema avisa); o foco só passa pelas que aparecem.
+    similar_shown: usize,
     /// Cabeçalho de loja com o foco do teclado (o destaque segue no último jogo escolhido).
     group_focus: Option<GameStore>,
     /// Visão geral (TelaBiblioteca) no lugar do destaque do jogo: o primeiro lugar da biblioteca; escolher um jogo sai
@@ -406,6 +427,9 @@ pub struct DesktopLibrary {
 /// Page Up e Page Down como o Slint manda.
 const PAGE_UP: char = '\u{F72C}';
 const PAGE_DOWN: char = '\u{F72D}';
+
+/// Quanto ↓ e ↑ rolam o corpo da página do jogo, em telas.
+const BODY_STEP: f32 = 0.3;
 
 /// Teclado rápido: só a seleção anda; arte e texto trocam quando ela para por este tempo.
 const HERO_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
@@ -438,7 +462,10 @@ impl DesktopLibrary {
             cat_focus: (0, 0),
             hero: None,
             hero_wait: None,
-            more: None,
+            page_scroll: 0.,
+            page_edge: 0,
+            similar: None,
+            similar_shown: usize::MAX,
             group_focus: None,
             overview: true,
         }
@@ -491,6 +518,110 @@ impl DesktopLibrary {
 
     pub fn zone(&self) -> Zone {
         self.zone
+    }
+
+    /// O tema avisa o estado da página do jogo (`Shell::click` com "page-edge" ou "page-similar-n").
+    pub fn report_page(&mut self, kind: &str, value: usize) {
+        match kind {
+            "edge" => self.page_edge = value,
+            "similar-n" => self.similar_shown = value,
+            _ => {}
+        }
+    }
+
+    /// Parecidos de `g`: recalcula só quando o jogo ou a biblioteca mudam.
+    fn similar_of(&mut self, ctx: &Ctx, g: &Game) -> &[(String, String)] {
+        let version = ctx.library.version();
+        let fresh = matches!(&self.similar, Some((id, v, _)) if *id == g.id && *v == version);
+        if !fresh {
+            let found = similar_games(ctx.library.games(), g)
+                .into_iter()
+                .map(|(o, why)| (o.id.clone(), why))
+                .collect();
+            self.similar = Some((g.id.clone(), version, found));
+        }
+        self.similar.as_ref().map_or(&[], |(.., found)| found)
+    }
+
+    /// Onde o foco do corpo da página do jogo pode parar, na ordem da tela: trailer, Ver todas e as capas de Parecidos.
+    fn body_items(&mut self, ctx: &Ctx) -> Vec<BodyItem> {
+        let Some(g) = self.selected(ctx).and_then(|id| ctx.library.find(&id)) else {
+            return Vec::new();
+        };
+        let mut items = Vec::new();
+        if g.media.contains_key(tako_core::library::media::VIDEO) {
+            items.push(BodyItem::Trailer);
+        }
+        if !ctx.library.sessions(&g.id).is_empty() {
+            items.push(BodyItem::Sessions);
+        }
+        let shown = self.similar_shown;
+        let n = self.similar_of(ctx, g).len().min(shown);
+        items.extend((0..n).map(BodyItem::Similar));
+        items
+    }
+
+    /// Teclado e controle no corpo da página do jogo. Com itens: ←→ andam na fileira (trailer e Ver todas, ou as capas),
+    /// ↓ passa para as capas, ↑ volta para o trailer e depois para as ações, Enter age. Sem itens, ↓ e ↑ rolam a página.
+    fn body_cmd(&mut self, cmd: Cmd, ctx: &mut Ctx) -> Nav {
+        let items = self.body_items(ctx);
+        let rolls = |edge: usize, cmd| match cmd {
+            Cmd::Down => edge < 2,
+            _ => edge > 0,
+        };
+        let covers = items.iter().position(|i| matches!(i, BodyItem::Similar(_)));
+        let Some(item) = items
+            .get(self.index.min(items.len().saturating_sub(1)))
+            .copied()
+        else {
+            match cmd {
+                Cmd::Down | Cmd::Up if rolls(self.page_edge, cmd) => {
+                    self.page_scroll += if cmd == Cmd::Down {
+                        BODY_STEP
+                    } else {
+                        -BODY_STEP
+                    };
+                }
+                Cmd::Up => self.focus_actions(),
+                Cmd::Left => self.zone = Zone::List,
+                _ => {}
+            }
+            return Nav::Stay;
+        };
+        let at = self.index.min(items.len() - 1);
+        let in_covers = matches!(item, BodyItem::Similar(_));
+        let (first, last) = match (in_covers, covers) {
+            (true, Some(c)) => (c, items.len() - 1),
+            (_, c) => (0, c.unwrap_or(items.len()) - 1),
+        };
+        match cmd {
+            Cmd::Left if at == first => self.zone = Zone::List,
+            Cmd::Left => self.index = at - 1,
+            Cmd::Right => self.index = (at + 1).min(last),
+            Cmd::Down if !in_covers && covers.is_some() => self.index = covers.unwrap_or(at),
+            // Última fileira: ↓ continua rolando para o que está abaixo.
+            Cmd::Down if rolls(self.page_edge, cmd) => self.page_scroll += BODY_STEP,
+            Cmd::Up if in_covers && first > 0 => self.index = 0,
+            Cmd::Up if !in_covers && covers.is_none() && rolls(self.page_edge, cmd) => {
+                self.page_scroll -= BODY_STEP;
+            }
+            Cmd::Up => self.focus_actions(),
+            Cmd::Accept => {
+                return match item {
+                    BodyItem::Trailer => self.click("trailer", 0, ctx),
+                    BodyItem::Sessions => self.click("sessions", 0, ctx),
+                    BodyItem::Similar(i) => self.click("similar", i, ctx),
+                };
+            }
+            _ => {}
+        }
+        Nav::Stay
+    }
+
+    /// Volta o foco para as ações do destaque (o tema rola a página de volta ao topo).
+    fn focus_actions(&mut self) {
+        self.zone = Zone::Actions;
+        self.index = 0;
     }
 
     /// Coleções da aba: as do usuário e as automáticas.
@@ -1165,7 +1296,12 @@ impl DesktopLibrary {
     /// Tab / Shift+Tab: próxima zona.
     fn cycle(&mut self, forward: bool) {
         let zones = self.zones();
-        let i = zones.iter().position(|z| *z == self.zone).unwrap_or(0) as i32;
+        let from = if self.zone == Zone::Body {
+            Zone::Actions
+        } else {
+            self.zone
+        };
+        let i = zones.iter().position(|z| *z == from).unwrap_or(0) as i32;
         let n = zones.len() as i32;
         self.zone = zones[((i + if forward { 1 } else { -1 }).rem_euclid(n)) as usize];
         self.index = match self.zone {
@@ -1389,79 +1525,6 @@ pub(super) fn strip(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     items
 }
 
-/// CartaoDetalhes: uma linha com ícone por informação que o jogo tem, até 6, as de menor prioridade saem primeiro.
-/// O tempo de jogo e a última vez ficam só na faixa do destaque.
-fn details_rows(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
-    let lang = ctx.lang();
-    // (prioridade, linha): 0 é a mais importante.
-    let mut rows: Vec<(u8, DeskInfo)> = Vec::new();
-    let mut add = |prio: u8, icon: &str, key: &str, value: String| {
-        if !value.trim().is_empty() {
-            rows.push((
-                prio,
-                DeskInfo {
-                    icon: icon.into(),
-                    label: ctx.t(key),
-                    value,
-                    ..Default::default()
-                },
-            ));
-        }
-    };
-    if let Some(d) = g.release_date {
-        add(1, "calendar", "details.release", game_text::date(lang, d));
-    }
-    if let Some(score) = g.metacritic_score.or(g.critic_score) {
-        add(5, "star", "desktop.info.critic", score.to_string());
-    }
-    let genres: Vec<&str> = g.genres.iter().take(2).map(String::as_str).collect();
-    add(2, "tag", "details.genres", genres.join(" - "));
-    if let Some(dev) = &g.developer {
-        let first = dev.split([',', ';']).next().unwrap_or(dev).trim();
-        add(3, "user", "details.developer", first.to_owned());
-    }
-    if let Some(f) = &g.franchise {
-        add(6, "layers", "details.series", f.clone());
-    }
-    if !g.tags.is_empty() {
-        rows.push((
-            4,
-            DeskInfo {
-                icon: "tag".into(),
-                label: ctx.t("desktop.info.tags"),
-                chips: g.tags.iter().take(3).cloned().collect(),
-                value: if g.tags.len() > 3 {
-                    format!("+{}", g.tags.len() - 3)
-                } else {
-                    String::new()
-                },
-                ..Default::default()
-            },
-        ));
-    }
-    rows.push((
-        0,
-        DeskInfo {
-            icon: "check".into(),
-            label: ctx.t("details.status"),
-            value: game_text::status(lang, g),
-            dot: g.is_installed,
-            ..Default::default()
-        },
-    ));
-    while rows.len() > 6 {
-        if let Some(worst) = rows
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, (p, _))| *p)
-            .map(|(i, _)| i)
-        {
-            rows.remove(worst);
-        }
-    }
-    rows.into_iter().map(|(_, r)| r).collect()
-}
-
 /// Descrição do CartaoSobre: até uns 240 caracteres, cortada na última palavra com "…". `true` quando cortou.
 pub(super) fn about(description: &str) -> (String, bool) {
     const LIMIT: usize = 240;
@@ -1477,69 +1540,32 @@ pub(super) fn about(description: &str) -> (String, bool) {
     )
 }
 
-/// CartaoSessoes: as 4 últimas sessões (dia, horário, duração) e o resumo; a sessão aberta tem o ponto verde.
-fn sessions_rows(ctx: &Ctx, g: &Game) -> (String, Vec<DeskInfo>) {
-    let lang = ctx.lang();
-    let all = ctx.library.sessions(&g.id);
-    if all.is_empty() {
-        return (String::new(), Vec::new());
-    }
-    let total: std::time::Duration = all.iter().map(|s| s.duration).sum();
-    let avg = total / all.len() as u32;
-    let summary = ctx.tf(
-        "desktop.sessions.summary",
-        &[
-            ("n", &all.len().to_string()),
-            ("avg", &game_text::play_time(lang, avg)),
-        ],
-    );
-    let mut rows: Vec<DeskInfo> = Vec::new();
-    if ctx.running.as_ref().is_some_and(|r| r.id == g.id) {
-        rows.push(DeskInfo {
-            label: ctx.t("desktop.day.today"),
-            detail: ctx.t("desktop.strip.playing_now"),
-            dot: true,
-            ..Default::default()
-        });
-    }
-    for s in all.iter().rev().take(3 - rows.len()) {
-        let start = s.started_at.with_timezone(&chrono::Local);
-        let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
-        rows.push(DeskInfo {
-            label: day(ctx, start),
-            detail: format!("{} – {}", start.format("%H:%M"), end.format("%H:%M")),
-            value: game_text::play_time(lang, s.duration),
-            ..Default::default()
-        });
-    }
-    (summary, rows)
-}
-
-/// DestaqueFases › fase 2, Detalhes: todas as informações que o jogo tem, sem o limite de 6 da fase 1.
+/// CartaoDetalhes: todas as informações que o jogo tem, uma linha por dado.
 fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
     let lang = ctx.lang();
     let text = |v: &Option<String>| v.clone().unwrap_or_default();
     let tags: Vec<&str> = g.tags.iter().map(String::as_str).collect();
     let release = g.release_date.map(|d| game_text::date(lang, d));
     let score = g.metacritic_score.or(g.critic_score).map(|s| s.to_string());
+    // A ordem do CartaoDetalhes: Desenvolvedor, Publicadora, Lançamento, o resto e, por último, Tamanho e Situação.
     [
-        ("check", "details.status", game_text::status(lang, g)),
+        ("user", "details.developer", text(&g.developer)),
+        ("user", "desktop.page.publisher", text(&g.publisher)),
+        ("calendar", "details.release", text(&release)),
+        ("tag", "details.genres", g.genres.join(" - ")),
         (
             store_icon(g.store()),
             "desktop.store",
             game_text::store_name(lang, g.store()),
         ),
-        ("tag", "details.genres", g.genres.join(" - ")),
-        ("user", "details.developer", text(&g.developer)),
-        ("user", "desktop.phase.publisher", text(&g.publisher)),
-        ("calendar", "details.release", text(&release)),
         ("layers", "details.series", text(&g.franchise)),
         ("star", "desktop.info.critic", text(&score)),
         ("tag", "desktop.info.tags", tags.join(", ")),
         ("monitor", "details.system", text(&g.platform)),
         ("user", "details.players", text(&g.players)),
+        ("folder", "desktop.page.folder", text(&g.install_path)),
         ("gauge", "desktop.size", text(&g.size_label)),
-        ("folder", "desktop.phase.folder", text(&g.install_path)),
+        ("check", "details.status", game_text::status(lang, g)),
     ]
     .into_iter()
     .filter(|(.., value)| !value.trim().is_empty())
@@ -1547,15 +1573,36 @@ fn more_details(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         icon: icon.into(),
         label: ctx.t(key),
         value,
+        // A situação ganha o ponto verde quando o jogo está instalado.
+        dot: key == "details.status" && g.is_installed,
         ..Default::default()
     })
     .collect()
 }
 
-/// DestaqueFases › fase 2, Sessões: o histórico, da mais recente para a mais antiga.
-fn more_sessions(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
-    // shortcut: só as 100 últimas (o painel de sessões tem todas), subir se alguém sentir falta.
+/// CartaoSessoes: as 5 últimas sessões (dia, horário e duração; a aberta leva o ponto verde) e os números delas
+/// (quantas e a média). Sem sessão registrada, nada.
+fn sessions_blocks(ctx: &Ctx, g: &Game) -> (Vec<DeskInfo>, Vec<DeskInfo>) {
     let lang = ctx.lang();
+    let all = ctx.library.sessions(&g.id);
+    if all.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+    let total: std::time::Duration = all.iter().map(|s| s.duration).sum();
+    let numbers = vec![
+        DeskInfo {
+            icon: "clock".into(),
+            label: ctx.t("desktop.sessions.title"),
+            value: all.len().to_string(),
+            ..Default::default()
+        },
+        DeskInfo {
+            icon: "gauge".into(),
+            label: ctx.t("desktop.page.average"),
+            value: game_text::play_time(lang, total / all.len() as u32),
+            ..Default::default()
+        },
+    ];
     let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
     let now = running.then(|| DeskInfo {
         label: ctx.t("desktop.day.today"),
@@ -1563,8 +1610,9 @@ fn more_sessions(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
         dot: true,
         ..Default::default()
     });
-    now.into_iter()
-        .chain(ctx.library.sessions(&g.id).iter().rev().take(100).map(|s| {
+    let rows = now
+        .into_iter()
+        .chain(all.iter().rev().map(|s| {
             let start = s.started_at.with_timezone(&chrono::Local);
             let end = start + chrono::Duration::from_std(s.duration).unwrap_or_default();
             DeskInfo {
@@ -1574,6 +1622,60 @@ fn more_sessions(ctx: &Ctx, g: &Game) -> Vec<DeskInfo> {
                 ..Default::default()
             }
         }))
+        .take(5)
+        .collect();
+    (rows, numbers)
+}
+
+/// Parecidos: até 8 jogos da biblioteca com gênero ou desenvolvedora em comum (a desenvolvedora pesa mais), cada um
+/// com o motivo. Só dado real: sem nenhum em comum, a fileira some.
+fn similar_games<'a>(games: &'a [Game], g: &Game) -> Vec<(&'a Game, String)> {
+    let genres: std::collections::BTreeSet<String> =
+        g.genres.iter().map(|x| x.to_lowercase()).collect();
+    let dev = g
+        .developer
+        .as_deref()
+        .map(str::to_lowercase)
+        .filter(|d| !d.is_empty());
+    let mut found: Vec<(usize, &Game, String)> = games
+        .iter()
+        .filter(|o| o.id != g.id)
+        .filter_map(|o| {
+            let shared: Vec<&String> = o
+                .genres
+                .iter()
+                .filter(|x| genres.contains(&x.to_lowercase()))
+                .collect();
+            let same_dev = dev.is_some() && o.developer.as_deref().map(str::to_lowercase) == dev;
+            let why = if same_dev {
+                o.developer.clone()?
+            } else {
+                (*shared.first()?).clone()
+            };
+            Some((shared.len() + if same_dev { 2 } else { 0 }, o, why))
+        })
+        .collect();
+    found.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.title.cmp(&b.1.title)));
+    found
+        .into_iter()
+        .take(8)
+        .map(|(_, o, why)| (o, why))
+        .collect()
+}
+
+/// CartaoSobre: os parágrafos da descrição. É dado externo: no máximo 24 parágrafos e 6000 caracteres.
+fn paragraphs(description: &str) -> Vec<String> {
+    let mut left = 6000;
+    description
+        .split('\n')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .take(24)
+        .map_while(|p| {
+            let cut: String = p.chars().take(left).collect();
+            left -= cut.chars().count();
+            (!cut.is_empty()).then_some(cut)
+        })
         .collect()
 }
 
@@ -1739,7 +1841,18 @@ impl Page for DesktopLibrary {
                     .unwrap_or(1);
                 self.index = (self.index + 1).min(n - 1);
             }
-            (Zone::Actions, Cmd::Up) | (Zone::Actions, Cmd::Down) => self.zone = Zone::List,
+            (Zone::Actions, Cmd::Up) => self.zone = Zone::List,
+            // Desce para o corpo da página: no primeiro item (o tema rola até ele) ou, sem itens, rolando o primeiro passo.
+            (Zone::Actions, Cmd::Down) => {
+                self.zone = Zone::Body;
+                self.index = 0;
+                if self.body_items(ctx).is_empty() {
+                    self.page_scroll += BODY_STEP;
+                }
+            }
+            (Zone::Body, Cmd::Up | Cmd::Down | Cmd::Left | Cmd::Right | Cmd::Accept) => {
+                return self.body_cmd(cmd, ctx);
+            }
             (Zone::Actions, Cmd::Accept) => {
                 let action = cur
                     .and_then(|i| ctx.library.find(&ids[i]))
@@ -1791,9 +1904,7 @@ impl Page for DesktopLibrary {
             },
             (Zone::Controls, Cmd::Down) => self.zone = Zone::List,
             (Zone::Controls, Cmd::Up) => self.cycle(false),
-            // Esc: fecha a fase 2 do destaque, sai da seleção múltipla, depois limpa a busca e os filtros, depois
-            // volta para a lista.
-            (_, Cmd::Back) if self.more.is_some() => self.more = None,
+            // Esc: sai da seleção múltipla, depois limpa a busca e os filtros, depois volta para a lista.
             (_, Cmd::Back) if !self.checked.is_empty() => {
                 self.checked.clear();
                 self.anchor = None;
@@ -1841,13 +1952,19 @@ impl Page for DesktopLibrary {
             }
             return Some(Nav::Stay);
         }
-        // DestaqueFases: Page Down abre a fase 2 do destaque, Page Up volta (com o foco na lista ou nas ações).
+        // Page Down e Page Up rolam a página do jogo (com o foco na lista, nas ações ou no corpo).
         if (c == PAGE_DOWN || c == PAGE_UP)
             && mods == KeyModifiers::NONE
-            && matches!(self.zone, Zone::List | Zone::Actions)
+            && matches!(self.zone, Zone::List | Zone::Actions | Zone::Body)
             && View::of(ctx) != View::Categories
+            && !self.overview_on(ctx)
         {
-            self.more = (c == PAGE_DOWN).then(|| self.hero.clone()).flatten();
+            self.page_scroll += if c == PAGE_DOWN { 1. } else { -1. };
+            // Com a página rolada, o foco das ações ficaria fora da tela: ele passa para o corpo (sem itens, que o tema
+            // rolaria de volta até o primeiro).
+            if self.zone == Zone::Actions && self.body_items(ctx).is_empty() {
+                self.zone = Zone::Body;
+            }
             return Some(Nav::Stay);
         }
         None
@@ -1995,47 +2112,41 @@ impl Page for DesktopLibrary {
                 }
             }
             "rescan" => rescan(ctx),
-            // DestaqueFases: 1 abre a fase 2 (roda para baixo, "Mais sobre o jogo"), 0 volta para a fase 1.
-            "game-more" => {
-                self.more = (index == 1)
-                    .then(|| self.hero.clone().or_else(|| self.selected(ctx)))
-                    .flatten();
+            // Parecidos: um clique abre a página do jogo.
+            "similar" => {
+                let selected = self.selected(ctx);
+                let game = selected.as_deref().and_then(|id| ctx.library.find(id));
+                let id = game
+                    .and_then(|g| self.similar_of(ctx, g).get(index))
+                    .map(|(id, _)| id.clone());
+                if let Some(id) = id {
+                    self.open_game(&id, ctx);
+                    // O foco vai para as ações do jogo novo (a página dele abre no topo).
+                    self.focus_actions();
+                }
             }
-            // Cartões do destaque: o texto inteiro do Sobre, o trailer e o histórico de sessões.
-            "about-more" | "trailer" | "sessions" => {
+            // O ← e a trilha "Biblioteca" da barra fina da página do jogo: voltam à Visão geral.
+            "game-back" => {
+                if self.tab == Tab::Collections {
+                    self.open_tab(Tab::All, ctx);
+                }
+                self.show_overview();
+            }
+            // Os dados do destaque: o trailer e o histórico de sessões.
+            "trailer" | "sessions" => {
                 let Some(g) = self
                     .selected(ctx)
                     .and_then(|id| ctx.library.find(&id).cloned())
                 else {
                     return Nav::Stay;
                 };
-                match zone {
-                    "about-more" => {
-                        let text = g.description.clone();
-                        let layer =
-                            super::layer::MenuLayer::dialog(ctx.t("desktop.about"), |ctx| {
-                                vec![
-                                    super::layer::MenuItem::new(PanelRow::button(
-                                        "close",
-                                        ctx.t("common.close"),
-                                    ))
-                                    .on(|_| super::layer::Flow::Close),
-                                ]
-                            })
-                            .text(text)
-                            .overline(g.title.to_uppercase())
-                            .wide();
-                        return Nav::Layer(Box::new(layer));
+                if zone == "trailer" {
+                    if let Some(url) = g.media.get(tako_core::library::media::VIDEO) {
+                        ctx.effect(Effect::OpenUrl(url.clone()));
                     }
-                    "trailer" => {
-                        if let Some(url) = g.media.get(tako_core::library::media::VIDEO) {
-                            ctx.effect(Effect::OpenUrl(url.clone()));
-                        }
-                    }
-                    _ => {
-                        ctx.open_route = Some("desk:profile:sessions".into());
-                        return Nav::Stay;
-                    }
+                } else {
+                    ctx.open_route = Some("desk:profile:sessions".into());
+                    return Nav::Stay;
                 }
             }
             "game-play" => {
@@ -2542,10 +2653,6 @@ impl Page for DesktopLibrary {
                 .map_or(-1, |p| p as i32),
         );
         let hero = self.hero_id(ctx, cur.map(|i| ids[i].clone()));
-        // Outro jogo no destaque (ou fora da Lista): volta para a fase 1.
-        if self.more != hero || View::of(ctx) == View::Categories || overview {
-            self.more = None;
-        }
         if overview && self.zone == Zone::Actions && targets.is_empty() {
             self.zone = Zone::List;
         }
@@ -2563,51 +2670,27 @@ impl Page for DesktopLibrary {
                 DeskOverview::default()
             },
         );
-        let more_on = self.more.is_some();
-        // Na fase 2 os botões de ação ficam escondidos: o foco do teclado não pode ficar neles (Enter jogaria).
-        if more_on && self.zone == Zone::Actions {
-            self.zone = Zone::List;
-        }
         let game = hero
             .and_then(|id| ctx.library.find(&id))
             .filter(|_| !overview);
-        out.set(
-            "desk-more",
-            DeskMore {
-                on: more_on,
-                labels: [
-                    "desktop.phase.more",
-                    "desktop.phase.back",
-                    "desktop.about",
-                    "desktop.details",
-                    "desktop.sessions.title",
-                    "desktop.phase.images",
-                    "desktop.trailer",
-                ]
-                .iter()
-                .map(|k| ctx.t(k))
-                .collect(),
-                description: game
-                    .map(|g| g.description.trim().to_owned())
-                    .unwrap_or_default(),
-                details: game.map(|g| more_details(ctx, g)).unwrap_or_default(),
-                sessions_summary: game.map(|g| sessions_rows(ctx, g).0).unwrap_or_default(),
-                sessions: game.map(|g| more_sessions(ctx, g)).unwrap_or_default(),
-                // A captura só decodifica com a fase aberta, no tamanho da miniatura (256 × 144, 2× para HiDPI).
-                shots: game
-                    .filter(|_| more_on)
-                    .and_then(|g| g.media.get(tako_core::library::media::SCREENSHOT))
-                    .map(|uri| vec![tiles::image(Some(uri), (512, 288))])
-                    .unwrap_or_default(),
-            },
-        );
-        let mut sessions = (String::new(), Vec::new());
-        let (view, actions, stats, details) = match game {
+        let (view, page, actions, stats, details) = match game {
             Some(g) => {
                 let running = ctx.running.as_ref().is_some_and(|r| r.id == g.id);
                 // Etiqueta de estado: JOGANDO, QUEBRADO, INSTALADO ou NÃO INSTALADO (e os casos de ROM e lançamento).
                 let badge = if running {
-                    ctx.t("desktop.badge.playing")
+                    // "JOGANDO · 42 MIN": a sessão atual, quando o Tako sabe quando abriu o jogo.
+                    let started = ctx.running.as_ref().and_then(|r| r.started);
+                    started.map_or_else(
+                        || ctx.t("desktop.badge.playing"),
+                        |t| {
+                            let time = std::time::Duration::from_secs(60).max(t.elapsed());
+                            format!(
+                                "{} · {}",
+                                ctx.t("desktop.badge.playing"),
+                                game_text::play_time(lang, time)
+                            )
+                        },
+                    )
                 } else if g.is_broken {
                     ctx.t("desktop.badge.broken")
                 } else {
@@ -2646,7 +2729,7 @@ impl Page for DesktopLibrary {
                                     .danger()
                             }
                             Action::End => PanelRow::button("end", ctx.t("desktop.end_game"))
-                                .icon("power")
+                                .icon("close")
                                 .danger(),
                         })
                         .collect();
@@ -2659,11 +2742,60 @@ impl Page for DesktopLibrary {
                     .shown_hero()
                     .and_then(crate::images::glass)
                     .unwrap_or_default();
-                let (description, about_more) = about(&g.description);
+                let description = about(&g.description).0;
                 let logo = tiles::image(g.shown_logo(), tiles::LOGO);
                 let show_logo = show_logo(ctx, g, &logo, &art_lum);
                 let title_pending = title_pending(ctx, g, &logo, &art_lum);
-                sessions = sessions_rows(ctx, g);
+                let (sessions, numbers) = sessions_blocks(ctx, g);
+                let similar: Vec<(&Game, String)> = self
+                    .similar_of(ctx, g)
+                    .iter()
+                    .filter_map(|(id, why)| Some((ctx.library.find(id)?, why.clone())))
+                    .collect();
+                let page = DeskPage {
+                    id: g.id.clone(),
+                    cover: tiles::image(g.shown_cover(), THUMB),
+                    labels: [
+                        "desktop.page.back",
+                        "desktop.library",
+                        "desktop.about",
+                        "desktop.details",
+                        "desktop.install.more",
+                        "desktop.page.images",
+                        "desktop.trailer",
+                        "desktop.page.features",
+                        "desktop.sessions.title",
+                        "desktop.sessions.see_all",
+                        "desktop.page.similar",
+                    ]
+                    .iter()
+                    .map(|k| ctx.t(k))
+                    .collect(),
+                    about: paragraphs(&g.description),
+                    on: running || (g.is_installed && !g.is_broken),
+                    bright: overview::bright(&art_lum),
+                    // A captura só decodifica na miniatura da página (276 × 156, 2× para telas densas).
+                    shots: g
+                        .media
+                        .get(tako_core::library::media::SCREENSHOT)
+                        .map(|uri| vec![tiles::image(Some(uri), (552, 312))])
+                        .unwrap_or_default(),
+                    features: g.game_modes.iter().take(8).cloned().collect(),
+                    sessions,
+                    numbers,
+                    similar: similar
+                        .iter()
+                        .map(|(o, why)| DeskEntry {
+                            id: o.id.clone(),
+                            title: o.title.clone(),
+                            detail: why.clone(),
+                            thumb: tiles::image(o.shown_cover(), tiles::COVER),
+                            accent: parse_color(&o.accent),
+                            dot: o.is_favorite,
+                            ..Default::default()
+                        })
+                        .collect(),
+                };
                 (
                     DeskGameView {
                         has_game: true,
@@ -2676,6 +2808,7 @@ impl Page for DesktopLibrary {
                         logo,
                         show_logo,
                         title_pending,
+                        progress: install.as_ref().and_then(|i| i.progress).unwrap_or(-1.0),
                         accent: game_card_accent(ctx, &g.accent),
                         hint,
                         install_note: install
@@ -2685,13 +2818,6 @@ impl Page for DesktopLibrary {
                             .unwrap_or_default(),
                         install_warn: install.as_ref().is_some_and(|i| i.warn),
                         running,
-                        about_more,
-                        genres: g.genres.iter().take(4).cloned().collect(),
-                        genres_more: if g.genres.len() > 4 {
-                            format!("+{}", g.genres.len() - 4)
-                        } else {
-                            String::new()
-                        },
                         trailer: g.media.contains_key(tako_core::library::media::VIDEO),
                         art_loading: g.shown_hero().is_some_and(crate::images::is_pending),
                         store_icon: store_icon(g.store()).into(),
@@ -2702,31 +2828,39 @@ impl Page for DesktopLibrary {
                             |s| library_text::status_label(lang, Some(s)),
                         ),
                     },
+                    page,
                     actions,
                     strip(ctx, g),
-                    details_rows(ctx, g),
+                    more_details(ctx, g),
                 )
             }
-            None => (DeskGameView::default(), Vec::new(), Vec::new(), Vec::new()),
+            None => (
+                DeskGameView::default(),
+                DeskPage::default(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
         };
         out.set("desk-game", view);
+        out.set("desk-page", page);
+        out.set("desk-scroll-page", self.page_scroll);
         out.set("desk-actions", actions);
         out.set("desk-stats", stats);
         out.set("desk-details", details);
-        out.set("desk-sessions-summary", sessions.0);
-        out.set("desk-sessions", sessions.1);
-        out.set(
-            "desk-card-labels",
-            vec![
-                ctx.t("desktop.sessions.title"),
-                ctx.t("desktop.sessions.see_all"),
-                ctx.t("desktop.about_more"),
-                ctx.t("desktop.trailer"),
-            ],
-        );
-        out.set("desk-about-label", ctx.t("desktop.about"));
-        out.set("desk-install-more-label", ctx.t("desktop.install.more"));
-        out.set("desk-details-label", ctx.t("desktop.details"));
+        // No corpo da página, a zona diz qual item tem o foco (o tema o mostra e rola até ele) e o índice é o da capa.
+        let (body, body_index) = match self.zone {
+            Zone::Body if !overview => {
+                let items = self.body_items(ctx);
+                match items.get(self.index.min(items.len().saturating_sub(1))) {
+                    Some(BodyItem::Trailer) => ("body-trailer", 0),
+                    Some(BodyItem::Sessions) => ("body-sessions", 0),
+                    Some(BodyItem::Similar(i)) => ("body-similar", *i),
+                    None => ("body", 0),
+                }
+            }
+            _ => ("", 0),
+        };
         out.set(
             "desk-zone",
             match self.zone {
@@ -2736,9 +2870,17 @@ impl Page for DesktopLibrary {
                 Zone::List => "list",
                 Zone::Actions if overview => "overview",
                 Zone::Actions => "actions",
+                Zone::Body => body,
             },
         );
-        out.set("desk-zone-index", self.index as i32);
+        out.set(
+            "desk-zone-index",
+            if body.is_empty() {
+                self.index
+            } else {
+                body_index
+            } as i32,
+        );
         out.set("desk-search-focus", self.search_focus);
         // ListaVazia: diz por quê e oferece a saída (zona do clique e o rótulo do botão).
         let none = String::new;
@@ -3310,7 +3452,87 @@ mod tests {
     }
 
     #[test]
-    fn hero_cards_cut_long_text_and_keep_at_most_six_detail_rows() {
+    fn similar_games_share_a_genre_or_the_developer_and_never_the_game_itself() {
+        let game = |id: &str, genres: &[&str], dev: Option<&str>| Game {
+            id: id.into(),
+            title: id.into(),
+            genres: genres.iter().map(|g| (*g).to_owned()).collect(),
+            developer: dev.map(Into::into),
+            ..Game::default()
+        };
+        let me = game("me", &["Ação", "RPG"], Some("Estúdio X"));
+        let all = [
+            me.clone(),
+            game("a-genero", &["ação"], None),
+            game("b-dois-generos", &["RPG", "Ação"], None),
+            game("c-estudio", &["Corrida"], Some("estúdio x")),
+            game("d-nada", &["Corrida"], Some("Outro")),
+            game("e-sem-dado", &[], None),
+        ];
+        let found: Vec<(&str, &str)> = similar_games(&all, &me)
+            .into_iter()
+            .map(|(g, why)| (g.id.as_str(), why.leak() as &str))
+            .collect();
+        // A desenvolvedora pesa 2; dois gêneros também; o de um gênero vem por último; ninguém sem nada em comum.
+        assert_eq!(
+            found,
+            [
+                ("b-dois-generos", "RPG"),
+                ("c-estudio", "estúdio x"),
+                ("a-genero", "ação")
+            ]
+        );
+        assert!(similar_games(&all[4..], &me).is_empty());
+        // No máximo 8.
+        let many: Vec<Game> = (0..20)
+            .map(|i| game(&format!("g{i:02}"), &["Ação"], None))
+            .collect();
+        assert_eq!(similar_games(&many, &me).len(), 8);
+    }
+
+    #[test]
+    fn the_page_shows_sessions_numbers_and_similar_games_only_with_data() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        let page = |shell: &mut Shell| {
+            let out = shell.render(std::time::Instant::now());
+            out.props.into_iter().find_map(|(n, v)| match (n, v) {
+                ("desk-page", slint_interpreter::Value::Struct(s)) => Some(s),
+                _ => None,
+            })
+        };
+        let len = |s: &slint_interpreter::Struct, field: &str| match s.get_field(field) {
+            Some(slint_interpreter::Value::Model(m)) => slint::Model::row_count(m),
+            _ => 0,
+        };
+        shell.click("game", 0);
+        let before = page(&mut shell).unwrap();
+        assert_eq!(len(&before, "sessions"), 0);
+        assert_eq!(len(&before, "numbers"), 0);
+        assert_eq!(len(&before, "shots"), 0);
+        // A fixture tem jogos do mesmo gênero: os parecidos vêm da biblioteca, e o clique abre o jogo.
+        assert!(len(&before, "similar") > 0);
+        crate::demo::sessions(&mut shell.ctx);
+        let after = page(&mut shell).unwrap();
+        assert_eq!(len(&after, "numbers"), 2);
+        assert!(len(&after, "sessions") > 0);
+        // O clique abre exatamente o primeiro parecido (o de mais gêneros em comum), não só "outro jogo".
+        let game = shell.ctx.library.games()[0].clone();
+        let expected = similar_games(shell.ctx.library.games(), &game)[0]
+            .0
+            .id
+            .clone();
+        assert_ne!(expected, game.id);
+        shell.click("similar", 0);
+        assert_eq!(
+            page(&mut shell).and_then(|s| s.get_field("id").cloned()),
+            Some(slint_interpreter::Value::String(expected.into()))
+        );
+    }
+
+    #[test]
+    fn the_hero_cuts_long_text_and_the_page_lists_every_detail() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, shell) = shell();
@@ -3319,7 +3541,7 @@ mod tests {
         let (text, more) = about(&long);
         assert!(more && text.ends_with('…') && text.chars().count() <= 241);
         assert_eq!(about("curta"), ("curta".to_owned(), false));
-        // Detalhes: com tudo preenchido, sai a de menor prioridade (Série) e o Status fica.
+        // Detalhes: uma linha por dado que o jogo tem, o Status por último e com o ponto verde se instalado.
         let mut g = shell.ctx.library.games()[0].clone();
         g.release_date = chrono::NaiveDate::from_ymd_opt(2025, 9, 25);
         g.metacritic_score = Some(93);
@@ -3327,15 +3549,19 @@ mod tests {
         g.developer = Some("Supergiant Games, Outro".into());
         g.franchise = Some("Hades".into());
         g.tags = ["Co-op".to_owned()].into();
-        let rows = details_rows(&shell.ctx, &g);
-        assert_eq!(rows.len(), 6);
-        assert!(
-            rows.iter()
-                .any(|r| r.dot || r.label == shell.ctx.t("details.status"))
-        );
-        assert!(!rows.iter().any(|r| r.value == "Hades"));
-        assert!(rows.iter().any(|r| r.value == "Roguelike - Ação"));
-        assert!(rows.iter().any(|r| r.value == "Supergiant Games"));
+        g.is_installed = true;
+        g.publisher = Some("Supergiant".into());
+        let rows = more_details(&shell.ctx, &g);
+        let last = rows.last().unwrap();
+        assert_eq!(last.label, shell.ctx.t("details.status"));
+        assert!(last.dot);
+        assert!(rows.iter().any(|r| r.value == "Hades"));
+        assert!(rows.iter().any(|r| r.value == "Roguelike - Ação - Indie"));
+        assert!(rows.iter().any(|r| r.value == "Supergiant Games, Outro"));
+        // Os parágrafos do Sobre vêm da descrição, sem linhas vazias e com limite.
+        assert_eq!(paragraphs("um\n\n  dois \n"), ["um", "dois"]);
+        assert_eq!(paragraphs(&"a\n".repeat(100)).len(), 24);
+        assert_eq!(paragraphs(&"x".repeat(9000))[0].len(), 6000);
         // A faixa não inventa Nuvem nem Conquistas; o Metacritic entra por último quando o jogo tem nota.
         let items = strip(&shell.ctx, &g);
         assert_eq!(items.len(), 2 + usize::from(g.metacritic_score.is_some()));
@@ -3720,46 +3946,35 @@ mod tests {
         assert!(!closed[2].flag("open"));
     }
 
-    /// A fase 2 do destaque está aberta no último desenho.
-    fn more_on(shell: &mut Shell) -> bool {
+    /// O contador de Page Up e Page Down que o tema lê para rolar a página do jogo.
+    fn page_scroll(shell: &mut Shell) -> f64 {
         let out = shell.render(std::time::Instant::now());
         out.props
             .iter()
             .find_map(|(n, v)| match (*n, v) {
-                ("desk-more", slint_interpreter::Value::Struct(s)) => s.get_field("on").cloned(),
+                ("desk-scroll-page", slint_interpreter::Value::Number(n)) => Some(*n),
                 _ => None,
             })
-            .is_some_and(|v| v == slint_interpreter::Value::Bool(true))
+            .unwrap_or_default()
     }
 
     #[test]
-    fn the_hero_pages_to_phase_two_and_back_and_a_new_game_starts_on_phase_one() {
+    fn page_keys_scroll_the_game_page_and_only_there() {
         let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
         let (_dir, mut shell) = shell();
-        // A Visão geral não tem fase 2: o jogo escolhido a abre.
+        // A Visão geral não tem a página: as teclas não contam.
         shell.show_overview();
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(!more_on(&mut shell));
+        assert_eq!(page_scroll(&mut shell), 0.);
+        // Escolhido um jogo, Page Down rola uma tela para baixo e Page Up uma para cima.
         shell.click("game", 0);
-        assert!(!more_on(&mut shell));
-        // Page Down abre, Page Up volta; Esc também volta.
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(more_on(&mut shell));
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert_eq!(page_scroll(&mut shell), 2.);
         shell.key("\u{F72C}", KeyModifiers::NONE);
-        assert!(!more_on(&mut shell));
-        shell.key("\u{F72D}", KeyModifiers::NONE);
-        shell.handle(Cmd::Back);
-        assert!(!more_on(&mut shell));
-        // A roda (ou "Mais sobre o jogo") abre; outro jogo no destaque volta para a fase 1.
-        shell.click("game-more", 1);
-        assert!(more_on(&mut shell));
-        shell.click("game", 2);
-        assert!(!more_on(&mut shell));
-        shell.click("game-more", 1);
-        shell.click("game-more", 0);
-        assert!(!more_on(&mut shell));
-        // Com o foco nos botões de ação (escondidos na fase 2), abrir a fase 2 leva o foco para a lista.
+        assert_eq!(page_scroll(&mut shell), 1.);
+        // Também com o foco nos botões de ação.
         for _ in 0..8 {
             if page(&shell).zone() == Zone::Actions {
                 break;
@@ -3768,17 +3983,251 @@ mod tests {
         }
         assert_eq!(page(&shell).zone(), Zone::Actions);
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(more_on(&mut shell));
-        assert_eq!(page(&shell).zone(), Zone::List);
-        shell.key("\u{F72C}", KeyModifiers::NONE);
-        // Na Grade o destaque continua ao lado; só as Categorias não têm destaque nem fase 2.
-        shell.click("game-more", 1);
-        shell.click("view", 1);
-        assert!(more_on(&mut shell));
-        shell.click("view", 2);
-        assert!(!more_on(&mut shell));
+        assert_eq!(page_scroll(&mut shell), 2.);
+        // O corpo tem itens (as capas de Parecidos): o foco fica nas ações, que o tema não rolaria de volta ao topo.
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // Sem nenhum item no corpo, a página rolada leva o foco das ações para ele.
+        shell.click("page-similar-n", 0);
         shell.key("\u{F72D}", KeyModifiers::NONE);
-        assert!(!more_on(&mut shell));
+        assert_eq!(page_scroll(&mut shell), 3.);
+        assert_eq!(page(&shell).zone(), Zone::Body);
+        shell.key("\u{F72C}", KeyModifiers::NONE);
+        assert_eq!(page_scroll(&mut shell), 2.);
+        // Com Ctrl, não: o atalho é de outra coisa. As Categorias não têm a página.
+        shell.key("\u{F72D}", KeyModifiers::CTRL);
+        assert_eq!(page_scroll(&mut shell), 2.);
+        shell.click("view", 2);
+        shell.key("\u{F72D}", KeyModifiers::NONE);
+        assert_eq!(page_scroll(&mut shell), 2.);
+    }
+
+    /// O foco do teclado e do controle da página do jogo: ↓ das ações entra no corpo e rola, ↑ rola de volta e, no topo,
+    /// devolve às ações. O tema avisa onde a página está (`page-edge`).
+    #[test]
+    fn arrows_and_dpad_scroll_the_game_page_body() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("game", 0);
+        // Nenhuma capa de Parecidos cabe (o tema avisa): sem trailer, sessões nem capas, o corpo só rola.
+        shell.click("page-similar-n", 0);
+        shell.key("\u{0009}", KeyModifiers::NONE);
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // ↓ entra no corpo e já rola um passo; os seguintes rolam mais.
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).zone(), Zone::Body);
+        assert_eq!(page_scroll(&mut shell), BODY_STEP as f64);
+        shell.click("page-edge", 1);
+        shell.handle(Cmd::Down);
+        assert_eq!(page_scroll(&mut shell), 2. * BODY_STEP as f64);
+        // No fim da página ↓ não rola mais.
+        shell.click("page-edge", 2);
+        shell.handle(Cmd::Down);
+        assert_eq!(page_scroll(&mut shell), 2. * BODY_STEP as f64);
+        // ↑ rola de volta enquanto a página não chegou ao topo…
+        shell.handle(Cmd::Up);
+        shell.click("page-edge", 1);
+        shell.handle(Cmd::Up);
+        assert_eq!(page_scroll(&mut shell), 0.);
+        assert_eq!(page(&shell).zone(), Zone::Body);
+        // …e no topo devolve o foco às ações.
+        shell.click("page-edge", 0);
+        shell.handle(Cmd::Up);
+        assert_eq!(page(&shell).zone(), Zone::Actions);
+        // O aviso da página não é gesto do usuário: o anel de foco continua.
+        shell.key("\u{0009}", KeyModifiers::SHIFT);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Down);
+        assert!(shell.ctx.focus_visible);
+        shell.click("page-edge", 1);
+        assert!(shell.ctx.focus_visible);
+        // ← sai do corpo para a lista; Tab sai dele para a zona seguinte às ações.
+        shell.handle(Cmd::Left);
+        assert_eq!(page(&shell).zone(), Zone::List);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Down);
+        assert_eq!(page(&shell).zone(), Zone::Body);
+        shell.key("\u{0009}", KeyModifiers::NONE);
+        assert_eq!(page(&shell).zone(), Zone::Bar);
+    }
+
+    /// Trailer, Ver todas e as capas de Parecidos entram na ordem da tela: ↓ das ações vai ao primeiro, ←→ andam na
+    /// fileira, ↓ passa às capas, ↑ volta e Enter age.
+    #[test]
+    fn the_keyboard_and_controller_reach_trailer_sessions_and_similar_games() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("game", 0);
+        let game = shell.ctx.library.games()[0].clone();
+        let similar: Vec<String> = similar_games(shell.ctx.library.games(), &game)
+            .into_iter()
+            .map(|(o, _)| o.id.clone())
+            .collect();
+        assert!(similar.len() >= 2);
+        let zone = |shell: &mut Shell| {
+            let out = shell.render(std::time::Instant::now());
+            let text = |name: &str| {
+                out.props.iter().find_map(|(n, v)| match (*n, v) {
+                    (n, slint_interpreter::Value::String(s)) if n == name => Some(s.to_string()),
+                    _ => None,
+                })
+            };
+            let index = out.props.iter().find_map(|(n, v)| match (*n, v) {
+                ("desk-zone-index", slint_interpreter::Value::Number(i)) => Some(*i as i32),
+                _ => None,
+            });
+            (text("desk-zone").unwrap_or_default(), index.unwrap_or(-1))
+        };
+        // Só capas: ↓ das ações cai na primeira, sem rolar o corpo à mão (o tema rola até ela).
+        shell.key("\u{0009}", KeyModifiers::NONE);
+        shell.handle(Cmd::Down);
+        assert_eq!(zone(&mut shell), ("body-similar".to_owned(), 0));
+        assert_eq!(page_scroll(&mut shell), 0.);
+        shell.handle(Cmd::Right);
+        assert_eq!(zone(&mut shell), ("body-similar".to_owned(), 1));
+        // Só cabem duas capas: → para na última que aparece.
+        shell.click("page-similar-n", 2);
+        shell.handle(Cmd::Right);
+        assert_eq!(zone(&mut shell), ("body-similar".to_owned(), 1));
+        shell.handle(Cmd::Left);
+        shell.handle(Cmd::Left);
+        assert_eq!(page(&shell).zone(), Zone::List);
+        // Enter na capa abre o parecido e leva o foco às ações dele.
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Down);
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Accept);
+        assert_eq!(shell.focused_game(), Some(similar[1].clone()));
+        assert_eq!(zone(&mut shell).0, "actions");
+        // Com sessões e trailer: trailer → Ver todas → capas.
+        let id = shell.focused_game().unwrap();
+        shell
+            .ctx
+            .library
+            .record_session(&id, std::time::Duration::from_secs(600))
+            .unwrap();
+        if let Some(g) = shell
+            .ctx
+            .library
+            .games_mut()
+            .iter_mut()
+            .find(|g| g.id == id)
+        {
+            g.media.insert(
+                tako_core::library::media::VIDEO.to_owned(),
+                "https://example.com/trailer".to_owned(),
+            );
+        }
+        shell.click("page-similar-n", 8);
+        shell.handle(Cmd::Down);
+        assert_eq!(zone(&mut shell).0, "body-trailer");
+        shell.handle(Cmd::Accept);
+        assert!(
+            shell
+                .ctx
+                .effects
+                .contains(&Effect::OpenUrl("https://example.com/trailer".to_owned()))
+        );
+        shell.handle(Cmd::Right);
+        assert_eq!(zone(&mut shell).0, "body-sessions");
+        shell.handle(Cmd::Down);
+        assert_eq!(zone(&mut shell).0, "body-similar");
+        shell.handle(Cmd::Up);
+        assert_eq!(zone(&mut shell).0, "body-trailer");
+        // Enter em Ver todas abre o histórico de sessões no Perfil.
+        shell.handle(Cmd::Right);
+        shell.handle(Cmd::Accept);
+        assert_eq!(shell.page().kind(), "desk-profile");
+    }
+
+    /// Parecidos são guardados por jogo e versão da biblioteca: o `render` roda a cada quadro e não varre tudo de novo.
+    #[test]
+    fn similar_games_are_cached_per_game_until_the_library_changes() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, mut shell) = shell();
+        shell.click("game", 0);
+        let game = shell.ctx.library.games()[0].clone();
+        let first: Vec<String> = {
+            let Shell { pages, ctx, .. } = &mut shell;
+            let d = pages.last_mut().and_then(|p| p.desktop_mut()).unwrap();
+            d.similar_of(ctx, &game)
+                .iter()
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        assert!(!first.is_empty());
+        // Tira o gênero do primeiro parecido sem a biblioteca avisar: o cache segue valendo…
+        let other = first[0].clone();
+        let strip_genres = |shell: &mut Shell| {
+            if let Some(o) = shell
+                .ctx
+                .library
+                .games_mut()
+                .iter_mut()
+                .find(|g| g.id == other)
+            {
+                o.genres.clear();
+                o.developer = None;
+            }
+        };
+        strip_genres(&mut shell);
+        let again = |shell: &mut Shell| -> Vec<String> {
+            let Shell { pages, ctx, .. } = shell;
+            let d = pages.last_mut().and_then(|p| p.desktop_mut()).unwrap();
+            d.similar_of(ctx, &game)
+                .iter()
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        assert_eq!(again(&mut shell), first);
+        // …até a biblioteca mudar (a versão sobe): aí recalcula e o jogo sai.
+        shell.ctx.library.toggle_favorite(&game.id).unwrap();
+        assert!(!again(&mut shell).contains(&other));
+    }
+
+    #[test]
+    fn game_details_follow_the_card_order_with_status_last() {
+        let _g = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+        let (_dir, shell) = shell();
+        let g = shell
+            .ctx
+            .library
+            .games()
+            .iter()
+            .find(|g| g.developer.is_some() && g.publisher.is_some())
+            .cloned()
+            .or_else(|| shell.ctx.library.games().first().cloned())
+            .unwrap();
+        let mut g = g;
+        g.developer = Some("Dev".into());
+        g.publisher = Some("Pub".into());
+        g.size_label = Some("23 GB".into());
+        let labels: Vec<String> = more_details(&shell.ctx, &g)
+            .into_iter()
+            .map(|d| d.label.to_string())
+            .collect();
+        let at = |key: &str| labels.iter().position(|l| *l == shell.ctx.t(key)).unwrap();
+        assert!(at("details.developer") < at("desktop.page.publisher"));
+        assert!(at("desktop.page.publisher") < at("desktop.size"));
+        assert_eq!(at("details.status"), labels.len() - 1);
+        assert_eq!(at("desktop.size"), labels.len() - 2);
+    }
+
+    #[test]
+    fn the_back_button_of_the_game_page_returns_to_the_overview() {
+        let (_dir, mut shell) = shell();
+        shell.click("game", 1);
+        assert!(page(&shell).selected(&shell.ctx).is_some());
+        shell.click("game-back", 0);
+        let out = shell.render(std::time::Instant::now());
+        let on = out.props.iter().find_map(|(n, v)| match (*n, v) {
+            ("desk-overview", slint_interpreter::Value::Struct(s)) => s.get_field("on").cloned(),
+            _ => None,
+        });
+        assert_eq!(on, Some(slint_interpreter::Value::Bool(true)));
     }
 
     #[test]

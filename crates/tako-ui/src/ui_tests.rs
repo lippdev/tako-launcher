@@ -671,6 +671,437 @@ fn desktop_journey_renders_selection_search_tabs_actions_and_controller_question
 /// `cargo test -p tako-ui desktop_snapshot -- --ignored`.
 /// TelaCarregamento: `TAKO_SNAP_OUT=<pasta>` grava `splash-<progresso>.png` (440 × 600) para cada valor de
 /// `TAKO_SNAP_PROGRESS` (padrão `-1,0.42,1`; negativo = barra indeterminada), depois dos tentáculos assentarem.
+/// A página do jogo rola pelo tema: Page Down move o corpo e, passado o primário do destaque, a barra fina ganha o
+/// botão Jogar (TelaJogoRolada). Pelos pixels, porque a rolagem mora no tema e não no Tako.
+#[test]
+fn game_page_scrolls_with_page_down_and_the_thin_bar_gets_the_play_button() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (1280usize, 800usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                let mut value = value;
+                // Muitos parágrafos no Sobre: a página tem por onde rolar.
+                if let ("desk-page", Value::Struct(s)) = (name, &mut value) {
+                    let about = (0..30).map(|_| Value::String("Um parágrafo do Sobre.".into()));
+                    s.set_field("about".into(), crate::values::model(about.collect()));
+                }
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        // Passa o tempo no relógio das animações (a rolagem anima em 200 ms).
+        let settle = |shell: &mut Shell, ms: u64| {
+            let t = START.elapsed() + std::time::Duration::from_millis(ms);
+            CLOCK.with(|c| c.set(Some(t)));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        draw(&mut shell);
+        let top = settle(&mut shell, 100);
+        // Page Down rolou 85% da janela: o corpo muda e a barra fina da direita deixa de ser só fundo.
+        shell.key("\u{F72D}", tako_core::input::shortcut::KeyModifiers::NONE);
+        draw(&mut shell);
+        // A rolagem nasce no primeiro passo (o `changed` dispara) e anda no segundo.
+        settle(&mut shell, 1000);
+        let rolled = settle(&mut shell, 1600);
+        // O primário branco da barra fina: pixels claros na faixa de 52 a 114, à direita (as pílulas do topo têm só o
+        // texto claro).
+        let light = |px: &[Rgb8Pixel]| {
+            (60..110)
+                .flat_map(|y| (900..1270).map(move |x| (x, y)))
+                .filter(|(x, y)| px[y * w + x].g > 235)
+                .count()
+        };
+        assert!(
+            light(&top) < 300,
+            "sem rolar, a barra fina não tem o primário"
+        );
+        assert!(
+            light(&rolled) > 2000,
+            "rolada, a barra fina mostra o primário: {}",
+            light(&rolled)
+        );
+        assert!(top != rolled, "o corpo da página se moveu");
+        // Page Up volta ao topo.
+        shell.key("\u{F72C}", tako_core::input::shortcut::KeyModifiers::NONE);
+        draw(&mut shell);
+        settle(&mut shell, 2200);
+        let back = settle(&mut shell, 3000);
+        assert!(
+            light(&back) < 300,
+            "de volta ao topo, o primário sai da barra"
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
+/// Trocar de jogo não recarrega a página: as partes do destaque saem, o outro jogo entra e elas voltam em escada. Com
+/// Reduzir animações tudo troca na hora. Pelos pixels do nome do jogo (texto claro), no relógio manual das animações.
+#[test]
+fn game_page_swaps_parts_in_a_staircase_and_instantly_with_reduced_motion() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (1600usize, 900usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        let base = START.elapsed();
+        let at = |shell: &mut Shell, ms: u64| {
+            CLOCK.with(|c| c.set(Some(base + std::time::Duration::from_millis(ms))));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        // O nome do jogo (texto claro) na coluna da identidade, embaixo à direita do destaque.
+        let title = |px: &[Rgb8Pixel]| {
+            (400..700)
+                .flat_map(|y| (900..1560).map(move |x| (x, y)))
+                .filter(|(x, y)| px[y * w + x].g > 215)
+                .count()
+        };
+        draw(&mut shell);
+        let before = at(&mut shell, 500);
+        assert!(title(&before) > 500, "o nome do primeiro jogo aparece");
+        shell.click("game", 1);
+        draw(&mut shell);
+        at(&mut shell, 510);
+        // No fim da saída (200 ms) a cópia troca e as partes recomeçam de zero: quase nada à vista.
+        let gap = at(&mut shell, 715);
+        assert!(
+            title(&gap) * 5 < title(&before),
+            "as partes saem antes do outro jogo entrar"
+        );
+        let end = at(&mut shell, 2500);
+        assert!(title(&end) > 500, "o outro jogo entrou");
+        assert!(end != before, "é outro jogo");
+        // Reduzir animações: troca na hora.
+        crate::bridge::set_global(&ui, "Ui", "reduce-motion", Value::Bool(true));
+        shell.click("game", 2);
+        draw(&mut shell);
+        at(&mut shell, 2600);
+        let instant = at(&mut shell, 2650);
+        assert!(
+            title(&instant) > 500,
+            "sem animação o jogo novo já está na tela"
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
+/// Trocar de jogo duas vezes dentro da saída de 200 ms (A→B→A e A→B→C): no fim fica na tela o último jogo escolhido,
+/// igual ao quadro de quem só o escolheu, e a página não fica presa fora do ar nem no jogo do meio.
+#[test]
+fn game_page_double_switch_inside_the_exit_ends_on_the_last_game() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (1600usize, 900usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        // O relógio manual anda `ms` a cada chamada.
+        let base = START.elapsed();
+        let now = std::cell::Cell::new(500u64);
+        let wait = |shell: &mut Shell, ms: u64| {
+            now.set(now.get() + ms);
+            CLOCK.with(|c| c.set(Some(base + std::time::Duration::from_millis(now.get()))));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        let pick = |shell: &mut Shell, game: usize| {
+            shell.click("game", game);
+            draw(shell);
+            wait(shell, 10);
+        };
+        // Espera a saída acabar (a cópia troca e as animações recomeçam no passo seguinte) e tudo assentar.
+        let assent = |shell: &mut Shell| {
+            wait(shell, 300);
+            wait(shell, 2500)
+        };
+        // Quem só escolhe o jogo e espera tudo assentar: o quadro de referência de cada um.
+        let settled = |shell: &mut Shell, game: usize| {
+            pick(shell, game);
+            assent(shell)
+        };
+        let reference: Vec<_> = (0..3).map(|g| settled(&mut shell, g)).collect();
+        let differ =
+            |a: &[Rgb8Pixel], b: &[Rgb8Pixel]| a.iter().zip(b).filter(|(x, y)| x != y).count();
+        assert!(
+            differ(&reference[0], &reference[1]) > 2000,
+            "são jogos diferentes"
+        );
+        assert!(
+            differ(&reference[1], &reference[2]) > 2000,
+            "são jogos diferentes"
+        );
+        let tolerance = w * h / 200;
+        // A→B→A: a segunda troca chega aos 110 ms da primeira, com a saída ainda correndo.
+        settled(&mut shell, 0);
+        pick(&mut shell, 1);
+        wait(&mut shell, 100);
+        pick(&mut shell, 0);
+        let back = assent(&mut shell);
+        assert!(
+            differ(&back, &reference[0]) < tolerance,
+            "A→B→A volta ao jogo A inteiro"
+        );
+        assert!(
+            differ(&back, &reference[1]) > 2000,
+            "e não fica no jogo do meio"
+        );
+        // A→B→C: o jogo do meio nunca chega à tela.
+        pick(&mut shell, 1);
+        wait(&mut shell, 100);
+        pick(&mut shell, 2);
+        let last = assent(&mut shell);
+        assert!(
+            differ(&last, &reference[2]) < tolerance,
+            "A→B→C termina em C"
+        );
+        assert!(differ(&last, &reference[1]) > 2000, "e não no jogo do meio");
+        // Nada ficou preso: uma troca comum depois disso funciona como sempre.
+        let after = settled(&mut shell, 1);
+        assert!(
+            differ(&after, &reference[1]) < tolerance,
+            "a página segue trocando"
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
+/// Janela pequena: a coluna da identidade nunca fica mais estreita que a fileira de ações, então o botão primário tem
+/// a mesma largura a 960 e a 1600 (antes saía cortado a 960). Pelos pixels: a corrida clara mais longa de uma linha é o
+/// fundo do primário.
+#[test]
+fn game_page_primary_action_is_not_clipped_in_a_small_window() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let mut longest_light_run = |w: usize, h: usize, scale: f64| {
+            window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+            ui.set_global_property("Ui", "text-scale", Value::Number(scale))
+                .unwrap();
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            for _ in 0..2 {
+                ui.window().request_redraw();
+                window.draw_if_needed(|r| {
+                    r.render(&mut pixels, w);
+                });
+            }
+            (0..h)
+                .map(|y| {
+                    let (mut best, mut run) = (0, 0);
+                    for x in w / 2..w {
+                        let p = pixels[y * w + x];
+                        run = if p.r > 235 && p.g > 235 && p.b > 235 {
+                            run + 1
+                        } else {
+                            0
+                        };
+                        best = best.max(run);
+                    }
+                    best
+                })
+                .max()
+                .unwrap_or(0)
+        };
+        let wide = longest_light_run(1600, 900, 1.);
+        let small = longest_light_run(960, 600, 1.);
+        let large_text = longest_light_run(960, 600, 1.25);
+        assert!(wide > 100, "o primário aparece a 1600: {wide}");
+        assert!(
+            small + 2 >= wide,
+            "primário cortado a 960: {small} < {wide}"
+        );
+        assert!(
+            large_text + 2 >= wide,
+            "primário cortado a 960 com texto a 125%: {large_text} < {wide}"
+        );
+    })
+    .join()
+    .unwrap();
+}
+
+/// Focar uma capa de Parecidos pelo teclado rola a página até ela: a fileira fica abaixo da dobra num 960 × 600 e
+/// passa a aparecer inteira (o quadro muda muito); ↑ volta ao topo, onde estavam as ações.
+#[test]
+fn focusing_similar_games_with_the_keyboard_scrolls_the_page_to_them() {
+    let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::thread::spawn(|| {
+        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(window.clone()))).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let builtin = crate::theme::install_builtin(dir.path()).unwrap();
+        let ui = crate::theme::compile_desktop(&builtin)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .create()
+            .unwrap();
+        ui.show().unwrap();
+        let (w, h) = (960usize, 600usize);
+        window.set_size(slint::PhysicalSize::new(w as u32, h as u32));
+        let mut ctx = crate::app::build_ctx(
+            DataPaths::at(dir.path().join("data")),
+            tako_platform::Platform::simulated(),
+            true,
+        );
+        i18n::set_lang(Lang::PtBr);
+        ctx.library.refresh();
+        let mut shell = Shell::new(ctx);
+        shell.enter_desktop();
+        shell.click("game", 0);
+        let draw = |shell: &mut Shell| {
+            for (name, value) in shell.render(Instant::now()).props {
+                crate::bridge::set(&ui, name, value);
+            }
+            let mut pixels = vec![Rgb8Pixel::default(); w * h];
+            ui.window().request_redraw();
+            window.draw_if_needed(|r| {
+                r.render(&mut pixels, w);
+            });
+            pixels
+        };
+        let settle = |shell: &mut Shell, ms: u64| {
+            let t = START.elapsed() + std::time::Duration::from_millis(ms);
+            CLOCK.with(|c| c.set(Some(t)));
+            slint::platform::update_timers_and_animations();
+            draw(shell)
+        };
+        let differ =
+            |a: &[Rgb8Pixel], b: &[Rgb8Pixel]| a.iter().zip(b).filter(|(x, y)| x != y).count();
+        shell.key("\u{0009}", tako_core::input::shortcut::KeyModifiers::NONE);
+        draw(&mut shell);
+        let top = settle(&mut shell, 100);
+        shell.handle(Cmd::Down);
+        draw(&mut shell);
+        settle(&mut shell, 1000);
+        let rolled = settle(&mut shell, 1600);
+        assert!(
+            differ(&top, &rolled) > 20_000,
+            "a página rolou até as capas: {}",
+            differ(&top, &rolled)
+        );
+        shell.handle(Cmd::Up);
+        draw(&mut shell);
+        settle(&mut shell, 2200);
+        let back = settle(&mut shell, 3000);
+        assert!(
+            differ(&top, &back) < differ(&top, &rolled) / 4,
+            "↑ voltou ao topo: {}",
+            differ(&top, &back)
+        );
+        CLOCK.with(|c| c.set(None));
+    })
+    .join()
+    .unwrap();
+}
+
 /// O escurecimento da arte (UI-GLASS-001) não pode ter aresta dura: sobre fundo branco, a luminância muda de um pixel
 /// para o outro só pelo degradê, inclusive no topo e na direita da elipse atrás do texto.
 #[test]
@@ -1046,6 +1477,11 @@ fn desktop_snapshot() {
         let mut shell = Shell::new(ctx);
         shell.enter_desktop();
         shell.show_overview();
+        // `TAKO_SNAP_RICH=1`: sessões de demonstração, e na página do jogo trailer, captura e recursos (o resto da
+        // página só aparece com dado).
+        if std::env::var("TAKO_SNAP_RICH").is_ok() {
+            crate::demo::sessions(&mut shell.ctx);
+        }
         match std::env::var("TAKO_SNAP_PAGE").as_deref() {
             Ok("sunshine-preview") => {
                 shell.open_route("settings");
@@ -1405,15 +1841,17 @@ created-by-tako = true
             Ok("welcome-back") => shell
                 .ctx
                 .toast_welcome_back("Bem-vindo de volta · Hades · 1 h 20 min"),
-            Ok("opening") | Ok("opening-slow") => {
+            // `playing`: o primeiro jogo aberto há 42 minutos (EstadoJogando); `opening`, ainda abrindo.
+            Ok("opening") | Ok("opening-slow") | Ok("playing") => {
                 let g = shell.ctx.library.games()[0].clone();
+                let playing = std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("playing");
                 shell.ctx.running = Some(crate::shell::ctx::RunningGame {
                     id: g.id,
                     title: g.title,
                     pid: None,
-                    started: None,
+                    started: playing.then(|| Instant::now() - std::time::Duration::from_secs(42 * 60)),
                 });
-                shell.ctx.launching = true;
+                shell.ctx.launching = !playing;
                 if std::env::var("TAKO_SNAP_PAGE").as_deref() == Ok("opening-slow") {
                     shell.ctx.launch_since =
                         Some(Instant::now() - std::time::Duration::from_secs(30));
@@ -1673,6 +2111,41 @@ created-by-tako = true
                         }
                     }
                 }
+                // `TAKO_SNAP_BRIGHT=1`: arte clara também na página do jogo.
+                if let ("desk-page", Value::Struct(s)) = (*name, &mut value)
+                    && std::env::var("TAKO_SNAP_BRIGHT").is_ok()
+                {
+                    s.set_field("bright".into(), Value::Bool(true));
+                }
+                if std::env::var("TAKO_SNAP_RICH").is_ok() {
+                    match (*name, &mut value) {
+                        ("desk-game", Value::Struct(s)) => {
+                            s.set_field("trailer".into(), Value::Bool(true));
+                        }
+                        ("desk-page", Value::Struct(s)) => {
+                            if let Some((art, ..)) = art {
+                                s.set_field(
+                                    "shots".into(),
+                                    crate::values::model(vec![Value::Image(art.clone())]),
+                                );
+                            }
+                            let modes = ["Um jogador", "Cooperativo", "Online"];
+                            let features = modes.iter().map(|m| Value::String((*m).into()));
+                            s.set_field("features".into(), crate::values::model(features.collect()));
+                        }
+                        _ => {}
+                    }
+                }
+                // `TAKO_SNAP_ABOUT=<n>`: n parágrafos no Sobre da página do jogo (a rolagem e os dados fixos).
+                if let ("desk-page", Value::Struct(s)) = (*name, &mut value)
+                    && let Some(n) = std::env::var("TAKO_SNAP_ABOUT")
+                        .ok()
+                        .and_then(|n| n.parse::<usize>().ok())
+                {
+                    let text = "Kratos e Atreus partem numa jornada mítica atrás de respostas antes do Ragnarök, enfrentando deuses e monstros dos Nove Reinos enquanto as forças de Odin se preparam para a batalha profetizada que vai acabar com o mundo.";
+                    let about = (0..n).map(|_| Value::String(text.into())).collect();
+                    s.set_field("about".into(), crate::values::model(about));
+                }
                 // `TAKO_SNAP_TITLE` / `TAKO_SNAP_DESC`: textos longos no destaque.
                 if let ("desk-game", Value::Struct(s)) = (*name, &mut value) {
                     for (var, field) in [
@@ -1735,6 +2208,52 @@ created-by-tako = true
                     r.render(&mut scratch, w as usize);
                 });
                 std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            // `TAKO_SNAP_PAGES=2`: com a página já na tela, Page Down duas vezes antes da captura (a página do jogo
+            // rolada; negativo = Page Up).
+            if let Some(n) = std::env::var("TAKO_SNAP_PAGES")
+                .ok()
+                .and_then(|n| n.parse::<i32>().ok())
+            {
+                let key = if n > 0 { "\u{F72D}" } else { "\u{F72C}" };
+                for _ in 0..n.abs() {
+                    shell.key(key, tako_core::input::shortcut::KeyModifiers::NONE);
+                }
+                apply(&mut shell, art.as_ref());
+                for _ in 0..wait / 50 {
+                    slint::platform::update_timers_and_animations();
+                    ui.window().request_redraw();
+                    window.draw_if_needed(|r| {
+                        r.render(&mut scratch, w as usize);
+                    });
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            }
+            // `TAKO_SNAP_CMDS=tab,down,right`: teclas antes da captura (foco do corpo da página do jogo). Use um tamanho por
+            // execução: o estado do teclado se acumula de um tamanho para o outro.
+            if let Ok(cmds) = std::env::var("TAKO_SNAP_CMDS") {
+                for name in cmds.split(',') {
+                    match name {
+                        "tab" => {
+                            shell.key("\u{0009}", tako_core::input::shortcut::KeyModifiers::NONE);
+                        }
+                        "up" => shell.handle(Cmd::Up),
+                        "down" => shell.handle(Cmd::Down),
+                        "left" => shell.handle(Cmd::Left),
+                        "right" => shell.handle(Cmd::Right),
+                        "accept" => shell.handle(Cmd::Accept),
+                        _ => {}
+                    }
+                }
+                apply(&mut shell, art.as_ref());
+                for _ in 0..wait / 50 {
+                    slint::platform::update_timers_and_animations();
+                    ui.window().request_redraw();
+                    window.draw_if_needed(|r| {
+                        r.render(&mut scratch, w as usize);
+                    });
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
             }
             slint::platform::update_timers_and_animations();
             let mut pixels = vec![Rgb8Pixel::default(); (w * h) as usize];

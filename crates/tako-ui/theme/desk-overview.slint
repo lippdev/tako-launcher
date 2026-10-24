@@ -282,6 +282,8 @@ export component CapaDoJogo inherits Rectangle {
     accessible-label: label != "" ? name + ", " + label : name;
     accessible-action-default => { root.clicked(); }
     Rectangle {
+        // Sem `y` o Slint centraliza a arte no cartão (que é 58 mais alto por causa do texto) e o anel de foco, em y 0, sai deslocado.
+        y: 0;
         width: parent.width;
         height: root.cover-h;
         border-radius: Ui.radius-block;

@@ -398,7 +398,7 @@ fn badge(ctx: &Ctx, g: &Game, running: bool) -> String {
 
 /// Arte clara atrás da barra de dados e da identidade (embaixo): pede mais escurecimento (EstadoArteClara). Mesmo
 /// limite do vidro (0,18).
-fn bright(lum: &[f32]) -> bool {
+pub(super) fn bright(lum: &[f32]) -> bool {
     let (cols, rows) = crate::images::GLASS_GRID;
     if lum.len() != (cols * rows) as usize {
         return false;
