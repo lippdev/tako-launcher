@@ -628,11 +628,41 @@ fn open_window(config: &Config) {
         quit_message_loop();
         return;
     };
-    let mut delegate = HostWindow::new(RefCell::new(Some(view)));
+    let mut delegate = HostWindow::new(RefCell::new(Some(view)), false);
     if window_create_top_level(Some(&mut delegate)).is_none() {
         tracing::error!("CEF não criou a janela");
         FAILED.store(true, Ordering::Relaxed);
         quit_message_loop();
+    }
+}
+
+fn window_icon(png_1x: &[u8], png_2x: &[u8]) -> Option<Image> {
+    let Some(image) = image_create() else {
+        tracing::error!("CEF não criou a imagem do ícone do Tako");
+        return None;
+    };
+    for (scale, png) in [(1.0, png_1x), (2.0, png_2x)] {
+        if image.add_png(scale, Some(png)) == 0 {
+            tracing::error!(scale, "CEF não decodificou o ícone do Tako");
+            return None;
+        }
+    }
+    Some(image)
+}
+
+fn set_window_icons(window: &Window) {
+    // PNGs extraídos de packaging/tako.ico, nas escalas 1x/2x, sem ampliar a arte original.
+    if let Some(mut icon) = window_icon(
+        include_bytes!("../assets/tako-16.png"),
+        include_bytes!("../assets/tako-32.png"),
+    ) {
+        window.set_window_icon(Some(&mut icon));
+    }
+    if let Some(mut icon) = window_icon(
+        include_bytes!("../assets/tako-128.png"),
+        include_bytes!("../assets/tako-256.png"),
+    ) {
+        window.set_window_app_icon(Some(&mut icon));
     }
 }
 
@@ -641,11 +671,19 @@ wrap_browser_view_delegate! {
     impl ViewDelegate {}
     impl BrowserViewDelegate {
         fn browser_runtime_style(&self) -> RuntimeStyle { RuntimeStyle::ALLOY }
+        fn on_popup_browser_view_created(&self, _browser_view: Option<&mut BrowserView>, popup_browser_view: Option<&mut BrowserView>, is_devtools: i32) -> i32 {
+            if is_devtools == 0 { return 0; }
+            let Some(view) = popup_browser_view else { return 0; };
+            let mut delegate = HostWindow::new(RefCell::new(Some(view.clone())), true);
+            if window_create_top_level(Some(&mut delegate)).is_some() { return 1; }
+            tracing::error!("CEF não criou a janela do DevTools com ícone do Tako");
+            0
+        }
     }
 }
 
 wrap_window_delegate! {
-    struct HostWindow { view: RefCell<Option<BrowserView>> }
+    struct HostWindow { view: RefCell<Option<BrowserView>>, is_devtools: bool }
     impl ViewDelegate {
         fn preferred_size(&self, _view: Option<&mut View>) -> Size { initial_size(display_get_primary()) }
         fn minimum_size(&self, _view: Option<&mut View>) -> Size { Size { width: 960, height: 600 } }
@@ -655,6 +693,7 @@ wrap_window_delegate! {
         fn on_window_created(&self, window: Option<&mut Window>) {
             if let (Some(window), Some(view)) = (window, self.view.borrow().as_ref()) {
                 window.set_title(Some(&CefString::from("Tako")));
+                set_window_icons(window);
                 window.set_to_fill_layout();
                 window.add_child_view(Some(&mut View::from(view)));
                 window.center_window(Some(&initial_size(window.display())));
@@ -662,14 +701,17 @@ wrap_window_delegate! {
             }
         }
         fn on_window_destroyed(&self, _window: Option<&mut Window>) { self.view.borrow_mut().take(); }
-        fn is_frameless(&self, _window: Option<&mut Window>) -> i32 { 1 }
+        fn is_frameless(&self, _window: Option<&mut Window>) -> i32 { i32::from(!self.is_devtools) }
         fn can_resize(&self, _window: Option<&mut Window>) -> i32 { 1 }
         fn can_minimize(&self, _window: Option<&mut Window>) -> i32 { 1 }
         fn can_maximize(&self, _window: Option<&mut Window>) -> i32 { 1 }
         fn can_close(&self, _window: Option<&mut Window>) -> i32 {
             self.view.borrow().as_ref().and_then(|view| view.browser()).and_then(|browser| browser.host()).map_or(1, |host| { host.close_dev_tools(); host.try_close_browser() })
         }
-        fn window_runtime_style(&self) -> RuntimeStyle { RuntimeStyle::ALLOY }
+        // O DevTools pode usar um estilo diferente do navegador inspecionado.
+        fn window_runtime_style(&self) -> RuntimeStyle {
+            self.view.borrow().as_ref().map_or(RuntimeStyle::ALLOY, |view| view.runtime_style())
+        }
     }
 }
 
