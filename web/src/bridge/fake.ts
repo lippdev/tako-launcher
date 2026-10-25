@@ -67,6 +67,9 @@ import type { SourceIdResults } from "./generated/SourceIdResults";
 import type { SourceIdsChecked } from "./generated/SourceIdsChecked";
 import type { SourceIdsFound } from "./generated/SourceIdsFound";
 import type { SourceIdsJob } from "./generated/SourceIdsJob";
+import type { UpdateOffer } from "./generated/UpdateOffer";
+import type { UpdatePrefs } from "./generated/UpdatePrefs";
+import type { UpdateStatus } from "./generated/UpdateStatus";
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
@@ -2572,3 +2575,209 @@ Object.assign(defaults, {
     return emulatorsView();
   },
 });
+// ---- Atualização do app (WEB-33) ----
+// O ciclo do Slint sem rede nenhuma: procurar, achar, baixar com progresso, pronta, reiniciar. O cenário vem de
+// `?atualizacao=` na URL: nova (padrão) · em-dia · falha · sem-arquivo · falha-download · jogo-aberto. Com o parâmetro,
+// a procura automática ao abrir também roda (a de verdade roda ao abrir o núcleo); sem ele, só o botão procura.
+
+Object.assign(SAMPLE_CATALOGS["pt-BR"], {
+  "desktop.window.update_ready": "Atualização pronta",
+  "updates.finish_game": "Encerre o jogo antes de atualizar",
+  "updates.apply_failed": "Não foi possível iniciar a atualização: {error}",
+  "updates.desktop.searching": "Procurando…",
+  "updates.desktop.current": "Você está em dia",
+  "updates.desktop.check_failed": "Não deu para procurar",
+  "updates.desktop.current_version": "Versão atual {version}",
+  "updates.desktop.current_toast": "Você está em dia — {version}",
+  "updates.desktop.failed_toast": "Não deu para procurar atualizações",
+  "updates.desktop.found": "Atualização {version} encontrada",
+  "updates.desktop.download_failed": "Não deu para atualizar",
+  "updates.desktop.progress": "{done} de {total} MB",
+  "updates.desktop.remaining": "{seconds} s restantes",
+  "updates.desktop.hide": "Esconder",
+  "updates.desktop.later": "Depois",
+  "updates.desktop.restart": "Reiniciar agora",
+  "updates.desktop.retry": "Tentar de novo",
+  "updates.desktop.downloading": "Baixando",
+  "updates.desktop.notes": "Novidades",
+  "updates.desktop.all_notes": "Ver todas as notas ↗",
+  "updates.desktop.view": "Ver",
+  "updates.desktop.size": "· {size} MB",
+  "updates.desktop.help_downloading": "Pode fechar: continua em segundo plano e avisa na barra superior.",
+  "updates.desktop.help_ready": '"Depois": instala quando você sair do Tako.',
+  "settings.general.updates_header": "Atualizações",
+  "settings.general.updates": "Procurar atualizações",
+  "settings.general.updates_desc": "Confere se há uma versão nova do Tako",
+  "settings.general.updates_value": "Procurar",
+  "settings.general.autoupdate": "Atualizar automaticamente",
+  "settings.general.autoupdate_desc": "Procura e baixa a versão nova em segundo plano; instala ao reiniciar ou ao sair do Tako",
+  "settings.general.prerelease": "Receber versões de teste",
+  "settings.general.prerelease_desc": "Versões alpha e beta chegam antes, mas podem ter falhas",
+  "settings.general.nightly": "Receber versões noturnas",
+  "settings.general.nightly_desc": "Uma build por dia com tudo que entrou no desenvolvimento, sem revisão. Para quem quer testar",
+});
+Object.assign(SAMPLE_CATALOGS["en-US"], {
+  "desktop.window.update_ready": "Update ready",
+  "updates.finish_game": "Close the game before updating",
+  "updates.apply_failed": "Couldn't start the update: {error}",
+  "updates.desktop.searching": "Checking…",
+  "updates.desktop.current": "You're up to date",
+  "updates.desktop.check_failed": "Couldn't check for updates",
+  "updates.desktop.current_version": "Current version {version}",
+  "updates.desktop.current_toast": "You're up to date — {version}",
+  "updates.desktop.failed_toast": "Couldn't check for updates",
+  "updates.desktop.found": "Update {version} found",
+  "updates.desktop.download_failed": "Couldn't update",
+  "updates.desktop.progress": "{done} of {total} MB",
+  "updates.desktop.remaining": "{seconds} s remaining",
+  "updates.desktop.hide": "Hide",
+  "updates.desktop.later": "Later",
+  "updates.desktop.restart": "Restart now",
+  "updates.desktop.retry": "Try again",
+  "updates.desktop.downloading": "Downloading",
+  "updates.desktop.notes": "What's new",
+  "updates.desktop.all_notes": "View all release notes ↗",
+  "updates.desktop.view": "View",
+  "updates.desktop.size": "· {size} MB",
+  "updates.desktop.help_downloading": "You can close this: it keeps going in the background and tells you in the top bar.",
+  "updates.desktop.help_ready": '"Later": installs when you quit Tako.',
+  "settings.general.updates_header": "Updates",
+  "settings.general.updates": "Check for updates",
+  "settings.general.updates_desc": "Checks whether there's a new version of Tako",
+  "settings.general.updates_value": "Check",
+  "settings.general.autoupdate": "Update automatically",
+  "settings.general.autoupdate_desc": "Finds and downloads the new version in the background; installs it on restart or when you quit Tako",
+  "settings.general.prerelease": "Get test versions",
+  "settings.general.prerelease_desc": "Alpha and beta versions arrive earlier, but may have bugs",
+  "settings.general.nightly": "Get nightly builds",
+  "settings.general.nightly_desc": "One build a day with everything merged into development, unreviewed. For testers",
+});
+
+type UpdateScenario = "nova" | "em-dia" | "falha" | "sem-arquivo" | "falha-download" | "jogo-aberto";
+const UPDATE_SCENARIOS: readonly UpdateScenario[] = ["nova", "em-dia", "falha", "sem-arquivo", "falha-download", "jogo-aberto"];
+const updateParam = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("atualizacao");
+const updateScenario: UpdateScenario = UPDATE_SCENARIOS.find((s) => s === updateParam) ?? "nova";
+
+const FAKE_UPDATE_OFFER: UpdateOffer = {
+  version: "0.3.0",
+  notes: [
+    "Novo visual: tema TAKO com as cores da arte do jogo",
+    "Downloads na barra de cima",
+    "Corrigido: lista recolhida perdia o jogo escolhido",
+  ],
+  pageUrl: "https://github.com/lippdev/tako-launcher/releases/tag/v0.3.0",
+  installable: true,
+  size: Math.round(18.2 * MB),
+};
+
+let fakeUpdateGame = updateScenario === "jogo-aberto";
+let fakeUpdateTimer: ReturnType<typeof setInterval> | undefined;
+let fakeUpdateStarted = 0;
+let fakeDownloadAttempts = 0;
+let fakeUpdatePrefs: UpdatePrefs = { autoUpdate: true, prereleases: false, nightly: false };
+let fakeUpdate: UpdateStatus = {
+  state: "idle",
+  current: "0.2.0",
+  offer: null,
+  progress: 0,
+  downloadedBytes: 0,
+  remainingSeconds: null,
+  gameRunning: fakeUpdateGame,
+};
+
+function setFakeUpdate(patch: Partial<UpdateStatus>) {
+  fakeUpdate = { ...fakeUpdate, ...patch, gameRunning: fakeUpdateGame };
+  emitFakeEvent("updates.changed", fakeUpdate, 0);
+}
+
+function startFakeDownload() {
+  fakeUpdateStarted = Date.now();
+  setFakeUpdate({ state: "downloading", offer: FAKE_UPDATE_OFFER, progress: 0, downloadedBytes: 0, remainingSeconds: null });
+  clearInterval(fakeUpdateTimer);
+  fakeUpdateTimer = setInterval(() => {
+    const progress = Math.min(1, Math.round((fakeUpdate.progress + 0.04) * 1000) / 1000);
+    // Falha-download: a primeira tentativa quebra no meio, a segunda (Tentar de novo) termina.
+    if (updateScenario === "falha-download" && fakeDownloadAttempts === 0 && progress >= 0.5) {
+      fakeDownloadAttempts += 1;
+      clearInterval(fakeUpdateTimer);
+      setFakeUpdate({ state: "download_failed", remainingSeconds: null });
+      return;
+    }
+    if (progress >= 1) {
+      clearInterval(fakeUpdateTimer);
+      fakeDownloadAttempts += 1;
+      setFakeUpdate({ state: "ready", progress: 1, downloadedBytes: FAKE_UPDATE_OFFER.size, remainingSeconds: null });
+      return;
+    }
+    const elapsed = (Date.now() - fakeUpdateStarted) / 1000;
+    const remaining = Math.ceil((elapsed * (1 - progress)) / progress);
+    setFakeUpdate({
+      progress,
+      downloadedBytes: Math.round(FAKE_UPDATE_OFFER.size * progress),
+      remainingSeconds: remaining > 0 ? remaining : null,
+    });
+  }, 250);
+}
+
+function fakeUpdateCheck(): UpdateStatus {
+  if (["searching", "downloading", "installing", "ready"].includes(fakeUpdate.state)) return fakeUpdate;
+  setFakeUpdate({ state: "searching", offer: null, progress: 0, downloadedBytes: 0, remainingSeconds: null });
+  // O "Procurando…" aparece por um instante, como no núcleo (mínimo de 600 ms).
+  setTimeout(() => {
+    if (updateScenario === "em-dia") setFakeUpdate({ state: "current" });
+    else if (updateScenario === "falha") setFakeUpdate({ state: "check_failed" });
+    else if (updateScenario === "sem-arquivo")
+      setFakeUpdate({ state: "available", offer: { ...FAKE_UPDATE_OFFER, installable: false, size: 0 } });
+    else startFakeDownload();
+  }, 900);
+  return fakeUpdate;
+}
+
+function fakeUpdateDownload(): UpdateStatus {
+  if (fakeUpdate.state !== "download_failed" || fakeUpdate.offer === null)
+    throw new FakeError("conflict", "nenhuma atualização para baixar");
+  startFakeDownload();
+  return fakeUpdate;
+}
+
+function fakeUpdateApply() {
+  if (fakeUpdateGame) throw new FakeError("conflict", "encerre o jogo antes de atualizar");
+  if (fakeUpdate.state !== "ready") throw new FakeError("conflict", "nenhuma atualização pronta");
+  setFakeUpdate({ state: "installing" });
+  // O núcleo de verdade sai aqui. No navegador não há o que fechar: volta a "pronta" para repetir o ciclo.
+  console.info("[hospedeiro falso] reiniciar para atualizar");
+  setTimeout(() => {
+    setFakeUpdate({ state: "ready" });
+  }, 2500);
+}
+
+function setFakeUpdatePrefs(payload: unknown): UpdatePrefs {
+  const { autoUpdate, prereleases, nightly } = payload as UpdatePrefs;
+  if (![autoUpdate, prereleases, nightly].every((v) => typeof v === "boolean")) throw new FakeError("bad_request", "preferências inválidas");
+  fakeUpdatePrefs = { autoUpdate, prereleases, nightly };
+  return fakeUpdatePrefs;
+}
+
+/** Abrir um jogo (`game.play`) o deixa aberto por 20 s no falso: com atualização pronta, reiniciar espera. */
+const playBeforeUpdates = defaults["game.play"];
+function playAndHoldTheGame(payload: unknown) {
+  playBeforeUpdates?.(payload);
+  fakeUpdateGame = true;
+  setFakeUpdate({});
+  setTimeout(() => {
+    fakeUpdateGame = false;
+    setFakeUpdate({});
+  }, 20_000);
+}
+
+Object.assign(defaults, {
+  "game.play": playAndHoldTheGame,
+  "updates.status": () => fakeUpdate,
+  "updates.check": fakeUpdateCheck,
+  "updates.download": fakeUpdateDownload,
+  "updates.apply": fakeUpdateApply,
+  "updates.preferences": () => fakeUpdatePrefs,
+  "updates.preferences.set": setFakeUpdatePrefs,
+});
+
+if (updateParam !== null) setTimeout(fakeUpdateCheck, 2500);

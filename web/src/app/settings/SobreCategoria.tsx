@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { call } from "../../bridge";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
+import { LinhasDeAtualizacao } from "../atualizacao/LinhasDeAtualizacao";
 import { settingsStrings } from "../strings";
 
 const s = settingsStrings.about;
@@ -29,41 +30,44 @@ export function SobreCategoria() {
   }, []);
 
   return (
-    <GrupoDeConfiguracao title={s.app}>
-      {version !== null && (
-        <LinhaDeConfiguracao title={s.version} control={<span>{version}</span>} />
-      )}
-      <LinhaDeConfiguracao
-        title={s.license.title}
-        description={s.license.description}
-        control={
-          <>
-            <span>{s.license.value}</span>
+    <>
+      <GrupoDeConfiguracao title={s.app}>
+        {version !== null && (
+          <LinhaDeConfiguracao title={s.version} control={<span>{version}</span>} />
+        )}
+        <LinhaDeConfiguracao
+          title={s.license.title}
+          description={s.license.description}
+          control={
+            <>
+              <span>{s.license.value}</span>
+              <BotaoDesktop
+                variant="outlined"
+                onClick={() => {
+                  openExternal(s.license.url);
+                }}
+              >
+                {s.license.action}
+              </BotaoDesktop>
+            </>
+          }
+        />
+        <LinhaDeConfiguracao
+          title={s.source.title}
+          description={s.source.description}
+          control={
             <BotaoDesktop
               variant="outlined"
               onClick={() => {
-                openExternal(s.license.url);
+                openExternal(s.source.url);
               }}
             >
-              {s.license.action}
+              {s.source.action}
             </BotaoDesktop>
-          </>
-        }
-      />
-      <LinhaDeConfiguracao
-        title={s.source.title}
-        description={s.source.description}
-        control={
-          <BotaoDesktop
-            variant="outlined"
-            onClick={() => {
-              openExternal(s.source.url);
-            }}
-          >
-            {s.source.action}
-          </BotaoDesktop>
-        }
-      />
-    </GrupoDeConfiguracao>
+          }
+        />
+      </GrupoDeConfiguracao>
+      <LinhasDeAtualizacao />
+    </>
   );
 }

@@ -29,6 +29,8 @@ export interface AtualizacaoDoAppRotulos {
   tituloErro: string;
   /** Texto explicativo opcional exibido durante o download. */
   ajudaBaixando?: string;
+  /** Rótulo do link para as notas completas da release (ex.: "Ver todas as notas ↗"). */
+  todasAsNotas?: string;
 }
 
 export interface AtualizacaoDoAppProps {
@@ -48,6 +50,8 @@ export interface AtualizacaoDoAppProps {
   progressoTexto?: string;
   /** Mensagem descritiva de erro (usada no estado "erro"). */
   mensagemErro?: string;
+  /** Letra de ajuda sob as novidades (estados "disponivel" e "pronta"): a regra do "Depois", o jogo aberto. */
+  observacao?: string;
   /** Rótulos traduzidos dos textos e botões vindos dos catálogos de tradução. */
   rotulos: AtualizacaoDoAppRotulos;
   /** Callback acionado ao fechar o diálogo. */
@@ -60,6 +64,8 @@ export interface AtualizacaoDoAppProps {
   onReiniciar?: () => void;
   /** Callback acionado ao clicar em "Tentar de novo". */
   onTentarDeNovo?: () => void;
+  /** Callback do link para as notas completas; sem ele (ou sem `rotulos.todasAsNotas`) o link não aparece. */
+  onVerNotas?: () => void;
   className?: string;
 }
 
@@ -80,12 +86,14 @@ export function AtualizacaoDoApp({
   progresso = 0,
   progressoTexto,
   mensagemErro,
+  observacao,
   rotulos,
   onFechar,
   onDepois,
   onBaixar,
   onReiniciar,
   onTentarDeNovo,
+  onVerNotas,
   className,
 }: AtualizacaoDoAppProps) {
   const fecharOuDepois = onDepois ?? onFechar;
@@ -211,6 +219,10 @@ export function AtualizacaoDoApp({
           </div>
         )}
 
+      {(estado === "disponivel" || estado === "pronta") && observacao && (
+        <p className={styles["ajudaTexto"]}>{observacao}</p>
+      )}
+
       {/* Estado "baixando": barra de progresso com transform: scaleX */}
       {estado === "baixando" && (
         <div>
@@ -235,6 +247,12 @@ export function AtualizacaoDoApp({
       {/* Estado "erro": mensagem descritiva de erro */}
       {estado === "erro" && mensagemErro && (
         <p className={styles["mensagemErro"]}>{mensagemErro}</p>
+      )}
+
+      {onVerNotas && rotulos.todasAsNotas && estado !== "erro" && (
+        <button type="button" className={styles["linkNotas"]} onClick={onVerNotas}>
+          {rotulos.todasAsNotas}
+        </button>
       )}
     </Dialogo>
   );

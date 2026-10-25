@@ -478,4 +478,47 @@ mod tests {
             Err(UpdateError::NotInstallable)
         ));
     }
+
+    #[test]
+    fn a_tampered_download_is_refused_and_leaves_nothing_behind() {
+        let (url, server) = slow_server(vec![b"adulterado".to_vec()], Duration::ZERO, false);
+        let dir = tempfile::tempdir().unwrap();
+        let hex: String = Sha256::digest(b"original")
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let update = UpdateInfo {
+            version: "0.2.0".into(),
+            name: "Tako 0.2.0".into(),
+            notes: String::new(),
+            page_url: String::new(),
+            asset: Some(feed::Asset {
+                size: 10,
+                url,
+                name: "Tako-Portable-x64.exe".into(),
+                digest: format!("sha256:{hex}"),
+            }),
+            is_prerelease: false,
+        };
+        let mut seen = Vec::new();
+        let result = download(&agent(), &update, dir.path(), &mut |f| seen.push(f));
+        server.join().unwrap();
+        assert!(
+            matches!(result, Err(UpdateError::DigestMismatch)),
+            "{result:?}"
+        );
+        // Nem o arquivo final nem o parcial: nada que o plano de aplicação pudesse executar.
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+        assert_eq!(seen.last().copied(), Some(1.0));
+    }
+
+    #[test]
+    fn a_missing_or_malformed_digest_refuses_every_download() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("f");
+        fs::write(&file, b"x").unwrap();
+        for digest in ["", "sha256:", "sha256:zz", "sha1:abcd"] {
+            assert!(!verify_file(&file, digest).unwrap(), "{digest}");
+        }
+    }
 }

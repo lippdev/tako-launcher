@@ -56,6 +56,8 @@ pub struct Core {
     /// Demonstração: nada é procurado nem verificado no disco.
     pub(crate) simulate: bool,
     pub(crate) art: crate::art::ArtState,
+    /// Atualização do app (WEB-33): procurar, baixar, conferir e aplicar.
+    pub(crate) updates: crate::updates::UpdateHub,
 }
 
 impl Core {
@@ -243,6 +245,7 @@ impl Core {
             emulators,
             simulate,
             art,
+            updates: crate::updates::UpdateHub::new(paths.clone(), simulate),
         };
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);

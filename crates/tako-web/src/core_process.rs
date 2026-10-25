@@ -359,6 +359,7 @@ pub fn run<L: UiLauncher>(
     let host_wake = host_tx.clone();
     service.set_host_sink(host_tx);
     service.set_event_sink(event_tx);
+    service.check_updates_on_open();
     // Um só receptor acorda por pedidos da página e por resultados das lojas, inclusive sem interface.
     let relay_stop = Arc::new(AtomicBool::new(false));
     let stopped = relay_stop.clone();
@@ -371,6 +372,8 @@ pub fn run<L: UiLauncher>(
         }
     });
     control(tx);
+    // Atualização aplicada (WEB-33): o instalador ou o script de troca já espera este processo sair.
+    let mut exiting = false;
     let result = loop {
         let now = Instant::now();
         let session = service
@@ -427,6 +430,7 @@ pub fn run<L: UiLauncher>(
                 tracing::info!(%game_id, "abrindo o jogo");
                 service.launch_game(&game_id);
             }
+            Some(Command::Host(HostRequest::Exit)) => exiting = true,
             Some(Command::Host(HostRequest::Resume)) => {
                 tracing::info!("voltar ao jogo: fechando a interface");
                 host.hide(Instant::now());
@@ -456,11 +460,19 @@ pub fn run<L: UiLauncher>(
         let messages = bridge::drain_messages(text, &events);
         // Resposta e eventos causados por ela seguem juntos e nessa ordem pela mesma fila do filho.
         host.deliver_all(target.as_ref(), &messages);
+        if exiting {
+            tracing::info!("atualização aplicada: encerrando o Tako");
+            break Ok(());
+        }
         if let Some(result) = host.watch(Instant::now(), service.game_active()) {
             break result;
         }
     };
     host.shutdown_ui();
+    // "Depois" = instala ao sair do Tako (como o Slint); uma queda ou a atualização já aplicada não instalam.
+    if result.is_ok() && !exiting {
+        service.install_update_on_exit();
+    }
     drop(service);
     relay_stop.store(true, Ordering::Relaxed);
     let _ = host_wake.send(HostRequest::PollBackground);
@@ -728,6 +740,18 @@ mod tests {
         let ui = launched.recv().unwrap();
         ui.exit(0);
         assert_eq!(core.join().unwrap(), Ok(()));
+    }
+
+    #[test]
+    fn an_applied_update_closes_the_ui_and_ends_the_core() {
+        let (launched, control, core) = start(fast());
+        let mut ui = launched.recv().unwrap();
+        // A atualização foi aplicada (WEB-33): o script de troca espera este processo sair.
+        control.send(Command::Host(HostRequest::Exit)).unwrap();
+        assert_eq!(ui.next(), Some(CoreMsg::Close));
+        assert_eq!(core.join().unwrap(), Ok(()));
+        // A interface que não sai no prazo é morta antes de o núcleo terminar.
+        assert!(ui.state.killed.load(Ordering::Relaxed));
     }
 
     #[test]

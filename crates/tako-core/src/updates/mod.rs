@@ -4,6 +4,7 @@
 mod apply;
 mod download;
 pub mod feed;
+mod local;
 mod semver;
 
 use std::path::Path;
@@ -16,6 +17,7 @@ pub use download::{
     fetch_highlight, verify_file,
 };
 pub use feed::{Arch, Asset, Channel, Package, UpdateInfo};
+pub use local::{apply_target, detect_package, install, release_notes, take_failed};
 pub use semver::SemVer;
 
 /// Preferências salvas em `updates.json` (mesmos nomes do C#, para a migração).

@@ -165,6 +165,26 @@ cache, arquivo local e ICO), `tests/art_bridge.rs` na aplicação (ponte livre d
 pelos metadados, publicação antes do evento e demonstração sem cofre/rede) e `resources` no hospedeiro
 (índice atualizado sem reabrir e ICO convertido para PNG). Os transportes desses testes são falsos.
 
+## Atualização do app (WEB-33)
+
+A regra é a do Slint (`tako_core::updates`, SHA-256 publicado no GitHub); o estado vive no núcleo (`tako-app/src/updates.rs`).
+
+| Chamada / pedido | Quem trata | O que faz |
+|---|---|---|
+| `updates.status`, `updates.check`, `updates.download`, `updates.apply` | `AppService` | Estado, procurar (canal de `updates.json`), baixar de novo depois de falha, aplicar. Evento `updates.changed` com o estado e o progresso |
+| `updates.preferences`, `updates.preferences.set` | `AppService` | `AutoUpdate`, `Prereleases` e `Nightly` de `updates.json` |
+| `HostRequest::Exit` | núcleo (`core_process.rs`) | A troca já foi iniciada (instalador ou script que espera este processo): fecha a interface e encerra o núcleo |
+
+- Ao abrir o núcleo, `AppService::check_updates_on_open` procura se `AutoUpdate` estiver ligado (compilação de desenvolvimento e
+  demonstração não procuram sozinhas) e avisa se o script de troca deixou `failed`.
+- Achou e o pacote se atualiza sozinho: baixa sozinho, confere o SHA-256 (o que não confere é apagado) e fica `ready`. `updates.apply`
+  confere de novo antes de executar. Com um jogo aberto (`game.running`) o reinício é recusado (`conflict`).
+- "Depois" instala ao sair: ao terminar o app sem queda, `install_update_on_exit` roda o plano sem reabrir.
+- Demonstração: versão de exemplo, download simulado e `updates.apply` que não faz nada.
+
+Testes: `tako-core` (`updates::`, inclusive o download adulterado), `tako-app` (`tests/updates_bridge.rs`, com consulta falsa,
+servidor HTTP local e instalador falso) e `tako-web` (`core_process.rs`: `Exit` encerra o núcleo).
+
 ## Preparar e compilar
 
 Windows x64, Rust de `rust-toolchain.toml`, Visual Studio 2022 Build Tools com C++ e Windows SDK.

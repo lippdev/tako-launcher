@@ -1,0 +1,64 @@
+/* AtualizacaoNaBarra (WEB-33): o botão da atualização na barra de cima, ao lado do Downloads. Mesma forma dos botões
+   da BarraSuperior; só `transform` e `opacity` animam. */
+
+.button {
+  /* Medidas da BarraSuperior sem variável no `tokens.css`: ficam locais. */
+  --button-padding: 9px;
+  --dot-size: 9px;
+  --dot-offset: 7px;
+  --dot-ring: 2px;
+
+  composes: ring from "../../lib/focus.module.css";
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-height);
+  height: var(--control-height);
+  margin: 0;
+  padding: 0 var(--button-padding);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background-color: transparent;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+  cursor: pointer;
+}
+
+.button:hover,
+.open {
+  color: var(--text);
+  background-color: var(--glass-hover);
+}
+
+.button:hover svg {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent));
+}
+
+/* Pronta, com falha ou só à espera da página: um ponto na cor de destaque, com a borda da cor da barra. */
+.dot {
+  position: absolute;
+  top: var(--dot-offset);
+  right: var(--dot-offset);
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border: var(--dot-ring) solid var(--titlebar);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+/* Baixando: o ícone pulsa de leve (opacidade), sem mexer em tamanho nem posição. "Reduzir animações" zera a duração
+   (`--tempo-pulso` e a regra geral do `base.css`). */
+.working svg {
+  animation: pulse var(--tempo-pulso) var(--curva-estado) infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.55;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+

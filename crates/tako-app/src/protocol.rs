@@ -102,6 +102,12 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "emulators.folder.add"
             | "emulators.folder.remove"
             | "emulators.folder.system.set"
+            | "updates.status"
+            | "updates.check"
+            | "updates.download"
+            | "updates.apply"
+            | "updates.preferences"
+            | "updates.preferences.set"
     ) {
         return Err((
             header.id,
@@ -126,6 +132,11 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "game.running"
             | "game.resume"
             | "emulators.list"
+            | "updates.status"
+            | "updates.check"
+            | "updates.download"
+            | "updates.apply"
+            | "updates.preferences"
     ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
@@ -515,6 +526,29 @@ pub enum Call {
         #[ts(as = "EmulatorFolderSystem")]
         EmulatorFolderSystem,
     ),
+    /// A atualização do Tako agora: versão nova, andamento do download e se já dá para reiniciar (WEB-33).
+    #[serde(rename = "updates.status")]
+    UpdatesStatus,
+    /// Procura versão nova no canal das preferências. Responde na hora com o estado; o resultado chega por
+    /// `updates.changed`. Achou e a instalação se atualiza sozinha: o download começa sozinho, como no Slint.
+    #[serde(rename = "updates.check")]
+    UpdatesCheck,
+    /// Baixa de novo a versão achada (depois de uma falha). `conflict` sem versão achada ou sem arquivo conferível.
+    #[serde(rename = "updates.download")]
+    UpdatesDownload,
+    /// Troca o executável e reinicia o Tako. `conflict` sem atualização pronta ou com um jogo aberto.
+    #[serde(rename = "updates.apply")]
+    UpdatesApply,
+    /// As preferências de atualização do Tako (Configurações › Geral › Atualizações no Slint), de `updates.json`.
+    #[serde(rename = "updates.preferences")]
+    UpdatesPreferences,
+    /// Grava as três preferências de uma vez e devolve o que ficou gravado.
+    #[serde(rename = "updates.preferences.set")]
+    UpdatesPreferencesSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "UpdatePrefs")]
+        UpdatePrefs,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -638,6 +672,18 @@ pub enum Reply {
     EmulatorsFolderRemove(EmulatorsView),
     #[serde(rename = "emulators.folder.system.set")]
     EmulatorsFolderSystemSet(EmulatorsView),
+    #[serde(rename = "updates.status")]
+    UpdatesStatus(UpdateStatus),
+    #[serde(rename = "updates.check")]
+    UpdatesCheck(UpdateStatus),
+    #[serde(rename = "updates.download")]
+    UpdatesDownload(UpdateStatus),
+    #[serde(rename = "updates.apply")]
+    UpdatesApply,
+    #[serde(rename = "updates.preferences")]
+    UpdatesPreferences(UpdatePrefs),
+    #[serde(rename = "updates.preferences.set")]
+    UpdatesPreferencesSet(UpdatePrefs),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -691,6 +737,9 @@ pub enum Event {
     /// Uma arte já está disponível no cache. A tela troca a versão da URL tako-img desse jogo.
     #[serde(rename = "art.changed")]
     ArtChanged(GameRequest),
+    /// A atualização do Tako mudou (procura, versão achada, progresso do download, pronta ou falha).
+    #[serde(rename = "updates.changed")]
+    UpdatesChanged(UpdateStatus),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -2107,4 +2156,72 @@ pub struct EmulatorsView {
     pub systems: Vec<RomFolderSystem>,
     #[ts(type = "number")]
     pub max_folders: usize,
+}
+
+/// Onde está a atualização do app. Plano: `idle` → `searching` → (`current` | `check_failed` | achou).
+/// Achou: `downloading` → `ready` | `download_failed`; sem arquivo conferível (`.deb`, sem hash) fica `available`
+/// e a interface só leva à página da release.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum UpdateState {
+    Idle,
+    Searching,
+    /// A procura terminou e este é o Tako mais novo do canal.
+    Current,
+    CheckFailed,
+    Available,
+    Downloading,
+    /// Baixada e com o hash conferido: `updates.apply` troca o executável.
+    Ready,
+    DownloadFailed,
+    /// O instalador ou o script de troca já foi iniciado e o Tako está saindo.
+    Installing,
+}
+
+/// A versão nova que a procura achou.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UpdateOffer {
+    pub version: String,
+    /// Até três novidades curtas da release.
+    pub notes: Vec<String>,
+    /// A página da release (sempre https), para as notas completas.
+    pub page_url: String,
+    /// Dá para baixar, conferir e instalar por aqui.
+    pub installable: bool,
+    /// Tamanho do arquivo em bytes; 0 quando a release não informa.
+    #[ts(type = "number")]
+    pub size: u64,
+}
+
+/// A atualização do app, para `updates.*` e para o evento `updates.changed`.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UpdateStatus {
+    pub state: UpdateState,
+    /// A versão em uso.
+    pub current: String,
+    pub offer: Option<UpdateOffer>,
+    /// Fração baixada (0 a 1).
+    pub progress: f64,
+    #[ts(type = "number")]
+    pub downloaded_bytes: u64,
+    /// Segundos que faltam, estimados pelo ritmo até agora.
+    #[ts(type = "number | null")]
+    pub remaining_seconds: Option<u64>,
+    /// Um jogo aberto impede o reinício: a interface espera ou avisa.
+    pub game_running: bool,
+}
+
+/// O canal de atualização: procurar e baixar ao abrir, versões de teste e builds noturnas (`updates.json`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct UpdatePrefs {
+    pub auto_update: bool,
+    pub prereleases: bool,
+    pub nightly: bool,
 }

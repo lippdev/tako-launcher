@@ -262,6 +262,7 @@ impl crate::AppService {
         self.poll_downloads();
         self.poll_edit();
         self.poll_art();
+        self.poll_updates();
     }
 
     pub(super) fn emit_scan_progress(&self) {

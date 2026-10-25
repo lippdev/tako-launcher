@@ -5,8 +5,8 @@ use crate::app::HostAction;
 use crate::shell::layer::{Flow, MenuItem, MenuLayer};
 use crate::shell::{Ctx, Effect, Shell};
 use crate::{images, model::PanelRow, tasks};
-use std::path::{Path, PathBuf};
-use tako_core::paths::{DataPaths, Os};
+use std::path::Path;
+use tako_core::paths::DataPaths;
 use tako_core::updates::{self, UpdatePreferences, feed};
 
 /// `None` = o host trata.
@@ -69,16 +69,7 @@ pub fn format_bytes(n: u64) -> String {
 }
 
 fn package(paths: &DataPaths) -> feed::Package {
-    let exe = std::env::current_exe().unwrap_or_default();
-    let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
-    let flatpak = std::env::var_os("FLATPAK_ID").is_some() || Path::new("/.flatpak-info").exists();
-    feed::Package::detect(
-        Os::current(),
-        paths.kind,
-        &exe,
-        appimage.as_deref(),
-        flatpak,
-    )
+    updates::detect_package(paths)
 }
 
 /// Procura (e, se puder instalar, baixa) a próxima versão. `explicit` = pedido do usuário (mostra o resultado).
@@ -167,50 +158,16 @@ fn install_update(ctx: &mut Ctx, relaunch: bool) -> HostAction {
         ctx.toast(ctx.t("updates.finish_game"));
         return HostAction::Stay;
     }
-    let exe = std::env::current_exe().unwrap_or_default();
-    let pkg = package(&ctx.paths);
-    let target = match pkg {
-        feed::Package::MacApp => updates::mac_bundle_of(&exe).unwrap_or(exe.clone()),
-        feed::Package::LinuxAppImage => std::env::var_os("APPIMAGE")
-            .map(PathBuf::from)
-            .unwrap_or(exe.clone()),
-        feed::Package::LinuxTarGz => exe.parent().map(PathBuf::from).unwrap_or_default(),
-        _ => exe.clone(),
-    };
-    let mut wait = vec![std::process::id()];
-    if let Some(parent) = supervisor_pid() {
-        wait.push(parent);
-    }
-    let Some(plan) =
-        updates::UpdateApplyPlan::build(pkg, std::path::Path::new(&file), &target, &wait, relaunch)
-    else {
-        return HostAction::Stay;
-    };
-    if let Some((path, body)) = &plan.script
-        && let Err(e) = std::fs::write(path, body)
-    {
-        ctx.toast(e.to_string());
-        return HostAction::Stay;
-    }
-    match std::process::Command::new(&plan.program)
-        .args(&plan.args)
-        .spawn()
-    {
-        Ok(_) => {
+    match updates::install(&ctx.paths, Path::new(&file), relaunch) {
+        Ok(true) => {
             ctx.app_update.installing = true;
             ctx.effect(Effect::ExitToDesktop);
-            HostAction::Stay
         }
-        Err(e) => {
-            ctx.toast(e.to_string());
-            HostAction::Stay
-        }
+        // Instalação que não se atualiza sozinha (.deb): nada a fazer.
+        Ok(false) => {}
+        Err(e) => ctx.toast(e.to_string()),
     }
-}
-
-/// PID do supervisor (definido por ele no ambiente da interface).
-fn supervisor_pid() -> Option<u32> {
-    std::env::var("TAKO_SUPERVISOR_PID").ok()?.parse().ok()
+    HostAction::Stay
 }
 
 /// Relatório do sistema em `logs/diagnostico-*.txt` (sem dados pessoais: passa pela redação dos logs).

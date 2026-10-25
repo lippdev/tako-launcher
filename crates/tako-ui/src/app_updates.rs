@@ -14,6 +14,7 @@ use tako_core::activities::{Action, Kind, State as Phase};
 use tako_core::updates::{
     self, UpdatePreferences,
     feed::{self, UpdateInfo},
+    release_notes, take_failed,
 };
 
 pub const BRAND_MENU: &str = "tako-brand";
@@ -213,11 +214,6 @@ fn retry_toast(ctx: &mut Ctx, key: &str) {
     toast_action(ctx, text, "updates.desktop.retry", |ctx| {
         ctx.effect(Effect::CheckUpdates)
     });
-}
-
-/// O script de troca deixa `failed` ao lado do download quando não conseguiu instalar (a versão antiga foi restaurada).
-fn take_failed(dir: &std::path::Path) -> bool {
-    std::fs::remove_file(dir.join("failed")).is_ok()
 }
 
 fn toast_action(ctx: &mut Ctx, text: String, label: &str, action: fn(&mut Ctx)) {
@@ -516,19 +512,6 @@ impl Layer for UpdateDialog {
     }
 }
 
-fn release_notes(notes: &str) -> Vec<String> {
-    notes
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            line.strip_prefix("- ")
-                .or_else(|| line.strip_prefix("* "))
-                .map(|s| s.chars().take(150).collect())
-        })
-        .take(3)
-        .collect()
-}
-
 #[cfg(test)]
 pub(crate) fn snapshot(ctx: &mut Ctx, downloading: bool) {
     ctx.app_update.info = Some(UpdateInfo {
@@ -550,13 +533,6 @@ pub(crate) fn snapshot(ctx: &mut Ctx, downloading: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn notes_limit_and_ignore_headers() {
-        assert_eq!(
-            release_notes("# Changes\n- Um\n* Dois\n- Três\n- Quatro"),
-            vec!["Um", "Dois", "Três"]
-        );
-    }
     #[test]
     fn timeout_invalidates_late_results_and_current_resets_after_four_seconds() {
         let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -755,15 +731,6 @@ mod tests {
         assert_eq!(o.rows[1].style, "primary");
         assert_eq!(o.sel, 1);
         assert_eq!(o.overline, "0.2.0-alpha.14");
-    }
-
-    #[test]
-    fn failed_marker_is_consumed_once() {
-        let dir = tempfile::tempdir().unwrap();
-        assert!(!take_failed(dir.path()));
-        std::fs::write(dir.path().join("failed"), "").unwrap();
-        assert!(take_failed(dir.path()));
-        assert!(!take_failed(dir.path()));
     }
 
     #[test]

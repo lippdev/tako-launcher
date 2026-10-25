@@ -19,9 +19,11 @@ mod session;
 mod settings;
 mod sources;
 mod system;
+mod updates;
 
 pub use core::{Core, CoreError};
 pub use session::SessionUpdate;
+pub use updates::{UpdateFeed, UpdateInstaller, UpdateSetup};
 
 use protocol::{
     AppInfo, BRIDGE_VERSION, BridgeError, Call, ErrorCode, Event, I18nLang, Reply, UiState,
@@ -45,6 +47,9 @@ pub enum HostRequest {
     PollBackground,
     /// `game.resume`: trazer o jogo para a frente. Na versão web a interface fecha (D-10) e reabre no fim do jogo.
     Resume,
+    /// A atualização foi aplicada (o instalador ou o script de troca já foi iniciado e espera este processo): o
+    /// hospedeiro fecha a interface e encerra o núcleo (WEB-33).
+    Exit,
 }
 
 /// Atende as chamadas da interface. Uma instância por processo, na thread do núcleo.
@@ -101,6 +106,7 @@ impl AppService {
             core.jobs.set_host_sink(sink.clone());
             core.art
                 .set_host_sink(sink.clone(), !core.library.games().is_empty());
+            core.updates.set_host_sink(sink.clone());
         }
         self.host = Some(sink);
     }
@@ -213,6 +219,12 @@ impl AppService {
                     .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
                 profile::handle(core, call)
             }
+            call @ (Call::UpdatesStatus
+            | Call::UpdatesCheck
+            | Call::UpdatesDownload
+            | Call::UpdatesApply
+            | Call::UpdatesPreferences
+            | Call::UpdatesPreferencesSet(_)) => self.handle_updates(call),
             call @ (Call::GameEdit(_)
             | Call::GameEditSet(_)
             | Call::GameRemove(_)

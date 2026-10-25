@@ -4,6 +4,7 @@ import { Aviso } from "../components/Aviso/Aviso";
 import { Icon } from "../components/Icon/Icon";
 import { Marca } from "../components/Marca/Marca";
 import { cx } from "../lib/cx";
+import { AtualizacaoNaBarra } from "./atualizacao/AtualizacaoNaBarra";
 import { BarraDaJanela } from "./BarraDaJanela";
 import { DownloadsNaBarra } from "./DownloadsNaBarra";
 import { DialogoAdicionarJogo } from "./editar/DialogoAdicionarJogo";
@@ -114,6 +115,7 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
         >
           <Icon name="search" />
         </button>
+        <AtualizacaoNaBarra />
         <DownloadsNaBarra onOpenGame={onOpenGame} onOpenSettings={onOpenDownloadSettings} />
 
         <button

@@ -113,6 +113,25 @@
   color: var(--text-muted);
 }
 
+/* Link para as notas completas da release (WEB-33) */
+.linkNotas {
+  composes: ring from "../../lib/focus.module.css";
+  display: block;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.linkNotas:hover {
+  text-decoration: underline;
+}
+
 /* Estado: Erro */
 .mensagemErro {
   margin: var(--space-14) 0 0;
