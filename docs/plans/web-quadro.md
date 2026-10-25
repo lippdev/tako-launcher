@@ -9,12 +9,12 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Conta | Provider | Situação |
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | livre; **poupar** (pedido do mantenedor: é a conta do orquestrador, perto do limite) |
-| Antigravity | `antigravity` | rodando WEB-04n (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
+| Antigravity | `antigravity` | **limite de uso** até ~22:55 (WIP salvo: WEB-04n `b7b536b`, WEB-22 `fe4231a`; retomada agendada) (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Antigravity 2 | `antigravity_antigravity_2` | nova (24/10); rodando WEB-05b rodada 2 (exceção N4 autorizada pelo foco do mantenedor no Antigravity; orquestrador confere cada correção) |
 | Antigravity 3 | `antigravity_antigravity_3` | nova (24/10); rodando WEB-12d |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | rodando WEB-34 |
 | Codex Lipp | `codex` | **sem créditos** de novo (24/10, fim da noite) |
-| Codex Alyx Medical | `codex_alyx_medical` | rodando WEB-22 |
+| Codex Alyx Medical | `codex_alyx_medical` | **sem créditos** (24/10, fim da noite) |
 
 ## Onda 1 — Fundação (D-14: direto no código definitivo)
 
@@ -67,7 +67,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-32 | **Metadados pelo núcleo:** fila de descrição, gênero, ano, desenvolvedora e publicadora; IDs fixados de Fontes e IDs respeitados; gênero no agrupamento e publicadora na busca; capa nova na tela por `art.changed` | N3 | Codex Alyx · GPT-6.1-Sol high | WEB-01d, WEB-12c | `crates/tako-app/src/metadata.rs`, `web/src/lib/` | integrada em `2a2b776` (15 de 18 jogos com dados em 31 s; ID fixado troca dados e arte) |
 | WEB-34 | **Discord, API local e `tako://`** no núcleo web, com trava de instância única | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-20 | `crates/tako-app/src/{discord,local_api,links}.rs` | despachada |
 | WEB-04n | **Props em inglês** nos componentes antigos (CapaDoJogo, FileiraDeCapas, ErroDoJogo etc.) e todos os usos | N2 | Antigravity · Gemini 3.8 Flash high | — | `web/src/components/`, `web/src/app/` | despachada |
-| WEB-22 | **Central rápida durante o jogo:** atalho global de teclado e combinação do controle abrem a interface na Central (jogo, voltar, encerrar, volume, saída de áudio, tela) | N3 | Codex Alyx · GPT-6.1-Sol high | WEB-20, WEB-05b, WEB-21 | `crates/tako-app/src/control_center.rs`, `web/src/app/central/` | despachada |
+| WEB-22 | **Central rápida durante o jogo:** atalho global de teclado e combinação do controle abrem a interface na Central (jogo, voltar, encerrar, volume, saída de áudio, tela) | N3 | Codex Alyx · GPT-6.1-Sol high (caiu sem créditos; WIP `3cf1d70`) → Antigravity · Gemini 3.8 Flash high | WEB-20, WEB-05b, WEB-21 | `crates/tako-app/src/control_center.rs`, `web/src/app/central/` | rodada 2 no Antigravity a partir do WIP |
 | WEB-12d | **Seletor de imagens e Revisar capas:** candidatos pelo núcleo e mostrados por `tako-img://`, escolher e voltar ao automático, tela de revisão | N3 | Antigravity 3 · Gemini 3.8 Flash high | WEB-01d, WEB-32 | `crates/tako-app/src/art.rs`, `web/src/app/revisarCapas/` | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | Codex Alyx · GPT-6.1-Sol high | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | integrada em `a606b11` (15 capas em 7,85 s com cache vazio, biblioteca real só Steam; Epic e GOG só com rede falsa) |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | integrada (sessão ligada no WEB-20; falta a bandeja) |
