@@ -100,7 +100,7 @@ Fluxo por tela, com o mantenedor validando ao vivo (hot reload do Vite):
 Ordem: barra e visão geral (WEB-10) → biblioteca (WEB-11) → página do jogo (WEB-12) → configurações (WEB-13) →
 camadas (WEB-14) → Big Picture (WEB-15) → primeira execução no onboarding (WEB-16, com o INST-03).
 
-Até o corte, a interface web abre por uma opção de desenvolvimento (por exemplo `--web`); o padrão continua Slint.
+Até a 0.2.0-alpha.22 a interface web abria por `--web` e o padrão era o Slint. A partir da alpha.23 a web é o padrão e o Slint só abre com `--slint`, até o corte (PRD D-16, D-17).
 
 ## Etapa 4 — Instalador e onboarding (INST-01 a INST-04)
 

@@ -1,6 +1,6 @@
 # ADR-0035: Interface web (React sobre Chromium embutido) com o núcleo em Rust
 
-- Status: Aceita (decisão do mantenedor em 2026-10-24); o motor no Windows e as metas finais dependem do gate do MIG-W01
+- Status: Aceita (decisão do mantenedor em 2026-10-24). Atualizada em 2026-10-25: CEF definitivo em todos os SOs (item 5), ver "Atualização de 2026-10-25"
 - Data: 2026-10-24
 - Substitui: a parte de interface do [ADR-0023](0023-slint-gate.md) (Slint) e a D-02 do PRD
 
@@ -100,3 +100,14 @@ Custos e riscos aceitos:
   React. Tema continua sem executar código: CSS, tokens e arquivos, sem JavaScript, bloqueado por CSP (PRD §7).
 - **A validar no spike:** bindings Rust do CEF (crate `cef`), CEF no Wayland e no gamescope, Linux arm64, e
   empacotamento e notarização do macOS com os processos auxiliares do CEF.
+
+## Atualização de 2026-10-25
+
+- **Item 5 substituído (PRD D-19):** o CEF é o motor definitivo em todos os SOs. A comparação com o WebView2
+  (MIG-W01) não será feita: o CEF ficou pronto no Windows e cumpre as metas medidas no WEB-60 (97,6 MB com a
+  interface aberta contra 325,5 MB do Slint; 9,4 MB e zero Chromium sem interface), e manter dois motores dobraria
+  a ponte e os testes.
+- **Item 7 complementado (PRD D-16):** o Slint não fica só congelado: sai do repositório no corte (WEB-50), assim
+  que a web cobrir a tela cheia e as funções adiadas. O código C# saiu em 2026-10-25 (WEB-72).
+- **Versões (PRD D-17):** a primeira versão publicada com a interface web é a 0.2.0-alpha.23, pelo instalador
+  oficial e com o mesmo AppId; o Slint fica atrás de `--slint` até o corte.
