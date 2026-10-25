@@ -492,4 +492,19 @@ impl AppService {
         result.map_err(|e| conflict(&format!("encerrar o jogo: {e}")))?;
         Ok(Reply::GameEnd)
     }
+
+    /// Encerra a sessão ativa (se houver) ao sair do Tako, restaurando tela, áudio e cursor (WEB-36).
+    pub fn finish_active_session(&mut self) {
+        if let Some(core) = self.core.as_mut() {
+            let sessions = &mut core.session;
+            if let Some(mut active) = sessions.active.take() {
+                let d = sessions.devices();
+                let _ = active.game.request_close(&d);
+                let played = active.opened.elapsed();
+                let _ = active.game.end(&d, played);
+                active.game.finish(&d, &sessions.paths);
+                sessions.presence = None;
+            }
+        }
+    }
 }

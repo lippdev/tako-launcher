@@ -13,6 +13,7 @@ mod hidhide;
 pub mod hotkey;
 mod pointer;
 mod process;
+pub mod tray;
 pub mod version_info;
 pub mod window_chrome;
 

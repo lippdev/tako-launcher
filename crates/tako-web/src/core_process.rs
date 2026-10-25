@@ -91,6 +91,8 @@ pub enum Command {
         id: u32,
         path: Option<String>,
     },
+    /// Ação vinda da bandeja do sistema (WEB-36).
+    Tray(tako_platform::tray::TrayAction),
 }
 
 /// Thread dos controles (SDL3): guarda o handle e o sinalizador de parada para aguardar o encerramento.
@@ -283,7 +285,12 @@ impl<L: UiLauncher> Host<L> {
 
     /// Confere o processo e os prazos. `Some` termina o app. Com `game` (um jogo aberto), a interface que sai por
     /// qualquer motivo fica fechada até o fim do jogo, como no supervisor do Slint.
-    fn watch(&mut self, now: Instant, game: bool) -> Option<Result<(), String>> {
+    fn watch(
+        &mut self,
+        now: Instant,
+        game: bool,
+        close_to_tray: bool,
+    ) -> Option<Result<(), String>> {
         let Some(ui) = &mut self.ui else {
             if std::mem::take(&mut self.show) {
                 return self.open_ui().err().map(Err);
@@ -305,6 +312,10 @@ impl<L: UiLauncher> Host<L> {
                 tracing::info!(
                     "interface fechada durante o jogo; ela volta quando o jogo terminar"
                 );
+                return None;
+            }
+            if close_to_tray && exit == Exit::User {
+                tracing::info!("fechar para a bandeja: núcleo continua na bandeja");
                 return None;
             }
             return match self
@@ -443,6 +454,20 @@ pub fn run<L: UiLauncher>(
             }
         }
     });
+    // Bandeja do sistema (WEB-36, PRD D-10 e D-15): ícone e menu de contexto.
+    let tray_state = Arc::new(std::sync::Mutex::new(tako_platform::tray::TrayState {
+        lang: service.language(),
+        game_active: service.game_active(),
+        recent_games: service
+            .recent_games(5)
+            .into_iter()
+            .map(|(id, title)| tako_platform::tray::TrayGame { id, title })
+            .collect(),
+    }));
+    let tray_tx = host.tx.clone();
+    let _tray = tako_platform::tray::create_tray(tray_state.clone(), move |action| {
+        let _ = tray_tx.send(Command::Tray(action));
+    });
     control(tx);
     // Atualização aplicada (WEB-33): o instalador ou o script de troca já espera este processo sair.
     let mut exiting = false;
@@ -578,6 +603,39 @@ pub fn run<L: UiLauncher>(
             Some(Command::Picked { id, path }) => {
                 service.deliver_picked(id, path);
             }
+            Some(Command::Tray(action)) => match action {
+                tako_platform::tray::TrayAction::Open => {
+                    tracing::info!("bandeja: abrir o Tako");
+                    if host.ui.is_none() {
+                        host.show = true;
+                    } else {
+                        host.reveal(Instant::now());
+                    }
+                }
+                tako_platform::tray::TrayAction::Central => {
+                    if service.game_active() {
+                        tracing::info!("bandeja: abrir a Central de Controle");
+                        service.set_central_open(true);
+                        input.over_game = true;
+                        if host.ui.is_none() {
+                            host.show = true;
+                        } else {
+                            host.reveal(Instant::now());
+                        }
+                    }
+                }
+                tako_platform::tray::TrayAction::Launch(game_id) => {
+                    tracing::info!(%game_id, "bandeja: iniciar jogo recente");
+                    service.launch_game(&game_id);
+                }
+                tako_platform::tray::TrayAction::Quit => {
+                    tracing::info!("bandeja: sair do Tako");
+                    if service.game_active() {
+                        service.finish_active_session();
+                    }
+                    exiting = true;
+                }
+            },
             None => {}
         }
         // Um link que esperava a primeira leitura das lojas; a API local acompanha a biblioteca e as chaves.
@@ -613,7 +671,11 @@ pub fn run<L: UiLauncher>(
             tracing::info!("atualização aplicada: encerrando o Tako");
             break Ok(());
         }
-        if let Some(result) = host.watch(Instant::now(), service.game_active()) {
+        if let Some(result) = host.watch(
+            Instant::now(),
+            service.game_active(),
+            service.close_to_tray(),
+        ) {
             break result;
         }
         // Depois do `watch`: a interface que acabou de sair já não recebe comandos do controle.
@@ -623,8 +685,20 @@ pub fn run<L: UiLauncher>(
             tako_platform::control_center::focus_processes(&service.central_game_pids());
             resume_focus = false;
         }
+        if let Ok(mut state) = tray_state.lock() {
+            state.lang = service.language();
+            state.game_active = service.game_active();
+            state.recent_games = service
+                .recent_games(5)
+                .into_iter()
+                .map(|(id, title)| tako_platform::tray::TrayGame { id, title })
+                .collect();
+        }
     };
     host.shutdown_ui();
+    if service.game_active() {
+        service.finish_active_session();
+    }
     // "Depois" = instala ao sair do Tako (como o Slint); uma queda ou a atualização já aplicada não instalam.
     if result.is_ok() && !exiting {
         service.install_update_on_exit();
@@ -1724,5 +1798,48 @@ mod tests {
             self.send(&UiMsg::UserClosed);
             self.exit(0);
         }
+    }
+
+    #[test]
+    fn close_to_tray_keeps_core_alive_and_tray_open_reopens_ui() {
+        let ((launched, control, core), _dir) = start_demo();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":1,"name":"settings.set","payload":{"key":"CloseToTray","value":"true"}}"#);
+        until(&mut ui, answer(1));
+
+        // Usuário fecha a janela pelo X: como CloseToTray está ativo, fecha o CEF mas o núcleo segue.
+        ui.send_closed_and_exit();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(!core.is_finished());
+        assert!(launched.try_recv().is_err());
+
+        // Clicar no ícone da bandeja reabre a interface onde estava.
+        control
+            .send(Command::Tray(tako_platform::tray::TrayAction::Open))
+            .unwrap();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":2,"name":"app.info"}"#);
+        assert_eq!(until(&mut ui, answer(2))["ok"], true);
+
+        // "Sair" pela bandeja encerra tudo.
+        control
+            .send(Command::Tray(tako_platform::tray::TrayAction::Quit))
+            .unwrap();
+        assert_eq!(core.join().unwrap(), Ok(()));
+    }
+
+    #[test]
+    fn tray_quit_with_game_active_finishes_session_and_quits() {
+        let ((launched, control, core), _dir) = start_demo();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":1,"name":"game.play","payload":{"gameId":"steam:demo0"}}"#);
+        assert_eq!(until(&mut ui, answer(1))["ok"], true);
+        until(&mut ui, event("game.started"));
+
+        // Sai pela bandeja enquanto o jogo está aberto.
+        control
+            .send(Command::Tray(tako_platform::tray::TrayAction::Quit))
+            .unwrap();
+        assert_eq!(core.join().unwrap(), Ok(()));
     }
 }

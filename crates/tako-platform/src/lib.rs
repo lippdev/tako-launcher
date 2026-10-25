@@ -20,6 +20,7 @@ pub mod gamepad;
 pub mod secrets;
 pub mod space;
 pub mod sunshine;
+pub mod tray;
 pub mod usage;
 
 /// Copia um texto para a área de transferência do sistema.

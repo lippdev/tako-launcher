@@ -8,7 +8,7 @@ abre a interface. Sem `--web`, o Slint continua. Sem a feature, `--web` termina 
 
 | Processo | Linha | Tem | Não tem |
 |---|---|---|---|
-| Núcleo | `tako --web [--data-dir …]` | `Core`, `AppService`, `ui.state`, leitura das lojas, ciclo de vida da interface (`core_process.rs`) | CEF: a `libcef.dll` não é carregada |
+| Núcleo | `tako --web [--data-dir …]` | `Core`, `AppService`, `ui.state`, leitura das lojas, ciclo de vida da interface (`core_process.rs`), bandeja do sistema (`tako-platform`) | CEF: a `libcef.dll` não é carregada |
 | Interface | `tako --web-ui [--data-dir …]`, aberto só pelo núcleo | CEF, janela, esquemas `tako-app://` e `tako-img://`, ações de janela (`windows_host.rs`) | `AppService`, banco, lojas |
 | Subprocessos do CEF | `tako.exe --type=…` (GPU, renderização, utilitários) | o que o Chromium põe neles | — |
 
@@ -53,9 +53,10 @@ eventos são descartados de propósito (ao reabrir, a página consulta o núcleo
 
 - **Abrir:** o núcleo abre o filho primeiro e o `Core` depois, para a janela subir enquanto o banco carrega; os
   pedidos esperam na fila. Se o `Core` falhar, o núcleo fecha o filho e sai com o erro.
-- **Usuário fecha (X ou `window.action` `close`):** a interface manda `user_closed` e termina, e o núcleo encerra
-  o app (com um jogo aberto, não: ver [Sessão de jogo](#sessão-de-jogo-web-20)). Saída com código 0 sem a mensagem conta igual. Ainda não há bandeja: quando houver, “fechar para a
-  bandeja” é o núcleo mandar `Command::Hide` em vez de encerrar.
+- **Usuário fecha (X ou `window.action` `close`):** a interface manda `user_closed` e termina. Sem a chave
+  `CloseToTray`, o núcleo encerra o app (com um jogo aberto, não: ver [Sessão de jogo](#sessão-de-jogo-web-20)).
+  Com `CloseToTray` ligada, a interface fecha, o filho CEF termina (zero processos Chromium) e o núcleo continua
+  rodando na bandeja do sistema.
 - **Núcleo pede (jogo, bandeja, teste):** `Command::Hide` → `close`; a interface fecha os navegadores e sai.
   Sem sair em **5 s**, o núcleo mata o processo. O núcleo segue sem interface até `Command::Show`, que abre um
   filho novo; a página lê o `ui.state` e volta onde estava. A sessão de jogo usa o mesmo caminho (`hide` e
@@ -282,7 +283,7 @@ mesmo caminho. Pedido inválido ou grande demais é descartado.
 
 **Argumentos.** `tako --web --open-url "<url>"` ou `tako --web "<url>"`. Em release, qualquer outra forma com link
 falha com código 2 (uma URL do navegador não injeta `--data-dir` pelas aspas da linha do Windows); em debug valem
-outras opções, para testar com `--data-dir`. O comando do protocolo no registro (`HKCUSoftwareClasses\takoshellopencommand`)
+outras opções, para testar com `--data-dir`. O comando do protocolo no registro (`HKCU\Software\Classes\tako\shell\open\command`)
 pertence ao instalador (INST-*): para abrir a versão web deve ser `"Tako.exe" --web --open-url "%1"`; o instalado hoje
 ainda aponta para o Slint (`--open-url "%1"`), que entrega o link ao núcleo web aberto pelo mesmo arquivo.
 
@@ -342,6 +343,33 @@ Paridade com os seletores nativos do Slint no Windows (`rfd`). A interface web (
 - **Hospedeiro falso:** em ambiente de desenvolvimento sem hospedeiro nativo, `fakeSystemPick` responde na hora com um id e emite `system.picked` após um pequeno atraso (150 ms) com caminhos simulados (`C:\Jogos\Exemplo\game.exe` ou `C:\Roms`).
 
 Testes: `crates/tako-app/src/picker.rs` (ciclo do id, limite e cancelamento), `crates/tako-app/tests/picker_bridge.rs` (ciclo completo pela ponte, resposta imediata, evento, cancelamento e rejeição de id inválido) e `crates/tako-web/src/core_process.rs` (entrega de `Command::Picked` e emissão do evento para a interface).
+
+## Bandeja (WEB-36)
+
+No Windows, o Tako exibe um ícone na área de notificação (bandeja do sistema) gerenciado exclusivamente pelo processo do **núcleo** (`crates/tako-web/src/core_process.rs` e `crates/tako-platform/src/windows/tray.rs`), com paridade de comportamento em relação à versão Slint (PRD D-10 e D-15). O processo filho CEF nunca toca na bandeja.
+
+### Arquitetura na plataforma (`tako-platform`)
+
+- Janela oculta dedicada a mensagens Win32 (`Shell_NotifyIconW`, `NIM_ADD`, `NIM_DELETE`) rodando em thread de segundo plano.
+- Ícone carregado a partir do binário (`IDI_APPLICATION`) dimensionado para as métricas da bandeja (`SM_CXSMICON`, `SM_CYSMICON`).
+- Tratamento de `TaskbarCreated` via `RegisterWindowMessageW`, garantindo restauração do ícone caso o Windows Explorer reinicie.
+- Menu de contexto suspenso (`TrackPopupMenuEx`) acionado por clique com o botão direito, com as seguintes ações e textos localizados (`tray.*` em `crates/tako-core/locales/`):
+  1. **Abrir o Tako** (`tray.open`): item padrão (também acionado por clique com o botão esquerdo / duplo clique no ícone).
+  2. **Jogos recentes** (até 5 títulos obtidos via `AppService::recent_games`), acionando `TrayAction::Launch(id)`.
+  3. **Central de Controle** (`tray.central`): exibido apenas se houver sessão de jogo ativa (`tray_state.game_running == true`).
+  4. **Sair do Tako** (`tray.quit`): encerra o núcleo e todos os subprocessos.
+
+### Fechar para a bandeja e ciclo de vida
+
+- **Configuração `CloseToTray`:** chave booleana em `Settings` (configurações do perfil).
+- **Comportamento ao fechar a janela:** ao clicar no botão de fechar ('X') da janela, o processo de interface CEF notifica o núcleo (`Exit::UserClosed`). Com `CloseToTray` ativado:
+  - O processo da interface é encerrado por completo (`host.watch` descarta o filho e limpa o estado).
+  - Todos os subprocessos Chromium são finalizados, garantindo consumo de memória $\le 40$ MB e **zero processos Chromium** ativos enquanto minimizado para a bandeja (D-10).
+  - O núcleo Rust permanece em execução com o ícone na bandeja.
+- **Reabertura:** um clique no ícone da bandeja envia `Command::Tray(TrayAction::Open)`, fazendo o núcleo iniciar um novo processo filho CEF, restaurando o estado da interface (`ui.state`) exatamente onde estava.
+- **Ação "Sair do Tako":** envia `Command::Tray(TrayAction::Quit)`. Caso haja jogo aberto na sessão gerenciada, o encerramento restaura tela, áudio, cursor, ferramentas e presença antes de sair, com o mesmo comportamento limpo do Slint.
+
+Testes: `crates/tako-platform` (`tray`), `crates/tako-app` (`tests/tray_tests.rs`) e `crates/tako-web` (`core_process.rs`: ciclo de fechar para a bandeja e reabertura, saída da bandeja com sessão ativa).
 
 ## Preparar e compilar
 
@@ -517,9 +545,8 @@ Sem interface, a meta da D-10 (≤ 40 MB e zero Chromium) fica com folga; o núm
 
 ## Limitações mantidas
 
-A sessão de jogo já fecha e reabre a interface (acima). Faltam a bandeja (ícone, “fechar para a bandeja” →
-`Hide`, clique → `Show`) e o descarte depois de um tempo minimizado (a interface avisa “minimizada”, o núcleo
-conta o tempo e manda `Hide`). Sem Job Object, a queda do núcleo depende do fim da entrada padrão do filho; os
+A sessão de jogo já fecha e reabre a interface (acima). O descarte depois de um tempo minimizado (a interface avisa “minimizada”, o núcleo
+conta o tempo e manda `Hide`) fica para próxima etapa. Sem Job Object, a queda do núcleo depende do fim da entrada padrão do filho; os
 subprocessos do CEF somem com o processo principal deles, conferido acima.
 
 A resolução de arte ainda é um snapshot de abertura, não cobre arte fixada fora do cache nem descobertas

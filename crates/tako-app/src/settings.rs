@@ -30,6 +30,7 @@ const BOOL_KEYS: &[&str] = &[
     // Opções do Liquid Glass (as mesmas chaves do app Slint, `tako-ui/src/desk_theme.rs`).
     "DesktopGlassAmbient",
     "DesktopGlassPill",
+    "CloseToTray",
 ];
 const TEXT_KEYS: &[&str] = &[
     "GameScreenId",

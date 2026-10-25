@@ -516,3 +516,54 @@ mod tests {
         app.emit(Event::LibraryChanged);
     }
 }
+
+impl AppService {
+    /// Idioma ativo no núcleo (WEB-36).
+    pub fn language(&self) -> tako_core::i18n::Lang {
+        self.core
+            .as_ref()
+            .map(|c| c.lang)
+            .unwrap_or(tako_core::i18n::Lang::PtBr)
+    }
+
+    /// Jogos jogados mais recentemente (WEB-36), até o limite pedido.
+    pub fn recent_games(&self, count: usize) -> Vec<(String, String)> {
+        let Some(core) = self.core.as_ref() else {
+            return Vec::new();
+        };
+        tako_core::library::query::recently_played(core.library().games())
+            .into_iter()
+            .take(count)
+            .map(|g| (g.id.clone(), g.title.clone()))
+            .collect()
+    }
+
+    /// Se a opção "fechar vai para a bandeja" está ligada (WEB-36, PRD D-10).
+    pub fn close_to_tray(&self) -> bool {
+        // Atalho de teste só em debug: em release vale apenas a configuração.
+        if cfg!(debug_assertions)
+            && std::env::var("TAKO_CLOSE_TO_TRAY")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false)
+        {
+            return true;
+        }
+        self.core
+            .as_ref()
+            .and_then(|c| c.settings.get("CloseToTray"))
+            .is_some_and(|v| v == "true")
+    }
+}
+
+#[cfg(test)]
+mod tray_tests {
+    use super::*;
+
+    #[test]
+    fn app_tray_helpers_without_core() {
+        let app = AppService::new("1.0");
+        assert_eq!(app.language(), tako_core::i18n::Lang::PtBr);
+        assert!(app.recent_games(5).is_empty());
+        assert!(!app.close_to_tray());
+    }
+}
