@@ -80,7 +80,9 @@ pub struct ImageRequest {
 pub fn parse_image_url(url: &str) -> Option<ImageRequest> {
     let rest = url.strip_prefix(IMG_SCHEME)?.strip_prefix("://")?;
     let (host, query) = rest.split_once('?')?;
-    let kind = match host.trim_end_matches('/') {
+    let host = host.trim_end_matches('/');
+    let candidate = host.starts_with("candidate-");
+    let kind = match host.strip_prefix("candidate-").unwrap_or(host) {
         "cover" => ImageKind::Cover,
         "hero" => ImageKind::Hero,
         "logo" => ImageKind::Logo,
@@ -101,9 +103,19 @@ pub fn parse_image_url(url: &str) -> Option<ImageRequest> {
             _ => return None,
         }
     }
-    let game_id = id?;
+    let mut game_id = id?;
     if game_id.is_empty() || game_id.len() > MAX_ID_BYTES || game_id.chars().any(char::is_control) {
         return None;
+    }
+    if candidate {
+        if !game_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+        {
+            return None;
+        }
+        // Referência interna impossível de confundir com um ID de jogo vindo de uma URL comum.
+        game_id.insert_str(0, "\0candidate:");
     }
     Some(ImageRequest {
         kind,
@@ -196,6 +208,41 @@ mod tests {
             parse_image_url("tako-img://hero/?id=steam%3A570").map(|r| r.kind),
             Some(ImageKind::Hero)
         );
+    }
+
+    #[test]
+    fn candidate_images_use_a_separate_namespace() {
+        let request = parse_image_url("tako-img://candidate-cover?id=g-cand-0").unwrap();
+        assert_eq!(request.game_id, "\0candidate:g-cand-0");
+        assert_eq!(request.kind, ImageKind::Cover);
+        let dir = tempfile::tempdir().unwrap();
+        let paths = tako_core::paths::DataPaths::at(dir.path());
+        std::fs::create_dir_all(paths.art_cache()).unwrap();
+        let real = paths.art_cache().join("real.png");
+        let preview = paths.art_cache().join("preview.png");
+        std::fs::write(&real, b"real").unwrap();
+        std::fs::write(&preview, b"preview").unwrap();
+        let art = tako_core::metadata::game_art::GameArt::new(&paths);
+        art.publish("g-cand-0", tako_core::library::ArtKind::Cover, &real)
+            .unwrap();
+        art.candidates()
+            .publish("g-cand-0", tako_core::library::ArtKind::Cover, &preview)
+            .unwrap();
+        assert_eq!(
+            art.resolve(&request.game_id, tako_core::library::ArtKind::Cover),
+            Some(preview.canonicalize().unwrap())
+        );
+        assert_eq!(
+            art.resolve("g-cand-0", tako_core::library::ArtKind::Cover),
+            Some(real.canonicalize().unwrap())
+        );
+        for bad in [
+            "tako-img://cover?id=%00candidate:g-cand-0",
+            "tako-img://candidate-cover?id=../g",
+            "tako-img://candidate-cover?id=%2fg",
+        ] {
+            assert!(parse_image_url(bad).is_none());
+        }
     }
 
     #[test]

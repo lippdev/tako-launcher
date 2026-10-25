@@ -355,7 +355,7 @@ fn art_candidates_choose_and_reset_flow() {
     assert!(!candidates.is_empty(), "deveria ter candidatos do Steam");
     for cand in &candidates {
         assert!(
-            cand.url.starts_with("tako-img://cover?id="),
+            cand.url.starts_with("tako-img://candidate-cover?id="),
             "URL deve usar tako-img://: {}",
             cand.url
         );
@@ -372,12 +372,21 @@ fn art_candidates_choose_and_reset_flow() {
         .handle(Call::ArtChoose(ArtChooseRequest {
             game_id: "steam:570".into(),
             kind: ArtKindDto::Cover,
-            candidate_id: "cand-0".into(),
+            candidate_id: candidates[0].id.clone(),
         }))
         .unwrap();
     assert_eq!(choose_reply, Reply::ArtChoose);
 
-    let events: Vec<_> = rx.try_iter().collect();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let events = loop {
+        app.poll();
+        let events: Vec<_> = rx.try_iter().collect();
+        if events.iter().any(|e| matches!(e, Event::ArtChooseReady(_))) {
+            break events;
+        }
+        assert!(Instant::now() < deadline, "faltou conclusão da escolha");
+        std::thread::sleep(Duration::from_millis(5));
+    };
     assert!(
         events.iter().any(|e| e
             == &Event::ArtChanged(GameRequest {
@@ -410,6 +419,8 @@ fn art_review_listing_and_accept_flow() {
     let paths = DataPaths::at(dir.path());
     let core = Core::open(paths.clone(), Platform::simulated(), true).unwrap();
     let mut app = AppService::with_core("test", core);
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sink(tx);
 
     let game1 = Game {
         id: "custom:1".into(),
@@ -424,6 +435,20 @@ fn art_review_listing_and_accept_flow() {
         other => panic!("resposta inesperada: {other:?}"),
     };
 
+    assert!(review_view.loading);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let review_view = loop {
+        app.poll();
+        if let Some(Event::ArtReviewReady(view)) = rx
+            .try_iter()
+            .find(|e| matches!(e, Event::ArtReviewReady(_)))
+        {
+            break view;
+        }
+        assert!(Instant::now() < deadline, "faltou art.review.ready");
+        std::thread::sleep(Duration::from_millis(5));
+    };
+    assert!(!review_view.loading);
     assert_eq!(review_view.total, 1);
     assert_eq!(review_view.items.len(), 1);
     let item = &review_view.items[0];
@@ -563,7 +588,7 @@ fn art_candidates_does_not_block_bridge_and_event_arrives_with_distinct_urls_and
     );
     for cand in &ready_candidates {
         assert!(
-            cand.url.starts_with("tako-img://cover?id="),
+            cand.url.starts_with("tako-img://candidate-cover?id="),
             "URL deve usar tako-img://: {}",
             cand.url
         );

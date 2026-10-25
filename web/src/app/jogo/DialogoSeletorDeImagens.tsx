@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { call, on } from "../../bridge";
 import type { ArtCandidateDto } from "../../bridge/generated/ArtCandidateDto";
 import type { ArtKindDto } from "../../bridge/generated/ArtKindDto";
@@ -43,7 +43,12 @@ function candidateToOption(c: ArtCandidateDto): OpcaoDeImagem {
   return item;
 }
 
-export function DialogoSeletorDeImagens({
+export function DialogoSeletorDeImagens(props: DialogoSeletorDeImagensProps) {
+  if (!props.open) return null;
+  return <SeletorAberto key={props.gameId} {...props} />;
+}
+
+function SeletorAberto({
   gameId,
   gameTitle,
   open,
@@ -55,6 +60,27 @@ export function DialogoSeletorDeImagens({
   const [optionsByType, setOptionsByType] = useState<Partial<Record<TipoDeImagem, readonly OpcaoDeImagem[]>>>({});
   const [loadingByType, setLoadingByType] = useState<Partial<Record<TipoDeImagem, boolean>>>({});
   const [emptyByType, setEmptyByType] = useState<Partial<Record<TipoDeImagem, boolean>>>({});
+  const choosing = useRef(false);
+
+  useEffect(() => () => {
+    void call("art.close", { gameId }).catch(console.error);
+  }, [gameId]);
+
+  useEffect(() => {
+    const stopReady = on("art.choose.ready", (payload) => {
+      if (payload.gameId !== gameId || !choosing.current) return;
+      choosing.current = false;
+      onImageChanged?.();
+      onClose();
+    });
+    const stopFailed = on("art.choose.failed", (payload) => {
+      if (payload.gameId !== gameId || !choosing.current) return;
+      choosing.current = false;
+      console.error("erro ao escolher arte", payload.error);
+      setOptionsByType({});
+    });
+    return () => { stopReady(); stopFailed(); };
+  }, [gameId, onClose, onImageChanged]);
 
   useEffect(() => {
     if (!open) return;
@@ -118,20 +144,23 @@ export function DialogoSeletorDeImagens({
   };
 
   const handleChoose = async (option: OpcaoDeImagem, type: TipoDeImagem) => {
+    if (choosing.current) return;
+    choosing.current = true;
     try {
       await call("art.choose", {
         gameId,
         kind: TIPO_TO_KIND[type],
         candidateId: option.id,
       });
-      onImageChanged?.();
-      onClose();
     } catch (err) {
+      choosing.current = false;
+      setOptionsByType({});
       console.error("erro ao escolher arte", err);
     }
   };
 
   const handleResetToOriginal = async () => {
+    if (choosing.current) return;
     try {
       await call("art.reset", {
         gameId,

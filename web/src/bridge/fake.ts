@@ -2214,6 +2214,7 @@ function setFakeSourceId(payload: unknown): GameSourceIds {
       throw new FakeMessageError("bad_request", "escolha inválida");
   }
   fakePins.set(game.id, pins);
+  fakeArtClose({ gameId: game.id });
   emitFakeEvent("library.changed", undefined, 100);
   emitFakeEvent("art.changed", { gameId: game.id }, 200);
   return fakeSourceIds(game);
@@ -3187,6 +3188,12 @@ Object.assign(SAMPLE_CATALOGS["en-US"], {
 
 // ---- Seletor de imagens e Revisar capas (WEB-12d) ----
 const fakeChosenArt = new Map<string, string>();
+const fakeArtVersions = new Map<string, number>();
+
+function fakeArtClose(payload: unknown) {
+  const { gameId } = payload as GameRequest;
+  fakeArtVersions.set(gameId, (fakeArtVersions.get(gameId) ?? 0) + 1);
+}
 
 function createFakeCandidateSvg(title: string, kind: string, label: string, color: string, w = 600, h = 900): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="${color}"/><circle cx="${w / 2}" cy="${h / 2 - 40}" r="${Math.min(w, h) / 4}" fill="white" fill-opacity="0.12"/><text x="${w / 2}" y="${h / 2 + 10}" fill="white" font-size="${Math.round(w / 14)}" font-weight="bold" font-family="sans-serif" text-anchor="middle">${title}</text><text x="${w / 2}" y="${h / 2 + 50}" fill="white" fill-opacity="0.7" font-size="${Math.round(w / 26)}" font-family="sans-serif" text-anchor="middle">${kind} · ${label}</text></svg>`;
@@ -3195,6 +3202,7 @@ function createFakeCandidateSvg(title: string, kind: string, label: string, colo
 
 function fakeArtCandidates(payload: unknown): ArtCandidatesView {
   const { gameId, kind } = payload as ArtCandidatesRequest;
+  const version = fakeArtVersions.get(gameId) ?? 0;
   const game = games.find((g) => g.id === gameId);
   const title = game?.title ?? gameId;
   const chosen = fakeChosenArt.get(`${gameId}:${kind}`);
@@ -3242,15 +3250,18 @@ function fakeArtCandidates(payload: unknown): ArtCandidatesView {
     },
   ];
 
-  emitFakeEvent(
-    "art.candidates.ready",
-    {
+  setTimeout(() => {
+    if ((fakeArtVersions.get(gameId) ?? 0) !== version) return;
+    const selected = fakeChosenArt.get(`${gameId}:${kind}`);
+    deliverEvent("art.candidates.ready", {
       gameId,
       kind,
-      candidates,
-    } satisfies ArtCandidatesReady,
-    50,
-  );
+      candidates: candidates.map((candidate, index) => ({
+        ...candidate,
+        current: selected ? candidate.id === selected : index === 0,
+      })),
+    } satisfies ArtCandidatesReady);
+  }, 50);
 
   return {
     candidates: [],
@@ -3260,9 +3271,13 @@ function fakeArtCandidates(payload: unknown): ArtCandidatesView {
 
 function fakeArtChoose(payload: unknown) {
   const { gameId, kind, candidateId } = payload as ArtChooseRequest;
-  fakeChosenArt.set(`${gameId}:${kind}`, candidateId);
-  deliverEvent("art.changed", { gameId });
-  deliverEvent("library.changed");
+  fakeArtClose({ gameId });
+  setTimeout(() => {
+    fakeChosenArt.set(`${gameId}:${kind}`, candidateId);
+    deliverEvent("art.changed", { gameId });
+    deliverEvent("art.choose.ready", { gameId });
+    deliverEvent("library.changed");
+  }, 50);
 }
 
 function fakeArtReset(payload: unknown) {
@@ -3311,10 +3326,24 @@ let fakeReviewItems: ArtReviewItem[] = [
   },
 ];
 
+let fakeReviewVersion = 0;
+
 function fakeArtReview(): ArtReviewView {
+  const requestId = ++fakeReviewVersion;
+  setTimeout(() => {
+    if (requestId !== fakeReviewVersion) return;
+    deliverEvent("art.review.ready", {
+    total: games.length,
+    items: [...fakeReviewItems],
+    loading: false,
+    requestId,
+    });
+  }, 50);
   return {
     total: games.length,
     items: [...fakeReviewItems],
+    loading: true,
+    requestId,
   };
 }
 
@@ -3330,6 +3359,8 @@ Object.assign(defaults, {
   "art.reset": fakeArtReset,
   "art.review": fakeArtReview,
   "art.review.accept": fakeArtReviewAccept,
+  "art.close": fakeArtClose,
+  "art.review.close": () => { fakeReviewVersion++; },
 });
 
 Object.assign(SAMPLE_CATALOGS["pt-BR"], {

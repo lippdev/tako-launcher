@@ -22,6 +22,27 @@ mod link_tests {
     use super::*;
 
     #[test]
+    fn supervisor_consumes_identified_activation_requests_from_the_web_launcher() {
+        let dir =
+            std::env::temp_dir().join(format!("tako-activation-queue-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let supervisor =
+            Supervisor::new(DataPaths::at(&dir), Platform::simulated(), &["tako".into()]);
+        tako_core::links::request_activation(&dir, Some("tako://settings")).unwrap();
+        tako_core::links::request_activation(&dir, Some("tako://play/steam:570")).unwrap();
+        let requests = [
+            supervisor.activation_requested(),
+            supervisor.activation_requested(),
+        ];
+        assert!(requests.contains(&Some("tako://settings".into())));
+        assert!(requests.contains(&Some("tako://play/steam:570".into())));
+        assert!(supervisor.activation_requested().is_none());
+        drop(supervisor);
+        std::fs::remove_file(dir.join("tako.db")).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
+    }
+
+    #[test]
     fn activation_is_bounded_validated_and_consumed_once() {
         let dir = std::env::temp_dir().join(format!("tako-links-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -181,23 +202,16 @@ impl Supervisor {
         }
     }
 
-    /// Outro Tako foi aberto (ver `ACTIVATE_FILE`)? Consome o pedido.
+    /// Consome os mesmos pedidos identificados usados pelo núcleo web.
     fn activation_requested(&self) -> Option<String> {
-        use std::io::Read;
-        let path = self.paths.root.join(crate::ACTIVATE_FILE);
-        let file = std::fs::File::open(&path).ok()?;
-        let mut url = String::new();
-        let read = file
-            .take(tako_core::links::MAX_URL as u64 + 1)
-            .read_to_string(&mut url);
-        if let Err(e) = std::fs::remove_file(path) {
-            tracing::warn!("consumir ativação: {e}");
-        }
-        if read.is_err() || (!url.is_empty() && tako_core::links::parse(&url).is_none()) {
-            tracing::warn!("pedido de ativação inválido ignorado");
-            return None;
-        }
-        Some(url)
+        use tako_core::links::{Activation, Link, take_activation};
+        Some(match take_activation(&self.paths.root)? {
+            Activation::Raise => String::new(),
+            Activation::Open(Link::Screen(route)) => format!("tako://{}", route.replace(':', "/")),
+            Activation::Open(Link::Game { id, play }) => {
+                format!("tako://{}/{id}", if play { "play" } else { "game" })
+            }
+        })
     }
 
     fn now(&self) -> Duration {

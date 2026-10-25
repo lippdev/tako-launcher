@@ -143,6 +143,9 @@ impl AppService {
 
     pub fn handle(&mut self, call: Call) -> Result<Reply, BridgeError> {
         self.poll();
+        if let Some(result) = self.handle_async_art(&call) {
+            return result;
+        }
         match call {
             call @ (Call::ControlCenterState | Call::ControlCenterSet(_)) => {
                 self.handle_control_center(call)

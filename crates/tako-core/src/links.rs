@@ -78,7 +78,7 @@ pub fn argument(args: &[String]) -> Option<&str> {
         })
 }
 
-/// Pedido do segundo Tako ao que já está aberto: um arquivo na pasta de dados, que o primeiro lê e apaga. Vale para o
+/// Prefixo dos pedidos do segundo Tako ao que já está aberto. Vale para o
 /// Tako Slint (o supervisor) e para o núcleo da versão web; sem porta de rede, só o disco do próprio usuário.
 pub const ACTIVATE_FILE: &str = "tako.activate";
 
@@ -94,9 +94,14 @@ pub enum Activation {
 /// Deixa o pedido para o Tako aberto atender. `url` é o link que o segundo Tako recebeu, se houver. Escreve num
 /// arquivo temporário e troca de nome, para o outro lado nunca ler um link pela metade.
 pub fn request_activation(root: &std::path::Path, url: Option<&str>) -> std::io::Result<()> {
-    let temp = root.join(format!("{ACTIVATE_FILE}.{}", std::process::id()));
+    let name = format!(
+        "{ACTIVATE_FILE}.{}.{}",
+        std::process::id(),
+        uuid::Uuid::new_v4()
+    );
+    let temp = root.join(format!("{name}.tmp"));
     std::fs::write(&temp, url.unwrap_or_default())?;
-    std::fs::rename(&temp, root.join(ACTIVATE_FILE)).inspect_err(|_| {
+    std::fs::rename(&temp, root.join(name)).inspect_err(|_| {
         let _ = std::fs::remove_file(&temp);
     })
 }
@@ -104,15 +109,52 @@ pub fn request_activation(root: &std::path::Path, url: Option<&str>) -> std::io:
 /// Atende o pedido do segundo Tako, se houver, e o consome. Texto grande demais ou que não é um link do Tako é
 /// descartado (o arquivo é de fora do processo, como qualquer entrada externa).
 pub fn take_activation(root: &std::path::Path) -> Option<Activation> {
+    take_activation_with(root, || {})
+}
+
+fn take_activation_with(root: &std::path::Path, after_claim: impl FnOnce()) -> Option<Activation> {
+    let mut after_claim = Some(after_claim);
+    let mut paths: Vec<_> = std::fs::read_dir(root)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            if !entry.file_type().is_ok_and(|kind| kind.is_file()) {
+                return false;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            name == ACTIVATE_FILE
+                || (name.starts_with(&format!("{ACTIVATE_FILE}."))
+                    && !name.ends_with(".tmp")
+                    && !name.ends_with(".claimed"))
+        })
+        .map(|entry| entry.path())
+        .collect();
+    paths.sort();
+    for path in paths {
+        let claimed = root.join(format!("{ACTIVATE_FILE}.{}.claimed", uuid::Uuid::new_v4()));
+        // A publicação seguinte nunca tem o nome do arquivo que este consumidor remove.
+        if std::fs::rename(&path, &claimed).is_err() {
+            continue;
+        }
+        if let Some(hook) = after_claim.take() {
+            hook();
+        }
+        let request = read_activation(&claimed);
+        let _ = std::fs::remove_file(claimed);
+        if request.is_some() {
+            return request;
+        }
+    }
+    None
+}
+
+fn read_activation(path: &std::path::Path) -> Option<Activation> {
     use std::io::Read;
-    let path = root.join(ACTIVATE_FILE);
-    let file = std::fs::File::open(&path).ok()?;
+    let file = std::fs::File::open(path).ok()?;
     let mut url = String::new();
     let read = file.take(MAX_URL as u64 + 1).read_to_string(&mut url);
-    if let Err(e) = std::fs::remove_file(path) {
-        tracing::warn!("consumir ativação: {e}");
-    }
-    if read.is_err() {
+    if read.is_err() || url.len() > MAX_URL {
         tracing::warn!("pedido de ativação inválido ignorado");
         return None;
     }
@@ -131,6 +173,38 @@ pub fn take_activation(root: &std::path::Path) -> Option<Activation> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn activation_keeps_requests_published_before_the_owner_starts() {
+        let dir = tempfile::tempdir().unwrap();
+        request_activation(dir.path(), Some("tako://settings")).unwrap();
+        request_activation(dir.path(), Some("tako://home")).unwrap();
+        let mut found = Vec::new();
+        while let Some(request) = take_activation(dir.path()) {
+            found.push(request);
+        }
+        assert_eq!(found.len(), 2);
+        assert!(found.contains(&Activation::Open(Link::Screen("settings"))));
+        assert!(found.contains(&Activation::Open(Link::Screen("home"))));
+    }
+
+    #[test]
+    fn activation_published_during_consumption_is_not_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        // Um produtor antigo ainda pode usar o nome compartilhado; a posse por rename também o protege.
+        std::fs::write(dir.path().join(ACTIVATE_FILE), "tako://settings").unwrap();
+        assert_eq!(
+            take_activation_with(dir.path(), || {
+                std::fs::write(dir.path().join(ACTIVATE_FILE), "tako://home").unwrap();
+            }),
+            Some(Activation::Open(Link::Screen("settings")))
+        );
+        assert_eq!(
+            take_activation(dir.path()),
+            Some(Activation::Open(Link::Screen("home")))
+        );
+        assert_eq!(take_activation(dir.path()), None);
+    }
 
     #[test]
     fn known_screens_and_encoded_game_ids() {
@@ -191,13 +265,12 @@ mod tests {
                 play: true
             }))
         );
-        // Outro pedido por cima do anterior: vale o último.
+        // Publicações independentes sobrevivem até serem consumidas.
         request_activation(dir.path(), Some("tako://settings")).unwrap();
         request_activation(dir.path(), Some("tako://home")).unwrap();
-        assert_eq!(
-            take_activation(dir.path()),
-            Some(Activation::Open(Link::Screen("home")))
-        );
+        let requests = [take_activation(dir.path()), take_activation(dir.path())];
+        assert!(requests.contains(&Some(Activation::Open(Link::Screen("home")))));
+        assert!(requests.contains(&Some(Activation::Open(Link::Screen("settings")))));
         for url in [
             "https://example.com".to_owned(),
             "tako://game/../x".to_owned(),

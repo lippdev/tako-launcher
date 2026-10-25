@@ -19,6 +19,13 @@ pub struct GameArt {
 }
 
 impl GameArt {
+    /// Índices temporários separados dos jogos da biblioteca.
+    pub fn candidates(&self) -> Self {
+        Self {
+            root: self.root.clone(),
+            index: self.index.join("candidates"),
+        }
+    }
     pub fn new(paths: &DataPaths) -> Self {
         Self {
             root: paths.art_cache(),
@@ -42,6 +49,13 @@ impl GameArt {
 
     /// Só lê um índice pequeno e um arquivo já no cache. Nenhum id ou conteúdo do índice vira caminho livre.
     pub fn resolve(&self, game_id: &str, kind: ArtKind) -> Option<PathBuf> {
+        if let Some(token) = game_id.strip_prefix("\0candidate:") {
+            return self.candidates().resolve_index(token, kind);
+        }
+        self.resolve_index(game_id, kind)
+    }
+
+    fn resolve_index(&self, game_id: &str, kind: ArtKind) -> Option<PathBuf> {
         let index = confined_file(&self.index, &self.index_path(game_id, kind))?;
         let bytes = read_limited(&index, 1024)?;
         let name: String = serde_json::from_slice(&bytes).ok()?;
@@ -80,7 +94,8 @@ fn confined_file(root: &Path, file: &Path) -> Option<PathBuf> {
     (file.starts_with(root) && file.is_file()).then_some(file)
 }
 
-fn read_limited(path: &Path, limit: u64) -> Option<Vec<u8>> {
+/// Lê no máximo `limit + 1` bytes e rejeita o excedente antes de importar uma imagem local.
+pub fn read_limited(path: &Path, limit: u64) -> Option<Vec<u8>> {
     let mut bytes = Vec::new();
     std::fs::File::open(path)
         .ok()?
@@ -205,6 +220,28 @@ mod tests {
     use std::time::{Duration, Instant};
 
     const PNG: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+    #[test]
+    fn candidate_namespace_cannot_overwrite_a_real_game_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = DataPaths::at(dir.path());
+        let art = GameArt::new(&paths);
+        let cache = cache(&paths, Arc::new(FakeHttp::new()));
+        let original = cache.import("original", PNG).unwrap();
+        let preview = cache.import("preview", b"\x89PNG\r\n\x1a\nother").unwrap();
+        art.publish("g-cand-0", ArtKind::Cover, &original).unwrap();
+        art.candidates()
+            .publish("g-cand-0", ArtKind::Cover, &preview)
+            .unwrap();
+        assert_eq!(
+            art.resolve("g-cand-0", ArtKind::Cover),
+            Some(original.canonicalize().unwrap())
+        );
+        assert_eq!(
+            art.candidates().resolve("g-cand-0", ArtKind::Cover),
+            Some(preview.canonicalize().unwrap())
+        );
+    }
 
     fn cache(paths: &DataPaths, http: Arc<FakeHttp>) -> Arc<ArtCache> {
         Arc::new(ArtCache::new(

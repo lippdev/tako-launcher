@@ -162,6 +162,8 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "art.review"
             | "art.review.accept"
             | "system.pick"
+            | "art.close"
+            | "art.review.close"
     ) {
         return Err((
             header.id,
@@ -194,6 +196,9 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "art.review"
     ) && value.get("payload").is_some()
     {
+        return Err((id, bad_request("chamada não aceita argumentos".into())));
+    }
+    if header.name == "art.review.close" && value.get("payload").is_some() {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
     }
     if header.name == "control_center.state" && value.get("payload").is_some() {
@@ -665,6 +670,15 @@ pub enum Call {
         #[ts(as = "SystemPickRequest")]
         SystemPickRequest,
     ),
+    /// Fecha o seletor e libera seus previews, inclusive buscas ainda em andamento.
+    #[serde(rename = "art.close")]
+    ArtClose(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
+    #[serde(rename = "art.review.close")]
+    ArtReviewClose,
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -820,6 +834,10 @@ pub enum Reply {
     ArtReviewAccept,
     #[serde(rename = "system.pick")]
     SystemPick(PickResponse),
+    #[serde(rename = "art.close")]
+    ArtClose,
+    #[serde(rename = "art.review.close")]
+    ArtReviewClose,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -894,6 +912,12 @@ pub enum Event {
     /// Resultado de uma escolha de arquivo ou pasta (`system.pick`). `path` é `null` quando o usuário cancela.
     #[serde(rename = "system.picked")]
     SystemPicked(SystemPicked),
+    #[serde(rename = "art.review.ready")]
+    ArtReviewReady(ArtReviewView),
+    #[serde(rename = "art.choose.failed")]
+    ArtChooseFailed(ArtChooseFailure),
+    #[serde(rename = "art.choose.ready")]
+    ArtChooseReady(GameRequest),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -2563,6 +2587,17 @@ pub struct ArtResetRequest {
 pub struct ArtReviewView {
     pub total: usize,
     pub items: Vec<ArtReviewItem>,
+    pub loading: bool,
+    #[ts(type = "number")]
+    pub request_id: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtChooseFailure {
+    pub game_id: String,
+    pub error: BridgeError,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]

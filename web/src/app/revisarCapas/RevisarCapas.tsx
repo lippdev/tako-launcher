@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { call } from "../../bridge";
+import { call, on } from "../../bridge";
 import type { ArtReviewItem } from "../../bridge/generated/ArtReviewItem";
+import type { ArtReviewView } from "../../bridge/generated/ArtReviewView";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { PilulaDaLoja } from "../../components/PilulaDaLoja/PilulaDaLoja";
 import { DialogoSeletorDeImagens } from "../jogo/DialogoSeletorDeImagens";
@@ -29,12 +30,24 @@ export function RevisarCapas({
 
   useEffect(() => {
     let cancelled = false;
+    let requestId: number | undefined;
+    let earlyView: ArtReviewView | undefined;
+    const apply = (view: ArtReviewView) => {
+      if (cancelled || view.requestId !== requestId) return;
+      setTotal(view.total);
+      setItems(view.items);
+      setLoading(view.loading);
+    };
+    const stop = on("art.review.ready", (view) => {
+      if (requestId === undefined) earlyView = view;
+      else apply(view);
+    });
     call("art.review")
       .then((view) => {
         if (!cancelled) {
-          setTotal(view.total);
-          setItems(view.items);
-          setLoading(false);
+          requestId = view.requestId;
+          apply(view);
+          if (earlyView) apply(earlyView);
         }
       })
       .catch((err: unknown) => {
@@ -46,6 +59,8 @@ export function RevisarCapas({
 
     return () => {
       cancelled = true;
+      stop();
+      void call("art.review.close").catch(console.error);
     };
   }, []);
 

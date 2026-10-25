@@ -62,8 +62,16 @@ fn init_logs(paths: &DataPaths, role: &str) {
 /// Definida no Tako reaberto por ele mesmo (saída do modo seguro): espera o anterior soltar a trava.
 pub const RESTART_ENV: &str = "TAKO_RESTARTED";
 
-/// Pedido do segundo Tako ao que já está aberto (o supervisor, ou o núcleo web, apaga ao atender).
+/// Prefixo dos pedidos ao Tako aberto, consumidos pelo supervisor ou pelo núcleo web.
 pub const ACTIVATE_FILE: &str = tako_core::links::ACTIVATE_FILE;
+
+#[cfg(any(feature = "web", test))]
+fn queue_startup_activation(root: &std::path::Path, url: Option<&str>) -> std::io::Result<()> {
+    match url {
+        Some(url) => tako_core::links::request_activation(root, Some(url)),
+        None => Ok(()),
+    }
+}
 
 /// Um link `tako://` só chega ao `--web` na forma que o sistema usa (`tako --web --open-url <url>` ou
 /// `tako --web <url>`) e válido: uma URL do navegador não pode injetar opções como `--data-dir` pelas aspas da linha
@@ -155,15 +163,10 @@ fn main() {
                 return;
             }
         };
-        // Com o trinco na mão, um pedido antigo ficou sem ninguém para atender: some. Tako fechado e aberto por um
-        // link: o link vai para o próprio núcleo, que o atende ao abrir (mesmo caminho do segundo Tako).
+        // Os pedidos já publicados ficam para consumo pelo núcleo, inclusive os que chegaram após o trinco.
         #[cfg(feature = "web")]
         {
-            let _ = std::fs::remove_file(paths.root.join(ACTIVATE_FILE));
-            if link_url.is_some()
-                && let Err(e) =
-                    tako_core::links::request_activation(&paths.root, link_url.as_deref())
-            {
+            if let Err(e) = queue_startup_activation(&paths.root, link_url.as_deref()) {
                 tracing::warn!("link de abertura: {e}");
             }
         }
@@ -241,10 +244,7 @@ fn main() {
         init_logs(&paths, "supervisor");
         let Some(_lock) = single_instance(&paths) else {
             tracing::info!("o Tako já está aberto; pedindo para ele vir para a frente");
-            if let Err(e) = std::fs::write(
-                paths.root.join(ACTIVATE_FILE),
-                link_url.as_deref().unwrap_or_default(),
-            ) {
+            if let Err(e) = tako_core::links::request_activation(&paths.root, link_url.as_deref()) {
                 tracing::warn!("pedido de ativação: {e}");
             }
             return;
@@ -263,10 +263,9 @@ fn main() {
                 // shortcut: sem supervisor (desenvolvimento, --no-supervisor) ninguém atende o pedido de vir para
                 // a frente; só a versão publicada (com supervisor) ativa a janela aberta.
                 tracing::info!("o Tako já está aberto");
-                if let Err(e) = std::fs::write(
-                    paths.root.join(ACTIVATE_FILE),
-                    link_url.as_deref().unwrap_or_default(),
-                ) {
+                if let Err(e) =
+                    tako_core::links::request_activation(&paths.root, link_url.as_deref())
+                {
                     tracing::warn!("pedido de ativação: {e}");
                 }
                 return;
@@ -412,6 +411,28 @@ fn theme_check(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::web_link_allowed;
+
+    #[test]
+    fn startup_preserves_the_request_published_after_the_lock()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use tako_core::links::{Activation, Link, request_activation, take_activation};
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("tako-startup-{}-{unique}", std::process::id()));
+        std::fs::create_dir(&root)?;
+        // A segunda instância publicou logo depois de a primeira adquirir o trinco.
+        request_activation(&root, Some("tako://settings"))?;
+        super::queue_startup_activation(&root, None)?;
+        super::queue_startup_activation(&root, Some("tako://home"))?;
+        let requests = [take_activation(&root), take_activation(&root)];
+        assert!(requests.contains(&Some(Activation::Open(Link::Screen("settings")))));
+        assert!(requests.contains(&Some(Activation::Open(Link::Screen("home")))));
+        assert_eq!(take_activation(&root), None);
+        std::fs::remove_dir(root)?;
+        Ok(())
+    }
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|a| (*a).to_owned()).collect()
