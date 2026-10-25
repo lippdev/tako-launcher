@@ -1,0 +1,156 @@
+/* AssistenteInicial (design/desktop/components/AssistenteInicial): primeiros passos ao criar perfil novo */
+
+.root {
+  /* Largura e preenchimento conforme o diálogo de 560px na prévia */
+  --assistente-largura: 560px;
+  --assistente-padding: 22px;
+  --assistente-passos-gap: 8px;
+  --assistente-passos-espaco-inferior: 16px;
+  --assistente-divisor-altura: 1px;
+  --assistente-divisor-largura-minima: 12px;
+  --assistente-fonte-passos: 12.5px;
+  --assistente-fonte-kicker: 11px;
+  --assistente-fonte-titulo: 22px;
+  --assistente-fonte-descricao: 13.5px;
+  --assistente-fonte-pular: 13px;
+  --assistente-margem-titulo: 6px;
+  --assistente-margem-descricao: 14px;
+  --assistente-margem-acoes: 20px;
+  --assistente-acoes-gap: 10px;
+}
+
+/* Oculta visualmente o cabeçalho padrão do Dialogo para renderizar os passos e títulos customizados */
+.dialogo > header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dialogo {
+  --dialogo-largura: var(--assistente-largura);
+}
+
+.box {
+  width: min(var(--assistente-largura), 100%);
+  padding: var(--assistente-padding);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-hero);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-layer);
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: var(--assistente-passos-gap);
+  margin: 0 0 var(--assistente-passos-espaco-inferior);
+  padding: 0;
+  list-style: none;
+  font-size: var(--assistente-fonte-passos);
+  color: var(--text-muted);
+}
+
+.stepItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.stepCompleted {
+  color: var(--text-muted);
+}
+
+.checkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepCurrent {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stepText {
+  white-space: nowrap;
+}
+
+.stepDivider {
+  flex: 1;
+  min-width: var(--assistente-divisor-largura-minima);
+  height: var(--assistente-divisor-altura);
+  background: var(--line-strong);
+  list-style: none;
+}
+
+.kicker {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: var(--assistente-fonte-kicker);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.title {
+  margin: var(--assistente-margem-titulo) 0;
+  font-family: var(--font-heading);
+  font-size: var(--assistente-fonte-titulo);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.description {
+  margin: 0 0 var(--assistente-margem-descricao);
+  font-size: var(--assistente-fonte-descricao);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--assistente-acoes-gap);
+  margin-top: var(--assistente-margem-acoes);
+}
+
+.skipButton {
+  margin: 0;
+  margin-right: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--assistente-fonte-pular);
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--tempo-hover) var(--curva-estado);
+}
+
+.skipButton:hover {
+  color: var(--text);
+}
