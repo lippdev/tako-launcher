@@ -34,7 +34,7 @@ export function TelaOnboarding({
           <i
             key={i}
             className={styles["muralCard"]}
-            style={coverSrc ? { backgroundImage: `url(${coverSrc})` } : undefined}
+            style={coverSrc ? { backgroundImage: `url(${JSON.stringify(coverSrc)})` } : undefined}
           />
         ))}
       </div>

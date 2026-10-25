@@ -5,6 +5,10 @@ import { useSavedAppearance } from "../settings/useSavedAppearance";
 import { SCAN_LIMIT_MS, decideAbertura, remainingHold, type Abertura as Tipo, type ScanProgress } from "./model";
 import { PrimeiraLeitura } from "./PrimeiraLeitura";
 import styles from "./Abertura.module.css";
+import { PrimeiraVez } from "../primeiraVez/PrimeiraVez";
+import { decideFirstRun, finishChoice, type Settings } from "../primeiraVez/model";
+import { onboardingStrings } from "../strings";
+import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 
 const TICK_MS = 50;
 
@@ -25,6 +29,9 @@ export function Abertura({ children }: { children: ReactNode }) {
   const [kind, setKind] = useState<Tipo | null>(null);
   const [scan, setScan] = useState<ScanProgress>(noScan);
   const [reading, setReading] = useState(true);
+  const [onboarding, setOnboarding] = useState<Settings | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
   const scanRef = useRef(scan);
 
   useEffect(() => {
@@ -45,22 +52,31 @@ export function Abertura({ children }: { children: ReactNode }) {
         setKind("nenhuma");
         return;
       }
-      const [page, sources] = await Promise.all([
-        call("library.list", { limit: 1 }).catch(() => ({ total: 0 })),
-        call("library.sources").catch(() => null),
-      ]);
-      if (cancelled) return;
-      const progress = sources
-        ? { scanning: sources.scanning, completed: sources.completed, total: sources.total }
-        : noScan;
-      setScan(progress);
-      setKind(decideAbertura({ hasSavedState: false, libraryCount: page.total, scanning: progress.scanning }));
+      try {
+        // Uma falha de leitura não pode virar "instalação nova" nem concluir o assistente por engano.
+        const [page, sources, settings] = await Promise.all([
+          call("library.list", { limit: 1 }),
+          call("library.sources"),
+          call("settings.get", {}),
+        ]);
+        if (cancelled) return;
+        const decision = decideFirstRun(settings.values, page.total, false);
+        if (decision === "show") setOnboarding(settings.values);
+        if (decision === "complete-existing") await call("settings.set", finishChoice());
+        if (cancelled) return;
+        const progress = { scanning: sources.scanning, completed: sources.completed, total: sources.total };
+        setScan(progress);
+        setKind(decideAbertura({ hasSavedState: false, libraryCount: page.total, scanning: progress.scanning }));
+      } catch {
+        if (!cancelled) setFailed(true);
+        return;
+      }
     })();
     return () => {
       cancelled = true;
       off();
     };
-  }, []);
+  }, [retry]);
 
   const decided = kind !== null && appearanceReady;
 
@@ -88,8 +104,13 @@ export function Abertura({ children }: { children: ReactNode }) {
     };
   }, [showReading]);
 
+  if (failed) return <div className={styles["fundo"]} role="alert">
+    <p>{onboardingStrings.loadError}</p>
+    <BotaoDesktop onClick={() => { setFailed(false); setRetry((n) => n + 1); }}>{onboardingStrings.retry}</BotaoDesktop>
+  </div>;
   if (!decided) return <div className={styles["fundo"]} />;
   if (showReading) return <PrimeiraLeitura scan={scan} />;
+  if (onboarding) return <PrimeiraVez initialSettings={onboarding} onFinish={() => { setOnboarding(null); setKind("nenhuma"); }} />;
   if (kind === "nenhuma") return <>{children}</>;
   return <EntradaDoApp fixed>{children}</EntradaDoApp>;
 }

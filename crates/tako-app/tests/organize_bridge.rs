@@ -733,3 +733,92 @@ fn downloads_settings_can_be_turned_on_through_the_bridge() {
     );
     assert_eq!(bad["error"]["code"], "bad_request", "{bad}");
 }
+
+#[test]
+fn onboarding_igdb_choice_preserves_credentials_and_never_exposes_them() {
+    use std::sync::Arc;
+    use tako_platform::secrets::{MemorySecrets, Secrets};
+    let dir = tempfile::tempdir().unwrap();
+    let secrets = Arc::new(MemorySecrets::default());
+    let original =
+        json!({"enabled":false,"client_id":"CLIENT_SENTINEL","client_secret":"SECRET_SENTINEL"});
+    secrets.set("metadata.igdb", &original.to_string()).unwrap();
+    let mut platform = Platform::simulated();
+    platform.secrets = secrets.clone();
+    let core =
+        Core::open_with_sources(DataPaths::at(dir.path()), platform, false, Vec::new()).unwrap();
+    let mut app = AppService::with_core("test", core);
+    for enabled in [true, false] {
+        let response = wire(
+            &mut app,
+            "settings.set",
+            Some(json!({"key":"metadata.igdb","value":enabled.to_string()})),
+        );
+        assert_eq!(response["ok"], true, "{response}");
+        let stored: Value = serde_json::from_str(&secrets.get("metadata.igdb").unwrap()).unwrap();
+        assert_eq!(stored["enabled"], enabled);
+        assert_eq!(stored["client_id"], original["client_id"]);
+        assert_eq!(stored["client_secret"], original["client_secret"]);
+        let choice = ok(
+            &mut app,
+            "settings.get",
+            Some(json!({"keys":["metadata.igdb"]})),
+        );
+        assert_eq!(
+            choice,
+            json!({"values":{"metadata.igdb":enabled.to_string()}})
+        );
+        for data in [
+            response,
+            choice,
+            ok(&mut app, "settings.get", Some(json!({}))),
+        ] {
+            assert!(!data.to_string().contains("SENTINEL"));
+        }
+    }
+    err(
+        &mut app,
+        "settings.set",
+        json!({"key":"metadata.igdb","value":original.to_string()}),
+        "bad_request",
+    );
+    let sqlite = SettingsStore::new(TakoDatabase::new(DataPaths::at(dir.path()).database()));
+    assert!(!sqlite.load_all().unwrap().contains_key("metadata.igdb"));
+}
+
+#[test]
+fn simulated_onboarding_never_touches_the_vault() {
+    use std::sync::Arc;
+    use tako_platform::secrets::Secrets;
+    struct Untouchable;
+    impl Secrets for Untouchable {
+        fn get(&self, _: &str) -> Option<String> {
+            panic!("cofre lido na demonstração")
+        }
+        fn set(&self, _: &str, _: &str) -> Result<(), String> {
+            panic!("cofre gravado na demonstração")
+        }
+        fn delete(&self, _: &str) -> Result<(), String> {
+            panic!("cofre apagado na demonstração")
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let mut platform = Platform::simulated();
+    platform.secrets = Arc::new(Untouchable);
+    let core =
+        Core::open_with_sources(DataPaths::at(dir.path()), platform, true, Vec::new()).unwrap();
+    let mut app = AppService::with_core("test", core);
+    for value in ["true", "false"] {
+        ok(
+            &mut app,
+            "settings.set",
+            Some(json!({"key":"metadata.igdb","value":value})),
+        );
+        let choice = ok(
+            &mut app,
+            "settings.get",
+            Some(json!({"keys":["metadata.igdb"]})),
+        );
+        assert_eq!(choice["values"]["metadata.igdb"], value);
+    }
+}

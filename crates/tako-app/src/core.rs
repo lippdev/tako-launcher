@@ -58,6 +58,7 @@ pub struct Core {
     pub(crate) art: crate::art::ArtState,
     /// Atualização do app (WEB-33): procurar, baixar, conferir e aplicar.
     pub(crate) updates: crate::updates::UpdateHub,
+    pub(crate) secrets: Option<Arc<dyn Secrets>>,
 }
 
 impl Core {
@@ -246,6 +247,7 @@ impl Core {
             simulate,
             art,
             updates: crate::updates::UpdateHub::new(paths.clone(), simulate),
+            secrets: (!simulate).then(|| Arc::clone(&platform.secrets)),
         };
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);

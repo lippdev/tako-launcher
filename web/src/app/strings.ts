@@ -4,6 +4,25 @@
 import type { ListaDeJogosLabels } from "../components/ListaDeJogos/ListaDeJogos";
 import type { ViewId } from "./uiState";
 
+/** Complementos do onboarding web; os textos dos passos vêm do catálogo `first_run`. */
+export const onboardingStrings = {
+  loading: "Lendo as lojas e os emuladores…",
+  loadError: "Não foi possível ler a configuração inicial.",
+  saveError: "Não foi possível salvar. Tente novamente.",
+  retry: "Tentar novamente",
+  enable: "Ligar",
+  disable: "Desligar",
+  toggleStore: (name: string) => `Ler jogos de ${name}`,
+  found: "Encontrado",
+  gameCount: (n: number) => `${String(n)} ${n === 1 ? "jogo" : "jogos"}`,
+  folderHelp: "Digite o caminho completo de uma pasta de ROMs que já existe neste PC.",
+  addFolder: "Adicionar pasta",
+  cancel: "Cancelar",
+  noGame: "Sem jogo para comparar",
+  igdbKeyNote: "Usa a chave da IGDB (Twitch) já salva no Tako. Se ainda não houver chave, a busca aguarda a configuração do provedor.",
+  fullscreenNote: "A escolha fica salva para abrir o Tako. O modo de tela cheia chegará à versão web em uma próxima atualização.",
+} as const;
+
 export const strings = {
   /** Título de cada vista (a vista vazia mostra só ele, por enquanto). */
   views: {

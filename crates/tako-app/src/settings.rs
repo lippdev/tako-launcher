@@ -1,6 +1,10 @@
 //! Preferências públicas da ponte. A lista positiva exclui inclusive segredos legados no SQLite.
 
 use crate::{Core, protocol::*};
+use tako_core::metadata::igdb::IgdbSettings;
+
+// A chave do Slint vive no cofre: a ponte só expõe a escolha, nunca o JSON com as credenciais.
+const IGDB_KEY: &str = "metadata.igdb";
 
 const BOOL_KEYS: &[&str] = &[
     "DynamicColor",
@@ -59,6 +63,7 @@ fn known(key: &str) -> bool {
                 | "ThemeMusicVolume"
                 | "desktop.view"
                 | "desktop.group_by"
+                | IGDB_KEY
         )
 }
 
@@ -68,16 +73,31 @@ pub(crate) fn get(core: &Core, request: SettingsGetRequest) -> Result<SettingsVa
     {
         return Err(crate::organize::bad("chaves de configuração inválidas"));
     }
-    Ok(SettingsValues {
-        values: core
-            .settings
-            .iter()
-            .filter(|(key, _)| {
-                known(key) && request.keys.as_ref().is_none_or(|keys| keys.contains(key))
-            })
-            .map(|(key, value)| (key.clone(), value.clone()))
-            .collect(),
-    })
+    let mut values = core
+        .settings
+        .iter()
+        .filter(|(key, _)| {
+            key.as_str() != IGDB_KEY
+                && known(key)
+                && request.keys.as_ref().is_none_or(|keys| keys.contains(key))
+        })
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    if request
+        .keys
+        .as_ref()
+        .is_some_and(|keys| keys.iter().any(|key| key == IGDB_KEY))
+    {
+        let enabled = match &core.secrets {
+            Some(secrets) => IgdbSettings::load(&Vault(secrets.as_ref())).enabled,
+            None => core
+                .settings
+                .get(IGDB_KEY)
+                .is_some_and(|value| value == "true"),
+        };
+        values.insert(IGDB_KEY.into(), enabled.to_string());
+    }
+    Ok(SettingsValues { values })
 }
 
 pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> {
@@ -86,6 +106,7 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
         && value.len() <= 4096
         && !value.contains('\0')
         && (!BOOL_KEYS.contains(&key.as_str()) || matches!(value.as_str(), "true" | "false"))
+        && (key != IGDB_KEY || matches!(value.as_str(), "true" | "false"))
         && (key != "Language" || tako_core::i18n::Lang::from_code(&value).is_some())
         && (key != "DesktopTitleLogo" || matches!(value.as_str(), "" | "logo" | "text"))
         && (key != "OpenIn" || matches!(value.as_str(), "desktop" | "big-picture"))
@@ -117,6 +138,23 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
     if !valid {
         return Err(crate::organize::bad("configuração inválida"));
     }
+    if key == IGDB_KEY {
+        if let Some(secrets) = &core.secrets {
+            let vault = Vault(secrets.as_ref());
+            let mut settings = IgdbSettings::load(&vault);
+            settings.enabled = value == "true";
+            settings.save(&vault).map_err(|_| {
+                BridgeError::new(
+                    ErrorCode::Internal,
+                    "não foi possível gravar a escolha da IGDB",
+                )
+            })?;
+        } else {
+            // Demonstração: só memória, sem SQLite nem cofre.
+            core.settings.insert(key, value);
+        }
+        return Ok(());
+    }
     save(core, &key, &value)?;
     if key == "Language"
         && let Some(lang) = tako_core::i18n::Lang::from_code(&value)
@@ -124,6 +162,18 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
         core.lang = lang;
     }
     Ok(())
+}
+
+struct Vault<'a>(&'a dyn tako_platform::secrets::Secrets);
+
+impl tako_core::metadata::SecretStore for Vault<'_> {
+    fn get(&self, key: &str) -> Option<String> {
+        self.0.get(key)
+    }
+
+    fn set(&self, key: &str, value: &str) -> Result<(), String> {
+        self.0.set(key, value)
+    }
 }
 
 pub(crate) fn save(core: &mut Core, key: &str, value: &str) -> Result<(), BridgeError> {

@@ -456,7 +456,9 @@ const BOOL_SETTINGS = new Set([
   "DeveloperOptions",
   "AskBigPictureWithController",
 ]);
-const SETTINGS_STORAGE = "tako.dev.settings";
+const firstRunDemo = typeof location !== "undefined" && new URLSearchParams(location.search).has("primeiraVez");
+// Cenário isolado: recarregar conserva a conclusão e não apaga as preferências da demo normal.
+const SETTINGS_STORAGE = firstRunDemo ? "tako.dev.first-run.settings" : "tako.dev.settings";
 
 const settings = new Map<string, string>(
   Object.entries(JSON.parse(sessionStorage.getItem(SETTINGS_STORAGE) ?? "{}") as Record<string, string>),
@@ -2514,7 +2516,7 @@ const SAMPLE_ROM_SYSTEMS: EmulatorsView["systems"] = [
   ["arcade", "Arcade"],
 ].map(([id, name]) => ({ id: id as string, name: name as string }));
 const MAX_ROM_FOLDERS = 256;
-const ROM_FOLDERS_STORAGE = "tako.dev.rom-folders";
+const ROM_FOLDERS_STORAGE = firstRunDemo ? "tako.dev.first-run.rom-folders" : "tako.dev.rom-folders";
 
 const romFolders: EmulatorsView["romFolders"] = JSON.parse(
   sessionStorage.getItem(ROM_FOLDERS_STORAGE) ?? "[]",
@@ -2534,6 +2536,7 @@ function romFoldersChanged() {
   sessionStorage.setItem(ROM_FOLDERS_STORAGE, JSON.stringify(romFolders));
   const emulatorStore = SAMPLE_STORES.find((sample) => sample.store === "emulators");
   if (emulatorStore) emulatorStore.found = romFolders.length * 12;
+  if (firstRunDemo) syncFirstRunRoms();
   scanSources();
 }
 
@@ -2781,3 +2784,181 @@ Object.assign(defaults, {
 });
 
 if (updateParam !== null) setTimeout(fakeUpdateCheck, 2500);
+
+// ---- Primeira execução (WEB-16): ?primeiraVez, com conclusão persistida na sessão. ----
+// Neste cenário as ROMs da leitura também entram na biblioteca: o resumo não pode somar jogos inexistentes.
+function syncFirstRunRoms() {
+  for (let index = games.length - 1; index >= 0; index--) {
+    if (games[index]?.id.startsWith("onboarding-rom:")) games.splice(index, 1);
+  }
+  const count = romFolders.length * 12;
+  const sample = games[0];
+  if (sample) for (let index = 0; index < count; index++) games.push({ ...sample, id: `onboarding-rom:${String(index)}`, title: `ROM ${String(index + 1)}`, store: "emulators", favorite: false, status: null, lastPlayedAt: null, playTimeSeconds: 0 });
+  const emulatorStore = SAMPLE_STORES.find((source) => source.store === "emulators");
+  if (emulatorStore) emulatorStore.found = count;
+}
+Object.assign(SAMPLE_CATALOGS["pt-BR"], {
+  "first_run.step": "PRIMEIROS PASSOS · {n} DE {total}",
+  "first_run.welcome": "Boas-vindas ao Tako",
+  "first_run.welcome_short": "Boas-vindas",
+  "first_run.welcome_text": "Três passos rápidos para deixar a biblioteca pronta. Tudo dá para mudar depois em Configurações. Primeiro, o idioma:",
+  "first_run.stores": "Lojas",
+  "first_run.stores_text": "O Tako lê os jogos instalados destas lojas. Desligue as que você não usa.",
+  "first_run.metadata": "Capas e descrições",
+  "first_run.metadata_text": "Estes serviços completam capas, logos e descrições. São opcionais: sem eles, o Tako usa o que as lojas oferecem.",
+  "first_run.next": "Continuar",
+  "first_run.skip": "Pular por agora",
+  "first_run.finish": "Concluir",
+  "first_run.done_toast": "Tudo pronto. Bom jogo!",
+  "first_run.count": "{n} de {total}",
+  "first_run.full.emulators": "Jogos de\nemuladores.",
+  "first_run.full.emulators_text": "O Tako acha os emuladores instalados e a pasta de ROMs, e abre cada jogo no emulador certo.",
+  "first_run.full.emulators_note": "O Tako não baixa ROMs nem BIOS: usa só os arquivos que já estão no seu PC.",
+  "first_run.full.emu_no_games": "Nenhum jogo achado ainda",
+  "first_run.full.roms": "Pasta de ROMs",
+  "first_run.full.roms_found": "{games} em {systems}",
+  "first_run.full.systems.one": "{n} sistema",
+  "first_run.full.systems.other": "{n} sistemas",
+  "first_run.full.roms_none": "Nenhuma pasta escolhida",
+  "first_run.full.roms_choose": "Escolher…",
+  "first_run.full.add_emulator": "Adicionar emulador…",
+  "first_run.full.no_emulators": "Não uso emuladores",
+  "first_run.full.welcome": "Boas-vindas ao Tako.",
+  "first_run.full.welcome_text": "Cinco passos rápidos para deixar a biblioteca pronta. Tudo dá para mudar depois em Configurações. Primeiro, o idioma:",
+  "first_run.full.welcome_note": "O idioma também fica em Configurações › Geral.",
+  "first_run.full.stores": "Vamos achar\nseus jogos.",
+  "first_run.full.stores_text": "O Tako olha as pastas das lojas instaladas neste PC e monta sua biblioteca. Nada sai do seu computador.",
+  "first_run.full.stores_note": "Dá para adicionar lojas e jogos à mão depois, em Configurações › Biblioteca e lojas.",
+  "first_run.full.stores_search": "Procurar jogos",
+  "first_run.full.stores_choose": "Escolher pastas…",
+  "first_run.full.stores_unchecked": "Ainda não procurado",
+  "first_run.full.stores_missing": "Não instalado",
+  "first_run.full.metadata": "Capas e\ndescrições.",
+  "first_run.full.metadata_text": "Capa, arte de fundo e descrição de cada jogo, buscadas na IGDB.",
+  "first_run.full.metadata_note": "Capas com dúvida vão para Configurações › Capas e metadados › Revisar capas. Dá para mudar a escolha lá também.",
+  "first_run.full.cover_none": "Sem capa",
+  "first_run.full.cover_with": "Com capa",
+  "first_run.full.igdb": "Buscar na IGDB",
+  "first_run.full.igdb_desc": "Envia só o nome de cada jogo ({games}).",
+  "first_run.full.igdb_key_desc": "Precisa da sua chave da IGDB (Twitch); ao escolher, abre o painel para colar.",
+  "first_run.full.igdb_offline": "Sem conexão agora; as capas chegam quando a internet voltar.",
+  "first_run.full.stores_only": "Usar só o que as lojas têm",
+  "first_run.full.stores_only_desc": "Nada sai do PC; jogos sem capa ficam com a cor do jogo e o nome.",
+  "first_run.full.mode": "Como você quer\nabrir o Tako?",
+  "first_run.full.mode_text": "Escolha o jeito de abrir. Os dois mostram os mesmos jogos.",
+  "first_run.full.mode_note": "F11 troca entre janela e tela cheia a qualquer hora. Com um controle conectado, \"Em tela cheia\" já vem marcado.",
+  "first_run.full.mode_window": "Em janela",
+  "first_run.full.mode_window_desc": "Para mouse e teclado. Fica junto das outras janelas do PC.",
+  "first_run.full.mode_full": "Em tela cheia",
+  "first_run.full.mode_full_desc": "Para controle e TV. Ocupa a tela toda, com tudo grande.",
+  "first_run.full.mode_window_hint": "Organizar, configurar, jogar na mesa",
+  "first_run.full.mode_full_hint": "Jogar no sofá, no notebook ligado na TV",
+  "first_run.full.back": "Voltar",
+  "first_run.full.ready": "{n} jogos\nprontos.",
+  "first_run.full.ready_none": "Nenhum jogo\nainda.",
+  "first_run.full.ready_text": "As capas que faltam vão chegando enquanto você navega.",
+  "first_run.full.ready_none_text": "Dá para adicionar um jogo à mão ou procurar de novo pela biblioteca.",
+  "first_run.full.ready_note": "F11 troca entre janela e tela cheia a qualquer hora.",
+  "first_run.full.opens_in": "Abre em",
+  "first_run.full.opens_window": "janela",
+  "first_run.full.opens_full": "tela cheia",
+  "first_run.full.change": "Trocar",
+  "first_run.full.open_library": "Abrir a biblioteca",
+  "first_run.full.add_game": "Adicionar jogo à mão",
+  "first_run.full.search_again": "Procurar de novo",
+  "first_run.full.review_covers": "Revisar capas",
+  "first_run.full.skip": "Pular configuração",
+  "first_run.splash.scanning": "Procurando seus jogos…",
+  "first_run.splash.starting": "Iniciando o Tako…"
+});
+Object.assign(SAMPLE_CATALOGS["en-US"], {
+  "first_run.step": "GETTING STARTED · {n} OF {total}",
+  "first_run.welcome": "Welcome to Tako",
+  "first_run.welcome_short": "Welcome",
+  "first_run.welcome_text": "Three quick steps to get your library ready. You can change everything later in Settings. First, the language:",
+  "first_run.stores": "Stores",
+  "first_run.stores_text": "Tako reads the installed games from these stores. Turn off the ones you don't use.",
+  "first_run.metadata": "Covers and descriptions",
+  "first_run.metadata_text": "These services fill in covers, logos and descriptions. They are optional: without them, Tako uses what the stores provide.",
+  "first_run.next": "Continue",
+  "first_run.skip": "Skip for now",
+  "first_run.finish": "Finish",
+  "first_run.done_toast": "All set. Have fun!",
+  "first_run.count": "{n} of {total}",
+  "first_run.full.emulators": "Emulator\ngames.",
+  "first_run.full.emulators_text": "Tako finds the installed emulators and your ROM folder, and opens each game in the right emulator.",
+  "first_run.full.emulators_note": "Tako doesn't download ROMs or BIOS files: it only uses the files already on your PC.",
+  "first_run.full.emu_no_games": "No games found yet",
+  "first_run.full.roms": "ROM folder",
+  "first_run.full.roms_found": "{games} in {systems}",
+  "first_run.full.systems.one": "{n} system",
+  "first_run.full.systems.other": "{n} systems",
+  "first_run.full.roms_none": "No folder chosen",
+  "first_run.full.roms_choose": "Choose…",
+  "first_run.full.add_emulator": "Add emulator…",
+  "first_run.full.no_emulators": "I don't use emulators",
+  "first_run.full.welcome": "Welcome to Tako.",
+  "first_run.full.welcome_text": "Five quick steps to get your library ready. You can change everything later in Settings. First, the language:",
+  "first_run.full.welcome_note": "The language is also in Settings › General.",
+  "first_run.full.stores": "Let's find\nyour games.",
+  "first_run.full.stores_text": "Tako looks at the folders of the stores installed on this PC and builds your library. Nothing leaves your computer.",
+  "first_run.full.stores_note": "You can add stores and games by hand later, in Settings › Library and stores.",
+  "first_run.full.metadata": "Covers and\ndescriptions.",
+  "first_run.full.metadata_text": "Cover, background art and description for each game, fetched from IGDB.",
+  "first_run.full.metadata_note": "Covers Tako isn't sure about go to Settings › Covers and metadata › Review covers. You can change this choice there too.",
+  "first_run.full.cover_none": "No cover",
+  "first_run.full.cover_with": "With cover",
+  "first_run.full.igdb": "Search IGDB",
+  "first_run.full.igdb_desc": "Sends only the name of each game ({games}).",
+  "first_run.full.igdb_key_desc": "Needs your IGDB (Twitch) key; choosing it opens the panel to paste it.",
+  "first_run.full.igdb_offline": "No connection right now; covers arrive when the internet is back.",
+  "first_run.full.stores_only": "Use only what the stores have",
+  "first_run.full.stores_only_desc": "Nothing leaves your PC; games without a cover show their color and name.",
+  "first_run.full.mode": "How do you want\nto open Tako?",
+  "first_run.full.mode_text": "Pick how it opens. Both show the same games.",
+  "first_run.full.mode_note": "F11 switches between window and full screen at any time. With a controller connected, \"Full screen\" comes selected.",
+  "first_run.full.stores_search": "Find games",
+  "first_run.full.stores_choose": "Choose folders…",
+  "first_run.full.stores_unchecked": "Not searched yet",
+  "first_run.full.stores_missing": "Not installed",
+  "first_run.full.mode_window": "In a window",
+  "first_run.full.mode_window_desc": "For mouse and keyboard. Sits with the other windows on your PC.",
+  "first_run.full.mode_full": "Full screen",
+  "first_run.full.mode_full_desc": "For controllers and TVs. Takes the whole screen, with everything large.",
+  "first_run.full.mode_window_hint": "Organize, configure, play at the desk",
+  "first_run.full.mode_full_hint": "Play on the couch or on a laptop hooked to the TV",
+  "first_run.full.back": "Back",
+  "first_run.full.ready": "{n} games\nready.",
+  "first_run.full.ready_none": "No games\nyet.",
+  "first_run.full.ready_text": "The missing covers keep arriving while you browse.",
+  "first_run.full.ready_none_text": "You can add a game by hand or look again from the library.",
+  "first_run.full.ready_note": "F11 switches between window and full screen at any time.",
+  "first_run.full.opens_in": "Opens in",
+  "first_run.full.opens_window": "a window",
+  "first_run.full.opens_full": "full screen",
+  "first_run.full.change": "Change",
+  "first_run.full.open_library": "Open the library",
+  "first_run.full.add_game": "Add a game by hand",
+  "first_run.full.search_again": "Search again",
+  "first_run.full.review_covers": "Review covers",
+  "first_run.full.skip": "Skip setup",
+  "first_run.splash.scanning": "Looking for your games…",
+  "first_run.splash.starting": "Starting Tako…"
+});
+
+for (const key of ["FirstRunCompleted", "metadata.igdb"]) { KNOWN_SETTINGS.add(key); BOOL_SETTINGS.add(key); }
+if (firstRunDemo) {
+  syncFirstRunRoms();
+  sources = { ...sources, sources: SAMPLE_STORES.map((sample, index) => sampleReport(sample, index, new Date())) };
+}
+if (firstRunDemo && settings.get("FirstRunCompleted") !== "true") {
+  // A abertura sonda o snapshot vazio (limit=1); os passos recebem os jogos que a primeira leitura encontrou.
+  uiState = { json: null };
+  const beforeFirstRun = defaults["library.list"];
+  Object.assign(defaults, {
+    "library.list": (payload: unknown) => {
+      if ((payload as LibraryListRequest).limit === 1 && settings.get("FirstRunCompleted") !== "true") return { rows: [], total: 0 };
+      return beforeFirstRun?.(payload);
+    },
+  });
+}

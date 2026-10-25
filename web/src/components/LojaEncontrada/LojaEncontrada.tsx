@@ -14,6 +14,8 @@ export interface LojaEncontradaProps {
   statusLabel?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Controle opcional da fonte (onboarding): conserva a linha e seus separadores. */
+  control?: ReactNode;
   className?: string;
 }
 
@@ -25,6 +27,7 @@ export function LojaEncontrada({
   statusLabel,
   actionLabel,
   onAction,
+  control,
   className,
 }: LojaEncontradaProps) {
   const isNotInstalled = status === "not-installed";
@@ -47,6 +50,7 @@ export function LojaEncontrada({
       </div>
 
       <div className={styles["control"]}>
+        {control}
         {status === "ready" && statusLabel && (
           <span className={styles["readyChip"]}>
             <i className={styles["statusDot"]} aria-hidden="true" />

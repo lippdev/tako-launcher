@@ -38,10 +38,12 @@
   display: flex;
   align-items: center;
   gap: var(--onboarding-comparison-gap);
+  margin-bottom: var(--space-18);
 }
 
 .coverBefore,
 .coverAfter {
+  --cover-aspect-ratio: 3 / 4;
   --onboarding-cover-width: 120px;
   --onboarding-cover-height: 160px;
 
