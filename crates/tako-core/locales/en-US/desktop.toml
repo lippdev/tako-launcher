@@ -72,6 +72,7 @@ big_picture_key = "F11"
 check_updates = "Check for updates…"
 quit = "Quit Tako"
 quit_key = "Alt + F4"
+quit_app = "Quit"
 
 [desktop.ask]
 title = "Controller connected"
@@ -188,6 +189,8 @@ see_all = "See all"
 summary = "{n} sessions · {avg} on average"
 
 [desktop.window]
+group = "Window"
+toggle_maximize = "Maximize or restore"
 update_ready = "Update ready"
 minimize = "Minimize"
 maximize = "Maximize"
@@ -263,3 +266,28 @@ installed_never = "Not played yet"
 prev = "Previous"
 next = "Next"
 
+[desktop.topbar]
+menu = "TAKO menu"
+nav = "Main navigation"
+online = "Online"
+
+[desktop.quick_search]
+title = "Quick search"
+key_shortcuts = "Control+K"
+results = "Search results"
+placeholder = "Search games, screens, and settings"
+label = "Quick search"
+error = "Could not search right now."
+loading = "Searching…"
+tag_shortcut = "Shortcut"
+views_group = "Go to"
+count.one = "{n} result"
+count.other = "{n} results"
+
+[desktop.library_overview]
+label = "Library overview"
+welcome = "Welcome back"
+hero_label = "Featured: {title}"
+continue_playing = "Continue playing"
+recent = "Recent"
+played_for = "{time} played"

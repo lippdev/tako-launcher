@@ -1,40 +1,41 @@
+import { useCallback } from "react";
 import { GrupoDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
-import { settingsStrings } from "../strings";
+import { useT } from "../../i18n";
 import { LinhaChave, LinhaDeslizante, type CategoryProps } from "./Linhas";
 import { DEFAULTS, KEYS, boolText, readBool, readPercent } from "./model";
 
-const s = settingsStrings.sound;
-
-/** "40%"; zero é "Mudo" (como no app atual). */
-function volumeText(value: number): string {
-  return value === 0 ? s.muted : `${String(value)}%`;
-}
-
 /** Configurações › Som: a música do tema e o volume dos sons de navegação. */
 export function SomCategoria({ values, save }: CategoryProps) {
+  const t = useT();
   const musicOn = readBool(values, KEYS.themeMusic, DEFAULTS.themeMusic);
+
+  const volumeText = useCallback(
+    (value: number): string => (value === 0 ? t("settings.sound.music_muted") : `${String(value)}%`),
+    [t],
+  );
+
   return (
     <>
-      <GrupoDeConfiguracao title={s.music}>
+      <GrupoDeConfiguracao title={t("settings.sound_web.music")}>
         <LinhaChave
-          title={s.musicEnabled.title}
-          description={s.musicEnabled.description}
+          title={t("settings.sound.music_enabled")}
+          description={t("settings.sound.music_enabled_desc")}
           checked={musicOn}
           onChange={(on) => void save(KEYS.themeMusic, boolText(on))}
         />
         <LinhaDeslizante
-          title={s.musicVolume.title}
-          description={s.musicVolume.description}
+          title={t("settings.sound.music_volume")}
+          description={t("settings.sound.music_volume_desc")}
           value={readPercent(values, KEYS.themeMusicVolume, DEFAULTS.themeMusicVolume)}
           format={volumeText}
           disabled={!musicOn}
           onCommit={(value) => void save(KEYS.themeMusicVolume, String(value))}
         />
       </GrupoDeConfiguracao>
-      <GrupoDeConfiguracao title={s.navigation}>
+      <GrupoDeConfiguracao title={t("settings.sound_web.navigation")}>
         <LinhaDeslizante
-          title={s.navigationVolume.title}
-          description={s.navigationVolume.description}
+          title={t("settings.sound.navigation_volume")}
+          description={t("settings.sound.navigation_volume_desc")}
           value={readPercent(values, KEYS.navigationVolume, DEFAULTS.navigationVolume)}
           format={volumeText}
           onCommit={(value) => void save(KEYS.navigationVolume, String(value))}

@@ -9,73 +9,22 @@ import {
   type ValoresConfiguracoesDoJogo,
 } from "../../components/ConfiguracoesDoJogo/ConfiguracoesDoJogo";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
-import { gameSettingsStrings as s } from "../strings";
+import { useT, type TFunction } from "../../i18n";
 import { modeLabel } from "../settings/model";
 import { panelModel, toChange, type PanelLabels } from "./configuracoesModel";
 import { useGameSettings } from "./useGameSettings";
 
-const v = s.values;
-
-const PANEL_LABELS: PanelLabels = {
-  noScreen: v.noScreen,
-  keepCurrent: v.keepCurrent,
-  keepAudio: v.keepAudio,
-  on: v.on,
-  off: v.off,
-  disconnected: v.disconnected,
-  mode: modeLabel,
-  screenNote: s.notes.useScreen,
-  whichScreenNote: s.notes.screen,
-  launchNote: s.notes.launch,
-  environmentNote: s.notes.environment,
-  commandsNote: s.notes.commands,
-  commandsBefore: s.commandsBefore,
-  commandsAfter: s.commandsAfter,
-  vrrUnsupported: s.notes.vrrUnsupported,
-  audioLocked: s.notes.audioLocked,
-};
-
-const ROTULOS: ConfiguracoesDoJogoLabels = {
-  title: s.title,
-  close: s.close,
-  screenGroup: s.groups.screen,
-  soundGroup: s.groups.sound,
-  launchGroup: s.groups.launch,
-  useScreen: s.rows.useScreen,
-  monitor: s.rows.screen,
-  resolutionAndRate: s.rows.mode,
-  hdr: s.rows.hdr,
-  vrr: s.rows.vrr,
-  audioOutput: s.rows.audio,
-  arguments: s.rows.arguments,
-  workingDirectory: s.rows.folder,
-  environmentVariables: s.rows.environment,
-  beforeAndAfterCommands: s.rows.commands,
-  useAllFromTako: s.reset.action,
-  useAllFromTakoDescription: s.reset.description,
-  defaultPrefix: v.default,
-  none: v.none,
-  noneFem: v.noneFeminine,
-  on: v.on,
-  off: v.off,
-  singularChange: s.changes.one,
-  pluralChanges: s.changes.other,
-  noChanges: s.changes.none,
-};
-
-const TEXTO_DO_VAZIO = {
-  argumentos: v.none,
-  pastaDeTrabalho: v.executableFolder,
-  variaveisDeAmbiente: v.noneFeminine,
-  comandosAntesEDepois: v.none,
-} as const;
-
 /** O texto do aviso para uma gravação que a ponte recusou ou que falhou. */
-function failureText(key: ChaveConfiguracaoJogo, value: ValorConfiguracaoJogo, code: ErrorCode): string {
-  if (key === "pastaDeTrabalho" && code === "not_found") return s.folderMissing(String(value).trim());
-  if (key === "variaveisDeAmbiente" && code === "bad_request") return s.invalidEnvironment;
-  if ((key === "argumentos" || key === "pastaDeTrabalho") && code === "bad_request") return s.invalid;
-  return s.saveError;
+function failureText(
+  key: ChaveConfiguracaoJogo,
+  value: ValorConfiguracaoJogo,
+  code: ErrorCode,
+  t: TFunction,
+): string {
+  if (key === "pastaDeTrabalho" && code === "not_found") return t("game_settings.folder_missing", { folder: String(value).trim() });
+  if (key === "variaveisDeAmbiente" && code === "bad_request") return t("game_settings.invalid_environment");
+  if ((key === "argumentos" || key === "pastaDeTrabalho") && code === "bad_request") return t("game_settings.invalid");
+  return t("game_settings.save_failed");
 }
 
 /** O mesmo objeto sem a chave `key`. */
@@ -100,6 +49,7 @@ interface PainelConfiguracoesDoJogoProps {
  * antes de apagar as escolhas do jogo.
  */
 export function PainelConfiguracoesDoJogo({ gameId, title, coverUrl, open, onClose, onError }: PainelConfiguracoesDoJogoProps) {
+  const t = useT();
   const { view, loadFailed, save } = useGameSettings(gameId, open);
   const [pending, setPending] = useState<{ values: ValoresConfiguracoesDoJogo; tokens: Partial<Record<ChaveConfiguracaoJogo, number>> }>({
     values: {},
@@ -107,13 +57,79 @@ export function PainelConfiguracoesDoJogo({ gameId, title, coverUrl, open, onClo
   });
   const [confirming, setConfirming] = useState(false);
   const counter = useRef(0);
-  const model = useMemo(() => (view ? panelModel(view, PANEL_LABELS) : null), [view]);
+
+  const panelLabels = useMemo<PanelLabels>(
+    () => ({
+      noScreen: t("game_settings.no_screen_cap"),
+      keepCurrent: t("game_settings.keep_current"),
+      keepAudio: t("game_settings.keep_audio"),
+      on: t("game_settings.on"),
+      off: t("game_settings.off"),
+      disconnected: (name: string) => t("game_settings.disconnected", { screen: name }),
+      mode: modeLabel,
+      screenNote: t("game_settings.screen_note"),
+      whichScreenNote: t("game_settings.which_screen_desc"),
+      launchNote: t("game_settings.launch_note"),
+      environmentNote: t("game_settings.environment_hint"),
+      commandsNote: t("game_settings.commands_edit_disabled"),
+      commandsBefore: t("game_settings.commands_before"),
+      commandsAfter: t("game_settings.commands_after"),
+      vrrUnsupported: t("vrr.unsupported"),
+      audioLocked: t("game_settings.audio_locked"),
+    }),
+    [t],
+  );
+
+  const rotulos = useMemo<ConfiguracoesDoJogoLabels>(
+    () => ({
+      title: t("details.game_settings"),
+      close: t("game_settings.close"),
+      screenGroup: t("game_settings.group_screen"),
+      soundGroup: t("game_settings.group_sound"),
+      launchGroup: t("game_settings.group_launch"),
+      useScreen: t("game_settings.use_screen"),
+      monitor: t("game_settings.which_screen"),
+      resolutionAndRate: t("game_settings.mode"),
+      hdr: t("game_settings.hdr"),
+      vrr: t("vrr.game"),
+      audioOutput: t("game_settings.audio"),
+      arguments: t("game_settings.arguments"),
+      workingDirectory: t("game_settings.folder"),
+      environmentVariables: t("game_settings.environment"),
+      beforeAndAfterCommands: t("game_settings.commands"),
+      useAllFromTako: t("game_settings.reset"),
+      useAllFromTakoDescription: (changes: number) =>
+        changes === 0 ? t("game_settings.reset_desc_none") : t("game_settings.reset_desc", { n: changes }),
+      defaultPrefix: t("game_settings.default_prefix"),
+      none: t("game_settings.none"),
+      noneFem: t("game_settings.none_fem"),
+      on: t("game_settings.on"),
+      off: t("game_settings.off"),
+      singularChange: t("game_settings.change_singular"),
+      pluralChanges: t("game_settings.change_plural"),
+      noChanges: t("game_settings.change_none"),
+    }),
+    [t],
+  );
+
+  const emptyText = useMemo(
+    () =>
+      ({
+        argumentos: t("game_settings.none"),
+        pastaDeTrabalho: t("game_settings.exe_folder"),
+        variaveisDeAmbiente: t("game_settings.none_fem"),
+        comandosAntesEDepois: t("game_settings.none"),
+      }) as const,
+    [t],
+  );
+
+  const model = useMemo(() => (view ? panelModel(view, panelLabels) : null), [view, panelLabels]);
 
   useEffect(() => {
     if (!open || !loadFailed || view) return;
-    onError(s.loadError);
+    onError(t("game_settings.load_error"));
     onClose();
-  }, [open, loadFailed, view, onError, onClose]);
+  }, [open, loadFailed, view, onError, onClose, t]);
 
   if (!view || !model) return null;
 
@@ -128,13 +144,13 @@ export function PainelConfiguracoesDoJogo({ gameId, title, coverUrl, open, onClo
       if (p.tokens[key] !== token) return p;
       return { values: without(p.values, key), tokens: without(p.tokens, key) };
     });
-    if (!result.ok) onError(failureText(key, value, result.code));
+    if (!result.ok) onError(failureText(key, value, result.code, t));
   };
 
   const reset = async () => {
     setConfirming(false);
     const result = await save({ field: "reset_all" });
-    if (!result.ok) onError(s.saveError);
+    if (!result.ok) onError(t("game_settings.save_failed"));
   };
 
   return (
@@ -148,10 +164,10 @@ export function PainelConfiguracoesDoJogo({ gameId, title, coverUrl, open, onClo
         defaults={model.padroes}
         options={model.opcoes}
         descriptions={model.descricoes}
-        labels={ROTULOS}
+        labels={rotulos}
         changesCount={model.mudancas}
         readOnly={model.somenteLeitura}
-        emptyText={TEXTO_DO_VAZIO}
+        emptyText={emptyText}
         onChange={(key, value) => void change(key, value)}
         onResetToDefault={() => {
           if (model.mudancas > 0) setConfirming(true);
@@ -162,8 +178,8 @@ export function PainelConfiguracoesDoJogo({ gameId, title, coverUrl, open, onClo
         onClose={() => {
           setConfirming(false);
         }}
-        title={s.reset.title}
-        closeLabel={s.close}
+        title={t("game_settings.reset_title")}
+        closeLabel={t("game_settings.close")}
         size="s"
         actions={
           <>
@@ -173,15 +189,15 @@ export function PainelConfiguracoesDoJogo({ gameId, title, coverUrl, open, onClo
                 setConfirming(false);
               }}
             >
-              {s.reset.cancel}
+              {t("common.cancel")}
             </BotaoDesktop>
             <BotaoDesktop variant="primary" onClick={() => void reset()}>
-              {s.reset.action}
+              {t("game_settings.reset")}
             </BotaoDesktop>
           </>
         }
       >
-        <p>{s.reset.text}</p>
+        <p>{t("game_settings.reset_text")}</p>
       </Dialogo>
     </>
   );

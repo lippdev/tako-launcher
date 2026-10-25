@@ -7,10 +7,10 @@ import { CampoDeBusca } from "../components/CampoDeBusca/CampoDeBusca";
 import { Icon } from "../components/Icon/Icon";
 import { BibliotecaGrade } from "../components/BibliotecaGrade/BibliotecaGrade";
 import { ListaDeJogos } from "../components/ListaDeJogos/ListaDeJogos";
+import { useT } from "../i18n";
 import { cx } from "../lib/cx";
 import { useRunningGameId, useSessionActions } from "./sessao/useGameSession";
 import { withRunning } from "./libraryRow";
-import { listLabels, listViewStrings, strings, libraryStrings as s } from "./strings";
 import { hasSavableCriteria, smartRuleFromCriteria } from "./colecoes/colecoesModel";
 import { OrganizarColecoes } from "./colecoes/OrganizarColecoes";
 import { SalvarColecao } from "./colecoes/SalvarColecao";
@@ -26,11 +26,6 @@ import { useLibrary } from "./useLibrary";
 import styles from "./ColunaDaLista.module.css";
 import controls from "./LibraryControls.module.css";
 
-const TABS: readonly Aba<LibraryCriteria["filter"]>[] = [
-  { id: "all", label: strings.list.tabs.all },
-  { id: "favorites", label: strings.list.tabs.favorites },
-  { id: "installed", label: strings.list.tabs.installed },
-];
 /** O modo de exibição e o agrupamento das Categorias: as chaves do núcleo que o Slint também usa. */
 const MODE_KEYS = [VIEW_KEY, GROUP_KEY];
 
@@ -55,6 +50,7 @@ export function ColunaDaLista({
   activeId,
   onActiveChange,
 }: ColunaDaListaProps) {
+  const t = useT();
   const library = useLibrary(criteria);
   const runningId = useRunningGameId();
   const sessionActions = useSessionActions();
@@ -89,12 +85,20 @@ export function ColunaDaLista({
   const [manageOpen, setManageOpen] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
 
+  const tabs: readonly Aba<LibraryCriteria["filter"]>[] = useMemo(
+    () => [
+      { id: "all", label: t("library.tabs_all") },
+      { id: "favorites", label: t("library.tabs_favorites") },
+      { id: "installed", label: t("library.tabs_installed") },
+    ],
+    [t],
+  );
 
   const update = (patch: Partial<LibraryCriteria>) => {
     setSelection(new Set());
     onCriteriaChange({ ...criteria, ...patch });
   };
-  const toggleLabel = collapsed ? strings.list.expand : strings.list.collapse;
+  const toggleLabel = collapsed ? t("library.expand") : t("library.collapse");
   const count = filterCount(criteria);
   const collection = library.collections.find((c) => c.id === criteria.collection);
   const rule = smartRuleFromCriteria(criteria, collection?.criteria ? collection : null);
@@ -134,41 +138,61 @@ export function ColunaDaLista({
             library.refresh();
           })
           .catch(() => {
-            collectionDone(true, s.loadError);
+            collectionDone(true, t("library.load_error"));
           });
       }
       // Menu na linha: no Slint abre o Gerenciar daquele jogo (`Action::More`); a linha da web ainda não tem esse
       // menu. TODO(WEB-05b): ligar quando houver.
-
     };
     el.addEventListener(COMMAND_EVENT, onCommand);
     return () => el.removeEventListener(COMMAND_EVENT, onCommand);
-  }, [selection, activeId, library, knownGame, collectionDone]);
+  }, [selection, activeId, library, knownGame, collectionDone, t]);
   const empty =
     criteria.search.trim() || count > Number(criteria.collection !== null)
-      ? listLabels.empty
+      ? t("desktop.empty.none_found")
       : criteria.collection
-        ? s.emptyCollection
+        ? t("library.empty_collection")
         : criteria.filter === "favorites"
-          ? s.emptyFavorites
+          ? t("library.empty_favorites")
           : criteria.filter === "installed"
-            ? s.emptyInstalled
-            : s.emptyLibrary;
+            ? t("library.empty_installed")
+            : t("library.empty_library");
+
+  const listLabels = useMemo(
+    () => ({
+      running: t("desktop.badge.playing"),
+      updateAvailable: t("library.row_update_available"),
+      notInstalled: t("game.not_installed"),
+      favorite: t("hint.favorite"),
+      downloading: (percent: number) => t("library.row_downloading", { percent }),
+      status: {
+        playing: t("library.status.playing"),
+        completed: t("library.status.beaten"),
+        queued: t("library.status.wishlist"),
+        paused: t("library.status.paused"),
+        dropped: t("library.status.abandoned"),
+      },
+      loading: t("desktop.empty.loading"),
+      empty,
+    }),
+    [t, empty],
+  );
+
   return (
     <>
       <aside
         ref={asideRef}
         inert={!shown}
         className={cx(styles["side"], collapsed && styles["collapsed"], !shown && styles["hidden"])}
-        aria-label={strings.list.label}
+        aria-label={t("desktop.library")}
         data-focus-region="list"
       >
         <div className={styles["inner"]}>
           {!collapsed && (
             <Abas
               variant="lista"
-              label={strings.list.tabsLabel}
-              tabs={TABS}
+              label={t("library.tabs_label")}
+              tabs={tabs}
               value={criteria.filter}
               onChange={(filter) => {
                 update({ filter });
@@ -184,10 +208,10 @@ export function ColunaDaLista({
                 onChange={(search) => {
                   update({ search });
                 }}
-                placeholder={strings.list.searchPlaceholder}
-                label={strings.list.searchLabel}
+                placeholder={t("library.search_placeholder")}
+                label={t("library.search_label")}
                 action={{
-                  label: s.filterCount(count),
+                  label: t("library.filter_count", { n: count }),
                   count,
                   active: count > 0,
                   expanded: filtersOpen,
@@ -203,7 +227,7 @@ export function ColunaDaLista({
               className={styles["toggle"]}
               aria-label={toggleLabel}
               aria-keyshortcuts="Control+B"
-              title={`${toggleLabel} · ${strings.list.shortcut}`}
+              title={`${toggleLabel} · ${t("library.shortcut")}`}
               onClick={onToggleCollapsed}
             >
               <Icon name="panel" size="sm" />
@@ -213,8 +237,8 @@ export function ColunaDaLista({
             <button
               type="button"
               className={cx(styles["home"], activeId === null && styles["active"])}
-              title={collection?.name ?? strings.list.overview}
-              aria-label={collection?.name ?? strings.list.overview}
+              title={collection?.name ?? t("library.overview")}
+              aria-label={collection?.name ?? t("library.overview")}
               aria-current={activeId === null ? "true" : undefined}
               onClick={() => {
                 onActiveChange(null);
@@ -227,16 +251,18 @@ export function ColunaDaLista({
               {!collapsed && (
                 <span className={styles["homeLabel"]}>
                   {collection
-                    ? s.collectionLabel(collection.name, collection.criteria ? null : collection.gameIds.length)
-                    : strings.list.overview}
+                    ? collection.criteria
+                      ? collection.name
+                      : t("library.collection_label", { name: collection.name, count: collection.gameIds.length })
+                    : t("library.overview")}
                 </span>
               )}
             </button>
             {!collapsed && criteria.collection && (
               <button
                 className={styles["toggle"]}
-                aria-label={s.allCollections}
-                title={s.allCollections}
+                aria-label={t("library.all_collections")}
+                title={t("library.all_collections")}
                 onClick={() => {
                   update({ collection: null });
                 }}
@@ -248,8 +274,8 @@ export function ColunaDaLista({
           {!collapsed && (
             <div className={controls["countLine"]}>
               <div className={controls["count"]} role="status">
-                {selection.size ? s.selected(selection.size, library.total) : s.count(library.total)}
-                {library.pending && !library.loading ? ` · ${s.busy}` : ""}
+                {selection.size ? t("desktop.bulk.count", { n: selection.size, total: library.total }) : t("common.games", { n: library.total })}
+                {library.pending && !library.loading ? ` · ${t("library.busy")}` : ""}
               </div>
               <SeletorDeModo view={view} onViewChange={chooseView} />
             </div>
@@ -257,9 +283,9 @@ export function ColunaDaLista({
           {view === "categories" && <AgruparPor value={groupBy} onChange={chooseGroup} />}
           {library.error && (
             <div className={controls["count"]} role="alert">
-              {s.loadError}
+              {t("library.load_error")}
               <button className={controls["retry"]} onClick={library.refresh}>
-                {s.retry}
+                {t("library.retry")}
               </button>
             </div>
           )}
@@ -269,9 +295,9 @@ export function ColunaDaLista({
             <BibliotecaGrade
               key={library.queryKey}
               className={cx(styles["games"])}
-              aria-label={strings.list.label}
+              aria-label={t("desktop.library")}
               rows={rows}
-              labels={{ ...listLabels, empty, play: listViewStrings.play }}
+              labels={{ ...listLabels, empty, play: t("game.play") }}
               loading={library.loading}
               activeId={activeId}
               selection={selection}
@@ -301,7 +327,7 @@ export function ColunaDaLista({
             <ListaDeJogos
               key={library.queryKey}
               className={cx(styles["games"])}
-              aria-label={strings.list.label}
+              aria-label={t("desktop.library")}
               collapsed={collapsed}
               rows={rows}
               labels={{ ...listLabels, empty }}
@@ -373,7 +399,7 @@ export function ColunaDaLista({
         onDone={collectionDone}
       />
       <Aviso open={library.error} onClose={() => {}} duration={null} tone="error">
-        {s.loadError}
+        {t("library.load_error")}
       </Aviso>
       <Aviso
         open={notice !== null}
@@ -383,7 +409,7 @@ export function ColunaDaLista({
         noticeKey={notice?.key ?? 0}
         tone={notice?.error ? "error" : "success"}
       >
-        {notice?.message ?? (notice?.error ? s.actionError : s.actionSuccess)}
+        {notice?.message ?? (notice?.error ? t("library.action_error") : t("library.action_success"))}
       </Aviso>
     </>
   );

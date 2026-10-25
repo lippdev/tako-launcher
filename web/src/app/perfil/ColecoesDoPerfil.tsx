@@ -2,7 +2,6 @@ import { useState } from "react";
 import { call } from "../../bridge";
 import { PerfilColecoes, type CollectionItem } from "../../components/PerfilColecoes/PerfilColecoes";
 import { useT } from "../../i18n";
-import { profileStrings as s } from "../strings";
 import { collectionDetail, collectionsSummary } from "./perfilModel";
 import { NovaColecaoDialogo } from "./NovaColecaoDialogo";
 import { useBridgeData } from "./useBridgeData";
@@ -26,9 +25,9 @@ export function ColecoesDoPerfil({ onOpenCollection }: ColecoesDoPerfilProps) {
   if (status === "error") {
     return (
       <div className={styles["aviso"]} role="alert">
-        {s.loadError}
+        {t("profile.web.load_error")}
         <button type="button" className={styles["retry"]} onClick={reload}>
-          {s.retry}
+          {t("profile.web.retry")}
         </button>
       </div>
     );
@@ -50,9 +49,9 @@ export function ColecoesDoPerfil({ onOpenCollection }: ColecoesDoPerfilProps) {
       {data && (
         <PerfilColecoes
           summary={collectionsSummary(data.collections.length, data.gameCount, t)}
-          toolbarLabel={s.collectionsToolbar}
-          gridLabel={s.collectionsGrid}
-          actionsLabel={s.collectionActions}
+          toolbarLabel={t("profile.web.collections_toolbar")}
+          gridLabel={t("profile.web.collections_grid")}
+          actionsLabel={t("profile.web.collection_actions")}
           autoBadgeLabel={t("profile.auto")}
           collections={items}
           newCollection={{

@@ -4,7 +4,6 @@ import type { SessionPeriod } from "../../bridge/generated/SessionPeriod";
 import type { Aba } from "../../components/Abas/Abas";
 import { PerfilSessoes } from "../../components/PerfilSessoes/PerfilSessoes";
 import { useT } from "../../i18n";
-import { profileStrings as s } from "../strings";
 import { PERIODS, sessionGroups, sessionsSummary } from "./perfilModel";
 import { useBridgeData } from "./useBridgeData";
 import { useCapas } from "./useCapas";
@@ -43,9 +42,9 @@ export function SessoesDoPerfil({ onOpenGame }: SessoesDoPerfilProps) {
   if (status === "error") {
     return (
       <div className={styles["aviso"]} role="alert">
-        {s.loadError}
+        {t("profile.web.load_error")}
         <button type="button" className={styles["retry"]} onClick={reload}>
-          {s.retry}
+          {t("profile.web.retry")}
         </button>
       </div>
     );
@@ -53,8 +52,8 @@ export function SessoesDoPerfil({ onOpenGame }: SessoesDoPerfilProps) {
 
   return (
     <PerfilSessoes
-      period={{ label: s.period, tabs, value: period, onChange: setPeriod }}
-      toolbarLabel={s.sessionsToolbar}
+      period={{ label: t("profile.web.period"), tabs, value: period, onChange: setPeriod }}
+      toolbarLabel={t("profile.web.sessions_toolbar")}
       {...(data ? { summary: sessionsSummary(data.count, data.totalSeconds, t) } : {})}
       groups={groups}
       {...(data && data.count === 0 ? { emptyMessage: t("profile.empty") } : {})}

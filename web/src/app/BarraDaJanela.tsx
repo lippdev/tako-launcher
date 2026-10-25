@@ -1,18 +1,19 @@
 import { Icon } from "../components/Icon/Icon";
+import { useT } from "../i18n";
 import { cx } from "../lib/cx";
-import { strings } from "./strings";
 import { windowAction } from "./windowActions";
 import styles from "./BarraDaJanela.module.css";
 
 /** Os botões da janela sem moldura, na ponta da BarraSuperior (README da BarraDaJanela). */
 export function BarraDaJanela() {
+  const t = useT();
   return (
-    <div className={styles["controls"]} data-focus-skip="" role="group" aria-label={strings.window.group}>
+    <div className={styles["controls"]} data-focus-skip="" role="group" aria-label={t("desktop.window.group")}>
       <button
         type="button"
         className={styles["button"]}
-        aria-label={strings.window.minimize}
-        title={strings.window.minimize}
+        aria-label={t("desktop.window.minimize")}
+        title={t("desktop.window.minimize")}
         onClick={() => {
           windowAction("minimize");
         }}
@@ -22,8 +23,8 @@ export function BarraDaJanela() {
       <button
         type="button"
         className={styles["button"]}
-        aria-label={strings.window.toggleMaximize}
-        title={strings.window.toggleMaximize}
+        aria-label={t("desktop.window.toggle_maximize")}
+        title={t("desktop.window.toggle_maximize")}
         onClick={() => {
           windowAction("toggle_maximize");
         }}
@@ -33,8 +34,8 @@ export function BarraDaJanela() {
       <button
         type="button"
         className={cx(styles["button"], styles["close"])}
-        aria-label={strings.window.close}
-        title={strings.window.close}
+        aria-label={t("desktop.window.close")}
+        title={t("desktop.window.close")}
         onClick={() => {
           windowAction("close");
         }}

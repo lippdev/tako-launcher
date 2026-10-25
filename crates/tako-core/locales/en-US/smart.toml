@@ -9,6 +9,14 @@ text = "Save a combination of library filters. Select a collection below to dele
 delete_title = "Delete {name}?"
 delete_text = "Only the collection will be deleted. Games stay in your library."
 play_time = "Time played"
+rename = "Rename {name}"
+rename_title = "Rename smart collection"
+name_label = "Collection name"
+renamed = "Collection renamed."
+deleted = "Collection deleted."
+load_error = "Could not load smart collections."
+save_error = "Could not save collection."
+remove = "Delete {name}"
 
 [smart.time]
 any = "Any time"

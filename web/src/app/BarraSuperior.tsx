@@ -1,21 +1,18 @@
-import { useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Abas, type Aba } from "../components/Abas/Abas";
 import { Aviso } from "../components/Aviso/Aviso";
 import { Icon } from "../components/Icon/Icon";
 import { Marca } from "../components/Marca/Marca";
+import { useT } from "../i18n";
 import { cx } from "../lib/cx";
 import { AtualizacaoNaBarra } from "./atualizacao/AtualizacaoNaBarra";
 import { BarraDaJanela } from "./BarraDaJanela";
 import { DownloadsNaBarra } from "./DownloadsNaBarra";
 import { DialogoAdicionarJogo } from "./editar/DialogoAdicionarJogo";
 import { MenuDoTako } from "./MenuDoTako";
-import { strings } from "./strings";
 import type { ViewId } from "./uiState";
 import { windowAction } from "./windowActions";
 import styles from "./BarraSuperior.module.css";
-
-/** Só a biblioteca: não existe loja (decisão do mantenedor), então a barra não tem LOJA. */
-const TABS: readonly Aba<"biblioteca">[] = [{ id: "biblioteca", label: strings.topbar.library }];
 
 interface BarraSuperiorProps {
   view: ViewId;
@@ -31,6 +28,8 @@ interface BarraSuperiorProps {
 
 /** A barra de cima de borda a borda (README da BarraSuperior), que também é a barra da janela (arrasta e duplo clique maximiza). */
 export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSettings, profile, onSearch }: BarraSuperiorProps) {
+  const t = useT();
+  const tabs = useMemo<readonly Aba<"biblioteca">[]>(() => [{ id: "biblioteca", label: t("desktop.library") }], [t]);
   const [brand, setBrand] = useState<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -48,7 +47,7 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
         ref={setBrand}
         type="button"
         className={styles["brand"]}
-        aria-label={strings.topbar.menu}
+        aria-label={t("desktop.topbar.menu")}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={() => {
@@ -95,8 +94,8 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
       <Abas
         variant="topo"
         className={cx(styles["nav"])}
-        label={strings.topbar.nav}
-        tabs={TABS}
+        label={t("desktop.topbar.nav")}
+        tabs={tabs}
         // Fora da biblioteca nenhuma aba fica marcada (README: "Nas Configurações nenhuma aba fica marcada").
         value={view === "biblioteca" ? "biblioteca" : ""}
         onChange={() => {
@@ -108,9 +107,9 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
         <button
           type="button"
           className={styles["action"]}
-          aria-label={strings.search.label}
+          aria-label={t("desktop.quick_search.label")}
           aria-keyshortcuts="Control+K"
-          title={strings.search.label}
+          title={t("desktop.quick_search.label")}
           onClick={onSearch}
         >
           <Icon name="search" />
@@ -121,8 +120,8 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
         <button
           type="button"
           className={cx(styles["action"], styles["profile"], view === "perfil" && styles["on"])}
-          aria-label={strings.topbar.profile}
-          title={strings.topbar.profile}
+          aria-label={t("profile.tab")}
+          title={t("profile.tab")}
           {...(view === "perfil" ? { "aria-current": "page" as const } : {})}
           onClick={() => {
             // TODO(WEB-14): a TelaPerfil; por enquanto abre a vista vazia.
@@ -131,7 +130,7 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
         >
           <span
             className={cx(styles["avatar"], profile.online && styles["online"])}
-            {...(profile.online ? { role: "img", "aria-label": strings.topbar.online } : { "aria-hidden": true })}
+            {...(profile.online ? { role: "img", "aria-label": t("desktop.topbar.online") } : { "aria-hidden": true })}
           >
             {Array.from(profile.name)[0]?.toUpperCase() ?? "?"}
           </span>
@@ -144,8 +143,8 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
         <button
           type="button"
           className={styles["action"]}
-          aria-label={strings.topbar.bigPicture}
-          title={strings.topbar.bigPicture}
+          aria-label={t("desktop.big_picture")}
+          title={t("desktop.big_picture")}
           onClick={() => {
             windowAction("big_picture");
           }}

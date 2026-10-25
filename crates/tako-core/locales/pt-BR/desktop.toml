@@ -72,6 +72,7 @@ big_picture_key = "F11"
 check_updates = "Procurar atualizações…"
 quit = "Sair do Tako"
 quit_key = "Alt + F4"
+quit_app = "Sair"
 
 [desktop.ask]
 title = "Controle conectado"
@@ -188,6 +189,8 @@ see_all = "Ver todas"
 summary = "{n} sessões · média de {avg}"
 
 [desktop.window]
+group = "Janela"
+toggle_maximize = "Maximizar ou restaurar"
 update_ready = "Atualização pronta"
 minimize = "Minimizar"
 maximize = "Maximizar"
@@ -263,3 +266,28 @@ installed_never = "Ainda não jogado"
 prev = "Anterior"
 next = "Próximo"
 
+[desktop.topbar]
+menu = "Menu do TAKO"
+nav = "Navegação principal"
+online = "Conectado"
+
+[desktop.quick_search]
+title = "Busca geral"
+key_shortcuts = "Control+K"
+results = "Resultados da busca"
+placeholder = "Buscar jogos, telas e configurações"
+label = "Busca geral"
+error = "Não foi possível buscar agora."
+loading = "Buscando…"
+tag_shortcut = "Atalho"
+views_group = "Ir para"
+count.one = "{n} resultado"
+count.other = "{n} resultados"
+
+[desktop.library_overview]
+label = "Visão geral da biblioteca"
+welcome = "Bem-vindo de volta"
+hero_label = "Em destaque: {title}"
+continue_playing = "Continuar jogando"
+recent = "Recentes"
+played_for = "{time} jogadas"

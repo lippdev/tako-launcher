@@ -10,8 +10,6 @@ import { PainelDownloads } from "../components/PainelDownloads/PainelDownloads";
 import { useT } from "../i18n";
 import { activityCount, findEntry, summaryPercent, toPanelItem } from "./downloadsModel";
 import { refreshDownloads, useDownloads } from "./downloadsStore";
-import { downloadsStrings as s } from "./downloadsStrings";
-import { strings } from "./strings";
 import styles from "./DownloadsNaBarra.module.css";
 
 interface DownloadsNaBarraProps {
@@ -76,8 +74,8 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
         count={count}
         progress={percent}
         open={open}
-        title={strings.topbar.downloads}
-        aria-label={count > 0 ? t("downloads.n_active", { n: count }) : strings.topbar.downloads}
+        title={t("downloads.title")}
+        aria-label={count > 0 ? t("downloads.n_active", { n: count }) : t("downloads.title")}
         onClick={() => {
           setOpen((value) => !value);
         }}
@@ -91,7 +89,7 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
         items={items}
         title={t("downloads.title")}
         activeLabel={() => t("downloads.n_active", { n: summary.downloading })}
-        emptyLabel={enabled ? t("downloads.empty") : s.off}
+        emptyLabel={enabled ? t("downloads.empty") : t("downloads.off")}
         sectionLabels={{
           downloading: t("downloads.group_active"),
           queued: t("downloads.group_queued"),
@@ -102,13 +100,13 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
           pausado: t("downloads.paused"),
           na_fila: t("downloads.group_queued"),
           concluido: t("downloads.group_done"),
-          erro: s.error,
+          erro: t("downloads.state_error"),
         }}
         actionLabels={{
           pause: t("downloads.pause"),
           resume: t("downloads.resume"),
           cancel: t("downloads.cancel"),
-          openGame: s.openGame,
+          openGame: t("downloads.open_game"),
         }}
         onPause={(id) => {
           const entry = findEntry(entries, id);
@@ -139,7 +137,7 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
                 onOpenSettings();
               }}
             >
-              {s.openSettings}
+              {t("downloads.open_settings")}
             </BotaoDesktop>
           </div>
         )}
@@ -192,7 +190,7 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
         noticeKey={failures}
         tone="error"
       >
-        {s.actionError}
+        {t("downloads.action_error")}
       </Aviso>
     </>
   );

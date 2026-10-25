@@ -7,7 +7,7 @@ import { PrimeiraLeitura } from "./PrimeiraLeitura";
 import styles from "./Abertura.module.css";
 import { PrimeiraVez } from "../primeiraVez/PrimeiraVez";
 import { decideFirstRun, finishChoice, type Settings } from "../primeiraVez/model";
-import { onboardingStrings } from "../strings";
+import { useT } from "../../i18n";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 
 const TICK_MS = 50;
@@ -24,6 +24,7 @@ function reduceMotion(): boolean {
  * animação do design system. Ao reabrir a interface depois de um jogo (`ui.state` já guardado) o app aparece direto.
  */
 export function Abertura({ children }: { children: ReactNode }) {
+  const t = useT();
   // A aparência salva vem antes de decidir: a entrada lê "Reduzir animações" ao montar.
   const appearanceReady = useSavedAppearance();
   const [kind, setKind] = useState<Tipo | null>(null);
@@ -105,8 +106,8 @@ export function Abertura({ children }: { children: ReactNode }) {
   }, [showReading]);
 
   if (failed) return <div className={styles["fundo"]} role="alert">
-    <p>{onboardingStrings.loadError}</p>
-    <BotaoDesktop onClick={() => { setFailed(false); setRetry((n) => n + 1); }}>{onboardingStrings.retry}</BotaoDesktop>
+    <p>{t("first_run.web.load_error")}</p>
+    <BotaoDesktop onClick={() => { setFailed(false); setRetry((n) => n + 1); }}>{t("first_run.web.retry")}</BotaoDesktop>
   </div>;
   if (!decided) return <div className={styles["fundo"]} />;
   if (showReading) return <PrimeiraLeitura scan={scan} />;

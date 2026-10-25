@@ -7,7 +7,6 @@ import {
 } from "../../components/BibliotecaCategorias/BibliotecaCategorias";
 import { useT } from "../../i18n";
 import { cx } from "../../lib/cx";
-import { libraryStrings as s, listLabels, listViewStrings as v } from "../strings";
 import type { GroupSpec } from "./listaModel";
 import type { GroupData } from "./useLibraryGroups";
 import styles from "./ModoDaLista.module.css";
@@ -31,12 +30,12 @@ interface CategoriasDaListaProps {
 }
 
 /** O título da fileira: situação e loja saem das tabelas do app, instalação do catálogo, o resto é o nome dado. */
-function titleOf(spec: GroupSpec, installedLabel: string, notInstalledLabel: string): string {
+function titleOf(spec: GroupSpec, t: (key: string, vars?: Record<string, string | number>) => string, installedLabel: string, notInstalledLabel: string): string {
   switch (spec.kind) {
     case "status":
-      return s.statuses[spec.value as keyof typeof s.statuses];
+      return t(`library.status.${spec.value}`);
     case "store":
-      return s.stores[spec.value as keyof typeof s.stores];
+      return t(`sources.store.${spec.value}`);
     case "install":
       return spec.value === "installed" ? installedLabel : notInstalledLabel;
     default:
@@ -74,7 +73,7 @@ export function CategoriasDaLista({
       return {
         id: game.id,
         title: game.title,
-        hint: percent === undefined ? null : listLabels.downloading(percent),
+        hint: percent === undefined ? null : t("library.row_downloading", { percent }),
         accentColor: game.accent,
         hasArt: devCover ? true : game.hasCover,
         coverUrl: devCover ? devCover(game.id, game.title) : null,
@@ -89,13 +88,13 @@ export function CategoriasDaLista({
       return [
         {
           id: spec.id,
-          title: titleOf(spec, installedLabel, notInstalledLabel),
-          countLabel: s.count(data.total),
+          title: titleOf(spec, t, installedLabel, notInstalledLabel),
+          countLabel: t("common.games", { n: data.total }),
           games: data.games.map(toGame),
         },
       ];
     });
-  }, [specs, groups, downloading, devCover, activeId, selection, installedLabel, notInstalledLabel]);
+  }, [specs, groups, downloading, devCover, activeId, selection, installedLabel, notInstalledLabel, t]);
 
   // A ordem em que as capas aparecem (sem repetir o jogo que está em mais de uma fileira): base do Shift + clique.
   const order = useMemo(() => [...new Set(rows.flatMap((row) => row.games.map((game) => game.id)))], [rows]);
@@ -149,17 +148,17 @@ export function CategoriasDaLista({
     >
       {loading && rows.length === 0 ? (
         <p className={styles["status"]} role="status">
-          {v.loadingGroups}
+          {t("library.loading_groups")}
         </p>
       ) : (
         <BibliotecaCategorias
           groups={rows}
           labels={{
-            previous: v.previous,
-            next: v.next,
-            gamesCount: s.count,
+            previous: t("common.previous"),
+            next: t("common.next"),
+            gamesCount: (n: number) => t("common.games", { n }),
             empty,
-            region: v.categoriesRegion,
+            region: t("library.categories_region"),
           }}
           loading={loading}
           onOpen={onActivate}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SourceIdChoice } from "../../bridge/generated/SourceIdChoice";
 import type { SourceIdMatch } from "../../bridge/generated/SourceIdMatch";
 import type { SourceIdState } from "../../bridge/generated/SourceIdState";
@@ -6,17 +6,10 @@ import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
-import { sourceIdsStrings as s } from "../strings";
+import { useT } from "../../i18n";
 import { describeSource, matchDetail, matchMarker, type SourceLabels } from "./editarModel";
 import { useSourceIds } from "./useSourceIds";
 import styles from "./editar.module.css";
-
-const LABELS: SourceLabels = {
-  noneChosen: s.noneChosen,
-  noMatch: s.noMatch,
-  chosen: s.chosen,
-  automatic: s.automaticLower,
-};
 
 interface DialogoFontesEIdsProps {
   gameId: string;
@@ -33,6 +26,7 @@ interface DialogoFontesEIdsProps {
  * fonte dizer qual jogo é e o usuário confirmar.
  */
 export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFontesEIdsProps) {
+  const t = useT();
   const ids = useSourceIds(gameId, open);
   const { view, loadFailed, results, term, searching, searchFailed, check, setCheck, search, verify, choose } = ids;
   /** O que o usuário digitou no campo do nome; enquanto não digita, vale o título (a busca de abertura saiu com ele). */
@@ -40,6 +34,16 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
   const [typing, setTyping] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const termText = termEdit ?? view?.title ?? "";
+
+  const labels: SourceLabels = useMemo(
+    () => ({
+      noneChosen: t("source_ids.none_chosen"),
+      noMatch: t("source_ids.no_match"),
+      chosen: t("source_ids.chosen"),
+      automatic: t("source_ids.automatic_lower"),
+    }),
+    [t],
+  );
 
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -53,17 +57,17 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
 
   useEffect(() => {
     if (open && loadFailed) {
-      onNotice("error", s.loadError);
+      onNotice("error", t("source_ids.load_error"));
       onClose();
     }
-  }, [open, loadFailed, onNotice, onClose]);
+  }, [open, loadFailed, onNotice, onClose, t]);
 
   if (!view) return null;
 
   const apply = async (source: string, choice: SourceIdChoice, name: string) => {
     const result = await choose(source, choice);
     if (!result.ok) {
-      onNotice("error", s.saveError);
+      onNotice("error", t("source_ids.save_failed"));
       return;
     }
     setTyping(null);
@@ -71,10 +75,10 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
     onNotice(
       "success",
       choice.kind === "auto"
-        ? s.autoDone(source)
+        ? t("source_ids.auto_done", { source })
         : choice.kind === "none"
-          ? s.noneDone(view.title, source)
-          : s.pinnedDone(view.title, name, source),
+          ? t("source_ids.none_done", { game: view.title, source })
+          : t("source_ids.pinned_done", { game: view.title, name, source }),
     );
   };
 
@@ -96,9 +100,9 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
     const mine = check && check.source === state.source ? check : null;
     return (
       <GrupoDeConfiguracao key={state.source} title={state.source.toUpperCase()}>
-        <LinhaDeConfiguracao title={describeSource(state, LABELS)} />
+        <LinhaDeConfiguracao title={describeSource(state, labels)} />
         <LinhaDeConfiguracao
-          title={s.typeId}
+          title={t("source_ids.type_id")}
           description={state.example}
           onClick={() => {
             if (isTyping) setTyping(null);
@@ -115,30 +119,30 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
           >
             <div className={styles["typingRow"]}>
               <CampoDeTexto
-                label={s.idIn(state.source)}
+                label={t("source_ids.id_in", { source: state.source })}
                 value={typed}
                 placeholder={state.example}
                 autoFocus
                 maxLength={1024}
-                error={mine?.state === "invalid" ? mine.message : mine?.state === "unknown" ? s.unknownId(state.source) : undefined}
+                error={mine?.state === "invalid" ? mine.message : mine?.state === "unknown" ? t("source_ids.unknown_id", { source: state.source }) : undefined}
                 onChange={(value) => {
                   setTyped(value);
                   if (mine) setCheck(null);
                 }}
               />
               <BotaoDesktop type="submit" variant="outlined" disabled={typed.trim() === "" || mine?.state === "checking"}>
-                {s.check}
+                {t("source_ids.check")}
               </BotaoDesktop>
             </div>
             {mine?.state === "checking" && (
               <p className={styles["info"]} role="status">
-                {s.checking(state.source)}
+                {t("source_ids.checking", { source: state.source })}
               </p>
             )}
             {mine?.state === "found" && (
               <div className={styles["confirm"]} role="status">
-                <p className={styles["confirmTitle"]}>{s.confirmTitle(mine.name)}</p>
-                <p className={styles["info"]}>{s.confirmText(state.source, mine.id)}</p>
+                <p className={styles["confirmTitle"]}>{t("source_ids.confirm_title", { name: mine.name })}</p>
+                <p className={styles["info"]}>{t("source_ids.confirm_text", { source: state.source, id: mine.id })}</p>
                 <div className={styles["confirmActions"]}>
                   <BotaoDesktop
                     size="sm"
@@ -146,7 +150,7 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
                       void apply(state.source, { kind: "id", value: mine.id }, mine.name);
                     }}
                   >
-                    {s.use}
+                    {t("source_ids.use")}
                   </BotaoDesktop>
                   <BotaoDesktop
                     size="sm"
@@ -155,7 +159,7 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
                       setCheck(null);
                     }}
                   >
-                    {s.cancel}
+                    {t("common.cancel")}
                   </BotaoDesktop>
                 </div>
               </div>
@@ -163,23 +167,23 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
           </form>
         )}
         <LinhaDeConfiguracao
-          title={s.none}
-          description={s.noneText}
+          title={t("source_ids.none")}
+          description={t("source_ids.none_text")}
           onClick={() => {
             void apply(state.source, { kind: "none" }, "");
           }}
         />
         {state.pinned && (
           <LinhaDeConfiguracao
-            title={s.automatic}
-            description={s.automaticText}
+            title={t("source_ids.automatic")}
+            description={t("source_ids.automatic_text")}
             onClick={() => {
               void apply(state.source, { kind: "auto" }, "");
             }}
           />
         )}
-        {searching && term !== null && <LinhaDeConfiguracao title={s.searching(term)} />}
-        {!searching && term !== null && matches.length === 0 && <LinhaDeConfiguracao title={s.nothing(term)} />}
+        {searching && term !== null && <LinhaDeConfiguracao title={t("source_ids.searching", { term })} />}
+        {!searching && term !== null && matches.length === 0 && <LinhaDeConfiguracao title={t("source_ids.nothing", { term })} />}
         {!searching &&
           matches.map((match) => {
             const marker = matchMarker(match, state, best);
@@ -199,7 +203,7 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
   };
 
   return (
-    <Dialogo open={open} onClose={onClose} title={s.title(view.title)} closeLabel={s.close} size="l">
+    <Dialogo open={open} onClose={onClose} title={t("source_ids.title", { game: view.title })} closeLabel={t("common.close")} size="l">
       <div className={styles["list"]}>
         <form
           className={styles["search"]}
@@ -209,17 +213,17 @@ export function DialogoFontesEIds({ gameId, open, onClose, onNotice }: DialogoFo
           }}
         >
           <CampoDeTexto
-            label={s.term}
+            label={t("source_ids.term")}
             value={termText}
             maxLength={200}
             onChange={setTermEdit}
-            error={searchFailed ? s.searchError : undefined}
+            error={searchFailed ? t("source_ids.search_error") : undefined}
           />
           <BotaoDesktop type="submit" variant="outlined" icon="search" disabled={termText.trim() === "" || searching}>
-            {s.search}
+            {t("source_ids.search")}
           </BotaoDesktop>
         </form>
-        {view.sources.length === 0 ? <p className={styles["info"]}>{s.noSources}</p> : view.sources.map(sourceRows)}
+        {view.sources.length === 0 ? <p className={styles["info"]}>{t("source_ids.no_sources")}</p> : view.sources.map(sourceRows)}
       </div>
     </Dialogo>
   );

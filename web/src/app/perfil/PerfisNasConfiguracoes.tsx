@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Aviso } from "../../components/Aviso/Aviso";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
 import { useT } from "../../i18n";
-import { profileStrings as s } from "../strings";
 import { PerfisDialogo } from "./PerfisDialogo";
 import { profileName } from "./perfilModel";
 import { useProfiles } from "./useProfiles";
@@ -40,7 +39,7 @@ export function PerfisNasConfiguracoes() {
         profiles={profiles}
         onChanged={profiles.reload}
         onSwitched={(name) => {
-          setNotice((before) => ({ open: true, text: s.restartNotice(name), key: before.key + 1 }));
+          setNotice((before) => ({ open: true, text: t("profiles.web.restart_notice", { name }), key: before.key + 1 }));
         }}
       />
       <Aviso

@@ -4,7 +4,6 @@ import { Abas, type Aba } from "../../components/Abas/Abas";
 import { Aviso } from "../../components/Aviso/Aviso";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { useT } from "../../i18n";
-import { profileStrings as s } from "../strings";
 import { ColecoesDoPerfil } from "./ColecoesDoPerfil";
 import { PerfisDialogo } from "./PerfisDialogo";
 import { PROFILE_TABS, initial, lastPlayedText, profileName, type ProfileTab } from "./perfilModel";
@@ -45,14 +44,14 @@ export function TelaPerfil({ onOpenGame, onOpenCollection }: TelaPerfilProps) {
       <div className={styles["pagina"]}>
         {status === "error" ? (
           <div className={styles["aviso"]} role="alert">
-            {s.loadError}
+            {t("profile.web.load_error")}
             <button type="button" className={styles["retry"]} onClick={reload}>
-              {s.retry}
+              {t("profile.web.retry")}
             </button>
           </div>
         ) : (
           <p className={styles["aviso"]} role="status">
-            {s.loading}
+            {t("profile.web.loading")}
           </p>
         )}
       </div>
@@ -101,7 +100,7 @@ export function TelaPerfil({ onOpenGame, onOpenCollection }: TelaPerfilProps) {
         </div>
       </header>
 
-      <Abas variant="loja" label={s.tabs} idPrefix={TAB_PREFIX} tabs={tabs} value={tab} onChange={setTab} />
+      <Abas variant="loja" label={t("profile.web.tabs")} idPrefix={TAB_PREFIX} tabs={tabs} value={tab} onChange={setTab} />
 
       <div
         className={styles["painel"]}
@@ -131,7 +130,7 @@ export function TelaPerfil({ onOpenGame, onOpenCollection }: TelaPerfilProps) {
         profiles={profiles}
         onChanged={reload}
         onSwitched={(switched) => {
-          setNotice((before) => ({ open: true, text: s.restartNotice(switched), key: before.key + 1 }));
+          setNotice((before) => ({ open: true, text: t("profiles.web.restart_notice", { name: switched }), key: before.key + 1 }));
         }}
       />
       <Aviso

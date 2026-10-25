@@ -3,7 +3,7 @@ import type { AudioOutputList } from "../../bridge/generated/AudioOutputList";
 import type { DisplayInfo } from "../../bridge/generated/DisplayInfo";
 import type { OpcaoDeSelecao } from "../../components/CampoDeSelecao/CampoDeSelecao";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
-import { settingsStrings } from "../strings";
+import { useT } from "../../i18n";
 import { LinhaChave, LinhaSelecao, type CategoryProps } from "./Linhas";
 import {
   DEFAULTS,
@@ -16,8 +16,6 @@ import {
   type SettingsMap,
 } from "./model";
 import { useSystemList } from "./useSystemList";
-
-const s = settingsStrings.screen;
 
 const readDisplays = () => call("system.displays");
 const readOutputs = () => call("system.audio_outputs");
@@ -35,6 +33,7 @@ function withSaved(options: OpcaoDeSelecao<string>[], value: string, label: stri
  * sem dado some. Ao trocar de tela, resolução, HDR e VRR voltam ao padrão (o núcleo guarda os da tela anterior).
  */
 export function TelaCategoria({ values, save, read }: CategoryProps) {
+  const t = useT();
   const displays = useSystemList(readDisplays);
   const outputs = useSystemList(readOutputs);
   const list = displays.status === "ready" ? displays.data : null;
@@ -59,34 +58,34 @@ export function TelaCategoria({ values, save, read }: CategoryProps) {
   const displayOptions = withSaved(
     (list?.displays ?? []).map((display) => ({ value: display.id, label: display.name })),
     selected?.id ?? screenId,
-    screenId ? (values[KEYS.screenName] ?? screenId) : s.display.choose,
+    screenId ? (values[KEYS.screenName] ?? screenId) : t("settings.screen_web.choose_display"),
   );
   const displayDescription =
     displays.status === "failed"
-      ? s.display.error
+      ? t("settings.screen_web.display_error")
       : list && list.displays.length === 0
-        ? s.display.none
-        : s.display.description;
+        ? t("settings.screen.no_displays")
+        : t("settings.screen.display_desc_desktop");
 
   return (
     <>
-      <GrupoDeConfiguracao title={s.screen}>
+      <GrupoDeConfiguracao title={t("settings.screen_web.screen_header")}>
         {managed && (
           <LinhaDeConfiguracao
-            title={s.managed.title}
-            description={s.managed.description}
-            control={<span>{s.managed.value}</span>}
+            title={t("settings.screen.managed")}
+            description={t("settings.screen.managed_desc")}
+            control={<span>{t("settings.screen.managed_value")}</span>}
           />
         )}
         <LinhaChave
-          title={s.enabled.title}
-          description={s.enabled.description}
+          title={t("settings.screen.enabled")}
+          description={t("settings.screen.enabled_desc")}
           checked={readBool(values, KEYS.screenEnabled, DEFAULTS.screenEnabled)}
           disabled={managed}
           onChange={(on) => void save(KEYS.screenEnabled, boolText(on))}
         />
         <LinhaSelecao
-          title={s.display.title}
+          title={t("settings.screen.display")}
           description={displayDescription}
           options={displayOptions}
           value={selected?.id ?? screenId}
@@ -97,19 +96,19 @@ export function TelaCategoria({ values, save, read }: CategoryProps) {
           }}
         />
         <LinhaChave
-          title={s.hide.title}
-          description={s.hide.description}
+          title={t("settings.screen.hide")}
+          description={t("settings.screen.hide_desc")}
           checked={readHideOthers(values)}
           disabled={managed}
           onChange={(on) => void save(KEYS.screenHideOthers, hideOthersText(on))}
         />
         {selected && (
           <LinhaSelecao
-            title={s.mode.title}
-            description={s.mode.description}
+            title={t("settings.screen.mode")}
+            description={t("settings.screen.mode_desc")}
             options={withSaved(
               [
-                { value: "", label: s.mode.keep },
+                { value: "", label: t("settings.screen.keep_mode") },
                 ...selected.modes.map((key) => ({ value: key, label: modeLabel(key) })),
               ],
               mode,
@@ -122,8 +121,8 @@ export function TelaCategoria({ values, save, read }: CategoryProps) {
         )}
         {selected && selected.hdr !== "unsupported" && (
           <LinhaChave
-            title={s.hdr.title}
-            description={s.hdr.description}
+            title={t("settings.screen.hdr")}
+            description={t("settings.screen.hdr_desc")}
             checked={readBool(values, KEYS.screenHdr, DEFAULTS.screenHdr)}
             disabled={managed}
             onChange={(on) => void save(KEYS.screenHdr, boolText(on))}
@@ -132,9 +131,9 @@ export function TelaCategoria({ values, save, read }: CategoryProps) {
         {/* O VRR aparece mesmo sem suporte, desligado e com o motivo (no Windows falta API pública). */}
         {selected && (
           <LinhaChave
-            title={s.vrr.title}
+            title={t("vrr.toggle")}
             description={
-              selected.vrr === "unsupported" ? (list?.vrrLimitation ?? s.vrr.unsupported) : s.vrr.description
+              selected.vrr === "unsupported" ? (list?.vrrLimitation ?? t("vrr.unsupported")) : t("vrr.toggle_desc")
             }
             checked={selected.vrr !== "unsupported" && readBool(values, KEYS.screenVrr, DEFAULTS.screenVrr)}
             disabled={managed || selected.vrr === "unsupported"}
@@ -142,25 +141,25 @@ export function TelaCategoria({ values, save, read }: CategoryProps) {
           />
         )}
       </GrupoDeConfiguracao>
-      <GrupoDeConfiguracao title={s.audio}>
+      <GrupoDeConfiguracao title={t("settings.screen.audio_header")}>
         <AudioRow outputs={outputs.status === "ready" ? outputs.data : null} failed={outputs.status === "failed"} values={values} save={save} />
       </GrupoDeConfiguracao>
-      <GrupoDeConfiguracao title={s.during}>
+      <GrupoDeConfiguracao title={t("settings.screen_web.during_header")}>
         <LinhaChave
-          title={s.restore.title}
-          description={s.restore.description}
+          title={t("settings.screen.restore")}
+          description={t("settings.screen.restore_desc")}
           checked={readBool(values, KEYS.restoreEnvironment, DEFAULTS.restoreEnvironment)}
           onChange={(on) => void save(KEYS.restoreEnvironment, boolText(on))}
         />
         <LinhaChave
-          title={s.cursor.title}
-          description={s.cursor.description}
+          title={t("settings.screen.cursor")}
+          description={t("settings.screen.cursor_desc")}
           checked={readBool(values, KEYS.hideCursor, DEFAULTS.hideCursor)}
           onChange={(on) => void save(KEYS.hideCursor, boolText(on))}
         />
         <LinhaChave
-          title={s.mouse.title}
-          description={s.mouse.description}
+          title={t("settings.screen.mouse")}
+          description={t("settings.screen.mouse_desc")}
           checked={readBool(values, KEYS.controllerMouse, DEFAULTS.controllerMouse)}
           onChange={(on) => void save(KEYS.controllerMouse, boolText(on))}
         />
@@ -177,11 +176,12 @@ interface AudioRowProps extends Pick<CategoryProps, "values" | "save"> {
 
 /** "Saída de áudio do jogo": "Não alterar" ou uma das saídas; desligada se o sistema não deixa trocar. */
 function AudioRow({ outputs, failed, values, save }: AudioRowProps) {
+  const t = useT();
   const audioId = values[KEYS.audioId] ?? "";
   const known = outputs?.outputs.find((output) => sameId(output.id, audioId));
   const options = withSaved(
     [
-      { value: "", label: s.audioOutput.keep },
+      { value: "", label: t("settings.screen.audio_keep") },
       ...(outputs?.outputs ?? []).map((output) => ({ value: output.id, label: output.name })),
     ],
     known?.id ?? audioId,
@@ -190,8 +190,8 @@ function AudioRow({ outputs, failed, values, save }: AudioRowProps) {
   const locked = outputs !== null && !outputs.canSwitch;
   return (
     <LinhaSelecao
-      title={s.audioOutput.title}
-      description={failed ? s.audioOutput.error : locked ? s.audioOutput.locked : s.audioOutput.description}
+      title={t("settings.screen.audio")}
+      description={failed ? t("settings.screen_web.audio_output_error") : locked ? t("settings.screen.audio_locked") : t("settings.screen.audio_desc")}
       options={options}
       value={known?.id ?? audioId}
       disabled={outputs === null || locked}

@@ -4,7 +4,6 @@ import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { useT } from "../../i18n";
-import { profileStrings as s } from "../strings";
 
 /** Maior nome de coleção que o núcleo aceita (`collections.name_rule`: "Até 40 caracteres"). */
 const MAX_NAME = 40;
@@ -45,7 +44,7 @@ export function NovaColecaoDialogo({ open, onClose }: NovaColecaoDialogoProps) {
       // Nome vazio, repetido ou grande demais volta como `bad_request`; o resto é falha do núcleo.
       const invalid = failure instanceof CallError && failure.error.code === "bad_request";
       if (!invalid) console.error("collections.create", failure);
-      setError(invalid ? t("collections.name_rule") : s.saveError);
+      setError(invalid ? t("collections.name_rule") : t("profile.web.save_error"));
     } finally {
       setBusy(false);
     }

@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { call } from "../../bridge";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
+import { useT } from "../../i18n";
 import { LinhasDeAtualizacao } from "../atualizacao/LinhasDeAtualizacao";
-import { settingsStrings } from "../strings";
 
-const s = settingsStrings.about;
+const LICENSE_URL = "https://www.gnu.org/licenses/agpl-3.0.html";
+const SOURCE_URL = "https://github.com/lipanski/tako";
 
 /** Abre o endereço no navegador do sistema: o hospedeiro manda janelas novas e links externos para fora do app. */
 function openExternal(url: string) {
@@ -14,6 +15,7 @@ function openExternal(url: string) {
 
 /** Configurações › Sobre: a versão (`app.info`), a licença e o código-fonte. Sem versão, a linha some. */
 export function SobreCategoria() {
+  const t = useT();
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -31,38 +33,38 @@ export function SobreCategoria() {
 
   return (
     <>
-      <GrupoDeConfiguracao title={s.app}>
+      <GrupoDeConfiguracao title={t("settings.about_web.app")}>
         {version !== null && (
-          <LinhaDeConfiguracao title={s.version} control={<span>{version}</span>} />
+          <LinhaDeConfiguracao title={t("settings.about.version")} control={<span>{version}</span>} />
         )}
         <LinhaDeConfiguracao
-          title={s.license.title}
-          description={s.license.description}
+          title={t("settings.about.license")}
+          description={t("settings.about.license_desc")}
           control={
             <>
-              <span>{s.license.value}</span>
+              <span>{t("settings.about.license_value")}</span>
               <BotaoDesktop
                 variant="outlined"
                 onClick={() => {
-                  openExternal(s.license.url);
+                  openExternal(LICENSE_URL);
                 }}
               >
-                {s.license.action}
+                {t("settings.about_web.license_action")}
               </BotaoDesktop>
             </>
           }
         />
         <LinhaDeConfiguracao
-          title={s.source.title}
-          description={s.source.description}
+          title={t("settings.about.source")}
+          description={t("settings.about.source_desc")}
           control={
             <BotaoDesktop
               variant="outlined"
               onClick={() => {
-                openExternal(s.source.url);
+                openExternal(SOURCE_URL);
               }}
             >
-              {s.source.action}
+              {t("settings.about_web.source_action")}
             </BotaoDesktop>
           }
         />

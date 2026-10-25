@@ -7,7 +7,6 @@ import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { cx } from "../../lib/cx";
 import { useT } from "../../i18n";
-import { collectionStrings as s } from "../strings";
 import { cleanName, nameProblem, ofKind } from "./colecoesModel";
 import { ExcluirColecao } from "./ExcluirColecao";
 import { problemText } from "./problemaDoNome";
@@ -53,7 +52,7 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
       })
       .catch((e: unknown) => {
         console.error("coleções: ação", e);
-        onDone(true, s.saveError);
+        onDone(true, t("library.collection.save_error"));
       })
       .finally(() => {
         setBusy(false);
@@ -67,7 +66,7 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
     if (newProblem) return;
     run(
       () => call("collections.create", { name: cleanName(newName) }),
-      s.created,
+      t("library.collection.created"),
       () => {
         setNewName("");
         setNewTouched(false);
@@ -82,7 +81,7 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
     const { id, name } = renaming;
     run(
       () => call("collections.rename", { collectionId: id, name: cleanName(name) }),
-      s.renamed,
+      t("library.collection.renamed"),
       () => {
         setRenaming(null);
       },
@@ -97,7 +96,7 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
     const { id } = deleting;
     run(
       () => call("collections.delete", { collectionId: id }),
-      s.deleted,
+      t("library.collection.deleted"),
       () => {
         onDeleted(id);
         closeDelete();
@@ -140,7 +139,7 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
                   <form className={styles["renameForm"]} onSubmit={rename}>
                     <CampoDeTexto
                       className={cx(styles["createField"])}
-                      label={s.renameFor(c.name)}
+                      label={t("library.collection.rename_for", { name: c.name })}
                       hideLabel
                       value={renaming.name}
                       error={renameProblem ? problemText(t, renameProblem) : undefined}
@@ -170,7 +169,7 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
                   <span className={styles["rowActions"]}>
                     <BotaoDesktop
                       variant="outlined"
-                      aria-label={s.renameFor(c.name)}
+                      aria-label={t("library.collection.rename_for", { name: c.name })}
                       disabled={busy}
                       onClick={() => {
                         setRenaming({ id: c.id, name: c.name, auto: c.criteria !== null });
@@ -181,21 +180,21 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
                     {c.criteria && (
                       <BotaoDesktop
                         variant="outlined"
-                        aria-label={s.useCurrentFor(c.name)}
+                        aria-label={t("library.collection.use_current_for", { name: c.name })}
                         disabled={busy}
                         onClick={() => {
                           run(
                             () => call("collections.smart.set", { collectionId: c.id, name: c.name, criteria: rule }),
-                            s.savedRule,
+                            t("library.collection.saved_rule"),
                           );
                         }}
                       >
-                        {s.useCurrent}
+                        {t("library.collection.use_current")}
                       </BotaoDesktop>
                     )}
                     <BotaoDesktop
                       variant="outlined"
-                      aria-label={s.deleteFor(c.name)}
+                      aria-label={t("library.collection.delete_for", { name: c.name })}
                       disabled={busy}
                       onClick={() => {
                         setDeleting(c);

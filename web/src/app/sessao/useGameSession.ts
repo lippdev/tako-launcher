@@ -3,7 +3,6 @@ import { call, on } from "../../bridge";
 import type { AvisoTone } from "../../components/Aviso/Aviso";
 import { useT } from "../../i18n";
 import { formatDuration } from "../jogo/jogoModel";
-import { gameStrings } from "../strings";
 import {
   elapsedMinutes,
   isClosingDialogOpen,
@@ -86,11 +85,11 @@ export function useSessionActions() {
       async play(game: { id: string; title: string }): Promise<PlayFeedback> {
         const other = store.getState().running;
         const result = await store.play(game.id, game.title);
-        if (result === "ok") return { tone: "tako", text: gameStrings.notices.opening(game.title) };
+        if (result === "ok") return { tone: "tako", text: t("game_page.notice_opening", { title: game.title }) };
         if (result === "conflict" && other && other.gameId !== game.id) {
           return { tone: "error", text: t("session.other_running", { game: other.title }) };
         }
-        return { tone: "error", text: result === "conflict" ? gameStrings.notices.cannotPlay : gameStrings.notices.playError };
+        return { tone: "error", text: result === "conflict" ? t("game_page.cannot_play") : t("game_page.play_error") };
       },
       /** Volta para a janela do jogo (a interface fecha e o jogo fica na frente). */
       resume: () => store.resume(),

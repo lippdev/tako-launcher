@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CallError, call, on } from "../../bridge";
 import type { GameEdit } from "../../bridge/generated/GameEdit";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
@@ -6,11 +6,9 @@ import { CampoDeSelecao } from "../../components/CampoDeSelecao/CampoDeSelecao";
 import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
-import { editGameStrings as s } from "../strings";
+import { useT } from "../../i18n";
 import { draftOf, editProblem, isDirty, toSet, TRACKING_ORDER, type EditDraft, type EditProblem } from "./editarModel";
 import styles from "./editar.module.css";
-
-const TRACKING_OPTIONS = TRACKING_ORDER.map((value) => ({ value, label: s.trackingOptions[value] }));
 
 interface DialogoEditarJogoProps {
   gameId: string;
@@ -27,12 +25,22 @@ interface DialogoEditarJogoProps {
  * adicionado à mão. O arquivo que abre o jogo só aparece: trocar o arquivo é adicionar outro jogo.
  */
 export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: DialogoEditarJogoProps) {
+  const t = useT();
   const [edit, setEdit] = useState<GameEdit | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<EditProblem | null>(null);
   const pendingPickId = useRef<number | null>(null);
   const formId = useId();
+
+  const trackingOptions = useMemo(
+    () =>
+      TRACKING_ORDER.map((value) => ({
+        value,
+        label: t(value === "install_folder" ? "edit_game.track.folder" : `edit_game.track.${value}`),
+      })),
+    [t],
+  );
 
   // Cada abertura começa sem a sobra da anterior (ajuste de estado durante o desenho).
   const [wasOpen, setWasOpen] = useState(open);
@@ -62,14 +70,14 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
       (failure: unknown) => {
         console.error("game.edit", failure);
         if (cancelled) return;
-        onError(failure instanceof CallError && failure.error.code === "conflict" ? s.notManual : s.loadError);
+        onError(failure instanceof CallError && failure.error.code === "conflict" ? t("edit_game.not_manual") : t("edit_game.load_error"));
         onClose();
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [open, gameId, onClose, onError]);
+  }, [open, gameId, onClose, onError, t]);
 
   useEffect(() => {
     return on("system.picked", ({ id, path: pickedPath }) => {
@@ -120,25 +128,25 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
     }
   };
 
-  const nameError = problem === "name" ? s.nameRequired : undefined;
-  const folderError = problem === "folder" ? s.folderMissing(draft.workingDirectory.trim()) : undefined;
+  const nameError = problem === "name" ? t("edit_game.name_required") : undefined;
+  const folderError = problem === "folder" ? t("game_settings.folder_missing", { folder: draft.workingDirectory.trim() }) : undefined;
   const generalError =
-    problem === "invalid" ? s.invalid : problem === "manual" ? s.notManual : problem === "save" ? s.saveError : undefined;
+    problem === "invalid" ? t("edit_game.invalid") : problem === "manual" ? t("edit_game.not_manual") : problem === "save" ? t("source_ids.save_failed") : undefined;
 
   return (
     <Dialogo
       open={open}
       onClose={onClose}
-      title={s.title}
-      closeLabel={s.close}
+      title={t("edit_game.title")}
+      closeLabel={t("common.close")}
       size="m"
       actions={
         <>
           <BotaoDesktop variant="outlined" onClick={onClose}>
-            {s.cancel}
+            {t("common.cancel")}
           </BotaoDesktop>
           <BotaoDesktop type="submit" form={formId} disabled={saving || !isDirty(draft, edit)}>
-            {s.save}
+            {t("common.save")}
           </BotaoDesktop>
         </>
       }
@@ -152,7 +160,7 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
         }}
       >
         <CampoDeTexto
-          label={s.name}
+          label={t("edit_game.name")}
           value={draft.title}
           maxLength={200}
           autoFocus
@@ -162,21 +170,21 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
           }}
         />
         <CampoDeTexto
-          label={s.arguments}
+          label={t("edit_game.arguments")}
           value={draft.arguments}
           maxLength={1024}
-          help={s.argumentsHint}
+          help={t("game_settings.none")}
           onChange={(args) => {
             change({ arguments: args });
           }}
         />
         <div className={styles["typingRow"]}>
           <CampoDeTexto
-            label={s.folder}
+            label={t("game_settings.folder")}
             value={draft.workingDirectory}
             maxLength={1024}
             placeholder={edit.defaultFolder ?? ""}
-            help={s.folderHint}
+            help={t("game_settings.folder_hint")}
             error={folderError}
             onChange={(workingDirectory) => {
               change({ workingDirectory });
@@ -189,16 +197,16 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
               void pickFolder();
             }}
           >
-            {s.choose}
+            {t("edit_game.choose")}
           </BotaoDesktop>
         </div>
         <GrupoDeConfiguracao>
           <LinhaDeConfiguracao
-            title={s.tracking}
+            title={t("edit_game.tracking")}
             control={
               <CampoDeSelecao
-                label={s.tracking}
-                options={TRACKING_OPTIONS}
+                label={t("edit_game.tracking")}
+                options={trackingOptions}
                 value={draft.tracking}
                 onChange={(tracking) => {
                   change({ tracking });

@@ -17,7 +17,6 @@ import { TelaOnboarding } from "../../components/TelaOnboarding/TelaOnboarding";
 import { useT } from "../../i18n";
 import { useDevArt } from "../busca/useDevArt";
 import { isStoreDisabled } from "../settings/model";
-import { onboardingStrings as s } from "../strings";
 import { RevisarCapas } from "../revisarCapas";
 import { coverChoice, finishChoice, IGDB_KEY, initialMode, modeChoice, nextStep, previousStep, storeChoice, type OpenMode, type Step, type Settings } from "./model";
 import common from "../../components/OnboardingEmuladores/OnboardingEmuladores.module.css";
@@ -49,7 +48,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
     const refreshLibrary = () => {
       void call("library.list", { limit: 15 }).then((data) => {
         if (!cancelled) setPage(data);
-      }).catch(() => { if (!cancelled) setError(s.loadError); });
+      }).catch(() => { if (!cancelled) setError(t("first_run.web.load_error")); });
     };
     const offScan = on("library.scan.progress", (data) => {
       if (!cancelled) setSources(data);
@@ -63,9 +62,9 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
         setPage(games);
         setValues((current) => ({ ...current, ...igdb.values }));
       })
-      .catch(() => { if (!cancelled) setError(s.loadError); });
+      .catch(() => { if (!cancelled) setError(t("first_run.web.load_error")); });
     return () => { cancelled = true; offScan(); offLibrary(); };
-  }, [reload]);
+  }, [reload, t]);
 
   useEffect(() => {
     if (busy || !ready || folderOpen) return;
@@ -83,7 +82,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
     lock.current = true;
     setBusy(true);
     setError("");
-    void action().catch(() => { setError(s.saveError); }).finally(() => {
+    void action().catch(() => { setError(t("first_run.web.save_error")); }).finally(() => {
       lock.current = false;
       setBusy(false);
     });
@@ -139,7 +138,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
     }
   }
 
-  const count = (n: number) => s.gameCount(n);
+  const count = (n: number) => t("first_run.web.game_count", { n });
   const stepLabel = t("first_run.count", { n: step, total: 5 });
   const next = t("first_run.next");
   const goBack = { backLabel: t("first_run.full.back"), onBack: back };
@@ -175,8 +174,8 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
         covers={page?.rows.filter((game) => game.hasCover).map(cover) ?? []}
       >
         {!ready ? <div className={styles["extra"]}>
-          <p role="status">{error || s.loading}</p>
-          {error && <BotaoDesktop onClick={() => { setError(""); setReload((n) => n + 1); }}>{s.retry}</BotaoDesktop>}
+          <p role="status">{error || t("first_run.web.loading")}</p>
+          {error && <BotaoDesktop onClick={() => { setError(""); setReload((n) => n + 1); }}>{t("first_run.web.retry")}</BotaoDesktop>}
         </div> : <>
           {step === 1 && <PassosDoOnboardingMovimento stepKey={step} className={common["root"] ?? ""}>
             <PassosDoOnboardingStaggerItem index={0}><PassosDoOnboarding currentStep={step} label={stepLabel} /></PassosDoOnboardingStaggerItem>
@@ -192,7 +191,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
                   status={!enabled ? "action" : source.clientInstalled ? "ready" : "not-installed"}
                   statusLabel={source.clientInstalled ? count(source.found) : t("first_run.full.stores_missing")}
                   control={<Chave
-                    aria-label={s.toggleStore(source.name)}
+                    aria-label={t("first_run.web.toggle_store", { name: source.name })}
                     checked={enabled}
                     onChange={(checked) => run(async () => { await save(storeChoice(values["DisabledStores"], source.store, checked)); await call("library.scan"); })}
                   />}
@@ -214,7 +213,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
               stepLabel={stepLabel}
               title={t("first_run.full.emulators")}
               description={t("first_run.full.emulators_text")}
-              emulators={emulators.emulators.slice(0, 4).map((item) => ({ id: item.key, name: item.name, status: item.found ? "ready" : "not-installed", details: item.path ?? "", statusLabel: item.found ? s.found : t("first_run.full.stores_missing") }))}
+              emulators={emulators.emulators.slice(0, 4).map((item) => ({ id: item.key, name: item.name, status: item.found ? "ready" : "not-installed", details: item.path ?? "", statusLabel: item.found ? t("first_run.web.found") : t("first_run.full.stores_missing") }))}
               romsFolder={{ name: t("first_run.full.roms"), details: emulators.romFolders.map((folder) => folder.path).join(" · ") || t("first_run.full.roms_none"), actionLabel: t("first_run.full.roms_choose"), onAction: () => { setFolderOpen(true); } }}
               continueLabel={next}
               onContinue={proceed}
@@ -232,9 +231,9 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
                 value={path}
                 onChange={setPath}
                 autoFocus
-                help={s.folderHelp}
+                help={t("first_run.web.folder_help")}
               />
-              <div className={styles["actions"]}><BotaoDesktop type="submit" disabled={!path.trim()}>{s.addFolder}</BotaoDesktop><BotaoDesktop variant="outlined" onClick={() => { setFolderOpen(false); }}>{s.cancel}</BotaoDesktop></div>
+              <div className={styles["actions"]}><BotaoDesktop type="submit" disabled={!path.trim()}>{t("first_run.web.add_folder")}</BotaoDesktop><BotaoDesktop variant="outlined" onClick={() => { setFolderOpen(false); }}>{t("common.cancel")}</BotaoDesktop></div>
             </form>}
             <BotaoDesktop variant="outlined" onClick={back}>{goBack.backLabel}</BotaoDesktop>
           </>}
@@ -242,11 +241,11 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
             stepLabel={stepLabel}
             title={t("first_run.full.metadata")}
             description={t("first_run.full.metadata_text")}
-            gameTitle={comparison?.title ?? s.noGame}
+            gameTitle={comparison?.title ?? t("first_run.web.no_game")}
             {...(comparison ? { gameCoverUrl: cover(comparison) } : {})}
             comparisonNote={t("first_run.full.cover_with")}
             optionsAriaLabel={t("first_run.metadata")}
-            options={[{ value: "igdb", title: t("first_run.full.igdb"), description: s.igdbKeyNote }, { value: "stores", title: t("first_run.full.stores_only"), description: t("first_run.full.stores_only_desc") }]}
+            options={[{ value: "igdb", title: t("first_run.full.igdb"), description: t("first_run.web.igdb_key_note") }, { value: "stores", title: t("first_run.full.stores_only"), description: t("first_run.full.stores_only_desc") }]}
             value={values[IGDB_KEY] === "true" ? "igdb" : "stores"}
             onChange={(value) => run(() => save(coverChoice(value === "igdb")))}
             continueLabel={next}
@@ -265,7 +264,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
             continueLabel={next}
             onContinue={proceed}
             {...goBack}
-            footerNote={s.fullscreenNote}
+            footerNote={t("first_run.web.fullscreen_note")}
           />}
           {step === 5 && <OnboardingPronto
             stepLabel={stepLabel}

@@ -4,16 +4,17 @@ import { call, on } from "../bridge";
 import type { Collection } from "../bridge/generated/Collection";
 import type { Tag } from "../bridge/generated/Tag";
 import type { LibraryGame } from "../bridge/generated/LibraryGame";
+import { useT } from "../i18n";
 import { percentByGame } from "./downloadsModel";
 import { useDownloads } from "./downloadsStore";
 import { libraryGameIcon, libraryGameToRow } from "./libraryRow";
 import type { LibraryCriteria } from "./uiState";
-import { libraryStrings } from "./strings";
 
 export const PAGE_SIZE = 40;
 
 /** Consulta só as páginas alcançadas; respostas de critérios antigos nunca substituem as atuais. */
 export function useLibrary(criteria: LibraryCriteria) {
+  const t = useT();
   // Só a busca espera (~200 ms); abas, filtros, ordenação e coleção valem na hora.
   const [search, setSearch] = useState(criteria.search);
   useEffect(() => {
@@ -154,9 +155,9 @@ export function useLibrary(criteria: LibraryCriteria) {
   const rows = useMemo(
     () =>
       data.games.map((game) =>
-        libraryGameToRow(game, libraryStrings.stores[game.store], downloading.get(game.id) ?? null),
+        libraryGameToRow(game, t(`sources.store.${game.store}`) || game.store, downloading.get(game.id) ?? null),
       ),
-    [data.games, downloading],
+    [data.games, downloading, t],
   );
   const byId = useMemo(() => new Map(data.games.map((game) => [game.id, game])), [data.games]);
   const resolveIcon = useCallback(
@@ -178,18 +179,21 @@ export function useLibrary(criteria: LibraryCriteria) {
     [byId, devCover],
   );
   return {
-    ...data,
-    rows,
+    games: data.games,
+    total: data.total,
+    loading: data.loading,
+    error: data.error,
+    pending,
     collections,
     tags,
-    loadMore,
     refresh,
+    loadMore,
+    rows,
     resolveIcon,
     resolveCover,
     devCover,
     downloading,
     request,
-    pending,
-    queryKey: JSON.stringify(request),
+    queryKey: `${String(revision)}:${JSON.stringify(request)}`,
   };
 }

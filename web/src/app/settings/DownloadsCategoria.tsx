@@ -7,12 +7,9 @@ import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/Linha
 import { useT } from "../../i18n";
 import { UPLOAD_LIMITS, formatBytes, readUploadLimit } from "../downloadsModel";
 import { refreshDownloads } from "../downloadsStore";
-import { downloadsStrings } from "../downloadsStrings";
 import { LinhaChave, LinhaSelecao, type CategoryProps } from "./Linhas";
 import { DEFAULTS, KEYS, boolText, readBool, readLanguage } from "./model";
 import styles from "./TelaConfiguracoes.module.css";
-
-const s = downloadsStrings.settings;
 
 /** "24 de out. de 2026" no idioma da interface; data ilegível não mostra nada. */
 function formatDate(iso: string, language: string): string {
@@ -122,10 +119,10 @@ export function DownloadsCategoria({ values, save }: CategoryProps) {
 
           <GrupoDeConfiguracao title={t("downloads.sources")}>
             {/* TODO(WEB-14b): adicionar, atualizar e remover fontes ainda não existem na ponte; a lista é só leitura. */}
-            {failed && <LinhaDeConfiguracao title={s.sourcesError} />}
-            {!failed && sources === null && <LinhaDeConfiguracao title={s.sourcesLoading} />}
+            {failed && <LinhaDeConfiguracao title={t("downloads.sources_error")} />}
+            {!failed && sources === null && <LinhaDeConfiguracao title={t("downloads.sources_loading")} />}
             {sources?.sources.length === 0 && !sources.loading && (
-              <LinhaDeConfiguracao title={s.sourcesEmpty} description={t("downloads.sources_desc", { count: 0 })} />
+              <LinhaDeConfiguracao title={t("downloads.sources_empty")} description={t("downloads.sources_desc", { count: 0 })} />
             )}
             {sources?.sources.map((source) => (
               <LinhaDeConfiguracao
@@ -137,7 +134,7 @@ export function DownloadsCategoria({ values, save }: CategoryProps) {
                     date: formatDate(source.updatedAt, language),
                   }),
                   source.host,
-                  source.dropped > 0 ? s.sourceDropped(source.dropped) : "",
+                  source.dropped > 0 ? t("downloads.source_dropped", { n: source.dropped }) : "",
                 ]
                   .filter(Boolean)
                   .join(" · ")}

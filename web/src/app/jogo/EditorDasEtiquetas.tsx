@@ -1,17 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { call, on } from "../../bridge";
-import { EditorDeEtiquetas, type EditorDeEtiquetasLabels, type SugestaoDeEtiqueta } from "../../components/EditorDeEtiquetas/EditorDeEtiquetas";
-import { tagEditorStrings as s } from "../strings";
-
-const ROTULOS: EditorDeEtiquetasLabels = {
-  list: s.list,
-  add: s.add,
-  field: s.field,
-  title: s.menuTitle,
-  remove: s.remove,
-  create: s.create,
-  games: s.games,
-};
+import {
+  EditorDeEtiquetas,
+  type EditorDeEtiquetasLabels,
+  type SugestaoDeEtiqueta,
+} from "../../components/EditorDeEtiquetas/EditorDeEtiquetas";
+import { useT } from "../../i18n";
 
 /** Todas as etiquetas da biblioteca (`tags.list`), lidas de novo a cada `library.changed`. */
 function useTagList(): SugestaoDeEtiqueta[] {
@@ -46,17 +40,32 @@ interface EditorDasEtiquetasProps {
 /** O editor de etiquetas da página do jogo, ligado ao núcleo: aplica e tira com `game.tags.set`. */
 export function EditorDasEtiquetas({ gameId, tags, onChanged, onError }: EditorDasEtiquetasProps) {
   const sugestoes = useTagList();
+  const t = useT();
+
+  const labels = useMemo<EditorDeEtiquetasLabels>(
+    () => ({
+      list: t("tags.list"),
+      add: t("tags.placeholder"),
+      field: t("tags.field"),
+      title: t("desktop.info.tags"),
+      remove: (name: string) => t("tags.remove", { name }),
+      create: (name: string) => t("tags.create", { name }),
+      games: (n: number) => t("common.games", { n }),
+    }),
+    [t],
+  );
+
   const change = (name: string, on: boolean) => {
     call("game.tags.set", { gameIds: [gameId], tags: [name], on }).then(onChanged, (error: unknown) => {
       console.error("game.tags.set", error);
-      onError(s.error);
+      onError(t("tags.error"));
     });
   };
   return (
     <EditorDeEtiquetas
       tags={tags}
       suggestions={sugestoes}
-      labels={ROTULOS}
+      labels={labels}
       size="sm"
       align="end"
       onAdd={(name) => {

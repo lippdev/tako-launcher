@@ -3,7 +3,6 @@ import { MenuDeContexto, type MenuCloseReason, type MenuEntry } from "../compone
 import { useT } from "../i18n";
 import { menuLine } from "./atualizacao/atualizacaoModel";
 import { checkForUpdates, useUpdates } from "./atualizacao/atualizacaoStore";
-import { addGameStrings, strings } from "./strings";
 import type { ViewId } from "./uiState";
 import { windowAction } from "./windowActions";
 
@@ -22,18 +21,18 @@ export function MenuDoTako({ open, onClose, anchor, onNavigate, onAddGame }: Men
   const t = useT();
   const { status, transient } = useUpdates();
   // A linha de atualizações muda no lugar conforme o estado, como no Slint (WEB-33).
-  const updates = menuLine(status, transient, strings.menu.checkUpdates, t);
+  const updates = menuLine(status, transient, t("desktop.menu.check_updates"), t);
   const entries = useMemo<MenuEntry[]>(
     () => [
       {
         id: "add-game",
-        label: addGameStrings.menu,
+        label: t("desktop.menu.add_game"),
         icon: "plus",
         onSelect: onAddGame,
       },
       {
         id: "settings",
-        label: strings.menu.settings,
+        label: t("desktop.menu.settings"),
         icon: "gear",
         onSelect: () => {
           onNavigate("configuracoes");
@@ -51,7 +50,7 @@ export function MenuDoTako({ open, onClose, anchor, onNavigate, onAddGame }: Men
       { type: "separator" },
       {
         id: "quit",
-        label: strings.menu.quit,
+        label: t("desktop.menu.quit_app"),
         icon: "x",
         danger: true,
         onSelect: () => {
@@ -60,8 +59,8 @@ export function MenuDoTako({ open, onClose, anchor, onNavigate, onAddGame }: Men
         },
       },
     ],
-    [onNavigate, onAddGame, updates.label, updates.icon, updates.disabled],
+    [onNavigate, onAddGame, updates.label, updates.icon, updates.disabled, t],
   );
 
-  return <MenuDeContexto open={open} onClose={onClose} anchor={anchor} entries={entries} label={strings.topbar.menu} align="start" />;
+  return <MenuDeContexto open={open} onClose={onClose} anchor={anchor} entries={entries} label={t("desktop.topbar.menu")} align="start" />;
 }

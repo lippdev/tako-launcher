@@ -6,7 +6,6 @@ import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
 import { useT, type TFunction } from "../../i18n";
-import { profileStrings as s } from "../strings";
 import { LinhaChave } from "../settings/Linhas";
 import { profileName } from "./perfilModel";
 import type { Profiles, ProfilesResult } from "./useProfiles";
@@ -146,7 +145,7 @@ export function PerfisDialogo({ open, onClose, manageId, profiles, onSwitched, o
               {...(profile.inUse
                 ? { description: t("profiles.in_use") }
                 : profile.next
-                  ? { description: s.nextOpen }
+                  ? { description: t("profiles.web.next_open") }
                   : {})}
               onClick={() => {
                 go({ kind: "manage", id: profile.id });

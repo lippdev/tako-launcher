@@ -10,11 +10,8 @@ import { useLatest } from "../../lib/useLatest";
 import { cleanName, nameProblem, ofKind } from "../colecoes/colecoesModel";
 import { ExcluirColecao } from "../colecoes/ExcluirColecao";
 import { problemText } from "../colecoes/problemaDoNome";
-import { settingsStrings } from "../strings";
 import type { Notify } from "./notice";
 import styles from "./ColecoesAutomaticas.module.css";
-
-const s = settingsStrings.library.smart;
 
 interface AutoCollection {
   collection: Collection;
@@ -26,7 +23,7 @@ interface AutoCollection {
  * As coleções automáticas e quantos jogos cada uma mostra agora. O núcleo resolve os jogos na consulta, então a conta
  * vem de uma página de um jogo em `library.list`. Refaz a lista quando a biblioteca muda.
  */
-function useAutoCollections(onError: (text: string) => void) {
+function useAutoCollections(onError: (text: string) => void, loadErrorMessage: string) {
   const [items, setItems] = useState<AutoCollection[] | null>(null);
   const [version, setVersion] = useState(0);
   // Quem chama passa uma função nova a cada desenho; ler a mais recente evita refazer a consulta a cada desenho.
@@ -52,7 +49,7 @@ function useAutoCollections(onError: (text: string) => void) {
           if (!cancelled) setItems(counted);
         } catch (error) {
           console.error("collections.list falhou", error);
-          if (!cancelled) fail.current(s.loadError);
+          if (!cancelled) fail.current(loadErrorMessage);
         }
       })();
     };
@@ -62,7 +59,7 @@ function useAutoCollections(onError: (text: string) => void) {
       cancelled = true;
       stop();
     };
-  }, [version, fail]);
+  }, [version, fail, loadErrorMessage]);
 
   return { items, reload: useCallback(() => { setVersion((v) => v + 1); }, []) };
 }
@@ -77,7 +74,7 @@ interface ColecoesAutomaticasProps {
  */
 export function ColecoesAutomaticas({ notify }: ColecoesAutomaticasProps) {
   const t = useT();
-  const { items, reload } = useAutoCollections((text) => { notify("error", text); });
+  const { items, reload } = useAutoCollections((text) => { notify("error", text); }, t("smart.load_error"));
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<Collection | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,7 +95,7 @@ export function ColecoesAutomaticas({ notify }: ColecoesAutomaticasProps) {
       })
       .catch((error: unknown) => {
         console.error("coleções automáticas: ação falhou", error);
-        notify("error", s.saveError);
+        notify("error", t("smart.save_error"));
       })
       .finally(() => {
         setBusy(false);
@@ -109,7 +106,7 @@ export function ColecoesAutomaticas({ notify }: ColecoesAutomaticasProps) {
     event.preventDefault();
     if (!renaming || problem) return;
     const { id, name } = renaming;
-    run(() => call("collections.rename", { collectionId: id, name: cleanName(name) }), s.renamed, () => {
+    run(() => call("collections.rename", { collectionId: id, name: cleanName(name) }), t("smart.renamed"), () => {
       setRenameOpen(false);
     });
   }
@@ -117,26 +114,26 @@ export function ColecoesAutomaticas({ notify }: ColecoesAutomaticasProps) {
   function confirmDelete() {
     if (!deleting) return;
     const { id } = deleting;
-    run(() => call("collections.delete", { collectionId: id }), s.deleted, () => {
+    run(() => call("collections.delete", { collectionId: id }), t("smart.deleted"), () => {
       setDeleting(null);
     });
   }
 
   return (
     <>
-      <p className={styles["intro"]}>{s.text}</p>
-      <GrupoDeConfiguracao title={s.section}>
-        {items && items.length === 0 && <LinhaDeConfiguracao title={s.empty} />}
+      <p className={styles["intro"]}>{t("smart.text")}</p>
+      <GrupoDeConfiguracao title={t("smart.title")}>
+        {items && items.length === 0 && <LinhaDeConfiguracao title={t("smart.empty")} />}
         {items?.map(({ collection, games }) => (
           <LinhaDeConfiguracao
             key={collection.id}
             title={collection.name}
-            {...(games !== null ? { description: s.count(games) } : {})}
+            {...(games !== null ? { description: t("common.games", { n: games }) } : {})}
             control={
               <>
                 <BotaoDesktop
                   variant="outlined"
-                  aria-label={s.rename(collection.name)}
+                  aria-label={t("smart.rename", { name: collection.name })}
                   disabled={busy}
                   onClick={() => {
                     setRenaming({ id: collection.id, name: collection.name });
@@ -147,7 +144,7 @@ export function ColecoesAutomaticas({ notify }: ColecoesAutomaticasProps) {
                 </BotaoDesktop>
                 <BotaoDesktop
                   variant="outlined"
-                  aria-label={s.remove(collection.name)}
+                  aria-label={t("smart.remove", { name: collection.name })}
                   disabled={busy}
                   onClick={() => {
                     setDeleting(collection);
@@ -167,7 +164,7 @@ export function ColecoesAutomaticas({ notify }: ColecoesAutomaticasProps) {
           setRenameOpen(false);
         }}
         size="s"
-        title={s.renameTitle}
+        title={t("smart.rename_title")}
         closeLabel={t("common.close")}
         actions={
           <>
@@ -187,7 +184,7 @@ export function ColecoesAutomaticas({ notify }: ColecoesAutomaticasProps) {
       >
         <form id="renomear-automatica" onSubmit={rename}>
           <CampoDeTexto
-            label={s.nameLabel}
+            label={t("smart.name_label")}
             value={renaming?.name ?? ""}
             help={t("smart.name_rule")}
             error={problem ? problemText(t, problem) : undefined}

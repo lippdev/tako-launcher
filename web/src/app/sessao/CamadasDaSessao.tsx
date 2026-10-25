@@ -4,7 +4,6 @@ import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { ErroDoJogo } from "../../components/ErroDoJogo/ErroDoJogo";
 import { useT } from "../../i18n";
-import { gameStrings } from "../strings";
 import { imageUrl } from "../jogo/jogoModel";
 import { useDevImages } from "../jogo/useDevImages";
 import { useGameDetails } from "../jogo/useGameDetails";
@@ -162,7 +161,7 @@ function AvisoDeErro({
       message={texts.message}
       labels={{
         close: t("common.close"),
-        technicalDetails: gameStrings.errorDialog.technicalDetails,
+        technicalDetails: t("game_page.technical_details"),
         saveReport: t("session.save_report"),
         repair: t("session.repair"),
         retry: t("session.try_again"),

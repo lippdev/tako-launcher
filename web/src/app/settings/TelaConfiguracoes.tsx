@@ -2,7 +2,6 @@ import { useState, type KeyboardEvent } from "react";
 import { Aviso } from "../../components/Aviso/Aviso";
 import { Icon } from "../../components/Icon/Icon";
 import { useT } from "../../i18n";
-import { settingsStrings } from "../strings";
 import { SETTINGS_CATEGORY_IDS, type SettingsCategoryId } from "../uiState";
 import { AparenciaCategoria } from "./AparenciaCategoria";
 import { BibliotecaCategoria } from "./BibliotecaCategoria";
@@ -60,7 +59,8 @@ interface TelaConfiguracoesProps {
 }
 
 function Soon() {
-  return <p className={styles["soon"]}>{settingsStrings.soon}</p>;
+  const t = useT();
+  return <p className={styles["soon"]}>{t("settings.categories.soon")}</p>;
 }
 
 /** O conteúdo de uma categoria. As que ainda não têm tela mostram o "em breve". */
@@ -106,10 +106,9 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
   const [loadNoticeClosed, setLoadNoticeClosed] = useState(false);
   const [saveNoticeClosedAt, setSaveNoticeClosedAt] = useState(0);
   const t = useT();
-  // Prova do WEB-06a: o título de Geral já vem do catálogo do núcleo (as outras categorias migram na WEB-06b).
-  const titleOf = (id: SettingsCategoryId) =>
-    id === "general" ? t("settings.general.title") : settingsStrings.categories[id].title;
-  const text = settingsStrings.categories[category];
+
+  const titleOf = (id: SettingsCategoryId) => t(`settings.categories.${id}_title`);
+  const descOf = (id: SettingsCategoryId) => t(`settings.categories.${id}_desc`);
 
   // ↑ ↓ Home End movem o foco pela lista; Enter e Espaço abrem (são botões). Tab percorre todos. Nas pontas a seta
   // não é tratada aqui: segue para o navegador de foco (↑ sobe para a barra, ↓ não tem para onde).
@@ -135,12 +134,12 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
     <div className={styles["screen"]}>
       <nav
         className={styles["nav"]}
-        aria-label={settingsStrings.nav}
+        aria-label={t("settings.categories.nav")}
         data-focus-region="categories"
         data-focus-sections="content"
         onKeyDown={onNavKeyDown}
       >
-        <p className={styles["meta"]}>{settingsStrings.count(SETTINGS_CATEGORY_IDS.length)}</p>
+        <p className={styles["meta"]}>{t("settings.categories.count", { n: SETTINGS_CATEGORY_IDS.length })}</p>
         {SETTINGS_CATEGORY_IDS.map((id) => (
           <CategoriaDeConfiguracao
             key={id}
@@ -165,7 +164,7 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
               <h1 id={`${PANEL_ID}-titulo`} className={styles["title"]}>
                 {titleOf(category)}
               </h1>
-              <p className={styles["description"]}>{text.description}</p>
+              <p className={styles["description"]}>{descOf(category)}</p>
             </div>
           </header>
           {ready && (
@@ -182,7 +181,7 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
         }}
         tone="error"
       >
-        {settingsStrings.loadError}
+        {t("settings.categories.load_error")}
       </Aviso>
       <Aviso
         open={failures > saveNoticeClosedAt}
@@ -192,7 +191,7 @@ export function TelaConfiguracoes({ category, onCategoryChange }: TelaConfigurac
         noticeKey={failures}
         tone="error"
       >
-        {settingsStrings.saveError}
+        {t("settings.categories.save_error")}
       </Aviso>
     </div>
   );

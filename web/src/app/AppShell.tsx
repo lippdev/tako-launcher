@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AvisosDoControle, useSpatialNavigation } from "../focus";
+import { useT } from "../i18n";
 import { BarraSuperior } from "./BarraSuperior";
 import { BuscaGeral } from "./BuscaGeral";
 import { ColunaDaLista } from "./ColunaDaLista";
@@ -10,21 +11,25 @@ import { CamadasDaSessao } from "./sessao/CamadasDaSessao";
 import { CentralRapida } from "./central/CentralRapida";
 import { useSavedAppearance } from "./settings/useSavedAppearance";
 import { VisaoGeral } from "./visao/VisaoGeral";
-import { strings } from "./strings";
 import { VIEW_IDS, defaultLibraryCriteria, type ViewId } from "./uiState";
 import { useScreenState } from "./useScreenState";
 import { Vista } from "./Vista";
 import { windowAction } from "./windowActions";
 import styles from "./AppShell.module.css";
 
-/** TODO(WEB-14): nome e situação vêm do perfil; por enquanto o marcador. */
-const PROFILE = { name: strings.topbar.profile, online: true };
+const VIEW_TITLE_KEYS: Record<ViewId, string> = {
+  biblioteca: "desktop.library",
+  configuracoes: "desktop.settings",
+  perfil: "profile.tab",
+  downloads: "downloads.title",
+};
 
 /**
  * O app desktop: barra de cima de borda a borda, a lista da biblioteca à esquerda e a área das vistas
  * (README do design system, "A referência: TelaBiblioteca"). Perfil e Downloads são contêineres vazios por enquanto.
  */
 export function AppShell() {
+  const t = useT();
   const { state, ready: screenReady, update } = useScreenState();
   // A aparência salva (tema, animações, vidro, tamanho) é lida na abertura, antes de mostrar a janela.
   const appearanceReady = useSavedAppearance();
@@ -35,6 +40,8 @@ export function AppShell() {
 
   const { view, listCollapsed, activeGame } = state;
   const listShown = view === "biblioteca";
+
+  const profile = { name: t("profile.tab"), online: true };
 
   const navigate = useCallback(
     (next: ViewId) => {
@@ -117,7 +124,7 @@ export function AppShell() {
       <BarraSuperior
         view={view}
         onNavigate={navigate}
-        profile={PROFILE}
+        profile={profile}
         onOpenGame={(id) => {
           update({ view: "biblioteca", activeGame: id });
         }}
@@ -145,7 +152,7 @@ export function AppShell() {
             return (
               <Vista
                 key={id}
-                title={strings.views[id]}
+                title={t(VIEW_TITLE_KEYS[id])}
                 active={id === view}
                 bare={id === "configuracoes" || id === "biblioteca" || id === "perfil"}
                 flush={id === "biblioteca"}

@@ -196,6 +196,11 @@ not_found = "Jogo não encontrado"
 screen_failed = "Não foi possível usar a tela de jogo"
 
 [cc]
+title = "Central rápida"
+action_error = "Não foi possível aplicar a alteração. Tente novamente."
+cpu_time = "Tempo de CPU do núcleo"
+memory = "{mib} MiB"
+seconds = "{seconds} s"
 home = "Início"
 more = "Mais opções"
 back_to_game = "Voltar ao jogo"

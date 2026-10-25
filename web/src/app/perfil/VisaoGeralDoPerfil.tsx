@@ -5,7 +5,6 @@ import { FileiraDeCapas, type CapaDaFileira } from "../../components/FileiraDeCa
 import { BarrasDaSemana, Bloco, GrupoDeBlocos } from "../../components/GrupoDeBlocos/GrupoDeBlocos";
 import { PerfilSessoes } from "../../components/PerfilSessoes/PerfilSessoes";
 import { useT } from "../../i18n";
-import { profileStrings as s } from "../strings";
 import { durationText, historySession, playTimeText, weekAriaLabel, weekBars, weekTotal } from "./perfilModel";
 import { useCapas } from "./useCapas";
 import styles from "./TelaPerfil.module.css";
@@ -66,14 +65,14 @@ export function VisaoGeralDoPerfil({ summary, onOpenGame, onSeeAll }: VisaoGeral
           <FileiraDeCapas
             title={t("profile.tile_top")}
             covers={top}
-            previousLabel={s.previous}
-            nextLabel={s.next}
+            previousLabel={t("common.previous")}
+            nextLabel={t("common.next")}
             onOpen={onOpenGame}
           />
         </div>
       )}
 
-      <section className={styles["secao"]} aria-label={s.recentList}>
+      <section className={styles["secao"]} aria-label={t("profile.web.recent_list")}>
         <div className={styles["secaoCabeca"]}>
           <h2 className={styles["secaoTitulo"]}>{t("profile.recent")}</h2>
           {recent.length > 0 && (

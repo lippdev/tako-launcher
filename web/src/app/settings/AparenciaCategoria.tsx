@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import type { Appearance } from "../../appearance/appearance";
 import { GrupoDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
-import { settingsStrings } from "../strings";
+import { useT } from "../../i18n";
 import { changeAppearance } from "./changeAppearance";
 import { LinhaChave, LinhaSelecao, type CategoryProps } from "./Linhas";
 import {
@@ -14,16 +15,12 @@ import {
   themeToStored,
 } from "./model";
 
-const s = settingsStrings.appearance;
-
-const THEME_OPTIONS = THEME_CHOICES.map(({ id }) => ({ value: id, label: s.themes[id] }));
-const SCALE_OPTIONS = UI_SCALE_CHOICES.map((scale) => ({ value: String(scale), label: `${String(scale)}%` }));
-
 /**
  * Configurações › Aparência. Cada mudança vale na hora (`setAppearance`) e é gravada pela ponte; se a gravação
  * falhar, a página volta à aparência que ficou nas configurações.
  */
 export function AparenciaCategoria({ values, save, read }: CategoryProps) {
+  const t = useT();
   const appearance = appearanceFromSettings(values);
   const artColors = readBool(values, KEYS.artColors, DEFAULTS.artColors);
 
@@ -31,31 +28,65 @@ export function AparenciaCategoria({ values, save, read }: CategoryProps) {
     changeAppearance({ save, read }, patch, key, value);
   }
 
+  const themeOptions = useMemo(
+    () =>
+      THEME_CHOICES.map(({ id }) => {
+        let label: string = id;
+        switch (id) {
+          case "tako":
+            label = t("settings.appearance.desk_theme_tako");
+            break;
+          case "escuro":
+            label = t("settings.appearance.desk_theme_dark");
+            break;
+          case "meia-noite":
+            label = t("settings.appearance.desk_theme_midnight");
+            break;
+          case "oled":
+            label = t("settings.appearance.desk_theme_oled");
+            break;
+          case "vidro":
+            label = t("settings.appearance.desk_theme_glass");
+            break;
+        }
+        return { value: id, label };
+      }),
+    [t],
+  );
+  const scaleOptions = useMemo(
+    () => UI_SCALE_CHOICES.map((scale) => ({ value: String(scale), label: `${String(scale)}%` })),
+    [],
+  );
+
   return (
     <>
-      <GrupoDeConfiguracao title={s.theme}>
+      <GrupoDeConfiguracao title={t("settings.appearance_web.theme_section")}>
         <LinhaSelecao
-          title={s.themeRow.title}
-          description={s.themeRow.description}
-          options={THEME_OPTIONS}
+          title={t("settings.appearance_web.theme_row_title")}
+          description={t("settings.appearance_web.theme_row_desc")}
+          options={themeOptions}
           value={appearance.theme}
           onChange={(theme) => {
             change({ theme }, KEYS.theme, themeToStored(theme));
           }}
         />
         <LinhaChave
-          title={s.artColors.title}
-          description={appearance.theme === "tako" ? s.artColors.description : `${s.artColors.description}. ${s.artColors.onlyTako}`}
+          title={t("settings.appearance.art_colors")}
+          description={
+            appearance.theme === "tako"
+              ? t("settings.appearance.art_colors_desc")
+              : `${t("settings.appearance.art_colors_desc")}. ${t("settings.appearance_web.art_colors_only_tako")}`
+          }
           checked={artColors}
           disabled={appearance.theme !== "tako"}
           onChange={(on) => void save(KEYS.artColors, boolText(on))}
         />
       </GrupoDeConfiguracao>
-      <GrupoDeConfiguracao title={s.layout}>
+      <GrupoDeConfiguracao title={t("settings.appearance_web.layout_section")}>
         <LinhaSelecao
-          title={s.scale.title}
-          description={s.scale.description}
-          options={SCALE_OPTIONS}
+          title={t("settings.appearance_web.scale_title")}
+          description={t("settings.appearance_web.scale_desc")}
+          options={scaleOptions}
           value={String(appearance.uiScale)}
           onChange={(value) => {
             const uiScale = UI_SCALE_CHOICES.find((scale) => String(scale) === value);
@@ -63,18 +94,18 @@ export function AparenciaCategoria({ values, save, read }: CategoryProps) {
           }}
         />
       </GrupoDeConfiguracao>
-      <GrupoDeConfiguracao title={s.effects}>
+      <GrupoDeConfiguracao title={t("settings.appearance_web.effects_section")}>
         <LinhaChave
-          title={s.motion.title}
-          description={s.motion.description}
+          title={t("settings.appearance.motion")}
+          description={t("settings.appearance.motion_desc")}
           checked={appearance.reduceMotion}
           onChange={(on) => {
             change({ reduceMotion: on }, KEYS.reducedMotion, boolText(on));
           }}
         />
         <LinhaChave
-          title={s.glass.title}
-          description={s.glass.description}
+          title={t("settings.appearance_web.glass_title")}
+          description={t("settings.appearance_web.glass_desc")}
           checked={appearance.glassEffects}
           onChange={(on) => {
             // "Efeitos de vidro" ligado = `ReducedTransparency` desligado.

@@ -14,7 +14,6 @@ import { StatusDoJogo, type GameStatus as StatusDoChip } from "../../components/
 import { TituloDoJogo } from "../../components/TituloDoJogo/TituloDoJogo";
 import { useT } from "../../i18n";
 import { useLatest } from "../../lib/useLatest";
-import { editGameStrings, gameStrings as s, libraryStrings } from "../strings";
 import { DialogoEditarJogo } from "../editar/DialogoEditarJogo";
 import { DialogoFontesEIds } from "../editar/DialogoFontesEIds";
 import { DialogoRemoverJogo } from "../editar/DialogoRemoverJogo";
@@ -50,8 +49,6 @@ interface Notice {
   key: number;
 }
 
-const CHIP_LABELS: Record<StatusDoChip, string> = s.status;
-
 /** Espera as transições das partes do destaque (e do corpo) acabarem; sem transição (reduzir animações), já resolve. */
 function settleParts(root: HTMLElement | null): Promise<unknown> {
   if (!root) return Promise.resolve();
@@ -80,6 +77,18 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   const session = useGameSession();
   const phase = session.phaseOf(gameId);
   const running = phase !== "none";
+
+  const chipLabels = useMemo<Record<StatusDoChip, string>>(
+    () => ({
+      none: t("game_page.status_none"),
+      playing: t("game_page.status_playing"),
+      completed: t("game_page.status_completed"),
+      queued: t("game_page.status_queued"),
+      paused: t("game_page.status_paused"),
+      dropped: t("game_page.status_dropped"),
+    }),
+    [t],
+  );
 
   // Dado novo do mesmo jogo entra no lugar; de outro jogo, só depois da saída animada (efeito abaixo).
   if (details && shown !== details && (shown === null || shown.game.id === details.game.id)) setShown(details);
@@ -147,15 +156,15 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
       <div className={styles["pagina"]}>
         {error ? (
           <div className={styles["aviso"]} role="alert">
-            {s.loadError}
+            {t("game_page.load_error")}
             <button type="button" className={styles["retry"]} onClick={refresh}>
-              {libraryStrings.retry}
+              {t("game_page.retry")}
             </button>
           </div>
         ) : (
           loading && (
             <div className={styles["aviso"]} role="status">
-              {s.loading}
+              {t("game_page.loading")}
             </div>
           )
         )}
@@ -164,7 +173,6 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   }
 
   const { game } = shown;
-
 
   const showNotice = (tone: AvisoTone, text: string) => {
     setNotice({ open: true, tone, text, key: Date.now() });
@@ -176,7 +184,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
       refresh();
     } catch (failure) {
       console.error("página do jogo", failure);
-      showNotice("error", s.notices.updateError);
+      showNotice("error", t("game_page.update_error"));
     }
   };
   const play = async () => {
@@ -188,7 +196,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   };
   /** Encerrar; se o núcleo recusar de vez, avisa (o `conflict` vira a oferta de forçar no diálogo "Fechando o jogo…"). */
   const stop = async () => {
-    if ((await session.end()) === "error") showNotice("error", s.notices.endError);
+    if ((await session.end()) === "error") showNotice("error", t("game_page.end_error"));
   };
   const cancellable = phase === "launching" && session.launchSlow;
 
@@ -196,7 +204,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   const manageEntries: MenuEntry[] = [
     {
       id: "change-art",
-      label: t("options.change_art") || "Trocar imagens",
+      label: t("options.change_art"),
       icon: "image",
       onSelect: () => {
         setDialog("art");
@@ -204,7 +212,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
     },
     {
       id: "source-ids",
-      label: editGameStrings.menu.sourceIds,
+      label: t("options.source_ids"),
       icon: "search",
       onSelect: () => {
         setDialog("ids");
@@ -214,7 +222,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
       ? ([
           {
             id: "edit",
-            label: editGameStrings.menu.edit,
+            label: t("options.edit"),
             icon: "gear",
             onSelect: () => {
               setDialog("edit");
@@ -223,7 +231,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           { type: "separator" },
           {
             id: "remove",
-            label: editGameStrings.menu.remove,
+            label: t("options.remove"),
             icon: "trash",
             danger: true,
             onSelect: () => {
@@ -246,18 +254,31 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           ? "nao-instalado"
           : "jogar";
 
+  const verdictText = (verdict: "universal" | "favorable" | "mixed" | "unfavorable") => {
+    switch (verdict) {
+      case "universal":
+        return t("game_page.verdict_universal");
+      case "favorable":
+        return t("game_page.verdict_favorable");
+      case "mixed":
+        return t("game_page.verdict_mixed");
+      case "unfavorable":
+        return t("game_page.verdict_unfavorable");
+    }
+  };
+
   const dataBar: DadoDaBarra[] = [
     ...(blocks.lastPlayed
-      ? [{ id: "last", icone: "calendar", label: s.lastSession, valor: blocks.lastPlayed } as const]
+      ? [{ id: "last", icone: "calendar", label: t("game_page.last_session"), valor: blocks.lastPlayed } as const]
       : []),
-    ...(blocks.playTime ? [{ id: "time", icone: "clock", label: s.playTime, valor: blocks.playTime } as const] : []),
+    ...(blocks.playTime ? [{ id: "time", icone: "clock", label: t("game_page.play_time"), valor: blocks.playTime } as const] : []),
     ...(blocks.metacritic !== null
       ? [
           {
             id: "metacritic",
             icone: "badge",
-            label: s.metacritic,
-            valor: s.verdicts[metacriticVerdict(blocks.metacritic)],
+            label: t("game_page.metacritic"),
+            valor: verdictText(metacriticVerdict(blocks.metacritic)),
             nota: { valor: blocks.metacritic, faixa: metacriticTone(blocks.metacritic) },
           } as const,
         ]
@@ -265,15 +286,15 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   ];
 
   const detailRows: DetalheDoJogo[] = [
-    ...(blocks.developer ? [{ id: "developer", label: s.developer, valor: blocks.developer }] : []),
-    ...(blocks.publisher ? [{ id: "publisher", label: s.publisher, valor: blocks.publisher }] : []),
-    ...(blocks.release ? [{ id: "release", label: s.release, valor: blocks.release }] : []),
-    ...(blocks.genres.length > 0 ? [{ id: "genres", label: s.genres, valor: blocks.genres.join(", ") }] : []),
-    ...(blocks.size ? [{ id: "size", label: s.size, valor: blocks.size }] : []),
+    ...(blocks.developer ? [{ id: "developer", label: t("game_page.developer"), valor: blocks.developer }] : []),
+    ...(blocks.publisher ? [{ id: "publisher", label: t("game_page.publisher"), valor: blocks.publisher }] : []),
+    ...(blocks.release ? [{ id: "release", label: t("game_page.release"), valor: blocks.release }] : []),
+    ...(blocks.genres.length > 0 ? [{ id: "genres", label: t("game_page.genres"), valor: blocks.genres.join(", ") }] : []),
+    ...(blocks.size ? [{ id: "size", label: t("game_page.size"), valor: blocks.size }] : []),
     {
       id: "installation",
-      label: s.installation,
-      valor: game.installed ? s.installed : s.notInstalled,
+      label: t("game_page.installation"),
+      valor: game.installed ? t("game_page.installed") : t("game_page.not_installed"),
       ligado: game.installed,
     },
   ];
@@ -285,7 +306,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   return (
     <div ref={scrollRef} className={styles["pagina"]}>
       <Destaque
-        aria-label={s.label(game.title)}
+        aria-label={t("game_page.label", { title: game.title })}
         trocando={leaving}
         fundo={
           <FundoDoJogo
@@ -299,28 +320,28 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           <>
             <StatusDoJogo
               status={statusToChip(game.status)}
-              labels={CHIP_LABELS}
-              defineLabel={s.status.set}
-              menuTitle={s.status.label}
+              labels={chipLabels}
+              defineLabel={t("game_page.status_set")}
+              menuTitle={t("game_page.status_label")}
               onStatusChange={(chip: StatusDoChip) =>
                 void change(() => call("game.status.set", { gameIds: [game.id], status: chipToStatus(chip) }))
               }
             />
-            {shown.platform && <PilulaDaLoja label={shown.platform} icon="monitor" aria-label={`${s.platform}: ${shown.platform}`} />}
-            <PilulaDaLoja label={libraryStrings.stores[game.store]} />
+            {shown.platform && <PilulaDaLoja label={shown.platform} icon="monitor" aria-label={`${t("game_page.platform")}: ${shown.platform}`} />}
+            <PilulaDaLoja label={t(`sources.store.${game.store}`)} />
           </>
         }
         situacao={
           running ? (
             <EtiquetaDeSituacao
-              texto={session.elapsed ? `${s.running} · ${session.elapsed}` : s.running}
+              texto={session.elapsed ? `${t("game_page.running")} · ${session.elapsed}` : t("game_page.running")}
               ligado
             />
           ) : shown.upcoming ? (
-            <EtiquetaDeSituacao texto={s.upcoming} />
+            <EtiquetaDeSituacao texto={t("game_page.upcoming")} />
           ) : (
             <EtiquetaDeSituacao
-              texto={game.installed ? s.installed : s.notInstalled}
+              texto={game.installed ? t("game_page.installed") : t("game_page.not_installed")}
               ligado={game.installed}
             />
           )
@@ -334,22 +355,22 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           />
         }
         descricao={blocks.description[0]}
-        dados={<BarraDeDados dados={dataBar} aria-label={s.dataBar} />}
+        dados={<BarraDeDados dados={dataBar} aria-label={t("game_page.data_bar")} />}
         acoes={
           <AcoesDoJogo
             estado={state}
             favorito={game.favorite}
             labels={{
-              jogar: s.actions.play,
-              abrindo: session.launchSlow ? t("desktop.opening_slow") : s.actions.opening,
-              voltarAoJogo: s.actions.resume,
-              encerrar: cancellable ? t("common.cancel") : s.actions.stop,
-              instalar: s.actions.install,
-              emBreve: s.actions.upcoming,
-              favoritar: s.actions.favorite,
-              desfavoritar: s.actions.unfavorite,
-              gerenciar: s.actions.manage,
-              configuracoes: s.actions.settings,
+              jogar: t("game_page.play"),
+              abrindo: session.launchSlow ? t("desktop.opening_slow") : t("game_page.opening"),
+              voltarAoJogo: t("game_page.resume"),
+              encerrar: cancellable ? t("common.cancel") : t("game_page.stop"),
+              instalar: t("game_page.install"),
+              emBreve: t("game_page.upcoming"),
+              favoritar: t("game_page.favorite"),
+              desfavoritar: t("game_page.unfavorite"),
+              gerenciar: t("game_page.manage"),
+              configuracoes: t("game_page.settings"),
             }}
             onJogar={() => void play()}
             onVoltarAoJogo={() => {
@@ -375,14 +396,14 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
       {(hasAbout || hasSide) && (
         <div className={styles["corpo"]} data-parte="" data-trocando={leaving}>
           <div className={styles["grade"]}>
-            {hasAbout && <CartaoSobre title={s.about} paragrafos={blocks.description} className={styles["sobre"]} />}
+            {hasAbout && <CartaoSobre title={t("game_page.about")} paragrafos={blocks.description} className={styles["sobre"]} />}
             {hasSide && (
               <div className={styles["lateral"]}>
                 <CartaoDetalhes
-                  aria-label={s.details}
+                  aria-label={t("game_page.details")}
                   linhas={detailRows}
                   etiquetas={blocks.tags}
-                  rotuloEtiquetas={s.tags}
+                  rotuloEtiquetas={t("game_page.tags")}
                   editorDeEtiquetas={
                     <EditorDasEtiquetas
                       gameId={game.id}
@@ -394,7 +415,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
                     />
                   }
                 />
-                <ListaDeSessoes title={s.recentSessions} sessoes={blocks.sessions.map((x) => ({ inicio: x.startedAt, duracao: x.duration }))} />
+                <ListaDeSessoes title={t("game_page.recent_sessions")} sessoes={blocks.sessions.map((x) => ({ inicio: x.startedAt, duracao: x.duration }))} />
               </div>
             )}
           </div>
@@ -427,7 +448,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
         }}
         onSaved={(title) => {
           setDialog(null);
-          showNotice("success", editGameStrings.saved(title));
+          showNotice("success", t("edit_game.saved", { game: title }));
           refresh();
         }}
         onError={(text) => {
@@ -475,7 +496,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
       <Aviso
         open={notice.open}
         tone={notice.tone}
-        noticeKey={notice.key}
+        key={notice.key}
         onClose={() => {
           setNotice((n) => ({ ...n, open: false }));
         }}

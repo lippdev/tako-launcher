@@ -25,7 +25,6 @@ import {
 import { useDevImages } from "../jogo/useDevImages";
 import { useGameSession } from "../sessao/useGameSession";
 import type { GamePhase } from "../sessao/sessionModel";
-import { gameStrings as g, libraryStrings, overviewStrings as s } from "../strings";
 import { useDetalhesDoDestaque } from "./useDetalhesDoDestaque";
 import { useVisaoGeral } from "./useVisaoGeral";
 import { CONTINUE_ID, RECENT_ID, gamesById, visibleShelves, type ShelfState } from "./visaoModel";
@@ -53,32 +52,32 @@ function settleParts(root: HTMLElement | null): Promise<unknown> {
   return Promise.allSettled(animations.map((animation) => animation.finished));
 }
 
-function shelfTitle(shelf: ShelfState): string {
+function shelfTitle(shelf: ShelfState, t: (key: string) => string): string {
   switch (shelf.spec.id) {
     case CONTINUE_ID:
-      return s.continuePlaying;
+      return t("desktop.library_overview.continue_playing");
     case RECENT_ID:
-      return s.recent;
+      return t("desktop.library_overview.recent");
     default:
       return shelf.spec.name ?? "";
   }
 }
 
 /** Dados embaixo à esquerda do destaque: o que a lista já sabe, mais a nota quando os detalhes chegaram. */
-function heroData(game: LibraryGame, details: GameDetails | null): DadoDaBarra[] {
+function heroData(game: LibraryGame, details: GameDetails | null, t: (key: string) => string): DadoDaBarra[] {
   const last = formatLastPlayed(game.lastPlayedAt);
   const time = formatPlayTime(game.playTimeSeconds);
   const score = validScore(details?.metacriticScore ?? null);
   return [
-    ...(last ? [{ id: "last", icone: "calendar", label: g.lastSession, valor: last } as const] : []),
-    ...(time ? [{ id: "time", icone: "clock", label: g.playTime, valor: time } as const] : []),
+    ...(last ? [{ id: "last", icone: "calendar", label: t("desktop.strip.last_session"), valor: last } as const] : []),
+    ...(time ? [{ id: "time", icone: "clock", label: t("details.play_time"), valor: time } as const] : []),
     ...(score !== null
       ? [
           {
             id: "metacritic",
             icone: "badge",
-            label: g.metacritic,
-            valor: g.verdicts[metacriticVerdict(score)],
+            label: t("details.metacritic"),
+            valor: t(`game_page.verdict_${metacriticVerdict(score)}`),
             nota: { valor: score, faixa: metacriticTone(score) },
           } as const,
         ]
@@ -172,7 +171,7 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
       return {
         id: item.id,
         title: item.title,
-        label: time ? s.playedFor(time) : null,
+        label: time ? t("desktop.library_overview.played_for", { time }) : null,
         accentColor: item.accent,
         hasArt: item.hasCover,
         src,
@@ -181,7 +180,7 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
 
   const empty = overview.status === "ready" && overview.total === 0;
   const headCount =
-    overview.status === "loading" ? s.loading : overview.status === "ready" ? libraryStrings.count(overview.total) : null;
+    overview.status === "loading" ? t("desktop.empty.loading") : overview.status === "ready" ? t("common.games", { n: overview.total }) : null;
 
   const openHero = (event: MouseEvent<HTMLDivElement>) => {
     // Clicar numa ação (Jogar) ou no menu de uma camada não abre a página; o resto do destaque abre.
@@ -193,31 +192,31 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
   return (
     <div className={styles["pagina"]}>
       <div className={styles["cabeca"]}>
-        <h1 className="page-title">{s.welcome}</h1>
+        <h1 className="page-title">{t("desktop.library_overview.welcome")}</h1>
         {headCount && <span className={styles["total"]}>{headCount}</span>}
       </div>
 
       {overview.status === "error" ? (
         <div className={styles["aviso"]} role="alert">
-          {s.loadError}
+          {t("library.load_error")}
           <button type="button" className={styles["retry"]} onClick={overview.retry}>
-            {s.retry}
+            {t("library.retry")}
           </button>
         </div>
       ) : empty ? (
         <div className={styles["vazia"]}>
           <img className={styles["polvo"]} src={mark} alt="" />
-          <p>{s.empty}</p>
+          <p>{t("library.empty_library")}</p>
         </div>
       ) : !game ? (
-        <Esqueleto label={s.loading} />
+        <Esqueleto label={t("desktop.empty.loading")} />
       ) : (
         <>
           {/* O clique no destaque é um atalho do mouse; pelo teclado o jogo se abre pela capa ou pela lista. */}
           <div ref={heroRef} className={styles["destaque"]} onClick={openHero}>
             <Destaque
               variante="visao"
-              aria-label={s.heroLabel(game.title)}
+              aria-label={t("desktop.library_overview.hero_label", { title: game.title })}
               trocando={swapping || !entered}
               fundo={
                 <FundoDoJogo
@@ -227,18 +226,18 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
                   src={devImage?.("hero", game.id, game.title)}
                 />
               }
-              chips={<PilulaDaLoja label={libraryStrings.stores[game.store]} />}
+              chips={<PilulaDaLoja label={t(`sources.store.${game.store}`)} />}
               situacao={
                 phase !== "none" ? (
                   <EtiquetaDeSituacao
-                    texto={session.elapsed ? `${g.running} · ${session.elapsed}` : g.running}
+                    texto={session.elapsed ? `${t("game_page.running")} · ${session.elapsed}` : t("game_page.running")}
                     ligado
                   />
                 ) : game.installed && game.lastPlayedAt !== null ? (
-                  <EtiquetaDeSituacao texto={s.continuePlaying} ligado />
+                  <EtiquetaDeSituacao texto={t("desktop.library_overview.continue_playing")} ligado />
                 ) : (
                   <EtiquetaDeSituacao
-                    texto={game.installed ? g.installed : g.notInstalled}
+                    texto={game.installed ? t("home.installed") : t("game.not_installed")}
                     ligado={game.installed}
                   />
                 )
@@ -253,23 +252,23 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
                 />
               }
               descricao={paragraphs(details?.description ?? null)[0]}
-              dados={<BarraDeDados dados={heroData(game, details)} aria-label={g.dataBar} />}
+              dados={<BarraDeDados dados={heroData(game, details, t)} aria-label={t("game_page.data_bar")} />}
               acoes={
                 <AcoesDoJogo
                   compacto
                   estado={heroState(game, details, phase)}
                   favorito={game.favorite}
                   labels={{
-                    jogar: g.actions.play,
-                    abrindo: session.launchSlow ? t("desktop.opening_slow") : g.actions.opening,
-                    voltarAoJogo: g.actions.resume,
-                    encerrar: g.actions.stop,
-                    instalar: g.actions.install,
-                    emBreve: g.actions.upcoming,
-                    favoritar: g.actions.favorite,
-                    desfavoritar: g.actions.unfavorite,
-                    gerenciar: g.actions.manage,
-                    configuracoes: g.actions.settings,
+                    jogar: t("game.play"),
+                    abrindo: session.launchSlow ? t("desktop.opening_slow") : t("game_page.opening"),
+                    voltarAoJogo: t("game.resume"),
+                    encerrar: t("desktop.end_game"),
+                    instalar: t("desktop.install.label"),
+                    emBreve: t("game.upcoming"),
+                    favoritar: t("details.favorite"),
+                    desfavoritar: t("details.unfavorite"),
+                    gerenciar: t("game_page.manage"),
+                    configuracoes: t("details.game_settings"),
                   }}
                   onJogar={() => void play(game)}
                   onVoltarAoJogo={() => {
@@ -284,12 +283,12 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
             <FileiraDeCapas
               key={shelf.spec.id}
               className={styles["fileira"]}
-              title={shelfTitle(shelf)}
+              title={shelfTitle(shelf, t)}
               // O total de continuar jogando e de recentes inclui jogos nunca jogados; só a coleção tem contagem certa.
-              count={shelf.spec.kind === "collection" ? libraryStrings.count(shelf.total) : undefined}
+              count={shelf.spec.kind === "collection" ? t("common.games", { n: shelf.total }) : undefined}
               covers={covers(shelf)}
-              previousLabel={s.previous}
-              nextLabel={s.next}
+              previousLabel={t("common.previous")}
+              nextLabel={t("common.next")}
               onOpen={onOpenGame}
               onHighlight={highlight}
               onNearEnd={() => {
@@ -329,12 +328,9 @@ function Esqueleto({ label }: { label: string }) {
       {[0, 1].map((row) => (
         <div key={row} className={styles["fileira"]}>
           <div className={cx(styles["bloco"], styles["blocoTitulo"])} />
-          <div className={styles["blocosCapas"]}>
-            {Array.from({ length: 5 }, (_, i) => (
-              <div key={i}>
-                <div className={cx(styles["bloco"], styles["blocoCapa"])} />
-                <div className={cx(styles["bloco"], styles["blocoNome"])} />
-              </div>
+          <div className={styles["blocoCapas"]}>
+            {[0, 1, 2, 3, 4].map((col) => (
+              <div key={col} className={cx(styles["bloco"], styles["blocoCapa"])} />
             ))}
           </div>
         </div>

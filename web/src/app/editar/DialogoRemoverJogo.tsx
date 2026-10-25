@@ -2,7 +2,7 @@ import { useState } from "react";
 import { call } from "../../bridge";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
-import { editGameStrings as s } from "../strings";
+import { useT } from "../../i18n";
 
 interface DialogoRemoverJogoProps {
   gameId: string;
@@ -16,6 +16,7 @@ interface DialogoRemoverJogoProps {
 
 /** "Remover {jogo}?" (port do `confirm_remove` do Slint): o jogo sai do Tako; os arquivos no disco ficam onde estão. */
 export function DialogoRemoverJogo({ gameId, title, open, onClose, onRemoved, onError }: DialogoRemoverJogoProps) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
 
   const remove = async () => {
@@ -26,7 +27,7 @@ export function DialogoRemoverJogo({ gameId, title, open, onClose, onRemoved, on
       onRemoved();
     } catch (failure) {
       console.error("game.remove", failure);
-      onError(s.removeError);
+      onError(t("edit_game.remove_error"));
       onClose();
     } finally {
       setBusy(false);
@@ -37,21 +38,21 @@ export function DialogoRemoverJogo({ gameId, title, open, onClose, onRemoved, on
     <Dialogo
       open={open}
       onClose={onClose}
-      title={s.removeTitle(title)}
-      closeLabel={s.close}
+      title={t("options.remove_title", { game: title })}
+      closeLabel={t("common.close")}
       size="s"
       actions={
         <>
           <BotaoDesktop variant="outlined" onClick={onClose}>
-            {s.cancel}
+            {t("common.cancel")}
           </BotaoDesktop>
           <BotaoDesktop disabled={busy} onClick={() => void remove()}>
-            {s.removeAction}
+            {t("options.remove")}
           </BotaoDesktop>
         </>
       }
     >
-      <p>{s.removeText}</p>
+      <p>{t("options.remove_text")}</p>
     </Dialogo>
   );
 }

@@ -6,7 +6,6 @@ import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { useT } from "../../i18n";
-import { collectionStrings as s } from "../strings";
 import { cleanName, nameProblem, ofKind } from "./colecoesModel";
 import { problemText } from "./problemaDoNome";
 import styles from "./Colecoes.module.css";
@@ -29,7 +28,7 @@ export function SalvarColecao({ open, onClose, collections, rule, onDone }: Salv
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const problem = nameProblem(name, ofKind(collections, true));
-  const error = failed ? s.saveError : touched && problem ? problemText(t, problem) : undefined;
+  const error = failed ? t("library.collection.save_error") : touched && problem ? problemText(t, problem) : undefined;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -73,7 +72,7 @@ export function SalvarColecao({ open, onClose, collections, rule, onDone }: Salv
       <form id="colecao-salvar" className={styles["form"]} onSubmit={submit}>
         <p className={styles["text"]}>{t("smart.save_desc")}</p>
         <CampoDeTexto
-          label={s.nameLabel}
+          label={t("library.collection.name_label")}
           value={name}
           help={t("smart.name_rule")}
           error={error}

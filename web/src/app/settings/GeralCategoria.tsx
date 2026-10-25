@@ -1,7 +1,8 @@
+import { useMemo } from "react";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
+import { useT } from "../../i18n";
 import { PerfisNasConfiguracoes } from "../perfil/PerfisNasConfiguracoes";
-import { settingsStrings } from "../strings";
 import { windowAction } from "../windowActions";
 import { LinhaChave, LinhaSelecao, type CategoryProps } from "./Linhas";
 import {
@@ -15,26 +16,34 @@ import {
   type OpenIn,
 } from "./model";
 
-const s = settingsStrings.general;
-
-const OPEN_IN_OPTIONS = [
-  { value: "desktop", label: s.openIn.window },
-  { value: "big-picture", label: s.openIn.bigPicture },
-] as const satisfies readonly { value: OpenIn; label: string }[];
-
-const LANGUAGE_OPTIONS = [
-  { value: "pt-BR", label: s.language.pt },
-  { value: "en-US", label: s.language.en },
-] as const satisfies readonly { value: Language; label: string }[];
-
 /** Configurações › Geral: modo de abertura, idioma e o que acontece ao fim do jogo. */
 export function GeralCategoria({ values, save }: CategoryProps) {
+  const t = useT();
+
+  const openInOptions = useMemo(
+    () =>
+      [
+        { value: "desktop", label: t("settings.general_web.open_in_window") },
+        { value: "big-picture", label: t("settings.general_web.open_in_big_picture") },
+      ] as const satisfies readonly { value: OpenIn; label: string }[],
+    [t],
+  );
+
+  const languageOptions = useMemo(
+    () =>
+      [
+        { value: "pt-BR", label: t("settings.general_web.language_pt") },
+        { value: "en-US", label: t("settings.general_web.language_en") },
+      ] as const satisfies readonly { value: Language; label: string }[],
+    [t],
+  );
+
   return (
     <>
-      <GrupoDeConfiguracao title={s.mode}>
+      <GrupoDeConfiguracao title={t("settings.general_web.mode")}>
         <LinhaDeConfiguracao
-          title={s.bigPicture.title}
-          description={s.bigPicture.description}
+          title={t("settings.general_web.big_picture_title")}
+          description={t("settings.general_web.big_picture_desc")}
           control={
             <BotaoDesktop
               variant="outlined"
@@ -42,37 +51,37 @@ export function GeralCategoria({ values, save }: CategoryProps) {
                 windowAction("big_picture");
               }}
             >
-              {s.bigPicture.action}
+              {t("settings.general_web.big_picture_action")}
             </BotaoDesktop>
           }
         />
         <LinhaChave
-          title={s.ask.title}
-          description={s.ask.description}
+          title={t("settings.general_web.ask_title")}
+          description={t("settings.general_web.ask_desc")}
           checked={readBool(values, KEYS.askBigPicture, DEFAULTS.askBigPicture)}
           onChange={(on) => void save(KEYS.askBigPicture, boolText(on))}
         />
         <LinhaSelecao
-          title={s.openIn.title}
-          options={OPEN_IN_OPTIONS}
+          title={t("settings.general_web.open_in")}
+          options={openInOptions}
           value={readOpenIn(values)}
           onChange={(value) => void save(KEYS.openIn, value)}
         />
       </GrupoDeConfiguracao>
-      <GrupoDeConfiguracao title={s.language.section}>
+      <GrupoDeConfiguracao title={t("settings.general_web.language_section")}>
         <LinhaSelecao
-          title={s.language.title}
-          description={s.language.description}
-          options={LANGUAGE_OPTIONS}
+          title={t("settings.general.language")}
+          description={t("settings.general.language_desc")}
+          options={languageOptions}
           value={readLanguage(values)}
           onChange={(value) => void save(KEYS.language, value)}
         />
       </GrupoDeConfiguracao>
       <PerfisNasConfiguracoes />
-      <GrupoDeConfiguracao title={s.games}>
+      <GrupoDeConfiguracao title={t("settings.general_web.games")}>
         <LinhaChave
-          title={s.restore.title}
-          description={s.restore.description}
+          title={t("settings.general_web.restore_title")}
+          description={t("settings.general_web.restore_desc")}
           checked={readBool(values, KEYS.restoreEnvironment, DEFAULTS.restoreEnvironment)}
           onChange={(on) => void save(KEYS.restoreEnvironment, boolText(on))}
         />

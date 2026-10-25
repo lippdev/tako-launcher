@@ -1,5 +1,3 @@
-import { useImageVersion } from "../lib/useImageVersion";
-import { imageUrl } from "../lib/imageVersions";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import mark from "../assets/brand/tako-mark.png";
 import { Aviso } from "../components/Aviso/Aviso";
@@ -9,6 +7,9 @@ import { useEscapeLayer } from "../lib/escapeLayers";
 import { useFocusTrap } from "../lib/focusTrap";
 import { Portal } from "../lib/Portal";
 import { usePresence } from "../lib/presence";
+import { useImageVersion } from "../lib/useImageVersion";
+import { useT } from "../i18n";
+import { imageUrl } from "../lib/imageVersions";
 import {
   buildResults,
   buildShortcuts,
@@ -22,7 +23,6 @@ import {
 import { CATEGORY_ICONS } from "./settings/categories";
 import { useBusca } from "./busca/useBusca";
 import { useDevArt } from "./busca/useDevArt";
-import { libraryStrings, settingsStrings, strings } from "./strings";
 import type { ViewId } from "./uiState";
 import styles from "./BuscaGeral.module.css";
 
@@ -36,29 +36,6 @@ interface BuscaGeralProps {
   /** Enter ou clique num atalho: leva à vista (e à categoria, nas Configurações). A busca já foi fechada. */
   onOpenShortcut: (target: ShortcutTarget) => void;
 }
-
-const s = strings.search;
-const cat = settingsStrings.categories;
-const SHORTCUTS = buildShortcuts({
-  views: strings.views,
-  categories: {
-    general: cat.general.title,
-    theme: cat.theme.title,
-    appearance: cat.appearance.title,
-    sound: cat.sound.title,
-    display: cat.display.title,
-    controllers: cat.controllers.title,
-    library: cat.library.title,
-    covers: cat.covers.title,
-    downloads: cat.downloads.title,
-    integrations: cat.integrations.title,
-    system: cat.system.title,
-    about: cat.about.title,
-  },
-  settingsGroup: s.settingsGroup,
-  viewsGroup: s.viewsGroup,
-});
-const RESULT_LABELS = { stores: libraryStrings.stores, installed: s.installed, notInstalled: s.notInstalled };
 
 /** `tako-img://` do núcleo (docs/web/ponte.md §4), em pixels físicos (o dobro do que se vê). */
 function artUrl(kind: "cover" | "icon", id: string, w: number, h: number): string {
@@ -116,6 +93,7 @@ function Arte({ result, art }: { result: SearchResult; art: ReturnType<typeof us
  * O foco fica no campo; a seleção é anunciada por `aria-activedescendant`.
  */
 export function BuscaGeral({ open, onClose, focusToken, onOpenGame, onOpenShortcut }: BuscaGeralProps) {
+  const t = useT();
   const veil = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -125,6 +103,59 @@ export function BuscaGeral({ open, onClose, focusToken, onOpenGame, onOpenShortc
   const { mounted, visible, animating } = usePresence(open, veil);
   const art = useDevArt();
   const { games, loading, error } = useBusca(open, query);
+
+  const shortcuts = useMemo(
+    () =>
+      buildShortcuts({
+        views: {
+          biblioteca: t("desktop.library"),
+          configuracoes: t("desktop.settings"),
+          perfil: t("profile.tab"),
+          downloads: t("downloads.title"),
+        },
+        categories: {
+          general: t("settings.general.title"),
+          theme: t("settings.theme.title"),
+          appearance: t("settings.appearance.title"),
+          sound: t("settings.sound.title"),
+          display: t("settings.screen.title"),
+          controllers: t("settings.controllers.title"),
+          library: t("settings.library.title"),
+          covers: t("settings.covers.title"),
+          downloads: t("downloads.title"),
+          integrations: t("settings.integrations.title"),
+          system: t("settings.system.title"),
+          about: t("settings.about.title"),
+        },
+        settingsGroup: t("desktop.settings"),
+        viewsGroup: t("desktop.quick_search.views_group"),
+      }),
+    [t],
+  );
+
+  const resultLabels = useMemo(
+    () => ({
+      stores: {
+        steam: t("sources.store.steam"),
+        epic: t("sources.store.epic"),
+        gog: t("sources.store.gog"),
+        xbox: t("sources.store.xbox"),
+        ubisoft: t("sources.store.ubisoft"),
+        ea: t("sources.store.ea"),
+        battle_net: t("sources.store.battle_net"),
+        amazon: t("sources.store.amazon"),
+        heroic: t("sources.store.heroic"),
+        lutris: t("sources.store.lutris"),
+        bottles: t("sources.store.bottles"),
+        itch: t("sources.store.itch"),
+        emulators: t("sources.store.emulators"),
+        manual: t("sources.store.manual"),
+      },
+      installed: t("game_page.installed"),
+      notInstalled: t("game_page.not_installed"),
+    }),
+    [t],
+  );
 
   // Cada abertura começa do zero, como o app atual (uma busca nova a cada Ctrl + K).
   const [wasOpen, setWasOpen] = useState(open);
@@ -136,7 +167,7 @@ export function BuscaGeral({ open, onClose, focusToken, onOpenGame, onOpenShortc
     }
   }
 
-  const results = useMemo(() => buildResults(games, matchShortcuts(SHORTCUTS, query), RESULT_LABELS), [games, query]);
+  const results = useMemo(() => buildResults(games, matchShortcuts(shortcuts, query), resultLabels), [games, shortcuts, query, resultLabels]);
   const selected = clampSelection(rawSelected, results.length);
   const optionId = (index: number) => `${listId}-${String(index)}`;
 
@@ -176,7 +207,7 @@ export function BuscaGeral({ open, onClose, focusToken, onOpenGame, onOpenShortc
           if (event.target === event.currentTarget) onClose();
         }}
       >
-        <div ref={box} role="dialog" aria-modal="true" aria-label={s.title} tabIndex={-1} className={styles["panel"]}>
+        <div ref={box} role="dialog" aria-modal="true" aria-label={t("desktop.quick_search.title")} tabIndex={-1} className={styles["panel"]}>
           <CampoDeBusca
             variant="geral"
             inputRef={input}
@@ -185,10 +216,10 @@ export function BuscaGeral({ open, onClose, focusToken, onOpenGame, onOpenShortc
               setQuery(value);
               setRawSelected(0);
             }}
-            placeholder={s.placeholder}
-            label={s.label}
-            hint={s.escape}
-            keyShortcuts={s.keyShortcuts}
+            placeholder={t("desktop.quick_search.placeholder")}
+            label={t("desktop.quick_search.label")}
+            hint={t("desktop.search_esc")}
+            keyShortcuts={t("desktop.quick_search.key_shortcuts")}
             role="combobox"
             aria-autocomplete="list"
             aria-expanded={results.length > 0}
@@ -205,7 +236,7 @@ export function BuscaGeral({ open, onClose, focusToken, onOpenGame, onOpenShortc
               }
             }}
           />
-          <div id={listId} role="listbox" aria-label={s.results} className={styles["results"]} hidden={results.length === 0}>
+          <div id={listId} role="listbox" aria-label={t("desktop.quick_search.results")} className={styles["results"]} hidden={results.length === 0}>
             {results.map((result, index) => (
               <div
                 key={result.id}
@@ -230,23 +261,23 @@ export function BuscaGeral({ open, onClose, focusToken, onOpenGame, onOpenShortc
                   <strong className={styles["title"]}>{result.title}</strong>
                   <span className={styles["meta"]}>{result.meta}</span>
                 </span>
-                <em className={styles["tag"]}>{result.kind === "game" ? s.tagGame : s.tagShortcut}</em>
+                <em className={styles["tag"]}>{result.kind === "game" ? t("desktop.global_search_library") : t("desktop.quick_search.tag_shortcut")}</em>
               </div>
             ))}
           </div>
           {showEmpty && (
             <p className={styles["empty"]}>
               <img className={styles["emptyMark"]} src={mark} alt="" />
-              {s.empty}
+              {t("desktop.global_search_empty")}
             </p>
           )}
           <p role="status" className={styles["live"]}>
-            {showEmpty ? s.empty : settled ? s.count(results.length) : ""}
+            {showEmpty ? t("desktop.global_search_empty") : settled ? t("desktop.quick_search.count", { n: results.length }) : ""}
           </p>
         </div>
       </div>
       <Aviso open={open && error} onClose={() => {}} duration={null} tone="error">
-        {s.error}
+        {t("desktop.quick_search.error")}
       </Aviso>
     </Portal>
   );

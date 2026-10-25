@@ -1,4 +1,4 @@
-﻿import { BotaoDesktop } from "../components/BotaoDesktop/BotaoDesktop";
+import { BotaoDesktop } from "../components/BotaoDesktop/BotaoDesktop";
 import { Chave } from "../components/Chave/Chave";
 import { CampoDeSelecao } from "../components/CampoDeSelecao/CampoDeSelecao";
 import { PainelLateral } from "../components/PainelLateral/PainelLateral";
@@ -6,7 +6,6 @@ import type { Collection } from "../bridge/generated/Collection";
 import type { Tag } from "../bridge/generated/Tag";
 import { useT } from "../i18n";
 import { defaultLibraryCriteria, SORT_IDS, STATUS_IDS, STORE_IDS, type LibraryCriteria } from "./uiState";
-import { libraryStrings as s } from "./strings";
 import styles from "./LibraryControls.module.css";
 
 export function filterCount(c: LibraryCriteria) {
@@ -19,15 +18,17 @@ export function filterCount(c: LibraryCriteria) {
     Number(c.collection !== null)
   );
 }
-export function collectionOptions(collections: Collection[]) {
+
+export function collectionOptions(collections: Collection[], t: (key: string, vars?: Record<string, string | number>) => string) {
   return [
-    { value: "", label: s.allCollections },
+    { value: "", label: t("library.all_collections") },
     ...collections.map((c) => ({
       value: c.id,
-      label: s.collectionLabel(c.name, c.criteria ? null : c.gameIds.length),
+      label: c.criteria ? c.name : t("library.collection_label", { name: c.name, count: c.gameIds.length }),
     })),
   ];
 }
+
 export function LibraryFilters({
   open,
   onClose,
@@ -56,8 +57,8 @@ export function LibraryFilters({
     <PainelLateral
       open={open}
       onClose={onClose}
-      title={s.filters}
-      closeLabel={s.close}
+      title={t("library.filters")}
+      closeLabel={t("common.close")}
       count={String(count)}
       footer={
         <div className={styles["footer"]}>
@@ -71,22 +72,22 @@ export function LibraryFilters({
                 });
               }}
             >
-              {s.clear}
+              {t("common.clear")}
             </button>
           )}
-          <button onClick={onClose}>{s.apply}</button>
+          <button onClick={onClose}>{t("common.apply")}</button>
         </div>
       }
     >
       <div className={styles["fields"]}>
         <div className={styles["field"]}>
-          <span>{s.sort}</span>
+          <span>{t("filters.sort_by")}</span>
           <CampoDeSelecao
-            label={s.sort}
+            label={t("filters.sort_by")}
             value={c.sort}
             options={SORT_IDS.map((value) => ({
               value,
-              label: s.sorts[value],
+              label: t(`library.sort.${value}`),
             }))}
             onChange={(sort) => {
               update({ sort });
@@ -94,7 +95,7 @@ export function LibraryFilters({
           />
         </div>
         <div className={styles["field"]}>
-          <span id="library-reversed">{s.reversed}</span>
+          <span id="library-reversed">{t("library.reversed")}</span>
           <Chave
             checked={c.reversed}
             aria-labelledby="library-reversed"
@@ -104,25 +105,25 @@ export function LibraryFilters({
           />
         </div>
         <div className={styles["field"]}>
-          <span>{s.collection}</span>
+          <span>{t("desktop.group.collection")}</span>
           <CampoDeSelecao
-            label={s.collection}
+            label={t("desktop.group.collection")}
             value={c.collection ?? ""}
-            options={collectionOptions(collections)}
+            options={collectionOptions(collections, t)}
             onChange={(collection) => {
               update({ collection: collection || null });
             }}
           />
         </div>
         <div className={styles["field"]}>
-          <span>{s.installed}</span>
+          <span>{t("desktop.group.install")}</span>
           <CampoDeSelecao
-            label={s.installed}
+            label={t("desktop.group.install")}
             value={c.installed === null ? "all" : c.installed ? "yes" : "no"}
             options={[
-              { value: "all", label: s.any },
-              { value: "yes", label: s.installedOnly },
-              { value: "no", label: s.notInstalled },
+              { value: "all", label: t("library.install.any") },
+              { value: "yes", label: t("library.install.installed") },
+              { value: "no", label: t("library.install.not_installed") },
             ]}
             onChange={(v) => {
               update({
@@ -132,13 +133,13 @@ export function LibraryFilters({
           />
         </div>
         <div className={styles["field"]}>
-          <span>{s.store}</span>
+          <span>{t("desktop.group.store")}</span>
           <CampoDeSelecao
-            label={s.store}
+            label={t("desktop.group.store")}
             value={c.stores[0] ?? ""}
             options={[
-              { value: "", label: s.any },
-              ...STORE_IDS.map((value) => ({ value, label: s.stores[value] })),
+              { value: "", label: t("library.install.any") },
+              ...STORE_IDS.map((value) => ({ value, label: t(`sources.store.${value}`) })),
             ]}
             onChange={(store) => {
               update({ stores: store ? [store] : [] });
@@ -146,14 +147,14 @@ export function LibraryFilters({
           />
         </div>
         <div className={styles["field"]}>
-          <span>{s.status}</span>
+          <span>{t("desktop.group.status")}</span>
           <CampoDeSelecao
-            label={s.status}
+            label={t("desktop.group.status")}
             value={c.noStatus ? "none" : (c.statuses[0] ?? "")}
             options={[
-              { value: "", label: s.any },
-              { value: "none", label: s.noStatus },
-              ...STATUS_IDS.map((value) => ({ value, label: s.statuses[value] })),
+              { value: "", label: t("library.install.any") },
+              { value: "none", label: t("library.no_status") },
+              ...STATUS_IDS.map((value) => ({ value, label: t(`library.status.${value}`) })),
             ]}
             onChange={(status) => {
               update({
@@ -165,12 +166,12 @@ export function LibraryFilters({
         </div>
         {tags.length > 0 && (
           <div className={styles["field"]}>
-            <span>{s.tags}</span>
+            <span>{t("desktop.group.tag")}</span>
             <CampoDeSelecao
-              label={s.tags}
+              label={t("desktop.group.tag")}
               value={c.tags[0] ?? ""}
               options={[
-                { value: "", label: s.any },
+                { value: "", label: t("library.install.any") },
                 ...tags.map((tag) => ({ value: tag.name, label: `${tag.name} · ${String(tag.count)}` })),
               ]}
               onChange={(tag) => {

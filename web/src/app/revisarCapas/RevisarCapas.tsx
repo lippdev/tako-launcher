@@ -6,7 +6,6 @@ import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { PilulaDaLoja } from "../../components/PilulaDaLoja/PilulaDaLoja";
 import { DialogoSeletorDeImagens } from "../jogo/DialogoSeletorDeImagens";
 import { useT } from "../../i18n";
-import { libraryStrings } from "../strings";
 import styles from "./RevisarCapas.module.css";
 
 export interface RevisarCapasProps {
@@ -83,7 +82,7 @@ export function RevisarCapas({
       await call("art.review.accept", { gameId: item.gameId });
       handleAvancarAposAcao(
         item.gameId,
-        t("art_review.accepted", { game: item.title }) || `Capa de ${item.title} confirmada`,
+        t("art_review.accepted", { game: item.title }),
       );
     } catch (err) {
       console.error("erro ao aceitar capa", err);
@@ -98,14 +97,12 @@ export function RevisarCapas({
     setPickerOpen(false);
     handleAvancarAposAcao(
       item.gameId,
-      t("art_review.accepted", { game: item.title }) || `Capa de ${item.title} trocada`,
+      t("art_review.accepted", { game: item.title }),
     );
   };
 
-  const titulo = t("art_review.title") || "Revisar capas";
-  const descricao =
-    t("art_review.desc") ||
-    "As fontes casam a biblioteca sozinhas; aqui ficam só os jogos que valem conferir";
+  const titulo = t("art_review.title");
+  const descricao = t("art_review.desc");
 
   const renderBarrasConfianca = (confidence: ArtReviewItem["confidence"]) => {
     return (
@@ -144,8 +141,7 @@ export function RevisarCapas({
           <h1 className={styles["titulo"]}>{titulo}</h1>
           {items.length > 0 && (
             <p className={styles["resumo"]}>
-              {t("art_review.summary", { count: items.length, total }) ||
-                `${items.length} de ${total} jogos para conferir`}
+              {t("art_review.summary", { count: items.length, total })}
             </p>
           )}
           <p className={styles["descricao"]}>{descricao}</p>
@@ -153,12 +149,12 @@ export function RevisarCapas({
         <div className={styles["cabecalhoAcoes"]}>
           {onVoltar && (
             <BotaoDesktop variant="outlined" onClick={onVoltar}>
-              Voltar
+              {t("art_review.back")}
             </BotaoDesktop>
           )}
           {onConcluir && (
             <BotaoDesktop variant="primary" onClick={onConcluir}>
-              Concluir
+              {t("art_review.finish")}
             </BotaoDesktop>
           )}
         </div>
@@ -172,23 +168,21 @@ export function RevisarCapas({
 
       {loading && (
         <div className={styles["carregando"]} role="status">
-          <p>{t("art_review.computing") || "Conferindo a biblioteca…"}</p>
+          <p>{t("art_review.computing")}</p>
         </div>
       )}
 
       {!loading && items.length === 0 && (
         <div className={styles["vazio"]}>
           <h2 className={styles["vazioTitulo"]}>
-            {t("art_review.all_good", { total }) ||
-              `Os ${total} jogos estão com as imagens e as correspondências em ordem`}
+            {t("art_review.all_good", { total })}
           </h2>
           <p className={styles["descricao"]}>
-            {t("art_review.text") ||
-              "Capa, fundo, logo e ícone vêm sozinhos das fontes ligadas. Confira os jogos achados só pelo nome e os que ficaram sem alguma imagem."}
+            {t("art_review.text")}
           </p>
           {onConcluir && (
             <BotaoDesktop variant="primary" onClick={onConcluir}>
-              Concluir
+              {t("art_review.finish")}
             </BotaoDesktop>
           )}
         </div>
@@ -200,11 +194,11 @@ export function RevisarCapas({
             <div className={styles["jogoInfo"]}>
               <h2 className={styles["jogoTitulo"]}>{currentItem.title}</h2>
               {currentItem.store && (
-                <PilulaDaLoja label={libraryStrings.stores[currentItem.store] ?? currentItem.store} />
+                <PilulaDaLoja label={t(`sources.store.${currentItem.store}`) || currentItem.store} />
               )}
             </div>
             <span className={styles["contador"]}>
-              {currentIndex + 1} de {items.length}
+              {t("library.count_of", { n: currentIndex + 1, total: items.length })}
             </span>
           </div>
 
@@ -214,17 +208,17 @@ export function RevisarCapas({
 
           <div className={styles["comparacaoArtes"]}>
             <div className={styles["colunaArte"]}>
-              <span className={styles["rotuloColuna"]}>Atual</span>
+              <span className={styles["rotuloColuna"]}>{t("art_picker.current")}</span>
               <div className={styles["molduraCapa"]}>
                 {currentItem.currentCover ? (
                   <img
                     src={currentItem.currentCover}
-                    alt={`Capa atual de ${currentItem.title}`}
+                    alt={t("art_review.alt_current", { title: currentItem.title })}
                     className={styles["capaImg"]}
                   />
                 ) : (
                   <div className={styles["semCapa"]}>
-                    <span>{t("art_review.no_cover") || "Sem capa"}</span>
+                    <span>{t("art_review.no_cover")}</span>
                   </div>
                 )}
               </div>
@@ -232,11 +226,11 @@ export function RevisarCapas({
 
             {currentItem.proposedCover && (
               <div className={styles["colunaArte"]}>
-                <span className={styles["rotuloColuna"]}>Proposta</span>
+                <span className={styles["rotuloColuna"]}>{t("art_review.proposed")}</span>
                 <div className={styles["molduraCapa"]}>
                   <img
                     src={currentItem.proposedCover}
-                    alt={`Capa proposta de ${currentItem.title}`}
+                    alt={t("art_review.alt_proposed", { title: currentItem.title })}
                     className={styles["capaImg"]}
                   />
                 </div>
@@ -245,7 +239,7 @@ export function RevisarCapas({
                   <span className={styles["textoConfianca"]}>
                     {t(`art_review.conf_${currentItem.confidence}`, {
                       percent: currentItem.confidencePercent,
-                    }) || `${currentItem.confidencePercent}% de confiança`}
+                    })}
                   </span>
                 </div>
               </div>
@@ -259,20 +253,20 @@ export function RevisarCapas({
                 disabled={currentIndex <= 0}
                 onClick={() => setCurrentIndex((idx) => Math.max(0, idx - 1))}
               >
-                Anterior
+                {t("art_review.previous")}
               </BotaoDesktop>
               <BotaoDesktop
                 variant="outlined"
                 disabled={currentIndex >= items.length - 1}
                 onClick={() => setCurrentIndex((idx) => Math.min(items.length - 1, idx + 1))}
               >
-                Próximo
+                {t("art_review.next")}
               </BotaoDesktop>
             </div>
 
             <div className={styles["acoesPrincipais"]}>
               <BotaoDesktop variant="outlined" onClick={handleTrocar}>
-                {t("art_review.other") || "Escolher outra"}
+                {t("art_review.other")}
               </BotaoDesktop>
               <BotaoDesktop
                 variant="primary"
@@ -280,7 +274,7 @@ export function RevisarCapas({
                   void handleAceitar(currentItem);
                 }}
               >
-                {t("art_review.accept") || "Aceitar"}
+                {t("art_review.accept")}
               </BotaoDesktop>
             </div>
           </div>

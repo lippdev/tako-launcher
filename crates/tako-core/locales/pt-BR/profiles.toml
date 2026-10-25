@@ -23,3 +23,7 @@ invalid_name = "Digite um nome de 1 a 32 caracteres."
 duplicate_name = "Já existe um perfil com esse nome."
 too_many = "O Tako aceita até 8 perfis."
 save_failed = "Não foi possível gravar os perfis."
+
+[profiles.web]
+next_open = "Na próxima abertura"
+restart_notice = "O perfil {name} será usado quando você reabrir o Tako."

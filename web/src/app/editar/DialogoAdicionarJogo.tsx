@@ -1,11 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CallError, call, on } from "../../bridge";
 import type { RomSystem } from "../../bridge/generated/RomSystem";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
 import { Dialogo } from "../../components/Dialogo/Dialogo";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
-import { addGameStrings as s } from "../strings";
+import { useT } from "../../i18n";
 import { addOutcome, addProblem, type AddProblem } from "./editarModel";
 import styles from "./editar.module.css";
 
@@ -16,13 +16,6 @@ interface SystemStep {
   others: readonly RomSystem[];
   showOthers: boolean;
 }
-
-const PROBLEM_TEXT: Record<AddProblem, string> = {
-  empty: s.empty,
-  invalid: s.invalid,
-  "not-found": s.notFound,
-  error: s.error,
-};
 
 interface DialogoAdicionarJogoProps {
   open: boolean;
@@ -37,6 +30,7 @@ interface DialogoAdicionarJogoProps {
  * em Editar.
  */
 export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdicionarJogoProps) {
+  const t = useT();
   const [path, setPath] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<AddProblem | null>(null);
@@ -45,6 +39,16 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
   const [step, setStep] = useState<SystemStep | null>(null);
   const pendingPickId = useRef<number | null>(null);
   const formId = useId();
+
+  const problemText: Record<AddProblem, string> = useMemo(
+    () => ({
+      empty: t("add_game.empty"),
+      invalid: t("add_game.invalid"),
+      "not-found": t("add_game.not_found"),
+      error: t("add_game.error"),
+    }),
+    [t],
+  );
 
   // Cada abertura começa em branco (ajuste de estado durante o desenho).
   const [wasOpen, setWasOpen] = useState(open);
@@ -104,7 +108,7 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
       const outcome = addOutcome(await call("library.add_game", { path, system: system?.key ?? null }));
       switch (outcome.kind) {
         case "added":
-          onAdded(system ? s.addedWithSystem(outcome.title, system.name) : s.added(outcome.title));
+          onAdded(system ? t("add_game.added_with_system", { game: outcome.title, system: system.name }) : t("add_game.added", { game: outcome.title }));
           break;
         case "ask-system":
           setStep({ fileName: outcome.fileName, systems: outcome.systems, others: outcome.others, showOthers: false });
@@ -133,21 +137,21 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
     <Dialogo
       open={open}
       onClose={onClose}
-      title={step ? s.whichSystem : s.title}
-      closeLabel={s.close}
+      title={step ? t("add_game.which_system") : t("add_game.title")}
+      closeLabel={t("common.close")}
       size="m"
       actions={
         step ? (
           <BotaoDesktop variant="outlined" onClick={onClose}>
-            {s.cancel}
+            {t("common.cancel")}
           </BotaoDesktop>
         ) : (
           <>
             <BotaoDesktop variant="outlined" onClick={onClose}>
-              {s.cancel}
+              {t("common.cancel")}
             </BotaoDesktop>
             <BotaoDesktop type="submit" form={formId} disabled={busy || path.trim() === ""}>
-              {busy ? s.adding : s.add}
+              {busy ? t("add_game.adding") : t("add_game.add")}
             </BotaoDesktop>
           </>
         )
@@ -158,7 +162,7 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
           <p className={styles["lead"]}>
             <strong>{step.fileName}</strong>
             <br />
-            {s.systemText}
+            {t("add_game.system_text")}
           </p>
           <GrupoDeConfiguracao>
             {systems.map((system) => (
@@ -172,7 +176,7 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
             ))}
             {!step.showOthers && step.others.length > 0 && (
               <LinhaDeConfiguracao
-                title={s.otherSystem}
+                title={t("add_game.other_system")}
                 onClick={() => {
                   setStep({ ...step, showOthers: true });
                 }}
@@ -191,13 +195,13 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
         >
           <div className={styles["typingRow"]}>
             <CampoDeTexto
-              label={s.file}
+              label={t("add_game.file")}
               value={path}
               maxLength={1024}
-              placeholder={s.filePlaceholder}
-              help={s.fileHint}
+              placeholder={t("add_game.file_placeholder")}
+              help={t("add_game.file_hint")}
               autoFocus
-              error={problem ? PROBLEM_TEXT[problem] : unreadable ? s.unreadable : undefined}
+              error={problem ? problemText[problem] : unreadable ? t("add_game.unreadable") : undefined}
               onChange={(value) => {
                 setPath(value);
                 setProblem(null);
@@ -212,12 +216,12 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
                 void pickFile();
               }}
             >
-              {s.choose}
+              {t("add_game.choose")}
             </BotaoDesktop>
           </div>
           {already !== null && (
             <p className={styles["info"]} role="status">
-              {s.already(already)}
+              {t("add_game.already", { game: already })}
             </p>
           )}
         </form>

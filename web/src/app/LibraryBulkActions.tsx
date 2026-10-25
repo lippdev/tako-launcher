@@ -1,12 +1,12 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { call } from "../bridge";
 import type { Collection } from "../bridge/generated/Collection";
 import type { Tag } from "../bridge/generated/Tag";
 import { Icon } from "../components/Icon/Icon";
 import { MenuDeContexto, type MenuEntry } from "../components/MenuDeContexto/MenuDeContexto";
 import { PainelLateral } from "../components/PainelLateral/PainelLateral";
+import { useT } from "../i18n";
 import { STATUS_IDS } from "./uiState";
-import { libraryStrings as s } from "./strings";
 import styles from "./LibraryControls.module.css";
 
 export function LibraryBulkActions({
@@ -24,6 +24,7 @@ export function LibraryBulkActions({
   clear: () => void;
   notify: (error: boolean) => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<{
     anchor: HTMLElement;
@@ -52,7 +53,7 @@ export function LibraryBulkActions({
       ? [
           {
             id: "none",
-            label: s.noStatus,
+            label: t("library.no_status"),
             onSelect: () => {
               run(() =>
                 call("game.status.set", {
@@ -64,7 +65,7 @@ export function LibraryBulkActions({
           },
           ...STATUS_IDS.map((status) => ({
             id: status,
-            label: s.statuses[status],
+            label: t(`library.status.${status}`),
             onSelect: () => {
               run(() => call("game.status.set", { gameIds, status }));
             },
@@ -76,7 +77,7 @@ export function LibraryBulkActions({
             { type: "header", label: c.name },
             {
               id: `add-${c.id}`,
-              label: s.addCollection,
+              label: t("library.add_collection"),
               onSelect: () => {
                 run(() =>
                   call("collections.add_games", {
@@ -88,7 +89,7 @@ export function LibraryBulkActions({
             },
             {
               id: `remove-${c.id}`,
-              label: s.removeCollection,
+              label: t("library.remove_collection"),
               onSelect: () => {
                 run(() =>
                   call("collections.remove_games", {
@@ -101,11 +102,11 @@ export function LibraryBulkActions({
           ]);
   return (
     <>
-      <div className={styles["actions"]} role="toolbar" aria-label={s.selectionActions} aria-busy={busy}>
+      <div className={styles["actions"]} role="toolbar" aria-label={t("library.selection_actions")} aria-busy={busy}>
         <button
           disabled={busy || !collections.some((c) => !c.criteria)}
-          title={s.collection}
-          aria-label={s.collection}
+          title={t("desktop.group.collection")}
+          aria-label={t("desktop.group.collection")}
           aria-haspopup="menu"
           onClick={(e) => {
             setMenu({
@@ -118,8 +119,8 @@ export function LibraryBulkActions({
         </button>
         <button
           disabled={busy}
-          title={s.tags}
-          aria-label={s.tags}
+          title={t("desktop.info.tags")}
+          aria-label={t("desktop.info.tags")}
           aria-haspopup="dialog"
           onClick={() => {
             setTagsOpen(true);
@@ -129,8 +130,8 @@ export function LibraryBulkActions({
         </button>
         <button
           disabled={busy}
-          title={s.status}
-          aria-label={s.status}
+          title={t("desktop.group.status")}
+          aria-label={t("desktop.group.status")}
           aria-haspopup="menu"
           onClick={(e) => {
             setMenu({ anchor: e.currentTarget, kind: "status" });
@@ -140,8 +141,8 @@ export function LibraryBulkActions({
         </button>
         <button
           disabled={busy}
-          title={allFavorite ? s.unfavorite : s.favorite}
-          aria-label={allFavorite ? s.unfavorite : s.favorite}
+          title={allFavorite ? t("library.unfavorite") : t("hint.favorite")}
+          aria-label={allFavorite ? t("library.unfavorite") : t("hint.favorite")}
           onClick={() => {
             run(() =>
               call("game.favorite.set", {
@@ -153,7 +154,7 @@ export function LibraryBulkActions({
         >
           <Icon name="star" filled={allFavorite} />
         </button>
-        <button title={s.close} aria-label={s.close} onClick={clear}>
+        <button title={t("common.close")} aria-label={t("common.close")} onClick={clear}>
           <Icon name="x" />
         </button>
       </div>
@@ -164,21 +165,21 @@ export function LibraryBulkActions({
         }}
         anchor={menu?.anchor ?? null}
         entries={entries}
-        title={menu?.kind === "status" ? s.status : s.collection}
+        title={menu?.kind === "status" ? t("desktop.group.status") : t("desktop.group.collection")}
       />
       <PainelLateral
         open={tagsOpen}
         onClose={() => {
           setTagsOpen(false);
         }}
-        title={s.tags}
-        closeLabel={s.close}
+        title={t("desktop.info.tags")}
+        closeLabel={t("common.close")}
       >
         <div className={styles["fields"]}>
           <input
             className={styles["tagInput"]}
-            aria-label={s.tags}
-            placeholder={s.tagPlaceholder}
+            aria-label={t("desktop.info.tags")}
+            placeholder={t("library.tag_placeholder")}
             list="library-tag-suggestions"
             value={tag}
             onChange={(e) => {
@@ -203,7 +204,7 @@ export function LibraryBulkActions({
                 );
               }}
             >
-              {s.removeTags}
+              {t("library.remove_tags")}
             </button>
             <button
               disabled={busy || !tag.trim()}
@@ -217,7 +218,7 @@ export function LibraryBulkActions({
                 );
               }}
             >
-              {s.addTags}
+              {t("library.add_tags")}
             </button>
           </div>
         </div>

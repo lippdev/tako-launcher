@@ -8,7 +8,6 @@ import { useEscapeLayer } from "../../lib/escapeLayers";
 import { useFocusTrap } from "../../lib/focusTrap";
 import { Portal } from "../../lib/Portal";
 import { useGameSession } from "../sessao/useGameSession";
-import { centralStrings } from "../strings";
 import { useControlCenter } from "./useControlCenter";
 import styles from "./CentralRapida.module.css";
 
@@ -35,7 +34,7 @@ export function CentralRapida() {
   return (
     <Portal>
       <div className={styles["veil"]}>
-        <div ref={box} className={styles["central"]} role="dialog" aria-modal="true" aria-label={centralStrings.title} tabIndex={-1}>
+        <div ref={box} className={styles["central"]} role="dialog" aria-modal="true" aria-label={t("cc.title")} tabIndex={-1}>
           <header className={styles["game"]}>
             <div>
               <h2>{session.running.title}</h2>
@@ -62,13 +61,13 @@ export function CentralRapida() {
           {panel === "performance" && <section className={styles["panel"]} aria-label={t("settings.performance.title")}>
             <p>{t("settings.performance.supervisor")}</p>
             <dl>
-              <div><dt>{t("settings.performance.memory")}</dt><dd>{state.memoryMib === null ? t("settings.performance.unknown") : centralStrings.memory(state.memoryMib)}</dd></div>
-              <div><dt>{centralStrings.cpuTime}</dt><dd>{state.cpuSeconds === null ? t("settings.performance.unknown") : centralStrings.seconds(state.cpuSeconds)}</dd></div>
+              <div><dt>{t("settings.performance.memory")}</dt><dd>{state.memoryMib === null ? t("settings.performance.unknown") : t("cc.memory", { mib: state.memoryMib.toFixed(1) })}</dd></div>
+              <div><dt>{t("cc.cpu_time")}</dt><dd>{state.cpuSeconds === null ? t("settings.performance.unknown") : t("cc.seconds", { seconds: state.cpuSeconds.toFixed(1) })}</dd></div>
             </dl>
           </section>}
 
-          {(central.error || endError) && <p role="alert">{centralStrings.actionError}</p>}
-          <nav className={styles["actions"]} aria-label={centralStrings.title}>
+          {(central.error || endError) && <p role="alert">{t("cc.action_error")}</p>}
+          <nav className={styles["actions"]} aria-label={t("cc.title")}>
             <BotaoDesktop icon="play" onClick={() => { void session.resume(); }}>{t("cc.back_to_game")}</BotaoDesktop>
             <BotaoDesktop variant="outlined" aria-expanded={panel === "audio"} onClick={() => { setPanel(panel === "audio" ? null : "audio"); }}>{t("cc.audio")}</BotaoDesktop>
             <BotaoDesktop variant="outlined" aria-expanded={panel === "screen"} onClick={() => { setPanel(panel === "screen" ? null : "screen"); }}>{t("cc.screen")}</BotaoDesktop>
