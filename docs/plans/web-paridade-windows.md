@@ -84,6 +84,6 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Item | Tarefa |
 |---|---|
 | Atualização do Chromium (processo e CI que avisa) | WEB-41 |
-| Medição contra a §8.5 no release, e comparação CEF × WebView2 | WEB-60 |
+| Medição contra a §8.5 no release (memória e abertura feitas; CPU, GPU, fps, latência e retorno pendentes; WebView2 não comparado) | WEB-60 |
 | Instalador por componentes e onboarding | INST-01 a INST-04 |
 | Corte: a web vira o padrão no Windows, sai o Slint | WEB-50 |
