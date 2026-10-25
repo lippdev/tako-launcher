@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { call } from "../../bridge";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { call, on } from "../../bridge";
 import type { EmulatorsView } from "../../bridge/generated/EmulatorsView";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { CampoDeSelecao } from "../../components/CampoDeSelecao/CampoDeSelecao";
@@ -35,14 +35,13 @@ function describeEmulator(emulator: EmulatorsView["emulators"][number]): string 
  * Configurações › Biblioteca › Emuladores e ROMs (`settings_emulators` do Slint): as pastas de ROMs (adicionar,
  * escolher o sistema, remover), os emuladores achados neste PC e a leitura de novo. O núcleo lê as lojas de novo
  * sozinho a cada mudança de pasta; o andamento aparece na própria categoria.
- *
- * Escolher a pasta pela janela do sistema é coisa do hospedeiro; por enquanto o caminho vem digitado.
  */
 export function EmuladoresERoms({ notify, onScan, scanning }: EmuladoresERomsProps) {
   const [view, setView] = useState<EmulatorsView | null>(null);
   const [busy, setBusy] = useState(false);
   const [path, setPath] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
+  const pendingPickId = useRef<number | null>(null);
   const tell = useLatest(notify);
 
   useEffect(() => {
@@ -59,6 +58,30 @@ export function EmuladoresERoms({ notify, onScan, scanning }: EmuladoresERomsPro
       cancelled = true;
     };
   }, [tell]);
+
+  useEffect(() => {
+    return on("system.picked", ({ id, path: pickedPath }) => {
+      if (pendingPickId.current === id) {
+        pendingPickId.current = null;
+        if (pickedPath !== null) {
+          setPath(pickedPath);
+          setAddError(null);
+        }
+      }
+    });
+  }, []);
+
+  const pickFolder = async () => {
+    try {
+      const res = await call("system.pick", {
+        kind: "folder",
+        purpose: "settings.emulators.add_folder",
+      });
+      pendingPickId.current = res.id;
+    } catch (failure) {
+      console.error("system.pick", failure);
+    }
+  };
 
   /** Roda uma chamada que devolve a lista nova. Se falhar, `onError` decide o que mostrar (senão, o aviso). */
   function change(action: () => Promise<EmulatorsView>, done: string | null, failure: string, options?: { onDone?: () => void; onError?: () => void }) {
@@ -152,6 +175,16 @@ export function EmuladoresERoms({ notify, onScan, scanning }: EmuladoresERomsPro
               setAddError(null);
             }}
           />
+          <BotaoDesktop
+            variant="outlined"
+            type="button"
+            onClick={() => {
+              void pickFolder();
+            }}
+            className={styles["addButton"]}
+          >
+            {s.add.choose}
+          </BotaoDesktop>
           <BotaoDesktop variant="outlined" type="submit" disabled={busy || path.trim() === ""} className={styles["addButton"]}>
             {s.add.action}
           </BotaoDesktop>

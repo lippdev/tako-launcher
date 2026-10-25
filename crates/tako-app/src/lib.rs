@@ -18,6 +18,7 @@ mod links;
 mod local_api;
 mod metadata;
 mod organize;
+mod picker;
 mod profile;
 pub mod protocol;
 mod session;
@@ -56,6 +57,13 @@ pub enum HostRequest {
     /// A atualização foi aplicada (o instalador ou o script de troca já foi iniciado e espera este processo): o
     /// hospedeiro fecha a interface e encerra o núcleo (WEB-33).
     Exit,
+    /// Abre o seletor de arquivos ou de pastas do sistema operacional numa thread separada (WEB-12e).
+    Pick {
+        id: u32,
+        kind: protocol::PickKind,
+        purpose: String,
+        filters: Option<Vec<protocol::PickFilter>>,
+    },
 }
 
 /// Atende as chamadas da interface. Uma instância por processo, na thread do núcleo.
@@ -74,6 +82,7 @@ pub struct AppService {
     /// A última entrada vista foi do controle (WEB-05b).
     using_pad: bool,
     central_open: bool,
+    picker: picker::PickerState,
 }
 
 impl AppService {
@@ -89,6 +98,7 @@ impl AppService {
             local_api: local_api::WebApi::default(),
             using_pad: false,
             central_open: false,
+            picker: picker::PickerState::default(),
         }
     }
 
@@ -141,6 +151,17 @@ impl AppService {
                 version: self.version.clone(),
                 bridge_version: BRIDGE_VERSION,
             })),
+            Call::SystemPick(request) => {
+                let id = self.picker.next_id();
+                self.picker.register(id);
+                self.request(HostRequest::Pick {
+                    id,
+                    kind: request.kind,
+                    purpose: request.purpose,
+                    filters: request.filters,
+                })?;
+                Ok(Reply::SystemPick(protocol::PickResponse { id }))
+            }
             Call::WindowAction(action) => {
                 self.request(HostRequest::Window(action))?;
                 Ok(Reply::WindowAction)
@@ -377,6 +398,17 @@ impl AppService {
             && sink.send(event).is_err()
         {
             tracing::debug!("evento sem interface aberta");
+        }
+    }
+
+    /// Entrega o caminho escolhido no diálogo nativo ou `None` se o usuário cancelou (WEB-12e).
+    /// Só emite o evento `system.picked` se o id corresponder a um pedido aberto.
+    pub fn deliver_picked(&mut self, id: u32, path: Option<String>) -> bool {
+        if self.picker.complete(id) {
+            self.emit(Event::SystemPicked(protocol::SystemPicked { id, path }));
+            true
+        } else {
+            false
         }
     }
 }

@@ -254,7 +254,7 @@ dependia de Slint foi para o `tako-core`; o Slint usa a mesma.
 
 **Discord.** O recurso só roda com `DISCORD_CLIENT_ID` (id do aplicativo no portal do Discord, do mantenedor), que
 hoje está **vazio** no código: sem ele nem o Slint mostra a presença, e a opção não faz efeito. Com o Discord aberto
-o IPC responde (`\.pipediscord-ipc-0`); a demonstração (`--simulate`) nunca fala com o Discord.
+o IPC responde (`\\.pipediscord-ipc-0`); a demonstração (`--simulate`) nunca fala com o Discord.
 
 **API local.** A mesma porta (`LocalApiPort`, padrão 47774), o mesmo token (`LocalApiToken`), a mesma autenticação
 `Bearer`, `Host` e limites do ADR-0033, sem código duplicado. Fica **desligada** com `LocalApiEnabled` desligada
@@ -282,7 +282,7 @@ mesmo caminho. Pedido inválido ou grande demais é descartado.
 
 **Argumentos.** `tako --web --open-url "<url>"` ou `tako --web "<url>"`. Em release, qualquer outra forma com link
 falha com código 2 (uma URL do navegador não injeta `--data-dir` pelas aspas da linha do Windows); em debug valem
-outras opções, para testar com `--data-dir`. O comando do protocolo no registro (`HKCUSoftwareClasses	akoshellopencommand`)
+outras opções, para testar com `--data-dir`. O comando do protocolo no registro (`HKCUSoftwareClasses\takoshellopencommand`)
 pertence ao instalador (INST-*): para abrir a versão web deve ser `"Tako.exe" --web --open-url "%1"`; o instalado hoje
 ainda aponta para o Slint (`--open-url "%1"`), que entrega o link ao núcleo web aberto pelo mesmo arquivo.
 
@@ -323,6 +323,25 @@ Durante um jogo aberto pela sessão (WEB-20), a Central rápida abre por cima do
 - **Hospedeiro falso:** abrir com `?central` inicia uma sessão simulada já na Central rápida, permitindo testar controles, atalho de teclado (`Ctrl+Shift+Tab`) e botões de voltar/encerrar no navegador.
 
 Testes: `crates/tako-app/tests/control_center_bridge.rs` (ciclo pela ponte, validações, atalho customizado e envelope de rede), `crates/tako-web/src/core_process.rs` (abertura com a interface fechada e retorno do foco ao jogo).
+
+## Seletor de arquivo e de pasta nativo (WEB-12e)
+
+Paridade com os seletores nativos do Slint no Windows (`rfd`). A interface web (`tako-web`) dispara diálogos modais nativos por meio da ponte para escolher executáveis, pastas de trabalho ou pastas de ROMs, sem bloquear a thread principal do núcleo nem a interface CEF.
+
+| Chamada / Evento | Tipo | Descrição |
+|---|---|---|
+| `system.pick` | Chamada | Solicita a abertura de um seletor nativo: `{ kind: "file" \| "folder", purpose: string, filters?: PickFilter[] }`. Responde imediatamente com `{ id: number }`. |
+| `HostRequest::Pick` | Pedido ao hospedeiro | Emitido pelo `AppService` ao hospedeiro com `{ id, kind, purpose, filters }`. |
+| `system.picked` | Evento | Notifica a página com `{ id: number, path: string \| null }`. O caminho é `null` se o usuário cancelar o diálogo. |
+
+### Isolamento de threads e segurança
+
+- **Thread própria:** `rfd::FileDialog` é síncrono e modal. Para nunca bloquear o laço de eventos do núcleo (`core_process.rs`) nem a renderização do Chromium, o diálogo é executado em uma thread dedicada (`std::thread::spawn`). Ao concluir, a thread envia um comando de volta à thread do núcleo (`Command::Picked { id, path }`).
+- **Casamento de IDs:** o `PickerState` no `AppService` registra o pedido pendente e confere o `id` quando o resultado retorna. Resultados para IDs desconhecidos ou expirados são rejeitados silenciosamente.
+- **Validação mantida:** o caminho escolhido retorna à interface apenas como sugestão de preenchimento dos campos de texto existentes. A gravação final e a validação de acesso continuam ocorrendo através das rotas de negócio existentes (`game.edit.set`, `library.add_game`, `emulators.folder.add`).
+- **Hospedeiro falso:** em ambiente de desenvolvimento sem hospedeiro nativo, `fakeSystemPick` responde na hora com um id e emite `system.picked` após um pequeno atraso (150 ms) com caminhos simulados (`C:\Jogos\Exemplo\game.exe` ou `C:\Roms`).
+
+Testes: `crates/tako-app/src/picker.rs` (ciclo do id, limite e cancelamento), `crates/tako-app/tests/picker_bridge.rs` (ciclo completo pela ponte, resposta imediata, evento, cancelamento e rejeição de id inválido) e `crates/tako-web/src/core_process.rs` (entrega de `Command::Picked` e emissão do evento para a interface).
 
 ## Preparar e compilar
 

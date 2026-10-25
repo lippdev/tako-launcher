@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from "react";
-import { CallError, call } from "../../bridge";
+import { useEffect, useId, useRef, useState } from "react";
+import { CallError, call, on } from "../../bridge";
 import type { GameEdit } from "../../bridge/generated/GameEdit";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { CampoDeSelecao } from "../../components/CampoDeSelecao/CampoDeSelecao";
@@ -31,6 +31,7 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<EditProblem | null>(null);
+  const pendingPickId = useRef<number | null>(null);
   const formId = useId();
 
   // Cada abertura começa sem a sobra da anterior (ajuste de estado durante o desenho).
@@ -43,6 +44,10 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
       setProblem(null);
     }
   }
+
+  useEffect(() => {
+    pendingPickId.current = null;
+  }, [open]);
 
   // ... e lê os dados de novo.
   useEffect(() => {
@@ -65,6 +70,30 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
       cancelled = true;
     };
   }, [open, gameId, onClose, onError]);
+
+  useEffect(() => {
+    return on("system.picked", ({ id, path: pickedPath }) => {
+      if (pendingPickId.current === id) {
+        pendingPickId.current = null;
+        if (pickedPath !== null) {
+          setDraft((prev) => (prev ? { ...prev, workingDirectory: pickedPath } : prev));
+          setProblem(null);
+        }
+      }
+    });
+  }, []);
+
+  const pickFolder = async () => {
+    try {
+      const res = await call("system.pick", {
+        kind: "folder",
+        purpose: "edit_game",
+      });
+      pendingPickId.current = res.id;
+    } catch (failure) {
+      console.error("system.pick", failure);
+    }
+  };
 
   if (!edit || !draft) return null;
 
@@ -135,23 +164,34 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
         <CampoDeTexto
           label={s.arguments}
           value={draft.arguments}
-          maxLength={2048}
-          placeholder={s.argumentsHint}
-          onChange={(value) => {
-            change({ arguments: value });
-          }}
-        />
-        <CampoDeTexto
-          label={s.folder}
-          value={draft.workingDirectory}
           maxLength={1024}
-          placeholder={edit.defaultFolder ?? ""}
-          help={s.folderHint}
-          error={folderError}
-          onChange={(workingDirectory) => {
-            change({ workingDirectory });
+          help={s.argumentsHint}
+          onChange={(args) => {
+            change({ arguments: args });
           }}
         />
+        <div className={styles["typingRow"]}>
+          <CampoDeTexto
+            label={s.folder}
+            value={draft.workingDirectory}
+            maxLength={1024}
+            placeholder={edit.defaultFolder ?? ""}
+            help={s.folderHint}
+            error={folderError}
+            onChange={(workingDirectory) => {
+              change({ workingDirectory });
+            }}
+          />
+          <BotaoDesktop
+            type="button"
+            variant="outlined"
+            onClick={() => {
+              void pickFolder();
+            }}
+          >
+            {s.choose}
+          </BotaoDesktop>
+        </div>
         <GrupoDeConfiguracao>
           <LinhaDeConfiguracao
             title={s.tracking}
@@ -167,12 +207,8 @@ export function DialogoEditarJogo({ gameId, open, onClose, onSaved, onError }: D
             }
           />
         </GrupoDeConfiguracao>
-        <p className={styles["target"]}>
-          <span className={styles["targetLabel"]}>{s.target}</span>
-          <span className={styles["targetValue"]}>{edit.target}</span>
-        </p>
         {generalError && (
-          <p className={styles["problem"]} role="alert">
+          <p className={styles["info"]} role="alert">
             {generalError}
           </p>
         )}

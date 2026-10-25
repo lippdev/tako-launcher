@@ -330,7 +330,8 @@ export const settingsStrings = {
       label: "Caminho da pasta",
       placeholder: "C:\\Jogos\\ROMs",
       action: "Adicionar",
-      // TODO(WEB-12c): trocar o caminho digitado pelo seletor de pasta do sistema, que é do hospedeiro.
+      choose: "Escolher…",
+      // O seletor nativo de pasta do sistema preenche o campo.
       help: "Digite o caminho completo da pasta.",
     },
     added: (path: string) => `Pasta adicionada: ${path}`,
@@ -720,6 +721,7 @@ export const editGameStrings = {
   argumentsHint: "Nenhum", // game_settings.none
   folder: "Pasta de trabalho", // game_settings.folder
   folderHint: "Vazio = a pasta do executável.", // game_settings.folder_hint
+  choose: "Escolher…",
   tracking: "Fim do jogo", // edit_game.tracking
   target: "Arquivo", // edit_game.target
   trackingOptions: {
@@ -749,6 +751,7 @@ export const addGameStrings = {
   file: "Arquivo do jogo",
   fileHint: "Caminho do executável, do atalho ou da ROM.",
   filePlaceholder: "C:\\Jogos\\MeuJogo\\jogo.exe",
+  choose: "Escolher…",
   close: "Fechar (Esc)",
   cancel: "Cancelar", // common.cancel
   add: "Adicionar",

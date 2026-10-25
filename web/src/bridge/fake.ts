@@ -84,6 +84,8 @@ import type { ArtChooseRequest } from "./generated/ArtChooseRequest";
 import type { ArtResetRequest } from "./generated/ArtResetRequest";
 import type { ArtReviewItem } from "./generated/ArtReviewItem";
 import type { ArtReviewView } from "./generated/ArtReviewView";
+import type { SystemPickRequest } from "./generated/SystemPickRequest";
+import type { PickResponse } from "./generated/PickResponse";
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
@@ -2217,7 +2219,19 @@ function setFakeSourceId(payload: unknown): GameSourceIds {
   return fakeSourceIds(game);
 }
 
+let nextFakePick = 1;
+
+function fakeSystemPick(payload: unknown): PickResponse {
+  const req = payload as SystemPickRequest;
+  const id = nextFakePick++;
+  const fakePath = req.kind === "file" ? "C:\\Jogos\\Exemplo\\game.exe" : "C:\\Jogos\\ROMs";
+  const cancel = sessionParams.has("pick_cancel");
+  emitFakeEvent("system.picked", { id, path: cancel ? null : fakePath }, 150);
+  return { id };
+}
+
 Object.assign(defaults, {
+  "system.pick": fakeSystemPick,
   "library.add_game": addFakeGame,
   "game.edit": (payload: unknown) => {
     const { game, manual } = manualOf(payload);

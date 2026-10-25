@@ -10,9 +10,10 @@ import type { InputNotice } from "./InputNotice";
 import type { LibrarySources } from "./LibrarySources";
 import type { SourceIdsChecked } from "./SourceIdsChecked";
 import type { SourceIdsFound } from "./SourceIdsFound";
+import type { SystemPicked } from "./SystemPicked";
 import type { UpdateStatus } from "./UpdateStatus";
 
 /**
  * Eventos do núcleo para a interface.
  */
-export type Event = { "name": "library.changed" } | { "name": "library.scan.progress", "payload": LibrarySources } | { "name": "i18n.changed", "payload": I18nLang } | { "name": "downloads.changed" } | { "name": "game.started", "payload": GameStarted } | { "name": "game.ended", "payload": GameEnded } | { "name": "game.source_ids.found", "payload": SourceIdsFound } | { "name": "game.source_ids.checked", "payload": SourceIdsChecked } | { "name": "art.changed", "payload": GameRequest } | { "name": "updates.changed", "payload": UpdateStatus } | { "name": "input.nav", "payload": InputNav } | { "name": "input.controller", "payload": ControllerInfo } | { "name": "input.notice", "payload": InputNotice } | { "name": "control_center.open", "payload": boolean } | { "name": "art.candidates.ready", "payload": ArtCandidatesReady };
+export type Event = { "name": "library.changed" } | { "name": "library.scan.progress", "payload": LibrarySources } | { "name": "i18n.changed", "payload": I18nLang } | { "name": "downloads.changed" } | { "name": "game.started", "payload": GameStarted } | { "name": "game.ended", "payload": GameEnded } | { "name": "game.source_ids.found", "payload": SourceIdsFound } | { "name": "game.source_ids.checked", "payload": SourceIdsChecked } | { "name": "art.changed", "payload": GameRequest } | { "name": "updates.changed", "payload": UpdateStatus } | { "name": "input.nav", "payload": InputNav } | { "name": "input.controller", "payload": ControllerInfo } | { "name": "input.notice", "payload": InputNotice } | { "name": "control_center.open", "payload": boolean } | { "name": "art.candidates.ready", "payload": ArtCandidatesReady } | { "name": "system.picked", "payload": SystemPicked };

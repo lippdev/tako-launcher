@@ -161,6 +161,7 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "art.reset"
             | "art.review"
             | "art.review.accept"
+            | "system.pick"
     ) {
         return Err((
             header.id,
@@ -656,6 +657,14 @@ pub enum Call {
         #[ts(as = "GameRequest")]
         GameRequest,
     ),
+    /// Abre o seletor de arquivo ou de pasta do sistema operacional (WEB-12e). Responde na hora com um id;
+    /// o resultado chega depois por `system.picked`.
+    #[serde(rename = "system.pick")]
+    SystemPick(
+        #[serde(with = "object_payload")]
+        #[ts(as = "SystemPickRequest")]
+        SystemPickRequest,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -809,6 +818,8 @@ pub enum Reply {
     ArtReview(ArtReviewView),
     #[serde(rename = "art.review.accept")]
     ArtReviewAccept,
+    #[serde(rename = "system.pick")]
+    SystemPick(PickResponse),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -880,6 +891,9 @@ pub enum Event {
     /// Candidatos de arte prontos para exibição (WEB-12d).
     #[serde(rename = "art.candidates.ready")]
     ArtCandidatesReady(ArtCandidatesReady),
+    /// Resultado de uma escolha de arquivo ou pasta (`system.pick`). `path` é `null` quando o usuário cancela.
+    #[serde(rename = "system.picked")]
+    SystemPicked(SystemPicked),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -2579,6 +2593,40 @@ pub struct ArtReviewItem {
     pub missing_kinds: Vec<ArtKindDto>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum PickKind {
+    File,
+    Folder,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct PickFilter {
+    pub name: String,
+    pub extensions: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct SystemPickRequest {
+    pub kind: PickKind,
+    pub purpose: String,
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub filters: Option<Vec<PickFilter>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PickResponse {
+    pub id: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -2603,4 +2651,12 @@ pub struct ArtCandidatesReady {
     pub game_id: String,
     pub kind: ArtKindDto,
     pub candidates: Vec<ArtCandidateDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SystemPicked {
+    pub id: u32,
+    pub path: Option<String>,
 }

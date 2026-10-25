@@ -86,6 +86,11 @@ pub enum Command {
     /// A thread do controle foi iniciada: guarda para sinalizar parada e esperar no fim.
     #[allow(dead_code)]
     InputThread(PadsThread),
+    /// Resultado de um seletor de arquivos ou de pastas do sistema operacional (WEB-12e).
+    Picked {
+        id: u32,
+        path: Option<String>,
+    },
 }
 
 /// Thread dos controles (SDL3): guarda o handle e o sinalizador de parada para aguardar o encerramento.
@@ -531,6 +536,47 @@ pub fn run<L: UiLauncher>(
             Some(Command::Activation(Activation::Raise)) => {
                 tracing::info!("o Tako foi aberto de novo: vindo para a frente");
                 host.reveal(Instant::now());
+            }
+            Some(Command::Host(HostRequest::Pick {
+                id,
+                kind,
+                purpose,
+                filters,
+            })) => {
+                let tx = host.tx.clone();
+                std::thread::spawn(move || {
+                    let mut dialog = rfd::FileDialog::new();
+                    let title = match purpose.as_str() {
+                        "add_game" | "add_game.title" => tako_core::i18n::t("add_game.title"),
+                        "edit_game" | "working_directory" | "game_settings.folder" => {
+                            tako_core::i18n::t("game_settings.folder")
+                        }
+                        "emulators" | "emulators.add_folder" | "settings.emulators.add_folder" => {
+                            tako_core::i18n::t("settings.emulators.add_folder")
+                        }
+                        other => {
+                            let tr = tako_core::i18n::t(other);
+                            if tr != other { tr } else { other.to_owned() }
+                        }
+                    };
+                    dialog = dialog.set_title(&title);
+                    if let Some(filters) = &filters {
+                        for filter in filters {
+                            let extensions: Vec<&str> =
+                                filter.extensions.iter().map(String::as_str).collect();
+                            dialog = dialog.add_filter(&filter.name, &extensions);
+                        }
+                    }
+                    let picked = match kind {
+                        tako_app::protocol::PickKind::File => dialog.pick_file(),
+                        tako_app::protocol::PickKind::Folder => dialog.pick_folder(),
+                    };
+                    let path = picked.map(|p| p.to_string_lossy().into_owned());
+                    let _ = tx.send(Command::Picked { id, path });
+                });
+            }
+            Some(Command::Picked { id, path }) => {
+                service.deliver_picked(id, path);
             }
             None => {}
         }
@@ -1645,6 +1691,32 @@ mod tests {
         assert!(stop.load(Ordering::Relaxed));
         assert!(woken.load(Ordering::Relaxed));
         assert!(sync.thread.is_none());
+    }
+
+    #[test]
+    fn picked_event_reaches_the_open_ui() {
+        let ((launched, control, core), _dir) = start_demo();
+        let mut ui = launched.recv().unwrap();
+        ui.request(
+            r#"{"v":1,"id":1,"name":"system.pick","payload":{"kind":"folder","purpose":"test"}}"#,
+        );
+        let resp = until(&mut ui, answer(1));
+        assert_eq!(resp["ok"], true);
+        let pick_id = resp["reply"]["data"]["id"].as_u64().unwrap() as u32;
+
+        control
+            .send(Command::Picked {
+                id: pick_id,
+                path: Some("C:\\Jogos\\ROMs".into()),
+            })
+            .unwrap();
+
+        let picked_ev = until(&mut ui, event("system.picked"));
+        assert_eq!(picked_ev["event"]["payload"]["id"], pick_id);
+        assert_eq!(picked_ev["event"]["payload"]["path"], "C:\\Jogos\\ROMs");
+
+        ui.send_closed_and_exit();
+        assert_eq!(core.join().unwrap(), Ok(()));
     }
 
     impl FakeUi {

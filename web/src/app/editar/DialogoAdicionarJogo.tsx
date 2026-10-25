@@ -1,5 +1,5 @@
-import { useId, useState } from "react";
-import { CallError, call } from "../../bridge";
+import { useEffect, useId, useRef, useState } from "react";
+import { CallError, call, on } from "../../bridge";
 import type { RomSystem } from "../../bridge/generated/RomSystem";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { CampoDeTexto } from "../../components/CampoDeTexto/CampoDeTexto";
@@ -35,8 +35,6 @@ interface DialogoAdicionarJogoProps {
  * "Adicionar jogo" (port do `add_game` do Slint): o arquivo que abre o jogo (executável, atalho ou ROM). O título sai
  * do nome do produto do `.exe` ou do nome do arquivo; ROM pergunta de qual sistema é. O nome pode ser mudado depois
  * em Editar.
- *
- * TODO(host): o seletor de arquivos do sistema ainda não existe no hospedeiro CEF; por enquanto o caminho é digitado.
  */
 export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdicionarJogoProps) {
   const [path, setPath] = useState("");
@@ -45,6 +43,7 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
   const [already, setAlready] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
   const [step, setStep] = useState<SystemStep | null>(null);
+  const pendingPickId = useRef<number | null>(null);
   const formId = useId();
 
   // Cada abertura começa em branco (ajuste de estado durante o desenho).
@@ -60,6 +59,36 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
       setStep(null);
     }
   }
+
+  useEffect(() => {
+    pendingPickId.current = null;
+  }, [open]);
+
+  useEffect(() => {
+    return on("system.picked", ({ id, path: pickedPath }) => {
+      if (pendingPickId.current === id) {
+        pendingPickId.current = null;
+        if (pickedPath !== null) {
+          setPath(pickedPath);
+          setProblem(null);
+          setAlready(null);
+          setUnreadable(false);
+        }
+      }
+    });
+  }, []);
+
+  const pickFile = async () => {
+    try {
+      const res = await call("system.pick", {
+        kind: "file",
+        purpose: "add_game",
+      });
+      pendingPickId.current = res.id;
+    } catch (failure) {
+      console.error("system.pick", failure);
+    }
+  };
 
   const submit = async (system?: RomSystem) => {
     if (busy) return;
@@ -160,21 +189,32 @@ export function DialogoAdicionarJogo({ open, onClose, onAdded }: DialogoAdiciona
             void submit();
           }}
         >
-          <CampoDeTexto
-            label={s.file}
-            value={path}
-            maxLength={1024}
-            placeholder={s.filePlaceholder}
-            help={s.fileHint}
-            autoFocus
-            error={problem ? PROBLEM_TEXT[problem] : unreadable ? s.unreadable : undefined}
-            onChange={(value) => {
-              setPath(value);
-              setProblem(null);
-              setAlready(null);
-              setUnreadable(false);
-            }}
-          />
+          <div className={styles["typingRow"]}>
+            <CampoDeTexto
+              label={s.file}
+              value={path}
+              maxLength={1024}
+              placeholder={s.filePlaceholder}
+              help={s.fileHint}
+              autoFocus
+              error={problem ? PROBLEM_TEXT[problem] : unreadable ? s.unreadable : undefined}
+              onChange={(value) => {
+                setPath(value);
+                setProblem(null);
+                setAlready(null);
+                setUnreadable(false);
+              }}
+            />
+            <BotaoDesktop
+              type="button"
+              variant="outlined"
+              onClick={() => {
+                void pickFile();
+              }}
+            >
+              {s.choose}
+            </BotaoDesktop>
+          </div>
           {already !== null && (
             <p className={styles["info"]} role="status">
               {s.already(already)}
