@@ -152,14 +152,20 @@ impl AppService {
                 bridge_version: BRIDGE_VERSION,
             })),
             Call::SystemPick(request) => {
+                if self.picker.is_busy() {
+                    return Err(BridgeError::new(
+                        ErrorCode::Conflict,
+                        "já há um seletor aberto",
+                    ));
+                }
                 let id = self.picker.next_id();
-                self.picker.register(id);
                 self.request(HostRequest::Pick {
                     id,
                     kind: request.kind,
                     purpose: request.purpose,
                     filters: request.filters,
                 })?;
+                self.picker.register(id);
                 Ok(Reply::SystemPick(protocol::PickResponse { id }))
             }
             Call::WindowAction(action) => {
@@ -533,6 +539,7 @@ impl AppService {
         };
         tako_core::library::query::recently_played(core.library().games())
             .into_iter()
+            .filter(|game| game.can_play())
             .take(count)
             .map(|g| (g.id.clone(), g.title.clone()))
             .collect()
@@ -565,5 +572,46 @@ mod tray_tests {
         assert_eq!(app.language(), tako_core::i18n::Lang::PtBr);
         assert!(app.recent_games(5).is_empty());
         assert!(!app.close_to_tray());
+    }
+
+    #[test]
+    fn tray_recent_games_filter_unplayable_before_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = Core::open(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        )
+        .unwrap();
+        let mut app = AppService::with_core("test", core);
+        let now = chrono::Utc::now();
+        app.reload_library(vec![
+            tako_core::library::Game {
+                id: "removed".into(),
+                last_played_at: Some(now),
+                ..Default::default()
+            },
+            tako_core::library::Game {
+                id: "upcoming".into(),
+                is_installed: true,
+                upcoming_release: chrono::NaiveDate::from_ymd_opt(2030, 1, 1),
+                last_played_at: Some(now),
+                ..Default::default()
+            },
+            tako_core::library::Game {
+                id: "installed".into(),
+                is_installed: true,
+                last_played_at: Some(now - chrono::TimeDelta::days(1)),
+                ..Default::default()
+            },
+        ])
+        .unwrap();
+        assert_eq!(
+            app.recent_games(1)
+                .iter()
+                .map(|g| g.0.as_str())
+                .collect::<Vec<_>>(),
+            vec!["installed"]
+        );
     }
 }

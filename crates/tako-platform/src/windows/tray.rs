@@ -4,6 +4,8 @@
 //! o menu de contexto suspenso (`TrackPopupMenu`).
 
 use crate::tray::{TrayAction, TrayState};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread::JoinHandle;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
@@ -23,14 +25,29 @@ fn encode_wide(s: &str) -> Vec<u16> {
 
 struct TrayContext {
     state: Arc<Mutex<TrayState>>,
-    on_action: Box<dyn Fn(TrayAction) + Send + 'static>,
+    on_action: Rc<dyn Fn(TrayAction) + Send + 'static>,
     nid: NOTIFYICONDATAW,
     taskbar_created_msg: u32,
+    _owned_icon: Option<OwnedIcon>,
+    available: Arc<AtomicBool>,
+}
+
+/// LoadImageW sem LR_SHARED transfere a posse; LoadIconW devolve um recurso compartilhado.
+struct OwnedIcon(HICON);
+
+impl Drop for OwnedIcon {
+    fn drop(&mut self) {
+        // SAFETY: somente o handle próprio de LoadImageW chega aqui, depois da remoção da bandeja.
+        if let Err(error) = unsafe { DestroyIcon(self.0) } {
+            tracing::warn!(%error, "liberar ícone da bandeja");
+        }
+    }
 }
 
 pub struct WindowsTray {
     hwnd: isize,
     handle: Option<JoinHandle<()>>,
+    available: Arc<AtomicBool>,
 }
 
 impl WindowsTray {
@@ -39,10 +56,12 @@ impl WindowsTray {
         on_action: impl Fn(TrayAction) + Send + 'static,
     ) -> Option<Self> {
         let (tx, rx) = mpsc::channel();
+        let available = Arc::new(AtomicBool::new(false));
+        let thread_available = available.clone();
         let handle = std::thread::Builder::new()
             .name("tako-tray".into())
             .spawn(move || {
-                run_tray_thread(state, Box::new(on_action), tx);
+                run_tray_thread(state, Box::new(on_action), tx, thread_available);
             })
             .ok()?;
 
@@ -50,7 +69,12 @@ impl WindowsTray {
         Some(Self {
             hwnd,
             handle: Some(handle),
+            available,
         })
+    }
+
+    pub fn is_available(&self) -> bool {
+        self.available.load(Ordering::Acquire)
     }
 }
 
@@ -77,6 +101,7 @@ fn run_tray_thread(
     state: Arc<Mutex<TrayState>>,
     on_action: Box<dyn Fn(TrayAction) + Send + 'static>,
     ready_tx: mpsc::Sender<Option<isize>>,
+    available: Arc<AtomicBool>,
 ) {
     // SAFETY: obtém o HINSTANCE do módulo atual para registrar a classe de janela.
     let hinstance = unsafe { GetModuleHandleW(None).unwrap_or_default() };
@@ -112,10 +137,10 @@ fn run_tray_thread(
 
     // Ícone da aplicação (resource 1 no binário oficial ou IDI_APPLICATION de reserva).
     // SAFETY: busca o ícone pequeno do sistema para a bandeja.
-    let icon = unsafe {
+    let (icon, owned_icon) = unsafe {
         let cx = GetSystemMetrics(SM_CXSMICON);
         let cy = GetSystemMetrics(SM_CYSMICON);
-        LoadImageW(
+        let loaded = LoadImageW(
             Some(hinst),
             PCWSTR(1 as _),
             IMAGE_ICON,
@@ -123,19 +148,23 @@ fn run_tray_thread(
             cy,
             LR_DEFAULTCOLOR,
         )
-        .map(|h| HICON(h.0))
-        .or_else(|_| LoadIconW(None, IDI_APPLICATION))
-        .unwrap_or_default()
+        .map(|h| HICON(h.0));
+        match loaded {
+            Ok(icon) => (icon, Some(OwnedIcon(icon))),
+            Err(_) => (LoadIconW(None, IDI_APPLICATION).unwrap_or_default(), None),
+        }
     };
     nid.hIcon = icon;
 
-    let ctx = Box::new(TrayContext {
+    let mut ctx = Box::new(TrayContext {
         state,
-        on_action,
+        on_action: Rc::from(on_action),
         nid,
         taskbar_created_msg,
+        _owned_icon: owned_icon,
+        available,
     });
-    let ctx_ptr = Box::into_raw(ctx);
+    let ctx_ptr = &raw mut *ctx;
 
     // SAFETY: cria a janela oculta da bandeja com o contexto no lpParam.
     let hwnd = unsafe {
@@ -156,10 +185,6 @@ fn run_tray_thread(
     };
 
     let Ok(hwnd) = hwnd else {
-        // SAFETY: recupera o Box se a janela não foi criada para evitar vazamento de memória.
-        unsafe {
-            let _ = Box::from_raw(ctx_ptr);
-        }
         let _ = ready_tx.send(None);
         return;
     };
@@ -169,7 +194,7 @@ fn run_tray_thread(
     // SAFETY: loop de mensagens padrão do Win32.
     unsafe {
         let mut msg = MSG::default();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+        while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
@@ -198,28 +223,41 @@ unsafe extern "system" fn tray_wnd_proc(
         // SAFETY: sem ponteiro de contexto, passa a mensagem ao procedimento padrão.
         return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    // SAFETY: ptr é um ponteiro válido para TrayContext alocado via Box::into_raw.
-    let ctx = unsafe { &mut *ptr };
+    // SAFETY: o Box pertence à thread e vive até o fim do loop (inclusive WM_NCDESTROY).
+    // Só copiamos dados neste escopo: nenhuma referência ao contexto atravessa APIs reentrantes.
+    let (state, on_action, mut nid, taskbar_created_msg, available) = unsafe {
+        let ctx = &*ptr;
+        (
+            ctx.state.clone(),
+            ctx.on_action.clone(),
+            ctx.nid,
+            ctx.taskbar_created_msg,
+            ctx.available.clone(),
+        )
+    };
 
     match msg {
         WM_CREATE => {
-            ctx.nid.hWnd = hwnd;
+            nid.hWnd = hwnd;
+            // SAFETY: acesso pontual na thread dona, sem chamada reentrante durante a escrita.
+            unsafe { (*ptr).nid = nid };
             // SAFETY: adiciona o ícone na bandeja do Windows.
-            unsafe {
-                let _ = Shell_NotifyIconW(NIM_ADD, &ctx.nid);
-            }
-            LRESULT(0)
+            let added = register_icon(&available, || unsafe {
+                Shell_NotifyIconW(NIM_ADD, &nid).as_bool()
+            });
+            LRESULT(if added { 0 } else { -1 })
         }
         WM_TRAY_CALLBACK => {
             let event = lparam.0 as u32;
             match event {
                 // Clique com botão esquerdo ou duplo clique reabre o Tako onde estava.
                 WM_LBUTTONUP | WM_LBUTTONDBLCLK => {
-                    (ctx.on_action)(TrayAction::Open);
+                    on_action(TrayAction::Open);
                 }
                 // Clique com botão direito abre o menu de contexto da bandeja.
                 WM_RBUTTONUP | WM_CONTEXTMENU => {
-                    show_context_menu(hwnd, ctx);
+                    let snapshot = state.lock().map(|s| s.clone()).unwrap_or_default();
+                    show_context_menu(hwnd, snapshot, on_action);
                 }
                 _ => {}
             }
@@ -228,14 +266,14 @@ unsafe extern "system" fn tray_wnd_proc(
         WM_COMMAND => {
             let cmd = wparam.0 & 0xffff;
             match cmd {
-                1 => (ctx.on_action)(TrayAction::Open),
-                2 => (ctx.on_action)(TrayAction::Central),
-                99 => (ctx.on_action)(TrayAction::Quit),
+                1 => on_action(TrayAction::Open),
+                2 => on_action(TrayAction::Central),
+                99 => on_action(TrayAction::Quit),
                 id @ 100..=120 => {
                     let idx = id - 100;
-                    let state = ctx.state.lock().map(|s| s.clone()).unwrap_or_default();
+                    let state = state.lock().map(|s| s.clone()).unwrap_or_default();
                     if let Some(game) = state.recent_games.get(idx) {
-                        (ctx.on_action)(TrayAction::Launch(game.id.clone()));
+                        on_action(TrayAction::Launch(game.id.clone()));
                     }
                 }
                 _ => {}
@@ -243,27 +281,27 @@ unsafe extern "system" fn tray_wnd_proc(
             LRESULT(0)
         }
         WM_DESTROY => {
+            available.store(false, Ordering::Release);
             // SAFETY: remove o ícone da bandeja ao fechar a janela.
             unsafe {
-                let _ = Shell_NotifyIconW(NIM_DELETE, &ctx.nid);
+                let _ = Shell_NotifyIconW(NIM_DELETE, &nid);
                 PostQuitMessage(0);
             }
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            // SAFETY: limpa o GWLP_USERDATA e libera a memória do TrayContext.
+            // SAFETY: desassocia o contexto; o Box continua vivo na thread até o loop terminar.
             unsafe {
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
-                let _ = Box::from_raw(ptr);
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
         }
-        m if m == ctx.taskbar_created_msg && ctx.taskbar_created_msg != 0 => {
+        m if m == taskbar_created_msg && taskbar_created_msg != 0 => {
             // Se o Explorer reiniciou, re-adiciona o ícone.
             // SAFETY: chamada Shell_NotifyIconW em recuperação do Explorer.
-            unsafe {
-                let _ = Shell_NotifyIconW(NIM_ADD, &ctx.nid);
-            }
+            register_icon(&available, || unsafe {
+                Shell_NotifyIconW(NIM_ADD, &nid).as_bool()
+            });
             LRESULT(0)
         }
         // SAFETY: repassa mensagens não tratadas ao DefWindowProcW.
@@ -271,7 +309,16 @@ unsafe extern "system" fn tray_wnd_proc(
     }
 }
 
-fn show_context_menu(hwnd: HWND, ctx: &mut TrayContext) {
+fn register_icon(available: &AtomicBool, add: impl FnOnce() -> bool) -> bool {
+    let added = add();
+    available.store(added, Ordering::Release);
+    if !added {
+        tracing::warn!("Windows não adicionou o ícone da bandeja; fechar encerra o aplicativo");
+    }
+    added
+}
+
+fn show_context_menu(hwnd: HWND, state: TrayState, on_action: Rc<dyn Fn(TrayAction) + Send>) {
     let mut pt = POINT::default();
     // SAFETY: lê a posição do cursor e traz a janela oculta para o foco antes de TrackPopupMenu.
     unsafe {
@@ -284,7 +331,6 @@ fn show_context_menu(hwnd: HWND, ctx: &mut TrayContext) {
         return;
     };
 
-    let state = ctx.state.lock().map(|s| s.clone()).unwrap_or_default();
     let lang = state.lang;
 
     // 1. Abrir o Tako
@@ -355,13 +401,13 @@ fn show_context_menu(hwnd: HWND, ctx: &mut TrayContext) {
     }
 
     match cmd.0 as usize {
-        1 => (ctx.on_action)(TrayAction::Open),
-        2 => (ctx.on_action)(TrayAction::Central),
-        99 => (ctx.on_action)(TrayAction::Quit),
+        1 => on_action(TrayAction::Open),
+        2 => on_action(TrayAction::Central),
+        99 => on_action(TrayAction::Quit),
         id @ 100..=120 => {
             let idx = id - 100;
             if let Some(game) = state.recent_games.get(idx) {
-                (ctx.on_action)(TrayAction::Launch(game.id.clone()));
+                on_action(TrayAction::Launch(game.id.clone()));
             }
         }
         _ => {}
@@ -371,6 +417,70 @@ fn show_context_menu(hwnd: HWND, ctx: &mut TrayContext) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_icon_registration_is_unavailable_including_after_explorer_restart() {
+        let available = AtomicBool::new(false);
+        assert!(!register_icon(&available, || false));
+        assert!(!available.load(Ordering::Acquire));
+        assert!(register_icon(&available, || true));
+        assert!(available.load(Ordering::Acquire));
+        assert!(!register_icon(&available, || false));
+        assert!(!available.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn owned_icon_is_destroyed_without_destroying_the_shared_fallback() {
+        // SAFETY: LoadIconW é compartilhado; só a cópia de CopyIcon é entregue ao guardião de posse.
+        unsafe {
+            let shared = LoadIconW(None, IDI_APPLICATION).unwrap();
+            let owned = CopyIcon(shared).unwrap();
+            drop(OwnedIcon(owned));
+            assert!(
+                DestroyIcon(owned).is_err(),
+                "o guardião não liberou o ícone próprio"
+            );
+            // A origem compartilhada continua válida depois da limpeza.
+            drop(OwnedIcon(CopyIcon(shared).unwrap()));
+        }
+    }
+
+    #[test]
+    fn repeated_popup_menus_dispatch_reentrant_commands_and_close_cleanly() {
+        let (tx, actions) = mpsc::channel();
+        let tray = WindowsTray::new(Arc::new(Mutex::new(TrayState::default())), move |action| {
+            let _ = tx.send(action);
+        })
+        .unwrap();
+        assert!(tray.is_available());
+        for _ in 0..5 {
+            // SAFETY: a janela pertence a este teste. O menu bombeia WM_COMMAND antes de ser cancelado.
+            unsafe {
+                let hwnd = Some(HWND(tray.hwnd as *mut _));
+                PostMessageW(
+                    hwnd,
+                    WM_TRAY_CALLBACK,
+                    WPARAM(0),
+                    LPARAM(WM_RBUTTONUP as isize),
+                )
+                .unwrap();
+                PostMessageW(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0)).unwrap();
+            }
+            let action = actions.recv_timeout(std::time::Duration::from_secs(2));
+            // SAFETY: cancela apenas o menu da nossa janela, inclusive se a asserção abaixo falhar.
+            unsafe {
+                PostMessageW(
+                    Some(HWND(tray.hwnd as *mut _)),
+                    WM_CANCELMODE,
+                    WPARAM(0),
+                    LPARAM(0),
+                )
+                .unwrap();
+            }
+            assert_eq!(action.unwrap(), TrayAction::Open);
+        }
+        drop(tray);
+    }
 
     #[test]
     fn tray_creation_and_teardown() {

@@ -51,6 +51,20 @@ pub struct TrayHandle {
     _inner: crate::windows::tray::WindowsTray,
 }
 
+impl TrayHandle {
+    /// Verdadeiro somente enquanto o ícone estiver registrado no sistema, inclusive após reinício do Explorer.
+    pub fn is_available(&self) -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            self._inner.is_available()
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            false
+        }
+    }
+}
+
 /// Cria o ícone na bandeja do sistema e conecta o menu às ações.
 pub fn create_tray(
     state: Arc<Mutex<TrayState>>,

@@ -251,8 +251,14 @@ impl<L: UiLauncher> Host<L> {
         Ok(())
     }
 
-    /// Pede para a interface fechar, sem encerrar o app.
+    /// Fecha para ficar oculto: um pedido anterior de reabertura não pode cobrir o jogo.
     fn hide(&mut self, now: Instant) {
+        self.show = false;
+        self.close_for_recycle(now);
+    }
+
+    /// Fechar para substituir a interface preserva a intenção de reabertura.
+    fn close_for_recycle(&mut self, now: Instant) {
         if let Some(ui) = &mut self.ui {
             ui.request_close(now, self.timings.grace);
         }
@@ -267,7 +273,7 @@ impl<L: UiLauncher> Host<L> {
         if booting {
             return;
         }
-        self.hide(now);
+        self.close_for_recycle(now);
         self.show = true;
     }
 
@@ -290,6 +296,7 @@ impl<L: UiLauncher> Host<L> {
         now: Instant,
         game: bool,
         close_to_tray: bool,
+        tray_available: bool,
     ) -> Option<Result<(), String>> {
         let Some(ui) = &mut self.ui else {
             if std::mem::take(&mut self.show) {
@@ -314,7 +321,7 @@ impl<L: UiLauncher> Host<L> {
                 );
                 return None;
             }
-            if close_to_tray && exit == Exit::User {
+            if close_to_tray && tray_available && exit == Exit::User {
                 tracing::info!("fechar para a bandeja: núcleo continua na bandeja");
                 return None;
             }
@@ -569,35 +576,48 @@ pub fn run<L: UiLauncher>(
                 filters,
             })) => {
                 let tx = host.tx.clone();
-                std::thread::spawn(move || {
-                    let mut dialog = rfd::FileDialog::new();
-                    let title = match purpose.as_str() {
-                        "add_game" | "add_game.title" => tako_core::i18n::t("add_game.title"),
-                        "edit_game" | "working_directory" | "game_settings.folder" => {
-                            tako_core::i18n::t("game_settings.folder")
-                        }
-                        "emulators" | "emulators.add_folder" | "settings.emulators.add_folder" => {
-                            tako_core::i18n::t("settings.emulators.add_folder")
-                        }
-                        other => {
-                            let tr = tako_core::i18n::t(other);
-                            if tr != other { tr } else { other.to_owned() }
-                        }
-                    };
-                    dialog = dialog.set_title(&title);
-                    if let Some(filters) = &filters {
-                        for filter in filters {
-                            let extensions: Vec<&str> =
-                                filter.extensions.iter().map(String::as_str).collect();
-                            dialog = dialog.add_filter(&filter.name, &extensions);
-                        }
+                dispatch_picker(&mut service, id, || {
+                    // Nos testes de pipes o resultado vem por Command::Picked, sem diálogo na máquina.
+                    if cfg!(test) {
+                        return Ok(());
                     }
-                    let picked = match kind {
-                        tako_app::protocol::PickKind::File => dialog.pick_file(),
-                        tako_app::protocol::PickKind::Folder => dialog.pick_folder(),
-                    };
-                    let path = picked.map(|p| p.to_string_lossy().into_owned());
-                    let _ = tx.send(Command::Picked { id, path });
+                    std::thread::Builder::new()
+                        .name("tako-picker".into())
+                        .spawn(move || {
+                            let mut dialog = rfd::FileDialog::new();
+                            let title = match purpose.as_str() {
+                                "add_game" | "add_game.title" => {
+                                    tako_core::i18n::t("add_game.title")
+                                }
+                                "edit_game" | "working_directory" | "game_settings.folder" => {
+                                    tako_core::i18n::t("game_settings.folder")
+                                }
+                                "emulators"
+                                | "emulators.add_folder"
+                                | "settings.emulators.add_folder" => {
+                                    tako_core::i18n::t("settings.emulators.add_folder")
+                                }
+                                other => {
+                                    let tr = tako_core::i18n::t(other);
+                                    if tr != other { tr } else { other.to_owned() }
+                                }
+                            };
+                            dialog = dialog.set_title(&title);
+                            if let Some(filters) = &filters {
+                                for filter in filters {
+                                    let extensions: Vec<&str> =
+                                        filter.extensions.iter().map(String::as_str).collect();
+                                    dialog = dialog.add_filter(&filter.name, &extensions);
+                                }
+                            }
+                            let picked = match kind {
+                                tako_app::protocol::PickKind::File => dialog.pick_file(),
+                                tako_app::protocol::PickKind::Folder => dialog.pick_folder(),
+                            };
+                            let path = picked.map(|p| p.to_string_lossy().into_owned());
+                            let _ = tx.send(Command::Picked { id, path });
+                        })
+                        .map(|_| ())
                 });
             }
             Some(Command::Picked { id, path }) => {
@@ -626,7 +646,7 @@ pub fn run<L: UiLauncher>(
                 }
                 tako_platform::tray::TrayAction::Launch(game_id) => {
                     tracing::info!(%game_id, "bandeja: iniciar jogo recente");
-                    service.launch_game(&game_id);
+                    launch_from_tray(&mut service, game_id);
                 }
                 tako_platform::tray::TrayAction::Quit => {
                     tracing::info!("bandeja: sair do Tako");
@@ -675,6 +695,7 @@ pub fn run<L: UiLauncher>(
             Instant::now(),
             service.game_active(),
             service.close_to_tray(),
+            _tray.as_ref().is_some_and(|tray| tray.is_available()),
         ) {
             break result;
         }
@@ -713,6 +734,21 @@ pub fn run<L: UiLauncher>(
         .join()
         .map_err(|_| "thread de avisos encerrou com pânico".to_owned())?;
     result
+}
+
+fn dispatch_picker(service: &mut AppService, id: u32, spawn: impl FnOnce() -> io::Result<()>) {
+    if let Err(error) = spawn() {
+        tracing::warn!(%error, id, "não foi possível iniciar o seletor");
+        service.deliver_picked(id, None);
+    }
+}
+
+fn launch_from_tray(service: &mut AppService, game_id: String) {
+    if let Err(error) = service.handle(tako_app::protocol::Call::GamePlay(
+        tako_app::protocol::GameRequest { game_id },
+    )) {
+        tracing::warn!(%error, "bandeja: pedido de lançamento recusado");
+    }
 }
 
 /// De quanto em quanto tempo se confere se outro Tako pediu para vir para a frente.
@@ -1793,6 +1829,38 @@ mod tests {
         assert_eq!(core.join().unwrap(), Ok(()));
     }
 
+    #[test]
+    fn picker_thread_failure_delivers_null_and_releases_reservation() {
+        use tako_app::protocol::{Call, PickKind, Reply, SystemPickRequest, SystemPicked};
+        let mut service = AppService::new("test");
+        let (tx, _rx) = mpsc::channel();
+        let (events_tx, events) = mpsc::channel();
+        service.set_host_sink(tx);
+        service.set_event_sink(events_tx);
+        let request = || {
+            Call::SystemPick(SystemPickRequest {
+                kind: PickKind::File,
+                purpose: "test".into(),
+                filters: None,
+            })
+        };
+        let Reply::SystemPick(first) = service.handle(request()).unwrap() else {
+            panic!("seletor")
+        };
+        dispatch_picker(&mut service, first.id, || {
+            Err(io::Error::other("falha simulada ao criar thread"))
+        });
+        assert_eq!(
+            events.try_recv().unwrap(),
+            Event::SystemPicked(SystemPicked {
+                id: first.id,
+                path: None
+            })
+        );
+        assert!(!service.deliver_picked(first.id, Some("atrasado".into())));
+        assert!(service.handle(request()).is_ok());
+    }
+
     impl FakeUi {
         fn send_closed_and_exit(mut self) {
             self.send(&UiMsg::UserClosed);
@@ -1800,6 +1868,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn close_to_tray_keeps_core_alive_and_tray_open_reopens_ui() {
         let ((launched, control, core), _dir) = start_demo();
@@ -1829,17 +1898,224 @@ mod tests {
     }
 
     #[test]
+    fn close_to_tray_without_an_icon_quits_instead_of_hiding() {
+        for available in [false, true] {
+            let (children, launched) = mpsc::channel();
+            let (tx, _rx) = mpsc::channel();
+            let mut host = Host {
+                launcher: FakeLauncher(children),
+                timings: fast(),
+                tx,
+                ui: None,
+                pages: HashMap::new(),
+                serial: 0,
+                restarts: Restarts::default(),
+                show: false,
+            };
+            host.open_ui().unwrap();
+            launched.recv().unwrap().exit(0);
+            assert_eq!(
+                host.watch(Instant::now(), false, true, available),
+                if available { None } else { Some(Ok(())) }
+            );
+            assert!(host.ui.is_none());
+        }
+    }
+
+    #[test]
     fn tray_quit_with_game_active_finishes_session_and_quits() {
-        let ((launched, control, core), _dir) = start_demo();
+        use tako_core::devices::fake::{FakeAudio, FakeDisplays};
+        use tako_core::devices::{AudioOutputs, Displays, VrrStatus};
+        use tako_core::persistence::{LibraryStore, SettingsStore, TakoDatabase};
+        let dir = tempfile::tempdir().unwrap();
+        let paths = tako_core::paths::DataPaths::at(dir.path());
+        let db = TakoDatabase::new(paths.database());
+        db.open().unwrap();
+        let settings = SettingsStore::new(db.clone());
+        for (key, value) in [
+            ("GameScreenEnabled", "true"),
+            ("GameScreenId", "DISPLAY2"),
+            ("GameScreenVrr", "true"),
+            ("GameAudioDeviceId", "tv"),
+            ("HideCursorDuringGame", "true"),
+            ("RestoreEnvironmentAfterGame", "true"),
+        ] {
+            settings.set(key, value).unwrap();
+        }
+        let displays = Arc::new(FakeDisplays::desk());
+        let displays_before = displays.capture().unwrap();
+        let audio = Arc::new(FakeAudio::desk());
+        let audio_before = audio.capture().unwrap();
+        let platform = tako_platform::Platform {
+            displays: displays.clone(),
+            audio: audio.clone(),
+            ..tako_platform::Platform::simulated()
+        };
+        let cursor = platform.cursor.clone();
+        let session_paths = paths.clone();
+        let (children, launched) = mpsc::channel();
+        let (control_tx, control) = mpsc::channel();
+        let core = std::thread::spawn(move || {
+            run(
+                FakeLauncher(children),
+                move || {
+                    let core =
+                        tako_app::Core::open_with_sources(paths, platform, false, vec![]).unwrap();
+                    let mut service = AppService::with_core("test", core);
+                    let deadline = Instant::now() + Duration::from_secs(5);
+                    while let tako_app::protocol::Reply::LibrarySources(state) = service
+                        .handle(tako_app::protocol::Call::LibrarySources)
+                        .unwrap()
+                    {
+                        if !state.scanning {
+                            break;
+                        }
+                        assert!(Instant::now() < deadline);
+                        service.poll();
+                        std::thread::yield_now();
+                    }
+                    service
+                        .reload_library(vec![tako_core::library::Game {
+                            id: "steam:demo0".into(),
+                            title: "Simulado".into(),
+                            is_installed: true,
+                            launch_target: Some("C:\\simulado\\game.exe".into()),
+                            ..Default::default()
+                        }])
+                        .unwrap();
+                    Ok(service)
+                },
+                fast(),
+                |tx| control_tx.send(tx).unwrap(),
+            )
+        });
+        let control: mpsc::Sender<Command> = control.recv().unwrap();
         let mut ui = launched.recv().unwrap();
         ui.request(r#"{"v":1,"id":1,"name":"game.play","payload":{"gameId":"steam:demo0"}}"#);
         assert_eq!(until(&mut ui, answer(1))["ok"], true);
         until(&mut ui, event("game.started"));
+
+        assert_eq!(displays.list().unwrap()[1].vrr, VrrStatus::On);
+        assert_ne!(displays.capture().unwrap(), displays_before);
+        assert_eq!(audio.capture().unwrap().default_id.as_deref(), Some("tv"));
+        assert!(cursor.is_hidden());
+        assert!(session_paths.session_environment().exists());
+        audio.set_volume("tv", 0.25).unwrap();
+        audio.set_mute("speakers", true).unwrap();
+        std::thread::sleep(Duration::from_millis(1100));
 
         // Sai pela bandeja enquanto o jogo está aberto.
         control
             .send(Command::Tray(tako_platform::tray::TrayAction::Quit))
             .unwrap();
         assert_eq!(core.join().unwrap(), Ok(()));
+        assert_eq!(displays.list().unwrap()[1].vrr, VrrStatus::Off);
+        assert_eq!(displays.capture().unwrap(), displays_before);
+        assert_eq!(audio.capture().unwrap(), audio_before);
+        assert!(!cursor.is_hidden());
+        assert!(!session_paths.session_environment().exists());
+        let saved = LibraryStore::new(db, None).load().unwrap();
+        let state = &saved.state["steam:demo0"];
+        assert_eq!(state.sessions.len(), 1, "uma sessão persistida");
+        let duration = state.sessions[0].duration;
+        assert!(
+            duration >= Duration::from_secs(1),
+            "tempo jogado perdido: {duration:?}"
+        );
+        // O histórico SQLite guarda segundos inteiros; o total preserva a fração do último segundo.
+        assert!((0.0..1.0).contains(&(state.play_minutes * 60.0 - duration.as_secs_f64())));
+    }
+
+    #[test]
+    fn tray_launch_uses_play_validation_and_reserves_launch() {
+        use tako_app::protocol::{Call, ErrorCode, GameRequest};
+        let dir = tempfile::tempdir().unwrap();
+        let core = tako_app::Core::open(
+            tako_core::paths::DataPaths::at(dir.path()),
+            tako_platform::Platform::simulated(),
+            true,
+        )
+        .unwrap();
+        let mut service = AppService::with_core("test", core);
+        service
+            .reload_library(vec![
+                tako_core::library::Game {
+                    id: "uninstalled".into(),
+                    launch_target: Some("test.exe".into()),
+                    ..Default::default()
+                },
+                tako_core::library::Game {
+                    id: "installed".into(),
+                    is_installed: true,
+                    launch_target: Some("test.exe".into()),
+                    ..Default::default()
+                },
+            ])
+            .unwrap();
+        let (tx, rx) = mpsc::channel();
+        service.set_host_sink(tx);
+        launch_from_tray(&mut service, "uninstalled".into());
+        assert!(rx.try_recv().is_err());
+        assert!(!service.game_active());
+        launch_from_tray(&mut service, "installed".into());
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            HostRequest::Launch {
+                game_id: "installed".into()
+            }
+        );
+        launch_from_tray(&mut service, "installed".into());
+        assert!(rx.try_recv().is_err());
+        assert_eq!(
+            service
+                .handle(Call::GamePlay(GameRequest {
+                    game_id: "installed".into()
+                }))
+                .unwrap_err()
+                .code,
+            ErrorCode::Conflict
+        );
+        service.launch_game("installed");
+        assert!(service.game_active());
+        launch_from_tray(&mut service, "installed".into());
+        assert!(rx.try_recv().is_err());
+        service.finish_active_session();
+    }
+
+    #[test]
+    fn tray_open_then_resume_in_transit_does_not_reopen_over_game() {
+        let ((launched, control, core), _dir) = start_demo();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":1,"name":"game.play","payload":{"gameId":"steam:demo0"}}"#);
+        until(&mut ui, event("game.started"));
+        while ui.next() != Some(CoreMsg::Close) {}
+        ui.exit(0);
+        control.send(Command::Show).unwrap();
+        let mut ui = launched.recv_timeout(Duration::from_secs(5)).unwrap();
+        ui.request(r#"{"v":1,"id":2,"name":"app.info"}"#);
+        until(&mut ui, answer(2));
+        control
+            .send(Command::Tray(tako_platform::tray::TrayAction::Open))
+            .unwrap();
+        assert_eq!(ui.next(), Some(CoreMsg::Close));
+        control.send(Command::Host(HostRequest::Resume)).unwrap();
+        // A resposta é uma barreira: Resume já foi processado, mas o filho ainda não saiu.
+        control
+            .send(Command::Ui(
+                2,
+                UiMsg::Request {
+                    page: page(),
+                    text: r#"{"v":1,"id":3,"name":"app.info"}"#.into(),
+                },
+            ))
+            .unwrap();
+        until(&mut ui, answer(3));
+        ui.exit(0);
+        let reopened = launched.recv_timeout(Duration::from_millis(350));
+        control
+            .send(Command::Tray(tako_platform::tray::TrayAction::Quit))
+            .unwrap();
+        assert_eq!(core.join().unwrap(), Ok(()));
+        assert!(reopened.is_err(), "reabriu sobre o jogo após Resume");
     }
 }

@@ -63,7 +63,7 @@ mod native {
     };
     use windows::Win32::UI::WindowsAndMessaging::{
         EnumWindows, GetMessageW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, MSG,
-        PM_NOREMOVE, PeekMessageW, SW_RESTORE, SetForegroundWindow, ShowWindow, WM_HOTKEY,
+        PM_NOREMOVE, PeekMessageW, SW_RESTORE, SetForegroundWindow, ShowWindowAsync, WM_HOTKEY,
     };
     use windows_core::BOOL;
 
@@ -138,13 +138,80 @@ mod native {
                 tracing::warn!(%error, "procurar janela da sessão");
             }
             if let Some(window) = search.window {
-                if IsIconic(window).as_bool() {
-                    let _ = ShowWindow(window, SW_RESTORE);
-                }
-                if !SetForegroundWindow(window).as_bool() {
-                    tracing::debug!("Windows recusou ativar janela da sessão");
-                }
+                focus_window(window);
             }
+        }
+    }
+
+    fn focus_window(window: HWND) {
+        // SAFETY: handle encontrado por EnumWindows; janela encerrada nesse intervalo só faz a API falhar.
+        unsafe {
+            if IsIconic(window).as_bool() {
+                // A fila do jogo pode estar travada: restaurar só posta o pedido, sem esperar por ela.
+                let _ = ShowWindowAsync(window, SW_RESTORE);
+            }
+            if !SetForegroundWindow(window).as_bool() {
+                tracing::debug!("Windows recusou ativar janela da sessão");
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        use windows::core::w;
+
+        #[test]
+        fn focus_does_not_wait_for_an_unresponsive_window_thread() {
+            let (ready, window) = std::sync::mpsc::channel();
+            let (release, blocked) = std::sync::mpsc::channel();
+            let owner = std::thread::spawn(move || {
+                // SAFETY: janela e recursos pertencem apenas a esta thread do teste.
+                unsafe {
+                    let hwnd = CreateWindowExW(
+                        WINDOW_EX_STYLE::default(),
+                        w!("STATIC"),
+                        w!("Tako focus test"),
+                        WS_OVERLAPPEDWINDOW,
+                        0,
+                        0,
+                        100,
+                        100,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .unwrap();
+                    let _ = ShowWindow(hwnd, SW_MINIMIZE);
+                    assert!(
+                        IsIconic(hwnd).as_bool(),
+                        "janela de teste não foi minimizada"
+                    );
+                    ready.send(hwnd.0 as isize).unwrap();
+                    // Não bombeia mensagens: simula um jogo que parou de responder.
+                    let _ = blocked.recv();
+                    DestroyWindow(hwnd).unwrap();
+                }
+            });
+            let hwnd = window
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap();
+            let (done, finished) = std::sync::mpsc::channel();
+            let focus = std::thread::spawn(move || {
+                focus_window(HWND(hwnd as *mut _));
+                let _ = done.send(());
+            });
+            let result = finished.recv_timeout(std::time::Duration::from_secs(1));
+            // Sempre solta a thread dona antes de afirmar, inclusive na regressão com ShowWindow síncrono.
+            release.send(()).unwrap();
+            owner.join().unwrap();
+            focus.join().unwrap();
+            assert!(
+                result.is_ok(),
+                "restaurar esperou pela fila travada da janela"
+            );
         }
     }
 }

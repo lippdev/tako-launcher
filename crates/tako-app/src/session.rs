@@ -407,10 +407,23 @@ impl AppService {
             }
             return None;
         };
+        self.finish_session(played);
+        Some(SessionUpdate::Ended)
+    }
+
+    /// Fim normal e saída pela bandeja compartilham restauração, persistência e aviso à próxima interface.
+    fn finish_session(&mut self, played: Duration) {
+        let Some(core) = self.core.as_mut() else {
+            return;
+        };
+        let sessions = &mut core.session;
+        let Some(mut active) = sessions.active.take() else {
+            return;
+        };
+        let d = sessions.devices();
         let end = active.game.end(&d, played);
         active.game.finish(&d, &sessions.paths);
-        let req = active.game.req.clone();
-        sessions.active = None;
+        let req = active.game.req;
         sessions.presence = None;
         tracing::info!(
             "jogo terminou: {} ({}, {} s jogados)",
@@ -425,7 +438,6 @@ impl AppService {
         core.session.unseen_end = Some(event.clone());
         self.emit(Event::LibraryChanged);
         self.emit(Event::GameEnded(event));
-        Some(SessionUpdate::Ended)
     }
 
     /// `game.ended` com `launch_failed`, guardado também para a interface que reabrir (como o fim normal).
@@ -495,16 +507,59 @@ impl AppService {
 
     /// Encerra a sessão ativa (se houver) ao sair do Tako, restaurando tela, áudio e cursor (WEB-36).
     pub fn finish_active_session(&mut self) {
-        if let Some(core) = self.core.as_mut() {
-            let sessions = &mut core.session;
-            if let Some(mut active) = sessions.active.take() {
-                let d = sessions.devices();
-                let _ = active.game.request_close(&d);
-                let played = active.opened.elapsed();
-                let _ = active.game.end(&d, played);
-                active.game.finish(&d, &sessions.paths);
-                sessions.presence = None;
-            }
+        let Some(sessions) = self.core.as_mut().map(|core| &mut core.session) else {
+            return;
+        };
+        let d = devices(&sessions.platform);
+        let Some(active) = sessions.active.as_mut() else {
+            return;
+        };
+        if let Err(error) = active.game.request_close(&d) {
+            tracing::warn!(%error, "sair do Tako: pedido de encerramento do jogo falhou");
         }
+        let played = active.opened.elapsed();
+        self.finish_session(played);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finishing_session_records_once_and_keeps_unseen_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let core =
+            crate::Core::open(DataPaths::at(dir.path()), Platform::simulated(), true).unwrap();
+        let mut app = AppService::with_core("test", core);
+        app.launch_game("steam:demo0");
+        app.core
+            .as_mut()
+            .unwrap()
+            .session
+            .active
+            .as_mut()
+            .unwrap()
+            .opened -= Duration::from_secs(37);
+        let (tx, events) = std::sync::mpsc::channel();
+        app.set_event_sink(tx);
+        app.finish_active_session();
+        app.finish_active_session();
+        let core = app.core.as_ref().unwrap();
+        let saved = core.library.sessions("steam:demo0");
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].duration.as_secs(), 37);
+        assert!(core.session.active.is_none());
+        assert!(core.session.presence.is_none());
+        let end = core.session.unseen_end.clone().unwrap();
+        assert_eq!(end.played_seconds, 37);
+        assert_eq!(
+            events.try_iter().collect::<Vec<_>>(),
+            vec![Event::LibraryChanged, Event::GameEnded(end.clone())]
+        );
+        app.running().unwrap();
+        assert_eq!(events.try_recv().unwrap(), Event::GameEnded(end));
+        app.running().unwrap();
+        assert!(events.try_recv().is_err());
     }
 }
