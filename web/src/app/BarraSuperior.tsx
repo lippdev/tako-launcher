@@ -1,10 +1,12 @@
 import { useState, type MouseEvent } from "react";
 import { Abas, type Aba } from "../components/Abas/Abas";
+import { Aviso } from "../components/Aviso/Aviso";
 import { Icon } from "../components/Icon/Icon";
 import { Marca } from "../components/Marca/Marca";
 import { cx } from "../lib/cx";
 import { BarraDaJanela } from "./BarraDaJanela";
 import { DownloadsNaBarra } from "./DownloadsNaBarra";
+import { DialogoAdicionarJogo } from "./editar/DialogoAdicionarJogo";
 import { MenuDoTako } from "./MenuDoTako";
 import { strings } from "./strings";
 import type { ViewId } from "./uiState";
@@ -30,6 +32,8 @@ interface BarraSuperiorProps {
 export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSettings, profile, onSearch }: BarraSuperiorProps) {
   const [brand, setBrand] = useState<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [added, setAdded] = useState<{ open: boolean; text: string; key: number }>({ open: false, text: "", key: 0 });
 
   /** Duplo clique no vazio da barra maximiza ou restaura; nos controles não. */
   const onDoubleClick = (event: MouseEvent<HTMLElement>) => {
@@ -62,7 +66,30 @@ export function BarraSuperior({ view, onNavigate, onOpenGame, onOpenDownloadSett
           setMenuOpen(false);
         }}
         onNavigate={onNavigate}
+        onAddGame={() => {
+          setAddOpen(true);
+        }}
       />
+      <DialogoAdicionarJogo
+        open={addOpen}
+        onClose={() => {
+          setAddOpen(false);
+        }}
+        onAdded={(text) => {
+          setAddOpen(false);
+          setAdded({ open: true, text, key: Date.now() });
+        }}
+      />
+      <Aviso
+        open={added.open}
+        tone="success"
+        noticeKey={added.key}
+        onClose={() => {
+          setAdded((a) => ({ ...a, open: false }));
+        }}
+      >
+        {added.text}
+      </Aviso>
 
       <Abas
         variant="topo"

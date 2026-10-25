@@ -6,9 +6,9 @@ use super::keyboard::KeyboardLayer;
 use super::layer::{Flow, Layer, MenuItem, MenuLayer, Pick};
 use crate::model::PanelRow;
 use std::cell::RefCell;
-use std::path::Path;
 use std::rc::Rc;
-use tako_core::library::{GameTrackingStrategy, ManualGameRecord, manual};
+use tako_core::library::manual_edit::{EditDraft, EditError};
+use tako_core::library::{GameTrackingStrategy, ManualGameRecord};
 
 const TRACKING: [(Option<GameTrackingStrategy>, &str); 4] = [
     (None, "edit_game.track.auto"),
@@ -36,33 +36,20 @@ type Shared = Rc<RefCell<Draft>>;
 
 /// Grava o rascunho; `Err` = o que falta (nome vazio, pasta que não existe).
 fn save(ctx: &mut Ctx, d: &Draft) -> Result<(), String> {
-    let name = d.name.trim();
-    let folder = d.folder.trim();
-    if name.is_empty() {
-        return Err(ctx.t("edit_game.name_required"));
-    }
-    if let Some(p) = super::game_settings::folder_problem(ctx, folder) {
-        return Err(p);
-    }
-    // Vazio: a pasta do executável, como ao adicionar (URIs ficam sem pasta).
-    let default_folder = || {
-        (!manual::is_uri(&d.record.path))
-            .then(|| Path::new(&d.record.path).parent())
-            .flatten()
-            .map(|p| p.to_string_lossy().into_owned())
-            .filter(|p| !p.is_empty())
-    };
-    let record = ManualGameRecord {
-        title: name.to_owned(),
-        arguments: Some(d.arguments.trim().to_owned()).filter(|a| !a.is_empty()),
-        working_directory: if folder.is_empty() {
-            default_folder()
-        } else {
-            Some(folder.to_owned())
-        },
-        track_by: TRACKING[d.tracking].0,
-        ..d.record.clone()
-    };
+    let record = d
+        .record
+        .edited(&EditDraft {
+            title: d.name.clone(),
+            arguments: d.arguments.clone(),
+            folder: d.folder.clone(),
+            track_by: TRACKING[d.tracking].0,
+        })
+        .map_err(|e| match e {
+            EditError::NameRequired => ctx.t("edit_game.name_required"),
+            EditError::FolderMissing(f) => {
+                ctx.tf("game_settings.folder_missing", &[("folder", &f)])
+            }
+        })?;
     ctx.library
         .update_manual(record)
         .map_err(|e| e.to_string())?;

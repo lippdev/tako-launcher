@@ -587,3 +587,106 @@ export const profileStrings = {
   restartNotice: (name: string) => `O perfil ${name} será usado quando você reabrir o Tako.`,
   saveError: "Não foi possível salvar. Tente de novo.",
 } as const;
+
+/**
+ * Textos de "Editar jogo", "Adicionar jogo", "Remover" e "Fontes e IDs" (WEB-12c). São os do catálogo do app atual
+ * (`crates/tako-core/locales/pt-BR/game.toml`, tabelas `edit_game`, `add_game`, `source_ids`; `ui.toml`, `options`);
+ * a chave de cada um vem no comentário.
+ */
+export const editGameStrings = {
+  menu: {
+    sourceIds: "Fontes e IDs", // options.source_ids
+    edit: "Editar", // options.edit
+    remove: "Remover da biblioteca", // options.remove
+  },
+  close: "Fechar (Esc)",
+  cancel: "Cancelar", // common.cancel
+  save: "Salvar", // common.save
+  title: "Editar jogo", // edit_game.title
+  name: "Nome", // edit_game.name
+  arguments: "Argumentos", // edit_game.arguments
+  argumentsHint: "Nenhum", // game_settings.none
+  folder: "Pasta de trabalho", // game_settings.folder
+  folderHint: "Vazio = a pasta do executável.", // game_settings.folder_hint
+  tracking: "Fim do jogo", // edit_game.tracking
+  target: "Arquivo", // edit_game.target
+  trackingOptions: {
+    auto: "Automático", // edit_game.track.auto
+    process: "Processo iniciado", // edit_game.track.process
+    install_folder: "Pasta do jogo", // edit_game.track.folder
+    none: "Não acompanhar", // edit_game.track.none
+  },
+  nameRequired: "Dê um nome ao jogo.", // edit_game.name_required
+  folderMissing: (folder: string) => `Pasta de trabalho não encontrada: ${folder}`, // game_settings.folder_missing
+  // Sem chave no catálogo: a tela de Slint não tem estes casos (ela só aceitava o que o teclado virtual deixava).
+  invalid: "Valor inválido: confira o tamanho e o formato.",
+  notManual: "Só jogos adicionados à mão podem ser editados.",
+  loadError: "Não foi possível ler os dados deste jogo.",
+  saveError: "Não foi possível salvar agora; veja os registros", // source_ids.save_failed
+  saved: (game: string) => `${game} atualizado`, // edit_game.saved
+  removeTitle: (game: string) => `Remover ${game}?`, // options.remove_title
+  removeText: "O jogo sai do Tako; os arquivos no disco ficam onde estão.", // options.remove_text
+  removeAction: "Remover da biblioteca", // options.remove
+  removed: "Jogo removido", // options.removed
+  removeError: "Não foi possível remover o jogo.",
+} as const;
+
+export const addGameStrings = {
+  title: "Adicionar jogo", // add_game.title
+  menu: "Adicionar jogo…", // desktop menu: add_game
+  file: "Arquivo do jogo",
+  fileHint: "Caminho do executável, do atalho ou da ROM.",
+  filePlaceholder: "C:\\Jogos\\MeuJogo\\jogo.exe",
+  close: "Fechar (Esc)",
+  cancel: "Cancelar", // common.cancel
+  add: "Adicionar",
+  adding: "Adicionando…",
+  whichSystem: "De qual sistema é este jogo?", // add_game.which_system
+  systemText: "O Tako usa o sistema para achar os dados e as artes. Abrir pelo emulador chega numa próxima versão.", // add_game.system_text
+  otherSystem: "Outro sistema", // add_game.other_system
+  added: (game: string) => `${game} adicionado`, // add_game.added
+  addedWithSystem: (game: string, system: string) => `${game} (${system}) adicionado`,
+  already: (game: string) => `${game} já está na biblioteca`, // add_game.already
+  unreadable: "Não consegui ler esse atalho", // add_game.unreadable
+  // Sem chave no catálogo: no Slint o seletor do sistema operacional só deixava escolher o que existe.
+  empty: "Digite o caminho do arquivo.",
+  notFound: "Não encontrei esse arquivo.",
+  invalid: "Esse caminho não é válido.",
+  error: "Não foi possível adicionar o jogo.",
+} as const;
+
+export const sourceIdsStrings = {
+  title: (game: string) => `Fontes e IDs de ${game}`, // source_ids.title
+  close: "Fechar (Esc)",
+  term: "Nome buscado", // source_ids.term
+  search: "Buscar",
+  noSources: "Nenhuma fonte de metadados ligada", // source_ids.no_sources
+  typeId: "Digitar ou colar o ID", // source_ids.type_id
+  idIn: (source: string) => `ID no ${source}`, // source_ids.id_in
+  check: "Conferir",
+  none: "Nenhum", // source_ids.none
+  noneText: "Não usar esta fonte para este jogo", // source_ids.none_text
+  automatic: "Automático", // source_ids.automatic
+  automaticText: "Soltar a escolha; o Tako casa sozinho de novo", // source_ids.automatic_text
+  noneChosen: "Nenhum · escolhido por você", // source_ids.none_chosen
+  noMatch: "Sem correspondência", // source_ids.no_match
+  chosen: "escolhido por você", // source_ids.chosen
+  automaticLower: "automático", // source_ids.automatic_lower
+  searching: (term: string) => `Buscando "${term}"…`, // source_ids.searching
+  nothing: (term: string) => `Nada encontrado para "${term}".`, // source_ids.nothing
+  checking: (source: string) => `Conferindo no ${source}…`, // source_ids.checking
+  unknownId: (source: string) => `O ${source} não conhece esse ID. Confira o número ou use a busca.`, // source_ids.unknown_id
+  confirmTitle: (name: string) => `Usar ${name}?`, // source_ids.confirm_title
+  confirmText: (source: string, id: string) =>
+    `${source} · ID ${id}. Os dados e as imagens desta fonte vêm deste jogo a partir de agora.`, // source_ids.confirm_text
+  use: "Usar", // source_ids.use
+  cancel: "Cancelar", // common.cancel
+  pinnedDone: (game: string, name: string, source: string) => `${game} usa ${name} no ${source}`, // source_ids.pinned_done
+  noneDone: (game: string, source: string) => `${source} não será usado para ${game}`, // source_ids.none_done
+  autoDone: (source: string) => `${source} volta a casar sozinho`, // source_ids.auto_done
+  saveError: "Não foi possível salvar agora; veja os registros", // source_ids.save_failed
+  loadError: "Não foi possível ler as fontes deste jogo.",
+  searchError: "Não foi possível buscar agora.",
+  current: "Escolhido agora",
+  best: "Mais provável",
+} as const;

@@ -3,8 +3,10 @@ import type { GameEnded } from "./GameEnded";
 import type { GameStarted } from "./GameStarted";
 import type { I18nLang } from "./I18nLang";
 import type { LibrarySources } from "./LibrarySources";
+import type { SourceIdsChecked } from "./SourceIdsChecked";
+import type { SourceIdsFound } from "./SourceIdsFound";
 
 /**
  * Eventos do núcleo para a interface.
  */
-export type Event = { "name": "library.changed" } | { "name": "library.scan.progress", "payload": LibrarySources } | { "name": "i18n.changed", "payload": I18nLang } | { "name": "downloads.changed" } | { "name": "game.started", "payload": GameStarted } | { "name": "game.ended", "payload": GameEnded };
+export type Event = { "name": "library.changed" } | { "name": "library.scan.progress", "payload": LibrarySources } | { "name": "i18n.changed", "payload": I18nLang } | { "name": "downloads.changed" } | { "name": "game.started", "payload": GameStarted } | { "name": "game.ended", "payload": GameEnded } | { "name": "game.source_ids.found", "payload": SourceIdsFound } | { "name": "game.source_ids.checked", "payload": SourceIdsChecked };

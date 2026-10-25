@@ -90,6 +90,14 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "game.running"
             | "game.resume"
             | "game.end"
+            | "game.edit"
+            | "game.edit.set"
+            | "game.remove"
+            | "library.add_game"
+            | "game.source_ids"
+            | "game.source_ids.set"
+            | "game.source_ids.search"
+            | "game.source_ids.check"
     ) {
         return Err((
             header.id,
@@ -420,6 +428,64 @@ pub enum Call {
         #[ts(as = "GameEndRequest")]
         GameEndRequest,
     ),
+    /// Os dados editáveis de um jogo adicionado à mão (MVP-024). `conflict` para jogo de loja.
+    #[serde(rename = "game.edit")]
+    GameEdit(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
+    /// Grava nome, argumentos, pasta de trabalho e fim do jogo; devolve o jogo já atualizado.
+    #[serde(rename = "game.edit.set")]
+    GameEditSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameEditSet")]
+        GameEditSet,
+    ),
+    /// Tira da biblioteca um jogo adicionado à mão; os arquivos no disco ficam onde estão.
+    #[serde(rename = "game.remove")]
+    GameRemove(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
+    /// Adiciona um jogo pelo caminho do arquivo. ROM sem `system` volta `needs_system` com os sistemas prováveis.
+    #[serde(rename = "library.add_game")]
+    LibraryAddGame(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameAdd")]
+        GameAdd,
+    ),
+    /// "Fontes e IDs": o id do jogo em cada fonte de metadados ligada.
+    #[serde(rename = "game.source_ids")]
+    GameSourceIds(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
+    /// Fixa o id numa fonte, diz "nenhum" ou volta ao automático; devolve as fontes já atualizadas.
+    #[serde(rename = "game.source_ids.set")]
+    GameSourceIdsSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameSourceIdSet")]
+        GameSourceIdSet,
+    ),
+    /// Busca o nome em todas as fontes ao mesmo tempo. Responde na hora; os resultados chegam pelo evento
+    /// `game.source_ids.found`.
+    #[serde(rename = "game.source_ids.search")]
+    GameSourceIdsSearch(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameSourceIdsSearch")]
+        GameSourceIdsSearch,
+    ),
+    /// Confere na fonte um id digitado ou colado (ou o endereço da página). Responde na hora; o nome do jogo
+    /// naquela fonte chega pelo evento `game.source_ids.checked`.
+    #[serde(rename = "game.source_ids.check")]
+    GameSourceIdsCheck(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameSourceIdsCheck")]
+        GameSourceIdsCheck,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -519,6 +585,22 @@ pub enum Reply {
     GameResume,
     #[serde(rename = "game.end")]
     GameEnd,
+    #[serde(rename = "game.edit")]
+    GameEdit(GameEdit),
+    #[serde(rename = "game.edit.set")]
+    GameEditSet(GameEdit),
+    #[serde(rename = "game.remove")]
+    GameRemove,
+    #[serde(rename = "library.add_game")]
+    LibraryAddGame(GameAddResult),
+    #[serde(rename = "game.source_ids")]
+    GameSourceIds(GameSourceIds),
+    #[serde(rename = "game.source_ids.set")]
+    GameSourceIdsSet(GameSourceIds),
+    #[serde(rename = "game.source_ids.search")]
+    GameSourceIdsSearch(SourceIdsJob),
+    #[serde(rename = "game.source_ids.check")]
+    GameSourceIdsCheck(SourceIdsJob),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -563,6 +645,12 @@ pub enum Event {
     /// estava fechada, o aviso sai logo depois da resposta do próximo `game.running`.
     #[serde(rename = "game.ended")]
     GameEnded(GameEnded),
+    /// A busca de `game.source_ids.search` terminou.
+    #[serde(rename = "game.source_ids.found")]
+    GameSourceIdsFound(SourceIdsFound),
+    /// A conferência de `game.source_ids.check` terminou.
+    #[serde(rename = "game.source_ids.checked")]
+    GameSourceIdsChecked(SourceIdsChecked),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -1696,4 +1784,222 @@ pub struct GameEnded {
     pub exit_code_text: Option<String>,
     /// Só em `launch_failed`: o motivo, já no idioma do usuário.
     pub message: Option<String>,
+}
+
+/// Como reconhecer o fim do jogo (MVP-026).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum GameTracking {
+    /// O processo iniciado e os filhos dele.
+    Auto,
+    Process,
+    /// Qualquer processo cujo executável esteja na pasta do jogo.
+    InstallFolder,
+    /// Só abre, não acompanha.
+    None,
+}
+
+/// Resposta de `game.edit` e `game.edit.set`: o que o usuário pode mudar num jogo adicionado à mão.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameEdit {
+    pub game_id: String,
+    pub title: String,
+    /// O que abre o jogo (executável, atalho, ROM ou endereço); só se vê, não muda.
+    pub target: String,
+    /// Vazio = sem argumentos.
+    pub arguments: String,
+    /// Vazio = a pasta do executável (`default_folder`).
+    pub working_directory: String,
+    pub default_folder: Option<String>,
+    pub tracking: GameTracking,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameEditSet {
+    pub game_id: String,
+    /// Não pode ficar vazio (`bad_request`).
+    pub title: String,
+    /// Até 2048 caracteres, uma linha.
+    pub arguments: String,
+    /// Precisa existir (`not_found` se não), até 1024 caracteres; vazio = a pasta do executável.
+    pub working_directory: String,
+    pub tracking: GameTracking,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameAdd {
+    /// Caminho do arquivo que abre o jogo (executável, atalho, ROM). O arquivo precisa existir.
+    pub path: String,
+    /// Sistema da ROM (`snes`, `ps2`…), quando a resposta anterior foi `needs_system`.
+    pub system: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum GameAddStatus {
+    /// `game_id` e `title` do jogo novo.
+    Added,
+    /// Já está na biblioteca: `title` é o do jogo que abre o mesmo arquivo.
+    Already,
+    /// É uma ROM: `file_name`, `systems` (os prováveis pela extensão; todos, se nenhum servir) e `others`
+    /// (os demais, para "Outro sistema").
+    NeedsSystem,
+    /// O atalho não pôde ser lido.
+    Unreadable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameAddResult {
+    pub status: GameAddStatus,
+    pub game_id: Option<String>,
+    pub title: Option<String>,
+    pub file_name: Option<String>,
+    pub systems: Vec<RomSystem>,
+    pub others: Vec<RomSystem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RomSystem {
+    pub key: String,
+    pub name: String,
+}
+
+/// Uma fonte de metadados ligada e o id do jogo nela.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceIdState {
+    pub source: String,
+    /// O id em uso; `null` se não casou ou se o usuário escolheu "nenhum".
+    pub id: Option<String>,
+    /// O nome e o ano do que o id representa, quando a fonte já respondeu.
+    pub title: Option<String>,
+    pub year: Option<i32>,
+    /// O usuário escolheu (id ou "nenhum"); senão é o casamento automático.
+    pub pinned: bool,
+    pub none: bool,
+    /// Exemplo de id ou endereço desta fonte, no idioma atual.
+    pub example: String,
+}
+
+/// Resposta de `game.source_ids` e `game.source_ids.set`. Sem fontes ligadas, `sources` vai vazio.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GameSourceIds {
+    pub game_id: String,
+    pub title: String,
+    pub sources: Vec<SourceIdState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+#[ts(export)]
+pub enum SourceIdChoice {
+    /// Usar este id (o de um candidato da busca ou um já conferido por `game.source_ids.check`).
+    Id(String),
+    /// Não usar esta fonte neste jogo.
+    None,
+    /// Soltar a escolha; o Tako casa sozinho de novo.
+    Auto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameSourceIdSet {
+    pub game_id: String,
+    pub source: String,
+    pub choice: SourceIdChoice,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameSourceIdsSearch {
+    pub game_id: String,
+    /// O nome buscado (até 200 caracteres).
+    pub term: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct GameSourceIdsCheck {
+    pub game_id: String,
+    pub source: String,
+    /// O que o usuário digitou ou colou: o id ou o endereço da página. Texto fora do formato é `bad_request`
+    /// com a explicação no idioma atual.
+    pub text: String,
+}
+
+/// O número que volta no evento da busca ou da conferência, para a interface descartar resposta velha.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceIdsJob {
+    pub request_id: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceIdMatch {
+    pub id: String,
+    pub title: String,
+    pub year: Option<i32>,
+    pub platforms: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceIdResults {
+    pub source: String,
+    pub matches: Vec<SourceIdMatch>,
+    /// O id do candidato mais provável (★), se algum passa do limite de semelhança.
+    pub best: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceIdsFound {
+    pub request_id: u32,
+    pub game_id: String,
+    pub term: String,
+    pub results: Vec<SourceIdResults>,
+}
+
+/// O que a fonte respondeu para o id conferido.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceIdFound {
+    pub id: String,
+    /// Nome (e ano) do jogo naquela fonte, para o usuário confirmar antes de fixar.
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceIdsChecked {
+    pub request_id: u32,
+    pub game_id: String,
+    pub source: String,
+    /// `null` = a fonte não conhece esse id.
+    pub found: Option<SourceIdFound>,
 }

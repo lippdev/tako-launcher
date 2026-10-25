@@ -6,6 +6,7 @@
 mod core;
 mod demo;
 mod downloads;
+mod edit;
 mod game_settings;
 mod i18n;
 mod library;
@@ -95,6 +96,7 @@ impl AppService {
         if let Some(core) = &mut self.core {
             core.sources.set_host_sink(sink.clone());
             core.downloads.set_host_sink(sink.clone());
+            core.jobs.set_host_sink(sink.clone());
         }
         self.host = Some(sink);
     }
@@ -207,6 +209,14 @@ impl AppService {
                     .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
                 profile::handle(core, call)
             }
+            call @ (Call::GameEdit(_)
+            | Call::GameEditSet(_)
+            | Call::GameRemove(_)
+            | Call::LibraryAddGame(_)
+            | Call::GameSourceIds(_)
+            | Call::GameSourceIdsSet(_)
+            | Call::GameSourceIdsSearch(_)
+            | Call::GameSourceIdsCheck(_)) => self.handle_edit(call),
             call => {
                 let core = self
                     .core

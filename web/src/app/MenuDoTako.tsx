@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { MenuDeContexto, type MenuCloseReason, type MenuEntry } from "../components/MenuDeContexto/MenuDeContexto";
-import { strings } from "./strings";
+import { addGameStrings, strings } from "./strings";
 import type { ViewId } from "./uiState";
 import { windowAction } from "./windowActions";
 
@@ -10,12 +10,20 @@ interface MenuDoTakoProps {
   /** A marca, que abriu o menu. */
   anchor: HTMLElement | null;
   onNavigate: (view: ViewId) => void;
+  /** Escolheu "Adicionar jogo…". */
+  onAddGame: () => void;
 }
 
-/** O menu da marca (README do MenuDoTako): Configurações, Procurar atualizações, separador e Sair. Sem itens de loja. */
-export function MenuDoTako({ open, onClose, anchor, onNavigate }: MenuDoTakoProps) {
+/** O menu da marca (README do MenuDoTako): Adicionar jogo, Configurações, Procurar atualizações, separador e Sair. Sem itens de loja. */
+export function MenuDoTako({ open, onClose, anchor, onNavigate, onAddGame }: MenuDoTakoProps) {
   const entries = useMemo<MenuEntry[]>(
     () => [
+      {
+        id: "add-game",
+        label: addGameStrings.menu,
+        icon: "plus",
+        onSelect: onAddGame,
+      },
       {
         id: "settings",
         label: strings.menu.settings,
@@ -44,7 +52,7 @@ export function MenuDoTako({ open, onClose, anchor, onNavigate }: MenuDoTakoProp
         },
       },
     ],
-    [onNavigate],
+    [onNavigate, onAddGame],
   );
 
   return <MenuDeContexto open={open} onClose={onClose} anchor={anchor} entries={entries} label={strings.topbar.menu} align="start" />;

@@ -32,6 +32,8 @@ export interface AcoesDoJogoProps {
   onAlternarFavorito: () => void;
   /** Escolher "Configurações do jogo" no menu Gerenciar. Sem ele a entrada fica desabilitada. */
   onConfiguracoes?: (() => void) | undefined;
+  /** Outras entradas do menu Gerenciar, depois de "Configurações do jogo" (Fontes e IDs, Editar, Remover). */
+  entradasExtras?: readonly MenuEntry[] | undefined;
   /** Só o primário (o destaque da Visão geral): sem ★ nem Gerenciar. */
   compacto?: boolean;
   className?: string | undefined;
@@ -50,6 +52,7 @@ export function AcoesDoJogo({
   onEncerrar,
   onAlternarFavorito,
   onConfiguracoes,
+  entradasExtras,
   compacto = false,
   className,
 }: AcoesDoJogoProps) {
@@ -74,6 +77,7 @@ export function AcoesDoJogo({
         onConfiguracoes?.();
       },
     },
+    ...(entradasExtras ?? []),
   ];
 
   return (

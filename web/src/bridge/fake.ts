@@ -47,6 +47,19 @@ import type { ProfileSessions } from "./generated/ProfileSessions";
 import type { ProfileSessionsRequest } from "./generated/ProfileSessionsRequest";
 import type { ProfileSummary } from "./generated/ProfileSummary";
 import type { ProfilesList } from "./generated/ProfilesList";
+import type { GameAdd } from "./generated/GameAdd";
+import type { GameAddResult } from "./generated/GameAddResult";
+import type { GameEdit } from "./generated/GameEdit";
+import type { GameEditSet } from "./generated/GameEditSet";
+import type { GameSourceIdSet } from "./generated/GameSourceIdSet";
+import type { GameSourceIds } from "./generated/GameSourceIds";
+import type { GameSourceIdsCheck } from "./generated/GameSourceIdsCheck";
+import type { GameSourceIdsSearch } from "./generated/GameSourceIdsSearch";
+import type { GameTracking } from "./generated/GameTracking";
+import type { SourceIdResults } from "./generated/SourceIdResults";
+import type { SourceIdsChecked } from "./generated/SourceIdsChecked";
+import type { SourceIdsFound } from "./generated/SourceIdsFound";
+import type { SourceIdsJob } from "./generated/SourceIdsJob";
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
@@ -1903,4 +1916,282 @@ Object.assign(SAMPLE_CATALOGS["en-US"], {
   "collections.new": "New collection",
   "collections.name_rule": "Up to 40 characters, not the same as another collection.",
   "common.save": "Save",
+});
+
+// ---- Editar jogo, adicionar jogo, remover e Fontes e IDs (WEB-12c) ----
+// Em memória. Mesmas regras do núcleo (`crates/tako-app/src/edit.rs`) em menor escala: um caminho com "inexistente"
+// faz de conta que o arquivo ou a pasta não existe, e ROM pergunta o sistema.
+
+/** Como `FakeError`, mas `String(e)` dá só a mensagem (o núcleo não põe "Error: " na frente). */
+class FakeMessageError extends FakeError {
+  override toString() {
+    return this.message;
+  }
+}
+
+interface FakeManual {
+  path: string;
+  arguments: string;
+  workingDirectory: string;
+  tracking: GameTracking;
+}
+
+const manualGames = new Map<string, FakeManual>();
+let nextManual = 1;
+
+const FAKE_ROM_SYSTEMS: Record<string, { key: string; name: string }> = {
+  sfc: { key: "snes", name: "SNES" },
+  smc: { key: "snes", name: "SNES" },
+  nes: { key: "nes", name: "NES" },
+  gba: { key: "gba", name: "Game Boy Advance" },
+  md: { key: "megadrive", name: "Mega Drive" },
+};
+const OTHER_ROM_SYSTEMS = [
+  { key: "n64", name: "Nintendo 64" },
+  { key: "ps2", name: "PlayStation 2" },
+  { key: "psx", name: "PlayStation" },
+  { key: "dreamcast", name: "Dreamcast" },
+];
+
+const fileOf = (path: string) => path.split(/[\\/]/).pop() ?? path;
+const extensionOf = (path: string) => (fileOf(path).includes(".") ? (fileOf(path).split(".").pop() ?? "").toLowerCase() : "");
+const guessFakeTitle = (path: string) => {
+  const stem = fileOf(path).replace(/\.[^.]*$/, "");
+  const title = stem.replace(/[_-]/g, " ").trim();
+  return title === "" ? stem : title;
+};
+const romTitle = (path: string) =>
+  fileOf(path)
+    .replace(/\.[^.]*$/, "")
+    .replace(/_/g, " ")
+    .replace(/\s*[([][^)\]]*[)\]]/g, "")
+    .trim();
+
+function manualOf(payload: unknown): { game: LibraryGame; manual: FakeManual } {
+  const { gameId } = payload as GameRequest;
+  if (typeof gameId !== "string" || gameId.trim() === "") throw new FakeMessageError("bad_request", "id inválido");
+  const game = games.find((g) => g.id === gameId);
+  if (!game) throw new FakeMessageError("not_found", "jogo não encontrado");
+  const manual = manualGames.get(gameId);
+  if (!manual) throw new FakeMessageError("conflict", "só jogos adicionados à mão têm isto");
+  return { game, manual };
+}
+
+function fakeEditView(game: LibraryGame, manual: FakeManual): GameEdit {
+  const folder = manual.path.replace(/[\\/][^\\/]*$/, "");
+  return {
+    gameId: game.id,
+    title: game.title,
+    target: manual.path,
+    arguments: manual.arguments,
+    workingDirectory: manual.workingDirectory,
+    defaultFolder: folder === manual.path ? null : folder,
+    tracking: manual.tracking,
+  };
+}
+
+function oneFakeLine(value: string, max: number, what: string) {
+  // eslint-disable-next-line no-control-regex -- é justamente o que o núcleo recusa
+  if ([...value].length > max || /[\u0000-\u001f\u007f]/.test(value)) throw new FakeMessageError("bad_request", `${what} inválido`);
+}
+
+function addFakeGame(payload: unknown): GameAddResult {
+  const { path: given, system } = payload as GameAdd;
+  const path = (given ?? "").trim();
+  // eslint-disable-next-line no-control-regex -- idem
+  if (path === "" || [...path].length > 1024 || /\u0000/.test(path)) throw new FakeMessageError("bad_request", "caminho inválido");
+  if (path.toLowerCase().includes("inexistente")) throw new FakeMessageError("not_found", "arquivo não encontrado");
+  const none: GameAddResult = { status: "added", gameId: null, title: null, fileName: null, systems: [], others: [], };
+  const known = [...manualGames].find(([, m]) => m.path.toLowerCase() === path.toLowerCase());
+  if (known) return { ...none, status: "already", title: games.find((g) => g.id === known[0])?.title ?? "" };
+  const extension = extensionOf(path);
+  const rom = FAKE_ROM_SYSTEMS[extension];
+  if (extension === "desktop") return { ...none, status: "unreadable" };
+  if (system != null && !rom) throw new FakeMessageError("bad_request", "sistema só vale para ROM");
+  let title = guessFakeTitle(path);
+  if (rom) {
+    if (system == null) {
+      const others = [...Object.values(FAKE_ROM_SYSTEMS), ...OTHER_ROM_SYSTEMS].filter(
+        (item, i, all) => item.key !== rom.key && all.findIndex((x) => x.key === item.key) === i,
+      );
+      return { ...none, status: "needs_system", fileName: fileOf(path), systems: [rom], others };
+    }
+    const chosen = [...Object.values(FAKE_ROM_SYSTEMS), ...OTHER_ROM_SYSTEMS].find((item) => item.key === system);
+    if (!chosen) throw new FakeMessageError("bad_request", "sistema desconhecido");
+    title = romTitle(path);
+  }
+  const id = `manual:fake${String(nextManual++)}`;
+  games.unshift({
+    id,
+    title,
+    store: "manual",
+    installed: true,
+    favorite: false,
+    status: null,
+    lastPlayedAt: null,
+    playTimeSeconds: 0,
+    accent: null,
+    hasCover: false,
+    hasIcon: false,
+    hasHero: false,
+    hasLogo: false,
+  });
+  manualGames.set(id, { path, arguments: "", workingDirectory: "", tracking: "auto" });
+  changed();
+  return { ...none, status: "added", gameId: id, title };
+}
+
+function editFakeGame(payload: unknown): GameEdit {
+  const request = payload as GameEditSet;
+  const { game, manual } = manualOf(request);
+  oneFakeLine(request.title, 200, "nome");
+  oneFakeLine(request.arguments, 2048, "argumentos");
+  oneFakeLine(request.workingDirectory, 1024, "pasta de trabalho");
+  const title = request.title.trim();
+  if (title === "") throw new FakeMessageError("bad_request", "o jogo precisa de um nome");
+  const folder = request.workingDirectory.trim();
+  if (folder.toLowerCase().includes("inexistente")) throw new FakeMessageError("not_found", `pasta não encontrada: ${folder}`);
+  if (!["auto", "process", "install_folder", "none"].includes(request.tracking)) throw new FakeMessageError("bad_request", "fim do jogo inválido");
+  game.title = title;
+  manual.arguments = request.arguments.trim();
+  manual.workingDirectory = folder === "" ? manual.path.replace(/[\\/][^\\/]*$/, "") : folder;
+  manual.tracking = request.tracking;
+  changed();
+  return fakeEditView(game, manual);
+}
+
+function removeFakeGame(payload: unknown) {
+  const { game } = manualOf(payload);
+  games.splice(games.indexOf(game), 1);
+  manualGames.delete(game.id);
+  changed();
+}
+
+const FAKE_SOURCES = ["Steam", "IGDB", "SteamGridDB"];
+const FAKE_SOURCE_EXAMPLES: Record<string, string> = {
+  Steam: "Ex.: 1145360 ou store.steampowered.com/app/1145360",
+  IGDB: "Ex.: 113112 ou igdb.com/games/hades",
+  SteamGridDB: "Ex.: 5249 ou steamgriddb.com/game/5249",
+};
+/** O que o casamento automático acharia, por fonte; "" = nada. */
+const FAKE_AUTO_IDS: Record<string, string> = { Steam: "", IGDB: "113112", SteamGridDB: "5249" };
+/** Ids que o usuário fixou, por jogo e fonte (vazio = "nenhum"). */
+const fakePins = new Map<string, Map<string, string>>();
+
+function fakeGameOf(payload: unknown): LibraryGame {
+  const { gameId } = payload as GameRequest;
+  if (typeof gameId !== "string" || gameId.trim() === "") throw new FakeMessageError("bad_request", "id inválido");
+  const game = games.find((g) => g.id === gameId);
+  if (!game) throw new FakeMessageError("not_found", "jogo não encontrado");
+  return game;
+}
+
+function fakeSourceIds(game: LibraryGame): GameSourceIds {
+  const pins = fakePins.get(game.id);
+  return {
+    gameId: game.id,
+    title: game.title,
+    sources: FAKE_SOURCES.map((source) => {
+      const pin = pins?.get(source);
+      const none = pin === "";
+      const auto = source === "Steam" ? (game.id.startsWith("steam:") ? game.id.slice(6) : "") : (FAKE_AUTO_IDS[source] ?? "");
+      const id = none ? null : (pin ?? (auto === "" ? null : auto));
+      return {
+        source,
+        id,
+        title: id === null ? null : game.title,
+        year: id === null ? null : 2018,
+        pinned: pin !== undefined,
+        none,
+        example: FAKE_SOURCE_EXAMPLES[source] ?? "",
+      };
+    }),
+  };
+}
+
+function emitFakeEvent(name: string, payload: unknown, delayMs: number) {
+  setTimeout(() => window.__takoDeliver?.(JSON.stringify({ v: 1, event: { name, payload } })), delayMs);
+}
+
+let nextFakeJob = 1;
+
+function searchFakeSourceIds(payload: unknown): SourceIdsJob {
+  const request = payload as GameSourceIdsSearch;
+  const game = fakeGameOf(request);
+  const term = (request.term ?? "").trim();
+  if (term === "") throw new FakeMessageError("bad_request", "nome vazio");
+  if ([...term].length > 200) throw new FakeMessageError("bad_request", "nome inválido");
+  const requestId = nextFakeJob++;
+  const results: SourceIdResults[] = FAKE_SOURCES.map((source, i) => ({
+    source,
+    best: String(113112 + i),
+    matches: [
+      { id: String(113112 + i), title: term, year: 2018, platforms: "PC" },
+      { id: String(7000 + i), title: `${term} II`, year: 2024, platforms: "PC" },
+      { id: String(8000 + i), title: `${term}: Definitive Edition`, year: null, platforms: null },
+    ],
+  }));
+  // A busca de verdade vai à rede: o "Buscando…" aparece por um instante.
+  emitFakeEvent("game.source_ids.found", { requestId, gameId: game.id, term, results } satisfies SourceIdsFound, 450);
+  return { requestId };
+}
+
+function checkFakeSourceId(payload: unknown): SourceIdsJob {
+  const request = payload as GameSourceIdsCheck;
+  const game = fakeGameOf(request);
+  if (!FAKE_SOURCES.includes(request.source)) throw new FakeMessageError("bad_request", "fonte desconhecida");
+  const text = (request.text ?? "").trim();
+  const digits = /^\d+$/.test(text) ? text : (/(?:app|games|game|gameid=)\/?(\d+)/.exec(text)?.[1] ?? null);
+  if (digits === null) {
+    throw new FakeMessageError(
+      "bad_request",
+      `Não reconheci o jogo nesse texto. ${FAKE_SOURCE_EXAMPLES[request.source] ?? "Número do jogo nesta fonte"}.`,
+    );
+  }
+  const requestId = nextFakeJob++;
+  // No falso, só os ids de 1 a 999999 existem.
+  const known = Number(digits) > 0 && Number(digits) < 1_000_000;
+  const found = known ? { id: digits, name: digits === "113112" ? "Hades (2018)" : `Jogo ${digits} (2020)` } : null;
+  emitFakeEvent("game.source_ids.checked", { requestId, gameId: game.id, source: request.source, found } satisfies SourceIdsChecked, 350);
+  return { requestId };
+}
+
+function setFakeSourceId(payload: unknown): GameSourceIds {
+  const request = payload as GameSourceIdSet;
+  const game = fakeGameOf(request);
+  if (!FAKE_SOURCES.includes(request.source)) throw new FakeMessageError("bad_request", "fonte desconhecida");
+  const pins = fakePins.get(game.id) ?? new Map<string, string>();
+  switch (request.choice.kind) {
+    case "id": {
+      const id = request.choice.value.trim();
+      if (id === "") throw new FakeMessageError("bad_request", "id vazio");
+      oneFakeLine(id, 128, "id");
+      pins.set(request.source, id);
+      break;
+    }
+    case "none":
+      pins.set(request.source, "");
+      break;
+    case "auto":
+      pins.delete(request.source);
+      break;
+    default:
+      throw new FakeMessageError("bad_request", "escolha inválida");
+  }
+  fakePins.set(game.id, pins);
+  return fakeSourceIds(game);
+}
+
+Object.assign(defaults, {
+  "library.add_game": addFakeGame,
+  "game.edit": (payload: unknown) => {
+    const { game, manual } = manualOf(payload);
+    return fakeEditView(game, manual);
+  },
+  "game.edit.set": editFakeGame,
+  "game.remove": removeFakeGame,
+  "game.source_ids": (payload: unknown) => fakeSourceIds(fakeGameOf(payload)),
+  "game.source_ids.set": setFakeSourceId,
+  "game.source_ids.search": searchFakeSourceIds,
+  "game.source_ids.check": checkFakeSourceId,
 });

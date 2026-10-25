@@ -10,6 +10,7 @@ use tako_core::library::{
     CollectionLibrary, Game, GameLibrary, LibraryStore, MemoryLibraryStore, system_clock,
 };
 use tako_core::metadata::SecretStore;
+use tako_core::metadata::agent::{MetadataAgent, PinnedIds};
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{self as db, TakoDatabase};
 use tako_platform::Platform;
@@ -43,6 +44,13 @@ pub struct Core {
     pub(crate) profiles: crate::profile::ProfileState,
     /// Sessão de jogo (WEB-20): abrir, acompanhar e restaurar, também sem interface aberta.
     pub(crate) session: crate::session::Sessions,
+    /// Fontes de metadados para "Fontes e IDs"; sem elas (demonstração) a lista de fontes vai vazia.
+    pub(crate) metadata: Option<Arc<MetadataAgent>>,
+    pub(crate) metadata_cache: std::path::PathBuf,
+    pub(crate) choices: Option<db::GameChoicesStore>,
+    /// Ids que o usuário fixou, por jogo e fonte (vazio = "nenhum").
+    pub(crate) pinned_ids: HashMap<String, PinnedIds>,
+    pub(crate) jobs: crate::edit::Jobs,
 }
 
 impl Core {
@@ -164,6 +172,9 @@ impl Core {
         // Antes de tudo que mexe na máquina: restaura tela e áudio de um jogo que o núcleo não viu terminar.
         let session =
             crate::session::Sessions::open(&platform, &paths, database.as_ref(), simulate);
+        let choices = database.clone().map(db::GameChoicesStore::new);
+        let metadata =
+            (!simulate).then(|| crate::edit::real_agent(&paths, &Vault(platform.secrets.as_ref())));
         let downloads = crate::downloads::DownloadsHub::new(
             database.clone().map(db::DownloadStore::new),
             paths.root.join("download-sources"),
@@ -207,6 +218,11 @@ impl Core {
             game_settings,
             profiles: crate::profile::ProfileState::open(&paths, simulate),
             session,
+            metadata,
+            metadata_cache: paths.metadata_cache(),
+            pinned_ids: crate::edit::load_pinned(choices.as_ref()),
+            choices,
+            jobs: crate::edit::Jobs::new(),
         };
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);
@@ -219,6 +235,11 @@ impl Core {
 
     pub fn setting(&self, key: &str) -> Option<&str> {
         self.settings.get(key).map(String::as_str)
+    }
+
+    /// Liga as fontes de metadados de "Fontes e IDs" (o hospedeiro, ou um teste com fontes falsas).
+    pub fn set_metadata_agent(&mut self, agent: Arc<MetadataAgent>) {
+        self.metadata = Some(agent);
     }
 
     pub fn library(&self) -> &GameLibrary {

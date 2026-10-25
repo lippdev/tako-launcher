@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CallError, call } from "../../bridge";
 import type { GameDetails } from "../../bridge/generated/GameDetails";
 import { AcoesDoJogo, type EstadoDoPrimario } from "../../components/AcoesDoJogo/AcoesDoJogo";
+import type { MenuEntry } from "../../components/MenuDeContexto/MenuDeContexto";
 import { Aviso, type AvisoTone } from "../../components/Aviso/Aviso";
 import { CartaoDetalhes, type DetalheDoJogo } from "../../components/CartaoDetalhes/CartaoDetalhes";
 import { BarraDeDados, ListaDeSessoes, type DadoDaBarra } from "../../components/CartaoSessoes/CartaoSessoes";
@@ -12,7 +13,10 @@ import { PilulaDaLoja } from "../../components/PilulaDaLoja/PilulaDaLoja";
 import { StatusDoJogo, type GameStatus as StatusDoChip } from "../../components/StatusDoJogo/StatusDoJogo";
 import { TituloDoJogo } from "../../components/TituloDoJogo/TituloDoJogo";
 import { useLatest } from "../../lib/useLatest";
-import { gameStrings as s, libraryStrings } from "../strings";
+import { editGameStrings, gameStrings as s, libraryStrings } from "../strings";
+import { DialogoEditarJogo } from "../editar/DialogoEditarJogo";
+import { DialogoFontesEIds } from "../editar/DialogoFontesEIds";
+import { DialogoRemoverJogo } from "../editar/DialogoRemoverJogo";
 import { EtiquetaDeSituacao } from "./EtiquetaDeSituacao";
 import { EditorDasEtiquetas } from "./EditorDasEtiquetas";
 import { PainelConfiguracoesDoJogo } from "./PainelConfiguracoesDoJogo";
@@ -67,6 +71,8 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
   const [entered, setEntered] = useState(false);
   const [opening, setOpening] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Qual diálogo de "Gerenciar" está aberto (um só por vez). */
+  const [dialog, setDialog] = useState<"edit" | "ids" | "remove" | null>(null);
   const [notice, setNotice] = useState<Notice>({ open: false, tone: "info", text: "", key: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const latestOnMissing = useLatest(onMissing);
@@ -160,6 +166,40 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
       setOpening(false);
     }
   };
+
+  // Editar e remover só existem para jogo adicionado à mão; Fontes e IDs vale para todos (como no Slint).
+  const manageEntries: MenuEntry[] = [
+    {
+      id: "source-ids",
+      label: editGameStrings.menu.sourceIds,
+      icon: "search",
+      onSelect: () => {
+        setDialog("ids");
+      },
+    },
+    ...(game.store === "manual"
+      ? ([
+          {
+            id: "edit",
+            label: editGameStrings.menu.edit,
+            icon: "gear",
+            onSelect: () => {
+              setDialog("edit");
+            },
+          },
+          { type: "separator" },
+          {
+            id: "remove",
+            label: editGameStrings.menu.remove,
+            icon: "trash",
+            danger: true,
+            onSelect: () => {
+              setDialog("remove");
+            },
+          },
+        ] satisfies MenuEntry[])
+      : []),
+  ];
 
   const primary = primaryState(shown);
   const state: EstadoDoPrimario = running
@@ -281,6 +321,7 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
             onConfiguracoes={() => {
               setSettingsOpen(true);
             }}
+            entradasExtras={manageEntries}
           />
         }
       />
@@ -325,6 +366,48 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
         open={settingsOpen}
         onClose={() => {
           setSettingsOpen(false);
+        }}
+        onError={(text) => {
+          showNotice("error", text);
+        }}
+      />
+      <DialogoEditarJogo
+        key={`edit-${game.id}`}
+        gameId={game.id}
+        open={dialog === "edit"}
+        onClose={() => {
+          setDialog(null);
+        }}
+        onSaved={(title) => {
+          setDialog(null);
+          showNotice("success", editGameStrings.saved(title));
+          refresh();
+        }}
+        onError={(text) => {
+          showNotice("error", text);
+        }}
+      />
+      <DialogoFontesEIds
+        key={`ids-${game.id}`}
+        gameId={game.id}
+        open={dialog === "ids"}
+        onClose={() => {
+          setDialog(null);
+        }}
+        onNotice={showNotice}
+      />
+      <DialogoRemoverJogo
+        key={`remove-${game.id}`}
+        gameId={game.id}
+        title={game.title}
+        open={dialog === "remove"}
+        onClose={() => {
+          setDialog(null);
+        }}
+        onRemoved={() => {
+          setDialog(null);
+          // O núcleo já não conhece o jogo: o `library.changed` faz a leitura dar `not_found` e a página volta à Visão geral.
+          refresh();
         }}
         onError={(text) => {
           showNotice("error", text);
