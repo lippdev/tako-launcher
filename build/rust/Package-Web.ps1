@@ -42,8 +42,11 @@ if (-not $SkipBuild) {
     Write-Host "-> Construindo interface web (web/)..."
     Push-Location (Join-Path $root "web")
     try {
-        & npm ci
-        if ($LASTEXITCODE -ne 0) { throw "npm ci falhou em web/" }
+        # Com node_modules presente (um Vite aberto trava os binários), usa as dependências já instaladas.
+        if (-not (Test-Path "node_modules")) {
+            & npm ci
+            if ($LASTEXITCODE -ne 0) { throw "npm ci falhou em web/" }
+        }
         & npm run build
         if ($LASTEXITCODE -ne 0) { throw "npm run build falhou em web/" }
     } finally {
