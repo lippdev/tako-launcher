@@ -276,6 +276,50 @@ impl AppService {
                 }
                 Ok(reply)
             }
+            Call::ArtCandidates(request) => {
+                let core = self.require_core()?;
+                Ok(Reply::ArtCandidates(core.art_candidates(&request)?))
+            }
+            Call::ArtChoose(request) => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                let game_id = request.game_id.clone();
+                let has_jobs = core.art.jobs.is_some();
+                core.art_choose(&request)?;
+                if !has_jobs {
+                    self.emit(Event::ArtChanged(protocol::GameRequest { game_id }));
+                }
+                self.emit(Event::LibraryChanged);
+                Ok(Reply::ArtChoose)
+            }
+            Call::ArtReset(request) => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                let game_id = request.game_id.clone();
+                let has_jobs = core.art.jobs.is_some();
+                core.art_reset(&request)?;
+                if !has_jobs {
+                    self.emit(Event::ArtChanged(protocol::GameRequest { game_id }));
+                }
+                self.emit(Event::LibraryChanged);
+                Ok(Reply::ArtReset)
+            }
+            Call::ArtReview => {
+                let core = self.require_core()?;
+                Ok(Reply::ArtReview(core.art_review()?))
+            }
+            Call::ArtReviewAccept(request) => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                core.art_review_accept(&request)?;
+                Ok(Reply::ArtReviewAccept)
+            }
             call => {
                 let core = self
                     .core

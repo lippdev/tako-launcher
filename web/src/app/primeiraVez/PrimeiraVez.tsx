@@ -18,6 +18,7 @@ import { useT } from "../../i18n";
 import { useDevArt } from "../busca/useDevArt";
 import { isStoreDisabled } from "../settings/model";
 import { onboardingStrings as s } from "../strings";
+import { RevisarCapas } from "../revisarCapas";
 import { coverChoice, finishChoice, IGDB_KEY, initialMode, modeChoice, nextStep, previousStep, storeChoice, type OpenMode, type Step, type Settings } from "./model";
 import common from "../../components/OnboardingEmuladores/OnboardingEmuladores.module.css";
 import styles from "./PrimeiraVez.module.css";
@@ -33,6 +34,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [folderOpen, setFolderOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [path, setPath] = useState("");
   // TODO(WEB-05b): o contrato desta base ainda não informa os controles conectados; por ora o padrão é janela.
   const [mode, setMode] = useState<OpenMode>(() => initialMode(initialSettings, false));
@@ -144,6 +146,18 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
   const cover = (game: NonNullable<LibraryPage["rows"][number]>) => devArt ? devArt.cover(game.id, game.title) : `tako-img://cover?id=${encodeURIComponent(game.id)}&w=240&h=320`;
   const comparison = page?.rows.find((game) => game.hasCover);
   const stores = sources?.sources.filter((source) => source.store !== "emulators" && source.store !== "manual") ?? [];
+
+  if (reviewOpen) {
+    return (
+      <div className={styles["viewport"]}>
+        <RevisarCapas
+          onConcluir={finish}
+          onVoltar={() => setReviewOpen(false)}
+        />
+      </div>
+    );
+  }
+
   return <div
     ref={root}
     className={styles["viewport"]}
@@ -263,8 +277,7 @@ export function PrimeiraVez({ initialSettings, onFinish }: { initialSettings: Se
             onFinish={finish}
             {...(page.total ? { reviewCoversLabel: t("first_run.full.review_covers") } : {})}
             onReviewCovers={() => {
-              // TODO(WEB-12d): abrir a revisão de capas quando a tela existir; por ora, a biblioteca.
-              finish();
+              setReviewOpen(true);
             }}
           />}
           {error && <p role="alert" className={styles["notice"]}>{error}</p>}

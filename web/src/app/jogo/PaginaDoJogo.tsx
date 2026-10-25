@@ -18,6 +18,7 @@ import { editGameStrings, gameStrings as s, libraryStrings } from "../strings";
 import { DialogoEditarJogo } from "../editar/DialogoEditarJogo";
 import { DialogoFontesEIds } from "../editar/DialogoFontesEIds";
 import { DialogoRemoverJogo } from "../editar/DialogoRemoverJogo";
+import { DialogoSeletorDeImagens } from "./DialogoSeletorDeImagens";
 import { useGameSession } from "../sessao/useGameSession";
 import { EtiquetaDeSituacao } from "./EtiquetaDeSituacao";
 import { EditorDasEtiquetas } from "./EditorDasEtiquetas";
@@ -69,7 +70,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   const [entered, setEntered] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** Qual diálogo de "Gerenciar" está aberto (um só por vez). */
-  const [dialog, setDialog] = useState<"edit" | "ids" | "remove" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "ids" | "remove" | "art" | null>(null);
   const [notice, setNotice] = useState<Notice>({ open: false, tone: "info", text: "", key: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const latestOnMissing = useLatest(onMissing);
@@ -193,6 +194,14 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
 
   // Editar e remover só existem para jogo adicionado à mão; Fontes e IDs vale para todos (como no Slint).
   const manageEntries: MenuEntry[] = [
+    {
+      id: "change-art",
+      label: t("options.change_art") || "Trocar imagens",
+      icon: "image",
+      onSelect: () => {
+        setDialog("art");
+      },
+    },
     {
       id: "source-ids",
       label: editGameStrings.menu.sourceIds,
@@ -449,6 +458,18 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
         }}
         onError={(text) => {
           showNotice("error", text);
+        }}
+      />
+      <DialogoSeletorDeImagens
+        key={`art-${game.id}`}
+        gameId={game.id}
+        gameTitle={game.title}
+        open={dialog === "art"}
+        onClose={() => {
+          setDialog(null);
+        }}
+        onImageChanged={() => {
+          refresh();
         }}
       />
       <Aviso

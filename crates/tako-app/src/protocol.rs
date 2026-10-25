@@ -156,6 +156,11 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "input.source"
             | "control_center.state"
             | "control_center.set"
+            | "art.candidates"
+            | "art.choose"
+            | "art.reset"
+            | "art.review"
+            | "art.review.accept"
     ) {
         return Err((
             header.id,
@@ -185,6 +190,7 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "updates.download"
             | "updates.apply"
             | "updates.preferences"
+            | "art.review"
     ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
@@ -619,6 +625,37 @@ pub enum Call {
         #[ts(as = "ControlCenterAction")]
         ControlCenterAction,
     ),
+    /// Candidatos de arte para o jogo e tipo escolhidos (WEB-12d).
+    #[serde(rename = "art.candidates")]
+    ArtCandidates(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ArtCandidatesRequest")]
+        ArtCandidatesRequest,
+    ),
+    /// Grava a arte escolhida para o jogo e tipo (WEB-12d).
+    #[serde(rename = "art.choose")]
+    ArtChoose(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ArtChooseRequest")]
+        ArtChooseRequest,
+    ),
+    /// Desfaz a arte escolhida e volta ao automático (WEB-12d).
+    #[serde(rename = "art.reset")]
+    ArtReset(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ArtResetRequest")]
+        ArtResetRequest,
+    ),
+    /// Lista de jogos com arte duvidosa ou ausente para revisar (WEB-12d).
+    #[serde(rename = "art.review")]
+    ArtReview,
+    /// Aceita a correspondência de metadados/arte para o jogo (WEB-12d).
+    #[serde(rename = "art.review.accept")]
+    ArtReviewAccept(
+        #[serde(with = "object_payload")]
+        #[ts(as = "GameRequest")]
+        GameRequest,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -762,6 +799,16 @@ pub enum Reply {
     ControlCenterState(ControlCenterState),
     #[serde(rename = "control_center.set")]
     ControlCenterSet(ControlCenterState),
+    #[serde(rename = "art.candidates")]
+    ArtCandidates(ArtCandidatesView),
+    #[serde(rename = "art.choose")]
+    ArtChoose,
+    #[serde(rename = "art.reset")]
+    ArtReset,
+    #[serde(rename = "art.review")]
+    ArtReview(ArtReviewView),
+    #[serde(rename = "art.review.accept")]
+    ArtReviewAccept,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -830,6 +877,9 @@ pub enum Event {
     InputNotice(InputNotice),
     #[serde(rename = "control_center.open")]
     ControlCenterOpen(bool),
+    /// Candidatos de arte prontos para exibição (WEB-12d).
+    #[serde(rename = "art.candidates.ready")]
+    ArtCandidatesReady(ArtCandidatesReady),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -2420,4 +2470,137 @@ pub struct InputNotice {
 #[ts(export)]
 pub struct InputSource {
     pub pad: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ArtKindDto {
+    Cover,
+    Hero,
+    Logo,
+    Icon,
+}
+
+impl From<tako_core::library::ArtKind> for ArtKindDto {
+    fn from(kind: tako_core::library::ArtKind) -> Self {
+        match kind {
+            tako_core::library::ArtKind::Cover => Self::Cover,
+            tako_core::library::ArtKind::Hero => Self::Hero,
+            tako_core::library::ArtKind::Logo => Self::Logo,
+            tako_core::library::ArtKind::Icon => Self::Icon,
+        }
+    }
+}
+
+impl From<ArtKindDto> for tako_core::library::ArtKind {
+    fn from(dto: ArtKindDto) -> Self {
+        match dto {
+            ArtKindDto::Cover => Self::Cover,
+            ArtKindDto::Hero => Self::Hero,
+            ArtKindDto::Logo => Self::Logo,
+            ArtKindDto::Icon => Self::Icon,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtCandidatesRequest {
+    pub game_id: String,
+    pub kind: ArtKindDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtCandidateDto {
+    pub id: String,
+    pub url: String,
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+    pub current: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtChooseRequest {
+    pub game_id: String,
+    pub kind: ArtKindDto,
+    pub candidate_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtResetRequest {
+    pub game_id: String,
+    pub kind: ArtKindDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtReviewView {
+    pub total: usize,
+    pub items: Vec<ArtReviewItem>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ArtConfidence {
+    High,
+    Medium,
+    Low,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtReviewItem {
+    pub game_id: String,
+    pub title: String,
+    pub store: Store,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_cover: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proposed_cover: Option<String>,
+    pub confidence: ArtConfidence,
+    pub confidence_percent: u8,
+    pub reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doubt: Option<ArtDoubtDto>,
+    pub missing_kinds: Vec<ArtKindDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtDoubtDto {
+    pub source: String,
+    pub id: String,
+    pub found: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtCandidatesView {
+    pub candidates: Vec<ArtCandidateDto>,
+    pub loading: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ArtCandidatesReady {
+    pub game_id: String,
+    pub kind: ArtKindDto,
+    pub candidates: Vec<ArtCandidateDto>,
 }

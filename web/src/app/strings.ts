@@ -802,3 +802,35 @@ export const sourceIdsStrings = {
   current: "Escolhido agora",
   best: "Mais provável",
 } as const;
+
+export const artReviewStrings = {
+  title: "Revisar capas", // art_review.title
+  desc: "As fontes casam a biblioteca sozinhas; aqui ficam só os jogos que valem conferir", // art_review.desc
+  open: "Abrir", // art_review.open
+  text: "Capa, fundo, logo e ícone vêm sozinhos das fontes ligadas. Confira os jogos achados só pelo nome e os que ficaram sem alguma imagem.", // art_review.text
+  computing: "Conferindo a biblioteca…", // art_review.computing
+  summary: (count: number, total: number) => `${count} de ${total} jogos para conferir`, // art_review.summary
+  allGood: (total: number) => `Os ${total} jogos estão com as imagens e as correspondências em ordem`, // art_review.all_good
+  refresh: "Buscar de novo para a biblioteca inteira", // art_review.refresh
+  refreshDesc: "Consulta as fontes de novo para todos os jogos, em segundo plano", // art_review.refresh_desc
+  doubt: (source: string, found: string) => `Achado pelo nome no ${source} como "${found}"`, // art_review.doubt
+  missing: (kinds: string) => `Sem ${kinds}`, // art_review.missing
+  pickArt: "Escolher imagens", // art_review.pick_art
+  fixMatch: "Corrigir correspondência", // art_review.fix_match
+  correct: "Está certo", // art_review.correct
+  highTitle: (n: number) => `${n} com confiança alta`, // art_review.high_title
+  highDesc: "O nome achado é praticamente o mesmo do jogo", // art_review.high_desc
+  acceptAll: (n: number) => `Aceitar as ${n}`, // art_review.accept_all
+  toReview: (n: number) => `Para revisar · ${n}`, // art_review.to_review
+  noCover: "Sem capa", // art_review.no_cover
+  confHigh: (percent: number) => `Confiança alta · ${percent}%`, // art_review.conf_high
+  confMedium: (percent: number) => `Confiança média · ${percent}%`, // art_review.conf_medium
+  confLow: (percent: number) => `Confiança baixa · ${percent}%`, // art_review.conf_low
+  accept: "Aceitar", // art_review.accept
+  other: "Escolher outra", // art_review.other
+  more: (shown: number, n: number) => `Mostrando ${shown} de ${n}; resolva estes para ver os outros`, // art_review.more
+  accepted: (game: string) => `Capa de ${game} trocada`, // art_review.accepted
+  acceptedMany: (n: number) => `${n} capas trocadas`, // art_review.accepted_many
+  finish: "Concluir",
+  back: "Voltar",
+} as const;

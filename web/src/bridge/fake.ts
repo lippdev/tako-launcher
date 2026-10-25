@@ -76,6 +76,14 @@ import type { SourceIdsJob } from "./generated/SourceIdsJob";
 import type { UpdateOffer } from "./generated/UpdateOffer";
 import type { UpdatePrefs } from "./generated/UpdatePrefs";
 import type { UpdateStatus } from "./generated/UpdateStatus";
+import type { ArtCandidateDto } from "./generated/ArtCandidateDto";
+import type { ArtCandidatesView } from "./generated/ArtCandidatesView";
+import type { ArtCandidatesReady } from "./generated/ArtCandidatesReady";
+import type { ArtCandidatesRequest } from "./generated/ArtCandidatesRequest";
+import type { ArtChooseRequest } from "./generated/ArtChooseRequest";
+import type { ArtResetRequest } from "./generated/ArtResetRequest";
+import type { ArtReviewItem } from "./generated/ArtReviewItem";
+import type { ArtReviewView } from "./generated/ArtReviewView";
 // Hospedeiro falso para rodar a interface no navegador (Vite) sem o Tako: responde com dados de exemplo.
 
 // Só para desenvolvimento; o build de produção não instala isto.
@@ -3161,4 +3169,214 @@ Object.assign(SAMPLE_CATALOGS["en-US"], {
   "cc.output": "AUDIO OUTPUT", "cc.audio_unavailable": "Audio unavailable", "cc.screen_unavailable": "No displays found",
   "settings.performance.title": "Tako performance", "settings.performance.supervisor": "Supervisor",
   "settings.performance.memory": "Memory", "settings.performance.unknown": "Unavailable",
+});
+
+// ---- Seletor de imagens e Revisar capas (WEB-12d) ----
+const fakeChosenArt = new Map<string, string>();
+
+function createFakeCandidateSvg(title: string, kind: string, label: string, color: string, w = 600, h = 900): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="${color}"/><circle cx="${w / 2}" cy="${h / 2 - 40}" r="${Math.min(w, h) / 4}" fill="white" fill-opacity="0.12"/><text x="${w / 2}" y="${h / 2 + 10}" fill="white" font-size="${Math.round(w / 14)}" font-weight="bold" font-family="sans-serif" text-anchor="middle">${title}</text><text x="${w / 2}" y="${h / 2 + 50}" fill="white" fill-opacity="0.7" font-size="${Math.round(w / 26)}" font-family="sans-serif" text-anchor="middle">${kind} · ${label}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function fakeArtCandidates(payload: unknown): ArtCandidatesView {
+  const { gameId, kind } = payload as ArtCandidatesRequest;
+  const game = games.find((g) => g.id === gameId);
+  const title = game?.title ?? gameId;
+  const chosen = fakeChosenArt.get(`${gameId}:${kind}`);
+
+  const dims = kind === "cover" ? "600 × 900" : kind === "hero" ? "1920 × 1080" : kind === "logo" ? "1280 × 720" : "512 × 512";
+  const [w, h] = kind === "cover" ? [600, 900] : kind === "hero" ? [1920, 1080] : kind === "logo" ? [1280, 720] : [512, 512];
+
+  const cand0Id = "cand-0";
+  const cand1Id = "cand-1";
+  const cand2Id = "cand-2";
+  const cand3Id = "cand-3";
+
+  const candidates: ArtCandidateDto[] = [
+    {
+      id: cand0Id,
+      url: createFakeCandidateSvg(title, kind, "Oficial", "darkslateblue", w, h),
+      source: "Steam",
+      dimensions: dims,
+      style: "Oficial",
+      current: chosen ? chosen === cand0Id : true,
+    },
+    {
+      id: cand1Id,
+      url: createFakeCandidateSvg(title, kind, "Alternativa", "midnightblue", w, h),
+      source: "SteamGridDB",
+      dimensions: dims,
+      style: "Alternativa",
+      current: chosen === cand1Id,
+    },
+    {
+      id: cand2Id,
+      url: createFakeCandidateSvg(title, kind, "Arte", "darkslategray", w, h),
+      source: "IGDB",
+      dimensions: dims,
+      style: "Arte",
+      current: chosen === cand2Id,
+    },
+    {
+      id: cand3Id,
+      url: createFakeCandidateSvg(title, kind, "Retro", "maroon", w, h),
+      source: "SteamGridDB",
+      dimensions: dims,
+      style: "Retro",
+      current: chosen === cand3Id,
+    },
+  ];
+
+  emitFakeEvent(
+    "art.candidates.ready",
+    {
+      gameId,
+      kind,
+      candidates,
+    } satisfies ArtCandidatesReady,
+    50,
+  );
+
+  return {
+    candidates: [],
+    loading: true,
+  };
+}
+
+function fakeArtChoose(payload: unknown) {
+  const { gameId, kind, candidateId } = payload as ArtChooseRequest;
+  fakeChosenArt.set(`${gameId}:${kind}`, candidateId);
+  deliverEvent("art.changed", { gameId });
+  deliverEvent("library.changed");
+}
+
+function fakeArtReset(payload: unknown) {
+  const { gameId, kind } = payload as ArtResetRequest;
+  fakeChosenArt.delete(`${gameId}:${kind}`);
+  deliverEvent("art.changed", { gameId });
+  deliverEvent("library.changed");
+}
+
+let fakeReviewItems: ArtReviewItem[] = [
+  {
+    gameId: "steam:1000",
+    title: "God of War: Ragnarök",
+    store: "steam",
+    currentCover: createFakeCandidateSvg("God of War: Ragnarök", "Capa", "Atual", "darkslateblue", 600, 900),
+    proposedCover: createFakeCandidateSvg("God of War: Ragnarök", "Capa", "Proposta", "midnightblue", 600, 900),
+    confidence: "high",
+    confidencePercent: 95,
+    reason: 'Achado pelo nome no IGDB como "God of War Ragnarök"',
+    doubt: { source: "IGDB", id: "123", found: "God of War Ragnarök" },
+    missingKinds: [],
+  },
+  {
+    gameId: "steam:1001",
+    title: "Hollow Knight",
+    store: "steam",
+    currentCover: createFakeCandidateSvg("Hollow Knight", "Capa", "Atual", "darkslategray", 600, 900),
+    proposedCover: createFakeCandidateSvg("Hollow Knight", "Capa", "Proposta", "indigo", 600, 900),
+    confidence: "medium",
+    confidencePercent: 72,
+    reason: 'Achado pelo nome no SteamGridDB como "Hollow Knight (PC)"',
+    doubt: { source: "SteamGridDB", id: "456", found: "Hollow Knight (PC)" },
+    missingKinds: [],
+  },
+  {
+    gameId: "manual:fake1",
+    title: "Chrono Trigger",
+    store: "manual",
+    currentCover: null,
+    proposedCover: null,
+    confidence: "low",
+    confidencePercent: 0,
+    reason: "Sem capa, fundo, logo, ícone",
+    doubt: null,
+    missingKinds: ["cover", "hero", "logo", "icon"],
+  },
+];
+
+function fakeArtReview(): ArtReviewView {
+  return {
+    total: games.length,
+    items: [...fakeReviewItems],
+  };
+}
+
+function fakeArtReviewAccept(payload: unknown) {
+  const { gameId } = payload as GameRequest;
+  fakeReviewItems = fakeReviewItems.filter((item) => item.gameId !== gameId);
+  deliverEvent("library.changed");
+}
+
+Object.assign(defaults, {
+  "art.candidates": fakeArtCandidates,
+  "art.choose": fakeArtChoose,
+  "art.reset": fakeArtReset,
+  "art.review": fakeArtReview,
+  "art.review.accept": fakeArtReviewAccept,
+});
+
+Object.assign(SAMPLE_CATALOGS["pt-BR"], {
+  "options.change_art": "Trocar imagens",
+  "art_review.title": "Revisar capas",
+  "art_review.desc": "As fontes casam a biblioteca sozinhas; aqui ficam só os jogos que valem conferir",
+  "art_review.open": "Abrir",
+  "art_review.text": "Capa, fundo, logo e ícone vêm sozinhos das fontes ligadas. Confira os jogos achados só pelo nome e os que ficaram sem alguma imagem.",
+  "art_review.computing": "Conferindo a biblioteca…",
+  "art_review.summary": "{count} de {total} jogos para conferir",
+  "art_review.all_good": "Os {total} jogos estão com as imagens e as correspondências em ordem",
+  "art_review.refresh": "Buscar de novo para a biblioteca inteira",
+  "art_review.refresh_desc": "Consulta as fontes de novo para todos os jogos, em segundo plano",
+  "art_review.doubt": 'Achado pelo nome no {source} como "{found}"',
+  "art_review.missing": "Sem {kinds}",
+  "art_review.pick_art": "Escolher imagens",
+  "art_review.fix_match": "Corrigir correspondência",
+  "art_review.correct": "Está certo",
+  "art_review.high_title": "{n} com confiança alta",
+  "art_review.high_desc": "O nome achado é praticamente o mesmo do jogo",
+  "art_review.accept_all": "Aceitar as {n}",
+  "art_review.to_review": "Para revisar · {n}",
+  "art_review.no_cover": "Sem capa",
+  "art_review.conf_high": "Confiança alta · {percent}%",
+  "art_review.conf_medium": "Confiança média · {percent}%",
+  "art_review.conf_low": "Confiança baixa · {percent}%",
+  "art_review.accept": "Aceitar",
+  "art_review.other": "Escolher outra",
+  "art_review.more": "Mostrando {shown} de {n}; resolva estes para ver os outros",
+  "art_review.accepted": "Capa de {game} trocada",
+  "art_review.accepted_many": "{n} capas trocadas",
+});
+
+Object.assign(SAMPLE_CATALOGS["en-US"], {
+  "options.change_art": "Change images",
+  "art_review.title": "Review covers",
+  "art_review.desc": "Sources match the whole library on their own; only the games worth checking are listed here",
+  "art_review.open": "Open",
+  "art_review.text": "Cover, background, logo and icon come on their own from the enabled sources. Check the games found only by name and the ones left without some image.",
+  "art_review.computing": "Checking the library…",
+  "art_review.summary": "{count} of {total} games to check",
+  "art_review.all_good": "All {total} games have their images and matches in order",
+  "art_review.refresh": "Search again for the whole library",
+  "art_review.refresh_desc": "Asks the sources again for every game, in the background",
+  "art_review.doubt": 'Found by name on {source} as "{found}"',
+  "art_review.missing": "No {kinds}",
+  "art_review.pick_art": "Choose images",
+  "art_review.fix_match": "Fix match",
+  "art_review.correct": "It's right",
+  "art_review.high_title": "{n} with high confidence",
+  "art_review.high_desc": "The name found is practically the same as the game's",
+  "art_review.accept_all": "Accept all {n}",
+  "art_review.to_review": "To review · {n}",
+  "art_review.no_cover": "No cover",
+  "art_review.conf_high": "High confidence · {percent}%",
+  "art_review.conf_medium": "Medium confidence · {percent}%",
+  "art_review.conf_low": "Low confidence · {percent}%",
+  "art_review.accept": "Accept",
+  "art_review.other": "Choose another",
+  "art_review.more": "Showing {shown} of {n}; resolve these to see the rest",
+  "art_review.accepted": "Cover of {game} changed",
+  "art_review.accepted_many": "{n} covers changed",
+
 });

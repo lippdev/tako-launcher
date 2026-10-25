@@ -3,7 +3,10 @@
 
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
-use tako_app::protocol::{Call, Event, GameRequest, Reply};
+use tako_app::protocol::{
+    ArtCandidatesRequest, ArtChooseRequest, ArtKindDto, ArtResetRequest, Call, Event, GameRequest,
+    Reply,
+};
 use tako_app::{AppService, Core, HostRequest};
 use tako_core::library::{ArtKind, Game};
 use tako_core::metadata::agent::MetadataAgent;
@@ -298,5 +301,306 @@ fn missing_art_is_discovered_by_metadata_worker_then_downloaded_and_persisted() 
             .shown_cover()
             .unwrap()
             .starts_with("file://")
+    );
+}
+
+#[test]
+fn art_candidates_choose_and_reset_flow() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = DataPaths::at(dir.path());
+    let core = Core::open(paths.clone(), Platform::simulated(), true).unwrap();
+    let mut app = AppService::with_core("test", core);
+    let (tx, rx) = mpsc::channel();
+    app.set_event_sink(tx);
+
+    let game = Game {
+        id: "steam:570".into(),
+        title: "Dota 2".into(),
+        steam_app_id: Some(570),
+        ..Default::default()
+    };
+    app.reload_library(vec![game]).unwrap();
+
+    let reply = app
+        .handle(Call::ArtCandidates(ArtCandidatesRequest {
+            game_id: "steam:570".into(),
+            kind: ArtKindDto::Cover,
+        }))
+        .unwrap();
+
+    match reply {
+        Reply::ArtCandidates(v) => assert!(v.loading, "resposta inicial deve ser loading: true"),
+        other => panic!("resposta inesperada: {other:?}"),
+    };
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut candidates = Vec::new();
+    while Instant::now() < deadline {
+        app.poll();
+        for event in rx.try_iter() {
+            if let Event::ArtCandidatesReady(ready) = event
+                && ready.game_id == "steam:570"
+                && ready.kind == ArtKindDto::Cover
+            {
+                candidates = ready.candidates;
+                break;
+            }
+        }
+        if !candidates.is_empty() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    assert!(!candidates.is_empty(), "deveria ter candidatos do Steam");
+    for cand in &candidates {
+        assert!(
+            cand.url.starts_with("tako-img://cover?id="),
+            "URL deve usar tako-img://: {}",
+            cand.url
+        );
+        assert!(!cand.url.contains("http://") && !cand.url.contains("https://"));
+        assert!(!cand.url.contains("key=") && !cand.url.contains("secret"));
+    }
+
+    let serialized = serde_json::to_string(&candidates).unwrap();
+    assert!(!serialized.to_lowercase().contains("secret"));
+    assert!(!serialized.to_lowercase().contains("token"));
+    assert!(!serialized.to_lowercase().contains("api_key"));
+
+    let choose_reply = app
+        .handle(Call::ArtChoose(ArtChooseRequest {
+            game_id: "steam:570".into(),
+            kind: ArtKindDto::Cover,
+            candidate_id: "cand-0".into(),
+        }))
+        .unwrap();
+    assert_eq!(choose_reply, Reply::ArtChoose);
+
+    let events: Vec<_> = rx.try_iter().collect();
+    assert!(
+        events.iter().any(|e| e
+            == &Event::ArtChanged(GameRequest {
+                game_id: "steam:570".into(),
+            })),
+        "deveria ter emitido art.changed"
+    );
+
+    let reset_reply = app
+        .handle(Call::ArtReset(ArtResetRequest {
+            game_id: "steam:570".into(),
+            kind: ArtKindDto::Cover,
+        }))
+        .unwrap();
+    assert_eq!(reset_reply, Reply::ArtReset);
+
+    let events_after_reset: Vec<_> = rx.try_iter().collect();
+    assert!(
+        events_after_reset.iter().any(|e| e
+            == &Event::ArtChanged(GameRequest {
+                game_id: "steam:570".into(),
+            })),
+        "deveria ter emitido art.changed no reset"
+    );
+}
+
+#[test]
+fn art_review_listing_and_accept_flow() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = DataPaths::at(dir.path());
+    let core = Core::open(paths.clone(), Platform::simulated(), true).unwrap();
+    let mut app = AppService::with_core("test", core);
+
+    let game1 = Game {
+        id: "custom:1".into(),
+        title: "Jogo Sem Capa".into(),
+        ..Default::default()
+    };
+    app.reload_library(vec![game1]).unwrap();
+
+    let reply = app.handle(Call::ArtReview).unwrap();
+    let review_view = match reply {
+        Reply::ArtReview(v) => v,
+        other => panic!("resposta inesperada: {other:?}"),
+    };
+
+    assert_eq!(review_view.total, 1);
+    assert_eq!(review_view.items.len(), 1);
+    let item = &review_view.items[0];
+    assert_eq!(item.game_id, "custom:1");
+    assert!(item.missing_kinds.contains(&ArtKindDto::Cover));
+
+    let serialized = serde_json::to_string(&review_view).unwrap();
+    assert!(!serialized.to_lowercase().contains("secret"));
+    assert!(!serialized.to_lowercase().contains("token"));
+
+    let accept_reply = app
+        .handle(Call::ArtReviewAccept(GameRequest {
+            game_id: "custom:1".into(),
+        }))
+        .unwrap();
+    assert_eq!(accept_reply, Reply::ArtReviewAccept);
+}
+
+struct SleepingHttp {
+    duration: Duration,
+}
+
+impl Http for SleepingHttp {
+    fn send(&self, _: &HttpRequest) -> Result<HttpResponse, String> {
+        std::thread::sleep(self.duration);
+        Ok(HttpResponse {
+            status: 200,
+            body: b"\x89PNG\r\n\x1a\nfakebytes".to_vec(),
+            content_type: Some("image/png".into()),
+            retry_after: None,
+        })
+    }
+}
+
+#[test]
+fn art_candidates_does_not_block_bridge_and_event_arrives_with_distinct_urls_and_choose_emits_changed()
+ {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = DataPaths::at(dir.path());
+    let pics = dir.path().join("pics");
+    std::fs::create_dir_all(&pics).unwrap();
+    std::fs::write(pics.join("a.png"), b"\x89PNG\r\n\x1a\n1").unwrap();
+    std::fs::write(pics.join("b.png"), b"\x89PNG\r\n\x1a\n2").unwrap();
+
+    let http = Arc::new(SleepingHttp {
+        duration: Duration::from_secs(2),
+    });
+    let cache = Arc::new(ArtCache::new(
+        paths.art_cache(),
+        http.clone(),
+        SteamArtResolver::new(http, None),
+        None,
+    ));
+    let catalog = tako_core::metadata::art_catalog::ArtCatalog {
+        igdb: None,
+        screenscraper: None,
+        steamgriddb: None,
+        picture_folders: vec![pics],
+    };
+    let core = Core::open(paths.clone(), Platform::simulated(), true)
+        .unwrap()
+        .with_art_pipeline(
+            &paths,
+            cache,
+            MetadataAgent::new(Vec::new(), Arc::new(SystemClock)),
+        )
+        .with_art_catalog(catalog);
+    let mut app = AppService::with_core("test", core);
+    let (host, wake) = mpsc::channel();
+    let (events, received) = mpsc::channel();
+    app.set_host_sink(host);
+    app.set_event_sink(events);
+
+    let game = Game {
+        id: "steam:570".into(),
+        title: "Dota 2".into(),
+        steam_app_id: Some(570),
+        ..Default::default()
+    };
+    app.reload_library(vec![game]).unwrap();
+
+    let start = Instant::now();
+    let reply = app
+        .handle(Call::ArtCandidates(ArtCandidatesRequest {
+            game_id: "steam:570".into(),
+            kind: ArtKindDto::Cover,
+        }))
+        .unwrap();
+    let elapsed = start.elapsed();
+    assert!(
+        elapsed < Duration::from_millis(400),
+        "art.candidates travou o núcleo: levou {:?}",
+        elapsed
+    );
+
+    match reply {
+        Reply::ArtCandidates(v) => {
+            assert!(v.loading, "deve responder na hora com loading: true");
+            assert!(v.candidates.is_empty());
+        }
+        other => panic!("resposta inesperada: {other:?}"),
+    }
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut ready_candidates = Vec::new();
+    while Instant::now() < deadline {
+        if let Ok(req) = wake.recv_timeout(Duration::from_millis(500)) {
+            assert_eq!(req, HostRequest::PollBackground);
+        }
+        app.poll();
+        for ev in received.try_iter() {
+            if let Event::ArtCandidatesReady(ready) = ev
+                && ready.game_id == "steam:570"
+                && ready.kind == ArtKindDto::Cover
+            {
+                ready_candidates = ready.candidates;
+                break;
+            }
+        }
+        if !ready_candidates.is_empty() {
+            break;
+        }
+    }
+
+    assert!(
+        ready_candidates.len() >= 2,
+        "deveria ter recebido candidatos de steam"
+    );
+
+    // Conferir URLs distintas por candidato
+    let urls: std::collections::HashSet<_> = ready_candidates.iter().map(|c| &c.url).collect();
+    assert_eq!(
+        urls.len(),
+        ready_candidates.len(),
+        "as URLs dos candidatos devem ser distintas: {:?}",
+        urls
+    );
+    for cand in &ready_candidates {
+        assert!(
+            cand.url.starts_with("tako-img://cover?id="),
+            "URL deve usar tako-img://: {}",
+            cand.url
+        );
+        assert!(!cand.url.contains("http://") && !cand.url.contains("https://"));
+    }
+
+    let chosen_id = ready_candidates[0].id.clone();
+    let choose_reply = app
+        .handle(Call::ArtChoose(ArtChooseRequest {
+            game_id: "steam:570".into(),
+            kind: ArtKindDto::Cover,
+            candidate_id: chosen_id,
+        }))
+        .unwrap();
+    assert_eq!(choose_reply, Reply::ArtChoose);
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut got_art_changed = false;
+    while Instant::now() < deadline {
+        if let Ok(req) = wake.recv_timeout(Duration::from_millis(500)) {
+            assert_eq!(req, HostRequest::PollBackground);
+        }
+        app.poll();
+        for ev in received.try_iter() {
+            if let Event::ArtChanged(g) = ev
+                && g.game_id == "steam:570"
+            {
+                got_art_changed = true;
+                break;
+            }
+        }
+        if got_art_changed {
+            break;
+        }
+    }
+    assert!(
+        got_art_changed,
+        "deveria ter emitido art.changed após download em segundo plano"
     );
 }
