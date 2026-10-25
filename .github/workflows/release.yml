@@ -10,7 +10,6 @@ name: Release
 #    7 noturnas mais novas. O agendamento do GitHub só roda o arquivo da branch padrão: vale depois de chegar na main.
 # Saídas: Windows (só o instalador, com a interface web e o CEF; só x64), Linux (deb, AppImage, tar.gz; x64 e
 # arm64) e macOS (dmg e zip; Apple Silicon e Intel). Testes não rodam aqui (PRD D-13): o workflow só empacota.
-# A versão C#/WPF tem o próprio workflow manual (release-wpf.yml) até o corte (MIG-043).
 on:
   push:
     branches: [main]
