@@ -11,7 +11,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Claude Alyx Medical | `claudeAgent` | rodando WEB-33; **poupar** (pedido do mantenedor: é a conta do orquestrador, perto do limite) |
 | Antigravity | `antigravity` | rodando WEB-04m (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | rodando WEB-05b |
-| Codex Lipp | `codex` | livre (mantenedor confirmou limite disponível) |
+| Codex Lipp | `codex` | rodando WEB-16 |
 | Codex Alyx Medical | `codex_alyx_medical` | rodando WEB-01d |
 
 ## Onda 1 — Fundação (D-14: direto no código definitivo)
@@ -61,6 +61,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-21 | **Sessão na interface:** "Abrindo…", "Fechando o jogo…", estado jogando na página e na lista, Voltar ao jogo e Encerrar, "bem-vindo de volta", ErroDoJogo (SESSION-003), sessão no hospedeiro falso | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-20 | `web/src/app/sessao/`, mínimo em `web/src/app/jogo/` | integrada (aguarda validação visual e um teste com jogo real no `tako --web`) |
 | WEB-33 | **Atualizações do app:** conferir, avisar (AtualizacaoDoApp), baixar com progresso, conferir assinatura, reiniciar pelo hospedeiro sem derrubar jogo aberto | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-04f, WEB-20 | `crates/tako-app/src/updates.rs`, `web/src/app/atualizacao/` | despachada |
 | WEB-04m | **AssistenteInicial e PainelControles** (componentes; primeiros passos de perfil novo e Configurações › Controles) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04k | `web/src/components/` (duas pastas) | despachada |
+| WEB-16 | **Primeira execução:** os cinco passos do onboarding (lojas, emuladores, capas, modo, pronto) com as chaves do Slint, convivendo com a abertura do WEB-35 | N3 | Codex Lipp · GPT-6.1-Sol high | WEB-04k, WEB-04l, WEB-13c1, WEB-35 | `web/src/app/primeiraVez/` | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | Codex Alyx · GPT-6.1-Sol high | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | despachada (inclui a busca da arte que falta, como no Slint, e o evento `art.changed`) |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | integrada (sessão ligada no WEB-20; falta a bandeja) |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
