@@ -5,6 +5,12 @@ import { closeTopLayer, hasOpenLayer } from "../lib/escapeLayers";
 import { FOCUSABLE } from "../lib/focusTrap";
 import { keyForAction, type NavAction } from "./keymap";
 import { choose, entry, type Candidate, type Direction, type Rect } from "./spatial";
+import { call } from "../bridge";
+import { reportInputSource, setSourceSender } from "./sourceReporter";
+
+setSourceSender((pad) => {
+  void call("input.source", { pad }).catch(() => {});
+});
 
 /** Quem entregou a última ação: o foco só aparece para teclado e controle, nunca depois do mouse. */
 export type InputSource = "keyboard" | "controller" | "mouse";
@@ -36,6 +42,7 @@ export function inputSource(): InputSource {
 export function setInputSource(next: InputSource): void {
   source = next;
   document.documentElement.dataset["input"] = next;
+  reportInputSource(next === "controller");
 }
 
 /**

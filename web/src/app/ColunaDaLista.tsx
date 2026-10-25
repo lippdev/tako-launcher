@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { call } from "../bridge";
+import { COMMAND_EVENT } from "../focus";
 import { Abas, type Aba } from "../components/Abas/Abas";
 import { Aviso } from "../components/Aviso/Aviso";
 import { CampoDeBusca } from "../components/CampoDeBusca/CampoDeBusca";
@@ -85,6 +87,9 @@ export function ColunaDaLista({
   const [saveOpen, setSaveOpen] = useState<number | null>(null);
   const [lastSaveKey, setLastSaveKey] = useState(0);
   const [manageOpen, setManageOpen] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
+
+
   const update = (patch: Partial<LibraryCriteria>) => {
     setSelection(new Set());
     onCriteriaChange({ ...criteria, ...patch });
@@ -105,12 +110,40 @@ export function ColunaDaLista({
     if (feedback.tone === "error") collectionDone(true, feedback.text);
   };
   // Os jogos que a tela conhece: a página da lista e as capas das fileiras (a seleção pode vir de qualquer uma).
-  const knownGame = (id: string) =>
-    library.games.find((g) => g.id === id) ??
-    [...groups.groups.values()].flatMap((g) => g.games).find((g) => g.id === id);
-  const collectionDone = (error: boolean, message: string) => {
+  const knownGame = useCallback(
+    (id: string) =>
+      library.games.find((g) => g.id === id) ??
+      [...groups.groups.values()].flatMap((g) => g.games).find((g) => g.id === id),
+    [library.games, groups.groups],
+  );
+  const collectionDone = useCallback((error: boolean, message: string) => {
     setNotice({ error, key: Date.now(), message });
-  };
+  }, []);
+  useEffect(() => {
+    const el = asideRef.current;
+    if (!el) return;
+    const onCommand = (e: Event) => {
+      const ce = e as CustomEvent<{ command: "favorite" | "menu" }>;
+      const targetIds = selection.size > 0 ? [...selection] : activeId ? [activeId] : [];
+      if (ce.detail?.command === "favorite") {
+        if (targetIds.length === 0) return;
+        ce.preventDefault();
+        const allFav = targetIds.every((id) => knownGame(id)?.favorite);
+        void call("game.favorite.set", { gameIds: targetIds, favorite: !allFav })
+          .then(() => {
+            library.refresh();
+          })
+          .catch(() => {
+            collectionDone(true, s.loadError);
+          });
+      }
+      // Menu na linha: no Slint abre o Gerenciar daquele jogo (`Action::More`); a linha da web ainda não tem esse
+      // menu. TODO(WEB-05b): ligar quando houver.
+
+    };
+    el.addEventListener(COMMAND_EVENT, onCommand);
+    return () => el.removeEventListener(COMMAND_EVENT, onCommand);
+  }, [selection, activeId, library, knownGame, collectionDone]);
   const empty =
     criteria.search.trim() || count > Number(criteria.collection !== null)
       ? listLabels.empty
@@ -124,6 +157,7 @@ export function ColunaDaLista({
   return (
     <>
       <aside
+        ref={asideRef}
         inert={!shown}
         className={cx(styles["side"], collapsed && styles["collapsed"], !shown && styles["hidden"])}
         aria-label={strings.list.label}

@@ -494,3 +494,82 @@ fn profiles_come_from_the_settings_of_the_profile_in_use() {
         [InputOutput::Central]
     );
 }
+
+#[test]
+fn battery_warning_is_delayed_behind_the_game() {
+    let mut b = InputBridge::new(Profiles::default());
+    b.update(connect("Xbox Controller", PadFamily::Xbox, 1), ms(0));
+    // Jogo abrindo com a página ainda aberta ("Abrindo…"): não lê nem emite bateria.
+    b.set_scene(InputScene {
+        listening: true,
+        playing: true,
+        over_game: false,
+    });
+    assert!(!b.wants_battery(ms(0)));
+    let out = b.update(
+        PadFrame {
+            battery: Some(BatteryReading {
+                active: Some(15),
+                low: vec![("Xbox Controller".into(), 15)],
+            }),
+            ..frame(B::NONE)
+        },
+        ms(16),
+    );
+    assert!(notices(&out).is_empty());
+
+    // Interface volta a ser navegável (jogo terminou ou Central por cima do jogo): agora lê e emite.
+    b.set_scene(OPEN);
+    assert!(b.wants_battery(ms(32)));
+    let out = b.update(
+        PadFrame {
+            battery: Some(BatteryReading {
+                active: Some(15),
+                low: vec![("Xbox Controller".into(), 15)],
+            }),
+            ..frame(B::NONE)
+        },
+        ms(48),
+    );
+    assert_eq!(
+        notices(&out),
+        [InputNotice {
+            kind: InputNoticeKind::BatteryLow,
+            pad: Some("Xbox Controller".into()),
+            percent: Some(15),
+        }]
+    );
+}
+
+#[test]
+fn input_source_call_and_switching_back_to_keyboard_suppresses_disconnect_notice() {
+    let mut app = AppService::new("1");
+    assert!(!app.using_pad());
+    let req: tako_app::protocol::Request =
+        serde_json::from_str(r#"{"v":1,"id":1,"name":"input.source","payload":{"pad":true}}"#)
+            .unwrap();
+    assert_eq!(
+        req.call,
+        tako_app::protocol::Call::InputSource(tako_app::protocol::InputSource { pad: true })
+    );
+    let reply = app.handle(req.call).unwrap();
+    assert_eq!(reply, tako_app::protocol::Reply::InputSource);
+    assert!(app.using_pad());
+
+    let req_kb: tako_app::protocol::Request =
+        serde_json::from_str(r#"{"v":1,"id":2,"name":"input.source","payload":{"pad":false}}"#)
+            .unwrap();
+    app.handle(req_kb.call).unwrap();
+    assert!(!app.using_pad());
+
+    // Na ponte: com using_pad = false, desconectar o controle não gera aviso.
+    let mut b = InputBridge::new(Profiles::default());
+    b.set_scene(OPEN);
+    b.update(connect("Xbox Controller", PadFamily::Xbox, 1), ms(0));
+    assert!(b.using_pad());
+    // Interface avisa que o usuário voltou para teclado/mouse:
+    b.set_using_pad(false);
+    assert!(!b.using_pad());
+    let out = b.update(disconnect(0), ms(100));
+    assert!(notices(&out).is_empty());
+}

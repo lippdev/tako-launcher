@@ -101,6 +101,7 @@ const defaults: FakeHandlers = {
     uiState = state as UiState;
     sessionStorage.setItem("tako.dev.ui.state", uiState.json ?? "");
   },
+  "input.source": () => {},
 };
 
 /** Instala o hospedeiro falso se não houver um de verdade. Devolve uma função para emitir eventos. */

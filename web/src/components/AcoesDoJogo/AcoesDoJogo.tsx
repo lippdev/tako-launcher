@@ -97,6 +97,7 @@ export function AcoesDoJogo({
             ref={setAncora}
             variant="secondary"
             icon="gear"
+            data-command-menu=""
             aria-haspopup="menu"
             aria-expanded={menuAberto}
             onClick={() => {

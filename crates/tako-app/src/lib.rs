@@ -70,6 +70,8 @@ pub struct AppService {
     pending_link: Option<tako_core::links::Link>,
     /// API local de integração (WEB-34): só existe com a chave ligada.
     local_api: local_api::WebApi,
+    /// A última entrada vista foi do controle (WEB-05b).
+    using_pad: bool,
 }
 
 impl AppService {
@@ -83,6 +85,7 @@ impl AppService {
             controller: protocol::ControllerInfo::default(),
             pending_link: None,
             local_api: local_api::WebApi::default(),
+            using_pad: false,
         }
     }
 
@@ -170,6 +173,10 @@ impl AppService {
             Call::GameResume => self.resume(),
             Call::GameEnd(request) => self.end_game(request),
             Call::InputController => Ok(Reply::InputController(self.controller.clone())),
+            Call::InputSource(request) => {
+                self.set_using_pad(request.pad);
+                Ok(Reply::InputSource)
+            }
             Call::LibraryScan => {
                 let core = self
                     .core

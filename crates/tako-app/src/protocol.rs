@@ -109,6 +109,7 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "updates.preferences"
             | "updates.preferences.set"
             | "input.controller"
+            | "input.source"
     ) {
         return Err((
             header.id,
@@ -553,6 +554,13 @@ pub enum Call {
     /// Controle em uso agora (WEB-05b): conectado, estilo dos botões e bateria. Muda pelo evento `input.controller`.
     #[serde(rename = "input.controller")]
     InputController,
+    /// Origem da entrada (WEB-05b): a interface avisa quando o usuário usa o controle ou volta a teclado e mouse.
+    #[serde(rename = "input.source")]
+    InputSource(
+        #[serde(with = "object_payload")]
+        #[ts(as = "InputSource")]
+        InputSource,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -690,6 +698,8 @@ pub enum Reply {
     UpdatesPreferencesSet(UpdatePrefs),
     #[serde(rename = "input.controller")]
     InputController(ControllerInfo),
+    #[serde(rename = "input.source")]
+    InputSource,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -2338,4 +2348,12 @@ pub struct InputNotice {
     /// Nome do controle (bateria fraca).
     pub pad: Option<String>,
     pub percent: Option<i32>,
+}
+
+/// Origem da entrada (WEB-05b): se a pessoa está usando controle ou teclado e mouse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct InputSource {
+    pub pad: bool,
 }

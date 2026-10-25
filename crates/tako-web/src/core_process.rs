@@ -83,6 +83,16 @@ pub enum Command {
     /// Outro Tako foi aberto (WEB-34): o segundo `tako --web`, ou um `tako://` aberto com o Tako já rodando. Vem
     /// para a frente e, se houver link, executa.
     Activation(Activation),
+    /// A thread do controle foi iniciada: guarda para sinalizar parada e esperar no fim.
+    #[allow(dead_code)]
+    InputThread(PadsThread),
+}
+
+/// Thread dos controles (SDL3): guarda o handle e o sinalizador de parada para aguardar o encerramento.
+#[allow(dead_code)]
+pub struct PadsThread {
+    pub handle: std::thread::JoinHandle<()>,
+    pub stop: Arc<AtomicBool>,
 }
 
 /// Ligação do núcleo com a thread do controle (SDL3).
@@ -97,6 +107,7 @@ pub struct InputLink {
 pub enum InputControl {
     Scene(InputScene),
     Profiles(Profiles),
+    Source(bool),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -496,7 +507,13 @@ pub fn run<L: UiLauncher>(
             Some(Command::Hide) => host.hide(Instant::now()),
             Some(Command::Show) => host.show = true,
             Some(Command::Input(output)) => input.output(output, &mut host, &mut service),
-            Some(Command::InputAttach(link)) => input.attach(link),
+            Some(Command::InputAttach(link)) => {
+                input.attach(link);
+                input.sync(&host, &service, false);
+            }
+            Some(Command::InputThread(thread)) => {
+                input.thread = Some(thread);
+            }
             Some(Command::Link(link) | Command::Activation(Activation::Open(link))) => {
                 let outcome = service.open_link(link);
                 host.after_link(outcome, Instant::now());
@@ -550,6 +567,7 @@ pub fn run<L: UiLauncher>(
         service.install_update_on_exit();
     }
     drop(service);
+    input.shutdown();
     relay_stop.store(true, Ordering::Relaxed);
     let _ = host_wake.send(HostRequest::PollBackground);
     // Liberar o receptor antes do join evita reter um relay bloqueado.
@@ -646,8 +664,10 @@ impl UiProcess for ExeProcess {
 #[derive(Default)]
 struct InputSync {
     link: Option<InputLink>,
+    thread: Option<PadsThread>,
     scene: Option<InputScene>,
     profiles: Option<Profiles>,
+    using_pad: Option<bool>,
     /// A interface foi reaberta por cima do jogo pela combinação da Central.
     over_game: bool,
 }
@@ -658,6 +678,7 @@ impl InputSync {
         self.link = Some(link);
         self.scene = None;
         self.profiles = None;
+        self.using_pad = None;
     }
 
     fn output<L: UiLauncher>(
@@ -666,12 +687,21 @@ impl InputSync {
         host: &mut Host<L>,
         service: &mut AppService,
     ) {
+        let playing = service.game_active();
+        if !playing || (host.ui.is_none() && !host.show) {
+            self.over_game = false;
+        }
+        let scene = InputScene {
+            listening: host.listening(),
+            playing,
+            over_game: self.over_game,
+        };
         match output {
             // Guardado também sem interface: ao reabrir, a página pergunta `input.controller`.
             InputOutput::Event(Event::InputController(info)) => service.set_controller(info),
-            // Comandos e avisos só com a interface aberta (D-10): fechada, nada vai para ela.
+            // Comandos e avisos só com a interface aberta e sem jogo à frente (D-10): fechada ou atrás do jogo, nada vai para ela.
             InputOutput::Event(event) => {
-                if host.listening() {
+                if scene.navigable() {
                     service.emit(event);
                 }
             }
@@ -720,8 +750,34 @@ impl InputSync {
                 changed |= link.control.send(InputControl::Profiles(profiles)).is_ok();
             }
         }
+        let using_pad = service.using_pad();
+        if self.using_pad != Some(using_pad) {
+            self.using_pad = Some(using_pad);
+            changed |= link.control.send(InputControl::Source(using_pad)).is_ok();
+        }
         if changed {
             (link.wake)();
+        }
+    }
+
+    fn shutdown(&mut self) {
+        let Some(thread) = self.thread.take() else {
+            return;
+        };
+        thread.stop.store(true, Ordering::Relaxed);
+        if let Some(link) = &self.link {
+            (link.wake)();
+        }
+        let (done_tx, done_rx) = mpsc::channel();
+        let handle = thread.handle;
+        std::thread::spawn(move || {
+            let res = handle.join();
+            let _ = done_tx.send(res);
+        });
+        match done_rx.recv_timeout(Duration::from_secs(2)) {
+            Ok(Ok(())) => tracing::info!("thread dos controles encerrada"),
+            Ok(Err(_)) => tracing::warn!("thread dos controles encerrou com pânico"),
+            Err(_) => tracing::warn!("thread dos controles não encerrou no prazo de 2 s"),
         }
     }
 }
@@ -733,6 +789,9 @@ pub fn spawn_pads(tx: mpsc::Sender<Command>) {
     use tako_app::input::{BatteryReading, InputBridge, PadChange, PadFrame};
     use tako_platform::gamepad::{PadEvent, Pads};
 
+    let stop = Arc::new(AtomicBool::new(false));
+    let stopped = stop.clone();
+    let input_tx = tx.clone();
     let thread = std::thread::Builder::new()
         .name("tako-pads".into())
         .spawn(move || {
@@ -752,17 +811,21 @@ pub fn spawn_pads(tx: mpsc::Sender<Command>) {
                 control: control_tx,
                 wake,
             };
-            if tx.send(Command::InputAttach(link)).is_err() {
+            if input_tx.send(Command::InputAttach(link)).is_err() {
                 return;
             }
             let mut bridge = InputBridge::new(Profiles::default());
             let started = Instant::now();
-            loop {
+            while !stopped.load(Ordering::Relaxed) {
                 let events = pads.wait(bridge.timeout());
+                if stopped.load(Ordering::Relaxed) {
+                    break;
+                }
                 loop {
                     match control.try_recv() {
                         Ok(InputControl::Scene(scene)) => bridge.set_scene(scene),
                         Ok(InputControl::Profiles(profiles)) => bridge.set_profiles(profiles),
+                        Ok(InputControl::Source(pad)) => bridge.set_using_pad(pad),
                         Err(mpsc::TryRecvError::Empty) => break,
                         Err(mpsc::TryRecvError::Disconnected) => return,
                     }
@@ -803,14 +866,19 @@ pub fn spawn_pads(tx: mpsc::Sender<Command>) {
                     if let InputOutput::Event(Event::InputNav(nav)) = &output {
                         tracing::debug!(?nav, "comando do controle");
                     }
-                    if tx.send(Command::Input(output)).is_err() {
+                    if input_tx.send(Command::Input(output)).is_err() {
                         return;
                     }
                 }
             }
         });
-    if let Err(error) = thread {
-        tracing::warn!(%error, "thread dos controles");
+    match thread {
+        Ok(handle) => {
+            let _ = tx.send(Command::InputThread(PadsThread { handle, stop }));
+        }
+        Err(error) => {
+            tracing::warn!(%error, "thread dos controles");
+        }
     }
 }
 
@@ -1430,6 +1498,93 @@ mod tests {
         )
         .unwrap();
         assert!(rx.recv_timeout(2 * ACTIVATION_EVERY).is_err());
+    }
+
+    #[test]
+    fn delayed_nav_event_is_discarded_when_game_is_active() {
+        let ((launched, control, core), _dir) = start_demo();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":1,"name":"app.info"}"#);
+        until(&mut ui, answer(1));
+
+        ui.request(r#"{"v":1,"id":2,"name":"game.play","payload":{"gameId":"steam:demo0"}}"#);
+        assert_eq!(until(&mut ui, answer(2))["ok"], true);
+        // Só depois de o jogo começar: o comando foi lido antes, mas chega com o jogo já na frente.
+        until(&mut ui, |m| m["event"]["name"] == "game.started");
+
+        control
+            .send(nav(tako_app::protocol::InputAction::Down))
+            .unwrap();
+
+        let mut got_nav = false;
+        loop {
+            match ui.next() {
+                Some(CoreMsg::Close) => break,
+                Some(CoreMsg::Deliver { messages, .. }) => {
+                    for m in messages {
+                        if m.contains("input.nav") {
+                            got_nav = true;
+                        }
+                    }
+                }
+                None => panic!("canal fechado"),
+            }
+        }
+        assert!(
+            !got_nav,
+            "o evento de navegação atrasado não devia ter sido entregue"
+        );
+        ui.exit(0);
+
+        control.send(Command::Show).unwrap();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":3,"name":"game.end","payload":{"force":true}}"#);
+        until(&mut ui, answer(3));
+        ui.send(&UiMsg::UserClosed);
+        ui.exit(0);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !core.is_finished() {
+            if let Ok(ui) = launched.try_recv() {
+                ui.send_closed_and_exit();
+            }
+            assert!(Instant::now() < deadline, "o app não terminou");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(core.join().unwrap(), Ok(()));
+    }
+
+    #[test]
+    fn shutdown_signals_and_joins_pads_thread() {
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_clone = stop.clone();
+        let woken = Arc::new(AtomicBool::new(false));
+        let woken_clone = woken.clone();
+        let handle = std::thread::spawn(move || {
+            while !stop_clone.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        });
+        let (control_tx, _control_rx) = mpsc::channel();
+        let mut sync = InputSync {
+            link: Some(InputLink {
+                control: control_tx,
+                wake: Box::new(move || {
+                    woken_clone.store(true, Ordering::Relaxed);
+                }),
+            }),
+            thread: Some(PadsThread {
+                handle,
+                stop: stop.clone(),
+            }),
+            scene: None,
+            profiles: None,
+            using_pad: None,
+            over_game: false,
+        };
+        sync.shutdown();
+        assert!(stop.load(Ordering::Relaxed));
+        assert!(woken.load(Ordering::Relaxed));
+        assert!(sync.thread.is_none());
     }
 
     impl FakeUi {

@@ -33,6 +33,7 @@ import {
 } from "./jogoModel";
 import { useDevImages } from "./useDevImages";
 import { useGameDetails } from "./useGameDetails";
+import { COMMAND_EVENT } from "../../focus";
 import styles from "./PaginaDoJogo.module.css";
 
 interface PaginaDoJogoProps {
@@ -116,6 +117,30 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
 
   const blocks = useMemo(() => (shown ? gameBlocks(shown) : null), [shown]);
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !shown) return;
+    const { game } = shown;
+    const onCommand = (e: Event) => {
+      const ce = e as CustomEvent<{ command: "favorite" | "menu" }>;
+      if (ce.detail?.command === "favorite") {
+        ce.preventDefault();
+        void call("game.favorite.set", { gameIds: [game.id], favorite: !game.favorite })
+          .then(() => refresh())
+          .catch((err) => console.error("página do jogo", err));
+      } else if (ce.detail?.command === "menu") {
+        // Como no Slint (`Action::More`): o Menu do controle abre o Gerenciar do jogo.
+        const manage = el.querySelector<HTMLButtonElement>("[data-command-menu]");
+        if (manage) {
+          ce.preventDefault();
+          manage.click();
+        }
+      }
+    };
+    el.addEventListener(COMMAND_EVENT, onCommand);
+    return () => el.removeEventListener(COMMAND_EVENT, onCommand);
+  }, [shown, refresh]);
+
   if (!shown || !blocks) {
     return (
       <div className={styles["pagina"]}>
@@ -138,6 +163,8 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   }
 
   const { game } = shown;
+
+
   const showNotice = (tone: AvisoTone, text: string) => {
     setNotice({ open: true, tone, text, key: Date.now() });
   };

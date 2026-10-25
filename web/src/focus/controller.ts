@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import { call, on } from "../bridge";
 import type { ControllerInfo } from "../bridge/generated/ControllerInfo";
 import type { InputNotice } from "../bridge/generated/InputNotice";
+import { shouldDropEcho } from "./echo";
 import { dispatchNavAction } from "./engine";
 import { actionForInput } from "./keymap";
 
@@ -34,7 +35,9 @@ function setInfo(next: ControllerInfo): void {
 export function startController(): () => void {
   const offs = [
     on("input.nav", (nav) => {
-      dispatchNavAction(actionForInput(nav.action), "controller", nav.repeat);
+      const action = actionForInput(nav.action);
+      if (shouldDropEcho(action, "controller")) return;
+      dispatchNavAction(action, "controller", nav.repeat);
     }),
     on("input.controller", (next) => {
       version += 1;

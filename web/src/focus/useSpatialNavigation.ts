@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLatest } from "../lib/useLatest";
+import { shouldDropEcho } from "./echo";
 import {
   dispatchNavAction,
   isTextEntry,
@@ -48,6 +49,12 @@ export function useSpatialNavigation(onBack: () => boolean): void {
       const { key, ctrlKey, altKey, metaKey, shiftKey } = event;
       const action = actionForKey({ key, ctrlKey, altKey, metaKey, shiftKey, typing });
       if (!action) return;
+
+      if (shouldDropEcho(action, "keyboard")) {
+        setInputSource("controller");
+        event.preventDefault();
+        return;
+      }
 
       if (typing && target) {
         // Num campo, ← e → são do texto até o cursor chegar à ponta; ↑ ↓ não têm uso no texto de uma linha.

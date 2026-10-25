@@ -137,6 +137,7 @@ impl InputBridge {
     pub fn set_scene(&mut self, scene: InputScene) {
         if scene.navigable() && !self.scene.navigable() {
             self.interp.reset();
+            self.next_battery = None;
         }
         self.scene = scene;
     }
@@ -147,6 +148,15 @@ impl InputBridge {
 
     pub fn info(&self) -> &ControllerInfo {
         &self.info
+    }
+
+    /// Origem da entrada (WEB-05b): a interface avisa quando a pessoa usa teclado e mouse.
+    pub fn set_using_pad(&mut self, using: bool) {
+        self.using_pad = using;
+    }
+
+    pub fn using_pad(&self) -> bool {
+        self.using_pad
     }
 
     /// Quanto esperar pelo próximo evento do SDL antes de uma volta sem evento.
@@ -160,9 +170,11 @@ impl InputBridge {
         }
     }
 
-    /// Hora de ler a bateria (só com a interface aberta: fechada, o aviso espera por ela, como no Slint).
+    /// Hora de ler a bateria (só com a interface aberta e sem jogo à frente: fechada, o aviso espera por ela, como no Slint).
     pub fn wants_battery(&self, now: Duration) -> bool {
-        self.scene.listening && self.info.count > 0 && self.next_battery.is_none_or(|at| now >= at)
+        self.scene.navigable()
+            && self.info.count > 0
+            && self.next_battery.is_none_or(|at| now >= at)
     }
 
     /// Uma leitura. `now`: relógio monotônico de quem chama.
@@ -205,9 +217,9 @@ impl InputBridge {
             self.info.battery = None;
         }
         if let Some(battery) = frame.battery {
-            self.next_battery = Some(now + Self::BATTERY_EVERY);
             self.info.battery = battery.active;
-            if self.scene.listening {
+            if self.scene.navigable() {
+                self.next_battery = Some(now + Self::BATTERY_EVERY);
                 for (pad, percent) in battery.low {
                     out.push(Event::InputNotice(InputNotice {
                         kind: InputNoticeKind::BatteryLow,
@@ -306,5 +318,14 @@ impl AppService {
             Some(core) => Profiles::load(|key| core.setting(key).map(str::to_owned)),
             None => Profiles::default(),
         }
+    }
+
+    /// A última entrada vista foi do controle (WEB-05b).
+    pub fn using_pad(&self) -> bool {
+        self.using_pad
+    }
+
+    pub fn set_using_pad(&mut self, pad: bool) {
+        self.using_pad = pad;
     }
 }
