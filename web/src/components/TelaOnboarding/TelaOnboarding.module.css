@@ -1,0 +1,112 @@
+/* Medidas da TelaOnboarding (design/desktop/components/TelaOnboarding/README.md) */
+.frame {
+  --onboarding-mural-width: 980px;
+  --onboarding-mural-height: 1100px;
+  --onboarding-mural-rotation: -8deg;
+  --onboarding-content-width: 600px;
+  --onboarding-content-left: 96px;
+  --onboarding-content-top: 150px;
+  --onboarding-brand-left: 56px;
+  --onboarding-brand-top: 28px;
+  --onboarding-skip-right: 48px;
+  --onboarding-skip-top: 36px;
+
+  position: relative;
+  width: 100%;
+  min-height: 900px;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(1200px 520px at 0% 0%, var(--ambient-1), transparent 60%), var(--canvas);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+/* Mural de capas inclinado à direita */
+.mural {
+  position: absolute;
+  right: -120px;
+  top: -80px;
+  width: var(--onboarding-mural-width);
+  height: var(--onboarding-mural-height);
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  transform: rotate(var(--onboarding-mural-rotation));
+  opacity: 0.3;
+  -webkit-mask-image: linear-gradient(90deg, transparent, var(--text) 45%);
+  mask-image: linear-gradient(90deg, transparent, var(--text) 45%);
+  pointer-events: none;
+}
+
+.muralCard {
+  display: block;
+  aspect-ratio: 3 / 4;
+  border-radius: 11px;
+  background-color: color-mix(in srgb, var(--text) 8%, transparent);
+  background-position: center;
+  background-size: cover;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.muralScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--canvas) 38%, transparent 75%);
+  pointer-events: none;
+}
+
+/* Marca TAKO */
+.brandContainer {
+  position: absolute;
+  left: var(--onboarding-brand-left);
+  top: var(--onboarding-brand-top);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  z-index: 2;
+}
+
+/* Botão de pular configuração */
+.skipButton {
+  position: absolute;
+  right: var(--onboarding-skip-right);
+  top: var(--onboarding-skip-top);
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: color var(--tempo-hover) var(--curva-estado);
+  z-index: 2;
+}
+
+.skipButton:hover {
+  color: var(--text);
+}
+
+.skipButton:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Coluna de conteúdo do passo */
+.contentColumn {
+  position: absolute;
+  left: var(--onboarding-content-left);
+  top: var(--onboarding-content-top);
+  width: var(--onboarding-content-width);
+  max-width: calc(100% - var(--onboarding-content-left) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skipButton {
+    transition: none;
+  }
+}

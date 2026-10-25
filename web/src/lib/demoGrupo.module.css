@@ -1,0 +1,21 @@
+/* Layout das demos da galeria (não é tela do app). */
+.grupo {
+  margin-bottom: var(--space-24);
+}
+
+.titulo {
+  margin: 0 0 var(--space-12);
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.fileira {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-16);
+}

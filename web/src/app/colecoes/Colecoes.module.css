@@ -1,0 +1,83 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.text {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.create {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+}
+
+.createField {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Alinha o botão ao campo, que tem o rótulo em cima. */
+.createButton {
+  margin-top: var(--space-24);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: var(--space-16) 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  background: var(--tile);
+}
+
+.name {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.kind {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.renameForm {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--space-8);
+}
+
+.empty {
+  margin: var(--space-16) 0 0;
+  color: var(--text-muted);
+}

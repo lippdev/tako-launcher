@@ -1,0 +1,77 @@
+/* AtividadeNaBarra: botão de downloads da barra de ferramentas (README do AtividadeNaBarra) */
+
+.btn {
+  composes: ring from "../../lib/focus.module.css";
+  height: var(--tb-btn-height);
+  min-width: var(--tb-btn-min-width);
+  padding: var(--tb-btn-padding);
+  border-radius: var(--tb-btn-radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  font-family: var(--font-text);
+  font-size: var(--tb-btn-font-size);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.btn:hover,
+.btn[data-force="hover"] {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.btn[data-force="pressed"],
+.btn:active,
+.btn.aberto {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.pct {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.badge {
+  position: absolute;
+  top: var(--badge-top);
+  right: var(--badge-right);
+  min-width: var(--badge-size);
+  height: var(--badge-size);
+  border-radius: var(--badge-radius);
+  background: var(--accent);
+  color: var(--badge-text-color);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0 var(--space-4);
+  border: var(--badge-border) solid var(--titlebar);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.pop {
+  animation: tk-pop var(--tempo-pop) var(--ease);
+}
+
+@keyframes tk-pop {
+  40% {
+    transform: scale(1.35);
+  }
+}

@@ -14,7 +14,7 @@ Ordem de verdade (PRD v0.2 §0): o PRD, depois as ADRs a partir da 0023. As ADRs
 - [ADR-0020](0020-organizacao-das-configuracoes.md): Configurações em categorias, menu Modo Console com cartões e assistente, e layout que não corta (rolagem e barra de dicas) (histórico, implementação C#).
 - [ADR-0021](0021-metadados-igdb.md): metadados pela IGDB com a chave da Twitch de cada usuário (sem proxy) e combinação por campo entre N provedores pela prioridade do tipo de jogo (histórico, implementação C#).
 - [ADR-0022](0022-metadados-screenscraper.md): ScreenScraper para ROMs, com a conta de cada usuário e as credenciais do software só no build de release (segredos do CI); hash da ROM, mídia sem credenciais no disco e ROM no "Adicionar jogo" sem abrir (histórico, implementação C#).
-- [ADR-0023](0023-slint-gate.md): Slint na interface e resultado do gate do MIG-001 (Aceita, números de referência pendentes).
+- [ADR-0023](0023-slint-gate.md): Slint na interface e resultado do gate do MIG-001 (interface substituída pelo ADR-0035; o processo da interface terminar durante o jogo continua valendo).
 - [ADR-0024](0024-matriz-de-plataforma.md): matriz real de suporte das funções de plataforma por SO (MIG-002).
 - [ADR-0025](0025-fronteira-com-o-console-mode.md): fronteira entre o Tako e o Console Mode e contrato da futura API (Aceita).
 - [ADR-0026](0026-supervisor-e-processo-durante-o-jogo.md): supervisor e processo do Tako durante o jogo (Aceita).
@@ -23,3 +23,4 @@ Ordem de verdade (PRD v0.2 §0): o PRD, depois as ADRs a partir da 0023. As ADRs
 - [ADR-0029](0029-jogos-da-conta-ubisoft-ea-amazon-windows.md): jogos da conta não instalados da Amazon no Windows pelo DPAPI do usuário; Ubisoft depois de um spike com arquivos reais; EA sem lista legível offline (Proposta).
 - [ADR-0033](0033-api-local-de-integracao.md): API local de integração (EXT-002): transporte HTTP/1.1 restrito a 127.0.0.1, autenticação Bearer token local, endpoints de leitura e ação, e desacoplamento para eventos de sessão (Proposta).
 - [ADR-0034](0034-integracao-sunshine-moonlight.md): exportação local e confirmada da biblioteca ao Sunshine/Apollo; Moonlight como cliente (Aceita).
+- [ADR-0035](0035-interface-web-rust-e-chromium.md): interface web (React sobre Chromium embutido, modelo do Steam) com o núcleo em Rust; motivos, alternativas, ponte tipada, interface descartável e instalador por componentes (Aceita; motor do Windows e metas finais no gate do MIG-W01).

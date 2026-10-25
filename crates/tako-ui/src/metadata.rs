@@ -9,18 +9,9 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tako_core::library::{Game, GameLibrary, system_clock};
-use tako_core::metadata::MetadataProvider;
 use tako_core::metadata::agent::{MetadataAgent, PinnedIds};
 use tako_core::metadata::art_catalog::ArtCatalog;
 use tako_core::metadata::cache::MetadataCache;
-use tako_core::metadata::http::{Clock, FileCache, Http, SystemClock, UreqHttp};
-use tako_core::metadata::igdb::{IgdbClient, IgdbProvider};
-use tako_core::metadata::rom_hash::RomHashCache;
-use tako_core::metadata::screenscraper::{
-    ScreenScraperClient, ScreenScraperProvider, ScreenScraperSoftware,
-};
-use tako_core::metadata::steam_store::SteamStoreProvider;
-use tako_core::metadata::steamgriddb::{SteamGridDbClient, SteamGridDbProvider};
 use tako_core::metadata::worker::{MetadataUpdated, MetadataWorker, SPACING};
 
 /// Fontes ligadas (busca, ids e imagens) e a fila em segundo plano.
@@ -215,66 +206,14 @@ fn install_enrich(ctx: &mut Ctx) {
 /// Provedores pelas chaves e opções que as Configurações gravam no cofre.
 // shortcut: chaves lidas ao ligar; depois de salvar uma chave, chamar `start_metadata` de novo.
 fn build(ctx: &Ctx) -> (Metadata, Receiver<MetadataUpdated>) {
-    let http: Arc<dyn Http> = Arc::new(UreqHttp::new(Duration::from_secs(20)));
-    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
-    let cache_dir = ctx.paths.cache();
-    let week = Duration::from_secs(7 * 24 * 3600);
-    let file_cache = |name: &str| -> Option<Box<dyn tako_core::metadata::http::ResponseCache>> {
-        Some(Box::new(FileCache::new(cache_dir.join(name), week)))
-    };
-
-    // Mesma leitura (em cache) das Configurações › Capas e metadados: chaves e ligado/desligado no cofre.
     let crate::shell::settings::metadata::Providers { igdb, ss, sgdb } =
         crate::shell::settings::metadata::providers(ctx);
-
-    let igdb = Arc::new(IgdbProvider::new(
-        IgdbClient::new(
-            http.clone(),
-            Arc::new(move || igdb.clone()),
-            clock.clone(),
-            file_cache("igdb"),
-        ),
-        clock.clone(),
-    ));
-    let screenscraper = Arc::new(ScreenScraperProvider::new(
-        Arc::new(ScreenScraperClient::new(
-            http.clone(),
-            ScreenScraperSoftware::from_build(),
-            Arc::new(move || ss.clone()),
-            clock.clone(),
-            file_cache("screenscraper"),
-        )),
-        RomHashCache::new(Some(cache_dir.join("rom-hashes.json"))),
-        clock.clone(),
-    ));
-    let steamgriddb = Arc::new(SteamGridDbProvider::new(
-        SteamGridDbClient::new(
-            http.clone(),
-            Arc::new(move || sgdb.clone()),
-            clock.clone(),
-            file_cache("steamgriddb"),
-        ),
-        clock.clone(),
-    ));
-    let providers: Vec<Arc<dyn MetadataProvider>> = vec![
-        Arc::new(SteamStoreProvider::new(http)),
-        igdb.clone(),
-        screenscraper.clone(),
-        steamgriddb.clone(),
-    ];
-    let (worker, rx) = MetadataWorker::spawn(
-        MetadataAgent::new(providers.clone(), clock.clone()),
-        cache(ctx),
-        SPACING,
-    );
+    let sources =
+        tako_core::metadata::runtime::sources(&ctx.paths, igdb, ss, sgdb, picture_folders());
+    let (worker, rx) = MetadataWorker::spawn(sources.agent(), cache(ctx), SPACING);
     let metadata = Metadata {
-        agent: Arc::new(MetadataAgent::new(providers, clock)),
-        catalog: Arc::new(ArtCatalog {
-            igdb: Some(igdb),
-            screenscraper: Some(screenscraper),
-            steamgriddb: Some(steamgriddb),
-            picture_folders: picture_folders(),
-        }),
+        agent: Arc::new(sources.agent()),
+        catalog: Arc::new(sources.catalog),
         worker: Some(worker),
         poll: slint::Timer::default(),
     };

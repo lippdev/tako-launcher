@@ -11,12 +11,16 @@ use tako_core::devices::{
 };
 
 pub mod console_mode;
+pub mod control_center;
 pub mod downloads;
 pub mod exe_icon;
 pub mod fse;
+#[cfg(feature = "gamepad")]
+pub mod gamepad;
 pub mod secrets;
 pub mod space;
 pub mod sunshine;
+pub mod tray;
 pub mod usage;
 
 /// Copia um texto para a área de transferência do sistema.

@@ -23,3 +23,7 @@ invalid_name = "Type a name with 1 to 32 characters."
 duplicate_name = "There's already a profile with that name."
 too_many = "Tako allows up to 8 profiles."
 save_failed = "Couldn't save the profiles."
+
+[profiles.web]
+next_open = "On next launch"
+restart_notice = "Profile {name} will be used when you reopen Tako."

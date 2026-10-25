@@ -9,6 +9,14 @@ text = "Salve uma combinação de filtros na biblioteca. Selecione uma coleção
 delete_title = "Excluir {name}?"
 delete_text = "Só a coleção será excluída. Os jogos continuam na biblioteca."
 play_time = "Tempo jogado"
+rename = "Renomear {name}"
+rename_title = "Renomear a coleção automática"
+name_label = "Nome da coleção"
+renamed = "Coleção renomeada."
+deleted = "Coleção excluída."
+load_error = "Não foi possível ler as coleções automáticas."
+save_error = "Não foi possível salvar a coleção."
+remove = "Excluir {name}"
 
 [smart.time]
 any = "Qualquer tempo"

@@ -1,0 +1,210 @@
+/* A coluna da lista (README da TelaBiblioteca, JanelaPequena e TrocaDeTela): 292 aberta, 76 recolhida, 0 fora da
+   biblioteca. A largura muda de uma vez; quem anima é o conteúdo ao lado, por `transform` (AppShell), e o fade
+   da coluna. Só `transform` e `opacity` animam. */
+
+.side {
+  --side-width: var(--list-width);
+  --side-padding-top: calc(var(--topbar-height) + 14px);
+
+  position: relative;
+  z-index: 5;
+  flex: none;
+  width: var(--side-width);
+}
+
+.collapsed {
+  --side-width: var(--list-collapsed-width);
+}
+
+.hidden {
+  --side-width: 0px;
+}
+
+/* O miolo tem a largura da coluna aberta (ou recolhida) mesmo com a coluna em 0: ao esconder, ele só some em fade. */
+.inner {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  width: var(--list-width);
+  padding: var(--side-padding-top) 0 10px;
+  border-right: 1px solid transparent;
+  opacity: 1;
+  transition: opacity var(--tempo-lista) var(--curva-entrada);
+}
+
+.collapsed .inner {
+  width: var(--list-collapsed-width);
+}
+
+.hidden .inner {
+  opacity: 0;
+}
+
+/* Fora do TAKO a coluna tem fundo e linha; no TAKO ela é transparente sobre o canvas. */
+:global(:root[data-theme]:not([data-theme="tako"])) .inner {
+  background: var(--titlebar);
+  border-right-color: var(--line);
+}
+
+.inner > * {
+  margin-right: var(--space-12);
+  margin-left: var(--space-12);
+}
+
+.inner > .games {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.top {
+  display: flex;
+  gap: var(--space-6);
+  margin-top: var(--space-12);
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle {
+  composes: ring from "../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-row);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background-image: radial-gradient(
+    70% 90% at 50% 100%,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    transparent
+  );
+  color: var(--text);
+}
+
+/* Recolhida o botão ocupa a largura toda e o ícone vira para o outro lado (o painel "abre"). */
+.collapsed .toggle {
+  width: 100%;
+}
+
+.collapsed .toggle svg {
+  transform: scaleX(-1);
+}
+
+/* Visão geral: a linha de 42 com o ícone de 28 (46 recolhida). */
+.home {
+  composes: ring from "../lib/focus.module.css";
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  flex: none;
+  height: var(--game-row-height);
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-4);
+  padding: 0 var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-row);
+  background-color: transparent;
+  color: color-mix(in srgb, var(--text) 87%, transparent);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home:hover {
+  background-color: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.home.active {
+  background-color: color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+}
+
+.homeIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--list-icon-size);
+  height: var(--list-icon-size);
+  border-radius: var(--radius-thumb);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.home.active .homeIcon {
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--text);
+}
+
+.homeLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collapsed .home {
+  height: var(--list-row-height-collapsed);
+  padding: 0 var(--space-4);
+  background-color: transparent;
+}
+
+.collapsed .homeIcon {
+  width: var(--list-icon-size-collapsed);
+  height: var(--list-icon-size-collapsed);
+  border-radius: var(--radius-button);
+}
+
+.collapsed .home.active .homeIcon {
+  box-shadow:
+    0 0 0 2px var(--canvas),
+    0 0 0 3px color-mix(in srgb, var(--text) 60%, transparent);
+  background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.homeLine {
+  display: flex;
+  align-items: center;
+}
+.homeLine .home {
+  flex: 1;
+  min-width: 0;
+}
+
+.collectionLine {
+  align-self: flex-start;
+  max-width: calc(var(--list-width) - var(--space-24));
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+}
+.collectionLine .home {
+  height: calc(var(--space-24) + var(--space-4));
+  margin: 0;
+  gap: var(--space-8);
+  font-size: var(--space-12);
+  background: transparent;
+}
+.collectionLine .home .homeIcon {
+  width: var(--space-16);
+  height: var(--space-16);
+  box-shadow: none;
+  background: transparent;
+}
+.collectionLine .toggle {
+  width: var(--space-24);
+  height: var(--space-24);
+}

@@ -1,0 +1,48 @@
+/* CampoDeSelecao: botão de 36, raio 10, `settings-control`, contorno `line-strong`, texto 13/600 e ⇕.
+   `data-force="hover|focus"` só existe para a galeria mostrar o estado parado. */
+
+.sel {
+  composes: ring from "../../lib/focus.module.css";
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: var(--control-height);
+  margin: 0;
+  padding: 0 10px 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-row);
+  background-color: var(--settings-control);
+  color: var(--text);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.sel:hover,
+.sel[data-force="hover"],
+.open {
+  background-color: var(--settings-control-hover);
+}
+
+.sel:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+  background-color: var(--settings-control);
+}
+
+.sel svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.value {
+  min-width: 0;
+}

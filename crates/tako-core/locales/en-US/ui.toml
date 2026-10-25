@@ -196,6 +196,11 @@ not_found = "Game not found"
 screen_failed = "Couldn't use the game screen"
 
 [cc]
+title = "Control center"
+action_error = "Could not apply change. Please try again."
+cpu_time = "Core CPU time"
+memory = "{mib} MiB"
+seconds = "{seconds} s"
 home = "Home"
 more = "More options"
 back_to_game = "Back to game"

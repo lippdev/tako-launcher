@@ -1,0 +1,267 @@
+/* PerfilColecoes (README do PerfilColecoes e preview.html): resumo e ordem
+   (Recentes · A–Z · Mais jogos) e grade de 4 caixas com mosaico 2×2 das capas,
+   nome, quantidade e instalados; selo "Automática" nas coleções inteligentes.
+   Cartões tracejados "Nova coleção" e "Importar coleção" no fim.
+   Sem dado, o bloco some. Animações apenas em transform e opacity. */
+
+.container {
+  /* Medidas de PerfilColecoes (README do PerfilColecoes e preview.html) */
+  --colecoes-grade-gap: 16px;
+  --colecoes-mosaico-altura: 220px;
+  --colecoes-mosaico-raio: 11px;
+  --colecoes-mosaico-gap: 4px;
+  --colecoes-cartao-padding: 8px;
+  --colecoes-cartao-raio: 16px;
+  --colecoes-cartao-min-altura: 290px;
+  --colecoes-selo-ponto: 6px;
+  --colecoes-selo-raio: 6px;
+  --colecoes-selo-padding: 4px 8px;
+  --colecoes-icone-acao: 26px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  width: 100%;
+}
+
+/* Barra superior com resumo à esquerda e seletor segmentado de ordem à direita */
+.barraSuperior {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+}
+
+.resumo {
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.ordemArea {
+  margin-left: auto;
+}
+
+/* Grade de coleções: 4 colunas no desktop, responsivo */
+.grade {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--colecoes-grade-gap);
+}
+
+@media (max-width: 1100px) {
+  .grade {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .grade {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .grade {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Cartão da coleção */
+.cartao {
+  display: flex;
+  flex-direction: column;
+  padding: var(--colecoes-cartao-padding);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--colecoes-cartao-raio);
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  transition:
+    background var(--tempo-hover) var(--curva-entrada),
+    border-color var(--tempo-hover) var(--curva-entrada),
+    transform var(--tempo-hover) var(--curva-entrada);
+}
+
+.cartao:hover {
+  background: var(--surface-raised);
+  border-color: var(--line-strong);
+}
+
+/* Mosaico 2×2 das capas dos jogos */
+.mosaico {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--colecoes-mosaico-gap);
+  height: var(--colecoes-mosaico-altura);
+  border-radius: var(--colecoes-mosaico-raio);
+  overflow: hidden;
+  background: var(--tile);
+}
+
+.mosaicoQuadrante {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--tile-foot);
+  display: grid;
+  place-items: center;
+}
+
+.mosaicoImagem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--tempo-cover) var(--curva-entrada);
+}
+
+.cartao:hover .mosaicoImagem {
+  transform: scale(var(--cover-zoom, 1.05));
+}
+
+.mosaicoPlaceholder {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+/* Rodapé do cartão */
+.cartaoRodape {
+  padding: 12px 8px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-8);
+}
+
+.textos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nome {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detalhe {
+  font-family: var(--font-text);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Selo "Automática" */
+.seloAutomatica {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--colecoes-selo-padding);
+  border-radius: var(--colecoes-selo-raio);
+  font-family: var(--font-text);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.seloPonto {
+  width: var(--colecoes-selo-ponto);
+  height: var(--colecoes-selo-ponto);
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Cartões de ação tracejados (Nova coleção e Importar coleção) */
+.acoesGrade {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--colecoes-grade-gap);
+}
+
+@media (max-width: 1100px) {
+  .acoesGrade {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .acoesGrade {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .acoesGrade {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cartaoAcao {
+  appearance: none;
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--colecoes-cartao-raio);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  min-height: var(--colecoes-cartao-min-altura);
+  padding: var(--space-16);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background var(--tempo-hover) var(--curva-entrada),
+    border-color var(--tempo-hover) var(--curva-entrada),
+    color var(--tempo-hover) var(--curva-entrada);
+}
+
+.cartaoAcao:hover {
+  background: var(--glass-hover);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.acaoConteudo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.acaoIcone {
+  width: var(--colecoes-icone-acao);
+  height: var(--colecoes-icone-acao);
+}
+
+/* Estado vazio */
+.vazio {
+  padding: var(--space-24);
+  text-align: center;
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--colecoes-cartao-raio);
+}

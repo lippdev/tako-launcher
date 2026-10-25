@@ -1,0 +1,149 @@
+/* Medidas do componente ConfiguracoesDoJogo:
+   - --cfg-input-min-width: largura minima do campo de texto inline (140px)
+   - --cfg-input-max-width: largura maxima do campo de texto inline (220px)
+   - --cfg-drawer-width: largura de 480px definida no design system para as configuracoes do jogo
+   Cores exclusivamente provenientes das variaveis do tokens.css. */
+
+.raiz {
+  --cfg-input-min-width: 140px;
+  --cfg-input-max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* Campo de texto inline para opcoes textuais (argumentos, pasta de trabalho, variaveis):
+   utilizado como substituto estilizado do CampoDeTexto (inexistente neste checkout). */
+.campoTexto {
+  composes: ring from "../../lib/focus.module.css";
+  box-sizing: border-box;
+  height: var(--control-height);
+  min-width: var(--cfg-input-min-width);
+  max-width: var(--cfg-input-max-width);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-row);
+  background-color: var(--settings-control);
+  color: var(--text);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado);
+}
+
+.campoTexto:hover {
+  background-color: var(--settings-control-hover);
+}
+
+.campoTexto:focus {
+  background-color: var(--settings-control-hover);
+}
+
+.campoTexto::placeholder {
+  color: var(--text-dim);
+  opacity: 1;
+}
+
+/* Valor de uma linha que só mostra (sem controle): no lugar do campo, na mesma altura. */
+.valorLeitura {
+  max-width: var(--cfg-input-max-width);
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Linha de perigo ("Usar tudo do TAKO"):
+   esconde o icone de chevron padrao para coincidir visualmente com o preview.html */
+.linhaPerigo {
+  display: contents;
+}
+
+.linhaPerigo button svg {
+  display: none;
+}
+
+/* Container do modo inline na galeria de componentes:
+   reproduz o painel lateral com largura fixa de 480px */
+.painelInline {
+  --cfg-drawer-width: 480px;
+  box-sizing: border-box;
+  width: var(--cfg-drawer-width);
+  max-width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+}
+
+.cabecalhoInline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.capaInline {
+  width: 36px;
+  height: 46px;
+  border-radius: var(--space-6);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.titulosInline {
+  flex: 1;
+  min-width: 0;
+}
+
+.tituloInline {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.subtituloInline {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.botaoFecharInline {
+  composes: ring from "../../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-thumb);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-foco) var(--curva-estado),
+    color var(--tempo-foco) var(--curva-estado);
+}
+
+.botaoFecharInline:hover {
+  background-color: var(--glass-hover);
+  color: var(--text);
+}
+
+.corpoInline {
+  box-sizing: border-box;
+  padding: var(--space-16);
+  max-height: 720px;
+  overflow-y: auto;
+}

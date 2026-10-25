@@ -1,0 +1,30 @@
+/* Etiqueta de situação do jogo (protótipo: `badge-st`): 26 de altura, raio 7, 11/800 em caixa alta. */
+
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--chip-bg);
+  backdrop-filter: blur(8px);
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.ligado {
+  background: var(--success);
+}

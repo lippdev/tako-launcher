@@ -1,0 +1,346 @@
+/*
+  BibliotecaGrade: exibição da lista da biblioteca em grade de capas.
+  Especificações do design system (design/desktop/components/BibliotecaGrade/README.md):
+  - 3 capas por linha na largura padrão da coluna (292px)
+  - Proporção 3:4 das capas (altura = largura * 4 / 3)
+  - Raio de 9px (var(--radius-control))
+  - Gap de 8px (var(--space-8)) entre capas
+  - Botão play com 26px e ícone de 12px
+  - Ponto de atualização / execução com 8px
+  - Título aparece no hover sobre um degradê inferior suave
+  - Animações restritas a transform e opacity
+  - Todas as cores vêm de variáveis CSS (tokens.css)
+*/
+
+.gradeRoot {
+  /* Medidas locais do componente documentadas por comentários: */
+  /* Colunas padrão da grade na barra lateral */
+  --grade-colunas: 3;
+  /* Espaçamento interno da coluna */
+  --grade-padding: var(--space-8);
+  /* Espaçamento entre as capas */
+  --grade-gap: var(--space-8);
+  /* Raio de curvatura das capas (9px) */
+  --grade-raio: var(--radius-control);
+  /* Dimensão do botão play no canto superior */
+  --grade-play-tamanho: 26px;
+  /* Dimensão do ponto indicador de status no canto */
+  --grade-dot-tamanho: 8px;
+  /* Borda de contraste do ponto indicador */
+  --grade-dot-borda: 2px;
+  /* Dimensão da caixa de seleção múltipla */
+  --grade-check-tamanho: 18px;
+  /* Altura da barra de progresso de download */
+  --grade-progresso-altura: 3px;
+  /* Tipografia do título no degradê inferior */
+  --grade-titulo-tamanho: 11px;
+  --grade-titulo-padding-top: 18px;
+  --grade-titulo-padding-inline: 7px;
+  --grade-titulo-padding-bottom: 6px;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 var(--grade-padding);
+  box-sizing: border-box;
+  outline: none;
+}
+
+.viewport:focus-visible {
+  outline: none;
+}
+
+/* Espaçador de altura total para a rolagem virtualizada */
+.spacer {
+  position: relative;
+  width: 100%;
+}
+
+/* Cada linha virtualizada contendo as colunas de capas */
+.row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--grade-colunas), 1fr);
+  gap: var(--grade-gap);
+  box-sizing: border-box;
+}
+
+/* Cartão da capa de jogo */
+.card {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--grade-raio);
+  overflow: hidden;
+  background: var(--tile);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  box-sizing: border-box;
+  transition: transform var(--tempo-hover) var(--curva-estado);
+}
+
+.card:focus-visible,
+.card.focused {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Jogo ativo / selecionado */
+.card.active {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.card.selected:not(.active) {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Jogo não instalado */
+.card.notInstalled .coverImg {
+  filter: grayscale(0.8) brightness(0.7);
+}
+
+.card.notInstalled .gameTitle {
+  color: var(--text-dim);
+}
+
+/* Contêiner da capa com imagem ou fallback de inicial */
+.coverContainer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-raised);
+}
+
+.coverImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: inherit;
+}
+
+.coverFallback {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* Marcação de seleção múltipla (canto superior esquerdo) */
+.checkBadge {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 3;
+  width: var(--grade-check-tamanho);
+  height: var(--grade-check-tamanho);
+  border-radius: var(--radius-thumb);
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--canvas) 85%, transparent);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transition:
+    background var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado);
+}
+
+.checkBadge.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-primary);
+}
+
+/* Canto superior direito: botão de play ou ponto de status */
+.corner {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+/* Ponto de status (atualização ou execução) */
+.dot {
+  width: var(--grade-dot-tamanho);
+  height: var(--grade-dot-tamanho);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 var(--grade-dot-borda) var(--canvas);
+  transition: opacity var(--tempo-hover) var(--curva-estado);
+}
+
+.dot.running {
+  background: var(--success);
+}
+
+/* Botão play (aparece no hover) */
+.playBtn {
+  pointer-events: auto;
+  width: var(--grade-play-tamanho);
+  height: var(--grade-play-tamanho);
+  border-radius: var(--radius-full);
+  border: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: var(--primary);
+  color: var(--on-primary);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity var(--tempo-hover) var(--curva-estado),
+    transform var(--tempo-hover) var(--curva-estado);
+}
+
+.playBtn:hover {
+  transform: scale(1.08);
+}
+
+.playBtn.playBtnUpdate {
+  background: var(--accent);
+  color: var(--on-primary);
+}
+
+/* No hover do card, o botão de play aparece e oculta o ponto estático */
+.card:hover .playBtn,
+.card:focus-visible .playBtn,
+.card.focused .playBtn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.card:hover .corner .dot,
+.card:focus-visible .corner .dot,
+.card.focused .corner .dot {
+  display: none;
+}
+
+/* Degradê inferior com o título do jogo no hover */
+.titleScrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--grade-titulo-padding-top) var(--grade-titulo-padding-inline) var(--grade-titulo-padding-bottom);
+  background: linear-gradient(to bottom, transparent, var(--art-scrim-strong));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--tempo-hover) var(--curva-estado);
+}
+
+.card:hover .titleScrim,
+.card:focus-visible .titleScrim,
+.card.focused .titleScrim,
+.card.active .titleScrim {
+  opacity: 1;
+}
+
+.gameTitle {
+  font-family: var(--font-text);
+  font-size: var(--grade-titulo-tamanho);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.downloadPct {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+/* Trilho e barra de download */
+.progressTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: var(--grade-progresso-altura);
+  background: color-mix(in srgb, var(--canvas) 60%, transparent);
+}
+
+.progressBar {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform var(--tempo-estado) linear;
+}
+
+/* Estado vazio */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-40) var(--space-16);
+  gap: var(--space-12);
+  color: var(--text-dim);
+  text-align: center;
+  font-size: 13px;
+}
+
+.emptyIcon {
+  width: 32px;
+  height: 32px;
+  opacity: 0.5;
+}
+
+/* Estado carregando (esqueleto) */
+.skeletonCard {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--grade-raio);
+  background: var(--surface-raised);
+  opacity: 0.6;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}

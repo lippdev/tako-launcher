@@ -22,6 +22,27 @@ mod link_tests {
     use super::*;
 
     #[test]
+    fn supervisor_consumes_identified_activation_requests_from_the_web_launcher() {
+        let dir =
+            std::env::temp_dir().join(format!("tako-activation-queue-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let supervisor =
+            Supervisor::new(DataPaths::at(&dir), Platform::simulated(), &["tako".into()]);
+        tako_core::links::request_activation(&dir, Some("tako://settings")).unwrap();
+        tako_core::links::request_activation(&dir, Some("tako://play/steam:570")).unwrap();
+        let requests = [
+            supervisor.activation_requested(),
+            supervisor.activation_requested(),
+        ];
+        assert!(requests.contains(&Some("tako://settings".into())));
+        assert!(requests.contains(&Some("tako://play/steam:570".into())));
+        assert!(supervisor.activation_requested().is_none());
+        drop(supervisor);
+        std::fs::remove_file(dir.join("tako.db")).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
+    }
+
+    #[test]
     fn activation_is_bounded_validated_and_consumed_once() {
         let dir = std::env::temp_dir().join(format!("tako-links-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -103,13 +124,12 @@ mod link_tests {
         assert!(supervisor.platform.cursor.is_hidden());
         supervisor.running = Some(running);
         supervisor.launching = true;
-        supervisor.closing = true;
         let played = Duration::from_secs(120);
         let (got, end) = supervisor.finish_game(played);
         assert_eq!(got, id);
         assert_eq!(end, GameEnd::Normal);
         assert!(supervisor.running.is_none());
-        assert!(!supervisor.launching && !supervisor.closing);
+        assert!(!supervisor.launching);
         assert!(!supervisor.platform.cursor.is_hidden());
         assert!(!ctx.paths.session_environment().exists());
         assert_eq!(
@@ -146,8 +166,6 @@ pub struct Supervisor {
     watch: UiWatch,
     started: Instant,
     running: Option<Running>,
-    /// Encerrar jogo foi pedido: confere o fim a cada volta (0,5 s), a interface mostra "Fechando o jogo…".
-    closing: bool,
     /// O jogo abriu com a interface em "Abrindo…": avisar quando a janela dele aparecer.
     launching: bool,
     pads: Option<Pads>,
@@ -172,7 +190,6 @@ impl Supervisor {
             watch: UiWatch::new(SupervisorOptions::default()),
             started: Instant::now(),
             running: None,
-            closing: false,
             launching: false,
             pads: None,
             chord: ButtonChordDetector::new(chord::DEFAULT),
@@ -181,23 +198,16 @@ impl Supervisor {
         }
     }
 
-    /// Outro Tako foi aberto (ver `ACTIVATE_FILE`)? Consome o pedido.
+    /// Consome os mesmos pedidos identificados usados pelo núcleo web.
     fn activation_requested(&self) -> Option<String> {
-        use std::io::Read;
-        let path = self.paths.root.join(crate::ACTIVATE_FILE);
-        let file = std::fs::File::open(&path).ok()?;
-        let mut url = String::new();
-        let read = file
-            .take(tako_core::links::MAX_URL as u64 + 1)
-            .read_to_string(&mut url);
-        if let Err(e) = std::fs::remove_file(path) {
-            tracing::warn!("consumir ativação: {e}");
-        }
-        if read.is_err() || (!url.is_empty() && tako_core::links::parse(&url).is_none()) {
-            tracing::warn!("pedido de ativação inválido ignorado");
-            return None;
-        }
-        Some(url)
+        use tako_core::links::{Activation, Link, take_activation};
+        Some(match take_activation(&self.paths.root)? {
+            Activation::Raise => String::new(),
+            Activation::Open(Link::Screen(route)) => format!("tako://{}", route.replace(':', "/")),
+            Activation::Open(Link::Game { id, play }) => {
+                format!("tako://{}/{id}", if play { "play" } else { "game" })
+            }
+        })
     }
 
     fn now(&self) -> Duration {
@@ -388,7 +398,17 @@ impl Supervisor {
     fn watch_ui(&mut self, ui: &mut UiProc) -> i32 {
         let mut last_poll = Instant::now();
         loop {
-            match ui.rx.recv_timeout(Duration::from_millis(500)) {
+            let every = self
+                .running
+                .as_ref()
+                .map(|r| r.poll_interval())
+                .unwrap_or(Duration::from_millis(500));
+            let wait = if self.running.is_some() {
+                every.saturating_sub(last_poll.elapsed())
+            } else {
+                every
+            };
+            match ui.rx.recv_timeout(wait) {
                 Ok(msg) => self.on_message(msg, ui),
                 Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => {}
             }
@@ -415,11 +435,11 @@ impl Supervisor {
                 let _ = ui.child.kill();
             }
             // Jogo rodando com a interface aberta (Início durante o jogo).
-            let every = if self.closing || self.launching {
-                Duration::from_millis(500)
-            } else {
-                Running::POLL
-            };
+            let every = self
+                .running
+                .as_ref()
+                .map(|r| r.poll_interval())
+                .unwrap_or(Duration::from_millis(500));
             if self.running.is_some() && last_poll.elapsed() >= every {
                 last_poll = Instant::now();
                 if let Some(played) = self.running.as_mut().and_then(|r| r.poll(&self.platform)) {
@@ -479,19 +499,17 @@ impl Supervisor {
             UiMsg::Resume => {}
             UiMsg::EndGame => {
                 tracing::info!("encerrar o jogo pedido pela interface");
-                if let Some(r) = self.running.as_mut() {
-                    self.closing = true;
-                    if let Err(e) = r.request_close(&self.platform) {
-                        tracing::warn!("encerrar o jogo: {e}");
-                    }
+                if let Some(r) = self.running.as_mut()
+                    && let Err(e) = r.request_close(&self.platform)
+                {
+                    tracing::warn!("encerrar o jogo: {e}");
                 }
             }
             UiMsg::ForceEndGame => {
-                if let Some(r) = self.running.as_mut() {
-                    self.closing = true;
-                    if let Err(e) = r.force_close(&self.platform) {
-                        tracing::warn!("forçar o encerramento do jogo: {e}");
-                    }
+                if let Some(r) = self.running.as_mut()
+                    && let Err(e) = r.force_close(&self.platform)
+                {
+                    tracing::warn!("forçar o encerramento do jogo: {e}");
                 }
             }
             UiMsg::Pointer { hide, mouse } => {
@@ -515,7 +533,6 @@ impl Supervisor {
         let Some(mut r) = self.running.take() else {
             return (String::new(), GameEnd::Normal);
         };
-        self.closing = false;
         self.launching = false;
         let end = r.end(&self.platform, played);
         r.finish(&self.platform, &self.paths);
@@ -554,6 +571,11 @@ impl Supervisor {
         let mut last = Instant::now();
         let mut last_buttons = 0;
         loop {
+            let every = self
+                .running
+                .as_ref()
+                .map(|r| r.poll_interval())
+                .unwrap_or(Running::POLL);
             let mouse = self
                 .running
                 .as_ref()
@@ -565,8 +587,9 @@ impl Supervisor {
             } else if self.chord.holding() {
                 Duration::from_millis(50)
             } else {
-                Running::POLL
+                every
             };
+            let wait = wait.min(every.saturating_sub(last_poll.elapsed()));
             if let Some(p) = self.pads.as_mut() {
                 let _ = p.wait(wait);
             } else {
@@ -599,7 +622,7 @@ impl Supervisor {
             if let Some(r) = self.running.as_mut() {
                 r.pointer_step(&self.platform, &pad, now, dt);
             }
-            if last_poll.elapsed() >= Running::POLL {
+            if last_poll.elapsed() >= every {
                 last_poll = Instant::now();
                 if let Some(played) = self.running.as_mut().and_then(|r| r.poll(&self.platform)) {
                     let (id, end) = self.finish_game(played);

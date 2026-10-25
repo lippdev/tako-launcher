@@ -6,12 +6,17 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+web = ["dep:tako-web", "tako-web/cef"]
+
 [dependencies]
 tako-core.workspace = true
 tako-platform.workspace = true
 tako-sources.workspace = true
 tako-themes.workspace = true
 tako-ui.workspace = true
+tako-web = { workspace = true, optional = true }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 serde.workspace = true

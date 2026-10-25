@@ -8,6 +8,8 @@ pub mod duplicates;
 pub mod game;
 pub mod game_library;
 pub mod manual;
+pub mod manual_add;
+pub mod manual_edit;
 pub mod query;
 pub mod search_text;
 pub mod smart;

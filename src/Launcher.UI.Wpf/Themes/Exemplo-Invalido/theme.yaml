@@ -1,6 +1,0 @@
-Id: UltraLauncher.Samples.Invalid
-Name: Exemplo inválido
-Author: UltraLauncher
-Version: 0.1.0
-Mode: Fullscreen
-# Tema de teste da tela de recuperação: tenta embutir código, o que o carregador XAML restrito rejeita.

@@ -44,8 +44,21 @@ impl MetadataWorker {
         cache: MetadataCache,
         spacing: Duration,
     ) -> (MetadataWorker, Receiver<MetadataUpdated>) {
-        let (tx, rx) = mpsc::channel();
         let (out, results) = mpsc::channel();
+        let worker = Self::spawn_observed(Arc::new(agent), cache, spacing, move |update, _| {
+            let _ = out.send(update);
+        });
+        (worker, results)
+    }
+
+    /// Compartilha o agente e identifica as escolhas usadas na consulta; o consumidor descarta resultados antigos.
+    pub fn spawn_observed(
+        agent: Arc<MetadataAgent>,
+        cache: MetadataCache,
+        spacing: Duration,
+        notify: impl Fn(MetadataUpdated, PinnedIds) + Send + 'static,
+    ) -> MetadataWorker {
+        let (tx, rx) = mpsc::channel();
         let progress = Arc::new([AtomicUsize::new(0), AtomicUsize::new(0)]);
         let shared = progress.clone();
         let spawned = std::thread::Builder::new()
@@ -56,7 +69,7 @@ impl MetadataWorker {
                     cache,
                     spacing,
                     rx,
-                    out,
+                    out: Box::new(notify),
                     paused: false,
                     pending: None,
                     progress: shared,
@@ -66,7 +79,7 @@ impl MetadataWorker {
         if let Err(e) = spawned {
             tracing::error!("Metadados: não foi possível iniciar a fila: {e}");
         }
-        (MetadataWorker { tx, progress }, results)
+        MetadataWorker { tx, progress }
     }
 
     /// Atualiza os jogos sem dados ou com dados velhos (`force` = todos). `pinned` = ids fixados
@@ -107,11 +120,11 @@ impl Drop for MetadataWorker {
 type Round = (Vec<Game>, bool, HashMap<String, PinnedIds>);
 
 struct Loop {
-    agent: MetadataAgent,
+    agent: Arc<MetadataAgent>,
     cache: MetadataCache,
     spacing: Duration,
     rx: Receiver<Command>,
-    out: Sender<MetadataUpdated>,
+    out: Box<dyn Fn(MetadataUpdated, PinnedIds) + Send>,
     paused: bool,
     pending: Option<Round>,
     /// Feitos e total da rodada, lidos por [`MetadataWorker::progress`].
@@ -152,6 +165,14 @@ impl Loop {
             } => {
                 // Rodada nova pedida: junta com a pendente (força vale se qualquer uma pediu).
                 let force = force || self.pending.as_ref().is_some_and(|p| p.1);
+                let mut games = games;
+                if let Some((older, _, _)) = self.pending.take() {
+                    for game in older {
+                        if !games.iter().any(|g| g.id == game.id) {
+                            games.push(game);
+                        }
+                    }
+                }
                 self.pending = Some((games, force, pinned));
             }
             Command::Pause => self.paused = true,
@@ -202,7 +223,7 @@ impl Loop {
         self.progress[0].store(0, Ordering::Relaxed);
         self.progress[1].store(due.len(), Ordering::Relaxed);
         // IGDB: a biblioteca inteira em poucas consultas em lote, antes de ir jogo a jogo.
-        self.agent.prefetch(&due);
+        self.agent.prefetch_with_pins(&due, &pinned);
         for game in &due {
             if !self.wait(Instant::now()) {
                 return false;
@@ -218,10 +239,13 @@ impl Loop {
                 if let Err(e) = self.cache.write(&game.id, &m) {
                     tracing::warn!(game = %game.id, "Metadados: não foi possível gravar o cache: {e}");
                 }
-                let _ = self.out.send(MetadataUpdated {
-                    game_id: game.id.clone(),
-                    metadata: m,
-                });
+                (self.out)(
+                    MetadataUpdated {
+                        game_id: game.id.clone(),
+                        metadata: m,
+                    },
+                    pins(&game.id).clone(),
+                );
             }
             self.progress[0].fetch_add(1, Ordering::Relaxed);
             if update.queried && !self.wait(Instant::now() + self.spacing) {

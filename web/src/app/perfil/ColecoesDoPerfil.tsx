@@ -1,0 +1,77 @@
+import { useMemo, useState } from "react";
+import { call } from "../../bridge";
+import { PerfilColecoes, type CollectionItem } from "../../components/PerfilColecoes/PerfilColecoes";
+import { useT } from "../../i18n";
+import { collectionDetail, collectionsSummary } from "./perfilModel";
+import { NovaColecaoDialogo } from "./NovaColecaoDialogo";
+import { useBridgeData } from "./useBridgeData";
+import { useCapas } from "./useCapas";
+import styles from "./TelaPerfil.module.css";
+
+interface ColecoesDoPerfilProps {
+  /** Abrir a biblioteca já filtrada na coleção. */
+  onOpenCollection: (id: string) => void;
+}
+
+const loadCollections = () => call("profile.collections");
+
+/** Perfil › Coleções (README do PerfilColecoes): as do usuário e as automáticas, com o mosaico das capas. */
+export function ColecoesDoPerfil({ onOpenCollection }: ColecoesDoPerfilProps) {
+  const t = useT();
+  const cover = useCapas(120, 160);
+  const { data, status, reload } = useBridgeData(loadCollections);
+  const [creating, setCreating] = useState(false);
+
+  const items: CollectionItem[] = useMemo(
+    () =>
+      (data?.collections ?? []).map((collection) => ({
+        id: collection.id,
+        name: collection.name,
+        detail: collectionDetail(collection.gameCount, collection.installedCount, t),
+        automatic: collection.automatic,
+        covers: collection.covers.flatMap((game) => cover(game) ?? []),
+        onClick: () => {
+          onOpenCollection(collection.id);
+        },
+      })),
+    [data?.collections, cover, onOpenCollection, t],
+  );
+
+  if (status === "error") {
+    return (
+      <div className={styles["aviso"]} role="alert">
+        {t("profile.web.load_error")}
+        <button type="button" className={styles["retry"]} onClick={reload}>
+          {t("profile.web.retry")}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {data && (
+        <PerfilColecoes
+          summary={collectionsSummary(data.collections.length, data.gameCount, t)}
+          toolbarLabel={t("profile.web.collections_toolbar")}
+          gridLabel={t("profile.web.collections_grid")}
+          actionsLabel={t("profile.web.collection_actions")}
+          autoBadgeLabel={t("profile.auto")}
+          collections={items}
+          newCollection={{
+            label: t("collections.new"),
+            onClick: () => {
+              setCreating(true);
+            },
+          }}
+        />
+      )}
+      <NovaColecaoDialogo
+        open={creating}
+        onClose={() => {
+          setCreating(false);
+        }}
+      />
+    </>
+  );
+}

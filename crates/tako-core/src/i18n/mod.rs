@@ -136,6 +136,14 @@ pub fn keys() -> impl Iterator<Item = &'static String> {
     catalogs().0.keys()
 }
 
+/// O catálogo inteiro de um idioma, `chave completa → texto`, como está nos `.toml`: `{nome}` nos parâmetros e
+/// `chave.one`/`chave.other` nos plurais. Sem o recuo ao pt-BR de [`t_in`] (o `catalogs_match` garante que os dois
+/// idiomas têm as mesmas chaves). É o que a interface web recebe pela ponte.
+pub fn messages(lang: Lang) -> &'static HashMap<String, String> {
+    let (pt, en) = catalogs();
+    if lang == Lang::EnUs { en } else { pt }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,6 +155,16 @@ mod tests {
         missing.extend(en.keys().filter(|k| !pt.contains_key(*k)));
         missing.sort();
         assert!(missing.is_empty(), "chaves sem tradução: {missing:?}");
+    }
+
+    #[test]
+    fn messages_expose_the_whole_catalog_of_each_language() {
+        let (pt, en) = (messages(Lang::PtBr), messages(Lang::EnUs));
+        assert_eq!(pt.len(), en.len());
+        assert_eq!(pt["settings.general.title"], "Geral");
+        assert_eq!(en["settings.general.title"], "General");
+        assert_eq!(pt["common.games.one"], "{n} jogo");
+        assert_eq!(en["common.games.other"], "{n} games");
     }
 
     #[test]

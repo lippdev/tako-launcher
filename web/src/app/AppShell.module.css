@@ -1,0 +1,26 @@
+/* A janela do app: ocupa a janela do hospedeiro inteira (`fixed` não depende da altura de `html` e `body`, nem do
+   `zoom` da escala da interface). A barra de cima fica por cima de tudo. */
+
+.window {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--text);
+}
+
+.body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+/* Área das vistas. Ao lado da lista, desliza (FLIP, `transform`) quando a largura da lista muda. */
+.main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  transition: transform var(--tempo-lista) var(--curva-entrada);
+}

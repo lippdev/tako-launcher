@@ -6,8 +6,9 @@ use super::layer::{Flow, Layer, MenuItem, MenuLayer};
 use crate::model::PanelRow;
 use std::path::{Path, PathBuf};
 use tako_core::library::ManualGameRecord;
+use tako_core::library::manual_add::{AddKind, find_by_target, guess_title, kind_of};
 use tako_core::metadata::screenscraper_parse::{
-    EmulatedSystem, SYSTEMS, candidates_for, looks_like_rom, rom_title,
+    EmulatedSystem, SYSTEMS, candidates_for, rom_title,
 };
 
 /// Trata `Effect::AddGame`. Camadas abertas daqui vão para `ctx.pending_layer` (com janela, entram já).
@@ -134,22 +135,14 @@ fn system_entries() -> Vec<(String, PathBuf)> {
 /// de PC com o nome do produto (`.exe` no Windows) ou do arquivo.
 pub fn add_path(ctx: &mut Ctx, path: &Path) {
     let text = path.to_string_lossy().into_owned();
-    if let Some(existing) = ctx.library.games().iter().find(|g| {
-        g.launch_target
-            .as_deref()
-            .is_some_and(|t| t.eq_ignore_ascii_case(&text))
-    }) {
+    if let Some(existing) = find_by_target(ctx.library.games(), &text) {
         let title = existing.title.clone();
         ctx.toast(ctx.tf("add_game.already", &[("game", &title)]));
         return;
     }
     let now = chrono::Utc::now();
-    let ext = path
-        .extension()
-        .map(|e| e.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
-    let record = match ext.as_str() {
-        "desktop" => {
+    let record = match kind_of(path) {
+        AddKind::Desktop => {
             let Some(entry) = tako_sources::desktop_entries::read_desktop_file(path) else {
                 ctx.toast(ctx.t("add_game.unreadable"));
                 return;
@@ -165,19 +158,19 @@ pub fn add_path(ctx: &mut Ctx, path: &Path) {
             }
             r
         }
-        "app" => {
+        AddKind::MacApp => {
             let name = tako_sources::mac_apps::read_app(path)
                 .map(|a| a.name)
-                .unwrap_or_else(|| guess_title(path));
+                .unwrap_or_else(|| title_of(path));
             ManualGameRecord::create(&name, &text, now)
         }
-        _ if looks_like_rom(&text) => {
+        AddKind::Rom => {
             let found = candidates_for(&text);
             let layer = choose_system(ctx, path.to_owned(), found);
             open_layer(ctx, layer);
             return;
         }
-        _ => ManualGameRecord::create(&guess_title(path), &text, now),
+        AddKind::Program => ManualGameRecord::create(&title_of(path), &text, now),
     };
     add(ctx, record, None);
 }
@@ -257,55 +250,25 @@ fn choose_system(ctx: &Ctx, path: PathBuf, found: Vec<&'static EmulatedSystem>) 
     Box::new(layer)
 }
 
-/// Nome do produto do `.exe` no Windows ("ELDEN RING™" → "ELDEN RING"); senão o nome do arquivo sem extensão nem
-/// separadores ("hollow_knight.exe" → "hollow knight").
-fn guess_title(path: &Path) -> String {
+/// O título do jogo de PC: o nome do produto do `.exe` no Windows; senão o do arquivo (regra no `tako-core`).
+fn title_of(path: &Path) -> String {
     #[cfg(target_os = "windows")]
-    if path
+    let names = if path
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("exe"))
-        && let Some(t) = product_title(tako_platform::windows::version_info::names(path))
     {
-        return t;
-    }
-    let stem = path
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let t = stem.replace(['_', '-'], " ").trim().to_owned();
-    if t.is_empty() { stem } else { t }
-}
-
-/// Primeiro de ProductName e FileDescription que sirva de título: com mais de 2 letras, sem "launcher" (o .exe do
-/// launcher da loja não é o jogo); tira ™ e ®.
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-fn product_title(candidates: [Option<String>; 2]) -> Option<String> {
-    candidates.into_iter().flatten().find_map(|c| {
-        let ok =
-            !c.trim().is_empty() && !c.to_lowercase().contains("launcher") && c.chars().count() > 2;
-        ok.then(|| c.replace(['™', '®'], "").trim().to_owned())
-    })
+        tako_platform::windows::version_info::names(path)
+    } else {
+        [None, None]
+    };
+    #[cfg(not(target_os = "windows"))]
+    let names = [None, None];
+    guess_title(path, names)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn product_title_skips_launchers_and_short_names() {
-        let s = |v: &str| Some(v.to_owned());
-        assert_eq!(
-            product_title([s("ELDEN RING™"), s("elden ring")]).as_deref(),
-            Some("ELDEN RING")
-        );
-        assert_eq!(
-            product_title([s("Rockstar Games Launcher"), s("GTA V®")]).as_deref(),
-            Some("GTA V")
-        );
-        assert_eq!(product_title([None, s("Hades")]).as_deref(), Some("Hades"));
-        assert_eq!(product_title([s("  "), s("UE")]), None);
-        assert_eq!(product_title([None, None]), None);
-    }
 
     #[test]
     fn adds_executables_once_and_asks_the_system_of_roms() {

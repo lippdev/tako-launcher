@@ -1,0 +1,63 @@
+/* PainelControles (design/desktop/components/TelaControles): painel de ajustes de controles */
+
+.root {
+  /* Medidas locais do cabeçalho de seção de configurações */
+  --painel-cabecalho-gap: 16px;
+  --painel-cabecalho-margem-inferior: 30px;
+  --painel-icone-tamanho: 52px;
+  --painel-icone-svg: 24px;
+  --painel-icone-raio: 14px;
+  --painel-titulo-fonte: 28px;
+  --painel-descricao-fonte: 13.5px;
+  --painel-descricao-margem-superior: 2px;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--painel-cabecalho-gap);
+  margin-bottom: var(--painel-cabecalho-margem-inferior);
+}
+
+.iconWrapper {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--painel-icone-tamanho);
+  height: var(--painel-icone-tamanho);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--painel-icone-raio);
+  background: var(--tile);
+  color: var(--text);
+}
+
+.iconWrapper svg {
+  width: var(--painel-icone-svg);
+  height: var(--painel-icone-svg);
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--painel-titulo-fonte);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.description {
+  margin: var(--painel-descricao-margem-superior) 0 0;
+  font-size: var(--painel-descricao-fonte);
+  line-height: 1.4;
+  color: var(--text-muted);
+}

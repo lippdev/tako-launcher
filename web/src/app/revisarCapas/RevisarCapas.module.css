@@ -1,0 +1,258 @@
+.revisarCapas {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+  padding: var(--space-24);
+  gap: var(--space-24);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding-bottom: var(--space-16);
+  border-bottom: 1px solid var(--line);
+}
+
+.cabecalhoTextos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.resumo {
+  margin: 0;
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.descricao {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.cabecalhoAcoes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex-shrink: 0;
+}
+
+.carregando,
+.vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-48) var(--space-24);
+  text-align: center;
+  gap: var(--space-16);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.vazioTitulo {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.cartaoRevisao {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-24);
+  gap: var(--space-24);
+}
+
+.cartaoCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.jogoInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.jogoTitulo {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.contador {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.motivoAviso {
+  padding: var(--space-8) var(--space-12);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-row);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.comparacaoArtes {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--space-24);
+  flex-wrap: wrap;
+}
+
+.colunaArte {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  width: 200px;
+}
+
+.rotuloColuna {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.molduraCapa {
+  width: 200px;
+  height: 300px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.capaImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity var(--tempo-hover) var(--curva-estado);
+}
+
+.semCapa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  padding: var(--space-12);
+  box-sizing: border-box;
+}
+
+.confiancaContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.barrasConfianca {
+  display: flex;
+  gap: var(--space-4);
+  width: 80px;
+  height: 6px;
+}
+
+.barra {
+  flex: 1;
+  border-radius: var(--radius-full);
+  background: var(--line-strong);
+  transition: background var(--tempo-estado) var(--curva-estado);
+}
+
+.barraAtivaHigh {
+  background: var(--success);
+}
+
+.barraAtivaMedium {
+  background: var(--warning);
+}
+
+.barraAtivaLow {
+  background: var(--error);
+}
+
+.textoConfianca {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.cartaoRodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.navegacao {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.acoesPrincipais {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.notificacao {
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-row);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  transition: opacity var(--tempo-estado) var(--curva-estado);
+}

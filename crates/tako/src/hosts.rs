@@ -210,7 +210,10 @@ impl Host for LocalHost {
             .unwrap_or(0.016);
         self.last_tick = Some(now);
         running.pointer_step(&ctx.platform, pad, now, dt);
-        if self.last_poll.is_some_and(|t| t.elapsed() < Running::POLL) {
+        if self
+            .last_poll
+            .is_some_and(|t| t.elapsed() < running.poll_interval())
+        {
             return HostAction::Stay;
         }
         self.last_poll = Some(Instant::now());

@@ -13,6 +13,8 @@ pub const RELEASES_URL: &str =
     "https://api.github.com/repos/lippdev/tako-launcher/releases?per_page=15";
 /// Os alphas em C# procuram por prefixo + `.exe`; os nomes do Windows não podem mudar (MIG-040).
 pub const SETUP_ASSET_PREFIX: &str = "Tako-Setup";
+/// Publicado até a 0.2.0-alpha.22. Desde a alpha.23 (interface web com o CEF, uma pasta) o Windows só tem o
+/// instalador: o portátil acha a versão nova sem arquivo e recebe só a página da release (INST-01).
 pub const PORTABLE_ASSET_PREFIX: &str = "Tako-Portable";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -397,6 +399,29 @@ mod tests {
             "0.2.0-alpha.19"
         );
         assert!(RELEASES_URL.ends_with("per_page=15"));
+    }
+
+    #[test]
+    fn from_alpha_23_windows_has_only_the_installer_and_the_portable_gets_the_page() {
+        // A 0.2.0-alpha.23 (interface web com o CEF) sai só com o Tako-Setup.
+        let f = releases(
+            &[
+                ("v0.2.0-alpha.23", true, false, true),
+                ("v0.2.0-alpha.22", true, false, true),
+            ],
+            &["Tako-Setup-x64.exe", "Tako-Linux-x64.AppImage"],
+        );
+        let installed = pick_win(&f, "0.2.0-alpha.22", true, true).unwrap();
+        assert_eq!(installed.version, "0.2.0-alpha.23");
+        assert_eq!(installed.asset.as_ref().unwrap().name, "Tako-Setup-x64.exe");
+        // O portátil antigo não acha arquivo: a atualização aparece mesmo assim, só com a página da release.
+        let portable = pick_win(&f, "0.2.0-alpha.22", true, false).unwrap();
+        assert_eq!(portable.version, "0.2.0-alpha.23");
+        assert!(portable.asset.is_none() && !portable.can_install());
+        assert_eq!(
+            portable.page_url,
+            "https://github.com/lippdev/tako-launcher/releases/tag/v0.2.0-alpha.23"
+        );
     }
 
     #[test]

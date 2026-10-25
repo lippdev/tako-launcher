@@ -1,0 +1,42 @@
+/* Emuladores e ROMs: o texto de abertura, a linha de "adicionar pasta" (campo e botão lado a lado) e o estado de
+   cada emulador. Só tokens; nada anima. */
+
+.intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.add {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  padding: 0 18px 16px;
+}
+
+.addField {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Alinha o botão ao campo, que tem o rótulo em cima. */
+.addButton {
+  margin-top: var(--space-24);
+}
+
+.status {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.found {
+  color: var(--success);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}

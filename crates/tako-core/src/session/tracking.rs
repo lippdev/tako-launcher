@@ -189,6 +189,10 @@ pub struct GameRunTracker {
     /// O Tako pediu para o jogo fechar: o fim vale assim que um dos sinais (processos ou Steam) disser que
     /// acabou. A Steam leva alguns segundos para zerar o `RunningAppID` e "Fechando o jogo…" ficava esperando.
     pub close_requested: bool,
+    /// A janela do jogo foi confirmada; o processo raiz sozinho pode ser apenas um launcher.
+    shown: bool,
+    /// Houve processo numa leitura real (não apenas o PID fornecido ao abrir).
+    processes_seen: bool,
 }
 
 // Tolerância de relógio ao comparar o início de um filho com a hora em que o jogo foi aberto.
@@ -197,6 +201,8 @@ const CLOCK_SKEW: TimeDelta = TimeDelta::seconds(5);
 impl GameRunTracker {
     pub const DEFAULT_START_TIMEOUT: TimeDelta = TimeDelta::minutes(2);
     pub const DEFAULT_EXIT_GRACE: TimeDelta = TimeDelta::seconds(4);
+    /// Margem para a variação do horário dos retratos: uma leitura aos 499 ms não deve custar mais 250 ms.
+    pub const RUNNING_EXIT_GRACE: TimeDelta = TimeDelta::milliseconds(450);
 
     /// `root_pid`: processo iniciado (obrigatório na estratégia por processo).
     pub fn new(
@@ -232,6 +238,8 @@ impl GameRunTracker {
             last_seen_at: None,
             steam_confirmed: false,
             close_requested: false,
+            shown: false,
+            processes_seen: false,
         };
         if let Some(root) = root_pid {
             // O processo foi iniciado agora: o jogo já conta como rodando.
@@ -266,6 +274,17 @@ impl GameRunTracker {
         matches!(self.status, GameRunStatus::Exited | GameRunStatus::TimedOut)
     }
 
+    /// Confirma a fase de jogo sem confundir o PID inicial do launcher com a janela do jogo.
+    pub fn mark_shown(&mut self) {
+        if !self.is_finished() {
+            self.shown = true;
+        }
+    }
+
+    pub fn was_shown(&self) -> bool {
+        self.shown
+    }
+
     /// Aplica uma leitura feita em `now`. `steam_running_app_id`: `RunningAppID` lido junto
     /// (`None` = não lido ou ilegível; `Some(0)` = nenhum jogo).
     pub fn update(
@@ -298,6 +317,13 @@ impl GameRunTracker {
             }
         }
         self.current_paths = paths;
+        self.processes_seen |= !self.current.is_empty();
+
+        let exit_grace = if self.shown {
+            self.exit_grace.min(Self::RUNNING_EXIT_GRACE)
+        } else {
+            self.exit_grace
+        };
 
         if self.is_present(steam_running_app_id) {
             self.first_seen_at.get_or_insert(now);
@@ -308,9 +334,7 @@ impl GameRunTracker {
         {
             self.status = GameRunStatus::TimedOut;
         } else if self.status == GameRunStatus::Running
-            && self
-                .last_seen_at
-                .is_some_and(|l| now - l >= self.exit_grace)
+            && self.last_seen_at.is_some_and(|l| now - l >= exit_grace)
         {
             self.status = GameRunStatus::Exited;
         }
@@ -329,7 +353,11 @@ impl GameRunTracker {
             self.plan.strategy,
             GameTrackingStrategy::InstallFolder | GameTrackingStrategy::Process
         );
-        if self.close_requested && watches_processes {
+        // Depois da janela confirmada, o registro da Steam pode demorar a zerar. Só usar a ausência
+        // dos processos se já vimos algum: há jogos que só podem ser acompanhados pelo registro.
+        if watches_processes
+            && (self.close_requested || (self.shown && self.processes_seen && self.steam_confirmed))
+        {
             return steam_says && !self.current.is_empty();
         }
         if self.steam_confirmed {
@@ -720,6 +748,113 @@ mod tests {
     }
 
     // Acompanhamento por processo
+
+    #[test]
+    fn opening_keeps_the_launcher_handoff_grace() {
+        let mut t =
+            GameRunTracker::new(TrackingPlan::new(S::Process), launched(), Some(100)).unwrap();
+        t.update(&[child(100, 1, None)], secs(1), None);
+        assert!(!t.was_shown(), "o PID raiz não confirma a janela");
+        assert_eq!(t.update(&[], secs(4), None), GameRunStatus::Running);
+        assert_eq!(
+            t.update(&[child(200, 100, Some(secs(4)))], secs(4), None),
+            GameRunStatus::Running
+        );
+        assert_eq!(t.game_process_ids(), [200]);
+    }
+
+    #[test]
+    fn after_shown_process_exit_is_detected_within_half_a_second() {
+        for plan in [TrackingPlan::new(S::Process), folder_plan(None)] {
+            let mut t = GameRunTracker::new(plan, launched(), Some(100)).unwrap();
+            let game = [proc(100, Some(&format!(r"{FOLDER}\game.exe")))];
+            t.update(&game, secs(10), None);
+            t.mark_shown();
+            assert_eq!(
+                t.update(&[], secs(10) + TimeDelta::milliseconds(250), None),
+                GameRunStatus::Running
+            );
+            assert_eq!(
+                t.update(&[], secs(10) + TimeDelta::milliseconds(449), None),
+                GameRunStatus::Running
+            );
+            // O retrato pode levar tempos diferentes; a segunda leitura não precisa cair em 500 ms exatos.
+            assert_eq!(
+                t.update(&[], secs(10) + TimeDelta::milliseconds(499), None),
+                GameRunStatus::Exited
+            );
+        }
+    }
+
+    #[test]
+    fn a_child_handoff_during_play_survives_a_missing_sample() {
+        let mut t =
+            GameRunTracker::new(TrackingPlan::new(S::Process), launched(), Some(100)).unwrap();
+        t.update(&[child(200, 100, None)], secs(10), None);
+        t.mark_shown();
+        assert_eq!(
+            t.update(&[], secs(10) + TimeDelta::milliseconds(250), None),
+            GameRunStatus::Running
+        );
+        assert_eq!(
+            t.update(
+                &[child(300, 200, None)],
+                secs(10) + TimeDelta::milliseconds(500),
+                None
+            ),
+            GameRunStatus::Running
+        );
+        assert_eq!(t.game_process_ids(), [300]);
+    }
+
+    #[test]
+    fn after_shown_process_exit_does_not_wait_for_a_stale_steam_signal() {
+        let mut t = GameRunTracker::new(folder_plan(Some(APP_ID)), launched(), None).unwrap();
+        let game = [proc(20, Some(&format!(r"{FOLDER}\game.exe")))];
+        t.update(&game, secs(10), Some(APP_ID));
+        t.mark_shown();
+        assert_eq!(
+            t.update(&[], secs(10) + TimeDelta::milliseconds(500), Some(APP_ID)),
+            GameRunStatus::Exited
+        );
+    }
+
+    #[test]
+    fn a_shown_game_does_not_require_steam_to_have_confirmed_it() {
+        let mut t = GameRunTracker::new(folder_plan(Some(APP_ID)), launched(), None).unwrap();
+        let game = [proc(20, Some(&format!(r"{FOLDER}\game.exe")))];
+        t.update(&game, secs(10), Some(0));
+        t.mark_shown();
+        assert!(!t.steam_confirmed);
+        assert_eq!(t.update(&game, secs(20), Some(0)), GameRunStatus::Running);
+        assert_eq!(
+            t.update(&[], secs(20) + TimeDelta::milliseconds(500), Some(0)),
+            GameRunStatus::Exited
+        );
+    }
+
+    #[test]
+    fn cold_steam_and_games_without_visible_processes_keep_their_start_rules() {
+        for strategy in [S::SteamApp, S::InstallFolder] {
+            let mut plan = folder_plan(Some(APP_ID));
+            plan.strategy = strategy;
+            let mut t = GameRunTracker::new(plan, launched(), None).unwrap();
+            assert_eq!(t.update(&[], secs(90), Some(0)), GameRunStatus::Waiting);
+            assert_eq!(
+                t.update(&[], secs(100), Some(APP_ID)),
+                GameRunStatus::Running
+            );
+            t.mark_shown();
+            assert_eq!(
+                t.update(&[], secs(101), Some(APP_ID)),
+                GameRunStatus::Running
+            );
+            assert_eq!(
+                t.update(&[], secs(101) + TimeDelta::milliseconds(500), Some(0)),
+                GameRunStatus::Exited
+            );
+        }
+    }
 
     #[test]
     fn process_tracking_counts_as_running_from_launch_and_follows_children() {

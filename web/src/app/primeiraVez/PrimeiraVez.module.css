@@ -1,0 +1,57 @@
+.screen h1 {
+  white-space: pre-line;
+}
+
+.screen {
+  min-height: 100%;
+  height: auto;
+}
+
+.controls {
+  display: contents;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin-top: var(--space-12);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.stores {
+  max-height: calc(var(--onboarding-store-row-height) * 4);
+  overflow: auto;
+}
+
+.notice {
+  font-family: var(--font-text);
+  font-size: var(--chip-font-size);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  background: var(--canvas);
+}
+
+.screen main {
+  position: relative;
+  top: auto;
+  left: auto;
+  margin-left: var(--onboarding-content-left);
+  padding-top: var(--onboarding-content-top);
+  padding-bottom: var(--space-40);
+}

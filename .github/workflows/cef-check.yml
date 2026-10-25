@@ -1,0 +1,92 @@
+name: CEF Check
+
+# Verificação semanal de atualizações do Chromium Embedded Framework (CEF) (WEB-41).
+# Conforme PRD D-13, os testes do projeto são locais: este workflow não testa código nem compila binários.
+# Apenas executa scripts/cef-check.ps1 e abre ou atualiza uma issue quando há nova versão estável disponível.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-cef:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Executar verificação do CEF
+        id: check
+        shell: pwsh
+        run: |
+          $output = & .\scripts\cef-check.ps1 2>&1
+          $exitCode = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          $fullText = $output -join "`n"
+
+          $bodyFile = Join-Path $env:RUNNER_TEMP "cef-check-output.txt"
+          Set-Content -Path $bodyFile -Value $fullText -Encoding utf8
+          "body_file=$bodyFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          if ($exitCode -eq 1) {
+            Write-Host "Nova versão do CEF detectada (código 1)."
+            "has_update=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } elseif ($exitCode -eq 0) {
+            Write-Host "CEF em dia (código 0)."
+            "has_update=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            throw "Erro inesperado ao executar cef-check.ps1 (código de saída: $exitCode)."
+          }
+
+      - name: Abrir ou atualizar issue
+        if: steps.check.outputs.has_update == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          $title = "Nova versão estável do CEF"
+          $bodyPath = "${{ steps.check.outputs.body_file }}"
+          $rawDetails = Get-Content -LiteralPath $bodyPath -Raw
+
+          $bodyLines = @(
+              '## Nova versão estável do Chromium Embedded Framework (CEF) detectada',
+              '',
+              'O workflow periódico de verificação identificou uma versão estável mais recente do CEF e/ou da crate `cef`.',
+              '',
+              '### Relatório do `cef-check.ps1`',
+              '```',
+              $rawDetails,
+              '```',
+              '',
+              '### Procedimento para atualização',
+              'Conforme estipulado no **ADR-0035** e no plano **WEB-41**, atualizações de segurança estáveis do CEF devem ser integradas e liberadas como release do runtime do Tako em poucos dias.',
+              '',
+              'Consulte o passo a passo completo em [`docs/web/atualizar-cef.md`](docs/web/atualizar-cef.md):',
+              '1. Atualizar a dependência `cef` no `Cargo.toml` e no `Cargo.lock`.',
+              '2. Verificar a resolução no `scripts/cef-setup.ps1`.',
+              '3. Executar a compilação e a bateria de testes locais de verificação de junção (PRD D-13).',
+              '4. Realizar o teste manual mínimo (ciclo de processos núcleo vs interface).',
+              '5. Conferir requisitos de sandbox no Windows (WEB-02c, modelo bootstrap).',
+              '6. Gerar e publicar a release do componente de runtime do Chromium (PRD D-11, INST-01/INST-02).'
+          )
+          $issueBody = $bodyLines -join "`n"
+
+          Write-Host "Verificando se já existe issue aberta com o título '$title'..."
+          $issuesJson = gh issue list --repo $env:REPO --state open --search "$title in:title" --json number,title
+          $existingList = $issuesJson | ConvertFrom-Json
+          $openIssue = $existingList | Where-Object { $_.title -eq $title } | Select-Object -First 1
+
+          if ($openIssue) {
+              $num = $openIssue.number
+              Write-Host "Atualizando issue existente #$num..."
+              gh issue comment $num --repo $env:REPO --body "Atualização periódica da verificação do CEF:`n`n$issueBody"
+          } else {
+              Write-Host "Abrindo nova issue..."
+              gh issue create --repo $env:REPO --title $title --body $issueBody
+          }

@@ -161,6 +161,29 @@ impl MetadataAgent {
         }
     }
 
+    /// IDs fixados dispensam a descoberta em lote, inclusive quando a escolha é "Nenhum".
+    pub fn prefetch_with_pins(
+        &self,
+        games: &[Game],
+        pinned: &std::collections::HashMap<String, PinnedIds>,
+    ) {
+        for provider in self.enabled() {
+            let lookups: Vec<_> = games
+                .iter()
+                .filter(|game| {
+                    !pinned
+                        .get(&game.id)
+                        .is_some_and(|ids| ids.contains_key(provider.name()))
+                })
+                .map(MetadataLookup::for_game)
+                .filter(|lookup| !lookup.external_ids.is_empty())
+                .collect();
+            if !lookups.is_empty() {
+                provider.prefetch(&lookups);
+            }
+        }
+    }
+
     /// Consulta as fontes que faltam. `pinned` vale mais que os ids da loja e os aprendidos; a fonte
     /// fixada não é buscada pelo nome e id vazio tira a fonte deste jogo.
     pub fn update(
@@ -300,9 +323,7 @@ fn pin_changed(
     sources: &[Arc<dyn MetadataProvider>],
 ) -> bool {
     pinned.iter().any(|(source, id)| {
-        let relevant = sources
-            .iter()
-            .any(|p| p.name() == source && p.art_fallback().is_none());
+        let relevant = sources.iter().any(|p| p.name() == source);
         let part = cached.parts.iter().find(|p| &p.source == source);
         relevant
             && if id.is_empty() {

@@ -1,0 +1,183 @@
+/* BarraSuperior (README e prévia): 52 de altura, de borda a borda, por cima do conteúdo, que rola por baixo.
+   Medidas do README sem variável no `tokens.css` ficam como variáveis locais da barra. */
+
+.bar {
+  --bar-padding-left: 20px;
+  --brand-gap: 14px;
+  --nav-gap: 40px;
+  --chevron-size: 13px;
+  --avatar-size: 24px;
+
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  height: var(--topbar-height);
+  padding: 0 var(--space-6) 0 var(--bar-padding-left);
+  border-bottom: 1px solid var(--line);
+  background: var(--titlebar);
+  user-select: none;
+  /* O vazio da barra arrasta a janela (o hospedeiro CEF trata a região); os controles abaixo são `no-drag`. */
+  -webkit-app-region: drag;
+}
+
+/* TAKO: vidro fosco da tinta violeta para o canvas; a barra mantém as cores do logo. */
+:global(:root[data-theme="tako"]) .bar {
+  border-bottom-color: color-mix(in srgb, var(--text) 6%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--titlebar-tint) 75%, transparent),
+    color-mix(in srgb, var(--canvas) 52%, transparent) 45%
+  );
+  backdrop-filter: blur(22px) saturate(1.5);
+}
+
+/* Liquid Glass: o `--titlebar` já é translúcido; o desfoque é o do tema. */
+:global(:root[data-theme="vidro"]) .bar {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.bar :is(button, [role="tab"]) {
+  -webkit-app-region: no-drag;
+}
+
+/* ---- Marca ---- */
+
+.brand {
+  composes: ring from "../lib/focus.module.css";
+  display: flex;
+  align-items: center;
+  gap: var(--brand-gap);
+  height: 40px;
+  margin: 0;
+  padding: 0 10px 0 0;
+  border: 0;
+  border-radius: 8px;
+  background-color: transparent;
+  cursor: pointer;
+}
+
+/* ---- Abas ---- */
+
+.nav {
+  margin-left: var(--nav-gap);
+}
+
+/* ---- Botões da direita ---- */
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+}
+
+.action {
+  composes: ring from "../lib/focus.module.css";
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  margin: 0;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background-color: transparent;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+  font-family: var(--font-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Hover: brilho da cor de destaque embaixo e o traço que cresce (só `transform` e `opacity` animam). */
+.action::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  opacity: 0;
+  transform: scaleX(0.3);
+  transition:
+    opacity var(--tempo-estado) var(--curva-estado),
+    transform var(--tempo-entrada) var(--curva-entrada);
+  pointer-events: none;
+}
+
+.action:hover,
+.on {
+  color: var(--text);
+}
+
+.action:hover {
+  background-image: radial-gradient(70% 90% at 50% 100%, color-mix(in srgb, var(--accent) 16%, transparent), transparent);
+}
+
+.action:hover::after,
+.on::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.action:hover svg {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent));
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.chevron svg {
+  width: var(--chevron-size);
+  height: var(--chevron-size);
+}
+
+/* ---- Perfil ---- */
+
+.profile {
+  gap: 9px;
+  padding: 0 10px 0 var(--space-6);
+  font-family: var(--font-heading);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: var(--radius-full);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--text) 16%, var(--tile)), var(--canvas));
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 75%, transparent),
+    0 0 0 3.5px color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* O ponto verde só quando está online (verde é "ligado"). */
+.online::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--titlebar);
+  border-radius: 50%;
+  background: var(--success);
+}

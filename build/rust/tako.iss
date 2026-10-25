@@ -1,6 +1,8 @@
 ; Tako (Rust) — instalador por usuário (sem administrador). Gerado por build\rust\Package-Tako.ps1:
-;   ISCC /DAppVersion=0.2.0 /DSourceDir=<pasta com Tako.exe> /DOutputDir=<dist> /DArch=x64 tako.iss
-; Mesmo AppId das alphas C#: a instalação existente é atualizada no lugar e os dados em %LOCALAPPDATA%\Tako ficam.
+;   ISCC /DAppVersion=0.2.0 /DSourceDir=<pasta do app> /DOutputDir=<dist> /DArch=x64 tako.iss
+; Mesmo AppId das alphas: a instalação existente é atualizada no lugar e os dados em %LOCALAPPDATA%\Tako ficam.
+; Desde a 0.2.0-alpha.23 a pasta do app leva Tako.exe (interface web padrão; Slint com --slint), o runtime do
+; Chromium embutido (CEF) e a interface em web\dist.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -73,6 +75,8 @@ es.LaunchApp=Abrir Tako
 Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; Flags: unchecked
 
 [InstallDelete]
+; Antes de copiar a versão nova, sai tudo o que uma versão anterior pode ter deixado na pasta do app, para nada
+; ficar órfão nem misturar duas versões. Só nomes conhecidos: a pasta pode ter sido escolhida pelo usuário.
 ; Arquivos da versão C#/WPF (vários .dll, temas do Playnite e o PresentMon) que o Tako em Rust não usa mais.
 Type: files; Name: "{app}\*.dll"
 Type: files; Name: "{app}\*.pdb"
@@ -80,9 +84,18 @@ Type: files; Name: "{app}\*.json"
 Type: files; Name: "{app}\PresentMon*.exe"
 Type: filesandordirs; Name: "{app}\Themes"
 Type: filesandordirs; Name: "{app}\runtimes"
+; Runtime do CEF (.dll e .json acima) e a interface web: o de uma versão nunca se mistura com o de outra.
+; Nunca `*.dat`: o unins000.dat do desinstalador fica nesta pasta.
+Type: files; Name: "{app}\*.pak"
+Type: files; Name: "{app}\icudtl.dat"
+Type: files; Name: "{app}\*.bin"
+Type: files; Name: "{app}\CEF-CREDITS.html"
+Type: filesandordirs; Name: "{app}\locales"
+Type: filesandordirs; Name: "{app}\web"
 
 [Files]
-Source: "{#SourceDir}\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+; A pasta do app inteira (Tako.exe, CEF, locales\ e web\dist), montada do zero pelo Package-Tako.ps1.
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Tells the app it is installed: data goes to %LOCALAPPDATA%\Tako instead of next to the exe.
 Source: "..\Tako.installed"; DestDir: "{app}"; Flags: ignoreversion
 
