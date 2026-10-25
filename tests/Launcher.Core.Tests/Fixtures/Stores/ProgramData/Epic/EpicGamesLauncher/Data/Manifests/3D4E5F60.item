@@ -1,9 +1,0 @@
-{
-  "bIsIncompleteInstall": true,
-  "AppName": "Baixando",
-  "CatalogItemId": "9999",
-  "CatalogNamespace": "baixandons",
-  "AppCategories": ["games"],
-  "DisplayName": "Jogo Ainda Baixando",
-  "InstallLocation": "D:\\Epic\\Baixando"
-}

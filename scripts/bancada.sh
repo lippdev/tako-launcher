@@ -50,17 +50,10 @@ own_target() {
 }
 
 ci() {
-  local base
-  base="$(git merge-base HEAD develop)"
   cargo fmt --all --check || return 1
   cargo clippy --workspace --all-targets --locked -- -D warnings || return 1
   cargo test --workspace --locked || return 1
   cargo build -p tako --release --locked || return 1
-  # O ci.yml do C# só importa se a branch mexeu no código .NET.
-  if git diff --name-only "$base" HEAD | grep -qE '^(src|tests|tools)/|\.sln$|^Directory\.|^global\.json$'; then
-    dotnet restore --locked-mode && dotnet format --verify-no-changes --no-restore &&
-      dotnet build --no-restore -c Release || return 1
-  fi
   say "CI local verde em $(git rev-parse --abbrev-ref HEAD)"
 }
 

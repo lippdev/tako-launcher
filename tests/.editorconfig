@@ -1,3 +1,0 @@
-[*.cs]
-# Nomes de teste no formato Cenario_resultado_esperado.
-dotnet_diagnostic.CA1707.severity = none

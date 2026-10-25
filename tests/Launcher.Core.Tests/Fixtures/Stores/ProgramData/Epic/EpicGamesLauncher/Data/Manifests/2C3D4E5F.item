@@ -1,9 +1,0 @@
-{
-  "bIsIncompleteInstall": false,
-  "AppName": "PluginDeAgua",
-  "CatalogItemId": "1234123412341234",
-  "CatalogNamespace": "ue",
-  "AppCategories": ["public", "plugins", "engines"],
-  "DisplayName": "Plugin de Água",
-  "InstallLocation": "C:\\Program Files\\Epic Games\\UE_5.4\\Engine\\Plugins\\Agua"
-}

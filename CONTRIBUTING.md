@@ -27,7 +27,7 @@ Regras:
 `<tipo>(<escopo>): <descrição no imperativo, até 72 caracteres>`
 
 - Tipos: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- Escopos: `core`, `sources`, `platform`, `themes`, `ui`, `app`, `docs`, `ci`, `build` (e, até o corte, os do C#: `host`, `compat-p10`, `runtime`, `ipc`, `fse`).
+- Escopos: `core`, `sources`, `platform`, `themes`, `ui`, `app`, `web`, `docs`, `ci`, `build`.
 - Referencie a história no rodapé: `Refs: MVP-005`. Breaking change: `feat(ipc)!:` + rodapé `BREAKING CHANGE:`.
 
 ## 3. Pull Requests
@@ -45,7 +45,7 @@ Vale a DoD do [PRD §12](docs/PRD.md); o checklist está no template de PR.
 
 ## 5. Padrões de código (Rust)
 
-Vale para o Tako em Rust (PRD v0.2, §4 e §5). O código C#/WPF continua com as regras da seção 5.1 até o corte (MIG-043).
+Vale para o Tako em Rust (PRD v0.2, §4 e §5).
 
 - Rust edição 2024, toolchain fixada em `rust-toolchain.toml`. Antes do commit: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` e `cargo test --workspace`. O CI roda os três nos três SOs.
 - Nomes em inglês; comentários e documentação em português, curtos, explicando o **porquê** (o que o código não mostra).
@@ -54,14 +54,6 @@ Vale para o Tako em Rust (PRD v0.2, §4 e §5). O código C#/WPF continua com as
 - Erros: `thiserror` nos tipos públicos; `Result<_, String>` onde for mais simples. Nunca engolir um erro sem log.
 - Logs com `tracing`. **Nunca** logar credenciais ou tokens (a redação do `tako_core::diagnostics` é a última barreira, não a primeira).
 - Textos da interface sempre por `tako_core::i18n` (`t`, `tf`, `tn`), com a chave nos dois catálogos (`crates/tako-core/locales/{pt-BR,en-US}/<módulo>.toml`); o teste `catalogs_match` reprova chave faltando.
-
-### 5.1 Padrões de código (C# / .NET 10, até o corte)
-
-- `.editorconfig` + analyzers; **warnings são erros**. Rode `dotnet format` antes do commit.
-- `Nullable` habilitado; sem `!` sem comentário justificando.
-- Namespaces file-scoped; campos privados `_camelCase` (constantes e `static readonly` em PascalCase); métodos assíncronos terminam em `Async` e aceitam `CancellationToken`.
-- **MVVM** na UI: sem lógica de negócio em code-behind.
-- Logs estruturados com `Microsoft.Extensions.Logging`. **Nunca** logar credenciais ou tokens.
 
 ## 6. Regras arquiteturais
 
@@ -76,23 +68,23 @@ Vale para o Tako em Rust (PRD v0.2, §4 e §5). O código C#/WPF continua com as
 
 ## 7. Testes
 
-- Testes de unidade ao lado do código (`#[cfg(test)]`), portados dos testes C# quando o módulo vem de lá, com fixtures fictícias.
+- Testes de unidade ao lado do código (`#[cfg(test)]`), com fixtures fictícias.
 - Parsers de loja e de API testados em todos os SOs (são código puro); só a descoberta de pastas e o registro dependem do SO.
 - Funções que exigem monitor, áudio, controle ou permissões reais não rodam no CI: use as versões em memória (`tako_core::devices::fake`) nos testes e os checklists de hardware em `docs/testing/` (`windows.md`, `linux.md`, `macos.md`) na PR.
 - O tema padrão é compilado nos testes do `tako-ui`; um tema quebrado precisa cair no padrão sem loop de falha.
 
 ## 8. Releases
 
-SemVer. O Tako em Rust sai pelo workflow `Release` (`.github/workflows/release.yml`, regras em `build/resolve-release.sh`): push na `main` publica a estável do topo do `CHANGELOG.md`; na `develop`, *Run workflow* com o canal alpha ou beta publica a próxima pré-release. Pacotes: `build/rust/Package-Tako.ps1` (Windows) e `build/rust/package.sh` (Linux e macOS). A versão C#/WPF tem o workflow manual `release-wpf.yml` até o corte. O processo anterior, ainda válido para a WPF:
+SemVer. O Tako em Rust sai pelo workflow `Release` (`.github/workflows/release.yml`, regras em `build/resolve-release.sh`): push na `main` publica a estável do topo do `CHANGELOG.md`; na `develop`, *Run workflow* com o canal alpha ou beta publica a próxima pré-release. Pacotes: `build/rust/Package-Tako.ps1` (Windows) e `build/rust/package.sh` (Linux e macOS).
 
 1. Adicione a seção `## [X.Y.Z]` (ou `## [X.Y.Z-alpha.N]`) **nos dois changelogs**: `CHANGELOG.md` (português) e `CHANGELOG.en-US.md` (inglês). Um `(#NN)` no fim do item vira link para a PR. O workflow falha se faltar alguma seção.
 2. Publique de um destes jeitos (versão com hífen = pré-release):
    - push de uma tag `vX.Y.Z` / `vX.Y.Z-alpha.N`; ou
    - Actions › Release › Run workflow na `main`, com a versão e "publish" marcado (a tag é criada ali). Sem "publish", só gera os arquivos como artefato.
-3. A release sai com o nome `Tako X.Y.Z`, notas em inglês tiradas do `CHANGELOG.en-US.md` mais o link para o changelog em português, e os arquivos `Tako-Setup-x64.exe` (instalador Inno Setup, por usuário) e `Tako-Portable-x64.exe` (um único .exe; dados em `Tako_Data` ao lado). O kit do spike FSE (`Tako-FseKit-x64.zip`) acompanha enquanto o MVP-007 estiver aberto.
+3. A release sai com o nome `Tako X.Y.Z`, notas em inglês tiradas do `CHANGELOG.en-US.md` mais o link para o changelog em português, e o `Tako-Setup-x64.exe` (instalador Inno Setup, por usuário, com o runtime do Chromium e a interface web). Desde a 0.2.0-alpha.23 não há portátil no Windows (PRD D-07).
 4. Assinatura (SignPath) e envio ao winget ficam prontos no workflow e ligam quando as variáveis/segredos existirem (`SIGNPATH_*`, `WINGET_TOKEN`).
 
-Para gerar localmente: `.\build\Publish-Tako.ps1 -Runtime x64 -Target All -Version X.Y.Z`.
+Para gerar localmente: `.\build\rust\Package-Tako.ps1` (Windows) ou `./build/rust/package.sh` (Linux/macOS).
 
 ## 9. Issues
 

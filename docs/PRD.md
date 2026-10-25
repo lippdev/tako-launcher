@@ -462,7 +462,7 @@ nova entregam a parte do núcleo agora e ganham tela já na versão web (D-12). 
 - [x] **MIG-040 — Empacotamento Rust.** Adaptar o `release.yml` e os scripts (`build/`) para `cargo`: Windows (instalador e portable), Linux (deb com regra udev, AppImage, tar.gz; x64 e arm64), macOS (`.app`, dmg e zip; arm64 e x64). Os nomes de arquivo precisam continuar compatíveis com o atualizador das alphas C# (`Tako-Setup-*.exe`, `Tako-Portable-*.exe`), para que elas encontrem a versão Rust. _A partir da alpha.23 o Windows publica só o `Tako-Setup-*.exe` (INST-05, D-07)._
 - [ ] **MIG-041 — Benchmark.** Medir as métricas da §8.1 no CI e nas máquinas de referência; publicar em `docs/`. _Estado: `tako --bench` e job `bench` no CI; faltam as máquinas de referência (`docs/marco-2/paridade.md`)._
 - [x] **MIG-042 — Checklists de hardware** por SO, em `docs/testing/`.
-- [ ] **MIG-043 — Corte do C#.** Remover a solução C#/WPF do repositório e do CI. _Estado: antecipado pela D-16 e feito no WEB-72 (25/10/2026, em revisão): saem `src/`, `tests/`, `tools/` C#, a solução, os `Directory.*.props`, o `global.json`, o pipeline WPF e as instruções de .NET. Marcar `[x]` quando entrar na integração._
+- [x] **MIG-043 — Corte do C#.** Remover a solução C#/WPF do repositório e do CI. _Estado: antecipado pela D-16 e feito no WEB-72 (25/10/2026): saem `src/`, `tests/`, `tools/` C#, a solução, os `Directory.*.props`, o `global.json`, o pipeline WPF e as instruções de .NET._
 
 ### Fase 4 — Interface web no Windows (P0, D-09 a D-15)
 
@@ -498,7 +498,7 @@ cortar. Processo de trabalho: [`docs/processo/multiagente.md`](processo/multiage
 **Fechamento: 0.2.0-alpha.23** (primeira alpha com a interface web, D-17)
 - [ ] **WEB-70 — Ícone do Tako na janela.** A janela do CEF mostrava o ícone do Chromium na barra de tarefas, no Alt+Tab e na barra de título, porque o hospedeiro não definia ícone. Aceite: ícone do Tako nos três lugares.
 - [ ] **WEB-71 — Ícones `.ico` da Steam na lista.** Jogos como The Witcher 3, CONTROL Resonant e ARC Raiders ficavam sem ícone: o `.ico` da Steam traz uma imagem de 512×512 declarada como 256×256 e o decodificador recusava o arquivo inteiro. Aceite: leitura tolerante (a melhor entrada que decodificar), com teste do caso e de arquivo quebrado sem pânico.
-- [ ] **WEB-72 — Remover o C#** (MIG-043, D-16).
+- [x] **WEB-72 — Remover o C#** (MIG-043, D-16).
 - [ ] **INST-05 — Pacote oficial com a web como padrão.** `Tako.exe` sem flag abre a interface web (inclusive pela inicialização com o Windows, `tako://` e instância única); `--slint` abre o legado; se o CEF falhar ao carregar, cai no Slint com log. `Package-Tako.ps1` e `tako.iss` levam o exe com a feature `web`, o runtime do CEF e o `web/dist`, com o mesmo AppId (atualiza a alpha.22 no lugar e mantém `%LOCALAPPDATA%\Tako`). Sem portátil; o atualizador de uma portátil antiga avisa e abre a página da release. O workflow `Release` monta o `web/` e o CEF. O instalador de prévia (INST-00, `Package-Web.ps1`, `tako-web.iss`) sai.
 - [ ] **REL-23 — Publicar a 0.2.0-alpha.23.** PR da integração para a `develop` com aprovação do mantenedor; workflow `Release`, canal alpha; teste da atualização por cima da alpha.22 instalada (dados mantidos, abre na web, ícone certo). Changelog com a troca de interface, o fim do portátil e o `--slint`.
 
