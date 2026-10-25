@@ -18,29 +18,29 @@ export function Demo() {
   return (
     <div>
       <DemoGrupo titulo="Pílulas de sistemas e plataformas (estáticas) — só texto ou com ícone genérico">
-        <PilulaDaLoja rotulo="Steam" />
-        <PilulaDaLoja rotulo="GOG" />
-        <PilulaDaLoja rotulo="Epic Games" />
-        <PilulaDaLoja rotulo="Windows" icone="monitor" />
+        <PilulaDaLoja label="Steam" />
+        <PilulaDaLoja label="GOG" />
+        <PilulaDaLoja label="Epic Games" />
+        <PilulaDaLoja label="Windows" icon="monitor" />
       </DemoGrupo>
 
       <DemoGrupo titulo="Pílula interativa (botão de ação com feedback)">
         <PilulaDaLoja
-          rotulo={copiado ? "Link copiado!" : "Compartilhar"}
-          icone={copiado ? "check" : "share"}
-          ativo={copiado}
+          label={copiado ? "Link copiado!" : "Compartilhar"}
+          icon={copiado ? "check" : "share"}
+          active={copiado}
           onClick={handleCompartilhar}
           aria-label="Compartilhar link do jogo"
         />
-        <PilulaDaLoja rotulo="Gerenciar" icone="gear" onClick={() => {}} />
+        <PilulaDaLoja label="Gerenciar" icon="gear" onClick={() => {}} />
       </DemoGrupo>
 
       <DemoGrupo titulo="Estados de interação (hover · foco · pressionado · desabilitado)">
-        <PilulaDaLoja rotulo="Normal" onClick={() => {}} />
-        <PilulaDaLoja rotulo="Hover" icone="share" onClick={() => {}} data-force="hover" />
-        <PilulaDaLoja rotulo="Foco" icone="share" onClick={() => {}} data-force="focus" />
-        <PilulaDaLoja rotulo="Pressionado" icone="share" onClick={() => {}} data-force="pressed" />
-        <PilulaDaLoja rotulo="Desabilitado" icone="share" onClick={() => {}} desabilitado />
+        <PilulaDaLoja label="Normal" onClick={() => {}} />
+        <PilulaDaLoja label="Hover" icon="share" onClick={() => {}} data-force="hover" />
+        <PilulaDaLoja label="Foco" icon="share" onClick={() => {}} data-force="focus" />
+        <PilulaDaLoja label="Pressionado" icon="share" onClick={() => {}} data-force="pressed" />
+        <PilulaDaLoja label="Desabilitado" icon="share" onClick={() => {}} disabled />
       </DemoGrupo>
     </div>
   );

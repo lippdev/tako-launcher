@@ -5,46 +5,46 @@ import { Icon } from "../Icon/Icon";
 import { cx } from "../../lib/cx";
 import styles from "./ErroDoJogo.module.css";
 
-export interface ErroDoJogoRotulos {
+export interface ErroDoJogoLabels {
   /** Rótulo do botão fechar (acessibilidade / aria-label). */
-  fechar: string;
+  close: string;
   /** Rótulo da linha de detalhes técnicos (ex.: "Detalhes técnicos"). */
-  detalhesTecnicos: string;
+  technicalDetails: string;
   /** Rótulo da ação de salvar relatório (ex.: "Salvar relatório"). */
-  salvarRelatorio: string;
+  saveReport: string;
   /** Rótulo da ação de reparar arquivos (ex.: "Reparar arquivos"). */
-  reparar: string;
+  repair: string;
   /** Rótulo da ação de tentar de novo (ex.: "Tentar de novo"). */
-  tentarDeNovo: string;
+  retry: string;
   /** Sufixo opcional para o título do jogo (ex.: "fechou sozinho"). */
-  sufixoTitulo?: string;
+  titleSuffix?: string;
 }
 
 export interface ErroDoJogoProps {
   /** Controla se o diálogo está visível. Padrão: true. */
   open?: boolean;
   /** Título do jogo (ou título completo do diálogo). */
-  tituloDoJogo: string;
+  gameTitle: string;
   /** Subtítulo com momento e duração da sessão (ex.: "Hoje, 14:02 · 12 segundos depois de abrir"). */
-  subtitulo?: string;
+  subtitle?: string;
   /** URL ou src da arte de capa do jogo. Se omitida, exibe um ícone de alerta. */
-  capaUrl?: string;
+  coverUrl?: string;
   /** Código de saída (ex.: "0xC0000005" ou número). Sem código (`null` ou `undefined`), não mostra a linha. */
-  codigoDeSaida?: string | number | null;
+  exitCode?: string | number | null;
   /** Mensagem descritiva da provável causa do encerramento. */
-  mensagem: string;
+  message: string;
   /** Se o jogo suporta verificação/reparo. Sem reparo (`false` ou omitido), não mostra o botão. */
-  podeReparar?: boolean;
+  canRepair?: boolean;
   /** Rótulos de texto dos botões e cabeçalhos vindos dos catálogos de tradução. */
-  rotulos: ErroDoJogoRotulos;
+  labels: ErroDoJogoLabels;
   /** Callback acionado ao clicar em "Tentar de novo". */
-  onTentarDeNovo: () => void;
+  onRetry: () => void;
   /** Callback acionado ao clicar em "Reparar arquivos". */
-  onReparar?: () => void;
+  onRepair?: () => void;
   /** Callback acionado ao clicar em "Salvar relatório". Sem ele (a ponte ainda não salva o relatório) a ação não aparece. */
-  onSalvarRelatorio?: () => void;
+  onSaveReport?: () => void;
   /** Callback acionado ao fechar o diálogo. */
-  onFechar: () => void;
+  onClose: () => void;
   className?: string;
 }
 
@@ -66,64 +66,64 @@ function formataCodigo(codigo: string | number | null | undefined): string | nul
  */
 export function ErroDoJogo({
   open = true,
-  tituloDoJogo,
-  subtitulo,
-  capaUrl,
-  codigoDeSaida,
-  mensagem,
-  podeReparar = false,
-  rotulos,
-  onTentarDeNovo,
-  onReparar,
-  onSalvarRelatorio,
-  onFechar,
+  gameTitle,
+  subtitle,
+  coverUrl,
+  exitCode,
+  message,
+  canRepair = false,
+  labels,
+  onRetry,
+  onRepair,
+  onSaveReport,
+  onClose,
   className,
 }: ErroDoJogoProps) {
   const [expandido, setExpandido] = useState(false);
-  const codigoTexto = formataCodigo(codigoDeSaida);
-  const tituloCompleto = rotulos.sufixoTitulo
-    ? `${tituloDoJogo} ${rotulos.sufixoTitulo}`
-    : tituloDoJogo;
+  const codigoTexto = formataCodigo(exitCode);
+  const tituloCompleto = labels.titleSuffix
+    ? `${gameTitle} ${labels.titleSuffix}`
+    : gameTitle;
 
   return (
     <Dialogo
       open={open}
-      onClose={onFechar}
+      onClose={onClose}
       size="m"
       title={tituloCompleto}
-      closeLabel={rotulos.fechar}
+      closeLabel={labels.close}
       className={cx(styles["dialogo"], className)}
       actions={
         <>
-          {onSalvarRelatorio && (
+          {onSaveReport && (
             <button
               type="button"
               className={styles["salvarRelatorio"]}
-              onClick={onSalvarRelatorio}
+              onClick={onSaveReport}
             >
-              {rotulos.salvarRelatorio}
+              {labels.saveReport}
             </button>
           )}
-          {podeReparar && (
-            <BotaoDesktop variant="outlined" onClick={onReparar}>
-              {rotulos.reparar}
+          {canRepair && (
+            <BotaoDesktop variant="outlined" onClick={onRepair}>
+              {labels.repair}
             </BotaoDesktop>
           )}
           <BotaoDesktop
             variant="primary"
             size="sm"
             icon="refresh"
-            onClick={onTentarDeNovo}
+            onClick={onRetry}
           >
-            {rotulos.tentarDeNovo}
+            {labels.retry}
           </BotaoDesktop>
         </>
       }
     >
       <div className={styles["cabecalho"]}>
-        {capaUrl ? (
+        {coverUrl ? (
           <span className={styles["capaWrap"]}>
-            <img src={capaUrl} alt="" className={styles["capa"]} />
+            <img src={coverUrl} alt="" className={styles["capa"]} />
             <i className={styles["pontoAlerta"]} aria-hidden="true" />
           </span>
         ) : (
@@ -136,20 +136,20 @@ export function ErroDoJogo({
         )}
         <div className={styles["titulos"]}>
           <h3 className={styles["titulo"]}>{tituloCompleto}</h3>
-          {subtitulo && <p className={styles["subtitulo"]}>{subtitulo}</p>}
+          {subtitle && <p className={styles["subtitulo"]}>{subtitle}</p>}
         </div>
         <button
           type="button"
           className={styles["botaoFechar"]}
-          aria-label={rotulos.fechar}
+          aria-label={labels.close}
           data-autofocus-last=""
-          onClick={onFechar}
+          onClick={onClose}
         >
           <Icon name="x" />
         </button>
       </div>
 
-      <p className={styles["mensagem"]}>{mensagem}</p>
+      <p className={styles["mensagem"]}>{message}</p>
 
       {codigoTexto != null && (
         <>
@@ -161,7 +161,7 @@ export function ErroDoJogo({
             }}
             aria-expanded={expandido}
           >
-            <span>{rotulos.detalhesTecnicos}</span>
+            <span>{labels.technicalDetails}</span>
             <strong className={styles["codigoWrap"]}>
               <span>{codigoTexto}</span>
               <span

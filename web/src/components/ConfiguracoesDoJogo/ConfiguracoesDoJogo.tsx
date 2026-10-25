@@ -57,57 +57,57 @@ export interface DescricoesConfiguracoesDoJogo {
   comandosAntesEDepois?: string;
 }
 
-export interface ConfiguracoesDoJogoRotulos {
-  titulo: string;
-  fechar: string;
-  grupoTela: string;
-  grupoSom: string;
-  grupoAbrirOJogo: string;
+export interface ConfiguracoesDoJogoLabels {
+  title: string;
+  close: string;
+  screenGroup: string;
+  soundGroup: string;
+  launchGroup: string;
   /** "Usar a tela de jogo" (liga e desliga); sem ele a linha `usarTela` não aparece. */
-  usarTela?: string;
+  useScreen?: string;
   monitor: string;
-  resolucaoETaxa: string;
+  resolutionAndRate: string;
   hdr: string;
   vrr: string;
-  saidaDeAudio: string;
-  argumentos: string;
-  pastaDeTrabalho: string;
-  variaveisDeAmbiente: string;
-  comandosAntesEDepois: string;
-  usarTudoDoTako: string;
-  descricaoUsarTudoDoTako?: string | ((mudancas: number) => string);
-  padraoPrefixo?: string;
-  nenhum?: string;
-  nenhuma?: string;
-  ligado?: string;
-  desligado?: string;
-  singularMudanca?: string;
-  pluralMudancas?: string;
-  nenhumaMudanca?: string;
+  audioOutput: string;
+  arguments: string;
+  workingDirectory: string;
+  environmentVariables: string;
+  beforeAndAfterCommands: string;
+  useAllFromTako: string;
+  useAllFromTakoDescription?: string | ((mudancas: number) => string);
+  defaultPrefix?: string;
+  none?: string;
+  noneFem?: string;
+  on?: string;
+  off?: string;
+  singularChange?: string;
+  pluralChanges?: string;
+  noChanges?: string;
 }
 
 export interface ConfiguracoesDoJogoProps {
   open?: boolean;
   onClose?: () => void;
-  tituloDoJogo: string;
-  capaUrl?: string;
-  valores: ValoresConfiguracoesDoJogo;
-  padroes?: Partial<ValoresConfiguracoesDoJogo>;
-  opcoes?: OpcoesConfiguracoesDoJogo;
-  descricoes?: DescricoesConfiguracoesDoJogo;
-  rotulos: ConfiguracoesDoJogoRotulos;
-  mudancasCount?: number;
+  gameTitle: string;
+  coverUrl?: string;
+  values: ValoresConfiguracoesDoJogo;
+  defaults?: Partial<ValoresConfiguracoesDoJogo>;
+  options?: OpcoesConfiguracoesDoJogo;
+  descriptions?: DescricoesConfiguracoesDoJogo;
+  labels: ConfiguracoesDoJogoLabels;
+  changesCount?: number;
   /**
    * Linhas que só mostram o valor, sem controle: o que o jogo guarda mas esta tela ainda não grava (comandos) ou o que
    * o sistema não deixa mudar (VRR sem suporte). O motivo vai na descrição da linha.
    */
-  somenteLeitura?: readonly ChaveConfiguracaoJogo[];
+  readOnly?: readonly ChaveConfiguracaoJogo[];
   /** O que dizer de uma linha de texto vazia ("Nenhum", "Pasta do executável"), no campo e em "Padrão: …". */
-  textoDoVazio?: Partial<Record<ChaveConfiguracaoJogo, string>>;
+  emptyText?: Partial<Record<ChaveConfiguracaoJogo, string>>;
   inline?: boolean;
   onChange?: (chave: ChaveConfiguracaoJogo, valor: ValorConfiguracaoJogo) => void;
-  onResetarAoPadrao?: () => void;
-  onCliqueLinha?: (chave: ChaveConfiguracaoJogo) => void;
+  onResetToDefault?: () => void;
+  onLineClick?: (chave: ChaveConfiguracaoJogo) => void;
   className?: string;
 }
 
@@ -119,6 +119,19 @@ const CHAVES_ABRIR: readonly ChaveConfiguracaoJogo[] = [
   "variaveisDeAmbiente",
   "comandosAntesEDepois",
 ];
+
+const CHAVE_LABEL_MAP: Record<ChaveConfiguracaoJogo, keyof ConfiguracoesDoJogoLabels> = {
+  usarTela: "useScreen",
+  monitor: "monitor",
+  resolucaoETaxa: "resolutionAndRate",
+  hdr: "hdr",
+  vrr: "vrr",
+  saidaDeAudio: "audioOutput",
+  argumentos: "arguments",
+  pastaDeTrabalho: "workingDirectory",
+  variaveisDeAmbiente: "environmentVariables",
+  comandosAntesEDepois: "beforeAndAfterCommands",
+};
 
 interface LinhaPropsBase {
   title: string;
@@ -133,29 +146,29 @@ interface LinhaPropsBase {
 export function ConfiguracoesDoJogo({
   open = true,
   onClose,
-  tituloDoJogo,
-  capaUrl,
-  valores,
-  padroes,
-  opcoes,
-  descricoes,
-  rotulos,
-  mudancasCount: mudancasCountProp,
-  somenteLeitura = [],
-  textoDoVazio,
+  gameTitle,
+  coverUrl,
+  values,
+  defaults,
+  options,
+  descriptions,
+  labels,
+  changesCount: changesCountProp,
+  readOnly = [],
+  emptyText,
   inline = false,
   onChange,
-  onResetarAoPadrao,
-  onCliqueLinha,
+  onResetToDefault,
+  onLineClick,
   className,
 }: ConfiguracoesDoJogoProps) {
-  const padraoPrefixo = rotulos.padraoPrefixo ?? "Padrao: ";
+  const padraoPrefixo = labels.defaultPrefix ?? "Padrao: ";
 
   const formatarRotuloValorPadrao = (chave: ChaveConfiguracaoJogo, valorPadrao: ValorConfiguracaoJogo): string => {
     if (typeof valorPadrao === "boolean") {
-      return valorPadrao ? (rotulos.ligado ?? "ligado") : (rotulos.desligado ?? "desligado");
+      return valorPadrao ? (labels.on ?? "ligado") : (labels.off ?? "desligado");
     }
-    const listaOpcoes = opcoes?.[chave as keyof OpcoesConfiguracoesDoJogo];
+    const listaOpcoes = options?.[chave as keyof OpcoesConfiguracoesDoJogo];
     if (listaOpcoes) {
       const encontrada = listaOpcoes.find((o: OpcaoDeSelecao<string>) => o.value === String(valorPadrao));
       if (encontrada) {
@@ -165,34 +178,34 @@ export function ConfiguracoesDoJogo({
     if (typeof valorPadrao === "string" && valorPadrao.length > 0) {
       return valorPadrao;
     }
-    if (textoDoVazio?.[chave]) {
-      return textoDoVazio[chave];
+    if (emptyText?.[chave]) {
+      return emptyText[chave];
     }
     if (chave === "variaveisDeAmbiente") {
-      return rotulos.nenhuma ?? "nenhuma";
+      return labels.noneFem ?? "nenhuma";
     }
-    return rotulos.nenhum ?? "nenhum";
+    return labels.none ?? "nenhum";
   };
 
   const chavesMudadas = useMemo(() => {
-    if (!padroes) return [];
+    if (!defaults) return [];
     const chaves: ChaveConfiguracaoJogo[] = [];
     const todas: ChaveConfiguracaoJogo[] = [...CHAVES_TELA, ...CHAVES_SOM, ...CHAVES_ABRIR];
     for (const ch of todas) {
-      const val = valores[ch];
-      const def = padroes[ch];
+      const val = values[ch];
+      const def = defaults[ch];
       if (val !== undefined && def !== undefined && val !== def) {
         chaves.push(ch);
       }
     }
     return chaves;
-  }, [valores, padroes]);
+  }, [values, defaults]);
 
-  const mudancas = mudancasCountProp !== undefined ? mudancasCountProp : chavesMudadas.length;
+  const mudancas = changesCountProp !== undefined ? changesCountProp : chavesMudadas.length;
 
-  const singularMudanca = rotulos.singularMudanca ?? "mudanca";
-  const pluralMudancas = rotulos.pluralMudancas ?? "mudancas";
-  const nenhumaMudanca = rotulos.nenhumaMudanca ?? "nenhuma mudanca";
+  const singularMudanca = labels.singularChange ?? "mudanca";
+  const pluralMudancas = labels.pluralChanges ?? "mudancas";
+  const nenhumaMudanca = labels.noChanges ?? "nenhuma mudanca";
 
   const textoMudancas =
     mudancas === 0
@@ -201,39 +214,40 @@ export function ConfiguracoesDoJogo({
         ? `1 ${singularMudanca}`
         : `${mudancas} ${pluralMudancas}`;
 
-  const subtituloPainel = `${tituloDoJogo} \u00b7 ${textoMudancas}`;
+  const subtituloPainel = `${gameTitle} \u00b7 ${textoMudancas}`;
 
   /** O valor de uma linha só de leitura, em texto: o rótulo da opção, ligado/desligado ou o texto do vazio. */
   const textoDeLeitura = (chave: ChaveConfiguracaoJogo, valor: ValorConfiguracaoJogo): string => {
     if (typeof valor === "boolean") {
-      return valor ? (rotulos.ligado ?? "ligado") : (rotulos.desligado ?? "desligado");
+      return valor ? (labels.on ?? "ligado") : (labels.off ?? "desligado");
     }
-    const opcao = opcoes?.[chave as keyof OpcoesConfiguracoesDoJogo]?.find((o) => o.value === valor);
+    const opcao = options?.[chave as keyof OpcoesConfiguracoesDoJogo]?.find((o) => o.value === valor);
     return opcao?.label ?? (valor.trim() || formatarRotuloValorPadrao(chave, ""));
   };
 
   const renderLinha = (chave: ChaveConfiguracaoJogo): ReactNode => {
-    const valor = valores[chave];
+    const valor = values[chave];
     if (valor === undefined || valor === null) {
       return null;
     }
 
-    const soLeitura = somenteLeitura.includes(chave);
-    const valorPadrao = padroes?.[chave];
+    const soLeitura = readOnly.includes(chave);
+    const valorPadrao = defaults?.[chave];
     const mudou = !soLeitura && valorPadrao !== undefined && valor !== valorPadrao;
 
-    let descricaoFinal: string | undefined = descricoes?.[chave];
+    let descricaoFinal: string | undefined = descriptions?.[chave];
     if (mudou && valorPadrao !== undefined) {
       descricaoFinal = `${padraoPrefixo}${formatarRotuloValorPadrao(chave, valorPadrao)}`;
     } else if (!descricaoFinal) {
       if (chave === "argumentos" || chave === "comandosAntesEDepois") {
-        descricaoFinal = (typeof valor === "string" && valor.trim()) ? undefined : (rotulos.nenhum ?? "Nenhum");
+        descricaoFinal = (typeof valor === "string" && valor.trim()) ? undefined : (labels.none ?? "Nenhum");
       } else if (chave === "variaveisDeAmbiente") {
-        descricaoFinal = (typeof valor === "string" && valor.trim()) ? undefined : (rotulos.nenhuma ?? "Nenhuma");
+        descricaoFinal = (typeof valor === "string" && valor.trim()) ? undefined : (labels.noneFem ?? "Nenhuma");
       }
     }
 
-    const tituloLinha = rotulos[chave as keyof ConfiguracoesDoJogoRotulos] as string;
+    const labelKey = CHAVE_LABEL_MAP[chave];
+    const tituloLinha = (labelKey ? labels[labelKey] : undefined) as string ?? "";
     const linhaProps: LinhaPropsBase = { title: tituloLinha };
     if (descricaoFinal) {
       linhaProps.description = descricaoFinal;
@@ -245,7 +259,7 @@ export function ConfiguracoesDoJogo({
     }
 
     if (chave === "usarTela") {
-      if (!rotulos.usarTela) return null;
+      if (!labels.useScreen) return null;
       linhaProps.control = ({ labelId, descriptionId }: LinhaIds) => (
         <Chave
           checked={Boolean(valor)}
@@ -258,7 +272,7 @@ export function ConfiguracoesDoJogo({
     }
 
     if (chave === "monitor") {
-      const opcoesMonitor = opcoes?.monitor;
+      const opcoesMonitor = options?.monitor;
       if (opcoesMonitor && opcoesMonitor.length > 0) {
         linhaProps.control = ({ labelId, descriptionId }: LinhaIds) => (
           <CampoDeSelecao
@@ -284,7 +298,7 @@ export function ConfiguracoesDoJogo({
     }
 
     if (chave === "resolucaoETaxa" || chave === "hdr" || chave === "saidaDeAudio") {
-      const listaOpcoes = opcoes?.[chave] ?? [];
+      const listaOpcoes = options?.[chave] ?? [];
       linhaProps.control = ({ labelId, descriptionId }: LinhaIds) => (
         <CampoDeSelecao
           label={tituloLinha}
@@ -309,7 +323,7 @@ export function ConfiguracoesDoJogo({
           />
         );
       } else {
-        const listaOpcoes = opcoes?.vrr ?? [];
+        const listaOpcoes = options?.vrr ?? [];
         linhaProps.control = ({ labelId, descriptionId }: LinhaIds) => (
           <CampoDeSelecao
             label={tituloLinha}
@@ -324,8 +338,8 @@ export function ConfiguracoesDoJogo({
       return <LinhaDeConfiguracao key={chave} {...linhaProps} />;
     }
 
-    if (onCliqueLinha) {
-      linhaProps.onClick = () => onCliqueLinha(chave);
+    if (onLineClick) {
+      linhaProps.onClick = () => onLineClick(chave);
       if (typeof valor === "string" && valor) {
         linhaProps.value = valor;
       }
@@ -335,7 +349,7 @@ export function ConfiguracoesDoJogo({
     linhaProps.control = ({ labelId, descriptionId }: LinhaIds) => (
       <CampoDaLinha
         value={typeof valor === "string" ? valor : ""}
-        placeholder={textoDoVazio?.[chave] ?? (chave === "variaveisDeAmbiente" ? rotulos.nenhuma : rotulos.nenhum)}
+        placeholder={emptyText?.[chave] ?? (chave === "variaveisDeAmbiente" ? labels.noneFem : labels.none)}
         onCommit={(novo) => onChange?.(chave, novo)}
         aria-labelledby={labelId}
         aria-describedby={descriptionId}
@@ -344,43 +358,43 @@ export function ConfiguracoesDoJogo({
     return <LinhaDeConfiguracao key={chave} {...linhaProps} />;
   };
 
-  const temLinhasTela = CHAVES_TELA.some((ch) => valores[ch] !== undefined && valores[ch] !== null);
-  const temLinhasSom = CHAVES_SOM.some((ch) => valores[ch] !== undefined && valores[ch] !== null);
-  const temLinhasAbrir = CHAVES_ABRIR.some((ch) => valores[ch] !== undefined && valores[ch] !== null);
+  const temLinhasTela = CHAVES_TELA.some((ch) => values[ch] !== undefined && values[ch] !== null);
+  const temLinhasSom = CHAVES_SOM.some((ch) => values[ch] !== undefined && values[ch] !== null);
+  const temLinhasAbrir = CHAVES_ABRIR.some((ch) => values[ch] !== undefined && values[ch] !== null);
 
   const descricaoUsarTudo =
-    typeof rotulos.descricaoUsarTudoDoTako === "function"
-      ? rotulos.descricaoUsarTudoDoTako(mudancas)
-      : (rotulos.descricaoUsarTudoDoTako ??
+    typeof labels.useAllFromTakoDescription === "function"
+      ? labels.useAllFromTakoDescription(mudancas)
+      : (labels.useAllFromTakoDescription ??
         (mudancas > 0
           ? `Volta as ${mudancas} ${mudancas === 1 ? singularMudanca : pluralMudancas} ao padrao`
-          : (rotulos.nenhumaMudanca ?? "Nenhuma mudanca ao padrao")));
+          : (labels.noChanges ?? "Nenhuma mudanca ao padrao")));
 
   const dangerLinhaProps: LinhaPropsBase = {
     danger: true,
-    title: rotulos.usarTudoDoTako,
+    title: labels.useAllFromTako,
     description: descricaoUsarTudo,
   };
-  if (onResetarAoPadrao) {
-    dangerLinhaProps.onClick = onResetarAoPadrao;
+  if (onResetToDefault) {
+    dangerLinhaProps.onClick = onResetToDefault;
   }
 
   const conteudo = (
     <div className={styles["raiz"]}>
       {temLinhasTela && (
-        <GrupoDeConfiguracao title={rotulos.grupoTela}>
+        <GrupoDeConfiguracao title={labels.screenGroup}>
           {CHAVES_TELA.map((ch) => renderLinha(ch))}
         </GrupoDeConfiguracao>
       )}
 
       {temLinhasSom && (
-        <GrupoDeConfiguracao title={rotulos.grupoSom}>
+        <GrupoDeConfiguracao title={labels.soundGroup}>
           {CHAVES_SOM.map((ch) => renderLinha(ch))}
         </GrupoDeConfiguracao>
       )}
 
       {temLinhasAbrir && (
-        <GrupoDeConfiguracao title={rotulos.grupoAbrirOJogo}>
+        <GrupoDeConfiguracao title={labels.launchGroup}>
           {CHAVES_ABRIR.map((ch) => renderLinha(ch))}
         </GrupoDeConfiguracao>
       )}
@@ -397,17 +411,17 @@ export function ConfiguracoesDoJogo({
     return (
       <aside className={cx(styles["painelInline"], className)}>
         <header className={styles["cabecalhoInline"]}>
-          {capaUrl && <img src={capaUrl} alt="" className={styles["capaInline"]} />}
+          {coverUrl && <img src={coverUrl} alt="" className={styles["capaInline"]} />}
           <div className={styles["titulosInline"]}>
-            <h3 className={styles["tituloInline"]}>{rotulos.titulo}</h3>
+            <h3 className={styles["tituloInline"]}>{labels.title}</h3>
             <span className={styles["subtituloInline"]}>{subtituloPainel}</span>
           </div>
           {onClose && (
             <button
               type="button"
               className={styles["botaoFecharInline"]}
-              aria-label={rotulos.fechar}
-              title={rotulos.fechar}
+              aria-label={labels.close}
+              title={labels.close}
               onClick={onClose}
             >
               <Icon name="x" />
@@ -424,9 +438,9 @@ export function ConfiguracoesDoJogo({
       open={open}
       onClose={onClose ?? (() => {})}
       wide
-      title={rotulos.titulo}
+      title={labels.title}
       count={subtituloPainel}
-      closeLabel={rotulos.fechar}
+      closeLabel={labels.close}
     >
       {conteudo}
     </PainelLateral>

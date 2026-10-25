@@ -239,15 +239,15 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
 
   const dataBar: DadoDaBarra[] = [
     ...(blocks.lastPlayed
-      ? [{ id: "last", icone: "calendar", rotulo: s.lastSession, valor: blocks.lastPlayed } as const]
+      ? [{ id: "last", icone: "calendar", label: s.lastSession, valor: blocks.lastPlayed } as const]
       : []),
-    ...(blocks.playTime ? [{ id: "time", icone: "clock", rotulo: s.playTime, valor: blocks.playTime } as const] : []),
+    ...(blocks.playTime ? [{ id: "time", icone: "clock", label: s.playTime, valor: blocks.playTime } as const] : []),
     ...(blocks.metacritic !== null
       ? [
           {
             id: "metacritic",
             icone: "badge",
-            rotulo: s.metacritic,
+            label: s.metacritic,
             valor: s.verdicts[metacriticVerdict(blocks.metacritic)],
             nota: { valor: blocks.metacritic, faixa: metacriticTone(blocks.metacritic) },
           } as const,
@@ -256,14 +256,14 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   ];
 
   const detailRows: DetalheDoJogo[] = [
-    ...(blocks.developer ? [{ id: "developer", rotulo: s.developer, valor: blocks.developer }] : []),
-    ...(blocks.publisher ? [{ id: "publisher", rotulo: s.publisher, valor: blocks.publisher }] : []),
-    ...(blocks.release ? [{ id: "release", rotulo: s.release, valor: blocks.release }] : []),
-    ...(blocks.genres.length > 0 ? [{ id: "genres", rotulo: s.genres, valor: blocks.genres.join(", ") }] : []),
-    ...(blocks.size ? [{ id: "size", rotulo: s.size, valor: blocks.size }] : []),
+    ...(blocks.developer ? [{ id: "developer", label: s.developer, valor: blocks.developer }] : []),
+    ...(blocks.publisher ? [{ id: "publisher", label: s.publisher, valor: blocks.publisher }] : []),
+    ...(blocks.release ? [{ id: "release", label: s.release, valor: blocks.release }] : []),
+    ...(blocks.genres.length > 0 ? [{ id: "genres", label: s.genres, valor: blocks.genres.join(", ") }] : []),
+    ...(blocks.size ? [{ id: "size", label: s.size, valor: blocks.size }] : []),
     {
       id: "installation",
-      rotulo: s.installation,
+      label: s.installation,
       valor: game.installed ? s.installed : s.notInstalled,
       ligado: game.installed,
     },
@@ -290,15 +290,15 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           <>
             <StatusDoJogo
               status={statusToChip(game.status)}
-              rotulos={CHIP_LABELS}
-              rotuloDefinir={s.status.set}
-              tituloMenu={s.status.label}
-              onAlterarStatus={(chip: StatusDoChip) =>
+              labels={CHIP_LABELS}
+              defineLabel={s.status.set}
+              menuTitle={s.status.label}
+              onStatusChange={(chip: StatusDoChip) =>
                 void change(() => call("game.status.set", { gameIds: [game.id], status: chipToStatus(chip) }))
               }
             />
-            {shown.platform && <PilulaDaLoja rotulo={shown.platform} icone="monitor" aria-label={`${s.platform}: ${shown.platform}`} />}
-            <PilulaDaLoja rotulo={libraryStrings.stores[game.store]} />
+            {shown.platform && <PilulaDaLoja label={shown.platform} icon="monitor" aria-label={`${s.platform}: ${shown.platform}`} />}
+            <PilulaDaLoja label={libraryStrings.stores[game.store]} />
           </>
         }
         situacao={
@@ -316,11 +316,11 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
             />
           )
         }
-        titulo={
+        title={
           <TituloDoJogo
             id={game.id}
-            titulo={game.title}
-            temLogo={game.hasLogo}
+            title={game.title}
+            hasLogo={game.hasLogo}
             src={devImage?.("logo", game.id, game.title)}
           />
         }
@@ -330,7 +330,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           <AcoesDoJogo
             estado={state}
             favorito={game.favorite}
-            rotulos={{
+            labels={{
               jogar: s.actions.play,
               abrindo: session.launchSlow ? t("desktop.opening_slow") : s.actions.opening,
               voltarAoJogo: s.actions.resume,
@@ -366,7 +366,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
       {(hasAbout || hasSide) && (
         <div className={styles["corpo"]} data-parte="" data-trocando={leaving}>
           <div className={styles["grade"]}>
-            {hasAbout && <CartaoSobre titulo={s.about} paragrafos={blocks.description} className={styles["sobre"]} />}
+            {hasAbout && <CartaoSobre title={s.about} paragrafos={blocks.description} className={styles["sobre"]} />}
             {hasSide && (
               <div className={styles["lateral"]}>
                 <CartaoDetalhes
@@ -385,7 +385,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
                     />
                   }
                 />
-                <ListaDeSessoes titulo={s.recentSessions} sessoes={blocks.sessions.map((x) => ({ inicio: x.startedAt, duracao: x.duration }))} />
+                <ListaDeSessoes title={s.recentSessions} sessoes={blocks.sessions.map((x) => ({ inicio: x.startedAt, duracao: x.duration }))} />
               </div>
             )}
           </div>

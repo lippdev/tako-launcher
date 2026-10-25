@@ -17,123 +17,121 @@ export interface OpcaoDeImagem {
   id: string;
   url: string;
   /** Nome legível da fonte de onde a imagem foi obtida (ex.: "Steam", "SteamGridDB", "Arquivo local"). */
-  fonte: string;
+  source: string;
   /** Dimensões da arte (ex.: "600 × 900", "1920 × 1080"). */
-  dimensoes?: string;
+  dimensions?: string;
   /** Estilo da arte para filtros (ex.: "Oficial", "Alternativa"). */
-  estilo?: string;
+  style?: string;
   /** Indica se esta imagem é a que está atualmente definida para o jogo. */
-  atual?: boolean;
+  current?: boolean;
 }
 
-export interface SeletorDeImagensRotulos {
+export interface SeletorDeImagensLabels {
   /** Rótulo do botão fechar (acessibilidade / aria-label). */
-  fechar?: string;
+  close?: string;
   /** Prefixo do título do diálogo (ex.: "Imagens de"). */
-  tituloPrefixo?: string;
+  titlePrefix?: string;
   /** Subtítulo descritivo por tipo de imagem. */
-  subtitulos?: Partial<Record<TipoDeImagem, string>>;
+  subtitles?: Partial<Record<TipoDeImagem, string>>;
   /** Nomes das abas de cada tipo. */
-  tipos?: Partial<Record<TipoDeImagem, string>>;
+  types?: Partial<Record<TipoDeImagem, string>>;
   /** Rótulo do filtro de fonte. */
-  filtroFonte?: string;
+  sourceFilter?: string;
   /** Rótulo do filtro de estilo. */
-  filtroEstilo?: string;
+  styleFilter?: string;
   /** Valor padrão dos filtros (ex.: "Todas", "Todos"). */
-  filtroTodas?: string;
+  allFilter?: string;
   /** Rótulo do botão para selecionar arquivo local. */
-  escolherDoComputador?: string;
+  chooseFromComputer?: string;
   /** Rótulo da coluna de metadados: fonte. */
-  rotuloFonte?: string;
+  sourceLabel?: string;
   /** Rótulo da coluna de metadados: tamanho. */
-  rotuloTamanho?: string;
+  sizeLabel?: string;
   /** Rótulo da ação primária por tipo (ex.: "Usar esta capa"). */
-  usarPorTipo?: Partial<Record<TipoDeImagem, string>>;
+  useByType?: Partial<Record<TipoDeImagem, string>>;
   /** Rótulo da ação de restaurar a arte original. */
-  voltarAoOriginal?: string;
+  resetToOriginal?: string;
   /** Rótulo do botão cancelar. */
-  cancelar?: string;
+  cancel?: string;
   /** Mensagem ou texto de carregamento. */
-  carregando?: string;
+  loading?: string;
   /** Mensagem exibida quando não houver imagens. */
-  vazio?: string;
+  empty?: string;
   /** Texto exibido quando uma imagem falha ao carregar. */
-  semArte?: string;
+  noArt?: string;
   /** Etiqueta da imagem atualmente aplicada ao jogo. */
-  atual?: string;
+  current?: string;
   /** Formatação do texto de resumo acima da grade. */
-  resumo?: (total: number, tipo: TipoDeImagem, fonte?: string, dimensoes?: string) => string;
+  summary?: (total: number, type: TipoDeImagem, source?: string, dimensions?: string) => string;
 }
 
 export interface SeletorDeImagensProps {
   /** Controla se o popup está aberto. */
   open: boolean;
   /** Callback acionado ao fechar o diálogo. */
-  onFechar: () => void;
-  /** Callback alternativo de fechamento (alias de `onFechar`). */
-  onClose?: () => void;
+  onClose: () => void;
   /** Callback acionado quando o usuário confirma a escolha de uma imagem. */
-  onEscolher: (opcao: OpcaoDeImagem, tipo: TipoDeImagem) => void;
+  onChoose: (option: OpcaoDeImagem, type: TipoDeImagem) => void;
   /** Título do jogo para exibição no cabeçalho. */
-  tituloDoJogo: string;
+  gameTitle: string;
   /** URL da miniatura da arte de capa do jogo para o cabeçalho. */
-  capaMiniaturaUrl?: string;
+  coverThumbnailUrl?: string;
   /** Lista de tipos de imagem disponíveis (padrão: capa, fundo, logo, ícone). */
-  tipos?: readonly TipoDeImagem[];
+  types?: readonly TipoDeImagem[];
   /** Tipo de imagem atualmente selecionado (controlado). */
-  tipoAtivo?: TipoDeImagem;
+  activeType?: TipoDeImagem;
   /** Callback acionado ao alternar de aba de tipo de imagem. */
-  onTrocarTipo?: (tipo: TipoDeImagem) => void;
+  onChangeType?: (type: TipoDeImagem) => void;
   /** Opções de imagem agrupadas por tipo. */
-  opcoesPorTipo?: Partial<Record<TipoDeImagem, readonly OpcaoDeImagem[]>>;
+  optionsByType?: Partial<Record<TipoDeImagem, readonly OpcaoDeImagem[]>>;
   /** Indica se as opções de um determinado tipo estão carregando. */
-  carregandoPorTipo?: Partial<Record<TipoDeImagem, boolean>>;
+  loadingByType?: Partial<Record<TipoDeImagem, boolean>>;
   /** Indica se a lista de opções de um determinado tipo está vazia. */
-  vazioPorTipo?: Partial<Record<TipoDeImagem, boolean>>;
+  emptyByType?: Partial<Record<TipoDeImagem, boolean>>;
   /** Callback acionado ao clicar em "Escolher do computador…". */
-  onEscolherDoComputador?: () => void;
+  onChooseFromComputer?: () => void;
   /** Callback acionado ao clicar em "Voltar à original". */
-  onVoltarAoOriginal?: () => void;
+  onResetToOriginal?: () => void;
   /** Catálogo de textos e rótulos para internacionalização. */
-  rotulos?: SeletorDeImagensRotulos;
+  labels?: SeletorDeImagensLabels;
   className?: string;
 }
 
 const TIPOS_PADRAO: readonly TipoDeImagem[] = ["capa", "fundo", "logo", "icone"];
 
-const ROTULOS_PADRAO = {
-  fechar: "Fechar (Esc)",
-  tituloPrefixo: "Imagens de",
-  subtitulos: {
+const DEFAULT_LABELS = {
+  close: "Fechar (Esc)",
+  titlePrefix: "Imagens de",
+  subtitles: {
     capa: "A capa aparece na grade, na biblioteca e em Voltar a jogar.",
     fundo: "O fundo preenche o destaque e a página do jogo.",
     logo: "O logo aparece sobre o fundo no topo da página do jogo.",
     icone: "O ícone aparece na barra lateral, na lista e nas notificações.",
   },
-  tipos: {
+  types: {
     capa: "Capa",
     fundo: "Fundo",
     logo: "Logo",
     icone: "Ícone",
   },
-  filtroFonte: "Fonte:",
-  filtroEstilo: "Estilo:",
-  filtroTodas: "Todas",
-  escolherDoComputador: "Escolher do computador…",
-  rotuloFonte: "Fonte",
-  rotuloTamanho: "Tamanho",
-  usarPorTipo: {
+  sourceFilter: "Fonte:",
+  styleFilter: "Estilo:",
+  allFilter: "Todas",
+  chooseFromComputer: "Escolher do computador…",
+  sourceLabel: "Fonte",
+  sizeLabel: "Tamanho",
+  useByType: {
     capa: "Usar esta capa",
     fundo: "Usar este fundo",
     logo: "Usar este logo",
     icone: "Usar este ícone",
   },
-  voltarAoOriginal: "Voltar à original",
-  cancelar: "Cancelar",
-  carregando: "Carregando opções…",
-  vazio: "Nenhuma imagem encontrada.",
-  semArte: "Sem imagem",
-  atual: "Atual",
+  resetToOriginal: "Voltar à original",
+  cancel: "Cancelar",
+  loading: "Carregando opções…",
+  empty: "Nenhuma imagem encontrada.",
+  noArt: "Sem imagem",
+  current: "Atual",
 } as const;
 
 function calculaProximoIndex(
@@ -158,142 +156,140 @@ function calculaProximoIndex(
  */
 export function SeletorDeImagens({
   open,
-  onFechar,
   onClose,
-  onEscolher,
-  tituloDoJogo,
-  capaMiniaturaUrl,
-  tipos = TIPOS_PADRAO,
-  tipoAtivo: tipoAtivoProp,
-  onTrocarTipo,
-  opcoesPorTipo = {},
-  carregandoPorTipo = {},
-  vazioPorTipo = {},
-  onEscolherDoComputador,
-  onVoltarAoOriginal,
-  rotulos: rotulosProp,
+  onChoose,
+  gameTitle,
+  coverThumbnailUrl,
+  types = TIPOS_PADRAO,
+  activeType: activeTypeProp,
+  onChangeType,
+  optionsByType = {},
+  loadingByType = {},
+  emptyByType = {},
+  onChooseFromComputer,
+  onResetToOriginal,
+  labels: labelsProp,
   className,
 }: SeletorDeImagensProps) {
-  const fechar = onClose ?? onFechar;
-
   // Mesclagem de rótulos com os padrões em português
-  const rotulos = useMemo(() => {
-    const subtitulosMap: Record<TipoDeImagem, string> = {
-      ...ROTULOS_PADRAO.subtitulos,
-      ...rotulosProp?.subtitulos,
+  const labels = useMemo(() => {
+    const subtitlesMap: Record<TipoDeImagem, string> = {
+      ...DEFAULT_LABELS.subtitles,
+      ...labelsProp?.subtitles,
     };
-    const tiposMap: Record<TipoDeImagem, string> = {
-      ...ROTULOS_PADRAO.tipos,
-      ...rotulosProp?.tipos,
+    const typesMap: Record<TipoDeImagem, string> = {
+      ...DEFAULT_LABELS.types,
+      ...labelsProp?.types,
     };
-    const usarMap: Record<TipoDeImagem, string> = {
-      ...ROTULOS_PADRAO.usarPorTipo,
-      ...rotulosProp?.usarPorTipo,
+    const useMap: Record<TipoDeImagem, string> = {
+      ...DEFAULT_LABELS.useByType,
+      ...labelsProp?.useByType,
     };
 
     return {
-      fechar: rotulosProp?.fechar ?? ROTULOS_PADRAO.fechar,
-      tituloPrefixo: rotulosProp?.tituloPrefixo ?? ROTULOS_PADRAO.tituloPrefixo,
-      subtitulos: subtitulosMap,
-      tipos: tiposMap,
-      filtroFonte: rotulosProp?.filtroFonte ?? ROTULOS_PADRAO.filtroFonte,
-      filtroEstilo: rotulosProp?.filtroEstilo ?? ROTULOS_PADRAO.filtroEstilo,
-      filtroTodas: rotulosProp?.filtroTodas ?? ROTULOS_PADRAO.filtroTodas,
-      escolherDoComputador: rotulosProp?.escolherDoComputador ?? ROTULOS_PADRAO.escolherDoComputador,
-      rotuloFonte: rotulosProp?.rotuloFonte ?? ROTULOS_PADRAO.rotuloFonte,
-      rotuloTamanho: rotulosProp?.rotuloTamanho ?? ROTULOS_PADRAO.rotuloTamanho,
-      usarPorTipo: usarMap,
-      voltarAoOriginal: rotulosProp?.voltarAoOriginal ?? ROTULOS_PADRAO.voltarAoOriginal,
-      cancelar: rotulosProp?.cancelar ?? ROTULOS_PADRAO.cancelar,
-      carregando: rotulosProp?.carregando ?? ROTULOS_PADRAO.carregando,
-      vazio: rotulosProp?.vazio ?? ROTULOS_PADRAO.vazio,
-      semArte: rotulosProp?.semArte ?? ROTULOS_PADRAO.semArte,
-      atual: rotulosProp?.atual ?? ROTULOS_PADRAO.atual,
-      resumo: rotulosProp?.resumo,
+      close: labelsProp?.close ?? DEFAULT_LABELS.close,
+      titlePrefix: labelsProp?.titlePrefix ?? DEFAULT_LABELS.titlePrefix,
+      subtitles: subtitlesMap,
+      types: typesMap,
+      sourceFilter: labelsProp?.sourceFilter ?? DEFAULT_LABELS.sourceFilter,
+      styleFilter: labelsProp?.styleFilter ?? DEFAULT_LABELS.styleFilter,
+      allFilter: labelsProp?.allFilter ?? DEFAULT_LABELS.allFilter,
+      chooseFromComputer: labelsProp?.chooseFromComputer ?? DEFAULT_LABELS.chooseFromComputer,
+      sourceLabel: labelsProp?.sourceLabel ?? DEFAULT_LABELS.sourceLabel,
+      sizeLabel: labelsProp?.sizeLabel ?? DEFAULT_LABELS.sizeLabel,
+      useByType: useMap,
+      resetToOriginal: labelsProp?.resetToOriginal ?? DEFAULT_LABELS.resetToOriginal,
+      cancel: labelsProp?.cancel ?? DEFAULT_LABELS.cancel,
+      loading: labelsProp?.loading ?? DEFAULT_LABELS.loading,
+      empty: labelsProp?.empty ?? DEFAULT_LABELS.empty,
+      noArt: labelsProp?.noArt ?? DEFAULT_LABELS.noArt,
+      current: labelsProp?.current ?? DEFAULT_LABELS.current,
+      summary: labelsProp?.summary,
     };
-  }, [rotulosProp]);
+  }, [labelsProp]);
 
   // Controle de tipo ativo (controlado ou interno)
-  const [tipoInterno, setTipoInterno] = useState<TipoDeImagem>(tipos[0] ?? "capa");
-  const tipoAtivo = tipoAtivoProp ?? tipoInterno;
+  const [internalActiveType, setInternalActiveType] = useState<TipoDeImagem>(types[0] ?? "capa");
+  const activeType = activeTypeProp ?? internalActiveType;
 
   const handleTrocarTipo = (novoTipo: TipoDeImagem) => {
-    if (onTrocarTipo) {
-      onTrocarTipo(novoTipo);
+    if (onChangeType) {
+      onChangeType(novoTipo);
     } else {
-      setTipoInterno(novoTipo);
+      setInternalActiveType(novoTipo);
     }
   };
 
   // Opções para o tipo ativo
-  const opcoesAtuais = useMemo(() => {
-    return opcoesPorTipo[tipoAtivo] ?? [];
-  }, [opcoesPorTipo, tipoAtivo]);
+  const currentOptions = useMemo(() => {
+    return optionsByType[activeType] ?? [];
+  }, [optionsByType, activeType]);
 
-  const estaCarregando = carregandoPorTipo[tipoAtivo] ?? false;
-  const estaVazio = (vazioPorTipo[tipoAtivo] ?? false) || (!estaCarregando && opcoesAtuais.length === 0);
+  const isLoading = loadingByType[activeType] ?? false;
+  const isEmpty = (emptyByType[activeType] ?? false) || (!isLoading && currentOptions.length === 0);
 
   // Controle de seleção para prévia sem efeitos colaterais síncronos
   const [overrideSelecionadoId, setOverrideSelecionadoId] = useState<string | null>(null);
-  const [ultimoTipo, setUltimoTipo] = useState<TipoDeImagem>(tipoAtivo);
+  const [ultimoTipo, setUltimoTipo] = useState<TipoDeImagem>(activeType);
 
-  if (tipoAtivo !== ultimoTipo) {
-    setUltimoTipo(tipoAtivo);
+  if (activeType !== ultimoTipo) {
+    setUltimoTipo(activeType);
     setOverrideSelecionadoId(null);
   }
 
   const idPadrao = useMemo(() => {
-    const atual = opcoesAtuais.find((o) => o.atual);
-    return atual?.id ?? opcoesAtuais[0]?.id ?? null;
-  }, [opcoesAtuais]);
+    const atual = currentOptions.find((o) => o.current);
+    return atual?.id ?? currentOptions[0]?.id ?? null;
+  }, [currentOptions]);
 
   const idSelecionado = overrideSelecionadoId ?? idPadrao;
-  const opcaoSelecionada = useMemo(() => {
+
+  const selectedOption = useMemo(() => {
     if (!idSelecionado) return null;
-    return opcoesAtuais.find((o) => o.id === idSelecionado) ?? opcoesAtuais[0] ?? null;
-  }, [idSelecionado, opcoesAtuais]);
+    return currentOptions.find((o) => o.id === idSelecionado) ?? currentOptions[0] ?? null;
+  }, [idSelecionado, currentOptions]);
 
   // Rastreamento de erros de carregamento de imagens individuais (estado sem arte)
   const [falhasDeImagem, setFalhasDeImagem] = useState<Record<string, boolean>>({});
 
   // Abas para o componente Abas segmentado
   const tabsData: readonly Aba<TipoDeImagem>[] = useMemo(() => {
-    return tipos.map((t) => ({
+    return types.map((t) => ({
       id: t,
-      label: rotulos.tipos[t] ?? t,
+      label: labels.types[t] ?? t,
     }));
-  }, [tipos, rotulos.tipos]);
+  }, [types, labels.types]);
 
   // Título e subtítulo do cabeçalho
-  const tituloCompleto = `${rotulos.tituloPrefixo} ${tituloDoJogo}`;
-  const subtituloAtivo = rotulos.subtitulos[tipoAtivo] ?? "";
+  const tituloCompleto = `${labels.titlePrefix} ${gameTitle}`;
+  const subtituloAtivo = labels.subtitles[activeType] ?? "";
 
   // Ação primária
-  const textoBotaoUsar = rotulos.usarPorTipo[tipoAtivo] ?? "Usar esta imagem";
+  const textoBotaoUsar = labels.useByType[activeType] ?? "Usar esta imagem";
 
   const handleEscolher = () => {
-    if (opcaoSelecionada) {
-      onEscolher(opcaoSelecionada, tipoAtivo);
+    if (selectedOption) {
+      onChoose(selectedOption, activeType);
     }
   };
 
   // Grade e número de colunas por tipo
-  const numColunas = tipoAtivo === "fundo" || tipoAtivo === "logo" ? 3 : 6;
+  const numColunas = activeType === "fundo" || activeType === "logo" ? 3 : 6;
   const classeGrade =
-    tipoAtivo === "fundo"
+    activeType === "fundo"
       ? styles["gradeFundo"]
-      : tipoAtivo === "logo"
+      : activeType === "logo"
         ? styles["gradeLogo"]
-        : tipoAtivo === "icone"
+        : activeType === "icone"
           ? styles["gradeIcone"]
           : styles["gradeCapa"];
 
   const classeAspect =
-    tipoAtivo === "fundo"
+    activeType === "fundo"
       ? styles["aspectFundo"]
-      : tipoAtivo === "logo"
+      : activeType === "logo"
         ? styles["aspectLogo"]
-        : tipoAtivo === "icone"
+        : activeType === "icone"
           ? styles["aspectIcone"]
           : styles["aspectCapa"];
 
@@ -301,14 +297,14 @@ export function SeletorDeImagens({
   const gridRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const handleKeyDownGrade = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const total = opcoesAtuais.length;
+    const total = currentOptions.length;
     if (total === 0) return;
 
     if (event.key === "Enter") {
       event.preventDefault();
-      const opcao = opcoesAtuais[index];
+      const opcao = currentOptions[index];
       if (opcao) {
-        onEscolher(opcao, tipoAtivo);
+        onChoose(opcao, activeType);
       }
       return;
     }
@@ -317,7 +313,7 @@ export function SeletorDeImagens({
     if (proximo !== null) {
       event.preventDefault();
       if (proximo !== index) {
-        const proximoItem = opcoesAtuais[proximo];
+        const proximoItem = currentOptions[proximo];
         if (proximoItem) {
           setOverrideSelecionadoId(proximoItem.id);
           gridRefs.current[proximo]?.focus();
@@ -328,42 +324,42 @@ export function SeletorDeImagens({
 
   // Texto de resumo informativo
   const textoResumo = useMemo(() => {
-    if (rotulos.resumo) {
-      return rotulos.resumo(
-        opcoesAtuais.length,
-        tipoAtivo,
-        opcaoSelecionada?.fonte,
-        opcaoSelecionada?.dimensoes,
+    if (labels.summary) {
+      return labels.summary(
+        currentOptions.length,
+        activeType,
+        selectedOption?.source,
+        selectedOption?.dimensions,
       );
     }
     const nomeTipoPlural =
-      tipoAtivo === "capa"
+      activeType === "capa"
         ? "capas"
-        : tipoAtivo === "fundo"
+        : activeType === "fundo"
           ? "fundos"
-          : tipoAtivo === "logo"
+          : activeType === "logo"
             ? "logos"
             : "ícones";
-    const partes: string[] = [`${opcoesAtuais.length} ${nomeTipoPlural}`];
-    if (opcaoSelecionada?.fonte) partes.push(opcaoSelecionada.fonte);
-    if (opcaoSelecionada?.dimensoes) partes.push(opcaoSelecionada.dimensoes);
+    const partes: string[] = [`${currentOptions.length} ${nomeTipoPlural}`];
+    if (selectedOption?.source) partes.push(selectedOption.source);
+    if (selectedOption?.dimensions) partes.push(selectedOption.dimensions);
     return partes.join(" · ");
-  }, [rotulos, opcoesAtuais.length, tipoAtivo, opcaoSelecionada]);
+  }, [labels, currentOptions.length, activeType, selectedOption]);
 
   return (
     <Dialogo
       open={open}
-      onClose={fechar}
+      onClose={onClose}
       size="l"
       title={tituloCompleto}
-      closeLabel={rotulos.fechar}
+      closeLabel={labels.close}
       className={cx(styles["dialogo"], className)}
     >
       {/* Cabeçalho com miniatura da capa do jogo, títulos e botão fechar */}
       <div className={styles["cabecalho"]}>
-        {capaMiniaturaUrl ? (
+        {coverThumbnailUrl ? (
           <img
-            src={capaMiniaturaUrl}
+            src={coverThumbnailUrl}
             alt=""
             className={styles["miniatura"]}
             onError={(e) => {
@@ -382,9 +378,9 @@ export function SeletorDeImagens({
         <button
           type="button"
           className={styles["botaoFechar"]}
-          aria-label={rotulos.fechar}
+          aria-label={labels.close}
           data-autofocus-last=""
-          onClick={fechar}
+          onClick={onClose}
         >
           <Icon name="x" />
         </button>
@@ -395,7 +391,7 @@ export function SeletorDeImagens({
         <Abas
           variant="segmentado"
           tabs={tabsData}
-          value={tipoAtivo}
+          value={activeType}
           onChange={(novaAba) => {
             handleTrocarTipo(novaAba);
           }}
@@ -404,11 +400,11 @@ export function SeletorDeImagens({
 
         <div className={styles["filtrosWrap"]}>
           <button type="button" className={styles["seletorFiltro"]}>
-            <span>{rotulos.filtroFonte} {rotulos.filtroTodas}</span>
+            <span>{labels.sourceFilter} {labels.allFilter}</span>
             <Icon name="updown" size="sm" />
           </button>
           <button type="button" className={styles["seletorFiltro"]}>
-            <span>{rotulos.filtroEstilo} {rotulos.filtroTodas}</span>
+            <span>{labels.styleFilter} {labels.allFilter}</span>
             <Icon name="updown" size="sm" />
           </button>
         </div>
@@ -417,9 +413,9 @@ export function SeletorDeImagens({
           <BotaoDesktop
             variant="outlined"
             icon="folder"
-            onClick={onEscolherDoComputador}
+            onClick={onChooseFromComputer}
           >
-            {rotulos.escolherDoComputador}
+            {labels.chooseFromComputer}
           </BotaoDesktop>
         </div>
       </div>
@@ -427,15 +423,15 @@ export function SeletorDeImagens({
       {/* Área principal: Grade à esquerda e Cartão de prévia à direita */}
       <div className={styles["areaPrincipal"]}>
         <div className={styles["colunaEsquerda"]}>
-          {!estaCarregando && !estaVazio && (
+          {!isLoading && !isEmpty && (
             <div className={styles["resumoInfo"]}>{textoResumo}</div>
           )}
 
-          {estaCarregando && (
+          {isLoading && (
             <div
               className={cx(styles["gradeOpcoes"], classeGrade)}
               aria-busy="true"
-              aria-label={rotulos.carregando}
+              aria-label={labels.loading}
             >
               {Array.from({ length: numColunas * 2 }).map((_, idx) => (
                 <div
@@ -446,20 +442,20 @@ export function SeletorDeImagens({
             </div>
           )}
 
-          {!estaCarregando && estaVazio && (
+          {!isLoading && isEmpty && (
             <div className={styles["estadoVazio"]} role="status">
               <Icon name="image" size="md" />
-              <p>{rotulos.vazio}</p>
+              <p>{labels.empty}</p>
             </div>
           )}
 
-          {!estaCarregando && !estaVazio && (
+          {!isLoading && !isEmpty && (
             <div
               className={cx(styles["gradeOpcoes"], classeGrade)}
               role="grid"
-              aria-label={rotulos.tipos[tipoAtivo] ?? tipoAtivo}
+              aria-label={labels.types[activeType] ?? activeType}
             >
-              {opcoesAtuais.map((opcao, idx) => {
+              {currentOptions.map((opcao, idx) => {
                 const estaSelecionada = opcao.id === idSelecionado;
                 const temFalha = falhasDeImagem[opcao.id] || !opcao.url;
 
@@ -472,7 +468,7 @@ export function SeletorDeImagens({
                     type="button"
                     role="gridcell"
                     aria-selected={estaSelecionada}
-                    aria-label={`${rotulos.tipos[tipoAtivo] ?? "Opção"} ${idx + 1}${opcao.atual ? ` (${rotulos.atual})` : ""}`}
+                    aria-label={`${labels.types[activeType] ?? "Opção"} ${idx + 1}${opcao.current ? ` (${labels.current})` : ""}`}
                     className={cx(
                       styles["opcaoItem"],
                       classeAspect,
@@ -482,7 +478,7 @@ export function SeletorDeImagens({
                       setOverrideSelecionadoId(opcao.id);
                     }}
                     onDoubleClick={() => {
-                      onEscolher(opcao, tipoAtivo);
+                      onChoose(opcao, activeType);
                     }}
                     onKeyDown={(e) => {
                       handleKeyDownGrade(e, idx);
@@ -492,7 +488,7 @@ export function SeletorDeImagens({
                       <div className={styles["semArte"]}>
                         <Icon name="image" size="sm" />
                         <span className={styles["semArteTexto"]}>
-                          {rotulos.semArte}
+                          {labels.noArt}
                         </span>
                       </div>
                     ) : (
@@ -502,7 +498,7 @@ export function SeletorDeImagens({
                         loading="lazy"
                         className={cx(
                           styles["opcaoImagem"],
-                          tipoAtivo === "logo" && styles["opcaoImagemLogo"],
+                          activeType === "logo" && styles["opcaoImagemLogo"],
                         )}
                         onError={() => {
                           setFalhasDeImagem((prev) => ({
@@ -513,9 +509,9 @@ export function SeletorDeImagens({
                       />
                     )}
 
-                    {opcao.atual && (
+                    {opcao.current && (
                       <span className={styles["etiquetaAtual"]}>
-                        {rotulos.atual}
+                        {labels.current}
                       </span>
                     )}
                   </button>
@@ -528,20 +524,20 @@ export function SeletorDeImagens({
         {/* Coluna direita: cartão de prévia e botões de ação */}
         <div className={styles["colunaPrevia"]}>
           <div className={cx(styles["previaImagemWrap"], classeAspect)}>
-            {opcaoSelecionada && !falhasDeImagem[opcaoSelecionada.id] && opcaoSelecionada.url ? (
+            {selectedOption && !falhasDeImagem[selectedOption.id] && selectedOption.url ? (
               <img
-                src={opcaoSelecionada.url}
+                src={selectedOption.url}
                 alt=""
                 className={cx(
                   styles["imagemPrevia"],
                   classeAspect,
-                  tipoAtivo === "logo" && styles["imagemPreviaLogo"],
+                  activeType === "logo" && styles["imagemPreviaLogo"],
                 )}
                 onError={() => {
-                  if (opcaoSelecionada) {
+                  if (selectedOption) {
                     setFalhasDeImagem((prev) => ({
                       ...prev,
-                      [opcaoSelecionada.id]: true,
+                      [selectedOption.id]: true,
                     }));
                   }
                 }}
@@ -550,23 +546,23 @@ export function SeletorDeImagens({
               <div className={styles["semArte"]}>
                 <Icon name="image" size="md" />
                 <span className={styles["semArteTexto"]}>
-                  {rotulos.semArte}
+                  {labels.noArt}
                 </span>
               </div>
             )}
           </div>
 
           <div className={styles["linhaMeta"]}>
-            <span>{rotulos.rotuloFonte}</span>
+            <span>{labels.sourceLabel}</span>
             <strong className={styles["linhaMetaValor"]}>
-              {opcaoSelecionada?.fonte ?? "—"}
+              {selectedOption?.source ?? "—"}
             </strong>
           </div>
 
           <div className={styles["linhaMeta"]}>
-            <span>{rotulos.rotuloTamanho}</span>
+            <span>{labels.sizeLabel}</span>
             <strong className={styles["linhaMetaValor"]}>
-              {opcaoSelecionada?.dimensoes ?? "—"}
+              {selectedOption?.dimensions ?? "—"}
             </strong>
           </div>
 
@@ -575,7 +571,7 @@ export function SeletorDeImagens({
               variant="primary"
               full
               icon="check"
-              disabled={!opcaoSelecionada}
+              disabled={!selectedOption}
               onClick={handleEscolher}
             >
               {textoBotaoUsar}
@@ -584,13 +580,13 @@ export function SeletorDeImagens({
             <div className={styles["acoesSecundarias"]}>
               <BotaoDesktop
                 variant="outlined"
-                disabled={!onVoltarAoOriginal}
-                onClick={onVoltarAoOriginal}
+                disabled={!onResetToOriginal}
+                onClick={onResetToOriginal}
               >
-                {rotulos.voltarAoOriginal}
+                {labels.resetToOriginal}
               </BotaoDesktop>
-              <BotaoDesktop variant="outlined" onClick={fechar}>
-                {rotulos.cancelar}
+              <BotaoDesktop variant="outlined" onClick={onClose}>
+                {labels.cancel}
               </BotaoDesktop>
             </div>
           </div>

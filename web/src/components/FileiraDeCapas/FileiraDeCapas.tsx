@@ -7,33 +7,33 @@ import styles from "./FileiraDeCapas.module.css";
 
 export interface CapaDaFileira {
   id: string;
-  titulo: string;
+  title: string;
   /** Rótulo pequeno acima do nome ("7 h jogadas"). Sem dado, não aparece. */
-  rotulo?: string | null;
-  corDestaque?: string | null;
+  label?: string | null;
+  accentColor?: string | null;
   /** Tem capa (`hasCover`). Sem ela, vale o EstadoSemArte da CapaDoJogo. */
-  temArte: boolean;
+  hasArt: boolean;
   /** URL da capa quando não vem do núcleo (galeria e hospedeiro falso). */
   src?: string | undefined;
   /** O jogo aberto na página dele (anel). */
-  ativa?: boolean;
+  active?: boolean;
   /** Marcado na seleção múltipla (anel de destaque). */
-  selecionada?: boolean;
+  selected?: boolean;
 }
 
 export interface FileiraDeCapasProps {
-  titulo: string;
+  title: string;
   /** Contagem ao lado do título ("9 jogos"). Só quando o número é o da fileira inteira. */
-  contagem?: string | undefined;
-  capas: readonly CapaDaFileira[];
-  rotuloAnterior: string;
-  rotuloProximo: string;
+  count?: string | undefined;
+  covers: readonly CapaDaFileira[];
+  previousLabel: string;
+  nextLabel: string;
   /** Abrir o jogo (clique, Enter ou Espaço na capa). */
-  onAbrir: (id: string) => void;
+  onOpen: (id: string) => void;
   /** O mouse passou por uma capa ou o foco chegou nela. */
-  onDestacar?: ((id: string) => void) | undefined;
+  onHighlight?: ((id: string) => void) | undefined;
   /** A rolagem chegou perto do fim: hora de pedir a página seguinte. */
-  onPertoDoFim?: (() => void) | undefined;
+  onNearEnd?: (() => void) | undefined;
   className?: string | undefined;
 }
 
@@ -47,19 +47,19 @@ const ALTURA = 311;
  * Quem usa decide o que passar o mouse ou abrir faz; a fileira não conhece jogo nem ponte.
  */
 export function FileiraDeCapas({
-  titulo,
-  contagem,
-  capas,
-  rotuloAnterior,
-  rotuloProximo,
-  onAbrir,
-  onDestacar,
-  onPertoDoFim,
+  title,
+  count,
+  covers,
+  previousLabel,
+  nextLabel,
+  onOpen,
+  onHighlight,
+  onNearEnd,
   className,
 }: FileiraDeCapasProps) {
   const trilho = useRef<HTMLUListElement>(null);
   const [pode, setPode] = useState({ anterior: false, proximo: false });
-  const pertoDoFim = useLatest(onPertoDoFim);
+  const pertoDoFim = useLatest(onNearEnd);
 
   // Mede a rolagem quando a fileira muda de tamanho, ganha capas ou rola.
   useEffect(() => {
@@ -78,7 +78,7 @@ export function FileiraDeCapas({
       observer.disconnect();
       el.removeEventListener("scroll", medir);
     };
-  }, [capas.length, pertoDoFim]);
+  }, [covers.length, pertoDoFim]);
 
   // A rolagem suave é do CSS (`scroll-behavior`), que "Reduzir animações" zera.
   const rolar = (sentido: -1 | 1) => {
@@ -87,19 +87,19 @@ export function FileiraDeCapas({
   };
 
   return (
-    <section className={cx(styles["fileira"], className)} aria-label={titulo}>
+    <section className={cx(styles["fileira"], className)} aria-label={title}>
       <div className={styles["cabeca"]}>
         <h2 className={styles["titulo"]}>
-          {titulo}
-          {contagem && <small className={styles["contagem"]}>{contagem}</small>}
+          {title}
+          {count && <small className={styles["contagem"]}>{count}</small>}
         </h2>
         {/* As setas só rolam; pelo teclado e pelo controle a fileira rola sozinha com o foco (`data-focus-skip`). */}
         <div className={styles["setas"]} data-focus-skip="">
           <button
             type="button"
             className={styles["seta"]}
-            aria-label={rotuloAnterior}
-            title={rotuloAnterior}
+            aria-label={previousLabel}
+            title={previousLabel}
             disabled={!pode.anterior}
             onClick={() => {
               rolar(-1);
@@ -110,8 +110,8 @@ export function FileiraDeCapas({
           <button
             type="button"
             className={styles["seta"]}
-            aria-label={rotuloProximo}
-            title={rotuloProximo}
+            aria-label={nextLabel}
+            title={nextLabel}
             disabled={!pode.proximo}
             onClick={() => {
               rolar(1);
@@ -122,31 +122,31 @@ export function FileiraDeCapas({
         </div>
       </div>
       <ul ref={trilho} className={styles["trilho"]} data-focus-group="">
-        {capas.map((capa) => (
+        {covers.map((capa) => (
           <li
             key={capa.id}
             className={styles["cartao"]}
             data-id={capa.id}
-            data-ativa={capa.ativa ? "" : undefined}
-            data-selecionada={capa.selecionada ? "" : undefined}
-            onPointerEnter={() => onDestacar?.(capa.id)}
-            onFocus={() => onDestacar?.(capa.id)}
+            data-ativa={capa.active ? "" : undefined}
+            data-selecionada={capa.selected ? "" : undefined}
+            onPointerEnter={() => onHighlight?.(capa.id)}
+            onFocus={() => onHighlight?.(capa.id)}
           >
             <CapaDoJogo
-              ajustar
-              {...(capa.temArte ? { id: capa.id } : {})}
-              titulo={capa.titulo}
-              {...(capa.temArte && capa.src ? { src: capa.src } : {})}
-              largura={LARGURA}
-              altura={ALTURA}
-              {...(capa.corDestaque ? { corDestaque: capa.corDestaque } : {})}
+              fit
+              {...(capa.hasArt ? { id: capa.id } : {})}
+              title={capa.title}
+              {...(capa.hasArt && capa.src ? { src: capa.src } : {})}
+              width={LARGURA}
+              height={ALTURA}
+              {...(capa.accentColor ? { accentColor: capa.accentColor } : {})}
               onClick={() => {
-                onAbrir(capa.id);
+                onOpen(capa.id);
               }}
             />
             <div className={styles["meta"]}>
-              {capa.rotulo && <small className={styles["rotulo"]}>{capa.rotulo}</small>}
-              <strong className={styles["nome"]}>{capa.titulo}</strong>
+              {capa.label && <small className={styles["rotulo"]}>{capa.label}</small>}
+              <strong className={styles["nome"]}>{capa.title}</strong>
             </div>
           </li>
         ))}

@@ -31,20 +31,20 @@ export function Demo() {
   const itensInterativos: ItemDownload[] = [
     {
       id: "demo-wd2",
-      titulo: "Watch Dogs 2",
-      estado: "baixando",
-      progresso: progressoInterativo,
-      tamanho: "60.9 / 108.7 GB",
-      velocidade: "12 MB/s",
-      tempoRestante: "15 min",
-      capa: CAPA_1,
+      title: "Watch Dogs 2",
+      state: "baixando",
+      progress: progressoInterativo,
+      size: "60.9 / 108.7 GB",
+      speed: "12 MB/s",
+      remainingTime: "15 min",
+      cover: CAPA_1,
     },
     {
       id: "demo-cp77",
-      titulo: "Cyberpunk 2077",
-      estado: "na_fila",
-      tamanho: "83.9 GB",
-      capa: CAPA_2,
+      title: "Cyberpunk 2077",
+      state: "na_fila",
+      size: "83.9 GB",
+      cover: CAPA_2,
     },
   ];
 
@@ -53,20 +53,20 @@ export function Demo() {
       <DemoGrupo titulo="Interativo — clique para abrir o PainelDownloads como camada (Esc ou clique fora fecha)">
         <AtividadeNaBarra
           ref={setAnchor}
-          contagem={contagemInterativa}
-          porcentagem={progressoInterativo}
-          aberto={aberto}
+          count={contagemInterativa}
+          progress={progressoInterativo}
+          open={aberto}
           onClick={() => setAberto((prev) => !prev)}
         />
         <PainelDownloads
           open={aberto}
           onClose={() => setAberto(false)}
           anchor={anchor}
-          itens={itensInterativos}
-          onPausar={() => {}}
-          onRetomar={() => {}}
-          onCancelar={() => {}}
-          onAbrirJogo={() => {}}
+          items={itensInterativos}
+          onPause={() => {}}
+          onResume={() => {}}
+          onCancel={() => {}}
+          onOpenGame={() => {}}
         />
       </DemoGrupo>
 
@@ -74,27 +74,27 @@ export function Demo() {
         <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
           <div>
             <p className="label-sm" style={{ margin: "0 0 6px" }}>Vazio / Ocioso</p>
-            <AtividadeNaBarra contagem={0} />
+            <AtividadeNaBarra count={0} />
           </div>
 
           <div>
             <p className="label-sm" style={{ margin: "0 0 6px" }}>Um baixando (56%)</p>
-            <AtividadeNaBarra contagem={1} porcentagem={56} />
+            <AtividadeNaBarra count={1} progress={56} />
           </div>
 
           <div>
             <p className="label-sm" style={{ margin: "0 0 6px" }}>Vários com fila (3 ativos)</p>
-            <AtividadeNaBarra contagem={3} porcentagem={42} />
+            <AtividadeNaBarra count={3} progress={42} />
           </div>
 
           <div>
             <p className="label-sm" style={{ margin: "0 0 6px" }}>Pausado</p>
-            <AtividadeNaBarra contagem={1} porcentagem={null} />
+            <AtividadeNaBarra count={1} progress={null} />
           </div>
 
           <div>
             <p className="label-sm" style={{ margin: "0 0 6px" }}>Com painel aberto</p>
-            <AtividadeNaBarra contagem={2} porcentagem={68} aberto={true} />
+            <AtividadeNaBarra count={2} progress={68} open={true} />
           </div>
         </div>
       </DemoGrupo>
@@ -102,8 +102,8 @@ export function Demo() {
       <DemoGrupo titulo="Animação do contador — clique para mudar o valor e ver o pulo (tk-pop 400ms)">
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
           <AtividadeNaBarra
-            contagem={contagemInterativa}
-            porcentagem={progressoInterativo}
+            count={contagemInterativa}
+            progress={progressoInterativo}
           />
           <button
             type="button"
@@ -148,9 +148,9 @@ export function Demo() {
 
       <DemoGrupo titulo="Estados de interação (hover · foco · pressionado)">
         <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-          <AtividadeNaBarra contagem={2} porcentagem={56} data-force="hover" />
-          <AtividadeNaBarra contagem={2} porcentagem={56} data-force="focus" />
-          <AtividadeNaBarra contagem={2} porcentagem={56} data-force="pressed" />
+          <AtividadeNaBarra count={2} progress={56} data-force="hover" />
+          <AtividadeNaBarra count={2} progress={56} data-force="focus" />
+          <AtividadeNaBarra count={2} progress={56} data-force="pressed" />
         </div>
       </DemoGrupo>
     </div>

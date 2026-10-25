@@ -14,12 +14,12 @@ export function Demo() {
           <CartaoSessoes
             aria-label="Dados do jogo"
             dados={[
-              { id: "last", icone: "calendar", rotulo: "Última sessão", valor: "23/10, 16:17" },
-              { id: "time", icone: "clock", rotulo: "Tempo de jogo", valor: "7 h" },
+              { id: "last", icone: "calendar", label: "Última sessão", valor: "23/10, 16:17" },
+              { id: "time", icone: "clock", label: "Tempo de jogo", valor: "7 h" },
               {
                 id: "mc",
                 icone: "badge",
-                rotulo: "Metacritic",
+                label: "Metacritic",
                 valor: "Aclamação universal",
                 nota: { valor: 94, faixa: "good" },
               },
@@ -30,7 +30,7 @@ export function Demo() {
           <CartaoSessoes
             aria-label="Dados do jogo"
             dados={[
-              { id: "mc", icone: "badge", rotulo: "Metacritic", valor: "Críticas mistas", nota: { valor: 62, faixa: "mixed" } },
+              { id: "mc", icone: "badge", label: "Metacritic", valor: "Críticas mistas", nota: { valor: 62, faixa: "mixed" } },
             ]}
           />
         </div>
@@ -41,7 +41,7 @@ export function Demo() {
               {
                 id: "mc",
                 icone: "badge",
-                rotulo: "Metacritic",
+                label: "Metacritic",
                 valor: "Críticas desfavoráveis",
                 nota: { valor: 38, faixa: "bad" },
               },
@@ -53,7 +53,7 @@ export function Demo() {
         <div style={{ width: 556 }}>
           <CartaoSessoes
             variante="lista"
-            titulo="Sessões recentes"
+            title="Sessões recentes"
             sessoes={[
               { inicio: "23/10, 16:17", duracao: "42 min" },
               { inicio: "21/10, 21:03", duracao: "7 h 20 min" },

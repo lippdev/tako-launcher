@@ -5,12 +5,12 @@ export const title = "CartaoDetalhes";
 export const preview = "CartaoDetalhes";
 
 const COMPLETO: DetalheDoJogo[] = [
-  { id: "developer", rotulo: "Desenvolvedora", valor: "Santa Monica Studios" },
-  { id: "publisher", rotulo: "Publicadora", valor: "PlayStation Publishing LLC" },
-  { id: "release", rotulo: "Lançamento", valor: "19 set, 2024" },
-  { id: "genres", rotulo: "Gêneros", valor: "Ação, Aventura" },
-  { id: "size", rotulo: "Tamanho no disco", valor: "23.5 GB" },
-  { id: "installation", rotulo: "Situação", valor: "Instalado", ligado: true },
+  { id: "developer", label: "Desenvolvedora", valor: "Santa Monica Studios" },
+  { id: "publisher", label: "Publicadora", valor: "PlayStation Publishing LLC" },
+  { id: "release", label: "Lançamento", valor: "19 set, 2024" },
+  { id: "genres", label: "Gêneros", valor: "Ação, Aventura" },
+  { id: "size", label: "Tamanho no disco", valor: "23.5 GB" },
+  { id: "installation", label: "Situação", valor: "Instalado", ligado: true },
 ];
 
 export function Demo() {
@@ -28,8 +28,8 @@ export function Demo() {
         <CartaoDetalhes
           aria-label="Detalhes do jogo"
           linhas={[
-            { id: "developer", rotulo: "Desenvolvedora", valor: "Capcom" },
-            { id: "installation", rotulo: "Situação", valor: "Instalado", ligado: true },
+            { id: "developer", label: "Desenvolvedora", valor: "Capcom" },
+            { id: "installation", label: "Situação", valor: "Instalado", ligado: true },
           ]}
           rotuloEtiquetas="Etiquetas"
         />
@@ -37,7 +37,7 @@ export function Demo() {
       <div style={{ width: 400 }}>
         <CartaoDetalhes
           aria-label="Detalhes do jogo"
-          linhas={[{ id: "installation", rotulo: "Situação", valor: "Não instalado" }]}
+          linhas={[{ id: "installation", label: "Situação", valor: "Não instalado" }]}
           rotuloEtiquetas="Etiquetas"
         />
       </div>

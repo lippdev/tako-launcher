@@ -4,6 +4,10 @@ import { Icon } from "../Icon/Icon";
 import { MenuDeContexto, type MenuEntry } from "../MenuDeContexto/MenuDeContexto";
 import styles from "./StatusDoJogo.module.css";
 
+/**
+ * Os 6 estados possíveis para um jogo na biblioteca.
+ * Baseado no modelo Takō e no README do componente.
+ */
 export type GameStatus =
   | "none"
   | "playing"
@@ -12,22 +16,26 @@ export type GameStatus =
   | "paused"
   | "dropped";
 
-export const STATUS_COLORS: Record<GameStatus, string> = {
-  none: "var(--status-none)",
-  playing: "var(--status-playing)",
-  completed: "var(--status-completed)",
-  queued: "var(--status-queued)",
-  paused: "var(--status-paused)",
-  dropped: "var(--status-dropped)",
-};
-
 const DEFAULT_LABELS: Record<GameStatus, string> = {
   none: "Sem situação",
   playing: "Jogando",
   completed: "Zerado",
-  queued: "Quero jogar",
+  queued: "Na fila",
   paused: "Pausado",
   dropped: "Abandonado",
+};
+
+/**
+ * Cores semânticas para as bolinhas de status.
+ * Seguem o padrão do sistema (--success, --accent, --warning, --error).
+ */
+const STATUS_COLORS: Record<GameStatus, string> = {
+  none: "transparent",
+  playing: "var(--accent)",
+  completed: "var(--success)",
+  queued: "var(--color-primary-light, #90caf9)",
+  paused: "var(--warning)",
+  dropped: "var(--error)",
 };
 
 const ALL_STATUSES: readonly GameStatus[] = [
@@ -43,13 +51,13 @@ export interface StatusDoJogoProps {
   /** Situação atual do jogo. */
   status: GameStatus;
   /** Callback ao escolher uma nova situação; se omitido, o chip é estático (somente leitura). */
-  onAlterarStatus?: (novoStatus: GameStatus) => void;
+  onStatusChange?: (newStatus: GameStatus) => void;
   /** Dicionário de rótulos para cada situação (internacionalização). */
-  rotulos?: Partial<Record<GameStatus, string>>;
+  labels?: Partial<Record<GameStatus, string>>;
   /** Rótulo exibido no botão quando status for "none" (padrão: "Definir situação"). */
-  rotuloDefinir?: string;
+  defineLabel?: string;
   /** Título do menu de seleção que se abre ao clicar (padrão: "Situação do jogo"). */
-  tituloMenu?: string;
+  menuTitle?: string;
   /** Rótulo para leitores de tela. */
   "aria-label"?: string;
   className?: string;
@@ -64,10 +72,10 @@ export interface StatusDoJogoProps {
  */
 export function StatusDoJogo({
   status,
-  onAlterarStatus,
-  rotulos,
-  rotuloDefinir = "Definir situação",
-  tituloMenu = "Situação do jogo",
+  onStatusChange,
+  labels,
+  defineLabel = "Definir situação",
+  menuTitle = "Situação do jogo",
   "aria-label": ariaLabel,
   className,
   "data-force": dataForce,
@@ -77,11 +85,11 @@ export function StatusDoJogo({
 
   const rotulosCompletos: Record<GameStatus, string> = {
     ...DEFAULT_LABELS,
-    ...rotulos,
+    ...labels,
   };
 
   const rotuloAtual =
-    status === "none" && onAlterarStatus ? rotuloDefinir : rotulosCompletos[status];
+    status === "none" && onStatusChange ? defineLabel : rotulosCompletos[status];
 
   const dotStyle: CSSProperties | undefined =
     status !== "none"
@@ -97,11 +105,11 @@ export function StatusDoJogo({
     checked: st === status,
     onSelect: () => {
       setMenuAberto(false);
-      onAlterarStatus?.(st);
+      onStatusChange?.(st);
     },
   }));
 
-  if (onAlterarStatus) {
+  if (onStatusChange) {
     return (
       <>
         <button
@@ -130,7 +138,7 @@ export function StatusDoJogo({
           onClose={() => setMenuAberto(false)}
           anchor={anchor}
           entries={entries}
-          title={tituloMenu}
+          title={menuTitle}
         />
       </>
     );

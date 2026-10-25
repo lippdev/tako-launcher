@@ -5,7 +5,7 @@ import styles from "./CartaoDetalhes.module.css";
 
 export interface DetalheDoJogo {
   id: string;
-  rotulo: string;
+  label: string;
   valor: string;
   /** Ponto verde à frente do valor (instalado). */
   ligado?: boolean;
@@ -45,7 +45,7 @@ export function CartaoDetalhes({
     <section className={cx(styles["caixa"], className)} aria-label={label}>
       {linhas.map((linha) => (
         <div key={linha.id} className={styles["linha"]}>
-          <span className={styles["rotulo"]}>{linha.rotulo}</span>
+          <span className={styles["rotulo"]}>{linha.label}</span>
           <strong className={styles["valor"]} title={linha.valor}>
             {linha.ligado && <i className={styles["ponto"]} aria-hidden="true" />}
             <span className={styles["texto"]}>{linha.valor}</span>
@@ -55,7 +55,7 @@ export function CartaoDetalhes({
       {temEtiquetas && (
         <div className={styles["linha"]}>
           <span className={styles["rotulo"]}>{rotuloEtiquetas}</span>
-          {editorDeEtiquetas ?? <EtiquetasDoJogo etiquetas={etiquetas} limite={3} tamanho="sm" aria-label={rotuloEtiquetas} />}
+          {editorDeEtiquetas ?? <EtiquetasDoJogo tags={etiquetas} limit={3} size="sm" aria-label={rotuloEtiquetas} />}
         </div>
       )}
     </section>

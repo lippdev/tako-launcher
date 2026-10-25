@@ -70,14 +70,14 @@ function heroData(game: LibraryGame, details: GameDetails | null): DadoDaBarra[]
   const time = formatPlayTime(game.playTimeSeconds);
   const score = validScore(details?.metacriticScore ?? null);
   return [
-    ...(last ? [{ id: "last", icone: "calendar", rotulo: g.lastSession, valor: last } as const] : []),
-    ...(time ? [{ id: "time", icone: "clock", rotulo: g.playTime, valor: time } as const] : []),
+    ...(last ? [{ id: "last", icone: "calendar", label: g.lastSession, valor: last } as const] : []),
+    ...(time ? [{ id: "time", icone: "clock", label: g.playTime, valor: time } as const] : []),
     ...(score !== null
       ? [
           {
             id: "metacritic",
             icone: "badge",
-            rotulo: g.metacritic,
+            label: g.metacritic,
             valor: g.verdicts[metacriticVerdict(score)],
             nota: { valor: score, faixa: metacriticTone(score) },
           } as const,
@@ -171,10 +171,10 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
       const src = devImage?.("cover", item.id, item.title);
       return {
         id: item.id,
-        titulo: item.title,
-        rotulo: time ? s.playedFor(time) : null,
-        corDestaque: item.accent,
-        temArte: item.hasCover,
+        title: item.title,
+        label: time ? s.playedFor(time) : null,
+        accentColor: item.accent,
+        hasArt: item.hasCover,
         src,
       };
     });
@@ -227,7 +227,7 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
                   src={devImage?.("hero", game.id, game.title)}
                 />
               }
-              chips={<PilulaDaLoja rotulo={libraryStrings.stores[game.store]} />}
+              chips={<PilulaDaLoja label={libraryStrings.stores[game.store]} />}
               situacao={
                 phase !== "none" ? (
                   <EtiquetaDeSituacao
@@ -243,12 +243,12 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
                   />
                 )
               }
-              titulo={
+              title={
                 <TituloDoJogo
                   id={game.id}
-                  titulo={game.title}
-                  temLogo={game.hasLogo}
-                  tamanho="visao"
+                  title={game.title}
+                  hasLogo={game.hasLogo}
+                  size="visao"
                   src={devImage?.("logo", game.id, game.title)}
                 />
               }
@@ -259,7 +259,7 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
                   compacto
                   estado={heroState(game, details, phase)}
                   favorito={game.favorite}
-                  rotulos={{
+                  labels={{
                     jogar: g.actions.play,
                     abrindo: session.launchSlow ? t("desktop.opening_slow") : g.actions.opening,
                     voltarAoJogo: g.actions.resume,
@@ -284,15 +284,15 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
             <FileiraDeCapas
               key={shelf.spec.id}
               className={styles["fileira"]}
-              titulo={shelfTitle(shelf)}
+              title={shelfTitle(shelf)}
               // O total de continuar jogando e de recentes inclui jogos nunca jogados; só a coleção tem contagem certa.
-              contagem={shelf.spec.kind === "collection" ? libraryStrings.count(shelf.total) : undefined}
-              capas={covers(shelf)}
-              rotuloAnterior={s.previous}
-              rotuloProximo={s.next}
-              onAbrir={onOpenGame}
-              onDestacar={highlight}
-              onPertoDoFim={() => {
+              count={shelf.spec.kind === "collection" ? libraryStrings.count(shelf.total) : undefined}
+              covers={covers(shelf)}
+              previousLabel={s.previous}
+              nextLabel={s.next}
+              onOpen={onOpenGame}
+              onHighlight={highlight}
+              onNearEnd={() => {
                 overview.loadMore(shelf.spec.id);
               }}
             />

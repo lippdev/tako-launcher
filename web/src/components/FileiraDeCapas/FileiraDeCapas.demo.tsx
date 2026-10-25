@@ -26,13 +26,13 @@ function arte(i: number): string {
   )}`;
 }
 
-const CAPAS: CapaDaFileira[] = NOMES.map((titulo, i) => ({
+const CAPAS: CapaDaFileira[] = NOMES.map((title, i) => ({
   id: `demo:${String(i)}`,
-  titulo,
-  rotulo: i % 3 === 2 ? null : `${String(7 + i * 5)} h jogadas`,
-  temArte: i !== 4,
+  title,
+  label: i % 3 === 2 ? null : `${String(7 + i * 5)} h jogadas`,
+  hasArt: i !== 4,
   src: arte(i),
-  corDestaque: "#6b8cae",
+  accentColor: "#6b8cae",
 }));
 
 export function Demo() {
@@ -42,15 +42,15 @@ export function Demo() {
       <DemoGrupo titulo={`Cinco capas por largura, setas ‹ › que rolam a fileira. Último evento: ${ultima}`}>
         <div style={{ width: "100%" }}>
           <FileiraDeCapas
-            titulo="Continuar jogando"
-            contagem="10 jogos"
-            capas={CAPAS}
-            rotuloAnterior="Anterior"
-            rotuloProximo="Próximo"
-            onAbrir={(id) => {
+            title="Continuar jogando"
+            count="10 jogos"
+            covers={CAPAS}
+            previousLabel="Anterior"
+            nextLabel="Próximo"
+            onOpen={(id) => {
               setUltima(`abrir ${id}`);
             }}
-            onDestacar={(id) => {
+            onHighlight={(id) => {
               setUltima(`destacar ${id}`);
             }}
           />

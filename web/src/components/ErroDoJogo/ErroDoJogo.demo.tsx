@@ -1,18 +1,18 @@
 import { useState } from "react";
-import { ErroDoJogo, type ErroDoJogoRotulos } from "./ErroDoJogo";
+import { ErroDoJogo, type ErroDoJogoLabels } from "./ErroDoJogo";
 import { BotaoDesktop } from "../BotaoDesktop/BotaoDesktop";
 import { DemoGrupo } from "../../lib/demoGrupo";
 
 export const title = "ErroDoJogo";
 export const preview = "ErroDoJogo";
 
-const ROTULOS: ErroDoJogoRotulos = {
-  fechar: "Fechar (Esc)",
-  detalhesTecnicos: "Detalhes técnicos",
-  salvarRelatorio: "Salvar relatório",
-  reparar: "Reparar arquivos",
-  tentarDeNovo: "Tentar de novo",
-  sufixoTitulo: "fechou sozinho",
+const ROTULOS: ErroDoJogoLabels = {
+  close: "Fechar (Esc)",
+  technicalDetails: "Detalhes técnicos",
+  saveReport: "Salvar relatório",
+  repair: "Reparar arquivos",
+  retry: "Tentar de novo",
+  titleSuffix: "fechou sozinho",
 };
 
 type Cenarios = "padrao" | "sem-codigo" | "sem-reparo" | "simples" | null;
@@ -76,25 +76,25 @@ export function Demo() {
       {cenario === "padrao" && (
         <ErroDoJogo
           open={true}
-          tituloDoJogo="God of War: Ragnarök"
-          subtitulo="Hoje, 14:02 · 12 segundos depois de abrir"
-          capaUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-          codigoDeSaida="0xC0000005"
-          mensagem="Parece um problema de memória no jogo. Isso costuma vir de mods, de sobreposições (Discord, gravadores) ou de falta de memória de vídeo."
-          podeReparar={true}
-          rotulos={ROTULOS}
-          onTentarDeNovo={() => {
+          gameTitle="God of War: Ragnarök"
+          subtitle="Hoje, 14:02 · 12 segundos depois de abrir"
+          coverUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+          exitCode="0xC0000005"
+          message="Parece um problema de memória no jogo. Isso costuma vir de mods, de sobreposições (Discord, gravadores) ou de falta de memória de vídeo."
+          canRepair={true}
+          labels={ROTULOS}
+          onRetry={() => {
             setUltimoAviso("Tentar de novo acionado");
             fechar();
           }}
-          onReparar={() => {
+          onRepair={() => {
             setUltimoAviso("Reparar arquivos acionado");
             fechar();
           }}
-          onSalvarRelatorio={() => {
+          onSaveReport={() => {
             setUltimoAviso("Salvar relatório acionado");
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
 
@@ -102,25 +102,25 @@ export function Demo() {
       {cenario === "sem-codigo" && (
         <ErroDoJogo
           open={true}
-          tituloDoJogo="Hades II"
-          subtitulo="Ontem, 22:45 · 45 minutos jogados"
-          capaUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-          codigoDeSaida={null}
-          mensagem="O jogo encerrou inesperadamente sem registrar código de erro."
-          podeReparar={true}
-          rotulos={ROTULOS}
-          onTentarDeNovo={() => {
+          gameTitle="Hades II"
+          subtitle="Ontem, 22:45 · 45 minutos jogados"
+          coverUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+          exitCode={null}
+          message="O jogo encerrou inesperadamente sem registrar código de erro."
+          canRepair={true}
+          labels={ROTULOS}
+          onRetry={() => {
             setUltimoAviso("Tentar de novo acionado");
             fechar();
           }}
-          onReparar={() => {
+          onRepair={() => {
             setUltimoAviso("Reparar arquivos acionado");
             fechar();
           }}
-          onSalvarRelatorio={() => {
+          onSaveReport={() => {
             setUltimoAviso("Salvar relatório acionado");
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
 
@@ -128,21 +128,21 @@ export function Demo() {
       {cenario === "sem-reparo" && (
         <ErroDoJogo
           open={true}
-          tituloDoJogo="Celeste"
-          subtitulo="Hoje, 10:15 · 3 minutos depois de abrir"
-          capaUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-          codigoDeSaida={1}
-          mensagem="O processo do jogo retornou código 1. Esta versão instalada não possui suporte a reparo automático de arquivos."
-          podeReparar={false}
-          rotulos={ROTULOS}
-          onTentarDeNovo={() => {
+          gameTitle="Celeste"
+          subtitle="Hoje, 10:15 · 3 minutos depois de abrir"
+          coverUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+          exitCode={1}
+          message="O processo do jogo retornou código 1. Esta versão instalada não possui suporte a reparo automático de arquivos."
+          canRepair={false}
+          labels={ROTULOS}
+          onRetry={() => {
             setUltimoAviso("Tentar de novo acionado");
             fechar();
           }}
-          onSalvarRelatorio={() => {
+          onSaveReport={() => {
             setUltimoAviso("Salvar relatório acionado");
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
 
@@ -150,16 +150,16 @@ export function Demo() {
       {cenario === "simples" && (
         <ErroDoJogo
           open={true}
-          tituloDoJogo="Jogo Desconhecido"
-          subtitulo="Hoje, 16:30"
-          mensagem="Ocorreu uma falha inesperada durante a execução."
-          podeReparar={false}
-          rotulos={ROTULOS}
-          onTentarDeNovo={() => {
+          gameTitle="Jogo Desconhecido"
+          subtitle="Hoje, 16:30"
+          message="Ocorreu uma falha inesperada durante a execução."
+          canRepair={false}
+          labels={ROTULOS}
+          onRetry={() => {
             setUltimoAviso("Tentar de novo acionado");
             fechar();
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
     </div>

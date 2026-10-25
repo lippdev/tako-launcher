@@ -11,7 +11,7 @@ export interface DestaqueProps {
   chips?: ReactNode;
   /** Embaixo à direita, de cima para baixo: situação do jogo, título (logo), descrição e ações. */
   situacao?: ReactNode;
-  titulo?: ReactNode;
+  title?: ReactNode;
   descricao?: ReactNode;
   acoes?: ReactNode;
   /** `pagina`: de borda a borda (560–700). `visao`: 400 de altura e raio de 18 (Visão geral). */
@@ -41,7 +41,7 @@ export function Destaque({
   dados,
   chips,
   situacao,
-  titulo,
+  title,
   descricao,
   acoes,
   variante = "pagina",
@@ -66,9 +66,9 @@ export function Destaque({
         <div className={styles["esquerda"]}>{dados && <Parte d={4}>{dados}</Parte>}</div>
         <div className={styles["direita"]}>
           {situacao && <Parte d={0}>{situacao}</Parte>}
-          {titulo && (
+          {title && (
             <Parte d={1} className={styles["titulo"]}>
-              {titulo}
+              {title}
             </Parte>
           )}
           {descricao && (

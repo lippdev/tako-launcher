@@ -20,41 +20,41 @@ const MINIATURA_JOGO = criaSvgArte("Capa", 1, "darkslateblue", 44, 44);
 
 // Opções de Capa (600 × 900)
 const OPCOES_CAPA: readonly OpcaoDeImagem[] = [
-  { id: "c1", url: criaSvgArte("Capa Oficial", 1, "darkslateblue", 600, 900), fonte: "Steam", dimensoes: "600 × 900", estilo: "Oficial" },
-  { id: "c2", url: criaSvgArte("Capa Alternativa", 2, "midnightblue", 600, 900), fonte: "SteamGridDB", dimensoes: "600 × 900", estilo: "Alternativa", atual: true },
-  { id: "c3", url: criaSvgArte("Capa Estilizada", 3, "darkslategray", 600, 900), fonte: "SteamGridDB", dimensoes: "600 × 900", estilo: "Minimalista" },
-  { id: "c4", url: criaSvgArte("Capa Retro", 4, "indigo", 600, 900), fonte: "SteamGridDB", dimensoes: "600 × 900", estilo: "Retro" },
-  { id: "c5", url: criaSvgArte("Capa Arte Conceito", 5, "maroon", 600, 900), fonte: "SteamGridDB", dimensoes: "600 × 900", estilo: "Arte" },
-  { id: "c6", url: criaSvgArte("Capa Edição Deluxe", 6, "teal", 600, 900), fonte: "Steam", dimensoes: "600 × 900", estilo: "Oficial" },
-  { id: "c7", url: criaSvgArte("Capa Sem Texto", 7, "purple", 600, 900), fonte: "SteamGridDB", dimensoes: "600 × 900", estilo: "Sem texto" },
-  { id: "c8", url: criaSvgArte("Capa Cartaz", 8, "darkolivegreen", 600, 900), fonte: "SteamGridDB", dimensoes: "600 × 900", estilo: "Cartaz" },
+  { id: "c1", url: criaSvgArte("Capa Oficial", 1, "darkslateblue", 600, 900), source: "Steam", dimensions: "600 × 900", style: "Oficial" },
+  { id: "c2", url: criaSvgArte("Capa Alternativa", 2, "midnightblue", 600, 900), source: "SteamGridDB", dimensions: "600 × 900", style: "Alternativa", current: true },
+  { id: "c3", url: criaSvgArte("Capa Estilizada", 3, "darkslategray", 600, 900), source: "SteamGridDB", dimensions: "600 × 900", style: "Minimalista" },
+  { id: "c4", url: criaSvgArte("Capa Retro", 4, "indigo", 600, 900), source: "SteamGridDB", dimensions: "600 × 900", style: "Retro" },
+  { id: "c5", url: criaSvgArte("Capa Arte Conceito", 5, "maroon", 600, 900), source: "SteamGridDB", dimensions: "600 × 900", style: "Arte" },
+  { id: "c6", url: criaSvgArte("Capa Edição Deluxe", 6, "teal", 600, 900), source: "Steam", dimensions: "600 × 900", style: "Oficial" },
+  { id: "c7", url: criaSvgArte("Capa Sem Texto", 7, "purple", 600, 900), source: "SteamGridDB", dimensions: "600 × 900", style: "Sem texto" },
+  { id: "c8", url: criaSvgArte("Capa Cartaz", 8, "darkolivegreen", 600, 900), source: "SteamGridDB", dimensions: "600 × 900", style: "Cartaz" },
 ];
 
 // Opções de Fundo (1920 × 1080)
 const OPCOES_FUNDO: readonly OpcaoDeImagem[] = [
-  { id: "f1", url: criaSvgArte("Fundo Submundo", 1, "midnightblue", 1920, 1080), fonte: "Steam", dimensoes: "1920 × 1080", estilo: "Oficial", atual: true },
-  { id: "f2", url: criaSvgArte("Fundo Tártaro", 2, "darkslategray", 1920, 1080), fonte: "SteamGridDB", dimensoes: "1920 × 1080", estilo: "Captura" },
-  { id: "f3", url: criaSvgArte("Fundo Olimpo", 3, "darkslateblue", 1920, 1080), fonte: "SteamGridDB", dimensoes: "1920 × 1080", estilo: "Arte" },
+  { id: "f1", url: criaSvgArte("Fundo Submundo", 1, "midnightblue", 1920, 1080), source: "Steam", dimensions: "1920 × 1080", style: "Oficial", current: true },
+  { id: "f2", url: criaSvgArte("Fundo Tártaro", 2, "darkslategray", 1920, 1080), source: "SteamGridDB", dimensions: "1920 × 1080", style: "Captura" },
+  { id: "f3", url: criaSvgArte("Fundo Olimpo", 3, "darkslateblue", 1920, 1080), source: "SteamGridDB", dimensions: "1920 × 1080", style: "Arte" },
 ];
 
 // Opções de Logo (contain, 1280 × 720)
 const OPCOES_LOGO: readonly OpcaoDeImagem[] = [
-  { id: "l1", url: criaSvgArte("Logo Principal", 1, "transparent", 1280, 720), fonte: "Steam", dimensoes: "1280 × 720", estilo: "Oficial", atual: true },
-  { id: "l2", url: criaSvgArte("Logo Branco", 2, "transparent", 1280, 720), fonte: "SteamGridDB", dimensoes: "1280 × 720", estilo: "Monocromático" },
+  { id: "l1", url: criaSvgArte("Logo Principal", 1, "transparent", 1280, 720), source: "Steam", dimensions: "1280 × 720", style: "Oficial", current: true },
+  { id: "l2", url: criaSvgArte("Logo Branco", 2, "transparent", 1280, 720), source: "SteamGridDB", dimensions: "1280 × 720", style: "Monocromático" },
 ];
 
 // Opções de Ícone (512 × 512)
 const OPCOES_ICONE: readonly OpcaoDeImagem[] = [
-  { id: "i1", url: criaSvgArte("Ícone Padrão", 1, "darkslateblue", 512, 512), fonte: "Steam", dimensoes: "512 × 512", atual: true },
-  { id: "i2", url: criaSvgArte("Ícone Alternativo", 2, "indigo", 512, 512), fonte: "SteamGridDB", dimensoes: "512 × 512" },
-  { id: "i3", url: criaSvgArte("Ícone Pixel", 3, "darkslategray", 512, 512), fonte: "SteamGridDB", dimensoes: "512 × 512" },
+  { id: "i1", url: criaSvgArte("Ícone Padrão", 1, "darkslateblue", 512, 512), source: "Steam", dimensions: "512 × 512", current: true },
+  { id: "i2", url: criaSvgArte("Ícone Alternativo", 2, "indigo", 512, 512), source: "SteamGridDB", dimensions: "512 × 512" },
+  { id: "i3", url: criaSvgArte("Ícone Pixel", 3, "darkslategray", 512, 512), source: "SteamGridDB", dimensions: "512 × 512" },
 ];
 
 // Opções com falha simulada (imagem quebrada)
 const OPCOES_COM_FALHA: readonly OpcaoDeImagem[] = [
-  { id: "quebrada-1", url: "tako-invalida://imagem-inexistente.png", fonte: "SteamGridDB", dimensoes: "600 × 900" },
-  { id: "valida-1", url: criaSvgArte("Capa Funcional", 1, "teal", 600, 900), fonte: "Steam", dimensoes: "600 × 900", atual: true },
-  { id: "quebrada-2", url: "https://tako.local/falha-404.jpg", fonte: "Arquivo local", dimensoes: "600 × 900" },
+  { id: "quebrada-1", url: "tako-invalida://imagem-inexistente.png", source: "SteamGridDB", dimensions: "600 × 900" },
+  { id: "valida-1", url: criaSvgArte("Capa Funcional", 1, "teal", 600, 900), source: "Steam", dimensions: "600 × 900", current: true },
+  { id: "quebrada-2", url: "https://tako.local/falha-404.jpg", source: "Arquivo local", dimensions: "600 × 900" },
 ];
 
 type ModoDemo = "padrao" | "carregando" | "vazio" | "quebrada" | null;
@@ -69,7 +69,7 @@ export function Demo() {
   };
 
   const handleEscolher = (opcao: OpcaoDeImagem, tipo: TipoDeImagem) => {
-    setUltimoAviso(`Imagem escolhida para ${tipo}: ${opcao.id} (${opcao.fonte} · ${opcao.dimensoes ?? "sem tamanho"})`);
+    setUltimoAviso(`Imagem escolhida para ${tipo}: ${opcao.id} (${opcao.source} · ${opcao.dimensions ?? "sem tamanho"})`);
     fechar();
   };
 
@@ -126,24 +126,24 @@ export function Demo() {
       {modoAberto === "padrao" && (
         <SeletorDeImagens
           open={true}
-          tituloDoJogo="Hades II"
-          capaMiniaturaUrl={MINIATURA_JOGO}
-          tipoAtivo={tipoAtivo}
-          onTrocarTipo={setTipoAtivo}
-          opcoesPorTipo={{
+          gameTitle="Hades II"
+          coverThumbnailUrl={MINIATURA_JOGO}
+          activeType={tipoAtivo}
+          onChangeType={setTipoAtivo}
+          optionsByType={{
             capa: OPCOES_CAPA,
             fundo: OPCOES_FUNDO,
             logo: OPCOES_LOGO,
             icone: OPCOES_ICONE,
           }}
-          onEscolher={handleEscolher}
-          onVoltarAoOriginal={() => {
+          onChoose={handleEscolher}
+          onResetToOriginal={() => {
             setUltimoAviso("Voltar à original acionado");
           }}
-          onEscolherDoComputador={() => {
+          onChooseFromComputer={() => {
             setUltimoAviso("Escolher do computador acionado");
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
 
@@ -151,12 +151,12 @@ export function Demo() {
       {modoAberto === "carregando" && (
         <SeletorDeImagens
           open={true}
-          tituloDoJogo="Hades II"
-          capaMiniaturaUrl={MINIATURA_JOGO}
-          tipoAtivo="capa"
-          carregandoPorTipo={{ capa: true }}
-          onEscolher={handleEscolher}
-          onFechar={fechar}
+          gameTitle="Hades II"
+          coverThumbnailUrl={MINIATURA_JOGO}
+          activeType="capa"
+          loadingByType={{ capa: true }}
+          onChoose={handleEscolher}
+          onClose={fechar}
         />
       )}
 
@@ -164,13 +164,13 @@ export function Demo() {
       {modoAberto === "vazio" && (
         <SeletorDeImagens
           open={true}
-          tituloDoJogo="Hades II"
-          capaMiniaturaUrl={MINIATURA_JOGO}
-          tipoAtivo="capa"
-          vazioPorTipo={{ capa: true }}
-          opcoesPorTipo={{ capa: [] }}
-          onEscolher={handleEscolher}
-          onFechar={fechar}
+          gameTitle="Hades II"
+          coverThumbnailUrl={MINIATURA_JOGO}
+          activeType="capa"
+          emptyByType={{ capa: true }}
+          optionsByType={{ capa: [] }}
+          onChoose={handleEscolher}
+          onClose={fechar}
         />
       )}
 
@@ -178,12 +178,12 @@ export function Demo() {
       {modoAberto === "quebrada" && (
         <SeletorDeImagens
           open={true}
-          tituloDoJogo="Hades II"
-          capaMiniaturaUrl={MINIATURA_JOGO}
-          tipoAtivo="capa"
-          opcoesPorTipo={{ capa: OPCOES_COM_FALHA }}
-          onEscolher={handleEscolher}
-          onFechar={fechar}
+          gameTitle="Hades II"
+          coverThumbnailUrl={MINIATURA_JOGO}
+          activeType="capa"
+          optionsByType={{ capa: OPCOES_COM_FALHA }}
+          onChoose={handleEscolher}
+          onClose={fechar}
         />
       )}
     </div>

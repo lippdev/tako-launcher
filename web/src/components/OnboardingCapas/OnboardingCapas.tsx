@@ -88,10 +88,10 @@ export function OnboardingCapas<T extends string = string>({
         <div className={styles["comparisonSection"]}>
           <div className={styles["coverBefore"]}>
             <CapaDoJogo
-              titulo={gameTitle}
-              largura={120}
-              altura={160}
-              {...(gameHighlightColor !== undefined ? { corDestaque: gameHighlightColor } : {})}
+              title={gameTitle}
+              width={120}
+              height={160}
+              {...(gameHighlightColor !== undefined ? { accentColor: gameHighlightColor } : {})}
             />
           </div>
           <span
@@ -102,9 +102,9 @@ export function OnboardingCapas<T extends string = string>({
           </span>
           <div className={styles["coverAfter"]}>
             <CapaDoJogo
-              titulo={gameTitle}
-              largura={120}
-              altura={160}
+              title={gameTitle}
+              width={120}
+              height={160}
               {...(gameCoverUrl !== undefined ? { src: gameCoverUrl } : {})}
             />
           </div>

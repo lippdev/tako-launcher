@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { DemoGrupo } from "../../lib/demoGrupo";
-import { AcoesDoJogo, type AcoesDoJogoRotulos, type EstadoDoPrimario } from "./AcoesDoJogo";
+import { AcoesDoJogo, type AcoesDoJogoLabels, type EstadoDoPrimario } from "./AcoesDoJogo";
 
 export const title = "AcoesDoJogo";
 export const preview = "AcoesDoJogo";
 
-const ROTULOS_DE_EXEMPLO: AcoesDoJogoRotulos = {
+const ROTULOS_DE_EXEMPLO: AcoesDoJogoLabels = {
   jogar: "Jogar",
   abrindo: "Abrindo…",
   voltarAoJogo: "Voltar ao jogo",
@@ -36,7 +36,7 @@ export function Demo() {
           <AcoesDoJogo
             estado={estado}
             favorito={favorito}
-            rotulos={ROTULOS_DE_EXEMPLO}
+            labels={ROTULOS_DE_EXEMPLO}
             onJogar={() => undefined}
             onVoltarAoJogo={() => undefined}
             onEncerrar={() => undefined}

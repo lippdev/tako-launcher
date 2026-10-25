@@ -9,27 +9,27 @@ export interface CapaDoJogoProps {
   /** ID do jogo (`steam:570`, `heroic:legendary:Fortnite`) para montar a URL `tako-img://cover`. */
   id?: string;
   /** Título do jogo, usado no texto alternativo da imagem e no EstadoSemArte. */
-  titulo: string;
+  title: string;
   /**
    * Cor de destaque do jogo (hex, CSS). Usada no degradê do `EstadoSemArte` quando não houver imagem
    * ou em caso de erro no carregamento. Padrão: var(--accent).
    */
-  corDestaque?: string;
+  accentColor?: string;
   /**
    * URL direta da imagem da capa. Quando informada (ex.: na demo ou teste), tem precedência sobre o
    * protocolo `tako-img://`.
    */
   src?: string;
   /** Largura da capa em pixels CSS para calcular a resolução física (w e h com devicePixelRatio). */
-  largura?: number;
+  width?: number;
   /** Altura da capa em pixels CSS (se omitida, calculada pela proporção 2:3 da Steam). */
-  altura?: number;
-  /** A capa ocupa a largura do contêiner (fileiras e grades); `largura` só dimensiona o pedido da imagem. */
-  ajustar?: boolean;
+  height?: number;
+  /** A capa ocupa a largura do contêiner (fileiras e grades); `width` só dimensiona o pedido da imagem. */
+  fit?: boolean;
   /** Clique na capa do jogo. */
   onClick?: () => void;
   /** Carregamento sob demanda (`lazy`, padrão) ou prioritário (`eager`). */
-  carregamento?: "lazy" | "eager";
+  loading?: "lazy" | "eager";
   className?: string;
   /** Força o estado hover para exibição na galeria de componentes. */
   "data-force"?: "hover";
@@ -53,22 +53,22 @@ function montaUrlCapa(id: string, larguraCss: number, alturaCss: number): string
  */
 export function CapaDoJogo({
   id,
-  titulo,
-  corDestaque,
+  title,
+  accentColor,
   src,
-  largura = 200,
-  altura,
-  ajustar = false,
+  width = 200,
+  height,
+  fit = false,
   onClick,
-  carregamento = "lazy",
+  loading = "lazy",
   className,
   "data-force": dataForce,
 }: CapaDoJogoProps) {
   useImageVersion(id);
   const [erroImagem, setErroImagem] = useState<string | undefined>(undefined);
 
-  const alturaCalculada = altura ?? Math.round(largura * 1.5);
-  const urlFinal = (src ? versionedImageUrl(src) : undefined) ?? (id ? montaUrlCapa(id, largura, alturaCalculada) : undefined);
+  const alturaCalculada = height ?? Math.round(width * 1.5);
+  const urlFinal = (src ? versionedImageUrl(src) : undefined) ?? (id ? montaUrlCapa(id, width, alturaCalculada) : undefined);
   const semArte = !urlFinal || erroImagem === urlFinal;
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -79,8 +79,8 @@ export function CapaDoJogo({
   };
 
   const styleCustom: CSSProperties = {
-    ...(corDestaque ? ({ "--capa-cor": corDestaque } as CSSProperties) : {}),
-    ...(largura && !ajustar ? { width: `${largura}px` } : {}),
+    ...(accentColor ? ({ "--capa-cor": accentColor } as CSSProperties) : {}),
+    ...(width && !fit ? { width: `${width}px` } : {}),
   };
 
   return (
@@ -94,20 +94,20 @@ export function CapaDoJogo({
             tabIndex: 0,
             onClick,
             onKeyDown: handleKeyDown,
-            "aria-label": titulo,
+            "aria-label": title,
           }
         : {})}
     >
       {semArte ? (
-        <div className={styles["semArte"]} aria-label={titulo}>
-          <span className={styles["semArteTitulo"]}>{titulo}</span>
+        <div className={styles["semArte"]} aria-label={title}>
+          <span className={styles["semArteTitulo"]}>{title}</span>
         </div>
       ) : (
         <img
           className={styles["img"]}
           src={urlFinal}
-          alt={titulo}
-          loading={carregamento}
+          alt={title}
+          loading={loading}
           decoding="async"
           draggable={false}
           onError={() => {

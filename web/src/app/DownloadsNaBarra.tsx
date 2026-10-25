@@ -73,11 +73,11 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
     <>
       <AtividadeNaBarra
         ref={setAnchor}
-        contagem={count}
-        porcentagem={percent}
-        aberto={open}
-        titulo={strings.topbar.downloads}
-        ariaLabel={count > 0 ? t("downloads.n_active", { n: count }) : strings.topbar.downloads}
+        count={count}
+        progress={percent}
+        open={open}
+        title={strings.topbar.downloads}
+        aria-label={count > 0 ? t("downloads.n_active", { n: count }) : strings.topbar.downloads}
         onClick={() => {
           setOpen((value) => !value);
         }}
@@ -88,41 +88,41 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
           setOpen(false);
         }}
         anchor={anchor}
-        itens={items}
-        titulo={t("downloads.title")}
-        rotuloAtivos={() => t("downloads.n_active", { n: summary.downloading })}
-        rotuloVazio={enabled ? t("downloads.empty") : s.off}
-        rotulosSecoes={{
-          baixando: t("downloads.group_active"),
-          naFila: t("downloads.group_queued"),
-          concluidos: t("downloads.group_done"),
+        items={items}
+        title={t("downloads.title")}
+        activeLabel={() => t("downloads.n_active", { n: summary.downloading })}
+        emptyLabel={enabled ? t("downloads.empty") : s.off}
+        sectionLabels={{
+          downloading: t("downloads.group_active"),
+          queued: t("downloads.group_queued"),
+          completed: t("downloads.group_done"),
         }}
-        rotulosEstado={{
+        stateLabels={{
           baixando: t("downloads.group_active"),
           pausado: t("downloads.paused"),
           na_fila: t("downloads.group_queued"),
           concluido: t("downloads.group_done"),
           erro: s.error,
         }}
-        rotulosAcoes={{
-          pausar: t("downloads.pause"),
-          retomar: t("downloads.resume"),
-          cancelar: t("downloads.cancel"),
-          abrirJogo: s.openGame,
+        actionLabels={{
+          pause: t("downloads.pause"),
+          resume: t("downloads.resume"),
+          cancel: t("downloads.cancel"),
+          openGame: s.openGame,
         }}
-        onPausar={(id) => {
+        onPause={(id) => {
           const entry = findEntry(entries, id);
           if (entry) run(call("downloads.pause", { downloadId: entry.id }));
         }}
-        onRetomar={(id) => {
+        onResume={(id) => {
           const entry = findEntry(entries, id);
           if (entry) run(call("downloads.resume", { downloadId: entry.id }));
         }}
-        onCancelar={(id) => {
+        onCancel={(id) => {
           const entry = findEntry(entries, id);
           if (entry) setCancelId(entry.id);
         }}
-        onAbrirJogo={(id) => {
+        onOpenGame={(id) => {
           const gameId = findEntry(entries, id)?.gameId;
           if (!gameId) return;
           setOpen(false);

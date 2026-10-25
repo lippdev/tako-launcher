@@ -51,41 +51,41 @@ export function AtualizacaoNaBarra() {
       {view && status && (
         <AtualizacaoDoApp
           open={dialogOpen}
-          estado={view.estado}
-          versao={view.versao}
-          subtitulo={view.subtitulo}
-          novidades={view.novidades}
-          progresso={view.progresso}
-          {...(view.observacao ? { observacao: view.observacao } : {})}
-          rotulos={{
-            fechar: t("common.close"),
+          state={view.estado}
+          version={view.versao}
+          subtitle={view.subtitulo}
+          releaseNotes={view.novidades}
+          progress={view.progresso}
+          {...(view.observacao ? { note: view.observacao } : {})}
+          labels={{
+            close: t("common.close"),
             // Baixando, "Depois" só esconde o diálogo: o download continua (como o "Esconder" do Slint).
-            depois: t(view.estado === "baixando" ? "updates.desktop.hide" : "updates.desktop.later"),
-            novidades: t("updates.desktop.notes"),
-            baixar: t("updates.desktop.view"),
-            reiniciar: t("updates.desktop.restart"),
-            tentarDeNovo: t("updates.desktop.retry"),
-            tituloDisponivel: t("updates.desktop.found", { version: view.versao }),
-            tituloBaixando: t("updates.desktop.downloading"),
-            tituloPronta: t("desktop.window.update_ready"),
-            tituloErro: t("updates.desktop.download_failed"),
-            ajudaBaixando: t("updates.desktop.help_downloading"),
-            todasAsNotas: t("updates.desktop.all_notes"),
+            later: t(view.estado === "baixando" ? "updates.desktop.hide" : "updates.desktop.later"),
+            notes: t("updates.desktop.notes"),
+            download: t("updates.desktop.view"),
+            restart: t("updates.desktop.restart"),
+            retry: t("updates.desktop.retry"),
+            availableTitle: t("updates.desktop.found", { version: view.versao }),
+            downloadingTitle: t("updates.desktop.downloading"),
+            readyTitle: t("desktop.window.update_ready"),
+            errorTitle: t("updates.desktop.download_failed"),
+            downloadingHelp: t("updates.desktop.help_downloading"),
+            allNotes: t("updates.desktop.all_notes"),
           }}
-          onFechar={closeUpdateDialog}
+          onClose={closeUpdateDialog}
           // Sem arquivo conferível para baixar, o botão principal só leva à página da release.
-          onBaixar={() => {
+          onDownload={() => {
             if (pageUrl) openExternal(pageUrl);
           }}
-          onReiniciar={() => {
+          onRestart={() => {
             void applyUpdate();
           }}
-          onTentarDeNovo={() => {
+          onRetry={() => {
             void retryUpdateDownload();
           }}
           {...(pageUrl
             ? {
-                onVerNotas: () => {
+                onViewNotes: () => {
                   openExternal(pageUrl);
                 },
               }

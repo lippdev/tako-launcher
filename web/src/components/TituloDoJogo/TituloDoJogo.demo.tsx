@@ -16,18 +16,18 @@ export function Demo() {
     <div>
       <DemoGrupo titulo="Com logo (até 440×140) · sem logo (o nome em texto, Poppins 54/800)">
         <div style={fundo}>
-          <TituloDoJogo id="demo:1" titulo="Hades II" temLogo src={LOGO} />
+          <TituloDoJogo id="demo:1" title="Hades II" hasLogo src={LOGO} />
         </div>
         <div style={fundo}>
-          <TituloDoJogo id="demo:2" titulo="Dragon's Dogma 2" temLogo={false} />
+          <TituloDoJogo id="demo:2" title="Dragon's Dogma 2" hasLogo={false} />
         </div>
       </DemoGrupo>
       <DemoGrupo titulo="Título longo e tamanho da Visão geral (320×100)">
         <div style={fundo}>
-          <TituloDoJogo id="demo:3" titulo="Ghost of Tsushima Director's Cut" temLogo={false} />
+          <TituloDoJogo id="demo:3" title="Ghost of Tsushima Director's Cut" hasLogo={false} />
         </div>
         <div style={fundo}>
-          <TituloDoJogo id="demo:4" titulo="Hades II" temLogo src={LOGO} tamanho="visao" />
+          <TituloDoJogo id="demo:4" title="Hades II" hasLogo src={LOGO} size="visao" />
         </div>
       </DemoGrupo>
     </div>

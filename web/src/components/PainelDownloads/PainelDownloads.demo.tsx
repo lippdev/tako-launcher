@@ -45,39 +45,39 @@ export function Demo() {
   const [itens, setItens] = useState<ItemDownload[]>([
     {
       id: "int-wd2",
-      titulo: "Watch Dogs 2",
-      estado: "baixando",
-      progresso: 56,
-      tamanho: "60.9 / 108.7 GB",
-      velocidade: "12 MB/s",
-      tempoRestante: "15 min",
-      capa: CAPA_WD2,
+      title: "Watch Dogs 2",
+      state: "baixando",
+      progress: 56,
+      size: "60.9 / 108.7 GB",
+      speed: "12 MB/s",
+      remainingTime: "15 min",
+      cover: CAPA_WD2,
     },
     {
       id: "int-cp77",
-      titulo: "Cyberpunk 2077",
-      estado: "na_fila",
-      tamanho: "83.9 GB",
-      capa: CAPA_CP77,
+      title: "Cyberpunk 2077",
+      state: "na_fila",
+      size: "83.9 GB",
+      cover: CAPA_CP77,
     },
     {
       id: "int-hk",
-      titulo: "Hollow Knight",
-      estado: "concluido",
-      tamanho: "9.2 GB",
-      capa: CAPA_HK,
+      title: "Hollow Knight",
+      state: "concluido",
+      size: "9.2 GB",
+      cover: CAPA_HK,
     },
   ]);
 
   const handlePausar = (id: string) => {
     setItens((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, estado: "pausado" as const } : it))
+      prev.map((it) => (it.id === id ? { ...it, state: "pausado" as const } : it))
     );
   };
 
   const handleRetomar = (id: string) => {
     setItens((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, estado: "baixando" as const } : it))
+      prev.map((it) => (it.id === id ? { ...it, state: "baixando" as const } : it))
     );
   };
 
@@ -114,11 +114,11 @@ export function Demo() {
           open={aberto}
           onClose={() => setAberto(false)}
           anchor={anchor}
-          itens={itens}
-          onPausar={handlePausar}
-          onRetomar={handleRetomar}
-          onCancelar={handleCancelar}
-          onAbrirJogo={handleAbrirJogo}
+          items={itens}
+          onPause={handlePausar}
+          onResume={handleRetomar}
+          onCancel={handleCancelar}
+          onOpenGame={handleAbrirJogo}
         />
         <p className="label-sm" style={{ margin: "8px 0 0" }}>
           Esc fecha a camada, Tab fica preso dentro, o foco volta para o botão que abriu.
@@ -126,122 +126,122 @@ export function Demo() {
       </DemoGrupo>
 
       <DemoGrupo titulo="1. Estado Vazio (sem downloads ativos)">
-        <PainelDownloads inline itens={[]} />
+        <PainelDownloads inline items={[]} />
       </DemoGrupo>
 
       <DemoGrupo titulo="2. Um baixando (com tamanho, velocidade, tempo restante e barra de progresso)">
         <PainelDownloads
           inline
-          itens={[
+          items={[
             {
               id: "demo-wd2-solo",
-              titulo: "Watch Dogs 2",
-              estado: "baixando",
-              progresso: 56,
-              tamanho: "60.9 / 108.7 GB",
-              velocidade: "12 MB/s",
-              tempoRestante: "15 min",
-              capa: CAPA_WD2,
+              title: "Watch Dogs 2",
+              state: "baixando",
+              progress: 56,
+              size: "60.9 / 108.7 GB",
+              speed: "12 MB/s",
+              remainingTime: "15 min",
+              cover: CAPA_WD2,
             },
           ]}
-          onPausar={() => {}}
+          onPause={() => {}}
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="3. Vários com fila e tarefas em segundo plano (com e sem capa)">
         <PainelDownloads
           inline
-          itens={[
+          items={[
             {
               id: "demo-wd2-multi",
-              titulo: "Watch Dogs 2",
-              estado: "baixando",
-              progresso: 56,
-              tamanho: "60.9 / 108.7 GB",
-              velocidade: "12 MB/s",
-              tempoRestante: "15 min",
-              capa: CAPA_WD2,
+              title: "Watch Dogs 2",
+              state: "baixando",
+              progress: 56,
+              size: "60.9 / 108.7 GB",
+              speed: "12 MB/s",
+              remainingTime: "15 min",
+              cover: CAPA_WD2,
             },
             {
               id: "demo-tarefa-sync",
-              titulo: "Sincronizando nuvem",
-              estado: "baixando",
-              progresso: null,
-              velocidade: null,
-              tempoRestante: null,
-              tamanho: null,
+              title: "Sincronizando nuvem",
+              state: "baixando",
+              progress: null,
+              speed: null,
+              remainingTime: null,
+              size: null,
             },
             {
               id: "demo-cp77-multi",
-              titulo: "Cyberpunk 2077",
-              estado: "na_fila",
-              tamanho: "83.9 GB",
-              capa: CAPA_CP77,
+              title: "Cyberpunk 2077",
+              state: "na_fila",
+              size: "83.9 GB",
+              cover: CAPA_CP77,
             },
             {
               id: "demo-hades-multi",
-              titulo: "Hades II",
-              estado: "na_fila",
-              tamanho: "12.4 GB",
-              capa: CAPA_HADES,
+              title: "Hades II",
+              state: "na_fila",
+              size: "12.4 GB",
+              cover: CAPA_HADES,
             },
           ]}
-          onPausar={() => {}}
-          onCancelar={() => {}}
+          onPause={() => {}}
+          onCancel={() => {}}
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="4. Pausado">
         <PainelDownloads
           inline
-          itens={[
+          items={[
             {
               id: "demo-cp77-paused",
-              titulo: "Cyberpunk 2077",
-              estado: "pausado",
-              progresso: 94,
-              tamanho: "83.9 / 89.3 GB",
-              capa: CAPA_CP77,
+              title: "Cyberpunk 2077",
+              state: "pausado",
+              progress: 94,
+              size: "83.9 / 89.3 GB",
+              cover: CAPA_CP77,
             },
           ]}
-          onRetomar={() => {}}
-          onCancelar={() => {}}
+          onResume={() => {}}
+          onCancel={() => {}}
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="5. Erro">
         <PainelDownloads
           inline
-          itens={[
+          items={[
             {
               id: "demo-hades-err",
-              titulo: "Hades II",
-              estado: "erro",
-              erro: "Falha na conexão de rede",
-              progresso: 32,
-              tamanho: "4.1 / 12.4 GB",
-              capa: CAPA_HADES,
+              title: "Hades II",
+              state: "erro",
+              error: "Falha na conexão de rede",
+              progress: 32,
+              size: "4.1 / 12.4 GB",
+              cover: CAPA_HADES,
             },
           ]}
-          onRetomar={() => {}}
-          onCancelar={() => {}}
+          onResume={() => {}}
+          onCancel={() => {}}
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="6. Concluído">
         <PainelDownloads
           inline
-          itens={[
+          items={[
             {
               id: "demo-hk-done",
-              titulo: "Hollow Knight",
-              estado: "concluido",
-              progresso: 100,
-              tamanho: "9.2 GB",
-              capa: CAPA_HK,
+              title: "Hollow Knight",
+              state: "concluido",
+              progress: 100,
+              size: "9.2 GB",
+              cover: CAPA_HK,
             },
           ]}
-          onAbrirJogo={() => {}}
+          onOpenGame={() => {}}
         />
       </DemoGrupo>
     </div>

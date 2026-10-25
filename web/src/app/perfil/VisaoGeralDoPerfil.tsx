@@ -29,10 +29,10 @@ export function VisaoGeralDoPerfil({ summary, onOpenGame, onSeeAll }: VisaoGeral
   const bars = useMemo(() => weekBars(summary.week, summary.today, t), [summary.week, summary.today, t]);
   const top: CapaDaFileira[] = summary.topGames.map((game) => ({
     id: game.id,
-    titulo: game.title,
-    rotulo: playTimeText(game.playTimeSeconds, t),
-    corDestaque: game.accent,
-    temArte: game.hasCover,
+    title: game.title,
+    label: playTimeText(game.playTimeSeconds, t),
+    accentColor: game.accent,
+    hasArt: game.hasCover,
     src: shelfCover(game),
   }));
   const recent = summary.recentSessions.map((session, index) => ({
@@ -64,11 +64,11 @@ export function VisaoGeralDoPerfil({ summary, onOpenGame, onSeeAll }: VisaoGeral
       {top.length > 0 && (
         <div className={styles["secao"]}>
           <FileiraDeCapas
-            titulo={t("profile.tile_top")}
-            capas={top}
-            rotuloAnterior={s.previous}
-            rotuloProximo={s.next}
-            onAbrir={onOpenGame}
+            title={t("profile.tile_top")}
+            covers={top}
+            previousLabel={s.previous}
+            nextLabel={s.next}
+            onOpen={onOpenGame}
           />
         </div>
       )}

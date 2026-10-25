@@ -56,57 +56,57 @@ export function Demo() {
     <div>
       <DemoGrupo titulo="Com arte (600×900, 2:3) — normal e hover">
         <CapaDoJogo
-          titulo="Chrono Odyssey"
+          title="Chrono Odyssey"
           src={ARTE_EXEMPLO_1}
-          largura={180}
+          width={180}
         />
         <CapaDoJogo
-          titulo="Stellaris Run"
+          title="Stellaris Run"
           src={ARTE_EXEMPLO_2}
-          largura={180}
+          width={180}
         />
         <CapaDoJogo
-          titulo="Hover forçado (zoom 1.05 + brilho)"
+          title="Hover forçado (zoom 1.05 + brilho)"
           src={ARTE_EXEMPLO_1}
-          largura={180}
+          width={180}
           data-force="hover"
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="EstadoSemArte — degradê da cor de destaque do jogo e título sobreposto">
         <CapaDoJogo
-          titulo="Elden Ring: Shadow of the Erdtree"
-          corDestaque="var(--warning)"
-          largura={180}
+          title="Elden Ring: Shadow of the Erdtree"
+          accentColor="var(--warning)"
+          width={180}
         />
         <CapaDoJogo
-          titulo="Cyberpunk 2077: Phantom Liberty"
-          corDestaque="var(--success)"
-          largura={180}
+          title="Cyberpunk 2077: Phantom Liberty"
+          accentColor="var(--success)"
+          width={180}
         />
         <CapaDoJogo
-          titulo="Hades II"
-          corDestaque="var(--error)"
-          largura={180}
+          title="Hades II"
+          accentColor="var(--error)"
+          width={180}
         />
         <CapaDoJogo
-          titulo="Dead Cells: Return to Castlevania"
-          corDestaque="var(--accent-exemplo)"
-          largura={180}
+          title="Dead Cells: Return to Castlevania"
+          accentColor="var(--accent-exemplo)"
+          width={180}
           data-force="hover"
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="Tamanhos variados da proporção 2:3">
         <CapaDoJogo
-          titulo="Miniatura (120px)"
+          title="Miniatura (120px)"
           src={ARTE_EXEMPLO_1}
-          largura={120}
+          width={120}
         />
         <CapaDoJogo
-          titulo="Padrão da vitrine (200px)"
+          title="Padrão da vitrine (200px)"
           src={ARTE_EXEMPLO_2}
-          largura={200}
+          width={200}
         />
       </DemoGrupo>
     </div>

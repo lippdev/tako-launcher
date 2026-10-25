@@ -4,15 +4,15 @@ import styles from "./PilulaDaLoja.module.css";
 
 export interface PilulaDaLojaProps {
   /** Rótulo da pílula (ex.: "Steam", "Epic Games", "GOG", "Windows", "Compartilhar"). */
-  rotulo: string;
+  label: string;
   /** Ícone genérico do design system (opcional). Sem marcas registradas de terceiros. */
-  icone?: IconName;
+  icon?: IconName;
   /** Callback ao clicar; quando presente, renderiza a pílula como um botão interativo. */
   onClick?: () => void;
   /** Estado ativo ou ligado (ex.: feedback "Link copiado" com destaque de sucesso). */
-  ativo?: boolean;
+  active?: boolean;
   /** Desabilita o botão quando interativo. */
-  desabilitado?: boolean;
+  disabled?: boolean;
   /** Rótulo para leitores de tela quando necessário. */
   "aria-label"?: string;
   className?: string;
@@ -26,16 +26,16 @@ export interface PilulaDaLojaProps {
  * Suporta ícones genéricos (sem marcas registradas de terceiros) e modo botão com feedback.
  */
 export function PilulaDaLoja({
-  rotulo,
-  icone,
+  label,
+  icon,
   onClick,
-  ativo = false,
-  desabilitado = false,
+  active = false,
+  disabled = false,
   "aria-label": ariaLabel,
   className,
   "data-force": dataForce,
 }: PilulaDaLojaProps) {
-  const classeFinal = cx(styles["chip"], ativo && styles["ativo"], className);
+  const classeFinal = cx(styles["chip"], active && styles["ativo"], className);
 
   if (onClick) {
     return (
@@ -43,20 +43,20 @@ export function PilulaDaLoja({
         type="button"
         className={classeFinal}
         onClick={onClick}
-        disabled={desabilitado}
+        disabled={disabled}
         aria-label={ariaLabel}
         data-force={dataForce}
       >
-        {icone && <Icon name={icone} size="sm" />}
-        <span>{rotulo}</span>
+        {icon && <Icon name={icon} size="sm" />}
+        <span>{label}</span>
       </button>
     );
   }
 
   return (
     <span className={classeFinal} aria-label={ariaLabel} data-force={dataForce}>
-      {icone && <Icon name={icone} size="sm" />}
-      <span>{rotulo}</span>
+      {icon && <Icon name={icon} size="sm" />}
+      <span>{label}</span>
     </span>
   );
 }

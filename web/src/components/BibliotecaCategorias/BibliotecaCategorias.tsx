@@ -76,13 +76,13 @@ export function BibliotecaCategorias({
     return groups.map((group) => {
       const capas: CapaDaFileira[] = group.games.map((game) => ({
         id: game.id,
-        titulo: game.title || game.id,
-        rotulo: game.hint ?? null,
-        corDestaque: game.accentColor ?? null,
-        temArte: game.hasArt !== false,
+        title: game.title || game.id,
+        label: game.hint ?? null,
+        accentColor: game.accentColor ?? null,
+        hasArt: game.hasArt !== false,
         src: game.coverUrl ?? resolveCover(game.id, 233, 311) ?? undefined,
-        ativa: game.active === true,
-        selecionada: game.selected === true,
+        active: game.active === true,
+        selected: game.selected === true,
       }));
 
       const contagem = group.countLabel ?? countFormatter(group.games.length);
@@ -116,14 +116,14 @@ export function BibliotecaCategorias({
       {processedGroups.map((group) => (
         <FileiraDeCapas
           key={group.id}
-          titulo={group.title}
-          contagem={group.contagem}
-          capas={group.capas}
-          rotuloAnterior={previousLabel}
-          rotuloProximo={nextLabel}
-          onAbrir={onOpen}
-          onDestacar={onHighlight}
-          onPertoDoFim={onNearEnd ? () => { onNearEnd(group.id); } : undefined}
+          title={group.title}
+          count={group.contagem}
+          covers={group.capas}
+          previousLabel={previousLabel}
+          nextLabel={nextLabel}
+          onOpen={onOpen}
+          onHighlight={onHighlight}
+          onNearEnd={onNearEnd ? () => { onNearEnd(group.id); } : undefined}
           className={cx(styles["fileiraCategorias"], group.className)}
         />
       ))}

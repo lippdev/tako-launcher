@@ -14,12 +14,12 @@ export function Demo() {
   return (
     <DemoGrupo titulo="Texto da página do jogo (644 de largura e 320); sem texto, o cartão não existe">
       <div style={{ width: 644 }}>
-        <CartaoSobre titulo="Sobre o jogo" paragrafos={TEXTO} />
+        <CartaoSobre title="Sobre o jogo" paragrafos={TEXTO} />
       </div>
       <div style={{ width: 320 }}>
-        <CartaoSobre titulo="Sobre o jogo" paragrafos={TEXTO.slice(2)} />
+        <CartaoSobre title="Sobre o jogo" paragrafos={TEXTO.slice(2)} />
       </div>
-      <CartaoSobre titulo="Sobre o jogo" paragrafos={[]} />
+      <CartaoSobre title="Sobre o jogo" paragrafos={[]} />
     </DemoGrupo>
   );
 }

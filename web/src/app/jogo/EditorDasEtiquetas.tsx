@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { call, on } from "../../bridge";
-import { EditorDeEtiquetas, type EditorDeEtiquetasRotulos, type SugestaoDeEtiqueta } from "../../components/EditorDeEtiquetas/EditorDeEtiquetas";
+import { EditorDeEtiquetas, type EditorDeEtiquetasLabels, type SugestaoDeEtiqueta } from "../../components/EditorDeEtiquetas/EditorDeEtiquetas";
 import { tagEditorStrings as s } from "../strings";
 
-const ROTULOS: EditorDeEtiquetasRotulos = {
-  lista: s.list,
-  adicionar: s.add,
-  campo: s.field,
-  titulo: s.menuTitle,
-  tirar: s.remove,
-  criar: s.create,
-  jogos: s.games,
+const ROTULOS: EditorDeEtiquetasLabels = {
+  list: s.list,
+  add: s.add,
+  field: s.field,
+  title: s.menuTitle,
+  remove: s.remove,
+  create: s.create,
+  games: s.games,
 };
 
 /** Todas as etiquetas da biblioteca (`tags.list`), lidas de novo a cada `library.changed`. */
@@ -54,15 +54,15 @@ export function EditorDasEtiquetas({ gameId, tags, onChanged, onError }: EditorD
   };
   return (
     <EditorDeEtiquetas
-      etiquetas={tags}
-      sugestoes={sugestoes}
-      rotulos={ROTULOS}
-      tamanho="sm"
-      alinhamento="fim"
-      onAdicionar={(name) => {
+      tags={tags}
+      suggestions={sugestoes}
+      labels={ROTULOS}
+      size="sm"
+      align="end"
+      onAdd={(name) => {
         change(name, true);
       }}
-      onRemover={(name) => {
+      onRemove={(name) => {
         change(name, false);
       }}
     />

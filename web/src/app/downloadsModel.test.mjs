@@ -93,11 +93,11 @@ test("a linha do download tem os textos do app atual", () => {
 test("o painel recebe o download com id de texto, estado e progresso", () => {
   const item = toPanelItem(entry(), t, (id) => `capa:${id}`);
   assert.equal(item.id, "7");
-  assert.equal(item.estado, "baixando");
-  assert.equal(item.progresso, 50);
-  assert.equal(item.capa, "capa:steam:1002");
-  assert.equal(item.subtitulo, "downloads.of(3,0 GB,6,0 GB) · downloads.left(1 h)");
-  assert.equal(toPanelItem(entry({ gameId: null }), t, () => "x").capa, null);
-  assert.equal(toPanelItem(entry({ state: "failed" }), t, () => "x").estado, "erro");
-  assert.equal(toPanelItem(entry({ state: "completed", speed: 0 }), t, () => "x").estado, "concluido");
+  assert.equal(item.state, "baixando");
+  assert.equal(item.progress, 50);
+  assert.equal(item.cover, "capa:steam:1002");
+  assert.equal(item.subtitle, "downloads.of(3,0 GB,6,0 GB) · downloads.left(1 h)");
+  assert.equal(toPanelItem(entry({ gameId: null }), t, () => "x").cover, null);
+  assert.equal(toPanelItem(entry({ state: "failed" }), t, () => "x").state, "erro");
+  assert.equal(toPanelItem(entry({ state: "completed", speed: 0 }), t, () => "x").state, "concluido");
 });

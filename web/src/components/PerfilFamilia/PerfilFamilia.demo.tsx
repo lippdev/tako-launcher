@@ -34,9 +34,9 @@ const OPCOES_JOGOS_ACIMA: readonly OpcaoDeSelecao<string>[] = [
 ];
 
 const PERFIS_INICIAIS: readonly PerfilFamiliaItem[] = [
-  { id: "p1", nome: "alyx", detalhe: "Responsável · sem limites", inicial: "A" },
-  { id: "p2", nome: "Bia", detalhe: "Até 12 anos · 2 h por dia", inicial: "B", ativo: true },
-  { id: "p3", nome: "Convidado", detalhe: "Não guarda sessões nem conquistas", inicial: "C" },
+  { id: "p1", name: "alyx", detail: "Responsável · sem limites", initial: "A" },
+  { id: "p2", name: "Bia", detail: "Até 12 anos · 2 h por dia", initial: "B", active: true },
+  { id: "p3", name: "Convidado", detail: "Não guarda sessões nem conquistas", initial: "C" },
 ];
 
 export function Demo() {
@@ -48,16 +48,16 @@ export function Demo() {
   const [jogosAcima, setJogosAcima] = useState("cadeado");
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const perfilAtivo = perfis.find((p) => p.ativo) ?? perfis[1];
+  const perfilAtivo = perfis.find((p) => p.active) ?? perfis[1];
 
   const handleSelecionarPerfil = (selecionado: PerfilFamiliaItem) => {
     setPerfis(
       perfis.map((p) => ({
         ...p,
-        ativo: p.id === selecionado.id,
+        active: p.id === selecionado.id,
       })),
     );
-    setAviso(`Perfil selecionado: ${selecionado.nome}`);
+    setAviso(`Perfil selecionado: ${selecionado.name}`);
   };
 
   const isResponsavel = perfilAtivo?.id === "p1";
@@ -102,10 +102,10 @@ export function Demo() {
           </div>
         )}
         <PerfilFamilia
-          perfisTitulo="Perfis neste PC"
-          perfis={perfis}
-          onSelecionarPerfil={handleSelecionarPerfil}
-          adicionarPerfil={{
+          profilesTitle="Perfis neste PC"
+          profiles={perfis}
+          onSelectProfile={handleSelecionarPerfil}
+          addProfile={{
             label: "Adicionar perfil",
             onClick: () => {
               setAviso("Ação disparada: Adicionar perfil");
@@ -113,31 +113,31 @@ export function Demo() {
           }}
           {...(!isResponsavel
             ? {
-                hoje: {
-                  titulo: `Hoje · ${perfilAtivo?.nome ?? "Bia"}`,
-                  tempoUsado: "1 h 12 min de 2 h",
-                  tempoRestante: "Sobram 48 min até as 21:00",
-                  progresso: 0.6,
+                today: {
+                  title: `Hoje · ${perfilAtivo?.name ?? "Bia"}`,
+                  timeUsed: "1 h 12 min de 2 h",
+                  timeRemaining: "Sobram 48 min até as 21:00",
+                  progress: 0.6,
                 },
-                limites: {
-                  titulo: "Limites",
-                  tempoPorDia: {
+                limits: {
+                  title: "Limites",
+                  timePerDay: {
                     label: "Tempo por dia",
-                    descricao: "Avisa 10 minutos antes de acabar",
+                    description: "Avisa 10 minutos antes de acabar",
                     value: tempo,
                     options: OPCOES_TEMPO,
                     onChange: setTempo,
                   },
-                  horario: {
+                  schedule: {
                     label: "Horário permitido",
-                    descricao: "Fora dele, o perfil não abre jogos",
+                    description: "Fora dele, o perfil não abre jogos",
                     value: horario,
                     options: OPCOES_HORARIO,
                     onChange: setHorario,
                   },
-                  classificacao: {
+                  rating: {
                     label: "Classificação indicativa",
-                    descricao: "Jogos acima ficam escondidos ou com cadeado",
+                    description: "Jogos acima ficam escondidos ou com cadeado",
                     value: classificacao,
                     options: OPCOES_CLASSIFICACAO,
                     onChange: setClassificacao,
@@ -145,17 +145,17 @@ export function Demo() {
                 },
               }
             : {})}
-          acesso={{
-            titulo: "Acesso",
+          access={{
+            title: "Acesso",
             pin: {
               label: "PIN para sair do perfil",
-              descricao: "Pedido ao trocar para outro perfil",
+              description: "Pedido ao trocar para outro perfil",
               checked: pinAtivo,
               onChange: setPinAtivo,
             },
             ...(!isResponsavel
               ? {
-                  jogosAcima: {
+                  gamesAboveRating: {
                     label: "Jogos acima da classificação",
                     value: jogosAcima,
                     options: OPCOES_JOGOS_ACIMA,
@@ -173,16 +173,16 @@ export function Demo() {
           PERFIL SEM LIMITES CONFIGURADOS (SEÇÃO HOJE E LIMITES SOMEM)
         </h3>
         <PerfilFamilia
-          perfisTitulo="Perfis neste PC"
-          perfis={[
-            { id: "p1", nome: "alyx", detalhe: "Responsável · sem limites", inicial: "A", ativo: true },
-            { id: "p2", nome: "Bia", detalhe: "Até 12 anos · 2 h por dia", inicial: "B" },
+          profilesTitle="Perfis neste PC"
+          profiles={[
+            { id: "p1", name: "alyx", detail: "Responsável · sem limites", initial: "A", active: true },
+            { id: "p2", name: "Bia", detail: "Até 12 anos · 2 h por dia", initial: "B" },
           ]}
-          acesso={{
-            titulo: "Acesso",
+          access={{
+            title: "Acesso",
             pin: {
               label: "PIN para sair do perfil",
-              descricao: "Pedido ao trocar para outro perfil",
+              description: "Pedido ao trocar para outro perfil",
               checked: false,
               onChange: () => undefined,
             },

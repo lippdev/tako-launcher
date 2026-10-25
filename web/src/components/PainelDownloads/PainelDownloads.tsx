@@ -26,31 +26,17 @@ export type EstadoDownload =
 
 export interface ItemDownload {
   id: string;
-  titulo: string;
-  title?: string;
+  title: string;
   /** Progresso de 0 a 100 ou null (quando null, a barra não é exibida). */
-  progresso?: number | null;
   progress?: number | null;
   /** Velocidade como texto pronto ou null (ex.: "12 MB/s"). */
-  velocidade?: string | null;
   speed?: string | null;
   /** Tempo restante como texto pronto ou null (ex.: "15 min"). */
-  tempoRestante?: string | null;
   remainingTime?: string | null;
   /** Tamanho como texto pronto ou null (ex.: "60.9 / 108.7 GB"). */
-  tamanho?: string | null;
   size?: string | null;
   /** Estado atual do item. */
-  estado:
-    | EstadoDownload
-    | "na fila"
-    | "concluído"
-    | "downloading"
-    | "paused"
-    | "queued"
-    | "completed"
-    | "error";
-  state?:
+  state:
     | EstadoDownload
     | "na fila"
     | "concluído"
@@ -60,13 +46,10 @@ export interface ItemDownload {
     | "completed"
     | "error";
   /** URL da imagem da capa (opcional; 36×46). */
-  capa?: string | null;
   cover?: string | null;
   /** Mensagem descritiva de erro quando estado === "erro". */
-  erro?: string | null;
   error?: string | null;
   /** Subtítulo customizado opcional (se omitido, montado a partir dos campos presentes). */
-  subtitulo?: string | null;
   subtitle?: string | null;
 }
 
@@ -79,56 +62,46 @@ export type PainelAnchor =
 export interface PainelDownloadsProps {
   /** Se o painel está aberto. */
   open?: boolean;
-  aberto?: boolean;
   /** Callback para fechar o painel (acionado por Esc ou clique fora). */
   onClose?: () => void;
-  onFechar?: () => void;
   /** Elemento, ref ou coordenadas de ancoragem para posicionar o popover (padrão: alinhado à direita do botão). */
   anchor?: PainelAnchor;
   /** Lista única de todos os downloads (agrupados automaticamente em seções). */
-  itens?: ItemDownload[];
   items?: ItemDownload[];
   /** Ou listas separadas por categoria: */
-  baixando?: ItemDownload[];
   downloading?: ItemDownload[];
-  naFila?: ItemDownload[];
   queued?: ItemDownload[];
-  concluidos?: ItemDownload[];
   completed?: ItemDownload[];
   /** Se deve renderizar inline (sem Portal nem posicionamento fixo), útil para visualização estática na galeria. */
   inline?: boolean;
   /** Callbacks de ação para itens: */
-  onPausar?: (id: string) => void;
   onPause?: (id: string) => void;
-  onRetomar?: (id: string) => void;
   onResume?: (id: string) => void;
-  onCancelar?: (id: string) => void;
   onCancel?: (id: string) => void;
-  onAbrirJogo?: (id: string) => void;
   onOpenGame?: (id: string) => void;
   /** Textos customizáveis recebidos por props: */
-  titulo?: string;
-  rotuloAtivos?: string | ((quantidade: number) => string);
-  rotuloVazio?: string;
-  rotulosSecoes?: {
-    baixando?: string;
-    naFila?: string;
-    concluidos?: string;
+  title?: string;
+  activeLabel?: string | ((count: number) => string);
+  emptyLabel?: string;
+  sectionLabels?: {
+    downloading?: string;
+    queued?: string;
+    completed?: string;
   };
-  rotulosAcoes?: {
-    pausar?: string;
-    retomar?: string;
-    cancelar?: string;
-    abrirJogo?: string;
+  actionLabels?: {
+    pause?: string;
+    resume?: string;
+    cancel?: string;
+    openGame?: string;
   };
-  rotulosEstado?: Partial<Record<EstadoDownload, string>>;
+  stateLabels?: Partial<Record<EstadoDownload, string>>;
   className?: string;
   "aria-label"?: string;
   children?: ReactNode;
 }
 
 function normalizarEstado(
-  estado: ItemDownload["estado"] | ItemDownload["state"]
+  estado: ItemDownload["state"]
 ): EstadoDownload {
   switch (estado) {
     case "pausado":
@@ -156,15 +129,15 @@ function normalizarItem(item: ItemDownload): ItemDownload & { estadoNormalizado:
   return {
     ...item,
     id: item.id,
-    titulo: item.titulo ?? item.title ?? "",
-    progresso: item.progresso ?? item.progress ?? null,
-    velocidade: item.velocidade ?? item.speed ?? null,
-    tempoRestante: item.tempoRestante ?? item.remainingTime ?? null,
-    tamanho: item.tamanho ?? item.size ?? null,
-    capa: item.capa ?? item.cover ?? null,
-    erro: item.erro ?? item.error ?? null,
-    subtitulo: item.subtitulo ?? item.subtitle ?? null,
-    estadoNormalizado: normalizarEstado(item.estado ?? item.state),
+    title: item.title ?? "",
+    progress: item.progress ?? null,
+    speed: item.speed ?? null,
+    remainingTime: item.remainingTime ?? null,
+    size: item.size ?? null,
+    cover: item.cover ?? null,
+    error: item.error ?? null,
+    subtitle: item.subtitle ?? null,
+    estadoNormalizado: normalizarEstado(item.state),
   };
 }
 
@@ -172,18 +145,18 @@ function formatarSubtitulo(
   item: ReturnType<typeof normalizarItem>,
   rotulosEstado: Record<EstadoDownload, string>
 ): string {
-  if (item.subtitulo) return item.subtitulo;
+  if (item.subtitle) return item.subtitle;
 
   const estadoTexto =
-    item.estadoNormalizado === "erro" && item.erro
-      ? item.erro
+    item.estadoNormalizado === "erro" && item.error
+      ? item.error
       : rotulosEstado[item.estadoNormalizado];
 
   const partes = [
     estadoTexto,
-    item.tamanho,
-    item.velocidade,
-    item.tempoRestante,
+    item.size,
+    item.speed,
+    item.remainingTime,
   ].filter((p): p is string => Boolean(p && p.trim().length > 0));
 
   return partes.join(" · ");
@@ -195,41 +168,31 @@ function formatarSubtitulo(
  */
 export function PainelDownloads(props: PainelDownloadsProps) {
   const {
-    open,
-    aberto,
+    open = false,
     onClose,
-    onFechar,
     anchor,
-    itens,
     items,
-    baixando,
     downloading,
-    naFila,
     queued,
-    concluidos,
     completed,
     inline = false,
-    onPausar,
     onPause,
-    onRetomar,
     onResume,
-    onCancelar,
     onCancel,
-    onAbrirJogo,
     onOpenGame,
-    titulo = "Downloads",
-    rotuloAtivos,
-    rotuloVazio = "Nenhum download ativo",
-    rotulosSecoes,
-    rotulosAcoes,
-    rotulosEstado: rotulosEstadoProp,
+    title = "Downloads",
+    activeLabel,
+    emptyLabel = "Nenhum download ativo",
+    sectionLabels,
+    actionLabels,
+    stateLabels: rotulosEstadoProp,
     className,
     "aria-label": ariaLabelProp,
     children,
   } = props;
 
-  const estaAberto = inline || (open ?? aberto ?? false);
-  const fechar = onClose ?? onFechar;
+  const estaAberto = inline || open;
+  const fechar = onClose;
   const fecharRef = useLatest(fechar);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -320,25 +283,25 @@ export function PainelDownloads(props: PainelDownloadsProps) {
   if (!inline && !mounted) return null;
 
   // Unificação e separação das listas de itens
-  const todosItens = (itens ?? items ?? []).map(normalizarItem);
-  const listaBaixando = (baixando ?? downloading ?? []).map(normalizarItem);
-  const listaNaFila = (naFila ?? queued ?? []).map(normalizarItem);
-  const listaConcluidos = (concluidos ?? completed ?? []).map(normalizarItem);
+  const todosItens = (items ?? []).map(normalizarItem);
+  const listaBaixando = (downloading ?? []).map(normalizarItem);
+  const listaNaFila = (queued ?? []).map(normalizarItem);
+  const listaConcluidos = (completed ?? []).map(normalizarItem);
 
   const secoesSeparadas =
     listaBaixando.length > 0 || listaNaFila.length > 0 || listaConcluidos.length > 0;
 
   const grupos = secoesSeparadas
     ? [
-        { chave: "baixando", titulo: rotulosSecoes?.baixando ?? "Baixando", itens: listaBaixando },
-        { chave: "naFila", titulo: rotulosSecoes?.naFila ?? "Na fila", itens: listaNaFila },
-        { chave: "concluidos", titulo: rotulosSecoes?.concluidos ?? "Concluídos", itens: listaConcluidos },
-      ].filter((g) => g.itens.length > 0)
+        { chave: "downloading", title: sectionLabels?.downloading ?? "Baixando", items: listaBaixando },
+        { chave: "queued", title: sectionLabels?.queued ?? "Na fila", items: listaNaFila },
+        { chave: "completed", title: sectionLabels?.completed ?? "Concluídos", items: listaConcluidos },
+      ].filter((g) => g.items.length > 0)
     : [
         {
           chave: "todos",
-          titulo: "",
-          itens: todosItens,
+          title: "",
+          items: todosItens,
         },
       ];
 
@@ -361,18 +324,18 @@ export function PainelDownloads(props: PainelDownloadsProps) {
   };
 
   const rotulosAcoesFinais = {
-    pausar: "Pausar",
-    retomar: "Retomar",
-    cancelar: "Cancelar",
-    abrirJogo: "Abrir o jogo",
-    ...rotulosAcoes,
+    pause: "Pausar",
+    resume: "Retomar",
+    cancel: "Cancelar",
+    openGame: "Abrir o jogo",
+    ...actionLabels,
   };
 
   const rotuloAtivosTexto =
     totalAtivos > 0
-      ? typeof rotuloAtivos === "function"
-        ? rotuloAtivos(totalAtivos)
-        : rotuloAtivos ?? `${totalAtivos} ${totalAtivos === 1 ? "ativo" : "ativos"}`
+      ? typeof activeLabel === "function"
+        ? activeLabel(totalAtivos)
+        : activeLabel ?? `${totalAtivos} ${totalAtivos === 1 ? "ativo" : "ativos"}`
       : null;
 
   const conteudo = (
@@ -381,7 +344,7 @@ export function PainelDownloads(props: PainelDownloadsProps) {
       role="dialog"
       aria-modal={!inline}
       aria-labelledby={titleId}
-      aria-label={ariaLabelProp ?? titulo}
+      aria-label={ariaLabelProp ?? title}
       tabIndex={-1}
       data-visible={inline || visible}
       data-animating={!inline && animating}
@@ -393,26 +356,26 @@ export function PainelDownloads(props: PainelDownloadsProps) {
     >
       <header className={styles["header"]}>
         <h6 className={styles["headerTitle"]} id={titleId}>
-          <span>{titulo}</span>
+          <span>{title}</span>
           {rotuloAtivosTexto && <span>{rotuloAtivosTexto}</span>}
         </h6>
       </header>
 
       {totalGeral === 0 ? (
-        <div className={styles["empty"]}>{rotuloVazio}</div>
+        <div className={styles["empty"]}>{emptyLabel}</div>
       ) : (
         <div className={styles["list"]} role="list">
           {grupos.map((grupo, gIdx) => (
             <div key={grupo.chave}>
               {gIdx > 0 && <hr className={styles["separator"]} />}
-              {grupo.titulo && secoesSeparadas && (
-                <div className={styles["sectionHeader"]}>{grupo.titulo}</div>
+              {grupo.title && secoesSeparadas && (
+                <div className={styles["sectionHeader"]}>{grupo.title}</div>
               )}
-              {grupo.itens.map((item) => {
+              {grupo.items.map((item) => {
                 const subtitulo = formatarSubtitulo(item, rotulosEstado);
                 const progressoValido =
-                  item.progresso != null
-                    ? Math.max(0, Math.min(100, item.progresso))
+                  item.progress != null
+                    ? Math.max(0, Math.min(100, item.progress))
                     : null;
 
                 const podePausar = item.estadoNormalizado === "baixando";
@@ -420,17 +383,17 @@ export function PainelDownloads(props: PainelDownloadsProps) {
                   item.estadoNormalizado === "pausado" || item.estadoNormalizado === "erro";
                 const podeAbrir = item.estadoNormalizado === "concluido";
                 const podeCancelar =
-                  Boolean(onCancelar ?? onCancel) && item.estadoNormalizado !== "concluido";
+                  Boolean(onCancel) && item.estadoNormalizado !== "concluido";
 
                 return (
                   <div key={item.id} className={styles["item"]} role="listitem">
-                    {item.capa && !brokenCovers.has(item.capa) ? (
+                    {item.cover && !brokenCovers.has(item.cover) ? (
                       <img
-                        src={item.capa}
+                        src={item.cover}
                         alt=""
                         className={styles["cover"]}
                         onError={() => {
-                          setBrokenCovers((previous) => new Set(previous).add(item.capa ?? ""));
+                          setBrokenCovers((previous) => new Set(previous).add(item.cover ?? ""));
                         }}
                       />
                     ) : (
@@ -450,8 +413,8 @@ export function PainelDownloads(props: PainelDownloadsProps) {
                     )}
 
                     <div className={styles["meta"]}>
-                      <strong className={styles["itemTitle"]} title={item.titulo}>
-                        {item.titulo}
+                      <strong className={styles["itemTitle"]} title={item.title}>
+                        {item.title}
                       </strong>
                       {subtitulo && <small className={styles["itemSub"]}>{subtitulo}</small>}
                       {progressoValido != null && (
@@ -461,7 +424,7 @@ export function PainelDownloads(props: PainelDownloadsProps) {
                           aria-valuenow={progressoValido}
                           aria-valuemin={0}
                           aria-valuemax={100}
-                          aria-label={`Progresso de ${item.titulo}: ${progressoValido}%`}
+                          aria-label={`Progresso de ${item.title}: ${progressoValido}%`}
                         >
                           <b
                             className={styles["barFill"]}
@@ -476,9 +439,9 @@ export function PainelDownloads(props: PainelDownloadsProps) {
                         <button
                           type="button"
                           className={styles["actionBtn"]}
-                          onClick={() => (onPausar ?? onPause)?.(item.id)}
-                          aria-label={`${rotulosAcoesFinais.pausar} ${item.titulo}`}
-                          title={rotulosAcoesFinais.pausar}
+                          onClick={() => onPause?.(item.id)}
+                          aria-label={`${rotulosAcoesFinais.pause} ${item.title}`}
+                          title={rotulosAcoesFinais.pause}
                         >
                           <Icon name="pause" size="sm" />
                         </button>
@@ -487,9 +450,9 @@ export function PainelDownloads(props: PainelDownloadsProps) {
                         <button
                           type="button"
                           className={styles["actionBtn"]}
-                          onClick={() => (onRetomar ?? onResume)?.(item.id)}
-                          aria-label={`${rotulosAcoesFinais.retomar} ${item.titulo}`}
-                          title={rotulosAcoesFinais.retomar}
+                          onClick={() => onResume?.(item.id)}
+                          aria-label={`${rotulosAcoesFinais.resume} ${item.title}`}
+                          title={rotulosAcoesFinais.resume}
                         >
                           <Icon
                             name={item.estadoNormalizado === "erro" ? "refresh" : "play"}
@@ -502,9 +465,9 @@ export function PainelDownloads(props: PainelDownloadsProps) {
                         <button
                           type="button"
                           className={styles["actionBtn"]}
-                          onClick={() => (onAbrirJogo ?? onOpenGame)?.(item.id)}
-                          aria-label={`${rotulosAcoesFinais.abrirJogo} ${item.titulo}`}
-                          title={rotulosAcoesFinais.abrirJogo}
+                          onClick={() => onOpenGame?.(item.id)}
+                          aria-label={`${rotulosAcoesFinais.openGame} ${item.title}`}
+                          title={rotulosAcoesFinais.openGame}
                         >
                           <Icon name="play" size="sm" filled />
                         </button>
@@ -513,9 +476,9 @@ export function PainelDownloads(props: PainelDownloadsProps) {
                         <button
                           type="button"
                           className={styles["actionBtn"]}
-                          onClick={() => (onCancelar ?? onCancel)?.(item.id)}
-                          aria-label={`${rotulosAcoesFinais.cancelar} ${item.titulo}`}
-                          title={rotulosAcoesFinais.cancelar}
+                          onClick={() => onCancel?.(item.id)}
+                          aria-label={`${rotulosAcoesFinais.cancel} ${item.title}`}
+                          title={rotulosAcoesFinais.cancel}
                         >
                           <Icon name="x" size="sm" />
                         </button>

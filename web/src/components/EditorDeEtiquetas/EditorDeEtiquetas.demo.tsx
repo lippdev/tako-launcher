@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { DemoGrupo } from "../../lib/demoGrupo";
-import { EditorDeEtiquetas, type EditorDeEtiquetasRotulos, type SugestaoDeEtiqueta } from "./EditorDeEtiquetas";
+import { EditorDeEtiquetas, type EditorDeEtiquetasLabels, type SugestaoDeEtiqueta } from "./EditorDeEtiquetas";
 
 export const title = "EditorDeEtiquetas";
 export const preview = "EtiquetasDoJogo";
 
-const ROTULOS: EditorDeEtiquetasRotulos = {
-  lista: "Etiquetas do jogo",
-  adicionar: "Etiqueta",
-  campo: "Nova etiqueta",
-  titulo: "Etiquetas",
-  tirar: (nome) => `Tirar ${nome}`,
-  criar: (nome) => `Criar "${nome}"`,
-  jogos: (n) => `${String(n)} ${n === 1 ? "jogo" : "jogos"}`,
+const ROTULOS: EditorDeEtiquetasLabels = {
+  list: "Etiquetas do jogo",
+  add: "Etiqueta",
+  field: "Nova etiqueta",
+  title: "Etiquetas",
+  remove: (nome) => `Tirar ${nome}`,
+  create: (nome) => `Criar "${nome}"`,
+  games: (n) => `${String(n)} ${n === 1 ? "jogo" : "jogos"}`,
 };
 
 const EXISTENTES: SugestaoDeEtiqueta[] = [
@@ -23,17 +23,17 @@ const EXISTENTES: SugestaoDeEtiqueta[] = [
 ];
 
 /** O editor guarda as etiquetas em memória, como a página faz pela ponte. */
-function Exemplo({ inicial, tamanho, alinhamento }: { inicial: string[]; tamanho?: "md" | "sm"; alinhamento?: "inicio" | "fim" }) {
+function Exemplo({ inicial, size, align }: { inicial: string[]; size?: "md" | "sm"; align?: "start" | "end" }) {
   const [etiquetas, setEtiquetas] = useState(inicial);
   const [todas, setTodas] = useState(EXISTENTES);
   return (
     <EditorDeEtiquetas
-      etiquetas={etiquetas}
-      sugestoes={todas}
-      rotulos={ROTULOS}
-      {...(tamanho ? { tamanho } : {})}
-      {...(alinhamento ? { alinhamento } : {})}
-      onAdicionar={(nome) => {
+      tags={etiquetas}
+      suggestions={todas}
+      labels={ROTULOS}
+      {...(size ? { size } : {})}
+      {...(align ? { align } : {})}
+      onAdd={(nome) => {
         const existente = todas.find((e) => e.nome.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"));
         const final = existente?.nome ?? nome;
         setEtiquetas((atuais) => (atuais.includes(final) ? atuais : [...atuais, final]));
@@ -43,7 +43,7 @@ function Exemplo({ inicial, tamanho, alinhamento }: { inicial: string[]; tamanho
             : [...atuais, { nome: final, jogos: 1 }],
         );
       }}
-      onRemover={(nome) => {
+      onRemove={(nome) => {
         setEtiquetas((atuais) => atuais.filter((e) => e !== nome));
         setTodas((atuais) => atuais.map((e) => (e.nome === nome ? { ...e, jogos: e.jogos - 1 } : e)).filter((e) => e.jogos > 0));
       }}
@@ -66,7 +66,7 @@ export function Demo() {
 
       <DemoGrupo titulo="Em Detalhes (chips de 26)">
         <div style={{ width: 360 }}>
-          <Exemplo inicial={["Zerado", "Sofá"]} tamanho="sm" alinhamento="fim" />
+          <Exemplo inicial={["Zerado", "Sofá"]} size="sm" align="end" />
         </div>
       </DemoGrupo>
     </div>

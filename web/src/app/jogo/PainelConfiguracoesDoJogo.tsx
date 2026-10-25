@@ -4,7 +4,7 @@ import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import {
   ConfiguracoesDoJogo,
   type ChaveConfiguracaoJogo,
-  type ConfiguracoesDoJogoRotulos,
+  type ConfiguracoesDoJogoLabels,
   type ValorConfiguracaoJogo,
   type ValoresConfiguracoesDoJogo,
 } from "../../components/ConfiguracoesDoJogo/ConfiguracoesDoJogo";
@@ -35,32 +35,32 @@ const PANEL_LABELS: PanelLabels = {
   audioLocked: s.notes.audioLocked,
 };
 
-const ROTULOS: ConfiguracoesDoJogoRotulos = {
-  titulo: s.title,
-  fechar: s.close,
-  grupoTela: s.groups.screen,
-  grupoSom: s.groups.sound,
-  grupoAbrirOJogo: s.groups.launch,
-  usarTela: s.rows.useScreen,
+const ROTULOS: ConfiguracoesDoJogoLabels = {
+  title: s.title,
+  close: s.close,
+  screenGroup: s.groups.screen,
+  soundGroup: s.groups.sound,
+  launchGroup: s.groups.launch,
+  useScreen: s.rows.useScreen,
   monitor: s.rows.screen,
-  resolucaoETaxa: s.rows.mode,
+  resolutionAndRate: s.rows.mode,
   hdr: s.rows.hdr,
   vrr: s.rows.vrr,
-  saidaDeAudio: s.rows.audio,
-  argumentos: s.rows.arguments,
-  pastaDeTrabalho: s.rows.folder,
-  variaveisDeAmbiente: s.rows.environment,
-  comandosAntesEDepois: s.rows.commands,
-  usarTudoDoTako: s.reset.action,
-  descricaoUsarTudoDoTako: s.reset.description,
-  padraoPrefixo: v.default,
-  nenhum: v.none,
-  nenhuma: v.noneFeminine,
-  ligado: v.on,
-  desligado: v.off,
-  singularMudanca: s.changes.one,
-  pluralMudancas: s.changes.other,
-  nenhumaMudanca: s.changes.none,
+  audioOutput: s.rows.audio,
+  arguments: s.rows.arguments,
+  workingDirectory: s.rows.folder,
+  environmentVariables: s.rows.environment,
+  beforeAndAfterCommands: s.rows.commands,
+  useAllFromTako: s.reset.action,
+  useAllFromTakoDescription: s.reset.description,
+  defaultPrefix: v.default,
+  none: v.none,
+  noneFem: v.noneFeminine,
+  on: v.on,
+  off: v.off,
+  singularChange: s.changes.one,
+  pluralChanges: s.changes.other,
+  noChanges: s.changes.none,
 };
 
 const TEXTO_DO_VAZIO = {
@@ -142,18 +142,18 @@ export function PainelConfiguracoesDoJogo({ gameId, title, coverUrl, open, onClo
       <ConfiguracoesDoJogo
         open={open}
         onClose={onClose}
-        tituloDoJogo={title}
-        {...(coverUrl ? { capaUrl: coverUrl } : {})}
-        valores={{ ...model.valores, ...pending.values }}
-        padroes={model.padroes}
-        opcoes={model.opcoes}
-        descricoes={model.descricoes}
-        rotulos={ROTULOS}
-        mudancasCount={model.mudancas}
-        somenteLeitura={model.somenteLeitura}
-        textoDoVazio={TEXTO_DO_VAZIO}
+        gameTitle={title}
+        {...(coverUrl ? { coverUrl } : {})}
+        values={{ ...model.valores, ...pending.values }}
+        defaults={model.padroes}
+        options={model.opcoes}
+        descriptions={model.descricoes}
+        labels={ROTULOS}
+        changesCount={model.mudancas}
+        readOnly={model.somenteLeitura}
+        emptyText={TEXTO_DO_VAZIO}
         onChange={(key, value) => void change(key, value)}
-        onResetarAoPadrao={() => {
+        onResetToDefault={() => {
           if (model.mudancas > 0) setConfirming(true);
         }}
       />

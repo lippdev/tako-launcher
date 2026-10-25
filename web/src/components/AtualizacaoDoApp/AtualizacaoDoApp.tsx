@@ -6,66 +6,66 @@ import styles from "./AtualizacaoDoApp.module.css";
 
 export type EstadoAtualizacao = "disponivel" | "baixando" | "pronta" | "erro";
 
-export interface AtualizacaoDoAppRotulos {
+export interface AtualizacaoDoAppLabels {
   /** Rótulo para fechar (acessibilidade / aria-label do botão ×). */
-  fechar: string;
+  close: string;
   /** Rótulo da ação de adiar a atualização (ex.: "Depois"). */
-  depois: string;
+  later: string;
   /** Rótulo da seção de novidades (ex.: "Novidades"). */
-  novidades: string;
+  notes: string;
   /** Rótulo da ação de iniciar o download (ex.: "Baixar agora"). */
-  baixar: string;
+  download: string;
   /** Rótulo da ação de reiniciar imediatamente (ex.: "Reiniciar agora"). */
-  reiniciar: string;
+  restart: string;
   /** Rótulo da ação de tentar novamente em caso de erro (ex.: "Tentar de novo"). */
-  tentarDeNovo: string;
+  retry: string;
   /** Título no estado "disponivel" (ex.: "Atualização disponível"). */
-  tituloDisponivel: string;
+  availableTitle: string;
   /** Título no estado "baixando" (ex.: "Baixando atualização"). */
-  tituloBaixando: string;
+  downloadingTitle: string;
   /** Título no estado "pronta" (ex.: "Atualização pronta"). */
-  tituloPronta: string;
+  readyTitle: string;
   /** Título no estado "erro" (ex.: "Não foi possível atualizar"). */
-  tituloErro: string;
+  errorTitle: string;
   /** Texto explicativo opcional exibido durante o download. */
-  ajudaBaixando?: string;
+  downloadingHelp?: string;
   /** Rótulo do link para as notas completas da release (ex.: "Ver todas as notas ↗"). */
-  todasAsNotas?: string;
+  allNotes?: string;
 }
 
 export interface AtualizacaoDoAppProps {
   /** Controla se o diálogo está visível. Padrão: true. */
   open?: boolean;
   /** Estado atual do fluxo de atualização. */
-  estado: EstadoAtualizacao;
+  state: EstadoAtualizacao;
   /** Versão nova do aplicativo (ex.: "0.2.1" ou "TAKO 0.2.1"). */
-  versao: string;
+  version: string;
   /** Subtítulo contextual opcional (ex.: "TAKO 0.2.1 · reinicia em uns 5 s"). */
-  subtitulo?: string;
+  subtitle?: string;
   /** Lista de itens de texto com as novidades da versão. */
-  novidades?: readonly string[];
+  releaseNotes?: readonly string[];
   /** Progresso atual de 0 a 100 (usado no estado "baixando"). */
-  progresso?: number;
+  progress?: number;
   /** Texto com métricas de download (ex.: "45% · 12 MB de 27 MB"). */
-  progressoTexto?: string;
+  progressText?: string;
   /** Mensagem descritiva de erro (usada no estado "erro"). */
-  mensagemErro?: string;
+  errorMessage?: string;
   /** Letra de ajuda sob as novidades (estados "disponivel" e "pronta"): a regra do "Depois", o jogo aberto. */
-  observacao?: string;
+  note?: string;
   /** Rótulos traduzidos dos textos e botões vindos dos catálogos de tradução. */
-  rotulos: AtualizacaoDoAppRotulos;
+  labels: AtualizacaoDoAppLabels;
   /** Callback acionado ao fechar o diálogo. */
-  onFechar: () => void;
-  /** Callback acionado ao clicar em "Depois". Se omitido, usa `onFechar`. */
-  onDepois?: () => void;
+  onClose: () => void;
+  /** Callback acionado ao clicar em "Depois". Se omitido, usa `onClose`. */
+  onLater?: () => void;
   /** Callback acionado ao clicar em "Baixar". */
-  onBaixar?: () => void;
+  onDownload?: () => void;
   /** Callback acionado ao clicar em "Reiniciar agora". */
-  onReiniciar?: () => void;
+  onRestart?: () => void;
   /** Callback acionado ao clicar em "Tentar de novo". */
-  onTentarDeNovo?: () => void;
-  /** Callback do link para as notas completas; sem ele (ou sem `rotulos.todasAsNotas`) o link não aparece. */
-  onVerNotas?: () => void;
+  onRetry?: () => void;
+  /** Callback do link para as notas completas; sem ele (ou sem `labels.allNotes`) o link não aparece. */
+  onViewNotes?: () => void;
   className?: string;
 }
 
@@ -79,111 +79,111 @@ export interface AtualizacaoDoAppProps {
  */
 export function AtualizacaoDoApp({
   open = true,
-  estado,
-  versao,
-  subtitulo,
-  novidades,
-  progresso = 0,
-  progressoTexto,
-  mensagemErro,
-  observacao,
-  rotulos,
-  onFechar,
-  onDepois,
-  onBaixar,
-  onReiniciar,
-  onTentarDeNovo,
-  onVerNotas,
+  state,
+  version,
+  subtitle,
+  releaseNotes,
+  progress = 0,
+  progressText,
+  errorMessage,
+  note,
+  labels,
+  onClose,
+  onLater,
+  onDownload,
+  onRestart,
+  onRetry,
+  onViewNotes,
   className,
 }: AtualizacaoDoAppProps) {
-  const fecharOuDepois = onDepois ?? onFechar;
+  const fecharOuDepois = onLater ?? onClose;
 
   const titulo = (() => {
-    switch (estado) {
+    switch (state) {
       case "disponivel":
-        return rotulos.tituloDisponivel;
+        return labels.availableTitle;
       case "baixando":
-        return rotulos.tituloBaixando;
+        return labels.downloadingTitle;
       case "pronta":
-        return rotulos.tituloPronta;
+        return labels.readyTitle;
       case "erro":
-        return rotulos.tituloErro;
+        return labels.errorTitle;
     }
   })();
 
   const subtituloExibicao =
-    subtitulo ??
-    (estado === "baixando" && progressoTexto ? progressoTexto : versao);
+    subtitle ??
+    (state === "baixando" && progressText ? progressText : version);
 
   const acoes = (() => {
-    switch (estado) {
+    switch (state) {
       case "disponivel":
         return (
           <>
             <BotaoDesktop variant="outlined" onClick={fecharOuDepois}>
-              {rotulos.depois}
+              {labels.later}
             </BotaoDesktop>
             <BotaoDesktop
               variant="primary"
               size="sm"
               icon="download"
-              onClick={onBaixar}
+              onClick={onDownload}
             >
-              {rotulos.baixar}
+              {labels.download}
             </BotaoDesktop>
           </>
         );
       case "baixando":
         return (
           <BotaoDesktop variant="outlined" onClick={fecharOuDepois}>
-            {rotulos.depois}
+            {labels.later}
           </BotaoDesktop>
         );
       case "pronta":
         return (
           <>
             <BotaoDesktop variant="outlined" onClick={fecharOuDepois}>
-              {rotulos.depois}
+              {labels.later}
             </BotaoDesktop>
             <BotaoDesktop
               variant="primary"
               size="sm"
               icon="refresh"
-              onClick={onReiniciar}
+              onClick={onRestart}
             >
-              {rotulos.reiniciar}
+              {labels.restart}
             </BotaoDesktop>
           </>
         );
       case "erro":
         return (
           <>
-            <BotaoDesktop variant="outlined" onClick={onFechar}>
-              {rotulos.fechar}
+            <BotaoDesktop variant="outlined" onClick={onClose}>
+              {labels.close}
             </BotaoDesktop>
             <BotaoDesktop
               variant="primary"
               size="sm"
               icon="refresh"
-              onClick={onTentarDeNovo}
+              onClick={onRetry}
             >
-              {rotulos.tentarDeNovo}
+              {labels.retry}
             </BotaoDesktop>
           </>
         );
     }
   })();
 
-  const progressoPercentual = Math.min(100, Math.max(0, progresso));
+  const progressoPercentual = Math.min(100, Math.max(0, progress));
   const progressoEscala = progressoPercentual / 100;
 
   return (
     <Dialogo
       open={open}
-      onClose={onFechar}
+      onClose={onClose}
       size="padrao"
       title={titulo}
-      closeLabel={rotulos.fechar}
+      closeLabel={labels.close}
       className={cx(styles["dialogo"], className)}
       actions={acoes}
     >
@@ -197,34 +197,34 @@ export function AtualizacaoDoApp({
         <button
           type="button"
           className={styles["botaoFechar"]}
-          aria-label={rotulos.fechar}
+          aria-label={labels.close}
           data-autofocus-last=""
-          onClick={onFechar}
+          onClick={onClose}
         >
           <Icon name="x" />
         </button>
       </div>
 
       {/* Estados "disponivel" e "pronta": exibem lista de novidades quando houver */}
-      {(estado === "disponivel" || estado === "pronta") &&
-        novidades &&
-        novidades.length > 0 && (
+      {(state === "disponivel" || state === "pronta") &&
+        releaseNotes &&
+        releaseNotes.length > 0 && (
           <div>
-            <h4 className={styles["novidadesTitulo"]}>{rotulos.novidades}</h4>
+            <h4 className={styles["novidadesTitulo"]}>{labels.notes}</h4>
             <ul className={styles["listaNovidades"]}>
-              {novidades.map((item, index) => (
+              {releaseNotes.map((item, index) => (
                 <li key={index}>{item}</li>
               ))}
             </ul>
           </div>
         )}
 
-      {(estado === "disponivel" || estado === "pronta") && observacao && (
-        <p className={styles["ajudaTexto"]}>{observacao}</p>
+      {(state === "disponivel" || state === "pronta") && note && (
+        <p className={styles["ajudaTexto"]}>{note}</p>
       )}
 
       {/* Estado "baixando": barra de progresso com transform: scaleX */}
-      {estado === "baixando" && (
+      {state === "baixando" && (
         <div>
           <div
             className={styles["trilhoProgresso"]}
@@ -238,20 +238,20 @@ export function AtualizacaoDoApp({
               style={{ transform: `scaleX(${progressoEscala})` }}
             />
           </div>
-          {rotulos.ajudaBaixando && (
-            <p className={styles["ajudaTexto"]}>{rotulos.ajudaBaixando}</p>
+          {labels.downloadingHelp && (
+            <p className={styles["ajudaTexto"]}>{labels.downloadingHelp}</p>
           )}
         </div>
       )}
 
       {/* Estado "erro": mensagem descritiva de erro */}
-      {estado === "erro" && mensagemErro && (
-        <p className={styles["mensagemErro"]}>{mensagemErro}</p>
+      {state === "erro" && errorMessage && (
+        <p className={styles["mensagemErro"]}>{errorMessage}</p>
       )}
 
-      {onVerNotas && rotulos.todasAsNotas && estado !== "erro" && (
-        <button type="button" className={styles["linkNotas"]} onClick={onVerNotas}>
-          {rotulos.todasAsNotas}
+      {onViewNotes && labels.allNotes && state !== "erro" && (
+        <button type="button" className={styles["linkNotas"]} onClick={onViewNotes}>
+          {labels.allNotes}
         </button>
       )}
     </Dialogo>

@@ -11,7 +11,7 @@ export function Demo() {
   return (
     <div>
       <DemoGrupo titulo="Interativo — clique para abrir o menu e mudar a situação">
-        <StatusDoJogo status={status} onAlterarStatus={setStatus} />
+        <StatusDoJogo status={status} onStatusChange={setStatus} />
       </DemoGrupo>
 
       <DemoGrupo titulo="Todas as situações (somente leitura)">
@@ -24,10 +24,10 @@ export function Demo() {
       </DemoGrupo>
 
       <DemoGrupo titulo="Estados de interação do botão (hover · foco · pressionado)">
-        <StatusDoJogo status="playing" onAlterarStatus={() => {}} />
-        <StatusDoJogo status="playing" onAlterarStatus={() => {}} data-force="hover" />
-        <StatusDoJogo status="playing" onAlterarStatus={() => {}} data-force="focus" />
-        <StatusDoJogo status="playing" onAlterarStatus={() => {}} data-force="pressed" />
+        <StatusDoJogo status="playing" onStatusChange={() => {}} />
+        <StatusDoJogo status="playing" onStatusChange={() => {}} data-force="hover" />
+        <StatusDoJogo status="playing" onStatusChange={() => {}} data-force="focus" />
+        <StatusDoJogo status="playing" onStatusChange={() => {}} data-force="pressed" />
       </DemoGrupo>
     </div>
   );

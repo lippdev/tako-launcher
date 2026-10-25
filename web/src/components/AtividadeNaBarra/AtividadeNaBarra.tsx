@@ -13,24 +13,18 @@ import styles from "./AtividadeNaBarra.module.css";
 export interface AtividadeNaBarraProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> {
   /** Quantidade de atividades/downloads ativos. Se omitido ou <= 0, o badge fica oculto. */
-  contagem?: number;
   count?: number;
   /** Porcentagem geral ou do download ativo (0 a 100). */
-  porcentagem?: number | null;
-  percentage?: number | null;
-  progresso?: number | null;
   progress?: number | null;
   /** Se o painel está aberto (para aria-expanded e estado ativo). */
-  aberto?: boolean;
   open?: boolean;
   /** Callback acionado ao clicar no botão. */
   onClick?: () => void;
   onToggle?: () => void;
   /** Rótulo acessível explícito. Se omitido, é gerado conforme contagem e porcentagem. */
   "aria-label"?: string;
-  ariaLabel?: string;
   /** Título do botão (tooltip nativo ou data-tip). */
-  titulo?: string;
+  title?: string;
   /** Força o estado visual para testes na galeria (hover, focus, pressed). */
   "data-force"?: "hover" | "focus" | "pressed";
   children?: ReactNode;
@@ -44,19 +38,13 @@ export interface AtividadeNaBarraProps
 export const AtividadeNaBarra = forwardRef<HTMLButtonElement, AtividadeNaBarraProps>(
   function AtividadeNaBarra(props, ref) {
     const {
-      contagem,
-      count,
-      porcentagem,
-      percentage,
-      progresso,
-      progress,
-      aberto,
-      open,
+      count = 0,
+      progress = null,
+      open = false,
       onClick,
       onToggle,
       "aria-label": ariaLabelProp,
-      ariaLabel,
-      titulo = "Downloads",
+      title = "Downloads",
       "data-force": dataForce,
       className,
       disabled,
@@ -64,10 +52,10 @@ export const AtividadeNaBarra = forwardRef<HTMLButtonElement, AtividadeNaBarraPr
       ...rest
     } = props;
 
-    const totalAtividades = contagem ?? count ?? 0;
+    const totalAtividades = count;
     const temAtividade = totalAtividades > 0;
-    const pct = porcentagem ?? percentage ?? progresso ?? progress ?? null;
-    const painelAberto = aberto ?? open ?? false;
+    const pct = progress;
+    const painelAberto = open;
 
     // Animação de pulo (tk-pop) ao mudar a contagem de atividades
     const [pop, setPop] = useState(false);
@@ -87,12 +75,11 @@ export const AtividadeNaBarra = forwardRef<HTMLButtonElement, AtividadeNaBarraPr
     // Rótulo acessível obrigatório
     const rotuloAcessivel =
       ariaLabelProp ??
-      ariaLabel ??
       (temAtividade
         ? pct != null
-          ? `${titulo}: ${totalAtividades} ${totalAtividades === 1 ? "ativo" : "ativos"}, ${Math.round(pct)}%`
-          : `${titulo}: ${totalAtividades} ${totalAtividades === 1 ? "ativo" : "ativos"}`
-        : titulo);
+          ? `${title}: ${totalAtividades} ${totalAtividades === 1 ? "ativo" : "ativos"}, ${Math.round(pct)}%`
+          : `${title}: ${totalAtividades} ${totalAtividades === 1 ? "ativo" : "ativos"}`
+        : title);
 
     const handleClick = () => {
       if (disabled) return;
@@ -113,8 +100,8 @@ export const AtividadeNaBarra = forwardRef<HTMLButtonElement, AtividadeNaBarraPr
         aria-label={rotuloAcessivel}
         aria-haspopup="dialog"
         aria-expanded={painelAberto}
-        title={titulo}
-        data-tip={titulo}
+        title={title}
+        data-tip={title}
         data-force={dataForce}
         {...rest}
       >

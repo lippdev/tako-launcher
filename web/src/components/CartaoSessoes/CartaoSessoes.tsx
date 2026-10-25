@@ -5,7 +5,7 @@ import styles from "./CartaoSessoes.module.css";
 export interface DadoDaBarra {
   id: string;
   icone: IconName;
-  rotulo: string;
+  label: string;
   valor: string;
   /** Etiqueta colorida antes do valor (a nota do Metacritic): o número, e a cor pela faixa. */
   nota?: { valor: number; faixa: "good" | "mixed" | "bad" };
@@ -31,7 +31,7 @@ export function BarraDeDados({ dados, "aria-label": label, className }: BarraPro
         <div key={dado.id} className={styles["item"]}>
           <Icon name={dado.icone} />
           <div>
-            <small className={styles["rotulo"]}>{dado.rotulo}</small>
+            <small className={styles["rotulo"]}>{dado.label}</small>
             <b className={styles["valor"]}>
               {dado.nota && (
                 <span className={cx(styles["nota"], styles[dado.nota.faixa])}>{dado.nota.valor}</span>
@@ -53,17 +53,17 @@ export interface SessaoDoJogo {
 }
 
 interface ListaProps {
-  titulo: string;
+  title: string;
   sessoes: readonly SessaoDoJogo[];
   className?: string | undefined;
 }
 
 /** As sessões mais recentes numa caixa de linhas alternadas, como os Detalhes. Sem sessão, não existe. */
-export function ListaDeSessoes({ titulo, sessoes, className }: ListaProps) {
+export function ListaDeSessoes({ title, sessoes, className }: ListaProps) {
   if (sessoes.length === 0) return null;
   return (
-    <section className={cx(styles["lista"], className)} aria-label={titulo}>
-      <h3 className={styles["titulo"]}>{titulo}</h3>
+    <section className={cx(styles["lista"], className)} aria-label={title}>
+      <h3 className={styles["titulo"]}>{title}</h3>
       {sessoes.map((sessao, i) => (
         <div key={i} className={styles["sessao"]}>
           <span className={styles["inicio"]}>{sessao.inicio}</span>

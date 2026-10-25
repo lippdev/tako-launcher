@@ -8,36 +8,36 @@ import styles from "./EditorDeEtiquetas.module.css";
 
 export type { SugestaoDeEtiqueta };
 
-export interface EditorDeEtiquetasRotulos {
+export interface EditorDeEtiquetasLabels {
   /** Nome da lista de etiquetas para leitores de tela. */
-  lista: string;
+  list: string;
   /** O texto do chip tracejado ("Etiqueta"; o + vem do ícone). */
-  adicionar: string;
+  add: string;
   /** Nome do campo quando ele abre. */
-  campo: string;
+  field: string;
   /** Cabeçalho das sugestões. */
-  titulo: string;
+  title: string;
   /** Nome do ✕ de cada chip ("Tirar Zerado"). */
-  tirar: (nome: string) => string;
+  remove: (nome: string) => string;
   /** A linha que cria o que foi digitado (`Criar "Coop"`). */
-  criar: (nome: string) => string;
+  create: (nome: string) => string;
   /** Quantos jogos têm a etiqueta ("3 jogos"). */
-  jogos: (n: number) => string;
+  games: (n: number) => string;
 }
 
 export interface EditorDeEtiquetasProps {
   /** As etiquetas do jogo. */
-  etiquetas: readonly string[];
+  tags: readonly string[];
   /** Todas as etiquetas que existem na biblioteca, com quantos jogos têm cada uma. */
-  sugestoes: readonly SugestaoDeEtiqueta[];
-  rotulos: EditorDeEtiquetasRotulos;
+  suggestions: readonly SugestaoDeEtiqueta[];
+  labels: EditorDeEtiquetasLabels;
   /** Aplica uma etiqueta que já existe ou cria uma nova com este nome. */
-  onAdicionar: (nome: string) => void;
-  onRemover: (nome: string) => void;
+  onAdd: (nome: string) => void;
+  onRemove: (nome: string) => void;
   /** Tamanho dos chips (`md` = 32, `sm` = 26, para a seção Detalhes). */
-  tamanho?: "md" | "sm";
+  size?: "md" | "sm";
   /** Onde os chips se juntam quando sobra espaço: no começo (padrão) ou no fim, como na seção Detalhes. */
-  alinhamento?: "inicio" | "fim";
+  align?: "start" | "end";
   className?: string | undefined;
 }
 
@@ -47,13 +47,13 @@ export interface EditorDeEtiquetasProps {
  * linha marcada (↑ ↓ mudam), Esc fecha o campo e Backspace no campo vazio tira a última etiqueta.
  */
 export function EditorDeEtiquetas({
-  etiquetas,
-  sugestoes,
-  rotulos,
-  onAdicionar,
-  onRemover,
-  tamanho = "md",
-  alinhamento = "inicio",
+  tags,
+  suggestions,
+  labels,
+  onAdd,
+  onRemove,
+  size = "md",
+  align = "start",
   className,
 }: EditorDeEtiquetasProps) {
   const [aberto, setAberto] = useState(false);
@@ -66,11 +66,11 @@ export function EditorDeEtiquetas({
   const lista = useRef<HTMLDivElement>(null);
   const listaId = useId();
 
-  const { existentes, criar } = useMemo(() => sugerir(sugestoes, etiquetas, texto), [sugestoes, etiquetas, texto]);
+  const { existentes, criar } = useMemo(() => sugerir(suggestions, tags, texto), [suggestions, tags, texto]);
   const linhas = [...existentes.map((e) => e.nome), ...(criar ? [criar] : [])];
   const atual = Math.min(marcada, Math.max(0, linhas.length - 1));
   const mostrarLista = aberto && linhas.length > 0;
-  const small = tamanho === "sm";
+  const small = size === "sm";
 
   // A lista fica junto ao campo, dentro da janela, e acompanha a janela e a rolagem.
   useLayoutEffect(() => {
@@ -114,7 +114,7 @@ export function EditorDeEtiquetas({
     setAndou(false);
   };
   const escolher = (nome: string) => {
-    onAdicionar(nome);
+    onAdd(nome);
     setTexto("");
     setMarcada(0);
     setAndou(false);
@@ -122,17 +122,22 @@ export function EditorDeEtiquetas({
   };
 
   return (
-    <div role="list" aria-label={rotulos.lista} data-alinhamento={alinhamento} className={cx(styles["raiz"], className)}>
-      {etiquetas.map((nome) => (
+    <div
+      role="list"
+      aria-label={labels.list}
+      data-alinhamento={align === "end" ? "fim" : "inicio"}
+      className={cx(styles["raiz"], className)}
+    >
+      {tags.map((nome) => (
         <span key={nome} role="listitem" className={cx(styles["chip"], small && styles["sm"])}>
           <span className={styles["nome"]}>{nome}</span>
           <button
             type="button"
             className={styles["tirar"]}
-            aria-label={rotulos.tirar(nome)}
-            title={rotulos.tirar(nome)}
+            aria-label={labels.remove(nome)}
+            title={labels.remove(nome)}
             onClick={() => {
-              onRemover(nome);
+              onRemove(nome);
             }}
           >
             <Icon name="x" size="sm" />
@@ -148,8 +153,8 @@ export function EditorDeEtiquetas({
             className={styles["campo"]}
             value={texto}
             maxLength={MAX_NOME}
-            placeholder={rotulos.adicionar}
-            aria-label={rotulos.campo}
+            placeholder={labels.add}
+            aria-label={labels.field}
             role="combobox"
             aria-expanded={mostrarLista}
             aria-controls={listaId}
@@ -176,8 +181,8 @@ export function EditorDeEtiquetas({
                 setAndou(true);
                 setMarcada((atual + passo + linhas.length) % Math.max(1, linhas.length));
               } else if (event.key === "Backspace" && texto === "") {
-                const ultima = etiquetas[etiquetas.length - 1];
-                if (ultima) onRemover(ultima);
+                const ultima = tags[tags.length - 1];
+                if (ultima) onRemove(ultima);
               }
             }}
           />
@@ -185,14 +190,14 @@ export function EditorDeEtiquetas({
       ) : (
         <button type="button" role="listitem" className={cx(styles["chip"], styles["adicionar"], small && styles["sm"])} onClick={abrir}>
           <Icon name="plus" size="sm" />
-          {rotulos.adicionar}
+          {labels.add}
         </button>
       )}
       {mostrarLista && (
         <Portal>
-          <div ref={lista} id={listaId} role="listbox" aria-label={rotulos.titulo} className={styles["sugestoes"]}>
+          <div ref={lista} id={listaId} role="listbox" aria-label={labels.title} className={styles["sugestoes"]}>
             <div role="presentation" className={styles["titulo"]}>
-              {rotulos.titulo}
+              {labels.title}
             </div>
             {existentes.map((sugestao, i) => (
               <div
@@ -214,7 +219,7 @@ export function EditorDeEtiquetas({
                 }}
               >
                 <span className={styles["rotuloOpcao"]}>{sugestao.nome}</span>
-                <span className={styles["contagem"]}>{rotulos.jogos(sugestao.jogos)}</span>
+                <span className={styles["contagem"]}>{labels.games(sugestao.jogos)}</span>
               </div>
             ))}
             {criar && (
@@ -237,7 +242,7 @@ export function EditorDeEtiquetas({
                   }}
                 >
                   <Icon name="plus" size="sm" />
-                  <span className={styles["rotuloOpcao"]}>{rotulos.criar(criar)}</span>
+                  <span className={styles["rotuloOpcao"]}>{labels.create(criar)}</span>
                 </div>
               </>
             )}

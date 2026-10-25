@@ -155,21 +155,20 @@ function AvisoDeErro({
   return (
     <ErroDoJogo
       open={open}
-      tituloDoJogo={texts.title}
-      {...(texts.subtitle ? { subtitulo: texts.subtitle } : {})}
-      {...(cover ? { capaUrl: cover } : {})}
-      codigoDeSaida={texts.exitCode}
-      mensagem={texts.message}
-      rotulos={{
-        fechar: t("common.close"),
-        detalhesTecnicos: gameStrings.errorDialog.technicalDetails,
-        salvarRelatorio: t("session.save_report"),
-        reparar: t("session.repair"),
-        tentarDeNovo: t("session.try_again"),
+      gameTitle={texts.title}
+      {...(texts.subtitle ? { subtitle: texts.subtitle } : {})}
+      {...(cover ? { coverUrl: cover } : {})}
+      exitCode={texts.exitCode}
+      message={texts.message}
+      labels={{
+        close: t("common.close"),
+        technicalDetails: gameStrings.errorDialog.technicalDetails,
+        saveReport: t("session.save_report"),
+        repair: t("session.repair"),
+        retry: t("session.try_again"),
       }}
-      onTentarDeNovo={onRetry}
-      onFechar={onClose}
+      onRetry={onRetry}
+      onClose={onClose}
     />
   );
 }
-

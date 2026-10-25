@@ -9,13 +9,13 @@ export interface TituloDoJogoProps {
   /** ID do jogo, para montar `tako-img://logo`. */
   id: string;
   /** Nome do jogo: o texto alternativo do logo e, sem logo, o próprio título. */
-  titulo: string;
+  title: string;
   /** Tem logo (`hasLogo`). Sem ele, o nome em texto. */
-  temLogo: boolean;
+  hasLogo: boolean;
   /** URL do logo quando não vem do núcleo (galeria e testes). */
   src?: string | undefined;
   /** `pagina`: até 440×140; `visao`: até 320×100 (README do TituloDoJogo). */
-  tamanho?: "pagina" | "visao";
+  size?: "pagina" | "visao";
   className?: string | undefined;
 }
 
@@ -32,21 +32,21 @@ function urlDoLogo(id: string, largura: number, altura: number): string {
  * O nome do jogo é o logo dele (README do TituloDoJogo), alinhado embaixo à direita, com sombra. Sem logo, ou se a
  * imagem falhar, o nome em texto (Poppins 54/800).
  */
-export function TituloDoJogo({ id, titulo, temLogo, src, tamanho = "pagina", className }: TituloDoJogoProps) {
+export function TituloDoJogo({ id, title, hasLogo, src, size = "pagina", className }: TituloDoJogoProps) {
   useImageVersion(id);
   // Guarda de qual jogo foi a falha: ao trocar de jogo a nova tentativa vale.
   const [falhou, setFalhou] = useState<string | null>(null);
-  const medida = MEDIDAS[tamanho];
+  const medida = MEDIDAS[size];
   const url = src ? versionedImageUrl(src) : urlDoLogo(id, medida.w, medida.h);
-  const logo = temLogo && falhou !== url ? url : null;
+  const logo = hasLogo && falhou !== url ? url : null;
 
   return (
-    <h1 className={cx(styles["titulo"], styles[tamanho], className)}>
+    <h1 className={cx(styles["titulo"], styles[size], className)}>
       {logo ? (
         <img
           className={styles["logo"]}
           src={logo}
-          alt={titulo}
+          alt={title}
           decoding="async"
           draggable={false}
           onError={() => {
@@ -54,7 +54,7 @@ export function TituloDoJogo({ id, titulo, temLogo, src, tamanho = "pagina", cla
           }}
         />
       ) : (
-        <span className={styles["texto"]}>{titulo}</span>
+        <span className={styles["texto"]}>{title}</span>
       )}
     </h1>
   );

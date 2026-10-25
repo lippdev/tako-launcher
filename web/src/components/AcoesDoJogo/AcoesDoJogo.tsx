@@ -7,7 +7,7 @@ import styles from "./AcoesDoJogo.module.css";
 /** O estado do primário (JogarEAbrir): Jogar → Abrindo… → Voltar ao jogo; não instalado; lançamento futuro. */
 export type EstadoDoPrimario = "jogar" | "abrindo" | "jogando" | "nao-instalado" | "em-breve";
 
-export interface AcoesDoJogoRotulos {
+export interface AcoesDoJogoLabels {
   jogar: string;
   abrindo: string;
   voltarAoJogo: string;
@@ -23,7 +23,7 @@ export interface AcoesDoJogoRotulos {
 export interface AcoesDoJogoProps {
   estado: EstadoDoPrimario;
   favorito: boolean;
-  rotulos: AcoesDoJogoRotulos;
+  labels: AcoesDoJogoLabels;
   onJogar?: (() => void) | undefined;
   /** Jogando: volta para a janela do jogo. */
   onVoltarAoJogo?: (() => void) | undefined;
@@ -46,7 +46,7 @@ export interface AcoesDoJogoProps {
 export function AcoesDoJogo({
   estado,
   favorito,
-  rotulos,
+  labels,
   onJogar,
   onVoltarAoJogo,
   onEncerrar,
@@ -62,7 +62,7 @@ export function AcoesDoJogo({
   const entradas: readonly MenuEntry[] = [
     {
       id: "favorito",
-      label: favorito ? rotulos.desfavoritar : rotulos.favoritar,
+      label: favorito ? labels.desfavoritar : labels.favoritar,
       icon: "star",
       onSelect: onAlternarFavorito,
     },
@@ -70,7 +70,7 @@ export function AcoesDoJogo({
     // Sem o ouvinte (a galeria de componentes) a entrada fica à vista e desligada.
     {
       id: "configuracoes",
-      label: rotulos.configuracoes,
+      label: labels.configuracoes,
       icon: "sliders",
       disabled: onConfiguracoes === undefined,
       onSelect: () => {
@@ -89,8 +89,8 @@ export function AcoesDoJogo({
             icon="star"
             on={favorito}
             tone="warning"
-            aria-label={favorito ? rotulos.desfavoritar : rotulos.favoritar}
-            title={favorito ? rotulos.desfavoritar : rotulos.favoritar}
+            aria-label={favorito ? labels.desfavoritar : labels.favoritar}
+            title={favorito ? labels.desfavoritar : labels.favoritar}
             onClick={onAlternarFavorito}
           />
           <BotaoDesktop
@@ -104,7 +104,7 @@ export function AcoesDoJogo({
               setMenuAberto((aberto) => !aberto);
             }}
           >
-            {rotulos.gerenciar}
+            {labels.gerenciar}
           </BotaoDesktop>
           <MenuDeContexto
             open={menuAberto}
@@ -113,7 +113,7 @@ export function AcoesDoJogo({
             }}
             anchor={ancora}
             entries={entradas}
-            label={rotulos.gerenciar}
+            label={labels.gerenciar}
           />
         </>
       )}
@@ -122,33 +122,33 @@ export function AcoesDoJogo({
           variant="square"
           icon="x"
           className={styles["encerrar"]}
-          aria-label={rotulos.encerrar}
-          title={rotulos.encerrar}
+          aria-label={labels.encerrar}
+          title={labels.encerrar}
           onClick={onEncerrar}
         />
       )}
-      <Primario estado={estado} rotulos={rotulos} onJogar={onJogar} onVoltarAoJogo={onVoltarAoJogo} />
+      <Primario estado={estado} labels={labels} onJogar={onJogar} onVoltarAoJogo={onVoltarAoJogo} />
     </div>
   );
 }
 
 function Primario({
   estado,
-  rotulos,
+  labels,
   onJogar,
   onVoltarAoJogo,
-}: Pick<AcoesDoJogoProps, "estado" | "rotulos" | "onJogar" | "onVoltarAoJogo">) {
+}: Pick<AcoesDoJogoProps, "estado" | "labels" | "onJogar" | "onVoltarAoJogo">) {
   switch (estado) {
     case "jogando":
       return (
         <BotaoDesktop icon="gamepad" onClick={onVoltarAoJogo}>
-          {rotulos.voltarAoJogo}
+          {labels.voltarAoJogo}
         </BotaoDesktop>
       );
     case "abrindo":
       return (
         <BotaoDesktop icon="play" iconFilled disabled aria-busy="true">
-          {rotulos.abrindo}
+          {labels.abrindo}
         </BotaoDesktop>
       );
     case "nao-instalado":
@@ -156,15 +156,15 @@ function Primario({
       // desligado até existir a chamada.
       return (
         <BotaoDesktop icon="download" disabled>
-          {rotulos.instalar}
+          {labels.instalar}
         </BotaoDesktop>
       );
     case "em-breve":
-      return <BotaoDesktop disabled>{rotulos.emBreve}</BotaoDesktop>;
+      return <BotaoDesktop disabled>{labels.emBreve}</BotaoDesktop>;
     case "jogar":
       return (
         <BotaoDesktop icon="play" iconFilled onClick={onJogar}>
-          {rotulos.jogar}
+          {labels.jogar}
         </BotaoDesktop>
       );
   }

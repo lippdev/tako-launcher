@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   AtualizacaoDoApp,
-  type AtualizacaoDoAppRotulos,
+  type AtualizacaoDoAppLabels,
   type EstadoAtualizacao,
 } from "./AtualizacaoDoApp";
 import { BotaoDesktop } from "../BotaoDesktop/BotaoDesktop";
@@ -10,18 +10,18 @@ import { DemoGrupo } from "../../lib/demoGrupo";
 export const title = "AtualizacaoDoApp";
 export const preview = "AtualizacaoDoApp";
 
-const ROTULOS: AtualizacaoDoAppRotulos = {
-  fechar: "Fechar (Esc)",
-  depois: "Depois",
-  novidades: "Novidades",
-  baixar: "Baixar atualização",
-  reiniciar: "Reiniciar agora",
-  tentarDeNovo: "Tentar de novo",
-  tituloDisponivel: "Atualização disponível",
-  tituloBaixando: "Baixando atualização",
-  tituloPronta: "Atualização pronta",
-  tituloErro: "Não foi possível atualizar",
-  ajudaBaixando: "Pode fechar: o download continua em segundo plano e avisa ao terminar.",
+const ROTULOS: AtualizacaoDoAppLabels = {
+  close: "Fechar (Esc)",
+  later: "Depois",
+  notes: "Novidades",
+  download: "Baixar atualização",
+  restart: "Reiniciar agora",
+  retry: "Tentar de novo",
+  availableTitle: "Atualização disponível",
+  downloadingTitle: "Baixando atualização",
+  readyTitle: "Atualização pronta",
+  errorTitle: "Não foi possível atualizar",
+  downloadingHelp: "Pode fechar: o download continua em segundo plano e avisa ao terminar.",
 };
 
 const NOVIDADES_EXEMPLO: readonly string[] = [
@@ -125,20 +125,20 @@ export function Demo() {
       {estadoAtivo === "pronta" && (
         <AtualizacaoDoApp
           open={true}
-          estado="pronta"
-          versao="TAKO 0.2.1"
-          subtitulo="TAKO 0.2.1 · reinicia em uns 5 s"
-          novidades={NOVIDADES_EXEMPLO}
-          rotulos={ROTULOS}
-          onDepois={() => {
+          state="pronta"
+          version="TAKO 0.2.1"
+          subtitle="TAKO 0.2.1 · reinicia em uns 5 s"
+          releaseNotes={NOVIDADES_EXEMPLO}
+          labels={ROTULOS}
+          onLater={() => {
             setUltimoAviso("Depois acionado");
             fechar();
           }}
-          onReiniciar={() => {
+          onRestart={() => {
             setUltimoAviso("Reiniciar agora acionado");
             fechar();
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
 
@@ -146,16 +146,16 @@ export function Demo() {
       {estadoAtivo === "baixando" && (
         <AtualizacaoDoApp
           open={true}
-          estado="baixando"
-          versao="TAKO 0.2.1"
-          progresso={progresso}
-          progressoTexto={`${progresso}% · ${Math.round((progresso * 27) / 100)} MB de 27 MB`}
-          rotulos={ROTULOS}
-          onDepois={() => {
+          state="baixando"
+          version="TAKO 0.2.1"
+          progress={progresso}
+          progressText={`${progresso}% · ${Math.round((progresso * 27) / 100)} MB de 27 MB`}
+          labels={ROTULOS}
+          onLater={() => {
             setUltimoAviso("Depois acionado durante download");
             fechar();
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
 
@@ -163,19 +163,19 @@ export function Demo() {
       {estadoAtivo === "disponivel" && (
         <AtualizacaoDoApp
           open={true}
-          estado="disponivel"
-          versao="TAKO 0.2.1"
-          novidades={NOVIDADES_EXEMPLO}
-          rotulos={ROTULOS}
-          onBaixar={() => {
+          state="disponivel"
+          version="TAKO 0.2.1"
+          releaseNotes={NOVIDADES_EXEMPLO}
+          labels={ROTULOS}
+          onDownload={() => {
             setUltimoAviso("Baixar atualização acionado");
             setEstadoAtivo("baixando");
           }}
-          onDepois={() => {
+          onLater={() => {
             setUltimoAviso("Depois acionado");
             fechar();
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
 
@@ -183,15 +183,15 @@ export function Demo() {
       {estadoAtivo === "erro" && (
         <AtualizacaoDoApp
           open={true}
-          estado="erro"
-          versao="TAKO 0.2.1"
-          mensagemErro="Não foi possível conectar ao servidor de atualizações. Verifique sua conexão com a internet e tente novamente."
-          rotulos={ROTULOS}
-          onTentarDeNovo={() => {
+          state="erro"
+          version="TAKO 0.2.1"
+          errorMessage="Não foi possível conectar ao servidor de atualizações. Verifique sua conexão com a internet e tente novamente."
+          labels={ROTULOS}
+          onRetry={() => {
             setUltimoAviso("Tentar de novo acionado");
             setEstadoAtivo("baixando");
           }}
-          onFechar={fechar}
+          onClose={fechar}
         />
       )}
     </div>

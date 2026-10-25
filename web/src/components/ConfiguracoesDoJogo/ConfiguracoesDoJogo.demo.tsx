@@ -4,7 +4,7 @@ import {
   ConfiguracoesDoJogo,
   type ChaveConfiguracaoJogo,
   type ValorConfiguracaoJogo,
-  type ConfiguracoesDoJogoRotulos,
+  type ConfiguracoesDoJogoLabels,
   type OpcoesConfiguracoesDoJogo,
   type DescricoesConfiguracoesDoJogo,
   type ValoresConfiguracoesDoJogo,
@@ -22,30 +22,30 @@ const CAPA_GOW = `data:image/svg+xml,${encodeURIComponent(`
 </svg>
 `)}`;
 
-const ROTULOS_PADRAO: ConfiguracoesDoJogoRotulos = {
-  titulo: "Configurações deste jogo",
-  fechar: "Fechar (Esc)",
-  grupoTela: "Tela",
-  grupoSom: "Som",
-  grupoAbrirOJogo: "Abrir o jogo",
+const ROTULOS_PADRAO: ConfiguracoesDoJogoLabels = {
+  title: "Configurações deste jogo",
+  close: "Fechar (Esc)",
+  screenGroup: "Tela",
+  soundGroup: "Som",
+  launchGroup: "Abrir o jogo",
   monitor: "Usar a tela de jogo",
-  resolucaoETaxa: "Resolução e taxa",
+  resolutionAndRate: "Resolução e taxa",
   hdr: "HDR",
   vrr: "VRR",
-  saidaDeAudio: "Saída de áudio",
-  argumentos: "Argumentos extras",
-  pastaDeTrabalho: "Pasta de trabalho",
-  variaveisDeAmbiente: "Variáveis de ambiente",
-  comandosAntesEDepois: "Comandos antes e depois",
-  usarTudoDoTako: "Usar tudo do TAKO",
-  padraoPrefixo: "Padrão: ",
-  nenhum: "Nenhum",
-  nenhuma: "Nenhuma",
-  ligado: "Ligado",
-  desligado: "desligado",
-  singularMudanca: "mudança",
-  pluralMudancas: "mudanças",
-  nenhumaMudanca: "nenhuma mudança",
+  audioOutput: "Saída de áudio",
+  arguments: "Argumentos extras",
+  workingDirectory: "Pasta de trabalho",
+  environmentVariables: "Variáveis de ambiente",
+  beforeAndAfterCommands: "Comandos antes e depois",
+  useAllFromTako: "Usar tudo do TAKO",
+  defaultPrefix: "Padrão: ",
+  none: "Nenhum",
+  noneFem: "Nenhuma",
+  on: "Ligado",
+  off: "desligado",
+  singularChange: "mudança",
+  pluralChanges: "mudanças",
+  noChanges: "nenhuma mudança",
 };
 
 const OPCOES_EXEMPLO: OpcoesConfiguracoesDoJogo = {
@@ -58,17 +58,16 @@ const OPCOES_EXEMPLO: OpcoesConfiguracoesDoJogo = {
   hdr: [
     { value: "desligado", label: "desligado" },
     { value: "ligado", label: "Ligado" },
-    { value: "automatico", label: "Automático" },
   ],
   vrr: [
-    { value: "desligado", label: "Desligado" },
+    { value: "do_jogo", label: "Do jogo" },
     { value: "ligado", label: "Ligado" },
+    { value: "desligado", label: "desligado" },
   ],
   saidaDeAudio: [
-    { value: "nao_mudar", label: "Não mudar" },
-    { value: "tv", label: "TV (HDMI)" },
-    { value: "fone", label: "Fones de ouvido" },
-    { value: "alto_falantes", label: "Alto-falantes" },
+    { value: "padrao", label: "Padrão do sistema" },
+    { value: "fone", label: "Headphone (Realtek Audio)" },
+    { value: "hdmi", label: "LG TV (NVIDIA High Definition Audio)" },
   ],
 };
 
@@ -76,8 +75,10 @@ const VALORES_PADRAO_GOW: ValoresConfiguracoesDoJogo = {
   monitor: false,
   resolucaoETaxa: "do_jogo",
   hdr: "desligado",
-  saidaDeAudio: "nao_mudar",
+  vrr: "do_jogo",
+  saidaDeAudio: "padrao",
   argumentos: "",
+  pastaDeTrabalho: "",
   variaveisDeAmbiente: "",
   comandosAntesEDepois: "",
 };
@@ -85,45 +86,40 @@ const VALORES_PADRAO_GOW: ValoresConfiguracoesDoJogo = {
 export function Demo() {
   const [painelAberto, setPainelAberto] = useState<"mudado" | "padrao" | "sem_dado" | null>(null);
 
-  // Cenário 1: Valores com mudanças (Fiel ao preview.html)
+  // Cenário 1: 2 mudanças (fiel ao preview.html)
   const [valoresMudados, setValoresMudados] = useState<ValoresConfiguracoesDoJogo>({
+    ...VALORES_PADRAO_GOW,
     monitor: true,
-    resolucaoETaxa: "do_jogo",
+    resolucaoETaxa: "1440p",
     hdr: "ligado",
-    saidaDeAudio: "nao_mudar",
-    argumentos: "",
-    variaveisDeAmbiente: "",
-    comandosAntesEDepois: "",
   });
 
+  const handleMudarValoresMudados = (chave: ChaveConfiguracaoJogo, valor: ValorConfiguracaoJogo) => {
+    setValoresMudados((prev) => ({ ...prev, [chave]: valor }));
+  };
+
   const descricoesMudados: DescricoesConfiguracoesDoJogo = {
-    monitor: "Padrão: Tela 1",
-    resolucaoETaxa: "2560 × 1440 · 144 Hz",
-    hdr: "Padrão: desligado",
-    saidaDeAudio: "Segue o TAKO",
-    argumentos: "Nenhum",
-    variaveisDeAmbiente: "Nenhuma",
-    comandosAntesEDepois: "Nenhum",
+    monitor: "Apenas monitores conectados",
+    vrr: "Sem suporte neste monitor",
+    pastaDeTrabalho: "Pasta do executável",
+    comandosAntesEDepois: "Script antes de abrir",
   };
 
   const padroesMudados: Partial<ValoresConfiguracoesDoJogo> = {
     ...VALORES_PADRAO_GOW,
   };
 
-  const handleMudarValoresMudados = (chave: ChaveConfiguracaoJogo, valor: ValorConfiguracaoJogo) => {
-    setValoresMudados((prev) => ({ ...prev, [chave]: valor }));
-  };
-
   const handleResetarMudados = () => {
     setValoresMudados({ ...VALORES_PADRAO_GOW });
   };
 
-  // Cenário 2: Todos os valores no padrão do TAKO (0 mudanças)
+  // Cenário 2: tudo no padrão
   const [valoresPadrao, setValoresPadrao] = useState<ValoresConfiguracoesDoJogo>({
     monitor: false,
     resolucaoETaxa: "do_jogo",
     hdr: "desligado",
-    saidaDeAudio: "nao_mudar",
+    vrr: "do_jogo",
+    saidaDeAudio: "padrao",
     argumentos: "",
     pastaDeTrabalho: "",
     variaveisDeAmbiente: "",
@@ -131,24 +127,19 @@ export function Demo() {
   });
 
   const descricoesPadrao: DescricoesConfiguracoesDoJogo = {
-    resolucaoETaxa: "1920 × 1080 · 60 Hz",
-    saidaDeAudio: "Segue o TAKO",
-    argumentos: "Nenhum",
-    pastaDeTrabalho: "Padrão da instalação",
-    variaveisDeAmbiente: "Nenhuma",
-    comandosAntesEDepois: "Nenhum",
+    vrr: "Sem suporte neste monitor",
   };
 
-  // Cenário 3: Linhas sem dado escondidas
+  // Cenário 3: campos sem dado ocultos
   const [valoresSemDado, setValoresSemDado] = useState<ValoresConfiguracoesDoJogo>({
     resolucaoETaxa: "1080p",
     saidaDeAudio: "fone",
   });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-24)" }}>
-      <DemoGrupo titulo="Interativo — abrir em camada lateral (PainelLateral wide de 480px)">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+    <div>
+      <DemoGrupo titulo="Interativo — abrir como painel lateral (gaveta à direita)">
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <button
             type="button"
             className="tb-btn"
@@ -163,7 +154,7 @@ export function Demo() {
             }}
             onClick={() => setPainelAberto("mudado")}
           >
-            Abrir: God of War (2 mudanças destacadas)
+            Abrir: God of War (2 mudanças)
           </button>
           <button
             type="button"
@@ -179,7 +170,7 @@ export function Demo() {
             }}
             onClick={() => setPainelAberto("padrao")}
           >
-            Abrir: Hades II (valores padrão, 0 mudanças)
+            Abrir: Hades II (padrão)
           </button>
           <button
             type="button"
@@ -195,7 +186,7 @@ export function Demo() {
             }}
             onClick={() => setPainelAberto("sem_dado")}
           >
-            Abrir: Celeste (linhas sem dado escondidas)
+            Abrir: Celeste (sem dados opcionais)
           </button>
         </div>
         <p className="label-sm" style={{ margin: "8px 0 0" }}>
@@ -207,16 +198,16 @@ export function Demo() {
           <ConfiguracoesDoJogo
             open={true}
             onClose={() => setPainelAberto(null)}
-            tituloDoJogo="God of War: Ragnarök"
-            capaUrl={CAPA_GOW}
-            valores={valoresMudados}
-            padroes={padroesMudados}
-            opcoes={OPCOES_EXEMPLO}
-            descricoes={descricoesMudados}
-            rotulos={ROTULOS_PADRAO}
+            gameTitle="God of War: Ragnarök"
+            coverUrl={CAPA_GOW}
+            values={valoresMudados}
+            defaults={padroesMudados}
+            options={OPCOES_EXEMPLO}
+            descriptions={descricoesMudados}
+            labels={ROTULOS_PADRAO}
             onChange={handleMudarValoresMudados}
-            onResetarAoPadrao={handleResetarMudados}
-            onCliqueLinha={(chave) => {
+            onResetToDefault={handleResetarMudados}
+            onLineClick={(chave) => {
               if (chave === "argumentos" || chave === "variaveisDeAmbiente" || chave === "comandosAntesEDepois") {
                 // Simulação de navegação para detalhes
               }
@@ -228,16 +219,16 @@ export function Demo() {
           <ConfiguracoesDoJogo
             open={true}
             onClose={() => setPainelAberto(null)}
-            tituloDoJogo="Hades II"
-            valores={valoresPadrao}
-            padroes={valoresPadrao}
-            opcoes={OPCOES_EXEMPLO}
-            descricoes={descricoesPadrao}
-            rotulos={ROTULOS_PADRAO}
+            gameTitle="Hades II"
+            values={valoresPadrao}
+            defaults={valoresPadrao}
+            options={OPCOES_EXEMPLO}
+            descriptions={descricoesPadrao}
+            labels={ROTULOS_PADRAO}
             onChange={(chave: ChaveConfiguracaoJogo, v: ValorConfiguracaoJogo) =>
               setValoresPadrao((p) => ({ ...p, [chave]: v }))
             }
-            onResetarAoPadrao={() => {}}
+            onResetToDefault={() => {}}
           />
         )}
 
@@ -245,10 +236,10 @@ export function Demo() {
           <ConfiguracoesDoJogo
             open={true}
             onClose={() => setPainelAberto(null)}
-            tituloDoJogo="Celeste"
-            valores={valoresSemDado}
-            opcoes={OPCOES_EXEMPLO}
-            rotulos={ROTULOS_PADRAO}
+            gameTitle="Celeste"
+            values={valoresSemDado}
+            options={OPCOES_EXEMPLO}
+            labels={ROTULOS_PADRAO}
             onChange={(chave: ChaveConfiguracaoJogo, v: ValorConfiguracaoJogo) =>
               setValoresSemDado((p) => ({ ...p, [chave]: v }))
             }
@@ -259,42 +250,42 @@ export function Demo() {
       <DemoGrupo titulo="1. Cenário Fiel ao preview.html — God of War: Ragnarök (2 mudanças destacadas com 'Padrão: …')">
         <ConfiguracoesDoJogo
           inline
-          tituloDoJogo="God of War: Ragnarök"
-          capaUrl={CAPA_GOW}
-          valores={valoresMudados}
-          padroes={padroesMudados}
-          opcoes={OPCOES_EXEMPLO}
-          descricoes={descricoesMudados}
-          rotulos={ROTULOS_PADRAO}
+          gameTitle="God of War: Ragnarök"
+          coverUrl={CAPA_GOW}
+          values={valoresMudados}
+          defaults={padroesMudados}
+          options={OPCOES_EXEMPLO}
+          descriptions={descricoesMudados}
+          labels={ROTULOS_PADRAO}
           onChange={handleMudarValoresMudados}
-          onResetarAoPadrao={handleResetarMudados}
-          onCliqueLinha={() => {}}
+          onResetToDefault={handleResetarMudados}
+          onLineClick={() => {}}
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="2. Cenário Valores Padrão — Hades II (0 mudanças, nenhuma linha destacada)">
         <ConfiguracoesDoJogo
           inline
-          tituloDoJogo="Hades II"
-          valores={valoresPadrao}
-          padroes={valoresPadrao}
-          opcoes={OPCOES_EXEMPLO}
-          descricoes={descricoesPadrao}
-          rotulos={ROTULOS_PADRAO}
+          gameTitle="Hades II"
+          values={valoresPadrao}
+          defaults={valoresPadrao}
+          options={OPCOES_EXEMPLO}
+          descriptions={descricoesPadrao}
+          labels={ROTULOS_PADRAO}
           onChange={(chave: ChaveConfiguracaoJogo, v: ValorConfiguracaoJogo) =>
             setValoresPadrao((p) => ({ ...p, [chave]: v }))
           }
-          onResetarAoPadrao={() => {}}
+          onResetToDefault={() => {}}
         />
       </DemoGrupo>
 
       <DemoGrupo titulo="3. Cenário Linhas Sem Dado Escondidas — Celeste (apenas resolução e saída de áudio)">
         <ConfiguracoesDoJogo
           inline
-          tituloDoJogo="Celeste"
-          valores={valoresSemDado}
-          opcoes={OPCOES_EXEMPLO}
-          rotulos={ROTULOS_PADRAO}
+          gameTitle="Celeste"
+          values={valoresSemDado}
+          options={OPCOES_EXEMPLO}
+          labels={ROTULOS_PADRAO}
           onChange={(chave: ChaveConfiguracaoJogo, v: ValorConfiguracaoJogo) =>
             setValoresSemDado((p) => ({ ...p, [chave]: v }))
           }

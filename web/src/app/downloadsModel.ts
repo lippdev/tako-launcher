@@ -106,8 +106,8 @@ export function toPanelItem(
   const percent = entryPercent(entry);
   return {
     id: String(entry.id),
-    titulo: entry.title,
-    estado:
+    title: entry.title,
+    state:
       entry.state === "downloading"
         ? "baixando"
         : entry.state === "queued"
@@ -117,10 +117,10 @@ export function toPanelItem(
             : entry.state === "completed"
               ? "concluido"
               : "erro",
-    progresso: percent,
-    subtitulo: entryLine(entry, t, comma),
-    capa: entry.gameId === null ? null : cover(entry.gameId),
-    erro: entry.error,
+    progress: percent,
+    subtitle: entryLine(entry, t, comma),
+    cover: entry.gameId === null ? null : cover(entry.gameId),
+    error: entry.error,
   };
 }
 

@@ -20,28 +20,28 @@ export function Demo() {
   return (
     <div>
       <DemoGrupo titulo="Exibição normal — todas as etiquetas">
-        <EtiquetasDoJogo etiquetas={EXEMPLO_TAGS} />
+        <EtiquetasDoJogo tags={EXEMPLO_TAGS} />
       </DemoGrupo>
 
       <DemoGrupo titulo="Com limite de espaço (até 3 chips + '+3')">
-        <EtiquetasDoJogo etiquetas={EXEMPLO_TAGS} limite={3} />
+        <EtiquetasDoJogo tags={EXEMPLO_TAGS} limit={3} />
       </DemoGrupo>
 
       <DemoGrupo titulo="Em Detalhes (tamanho compacto 26px com limite e '+N')">
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Etiquetas:</span>
-          <EtiquetasDoJogo etiquetas={EXEMPLO_TAGS} limite={1} tamanho="sm" />
+          <EtiquetasDoJogo tags={EXEMPLO_TAGS} limit={1} size="sm" />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 12 }}>
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Etiquetas:</span>
-          <EtiquetasDoJogo etiquetas={EXEMPLO_TAGS} limite={3} tamanho="sm" />
+          <EtiquetasDoJogo tags={EXEMPLO_TAGS} limit={3} size="sm" />
         </div>
       </DemoGrupo>
 
       <DemoGrupo titulo="Etiquetas clicáveis (filtro na biblioteca)">
         <EtiquetasDoJogo
-          etiquetas={EXEMPLO_TAGS}
-          onClickEtiqueta={(t) => setSelecionada(t)}
+          tags={EXEMPLO_TAGS}
+          onTagClick={(t) => setSelecionada(t)}
         />
         {selecionada && (
           <span style={{ fontSize: 12.5, color: "var(--accent)" }}>
