@@ -13,7 +13,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Boot do núcleo, biblioteca, snapshot | ✅ | WEB-01a |
 | Leitura das lojas e emuladores (`sources`, Playnite) | 🟡 lojas e emuladores; falta importar do Playnite | WEB-01c · **WEB-31** |
 | Metadados e arte (`metadata.rs`, `art.rs`): fontes, cache, IGDB, ScreenScraper, SteamGridDB | 🟡 cache lido pelo hospedeiro; falta arte pelo núcleo e a busca de metadados | **WEB-01d**, **WEB-32** |
-| Sessão de jogo (`session.rs`, `hosts.rs`): abrir, tela e áudio, acompanhar, restaurar, recuperação | ⬜ em andamento | **WEB-20** |
+| Sessão de jogo (`session.rs`, `hosts.rs`): abrir, tela e áudio, acompanhar, restaurar, recuperação | ✅ núcleo (falta a interface usar `game.running` e `game.ended`: WEB-21) | WEB-20 · **WEB-21** |
 | "Abrindo…" (`launch_splash`) e "Fechando o jogo…" (`closing_game`) | ⬜ | **WEB-21** |
 | Central rápida durante o jogo (`control_center`) e o atalho global | ⬜ | **WEB-22** |
 | Controles pelo SDL3 (`gamepad.rs`): navegação, bateria, reconexão, isolar do jogo (HidHide) | ⬜ teclado pronto | **WEB-05b** |
@@ -35,12 +35,12 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 |---|---|---|
 | Janela, barra de cima, menu do Tako (`bar`, `desktop`) | ✅ | WEB-10a |
 | Lista da biblioteca: abas, busca, filtros, ordenação, coleções, seleção múltipla (`desktop`, `library`) | ✅ | WEB-11a |
-| Modos Grade e Categorias da lista | 🟡 componentes prontos; falta ligar | WEB-04j · **WEB-11c** |
+| Modos Grade e Categorias da lista | ✅ (Categorias na coluna, não na janela toda; sem Gênero) | WEB-04j · WEB-11c |
 | Visão geral (`overview`, `home`) | ✅ (falta "Voltar a jogar") | WEB-10b |
 | Página do jogo (`details`) | ✅ (falta "jogando", depende do WEB-20) | WEB-12a |
 | Configurações do jogo (`game_settings`) | 🟡 pronto; comandos antes e depois só leitura até a aprovação | WEB-12b · **WEB-20** |
-| Editar jogo (`edit_game`) e Fontes e IDs (`source_ids`) | ⬜ | **WEB-12c** |
-| Adicionar jogo (`add_game`) | ⬜ | **WEB-12c** |
+| Editar jogo (`edit_game`) e Fontes e IDs (`source_ids`) | 🟡 pronto; ID fixado só vale com a fila de metadados | WEB-12c · **WEB-32** |
+| Adicionar jogo (`add_game`) | 🟡 pronto; caminho digitado, sem seletor de arquivo | WEB-12c |
 | Seletor de imagens (`art`) e Revisar capas (`art_review`) | 🟡 componente do seletor pronto | **WEB-12d** |
 | Editor de etiquetas (`tags_editor`) | ✅ | WEB-12b |
 | Coleções automáticas (`smart`): salvar filtros | ✅ (falta a lista em Configurações › Biblioteca, WEB-13c) | WEB-11b |
