@@ -1,0 +1,38 @@
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--space-40);
+  background: var(--art-scrim-left);
+}
+
+.central {
+  width: min(100%, var(--window-width));
+  max-height: 100%;
+  overflow: auto;
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  background: var(--glass-panel);
+  box-shadow: var(--shadow-layer);
+  color: var(--text);
+  font-family: var(--font-text);
+}
+
+.game, .actions, .panel, dl {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+}
+
+.game { justify-content: space-between; }
+.game h2 { margin: 0; font: inherit; font-family: var(--font-heading); }
+.game p { color: var(--text-muted); }
+.actions { margin-top: var(--space-16); }
+.panel { padding-block: var(--space-24); }
+.panel label { display: grid; gap: var(--space-12); }
+.panel dl { margin: 0; }
+.panel dd { margin: var(--space-8) 0 0; }

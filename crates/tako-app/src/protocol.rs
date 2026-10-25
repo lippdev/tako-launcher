@@ -13,6 +13,50 @@ pub const BRIDGE_VERSION: u32 = 1;
 /// Maior mensagem aceita da interface; confere antes de alocar o JSON.
 pub const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+#[ts(export)]
+pub enum ControlCenterAction {
+    Volume { value: f32 },
+    Mute { muted: bool },
+    AudioOutput { id: String },
+    DisplayMode { id: String, mode: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ControlCenterState {
+    pub open: bool,
+    pub audio: Option<ControlCenterAudio>,
+    pub displays: Vec<ControlCenterDisplay>,
+    pub display_managed: bool,
+    pub controller: ControllerInfo,
+    /// Memória residente e CPU acumulada do núcleo, sem inventar métricas do jogo.
+    pub memory_mib: Option<f64>,
+    pub cpu_seconds: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ControlCenterAudio {
+    pub outputs: AudioOutputList,
+    pub default_id: Option<String>,
+    pub volume: Option<f32>,
+    pub muted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ControlCenterDisplay {
+    pub id: String,
+    pub name: String,
+    pub current_mode: Option<String>,
+    pub modes: Vec<String>,
+}
+
 /// Valida o envelope antes do payload, para distinguir chamada desconhecida de enum inválido.
 pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
     let bad_request = |message| BridgeError::new(ErrorCode::BadRequest, message);
@@ -110,6 +154,8 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "updates.preferences.set"
             | "input.controller"
             | "input.source"
+            | "control_center.state"
+            | "control_center.set"
     ) {
         return Err((
             header.id,
@@ -141,6 +187,9 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "updates.preferences"
     ) && value.get("payload").is_some()
     {
+        return Err((id, bad_request("chamada não aceita argumentos".into())));
+    }
+    if header.name == "control_center.state" && value.get("payload").is_some() {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
     }
     let request: Request =
@@ -561,6 +610,15 @@ pub enum Call {
         #[ts(as = "InputSource")]
         InputSource,
     ),
+    /// Central consultável depois de recriar a interface (WEB-22).
+    #[serde(rename = "control_center.state")]
+    ControlCenterState,
+    #[serde(rename = "control_center.set")]
+    ControlCenterSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "ControlCenterAction")]
+        ControlCenterAction,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -700,6 +758,10 @@ pub enum Reply {
     InputController(ControllerInfo),
     #[serde(rename = "input.source")]
     InputSource,
+    #[serde(rename = "control_center.state")]
+    ControlCenterState(ControlCenterState),
+    #[serde(rename = "control_center.set")]
+    ControlCenterSet(ControlCenterState),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -766,6 +828,8 @@ pub enum Event {
     /// Aviso para a tela: controle desconectado, conectado de volta ou com bateria fraca (INPUT-003, INPUT-004).
     #[serde(rename = "input.notice")]
     InputNotice(InputNotice),
+    #[serde(rename = "control_center.open")]
+    ControlCenterOpen(bool),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.

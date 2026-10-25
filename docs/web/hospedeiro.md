@@ -290,6 +290,40 @@ Testes: `tako-core` (`session::discord` com o Discord simulado por pipes, `api::
 (`tests/local_api_bridge.rs`, `tests/links_bridge.rs`) e `tako-web` (`core_process.rs`: o link reabre a interface no
 destino, o segundo Tako traz a janela, o arquivo de ativação chega ao laço).
 
+## Central rápida (WEB-22)
+
+Durante um jogo aberto pela sessão (WEB-20), a Central rápida abre por cima do jogo como no Slint (PRD D-15, `docs/plans/web-paridade-windows.md`). Sem jogo aberto, o atalho não faz nada.
+
+### Abertura e foco
+
+- **Como abre:**
+  - Pela combinação do controle (View + Y por padrão), detectada pelo interpretador de controle no núcleo (`InputSync` em `core_process.rs`);
+  - Pelo atalho global de teclado do Slint (`ControlCenterKey`, padrão `Ctrl+Shift+Tab`), registrado via `RegisterHotKey` na thread dedicada da plataforma (`tako_platform::control_center::register`), sem instalar hook global de teclado.
+- **Foco e sobreposição:**
+  - Ao acionar o atalho com a interface fechada, o núcleo aciona `host.show = true` e marca `service.set_central_open(true)`;
+  - Quando a janela da interface reabre (`UiMsg::Page`), o núcleo traz a janela do CEF para a frente com `focus_processes(&[ui.process.id()])`;
+  - Ao voltar ao jogo (`game.resume` ou repetição do atalho), a interface fecha (`host.hide`) e o foco retorna à janela do processo do jogo com `focus_processes(&service.central_game_pids())`.
+
+### Ponte e controles do sistema
+
+| Chamada / Evento | Tipo | Descrição |
+|---|---|---|
+| `control_center.state` | Chamada | Devolve o estado da Central: `open`, `audio` (dispositivo padrão, volume, mudo, saídas disponíveis), `displays` (telas ativas e modos), `displayManaged`, `controller`, `memoryMib` e `cpuSeconds`. |
+| `control_center.set` | Chamada | Aplica alterações nos dispositivos (`volume`, `mute`, `audio_output`, `display_mode`) e devolve o estado atualizado. Exige jogo ativo (`conflict` sem jogo). |
+| `control_center.open` | Evento | Notifica a interface quando a Central abre (`true`) ou fecha (`false`). |
+
+### Interface React e hospedeiro falso
+
+- `CentralRapida.tsx` (`web/src/app/central/`) exibe o diálogo modal sobre a tela:
+  - Cabeçalho com o nome do jogo, tempo jogado e bateria do controle conectado;
+  - Botão "Voltar ao jogo", que chama `game.resume` e fecha a interface;
+  - Botões para alternar os painéis rápidos de Áudio (volume, mudo, saída), Tela (resolução e taxa de atualização) e Desempenho (CPU e memória);
+  - Botão "Encerrar jogo", com confirmação e transição direta para o fluxo "Fechando…" da WEB-21 (`web/src/app/sessao/`);
+  - Suporte a Escape (fecha o painel aberto ou volta ao jogo) e aprisionamento de foco (`useFocusTrap`).
+- **Hospedeiro falso:** abrir com `?central` inicia uma sessão simulada já na Central rápida, permitindo testar controles, atalho de teclado (`Ctrl+Shift+Tab`) e botões de voltar/encerrar no navegador.
+
+Testes: `crates/tako-app/tests/control_center_bridge.rs` (ciclo pela ponte, validações, atalho customizado e envelope de rede), `crates/tako-web/src/core_process.rs` (abertura com a interface fechada e retorno do foco ao jogo).
+
 ## Preparar e compilar
 
 Windows x64, Rust de `rust-toolchain.toml`, Visual Studio 2022 Build Tools com C++ e Windows SDK.

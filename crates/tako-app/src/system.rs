@@ -16,6 +16,14 @@ pub(crate) struct Devices {
 }
 
 impl Devices {
+    pub(crate) fn audio(&self) -> &dyn devices::AudioOutputs {
+        self.audio.as_ref()
+    }
+
+    pub(crate) fn displays(&self) -> &dyn devices::Displays {
+        self.displays.as_ref()
+    }
+
     pub(crate) fn new(platform: &tako_platform::Platform, simulate: bool) -> Self {
         if simulate {
             Self {

@@ -11,6 +11,7 @@ use tako_core::devices::{
 };
 
 pub mod console_mode;
+pub mod control_center;
 pub mod downloads;
 pub mod exe_icon;
 pub mod fse;

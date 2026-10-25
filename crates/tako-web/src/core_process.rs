@@ -443,6 +443,8 @@ pub fn run<L: UiLauncher>(
     let mut exiting = false;
     // Controle (WEB-05b): a thread do SDL3, se houver, e o que ela já sabe da interface.
     let mut input = InputSync::default();
+    let mut central_hotkey = CentralHotkey::default();
+    let mut resume_focus = false;
     let result = loop {
         let now = Instant::now();
         let session = service
@@ -467,6 +469,11 @@ pub fn run<L: UiLauncher>(
                 }
                 UiMsg::Page { page } => {
                     host.pages.insert(page.browser, page);
+                    if service.central_open()
+                        && let Some(ui) = &host.ui
+                    {
+                        tako_platform::control_center::focus_processes(&[ui.process.id()]);
+                    }
                 }
                 UiMsg::Closed { browser } => {
                     host.pages.remove(&browser);
@@ -501,6 +508,9 @@ pub fn run<L: UiLauncher>(
             }
             Some(Command::Host(HostRequest::Exit)) => exiting = true,
             Some(Command::Host(HostRequest::Resume)) => {
+                service.set_central_open(false);
+                input.over_game = false;
+                resume_focus = true;
                 tracing::info!("voltar ao jogo: fechando a interface");
                 host.hide(Instant::now());
             }
@@ -536,6 +546,8 @@ pub fn run<L: UiLauncher>(
                 host.hide(Instant::now());
             }
             Some(SessionUpdate::Ended) => {
+                service.set_central_open(false);
+                resume_focus = false;
                 if host.listening() {
                     // O `game.ended` vai agora para a página aberta; sem ela, sai depois do próximo `game.running`.
                     service.session_end_seen();
@@ -560,6 +572,11 @@ pub fn run<L: UiLauncher>(
         }
         // Depois do `watch`: a interface que acabou de sair já não recebe comandos do controle.
         input.sync(&host, &service, requested);
+        central_hotkey.sync(&service, &host.tx);
+        if resume_focus && host.ui.is_none() {
+            tako_platform::control_center::focus_processes(&service.central_game_pids());
+            resume_focus = false;
+        }
     };
     host.shutdown_ui();
     // "Depois" = instala ao sair do Tako (como o Slint); uma queda ou a atualização já aplicada não instalam.
@@ -672,6 +689,33 @@ struct InputSync {
     over_game: bool,
 }
 
+/// Registro limitado à sessão; mudar a chave solta a inscrição anterior antes de criar a nova.
+#[derive(Default)]
+struct CentralHotkey {
+    shortcut: Option<tako_core::input::shortcut::KeyShortcut>,
+    registration: Option<tako_platform::control_center::Hotkey>,
+}
+
+impl CentralHotkey {
+    fn sync(&mut self, service: &AppService, tx: &mpsc::Sender<Command>) {
+        let shortcut = service.central_shortcut();
+        if shortcut == self.shortcut {
+            return;
+        }
+        self.registration = None;
+        self.shortcut = shortcut;
+        if let Some(shortcut) = &self.shortcut {
+            let tx = tx.clone();
+            // Testes do hospedeiro usam pipes e dispositivos falsos; não reservam atalhos da máquina.
+            if !cfg!(test) {
+                self.registration = tako_platform::control_center::register(shortcut, move || {
+                    let _ = tx.send(Command::Input(InputOutput::Central));
+                });
+            }
+        }
+    }
+}
+
 impl InputSync {
     fn attach(&mut self, link: InputLink) {
         tracing::info!("controles pelo SDL3 no núcleo");
@@ -707,7 +751,16 @@ impl InputSync {
             }
             InputOutput::Central if service.game_active() => {
                 if host.listening() {
+                    if !self.over_game {
+                        self.over_game = true;
+                        service.set_central_open(true);
+                        return;
+                    }
                     if self.over_game {
+                        service.set_central_open(false);
+                        if let Err(error) = service.handle(tako_app::protocol::Call::GameResume) {
+                            tracing::warn!(%error, "voltar da Central ao jogo");
+                        }
                         tracing::info!("combinação da Central: voltando ao jogo");
                         host.hide(Instant::now());
                     }
@@ -716,6 +769,7 @@ impl InputSync {
                     // modo da versão web até o WEB-15, o jogo continua com ele.
                     tracing::info!("combinação da Central: interface por cima do jogo");
                     self.over_game = true;
+                    service.set_central_open(true);
                     host.show = true;
                 }
             }
@@ -1302,6 +1356,10 @@ mod tests {
             .unwrap();
         ui.request(r#"{"v":1,"id":1,"name":"app.info"}"#);
         until(&mut ui, answer(1));
+        // Teclado e controle usam a mesma entrada; sem sessão, nenhum abre a Central.
+        control.send(Command::Input(InputOutput::Central)).unwrap();
+        ui.request(r#"{"v":1,"id":30,"name":"control_center.state"}"#);
+        assert_eq!(until(&mut ui, answer(30))["reply"]["data"]["open"], false);
         scene_until(&pad, |s| s.listening && !s.playing);
         assert!(woken.load(Ordering::Relaxed) > 0);
 
@@ -1355,6 +1413,8 @@ mod tests {
             "playing"
         );
         scene_until(&pad, |s| s.listening && s.playing && s.over_game);
+        ui.request(r#"{"v":1,"id":40,"name":"control_center.state"}"#);
+        assert_eq!(until(&mut ui, answer(40))["reply"]["data"]["open"], true);
         control.send(nav(InputAction::Back)).unwrap();
         assert_eq!(
             until(&mut ui, event("input.nav"))["event"]["payload"]["action"],

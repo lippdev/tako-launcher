@@ -4,6 +4,14 @@
 import type { ListaDeJogosLabels } from "../components/ListaDeJogos/ListaDeJogos";
 import type { ViewId } from "./uiState";
 
+export const centralStrings = {
+  title: "Central rápida",
+  actionError: "Não foi possível aplicar a alteração. Tente novamente.",
+  cpuTime: "Tempo de CPU do núcleo",
+  memory: (mib: number) => `${mib.toFixed(1)} MiB`,
+  seconds: (seconds: number) => `${seconds.toFixed(1)} s`,
+} as const;
+
 /** Complementos do onboarding web; os textos dos passos vêm do catálogo `first_run`. */
 export const onboardingStrings = {
   loading: "Lendo as lojas e os emuladores…",

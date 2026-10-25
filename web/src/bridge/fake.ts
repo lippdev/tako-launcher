@@ -1,4 +1,6 @@
 import type { Call, Event } from "./index";
+import type { ControlCenterState } from "./generated/ControlCenterState";
+import type { ControlCenterAction } from "./generated/ControlCenterAction";
 import type { BridgeError } from "./generated/BridgeError";
 import type { ErrorCode } from "./generated/ErrorCode";
 import type { GameDetails } from "./generated/GameDetails";
@@ -3074,4 +3076,89 @@ Object.assign(SAMPLE_CATALOGS["en-US"], {
   "status.pad_disconnected": "Controller disconnected",
   "status.pad_connected": "Controller connected",
   "status.battery_low": "Low battery: {pad} at {percent}%",
+});
+
+// ---- Central rápida (WEB-22): sessão longa para explorar os controles, sem alterar o SO. ----
+let fakeCentralOpen = sessionParams.has("central");
+let centralVolume = 0.6;
+let centralMuted = false;
+let centralOutput = "speakers";
+const centralModes = new Map<string, string>();
+if (fakeCentralOpen) {
+  fakeSession = { gameId: "steam:1000", title: "God of War: Ragnarök", launchedAt: Date.now() - 42 * 60_000, state: "playing", timers: [] };
+}
+
+function readCentral(): ControlCenterState {
+  return {
+    open: fakeCentralOpen && fakeSession !== null,
+    audio: {
+      outputs: { ...SAMPLE_AUDIO, outputs: SAMPLE_AUDIO.outputs.map((o) => ({ ...o, default: o.id === centralOutput })) },
+      defaultId: centralOutput, volume: centralVolume, muted: centralMuted,
+    },
+    displays: SAMPLE_DISPLAYS.displays.filter((d) => d.active).map((d) => ({ id: d.id, name: d.name, modes: d.modes, currentMode: centralModes.get(d.id) ?? d.modes[0] ?? null })),
+    displayManaged: false,
+    controller: fakePad,
+    memoryMib: null,
+    cpuSeconds: null,
+  };
+}
+const resumeBeforeCentral = defaults["game.resume"];
+const endBeforeCentral = defaults["game.end"];
+Object.assign(defaults, {
+  "control_center.state": readCentral,
+  "control_center.set": (payload: unknown) => {
+    if (!fakeSession) throw new FakeError("conflict", "nenhum jogo aberto");
+    const action = payload as ControlCenterAction;
+    switch (action.action) {
+      case "volume":
+        if (!Number.isFinite(action.value) || action.value < 0 || action.value > 1) throw new FakeError("bad_request", "volume inválido");
+        centralVolume = action.value;
+        break;
+      case "mute": centralMuted = action.muted; break;
+      case "audio_output":
+        if (action.id === BROKEN_AUDIO_ID) throw new FakeError("internal", "saída indisponível");
+        if (!SAMPLE_AUDIO.outputs.some((o) => o.id === action.id)) throw new FakeError("not_found", "saída ausente");
+        centralOutput = action.id;
+        break;
+      case "display_mode":
+        if (!SAMPLE_DISPLAYS.displays.some((d) => d.id === action.id && d.active && d.modes.includes(action.mode))) throw new FakeError("bad_request", "modo inválido");
+        centralModes.set(action.id, action.mode);
+        break;
+    }
+    return readCentral();
+  },
+  "game.resume": () => {
+    resumeBeforeCentral?.(undefined);
+    fakeCentralOpen = false;
+    deliverEvent("control_center.open", false);
+  },
+  "game.end": (payload: unknown) => {
+    fakeCentralOpen = false;
+    deliverEvent("control_center.open", false);
+    return endBeforeCentral?.(payload);
+  },
+});
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || !event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey || event.repeat || !fakeSession) return;
+    event.preventDefault();
+    fakeCentralOpen = !fakeCentralOpen;
+    deliverEvent("control_center.open", fakeCentralOpen);
+  });
+}
+Object.assign(SAMPLE_CATALOGS["pt-BR"], {
+  "cc.back_to_game": "Voltar ao jogo",
+  "cc.audio": "Áudio", "cc.screen": "Tela", "cc.end": "Encerrar jogo", "cc.end_confirm": "Encerrar o jogo",
+  "cc.playing": "Jogando agora", "cc.pad_battery": "Controle com {percent}%", "cc.volume": "Volume", "cc.mute": "Sem som",
+  "cc.output": "SAÍDA DE ÁUDIO", "cc.audio_unavailable": "Áudio indisponível", "cc.screen_unavailable": "Nenhuma tela encontrada",
+  "settings.performance.title": "Desempenho do Tako", "settings.performance.supervisor": "Supervisor",
+  "settings.performance.memory": "Memória", "settings.performance.unknown": "Indisponível",
+});
+Object.assign(SAMPLE_CATALOGS["en-US"], {
+  "cc.back_to_game": "Back to game",
+  "cc.audio": "Audio", "cc.screen": "Display", "cc.end": "Close game", "cc.end_confirm": "Close the game",
+  "cc.playing": "Playing now", "cc.pad_battery": "Controller at {percent}%", "cc.volume": "Volume", "cc.mute": "Mute",
+  "cc.output": "AUDIO OUTPUT", "cc.audio_unavailable": "Audio unavailable", "cc.screen_unavailable": "No displays found",
+  "settings.performance.title": "Tako performance", "settings.performance.supervisor": "Supervisor",
+  "settings.performance.memory": "Memory", "settings.performance.unknown": "Unavailable",
 });

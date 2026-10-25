@@ -7,6 +7,7 @@ import { PaginaDoJogo } from "./jogo/PaginaDoJogo";
 import { TelaPerfil } from "./perfil/TelaPerfil";
 import { TelaConfiguracoes } from "./settings/TelaConfiguracoes";
 import { CamadasDaSessao } from "./sessao/CamadasDaSessao";
+import { CentralRapida } from "./central/CentralRapida";
 import { useSavedAppearance } from "./settings/useSavedAppearance";
 import { VisaoGeral } from "./visao/VisaoGeral";
 import { strings } from "./strings";
@@ -182,6 +183,7 @@ export function AppShell() {
         </main>
       </div>
       <CamadasDaSessao />
+      <CentralRapida />
       <AvisosDoControle />
       <BuscaGeral
         open={searchOpen}

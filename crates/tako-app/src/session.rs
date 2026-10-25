@@ -214,6 +214,15 @@ fn with_emulator(
 }
 
 impl AppService {
+    /// PIDs acompanhados pela sessão; não inclui o launcher da loja.
+    pub fn central_game_pids(&self) -> Vec<u32> {
+        self.core
+            .as_ref()
+            .and_then(|c| c.session.active.as_ref())
+            .map(|a| a.game.game_pids())
+            .unwrap_or_default()
+    }
+
     /// `game.play` aceito: valida aqui, e a abertura acontece no hospedeiro (`HostRequest::Launch`), depois da
     /// resposta. Um jogo por vez.
     pub(crate) fn play(&mut self, request: GameRequest) -> Result<Reply, BridgeError> {

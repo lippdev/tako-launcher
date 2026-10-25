@@ -4,6 +4,7 @@
 //! janela ou React: o hospedeiro (`tako-web`) recebe o JSON, chama `AppService::handle` e devolve a resposta.
 
 mod art;
+mod control_center;
 mod core;
 mod demo;
 mod downloads;
@@ -72,6 +73,7 @@ pub struct AppService {
     local_api: local_api::WebApi,
     /// A última entrada vista foi do controle (WEB-05b).
     using_pad: bool,
+    central_open: bool,
 }
 
 impl AppService {
@@ -86,6 +88,7 @@ impl AppService {
             pending_link: None,
             local_api: local_api::WebApi::default(),
             using_pad: false,
+            central_open: false,
         }
     }
 
@@ -131,6 +134,9 @@ impl AppService {
     pub fn handle(&mut self, call: Call) -> Result<Reply, BridgeError> {
         self.poll();
         match call {
+            call @ (Call::ControlCenterState | Call::ControlCenterSet(_)) => {
+                self.handle_control_center(call)
+            }
             Call::AppInfo => Ok(Reply::AppInfo(AppInfo {
                 version: self.version.clone(),
                 bridge_version: BRIDGE_VERSION,
