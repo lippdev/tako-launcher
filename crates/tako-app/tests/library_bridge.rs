@@ -543,6 +543,16 @@ fn game_play_json_accepts_the_request_and_sends_only_the_id_to_the_host() {
             game_id: "steam:demo0".into()
         }
     );
+    // Com o primeiro pedido ainda na fila do hospedeiro, um segundo é `conflict`.
+    assert_eq!(
+        app.handle(Call::GamePlay(game_request("steam:demo0")))
+            .unwrap_err()
+            .code,
+        ErrorCode::Conflict
+    );
+    let (_dir, mut app) = demo();
+    let (tx, rx) = mpsc::channel();
+    app.set_host_sink(tx);
     let reply = wire(
         &mut app,
         r#"{"v":1,"id":17,"name":"game.play","payload":{"gameId":"steam:demo0"}}"#,
@@ -557,6 +567,10 @@ fn game_play_json_accepts_the_request_and_sends_only_the_id_to_the_host() {
             game_id: "steam:demo0".into()
         }
     );
+    // Hospedeiro que parou de ouvir: o pedido não é aceito.
+    let (_dir, mut app) = demo();
+    let (tx, rx) = mpsc::channel();
+    app.set_host_sink(tx);
     drop(rx);
     assert_eq!(
         app.handle(Call::GamePlay(game_request("steam:demo0")))

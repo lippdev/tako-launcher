@@ -429,9 +429,9 @@ pub fn run<L: UiLauncher>(
             }
             Some(Command::Host(HostRequest::Resume)) => {
                 tracing::info!("voltar ao jogo: fechando a interface");
-                host.hide(now);
+                host.hide(Instant::now());
             }
-            Some(Command::Hide) => host.hide(now),
+            Some(Command::Hide) => host.hide(Instant::now()),
             Some(Command::Show) => host.show = true,
             None => {}
         }
@@ -439,7 +439,7 @@ pub fn run<L: UiLauncher>(
         match service.poll_session(Instant::now()) {
             Some(SessionUpdate::Shown) => {
                 tracing::info!("janela do jogo na tela: fechando a interface");
-                host.hide(now);
+                host.hide(Instant::now());
             }
             Some(SessionUpdate::Ended) => {
                 if host.listening() {

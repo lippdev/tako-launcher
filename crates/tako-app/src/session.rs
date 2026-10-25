@@ -55,6 +55,8 @@ pub(crate) struct Sessions {
     active: Option<Active>,
     /// Fim que a interface fechada não viu: sai logo depois da próxima resposta de `game.running`.
     unseen_end: Option<GameEnded>,
+    /// `game.play` aceito e o `HostRequest::Launch` ainda na fila: um segundo `game.play` dá `conflict`.
+    launching: bool,
 }
 
 impl Sessions {
@@ -84,6 +86,7 @@ impl Sessions {
                 simulate,
                 active: None,
                 unseen_end: None,
+                launching: false,
             }
         } else {
             Sessions {
@@ -93,6 +96,7 @@ impl Sessions {
                 simulate,
                 active: None,
                 unseen_end: None,
+                launching: false,
             }
         };
         if !simulate && launch::recover_after_crash(&sessions.devices(), &sessions.paths) {
@@ -193,13 +197,16 @@ impl AppService {
         if self
             .core
             .as_ref()
-            .is_some_and(|c| c.session.active.is_some())
+            .is_some_and(|c| c.session.active.is_some() || c.session.launching)
         {
             return Err(conflict("já há um jogo aberto"));
         }
         self.request(HostRequest::Launch {
             game_id: request.game_id,
         })?;
+        if let Some(core) = self.core.as_mut() {
+            core.session.launching = true;
+        }
         Ok(Reply::GamePlay)
     }
 
@@ -209,13 +216,14 @@ impl AppService {
         let Some(core) = self.core.as_mut() else {
             return;
         };
+        core.session.launching = false;
         if core.session.active.is_some() {
             tracing::warn!(%game_id, "outro jogo já está aberto; pedido ignorado");
             return;
         }
         let Some(game) = core.library.find(game_id).cloned() else {
             let message = tako_core::i18n::t("session.ui.not_found");
-            self.emit(Event::GameEnded(launch_failed(game_id, "", message)));
+            self.fail_launch(launch_failed(game_id, "", message));
             return;
         };
         let title = game.title.clone();
@@ -223,7 +231,7 @@ impl AppService {
             match with_emulator(&core.settings, game) {
                 Ok(game) => game,
                 Err(message) => {
-                    self.emit(Event::GameEnded(launch_failed(game_id, &title, message)));
+                    self.fail_launch(launch_failed(game_id, &title, message));
                     return;
                 }
             }
@@ -310,7 +318,7 @@ impl AppService {
             Ok(started) => self.emit(Event::GameStarted(started)),
             Err(message) => {
                 tracing::warn!(%game_id, "o jogo não abriu: {message}");
-                self.emit(Event::GameEnded(launch_failed(game_id, &title, message)));
+                self.fail_launch(launch_failed(game_id, &title, message));
             }
         }
     }
@@ -377,6 +385,14 @@ impl AppService {
         self.emit(Event::LibraryChanged);
         self.emit(Event::GameEnded(event));
         Some(SessionUpdate::Ended)
+    }
+
+    /// `game.ended` com `launch_failed`, guardado também para a interface que reabrir (como o fim normal).
+    fn fail_launch(&mut self, event: GameEnded) {
+        if let Some(core) = self.core.as_mut() {
+            core.session.unseen_end = Some(event.clone());
+        }
+        self.emit(Event::GameEnded(event));
     }
 
     /// O hospedeiro entregou o último `game.ended` a uma interface aberta: não repetir no próximo `game.running`.

@@ -326,6 +326,53 @@ fn a_game_that_does_not_open_is_reported_and_changes_nothing() {
 }
 
 #[test]
+fn a_second_game_play_before_the_launch_runs_is_a_conflict() {
+    let mut rig = rig();
+    assert_eq!(
+        rig.app.handle(Call::GamePlay(request(ID))).unwrap(),
+        Reply::GamePlay
+    );
+    // O `HostRequest::Launch` ainda está na fila do hospedeiro: o segundo pedido não pode ser aceito.
+    let second = rig.app.handle(Call::GamePlay(request(ID))).unwrap_err();
+    assert_eq!(second.code, ErrorCode::Conflict);
+    let launches: Vec<_> = rig
+        .host
+        .try_iter()
+        .filter(|r| matches!(r, HostRequest::Launch { .. }))
+        .collect();
+    assert_eq!(launches.len(), 1);
+    rig.app.launch_game(ID);
+    rig.app
+        .handle(Call::GameEnd(GameEndRequest { force: true }))
+        .unwrap();
+    rig.poll_until_update();
+    // Terminado o jogo, Jogar volta a valer.
+    assert_eq!(
+        rig.app.handle(Call::GamePlay(request(ID))).unwrap(),
+        Reply::GamePlay
+    );
+}
+
+#[test]
+fn a_launch_failure_reaches_the_ui_that_reopens_later() {
+    let mut rig = rig_with(|p| Platform {
+        processes: Arc::new(Failing),
+        ..p
+    });
+    rig.play(ID);
+    // A interface estava fechada: o evento se perdeu.
+    let _ = rig.events();
+    assert_eq!(rig.running(), Value::Null);
+    let events = rig.events();
+    let ended = named(&events, "game.ended");
+    assert_eq!(ended.len(), 1, "{events:?}");
+    assert_eq!(ended[0]["payload"]["end"], "launch_failed");
+    // Visto uma vez, não repete.
+    assert_eq!(rig.running(), Value::Null);
+    assert!(named(&rig.events(), "game.ended").is_empty());
+}
+
+#[test]
 fn a_core_that_dies_in_the_middle_of_the_game_restores_the_screen_on_the_next_open() {
     let mut rig = rig();
     rig.play(ID);
