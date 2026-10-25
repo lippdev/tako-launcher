@@ -62,8 +62,26 @@ fn init_logs(paths: &DataPaths, role: &str) {
 /// Definida no Tako reaberto por ele mesmo (saída do modo seguro): espera o anterior soltar a trava.
 pub const RESTART_ENV: &str = "TAKO_RESTARTED";
 
-/// Pedido do segundo Tako ao que já está aberto (o supervisor apaga ao atender).
-pub const ACTIVATE_FILE: &str = "tako.activate";
+/// Pedido do segundo Tako ao que já está aberto (o supervisor, ou o núcleo web, apaga ao atender).
+pub const ACTIVATE_FILE: &str = tako_core::links::ACTIVATE_FILE;
+
+/// Um link `tako://` só chega ao `--web` na forma que o sistema usa (`tako --web --open-url <url>` ou
+/// `tako --web <url>`) e válido: uma URL do navegador não pode injetar opções como `--data-dir` pelas aspas da linha
+/// do Windows. Em build de desenvolvimento valem as outras opções (testes com `--data-dir`).
+fn web_link_allowed(all: &[String], url: Option<&str>, relaxed: bool) -> bool {
+    if url.and_then(tako_core::links::parse).is_none() {
+        return false;
+    }
+    if relaxed {
+        return true;
+    }
+    let rest: Vec<&str> = all[1..]
+        .iter()
+        .map(String::as_str)
+        .filter(|a| *a != "--web")
+        .collect();
+    rest.len() == 1 || (rest.len() == 2 && rest[0] == "--open-url")
+}
 
 /// Só um Tako por usuário: um segundo `tako` sai sem abrir outra janela.
 fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
@@ -115,6 +133,40 @@ fn main() {
             .clone()
             .map_or_else(DataPaths::detect, DataPaths::at);
         init_logs(&paths, "web");
+        let link_url = tako_core::links::argument(&all).map(str::to_owned);
+        if link_url.is_some()
+            && !web_link_allowed(&all, link_url.as_deref(), cfg!(debug_assertions))
+        {
+            eprintln!("tako: link inválido");
+            std::process::exit(2);
+        }
+        // Um só Tako por usuário, o mesmo trinco do Slint: o segundo `tako --web` só entrega o link (ou o pedido de
+        // vir para a frente) ao que já roda, núcleo web ou Slint, e sai sem abrir outra janela nem outro núcleo.
+        #[cfg(feature = "web")]
+        let _lock = match single_instance(&paths) {
+            Some(lock) => lock,
+            None => {
+                tracing::info!("o Tako já está aberto; entregando o pedido a ele");
+                if let Err(e) =
+                    tako_core::links::request_activation(&paths.root, link_url.as_deref())
+                {
+                    tracing::warn!("pedido de ativação: {e}");
+                }
+                return;
+            }
+        };
+        // Com o trinco na mão, um pedido antigo ficou sem ninguém para atender: some. Tako fechado e aberto por um
+        // link: o link vai para o próprio núcleo, que o atende ao abrir (mesmo caminho do segundo Tako).
+        #[cfg(feature = "web")]
+        {
+            let _ = std::fs::remove_file(paths.root.join(ACTIVATE_FILE));
+            if link_url.is_some()
+                && let Err(e) =
+                    tako_core::links::request_activation(&paths.root, link_url.as_deref())
+            {
+                tracing::warn!("link de abertura: {e}");
+            }
+        }
         #[cfg(feature = "web")]
         let result = tako_web::run(paths, data_dir);
         #[cfg(not(feature = "web"))]
@@ -353,6 +405,46 @@ fn theme_check(args: &[String]) -> i32 {
                 eprintln!("- {p}");
             }
             1
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::web_link_allowed;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|a| (*a).to_owned()).collect()
+    }
+
+    #[test]
+    fn web_links_only_in_the_shapes_the_system_uses() {
+        let url = Some("tako://play/steam:570");
+        for ok in [
+            args(&["tako", "--web", "tako://play/steam:570"]),
+            args(&["tako", "--web", "--open-url", "tako://play/steam:570"]),
+            args(&["tako", "--open-url", "tako://play/steam:570", "--web"]),
+        ] {
+            assert!(web_link_allowed(&ok, url, false), "{ok:?}");
+        }
+        // Uma URL com aspas não pode trazer opções junto (--data-dir, --simulate…) em release.
+        let injected = args(&[
+            "tako",
+            "--web",
+            "--open-url",
+            "tako://play/steam:570",
+            "--data-dir",
+            "dados",
+        ]);
+        assert!(!web_link_allowed(&injected, url, false));
+        assert!(
+            web_link_allowed(&injected, url, true),
+            "só no desenvolvimento"
+        );
+        // O link precisa ser válido em qualquer caso.
+        for bad in [Some("https://example.com"), Some("tako://game/../x"), None] {
+            let all = args(&["tako", "--web", "--open-url", bad.unwrap_or("")]);
+            assert!(!web_link_allowed(&all, bad, true), "{bad:?}");
         }
     }
 }

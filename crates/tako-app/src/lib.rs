@@ -13,6 +13,8 @@ mod game_settings;
 mod i18n;
 pub mod input;
 mod library;
+mod links;
+mod local_api;
 mod metadata;
 mod organize;
 mod profile;
@@ -24,6 +26,7 @@ mod system;
 mod updates;
 
 pub use core::{Core, CoreError};
+pub use links::LinkOutcome;
 pub use session::SessionUpdate;
 pub use updates::{UpdateFeed, UpdateInstaller, UpdateSetup};
 
@@ -63,6 +66,10 @@ pub struct AppService {
     core: Option<Core>,
     /// Controle em uso (WEB-05b), atualizado pelo hospedeiro que lê o SDL3.
     controller: protocol::ControllerInfo,
+    /// Link `tako://` de um jogo que a leitura das lojas ainda não trouxe (WEB-34).
+    pending_link: Option<tako_core::links::Link>,
+    /// API local de integração (WEB-34): só existe com a chave ligada.
+    local_api: local_api::WebApi,
 }
 
 impl AppService {
@@ -74,6 +81,8 @@ impl AppService {
             ui_state: None,
             core: None,
             controller: protocol::ControllerInfo::default(),
+            pending_link: None,
+            local_api: local_api::WebApi::default(),
         }
     }
 

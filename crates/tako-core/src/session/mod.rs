@@ -4,6 +4,7 @@
 //! Abrir e acompanhar ([`launch`], [`running`]) servem às duas interfaces: a Slint e o núcleo da versão web.
 
 pub mod audio;
+pub mod discord;
 pub mod events;
 pub mod launch;
 pub mod restore;

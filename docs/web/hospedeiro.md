@@ -241,6 +241,55 @@ Testes: `tako-core` (`input::pad`), `tako-app` (`tests/input_bridge.rs`: zona mo
 Central, avisos, bateria, formato) e `tako-web` (`core_process.rs`: comandos para a página aberta, nada com ela
 fechada, a Central reabre por cima do jogo e volta a ele).
 
+## Discord, API local e links tako:// (WEB-34)
+
+Três integrações do Slint que vivem no processo do **núcleo** (`tako --web`), nunca no filho CEF. A regra que não
+dependia de Slint foi para o `tako-core`; o Slint usa a mesma.
+
+| Integração | Regra (compartilhada) | No núcleo web |
+|---|---|---|
+| Discord Rich Presence (EXT-004) | `tako_core::session::discord` (IPC, `Presence`) | `session.rs`: com a chave `DiscordRichPresence` ligada e o id do aplicativo definido, `game.play` mostra o jogo; o fim da sessão solta a presença e limpa a atividade |
+| API local (EXT-002, ADR-0033) | `tako_core::api` (servidor) e `api::runtime` (ligar/desligar pela chave, token, estado pelos eventos de sessão) | `tako_app::local_api`: `AppService::sync_local_api` a cada volta do laço |
+| Links `tako://` (EXT-005) | `tako_core::links` (`parse`, o arquivo de ativação) | `tako_app::links`: `AppService::open_link` |
+
+**Discord.** O recurso só roda com `DISCORD_CLIENT_ID` (id do aplicativo no portal do Discord, do mantenedor), que
+hoje está **vazio** no código: sem ele nem o Slint mostra a presença, e a opção não faz efeito. Com o Discord aberto
+o IPC responde (`\.pipediscord-ipc-0`); a demonstração (`--simulate`) nunca fala com o Discord.
+
+**API local.** A mesma porta (`LocalApiPort`, padrão 47774), o mesmo token (`LocalApiToken`), a mesma autenticação
+`Bearer`, `Host` e limites do ADR-0033, sem código duplicado. Fica **desligada** com `LocalApiEnabled` desligada
+(o padrão): nenhuma porta abre e nenhum evento é assinado. Ligada, o token é criado e guardado nas configurações na
+primeira vez, e trocado se o guardado for inválido. As chaves não estão na lista da ponte: a interface não lê nem
+grava o token (D-09: esta porta é para integrações externas, não é a ponte da interface), e ligar ou desligar vale
+no próximo `tako --web`. `open` e `play` chegam ao laço do núcleo (`Command::Link`) e seguem o mesmo caminho do
+link `tako://`; sem o laço, `503`.
+
+**Links.** Um link válido (só as telas e IDs de jogo que o Slint aceita; nunca caminho, comando ou outra URL) vira o
+estado de tela (`ui.state`, D-10): `activeGame`/`view`/`library.filter`, sem mexer no resto. A interface aberta
+noutro lugar é fechada e reaberta já no destino (não há ação de janela para navegar uma página aberta); uma que ainda
+está subindo lê o estado sozinha. `tako://play/<id>` abre o jogo direto **só** quando o Slint também abriria sem
+diálogo (`details::primary_action`): instalado, sem outro jogo aberto, cliente da loja achado e comandos aprovados;
+o mesmo jogo já aberto volta para a frente; em qualquer outro caso a página do jogo aparece e a confirmação é do
+usuário. Jogo que a biblioteca não conhece não faz nada (e, se a primeira leitura das lojas ainda corre, o link
+espera por ela). Sem aviso na tela para o jogo desconhecido: a ponte ainda não tem toast.
+
+**Instância única.** `tako --web` pega o mesmo `tako.lock` do Slint (um Tako por usuário, web ou Slint). O segundo
+só deixa um pedido em `tako.activate` (escrito por `links::request_activation`, com a troca de nome atômica) e sai,
+sem abrir janela nem outro núcleo. O núcleo confere o arquivo a cada 400 ms (`core_process::watch_activation`) e
+executa o link, ou só traz a interface para a frente (hoje isso é fechar e reabrir a janela). Com o Tako fechado, o
+link entra pelo mesmo arquivo, antes de a interface ler o estado. Um Tako Slint aberto depois do web entrega pelo
+mesmo caminho. Pedido inválido ou grande demais é descartado.
+
+**Argumentos.** `tako --web --open-url "<url>"` ou `tako --web "<url>"`. Em release, qualquer outra forma com link
+falha com código 2 (uma URL do navegador não injeta `--data-dir` pelas aspas da linha do Windows); em debug valem
+outras opções, para testar com `--data-dir`. O comando do protocolo no registro (`HKCUSoftwareClasses	akoshellopencommand`)
+pertence ao instalador (INST-*): para abrir a versão web deve ser `"Tako.exe" --web --open-url "%1"`; o instalado hoje
+ainda aponta para o Slint (`--open-url "%1"`), que entrega o link ao núcleo web aberto pelo mesmo arquivo.
+
+Testes: `tako-core` (`session::discord` com o Discord simulado por pipes, `api::runtime`, `links`), `tako-app`
+(`tests/local_api_bridge.rs`, `tests/links_bridge.rs`) e `tako-web` (`core_process.rs`: o link reabre a interface no
+destino, o segundo Tako traz a janela, o arquivo de ativação chega ao laço).
+
 ## Preparar e compilar
 
 Windows x64, Rust de `rust-toolchain.toml`, Visual Studio 2022 Build Tools com C++ e Windows SDK.
@@ -418,9 +467,7 @@ Sem interface, a meta da D-10 (≤ 40 MB e zero Chromium) fica com folga; o núm
 
 A sessão de jogo já fecha e reabre a interface (acima). Faltam a bandeja (ícone, “fechar para a bandeja” →
 `Hide`, clique → `Show`) e o descarte depois de um tempo minimizado (a interface avisa “minimizada”, o núcleo
-conta o tempo e manda `Hide`). Um segundo `tako --web` ainda não traz a janela do primeiro (a trava de instância
-do supervisor Slint não vale aqui); aberto durante um jogo, ele acharia o diário da sessão e restauraria a tela
-por baixo do jogo, então a trava precisa chegar antes da publicação. Sem Job Object, a queda do núcleo depende do fim da entrada padrão do filho; os
+conta o tempo e manda `Hide`). Sem Job Object, a queda do núcleo depende do fim da entrada padrão do filho; os
 subprocessos do CEF somem com o processo principal deles, conferido acima.
 
 A resolução de arte ainda é um snapshot de abertura, não cobre arte fixada fora do cache nem descobertas

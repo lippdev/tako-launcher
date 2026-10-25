@@ -10,6 +10,7 @@
 //! Assina eventos de sessão (`GameStarting`, `GameStarted`, `GameExited`) para manter o estado
 //! sincronizado sem necessidade de polling ativo.
 
+pub mod runtime;
 pub mod server;
 
 pub use server::{

@@ -18,6 +18,7 @@ use tako_core::devices::fake::{FakeAudio, FakeDisplays, FakePointer, FakeProcess
 use tako_core::library::GameStore;
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{GameSettingsStore, TakoDatabase};
+use tako_core::session::discord::{self, Presence};
 use tako_core::session::launch::{self, LaunchReport, LaunchRequest, Started, TrackRequest, keys};
 use tako_core::session::tracking::exit_code_text;
 use tako_core::session::{GameEnd, GameSession, SessionDevices};
@@ -57,6 +58,8 @@ pub(crate) struct Sessions {
     unseen_end: Option<GameEnded>,
     /// `game.play` aceito e o `HostRequest::Launch` ainda na fila: um segundo `game.play` dá `conflict`.
     launching: bool,
+    /// Rich Presence do jogo aberto (WEB-34); soltar limpa a atividade no Discord.
+    presence: Option<Presence>,
 }
 
 impl Sessions {
@@ -87,6 +90,7 @@ impl Sessions {
                 active: None,
                 unseen_end: None,
                 launching: false,
+                presence: None,
             }
         } else {
             Sessions {
@@ -97,6 +101,7 @@ impl Sessions {
                 active: None,
                 unseen_end: None,
                 launching: false,
+                presence: None,
             }
         };
         if !simulate && launch::recover_after_crash(&sessions.devices(), &sessions.paths) {
@@ -107,6 +112,27 @@ impl Sessions {
 
     fn devices(&self) -> SessionDevices<'_> {
         devices(&self.platform)
+    }
+
+    pub(crate) fn paths(&self) -> &DataPaths {
+        &self.paths
+    }
+
+    /// O jogo aberto pela sessão, se houver.
+    pub(crate) fn active_game(&self) -> Option<&str> {
+        self.active.as_ref().map(|a| a.game.req.game_id.as_str())
+    }
+
+    /// Os comandos do jogo (antes, depois, ferramentas, argumentos extras) já foram aprovados pelo usuário (WEB-34:
+    /// um link `tako://play` só abre direto sem eles ou com eles aprovados).
+    pub(crate) fn commands_approved(
+        &self,
+        settings: &std::collections::HashMap<String, String>,
+        game_id: &str,
+    ) -> bool {
+        let get = |k: &str| settings.get(k).cloned();
+        launch::effective(&launch::global_settings(get), self.store.as_ref(), game_id)
+            .commands_approved
     }
 }
 
@@ -247,9 +273,11 @@ impl AppService {
         let mut request = LaunchRequest::new(game, eff, get);
         // A página da versão web é a do modo desktop: marca "Jogando", como o Slint no desktop.
         request.mark_playing = true;
-        // Ainda sem controle nem Discord no núcleo web (WEB-22): o ponteiro pelo analógico não teria quem o mova.
+        // Ainda sem controle no núcleo web (WEB-22): o ponteiro pelo analógico não teria quem o mova.
         request.controller_mouse = false;
-        request.discord = false;
+        // Discord (WEB-34): a chave é a do Slint (`DiscordRichPresence`); sem id do aplicativo o recurso não roda, e a
+        // demonstração nunca fala com o Discord.
+        request.discord = discord::available() && request.discord && !core.session.simulate;
         if core.session.simulate {
             request.restore_environment = false;
         }
@@ -273,6 +301,9 @@ impl AppService {
             Ok(Started::Tracking(req)) => match GameSession::new(req.clone()) {
                 Ok(mut game) => {
                     game.begin(&core.session.devices());
+                    if req.discord {
+                        core.session.presence = Presence::start(&req.title, req.launched_at);
+                    }
                     tracing::info!(
                         "acompanhando {} ({:?}, pasta: {}, steam: {:?}, pid: {:?})",
                         req.game_id,
@@ -371,6 +402,7 @@ impl AppService {
         active.game.finish(&d, &sessions.paths);
         let req = active.game.req.clone();
         sessions.active = None;
+        sessions.presence = None;
         tracing::info!(
             "jogo terminou: {} ({}, {} s jogados)",
             req.game_id,

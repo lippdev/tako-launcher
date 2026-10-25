@@ -21,8 +21,10 @@ use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 use tako_app::input::{InputOutput, InputScene};
 use tako_app::protocol::Event;
-use tako_app::{AppService, HostRequest, SessionUpdate};
+use tako_app::{AppService, HostRequest, LinkOutcome, SessionUpdate};
+use tako_core::api::ApiActionError;
 use tako_core::input::profiles::Profiles;
+use tako_core::links::{Activation, Link};
 
 /// O processo da interface, visto do núcleo.
 pub trait UiProcess: Send {
@@ -76,6 +78,11 @@ pub enum Command {
     Input(InputOutput),
     /// A thread do controle começou: por onde mandar a cena e os perfis, e como acordá-la.
     InputAttach(InputLink),
+    /// Abrir ou jogar um jogo pedido pela API local (WEB-34): o mesmo caminho do link `tako://`.
+    Link(Link),
+    /// Outro Tako foi aberto (WEB-34): o segundo `tako --web`, ou um `tako://` aberto com o Tako já rodando. Vem
+    /// para a frente e, se houver link, executa.
+    Activation(Activation),
 }
 
 /// Ligação do núcleo com a thread do controle (SDL3).
@@ -233,6 +240,26 @@ impl<L: UiLauncher> Host<L> {
         }
     }
 
+    /// Mostra a interface no estado de tela que o núcleo guarda (link, segundo Tako): abre se estiver fechada e, se
+    /// estiver aberta noutro lugar, fecha e reabre já no destino (a interface é descartável, D-10; a janela nova vem
+    /// para a frente). Uma interface que ainda está subindo (sem página registrada) lê o estado novo sozinha.
+    fn reveal(&mut self, now: Instant) {
+        let booting =
+            self.ui.as_ref().is_some_and(|ui| !ui.close_requested) && self.pages.is_empty();
+        if booting {
+            return;
+        }
+        self.hide(now);
+        self.show = true;
+    }
+
+    fn after_link(&mut self, outcome: LinkOutcome, now: Instant) {
+        tracing::info!(?outcome, "link executado");
+        if outcome == LinkOutcome::Show {
+            self.reveal(now);
+        }
+    }
+
     /// Há uma página aberta que recebe o que for entregue agora.
     fn listening(&self) -> bool {
         self.ui.as_ref().is_some_and(|ui| !ui.close_requested) && !self.pages.is_empty()
@@ -380,6 +407,14 @@ pub fn run<L: UiLauncher>(
     let host_wake = host_tx.clone();
     service.set_host_sink(host_tx);
     service.set_event_sink(event_tx);
+    // API local (WEB-34): abrir e jogar chegam ao laço como o link `tako://`, na thread do núcleo.
+    let api_tx = tx.clone();
+    service.set_link_dispatch(Arc::new(move |link| {
+        api_tx
+            .send(Command::Link(link))
+            .map_err(|_| ApiActionError::Unavailable)
+    }));
+    service.sync_local_api();
     service.check_updates_on_open();
     // Um só receptor acorda por pedidos da página e por resultados das lojas, inclusive sem interface.
     let relay_stop = Arc::new(AtomicBool::new(false));
@@ -462,8 +497,21 @@ pub fn run<L: UiLauncher>(
             Some(Command::Show) => host.show = true,
             Some(Command::Input(output)) => input.output(output, &mut host, &mut service),
             Some(Command::InputAttach(link)) => input.attach(link),
+            Some(Command::Link(link) | Command::Activation(Activation::Open(link))) => {
+                let outcome = service.open_link(link);
+                host.after_link(outcome, Instant::now());
+            }
+            Some(Command::Activation(Activation::Raise)) => {
+                tracing::info!("o Tako foi aberto de novo: vindo para a frente");
+                host.reveal(Instant::now());
+            }
             None => {}
         }
+        // Um link que esperava a primeira leitura das lojas; a API local acompanha a biblioteca e as chaves.
+        if let Some(outcome) = service.resume_pending_link() {
+            host.after_link(outcome, Instant::now());
+        }
+        service.sync_local_api();
         // A interface fecha durante o jogo (D-10) e volta no fim, onde estava (`ui.state`).
         match service.poll_session(Instant::now()) {
             Some(SessionUpdate::Shown) => {
@@ -510,6 +558,30 @@ pub fn run<L: UiLauncher>(
         .join()
         .map_err(|_| "thread de avisos encerrou com pânico".to_owned())?;
     result
+}
+
+/// De quanto em quanto tempo se confere se outro Tako pediu para vir para a frente.
+const ACTIVATION_EVERY: Duration = Duration::from_millis(400);
+
+/// Atende o segundo Tako (`tako_core::links::take_activation`, o mesmo arquivo do supervisor do Slint) numa thread do
+/// núcleo: confere logo e depois a cada [`ACTIVATION_EVERY`], e manda o pedido ao laço. Nada de porta de rede: o
+/// pedido é um arquivo na pasta de dados do usuário.
+pub fn watch_activation(root: std::path::PathBuf, tx: mpsc::Sender<Command>) {
+    let thread = std::thread::Builder::new()
+        .name("tako-activation".into())
+        .spawn(move || {
+            loop {
+                if let Some(activation) = tako_core::links::take_activation(&root)
+                    && tx.send(Command::Activation(activation)).is_err()
+                {
+                    return;
+                }
+                std::thread::sleep(ACTIVATION_EVERY);
+            }
+        });
+    if let Err(error) = thread {
+        tracing::warn!(%error, "thread de ativação");
+    }
 }
 
 /// Abre `tako --web-ui` com pipes na entrada e na saída padrão; a saída de erro fica com a do núcleo.
@@ -1248,6 +1320,116 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(core.join().unwrap(), Ok(()));
+    }
+
+    /// Núcleo de demonstração (biblioteca simulada) com o laço de verdade e a interface falsa.
+    fn start_demo() -> (Running, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = tako_core::paths::DataPaths::at(dir.path());
+        let (children, launched) = mpsc::channel();
+        let (control_tx, control) = mpsc::channel();
+        let core = std::thread::spawn(move || {
+            run(
+                FakeLauncher(children),
+                move || {
+                    tako_app::Core::open(paths, tako_platform::Platform::simulated(), true)
+                        .map(|core| AppService::with_core("9.9.9", core))
+                        .map_err(|e| e.to_string())
+                },
+                fast(),
+                |tx| control_tx.send(tx).unwrap(),
+            )
+        });
+        ((launched, control.recv().unwrap(), core), dir)
+    }
+
+    fn screen_state(ui: &mut FakeUi, id: u32) -> serde_json::Value {
+        ui.request(&format!(r#"{{"v":1,"id":{id},"name":"ui.state"}}"#));
+        let json = until(ui, answer(id))["reply"]["data"]["json"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        serde_json::from_str(&json).unwrap()
+    }
+
+    #[test]
+    fn a_link_reopens_the_open_ui_already_at_the_destination() {
+        let ((launched, control, core), _dir) = start_demo();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":1,"name":"app.info"}"#);
+        until(&mut ui, answer(1));
+        control
+            .send(Command::Link(Link::Game {
+                id: "steam:demo0".into(),
+                play: false,
+            }))
+            .unwrap();
+        assert_eq!(ui.next(), Some(CoreMsg::Close));
+        ui.exit(0);
+        let mut ui = launched.recv().unwrap();
+        let screen = screen_state(&mut ui, 1);
+        assert_eq!(screen["view"], "biblioteca");
+        assert_eq!(screen["activeGame"], "steam:demo0");
+
+        // Um link de jogo que a biblioteca não conhece não mexe em nada.
+        control
+            .send(Command::Activation(Activation::Open(Link::Game {
+                id: "steam:nao-existe".into(),
+                play: false,
+            })))
+            .unwrap();
+        assert_eq!(screen_state(&mut ui, 2)["activeGame"], "steam:demo0");
+        assert!(launched.try_recv().is_err());
+        ui.send_closed_and_exit();
+        assert_eq!(core.join().unwrap(), Ok(()));
+    }
+
+    #[test]
+    fn a_second_tako_brings_the_ui_forward_but_leaves_a_booting_ui_alone() {
+        let ((launched, control, core), _dir) = start_demo();
+        let mut ui = launched.recv().unwrap();
+        // A interface ainda não falou com o núcleo: vai ler o estado sozinha, nada de fechar e reabrir.
+        control
+            .send(Command::Activation(Activation::Raise))
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(!ui.state.killed.load(Ordering::Relaxed));
+        ui.request(r#"{"v":1,"id":1,"name":"app.info"}"#);
+        // Se o pedido tivesse fechado a interface, o Close viria antes da resposta.
+        assert_eq!(reply(ui.next().unwrap())["id"], 1);
+
+        // Com a página no ar, vir para a frente é uma janela nova no mesmo lugar.
+        control
+            .send(Command::Activation(Activation::Raise))
+            .unwrap();
+        assert_eq!(ui.next(), Some(CoreMsg::Close));
+        ui.exit(0);
+        let ui = launched.recv().unwrap();
+        ui.send_closed_and_exit();
+        assert_eq!(core.join().unwrap(), Ok(()));
+    }
+
+    #[test]
+    fn an_activation_request_file_reaches_the_loop() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, rx) = mpsc::channel();
+        watch_activation(dir.path().to_path_buf(), tx);
+        tako_core::links::request_activation(dir.path(), Some("tako://library/favorites")).unwrap();
+        let command = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(matches!(
+            command,
+            Command::Activation(Activation::Open(Link::Screen("library:favorites")))
+        ));
+        tako_core::links::request_activation(dir.path(), None).unwrap();
+        let command = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(matches!(command, Command::Activation(Activation::Raise)));
+        // Pedido que não é link do Tako é descartado e não chega ao laço.
+        std::fs::write(
+            dir.path().join(tako_core::links::ACTIVATE_FILE),
+            "https://example.com",
+        )
+        .unwrap();
+        assert!(rx.recv_timeout(2 * ACTIVATION_EVERY).is_err());
     }
 
     impl FakeUi {

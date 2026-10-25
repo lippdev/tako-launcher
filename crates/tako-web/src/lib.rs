@@ -71,6 +71,8 @@ pub fn run(paths: tako_core::paths::DataPaths, data_dir: Option<String>) -> Resu
         }
         tracing::info!(pid = std::process::id(), "núcleo do --web sem CEF");
         let version = env!("CARGO_PKG_VERSION");
+        // O segundo `tako --web` (ou o Slint) deixa o pedido de ativação nesta pasta (WEB-34).
+        let activation_root = paths.root.clone();
         core_process::run(
             core_process::ExeLauncher { exe, args },
             move || {
@@ -82,6 +84,7 @@ pub fn run(paths: tako_core::paths::DataPaths, data_dir: Option<String>) -> Resu
             core_process::Timings::default(),
             |control| {
                 core_process::spawn_pads(control.clone());
+                core_process::watch_activation(activation_root, control.clone());
                 if let Some(delay) = recycle_delay() {
                     std::thread::spawn(move || recycle(&control, delay));
                 }
