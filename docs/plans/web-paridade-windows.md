@@ -13,8 +13,8 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Boot do núcleo, biblioteca, snapshot | ✅ | WEB-01a |
 | Leitura das lojas e emuladores (`sources`, Playnite) | 🟡 lojas e emuladores; falta importar do Playnite | WEB-01c · **WEB-31** |
 | Metadados e arte (`metadata.rs`, `art.rs`): fontes, cache, IGDB, ScreenScraper, SteamGridDB | 🟡 cache lido pelo hospedeiro; falta arte pelo núcleo e a busca de metadados | **WEB-01d**, **WEB-32** |
-| Sessão de jogo (`session.rs`, `hosts.rs`): abrir, tela e áudio, acompanhar, restaurar, recuperação | ✅ núcleo (falta a interface usar `game.running` e `game.ended`: WEB-21) | WEB-20 · **WEB-21** |
-| "Abrindo…" (`launch_splash`) e "Fechando o jogo…" (`closing_game`) | ⬜ | **WEB-21** |
+| Sessão de jogo (`session.rs`, `hosts.rs`): abrir, tela e áudio, acompanhar, restaurar, recuperação | ✅ (falta testar com jogo real pela interface; Discord e ponteiro no WEB-34) | WEB-20 · WEB-21 |
+| "Abrindo…" (`launch_splash`) e "Fechando o jogo…" (`closing_game`) | ✅ desktop (a tela cheia do "Abrindo…" fica com o WEB-15) | WEB-21 |
 | Central rápida durante o jogo (`control_center`) e o atalho global | ⬜ | **WEB-22** |
 | Controles pelo SDL3 (`gamepad.rs`): navegação, bateria, reconexão, isolar do jogo (HidHide) | ⬜ teclado pronto | **WEB-05b** |
 | Teclado virtual (`keyboard`) para busca e campos no controle | ⬜ | **WEB-23** |
