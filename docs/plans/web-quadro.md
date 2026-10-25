@@ -10,7 +10,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | livre; **poupar** (pedido do mantenedor: é a conta do orquestrador, perto do limite) |
 | Antigravity | `antigravity` | rodando WEB-36 (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
-| Antigravity 2 | `antigravity_antigravity_2` | livre |
+| Antigravity 2 | `antigravity_antigravity_2` | rodando WEB-12e |
 | Antigravity 3 | `antigravity_antigravity_3` | nova (24/10); rodando WEB-12d |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | livre, mas com poucos tokens (mantenedor, 24/10) |
 | Codex Lipp | `codex` | **sem créditos** de novo (24/10, fim da noite) |
@@ -71,10 +71,12 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-12d | **Seletor de imagens e Revisar capas:** candidatos pelo núcleo e mostrados por `tako-img://`, escolher e voltar ao automático, tela de revisão | N3 | Antigravity 3 · Gemini 3.8 Flash high | WEB-01d, WEB-32 | `crates/tako-app/src/art.rs`, `web/src/app/revisarCapas/` | rodada 3 no Antigravity 3 (r2 caiu por erro do harness; base `6acfdcc`) |
 | WEB-02c | **Sandbox do Chromium no Windows** para o filho `--web-ui`, sem quebrar esquemas, ponte e DevTools | N4 | Antigravity 2 · Gemini 3.8 Flash high | WEB-02b | `crates/tako-web/src/{windows_host,lib,target}.rs`, `crates/tako/src/main.rs` | **bloqueada: decisão do mantenedor.** O crate `cef` não expõe o sandbox no Windows (o Chromium injeta `--no-sandbox`). Opções: `cef_sandbox.lib` da distribuição standard com shim C++, ou o modelo bootstrap oficial do CEF (exe da interface vira DLL). Recomendação: fazer junto do INST e do WEB-41 |
 | WEB-36 | **Bandeja do sistema:** ícone e menu como no Slint, fechar para a bandeja fecha a interface (zero Chromium), clique reabre, Sair encerra | N3 | Antigravity · Gemini 3.8 Flash high | WEB-20, WEB-22 | `crates/tako-platform/`, `core_process.rs` | despachada |
+| WEB-12e | **Seletor de arquivo e pasta do Windows** (rfd numa thread do núcleo, `system.pick` e `system.picked`) em Editar e Adicionar jogo e em Emuladores e ROMs | N3 | Antigravity 2 · Gemini 3.8 Flash high | WEB-12c, WEB-13c1 | `crates/tako-app/src/picker.rs`, `web/src/app/editar/` | despachada |
 | WEB-01d | **Arte pelo núcleo:** "id do jogo + tipo → arquivo no cache" na `tako-app`/`tako-core`, usado pelo `tako-img://`; hoje o hospedeiro lê o `found-games.json` na abertura e monta o URI da Steam à mão (arte de jogo descoberto depois não aparece) | N3 | Codex Alyx · GPT-6.1-Sol high | WEB-01c, WEB-02a | `crates/tako-app/`, `crates/tako-web/src/resources.rs` | integrada em `a606b11` (15 capas em 7,85 s com cache vazio, biblioteca real só Steam; Epic e GOG só com rede falsa) |
 | WEB-02b | **Interface em processo próprio (D-10):** o CEF não reinicia no mesmo processo e, fechando só a janela, ficam 74,7 MiB e 4 processos do Chromium. O núcleo (`AppService`) fica no processo que vive; a interface CEF roda num processo filho descartável, que fecha durante o jogo, minimizado e na bandeja, e reabre restaurando o `ui.state`. Meta: ≤ 40 MB e zero Chromium sem interface | N4 | Claude Alyx · Opus 5.5 alto; revisão: Antigravity + orquestrador | WEB-02a | `crates/tako-web/`, `crates/tako/` | integrada (sessão ligada no WEB-20; falta a bandeja) |
 | WEB-02c | **Sandbox do CEF no Windows:** religar o sandbox (desligado no WEB-02a porque a crate pede outro bootstrap) | N4 | a definir | WEB-02a | `crates/tako-web/`, `crates/tako/` | fila |
 | WEB-36 | **Bandeja do sistema:** ícone e menu como no Slint, fechar para a bandeja fecha a interface (zero Chromium), clique reabre, Sair encerra | N3 | Antigravity · Gemini 3.8 Flash high | WEB-20, WEB-22 | `crates/tako-platform/`, `core_process.rs` | despachada |
+| WEB-12e | **Seletor de arquivo e pasta do Windows** (rfd numa thread do núcleo, `system.pick` e `system.picked`) em Editar e Adicionar jogo e em Emuladores e ROMs | N3 | Antigravity 2 · Gemini 3.8 Flash high | WEB-12c, WEB-13c1 | `crates/tako-app/src/picker.rs`, `web/src/app/editar/` | despachada |
 
 Paralelismo: WEB-00 primeiro (orquestrador). Depois WEB-02a, WEB-03 e WEB-01a juntas, uma por conta (duas com
 Rust). WEB-04a e WEB-04b entram assim que o WEB-03 for integrado; WEB-06 e WEB-05 quando o hospedeiro existir.
