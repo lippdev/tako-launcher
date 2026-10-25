@@ -113,7 +113,7 @@ cargo tree -p tako --edges normal,build | Select-String "cef"
 # 6. Build final com interface web
 cargo build -p tako --features web
 
-# 7. Checagem estática dos tipos TypeScript da interface
+# 7. Checagem estática dos tipos TypeScript da interface (requer dependências instaladas via `npm ci` em `web/`)
 (cd web && npm run typecheck)
 ```
 
