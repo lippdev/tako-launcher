@@ -178,7 +178,7 @@ impl Rig {
     }
 
     /// Lê até a sessão mudar, sem esperar o prazo de leitura (que é do hospedeiro). O fim de um jogo que fechou
-    /// sozinho espera a folga do acompanhamento (4 s, troca de launcher para jogo).
+    /// sozinho espera a folga do acompanhamento (500 ms depois da janela confirmada).
     fn poll_until_update(&mut self) -> SessionUpdate {
         let deadline = Instant::now() + Duration::from_secs(10);
         while Instant::now() < deadline {

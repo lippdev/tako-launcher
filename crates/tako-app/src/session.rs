@@ -24,9 +24,6 @@ use tako_core::session::tracking::exit_code_text;
 use tako_core::session::{GameEnd, GameSession, SessionDevices};
 use tako_platform::Platform;
 
-/// Com o jogo abrindo ou fechando, a leitura é mais frequente (como o supervisor).
-const QUICK_POLL: Duration = Duration::from_millis(500);
-
 /// Na demonstração o jogo simulado fecha sozinho depois deste tempo, para o ciclo inteiro aparecer (a interface
 /// fecha, o jogo "termina", a interface volta com o tempo jogado).
 const DEMO_PLAY: Duration = Duration::from_secs(15);
@@ -366,11 +363,7 @@ impl AppService {
     /// Quando chamar [`Self::poll_session`] de novo; `None` sem jogo aberto.
     pub fn session_deadline(&self) -> Option<Instant> {
         let active = self.core.as_ref()?.session.active.as_ref()?;
-        let every = match active.state {
-            RunningState::Playing => GameSession::POLL,
-            RunningState::Launching | RunningState::Closing => QUICK_POLL,
-        };
-        Some(active.last_poll + every)
+        Some(active.last_poll + active.game.poll_interval())
     }
 
     /// Há um jogo aberto e acompanhado.
@@ -525,6 +518,37 @@ impl AppService {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deadlines_accelerate_only_for_an_active_confirmed_game() {
+        let dir = tempfile::tempdir().unwrap();
+        let core =
+            crate::Core::open(DataPaths::at(dir.path()), Platform::simulated(), true).unwrap();
+        let mut app = AppService::with_core("test", core);
+        assert!(app.session_deadline().is_none());
+        assert_eq!(app.poll_session(Instant::now()), None);
+        app.launch_game("steam:demo0");
+        let last = app
+            .core
+            .as_ref()
+            .unwrap()
+            .session
+            .active
+            .as_ref()
+            .unwrap()
+            .last_poll;
+        let opening = last + GameSession::OPENING_POLL;
+        assert_eq!(app.session_deadline(), Some(opening));
+        assert_eq!(app.poll_session(opening - Duration::from_millis(1)), None);
+        assert_eq!(app.poll_session(opening), Some(SessionUpdate::Shown));
+        assert_eq!(app.session_deadline(), Some(opening + GameSession::POLL));
+        app.finish_active_session();
+        assert!(app.session_deadline().is_none());
+        assert_eq!(
+            app.poll_session(Instant::now() + Duration::from_secs(60)),
+            None
+        );
+    }
 
     #[test]
     fn finishing_session_records_once_and_keeps_unseen_end() {

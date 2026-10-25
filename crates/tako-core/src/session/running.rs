@@ -26,9 +26,19 @@ pub struct GameSession {
 }
 
 impl GameSession {
-    pub const POLL: Duration = Duration::from_secs(2);
+    pub const POLL: Duration = Duration::from_millis(250);
+    pub const OPENING_POLL: Duration = Duration::from_millis(500);
     /// Jogo em janela: quanto esperar antes de sair de "Abrindo…".
     pub const WINDOWED_GRACE: Duration = Duration::from_secs(4);
+
+    /// Só acelera a leitura depois da janela confirmada; não cria trabalho quando não há sessão.
+    pub fn poll_interval(&self) -> Duration {
+        if self.tracker.was_shown() {
+            Self::POLL
+        } else {
+            Self::OPENING_POLL
+        }
+    }
 
     pub fn new(req: TrackRequest) -> Result<GameSession, String> {
         let plan = TrackingPlan {
@@ -139,6 +149,10 @@ impl GameSession {
             );
             self.logged_paths = paths.to_vec();
         }
+        if !self.tracker.is_finished() {
+            // Também confirma no Slint sem supervisor, que não consulta `window_shown` por conta própria.
+            self.window_shown(devices);
+        }
         match status {
             GameRunStatus::Exited => Some(self.tracker.play_time().to_std().unwrap_or_default()),
             GameRunStatus::TimedOut => Some(Duration::ZERO),
@@ -187,24 +201,31 @@ impl GameSession {
     /// [`Self::WINDOWED_GRACE`] (muitos jogos abrem uma janela pequena antes de ir para tela cheia). Acompanhado só
     /// pela Steam (sem processos), vale a confirmação dela.
     pub fn window_shown(&mut self, devices: &SessionDevices) -> bool {
+        if self.tracker.was_shown() {
+            return true;
+        }
         let pids = self.game_pids();
-        if pids.is_empty() {
-            return self.req.strategy == GameTrackingStrategy::SteamApp
-                && self.tracker.steam_confirmed;
-        }
-        match devices.processes.game_window(&pids) {
-            GameWindow::Fullscreen => true,
-            GameWindow::Windowed => {
-                self.windowed_since
-                    .get_or_insert_with(std::time::Instant::now)
-                    .elapsed()
-                    >= Self::WINDOWED_GRACE
+        let shown = if pids.is_empty() {
+            self.req.strategy == GameTrackingStrategy::SteamApp && self.tracker.steam_confirmed
+        } else {
+            match devices.processes.game_window(&pids) {
+                GameWindow::Fullscreen => true,
+                GameWindow::Windowed => {
+                    self.windowed_since
+                        .get_or_insert_with(std::time::Instant::now)
+                        .elapsed()
+                        >= Self::WINDOWED_GRACE
+                }
+                GameWindow::None => {
+                    self.windowed_since = None;
+                    false
+                }
             }
-            GameWindow::None => {
-                self.windowed_since = None;
-                false
-            }
+        };
+        if shown {
+            self.tracker.mark_shown();
         }
+        shown
     }
 
     pub fn game_pids(&self) -> Vec<u32> {
@@ -238,6 +259,21 @@ mod tests {
             Started::Tracking(req) => req,
             Started::Untracked => panic!("deveria acompanhar"),
         }
+    }
+
+    #[test]
+    fn polling_only_accelerates_after_the_game_window_is_confirmed() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = DataPaths::at(dir.path());
+        let fakes = Fakes::new();
+        let req = started(&fakes, &paths, false);
+        let mut session = GameSession::new(req).unwrap();
+        assert_eq!(session.poll_interval(), GameSession::OPENING_POLL);
+        assert!(!session.tracker.was_shown());
+        // A confirmação acontece no próprio núcleo, inclusive sem supervisor Slint.
+        assert_eq!(session.poll(&fakes.devices()), None);
+        assert!(session.tracker.was_shown());
+        assert_eq!(session.poll_interval(), Duration::from_millis(250));
     }
 
     #[test]
