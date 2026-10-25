@@ -11,13 +11,13 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Função (Slint) | Web | Tarefa |
 |---|---|---|
 | Boot do núcleo, biblioteca, snapshot | ✅ | WEB-01a |
-| Leitura das lojas e emuladores (`sources`, Playnite) | 🟡 lojas e emuladores; falta importar do Playnite | WEB-01c · **WEB-31** |
-| Metadados e arte (`metadata.rs`, `art.rs`): fontes, cache, IGDB, ScreenScraper, SteamGridDB | 🟡 arte pelo núcleo pronta; falta a fila de metadados | WEB-01d · **WEB-32** |
+| Leitura das lojas e emuladores (`sources`, Playnite) | 🟡 lojas e emuladores; Playnite adiado pelo mantenedor (24/10) | WEB-01c · WEB-31 (adiada) |
+| Metadados e arte (`metadata.rs`, `art.rs`): fontes, cache, IGDB, ScreenScraper, SteamGridDB | ✅ | WEB-01d · WEB-32 |
 | Sessão de jogo (`session.rs`, `hosts.rs`): abrir, tela e áudio, acompanhar, restaurar, recuperação | ✅ (falta testar com jogo real pela interface; Discord e ponteiro no WEB-34) | WEB-20 · WEB-21 |
 | "Abrindo…" (`launch_splash`) e "Fechando o jogo…" (`closing_game`) | ✅ desktop (a tela cheia do "Abrindo…" fica com o WEB-15) | WEB-21 |
 | Central rápida durante o jogo (`control_center`) e o atalho global | ⬜ | **WEB-22** |
 | Controles pelo SDL3 (`gamepad.rs`): navegação, bateria, reconexão, isolar do jogo (HidHide) | 🟡 pronto; falta teste com controle real e HidHide (só na tela cheia) | WEB-05b · **WEB-15** |
-| Teclado virtual (`keyboard`) para busca e campos no controle | ⬜ | **WEB-23** |
+| Teclado virtual (`keyboard`) para busca e campos no controle | adiado pelo mantenedor (24/10) | WEB-23 (adiada) |
 | Atualizações do app (`app_updates.rs`) | ✅ (falta testar com release real) | WEB-33 |
 | Discord Rich Presence (`discord.rs`) | ⬜ chave existe, ninguém lê | **WEB-34** |
 | API local (`local_api.rs`, EXT-002) | ⬜ | **WEB-34** |
@@ -25,8 +25,8 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Splash de abertura e primeira leitura (`splash.rs`) | ✅ | WEB-35 |
 | Interface descartável (núcleo e interface separados) | ✅ | WEB-02b |
 | Bandeja do sistema | ⬜ | **WEB-36** |
-| Desempenho do Tako (`performance`, PERF-001) | ⬜ | **WEB-37** |
-| Modo seguro e recuperação de tema | ⬜ | **WEB-37** |
+| Desempenho do Tako (`performance`, PERF-001) | adiado pelo mantenedor (24/10) | WEB-37 (adiada) |
+| Modo seguro e recuperação de tema | adiado pelo mantenedor (24/10) | WEB-37 (adiada) |
 | Sandbox do CEF | ⬜ | **WEB-02c** |
 
 ## Telas do desktop
@@ -58,13 +58,13 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Geral, Aparência, Bibliotecas | ✅ | WEB-13a |
 | Tema, Som, Tela e áudio, Integrações, Sistema, Sobre | ✅ (lacunas no quadro) | WEB-13b |
 | Aparência do desktop: cor de destaque, opções do Liquid Glass (`settings_desk_theme`) | ✅ | WEB-13c1 |
-| Capas e metadados: chaves no cofre, capas (`settings_metadata`) | ⬜ | **WEB-13c** |
-| Controles: atalhos, mapeamento, HidHide (`settings_controls`) | ⬜ | **WEB-13c** (depois do WEB-05b) |
+| Capas e metadados: chaves no cofre, capas (`settings_metadata`) | adiado pelo mantenedor (24/10) | WEB-13c2 (adiada) |
+| Controles: atalhos, mapeamento, HidHide (`settings_controls`) | ⬜ | WEB-13c2 (adiada pelo mantenedor, 24/10) |
 | Emuladores e ROMs (`settings_emulators`) | 🟡 pastas e sistemas; executável à mão espera o seletor de arquivo | WEB-13c1 |
-| Sunshine com prévia e confirmação (`settings_sunshine`) | 🟡 só a chave | **WEB-13c** |
+| Sunshine com prévia e confirmação (`settings_sunshine`) | 🟡 só a chave; resto adiado (24/10) | WEB-13c2 (adiada) |
 | Downloads (ligar, aviso legal, limite) | ✅ | WEB-14b |
 | Perfis | ✅ (em Geral) | WEB-14c |
-| Backup e restauração (CLOUD-001) | ⬜ | **WEB-13c** |
+| Backup e restauração (CLOUD-001) | adiado pelo mantenedor (24/10) | WEB-13c2 (adiada) |
 
 ## Tela cheia (Big Picture)
 
