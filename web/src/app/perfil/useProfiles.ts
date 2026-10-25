@@ -21,7 +21,7 @@ export interface Profiles {
 }
 
 /** A lista de perfis locais (UX-004) e as mudanças nela, pela ponte. Cada mudança devolve a lista já atualizada. */
-export function useProfiles(): Profiles {
+export function useProfiles(active = true): Profiles {
   const [list, setList] = useState<ProfilesList | null>(null);
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
@@ -43,7 +43,10 @@ export function useProfiles(): Profiles {
       },
     );
   }, []);
-  useEffect(reload, [reload]);
+
+  useEffect(() => {
+    if (active) reload();
+  }, [active, reload]);
 
   const run = useCallback(async (change: () => Promise<ProfilesList>): Promise<ProfilesResult> => {
     setBusy(true);

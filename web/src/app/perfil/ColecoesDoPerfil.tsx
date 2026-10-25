@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { call } from "../../bridge";
 import { PerfilColecoes, type CollectionItem } from "../../components/PerfilColecoes/PerfilColecoes";
 import { useT } from "../../i18n";
@@ -22,6 +22,21 @@ export function ColecoesDoPerfil({ onOpenCollection }: ColecoesDoPerfilProps) {
   const { data, status, reload } = useBridgeData(loadCollections);
   const [creating, setCreating] = useState(false);
 
+  const items: CollectionItem[] = useMemo(
+    () =>
+      (data?.collections ?? []).map((collection) => ({
+        id: collection.id,
+        name: collection.name,
+        detail: collectionDetail(collection.gameCount, collection.installedCount, t),
+        automatic: collection.automatic,
+        covers: collection.covers.flatMap((game) => cover(game) ?? []),
+        onClick: () => {
+          onOpenCollection(collection.id);
+        },
+      })),
+    [data?.collections, cover, onOpenCollection, t],
+  );
+
   if (status === "error") {
     return (
       <div className={styles["aviso"]} role="alert">
@@ -32,17 +47,6 @@ export function ColecoesDoPerfil({ onOpenCollection }: ColecoesDoPerfilProps) {
       </div>
     );
   }
-
-  const items: CollectionItem[] = (data?.collections ?? []).map((collection) => ({
-    id: collection.id,
-    name: collection.name,
-    detail: collectionDetail(collection.gameCount, collection.installedCount, t),
-    automatic: collection.automatic,
-    covers: collection.covers.flatMap((game) => cover(game) ?? []),
-    onClick: () => {
-      onOpenCollection(collection.id);
-    },
-  }));
 
   return (
     <>

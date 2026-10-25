@@ -134,8 +134,7 @@ export function PerfilSessoes<TPeriod extends string = string, TGame extends str
   return (
     <div className={cx(styles["container"], className)}>
       {/* Bloco opcional com o tempo jogado na semana em barras */}
-      {hasWeek && week && (
-        <section className={styles["semanaBloco"]} aria-label={week.ariaLabel}>
+      {hasWeek && week && (        <section className={styles["semanaBloco"]} aria-label={week.ariaLabel}>
           <GrupoDeBlocos flat>
             {week.total && (
               <Bloco label={week.label} icon="clock">
@@ -224,6 +223,9 @@ export function PerfilSessoes<TPeriod extends string = string, TGame extends str
                           src={session.coverSrc}
                           alt={session.coverAlt ?? session.game}
                           className={styles["capaImagem"]}
+                          width={40}
+                          height={52}
+                          decoding="async"
                           loading="lazy"
                         />
                       ) : (

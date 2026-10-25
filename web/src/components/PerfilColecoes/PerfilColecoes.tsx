@@ -163,6 +163,7 @@ export function PerfilColecoes<TOrder extends string = string>({
                           alt={quadrant.alt ?? ""}
                           className={styles["mosaicoImagem"]}
                           loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <span className={styles["mosaicoPlaceholder"]}>TAKO</span>

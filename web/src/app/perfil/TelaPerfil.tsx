@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { call } from "../../bridge";
 import { Abas, type Aba } from "../../components/Abas/Abas";
 import { Aviso } from "../../components/Aviso/Aviso";
@@ -32,12 +32,28 @@ const TAB_PREFIX = "perfil";
 export function TelaPerfil({ onOpenGame, onOpenCollection }: TelaPerfilProps) {
   const t = useT();
   const { data: summary, status, reload } = useBridgeData(loadSummary);
-  const profiles = useProfiles();
   const [tab, setTab] = useState<ProfileTab>("overview");
   const [dialog, setDialog] = useState<{ manageId: string | null } | null>(null);
   const [notice, setNotice] = useState({ open: false, text: "", key: 0 });
+  const profiles = useProfiles(dialog !== null);
 
-  const tabs: readonly Aba<ProfileTab>[] = PROFILE_TABS.map((id) => ({ id, label: t(`profile.tab_${id}`) }));
+  const tabs: readonly Aba<ProfileTab>[] = useMemo(
+    () => PROFILE_TABS.map((id) => ({ id, label: t(`profile.tab_${id}`) })),
+    [t],
+  );
+
+  const name = useMemo(() => (summary ? profileName(summary.profile, t) : ""), [summary, t]);
+  const last = useMemo(
+    () => (summary ? lastPlayedText(summary.lastPlayedAt, summary.today, t) : null),
+    [summary, t],
+  );
+  const line = useMemo(
+    () =>
+      summary
+        ? [summary.profile.main ? t("profile.main") : null, last].filter((text): text is string => text !== null)
+        : [],
+    [summary, last, t],
+  );
 
   if (summary === null) {
     return (
@@ -57,10 +73,6 @@ export function TelaPerfil({ onOpenGame, onOpenCollection }: TelaPerfilProps) {
       </div>
     );
   }
-
-  const name = profileName(summary.profile, t);
-  const last = lastPlayedText(summary.lastPlayedAt, summary.today, t);
-  const line = [summary.profile.main ? t("profile.main") : null, last].filter((text): text is string => text !== null);
 
   return (
     <div className={styles["pagina"]}>
