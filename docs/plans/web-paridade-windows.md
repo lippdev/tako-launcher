@@ -16,9 +16,9 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Sessão de jogo (`session.rs`, `hosts.rs`): abrir, tela e áudio, acompanhar, restaurar, recuperação | ✅ (falta testar com jogo real pela interface; Discord e ponteiro no WEB-34) | WEB-20 · WEB-21 |
 | "Abrindo…" (`launch_splash`) e "Fechando o jogo…" (`closing_game`) | ✅ desktop (a tela cheia do "Abrindo…" fica com o WEB-15) | WEB-21 |
 | Central rápida durante o jogo (`control_center`) e o atalho global | ⬜ | **WEB-22** |
-| Controles pelo SDL3 (`gamepad.rs`): navegação, bateria, reconexão, isolar do jogo (HidHide) | ⬜ teclado pronto | **WEB-05b** |
+| Controles pelo SDL3 (`gamepad.rs`): navegação, bateria, reconexão, isolar do jogo (HidHide) | 🟡 pronto; falta teste com controle real e HidHide (só na tela cheia) | WEB-05b · **WEB-15** |
 | Teclado virtual (`keyboard`) para busca e campos no controle | ⬜ | **WEB-23** |
-| Atualizações do app (`app_updates.rs`) | 🟡 componente pronto; falta ligar | **WEB-33** |
+| Atualizações do app (`app_updates.rs`) | ✅ (falta testar com release real) | WEB-33 |
 | Discord Rich Presence (`discord.rs`) | ⬜ chave existe, ninguém lê | **WEB-34** |
 | API local (`local_api.rs`, EXT-002) | ⬜ | **WEB-34** |
 | Links `tako://` (`links`) | ⬜ | **WEB-34** |
@@ -49,7 +49,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Atividades na barra (`activities`) | ✅ (downloads) | WEB-14b |
 | Perfil (`profile`) e perfis locais (`profiles`, UX-004) | 🟡 pronto; falta reabrir com o perfil trocado e "Jogando…" | WEB-14c · **WEB-20** |
 | Diálogos do jogo e da biblioteca (`dialogs`): remover, erro do jogo, confirmar | 🟡 erro do jogo pronto | **WEB-14d** |
-| Primeira execução (`first_run`, UX-003) | ⬜ | **WEB-16** |
+| Primeira execução (`first_run`, UX-003) | ✅ (tela cheia depende do WEB-15) | WEB-16 |
 
 ## Configurações
 
