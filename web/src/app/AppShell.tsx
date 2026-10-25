@@ -6,6 +6,7 @@ import { ColunaDaLista } from "./ColunaDaLista";
 import { PaginaDoJogo } from "./jogo/PaginaDoJogo";
 import { TelaPerfil } from "./perfil/TelaPerfil";
 import { TelaConfiguracoes } from "./settings/TelaConfiguracoes";
+import { CamadasDaSessao } from "./sessao/CamadasDaSessao";
 import { useSavedAppearance } from "./settings/useSavedAppearance";
 import { VisaoGeral } from "./visao/VisaoGeral";
 import { strings } from "./strings";
@@ -180,6 +181,7 @@ export function AppShell() {
           })}
         </main>
       </div>
+      <CamadasDaSessao />
       <BuscaGeral
         open={searchOpen}
         focusToken={searchFocus}

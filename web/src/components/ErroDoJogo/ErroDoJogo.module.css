@@ -107,6 +107,8 @@
   font-size: 14px;
   line-height: 1.55;
   color: var(--text);
+  /* O código de saída e a sugestão vêm em duas partes separadas por linha em branco. */
+  white-space: pre-line;
 }
 
 .detalhesTecnicos {

@@ -457,6 +457,11 @@ export const gameStrings = {
     cannotPlay: "Este jogo não pode ser aberto agora.",
     playError: "Não foi possível abrir o jogo.",
     updateError: "Não foi possível atualizar o jogo.",
+    endError: "Não foi possível encerrar o jogo.",
+  },
+  /** O que o design do ErroDoJogo tem e os catálogos não (o Slint não mostra os detalhes técnicos). */
+  errorDialog: {
+    technicalDetails: "Detalhes técnicos",
   },
 } as const;
 

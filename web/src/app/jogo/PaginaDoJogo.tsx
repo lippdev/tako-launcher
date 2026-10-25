@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CallError, call } from "../../bridge";
+import { call } from "../../bridge";
 import type { GameDetails } from "../../bridge/generated/GameDetails";
 import { AcoesDoJogo, type EstadoDoPrimario } from "../../components/AcoesDoJogo/AcoesDoJogo";
 import type { MenuEntry } from "../../components/MenuDeContexto/MenuDeContexto";
@@ -12,11 +12,13 @@ import { FundoDoJogo } from "../../components/FundoDoJogo/FundoDoJogo";
 import { PilulaDaLoja } from "../../components/PilulaDaLoja/PilulaDaLoja";
 import { StatusDoJogo, type GameStatus as StatusDoChip } from "../../components/StatusDoJogo/StatusDoJogo";
 import { TituloDoJogo } from "../../components/TituloDoJogo/TituloDoJogo";
+import { useT } from "../../i18n";
 import { useLatest } from "../../lib/useLatest";
 import { editGameStrings, gameStrings as s, libraryStrings } from "../strings";
 import { DialogoEditarJogo } from "../editar/DialogoEditarJogo";
 import { DialogoFontesEIds } from "../editar/DialogoFontesEIds";
 import { DialogoRemoverJogo } from "../editar/DialogoRemoverJogo";
+import { useGameSession } from "../sessao/useGameSession";
 import { EtiquetaDeSituacao } from "./EtiquetaDeSituacao";
 import { EditorDasEtiquetas } from "./EditorDasEtiquetas";
 import { PainelConfiguracoesDoJogo } from "./PainelConfiguracoesDoJogo";
@@ -37,11 +39,6 @@ interface PaginaDoJogoProps {
   gameId: string;
   /** O núcleo não conhece mais este jogo (saiu da biblioteca): quem abriu a página volta para a Visão geral. */
   onMissing: () => void;
-  /**
-   * O jogo está rodando agora (EstadoJogando: Voltar ao jogo e Encerrar). A ponte ainda não informa isso, então
-   * hoje nada passa `true`; a página já fica pronta para o dia em que o núcleo mandar.
-   */
-  running?: boolean;
 }
 
 interface Notice {
@@ -65,11 +62,10 @@ function settleParts(root: HTMLElement | null): Promise<unknown> {
  * baixo (sobre, detalhes, sessões). Trocar de jogo não recarrega a página: as partes saem, a página volta ao topo
  * e elas voltam em escada (TrocaDeJogo). O que o núcleo não respondeu não vira bloco.
  */
-export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJogoProps) {
+export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   const { details, error, loading, refresh } = useGameDetails(gameId);
   const [shown, setShown] = useState<GameDetails | null>(null);
   const [entered, setEntered] = useState(false);
-  const [opening, setOpening] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** Qual diálogo de "Gerenciar" está aberto (um só por vez). */
   const [dialog, setDialog] = useState<"edit" | "ids" | "remove" | null>(null);
@@ -77,6 +73,11 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
   const scrollRef = useRef<HTMLDivElement>(null);
   const latestOnMissing = useLatest(onMissing);
   const devImage = useDevImages();
+  const t = useT();
+  // A sessão é da interface inteira (abrindo, jogando, fechando); a página só lê o ponto em que este jogo está.
+  const session = useGameSession();
+  const phase = session.phaseOf(gameId);
+  const running = phase !== "none";
 
   // Dado novo do mesmo jogo entra no lugar; de outro jogo, só depois da saída animada (efeito abaixo).
   if (details && shown !== details && (shown === null || shown.game.id === details.game.id)) setShown(details);
@@ -151,21 +152,17 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
     }
   };
   const play = async () => {
-    if (opening) return;
-    setOpening(true);
-    try {
-      await call("game.play", { gameId: game.id });
-      showNotice("tako", s.notices.opening(game.title));
-    } catch (failure) {
-      const conflict = failure instanceof CallError && failure.error.code === "conflict";
-      if (!conflict) console.error("game.play", failure);
-      // `conflict`: o núcleo diz que não dá para jogar (o jogo saiu do disco, ou ainda não saiu). Relê os detalhes.
-      showNotice("error", conflict ? s.notices.cannotPlay : s.notices.playError);
-      if (conflict) refresh();
-    } finally {
-      setOpening(false);
-    }
+    if (running) return;
+    const feedback = await session.play(game);
+    showNotice(feedback.tone, feedback.text);
+    // Não abriu (o jogo saiu do disco, ou há outro aberto): relê os detalhes.
+    if (feedback.tone === "error") refresh();
   };
+  /** Encerrar; se o núcleo recusar de vez, avisa (o `conflict` vira a oferta de forçar no diálogo "Fechando o jogo…"). */
+  const stop = async () => {
+    if ((await session.end()) === "error") showNotice("error", s.notices.endError);
+  };
+  const cancellable = phase === "launching" && session.launchSlow;
 
   // Editar e remover só existem para jogo adicionado à mão; Fontes e IDs vale para todos (como no Slint).
   const manageEntries: MenuEntry[] = [
@@ -202,11 +199,12 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
   ];
 
   const primary = primaryState(shown);
-  const state: EstadoDoPrimario = running
-    ? "jogando"
-    : opening
+  const state: EstadoDoPrimario =
+    phase === "launching"
       ? "abrindo"
-      : primary === "upcoming"
+      : running
+        ? "jogando"
+        : primary === "upcoming"
         ? "em-breve"
         : primary === "not-installed"
           ? "nao-instalado"
@@ -278,7 +276,10 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
         }
         situacao={
           running ? (
-            <EtiquetaDeSituacao texto={s.running} ligado />
+            <EtiquetaDeSituacao
+              texto={session.elapsed ? `${s.running} · ${session.elapsed}` : s.running}
+              ligado
+            />
           ) : shown.upcoming ? (
             <EtiquetaDeSituacao texto={s.upcoming} />
           ) : (
@@ -304,9 +305,9 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
             favorito={game.favorite}
             rotulos={{
               jogar: s.actions.play,
-              abrindo: s.actions.opening,
+              abrindo: session.launchSlow ? t("desktop.opening_slow") : s.actions.opening,
               voltarAoJogo: s.actions.resume,
-              encerrar: s.actions.stop,
+              encerrar: cancellable ? t("common.cancel") : s.actions.stop,
               instalar: s.actions.install,
               emBreve: s.actions.upcoming,
               favoritar: s.actions.favorite,
@@ -315,6 +316,16 @@ export function PaginaDoJogo({ gameId, onMissing, running = false }: PaginaDoJog
               configuracoes: s.actions.settings,
             }}
             onJogar={() => void play()}
+            onVoltarAoJogo={() => {
+              void session.resume();
+            }}
+            onEncerrar={
+              running && (phase !== "launching" || cancellable)
+                ? () => {
+                    void stop();
+                  }
+                : undefined
+            }
             onAlternarFavorito={() =>
               void change(() => call("game.favorite.set", { gameIds: [game.id], favorite: !game.favorite }))
             }

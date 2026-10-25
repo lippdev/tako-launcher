@@ -41,7 +41,7 @@ export interface ErroDoJogoProps {
   onTentarDeNovo: () => void;
   /** Callback acionado ao clicar em "Reparar arquivos". */
   onReparar?: () => void;
-  /** Callback acionado ao clicar em "Salvar relatório". */
+  /** Callback acionado ao clicar em "Salvar relatório". Sem ele (a ponte ainda não salva o relatório) a ação não aparece. */
   onSalvarRelatorio?: () => void;
   /** Callback acionado ao fechar o diálogo. */
   onFechar: () => void;
@@ -95,13 +95,15 @@ export function ErroDoJogo({
       className={cx(styles["dialogo"], className)}
       actions={
         <>
-          <button
-            type="button"
-            className={styles["salvarRelatorio"]}
-            onClick={onSalvarRelatorio}
-          >
-            {rotulos.salvarRelatorio}
-          </button>
+          {onSalvarRelatorio && (
+            <button
+              type="button"
+              className={styles["salvarRelatorio"]}
+              onClick={onSalvarRelatorio}
+            >
+              {rotulos.salvarRelatorio}
+            </button>
+          )}
           {podeReparar && (
             <BotaoDesktop variant="outlined" onClick={onReparar}>
               {rotulos.reparar}

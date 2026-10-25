@@ -3,6 +3,10 @@ import type { BridgeError } from "./generated/BridgeError";
 import type { ErrorCode } from "./generated/ErrorCode";
 import type { GameDetails } from "./generated/GameDetails";
 import type { GameRequest } from "./generated/GameRequest";
+import type { GameEndRequest } from "./generated/GameEndRequest";
+import type { GameEnded } from "./generated/GameEnded";
+import type { RunningGame } from "./generated/RunningGame";
+import type { RunningState } from "./generated/RunningState";
 import type { UiState } from "./generated/UiState";
 import type { GameRow } from "../components/ListaDeJogos/ListaDeJogos";
 import type { LibraryGame } from "./generated/LibraryGame";
@@ -2194,4 +2198,267 @@ Object.assign(defaults, {
   "game.source_ids.set": setFakeSourceId,
   "game.source_ids.search": searchFakeSourceIds,
   "game.source_ids.check": checkFakeSourceId,
+});
+
+// ---- Sessão de jogo (WEB-21) ----
+// Uma sessão simulada de alguns segundos: Jogar → abrindo → jogando → fim. Faz o que o núcleo faz
+// (`crates/tako-app/src/session.rs`): um jogo por vez (`conflict`), `game.end` que recusa (`conflict`) enquanto a
+// janela do jogo não existe, o `game.ended` que espera a próxima leitura de `game.running` quando a interface estava
+// fechada. Parâmetros da página para ver os estados no navegador:
+//   ?falha[=quick|never_started|launch_failed]  o jogo termina com erro (sem valor: caiu com um código do Windows);
+//   ?abrindo=25000  quanto o jogo demora para aparecer (1500 ms; passe de 20 s para ver "Ainda abrindo…" e o cancelar);
+//   ?sessao=6000    quanto dura a sessão depois que o jogo aparece (6 s);
+//   ?preso          o jogo ignora o pedido de fechar: só "Forçar encerramento" o encerra;
+//   ?avisos         a abertura traz um aviso (ferramenta que não abriu);
+//   ?fechada        o fim da sessão não chega por evento: fica guardado até a próxima `game.running` (recarregue a página);
+//   ?voltou         a página abre com um fim de sessão não visto (com ?falha, o erro).
+const sessionParams = typeof location === "undefined" ? new URLSearchParams() : new URLSearchParams(location.search);
+const UNSEEN_KEY = "tako.dev.session.unseen";
+
+interface FakeGameSession {
+  gameId: string;
+  title: string;
+  launchedAt: number;
+  state: RunningState;
+  timers: ReturnType<typeof setTimeout>[];
+}
+let fakeSession: FakeGameSession | null = null;
+let unseenEnd: GameEnded | null = (() => {
+  const saved = typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(UNSEEN_KEY);
+  return saved ? (JSON.parse(saved) as GameEnded) : null;
+})();
+
+const FAILURES = {
+  failed: {
+    end: "failed",
+    exitCode: 0xc0000005,
+    exitCodeText:
+      "Código de saída 0xC0000005 (3221225477): o jogo acessou uma memória que não podia e caiu (mods, sobreposições, driver de vídeo ou arquivos corrompidos)",
+  },
+  quick: {
+    end: "quick",
+    exitCode: 0xc0000135,
+    exitCodeText:
+      "Código de saída 0xC0000135 (3221225781): uma DLL que o jogo precisa não foi encontrada (instale o Visual C++ e o DirectX, ou repare os arquivos do jogo)",
+  },
+  never_started: { end: "never_started", exitCode: null, exitCodeText: null },
+  launch_failed: { end: "launch_failed", exitCode: null, exitCodeText: null },
+} as const;
+
+function sessionFailure() {
+  if (!sessionParams.has("falha")) return null;
+  const kind = sessionParams.get("falha") ?? "";
+  return FAILURES[kind in FAILURES ? (kind as keyof typeof FAILURES) : "failed"];
+}
+
+const LAUNCH_FAILED_MESSAGE = "O comando antes do jogo falhou: mount.bat não foi encontrado";
+
+function sessionMs(name: string, fallback: number): number {
+  const value = Number(sessionParams.get(name));
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function deliverEvent(name: Event["name"], payload?: unknown) {
+  window.__takoDeliver?.(JSON.stringify({ v: 1, event: payload === undefined ? { name } : { name, payload } }));
+}
+
+function endFakeSession(end: GameEnded["end"], requested = false) {
+  const session = fakeSession;
+  if (!session) return;
+  session.timers.forEach(clearTimeout);
+  fakeSession = null;
+  const failure = sessionFailure();
+  const seconds = Math.round((Date.now() - session.launchedAt) / 1000);
+  const ended: GameEnded = {
+    gameId: session.gameId,
+    title: session.title,
+    playedSeconds: end === "launch_failed" ? 0 : seconds,
+    end,
+    exitCode: failure?.end === end ? failure.exitCode : null,
+    exitCodeText: failure?.end === end ? failure.exitCodeText : null,
+    message: end === "launch_failed" ? LAUNCH_FAILED_MESSAGE : null,
+  };
+  if (end !== "launch_failed") {
+    const game = games.find((g) => g.id === session.gameId);
+    if (game) {
+      game.lastPlayedAt = new Date().toISOString();
+      game.playTimeSeconds += seconds;
+    }
+    changed();
+  }
+  if (sessionParams.has("fechada") && !requested) {
+    // Sem interface aberta o evento se perde: o núcleo guarda o último fim e o manda depois do próximo `game.running`.
+    unseenEnd = ended;
+    sessionStorage.setItem(UNSEEN_KEY, JSON.stringify(ended));
+  } else {
+    deliverEvent("game.ended", ended);
+  }
+}
+
+function startFakeSession(payload: unknown) {
+  const { gameId } = payload as GameRequest;
+  const game = games.find((g) => g.id === gameId);
+  if (!game) throw new FakeError("not_found", gameId);
+  if (!game.installed || SAMPLE_GAMES[gameId]?.details.upcoming || gameId === "steam:1009")
+    throw new FakeError("conflict", `${gameId} não pode ser jogado agora`);
+  if (fakeSession) throw new FakeError("conflict", "já há um jogo aberto");
+  const session: FakeGameSession = { gameId, title: game.title, launchedAt: Date.now(), state: "launching", timers: [] };
+  fakeSession = session;
+  const failure = sessionFailure();
+  const opening = sessionMs("abrindo", 1500);
+  const playing = sessionMs("sessao", 6000);
+  const after = (ms: number, run: () => void) => {
+    session.timers.push(setTimeout(run, ms));
+  };
+  // O núcleo responde antes de abrir o jogo: o `game.started` vem logo depois da resposta.
+  if (failure?.end === "launch_failed") {
+    after(800, () => {
+      endFakeSession("launch_failed");
+    });
+    return;
+  }
+  after(80, () => {
+    deliverEvent("game.started", {
+      gameId,
+      title: game.title,
+      startedAt: new Date(session.launchedAt).toISOString(),
+      tracked: true,
+      notices: sessionParams.has("avisos") ? ["Não foi possível abrir OBS Studio: o arquivo não foi encontrado."] : [],
+    });
+  });
+  after(opening, () => {
+    // A janela do jogo apareceu (no Tako de verdade a interface fecha aqui).
+    if (fakeSession === session && session.state === "launching") session.state = "playing";
+  });
+  after(opening + playing, () => {
+    endFakeSession(failure ? failure.end : "normal");
+  });
+}
+
+function readRunningGame(): RunningGame | null {
+  const running: RunningGame | null = fakeSession && {
+    gameId: fakeSession.gameId,
+    title: fakeSession.title,
+    startedAt: new Date(fakeSession.launchedAt).toISOString(),
+    state: fakeSession.state,
+  };
+  if (unseenEnd) {
+    const end = unseenEnd;
+    unseenEnd = null;
+    sessionStorage.removeItem(UNSEEN_KEY);
+    // Depois da resposta (que sai em ~30 ms), na mesma entrega.
+    setTimeout(() => {
+      deliverEvent("game.ended", end);
+    }, 90);
+  }
+  return running;
+}
+
+function endFakeGame(payload: unknown) {
+  const { force } = payload as GameEndRequest;
+  const session = fakeSession;
+  if (!session) throw new FakeError("conflict", "nenhum jogo aberto");
+  const wasLaunching = session.state === "launching";
+  session.state = "closing";
+  const closeIn = (ms: number) => {
+    session.timers.push(
+      setTimeout(() => {
+        endFakeSession("normal", true);
+      }, ms),
+    );
+  };
+  if (force) {
+    closeIn(300);
+    return;
+  }
+  // A janela do jogo ainda não existe: não há o que fechar agora (a sessão fica "fechando", como no núcleo).
+  if (wasLaunching) throw new FakeError("conflict", "encerrar o jogo: a janela do jogo ainda não existe");
+  if (!sessionParams.has("preso")) closeIn(2000);
+}
+
+Object.assign(defaults, {
+  "game.play": startFakeSession,
+  "game.running": readRunningGame,
+  "game.resume": () => {
+    if (!fakeSession) throw new FakeError("conflict", "nenhum jogo aberto");
+    console.info("[hospedeiro falso] voltar ao jogo:", fakeSession.title);
+  },
+  "game.end": endFakeGame,
+});
+
+if (sessionParams.has("voltou") && !unseenEnd) {
+  const failure = sessionFailure();
+  unseenEnd = {
+    gameId: "steam:1000",
+    title: "God of War: Ragnarök",
+    playedSeconds: failure ? (failure.end === "quick" ? 4 : failure.end === "launch_failed" ? 0 : 3720) : 2520,
+    end: failure ? failure.end : "normal",
+    exitCode: failure ? failure.exitCode : null,
+    exitCodeText: failure ? failure.exitCodeText : null,
+    message: failure?.end === "launch_failed" ? LAUNCH_FAILED_MESSAGE : null,
+  };
+  sessionStorage.setItem(UNSEEN_KEY, JSON.stringify(unseenEnd));
+}
+
+Object.assign(SAMPLE_CATALOGS["pt-BR"], {
+  "session.closing": "Fechando {game}…",
+  "session.closing_wait": "Esperando o jogo fechar.",
+  "session.closing_stuck":
+    "O jogo ainda não fechou. Ele pode estar perguntando se você quer salvar: volte ao jogo para responder, ou force o encerramento (o que não foi salvo se perde).",
+  "session.force_close": "Forçar encerramento",
+  "session.other_running": "{game} ainda está aberto",
+  "session.welcome_back": "Bem-vindo de volta · {game}",
+  "session.welcome_back_played": "Bem-vindo de volta · {game} · {time}",
+  "session.ended_quick": "{game} fechou logo depois de abrir",
+  "session.ended_quick_text":
+    "O jogo fechou sozinho em poucos segundos. Costuma ser uma dependência faltando (DirectX, Visual C++), arquivos corrompidos ou o jogo pedindo para abrir pela loja. Tente de novo, use Reparar arquivos nas opções do jogo ou salve o relatório de diagnóstico para pedir ajuda.",
+  "session.ended_error": "{game} fechou com um erro",
+  "session.ended_error_text":
+    "O jogo fechou sozinho com um código de erro. Tente de novo, use Reparar arquivos nas opções do jogo ou salve o relatório de diagnóstico para pedir ajuda.",
+  "session.never_started": "{game} não abriu",
+  "session.never_started_text":
+    "O Tako esperou 2 minutos e o jogo não apareceu. A loja pode ter mostrado um aviso, pedido login ou uma atualização: confira na loja, tente de novo ou salve o relatório de diagnóstico.",
+  "session.try_again": "Tentar de novo",
+  "session.closed_after": "Fechou {time} depois de abrir.",
+  "session.repair": "Reparar arquivos",
+  "session.save_report": "Salvar relatório de diagnóstico",
+  "cc.back_to_game": "Voltar ao jogo",
+  "desktop.opening": "Abrindo…",
+  "desktop.opening_slow": "Ainda abrindo…",
+  "presentation.session.less_than_minute": "menos de 1 min jogado",
+  "presentation.session.minutes.one": "{n} min jogado",
+  "presentation.session.minutes.other": "{n} min jogados",
+  "presentation.session.hours": "{h} h jogadas",
+  "presentation.session.hours_minutes": "{h} h {m} min jogados",
+});
+Object.assign(SAMPLE_CATALOGS["en-US"], {
+  "session.closing": "Closing {game}…",
+  "session.closing_wait": "Waiting for the game to close.",
+  "session.closing_stuck":
+    "The game hasn't closed yet. It may be asking whether to save: go back to the game to answer, or force it to close (anything unsaved is lost).",
+  "session.force_close": "Force close",
+  "session.other_running": "{game} is still open",
+  "session.welcome_back": "Welcome back · {game}",
+  "session.welcome_back_played": "Welcome back · {game} · {time}",
+  "session.ended_quick": "{game} closed right after opening",
+  "session.ended_quick_text":
+    "The game closed by itself within a few seconds. This is usually a missing dependency (DirectX, Visual C++), corrupted files or the game asking to be opened from its store. Try again, use Repair files in the game options or save the diagnostics report to ask for help.",
+  "session.ended_error": "{game} closed with an error",
+  "session.ended_error_text":
+    "The game closed by itself with an error code. Try again, use Repair files in the game options or save the diagnostics report to ask for help.",
+  "session.never_started": "{game} didn't open",
+  "session.never_started_text":
+    "Tako waited 2 minutes and the game never showed up. The store may have shown a notice, asked you to sign in or started an update: check the store, try again or save the diagnostics report.",
+  "session.try_again": "Try again",
+  "session.closed_after": "It closed {time} after opening.",
+  "session.repair": "Repair files",
+  "session.save_report": "Save diagnostics report",
+  "cc.back_to_game": "Back to game",
+  "desktop.opening": "Opening…",
+  "desktop.opening_slow": "Still opening…",
+  "presentation.session.less_than_minute": "less than 1 min played",
+  "presentation.session.minutes.one": "{n} min played",
+  "presentation.session.minutes.other": "{n} min played",
+  "presentation.session.hours": "{h} h played",
+  "presentation.session.hours_minutes": "{h} h {m} min played",
 });

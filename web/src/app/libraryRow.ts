@@ -28,6 +28,12 @@ export function libraryGameToRow(
   };
 }
 
+/** Marca como aberto (`running`) a linha do jogo que o núcleo diz estar aberto; as outras ficam como estão. */
+export function withRunning(rows: readonly GameRow[], runningId: string | null): readonly GameRow[] {
+  if (runningId === null || !rows.some((row) => row.id === runningId)) return rows;
+  return rows.map((row) => (row.id === runningId ? { ...row, running: true } : row));
+}
+
 export function libraryGameIcon(game: LibraryGame, px: number): string | null {
   return game.hasIcon ? `tako-img://icon?id=${encodeURIComponent(game.id)}&w=${px}&h=${px}` : null;
 }

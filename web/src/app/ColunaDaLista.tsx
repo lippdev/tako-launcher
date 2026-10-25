@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { CallError, call } from "../bridge";
 import { Abas, type Aba } from "../components/Abas/Abas";
 import { Aviso } from "../components/Aviso/Aviso";
 import { CampoDeBusca } from "../components/CampoDeBusca/CampoDeBusca";
@@ -7,6 +6,8 @@ import { Icon } from "../components/Icon/Icon";
 import { BibliotecaGrade } from "../components/BibliotecaGrade/BibliotecaGrade";
 import { ListaDeJogos } from "../components/ListaDeJogos/ListaDeJogos";
 import { cx } from "../lib/cx";
+import { useRunningGameId, useSessionActions } from "./sessao/useGameSession";
+import { withRunning } from "./libraryRow";
 import { listLabels, listViewStrings, strings, libraryStrings as s } from "./strings";
 import { hasSavableCriteria, smartRuleFromCriteria } from "./colecoes/colecoesModel";
 import { OrganizarColecoes } from "./colecoes/OrganizarColecoes";
@@ -53,6 +54,10 @@ export function ColunaDaLista({
   onActiveChange,
 }: ColunaDaListaProps) {
   const library = useLibrary(criteria);
+  const runningId = useRunningGameId();
+  const sessionActions = useSessionActions();
+  // O jogo aberto ganha o ponto "Jogando" na lista e na grade (o núcleo diz qual; a lista só pinta).
+  const rows = useMemo(() => withRunning(library.rows, runningId), [library.rows, runningId]);
   const prefs = useSettings(MODE_KEYS);
   // Recolhida a coluna só tem os ícones: a grade e as categorias esperam ela abrir (como o Slint).
   const view: ListView = collapsed ? "list" : parseListView(prefs.values[VIEW_KEY]);
@@ -88,14 +93,16 @@ export function ColunaDaLista({
   const count = filterCount(criteria);
   const collection = library.collections.find((c) => c.id === criteria.collection);
   const rule = smartRuleFromCriteria(criteria, collection?.criteria ? collection : null);
+  // O ▶ da grade: abre o jogo; no que já está aberto, volta a ele.
   const play = async (id: string) => {
-    try {
-      await call("game.play", { gameId: id });
-    } catch (failure) {
-      const conflict = failure instanceof CallError && failure.error.code === "conflict";
-      if (!conflict) console.error("game.play", failure);
-      setNotice({ error: true, key: Date.now(), message: conflict ? listViewStrings.cannotPlay : listViewStrings.playError });
+    if (id === runningId) {
+      void sessionActions.resume();
+      return;
     }
+    const game = knownGame(id);
+    const feedback = await sessionActions.play({ id, title: game?.title ?? "" });
+    // O aviso de "abrindo" é do próprio botão (Abrindo…); só o que deu errado precisa de texto aqui.
+    if (feedback.tone === "error") collectionDone(true, feedback.text);
   };
   // Os jogos que a tela conhece: a página da lista e as capas das fileiras (a seleção pode vir de qualquer uma).
   const knownGame = (id: string) =>
@@ -229,7 +236,7 @@ export function ColunaDaLista({
               key={library.queryKey}
               className={cx(styles["games"])}
               aria-label={strings.list.label}
-              rows={library.rows}
+              rows={rows}
               labels={{ ...listLabels, empty, play: listViewStrings.play }}
               loading={library.loading}
               activeId={activeId}
@@ -262,7 +269,7 @@ export function ColunaDaLista({
               className={cx(styles["games"])}
               aria-label={strings.list.label}
               collapsed={collapsed}
-              rows={library.rows}
+              rows={rows}
               labels={{ ...listLabels, empty }}
               loading={library.loading}
               activeId={activeId}

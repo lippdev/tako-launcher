@@ -27,7 +27,7 @@ export interface AcoesDoJogoProps {
   onJogar?: (() => void) | undefined;
   /** Jogando: volta para a janela do jogo. */
   onVoltarAoJogo?: (() => void) | undefined;
-  /** Jogando: encerra o jogo. Sem ele o ✕ não aparece. */
+  /** Jogando, ou abrindo há tempo demais (cancelar): encerra o jogo. Sem ele o ✕ não aparece. */
   onEncerrar?: (() => void) | undefined;
   onAlternarFavorito: () => void;
   /** Escolher "Configurações do jogo" no menu Gerenciar. Sem ele a entrada fica desabilitada. */
@@ -116,7 +116,7 @@ export function AcoesDoJogo({
           />
         </>
       )}
-      {estado === "jogando" && onEncerrar && (
+      {(estado === "jogando" || estado === "abrindo") && onEncerrar && (
         <BotaoDesktop
           variant="square"
           icon="x"

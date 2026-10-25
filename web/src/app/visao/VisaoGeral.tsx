@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { CallError, call } from "../../bridge";
 import type { GameDetails } from "../../bridge/generated/GameDetails";
 import type { LibraryGame } from "../../bridge/generated/LibraryGame";
 import mark from "../../assets/brand/tako-mark.png";
@@ -11,6 +10,7 @@ import { FileiraDeCapas, type CapaDaFileira } from "../../components/FileiraDeCa
 import { FundoDoJogo } from "../../components/FundoDoJogo/FundoDoJogo";
 import { PilulaDaLoja } from "../../components/PilulaDaLoja/PilulaDaLoja";
 import { TituloDoJogo } from "../../components/TituloDoJogo/TituloDoJogo";
+import { useT } from "../../i18n";
 import { cx } from "../../lib/cx";
 import { EtiquetaDeSituacao } from "../jogo/EtiquetaDeSituacao";
 import {
@@ -23,6 +23,8 @@ import {
   validScore,
 } from "../jogo/jogoModel";
 import { useDevImages } from "../jogo/useDevImages";
+import { useGameSession } from "../sessao/useGameSession";
+import type { GamePhase } from "../sessao/sessionModel";
 import { gameStrings as g, libraryStrings, overviewStrings as s } from "../strings";
 import { useDetalhesDoDestaque } from "./useDetalhesDoDestaque";
 import { useVisaoGeral } from "./useVisaoGeral";
@@ -91,12 +93,13 @@ function heroData(game: LibraryGame, details: GameDetails | null): DadoDaBarra[]
  */
 export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
   const overview = useVisaoGeral();
+  const t = useT();
+  const session = useGameSession();
   const devImage = useDevImages();
   const heroRef = useRef<HTMLDivElement>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [shownId, setShownId] = useState<string | null>(null);
   const [entered, setEntered] = useState(false);
-  const [opening, setOpening] = useState(false);
   const [notice, setNotice] = useState<Notice>({ open: false, tone: "info", text: "", key: 0 });
 
   const games = useMemo(() => gamesById(overview.shelves, overview.first), [overview.shelves, overview.first]);
@@ -154,21 +157,13 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
     setNotice({ open: true, tone, text, key: Date.now() });
   };
   const play = async (game: LibraryGame) => {
-    if (opening) return;
-    setOpening(true);
-    try {
-      await call("game.play", { gameId: game.id });
-      showNotice("tako", g.notices.opening(game.title));
-    } catch (failure) {
-      const conflict = failure instanceof CallError && failure.error.code === "conflict";
-      if (!conflict) console.error("game.play", failure);
-      showNotice("error", conflict ? g.notices.cannotPlay : g.notices.playError);
-    } finally {
-      setOpening(false);
-    }
+    if (session.phaseOf(game.id) !== "none") return;
+    const feedback = await session.play(game);
+    showNotice(feedback.tone, feedback.text);
   };
 
   const game = shownId !== null ? games.get(shownId) : undefined;
+  const phase = game ? session.phaseOf(game.id) : "none";
   const details = shownId !== null ? (entries[shownId]?.details ?? null) : null;
   const covers = (shelf: ShelfState): CapaDaFileira[] =>
     shelf.games.map((item) => {
@@ -234,7 +229,12 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
               }
               chips={<PilulaDaLoja rotulo={libraryStrings.stores[game.store]} />}
               situacao={
-                game.installed && game.lastPlayedAt !== null ? (
+                phase !== "none" ? (
+                  <EtiquetaDeSituacao
+                    texto={session.elapsed ? `${g.running} · ${session.elapsed}` : g.running}
+                    ligado
+                  />
+                ) : game.installed && game.lastPlayedAt !== null ? (
                   <EtiquetaDeSituacao texto={s.continuePlaying} ligado />
                 ) : (
                   <EtiquetaDeSituacao
@@ -257,11 +257,11 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
               acoes={
                 <AcoesDoJogo
                   compacto
-                  estado={heroState(game, details, opening)}
+                  estado={heroState(game, details, phase)}
                   favorito={game.favorite}
                   rotulos={{
                     jogar: g.actions.play,
-                    abrindo: g.actions.opening,
+                    abrindo: session.launchSlow ? t("desktop.opening_slow") : g.actions.opening,
                     voltarAoJogo: g.actions.resume,
                     encerrar: g.actions.stop,
                     instalar: g.actions.install,
@@ -272,6 +272,9 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
                     configuracoes: g.actions.settings,
                   }}
                   onJogar={() => void play(game)}
+                  onVoltarAoJogo={() => {
+                    void session.resume();
+                  }}
                   onAlternarFavorito={() => {}}
                 />
               }
@@ -311,8 +314,9 @@ export function VisaoGeral({ onOpenGame }: VisaoGeralProps) {
 }
 
 /** O que o primário do destaque faz, com o que já se sabe: sem detalhes, instalado joga e o resto vira Instalar. */
-function heroState(game: LibraryGame, details: GameDetails | null, opening: boolean): EstadoDoPrimario {
-  if (opening) return "abrindo";
+function heroState(game: LibraryGame, details: GameDetails | null, phase: GamePhase): EstadoDoPrimario {
+  if (phase === "launching") return "abrindo";
+  if (phase !== "none") return "jogando";
   const state = details ? primaryState(details) : game.installed ? "play" : "not-installed";
   return state === "upcoming" ? "em-breve" : state === "not-installed" ? "nao-instalado" : "jogar";
 }
