@@ -116,6 +116,7 @@ Em paralelo à Etapa 3, a partir do WEB-02:
 
 - [ ] **WEB-40:** formato de tema web, validação do CSS, CSP, layouts oficiais (Fita), prévia, edição e criação.
 - [ ] **WEB-41:** job do CI que avisa nova estável do CEF; procedimento para publicar o runtime em poucos dias.
+- [ ] **WEB-02c:** sandbox do Chromium no Windows pelo **modelo bootstrap oficial do CEF** (o executável da interface vira uma DLL carregada por `bootstrap.exe`; o crate `cef` não expõe o `sandbox_info` no Windows). Decisão do mantenedor em 25/10; feito junto do INST e do WEB-41, porque muda o empacotamento. Diagnóstico em `docs/web/hospedeiro.md`.
 - [ ] **WEB-50:** beta web nos três SOs; remover `tako-ui`, `.slint`, dependências do Slint e o modo dev de hot
   reload do Slint; changelog sobre temas `.slint`.
 - [ ] **WEB-60:** ferramenta de medição (memória somada da árvore de processos, quadros por tela, abertura e
