@@ -4,14 +4,11 @@ use crate::schemes::{self, ImageKind};
 use image::{ImageFormat, ImageReader};
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tako_core::library::Game;
-use tako_core::metadata::art_cache::{ArtCache, MAX_IMAGE_BYTES};
-use tako_core::metadata::http::UreqHttp;
-use tako_core::metadata::steam_art::SteamArtResolver;
+use tako_core::library::ArtKind;
+use tako_core::metadata::art_cache::MAX_IMAGE_BYTES;
+use tako_core::metadata::game_art::GameArt;
 use tako_core::paths::DataPaths;
 
-const MAX_LIBRARY_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_APP_FILE_BYTES: u64 = 32 * 1024 * 1024;
 
 #[cfg(all(windows, feature = "cef"))]
@@ -36,32 +33,15 @@ impl Resource {
 pub struct Resources {
     pub app_root: PathBuf,
     cache_root: PathBuf,
-    cache: ArtCache,
-    games: Vec<Game>,
+    art: GameArt,
 }
 
 impl Resources {
     pub fn new(app_root: PathBuf, paths: &DataPaths) -> Self {
-        let http = Arc::new(UreqHttp::new(std::time::Duration::from_secs(2)));
-        let cache_root = paths.art_cache();
-        let cache = ArtCache::new(
-            &cache_root,
-            http.clone(),
-            SteamArtResolver::new(http, None),
-            None,
-        );
-        // A resolução compartilhada de arte passa para o núcleo na WEB-01d.
-        let games = read_limited(
-            &paths.cache().join("found-games.json"),
-            MAX_LIBRARY_SNAPSHOT_BYTES,
-        )
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default();
         Self {
             app_root,
-            cache_root,
-            cache,
-            games,
+            cache_root: paths.art_cache(),
+            art: GameArt::new(paths),
         }
     }
 
@@ -70,7 +50,12 @@ impl Resources {
         let bytes = read_limited(path, MAX_IMAGE_BYTES)
             .ok_or("fixture de arte ausente ou grande demais")?;
         std::fs::create_dir_all(&self.cache_root).map_err(|e| e.to_string())?;
-        std::fs::write(self.cache.cache_path("tako-test://cover"), bytes).map_err(|e| e.to_string())
+        let file = self.cache_root.join("test-cover.img");
+        std::fs::write(&file, bytes).map_err(|e| e.to_string())?;
+        self.art
+            .publish("test:cover", ArtKind::Cover, &file)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 
     pub fn serve(&self, url: &str) -> Resource {
@@ -113,37 +98,13 @@ impl Resources {
             });
         }
         let request = schemes::parse_image_url(url)?;
-        let uri = if cfg!(debug_assertions)
-            && request.game_id == "test:cover"
-            && request.kind == ImageKind::Cover
-        {
-            "tako-test://cover".to_owned()
-        } else if let Some(game) = self.games.iter().find(|game| game.id == request.game_id) {
-            match request.kind {
-                ImageKind::Cover => game.shown_cover(),
-                ImageKind::Hero => game.shown_hero(),
-                ImageKind::Logo => game.shown_logo(),
-                ImageKind::Icon => game.shown_icon(),
-            }?
-            .to_owned()
-        } else {
-            let id = request.game_id.strip_prefix("steam:")?;
-            if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
-                return None;
-            }
-            let kind = match request.kind {
-                ImageKind::Cover => "cover",
-                ImageKind::Hero => "hero",
-                ImageKind::Logo => "logo",
-                ImageKind::Icon => "icon",
-            };
-            format!("steam-art://{id}/{kind}")
+        let kind = match request.kind {
+            ImageKind::Cover => ArtKind::Cover,
+            ImageKind::Hero => ArtKind::Hero,
+            ImageKind::Logo => ArtKind::Logo,
+            ImageKind::Icon => ArtKind::Icon,
         };
-        // cache_path só calcula um hash. locate poderia baixar ou aceitar file:// fora do cache.
-        let file = self.cache.cache_path(&uri).canonicalize().ok()?;
-        if !file.starts_with(self.cache_root.canonicalize().ok()?) {
-            return None;
-        }
+        let file = self.art.resolve(&request.game_id, kind)?;
         let bytes = read_limited(&file, MAX_IMAGE_BYTES)?;
         let mut reader = ImageReader::new(Cursor::new(bytes))
             .with_guessed_format()
@@ -246,7 +207,63 @@ mod tests {
                 .status,
             404
         );
-        std::fs::write(store.cache.cache_path("tako-test://cover"), b"broken").unwrap();
+        std::fs::write(store.cache_root.join("test-cover.img"), b"broken").unwrap();
         assert_eq!(store.serve("tako-img://cover?id=test%3Acover").status, 404);
+    }
+
+    #[test]
+    fn running_host_reads_new_core_art_without_reopening_or_library_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = DataPaths::at(dir.path());
+        let store = Resources::new(dir.path().into(), &paths);
+        let url = "tako-img://cover?id=gog%3Anew&v=1&w=20&h=30";
+        assert_eq!(store.serve(url).status, 404);
+        std::fs::create_dir_all(paths.art_cache()).unwrap();
+        let file = paths.art_cache().join("new.png");
+        image::RgbaImage::from_pixel(40, 60, image::Rgba([1, 2, 3, 255]))
+            .save(&file)
+            .unwrap();
+        GameArt::new(&paths)
+            .publish("gog:new", ArtKind::Cover, &file)
+            .unwrap();
+        assert_eq!(store.serve(url).status, 200);
+        assert!(!paths.cache().join("found-games.json").exists());
+    }
+
+    #[test]
+    fn imported_local_ico_is_decoded_to_png() {
+        use std::sync::Arc;
+        use tako_core::metadata::http::{Http, HttpRequest, HttpResponse};
+        struct Offline;
+        impl Http for Offline {
+            fn send(&self, _: &HttpRequest) -> Result<HttpResponse, String> {
+                panic!("ícone local não deve usar rede");
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let paths = DataPaths::at(dir.path());
+        let store = Resources::new(dir.path().into(), &paths);
+        let mut bytes = Cursor::new(Vec::new());
+        image::RgbaImage::from_pixel(32, 32, image::Rgba([30, 100, 180, 255]))
+            .write_to(&mut bytes, ImageFormat::Ico)
+            .unwrap();
+        let http = Arc::new(Offline);
+        let cache = tako_core::metadata::art_cache::ArtCache::new(
+            paths.art_cache(),
+            http.clone(),
+            tako_core::metadata::steam_art::SteamArtResolver::new(http, None),
+            None,
+        );
+        let file = cache
+            .import("file:///steam/icon.ico", bytes.get_ref())
+            .unwrap();
+        GameArt::new(&paths)
+            .publish("steam:1", ArtKind::Icon, &file)
+            .unwrap();
+        let resource = store.serve("tako-img://icon?id=steam%3A1&w=16&h=16&v=2");
+        assert_eq!(resource.status, 200);
+        assert_eq!(resource.mime, "image/png");
+        let image = image::load_from_memory(&resource.bytes).unwrap();
+        assert_eq!((image.width(), image.height()), (16, 16));
     }
 }

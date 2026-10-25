@@ -3,6 +3,7 @@
 //! A interface só desenha; dados e regras ficam aqui e nos crates do núcleo. Nada neste crate conhece CEF,
 //! janela ou React: o hospedeiro (`tako-web`) recebe o JSON, chama `AppService::handle` e devolve a resposta.
 
+mod art;
 mod core;
 mod demo;
 mod downloads;
@@ -98,6 +99,8 @@ impl AppService {
             core.sources.set_host_sink(sink.clone());
             core.downloads.set_host_sink(sink.clone());
             core.jobs.set_host_sink(sink.clone());
+            core.art
+                .set_host_sink(sink.clone(), !core.library.games().is_empty());
         }
         self.host = Some(sink);
     }

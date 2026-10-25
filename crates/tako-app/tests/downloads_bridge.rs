@@ -26,6 +26,17 @@ const SOURCE_URL: &str = "https://exemplo.invalid/segredo/fonte.json";
 
 struct Stub(Vec<Game>);
 
+// Downloads não exercitam fontes de arte; mantém a fila nova isolada da rede e das credenciais reais.
+struct OfflineArt;
+impl tako_core::metadata::http::Http for OfflineArt {
+    fn send(
+        &self,
+        _: &tako_core::metadata::http::HttpRequest,
+    ) -> Result<tako_core::metadata::http::HttpResponse, String> {
+        Err("rede desativada neste teste".into())
+    }
+}
+
 impl LibrarySource for Stub {
     fn store(&self) -> GameStore {
         GameStore::Steam
@@ -98,7 +109,7 @@ fn open(
     let (count, shared) = (Arc::clone(&engines), engine.clone());
     let root = dir.join("Downloads");
     let core = Core::open_with_downloads(
-        paths,
+        paths.clone(),
         Platform::simulated(),
         false,
         vec![Box::new(Stub(vec![
@@ -112,6 +123,21 @@ fn open(
         root.clone(),
     )
     .unwrap();
+    let http = Arc::new(OfflineArt);
+    let cache = Arc::new(tako_core::metadata::art_cache::ArtCache::new(
+        paths.art_cache(),
+        http.clone(),
+        tako_core::metadata::steam_art::SteamArtResolver::new(http, None),
+        None,
+    ));
+    let core = core.with_art_pipeline(
+        &paths,
+        cache,
+        tako_core::metadata::agent::MetadataAgent::new(
+            Vec::new(),
+            Arc::new(tako_core::metadata::http::SystemClock),
+        ),
+    );
     let mut app = AppService::with_core("test", core);
     let (event_sink, events) = mpsc::channel();
     let (host_sink, wakes) = mpsc::channel();

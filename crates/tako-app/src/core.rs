@@ -55,9 +55,14 @@ pub struct Core {
     pub(crate) emulators: Arc<Mutex<tako_sources::emulators::Config>>,
     /// Demonstração: nada é procurado nem verificado no disco.
     pub(crate) simulate: bool,
+    pub(crate) art: crate::art::ArtState,
 }
 
 impl Core {
+    pub(crate) fn metadata_vault(platform: &Platform) -> impl SecretStore + '_ {
+        Vault(platform.secrets.as_ref())
+    }
+
     /// Abre o banco e os dados locais; a primeira consulta usa o snapshot da última leitura das lojas.
     /// Em demonstração nada é lido ou gravado no banco, no snapshot ou no cofre.
     pub fn open(paths: DataPaths, platform: Platform, simulate: bool) -> Result<Self, CoreError> {
@@ -171,6 +176,13 @@ impl Core {
         );
         library.load();
         let settings_store = database.clone().map(db::SettingsStore::new);
+        let art = crate::art::ArtState::open(
+            &paths,
+            &platform,
+            database.as_ref(),
+            simulate,
+            &mut library,
+        );
         let game_settings =
             crate::game_settings::Overrides::new(database.clone().map(db::GameSettingsStore::new));
         // Antes de tudo que mexe na máquina: restaura tela e áudio de um jogo que o núcleo não viu terminar.
@@ -230,6 +242,7 @@ impl Core {
             jobs: crate::edit::Jobs::new(),
             emulators,
             simulate,
+            art,
         };
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);

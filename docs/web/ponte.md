@@ -90,6 +90,19 @@ pedido (pixels físicos). Tipos: `cover` (2:3), `hero` (larga), `logo`, `icon`. 
 (`steam:570`, `heroic:legendary:Fortnite`) com `encodeURIComponent`. `schemes::parse_image_url` recusa o resto.
 Sem imagem no cache → 404, e a tela mostra o estado sem arte do design system.
 
+O núcleo publica a resolução de **id + tipo** por `tako_core::metadata::game_art::GameArt`. O filho CEF lê esse
+índice atualizado em disco a cada pedido, sem snapshot da biblioteca, consulta pela ponte ou rede. Arquivos
+locais escolhidos e arte do cache da Steam são copiados para o cache de arte antes da publicação. Índices têm
+nomes derivados de hash, limite de leitura e apenas o nome do arquivo; caminhos absolutos, `..` e links para
+fora do cache são recusados. O esquema nunca espera por download: ausência continua sendo 404.
+Ícones ICO locais da Steam também são importados; a resposta do esquema é PNG, como para os demais formatos.
+
+**Chegada de arte:** `{"name":"art.changed","payload":{"gameId":"steam:570"}}`. O evento sai depois da
+publicação no cache; pode haver mais de um por jogo (capa, fundo, logo e ícone). O React deve incrementar uma
+versão local das URLs desse jogo, acrescentando `&v=<versão>` (até 64 bytes). `v` é opaco, não muda a resolução
+nem vira caminho. A assinatura do evento já está nos tipos gerados; o consumo no React pertence a outra tarefa.
+Sem interface aberta o evento se perde; o cache e o índice permanecem e a próxima abertura já encontra a arte.
+
 ```ts
 const src = `tako-img://cover?id=${encodeURIComponent(game.id)}&w=${w * devicePixelRatio}&h=${h * devicePixelRatio}`;
 ```

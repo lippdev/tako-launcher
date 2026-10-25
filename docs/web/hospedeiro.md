@@ -132,6 +132,39 @@ Testes: `tako-core` (`session::launch`, `session::running`: abrir, restaurar, qu
 (`tests/session_bridge.rs`: o ciclo pela ponte, `launch_failed`, a queda do núcleo, a demonstração, o formato) e
 `tako-web` (`core_process.rs`: a interface fecha e volta com o jogo).
 
+## Arte pelo núcleo (WEB-01d)
+
+O `--web` monta as fontes por `tako_core::metadata::runtime`, compartilhado com o Slint: Steam, IGDB,
+ScreenScraper e SteamGridDB, com a mesma prioridade do `MetadataAgent`, opções e chaves carregadas por
+`IgdbSettings`, `ScreenScraperSettings` e `SteamGridDbSettings` do cofre. Mantém cache de respostas de sete dias,
+cache de metadados (30 dias; sete sem correspondência), fila `MetadataWorker` com intervalo de 1,5 s, limites e
+backoff dos clientes existentes, incluindo a opção de preenchimento automático do SteamGridDB. IDs e imagens
+fixados no banco são aplicados antes da fila e novamente a cada leitura da biblioteca.
+
+A fila de arte é separada da fila de metadados: capas já conhecidas não esperam uma consulta de metadados.
+`ArtWorker` junta pedidos pendentes por jogo, baixa uma arte por vez com `ArtCache` (32 MiB por imagem,
+cache de 1 GiB e faltas confirmadas por sete dias) e importa arquivos locais/Steam para o mesmo cache.
+O transporte de imagens tem timeout de oito segundos; a mídia ScreenScraper usa seu cliente autenticado,
+compartilhado com os metadados (20 s). A demonstração não inicia essas filas nem acessa o cofre. Não há nova
+fonte nem implementação de cliente HTTP.
+
+O núcleo publica um pequeno índice por jogo/tipo em `<perfil>/cache/art-index/`, apontando apenas para nomes
+de arquivos em `DataPaths::art_cache()`. O índice é por perfil; as imagens e o limite continuam compartilhados
+na máquina. `GameArt::resolve` é a função local usada no filho CEF: lê o índice a cada pedido, valida tamanho,
+nome e caminho canônico e retorna só arquivos presos ao cache. Isso evita ida e volta na ponte e não prende
+o esquema ao snapshot de abertura. Download e importação só acontecem no núcleo; sem arquivo, 404 imediato.
+
+Resultados acordam o laço do núcleo por `HostRequest::PollBackground`, inclusive sem janela. `AppService::poll`
+aplica metadados e enfileira suas novas URLs; quando uma arte é publicada, emite `art.changed { gameId }`.
+O transporte existente entrega o evento à página aberta. Nenhum caminho, URL de origem ou segredo está nesse
+evento. A página deve trocar a versão `v` das URLs `tako-img://` desse jogo (contrato em [ponte.md §4](ponte.md#4-esquemas-próprios)).
+O tratamento no React fica para outra tarefa.
+
+Testes: `metadata::game_art` no núcleo (resolução, limites, links para fora, fila, reaproveitamento e limpeza do
+cache, arquivo local e ICO), `tests/art_bridge.rs` na aplicação (ponte livre durante download, URL descoberta
+pelos metadados, publicação antes do evento e demonstração sem cofre/rede) e `resources` no hospedeiro
+(índice atualizado sem reabrir e ICO convertido para PNG). Os transportes desses testes são falsos.
+
 ## Preparar e compilar
 
 Windows x64, Rust de `rust-toolchain.toml`, Visual Studio 2022 Build Tools com C++ e Windows SDK.
@@ -186,7 +219,8 @@ Arquivos arrastados para a janela são recusados. Links HTTP/HTTPS fora da orige
 `Platform.processes.launch` da `tako-platform`, sem navegar a janela; outros esquemas externos são recusados.
 Popups não criam outra janela de aplicação. Alertas são suprimidos e `onbeforeunload` permite encerrar.
 
-A fixture PNG local de 120×180 é copiada para `ArtCache::cache_path("tako-test://cover")` no cache do núcleo.
+A fixture PNG local de 120×180 é copiada para `test-cover.img` no cache do núcleo e publicada no índice
+`GameArt` sob o ID `test:cover`.
 A página pede `tako-img://cover?id=test%3Acover&w=120&h=180`; nenhum caminho local é exposto a ela.
 `TAKO_WEB_TEST_ROOT`, `TAKO_WEB_TEST_ART`, `TAKO_WEB_RECYCLE_MS` e o ID `test:cover` só valem em debug.
 

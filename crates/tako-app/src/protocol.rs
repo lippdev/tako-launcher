@@ -688,6 +688,9 @@ pub enum Event {
     /// A conferência de `game.source_ids.check` terminou.
     #[serde(rename = "game.source_ids.checked")]
     GameSourceIdsChecked(SourceIdsChecked),
+    /// Uma arte já está disponível no cache. A tela troca a versão da URL tako-img desse jogo.
+    #[serde(rename = "art.changed")]
+    ArtChanged(GameRequest),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.

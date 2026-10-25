@@ -94,6 +94,10 @@ pub fn parse_image_url(url: &str) -> Option<ImageRequest> {
             "id" => id = Some(percent_decode(value)?),
             "w" => width = Some(side(value)?),
             "h" => height = Some(side(value)?),
+            // Versão opaca para invalidar o cache do Chromium depois de art.changed; nunca entra no caminho.
+            "v" if value.len() <= 64 => {
+                percent_decode(value)?;
+            }
             _ => return None,
         }
     }
@@ -178,6 +182,7 @@ mod tests {
 
     #[test]
     fn parses_image_requests() {
+        assert!(parse_image_url("tako-img://cover?id=steam%3A570&v=3").is_some());
         assert_eq!(
             parse_image_url("tako-img://cover?id=heroic%3Alegendary%3AFortnite&w=300&h=450"),
             Some(ImageRequest {

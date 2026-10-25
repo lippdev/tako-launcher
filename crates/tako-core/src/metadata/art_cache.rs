@@ -55,6 +55,17 @@ impl ArtCache {
         self.limit.load(Ordering::Relaxed)
     }
 
+    /// Importa uma arte local para servir sob a mesma regra de tamanho, assinatura e limite do cache.
+    pub fn import(&self, uri: &str, bytes: &[u8]) -> Option<PathBuf> {
+        // A Steam fornece ícones locais em ICO; o Slint já os decodifica. A regra HTTP continua igual.
+        if bytes.len() as u64 > MAX_IMAGE_BYTES
+            || !(looks_like_image(bytes) || bytes.starts_with(&[0, 0, 1, 0]))
+        {
+            return None;
+        }
+        self.store(&self.cache_path(uri), bytes)
+    }
+
     /// Novo limite em bytes; aplicado já.
     pub fn set_limit(&self, bytes: u64) {
         self.limit.store(bytes, Ordering::Relaxed);
@@ -267,7 +278,7 @@ fn steam_app_from_icon_url(url: &str) -> Option<u32> {
 }
 
 // Marca o uso (a data de acesso do disco não é confiável: `noatime`, `relatime`).
-fn touch(path: &Path) {
+pub(crate) fn touch(path: &Path) {
     if let Ok(f) = std::fs::File::options().write(true).open(path) {
         let _ = f.set_modified(SystemTime::now());
     }
