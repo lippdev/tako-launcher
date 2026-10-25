@@ -1,4 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { imageUrl } from "../lib/imageVersions";
+import { useArtRevision } from "../lib/useImageVersion";
+import { useCallback, useState } from "react";
 import { call } from "../bridge";
 import { AtividadeNaBarra } from "../components/AtividadeNaBarra/AtividadeNaBarra";
 import { Aviso } from "../components/Aviso/Aviso";
@@ -24,7 +26,7 @@ function coverUrl(gameId: string): string {
   const ratio = window.devicePixelRatio || 1;
   const w = Math.round(36 * ratio);
   const h = Math.round(46 * ratio);
-  return `tako-img://cover?id=${encodeURIComponent(gameId)}&w=${String(w)}&h=${String(h)}`;
+  return imageUrl("cover", gameId, w, h);
 }
 
 /**
@@ -33,6 +35,7 @@ function coverUrl(gameId: string): string {
  * Desligados, a interface não chama o motor: o painel diz que estão desligados e leva às Configurações.
  */
 export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarraProps) {
+  useArtRevision();
   const t = useT();
   const { enabled, entries, summary } = useDownloads();
   const [open, setOpen] = useState(false);
@@ -42,10 +45,7 @@ export function DownloadsNaBarra({ onOpenGame, onOpenSettings }: DownloadsNaBarr
   const [noticeClosedAt, setNoticeClosedAt] = useState(0);
 
   const comma = !document.documentElement.lang.startsWith("en");
-  const items = useMemo(
-    () => (enabled ? entries.map((entry) => toPanelItem(entry, t, coverUrl, comma)) : []),
-    [enabled, entries, t, comma],
-  );
+  const items = enabled ? entries.map((entry) => toPanelItem(entry, t, coverUrl, comma)) : [];
   const count = enabled ? activityCount(summary) : 0;
   const percent = enabled ? summaryPercent(summary) : null;
 

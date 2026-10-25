@@ -82,7 +82,8 @@ export function CategoriasDaLista({
         selected: selection.has(game.id),
       };
     };
-    return specs.flatMap<GameCategoryGroup>((spec) => {
+    const effectiveSpecs = specs[0]?.kind === "genre" ? [...groups.values()].flatMap((data) => data.spec ? [data.spec] : []).sort((a, b) => a.value.localeCompare(b.value)) : specs;
+    return effectiveSpecs.flatMap<GameCategoryGroup>((spec) => {
       const data = groups.get(spec.id);
       if (!data || data.total === 0) return [];
       return [

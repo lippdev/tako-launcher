@@ -946,6 +946,8 @@ pub struct LibraryListRequest {
     // Valores acima de MAX_PAGE_LIMIT são reduzidos ao teto; zero retorna só o total.
     #[ts(as = "Option<u32>", optional)]
     pub limit: u32,
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub genres: Vec<String>,
 }
 
 impl Default for LibraryListRequest {
@@ -963,6 +965,7 @@ impl Default for LibraryListRequest {
             installed: None,
             offset: 0,
             limit: DEFAULT_PAGE_LIMIT,
+            genres: Vec::new(),
         }
     }
 }
@@ -970,6 +973,8 @@ impl Default for LibraryListRequest {
 impl LibraryListRequest {
     pub fn validate(&self) -> Result<(), BridgeError> {
         if self.search.chars().count() > 256
+            || self.genres.len() > 64
+            || self.genres.iter().any(|genre| genre.chars().count() > 128)
             || self.tags.len() > 64
             || self.statuses.len() > 64
             || self.stores.len() > 64
@@ -1001,6 +1006,10 @@ pub struct GameRequest {
 pub struct LibraryPage {
     pub rows: Vec<LibraryGame>,
     pub total: usize,
+    // Gêneros dos jogos filtrados, antes da paginação (Categorias).
+    #[serde(default)]
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub genres: Vec<String>,
 }
 
 /// Só dados para desenhar; imagens são pedidas por id em tako-img://, nunca por URI da fonte.
@@ -1023,6 +1032,12 @@ pub struct LibraryGame {
     pub has_icon: bool,
     pub has_hero: bool,
     pub has_logo: bool,
+    #[serde(default)]
+    #[ts(optional)]
+    pub genres: Option<Vec<String>>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub publisher: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]

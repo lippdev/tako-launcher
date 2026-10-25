@@ -1,3 +1,5 @@
+import { useImageVersion } from "../../lib/useImageVersion";
+import { imageUrl } from "../../lib/imageVersions";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import mark from "../../assets/brand/tako-mark.png";
 import { useAppearance } from "../../appearance/appearance";
@@ -75,7 +77,7 @@ interface ListaDeJogosProps {
 const failedIcons = new Set<string>();
 
 function coreIcon(id: string, px: number): string {
-  return `tako-img://icon?id=${encodeURIComponent(id)}&w=${px}&h=${px}`;
+  return imageUrl("icon", id, px, px);
 }
 
 /** Tamanho pedido: o ícone de 28 na escala da interface e da tela, em degraus de 8 (para o cache reaproveitar), mínimo 40. */
@@ -87,8 +89,10 @@ function iconPixels(uiScale: number): number {
 const FALLBACK_PITCH = 44;
 
 function RowIcon({ row, px, resolveIcon }: { row: GameRow; px: number; resolveIcon: (id: string, px: number) => string | null }) {
-  const [failed, setFailed] = useState(() => failedIcons.has(row.id));
-  const src = failed ? null : resolveIcon(row.id, px);
+  const version = useImageVersion(row.id);
+  const key = `${row.id}:${String(version)}`;
+  const [failed, setFailed] = useState<string | null>(null);
+  const src = failed === key || failedIcons.has(key) ? null : resolveIcon(row.id, px);
   const percent = row.downloadPercent;
   return (
     <span className={styles["icon"]} aria-hidden="true">
@@ -103,8 +107,8 @@ function RowIcon({ row, px, resolveIcon }: { row: GameRow; px: number; resolveIc
           decoding="async"
           draggable={false}
           onError={() => {
-            failedIcons.add(row.id);
-            setFailed(true);
+            failedIcons.add(key);
+            setFailed(key);
           }}
         />
       ) : (

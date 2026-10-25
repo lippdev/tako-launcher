@@ -10,6 +10,7 @@ const CONCURRENCY = 4;
 export interface GroupData {
   games: LibraryGame[];
   total: number;
+  spec?: GroupSpec;
 }
 
 /** A tela pede cada fileira de uma vez: o núcleo filtra (`library.list` com o critério da fileira), a tela só junta. */
@@ -45,6 +46,7 @@ export function useLibraryGroups(enabled: boolean, criteria: LibraryCriteria, sp
   groupsRef.current = groups;
   const busy = useRef(new Set<string>());
   const lastKey = useRef("");
+  const activeSpecs = useRef<readonly GroupSpec[]>(specs);
 
   useEffect(() => on("library.changed", () => setRevision((n) => n + 1)), []);
 
@@ -71,7 +73,7 @@ export function useLibraryGroups(enabled: boolean, criteria: LibraryCriteria, sp
           total = page.total;
           if (page.rows.length === 0 || games.length >= total) break;
         }
-        setGroups((map) => new Map(map).set(spec.id, { games, total }));
+        setGroups((map) => new Map(map).set(spec.id, { games, total, spec }));
       }
     };
     void (async () => {
@@ -80,7 +82,16 @@ export function useLibraryGroups(enabled: boolean, criteria: LibraryCriteria, sp
         setLoading(true);
       }
       setError(false);
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, specs.length) }, worker));
+      if (specs[0]?.kind === "genre") {
+        const page = await call("library.list", { ...criteria, offset: 0, limit: 0 });
+        if (current !== generation.current) return;
+        queue.splice(0, queue.length, ...(page.genres ?? []).map((genre): GroupSpec => ({
+          id: `genre:${genre}`, kind: "genre", value: genre, title: genre, request: { ...specs[0]!.request, genres: [genre] },
+        })));
+        setGroups(new Map());
+      }
+      activeSpecs.current = [...queue];
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
     })()
       .catch((failure: unknown) => {
         if (current !== generation.current) return;
@@ -101,7 +112,7 @@ export function useLibraryGroups(enabled: boolean, criteria: LibraryCriteria, sp
   const loadMore = useCallback(
     (id: string) => {
       const data = groupsRef.current.get(id);
-      const spec = specs.find((s) => s.id === id);
+      const spec = activeSpecs.current.find((s) => s.id === id);
       if (!data || !spec || busy.current.has(id) || data.games.length >= data.total) return;
       busy.current.add(id);
       const current = generation.current;
@@ -110,7 +121,7 @@ export function useLibraryGroups(enabled: boolean, criteria: LibraryCriteria, sp
           if (current !== generation.current) return;
           setGroups((map) => {
             const row = map.get(id);
-            return row ? new Map(map).set(id, { games: [...row.games, ...page.rows], total: page.total }) : map;
+            return row ? new Map(map).set(id, { games: [...row.games, ...page.rows], total: page.total, spec }) : map;
           });
         })
         .catch((failure: unknown) => {
@@ -121,7 +132,7 @@ export function useLibraryGroups(enabled: boolean, criteria: LibraryCriteria, sp
           busy.current.delete(id);
         });
     },
-    [criteria, specs],
+    [criteria],
   );
 
   return { groups, loading, error, loadMore };

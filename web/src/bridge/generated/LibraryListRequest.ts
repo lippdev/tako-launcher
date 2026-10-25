@@ -4,4 +4,4 @@ import type { LibraryTab } from "./LibraryTab";
 import type { SortOrder } from "./SortOrder";
 import type { Store } from "./Store";
 
-export type LibraryListRequest = { filter?: LibraryTab, search?: string, sort?: SortOrder, reversed?: boolean, collection?: string | null, tags?: Array<string>, statuses?: Array<GameStatus>, noStatus?: boolean, stores?: Array<Store>, installed?: boolean | null, offset?: number, limit?: number, };
+export type LibraryListRequest = { filter?: LibraryTab, search?: string, sort?: SortOrder, reversed?: boolean, collection?: string | null, tags?: Array<string>, statuses?: Array<GameStatus>, noStatus?: boolean, stores?: Array<Store>, installed?: boolean | null, offset?: number, limit?: number, genres?: Array<string>, };

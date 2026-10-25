@@ -249,6 +249,8 @@ impl Core {
             updates: crate::updates::UpdateHub::new(paths.clone(), simulate),
             secrets: (!simulate).then(|| Arc::clone(&platform.secrets)),
         };
+        core.art
+            .attach_metadata(core.metadata.clone(), core.metadata_cache.clone());
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);
         Ok(core)
@@ -264,11 +266,22 @@ impl Core {
 
     /// Liga as fontes de metadados de "Fontes e IDs" (o hospedeiro, ou um teste com fontes falsas).
     pub fn set_metadata_agent(&mut self, agent: Arc<MetadataAgent>) {
+        self.art
+            .attach_metadata(Some(agent.clone()), self.metadata_cache.clone());
         self.metadata = Some(agent);
     }
 
     pub fn library(&self) -> &GameLibrary {
         &self.library
+    }
+
+    pub(crate) fn metadata_base_game(&self, id: &str) -> Option<Game> {
+        self.found
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .find(|g| g.id == id)
+            .cloned()
     }
 
     /// O AppService emite library.changed depois desta troca. Não expõe mutação silenciosa à interface.

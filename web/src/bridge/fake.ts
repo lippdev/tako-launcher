@@ -299,6 +299,7 @@ function matchesRequest(g: LibraryGame, p: LibraryListRequest): boolean {
     (p.filter !== "installed" || g.installed) &&
     g.title.toLocaleLowerCase("pt-BR").includes(needle) &&
     (!p.stores?.length || p.stores.includes(g.store)) &&
+    (!p.genres?.length || p.genres.some((genre) => g.genres?.includes(genre))) &&
     (p.installed == null || p.installed === g.installed) &&
     ((!p.statuses?.length && !p.noStatus) || (g.status === null ? p.noStatus : p.statuses?.includes(g.status))) &&
     (!p.tags?.length || p.tags.every((tag) => gameTags.get(g.id)?.has(tag))),
@@ -337,7 +338,8 @@ function listLibrary(payload: unknown) {
   const offset = Math.max(0, p.offset ?? 0);
   return {
     total: rows.length,
-    rows: rows.slice(offset, offset + Math.min(200, Math.max(1, p.limit ?? 40))),
+    genres: [...new Set(rows.flatMap((game) => game.genres ?? []))].sort(),
+    rows: rows.slice(offset, offset + Math.min(200, Math.max(0, p.limit ?? 40))),
   };
 }
 let nextCollection = 1;
@@ -727,6 +729,8 @@ for (const game of games) {
     accent: sample?.accent ?? null,
     hasHero: sample?.hero ?? false,
     hasLogo: sample?.logo ?? false,
+    genres: sample?.details.genres ?? null,
+    publisher: sample?.details.publisher ?? null,
     // Dois jogos sem capa, para ver o EstadoSemArte nas fileiras.
     hasCover: game.id !== "steam:1002" && game.id !== "steam:1011",
   });
@@ -945,6 +949,7 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
     "desktop.group.status": "Status",
     "desktop.group.collection": "Coleção",
     "desktop.group.tag": "Etiqueta",
+    "desktop.group.genre": "Gênero",
     "desktop.group.store": "Loja",
     "desktop.group.install": "Instalação",
     "desktop.group.installed": "Instalados",
@@ -1027,6 +1032,7 @@ const SAMPLE_CATALOGS: Record<"pt-BR" | "en-US", Record<string, string>> = {
     "desktop.group.status": "Status",
     "desktop.group.collection": "Collection",
     "desktop.group.tag": "Tag",
+    "desktop.group.genre": "Genre",
     "desktop.group.store": "Store",
     "desktop.group.install": "Install state",
     "desktop.group.installed": "Installed",
@@ -2195,6 +2201,8 @@ function setFakeSourceId(payload: unknown): GameSourceIds {
       throw new FakeMessageError("bad_request", "escolha inválida");
   }
   fakePins.set(game.id, pins);
+  emitFakeEvent("library.changed", undefined, 100);
+  emitFakeEvent("art.changed", { gameId: game.id }, 200);
   return fakeSourceIds(game);
 }
 

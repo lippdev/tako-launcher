@@ -1,3 +1,6 @@
+import { useArtRevision } from "../../lib/useImageVersion";
+import { imageVersion } from "../../lib/imageVersions";
+import { imageUrl } from "../../lib/imageVersions";
 import {
   useState,
   useRef,
@@ -47,7 +50,7 @@ export interface BibliotecaGradeProps {
 }
 
 function defaultResolveCover(id: string, w: number, h: number): string {
-  return `tako-img://cover?id=${encodeURIComponent(id)}&w=${String(w)}&h=${String(h)}`;
+  return imageUrl("cover", id, w, h);
 }
 
 /**
@@ -72,6 +75,7 @@ export function BibliotecaGrade({
   className,
   onNearEnd,
 }: BibliotecaGradeProps) {
+  useArtRevision();
   const viewportRef = useRef<HTMLDivElement>(null);
   const gridId = useId();
   const anchorRef = useRef<string | null>(null);
@@ -227,7 +231,8 @@ export function BibliotecaGrade({
           const isActive = row.id === activeId;
           const isSelected = selection.has(row.id);
           const isFocused = focusIndex === index;
-          const hasImageError = failedImages.has(row.id);
+          const imageKey = `${row.id}:${String(imageVersion(row.id))}`;
+          const hasImageError = failedImages.has(imageKey);
           const coverUrl = !hasImageError
             ? resolveCover(row.id, Math.round(cardWidth * 2), Math.round(cardHeight * 2)) ??
               (resolveIcon ? resolveIcon(row.id, 64) : null)
@@ -264,7 +269,7 @@ export function BibliotecaGrade({
                     loading="lazy"
                     className={styles["coverImg"]}
                     onError={() => {
-                      setFailedImages((prev) => new Set([...prev, row.id]));
+                      setFailedImages((prev) => new Set([...prev, imageKey]));
                     }}
                   />
                 ) : (

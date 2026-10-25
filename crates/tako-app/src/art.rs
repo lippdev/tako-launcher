@@ -12,7 +12,7 @@ use tako_core::metadata::game_art::{ArtWorker, GameArt};
 use tako_core::metadata::igdb::IgdbSettings;
 use tako_core::metadata::screenscraper::ScreenScraperSettings;
 use tako_core::metadata::steamgriddb::SteamGridDbSettings;
-use tako_core::metadata::worker::{MetadataUpdated, MetadataWorker, SPACING};
+use tako_core::metadata::worker::MetadataUpdated;
 use tako_core::paths::DataPaths;
 use tako_core::persistence::{GameChoicesStore, TakoDatabase};
 use tako_platform::Platform;
@@ -20,18 +20,18 @@ use tako_platform::Platform;
 type Wake = Arc<Mutex<Option<mpsc::Sender<HostRequest>>>>;
 enum Update {
     Art(String),
-    Metadata(Box<MetadataUpdated>),
+    Metadata(Box<MetadataUpdated>, PinnedIds),
 }
 
 pub(crate) struct ArtState {
     jobs: Option<Jobs>,
     version: Option<u64>,
-    pins: HashMap<String, PinnedIds>,
 }
 
 struct Jobs {
+    sender: mpsc::Sender<Update>,
     art: ArtWorker,
-    metadata: MetadataWorker,
+    metadata: Option<crate::metadata::MetadataQueue>,
     updates: mpsc::Receiver<Update>,
     wake: Wake,
 }
@@ -45,6 +45,31 @@ fn send(tx: &mpsc::Sender<Update>, wake: &Wake, update: Update) {
 }
 
 impl ArtState {
+    pub(crate) fn attach_metadata(
+        &mut self,
+        agent: Option<Arc<MetadataAgent>>,
+        cache: std::path::PathBuf,
+    ) {
+        if let Some(jobs) = &mut self.jobs {
+            jobs.metadata = agent.map(|agent| {
+                let (tx, wake) = (jobs.sender.clone(), jobs.wake.clone());
+                crate::metadata::MetadataQueue::new(agent, cache, move |update, pins| {
+                    send(&tx, &wake, Update::Metadata(Box::new(update), pins));
+                })
+            });
+            self.version = None;
+        }
+    }
+
+    pub(crate) fn refresh_metadata(
+        &self,
+        game: tako_core::library::Game,
+        pins: &HashMap<String, PinnedIds>,
+    ) {
+        if let Some(metadata) = self.jobs.as_ref().and_then(|jobs| jobs.metadata.as_ref()) {
+            metadata.worker.refresh(vec![game], true, pins.clone());
+        }
+    }
     pub(crate) fn open(
         paths: &DataPaths,
         platform: &Platform,
@@ -56,7 +81,6 @@ impl ArtState {
             return Self {
                 jobs: None,
                 version: None,
-                pins: HashMap::new(),
             };
         }
         let choices = database.cloned().map(GameChoicesStore::new);
@@ -64,13 +88,6 @@ impl ArtState {
             .as_ref()
             .and_then(|c| c.load_all_art().ok())
             .unwrap_or_default();
-        let pins = choices
-            .as_ref()
-            .and_then(|c| c.load_all_ids().ok())
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(id, pins)| (id, pins.into_iter().collect()))
-            .collect();
         let cache = MetadataCache::new(paths.metadata_cache());
         let old = std::mem::replace(
             library,
@@ -96,12 +113,10 @@ impl ArtState {
             tako_sources::steam::find_root(),
             Some(sources.screenscraper.clone()),
         );
-        let mut state = Self::pipeline(paths, cache, sources.agent());
-        state.pins = pins;
-        state
+        Self::pipeline(paths, cache)
     }
 
-    fn pipeline(paths: &DataPaths, cache: Arc<ArtCache>, agent: MetadataAgent) -> Self {
+    fn pipeline(paths: &DataPaths, cache: Arc<ArtCache>) -> Self {
         let (tx, updates) = mpsc::channel();
         let wake: Wake = Arc::default();
         let art_tx = tx.clone();
@@ -109,28 +124,15 @@ impl ArtState {
         let art = ArtWorker::spawn(cache, GameArt::new(paths), move |id| {
             send(&art_tx, &art_wake, Update::Art(id))
         });
-        let (metadata, results) =
-            MetadataWorker::spawn(agent, MetadataCache::new(paths.metadata_cache()), SPACING);
-        let meta_wake = wake.clone();
-        let spawned = std::thread::Builder::new()
-            .name("art-metadata-relay".into())
-            .spawn(move || {
-                for update in results {
-                    send(&tx, &meta_wake, Update::Metadata(Box::new(update)));
-                }
-            });
-        if spawned.is_err() {
-            tracing::error!("não foi possível iniciar os avisos de arte");
-        }
         Self {
             jobs: Some(Jobs {
+                sender: tx,
                 art,
-                metadata,
+                metadata: None,
                 updates,
                 wake,
             }),
             version: None,
-            pins: HashMap::new(),
         }
     }
 
@@ -143,15 +145,18 @@ impl ArtState {
         }
     }
 
-    fn queue(&mut self, library: &GameLibrary) {
+    fn queue(&mut self, library: &GameLibrary, pins: &HashMap<String, PinnedIds>) {
         if self.version == Some(library.version()) {
             return;
         }
         self.version = Some(library.version());
         if let Some(jobs) = &self.jobs {
             jobs.art.refresh(library.games().iter().cloned());
-            jobs.metadata
-                .refresh(library.games().to_vec(), false, self.pins.clone());
+            if let Some(metadata) = &jobs.metadata {
+                metadata
+                    .worker
+                    .refresh(library.games().to_vec(), false, pins.clone());
+            }
         }
     }
 }
@@ -164,9 +169,8 @@ impl Core {
         cache: Arc<ArtCache>,
         agent: MetadataAgent,
     ) -> Self {
-        let pins = std::mem::take(&mut self.art.pins);
-        self.art = ArtState::pipeline(paths, cache, agent);
-        self.art.pins = pins;
+        self.art = ArtState::pipeline(paths, cache);
+        self.set_metadata_agent(Arc::new(agent));
         self
     }
 }
@@ -174,20 +178,30 @@ impl Core {
 impl crate::AppService {
     pub(crate) fn poll_art(&mut self) {
         let Some(core) = &mut self.core else { return };
-        core.art.queue(&core.library);
+        core.art.queue(&core.library, &core.pinned_ids);
         let mut events = Vec::new();
         if let Some(jobs) = &core.art.jobs {
             while let Ok(update) = jobs.updates.try_recv() {
                 match update {
                     Update::Art(game_id) => events.push(Event::ArtChanged(GameRequest { game_id })),
-                    Update::Metadata(update) => {
+                    Update::Metadata(update, pins) => {
+                        if core
+                            .pinned_ids
+                            .get(&update.game_id)
+                            .cloned()
+                            .unwrap_or_default()
+                            != pins
+                        {
+                            continue;
+                        }
+                        let base = core.metadata_base_game(&update.game_id);
                         if let Some(game) = core
                             .library
                             .games_mut()
                             .iter_mut()
                             .find(|g| g.id == update.game_id)
                         {
-                            update.metadata.apply_to(game);
+                            crate::metadata::apply(game, base.as_ref(), &update.metadata);
                             jobs.art.refresh([game.clone()]);
                             events.push(Event::LibraryChanged);
                         }

@@ -1,3 +1,6 @@
+import { useImageVersion } from "../../lib/useImageVersion";
+import { versionedImageUrl } from "../../lib/imageVersions";
+import { imageUrl } from "../../lib/imageVersions";
 import { useState, type CSSProperties, type KeyboardEvent } from "react";
 import { cx } from "../../lib/cx";
 import styles from "./CapaDoJogo.module.css";
@@ -40,7 +43,7 @@ function montaUrlCapa(id: string, larguraCss: number, alturaCss: number): string
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
   const w = Math.max(1, Math.round(larguraCss * dpr));
   const h = Math.max(1, Math.round(alturaCss * dpr));
-  return `tako-img://cover?id=${encodeURIComponent(id)}&w=${w}&h=${h}`;
+  return imageUrl("cover", id, w, h);
 }
 
 /**
@@ -61,11 +64,12 @@ export function CapaDoJogo({
   className,
   "data-force": dataForce,
 }: CapaDoJogoProps) {
-  const [erroImagem, setErroImagem] = useState(false);
+  useImageVersion(id);
+  const [erroImagem, setErroImagem] = useState<string | undefined>(undefined);
 
   const alturaCalculada = altura ?? Math.round(largura * 1.5);
-  const urlFinal = src ?? (id ? montaUrlCapa(id, largura, alturaCalculada) : undefined);
-  const semArte = !urlFinal || erroImagem;
+  const urlFinal = (src ? versionedImageUrl(src) : undefined) ?? (id ? montaUrlCapa(id, largura, alturaCalculada) : undefined);
+  const semArte = !urlFinal || erroImagem === urlFinal;
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (onClick && (e.key === "Enter" || e.key === " ")) {
@@ -107,7 +111,7 @@ export function CapaDoJogo({
           decoding="async"
           draggable={false}
           onError={() => {
-            setErroImagem(true);
+            setErroImagem(urlFinal);
           }}
         />
       )}

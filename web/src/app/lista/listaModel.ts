@@ -1,7 +1,6 @@
 // Regras puras dos modos de exibição da lista da biblioteca (WEB-11c): os três modos, o agrupamento das Categorias e
 // o pedido de cada fileira. Sem importações em execução, para o teste rodar direto no Node. Espelha o Slint
-// (`crates/tako-ui/src/shell/desktop.rs`: `View`, `GroupBy`, `groups`), menos Gênero: a ponte ainda não leva gênero
-// na lista nem aceita filtro por gênero.
+// (`crates/tako-ui/src/shell/desktop.rs`: `View`, `GroupBy`, `groups`).
 
 import type { Collection } from "../../bridge/generated/Collection";
 import type { GameStatus } from "../../bridge/generated/GameStatus";
@@ -16,8 +15,8 @@ export const GROUP_KEY = "desktop.group_by";
 export const LIST_VIEWS = ["list", "grid", "categories"] as const;
 export type ListView = (typeof LIST_VIEWS)[number];
 
-/** Os agrupamentos que a web sabe fazer (o Slint tem também `genre`). */
-export const GROUP_BYS = ["status", "collection", "tag", "store", "install"] as const;
+/** Os agrupamentos das Categorias, como no Slint. */
+export const GROUP_BYS = ["status", "collection", "tag", "store", "install", "genre"] as const;
 export type GroupBy = (typeof GROUP_BYS)[number];
 
 /** Ordem das situações nas Categorias (a do Slint). */
@@ -31,13 +30,13 @@ export function parseListView(raw: string | undefined): ListView {
   return LIST_VIEWS.find((view) => view === raw) ?? "list";
 }
 
-/** Valor guardado → agrupamento. Ausente ou desconhecido (inclusive `genre`) é a Situação, o padrão do Slint. */
+/** Valor guardado → agrupamento. Ausente ou desconhecido é a Situação, o padrão do Slint. */
 export function parseGroupBy(raw: string | undefined): GroupBy {
   return GROUP_BYS.find((group) => group === raw) ?? "status";
 }
 
 /** O que muda no pedido de `library.list` para listar só uma fileira. */
-export type GroupRequest = Pick<LibraryCriteria, "statuses" | "noStatus" | "tags" | "stores" | "collection" | "installed">;
+export type GroupRequest = Pick<LibraryCriteria, "statuses" | "noStatus" | "tags" | "stores" | "collection" | "installed"> & { genres?: string[] };
 
 /** Uma fileira das Categorias, antes de ter jogos. */
 export interface GroupSpec {
@@ -81,6 +80,9 @@ export function planGroups(by: GroupBy, criteria: LibraryCriteria, sources: Grou
     request: { ...base, ...patch },
   });
   switch (by) {
+    case "genre":
+      // A fila de fileiras consulta os gêneros dos jogos filtrados antes de pedir as capas.
+      return [spec("*", null, {})];
     case "status":
       // Filtro "sem situação" sozinho não deixa jogo com situação; com situações escolhidas, só elas.
       return GROUP_STATUS_ORDER.filter((status) =>

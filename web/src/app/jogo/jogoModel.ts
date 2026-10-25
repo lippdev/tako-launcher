@@ -1,3 +1,4 @@
+import { imageUrl as coreImageUrl } from "../../lib/imageVersions.ts";
 // Regras da página do jogo que não dependem de tela: formatos, mapeamento de situação e quais blocos existem.
 // Sem importações em execução (só tipos), para o teste rodar direto no Node.
 
@@ -99,7 +100,7 @@ export type ImageKind = "hero" | "logo" | "cover";
 
 /** `tako-img://` do núcleo (docs/web/ponte.md §4); largura e altura em pixels físicos. */
 export function imageUrl(kind: ImageKind, id: string, width: number, height: number): string {
-  return `tako-img://${kind}?id=${encodeURIComponent(id)}&w=${String(Math.round(width))}&h=${String(Math.round(height))}`;
+  return coreImageUrl(kind, id, width, height);
 }
 
 /** Texto em parágrafos: linhas em branco separam, e espaços nas pontas não contam. */

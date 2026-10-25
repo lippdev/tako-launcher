@@ -100,12 +100,33 @@ fora do cache são recusados. O esquema nunca espera por download: ausência con
 **Chegada de arte:** `{"name":"art.changed","payload":{"gameId":"steam:570"}}`. O evento sai depois da
 publicação no cache; pode haver mais de um por jogo (capa, fundo, logo e ícone). O React deve incrementar uma
 versão local das URLs desse jogo, acrescentando `&v=<versão>` (até 64 bytes). `v` é opaco, não muda a resolução
-nem vira caminho. A assinatura do evento já está nos tipos gerados; o consumo no React pertence a outra tarefa.
+nem vira caminho. `web/src/lib/imageVersions.ts` guarda a versão por jogo, e `useImageVersion.ts` mantém uma
+assinatura da ponte por página. Todos os helpers chamam `imageUrl`; componentes que recebem uma URL pronta usam
+`versionedImageUrl`. Falhas pertencem à URL/versão que falhou: o próximo evento permite tentar de novo, inclusive
+em imagens que responderam 404. Desmontar e remontar uma tela preserva a versão durante a vida da página.
 Sem interface aberta o evento se perde; o cache e o índice permanecem e a próxima abertura já encontra a arte.
 
 ```ts
-const src = `tako-img://cover?id=${encodeURIComponent(game.id)}&w=${w * devicePixelRatio}&h=${h * devicePixelRatio}`;
+import { imageUrl } from "../lib/imageVersions";
+const src = imageUrl("cover", game.id, w * devicePixelRatio, h * devicePixelRatio);
 ```
+
+### Metadados no núcleo (WEB-32)
+
+O núcleo compartilha o mesmo `MetadataAgent` entre “Fontes e IDs” e `MetadataWorker`. A fila usa os provedores,
+cache, prioridades e espaçamento de 1,5 s do Slint, sem rede na thread da ponte. Na demonstração não cria a fila
+nem lê o cofre. Chaves continuam nos clientes Rust; respostas/eventos não levam credenciais nem URLs de provedores.
+
+`game.source_ids.set` grava a escolha e agenda uma atualização do jogo. ID explícito dispensa busca por título;
+“Nenhum” dispensa inclusive a descoberta em lote daquela fonte; automático força a correspondência original.
+Resultados levam internamente as escolhas usadas: se já mudaram, não são aplicados à biblioteca. Campos e artes
+são reaplicados sobre os dados da loja, preservando preferências e imagens fixadas, e emitem `library.changed`.
+As artes publicadas pela fila emitem `art.changed` depois da gravação do índice; arte removida limpa sua publicação.
+
+`LibraryGame` acrescenta `genres` e `publisher` (nulos sem dados). `library.list` aceita `genres` (qualquer gênero
+do grupo; combinado com os demais filtros) e acrescenta à página os gêneros dos resultados antes da paginação.
+Categorias pede `limit: 0` para descobrir as fileiras e depois pagina cada gênero pelo núcleo. A busca geral usa
+a publicadora na informação secundária da linha do jogo.
 
 CSP da página: `default-src tako-app:; img-src tako-app: tako-img: data:; style-src tako-app: 'unsafe-inline';
 script-src tako-app:; connect-src 'none'`. Em desenvolvimento, o servidor do Vite entra no lugar de `tako-app:`.

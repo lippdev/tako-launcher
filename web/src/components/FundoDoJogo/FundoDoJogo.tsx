@@ -1,3 +1,6 @@
+import { useImageVersion } from "../../lib/useImageVersion";
+import { versionedImageUrl } from "../../lib/imageVersions";
+import { imageUrl } from "../../lib/imageVersions";
 import { useEffect, useState, type CSSProperties } from "react";
 import { settled } from "../../lib/presence";
 import { cx } from "../../lib/cx";
@@ -34,7 +37,7 @@ function urlDaArte(id: string, largura: number, altura: number): string {
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   const w = Math.min(3840, Math.max(1, Math.round(largura * dpr)));
   const h = Math.min(1240, Math.max(1, Math.round(altura * dpr)));
-  return `tako-img://hero?id=${encodeURIComponent(id)}&w=${String(w)}&h=${String(h)}`;
+  return imageUrl("hero", id, w, h);
 }
 
 /**
@@ -43,7 +46,8 @@ function urlDaArte(id: string, largura: number, altura: number): string {
  * `transform` e `opacity` animam. Sem arte, ou se a imagem falhar, a camada é o degradê da cor do jogo.
  */
 export function FundoDoJogo({ id, temArte, corDestaque, src, largura = 1308, altura = 700, className }: FundoDoJogoProps) {
-  const url = temArte ? (src ?? urlDaArte(id, largura, altura)) : null;
+  useImageVersion(id);
+  const url = temArte ? (src ? versionedImageUrl(src) : urlDaArte(id, largura, altura)) : null;
   const cor = corDestaque ?? null;
   const [camadas, setCamadas] = useState<Camada[]>([{ key: id, src: url, cor, on: false }]);
   const [falhou, setFalhou] = useState<ReadonlySet<string>>(new Set());
@@ -89,7 +93,7 @@ export function FundoDoJogo({ id, temArte, corDestaque, src, largura = 1308, alt
   return (
     <div ref={setRaiz} className={cx(styles["fundo"], className)} aria-hidden="true">
       {camadas.map((camada, i) => {
-        const semArte = camada.src === null || falhou.has(camada.key);
+        const semArte = camada.src === null || falhou.has(camada.src ?? "");
         const topo = i === camadas.length - 1;
         return (
           <div
@@ -107,7 +111,7 @@ export function FundoDoJogo({ id, temArte, corDestaque, src, largura = 1308, alt
                 decoding="async"
                 draggable={false}
                 onError={() => {
-                  setFalhou((antes) => new Set(antes).add(camada.key));
+                  setFalhou((antes) => new Set(antes).add(camada.src ?? ""));
                 }}
               />
             )}

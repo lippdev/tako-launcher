@@ -31,6 +31,15 @@ impl GameArt {
         self.index.join(format!("{hash}-{}.json", kind.key()))
     }
 
+    /// Remove só a publicação deste jogo; o arquivo compartilhado fica no cache até sua limpeza normal.
+    pub fn clear(&self, game_id: &str, kind: ArtKind) -> std::io::Result<bool> {
+        match std::fs::remove_file(self.index_path(game_id, kind)) {
+            Ok(()) => Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Só lê um índice pequeno e um arquivo já no cache. Nenhum id ou conteúdo do índice vira caminho livre.
     pub fn resolve(&self, game_id: &str, kind: ArtKind) -> Option<PathBuf> {
         let index = confined_file(&self.index, &self.index_path(game_id, kind))?;
@@ -130,6 +139,13 @@ impl ArtWorker {
                             return;
                         }
                         let Some(uri) = uri(&game, kind) else {
+                            match index.clear(&game.id, kind) {
+                                Ok(true) => changed(game.id.clone()),
+                                Ok(false) => {}
+                                Err(_) => {
+                                    tracing::warn!("não foi possível remover o índice de arte")
+                                }
+                            }
                             continue;
                         };
                         let missing = index.resolve(&game.id, kind).is_none();

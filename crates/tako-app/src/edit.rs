@@ -13,7 +13,6 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use tako_core::library::manual_add::{self, AddKind};
 use tako_core::library::manual_edit::{EditDraft, EditError};
 use tako_core::library::{Game, GameTrackingStrategy, LibraryError, ManualGameRecord};
@@ -21,21 +20,14 @@ use tako_core::metadata::agent::{MetadataAgent, PinnedIds};
 use tako_core::metadata::art::{parse_source_id, source_id_example};
 use tako_core::metadata::art_catalog::known_ids;
 use tako_core::metadata::cache::MetadataCache;
-use tako_core::metadata::http::{Clock, FileCache, Http, ResponseCache, SystemClock, UreqHttp};
-use tako_core::metadata::igdb::{IgdbClient, IgdbProvider, IgdbSettings};
-use tako_core::metadata::rom_hash::RomHashCache;
-use tako_core::metadata::screenscraper::{
-    ScreenScraperClient, ScreenScraperProvider, ScreenScraperSettings, ScreenScraperSoftware,
-};
+use tako_core::metadata::igdb::IgdbSettings;
+use tako_core::metadata::screenscraper::ScreenScraperSettings;
 use tako_core::metadata::screenscraper_parse::{
     EmulatedSystem, SYSTEMS, candidates_for, rom_title,
 };
-use tako_core::metadata::steam_store::SteamStoreProvider;
-use tako_core::metadata::steamgriddb::{
-    SteamGridDbClient, SteamGridDbProvider, SteamGridDbSettings,
-};
+use tako_core::metadata::steamgriddb::SteamGridDbSettings;
 use tako_core::metadata::title_matcher;
-use tako_core::metadata::{MetadataMatch, MetadataProvider, SecretStore};
+use tako_core::metadata::{MetadataMatch, SecretStore};
 use tako_core::paths::DataPaths;
 
 const MAX_TITLE_CHARS: usize = 200;
@@ -383,6 +375,7 @@ fn source_ids_set(core: &mut Core, request: GameSourceIdSet) -> Result<GameSourc
         None => ids.remove(&request.source),
         Some(id) => ids.insert(request.source, id),
     };
+    core.refresh_metadata(&game.id);
     Ok(source_ids_view(core, &game))
 }
 
@@ -619,54 +612,16 @@ impl AppService {
 /// As fontes de metadados ligadas pelas chaves e opções que as Configurações gravam no cofre (as mesmas da fila de
 /// metadados da interface Slint). Nenhuma consulta de rede acontece aqui; só quando alguém busca ou confere.
 pub(crate) fn real_agent(paths: &DataPaths, vault: &dyn SecretStore) -> Arc<MetadataAgent> {
-    let http: Arc<dyn Http> = Arc::new(UreqHttp::new(Duration::from_secs(20)));
-    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
-    let cache_dir = paths.cache();
-    let week = Duration::from_secs(7 * 24 * 3600);
-    let file_cache = |name: &str| -> Option<Box<dyn ResponseCache>> {
-        Some(Box::new(FileCache::new(cache_dir.join(name), week)))
-    };
-    let (igdb, ss, sgdb) = (
-        IgdbSettings::load(vault),
-        ScreenScraperSettings::load(vault),
-        SteamGridDbSettings::load(vault),
-    );
-    let igdb = Arc::new(IgdbProvider::new(
-        IgdbClient::new(
-            http.clone(),
-            Arc::new(move || igdb.clone()),
-            clock.clone(),
-            file_cache("igdb"),
-        ),
-        clock.clone(),
-    ));
-    let screenscraper = Arc::new(ScreenScraperProvider::new(
-        Arc::new(ScreenScraperClient::new(
-            http.clone(),
-            ScreenScraperSoftware::from_build(),
-            Arc::new(move || ss.clone()),
-            clock.clone(),
-            file_cache("screenscraper"),
-        )),
-        RomHashCache::new(Some(cache_dir.join("rom-hashes.json"))),
-        clock.clone(),
-    ));
-    let steamgriddb = Arc::new(SteamGridDbProvider::new(
-        SteamGridDbClient::new(
-            http.clone(),
-            Arc::new(move || sgdb.clone()),
-            clock.clone(),
-            file_cache("steamgriddb"),
-        ),
-        clock.clone(),
-    ));
-    let providers: Vec<Arc<dyn MetadataProvider>> = vec![
-        Arc::new(SteamStoreProvider::new(http)),
-        igdb,
-        screenscraper,
-        steamgriddb,
-    ];
-    Arc::new(MetadataAgent::new(providers, clock))
+    Arc::new(
+        tako_core::metadata::runtime::sources(
+            paths,
+            IgdbSettings::load(vault),
+            ScreenScraperSettings::load(vault),
+            SteamGridDbSettings::load(vault),
+            Vec::new(),
+        )
+        .agent(),
+    )
 }
 
 /// Ids fixados de todos os jogos, lidos do banco uma vez (a fila de metadados os usa).

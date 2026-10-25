@@ -34,10 +34,10 @@ test("o modo guardado vale, o resto é a Lista", () => {
   assert.equal(parseListView("cards"), "list");
 });
 
-test("o agrupamento guardado vale; gênero (só do Slint) e desconhecido caem na situação", () => {
+test("o agrupamento guardado reconhece gênero e usa situação para valor desconhecido", () => {
   assert.equal(parseGroupBy("store"), "store");
   assert.equal(parseGroupBy("install"), "install");
-  assert.equal(parseGroupBy("genre"), "status");
+  assert.equal(parseGroupBy("genre"), "genre");
   assert.equal(parseGroupBy(undefined), "status");
 });
 

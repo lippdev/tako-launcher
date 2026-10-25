@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { imageUrl } from "../lib/imageVersions";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { call, on } from "../bridge";
 import type { Collection } from "../bridge/generated/Collection";
 import type { Tag } from "../bridge/generated/Tag";
@@ -171,7 +172,7 @@ export function useLibrary(criteria: LibraryCriteria) {
       const game = byId.get(id);
       if (devCover) return game ? devCover(id, game.title) : null;
       return game?.hasCover
-        ? `tako-img://cover?id=${encodeURIComponent(id)}&w=${String(width)}&h=${String(height)}`
+        ? imageUrl("cover", id, width, height)
         : null;
     },
     [byId, devCover],

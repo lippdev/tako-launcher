@@ -13,6 +13,7 @@ mod game_settings;
 mod i18n;
 pub mod input;
 mod library;
+mod metadata;
 mod organize;
 mod profile;
 pub mod protocol;

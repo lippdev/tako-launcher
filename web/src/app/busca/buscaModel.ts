@@ -133,7 +133,7 @@ export function gameResult(game: LibraryGame, labels: ResultLabels): GameResult 
     kind: "game",
     id: game.id,
     title: game.title,
-    meta: `${labels.stores[game.store]} · ${game.installed ? labels.installed : labels.notInstalled}`,
+    meta: [labels.stores[game.store], game.publisher, game.installed ? labels.installed : labels.notInstalled].filter(Boolean).join(" · "),
     game,
   };
 }

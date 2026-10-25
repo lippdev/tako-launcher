@@ -1,3 +1,4 @@
+import { imageUrl } from "../../lib/imageVersions";
 import { useMemo } from "react";
 import mark from "../../assets/brand/tako-mark.png";
 import { FileiraDeCapas, type CapaDaFileira } from "../FileiraDeCapas/FileiraDeCapas";
@@ -50,7 +51,7 @@ export interface BibliotecaCategoriasProps {
 }
 
 function defaultResolveCover(id: string, width: number, height: number): string {
-  return `tako-img://cover?id=${encodeURIComponent(id)}&w=${String(width)}&h=${String(height)}`;
+  return imageUrl("cover", id, width, height);
 }
 
 /**

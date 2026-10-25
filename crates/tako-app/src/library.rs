@@ -58,6 +58,7 @@ pub(crate) fn criteria(request: LibraryListRequest) -> (LibraryCriteria, Library
         tags: request.tags.into_iter().collect(),
         statuses: request.statuses.into_iter().map(Into::into).collect(),
         no_status: request.no_status,
+        genres: request.genres.into_iter().collect(),
         install: match request.installed {
             None => InstallFilter::Any,
             Some(true) => InstallFilter::Installed,
@@ -114,6 +115,12 @@ pub(crate) fn list(core: &Core, mut request: LibraryListRequest) -> LibraryPage 
         &criteria,
     );
     LibraryPage {
+        genres: matches
+            .iter()
+            .flat_map(|g| g.genres.iter().cloned())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect(),
         total: matches.len(),
         rows: matches
             .into_iter()
@@ -158,6 +165,8 @@ pub(crate) fn row(game: &Game) -> LibraryGame {
         has_icon: game.shown_icon().is_some_and(|s| !s.trim().is_empty()),
         has_hero: game.shown_hero().is_some_and(|s| !s.trim().is_empty()),
         has_logo: game.shown_logo().is_some_and(|s| !s.trim().is_empty()),
+        genres: nonempty(game.genres.clone()),
+        publisher: optional_text(game.publisher.as_deref()),
     }
 }
 

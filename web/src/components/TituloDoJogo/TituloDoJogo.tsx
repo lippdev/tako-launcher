@@ -1,3 +1,6 @@
+import { useImageVersion } from "../../lib/useImageVersion";
+import { versionedImageUrl } from "../../lib/imageVersions";
+import { imageUrl } from "../../lib/imageVersions";
 import { useState } from "react";
 import { cx } from "../../lib/cx";
 import styles from "./TituloDoJogo.module.css";
@@ -22,7 +25,7 @@ function urlDoLogo(id: string, largura: number, altura: number): string {
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   const w = Math.round(largura * dpr);
   const h = Math.round(altura * dpr);
-  return `tako-img://logo?id=${encodeURIComponent(id)}&w=${String(w)}&h=${String(h)}`;
+  return imageUrl("logo", id, w, h);
 }
 
 /**
@@ -30,10 +33,12 @@ function urlDoLogo(id: string, largura: number, altura: number): string {
  * imagem falhar, o nome em texto (Poppins 54/800).
  */
 export function TituloDoJogo({ id, titulo, temLogo, src, tamanho = "pagina", className }: TituloDoJogoProps) {
+  useImageVersion(id);
   // Guarda de qual jogo foi a falha: ao trocar de jogo a nova tentativa vale.
   const [falhou, setFalhou] = useState<string | null>(null);
   const medida = MEDIDAS[tamanho];
-  const logo = temLogo && falhou !== id ? (src ?? urlDoLogo(id, medida.w, medida.h)) : null;
+  const url = src ? versionedImageUrl(src) : urlDoLogo(id, medida.w, medida.h);
+  const logo = temLogo && falhou !== url ? url : null;
 
   return (
     <h1 className={cx(styles["titulo"], styles[tamanho], className)}>
@@ -45,7 +50,7 @@ export function TituloDoJogo({ id, titulo, temLogo, src, tamanho = "pagina", cla
           decoding="async"
           draggable={false}
           onError={() => {
-            setFalhou(id);
+            setFalhou(url);
           }}
         />
       ) : (

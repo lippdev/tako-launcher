@@ -1,3 +1,5 @@
+import { useImageVersion } from "../lib/useImageVersion";
+import { imageUrl } from "../lib/imageVersions";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import mark from "../assets/brand/tako-mark.png";
 import { Aviso } from "../components/Aviso/Aviso";
@@ -60,14 +62,16 @@ const RESULT_LABELS = { stores: libraryStrings.stores, installed: s.installed, n
 
 /** `tako-img://` do núcleo (docs/web/ponte.md §4), em pixels físicos (o dobro do que se vê). */
 function artUrl(kind: "cover" | "icon", id: string, w: number, h: number): string {
-  return `tako-img://${kind}?id=${encodeURIComponent(id)}&w=${String(w)}&h=${String(h)}`;
+  return imageUrl(kind, id, w, h);
 }
 
 const VIEW_ICONS: Record<ViewId, IconName> = { biblioteca: "home", configuracoes: "gear", perfil: "user", downloads: "download" };
 
 /** A arte da linha: o ícone do destino num atalho; num jogo, capa, senão ícone, senão a inicial (também se a imagem não carrega). */
 function Arte({ result, art }: { result: SearchResult; art: ReturnType<typeof useDevArt> }) {
-  const [failed, setFailed] = useState(false);
+  const version = useImageVersion(result.kind === "game" ? result.id : undefined);
+  const key = `${result.id}:${String(version)}`;
+  const [failed, setFailed] = useState<string | null>(null);
   if (result.kind === "shortcut") {
     const { view, settingsCategory } = result.target;
     return (
@@ -76,7 +80,7 @@ function Arte({ result, art }: { result: SearchResult; art: ReturnType<typeof us
       </span>
     );
   }
-  if (!failed) {
+  if (failed !== key) {
     const { game } = result;
     const src = game.hasCover
       ? (art?.cover(game.id, game.title) ?? artUrl("cover", game.id, 80, 108))
@@ -93,7 +97,7 @@ function Arte({ result, art }: { result: SearchResult; art: ReturnType<typeof us
           height={54}
           draggable={false}
           onError={() => {
-            setFailed(true);
+            setFailed(key);
           }}
         />
       );

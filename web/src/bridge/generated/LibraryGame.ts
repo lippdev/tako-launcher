@@ -5,4 +5,4 @@ import type { Store } from "./Store";
 /**
  * Só dados para desenhar; imagens são pedidas por id em tako-img://, nunca por URI da fonte.
  */
-export type LibraryGame = { id: string, title: string, store: Store, installed: boolean, favorite: boolean, status: GameStatus | null, lastPlayedAt: string | null, playTimeSeconds: number, accent: string | null, hasCover: boolean, hasIcon: boolean, hasHero: boolean, hasLogo: boolean, };
+export type LibraryGame = { id: string, title: string, store: Store, installed: boolean, favorite: boolean, status: GameStatus | null, lastPlayedAt: string | null, playTimeSeconds: number, accent: string | null, hasCover: boolean, hasIcon: boolean, hasHero: boolean, hasLogo: boolean, genres?: Array<string>, publisher?: string, };

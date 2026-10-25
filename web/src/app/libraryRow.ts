@@ -1,4 +1,5 @@
-﻿import type { LibraryGame } from "../bridge/generated/LibraryGame";
+import { imageUrl } from "../lib/imageVersions.ts";
+import type { LibraryGame } from "../bridge/generated/LibraryGame";
 import type { GameRow } from "../components/ListaDeJogos/ListaDeJogos";
 
 const statuses = {
@@ -35,5 +36,5 @@ export function withRunning(rows: readonly GameRow[], runningId: string | null):
 }
 
 export function libraryGameIcon(game: LibraryGame, px: number): string | null {
-  return game.hasIcon ? `tako-img://icon?id=${encodeURIComponent(game.id)}&w=${px}&h=${px}` : null;
+  return game.hasIcon ? imageUrl("icon", game.id, px, px) : null;
 }
