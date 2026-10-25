@@ -27,7 +27,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Bandeja do sistema | ⬜ | **WEB-36** |
 | Desempenho do Tako (`performance`, PERF-001) | adiado pelo mantenedor (24/10) | WEB-37 (adiada) |
 | Modo seguro e recuperação de tema | adiado pelo mantenedor (24/10) | WEB-37 (adiada) |
-| Sandbox do CEF | ⬜ | **WEB-02c** |
+| Sandbox do CEF | ⬜ bloqueada: o crate `cef` não expõe o sandbox no Windows; decisão do mantenedor | WEB-02c |
 
 ## Telas do desktop
 
