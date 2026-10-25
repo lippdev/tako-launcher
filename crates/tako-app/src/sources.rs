@@ -118,13 +118,20 @@ impl Scanner {
     }
 }
 
-pub(crate) fn factory(settings: &HashMap<String, String>) -> Factory {
-    let config = Config::parse(
+/// As pastas de ROMs e os executáveis gravados nas configurações.
+pub(crate) fn emulator_config(settings: &HashMap<String, String>) -> Config {
+    Config::parse(
         settings.get(keys::ROM_FOLDERS).map(String::as_str),
         settings.get(keys::PATHS).map(String::as_str),
         settings.get(keys::BY_SYSTEM).map(String::as_str),
-    );
+    )
+}
+
+/// As fontes de cada leitura. A configuração dos emuladores é lida a cada leitura (e não só ao abrir), para uma
+/// pasta de ROMs nova entrar na leitura seguinte sem reabrir o Tako.
+pub(crate) fn factory(emulators: Arc<Mutex<Config>>) -> Factory {
     Box::new(move || {
+        let config = emulators.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let mut sources = vec![tako_sources::steam_source(None)];
         #[cfg(windows)]
         sources.extend(tako_sources::windows_sources(
@@ -133,7 +140,7 @@ pub(crate) fn factory(settings: &HashMap<String, String>) -> Factory {
         ));
         #[cfg(unix)]
         sources.extend(tako_sources::unix_sources());
-        sources.push(Box::new(EmulatorSource::new(config.clone())));
+        sources.push(Box::new(EmulatorSource::new(config)));
         Arc::new(sources)
     })
 }

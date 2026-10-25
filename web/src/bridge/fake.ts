@@ -30,6 +30,9 @@ import type { Store } from "./generated/Store";
 import type { AudioOutputList } from "./generated/AudioOutputList";
 import type { DisplayList } from "./generated/DisplayList";
 import type { DownloadAdd } from "./generated/DownloadAdd";
+import type { EmulatorFolder } from "./generated/EmulatorFolder";
+import type { EmulatorFolderSystem } from "./generated/EmulatorFolderSystem";
+import type { EmulatorsView } from "./generated/EmulatorsView";
 import type { DownloadCancel } from "./generated/DownloadCancel";
 import type { DownloadEntry } from "./generated/DownloadEntry";
 import type { DownloadRequest } from "./generated/DownloadRequest";
@@ -2461,4 +2464,111 @@ Object.assign(SAMPLE_CATALOGS["en-US"], {
   "presentation.session.minutes.other": "{n} min played",
   "presentation.session.hours": "{h} h played",
   "presentation.session.hours_minutes": "{h} h {m} min played",
+});
+
+// ---- Aparência do desktop e emuladores (WEB-13c1) ----
+// As chaves novas, com a mesma validação do núcleo (`crates/tako-app/src/settings.rs`), e `emulators.*` com estado em
+// memória: pastas de ROMs que mudam a lista e a contagem do "Emuladores" na próxima leitura.
+
+for (const key of ["DesktopAccent", "DesktopGlassOpacity", "DesktopGlassAmbient", "DesktopGlassPill"]) KNOWN_SETTINGS.add(key);
+for (const key of ["DesktopGlassAmbient", "DesktopGlassPill"]) BOOL_SETTINGS.add(key);
+
+const setSettingBeforeLook = defaults["settings.set"];
+Object.assign(defaults, {
+  "settings.set": (payload: unknown) => {
+    const { key, value } = payload as Setting;
+    // `#RRGGBB` e uma posição de 0 a 100, como o núcleo aceita.
+    if (key === "DesktopAccent" && !/^#[0-9a-fA-F]{6}$/.test(value)) throw new Error("bad_request: configuração inválida");
+    if (key === "DesktopGlassOpacity" && !(/^\d{1,3}$/.test(value) && Number(value) <= 100))
+      throw new Error("bad_request: configuração inválida");
+    setSettingBeforeLook?.(payload);
+  },
+});
+
+/** Os emuladores de `Emulator::ALL`; os dois primeiros "achados" neste PC de exemplo. */
+const SAMPLE_EMULATORS: EmulatorsView["emulators"] = [
+  { key: "retroarch", name: "RetroArch", found: true, path: "C:\\Program Files\\RetroArch\\retroarch.exe", flatpak: null, chosen: false },
+  { key: "dolphin", name: "Dolphin", found: true, path: "C:\\Program Files\\Dolphin\\Dolphin.exe", flatpak: null, chosen: false },
+  { key: "pcsx2", name: "PCSX2", found: false, path: null, flatpak: null, chosen: false },
+  { key: "duckstation", name: "DuckStation", found: false, path: null, flatpak: null, chosen: false },
+  { key: "ppsspp", name: "PPSSPP", found: false, path: null, flatpak: null, chosen: false },
+  { key: "ryujinx", name: "Ryujinx", found: false, path: null, flatpak: null, chosen: false },
+  { key: "cemu", name: "Cemu", found: false, path: null, flatpak: null, chosen: false },
+  { key: "rpcs3", name: "RPCS3", found: false, path: null, flatpak: null, chosen: false },
+];
+const SAMPLE_ROM_SYSTEMS: EmulatorsView["systems"] = [
+  ["nes", "Nintendo Entertainment System"],
+  ["snes", "Super Nintendo"],
+  ["n64", "Nintendo 64"],
+  ["gba", "Game Boy Advance"],
+  ["gc", "GameCube"],
+  ["psx", "PlayStation"],
+  ["ps2", "PlayStation 2"],
+  ["ps3", "PlayStation 3"],
+  ["psp", "PlayStation Portable"],
+  ["megadrive", "Mega Drive"],
+  ["dreamcast", "Dreamcast"],
+  ["arcade", "Arcade"],
+].map(([id, name]) => ({ id: id as string, name: name as string }));
+const MAX_ROM_FOLDERS = 256;
+const ROM_FOLDERS_STORAGE = "tako.dev.rom-folders";
+
+const romFolders: EmulatorsView["romFolders"] = JSON.parse(
+  sessionStorage.getItem(ROM_FOLDERS_STORAGE) ?? "[]",
+) as EmulatorsView["romFolders"];
+
+function emulatorsView(): EmulatorsView {
+  return {
+    romFolders: romFolders.map((folder) => ({ ...folder })),
+    emulators: SAMPLE_EMULATORS.map((emulator) => ({ ...emulator })),
+    systems: SAMPLE_ROM_SYSTEMS,
+    maxFolders: MAX_ROM_FOLDERS,
+  };
+}
+
+/** Uma mudança nas pastas: o falso guarda, conta as ROMs do "Emuladores" e lê as lojas de novo, como o núcleo. */
+function romFoldersChanged() {
+  sessionStorage.setItem(ROM_FOLDERS_STORAGE, JSON.stringify(romFolders));
+  const emulatorStore = SAMPLE_STORES.find((sample) => sample.store === "emulators");
+  if (emulatorStore) emulatorStore.found = romFolders.length * 12;
+  scanSources();
+}
+
+function folderIndex(path: string): number {
+  return romFolders.findIndex((folder) => folder.path === path.trim());
+}
+
+Object.assign(defaults, {
+  "emulators.list": emulatorsView,
+  "emulators.folder.add": (payload: unknown) => {
+    const path = (payload as EmulatorFolder).path.trim();
+    if (!path || path.length > 4096 || path.includes("\0") || !/^([a-zA-Z]:[\\/]|\\\\|\/)/.test(path))
+      throw new FakeError("bad_request", "caminho de pasta inválido");
+    // Um caminho com "inexistente" faz o falso responder como o núcleo para uma pasta que não existe.
+    if (path.toLowerCase().includes("inexistente")) throw new FakeError("bad_request", "a pasta não existe");
+    if (folderIndex(path) >= 0) return emulatorsView();
+    if (romFolders.length >= MAX_ROM_FOLDERS) throw new FakeError("conflict", "pastas de ROMs demais");
+    romFolders.push({ path, system: null });
+    romFoldersChanged();
+    return emulatorsView();
+  },
+  "emulators.folder.remove": (payload: unknown) => {
+    const index = folderIndex((payload as EmulatorFolder).path);
+    if (index < 0) throw new FakeError("not_found", "pasta de ROMs não encontrada");
+    romFolders.splice(index, 1);
+    romFoldersChanged();
+    return emulatorsView();
+  },
+  "emulators.folder.system.set": (payload: unknown) => {
+    const { path, system } = payload as EmulatorFolderSystem;
+    if (system !== null && !SAMPLE_ROM_SYSTEMS.some((sample) => sample.id === system))
+      throw new FakeError("bad_request", "sistema inválido");
+    const folder = romFolders[folderIndex(path)];
+    if (!folder) throw new FakeError("not_found", "pasta de ROMs não encontrada");
+    if (folder.system !== system) {
+      folder.system = system;
+      romFoldersChanged();
+    }
+    return emulatorsView();
+  },
 });

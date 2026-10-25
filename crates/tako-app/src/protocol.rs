@@ -98,6 +98,10 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "game.source_ids.set"
             | "game.source_ids.search"
             | "game.source_ids.check"
+            | "emulators.list"
+            | "emulators.folder.add"
+            | "emulators.folder.remove"
+            | "emulators.folder.system.set"
     ) {
         return Err((
             header.id,
@@ -121,6 +125,7 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "profiles.list"
             | "game.running"
             | "game.resume"
+            | "emulators.list"
     ) && value.get("payload").is_some()
     {
         return Err((id, bad_request("chamada não aceita argumentos".into())));
@@ -486,6 +491,30 @@ pub enum Call {
         #[ts(as = "GameSourceIdsCheck")]
         GameSourceIdsCheck,
     ),
+    /// Emuladores achados neste PC, pastas de ROMs e os sistemas que uma pasta aceita (Configurações › Biblioteca).
+    #[serde(rename = "emulators.list")]
+    EmulatorsList,
+    /// Acrescenta uma pasta de ROMs (caminho absoluto de uma pasta que existe) e lê a biblioteca de novo.
+    #[serde(rename = "emulators.folder.add")]
+    EmulatorsFolderAdd(
+        #[serde(with = "object_payload")]
+        #[ts(as = "EmulatorFolder")]
+        EmulatorFolder,
+    ),
+    /// Tira uma pasta de ROMs da lista e lê a biblioteca de novo; os arquivos não são tocados.
+    #[serde(rename = "emulators.folder.remove")]
+    EmulatorsFolderRemove(
+        #[serde(with = "object_payload")]
+        #[ts(as = "EmulatorFolder")]
+        EmulatorFolder,
+    ),
+    /// Diz a que sistema pertence a pasta (ou volta a "uma subpasta por sistema") e lê a biblioteca de novo.
+    #[serde(rename = "emulators.folder.system.set")]
+    EmulatorsFolderSystemSet(
+        #[serde(with = "object_payload")]
+        #[ts(as = "EmulatorFolderSystem")]
+        EmulatorFolderSystem,
+    ),
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -601,6 +630,14 @@ pub enum Reply {
     GameSourceIdsSearch(SourceIdsJob),
     #[serde(rename = "game.source_ids.check")]
     GameSourceIdsCheck(SourceIdsJob),
+    #[serde(rename = "emulators.list")]
+    EmulatorsList(EmulatorsView),
+    #[serde(rename = "emulators.folder.add")]
+    EmulatorsFolderAdd(EmulatorsView),
+    #[serde(rename = "emulators.folder.remove")]
+    EmulatorsFolderRemove(EmulatorsView),
+    #[serde(rename = "emulators.folder.system.set")]
+    EmulatorsFolderSystemSet(EmulatorsView),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -2002,4 +2039,69 @@ pub struct SourceIdsChecked {
     pub source: String,
     /// `null` = a fonte não conhece esse id.
     pub found: Option<SourceIdFound>,
+}
+
+/// Uma pasta de ROMs, pelo caminho como está na lista.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct EmulatorFolder {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export)]
+pub struct EmulatorFolderSystem {
+    pub path: String,
+    /// Id do sistema (`snes`, `psx`…); `null` = uma subpasta por sistema.
+    pub system: Option<String>,
+}
+
+/// Pasta de ROMs da lista.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RomFolderEntry {
+    pub path: String,
+    /// Id do sistema da pasta; `null` = uma subpasta por sistema.
+    pub system: Option<String>,
+}
+
+/// Um emulador conhecido e se foi achado neste PC.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EmulatorEntry {
+    /// `retroarch`, `dolphin`…
+    pub key: String,
+    pub name: String,
+    pub found: bool,
+    /// Onde o emulador abre: o executável achado ou escolhido.
+    pub path: Option<String>,
+    /// Id do pacote Flatpak, quando é por ele que abre.
+    pub flatpak: Option<String>,
+    /// O executável foi escolhido à mão em vez de achado sozinho.
+    pub chosen: bool,
+}
+
+/// Um sistema que uma pasta de ROMs pode ter.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RomFolderSystem {
+    pub id: String,
+    pub name: String,
+}
+
+/// Resposta de `emulators.list` e das chamadas `emulators.folder.*`: o estado depois da mudança.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct EmulatorsView {
+    pub rom_folders: Vec<RomFolderEntry>,
+    pub emulators: Vec<EmulatorEntry>,
+    pub systems: Vec<RomFolderSystem>,
+    #[ts(type = "number")]
+    pub max_folders: usize,
 }

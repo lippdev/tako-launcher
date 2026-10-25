@@ -3,6 +3,7 @@
 // é assunto das telas de configuração.
 
 import { useSyncExternalStore } from "react";
+import { GLASS_OPACITY_DEFAULT, lookVariables } from "./desktopLook";
 
 export const THEMES = ["tako", "escuro", "meia-noite", "oled", "vidro"] as const;
 export type Theme = (typeof THEMES)[number];
@@ -18,6 +19,12 @@ export interface Appearance {
   glassEffects: boolean;
   /** "Tamanho da interface", em porcentagem. */
   uiScale: UiScale;
+  /** Cor de destaque escolhida (`#RRGGBB`); `null` = a do tema. Só vale fora do TAKO (`desktopLook.ts`). */
+  accent: string | null;
+  /** Opções do Liquid Glass: opacidade das superfícies (posição de 0 a 100), controles em pílula e luz ambiente. */
+  glassOpacity: number;
+  glassPill: boolean;
+  glassAmbient: boolean;
 }
 
 export const defaultAppearance: Appearance = {
@@ -25,6 +32,10 @@ export const defaultAppearance: Appearance = {
   reduceMotion: false,
   glassEffects: true,
   uiScale: 100,
+  accent: null,
+  glassOpacity: GLASS_OPACITY_DEFAULT,
+  glassPill: true,
+  glassAmbient: true,
 };
 
 /**
@@ -41,6 +52,10 @@ export function applyAppearance(a: Appearance, root: HTMLElement = document.docu
   root.dataset["reduceMotion"] = String(a.reduceMotion);
   root.dataset["glass"] = a.glassEffects ? "on" : "off";
   root.style.setProperty("--ui-scale", String(a.uiScale / 100));
+  // A cor de destaque e o Liquid Glass trocam variáveis do tema, as mesmas que o `tokens.css` define.
+  const { set, clear } = lookVariables(a);
+  for (const [name, value] of Object.entries(set)) root.style.setProperty(name, value);
+  for (const name of clear) root.style.removeProperty(name);
 }
 
 let current = defaultAppearance;

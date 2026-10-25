@@ -212,7 +212,7 @@ export const settingsStrings = {
     sound: { title: "Som", description: "Volume e áudio do tema." },
     display: { title: "Tela", description: "Onde o jogo aparece e toca, e o que muda durante a partida." },
     controllers: { title: "Controles", description: "Controles, botões e atalhos." },
-    library: { title: "Biblioteca e lojas", description: "Lojas ligadas e a leitura da biblioteca." },
+    library: { title: "Biblioteca e lojas", description: "Lojas ligadas, leitura da biblioteca, emuladores e coleções automáticas." },
     covers: { title: "Capas e dados", description: "Capas, fontes de dados e cache." },
     downloads: { title: "Downloads", description: "Pastas e limites de download." },
     integrations: { title: "Integrações", description: "Contas e serviços ligados ao TAKO." },
@@ -273,6 +273,56 @@ export const settingsStrings = {
       measuring: "Medindo o tamanho das pastas dos jogos…",
       done: "Leitura concluída.",
     },
+    // WEB-13c1: smart.title, smart.text, smart.empty, smart.delete_*, settings.library.rename/delete
+    smart: {
+      section: "Coleções automáticas",
+      text: "Salve uma combinação de filtros na biblioteca. Os jogos de cada coleção se atualizam sozinhos.",
+      empty: "Nenhuma coleção automática",
+      rename: (name: string) => `Renomear ${name}`,
+      remove: (name: string) => `Excluir ${name}`,
+      renameTitle: "Renomear a coleção automática",
+      nameLabel: "Nome da coleção",
+      renamed: "Coleção renomeada.",
+      deleted: "Coleção excluída.",
+      loadError: "Não foi possível ler as coleções automáticas.",
+      saveError: "Não foi possível salvar a coleção.",
+      count: (n: number) => `${String(n)} ${n === 1 ? "jogo" : "jogos"}`,
+    },
+  },
+  // Emuladores e ROMs (WEB-13c1): os textos de settings.emulators.* do catálogo do app atual.
+  emulators: {
+    section: "Emuladores e ROMs",
+    text: "O Tako junta os jogos que o RetroArch, o ES-DE e os emuladores avulsos já conhecem com as suas pastas de ROMs, e abre cada um no emulador certo.",
+    folders: "Pastas de ROMs",
+    noFolders: "Nenhuma pasta de ROMs",
+    folderAuto: "Uma subpasta por sistema",
+    folderSystem: (path: string) => `Sistema da pasta ${path}`,
+    add: {
+      title: "Adicionar pasta…",
+      description: "A pasta de um sistema (ex.: snes) ou uma com uma subpasta por sistema, como a do ES-DE",
+      label: "Caminho da pasta",
+      placeholder: "C:\\Jogos\\ROMs",
+      action: "Adicionar",
+      // TODO(WEB-12c): trocar o caminho digitado pelo seletor de pasta do sistema, que é do hospedeiro.
+      help: "Digite o caminho completo da pasta.",
+    },
+    added: (path: string) => `Pasta adicionada: ${path}`,
+    removed: "Pasta removida",
+    remove: "Remover pasta",
+    removeFor: (path: string) => `Remover a pasta ${path}`,
+    emulators: "Emuladores",
+    found: "Encontrado",
+    missing: "Não encontrado",
+    missingDescription: "Escolha o executável se ele estiver em outra pasta",
+    flatpak: (id: string) => `Flatpak · ${id}`,
+    chosen: (path: string) => `Escolhido por você: ${path}`,
+    rescan: { title: "Ler as pastas de ROMs de novo", description: "Procura ROMs novas nas pastas e nos emuladores", action: "Ler de novo" },
+    errors: {
+      load: "Não foi possível consultar os emuladores.",
+      add: "Não foi possível adicionar a pasta. Confira se o caminho completo existe.",
+      remove: "Não foi possível remover a pasta.",
+      system: "Não foi possível mudar o sistema da pasta.",
+    },
   },
   // Os textos de Tema a Sobre (WEB-13b) são os dos catálogos do app atual (`crates/tako-core/locales/pt-BR`); a
   // chave de cada bloco vem no comentário, para o WEB-06 achar. Texto sem chave lá é novo desta tela.
@@ -289,6 +339,36 @@ export const settingsStrings = {
     },
     // O nome da seção das opções do tema escolhido (README do Temas).
     takoOptions: "TAKO",
+    // WEB-13c1: settings.theme.accent_header, desk_accent_*, custom, desk_accent_custom_hint, desk_accent_invalid
+    accent: {
+      section: "Cor de destaque",
+      cards: "Escolha da cor de destaque",
+      names: {
+        stone: "Pedra TAKO",
+        orange: "Laranja",
+        gold: "Ouro",
+        green: "Verde",
+        cyan: "Ciano",
+        blue: "Azul",
+        violet: "Violeta",
+        pink: "Rosa",
+        white: "Branco",
+      },
+      custom: { title: "Cor própria", label: "Código da cor", hint: "Código da cor, como #D8C8BC", invalid: "Use o formato #RRGGBB" },
+    },
+    // settings.appearance.desk_theme_glass, glass_ambient, glass_opacity, glass_pill (e as _desc)
+    glass: {
+      section: "Liquid Glass",
+      ambient: {
+        title: "Arte do jogo como luz ambiente",
+        description: "Tinge a janela com a arte do jogo na tela. Desligado, usa uma aurora na cor de destaque",
+      },
+      opacity: {
+        title: "Opacidade das superfícies",
+        description: "Valores maiores deixam os painéis mais sólidos e fáceis de ler, de 2 a 20%",
+      },
+      pill: { title: "Controles em pílula", description: "Botões, seletores, abas e chips viram pílulas" },
+    },
   },
   sound: {
     // settings.sound.*

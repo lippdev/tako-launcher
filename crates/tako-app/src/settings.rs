@@ -23,6 +23,9 @@ const BOOL_KEYS: &[&str] = &[
     "HideControllerFromGame",
     "DownloadsEnabled",
     "DownloadsLegalAccepted",
+    // Opções do Liquid Glass (as mesmas chaves do app Slint, `tako-ui/src/desk_theme.rs`).
+    "DesktopGlassAmbient",
+    "DesktopGlassPill",
 ];
 const TEXT_KEYS: &[&str] = &[
     "GameScreenId",
@@ -44,6 +47,8 @@ fn known(key: &str) -> bool {
             key,
             "Language"
                 | "DesktopTheme"
+                | "DesktopAccent"
+                | "DesktopGlassOpacity"
                 | "GameScreenHideOthers"
                 | "DownloadsUploadLimitKiB"
                 | "DesktopTitleLogo"
@@ -98,6 +103,10 @@ pub(crate) fn set(core: &mut Core, setting: Setting) -> Result<(), BridgeError> 
                 value.as_str(),
                 "status" | "collection" | "tag" | "genre" | "store" | "install"
             ))
+        // Cor de destaque do desktop: `#RRGGBB`, como o Slint grava (`Rgb::to_string`, maiúsculas).
+        && (key != "DesktopAccent" || tako_core::presentation::Rgb::parse(&value).is_some())
+        // Opacidade das superfícies do vidro: posição do deslizante, 0 a 100.
+        && (key != "DesktopGlassOpacity" || value.parse::<u32>().is_ok_and(|n| n <= 100))
         && (key != "ControlCenterChord" || value.parse::<u32>().is_ok())
         && (!matches!(key.as_str(), "NavigationSoundVolume" | "ThemeMusicVolume")
             || value.parse::<u32>().is_ok_and(|n| n <= 100))

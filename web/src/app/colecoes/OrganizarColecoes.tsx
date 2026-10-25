@@ -9,6 +9,7 @@ import { cx } from "../../lib/cx";
 import { useT } from "../../i18n";
 import { collectionStrings as s } from "../strings";
 import { cleanName, nameProblem, ofKind } from "./colecoesModel";
+import { ExcluirColecao } from "./ExcluirColecao";
 import { problemText } from "./problemaDoNome";
 import styles from "./Colecoes.module.css";
 
@@ -41,8 +42,6 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
   const [newTouched, setNewTouched] = useState(false);
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const [deleting, setDeleting] = useState<Collection | null>(null);
-  // O diálogo de exclusão sai com animação; o nome fica até ele sumir.
-  const [lastDeleting, setLastDeleting] = useState<Collection | null>(null);
 
   const run = (action: () => Promise<unknown>, message: string, after?: () => void) => {
     if (busy) return;
@@ -105,8 +104,6 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
       },
     );
   };
-
-  const shownDeleting = deleting ?? lastDeleting;
 
   return (
     <>
@@ -201,7 +198,6 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
                       aria-label={s.deleteFor(c.name)}
                       disabled={busy}
                       onClick={() => {
-                        setLastDeleting(c);
                         setDeleting(c);
                       }}
                     >
@@ -215,27 +211,7 @@ export function OrganizarColecoes({ open, onClose, collections, rule, onDeleted,
         )}
       </Dialogo>
 
-      <Dialogo
-        open={deleting !== null}
-        onClose={closeDelete}
-        size="s"
-        title={t("settings.library.delete_title", { name: shownDeleting?.name ?? "" })}
-        closeLabel={t("common.close")}
-        actions={
-          <>
-            <BotaoDesktop variant="outlined" onClick={closeDelete}>
-              {t("common.cancel")}
-            </BotaoDesktop>
-            <BotaoDesktop size="sm" disabled={busy} onClick={confirmDelete}>
-              {t("settings.library.delete")}
-            </BotaoDesktop>
-          </>
-        }
-      >
-        <p className={styles["text"]}>
-          {shownDeleting?.criteria ? t("smart.delete_text") : t("settings.library.delete_text")}
-        </p>
-      </Dialogo>
+      <ExcluirColecao collection={deleting} busy={busy} onCancel={closeDelete} onConfirm={confirmDelete} />
     </>
   );
 }

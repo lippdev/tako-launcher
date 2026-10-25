@@ -6,7 +6,10 @@ import { Aviso } from "../../components/Aviso/Aviso";
 import { BotaoDesktop } from "../../components/BotaoDesktop/BotaoDesktop";
 import { GrupoDeConfiguracao, LinhaDeConfiguracao } from "../../components/LinhaDeConfiguracao/LinhaDeConfiguracao";
 import { settingsStrings } from "../strings";
+import { ColecoesAutomaticas } from "./ColecoesAutomaticas";
+import { EmuladoresERoms } from "./EmuladoresERoms";
 import { LinhaChave, type CategoryProps } from "./Linhas";
+import type { Notify } from "./notice";
 import { KEYS, isStoreDisabled, readLanguage, withStoreEnabled } from "./model";
 import styles from "./TelaConfiguracoes.module.css";
 
@@ -33,6 +36,17 @@ function describeSource(report: LibrarySourceReport, disabled: boolean, language
   return parts.join(" · ");
 }
 
+interface NoticeState {
+  key: number;
+  text: string;
+  tone: "success" | "error";
+}
+
+/** Um aviso novo leva uma chave nova, para o mesmo texto aparecer de novo. */
+function nextNotice(previous: NoticeState | null, tone: NoticeState["tone"], text: string): NoticeState {
+  return { key: (previous?.key ?? 0) + 1, text, tone };
+}
+
 function progressText(sources: LibrarySources, finished: boolean): string | null {
   if (sources.scanning) {
     return sources.measuringSizes ? s.progress.measuring : s.progress.scanning(sources.completed, sources.total);
@@ -41,17 +55,24 @@ function progressText(sources: LibrarySources, finished: boolean): string | null
   return finished ? s.progress.done : null;
 }
 
-/** Configurações › Biblioteca e lojas: liga e desliga as lojas (`DisabledStores`) e lê de novo, com o andamento. */
+/**
+ * Configurações › Biblioteca e lojas: liga e desliga as lojas (`DisabledStores`) e lê de novo, com o andamento; os
+ * emuladores e as pastas de ROMs; e as coleções automáticas. Cada parte avisa o resultado no mesmo aviso de baixo.
+ */
 export function BibliotecaCategoria({ values, save }: CategoryProps) {
   const language = readLanguage(values);
   const [sources, setSources] = useState<LibrarySources | null>(null);
   const [finished, setFinished] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [problem, setProblem] = useState<{ key: number; text: string } | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
   const wasScanning = useRef(false);
 
+  const notify: Notify = (tone, text) => {
+    setNotice((previous) => nextNotice(previous, tone, text));
+  };
+
   function fail(text: string) {
-    setProblem((previous) => ({ key: (previous?.key ?? 0) + 1, text }));
+    setNotice((previous) => nextNotice(previous, "error", text));
   }
 
   function receive(next: LibrarySources) {
@@ -134,8 +155,17 @@ export function BibliotecaCategoria({ values, save }: CategoryProps) {
           {progress}
         </p>
       </div>
-      <Aviso open={problem !== null} onClose={() => { setProblem(null); }} noticeKey={problem?.key ?? 0} tone="error">
-        {problem?.text}
+      <EmuladoresERoms notify={notify} onScan={scan} scanning={scanning} />
+      <ColecoesAutomaticas notify={notify} />
+      <Aviso
+        open={notice !== null}
+        onClose={() => {
+          setNotice(null);
+        }}
+        noticeKey={notice?.key ?? 0}
+        tone={notice?.tone ?? "error"}
+      >
+        {notice?.text}
       </Aviso>
     </>
   );

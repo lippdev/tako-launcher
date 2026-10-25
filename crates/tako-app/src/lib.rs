@@ -7,6 +7,7 @@ mod core;
 mod demo;
 mod downloads;
 mod edit;
+mod emulators;
 mod game_settings;
 mod i18n;
 mod library;
@@ -217,6 +218,21 @@ impl AppService {
             | Call::GameSourceIdsSet(_)
             | Call::GameSourceIdsSearch(_)
             | Call::GameSourceIdsCheck(_)) => self.handle_edit(call),
+            call @ (Call::EmulatorsList
+            | Call::EmulatorsFolderAdd(_)
+            | Call::EmulatorsFolderRemove(_)
+            | Call::EmulatorsFolderSystemSet(_)) => {
+                let core = self
+                    .core
+                    .as_mut()
+                    .ok_or_else(|| BridgeError::new(ErrorCode::Internal, "núcleo não aberto"))?;
+                let (reply, changed) = emulators::handle(core, call)?;
+                // A configuração já está gravada; se a leitura não puder começar, o botão "Ler de novo" cobre.
+                if changed && emulators::rescan(core)? {
+                    self.emit_scan_progress();
+                }
+                Ok(reply)
+            }
             call => {
                 let core = self
                     .core

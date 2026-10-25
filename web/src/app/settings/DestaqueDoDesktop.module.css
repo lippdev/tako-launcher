@@ -1,0 +1,37 @@
+/* README da TelaTema: bolinhas de 34 com a cor própria e o código ao lado. O anel da escolhida é um contorno;
+   só `transform` anima. */
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  padding: 14px 18px 4px;
+}
+
+.swatch {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: transform var(--tempo-hover) var(--curva-estado);
+}
+
+.swatch:hover {
+  transform: scale(1.1);
+}
+
+.swatch[aria-pressed="true"] {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+.custom {
+  padding: var(--space-12) 18px 16px;
+}
+
+.field {
+  max-width: 280px;
+}

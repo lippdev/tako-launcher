@@ -17,19 +17,23 @@ test("sem nada guardado a aparência é a padrão", () => {
     reduceMotion: false,
     glassEffects: true,
     uiScale: 100,
+    accent: null,
+    glassOpacity: 28,
+    glassPill: true,
+    glassAmbient: true,
   });
 });
 test("a aparência guardada vira a aparência da página; vidro é o ReducedTransparency invertido", () => {
   assert.deepEqual(
     appearanceFromSettings({ DesktopTheme: "glass", ReducedMotion: "true", ReducedTransparency: "true", TextSizePercent: "125" }),
-    { theme: "vidro", reduceMotion: true, glassEffects: false, uiScale: 125 },
+    { theme: "vidro", reduceMotion: true, glassEffects: false, uiScale: 125, accent: null, glassOpacity: 28, glassPill: true, glassAmbient: true },
   );
   assert.equal(appearanceFromSettings({ ReducedTransparency: "false" }).glassEffects, true);
 });
 test("valor ilegível cai no padrão, campo a campo", () => {
   assert.deepEqual(
     appearanceFromSettings({ DesktopTheme: "lixo", ReducedMotion: "sim", ReducedTransparency: "", TextSizePercent: "90" }),
-    { theme: "tako", reduceMotion: false, glassEffects: true, uiScale: 100 },
+    { theme: "tako", reduceMotion: false, glassEffects: true, uiScale: 100, accent: null, glassOpacity: 28, glassPill: true, glassAmbient: true },
   );
   assert.equal(appearanceFromSettings({ TextSizePercent: "abc" }).uiScale, 100);
   assert.equal(appearanceFromSettings({ DesktopTheme: "toString" }).theme, "tako");

@@ -51,6 +51,10 @@ pub struct Core {
     /// Ids que o usuário fixou, por jogo e fonte (vazio = "nenhum").
     pub(crate) pinned_ids: HashMap<String, PinnedIds>,
     pub(crate) jobs: crate::edit::Jobs,
+    /// Pastas de ROMs e executáveis dos emuladores; a próxima leitura das lojas usa o que está aqui.
+    pub(crate) emulators: Arc<Mutex<tako_sources::emulators::Config>>,
+    /// Demonstração: nada é procurado nem verificado no disco.
+    pub(crate) simulate: bool,
 }
 
 impl Core {
@@ -194,8 +198,9 @@ impl Core {
             .unwrap_or_else(|| {
                 CollectionLibrary::new(Box::new(crate::organize::MemoryCollections), system_clock())
             });
+        let emulators = Arc::new(Mutex::new(crate::sources::emulator_config(&settings)));
         let sources = crate::sources::Scanner::open(
-            factory.unwrap_or_else(|| crate::sources::factory(&settings)),
+            factory.unwrap_or_else(|| crate::sources::factory(Arc::clone(&emulators))),
             settings.get("DisabledStores").cloned().unwrap_or_default(),
             lang,
             simulate,
@@ -223,6 +228,8 @@ impl Core {
             pinned_ids: crate::edit::load_pinned(choices.as_ref()),
             choices,
             jobs: crate::edit::Jobs::new(),
+            emulators,
+            simulate,
         };
         // Ligado, o estado salvo volta já na abertura; desligado, o motor nem é criado.
         core.downloads.ensure(&core.settings);

@@ -16,6 +16,10 @@ export const KEYS = {
   restoreEnvironment: "RestoreEnvironmentAfterGame",
   theme: "DesktopTheme",
   artColors: "DesktopArtColors",
+  accent: "DesktopAccent",
+  glassAmbient: "DesktopGlassAmbient",
+  glassOpacity: "DesktopGlassOpacity",
+  glassPill: "DesktopGlassPill",
   reducedMotion: "ReducedMotion",
   reducedTransparency: "ReducedTransparency",
   textSize: "TextSizePercent",
@@ -45,6 +49,10 @@ export const KEYS = {
 /** As chaves que a aparência salva depende (lidas ao abrir o app). */
 export const APPEARANCE_KEYS: readonly string[] = [
   KEYS.theme,
+  KEYS.accent,
+  KEYS.glassAmbient,
+  KEYS.glassOpacity,
+  KEYS.glassPill,
   KEYS.reducedMotion,
   KEYS.reducedTransparency,
   KEYS.textSize,
@@ -55,6 +63,10 @@ export const DEFAULTS = {
   askBigPicture: true,
   restoreEnvironment: true,
   artColors: true,
+  glassAmbient: true,
+  glassPill: true,
+  /** Igual a `GLASS_OPACITY_DEFAULT` de `desktopLook.ts` (este arquivo não importa nada em execução). */
+  glassOpacity: 28,
   reducedMotion: false,
   reducedTransparency: false,
   themeMusic: true,
@@ -89,6 +101,12 @@ export function readPercent(values: SettingsMap, key: string, fallback: number):
   if (text === undefined || !/^\d{1,3}$/.test(text)) return fallback;
   const value = Number(text);
   return value <= 100 ? value : fallback;
+}
+
+/** `#RRGGBB` (o Slint só aceita assim) em maiúsculas, que é como ele grava; qualquer outra coisa dá `null`. */
+export function parseAccent(text: string | undefined): string | null {
+  const clean = (text ?? "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(clean) ? clean.toUpperCase() : null;
 }
 
 // ---- Idioma e "Abrir em" ----
@@ -146,6 +164,11 @@ export function appearanceFromSettings(values: SettingsMap): Appearance {
     reduceMotion: readBool(values, KEYS.reducedMotion, DEFAULTS.reducedMotion),
     glassEffects: !readBool(values, KEYS.reducedTransparency, DEFAULTS.reducedTransparency),
     uiScale: readUiScale(values),
+    // Cor ilegível vale a do tema; as opções do vidro seguem os padrões do Slint.
+    accent: parseAccent(values[KEYS.accent]),
+    glassOpacity: readPercent(values, KEYS.glassOpacity, DEFAULTS.glassOpacity),
+    glassPill: readBool(values, KEYS.glassPill, DEFAULTS.glassPill),
+    glassAmbient: readBool(values, KEYS.glassAmbient, DEFAULTS.glassAmbient),
   };
 }
 
