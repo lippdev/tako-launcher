@@ -1,10 +1,11 @@
 //! Entrada (MIG-014): comandos do launcher, interpretação do controle, fusão de fontes e filtro do eco
 //! do teclado da Steam. Port de `Input/{GamepadInterpreter,InputEchoFilter,GamepadFusion}.cs`.
 //!
-//! A fonte das leituras é o SDL3 (em `tako-ui`); aqui só há regras, com relógio monotônico (`Duration`).
+//! A fonte das leituras é o SDL3 (em `tako-platform`, `gamepad`); aqui só há regras, com relógio monotônico (`Duration`).
 
 pub mod controller_mouse;
 pub mod controller_test;
+pub mod pad;
 pub mod profiles;
 pub mod shortcut;
 

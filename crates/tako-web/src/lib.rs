@@ -81,6 +81,7 @@ pub fn run(paths: tako_core::paths::DataPaths, data_dir: Option<String>) -> Resu
             },
             core_process::Timings::default(),
             |control| {
+                core_process::spawn_pads(control.clone());
                 if let Some(delay) = recycle_delay() {
                     std::thread::spawn(move || recycle(&control, delay));
                 }

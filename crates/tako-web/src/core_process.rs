@@ -19,7 +19,10 @@ use std::io::{self, BufReader, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
+use tako_app::input::{InputOutput, InputScene};
+use tako_app::protocol::Event;
 use tako_app::{AppService, HostRequest, SessionUpdate};
+use tako_core::input::profiles::Profiles;
 
 /// O processo da interface, visto do núcleo.
 pub trait UiProcess: Send {
@@ -69,6 +72,24 @@ pub enum Command {
     Hide,
     /// Reabrir a interface fechada a pedido.
     Show,
+    /// Saída do controle (WEB-05b): evento para a interface ou o atalho da Central.
+    Input(InputOutput),
+    /// A thread do controle começou: por onde mandar a cena e os perfis, e como acordá-la.
+    InputAttach(InputLink),
+}
+
+/// Ligação do núcleo com a thread do controle (SDL3).
+pub struct InputLink {
+    pub control: mpsc::Sender<InputControl>,
+    /// Acorda a espera do SDL para a cena nova valer já.
+    pub wake: Box<dyn Fn() + Send>,
+}
+
+/// O que o núcleo diz à thread do controle.
+#[derive(Debug, Clone, PartialEq)]
+pub enum InputControl {
+    Scene(InputScene),
+    Profiles(Profiles),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -374,6 +395,8 @@ pub fn run<L: UiLauncher>(
     control(tx);
     // Atualização aplicada (WEB-33): o instalador ou o script de troca já espera este processo sair.
     let mut exiting = false;
+    // Controle (WEB-05b): a thread do SDL3, se houver, e o que ela já sabe da interface.
+    let mut input = InputSync::default();
     let result = loop {
         let now = Instant::now();
         let session = service
@@ -437,6 +460,8 @@ pub fn run<L: UiLauncher>(
             }
             Some(Command::Hide) => host.hide(Instant::now()),
             Some(Command::Show) => host.show = true,
+            Some(Command::Input(output)) => input.output(output, &mut host, &mut service),
+            Some(Command::InputAttach(link)) => input.attach(link),
             None => {}
         }
         // A interface fecha durante o jogo (D-10) e volta no fim, onde estava (`ui.state`).
@@ -456,6 +481,7 @@ pub fn run<L: UiLauncher>(
             }
             None => {}
         }
+        let requested = response.is_some();
         let (target, text) = response.unzip();
         let messages = bridge::drain_messages(text, &events);
         // Resposta e eventos causados por ela seguem juntos e nessa ordem pela mesma fila do filho.
@@ -467,6 +493,8 @@ pub fn run<L: UiLauncher>(
         if let Some(result) = host.watch(Instant::now(), service.game_active()) {
             break result;
         }
+        // Depois do `watch`: a interface que acabou de sair já não recebe comandos do controle.
+        input.sync(&host, &service, requested);
     };
     host.shutdown_ui();
     // "Depois" = instala ao sair do Tako (como o Slint); uma queda ou a atualização já aplicada não instalam.
@@ -538,6 +566,179 @@ impl UiProcess for ExeProcess {
         if let Err(error) = self.0.kill() {
             tracing::warn!(%error, "matar a interface");
         }
+    }
+}
+
+/// O controle visto do laço do núcleo (WEB-05b): repassa as saídas da thread do SDL3 e conta a ela onde a interface
+/// está. Sem thread (testes, SDL indisponível), nada acontece.
+#[derive(Default)]
+struct InputSync {
+    link: Option<InputLink>,
+    scene: Option<InputScene>,
+    profiles: Option<Profiles>,
+    /// A interface foi reaberta por cima do jogo pela combinação da Central.
+    over_game: bool,
+}
+
+impl InputSync {
+    fn attach(&mut self, link: InputLink) {
+        tracing::info!("controles pelo SDL3 no núcleo");
+        self.link = Some(link);
+        self.scene = None;
+        self.profiles = None;
+    }
+
+    fn output<L: UiLauncher>(
+        &mut self,
+        output: InputOutput,
+        host: &mut Host<L>,
+        service: &mut AppService,
+    ) {
+        match output {
+            // Guardado também sem interface: ao reabrir, a página pergunta `input.controller`.
+            InputOutput::Event(Event::InputController(info)) => service.set_controller(info),
+            // Comandos e avisos só com a interface aberta (D-10): fechada, nada vai para ela.
+            InputOutput::Event(event) => {
+                if host.listening() {
+                    service.emit(event);
+                }
+            }
+            InputOutput::Central if service.game_active() => {
+                if host.listening() {
+                    if self.over_game {
+                        tracing::info!("combinação da Central: voltando ao jogo");
+                        host.hide(Instant::now());
+                    }
+                } else {
+                    // INPUT-005: o Slint só esconde o controle do jogo (HidHide) na tela cheia; no desktop, o único
+                    // modo da versão web até o WEB-15, o jogo continua com ele.
+                    tracing::info!("combinação da Central: interface por cima do jogo");
+                    self.over_game = true;
+                    host.show = true;
+                }
+            }
+            InputOutput::Central => {}
+        }
+    }
+
+    /// Conta à thread do controle a cena atual e, depois de um pedido da página (Configurações, troca de perfil), os
+    /// perfis de botões, se mudaram.
+    fn sync<L: UiLauncher>(&mut self, host: &Host<L>, service: &AppService, requested: bool) {
+        let playing = service.game_active();
+        if !playing || (host.ui.is_none() && !host.show) {
+            self.over_game = false;
+        }
+        let Some(link) = &self.link else {
+            return;
+        };
+        let scene = InputScene {
+            listening: host.listening(),
+            playing,
+            over_game: self.over_game,
+        };
+        let mut changed = false;
+        if self.scene != Some(scene) {
+            self.scene = Some(scene);
+            changed |= link.control.send(InputControl::Scene(scene)).is_ok();
+        }
+        if requested || self.profiles.is_none() {
+            let profiles = service.pad_profiles();
+            if self.profiles.as_ref() != Some(&profiles) {
+                self.profiles = Some(profiles.clone());
+                changed |= link.control.send(InputControl::Profiles(profiles)).is_ok();
+            }
+        }
+        if changed {
+            (link.wake)();
+        }
+    }
+}
+
+/// Lê os controles pelo SDL3 numa thread própria do núcleo (nunca no filho CEF) e manda o que vale para a interface
+/// a `tx`. Sem SDL (falhou ao abrir), só registra: o app segue com teclado e mouse.
+#[cfg(all(windows, feature = "cef"))]
+pub fn spawn_pads(tx: mpsc::Sender<Command>) {
+    use tako_app::input::{BatteryReading, InputBridge, PadChange, PadFrame};
+    use tako_platform::gamepad::{PadEvent, Pads};
+
+    let thread = std::thread::Builder::new()
+        .name("tako-pads".into())
+        .spawn(move || {
+            let mut pads = match Pads::open() {
+                Ok(pads) => pads,
+                Err(error) => {
+                    tracing::warn!(%error, "controles indisponíveis");
+                    return;
+                }
+            };
+            let (control_tx, control) = mpsc::channel();
+            let wake: Box<dyn Fn() + Send> = match pads.waker() {
+                Some(wake) => Box::new(wake),
+                None => Box::new(|| {}),
+            };
+            let link = InputLink {
+                control: control_tx,
+                wake,
+            };
+            if tx.send(Command::InputAttach(link)).is_err() {
+                return;
+            }
+            let mut bridge = InputBridge::new(Profiles::default());
+            let started = Instant::now();
+            loop {
+                let events = pads.wait(bridge.timeout());
+                loop {
+                    match control.try_recv() {
+                        Ok(InputControl::Scene(scene)) => bridge.set_scene(scene),
+                        Ok(InputControl::Profiles(profiles)) => bridge.set_profiles(profiles),
+                        Err(mpsc::TryRecvError::Empty) => break,
+                        Err(mpsc::TryRecvError::Disconnected) => return,
+                    }
+                }
+                let now = started.elapsed();
+                let changes = events
+                    .into_iter()
+                    .map(|event| match event {
+                        PadEvent::Connected { name, family, guid } => {
+                            tracing::info!(%name, ?family, %guid, "controle conectado");
+                            PadChange::Connected { name, family, guid }
+                        }
+                        PadEvent::Disconnected { remaining } => {
+                            tracing::info!(remaining, "controle desconectado");
+                            PadChange::Disconnected { remaining }
+                        }
+                    })
+                    .collect();
+                let battery = bridge.wants_battery(now).then(|| {
+                    let (active, low) = pads.battery();
+                    BatteryReading { active, low }
+                });
+                let state = pads.state();
+                let frame = PadFrame {
+                    changes,
+                    pads: pads
+                        .buttons()
+                        .map(|(guid, buttons)| (guid.to_owned(), buttons))
+                        .collect(),
+                    left_x: state.left_x,
+                    left_y: state.left_y,
+                    count: pads.count(),
+                    family: pads.family(),
+                    name: pads.name().to_owned(),
+                    battery,
+                };
+                for output in bridge.update(frame, now) {
+                    if let InputOutput::Event(Event::InputNav(nav)) = &output {
+                        tracing::debug!(?nav, "comando do controle");
+                    }
+                    if tx.send(Command::Input(output)).is_err() {
+                        return;
+                    }
+                }
+            }
+        });
+    if let Err(error) = thread {
+        tracing::warn!(%error, "thread dos controles");
     }
 }
 
@@ -901,5 +1102,158 @@ mod tests {
         assert_eq!(ui.next(), Some(CoreMsg::Close));
         ui.exit(0);
         assert_eq!(core.join().unwrap(), Err("banco".into()));
+    }
+
+    /// Lê o que o núcleo contou à thread do controle até achar uma cena que satisfaça `want`.
+    fn scene_until(
+        control: &mpsc::Receiver<InputControl>,
+        want: impl Fn(&InputScene) -> bool,
+    ) -> InputScene {
+        loop {
+            match control.recv_timeout(Duration::from_secs(5)) {
+                Ok(InputControl::Scene(scene)) if want(&scene) => return scene,
+                Ok(_) => {}
+                Err(error) => panic!("sem a cena esperada: {error}"),
+            }
+        }
+    }
+
+    fn nav(action: tako_app::protocol::InputAction) -> Command {
+        Command::Input(InputOutput::Event(Event::InputNav(
+            tako_app::protocol::InputNav {
+                action,
+                repeat: false,
+            },
+        )))
+    }
+
+    #[test]
+    fn the_controller_reaches_the_open_ui_and_the_central_reopens_it_over_the_game() {
+        use tako_app::protocol::{ControllerInfo, ControllerStyle, InputAction};
+        let dir = tempfile::tempdir().unwrap();
+        let paths = tako_core::paths::DataPaths::at(dir.path());
+        let (children, launched) = mpsc::channel();
+        let (control_tx, control) = mpsc::channel();
+        let core = std::thread::spawn(move || {
+            run(
+                FakeLauncher(children),
+                move || {
+                    tako_app::Core::open(paths, tako_platform::Platform::simulated(), true)
+                        .map(|core| AppService::with_core("9.9.9", core))
+                        .map_err(|e| e.to_string())
+                },
+                fast(),
+                |tx| control_tx.send(tx).unwrap(),
+            )
+        });
+        let control: mpsc::Sender<Command> = control.recv().unwrap();
+        let mut ui = launched.recv().unwrap();
+        // A "thread do SDL" deste teste: só registra o que o núcleo conta e quantas vezes a acordou.
+        let (pad_tx, pad) = mpsc::channel();
+        let woken = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = woken.clone();
+        control
+            .send(Command::InputAttach(InputLink {
+                control: pad_tx,
+                wake: Box::new(move || {
+                    counter.fetch_add(1, Ordering::Relaxed);
+                }),
+            }))
+            .unwrap();
+        ui.request(r#"{"v":1,"id":1,"name":"app.info"}"#);
+        until(&mut ui, answer(1));
+        scene_until(&pad, |s| s.listening && !s.playing);
+        assert!(woken.load(Ordering::Relaxed) > 0);
+
+        // Comando e estado do controle chegam à página aberta; o estado fica para quem perguntar.
+        control.send(nav(InputAction::Down)).unwrap();
+        let down = until(&mut ui, event("input.nav"));
+        assert_eq!(down["event"]["payload"]["action"], "down");
+        let info = ControllerInfo {
+            connected: true,
+            count: 1,
+            style: ControllerStyle::Playstation,
+            name: "DualSense Wireless Controller".into(),
+            battery: Some(40),
+        };
+        control
+            .send(Command::Input(InputOutput::Event(Event::InputController(
+                info,
+            ))))
+            .unwrap();
+        let changed = until(&mut ui, event("input.controller"));
+        assert_eq!(changed["event"]["payload"]["style"], "playstation");
+        ui.request(r#"{"v":1,"id":2,"name":"input.controller"}"#);
+        assert_eq!(
+            until(&mut ui, answer(2))["reply"]["data"]["battery"],
+            serde_json::json!(40)
+        );
+
+        // Jogo aberto: a interface fecha e a thread do controle sabe que nada vai para ela.
+        ui.request(r#"{"v":1,"id":3,"name":"game.play","payload":{"gameId":"steam:demo0"}}"#);
+        assert_eq!(until(&mut ui, answer(3))["ok"], true);
+        loop {
+            match ui.next() {
+                Some(CoreMsg::Close) => break,
+                Some(_) => {}
+                None => panic!("canal fechado"),
+            }
+        }
+        ui.exit(0);
+        scene_until(&pad, |s| !s.listening && s.playing && !s.over_game);
+        // Um comando atrasado não reabre nem vai a lugar nenhum.
+        control.send(nav(InputAction::Accept)).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(launched.try_recv().is_err());
+
+        // A combinação da Central reabre a interface por cima do jogo; os comandos voltam a valer.
+        control.send(Command::Input(InputOutput::Central)).unwrap();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":4,"name":"game.running"}"#);
+        assert_eq!(
+            until(&mut ui, answer(4))["reply"]["data"]["state"],
+            "playing"
+        );
+        scene_until(&pad, |s| s.listening && s.playing && s.over_game);
+        control.send(nav(InputAction::Back)).unwrap();
+        assert_eq!(
+            until(&mut ui, event("input.nav"))["event"]["payload"]["action"],
+            "back"
+        );
+        // De novo: volta ao jogo.
+        control.send(Command::Input(InputOutput::Central)).unwrap();
+        loop {
+            match ui.next() {
+                Some(CoreMsg::Close) => break,
+                Some(_) => {}
+                None => panic!("canal fechado"),
+            }
+        }
+        ui.exit(0);
+        scene_until(&pad, |s| !s.listening && s.playing && !s.over_game);
+
+        // Encerra o jogo por uma interface reaberta e fecha a janela: ela volta no fim do jogo, e sair dela encerra o app.
+        control.send(Command::Show).unwrap();
+        let mut ui = launched.recv().unwrap();
+        ui.request(r#"{"v":1,"id":5,"name":"game.end","payload":{"force":true}}"#);
+        until(&mut ui, answer(5));
+        ui.send(&UiMsg::UserClosed);
+        ui.exit(0);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !core.is_finished() {
+            if let Ok(ui) = launched.try_recv() {
+                ui.send_closed_and_exit();
+            }
+            assert!(Instant::now() < deadline, "o app não terminou");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(core.join().unwrap(), Ok(()));
+    }
+
+    impl FakeUi {
+        fn send_closed_and_exit(mut self) {
+            self.send(&UiMsg::UserClosed);
+            self.exit(0);
+        }
     }
 }

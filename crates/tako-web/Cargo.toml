@@ -21,7 +21,8 @@ cef = { workspace = true, optional = true }
 [features]
 # O hospedeiro CEF (Windows). Sem ela o crate só tem a ponte e os esquemas, e `cargo test --workspace`
 # não baixa nem compila o Chromium. O `tako --features web` liga esta.
-cef = ["dep:cef"]
+# Liga também os controles pelo SDL3 no núcleo (`tako-platform/gamepad`, WEB-05b).
+cef = ["dep:cef", "tako-platform/gamepad"]
 
 [dev-dependencies]
 tempfile.workspace = true

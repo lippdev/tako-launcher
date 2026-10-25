@@ -9,6 +9,7 @@ import {
   setBackHandler,
   setInputSource,
 } from "./engine";
+import { startController } from "./controller";
 import { actionForKey } from "./keymap";
 
 /** O cursor está na ponta do campo, para onde a seta quer ir? Antes disso a seta é do texto. */
@@ -20,9 +21,10 @@ function caretAtEdge(field: HTMLElement, key: string): boolean {
 }
 
 /**
- * Liga a navegação por direção ao app: teclado, origem da entrada (mouse apaga o foco visível), memória de foco
- * por região e recuperação do foco quando a tela troca. Uma vez, no `AppShell`. `onBack` é o "voltar" da tela
- * (fechar a página do jogo, sair das Configurações): roda quando camada, campo e componente não trataram o Esc.
+ * Liga a navegação por direção ao app: teclado, controle (pela ponte), origem da entrada (mouse apaga o foco
+ * visível), memória de foco por região e recuperação do foco quando a tela troca. Uma vez, no `AppShell`. `onBack` é
+ * o "voltar" da tela (fechar a página do jogo, sair das Configurações): roda quando camada, campo e componente não
+ * trataram o Esc.
  */
 export function useSpatialNavigation(onBack: () => boolean): void {
   const back = useLatest(onBack);
@@ -92,9 +94,10 @@ export function useSpatialNavigation(onBack: () => boolean): void {
     document.addEventListener("pointerdown", onPointer, true);
     window.addEventListener("keydown", onKeyDown);
     document.addEventListener("focusin", onFocusIn);
-    // TODO(WEB-05b): o núcleo entrega as ações do controle (SDL3) pela ponte como evento; aqui entra
-    // `listen("input.action", (action) => dispatchNavAction(action, "controller"))`. O mapa de botões é do núcleo.
+    // O controle (SDL3 no núcleo) chega pela ponte já como comando; o mapa de botões e a repetição são do núcleo.
+    const stopController = startController();
     return () => {
+      stopController();
       observer.disconnect();
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeySource, true);

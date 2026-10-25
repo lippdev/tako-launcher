@@ -9,7 +9,7 @@ rust-version.workspace = true
 [dependencies]
 tako-core.workspace = true
 tako-themes.workspace = true
-tako-platform.workspace = true
+tako-platform = { workspace = true, features = ["gamepad"] }
 tako-sources.workspace = true
 tako-downloads.workspace = true
 slint.workspace = true

@@ -125,8 +125,9 @@ aqui): com o cliente da Steam fechado, o processo que abre a URI sai e a Steam l
 abrir o jogo, então a sessão termina como `quick` e o jogo abre fora dela; e um `game.end` antes de o processo do
 jogo aparecer encerra a sessão sem nada para fechar. Com a Steam aberta, o jogo aparece em cerca de 2 s.
 
-Ainda não há no núcleo web: presença no Discord, ponteiro pelo analógico (precisa ler o controle, WEB-22), Wine e
-Proton (Linux, fora da fase Windows, D-15) e esconder o controle do jogo com a Central aberta (INPUT-005).
+Ainda não há no núcleo web: presença no Discord, ponteiro pelo analógico (o controle já é lido no núcleo, WEB-05b;
+o ponteiro é do WEB-34), Wine e Proton (Linux, fora da fase Windows, D-15) e esconder o controle do jogo com a
+Central aberta (INPUT-005; só na tela cheia, veja "Controle").
 
 Testes: `tako-core` (`session::launch`, `session::running`: abrir, restaurar, queda, encerrar), `tako-app`
 (`tests/session_bridge.rs`: o ciclo pela ponte, `launch_failed`, a queda do núcleo, a demonstração, o formato) e
@@ -184,6 +185,61 @@ A regra é a do Slint (`tako_core::updates`, SHA-256 publicado no GitHub); o est
 
 Testes: `tako-core` (`updates::`, inclusive o download adulterado), `tako-app` (`tests/updates_bridge.rs`, com consulta falsa,
 servidor HTTP local e instalador falso) e `tako-web` (`core_process.rs`: `Exit` encerra o núcleo).
+
+## Controle (WEB-05b)
+
+O SDL3 roda no **núcleo**, numa thread própria (`core_process::spawn_pads`, ligada pela feature `cef`), e nunca no
+filho CEF. Como o núcleo vive durante o jogo, é ele que vê o atalho da Central com a interface fechada, como o
+supervisor do Slint. A leitura pelo SDL (`Pads`) saiu da `tako-ui` para a `tako-platform` (feature `gamepad`); as
+regras são as do Slint e ficam no `tako-core`:
+
+| Regra | Onde | Valor |
+|---|---|---|
+| Zona morta do analógico, repetição da direção mantida | `input::GamepadInterpreter` | 0,5; 380 ms e depois a cada 110 ms |
+| Botões de cada controle pelo seu perfil, combinação da Central | `input::profiles`, `input::shortcut` | INPUT-001; View + Y por 500 ms no padrão |
+| Família dos botões, estado somado, avisos de conexão | `input::pad` | Xbox, PlayStation, Nintendo; `PadNotices` |
+| Bateria fraca | `input::low_battery_warning` | 15 %, um aviso por conexão |
+
+A thread do SDL entrega cada leitura (`PadFrame`) a um `tako_app::input::InputBridge`, que diz o que vai para a
+interface. O laço do núcleo (`InputSync`) repassa e conta à thread onde a interface está (`InputScene`) e, depois
+de cada pedido da página, os perfis de botões das configurações do perfil em uso.
+
+| Ponte | O quê |
+|---|---|
+| evento `input.nav` `{ action, repeat }` | Comando já traduzido: `up`, `down`, `left`, `right`, `accept` (A), `back` (B), `favorite` (X), `search` (Y), `previous_section` e `next_section` (LB e RB), `menu`. `repeat` só em direção mantida |
+| evento `input.controller` | `{ connected, count, style, name, battery }`: `style` é `xbox`, `playstation` ou `nintendo` (o último controle que conectou ou apertou um botão); `battery` em % só sem fio |
+| chamada `input.controller` | O mesmo estado, para a página que abre (ou reabre depois do jogo) |
+| evento `input.notice` `{ kind, pad, percent }` | `connected`, `disconnected` ou `battery_low`; o texto é `status.pad_connected`, `status.pad_disconnected` e `status.battery_low` do catálogo |
+
+**Quando vai algo para a interface.** Comandos e avisos só com uma página aberta; fechada (durante o jogo), nada
+(D-10). Com um jogo aberto o controle é do jogo: nem a interface que ainda mostra "Abrindo…" recebe comandos (no
+Slint desktop é igual). Avisos de conexão não saem durante o jogo, e "desconectado" só para quem usava o controle;
+como o núcleo não vê teclado nem mouse, conectar já conta como "usando o controle" (no Slint o teclado desfaz).
+"Conectado" só aparece depois de o último controle cair com aviso. A bateria é lida a cada 30 s só com a interface
+aberta (e logo depois de um controle entrar ou sair), então o aviso de bateria fraca espera a interface, como no
+Slint.
+
+**Atalho da Central durante o jogo.** A combinação do perfil (View + Y por padrão) com a interface fechada a reabre
+por cima do jogo, e os comandos voltam a valer; a mesma combinação com ela aberta assim volta ao jogo. A tela da
+Central é do WEB-22. O que estiver apertado quando a interface volta só vale depois de solto. O SDL só acorda pelos
+eventos com a interface fechada (2 s de espera, 50 ms segurando a combinação); aberta, uma volta a cada 16 ms.
+
+**HidHide (INPUT-005).** O Slint só esconde o controle do jogo na tela cheia (o supervisor, com a interface por cima
+do jogo); no desktop o jogo continua com ele (ADR-0027). A versão web é só desktop até o WEB-15, então não esconde.
+
+**No React** (`web/src/focus/`): `controller.ts` liga `input.nav` ao mesmo `dispatchNavAction` do teclado, com a
+ação oferecida antes ao componente focado como a tecla equivalente (com `repeat`, para lista e deslizante não
+pularem a borda segurando). Y abre a busca geral pelo mesmo Ctrl+K; X e Menu chegam ao componente focado como
+`tako:command` (`detail.command` é `favorite` ou `menu`), e quem não escuta ignora. `data-pad` na raiz e
+`useController()` dão a família dos botões para ícones e dicas; `AvisosDoControle` mostra os avisos.
+
+**Hospedeiro falso.** `?controle[=xbox|playstation|nintendo]` e `?bateria=12` simulam um controle conectado;
+Ctrl+Shift+F8 desconecta e reconecta, Ctrl+Shift+F9 troca a família, e `window.takoFakePad.press("down")` manda um
+comando como se viesse do controle.
+
+Testes: `tako-core` (`input::pad`), `tako-app` (`tests/input_bridge.rs`: zona morta, repetição, perfis, cena,
+Central, avisos, bateria, formato) e `tako-web` (`core_process.rs`: comandos para a página aberta, nada com ela
+fechada, a Central reabre por cima do jogo e volta a ele).
 
 ## Preparar e compilar
 

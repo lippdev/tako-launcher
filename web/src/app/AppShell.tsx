@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useSpatialNavigation } from "../focus";
+import { AvisosDoControle, useSpatialNavigation } from "../focus";
 import { BarraSuperior } from "./BarraSuperior";
 import { BuscaGeral } from "./BuscaGeral";
 import { ColunaDaLista } from "./ColunaDaLista";
@@ -182,6 +182,7 @@ export function AppShell() {
         </main>
       </div>
       <CamadasDaSessao />
+      <AvisosDoControle />
       <BuscaGeral
         open={searchOpen}
         focusToken={searchFocus}

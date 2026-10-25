@@ -6737,6 +6737,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-foundation 0.3.2",
+ "sdl3",
  "serde",
  "serde_json",
  "tako-core",

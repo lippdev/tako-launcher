@@ -11,6 +11,7 @@ mod edit;
 mod emulators;
 mod game_settings;
 mod i18n;
+pub mod input;
 mod library;
 mod organize;
 mod profile;
@@ -59,6 +60,8 @@ pub struct AppService {
     host: Option<Sender<HostRequest>>,
     ui_state: Option<String>,
     core: Option<Core>,
+    /// Controle em uso (WEB-05b), atualizado pelo hospedeiro que lê o SDL3.
+    controller: protocol::ControllerInfo,
 }
 
 impl AppService {
@@ -69,6 +72,7 @@ impl AppService {
             host: None,
             ui_state: None,
             core: None,
+            controller: protocol::ControllerInfo::default(),
         }
     }
 
@@ -155,6 +159,7 @@ impl AppService {
             Call::GameRunning => self.running(),
             Call::GameResume => self.resume(),
             Call::GameEnd(request) => self.end_game(request),
+            Call::InputController => Ok(Reply::InputController(self.controller.clone())),
             Call::LibraryScan => {
                 let core = self
                     .core

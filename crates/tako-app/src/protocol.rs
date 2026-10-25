@@ -108,6 +108,7 @@ pub fn parse_request(text: &str) -> Result<Request, (u32, BridgeError)> {
             | "updates.apply"
             | "updates.preferences"
             | "updates.preferences.set"
+            | "input.controller"
     ) {
         return Err((
             header.id,
@@ -549,6 +550,9 @@ pub enum Call {
         #[ts(as = "UpdatePrefs")]
         UpdatePrefs,
     ),
+    /// Controle em uso agora (WEB-05b): conectado, estilo dos botões e bateria. Muda pelo evento `input.controller`.
+    #[serde(rename = "input.controller")]
+    InputController,
 }
 
 /// Respostas, uma por chamada e com o mesmo nome.
@@ -684,6 +688,8 @@ pub enum Reply {
     UpdatesPreferences(UpdatePrefs),
     #[serde(rename = "updates.preferences.set")]
     UpdatesPreferencesSet(UpdatePrefs),
+    #[serde(rename = "input.controller")]
+    InputController(ControllerInfo),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -740,6 +746,16 @@ pub enum Event {
     /// A atualização do Tako mudou (procura, versão achada, progresso do download, pronta ou falha).
     #[serde(rename = "updates.changed")]
     UpdatesChanged(UpdateStatus),
+    /// Um comando do controle (SDL3 no núcleo, WEB-05b), já com o perfil de botões, a zona morta e a repetição. Só
+    /// chega com a interface aberta e sem jogo na frente.
+    #[serde(rename = "input.nav")]
+    InputNav(InputNav),
+    /// O controle em uso mudou: conectou, saiu, trocou de família ou a bateria mudou.
+    #[serde(rename = "input.controller")]
+    InputController(ControllerInfo),
+    /// Aviso para a tela: controle desconectado, conectado de volta ou com bateria fraca (INPUT-003, INPUT-004).
+    #[serde(rename = "input.notice")]
+    InputNotice(InputNotice),
 }
 
 /// Estado consultável também depois de reabrir a interface. Durante a medição, a leitura segue em andamento.
@@ -2224,4 +2240,87 @@ pub struct UpdatePrefs {
     pub auto_update: bool,
     pub prereleases: bool,
     pub nightly: bool,
+}
+
+/// Comando do controle, independente do botão (o perfil de botões já foi aplicado: INPUT-001).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum InputAction {
+    Up,
+    Down,
+    Left,
+    Right,
+    /// A.
+    Accept,
+    /// B.
+    Back,
+    /// X.
+    Favorite,
+    /// Y.
+    Search,
+    /// LB.
+    PreviousSection,
+    /// RB.
+    NextSection,
+    /// Menu (Start).
+    Menu,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct InputNav {
+    pub action: InputAction,
+    /// Direção mantida: repetição (380 ms depois do aperto, depois a cada 110 ms).
+    pub repeat: bool,
+}
+
+/// Família dos botões, para os ícones e as dicas.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ControllerStyle {
+    #[default]
+    Xbox,
+    Playstation,
+    Nintendo,
+}
+
+/// O controle em uso (o último que conectou ou apertou um botão).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ControllerInfo {
+    /// Há pelo menos um controle conectado.
+    pub connected: bool,
+    pub count: u32,
+    pub style: ControllerStyle,
+    /// Nome do controle em uso; vazio sem controle.
+    pub name: String,
+    /// Bateria (%) do controle em uso sem fio; `null` com fio, carregando, desconhecida ou sem controle.
+    pub battery: Option<i32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum InputNoticeKind {
+    /// `status.pad_connected`.
+    Connected,
+    /// `status.pad_disconnected`.
+    Disconnected,
+    /// `status.battery_low`, com `pad` e `percent`.
+    BatteryLow,
+}
+
+/// Aviso do controle; o texto sai do catálogo (`status.*`).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct InputNotice {
+    pub kind: InputNoticeKind,
+    /// Nome do controle (bateria fraca).
+    pub pad: Option<String>,
+    pub percent: Option<i32>,
 }

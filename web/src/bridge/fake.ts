@@ -8,6 +8,10 @@ import type { GameEnded } from "./generated/GameEnded";
 import type { RunningGame } from "./generated/RunningGame";
 import type { RunningState } from "./generated/RunningState";
 import type { UiState } from "./generated/UiState";
+import type { ControllerInfo } from "./generated/ControllerInfo";
+import type { ControllerStyle } from "./generated/ControllerStyle";
+import type { InputAction } from "./generated/InputAction";
+import type { InputNotice } from "./generated/InputNotice";
 import type { GameRow } from "../components/ListaDeJogos/ListaDeJogos";
 import type { LibraryGame } from "./generated/LibraryGame";
 import type { LibraryListRequest } from "./generated/LibraryListRequest";
@@ -2962,3 +2966,103 @@ if (firstRunDemo && settings.get("FirstRunCompleted") !== "true") {
     },
   });
 }
+// ---- Controle (WEB-05b) ----
+// No Tako o núcleo lê o controle pelo SDL3 e manda `input.nav`, `input.controller` e `input.notice`. No navegador, um
+// controle simulado, para ver o estilo dos botões (`data-pad` na raiz) e os avisos:
+//   ?controle[=xbox|playstation|nintendo]  um controle conectado desde a abertura (sem valor: Xbox);
+//   ?bateria=12                              a bateria dele; com 15 % ou menos, o aviso de bateria fraca ao abrir;
+//   Ctrl+Shift+F8                            desconecta e reconecta (os avisos de quem usa o controle);
+//   Ctrl+Shift+F9                            troca a família dos botões;
+//   window.takoFakePad.press("down")         um comando, como se viesse do controle (setas, accept, back, search…).
+const padParams = typeof location === "undefined" ? new URLSearchParams() : new URLSearchParams(location.search);
+const PAD_STYLES: ControllerStyle[] = ["xbox", "playstation", "nintendo"];
+const PAD_NAMES: Record<ControllerStyle, string> = {
+  xbox: "Xbox Wireless Controller",
+  playstation: "DualSense Wireless Controller",
+  nintendo: "Pro Controller",
+};
+const NO_PAD: ControllerInfo = { connected: false, count: 0, style: "xbox", name: "", battery: null };
+
+function fakePadInfo(style: ControllerStyle): ControllerInfo {
+  const battery = Number(padParams.get("bateria"));
+  return {
+    connected: true,
+    count: 1,
+    style,
+    name: PAD_NAMES[style],
+    battery: padParams.has("bateria") && Number.isFinite(battery) ? Math.round(battery) : null,
+  };
+}
+
+const padStyleParam = padParams.get("controle") ?? "";
+let fakePad: ControllerInfo = padParams.has("controle")
+  ? fakePadInfo(PAD_STYLES.includes(padStyleParam as ControllerStyle) ? (padStyleParam as ControllerStyle) : "xbox")
+  : NO_PAD;
+let fakePadStyle: ControllerStyle = fakePad.style;
+/** Caiu com aviso: o "conectado" só aparece depois disso (regra do núcleo, `PadNotices`). */
+let fakePadLost = false;
+
+function fakePadNotice(notice: InputNotice) {
+  deliverEvent("input.notice", notice);
+}
+
+function toggleFakePad() {
+  if (fakePad.connected) {
+    fakePad = NO_PAD;
+    fakePadLost = true;
+    fakePadNotice({ kind: "disconnected", pad: null, percent: null });
+  } else {
+    fakePad = fakePadInfo(fakePadStyle);
+    if (fakePadLost) fakePadNotice({ kind: "connected", pad: null, percent: null });
+    fakePadLost = false;
+  }
+  deliverEvent("input.controller", fakePad);
+}
+
+function cycleFakePadStyle() {
+  fakePadStyle = PAD_STYLES[(PAD_STYLES.indexOf(fakePadStyle) + 1) % PAD_STYLES.length] ?? "xbox";
+  if (!fakePad.connected) return;
+  fakePad = fakePadInfo(fakePadStyle);
+  deliverEvent("input.controller", fakePad);
+}
+
+Object.assign(defaults, { "input.controller": () => fakePad });
+
+// Só no navegador: os testes do falso rodam no Node com um `window` de mentira.
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("keydown", (event) => {
+    if (!installedFake || !event.ctrlKey || !event.shiftKey || event.altKey) return;
+    if (event.key === "F8") {
+      event.preventDefault();
+      toggleFakePad();
+    } else if (event.key === "F9") {
+      event.preventDefault();
+      cycleFakePadStyle();
+    }
+  });
+  (window as unknown as { takoFakePad: unknown }).takoFakePad = {
+    press(action: InputAction, repeat = false) {
+      deliverEvent("input.nav", { action, repeat });
+    },
+    toggle: toggleFakePad,
+    style: cycleFakePadStyle,
+  };
+  const battery = fakePad.battery;
+  if (fakePad.connected && battery !== null && battery <= 15) {
+    // Depois de a página abrir e escutar os avisos.
+    setTimeout(() => {
+      fakePadNotice({ kind: "battery_low", pad: fakePad.name, percent: battery });
+    }, 1500);
+  }
+}
+
+Object.assign(SAMPLE_CATALOGS["pt-BR"], {
+  "status.pad_disconnected": "Controle desconectado",
+  "status.pad_connected": "Controle conectado",
+  "status.battery_low": "Bateria fraca: {pad} com {percent}%",
+});
+Object.assign(SAMPLE_CATALOGS["en-US"], {
+  "status.pad_disconnected": "Controller disconnected",
+  "status.pad_connected": "Controller connected",
+  "status.battery_low": "Low battery: {pad} at {percent}%",
+});

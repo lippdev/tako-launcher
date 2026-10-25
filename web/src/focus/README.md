@@ -9,6 +9,8 @@ Q e E trocam de seção. Mesmo mapa do app atual (`crates/tako-ui/src/shell/keys
 | `keymap.ts` | Tecla → ação (`NavAction`), e a tecla que o componente focado entenderia no lugar de uma ação. |
 | `engine.ts` | DOM: candidatos, camadas, memória por região, foco com rolagem, recuperação do foco. |
 | `useSpatialNavigation.ts` | Liga o teclado e o resto no `AppShell`. Uma vez. |
+| `controller.ts` | O controle pela ponte: `input.nav` → `dispatchNavAction`, estado (`useController`) e avisos. |
+| `AvisosDoControle.tsx` | Os avisos do controle (desconectado, de volta, bateria fraca). Uma vez, no `AppShell`. |
 
 ## Marcas no DOM
 
@@ -56,7 +58,14 @@ camada que contém o foco. O Esc e o "voltar" fecham a de cima (`closeTopLayer`)
 `useSpatialNavigation`; o controle chega pela ponte (`source: "controller"`), e a ação é antes oferecida ao componente
 focado como a tecla equivalente (`keyForAction`), para lista, abas, deslizante e menu continuarem donos das setas.
 
-`// TODO(WEB-05b)` em `useSpatialNavigation.ts`: o evento do núcleo (SDL3) que chama `dispatchNavAction`.
+O controle (WEB-05b, `controller.ts`): o núcleo lê o SDL3, aplica o perfil de botões, a zona morta e a repetição e
+manda `input.nav { action, repeat }`; `actionForInput` (`keymap.ts`) traduz e `dispatchNavAction` executa. `repeat` vai
+na tecla oferecida, então a regra "um aperto novo" das bordas vale também segurando o direcional. Y abre a busca geral
+(o mesmo Ctrl+K). X e Menu não têm tecla: chegam ao componente focado como o evento `tako:command` (`COMMAND_EVENT`,
+`detail.command` = `favorite` ou `menu`), que sobe pela árvore; o componente que tem favorito ou menu escuta e chama
+`preventDefault`. Durante o jogo nada chega (o controle é do jogo). `useController()` e `data-pad` na raiz
+(`xbox | playstation | nintendo`, ausente sem controle) dão a família dos botões para ícones e dicas;
+`AvisosDoControle` mostra "desconectado", "conectado" e "bateria fraca". Detalhes em `docs/web/hospedeiro.md`.
 
 "Voltar" quando nada acima tratou: `setBackHandler`, registrado pelo `AppShell` (página do jogo → Visão geral; outras
 vistas → biblioteca).

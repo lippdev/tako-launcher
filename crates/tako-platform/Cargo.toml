@@ -16,6 +16,14 @@ keyring.workspace = true
 image.workspace = true
 arboard.workspace = true
 
+[dependencies.sdl3]
+workspace = true
+optional = true
+
+[features]
+# Leitura dos controles pelo SDL3 (`gamepad`). Opcional: quem não lê controle não compila o SDL.
+gamepad = ["dep:sdl3"]
+
 [dev-dependencies]
 tempfile.workspace = true
 

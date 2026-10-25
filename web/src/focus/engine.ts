@@ -16,6 +16,9 @@ const LAYER = '[role="dialog"][aria-modal="true"], [role="menu"]';
 /** Quem muda de seção com Q e E: `tablist` e o que se marcar com `data-focus-sections`. */
 const SECTIONS = '[role="tablist"], [data-focus-sections]';
 
+/** Evento dos comandos do controle sem tecla (X, Menu): `detail.command` é `favorite` ou `menu`. */
+export const COMMAND_EVENT = "tako:command";
+
 type Focusable = HTMLElement;
 
 /** Último foco de cada região. */
@@ -183,9 +186,9 @@ export function needsClick(el: Element): boolean {
  * Entrega a tecla ao componente focado, como se ela tivesse sido apertada (o controle não gera tecla). `true` se ele
  * tratou (`preventDefault`): lista, abas, deslizante e menu continuam donos das próprias setas.
  */
-function offer(key: string): boolean {
+function offer(key: string, init: KeyboardEventInit = {}): boolean {
   const target = document.activeElement ?? document.body;
-  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+  const event = new KeyboardEvent("keydown", { ...init, key, bubbles: true, cancelable: true });
   target.dispatchEvent(event);
   return event.defaultPrevented;
 }
@@ -245,15 +248,32 @@ export function switchSection(delta: -1 | 1): boolean {
   return true;
 }
 
+/** Y do controle: a busca geral, pelo mesmo Ctrl+K do teclado (o atalho é do `AppShell`). */
+function openSearch(): boolean {
+  return offer("k", { ctrlKey: true });
+}
+
 /**
- * O ponto único das ações. Hoje o teclado chega pelo `useSpatialNavigation`; o controle chega aqui, vindo da ponte
- * (`source: "controller"`), e passa antes pelo componente focado, como uma tecla.
+ * X e Menu do controle: `tako:command` no elemento focado, subindo pela árvore. O componente que tem favorito ou menu
+ * escuta e chama `preventDefault`; `false` se ninguém tratou.
  */
-export function dispatchNavAction(action: NavAction, from: InputSource = "controller"): boolean {
+function sendCommand(command: "favorite" | "menu"): boolean {
+  const target = document.activeElement ?? document.body;
+  const event = new CustomEvent(COMMAND_EVENT, { detail: { command }, bubbles: true, cancelable: true });
+  target.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
+/**
+ * O ponto único das ações. O teclado chega pelo `useSpatialNavigation`; o controle chega aqui, vindo da ponte
+ * (`source: "controller"`, `controller.ts`), e passa antes pelo componente focado, como uma tecla. `repeat`: direção
+ * mantida no controle; vai na tecla oferecida, para a lista e o deslizante não pularem a borda segurando.
+ */
+export function dispatchNavAction(action: NavAction, from: InputSource = "controller", repeat = false): boolean {
   setInputSource(from);
   if (from === "controller") {
     const key = keyForAction(action);
-    if (key !== null && offer(key)) return true;
+    if (key !== null && offer(key, { repeat })) return true;
   }
   switch (action.kind) {
     case "navigate":
@@ -264,6 +284,10 @@ export function dispatchNavAction(action: NavAction, from: InputSource = "contro
       return back();
     case "section":
       return switchSection(action.delta);
+    case "search":
+      return openSearch();
+    case "command":
+      return sendCommand(action.command);
   }
 }
 

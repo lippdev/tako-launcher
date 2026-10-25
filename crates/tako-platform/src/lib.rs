@@ -14,6 +14,8 @@ pub mod console_mode;
 pub mod downloads;
 pub mod exe_icon;
 pub mod fse;
+#[cfg(feature = "gamepad")]
+pub mod gamepad;
 pub mod secrets;
 pub mod space;
 pub mod sunshine;
