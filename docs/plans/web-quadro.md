@@ -8,10 +8,10 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 
 | Conta | Provider | Situação |
 |---|---|---|
-| Claude Alyx Medical | `claudeAgent` | rodando WEB-13c1 e WEB-33 |
+| Claude Alyx Medical | `claudeAgent` | rodando WEB-33; **poupar** (pedido do mantenedor: é a conta do orquestrador, perto do limite) |
 | Antigravity | `antigravity` | rodando WEB-04m (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | rodando WEB-05b |
-| Codex Lipp | `codex` | **sem créditos no workspace** (24/10, ~21:00; não é limite que reseta: o mantenedor precisa pôr créditos) |
+| Codex Lipp | `codex` | livre (mantenedor confirmou limite disponível) |
 | Codex Alyx Medical | `codex_alyx_medical` | rodando WEB-01d |
 
 ## Onda 1 — Fundação (D-14: direto no código definitivo)
@@ -57,7 +57,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | WEB-04k | **Componentes do onboarding:** PassosDoOnboarding (com a escada de entrada), EscolhaDoOnboarding (cartão e linha, sem pagamento), LojaEncontrada, TelaOnboarding (moldura); os passos ficam para o WEB-16 | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04a | `web/src/components/` (quatro pastas) | integrada (aguarda validação visual; o orquestrador trocou a duração fixa da escada pelos tokens de tempo) |
 | WEB-11c | **Modos Grade e Categorias na lista:** seletor de modo como no Slint, BibliotecaGrade e BibliotecaCategorias ligadas à paginação, filtros, coleção e seleção | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-04j, WEB-11b | `web/src/app/ColunaDaLista.tsx`, `web/src/app/lista/` | integrada (aguarda validação visual; Categorias ficam na coluna de 292, no Slint ocupam a janela) |
 | WEB-04l | **Passos do onboarding:** OnboardingEmuladores, OnboardingCapas, OnboardingModo, OnboardingPronto (visuais, montados com as peças do WEB-04k); ligar no WEB-16 | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04k | `web/src/components/Onboarding*/` | integrada (aguarda validação visual; conferida pelo orquestrador sem correções) |
-| WEB-13c1 | **Configurações que faltam (1):** aparência do desktop (cor de destaque, Liquid Glass), coleções automáticas em Biblioteca, Emuladores e ROMs | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-13b, WEB-11b | `web/src/app/settings/`, `crates/tako-app/src/{settings,emulators}.rs` | despachada |
+| WEB-13c1 | **Configurações que faltam (1):** aparência do desktop (cor de destaque, Liquid Glass), coleções automáticas em Biblioteca, Emuladores e ROMs | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-13b, WEB-11b | `web/src/app/settings/`, `crates/tako-app/src/{settings,emulators}.rs` | integrada (aguarda validação visual; caminho de pasta digitado; executável do emulador à mão fica com o seletor de arquivo) |
 | WEB-21 | **Sessão na interface:** "Abrindo…", "Fechando o jogo…", estado jogando na página e na lista, Voltar ao jogo e Encerrar, "bem-vindo de volta", ErroDoJogo (SESSION-003), sessão no hospedeiro falso | N3 | Claude InvestSmart · Sonnet 5.5 alto | WEB-20 | `web/src/app/sessao/`, mínimo em `web/src/app/jogo/` | integrada (aguarda validação visual e um teste com jogo real no `tako --web`) |
 | WEB-33 | **Atualizações do app:** conferir, avisar (AtualizacaoDoApp), baixar com progresso, conferir assinatura, reiniciar pelo hospedeiro sem derrubar jogo aberto | N3 | Claude Alyx · Sonnet 5.5 alto | WEB-04f, WEB-20 | `crates/tako-app/src/updates.rs`, `web/src/app/atualizacao/` | despachada |
 | WEB-04m | **AssistenteInicial e PainelControles** (componentes; primeiros passos de perfil novo e Configurações › Controles) | N2 | Antigravity · Gemini 3.8 Flash high | WEB-04k | `web/src/components/` (duas pastas) | despachada |

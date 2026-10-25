@@ -57,10 +57,10 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 |---|---|---|
 | Geral, Aparência, Bibliotecas | ✅ | WEB-13a |
 | Tema, Som, Tela e áudio, Integrações, Sistema, Sobre | ✅ (lacunas no quadro) | WEB-13b |
-| Aparência do desktop: cor de destaque, opções do Liquid Glass (`settings_desk_theme`) | ⬜ | **WEB-13c** |
+| Aparência do desktop: cor de destaque, opções do Liquid Glass (`settings_desk_theme`) | ✅ | WEB-13c1 |
 | Capas e metadados: chaves no cofre, capas (`settings_metadata`) | ⬜ | **WEB-13c** |
 | Controles: atalhos, mapeamento, HidHide (`settings_controls`) | ⬜ | **WEB-13c** (depois do WEB-05b) |
-| Emuladores e ROMs (`settings_emulators`) | ⬜ | **WEB-13c** |
+| Emuladores e ROMs (`settings_emulators`) | 🟡 pastas e sistemas; executável à mão espera o seletor de arquivo | WEB-13c1 |
 | Sunshine com prévia e confirmação (`settings_sunshine`) | 🟡 só a chave | **WEB-13c** |
 | Downloads (ligar, aviso legal, limite) | ✅ | WEB-14b |
 | Perfis | ✅ (em Geral) | WEB-14c |
