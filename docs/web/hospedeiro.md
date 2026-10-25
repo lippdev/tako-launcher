@@ -555,3 +555,13 @@ interface a cada abertura. O empacotamento do runtime continua fora desta tarefa
 pelo redator/rotação do núcleo. O build debug emite LNK4098 pela mistura
 de runtimes C++ (SDL3, e também CEF com a feature `web`).
 Linux e macOS precisam de entradas próprias; `--web` retorna erro nesses sistemas nesta etapa.
+
+## Instalador de prévia
+
+O script `build/rust/Package-Web.ps1` automatiza a geração do pacote e do instalador Inno Setup (`dist/Tako-Web-Preview-Setup-x64.exe`) para testes da versão web no Windows:
+
+1. Compila os arquivos estáticos da interface web (`npm ci` e `npm run build` em `web/`), gerando `web/dist`.
+2. Configura o ambiente CEF (`scripts/cef-setup.ps1`) e compila o binário em release com `cargo build -p tako --release --features web --locked`.
+3. Monta uma pasta de estágio independente (`artifacts/rust/web-preview-x64/`) contendo o executável `tako.exe`, o runtime completo do CEF (`libcef.dll`, `chrome_elf.dll`, `d3dcompiler_47.dll`, `icudtl.dat`, `v8_context_snapshot.bin`, arquivos `.pak`, `locales/`, etc.) e a interface compilada em `web/dist/`.
+4. Executa um teste automatizado na pasta montada iniciando `tako.exe --web` com um `--data-dir` temporário, validando a subida da interface e encerrando apenas o PID de teste iniciado.
+5. Invoca o Inno Setup (`build/rust/tako-web.iss`) para produzir o instalador por usuário `dist/Tako-Web-Preview-Setup-x64.exe`. O instalador utiliza AppId dedicado e pasta de destino própria (`%LOCALAPPDATA%\Programs\Tako Web (prévia)`), mantendo atalhos apontando para `tako.exe --web` sem interferir na instalação existente do Tako Slint. Caso o Inno Setup não esteja disponível, pode ser instalado via `winget install --id JRSoftware.InnoSetup -e --scope user` ou compactado diretamente como pacote portátil (`dist/Tako-Web-Preview-Portable-x64.zip`).
