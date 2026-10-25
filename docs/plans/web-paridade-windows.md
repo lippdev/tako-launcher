@@ -15,7 +15,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Metadados e arte (`metadata.rs`, `art.rs`): fontes, cache, IGDB, ScreenScraper, SteamGridDB | ✅ | WEB-01d · WEB-32 |
 | Sessão de jogo (`session.rs`, `hosts.rs`): abrir, tela e áudio, acompanhar, restaurar, recuperação | ✅ (falta testar com jogo real pela interface; Discord e ponteiro no WEB-34) | WEB-20 · WEB-21 |
 | "Abrindo…" (`launch_splash`) e "Fechando o jogo…" (`closing_game`) | ✅ desktop (a tela cheia do "Abrindo…" fica com o WEB-15) | WEB-21 |
-| Central rápida durante o jogo (`control_center`) e o atalho global | ⬜ | **WEB-22** |
+| Central rápida durante o jogo (`control_center`) e o atalho global | ✅ (falta teste com jogo real) | WEB-22 |
 | Controles pelo SDL3 (`gamepad.rs`): navegação, bateria, reconexão, isolar do jogo (HidHide) | 🟡 pronto; falta teste com controle real e HidHide (só na tela cheia) | WEB-05b · **WEB-15** |
 | Teclado virtual (`keyboard`) para busca e campos no controle | adiado pelo mantenedor (24/10) | WEB-23 (adiada) |
 | Atualizações do app (`app_updates.rs`) | ✅ (falta testar com release real) | WEB-33 |
