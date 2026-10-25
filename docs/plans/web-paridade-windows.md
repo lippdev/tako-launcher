@@ -24,7 +24,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Links `tako://` (`links`) | ✅ (o registro no Windows é do instalador) | WEB-34 |
 | Splash de abertura e primeira leitura (`splash.rs`) | ✅ | WEB-35 |
 | Interface descartável (núcleo e interface separados) | ✅ | WEB-02b |
-| Bandeja do sistema | ⬜ | **WEB-36** |
+| Bandeja do sistema | ✅ (falta a chave nas Configurações) | WEB-36 |
 | Desempenho do Tako (`performance`, PERF-001) | adiado pelo mantenedor (24/10) | WEB-37 (adiada) |
 | Modo seguro e recuperação de tema | adiado pelo mantenedor (24/10) | WEB-37 (adiada) |
 | Sandbox do CEF | decidido: modelo bootstrap do CEF, junto do INST e do WEB-41 (fora da paridade, o Slint não tem Chromium) | WEB-02c |
@@ -77,7 +77,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 
 | Função | Web | Tarefa |
 |---|---|---|
-| Idiomas pt-BR e en-US em todas as telas | 🟡 infraestrutura pronta | **WEB-06b** |
+| Idiomas pt-BR e en-US em todas as telas | 🟡 em andamento | **WEB-06b** |
 
 ## Fechamento (só Windows)
 
