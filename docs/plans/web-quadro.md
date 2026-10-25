@@ -10,10 +10,10 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 |---|---|---|
 | Claude Alyx Medical | `claudeAgent` | livre; **poupar** (pedido do mantenedor: é a conta do orquestrador, perto do limite) |
 | Antigravity | `antigravity` | livre (conferir tudo que ele entrega; já inventou um achado "bloqueia" na revisão do WEB-02b) |
-| Antigravity 2 | `antigravity_antigravity_2` | quadro lento no Perfil |
+| Antigravity 2 | `antigravity_antigravity_2` | livre |
 | Antigravity 3 | `antigravity_antigravity_3` | livre |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | CPU em repouso e fila de metadados |
-| Codex Lipp | `codex` | fim do jogo mais rápido |
+| Codex Lipp | `codex` | **sem créditos** de novo (25/10); a correção do fim do jogo ficou quase pronta e o orquestrador termina a verificação |
 | Codex Alyx Medical | `codex_alyx_medical` | reabertura de 10,6 s |
 
 ## Onda 1 — Fundação (D-14: direto no código definitivo)
