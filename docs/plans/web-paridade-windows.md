@@ -41,7 +41,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Configurações do jogo (`game_settings`) | 🟡 pronto; comandos antes e depois só leitura até a aprovação | WEB-12b · **WEB-20** |
 | Editar jogo (`edit_game`) e Fontes e IDs (`source_ids`) | 🟡 pronto; ID fixado só vale com a fila de metadados | WEB-12c · **WEB-32** |
 | Adicionar jogo (`add_game`) | 🟡 pronto; caminho digitado, sem seletor de arquivo | WEB-12c |
-| Seletor de imagens (`art`) e Revisar capas (`art_review`) | 🟡 componente do seletor pronto | **WEB-12d** |
+| Seletor de imagens (`art`) e Revisar capas (`art_review`) | ✅ | WEB-12d |
 | Editor de etiquetas (`tags_editor`) | ✅ | WEB-12b |
 | Coleções automáticas (`smart`): salvar filtros | ✅ (falta a lista em Configurações › Biblioteca, WEB-13c) | WEB-11b |
 | Busca geral Ctrl+K (`global_search`) | ✅ | WEB-14a |
