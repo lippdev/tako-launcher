@@ -19,9 +19,9 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 | Controles pelo SDL3 (`gamepad.rs`): navegação, bateria, reconexão, isolar do jogo (HidHide) | 🟡 pronto; falta teste com controle real e HidHide (só na tela cheia) | WEB-05b · **WEB-15** |
 | Teclado virtual (`keyboard`) para busca e campos no controle | adiado pelo mantenedor (24/10) | WEB-23 (adiada) |
 | Atualizações do app (`app_updates.rs`) | ✅ (falta testar com release real) | WEB-33 |
-| Discord Rich Presence (`discord.rs`) | ⬜ chave existe, ninguém lê | **WEB-34** |
-| API local (`local_api.rs`, EXT-002) | ⬜ | **WEB-34** |
-| Links `tako://` (`links`) | ⬜ | **WEB-34** |
+| Discord Rich Presence (`discord.rs`) | ✅ (aparece com o id do aplicativo) | WEB-34 |
+| API local (`local_api.rs`, EXT-002) | ✅ | WEB-34 |
+| Links `tako://` (`links`) | ✅ (o registro no Windows é do instalador) | WEB-34 |
 | Splash de abertura e primeira leitura (`splash.rs`) | ✅ | WEB-35 |
 | Interface descartável (núcleo e interface separados) | ✅ | WEB-02b |
 | Bandeja do sistema | ⬜ | **WEB-36** |
