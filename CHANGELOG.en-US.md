@@ -5,6 +5,7 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 ## [Unreleased]
 
 ### What's new
+- **New interface on Windows:** Tako opens in the new interface, built with React and shown by the Chromium that ships with the app. The shortcut, start with Windows and `tako://` links open in it. The previous interface stays in the app for now: open it with `Tako.exe --slint`; full screen (Xbox mode and Console Mode) stays on it. If the new interface can't open, Tako opens the previous one instead. Nothing changes on Linux and macOS.
 - **Desktop motion (TAKO):** animations follow the design system timings and easing curve; page changes fade with a subtle scale, respect Reduce motion, and skip transitions while the window is inactive.
 - **Floating global search with Ctrl+K (TAKO):** 560-wide floating search panel positioned 110 px from the top over a dimmed backdrop, reachable via keyboard shortcut or on pages without an embedded search; shows library results with cover, title, publisher, and status with a Library badge; supports arrow key navigation (↑↓), Enter to open the selected game directly, and Esc to clear or dismiss.
 - **Desktop layer screens (TAKO):** image dialogs adjusted to 540px, the Image picker to 1180px, and updates to Text field and App update dialogs.
@@ -71,6 +72,13 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 - **Play time:** a game with a session but no recorded time shows "Not tracked" instead of "Not played yet".
 - **Window on Windows:** Minimize, Maximize and Close on the desktop bar respond again; Maximize snap layouts still work.
 - **UI closing and reopening when playing:** new logs to diagnose the issue (BUG-001).
+- **Update with no file for your install:** when the new version has no file for your kind of install, the automatic check also tells you and offers the release page, instead of staying silent.
+
+### Changes
+- **Windows installer only:** with Chromium bundled, Tako became a folder of about 450 MB and the portable (`Tako-Portable-x64.exe`) is gone. `Tako-Setup-x64.exe` updates the existing install in place, replaces Chromium as a whole on every version and keeps your data in `%LOCALAPPDATA%\Tako`.
+
+### Updating from 0.2.0-alpha.22
+- Windows portable: it finds no new file, and "Check for updates" opens the release page. Download `Tako-Setup-x64.exe`; to keep your library, close Tako and copy the contents of the `Tako_Data` folder (next to the portable) to `%LOCALAPPDATA%\Tako` before opening the installed version.
 
 ## [0.2.0-alpha.14]
 ### What's new

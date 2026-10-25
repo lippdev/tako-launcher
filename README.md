@@ -15,7 +15,6 @@ Launcher de jogos para Windows 11 com experiência de console: gamepad-first, te
 
 Na [página de releases](https://github.com/lippdev/ultralauncher/releases), no mesmo formato do Console Mode:
 - **Instalador:** `Tako-Setup-x64.exe` — instala para o seu usuário (sem administrador), com atalho no Menu Iniciar; dados em `%LOCALAPPDATA%\Tako`.
-- **Portátil:** `Tako-Portable-x64.exe` — um único executável; guarda os dados na pasta `Tako_Data` ao lado do arquivo.
 
 Depois de instalado, o Tako se atualiza sozinho: ao abrir, baixa a versão nova em segundo plano (conferida pelo SHA-256 do GitHub) e instala ao reiniciar ou ao sair. Para gerar localmente os pacotes: `.\build\rust\Package-Tako.ps1` (o instalador do Windows precisa do Inno Setup 6).
 
@@ -63,7 +62,7 @@ Controle Xbox (XInput), controle PlayStation (DualSense, DualSense Edge ou DualS
 
 O atalho da Central muda em Configurações › "Abrir a Central de Controle no controle" e "… no teclado" (há "Restaurar atalhos padrão"). O Guia/PS e o Shift+Tab não abrem mais a Central: o Guia abre a Barra de Jogo do Xbox e a Steam, e o Shift+Tab é a sobreposição da Steam. Com um jogo em janela ou em tela cheia sem bordas, a Central abre por cima do jogo, que continua rodando atrás; em tela cheia exclusiva, o Tako vem para a frente com a arte do jogo (detalhes no [DESIGN.md](DESIGN.md), Menu rápido).
 
-Dados do usuário e caches ficam em `%LOCALAPPDATA%\Tako` na versão instalada, ou em `Tako_Data` ao lado do executável na portátil (e ao rodar em desenvolvimento); nenhuma arte de jogo vai para o repositório.
+Dados do usuário e caches ficam em `%LOCALAPPDATA%\Tako` na versão instalada, ou em `Tako_Data` ao lado do executável ao rodar em desenvolvimento; nenhuma arte de jogo vai para o repositório.
 
 Comandos de validação e testes:
 

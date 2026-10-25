@@ -136,6 +136,15 @@ fn found(ctx: &mut Ctx, info: UpdateInfo, pkg: feed::Package, explicit: bool) {
         ctx.update_status = ctx.tf("updates.available_page", &[("version", &version)]);
         if explicit {
             ctx.effect(Effect::OpenUrl(page));
+        } else if !ctx.app_update.menu_open {
+            // Release sem arquivo para esta instalação (o portátil do Windows acabou na 0.2.0-alpha.23): a busca
+            // automática também avisa e oferece a página da release, em vez de ficar calada.
+            let text = ctx.update_status.clone();
+            if ctx.desktop {
+                result_on_pill(ctx, &text, "");
+            } else {
+                toast_action(ctx, text, "updates.desktop.view", open_page);
+            }
         }
     }
     if explicit && !ctx.app_update.menu_open {
@@ -143,8 +152,17 @@ fn found(ctx: &mut Ctx, info: UpdateInfo, pkg: feed::Package, explicit: bool) {
         if ctx.desktop {
             result_on_pill(ctx, &text, "");
         } else {
-            toast_action(ctx, text, "updates.desktop.view", open);
+            // Sem arquivo para baixar, "Ver" leva à página da release, não ao download.
+            let view: fn(&mut Ctx) = if installable { open } else { open_page };
+            toast_action(ctx, text, "updates.desktop.view", view);
         }
+    }
+}
+
+/// Abre a página da release encontrada (para baixar à mão o que a instalação não baixa sozinha).
+fn open_page(ctx: &mut Ctx) {
+    if let Some(info) = &ctx.app_update.info {
+        ctx.effect(Effect::OpenUrl(info.page_url.clone()));
     }
 }
 
@@ -681,6 +699,54 @@ mod tests {
         ctx.desktop = false;
         found(&mut ctx, info(), feed::Package::WindowsSetup, true);
         assert!(ctx.toast.is_some() && ctx.activity.list.all().is_empty());
+    }
+
+    #[test]
+    fn an_old_portable_without_a_file_in_the_release_is_told_and_offered_the_page() {
+        let _guard = crate::LANG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // A 0.2.0-alpha.23 só publica o Tako-Setup: o portátil do Windows não acha o arquivo dele.
+        let info = || UpdateInfo {
+            version: "0.2.0-alpha.23".into(),
+            name: String::new(),
+            notes: String::new(),
+            page_url: "https://github.com/lippdev/tako-launcher/releases/tag/v0.2.0-alpha.23"
+                .into(),
+            asset: None,
+            is_prerelease: true,
+        };
+        let page = |ctx: &Ctx| {
+            ctx.effects
+                .iter()
+                .any(|e| matches!(e, Effect::OpenUrl(url) if url.ends_with("/tag/v0.2.0-alpha.23")))
+        };
+        let notice = |ctx: &Ctx| ctx.tf("updates.available_page", &[("version", "0.2.0-alpha.23")]);
+        // Busca automática no desktop: aviso na pílula, sem baixar nada.
+        let (_dir, mut ctx) = desktop_ctx();
+        found(&mut ctx, info(), feed::Package::WindowsPortable, false);
+        assert!(!ctx.app_update.downloading);
+        let a = ctx.activity.list.get(UPDATE_CHECK).unwrap();
+        assert_eq!((a.state, a.title.clone()), (Phase::Done, notice(&ctx)));
+        assert!(
+            !page(&ctx),
+            "a busca automática não abre o navegador sozinha"
+        );
+        // Tela cheia: aviso com "Ver", que abre a página da release.
+        let (_dir, mut ctx) = desktop_ctx();
+        ctx.desktop = false;
+        found(&mut ctx, info(), feed::Package::WindowsPortable, false);
+        assert_eq!(ctx.toast.as_ref().map(|t| t.0.clone()), Some(notice(&ctx)));
+        let view = ctx.toast_undo.clone().unwrap();
+        view(&mut ctx);
+        assert!(page(&ctx));
+        // Pedida pelo usuário: abre a página na hora, e o "Ver" do aviso também leva a ela.
+        let (_dir, mut ctx) = desktop_ctx();
+        ctx.desktop = false;
+        found(&mut ctx, info(), feed::Package::WindowsPortable, true);
+        assert!(page(&ctx));
+        ctx.effects.clear();
+        let view = ctx.toast_undo.clone().unwrap();
+        view(&mut ctx);
+        assert!(page(&ctx) && ctx.pending_layer.is_none());
     }
 
     #[test]

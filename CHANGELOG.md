@@ -5,6 +5,7 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 ## [Unreleased]
 
 ### Novidades
+- **Interface nova no Windows:** o Tako abre na interface nova, feita em React e mostrada pelo Chromium que vem junto com o app. O atalho, o iniciar com o Windows e os links `tako://` abrem nela. A interface anterior continua no app por enquanto: abra com `Tako.exe --slint`; a tela cheia (modo Xbox e Console Mode) continua nela. Se a interface nova não conseguir abrir, o Tako abre a anterior no lugar. No Linux e no macOS nada muda.
 - **Movimento do desktop (TAKO):** as animações seguem os tempos e a curva do design system; a troca entre as páginas ganha fade com escala sutil, respeita Reduzir animações e pausa a transição quando a janela está inativa.
 - **Busca geral flutuante com Ctrl+K (TAKO):** painel flutuante de busca geral de 560 a 110 do topo sobre fundo escuro desfocado, acionado por atalho de teclado ou em telas sem busca própria; lista resultados da biblioteca com capa, título, publicadora e situação com etiqueta Biblioteca; suporta navegação por setas (↑↓), Enter para abrir o jogo diretamente e Esc para limpar ou fechar a busca.
 - **Telas de camadas do desktop (TAKO):** diálogo com imagem ajustado para 540 px, Seletor de imagens para 1180 px e atualizações no Campo de texto e na Atualização do app.
@@ -71,6 +72,13 @@ Notas em português do Brasil; a versão em inglês (Estados Unidos) fica em `CH
 - **Tempo de jogo:** jogo com sessão mas sem tempo registrado mostra "Não registrado" em vez de "Ainda não jogado".
 - **Janela no Windows:** Minimizar, Maximizar e Fechar da barra do desktop voltam a responder; o encaixe do Maximizar continua.
 - **Interface que fecha e reabre ao jogar:** logs novos para diagnosticar o problema (BUG-001).
+- **Atualização sem arquivo para a sua instalação:** quando a versão nova não tem arquivo para o tipo da sua instalação, a busca automática também avisa e oferece a página da release, em vez de ficar calada.
+
+### Mudanças
+- **Windows só com instalador:** com o Chromium junto, o Tako virou uma pasta de cerca de 450 MB e o portátil (`Tako-Portable-x64.exe`) deixou de existir. O `Tako-Setup-x64.exe` atualiza a instalação existente no lugar, troca o Chromium inteiro a cada versão e mantém os dados em `%LOCALAPPDATA%\Tako`.
+
+### Atualizando da 0.2.0-alpha.22
+- Portátil no Windows: ele não acha arquivo novo, e "Procurar atualizações" abre a página da release. Baixe o `Tako-Setup-x64.exe`; para levar a biblioteca, feche o Tako e copie o conteúdo da pasta `Tako_Data` (ao lado do portátil) para `%LOCALAPPDATA%\Tako` antes de abrir a versão instalada.
 
 ## [0.2.0-alpha.14]
 ### Novidades

@@ -1,8 +1,9 @@
 //! Binário `tako`: inicialização, supervisor e ciclo de vida da sessão (PRD §5.2, ADR-0026).
 //!
+//! Interface web (feature `web`, padrão no Windows desde a 0.2.0-alpha.23): `tako` = núcleo sem CEF, que abre
+//! `tako --web-ui` (interface descartável, WEB-02b); `tako --web` força a web. Fora dela, ou com `--slint`:
 //! `tako` (versão publicada) = supervisor, que abre `tako --ui`; `tako --no-supervisor` = só a interface.
 //! `--simulate` usa a biblioteca de demonstração e funções de plataforma em memória.
-//! Com a feature `web`: `tako --web` = núcleo sem CEF, que abre `tako --web-ui` (interface descartável, WEB-02b).
 
 // Sem janela de terminal no Windows (supervisor e interface rodam em segundo plano). Builds de desenvolvimento
 // mantêm o console para os logs.
@@ -115,6 +116,169 @@ fn single_instance(paths: &DataPaths) -> Option<std::fs::File> {
     file.try_lock().ok().map(|_| file)
 }
 
+/// Que interface este processo abre.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Interface {
+    Web,
+    Slint,
+}
+
+/// Força a interface Slint (no Windows a padrão é a web desde a 0.2.0-alpha.23).
+const SLINT_ARG: &str = "--slint";
+/// Força a interface web (atalhos da prévia, testes).
+const WEB_ARG: &str = "--web";
+
+/// Opções que só o Slint atende: os papéis do supervisor, a tela cheia (modo Xbox e Console Mode, que a web ainda
+/// não tem), o modo seguro, a demonstração e as ferramentas de linha de comando.
+const SLINT_ONLY: &[&str] = &[
+    SLINT_ARG,
+    args::UI,
+    args::PIPE,
+    args::NO_SUPERVISOR,
+    args::SAFE_MODE,
+    args::BIG_PICTURE,
+    args::CONSOLE_SESSION,
+    args::DESKTOP,
+    "--simulate",
+    "--controller-mouse",
+    "--control-center",
+    "--after-game",
+    "--running",
+    "--bench",
+    "--bench-supervisor",
+    "--version",
+    "--fse-setup",
+];
+
+/// `--slint` (ou uma opção só do Slint) e `--web` decidem; sem elas vale a padrão do build: a web no Windows com a
+/// feature `web`, o Slint no resto. Assim o atalho, a chave Run (`--startup`) e o `tako://` (`--open-url`) abrem a
+/// web, e a interface que o supervisor do Slint abre (`--ui`) continua Slint.
+fn interface(all: &[String], web_default: bool) -> Interface {
+    let rest = all.get(1..).unwrap_or_default();
+    let slint_only = rest.first().is_some_and(|a| a == "theme")
+        || SLINT_ONLY.iter().any(|flag| args::has(rest, flag));
+    if slint_only {
+        Interface::Slint
+    } else if web_default || rest.iter().any(|a| a == WEB_ARG) {
+        Interface::Web
+    } else {
+        Interface::Slint
+    }
+}
+
+/// O que falta na pasta do executável para a interface web abrir: a `libcef.dll` e, na versão publicada, o
+/// `web/dist`. Conferido antes da trava de instância, para o Slint abrir no lugar já com o link recebido.
+#[cfg(any(feature = "web", test))]
+fn web_missing(exe_dir: &std::path::Path, published: bool) -> Option<std::path::PathBuf> {
+    let runtime = exe_dir.join("libcef.dll");
+    let page = exe_dir.join("web").join("dist").join("index.html");
+    if !runtime.is_file() {
+        Some(runtime)
+    } else if published && !page.is_file() {
+        Some(page)
+    } else {
+        None
+    }
+}
+
+/// Os argumentos sem o link `tako://`: depois de uma falha da web o núcleo dela já recebeu o link, e o Slint aberto
+/// no lugar não pode repeti-lo (um Jogar duas vezes).
+#[cfg(any(feature = "web", test))]
+fn without_link(all: &[String]) -> Vec<String> {
+    let mut out = Vec::with_capacity(all.len());
+    let mut it = all.iter();
+    while let Some(arg) = it.next() {
+        if arg == "--open-url" {
+            it.next();
+        } else if !arg
+            .get(..7)
+            .is_some_and(|s| s.eq_ignore_ascii_case("tako://"))
+        {
+            out.push(arg.clone());
+        }
+    }
+    out
+}
+
+/// Como terminou o caminho da interface web.
+#[derive(Debug, PartialEq, Eq)]
+enum WebEnd {
+    /// O Tako fechou (ou entregou o pedido ao que já estava aberto).
+    Done,
+    /// A web não pôde abrir: o Slint abre no lugar, com estes argumentos. Sem a feature `web` não há queda.
+    #[cfg_attr(not(feature = "web"), allow(dead_code))]
+    Slint(Vec<String>),
+}
+
+/// `tako` (web padrão) ou `tako --web`: núcleo sem CEF que abre `tako --web-ui`. Sem `--web` explícito, runtime do
+/// CEF ausente ou interface que não sobe caem no Slint em vez de não abrir nada.
+fn run_web(all: &[String]) -> WebEnd {
+    let forced = all.iter().any(|a| a == WEB_ARG);
+    let data_dir = value(all, "--data-dir");
+    let paths = data_dir
+        .clone()
+        .map_or_else(DataPaths::detect, DataPaths::at);
+    init_logs(&paths, "web");
+    #[cfg(feature = "web")]
+    if !forced {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+            .unwrap_or_default();
+        if let Some(missing) = web_missing(&exe_dir, !cfg!(debug_assertions)) {
+            tracing::error!(
+                missing = %missing.display(),
+                "interface web indisponível; abrindo a interface Slint"
+            );
+            return WebEnd::Slint(all.to_vec());
+        }
+    }
+    let link_url = tako_core::links::argument(all).map(str::to_owned);
+    if link_url.is_some() && !web_link_allowed(all, link_url.as_deref(), cfg!(debug_assertions)) {
+        eprintln!("tako: link inválido");
+        std::process::exit(2);
+    }
+    // Um só Tako por usuário, o mesmo trinco do Slint: o segundo `tako` só entrega o link (ou o pedido de vir para a
+    // frente) ao que já roda, núcleo web ou Slint, e sai sem abrir outra janela nem outro núcleo.
+    #[cfg(feature = "web")]
+    let lock = match single_instance(&paths) {
+        Some(lock) => lock,
+        None => {
+            tracing::info!("o Tako já está aberto; entregando o pedido a ele");
+            if let Err(e) = tako_core::links::request_activation(&paths.root, link_url.as_deref()) {
+                tracing::warn!("pedido de ativação: {e}");
+            }
+            return WebEnd::Done;
+        }
+    };
+    // Os pedidos já publicados ficam para consumo pelo núcleo, inclusive os que chegaram após o trinco.
+    #[cfg(feature = "web")]
+    if let Err(e) = queue_startup_activation(&paths.root, link_url.as_deref()) {
+        tracing::warn!("link de abertura: {e}");
+    }
+    #[cfg(feature = "web")]
+    let result = tako_web::run(paths, data_dir);
+    #[cfg(not(feature = "web"))]
+    let result: Result<(), String> = {
+        let _ = (paths, data_dir, forced);
+        Err("compilado sem a interface web; use cargo build -p tako --features web".into())
+    };
+    let Err(error) = result else {
+        return WebEnd::Done;
+    };
+    tracing::error!(%error, "hospedeiro web");
+    #[cfg(feature = "web")]
+    if !forced {
+        // O trinco sai antes de o Slint pegá-lo de novo; o link, se havia, já foi entregue ao núcleo web.
+        drop(lock);
+        tracing::warn!("a interface web falhou; abrindo a interface Slint");
+        return WebEnd::Slint(without_link(all));
+    }
+    tako_platform::attach_parent_console();
+    eprintln!("Tako: {error}");
+    std::process::exit(1);
+}
+
 fn main() {
     #[cfg(feature = "web")]
     if let Some(code) = tako_web::execute_subprocess() {
@@ -122,64 +286,14 @@ fn main() {
     }
     let started = std::time::Instant::now();
     tako_platform::tune_allocator();
-    let all: Vec<String> = std::env::args().collect();
-    // Processo da interface web (WEB-02b): só o `tako --web` abre; aceito em qualquer posição.
+    let mut all: Vec<String> = std::env::args().collect();
+    // Processo da interface web (WEB-02b): só o núcleo web abre; aceito em qualquer posição.
     #[cfg(feature = "web")]
     if all.iter().any(|arg| arg == tako_web::UI_ARG) {
         let paths = value(&all, "--data-dir").map_or_else(DataPaths::detect, DataPaths::at);
         init_logs(&paths, "web-ui");
         if let Err(error) = tako_web::run_ui(paths) {
             tracing::error!(%error, "interface web");
-            eprintln!("Tako: {error}");
-            std::process::exit(1);
-        }
-        return;
-    }
-    if all.iter().any(|arg| arg == "--web") {
-        let data_dir = value(&all, "--data-dir");
-        let paths = data_dir
-            .clone()
-            .map_or_else(DataPaths::detect, DataPaths::at);
-        init_logs(&paths, "web");
-        let link_url = tako_core::links::argument(&all).map(str::to_owned);
-        if link_url.is_some()
-            && !web_link_allowed(&all, link_url.as_deref(), cfg!(debug_assertions))
-        {
-            eprintln!("tako: link inválido");
-            std::process::exit(2);
-        }
-        // Um só Tako por usuário, o mesmo trinco do Slint: o segundo `tako --web` só entrega o link (ou o pedido de
-        // vir para a frente) ao que já roda, núcleo web ou Slint, e sai sem abrir outra janela nem outro núcleo.
-        #[cfg(feature = "web")]
-        let _lock = match single_instance(&paths) {
-            Some(lock) => lock,
-            None => {
-                tracing::info!("o Tako já está aberto; entregando o pedido a ele");
-                if let Err(e) =
-                    tako_core::links::request_activation(&paths.root, link_url.as_deref())
-                {
-                    tracing::warn!("pedido de ativação: {e}");
-                }
-                return;
-            }
-        };
-        // Os pedidos já publicados ficam para consumo pelo núcleo, inclusive os que chegaram após o trinco.
-        #[cfg(feature = "web")]
-        {
-            if let Err(e) = queue_startup_activation(&paths.root, link_url.as_deref()) {
-                tracing::warn!("link de abertura: {e}");
-            }
-        }
-        #[cfg(feature = "web")]
-        let result = tako_web::run(paths, data_dir);
-        #[cfg(not(feature = "web"))]
-        let result: Result<(), String> = {
-            let _ = data_dir;
-            Err("compilado sem a interface web; use cargo build -p tako --features web".into())
-        };
-        if let Err(error) = result {
-            tracing::error!(%error, "hospedeiro web");
-            tako_platform::attach_parent_console();
             eprintln!("Tako: {error}");
             std::process::exit(1);
         }
@@ -193,6 +307,13 @@ fn main() {
         }
         return;
     }
+    if interface(&all, cfg!(all(windows, feature = "web"))) == Interface::Web {
+        match run_web(&all) {
+            WebEnd::Done => return,
+            WebEnd::Slint(fallback) => all = fallback,
+        }
+    }
+    all.retain(|a| !a.eq_ignore_ascii_case(SLINT_ARG));
     let link_url = tako_core::links::argument(&all).map(str::to_owned);
     let link = link_url.as_deref().and_then(tako_core::links::parse);
     // Uma URL do navegador não pode injetar opções como --data-dir por aspas na linha do Windows.
@@ -467,5 +588,108 @@ mod tests {
             let all = args(&["tako", "--web", "--open-url", bad.unwrap_or("")]);
             assert!(!web_link_allowed(&all, bad, true), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn every_way_in_opens_the_web_when_it_is_the_default() {
+        use super::{Interface, interface};
+        for way in [
+            args(&["Tako.exe"]),
+            // Chave Run de iniciar com o Windows.
+            args(&["Tako.exe", "--startup"]),
+            // `tako://` registrado em HKCU\Software\Classes\tako e o link solto.
+            args(&["Tako.exe", "--open-url", "tako://play/steam:570"]),
+            args(&["Tako.exe", "tako://settings"]),
+            // Atalhos da prévia e testes.
+            args(&["Tako.exe", "--web"]),
+            args(&["Tako.exe", "--web", "--data-dir", "dados"]),
+            args(&["Tako.exe", "--data-dir", "dados"]),
+        ] {
+            assert_eq!(interface(&way, true), Interface::Web, "{way:?}");
+        }
+    }
+
+    #[test]
+    fn slint_stays_reachable_and_keeps_its_own_roles() {
+        use super::{Interface, interface};
+        for way in [
+            args(&["Tako.exe", "--slint"]),
+            args(&["Tako.exe", "--SLINT"]),
+            args(&["Tako.exe", "--slint", "--open-url", "tako://home"]),
+            // `--slint` vence o `--web`.
+            args(&["Tako.exe", "--web", "--slint"]),
+            // A interface aberta pelo supervisor do Slint e o diagnóstico sem ele.
+            args(&["Tako.exe", "--ui", "--supervisor-pipe", "tako-1", "--slint"]),
+            args(&["Tako.exe", "--no-supervisor"]),
+            args(&["Tako.exe", "--safe-mode"]),
+            // Tela cheia (FSE do Xbox abre com `--big-picture`) e Console Mode: a web ainda não tem.
+            args(&["Tako.exe", "--big-picture"]),
+            args(&["Tako.exe", "--console-session"]),
+            args(&["Tako.exe", "--simulate"]),
+            args(&["Tako.exe", "--version"]),
+            args(&["Tako.exe", "--bench"]),
+            args(&["Tako.exe", "--fse-setup", "disable"]),
+            args(&["Tako.exe", "theme", "check", "pasta"]),
+        ] {
+            assert_eq!(interface(&way, true), Interface::Slint, "{way:?}");
+        }
+    }
+
+    #[test]
+    fn without_the_web_build_only_an_explicit_web_asks_for_it() {
+        use super::{Interface, interface};
+        assert_eq!(interface(&args(&["tako"]), false), Interface::Slint);
+        assert_eq!(
+            interface(&args(&["tako", "--open-url", "tako://home"]), false),
+            Interface::Slint
+        );
+        assert_eq!(
+            interface(&args(&["tako", "--slint"]), false),
+            Interface::Slint
+        );
+        assert_eq!(interface(&args(&["tako", "--web"]), false), Interface::Web);
+        // Um link não vira opção: `--slint` dentro da URL continua sendo parte dela.
+        assert_eq!(
+            interface(&args(&["tako", "--open-url", "tako://x --slint"]), true),
+            Interface::Web
+        );
+    }
+
+    #[test]
+    fn the_slint_fallback_does_not_replay_the_link() {
+        assert_eq!(
+            super::without_link(&args(&["Tako.exe", "--open-url", "tako://play/steam:570"])),
+            args(&["Tako.exe"])
+        );
+        assert_eq!(
+            super::without_link(&args(&["Tako.exe", "TAKO://settings", "--data-dir", "d"])),
+            args(&["Tako.exe", "--data-dir", "d"])
+        );
+        assert_eq!(
+            super::without_link(&args(&["Tako.exe", "--startup"])),
+            args(&["Tako.exe", "--startup"])
+        );
+    }
+
+    #[test]
+    fn the_web_needs_the_cef_runtime_and_the_page_next_to_the_exe()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use super::web_missing;
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("tako-web-{}-{unique}", std::process::id()));
+        std::fs::create_dir(&dir)?;
+        assert_eq!(web_missing(&dir, true), Some(dir.join("libcef.dll")));
+        std::fs::write(dir.join("libcef.dll"), [])?;
+        let page = dir.join("web").join("dist").join("index.html");
+        assert_eq!(web_missing(&dir, true), Some(page.clone()));
+        // No desenvolvimento a página vem do repositório (ou do Vite), não da pasta do executável.
+        assert_eq!(web_missing(&dir, false), None);
+        std::fs::create_dir_all(dir.join("web").join("dist"))?;
+        std::fs::write(&page, "<!doctype html>")?;
+        assert_eq!(web_missing(&dir, true), None);
+        std::fs::remove_dir_all(dir)?;
+        Ok(())
     }
 }
