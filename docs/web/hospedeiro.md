@@ -449,8 +449,7 @@ F12 ou Ctrl+Shift+I abre DevTools apenas no debug; o hospedeiro não acrescenta 
 - Imagens só saem do hash em `ArtCache::cache_path`, validado sob `cache/art`: entrada de até 32 MiB, decode
   de até 128 MiB e saída de até 16 milhões de pixels. Nenhum `locate`, caminho externo ou download.
   A resolução temporária por `found-games.json`/`steam-art://` passa ao núcleo na WEB-01d.
-- O sandbox continua desativado conforme a implementação anterior. O bootstrap/empacotamento fica para a
-  WEB-02c; esta rodada não muda essa decisão.
+- O sandbox continua desativado no Windows (WEB-02c). A crate cef (v156.1.0) não expõe cef_sandbox_info_create/destroy para Windows (módulo sandbox restrito ao macOS via dylib), o pacote minimal do CEF (scripts/cef-setup.ps1) não contém cef_sandbox.lib (presente apenas na distribuição standard), e a inicialização do CEF sem windows_sandbox_info força a injeção de --no-sandbox pelo próprio runtime do Chromium. A ativação no Windows exigirá empacotar cef_sandbox.lib e fornecer bindings/bootstrap nativo.
 
 ## Verificação
 
