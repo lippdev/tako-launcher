@@ -77,7 +77,7 @@ Estados: ✅ pronto · 🟡 parcial · ⬜ falta · — não se aplica.
 
 | Função | Web | Tarefa |
 |---|---|---|
-| Idiomas pt-BR e en-US em todas as telas | 🟡 em andamento | **WEB-06b** |
+| Idiomas pt-BR e en-US em todas as telas | ✅ | WEB-06b |
 
 ## Fechamento (só Windows)
 
