@@ -13,7 +13,7 @@ Estados: `fila` → `despachada` → `em revisão` → `validação` (mantenedor
 | Antigravity 2 | `antigravity_antigravity_2` | livre |
 | Antigravity 3 | `antigravity_antigravity_3` | livre |
 | Claude Lipp InvestSmart | `claudeAgent_lipp_investsmart` | CPU em repouso e fila de metadados |
-| Codex Lipp | `codex` | **sem créditos** de novo (25/10); a correção do fim do jogo ficou quase pronta e o orquestrador termina a verificação |
+| Codex Lipp | `codex` | **sem créditos** (3ª vez em 25/10); fora da rotação até o mantenedor confirmar |
 | Codex Alyx Medical | `codex_alyx_medical` | reabertura de 10,6 s |
 
 ## Onda 1 — Fundação (D-14: direto no código definitivo)
