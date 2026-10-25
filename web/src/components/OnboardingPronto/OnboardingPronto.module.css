@@ -1,0 +1,86 @@
+/* Medidas do OnboardingPronto (design/desktop/components/OnboardingPronto/README.md) */
+.root {
+  --onboarding-pronto-gap: 18px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--onboarding-pronto-gap);
+  width: 100%;
+}
+
+.title {
+  --onboarding-title-size: 40px;
+
+  font-family: var(--font-heading);
+  font-size: var(--onboarding-title-size);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--text);
+  margin: 0;
+}
+
+.description {
+  --onboarding-desc-size: 15px;
+  --onboarding-desc-max-width: 520px;
+
+  font-family: var(--font-text);
+  font-size: var(--onboarding-desc-size);
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: var(--onboarding-desc-max-width);
+  margin: 0;
+}
+
+.actions {
+  --onboarding-actions-gap: 10px;
+  --onboarding-actions-margin-top: 8px;
+
+  display: flex;
+  align-items: center;
+  gap: var(--onboarding-actions-gap);
+  margin-top: var(--onboarding-actions-margin-top);
+}
+
+.reviewButton {
+  --onboarding-review-font-size: 13px;
+  --onboarding-review-margin-left: 8px;
+
+  font-family: inherit;
+  font-size: var(--onboarding-review-font-size);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  margin-left: var(--onboarding-review-margin-left);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--tempo-hover) var(--curva-estado);
+}
+
+.reviewButton:hover {
+  color: var(--text);
+}
+
+.reviewButton:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.footerNote {
+  --onboarding-footer-size: 12.5px;
+  --onboarding-footer-margin-top: 4px;
+
+  font-family: var(--font-text);
+  font-size: var(--onboarding-footer-size);
+  color: var(--text-dim);
+  margin: 0;
+  margin-top: var(--onboarding-footer-margin-top);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reviewButton {
+    transition: none;
+  }
+}

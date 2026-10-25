@@ -1,0 +1,54 @@
+/* Medidas do OnboardingModo (design/desktop/components/OnboardingModo/README.md) */
+.root {
+  --onboarding-modo-gap: 18px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--onboarding-modo-gap);
+  width: 100%;
+}
+
+.title {
+  --onboarding-title-size: 40px;
+
+  font-family: var(--font-heading);
+  font-size: var(--onboarding-title-size);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--text);
+  margin: 0;
+}
+
+.description {
+  --onboarding-desc-size: 15px;
+  --onboarding-desc-max-width: 520px;
+
+  font-family: var(--font-text);
+  font-size: var(--onboarding-desc-size);
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: var(--onboarding-desc-max-width);
+  margin: 0;
+}
+
+.actions {
+  --onboarding-actions-gap: 10px;
+  --onboarding-actions-margin-top: 8px;
+
+  display: flex;
+  align-items: center;
+  gap: var(--onboarding-actions-gap);
+  margin-top: var(--onboarding-actions-margin-top);
+}
+
+.footerNote {
+  --onboarding-footer-size: 12.5px;
+  --onboarding-footer-margin-top: 4px;
+
+  font-family: var(--font-text);
+  font-size: var(--onboarding-footer-size);
+  color: var(--text-dim);
+  margin: 0;
+  margin-top: var(--onboarding-footer-margin-top);
+}
