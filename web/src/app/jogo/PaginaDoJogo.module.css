@@ -5,8 +5,28 @@
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  /* Rolagem em etapas: o destaque e o corpo param no lugar (sem prender quem rola devagar pelo corpo). */
+  scroll-snap-type: y proximity;
+  /* As camadas do destaque andam com esta rolagem (Destaque.module.css, `.pagina .interno`). */
+  scroll-timeline: --pagina-jogo y;
+}
+
+/* A "home" do jogo: o destaque ocupa a vista inteira; o resto vem rolando. */
+.heroi {
+  scroll-snap-align: start;
+}
+
+/* Camada de trás: a arte anda mais devagar que a página (sobe a 60% da rolagem) e aproxima um pouco. */
+.fundo {
+  animation: fundo-paralaxe linear both;
+  animation-timeline: --pagina-jogo;
+  animation-range: 0 100vh;
+}
+
+@keyframes fundo-paralaxe {
+  to {
+    transform: translateY(40%) scale(1.06);
+  }
 }
 
 .aviso {
@@ -33,7 +53,11 @@
 
 /* O corpo faz só opacidade na troca de jogo: 150 ms para sair e 400 ms para voltar (TrocaDeJogo). */
 .corpo {
-  padding: 0 var(--space-40);
+  scroll-snap-align: start;
+  scroll-margin-top: var(--topbar-height);
+  /* Segunda etapa: o corpo enche a vista abaixo da barra, mesmo com pouco conteúdo, para o destaque sair inteiro. */
+  min-height: calc(100% - var(--topbar-height));
+  padding: var(--space-24) var(--space-40) 0;
   container-type: inline-size;
   transition: opacity 400ms var(--curva-entrada);
 }
@@ -76,5 +100,41 @@
 
   .sobre {
     margin-top: 0;
+  }
+}
+
+/* Camada da frente: cada bloco do corpo sobe e aparece quando entra na vista, um depois do outro. */
+.grade > *,
+.lateral > * {
+  animation: bloco-entra linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 70%;
+}
+
+/* A coluna dos dados entra pelos filhos, não como um bloco só. */
+.grade > .lateral {
+  animation: none;
+}
+
+@keyframes bloco-entra {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-40));
+  }
+}
+
+/* Reduzir animações: sem camadas, a página rola inteira junto. A duração zerada da base não basta aqui, porque a
+   animação segue a rolagem e não o tempo. */
+:root[data-reduce-motion="true"] .fundo,
+:root[data-reduce-motion="true"] .grade > *,
+:root[data-reduce-motion="true"] .lateral > * {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fundo,
+  .grade > *,
+  .lateral > * {
+    animation: none !important;
   }
 }

@@ -29,8 +29,6 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
 }
 
 .body {

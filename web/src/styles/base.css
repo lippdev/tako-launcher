@@ -16,6 +16,9 @@
   --brand-glow-blur: 8px;
   /* "Tamanho da interface": 0,9 / 1 / 1,1 / 1,25, escrita por `applyAppearance`. */
   --ui-scale: 1;
+  /* Barra de rolagem: 10 de área, pílula de 4 (3 de folga de cada lado). */
+  --scrollbar-size: 10px;
+  --scrollbar-inset: 3px;
 
   /* GrupoDeBlocos (README: bloco com valor de 78 e faixa de rótulo de 40; protótipo: bloco fixo de 132 e barras da semana). */
   --tile-value-height: 78px;
@@ -355,4 +358,36 @@ textarea {
    (`focus-ring-width`) não ficarem cortados na borda de quem rola. */
 :where(a[href], button, input, select, textarea, [tabindex]) {
   scroll-margin: var(--space-20);
+}
+
+/* Barra de rolagem do Tako, em toda área que rola: trilho invisível e uma pílula fina que clareia sob o mouse.
+   As áreas não declaram barra própria (só `scrollbar-width: none` onde ela some). */
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  /* A borda transparente afasta a pílula da beirada sem mudar a área de rolagem. */
+  border: var(--scrollbar-inset) solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--line-strong) padding-box;
+  min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-dim);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--text-muted);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
 }

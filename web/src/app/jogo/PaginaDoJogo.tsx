@@ -306,6 +306,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   return (
     <div ref={scrollRef} className={styles["pagina"]}>
       <Destaque
+        className={styles["heroi"]}
         aria-label={t("game_page.label", { title: game.title })}
         trocando={leaving}
         fundo={
@@ -314,6 +315,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
             temArte={game.hasHero}
             corDestaque={game.accent}
             src={devImage?.("hero", game.id, game.title)}
+            className={styles["fundo"]}
           />
         }
         chips={

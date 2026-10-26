@@ -32,6 +32,14 @@
   transform-origin: bottom right;
 }
 
+.menu[data-align="start"] {
+  transform-origin: top left;
+}
+
+.menu[data-side="top"][data-align="start"] {
+  transform-origin: bottom left;
+}
+
 .menu[data-visible="true"] {
   opacity: 1;
   transform: none;
