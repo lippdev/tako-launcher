@@ -109,6 +109,8 @@
   --vidro-selected-edge: #ffffff24;
   --vidro-selected-spec: inset 0 1px 0 #ffffff29;
   --vidro-row-hover: #ffffff12;
+  /* Contorno da linha escolhida da lista: mais discreto que o dos controles (6%). */
+  --vidro-row-edge: #ffffff0f;
   --vidro-primary: linear-gradient(180deg, #fffffff7, #e4e8f0eb);
   --vidro-primary-edge: #ffffffe6;
   --vidro-primary-shadow: inset 0 1px 0 #ffffff, 0 8px 30px #ffffff1f;

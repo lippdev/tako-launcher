@@ -84,14 +84,15 @@
 
 :global(:root[data-theme="vidro"]) .active,
 :global(:root[data-theme="vidro"]) .active:hover {
-  border-color: var(--vidro-selected-edge);
+  border-color: var(--vidro-row-edge);
   box-shadow: var(--vidro-selected-spec);
 }
 
-/* O foco fica na lista; o anel aparece na linha que o teclado escolheu. */
+/* O foco fica na lista; o anel aparece na linha que o teclado escolheu. Fino (1) para não pesar sobre a linha
+   escolhida, que já tem fundo e contorno próprios. */
 .viewport:focus-visible .focused {
-  outline: var(--focus-ring-width) solid var(--focus-ring);
-  outline-offset: -2px;
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
 }
 
 .check {

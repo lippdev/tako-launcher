@@ -38,6 +38,8 @@
   content: "";
   position: absolute;
   inset: 0;
+  /* O clareado segue o formato do botão (pílula, raio 11 ou 9); sem isso os cantos saíam da pílula. */
+  border-radius: inherit;
   z-index: -1;
   background: var(--glass-hover);
   opacity: 0;
