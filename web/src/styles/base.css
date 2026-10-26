@@ -114,6 +114,23 @@
   --vidro-primary-shadow: inset 0 1px 0 #ffffff, 0 8px 30px #ffffff1f;
   --vidro-chip-edge: #ffffff26;
   --vidro-primary-chip: #0d0d0d;
+  /* Grupos e cartões (`.box`, `.tiles-group`, `.set-group`): vidro com reflexo e sombra suave. */
+  --vidro-group-edge: #ffffff21;
+  --vidro-group-shadow: var(--vidro-spec), 0 12px 40px #0000002e;
+  --vidro-group-blur: blur(var(--glass-blur)) saturate(160%);
+  /* Camadas (menu, popover, gaveta, diálogo, busca, dica): desfoque 34 e sombra funda. */
+  --vidro-layer-edge: #ffffff24;
+  --vidro-layer-blur: blur(34px) saturate(180%);
+  --vidro-layer-shadow: var(--vidro-spec), 0 30px 80px #00000073;
+  /* Coluna da lista e das configurações: branco a 55% da opacidade das superfícies, linha de 9% à direita. */
+  --vidro-side: color-mix(in srgb, var(--group) 55%, transparent);
+  --vidro-side-edge: #ffffff17;
+  /* Bloco dentro de grupo e chave desligada. */
+  --vidro-tile-edge: #ffffff14;
+  --vidro-tile-spec: inset 0 1px 0 #ffffff14;
+  --vidro-switch-off: #ffffff24;
+  --vidro-switch-shadow: inset 0 1px 2px #0000004d;
+  --vidro-icon-bg: #ffffff14;
 }
 
 /* Camadas, avisos e controles (WEB-04a): valores do README/protótipo que o `tokens.css` não tem. */

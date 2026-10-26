@@ -75,3 +75,11 @@
   border: 0;
   background: var(--sc);
 }
+
+/* Liquid Glass (protótipo, `.badge-st` e `.chip`): controle de vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .chip {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}

@@ -56,3 +56,11 @@
   border-radius: 50%;
   background: var(--success);
 }
+
+/* Liquid Glass (protótipo, `.box`): grupo de vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .caixa {
+  border-color: var(--vidro-group-edge);
+  background: var(--group);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}

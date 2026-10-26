@@ -208,3 +208,21 @@
   width: var(--space-24);
   height: var(--space-24);
 }
+
+/* Liquid Glass (protótipo, `.sidebar` e `.sb-home`): coluna de vidro clara com linha à direita; Visão geral escolhida
+   como o vidro escolhido. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .inner {
+  border-right-color: var(--vidro-side-edge);
+  background: var(--vidro-side);
+  backdrop-filter: var(--vidro-group-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .home:hover {
+  background-color: var(--vidro-row-hover);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .home.active {
+  border-color: var(--vidro-selected-edge);
+  background-color: var(--glass-selected);
+  box-shadow: var(--vidro-selected-spec);
+}

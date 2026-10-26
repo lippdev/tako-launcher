@@ -134,3 +134,17 @@
   color: var(--text-muted);
   white-space: pre-line;
 }
+
+/* Liquid Glass (protótipo, `.set-nav` e `.set-head .hic`): a coluna como a da lista; o ícone do cabeçalho em vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .nav {
+  border-right-color: var(--vidro-side-edge);
+  background: var(--vidro-side);
+  backdrop-filter: var(--vidro-group-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .headIcon {
+  border-color: var(--vidro-group-edge);
+  background: var(--group);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}

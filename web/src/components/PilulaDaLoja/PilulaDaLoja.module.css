@@ -62,3 +62,11 @@ button.chip:disabled {
   border-color: color-mix(in srgb, var(--success) 45%, transparent);
   color: var(--success);
 }
+
+/* Liquid Glass (protótipo, `.badge-st` e `.chip`): controle de vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .chip {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}

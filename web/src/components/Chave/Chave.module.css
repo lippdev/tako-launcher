@@ -37,3 +37,9 @@
 .on .thumb {
   transform: translateX(calc(var(--switch-width) - var(--switch-thumb) - 2 * var(--switch-inset)));
 }
+
+/* Liquid Glass (protótipo, `.switch`): desligada em branco 14% com sombra por dentro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .switch:not(.on) {
+  background: var(--vidro-switch-off);
+  box-shadow: var(--vidro-switch-shadow);
+}
