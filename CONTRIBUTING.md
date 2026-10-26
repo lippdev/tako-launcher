@@ -47,7 +47,7 @@ Vale a DoD do [PRD §12](docs/PRD.md); o checklist está no template de PR.
 
 Vale para o Tako em Rust (PRD v0.2, §4 e §5).
 
-- Rust edição 2024, toolchain fixada em `rust-toolchain.toml`. Antes do commit: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` e `cargo test --workspace`. O CI roda os três nos três SOs.
+- Rust edição 2024, toolchain fixada em `rust-toolchain.toml`. Antes do commit: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` e `cargo test --workspace`. Durante a alpha os testes e o CI são só do Windows (PRD D-20); Linux e macOS voltam na Fase 6.
 - Nomes em inglês; comentários e documentação em português, curtos, explicando o **porquê** (o que o código não mostra).
 - O menor código que resolve: sem abstração, opção ou dependência "para depois". Prefira a biblioteca padrão e as dependências já listadas em `[workspace.dependencies]`; dependência nova entra lá.
 - **Dados externos não são confiáveis** (arquivos das lojas, JSON de APIs, temas, arquivos do usuário): limite de tamanho, nada de `unwrap`/`expect`/pânico em entrada inválida e teste com entrada quebrada. `unwrap` só em testes.

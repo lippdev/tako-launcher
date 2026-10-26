@@ -1,6 +1,6 @@
 # Pacotes do Linux: AUR e Flatpak (PLAT-002)
 
-Arquivos em `packaging/aur/` e `packaging/flatpak/`. O CI (`.github/workflows/packaging.yml`) valida tudo e **não publica nada**: AUR e Flathub exigem a conta do mantenedor.
+Arquivos em `packaging/aur/` e `packaging/flatpak/`. **Pausado durante a alpha (PRD D-20):** o workflow `packaging.yml` saiu do repositório e volta na Fase 6 (está no histórico do git). Quando voltar, ele valida tudo e **não publica nada**: AUR e Flathub exigem a conta do mantenedor.
 
 ## AUR (Arch, CachyOS, Manjaro...)
 
