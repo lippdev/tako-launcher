@@ -91,3 +91,11 @@
 .danger .title {
   color: var(--error);
 }
+
+/* Liquid Glass (protótipo, `.set-group`): o grupo de linhas é vidro; as linhas dentro dele não. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .group {
+  border-color: var(--vidro-group-edge);
+  background: var(--group);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}

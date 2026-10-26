@@ -114,14 +114,17 @@ export function MenuDeContexto({ open, onClose, anchor, entries, title, label, a
         menu.style.maxHeight = `${maxHeight / zoom}px`;
         natural.height = maxHeight;
       }
+      const edge = anchor instanceof HTMLElement ? align : "start";
       const spot = placeMenu(rect, natural, viewport, {
-        align: anchor instanceof HTMLElement ? align : "start",
+        align: edge,
         gap: 6 * zoom,
         margin,
       });
       menu.style.left = `${spot.left / zoom}px`;
       menu.style.top = `${spot.top / zoom}px`;
       menu.dataset["side"] = spot.side;
+      // A animação cresce a partir do canto do botão: à esquerda quando o menu se alinha pelo início.
+      menu.dataset["align"] = edge;
     };
     place();
     window.addEventListener("resize", place);

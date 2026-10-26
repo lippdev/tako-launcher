@@ -180,7 +180,7 @@
 
 :global(:root[data-theme]:not([data-theme="tako"])) .lista .tab {
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-tab, 8px);
   font-family: var(--font-text);
   font-size: 13px;
   font-weight: 500;
@@ -286,4 +286,17 @@
 
 .ready .pill {
   transition: transform var(--tempo-entrada) var(--curva-entrada);
+}
+
+/* (O `:not([data-glass="off"])` iguala a força das regras "fora do TAKO" acima, para estas valerem.) */
+/* Liquid Glass: o trilho é um controle de vidro e a aba atual, o vidro escolhido (protótipo, `.sb-tabs`). */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista {
+  border-color: var(--vidro-control-edge);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista .selected {
+  background-color: var(--glass-selected);
+  box-shadow: var(--vidro-selected-spec);
 }

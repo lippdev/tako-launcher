@@ -152,3 +152,15 @@
   line-height: 1;
   color: var(--text-dim);
 }
+
+/* Liquid Glass (protótipo, `.tiles-group` e `.tile`): o grupo é vidro; o bloco, um preenchimento de 5% com reflexo. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .group:not(.flat) {
+  border-color: var(--vidro-group-edge);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .tile {
+  border-color: var(--vidro-tile-edge);
+  box-shadow: var(--vidro-tile-spec);
+}

@@ -16,6 +16,9 @@
   --brand-glow-blur: 8px;
   /* "Tamanho da interface": 0,9 / 1 / 1,1 / 1,25, escrita por `applyAppearance`. */
   --ui-scale: 1;
+  /* Barra de rolagem: 10 de área, pílula de 4 (3 de folga de cada lado). */
+  --scrollbar-size: 10px;
+  --scrollbar-inset: 3px;
 
   /* GrupoDeBlocos (README: bloco com valor de 78 e faixa de rótulo de 40; protótipo: bloco fixo de 132 e barras da semana). */
   --tile-value-height: 78px;
@@ -97,6 +100,40 @@
 
 [data-theme="vidro"] {
   --control-track: #ffffff24;
+  /* Material do Liquid Glass (protótipo, `.tk.theme-glass`): reflexo no topo e sombra embaixo (`--spec`), controles
+     de vidro (branco 10% com contorno 16% e desfoque) e o item escolhido (12%, contorno 14%, reflexo 16%). */
+  --vidro-spec: inset 0 1px 0 #ffffff24, inset 0 -1px 0 #0000002e;
+  --vidro-control-edge: #ffffff29;
+  --vidro-control-hover: #ffffff2b;
+  --vidro-control-blur: blur(var(--glass-blur)) saturate(160%);
+  --vidro-selected-edge: #ffffff24;
+  --vidro-selected-spec: inset 0 1px 0 #ffffff29;
+  --vidro-row-hover: #ffffff12;
+  /* Contorno da linha escolhida da lista: mais discreto que o dos controles (6%). */
+  --vidro-row-edge: #ffffff0f;
+  --vidro-primary: linear-gradient(180deg, #fffffff7, #e4e8f0eb);
+  --vidro-primary-edge: #ffffffe6;
+  /* Só o reflexo no topo: o brilho de 30 do protótipo vazava para os botões ao lado. */
+  --vidro-primary-shadow: inset 0 1px 0 #ffffff;
+  --vidro-chip-edge: #ffffff26;
+  --vidro-primary-chip: #0d0d0d;
+  /* Grupos e cartões (`.box`, `.tiles-group`, `.set-group`): vidro com reflexo e sombra suave. */
+  --vidro-group-edge: #ffffff21;
+  --vidro-group-shadow: var(--vidro-spec), 0 12px 40px #0000002e;
+  --vidro-group-blur: blur(var(--glass-blur)) saturate(160%);
+  /* Camadas (menu, popover, gaveta, diálogo, busca, dica): desfoque 34 e sombra funda. */
+  --vidro-layer-edge: #ffffff24;
+  --vidro-layer-blur: blur(34px) saturate(180%);
+  --vidro-layer-shadow: var(--vidro-spec), 0 30px 80px #00000073;
+  /* Coluna da lista e das configurações: branco a 55% da opacidade das superfícies, linha de 9% à direita. */
+  --vidro-side: color-mix(in srgb, var(--group) 55%, transparent);
+  --vidro-side-edge: #ffffff17;
+  /* Bloco dentro de grupo e chave desligada. */
+  --vidro-tile-edge: #ffffff14;
+  --vidro-tile-spec: inset 0 1px 0 #ffffff14;
+  --vidro-switch-off: #ffffff24;
+  --vidro-switch-shadow: inset 0 1px 2px #0000004d;
+  --vidro-icon-bg: #ffffff14;
 }
 
 /* Camadas, avisos e controles (WEB-04a): valores do README/protótipo que o `tokens.css` não tem. */
@@ -355,4 +392,36 @@ textarea {
    (`focus-ring-width`) não ficarem cortados na borda de quem rola. */
 :where(a[href], button, input, select, textarea, [tabindex]) {
   scroll-margin: var(--space-20);
+}
+
+/* Barra de rolagem do Tako, em toda área que rola: trilho invisível e uma pílula fina que clareia sob o mouse.
+   As áreas não declaram barra própria (só `scrollbar-width: none` onde ela some). */
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  /* A borda transparente afasta a pílula da beirada sem mudar a área de rolagem. */
+  border: var(--scrollbar-inset) solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--line-strong) padding-box;
+  min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-dim);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--text-muted);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
 }

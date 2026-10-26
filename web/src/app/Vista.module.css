@@ -8,8 +8,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding-top: var(--topbar-height);
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
   opacity: 0;
   transform: scale(var(--escala-vista));
   pointer-events: none;

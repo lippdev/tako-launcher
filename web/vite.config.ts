@@ -1,8 +1,10 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { designTokens, devData } from "./scripts/vite-dev.mjs";
 
 export default defineConfig({
-  plugins: [react()],
+  // `devData` e `designTokens` só valem no `npm run dev`: biblioteca real de `dev-data/` e tokens ao vivo.
+  plugins: [react(), devData(), designTokens()],
   // O build roda dentro do Tako por `tako-app://app/`: caminhos relativos, nada de `/` absoluto.
   base: "./",
   server: {

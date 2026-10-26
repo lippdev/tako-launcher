@@ -36,7 +36,7 @@
 
 /* Liquid Glass: o `--titlebar` já é translúcido; o desfoque é o do tema. */
 :global(:root[data-theme="vidro"]) .bar {
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(170%);
 }
 
 .bar :is(button, [role="tab"]) {

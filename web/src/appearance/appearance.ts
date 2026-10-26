@@ -51,6 +51,8 @@ export function applyAppearance(a: Appearance, root: HTMLElement = document.docu
   root.dataset["theme"] = effectiveTheme(a);
   root.dataset["reduceMotion"] = String(a.reduceMotion);
   root.dataset["glass"] = a.glassEffects ? "on" : "off";
+  // "Controles em pílula" do Liquid Glass: além dos raios (variáveis abaixo), o CSS ajusta respiros pelo atributo.
+  root.dataset["pills"] = String(a.theme === "vidro" && a.glassPill);
   root.style.setProperty("--ui-scale", String(a.uiScale / 100));
   // A cor de destaque e o Liquid Glass trocam variáveis do tema, as mesmas que o `tokens.css` define.
   const { set, clear } = lookVariables(a);

@@ -82,3 +82,19 @@
   font-size: 12px;
   font-weight: 700;
 }
+
+/* Liquid Glass (protótipo, `.set-item` e `.sic`): escolhida como o vidro escolhido; ícone em branco 8%. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .item:hover {
+  background: var(--vidro-row-hover);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .current,
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .current:hover {
+  border-color: var(--vidro-selected-edge);
+  background: var(--glass-selected);
+  box-shadow: var(--vidro-selected-spec);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .item:not(.current) .icon {
+  background: var(--vidro-icon-bg);
+}

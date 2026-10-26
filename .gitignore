@@ -14,3 +14,6 @@ Tako_Data/
 # Rust
 /target/
 .claude/
+
+# Biblioteca real para o `npm run dev` (`tako dev-snapshot`, WEB-DEV-01): dados pessoais, nunca no git.
+web/dev-data/

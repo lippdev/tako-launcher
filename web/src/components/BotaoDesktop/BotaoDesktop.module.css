@@ -4,7 +4,7 @@
 .btn {
   composes: ring from "../../lib/focus.module.css";
   --botao-chip: 36px;
-  --botao-chip-radius: 8px;
+  --botao-chip-radius: var(--radius-chip, 8px);
   --botao-chip-icon: 17px;
   --botao-ring: var(--focus-glow);
   --botao-ring-hover: var(--glass-pressed);
@@ -38,6 +38,8 @@
   content: "";
   position: absolute;
   inset: 0;
+  /* O clareado segue o formato do botão (pílula, raio 11 ou 9); sem isso os cantos saíam da pílula. */
+  border-radius: inherit;
   z-index: -1;
   background: var(--glass-hover);
   opacity: 0;
@@ -276,4 +278,39 @@
 
 .dot-accent {
   background: var(--accent);
+}
+
+/* ---- Liquid Glass (protótipo, `.tk.theme-glass .btn`) ---- */
+
+/* Secundário, quadrado e contornado: vidro (10%, contorno 16%, desfoque e reflexo); hover a 17%. */
+:global(:root[data-theme="vidro"]) .btn:not(.primary):not(.state) {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]) .btn:not(.primary):not(.state)::before {
+  background: var(--vidro-control-hover);
+}
+
+:global(:root[data-theme="vidro"]) .secondary .iconChip {
+  border-color: var(--vidro-chip-edge);
+}
+
+/* Primário: degradê branco com reflexo e brilho; o chip fica preto. */
+:global(:root[data-theme="vidro"]) .primary {
+  border-color: var(--vidro-primary-edge);
+  background: var(--vidro-primary);
+  box-shadow: var(--vidro-primary-shadow);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]) .primary .iconChip {
+  background: var(--vidro-primary-chip);
+}
+
+/* Controles em pílula: o texto começa a 20, como no protótipo (`.glass-pills .btn`). */
+:global(:root[data-theme="vidro"][data-pills="true"]) .action {
+  padding-left: 20px;
 }

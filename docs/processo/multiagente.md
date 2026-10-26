@@ -131,7 +131,7 @@ O agente só sabe o que está no brief. Todo brief tem:
 <comandos exatos que precisam passar e o que medir ou capturar>
 
 ## Entrega
-Commits na branch desta worktree (sem push, sem PR) e o relatório no formato do AGENTS.md §4.
+Commits na branch desta worktree (sem push, sem PR) e o relatório no formato do AGENTS.md §5.
 ```
 
 ## 7. O que se espera de volta

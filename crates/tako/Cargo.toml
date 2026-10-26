@@ -15,6 +15,7 @@ tako-core.workspace = true
 tako-platform.workspace = true
 tako-sources.workspace = true
 tako-themes.workspace = true
+tako-app.workspace = true
 tako-ui.workspace = true
 tako-web = { workspace = true, optional = true }
 tracing.workspace = true

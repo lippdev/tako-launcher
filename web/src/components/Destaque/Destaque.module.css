@@ -10,9 +10,36 @@
   container-type: inline-size;
 }
 
-/* Página do jogo: 86% da vista, entre 560 e 700. A vista cobre a janela inteira (a barra de cima fica por cima). */
+/* Página do jogo: a vista inteira (a barra de cima fica por cima), nunca abaixo de 560. Quem usa pode trocar a
+   altura e o mínimo por `--heroi-altura` e `--heroi-minimo`. */
 .pagina {
-  height: clamp(560px, 86%, 700px);
+  height: var(--heroi-altura, 100%);
+  min-height: var(--heroi-minimo, 560px);
+}
+
+/* Rolando a página do jogo, o miolo sai antes da arte: sobe e some na primeira metade da vista
+   (`--pagina-jogo` vem da PaginaDoJogo; fora dela a animação não tem linha do tempo e fica parada). */
+.pagina .interno {
+  animation: interno-sai linear both;
+  animation-timeline: --pagina-jogo;
+  animation-range: 0 55vh;
+}
+
+@keyframes interno-sai {
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--space-48)));
+  }
+}
+
+:root[data-reduce-motion="true"] .pagina .interno {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagina .interno {
+    animation: none !important;
+  }
 }
 
 /* Visão geral: 400 de altura, raio de 18; em janela estreita, onde a identidade e os dados se empilham, cresce o que

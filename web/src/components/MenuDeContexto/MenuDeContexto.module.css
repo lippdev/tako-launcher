@@ -17,9 +17,10 @@
   box-shadow: var(--shadow-float);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   outline: none;
-  /* Fechado: um pouco acima (ou abaixo, quando abre para cima) e menor; a origem é o lado do botão. */
+  /* Fechado: um pouco acima (ou abaixo, quando abre para cima). */
   opacity: 0;
-  transform: translateY(calc(-1 * var(--menu-deslocamento))) scale(var(--escala-menu));
+  /* Sem escala: encolher o menu fazia os ícones andarem em relação ao texto e assentarem com um pulinho. */
+  transform: translateY(calc(-1 * var(--menu-deslocamento)));
   transform-origin: top right;
   pointer-events: none;
   transition:
@@ -28,8 +29,16 @@
 }
 
 .menu[data-side="top"] {
-  transform: translateY(var(--menu-deslocamento)) scale(var(--escala-menu));
+  transform: translateY(var(--menu-deslocamento));
   transform-origin: bottom right;
+}
+
+.menu[data-align="start"] {
+  transform-origin: top left;
+}
+
+.menu[data-side="top"][data-align="start"] {
+  transform-origin: bottom left;
 }
 
 .menu[data-visible="true"] {
@@ -38,8 +47,9 @@
   pointer-events: auto;
 }
 
-/* `will-change` só enquanto anima: a camada fica na GPU durante a transição e volta ao normal depois. */
-.menu[data-animating="true"] {
+/* A camada fica na GPU o tempo todo em que o menu existe (ele só monta aberto). Tirar o `will-change` no fim da
+   animação redesenhava o conteúdo e os ícones davam um pulinho de meio pixel. */
+.menu {
   will-change: transform, opacity;
 }
 
@@ -123,4 +133,12 @@
   height: 0;
   margin: 5px var(--space-4);
   border-top: 1px solid var(--line);
+}
+
+/* Liquid Glass (protótipo, `.menu`, `.dl-pop`, `.drawer`, `.modal`, `.search-panel`): camada de vidro funda. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .menu {
+  border-color: var(--vidro-layer-edge);
+  background: var(--glass-panel-dense);
+  box-shadow: var(--vidro-layer-shadow);
+  backdrop-filter: var(--vidro-layer-blur);
 }

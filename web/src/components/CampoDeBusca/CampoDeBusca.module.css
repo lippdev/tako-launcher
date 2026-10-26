@@ -83,7 +83,7 @@
   gap: 10px;
   height: 38px;
   padding: 0 var(--space-4) 0 13px;
-  border-radius: var(--radius-row);
+  border-radius: var(--radius-search, var(--radius-row));
 }
 
 /* TAKO: fundo branco 3,5%, sem borda; foco com anel da cor de destaque a 50% e brilho. */
@@ -115,6 +115,22 @@
   border-color: color-mix(in srgb, var(--text) 30%, transparent);
   background: var(--surface);
   box-shadow: none;
+}
+
+/* Liquid Glass: controle de vidro (protótipo, `.sb-search`). O `:not([data-glass="off"])` iguala a força das regras
+   "fora do TAKO" acima. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista .box {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista:focus-within .box,
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista:has(.input[data-force="focus"]) .box {
+  border-color: color-mix(in srgb, var(--text) 30%, transparent);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
 }
 
 .action {

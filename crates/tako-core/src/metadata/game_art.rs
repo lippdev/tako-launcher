@@ -55,7 +55,19 @@ impl GameArt {
         self.resolve_index(game_id, kind)
     }
 
+    /// Como [`GameArt::resolve`], sem renovar a data do arquivo no cache: para quem só lê a pasta de dados e não
+    /// pode alterá-la (`tako dev-snapshot`).
+    pub fn peek(&self, game_id: &str, kind: ArtKind) -> Option<PathBuf> {
+        self.locate(game_id, kind)
+    }
+
     fn resolve_index(&self, game_id: &str, kind: ArtKind) -> Option<PathBuf> {
+        let file = self.locate(game_id, kind)?;
+        super::art_cache::touch(&file);
+        Some(file)
+    }
+
+    fn locate(&self, game_id: &str, kind: ArtKind) -> Option<PathBuf> {
         let index = confined_file(&self.index, &self.index_path(game_id, kind))?;
         let bytes = read_limited(&index, 1024)?;
         let name: String = serde_json::from_slice(&bytes).ok()?;
@@ -66,9 +78,7 @@ impl GameArt {
         {
             return None;
         }
-        let file = confined_file(&self.root, &self.root.join(name))?;
-        super::art_cache::touch(&file);
-        Some(file)
+        confined_file(&self.root, &self.root.join(name))
     }
 
     /// Publica só depois de a imagem estar inteira no cache. Caminhos locais/Steam são importados pelo worker.

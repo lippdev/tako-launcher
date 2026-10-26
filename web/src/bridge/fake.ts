@@ -1,4 +1,5 @@
 import { SAMPLE_CATALOGS } from "./generatedCatalogs.ts";
+import { devImageUrl, fetchDevSnapshot, type DevSnapshot } from "./devSnapshot.ts";
 import type { Call, Event } from "./index";
 import type { ControlCenterState } from "./generated/ControlCenterState";
 import type { ControlCenterAction } from "./generated/ControlCenterAction";
@@ -206,6 +207,8 @@ const HUES = [210, 20, 340, 150, 45, 275];
 
 /** Ícone de exemplo (SVG num data URI): um degradê por jogo. No lugar de `tako-img://icon`, que só o Tako serve. */
 export function fakeGameIcon(id: string, px: number): string {
+  const real = devSnapshot && devImageUrl(devSnapshot, id, "icon");
+  if (real) return real;
   const n = Number(id.split(":")[1]);
   const hue = HUES[n % HUES.length] ?? 210;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${String(px)}" height="${String(px)}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${String(hue)} 45% 45%)"/><stop offset="1" stop-color="hsl(${String((hue + 40) % 360)} 50% 18%)"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
@@ -763,6 +766,8 @@ function coverLines(title: string): string[] {
 
 /** Arte de exemplo (SVG num data URI) no lugar de `tako-img://hero`, `logo` e `cover`, que só o Tako serve. */
 export function fakeGameImage(kind: "hero" | "logo" | "cover", id: string, title: string): string {
+  const real = devSnapshot && devImageUrl(devSnapshot, id, kind);
+  if (real) return real;
   const n = Number(id.split(":")[1]);
   const hue = HUES[n % HUES.length] ?? 210;
   const lines = coverLines(title);
@@ -782,6 +787,12 @@ function gameDetails(payload: unknown): GameDetails {
   const { gameId } = payload as GameRequest;
   const game = games.find((g) => g.id === gameId);
   if (!game) throw new FakeError("not_found", gameId);
+  const real = devSnapshot?.details[game.id];
+  if (real) {
+    // O que o núcleo leu, com as mudanças desta sessão (favorito, situação, etiquetas) por cima.
+    const realTags = [...(gameTags.get(game.id) ?? [])];
+    return { ...real, game: { ...game }, tags: realTags.length > 0 ? realTags : null };
+  }
   const sample = SAMPLE_GAMES[game.id]?.details ?? {};
   const tags = [...(gameTags.get(game.id) ?? [])];
   const upcoming = sample.upcoming ?? false;
@@ -1430,11 +1441,14 @@ interface FakeSession {
 
 function fakeSessions(): FakeSession[] {
   const now = new Date();
-  return SAMPLE_SESSIONS.map(([gameIndex, daysAgo, hour, minute, seconds]) => ({
-    gameIndex,
-    startedAt: new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, hour, minute),
-    seconds,
-  })).sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+  // Com a biblioteca real (WEB-DEV-01) as posições podem não existir: essas sessões de exemplo saem.
+  return SAMPLE_SESSIONS.filter(([gameIndex]) => games[gameIndex] !== undefined)
+    .map(([gameIndex, daysAgo, hour, minute, seconds]) => ({
+      gameIndex,
+      startedAt: new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, hour, minute),
+      seconds,
+    }))
+    .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
 }
 
 /** Menos de 1 minuto: "abriu e fechou", fora dos totais (como o núcleo). */
@@ -1504,6 +1518,14 @@ function profileById(payload: unknown): { id: string; name: string } {
 }
 
 function profileSummary(): ProfileSummary {
+  const real = devSnapshot?.profileSummary;
+  if (real)
+    return {
+      ...real,
+      topGames: real.topGames.map(currentGame),
+      latestGames: real.latestGames.map(currentGame),
+      recentSessions: real.recentSessions.map((s) => ({ ...s, game: currentGame(s.game) })),
+    };
   const sessions = fakeSessions();
   const today = new Date();
   const start = monday(today);
@@ -1532,6 +1554,12 @@ function profileSummary(): ProfileSummary {
 
 function profileSessions(payload: unknown): ProfileSessions {
   const { period } = payload as ProfileSessionsRequest;
+  const real = devSnapshot?.profileSessions[period];
+  if (real)
+    return {
+      ...real,
+      days: real.days.map((d) => ({ ...d, sessions: d.sessions.map((s) => ({ ...s, game: currentGame(s.game) })) })),
+    };
   const now = new Date();
   const since =
     period === "week" ? monday(now) : period === "month" ? new Date(now.getFullYear(), now.getMonth(), 1) : null;
@@ -1567,6 +1595,19 @@ function profileCollections(): ProfileCollections {
       covers: inside.slice(0, 4).map((g) => ({ ...g })),
     };
   });
+  const real = devSnapshot?.profileCollections;
+  if (real) {
+    // As manuais refletem as mudanças desta sessão; as automáticas são as que o núcleo resolveu no snapshot.
+    const listed = new Set((devSnapshot?.collections ?? []).map((c) => c.id));
+    const automatic = real.collections
+      .filter((c) => c.automatic && (!listed.has(c.id) || collections.some((saved) => saved.id === c.id)))
+      .map((c) => ({ ...c, name: collections.find((saved) => saved.id === c.id)?.name ?? c.name, covers: c.covers.map(currentGame) }));
+    const manualOnly = collections.filter((c) => c.criteria === null);
+    return {
+      collections: [...manual.filter((c) => manualOnly.some((m) => m.id === c.id)), ...automatic],
+      gameCount: new Set(manualOnly.flatMap((c) => c.gameIds)).size,
+    };
+  }
   // Uma automática de exemplo, para o selo "Automática"; ela não existe em `collections.list`.
   const installed = games.filter((g) => g.installed);
   const automatic: ProfileCollection = {
@@ -3257,3 +3298,57 @@ Object.assign(SAMPLE_CATALOGS["en-US"], {
   "art_review.accepted_many": "{n} covers changed",
 
 });
+
+// ---- Biblioteca real (WEB-DEV-01) ----
+// Com `web/dev-data/snapshot.json` (`cargo run -p tako -- dev-snapshot`), os jogos, detalhes, coleções, etiquetas,
+// sessões, perfis e configurações públicas vêm da biblioteca desta máquina, e as imagens dos arquivos copiados.
+// Escritas (favoritar, renomear coleção…) ficam só em memória, como no resto do falso.
+
+let devSnapshot: DevSnapshot | null = null;
+
+/** O hospedeiro falso está respondendo com a biblioteca real. */
+export function usingDevSnapshot(): boolean {
+  return devSnapshot !== null;
+}
+
+/** O jogo como está agora nesta sessão (favorito, situação), ou o do snapshot se ele saiu da lista. */
+function currentGame(game: LibraryGame): LibraryGame {
+  const current = games.find((g) => g.id === game.id);
+  return { ...(current ?? game) };
+}
+
+/** Troca os dados de exemplo pelos do snapshot. Chame antes de `installFakeHost`. */
+export function applyDevSnapshot(snapshot: DevSnapshot): void {
+  devSnapshot = snapshot;
+  games.splice(0, games.length, ...snapshot.games.map((g) => ({ ...g })));
+  collections.splice(
+    0,
+    collections.length,
+    ...(snapshot.collections ?? []).map((c) => ({ ...c, gameIds: [...c.gameIds] })),
+  );
+  gameTags.clear();
+  for (const [id, details] of Object.entries(snapshot.details)) {
+    if (details.tags?.length) gameTags.set(id, new Set(details.tags));
+  }
+  // As escolhas feitas nesta aba do navegador continuam valendo por cima das do snapshot.
+  for (const [key, value] of Object.entries(snapshot.settings?.values ?? {})) {
+    if (!settings.has(key)) settings.set(key, value);
+  }
+  if (snapshot.profiles) {
+    fakeProfiles = snapshot.profiles.profiles.map((p) => ({ id: p.id, name: p.name }));
+    nextProfile = snapshot.profiles.profiles.find((p) => p.next)?.id ?? "main";
+    askOnStart = snapshot.profiles.askOnStart;
+  }
+}
+
+/** Lê `/dev-data/snapshot.json` e, se houver, passa a usá-lo. Devolve se está usando a biblioteca real. */
+export async function loadDevSnapshot(): Promise<boolean> {
+  const snapshot = await fetchDevSnapshot();
+  if (!snapshot) {
+    console.info("[hospedeiro falso] dados de exemplo (sem web/dev-data/snapshot.json)");
+    return false;
+  }
+  applyDevSnapshot(snapshot);
+  console.info(`[hospedeiro falso] biblioteca real: ${String(snapshot.games.length)} jogos, de ${snapshot.createdAt}`);
+  return true;
+}

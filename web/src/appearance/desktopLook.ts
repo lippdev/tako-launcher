@@ -71,7 +71,7 @@ export interface LookVariables {
 
 const ACCENT_VARS = ["--accent", "--on-accent"] as const;
 const OPACITY_VARS = ["--glass-panel", "--surface", "--group", "--tile", "--glass-control"] as const;
-const PILL_VARS = ["--radius-control", "--radius-button"] as const;
+const PILL_VARS = ["--radius-control", "--radius-button", "--radius-tab", "--radius-search", "--radius-chip"] as const;
 const AMBIENT_VARS = ["--ambient-1", "--ambient-2"] as const;
 
 /** Branco com `percent` % de opacidade, a conta dos valores do Liquid Glass no `tokens.css` (#ffffff12 = 7%). */

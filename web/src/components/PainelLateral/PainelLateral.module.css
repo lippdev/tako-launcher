@@ -89,11 +89,17 @@
   flex: 1;
   overflow-y: auto;
   padding: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
 }
 
 .foot {
   padding: 16px 18px 18px;
   border-top: 1px solid var(--line);
+}
+
+/* Liquid Glass (protótipo, `.menu`, `.dl-pop`, `.drawer`, `.modal`, `.search-panel`): camada de vidro funda. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .panel {
+  border-color: var(--vidro-layer-edge);
+  background: var(--glass-panel-dense);
+  box-shadow: var(--vidro-layer-shadow);
+  backdrop-filter: var(--vidro-layer-blur);
 }
