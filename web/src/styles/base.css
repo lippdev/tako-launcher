@@ -113,7 +113,8 @@
   --vidro-row-edge: #ffffff0f;
   --vidro-primary: linear-gradient(180deg, #fffffff7, #e4e8f0eb);
   --vidro-primary-edge: #ffffffe6;
-  --vidro-primary-shadow: inset 0 1px 0 #ffffff, 0 8px 30px #ffffff1f;
+  /* Só o reflexo no topo: o brilho de 30 do protótipo vazava para os botões ao lado. */
+  --vidro-primary-shadow: inset 0 1px 0 #ffffff;
   --vidro-chip-edge: #ffffff26;
   --vidro-primary-chip: #0d0d0d;
   /* Grupos e cartões (`.box`, `.tiles-group`, `.set-group`): vidro com reflexo e sombra suave. */
