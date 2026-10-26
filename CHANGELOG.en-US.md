@@ -5,6 +5,10 @@ English (US) release notes, mirroring CHANGELOG.md (Brazilian Portuguese). Befor
 ## [Unreleased]
 
 ### What's new
+- **Liquid Glass as in the design system:** buttons, tabs, search, the selected list row, chips, cards, side columns, menus, panels and dialogs get the glass material (top reflection, edge and blur); Play becomes a white gradient with its icon in a black circle. With "Pill controls", tabs, search and the button icon are round too.
+- **Game page:** the hero takes 70% of the window, so Play is not stuck to the bottom, and the rest scrolls in layers: the art moves slower, the title and buttons leave first and each body block rises as it appears. With Reduce motion, the page scrolls as one.
+- **Tako scrollbar** in every scrolling area: invisible track and a thin pill that brightens under the mouse.
+- **Finishing touches:** the Downloads button matches the other title bar buttons; menus open from their button without shrinking (icons no longer jump); the hover highlight follows the button shape; the selected game outline in the list is thin.
 - **New interface on Windows:** Tako opens in the new interface, built with React and shown by the Chromium that ships with the app. The shortcut, start with Windows and `tako://` links open in it. The previous interface stays in the app for now: open it with `Tako.exe --slint`; full screen (Xbox mode and Console Mode) stays on it. If the new interface can't open, Tako opens the previous one instead. Nothing changes on Linux and macOS.
 - **Desktop motion (TAKO):** animations follow the design system timings and easing curve; page changes fade with a subtle scale, respect Reduce motion, and skip transitions while the window is inactive.
 - **Floating global search with Ctrl+K (TAKO):** 560-wide floating search panel positioned 110 px from the top over a dimmed backdrop, reachable via keyboard shortcut or on pages without an embedded search; shows library results with cover, title, publisher, and status with a Library badge; supports arrow key navigation (↑↓), Enter to open the selected game directly, and Esc to clear or dismiss.
