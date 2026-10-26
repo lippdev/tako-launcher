@@ -11,28 +11,52 @@
   scroll-timeline: --pagina-jogo y;
 }
 
-/* A "home" do jogo: o destaque e, logo abaixo, a faixa com os números enchem a vista; o resto vem rolando. */
+/* A "home" do jogo: a arte com o título e a descrição, e a barra do jogo logo abaixo; o corpo aparece
+   embaixo e vem rolando. */
 .heroi {
-  --faixa-altura: 0px;
+  --heroi-altura: clamp(420px, 66%, 680px);
+  --heroi-minimo: 420px;
+  /* A barra cobre 40 da arte: o título e a descrição sobem o mesmo tanto. */
+  --heroi-folga: calc(46px + var(--space-40));
   scroll-snap-align: start;
 }
 
-/* Faixa: grupo de blocos (6 + 118 + 6, mais os contornos) e 24 embaixo. */
-.comFaixa {
-  --faixa-altura: 156px;
-  --heroi-minimo: 480px;
-}
-
-.faixa {
+/* Barra do jogo: painel de vidro que sobe 40 sobre a borda de baixo da arte (a camada da frente). */
+.barra {
   position: relative;
-  z-index: 1;
-  padding: 0 var(--space-40) var(--space-24);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-24);
+  margin: calc(-1 * var(--space-40)) var(--space-40) 0;
+  padding: var(--space-12) var(--space-12) var(--space-12) var(--space-24);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  background: var(--group);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(var(--glass-item-blur));
   transition: opacity 400ms var(--curva-entrada);
 }
 
-.faixa[data-trocando="true"] {
+.barra[data-trocando="true"] {
   opacity: 0;
   transition-duration: 150ms;
+}
+
+/* Sem espaço para os dois lado a lado, as ações descem e ficam à direita. */
+.barra {
+  flex-wrap: wrap;
+  row-gap: var(--space-12);
+}
+
+.barra > :last-child {
+  margin-left: auto;
+}
+
+/* Os números ficam numa linha só dentro da barra. */
+.barra > :first-child {
+  flex-wrap: nowrap;
 }
 
 /* Camada de trás: a arte anda mais devagar que a página (sobe a 60% da rolagem) e aproxima um pouco. */

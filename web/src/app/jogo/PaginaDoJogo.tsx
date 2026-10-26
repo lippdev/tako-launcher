@@ -5,16 +5,14 @@ import { AcoesDoJogo, type EstadoDoPrimario } from "../../components/AcoesDoJogo
 import type { MenuEntry } from "../../components/MenuDeContexto/MenuDeContexto";
 import { Aviso, type AvisoTone } from "../../components/Aviso/Aviso";
 import { CartaoDetalhes, type DetalheDoJogo } from "../../components/CartaoDetalhes/CartaoDetalhes";
-import { ListaDeSessoes } from "../../components/CartaoSessoes/CartaoSessoes";
+import { BarraDeDados, ListaDeSessoes, type DadoDaBarra } from "../../components/CartaoSessoes/CartaoSessoes";
 import { CartaoSobre } from "../../components/CartaoSobre/CartaoSobre";
 import { Destaque } from "../../components/Destaque/Destaque";
 import { FundoDoJogo } from "../../components/FundoDoJogo/FundoDoJogo";
-import { Bloco, GrupoDeBlocos } from "../../components/GrupoDeBlocos/GrupoDeBlocos";
 import { PilulaDaLoja } from "../../components/PilulaDaLoja/PilulaDaLoja";
 import { StatusDoJogo, type GameStatus as StatusDoChip } from "../../components/StatusDoJogo/StatusDoJogo";
 import { TituloDoJogo } from "../../components/TituloDoJogo/TituloDoJogo";
 import { useT } from "../../i18n";
-import { cx } from "../../lib/cx";
 import { useLatest } from "../../lib/useLatest";
 import { DialogoEditarJogo } from "../editar/DialogoEditarJogo";
 import { DialogoFontesEIds } from "../editar/DialogoFontesEIds";
@@ -28,6 +26,8 @@ import {
   chipToStatus,
   gameBlocks,
   imageUrl,
+  metacriticTone,
+  metacriticVerdict,
   primaryState,
   statusToChip,
 } from "./jogoModel";
@@ -254,24 +254,43 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           ? "nao-instalado"
           : "jogar";
 
-  // Os números do jogo, na faixa logo abaixo do destaque (primeira etapa da página).
-  const numbers = [
-    ...(blocks.playTime ? [{ id: "time", icon: "clock", label: t("game_page.play_time"), value: blocks.playTime } as const] : []),
+  const verdictText = (verdict: "universal" | "favorable" | "mixed" | "unfavorable") => {
+    switch (verdict) {
+      case "universal":
+        return t("game_page.verdict_universal");
+      case "favorable":
+        return t("game_page.verdict_favorable");
+      case "mixed":
+        return t("game_page.verdict_mixed");
+      case "unfavorable":
+        return t("game_page.verdict_unfavorable");
+    }
+  };
+
+  const dataBar: DadoDaBarra[] = [
     ...(blocks.lastPlayed
-      ? [{ id: "last", icon: "calendar", label: t("game_page.last_session"), value: blocks.lastPlayed } as const]
+      ? [{ id: "last", icone: "calendar", label: t("game_page.last_session"), valor: blocks.lastPlayed } as const]
       : []),
+    ...(blocks.playTime ? [{ id: "time", icone: "clock", label: t("game_page.play_time"), valor: blocks.playTime } as const] : []),
     ...(blocks.metacritic !== null
-      ? [{ id: "metacritic", icon: "badge", label: t("game_page.metacritic"), value: String(blocks.metacritic) } as const]
+      ? [
+          {
+            id: "metacritic",
+            icone: "badge",
+            label: t("game_page.metacritic"),
+            valor: verdictText(metacriticVerdict(blocks.metacritic)),
+            nota: { valor: blocks.metacritic, faixa: metacriticTone(blocks.metacritic) },
+          } as const,
+        ]
       : []),
-    ...(blocks.release ? [{ id: "release", icon: undefined, label: t("game_page.release"), value: blocks.release } as const] : []),
-    ...(blocks.size ? [{ id: "size", icon: undefined, label: t("game_page.size"), value: blocks.size } as const] : []),
   ];
 
-  // Lançamento e tamanho já estão na faixa de números.
   const detailRows: DetalheDoJogo[] = [
     ...(blocks.developer ? [{ id: "developer", label: t("game_page.developer"), valor: blocks.developer }] : []),
     ...(blocks.publisher ? [{ id: "publisher", label: t("game_page.publisher"), valor: blocks.publisher }] : []),
+    ...(blocks.release ? [{ id: "release", label: t("game_page.release"), valor: blocks.release }] : []),
     ...(blocks.genres.length > 0 ? [{ id: "genres", label: t("game_page.genres"), valor: blocks.genres.join(", ") }] : []),
+    ...(blocks.size ? [{ id: "size", label: t("game_page.size"), valor: blocks.size }] : []),
     {
       id: "installation",
       label: t("game_page.installation"),
@@ -287,7 +306,7 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
   return (
     <div ref={scrollRef} className={styles["pagina"]}>
       <Destaque
-        className={cx(styles["heroi"], numbers.length > 0 && styles["comFaixa"])}
+        className={styles["heroi"]}
         aria-label={t("game_page.label", { title: game.title })}
         trocando={leaving}
         fundo={
@@ -338,54 +357,45 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           />
         }
         descricao={blocks.description[0]}
-        acoes={
-          <AcoesDoJogo
-            estado={state}
-            favorito={game.favorite}
-            labels={{
-              jogar: t("game_page.play"),
-              abrindo: session.launchSlow ? t("desktop.opening_slow") : t("game_page.opening"),
-              voltarAoJogo: t("game_page.resume"),
-              encerrar: cancellable ? t("common.cancel") : t("game_page.stop"),
-              instalar: t("game_page.install"),
-              emBreve: t("game_page.upcoming"),
-              favoritar: t("game_page.favorite"),
-              desfavoritar: t("game_page.unfavorite"),
-              gerenciar: t("game_page.manage"),
-              configuracoes: t("game_page.settings"),
-            }}
-            onJogar={() => void play()}
-            onVoltarAoJogo={() => {
-              void session.resume();
-            }}
-            onEncerrar={
-              running && (phase !== "launching" || cancellable)
-                ? () => {
-                    void stop();
-                  }
-                : undefined
-            }
-            onAlternarFavorito={() =>
-              void change(() => call("game.favorite.set", { gameIds: [game.id], favorite: !game.favorite }))
-            }
-            onConfiguracoes={() => {
-              setSettingsOpen(true);
-            }}
-            entradasExtras={manageEntries}
-          />
-        }
       />
-      {numbers.length > 0 && (
-        <div className={styles["faixa"]} data-parte="" data-trocando={leaving}>
-          <GrupoDeBlocos aria-label={t("game_page.data_bar")}>
-            {numbers.map((n) => (
-              <Bloco key={n.id} label={n.label} {...(n.icon ? { icon: n.icon } : {})}>
-                {n.value}
-              </Bloco>
-            ))}
-          </GrupoDeBlocos>
-        </div>
-      )}
+      {/* Barra do jogo: os números à esquerda e as ações à direita, sobre a borda de baixo da arte. */}
+      <div className={styles["barra"]} data-parte="" data-trocando={leaving}>
+        {dataBar.length > 0 ? <BarraDeDados dados={dataBar} aria-label={t("game_page.data_bar")} /> : <span />}
+        <AcoesDoJogo
+          estado={state}
+          favorito={game.favorite}
+          labels={{
+            jogar: t("game_page.play"),
+            abrindo: session.launchSlow ? t("desktop.opening_slow") : t("game_page.opening"),
+            voltarAoJogo: t("game_page.resume"),
+            encerrar: cancellable ? t("common.cancel") : t("game_page.stop"),
+            instalar: t("game_page.install"),
+            emBreve: t("game_page.upcoming"),
+            favoritar: t("game_page.favorite"),
+            desfavoritar: t("game_page.unfavorite"),
+            gerenciar: t("game_page.manage"),
+            configuracoes: t("game_page.settings"),
+          }}
+          onJogar={() => void play()}
+          onVoltarAoJogo={() => {
+            void session.resume();
+          }}
+          onEncerrar={
+            running && (phase !== "launching" || cancellable)
+              ? () => {
+                  void stop();
+                }
+              : undefined
+          }
+          onAlternarFavorito={() =>
+            void change(() => call("game.favorite.set", { gameIds: [game.id], favorite: !game.favorite }))
+          }
+          onConfiguracoes={() => {
+            setSettingsOpen(true);
+          }}
+          entradasExtras={manageEntries}
+        />
+      </div>
       {(hasAbout || hasSide) && (
         <div className={styles["corpo"]} data-parte="" data-trocando={leaving}>
           <div className={styles["grade"]}>

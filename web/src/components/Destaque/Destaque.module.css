@@ -10,16 +10,18 @@
   container-type: inline-size;
 }
 
-/* Página do jogo: a vista inteira (a barra de cima fica por cima) menos o que a página põe logo abaixo
-   (`--faixa-altura`), nunca abaixo de 560 (ou `--heroi-minimo`). O corpo vem rolando. */
+/* Página do jogo: a vista inteira (a barra de cima fica por cima), nunca abaixo de 560. Quem usa pode trocar a
+   altura e o mínimo por `--heroi-altura` e `--heroi-minimo`. */
 .pagina {
-  height: calc(100% - var(--faixa-altura, 0px));
+  height: var(--heroi-altura, 100%);
   min-height: var(--heroi-minimo, 560px);
 }
 
 /* Rolando a página do jogo, o miolo sai antes da arte: sobe e some na primeira metade da vista
    (`--pagina-jogo` vem da PaginaDoJogo; fora dela a animação não tem linha do tempo e fica parada). */
 .pagina .interno {
+  /* Folga de baixo: 46, ou o que a página pedir (`--heroi-folga`) quando põe algo sobre a borda da arte. */
+  padding-bottom: var(--heroi-folga, 46px);
   animation: interno-sai linear both;
   animation-timeline: --pagina-jogo;
   animation-range: 0 55vh;
